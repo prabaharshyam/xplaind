@@ -56,3 +56,10 @@ The six sample resources, three stops and six check questions exist to exercise 
 - **Level pages use lowercase URLs**, `/roadmap/genai-engineer/b2`. Any other spelling is not found.
 - **A draft "How we rank" page (ED-3)** is live because every card links to it, and the footer links to it. Slice S7 finishes it. It has no way to report a wrong link yet; that needs a contact route the owner chooses.
 - **Fixed a layout bug from S2.** Two questions with a long code line made the test page wider than a phone, because a form fieldset grows to fit its widest content. Fieldsets now shrink, and a browser test opens every question at 360 px.
+
+## Roadmap map (owner's request: a complete, visual roadmap like roadmap.sh, not a copy)
+
+- **A metro map, not a flowchart.** The site already calls a lesson a "stop", so the roadmap is drawn as three coloured lines: green Beginner, blue Intermediate, violet Pro. Each level is a station, each topic a stop on the line, optional topics sit on a dashed branch, and each level ends at its level project. Phones get one rail on the left; wider screens put the rail in the middle with topics alternating left and right. A row of nine station chips at the top jumps to any level.
+- **The full outline is new content: `topics` in `content/levels/levels.yaml`.** Five or six topics per level, 50 in all, one or two of each marked optional. A topic's id is the shared tag: placement questions use it and a stop lists it in `gap_tags`. All 33 placement tags became topics at their own level, and I added 17 more. Claude drafted them; they need the same review as the rest of the content.
+- **Topics without a lesson still show**, marked "Coming soon", so the map is complete from day one and the empty parts are honest.
+- **New validation rules:** a topic sits on one level only; every stop gap tag must be a topic at the stop's level or below; every placement tag must be a topic at the question's own level. A core topic with no stop yet is on the launch to-do list.

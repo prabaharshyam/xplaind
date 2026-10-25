@@ -27,6 +27,10 @@ describe("broken bundles fail", () => {
     ["two resources share a link", (b) => b.resources.push(entry("resources/r2.yaml", resource({ id: "res-two" }))), /same url/],
     ["two resources share an id", (b) => b.resources.push(entry("resources/r3.yaml", resource({ url: "https://example.org/other" }))), /duplicate resource id/],
     ["an interview question points to a missing stop", (b) => (b.interview[0].data.stop_id = "ghost"), /stop "ghost" does not exist/],
+    ["a topic sits on two levels (RM-1)", (b) => b.levels[1].data.topics.push({ id: "tag-one", title: "Again", summary: "Twice.", optional: false }), /listed at B1 and B2/],
+    ["a stop's gap tag is not a topic (RM-1)", (b) => (b.stops[0].data.gap_tags = ["not-a-topic"]), /gap tag "not-a-topic" is not a topic/],
+    ["a stop's gap tag is a topic from a higher level (RM-1)", (b) => (b.stops[0].data.gap_tags = ["b2-a"]), /is a B2 topic, above this B1 stop/],
+    ["a placement tag is not a topic at the question's level (RM-1)", (b) => (b.placement[0].data.topic_tags = ["b3-a"]), /is a B3 topic, not B1/],
     ["a verified date is in the future", (b) => (b.resources[0].data.last_verified = "2026-12-01"), /in the future/],
     ["a review date is in the future", (b) => (b.stops[0].data.reviewed_on = "2027-01-01"), /in the future/],
     ["the levels are out of order", (b) => b.levels.reverse(), /exactly B1, B2/],
@@ -89,6 +93,12 @@ describe("launch coverage (PL-1, RM-2, IQ-2)", () => {
     }
     const b1Gaps = run(b, true).filter((i) => i.file === "coverage/B1");
     expect(b1Gaps).toEqual([]);
+  });
+
+  it("lists a core topic with no stop, but not an optional one (RM-2)", () => {
+    const messages = run(validBundle(), true).map((i) => i.message);
+    expect(messages).toContain('core topic "b2-a" has no stop at B2 yet');
+    expect(messages.some((m) => m.includes('"b2-b"'))).toBe(false);
   });
 
   it("flags an interview topic with fewer than 5 questions", () => {

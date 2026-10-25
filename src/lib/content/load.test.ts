@@ -47,7 +47,7 @@ title: One
 outcome: Do it.
 why_it_matters: Because.
 hours: 2
-gap_tags: [t]
+gap_tags: [ai-basics]
 primary_resource: res-one
 alternates: []
 check:

@@ -43,6 +43,18 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     );
   }
 
+  // ---- topics (the roadmap outline) ---------------------------------------
+  /** Topic id to the level it sits on. */
+  const topicLevel = new Map<string, LevelId>();
+  for (const { file, data: l } of bundle.levels) {
+    for (const t of l.topics) {
+      const first = topicLevel.get(t.id);
+      if (first) error(file, `topic "${t.id}" is listed at ${first} and ${l.id}; a topic sits on one level`, "RM-1");
+      else topicLevel.set(t.id, l.id);
+    }
+  }
+  const hasTopics = topicLevel.size > 0;
+
   // ---- unique ids ---------------------------------------------------------
   const uniqueIds = (label: string, entries: Entry<{ id: string }>[]) => {
     const seen = new Map<string, string>();
@@ -114,6 +126,14 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
       }
     }
 
+    for (const tag of s.gap_tags) {
+      const at = topicLevel.get(tag);
+      if (hasTopics && !at) error(file, `gap tag "${tag}" is not a topic in levels/levels.yaml`, "RM-1");
+      else if (at && levelIndex(at) > levelIndex(s.level)) {
+        error(file, `gap tag "${tag}" is a ${at} topic, above this ${s.level} stop`, "RM-1");
+      }
+    }
+
     if (!isHumanName(s.reviewed_by)) {
       gap(file, `reviewed_by "${s.reviewed_by}" is not a person; a human must review this stop before launch`, "ED-9");
     }
@@ -147,6 +167,10 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   // ---- PL-4: every gap tag maps to a review stop ---------------------------
   for (const { file, data: q } of bundle.placement) {
     for (const tag of q.topic_tags) {
+      const at = topicLevel.get(tag);
+      if (hasTopics && at !== q.level) {
+        error(file, at ? `topic tag "${tag}" is a ${at} topic, not ${q.level}` : `topic tag "${tag}" is not a topic in levels/levels.yaml`, "RM-1");
+      }
       const covered = bundle.stops.some(
         (s) => levelIndex(s.data.level) <= levelIndex(q.level) && s.data.gap_tags.includes(tag),
       );
@@ -163,6 +187,13 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     }
     if (stops < LAUNCH_MINIMUMS.stopsPerLevel) {
       gap(`coverage/${level}`, `${stops} stops at ${level}; launch needs at least ${LAUNCH_MINIMUMS.stopsPerLevel}`, "RM-2");
+    }
+  }
+  for (const { data: l } of bundle.levels) {
+    for (const t of l.topics) {
+      if (t.optional) continue;
+      const taught = bundle.stops.some((s) => s.data.level === l.id && s.data.gap_tags.includes(t.id));
+      if (!taught) gap(`coverage/${l.id}`, `core topic "${t.id}" has no stop at ${l.id} yet`, "RM-2");
     }
   }
   const perTopic = new Map<string, number>();

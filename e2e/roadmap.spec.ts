@@ -28,6 +28,10 @@ test.describe("roadmap (RM-1)", () => {
       await expect(page.getByRole("heading", { level: 2, name: new RegExp(`^${id} `) })).toBeVisible();
     }
     await expect(page.getByRole("link", { name: "Find my level" })).toBeVisible();
+    // the complete outline shows, including topics with no lesson yet
+    await expect(page.getByText("Prompt injection defence")).toBeVisible();
+    await expect(page.getByText("Coming soon").first()).toBeVisible();
+    await expect(page.getByText("Level project:").first()).toBeVisible();
     expect(await overflow(page)).toBe(false);
     expect((await wcag(page)).violations).toEqual([]);
     expect(errors).toEqual([]);
@@ -42,8 +46,17 @@ test.describe("roadmap (RM-1)", () => {
     await page.goto("/roadmap/genai-engineer");
     await expect(page.getByText("You start here")).toBeVisible();
     await expect(page.getByRole("heading", { name: "You start at B1" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /What AI, machine learning.*Done/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /AI, machine learning and language models.*Done/ })).toBeVisible();
     await expect(page.getByRole("progressbar", { name: "Roadmap covered" })).not.toHaveAttribute("aria-valuenow", "0");
+    expect((await wcag(page)).violations).toEqual([]);
+  });
+
+  test("the map works at desktop width too", async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.goto("/roadmap/genai-engineer");
+    await page.getByRole("navigation", { name: "Levels" }).getByRole("link", { name: /^I2 / }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "I2 RAG builder" })).toBeInViewport();
+    expect(await overflow(page)).toBe(false);
     expect((await wcag(page)).violations).toEqual([]);
   });
 

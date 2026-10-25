@@ -1,5 +1,6 @@
 // What the roadmap pages pass to their client islands. Node only.
 import { getContent, getStopsInOrder } from "@/lib/content";
+import { topicsWithStops } from "@/lib/roadmap/map";
 import type { LevelSummary, StopSummary } from "./shared";
 
 export { levelSlug } from "./shared";
@@ -9,10 +10,18 @@ export const GOAL_ID = "genai-engineer";
 export function roadmapData(): { goal: { id: string; name: string }; levels: LevelSummary[]; stops: StopSummary[] } {
   const content = getContent();
   const goal = content.goals.find((g) => g.data.id === GOAL_ID)!.data;
+  const stops = getStopsInOrder();
   return {
     goal: { id: goal.id, name: goal.name },
-    levels: content.levels.map(({ data: l }) => ({ id: l.id, name: l.name, can_do: l.can_do, exit_check: l.exit_check, draft_hours: l.draft_hours })),
-    stops: getStopsInOrder().map((s) => ({
+    levels: content.levels.map(({ data: l }) => ({
+      id: l.id,
+      name: l.name,
+      can_do: l.can_do,
+      exit_check: l.exit_check,
+      draft_hours: l.draft_hours,
+      topics: topicsWithStops(l.id, l.topics, stops),
+    })),
+    stops: stops.map((s) => ({
       id: s.id,
       level: s.level,
       order: s.order,

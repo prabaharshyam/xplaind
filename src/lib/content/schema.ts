@@ -220,12 +220,26 @@ export type Book = z.infer<typeof Book>;
 
 // ---------------------------------------------------------- goal & levels ---
 
+/**
+ * One topic on a level's map. The id is the shared topic tag: placement questions
+ * tag it, and the stop that teaches it lists it in gap_tags. A topic with no stop
+ * yet still shows on the roadmap as "coming soon".
+ */
+export const Topic = z.strictObject({
+  id: Slug,
+  title: Text,
+  summary: Text.max(140),
+  optional: z.boolean().default(false),
+});
+export type Topic = z.infer<typeof Topic>;
+
 export const LevelDefinition = z.strictObject({
   id: Level,
   name: Text,
   can_do: Text,
   draft_hours: z.number().positive(),
   exit_check: Text,
+  topics: z.array(Topic).min(3, "a level needs at least 3 topics"),
 });
 export type LevelDefinition = z.infer<typeof LevelDefinition>;
 

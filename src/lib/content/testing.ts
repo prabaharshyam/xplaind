@@ -112,7 +112,16 @@ export function validBundle(): Bundle {
     goals: [{ ...f("goals/g.yaml"), data: { id: "genai-engineer", name: "GenAI Engineer", description: "Build." } }],
     levels: LEVEL_IDS.map((id) => ({
       ...f("levels/levels.yaml"),
-      data: { id, name: `Level ${id}`, can_do: "Can do.", draft_hours: 10, exit_check: "Check." },
+      data: {
+        id,
+        name: `Level ${id}`,
+        can_do: "Can do.",
+        draft_hours: 10,
+        exit_check: "Check.",
+        topics: [id === "B1" ? "tag-one" : `${id.toLowerCase()}-a`, `${id.toLowerCase()}-b`, `${id.toLowerCase()}-c`].map(
+          (t, i) => ({ id: t, title: `Topic ${t}`, summary: "What you learn.", optional: i > 0 }),
+        ),
+      },
     })),
     stops: [{ ...f("stops/B1/stop-one.mdx"), data: stop() }],
     resources: [{ ...f("resources/res-one.yaml"), data: resource() }],
