@@ -1,0 +1,81 @@
+---
+id: evaluating-agents
+level: P1
+title: "Evaluating agents"
+outcome: "Build an eval suite for an agent: realistic tasks, graders for outcomes and for trajectories, repeated runs to measure consistency, and tracking that shows real progress."
+why_it_matters: "Agents fail in more ways than single model calls: wrong tools, wasted steps, unsafe actions, right answers by luck. Without agent-specific evals, every prompt change is a gamble. Teams hiring for agent work ask how you would evaluate one."
+hours: 4
+gap_tags: []
+primary_resource: anthropic-agent-evals
+alternates: [dlai-evaluating-ai-agents]
+format: explainer
+key_terms: [trajectory, evals, llm-as-judge, golden-set]
+check:
+  type: mcq
+  question_ids: [evaluating-agents-1, evaluating-agents-2, evaluating-agents-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Evaluating an agent means running it on a set of tasks and scoring what happened. Two things are scored:
+
+- **The outcome**: did it achieve the goal? Was the refund issued correctly, the report accurate, the ticket routed to the right team?
+- **The trajectory**: how did it get there? Which tools, how many steps, any unsafe or wasted actions, did it ask for approval where required?
+
+Because agents are not deterministic and take many steps, you also measure **consistency**: run each task several times and see how often it succeeds.
+
+## How it works
+
+**Tasks.** Write 30 to 100 realistic tasks with a defined starting state (a fake customer account, a sandbox database, a set of documents) and a clear success condition. Cover common cases, hard cases, tasks that should be refused or escalated, and tasks with traps (a tool that errors, missing information that requires a question).
+
+**Graders.** Use the cheapest reliable grader for each check:
+
+- *Code checks* on the end state: is the refund row in the database with the right amount? Did the file get created? These are precise and cheap.
+- *Rules on the trajectory*: no call to `issue_refund` without a prior `get_cancellation_quote`; no more than 12 steps; approval requested before any payment.
+- *Model graders* for open-ended quality (was the customer reply accurate and polite?), with a rubric, checked against human grades.
+- *Human review* of a sample, especially early on.
+
+**Metrics.** Success rate; success across all of several runs (a stricter measure of reliability); average steps, tokens, cost and time per task; safety violations (should be zero); escalation correctness.
+
+**Environment.** Run evals in a sandbox that resets between tasks: fake APIs or a test database with seed data. Never run evals against production systems.
+
+**Track over time.** Run the suite on every prompt, tool or model change, and keep a history. Add every interesting production failure as a new task.
+
+**Read transcripts.** Numbers show that something changed; reading ten failed trajectories shows why.
+
+## A worked example
+
+An ed-tech company in Hyderabad has an agent that handles course-refund requests: checks enrolment, applies the refund policy, issues refunds under ₹5,000 after approval, and escalates the rest.
+
+The eval suite has 60 tasks in a sandbox with seeded students and payments:
+
+- 30 routine refunds (should succeed),
+- 10 outside the policy window (should be politely declined),
+- 10 above ₹5,000 (should escalate),
+- 5 where the payment API errors once (should retry, then escalate),
+- 5 with a prompt injection in the student's message (should ignore it).
+
+Graders: code checks on the refunds table; trajectory rules (quote before refund, approval before payment, at most 10 steps); a model grader for reply tone, calibrated on 40 human-graded replies (88% agreement).
+
+Each task runs three times. Baseline: 82% success, 71% success on all three runs, and one safety violation (a refund issued without approval when the approval tool timed out). The fix makes a timeout count as "not approved". After changes the suite shows 93% success, 88% on all three runs and zero violations. The same suite now runs in CI on every change.
+
+## Common mistakes
+
+- **Scoring only the final message.** The agent may have done something unsafe on the way.
+- **One run per task.** Agents vary; measure consistency.
+- **Evals against real systems.** Use a resettable sandbox.
+- **Only happy paths.** Include refusals, escalations, tool failures and injection attempts.
+- **Never reading transcripts.** Scores tell you that it failed, not why.
+
+## Practise
+
+Read Anthropic's article on agent evals and take DeepLearning.AI's short course on evaluating agents.
+
+1. Write 20 tasks for an agent you have built, including at least four that should be refused or escalated and two with a failing tool.
+2. Build a sandbox with seeded data that resets per task, and implement code checks and two trajectory rules.
+3. Run each task three times and report success, all-runs success, average steps and safety violations.
+
+**You are done when you can** show a table of these metrics before and after one change, and explain one failure from its transcript.
