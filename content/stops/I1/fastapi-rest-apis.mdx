@@ -1,0 +1,96 @@
+---
+id: fastapi-rest-apis
+level: I1
+title: "REST APIs with FastAPI"
+outcome: "Build a small typed REST API with FastAPI: endpoints, request and response models, status codes, errors and tests."
+why_it_matters: "Every AI system you deploy for a client is reached through an API, by their app, their workflow tool or another service. FastAPI is the most common way Python teams build one, and its typed models catch bad requests for free."
+hours: 5
+gap_tags: []
+primary_resource: fastapi-tutorial
+alternates: [mdn-http-overview]
+format: explainer
+key_terms: [rest-api, endpoint, http-method, http-status-code]
+check:
+  type: mcq
+  question_ids: [fastapi-rest-apis-1, fastapi-rest-apis-2, fastapi-rest-apis-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A REST API lets other programs use your system over HTTP. Each **endpoint** is a URL plus a method: `POST /tickets` creates a ticket, `GET /tickets/42` reads one. The caller sends JSON and gets JSON back, with a **status code** that says what happened.
+
+FastAPI is a Python framework for building these APIs. You write ordinary functions with type hints and Pydantic models; FastAPI turns them into endpoints that validate input, convert output to JSON and publish interactive documentation at `/docs`. It also runs async code natively, which suits services that wait on model APIs.
+
+## How it works
+
+**Methods.** GET reads and must not change anything. POST creates or triggers work. PUT replaces, PATCH updates part, DELETE removes. Keeping to these meanings lets caches, retries and other engineers guess correctly.
+
+**Status codes.** 200 OK and 201 Created for success. 400 for a malformed request, 401 when the caller is not signed in, 403 when they are but may not do this, 404 when the thing does not exist, 422 when the body fails validation (FastAPI's default), 429 when they are sending too much. 500 means your code broke, and 503 means a dependency, such as the model provider, is down.
+
+**Models.** A Pydantic model on the request body means FastAPI rejects bad input with a 422 and a list of exactly which fields failed, before your function runs. A `response_model` controls what goes back, so an internal field such as a cost figure never leaks by accident.
+
+**Dependencies.** FastAPI's `Depends` injects shared things, such as the database session, the current user or a model client, into each endpoint. In tests you swap them for fakes.
+
+**Testing.** `TestClient` calls your app in memory, with no server, so endpoint tests run in milliseconds.
+
+## A worked example
+
+A Kochi insurance broker wants other teams to send claim descriptions and get back a category and a summary.
+
+```python
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Claims triage")
+
+class ClaimIn(BaseModel):
+    policy_no: str = Field(pattern=r"^[A-Z]{3}\d{7}$")
+    description: str = Field(min_length=20, max_length=5000)
+
+class ClaimOut(BaseModel):
+    category: str
+    summary: str
+
+@app.post("/claims/triage", response_model=ClaimOut, status_code=200)
+async def triage(claim: ClaimIn, llm=Depends(get_llm)):
+    try:
+        result = await llm.classify(claim.description)
+    except ProviderDown:
+        raise HTTPException(503, "Triage is unavailable; try again shortly")
+    return ClaimOut(category=result.category, summary=result.summary)
+```
+
+A request with policy number "abc123" never reaches the model: FastAPI returns 422 naming the field. If the model provider is down, callers get a 503 they can retry, not a confusing 500.
+
+The test fakes the model:
+
+```python
+def test_triage_returns_category():
+    app.dependency_overrides[get_llm] = lambda: FakeLLM("motor", "Rear bumper damage")
+    r = TestClient(app).post("/claims/triage",
+        json={"policy_no": "MOT1234567", "description": "Car was hit from behind at a signal"})
+    assert r.status_code == 200 and r.json()["category"] == "motor"
+```
+
+Open `/docs` and the broker's other teams can try the endpoint in the browser, with the request schema already written for them.
+
+## Common mistakes
+
+- **Returning 200 for errors.** A body saying `"error": true` with status 200 breaks every retry and monitoring tool. Use the right code.
+- **Returning your database rows directly.** Internal fields leak. Always set a response model.
+- **Blocking calls in async endpoints.** A synchronous model client inside `async def` freezes the server. Use an async client, or declare the endpoint with plain `def` so FastAPI runs it in a thread pool.
+- **No timeout on the model call.** One hung request ties up a worker forever. Set timeouts and return 503 or 504.
+- **Skipping input limits.** Without a maximum length, someone pastes a 300-page document and your token bill jumps.
+
+## Practise
+
+Work through the FastAPI tutorial up to "Handling Errors" and "Testing", and skim MDN's HTTP overview.
+
+1. Build `POST /summaries` that takes text (20 to 5,000 characters) and returns a summary from any model API, or a fake one.
+2. Add `GET /summaries/{id}` that returns 404 for an unknown id.
+3. Write three tests with `TestClient`: a success, a 422 for short text and a 404.
+
+**You are done when you can** explain the difference between 401, 403, 422 and 503 to a teammate, and show your API's `/docs` page.

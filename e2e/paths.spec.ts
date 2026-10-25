@@ -72,6 +72,6 @@ test.describe("paths", () => {
     await page.goto("/result");
     await expect(page.getByText("Your result for the Forward Deployed Engineer path")).toBeVisible();
     const steps = page.getByRole("region", { name: "Your next five steps" }).getByRole("link");
-    await expect(steps.first()).toHaveAttribute("href", "/stop/first-llm-api-call");
+    await expect(steps.first()).toHaveAttribute("href", "/stop/python-for-production");
   });
 });
