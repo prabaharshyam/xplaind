@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { Reveal } from "@/components/motion/reveal";
 import { ScrollScene } from "@/components/motion/scroll-scene";
-import type { LevelId } from "@/lib/levels";
-import { stageOf } from "@/lib/roadmap/map";
 
-const TONE = { beginner: "bg-emerald-500", intermediate: "bg-sky-500", pro: "bg-violet-500" } as const;
-const STAGE = { beginner: "Beginner", intermediate: "Intermediate", pro: "Pro" } as const;
+/** Literal class names, cycling like the roadmap lines. */
+const TONES = ["bg-emerald-500", "bg-sky-500", "bg-violet-500"] as const;
 
 export function Numbers({ stats }: { stats: { value: string; label: string }[] }) {
   return (
@@ -13,7 +11,7 @@ export function Numbers({ stats }: { stats: { value: string; label: string }[] }
       <div className="mx-auto max-w-6xl">
         <Reveal>
           <h2 id="numbers-heading" className="lx-title max-w-3xl text-balance">
-            One path. Every step chosen by hand.
+            Nine paths. Every step written and chosen by hand.
           </h2>
         </Reveal>
         <dl className="mt-14 grid grid-cols-2 gap-x-6 gap-y-12 md:mt-20 md:grid-cols-5">
@@ -29,34 +27,38 @@ export function Numbers({ stats }: { stats: { value: string; label: string }[] }
   );
 }
 
-/** The nine levels slide past sideways as you scroll down. */
-export function Ladder({ levels }: { levels: { id: LevelId; name: string; can_do: string; draft_hours: number }[] }) {
+export type PathCard = { id: string; name: string; tagline: string; coding: string; months: number; lessons: number };
+
+/** The nine paths slide past sideways as you scroll down. */
+export function PathsTrack({ paths }: { paths: PathCard[] }) {
   return (
     <ScrollScene length={3} className="lx-paper" stageClassName="flex flex-col justify-center gap-10 md:gap-14">
       <div className="mx-auto w-full max-w-6xl px-5 md:px-6">
-        <p className="lx-eyebrow text-emerald-700 dark:text-emerald-400">The ladder</p>
-        <h2 className="lx-title mt-4 max-w-3xl text-balance">From your first prompt to system design.</h2>
+        <p className="lx-eyebrow text-emerald-700 dark:text-emerald-400">The paths</p>
+        <h2 className="lx-title mt-4 max-w-3xl text-balance">From your first prompt to the job you want.</h2>
       </div>
       <ol className="lx-track flex w-max gap-4 pl-5 md:gap-6 md:pl-[max(1.5rem,calc((100vw-72rem)/2+1.5rem))]">
-        {levels.map((l) => {
-          const stage = stageOf(l.id);
-          return (
-            <li
-              key={l.id}
-              className="flex min-h-[340px] w-[260px] shrink-0 flex-col rounded-[28px] border border-[var(--lx-line)] bg-white p-6 shadow-[0_30px_60px_-40px_rgba(0,0,0,0.35)] md:h-[360px] md:w-[320px] dark:bg-[#18181b]"
-            >
-              <span className={`h-1.5 w-10 rounded-full ${TONE[stage]}`} />
-              <p className="lx-muted mt-5 text-xs font-medium">{STAGE[stage]}</p>
-              <p className="mt-1 text-4xl font-semibold tracking-tight">{l.id}</p>
-              <p className="mt-1 text-lg font-medium">{l.name}</p>
-              <p className="lx-muted mt-4 text-[15px] leading-6">{l.can_do}.</p>
-              <p className="lx-muted mt-auto text-sm">About {l.draft_hours} hours</p>
-            </li>
-          );
-        })}
+        {paths.map((p, i) => (
+          <li
+            key={p.id}
+            className="flex min-h-[340px] w-[260px] shrink-0 flex-col rounded-[28px] border border-[var(--lx-line)] bg-white p-6 shadow-[0_30px_60px_-40px_rgba(0,0,0,0.35)] md:h-[360px] md:w-[320px] dark:bg-[#18181b]"
+          >
+            <span className={`h-1.5 w-10 rounded-full ${TONES[i % TONES.length]}`} />
+            <p className="lx-muted mt-5 text-xs font-medium">
+              {p.coding} · about {p.months} {p.months === 1 ? "month" : "months"}
+            </p>
+            <p className="mt-2 text-2xl leading-tight font-semibold tracking-tight">
+              <Link href={`/roadmap/${p.id}`} className="underline-offset-4 hover:underline">
+                {p.name}
+              </Link>
+            </p>
+            <p className="lx-muted mt-4 text-[15px] leading-6">{p.tagline}</p>
+            <p className="lx-muted mt-auto text-sm">{p.lessons} lessons</p>
+          </li>
+        ))}
         <li className="flex w-[260px] shrink-0 items-center md:w-[320px]">
-          <Link href="/roadmap/genai-engineer" className="text-lg font-medium text-emerald-700 underline-offset-4 hover:underline dark:text-emerald-400">
-            See every step on the roadmap
+          <Link href="/paths" className="text-lg font-medium text-emerald-700 underline-offset-4 hover:underline dark:text-emerald-400">
+            Compare all nine paths
           </Link>
         </li>
       </ol>
@@ -69,8 +71,9 @@ const PRINCIPLES = [
   { title: "Free first.", body: "Every step starts with a free course. A paid one has to earn its place, at about the price of a movie ticket." },
   { title: "Prices in rupees, with a date.", body: "When a course costs money, you see the price and the day we last checked it." },
   { title: "No ads. No paid placement.", body: "No one can pay to be listed or moved up. Where a link earns us a commission, it says so." },
+  { title: "Our own lessons, then the best course.", body: "Every topic has an explanation we wrote, with Indian examples, before we point you to the one free course worth your time." },
   { title: "Every step proves itself.", body: "A quick check or a small project ends each step, so you know you learned it, not just watched it." },
-  { title: "Built for India.", body: "Weeks run on India time. Lessons fit three to eight hours a week, alongside a job or college." },
+  { title: "Built for India.", body: "Examples from Indian work, rules such as the DPDP Act, and lessons that fit a few hours a week alongside a job or college." },
 ];
 
 export function Principles() {
@@ -113,7 +116,7 @@ export function InterviewPreview({ count, questions }: { count: number; question
             Walk in ready.
           </h2>
           <p className="lx-muted mt-6 max-w-md text-lg leading-8">
-            {count} questions GenAI interviews ask, each with a short answer to say out loud, a deeper one, the follow-ups to
+            {count} questions AI interviews ask, each with a short answer to say out loud, a deeper one, the follow-ups to
             expect and the mistakes to avoid. Rate yourself, and the ones you miss come back first.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
@@ -148,10 +151,10 @@ export function InterviewPreview({ count, questions }: { count: number; question
 }
 
 const PLAN = [
-  { when: "Live now", items: ["The placement test", "The nine-level roadmap with a lesson for every core topic", "Interview questions, practice and quick quizzes"] },
-  { when: "Next", items: ["Accounts that keep your progress across devices", "Weekly streaks, level badges and a card to share", "A weekly email with your next step", "Books with honest links, and weekly checks on every course link"] },
-  { when: "Later", items: ["Feedback on answers you type", "A second path, AI at work, for people who will use AI rather than build it", "Questions you missed, brought back at the right time", "A re-test after 30 days, so you can see how far you have come"] },
-  { when: "After that", items: ["Spoken mock interviews with a written report", "Hindi and Tamil"] },
+  { when: "Live now", items: ["Nine paths with our own lesson for every topic", "The level test for engineering paths", "An AI glossary in plain words", "Interview questions, practice and quick quizzes"] },
+  { when: "Next", items: ["Accounts that keep your progress across devices", "Bookmarks, streaks, badges and a card to share", "Guided projects with steps and rubrics", "A weekly email with your next step and the AI news worth reading"] },
+  { when: "Later", items: ["Interview questions for every path", "Portfolios that show your projects and skills", "Feedback on answers you type, and mock interviews", "An AI tutor that adapts to you"] },
+  { when: "After that", items: ["Tamil, then more Indian languages", "Programmes for colleges and companies", "Lessons and projects from the community"] },
 ];
 
 export function WhatsNext() {
@@ -190,13 +193,21 @@ export function FinalCall() {
         <h2 id="final-heading" className="lx-display text-balance">
           Ten minutes from now, you will know your next step.
         </h2>
-        <Link
-          href="/start"
-          className="mt-12 inline-flex h-14 items-center rounded-full bg-white px-8 text-[17px] font-medium text-black hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
-        >
-          Find my level
-        </Link>
-        <p className="lx-muted mt-5 text-sm">Free. No sign-up. Your answers stay on your device.</p>
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/paths"
+            className="inline-flex h-14 items-center rounded-full bg-white px-8 text-[17px] font-medium text-black hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+          >
+            Choose a path
+          </Link>
+          <Link
+            href="/start"
+            className="inline-flex h-14 items-center rounded-full px-7 text-[17px] font-medium text-white ring-1 ring-white/25 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+          >
+            Find my level
+          </Link>
+        </div>
+        <p className="lx-muted mt-5 text-sm">Free. No sign-up. Your progress stays on your device.</p>
       </Reveal>
     </section>
   );

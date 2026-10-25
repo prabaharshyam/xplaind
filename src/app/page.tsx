@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Hero } from "@/components/landing/hero";
 import { Problem } from "@/components/landing/problem";
-import { FinalCall, InterviewPreview, Ladder, Numbers, Principles, WhatsNext } from "@/components/landing/sections";
-import { getContent, getStopsInOrder } from "@/lib/content";
+import { FinalCall, InterviewPreview, Numbers, PathsTrack, Principles, WhatsNext } from "@/components/landing/sections";
+import { getContent, getGlossary, getPaths, getStops, getStopsInOrder } from "@/lib/content";
+import { pathView } from "@/lib/content/paths";
+import { CODING_LABEL } from "@/lib/paths";
 import { getInterviewViews } from "@/lib/content/interview";
 import { interviewTopicLabel } from "@/lib/interview-topics";
 import { splitStem } from "@/lib/text";
@@ -12,15 +14,14 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: { absolute: "Xplaind: learn AI, in the right order" },
   description:
-    "A ten-minute test finds your level. Then you get your next five steps on a nine-level GenAI engineer path, each with the best free course. No ads, no paid placement.",
+    "Nine AI career paths, from AI for beginners to forward deployed engineer. Our own lesson for every topic, the best free course, a check and a project per stage. No ads, no paid placement.",
 };
 
 export default function Home() {
   const content = getContent();
-  const levels = content.levels.map(({ data: l }) => l);
   const stops = getStopsInOrder();
   const interview = getInterviewViews();
-  const topics = content.levels.reduce((n, l) => n + l.data.topics.length, 0);
+  const paths = getPaths().map(pathView);
 
   // Real content for the "how it works" faces, so the page never shows a made-up example.
   const sample = content.placement.find((q) => q.data.id === "i1-temperature")?.data ?? content.placement[0].data;
@@ -29,7 +30,9 @@ export default function Home() {
 
   return (
     <main>
-      <Hero levels={levels.map((l) => ({ id: l.id, name: l.name }))} />
+      <Hero
+        paths={paths.map((p) => ({ id: p.id, name: p.name, detail: `${CODING_LABEL[p.coding]} · ${p.counts.lessons} lessons` }))}
+      />
       <Problem />
       <HowItWorks
         data={{
@@ -40,14 +43,23 @@ export default function Home() {
       />
       <Numbers
         stats={[
-          { value: String(levels.length), label: "levels" },
-          { value: String(topics), label: "topics" },
-          { value: String(stops.length), label: "lessons" },
+          { value: String(paths.length), label: "career paths" },
+          { value: String(getStops().length), label: "lessons" },
+          { value: String(getGlossary().length), label: "glossary terms" },
           { value: String(interview.length), label: "interview questions" },
           { value: "₹0", label: "to start" },
         ]}
       />
-      <Ladder levels={levels} />
+      <PathsTrack
+        paths={paths.map((p) => ({
+          id: p.id,
+          name: p.name,
+          tagline: p.tagline,
+          coding: CODING_LABEL[p.coding],
+          months: p.months,
+          lessons: p.counts.lessons,
+        }))}
+      />
       <Principles />
       <InterviewPreview
         count={interview.length}

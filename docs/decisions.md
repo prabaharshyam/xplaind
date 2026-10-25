@@ -126,3 +126,10 @@ The six sample resources, three stops and six check questions exist to exercise 
 - **Examples are Indian and original.** Worked examples use Indian settings (UPI payments, Chennai support teams, Hinglish queries) and are written for Xplaind, not adapted from a course.
 - **Glossary.** One YAML file per term under `content/glossary/`, with a definition of 45 words or fewer, an optional fuller explanation, other names and related terms. `/glossary` lists terms A to Z; each term links to the lessons that list it as a key term. Terms are drafts until a person reviews them.
 - **MDX limits.** Lessons avoid tables and curly braces outside code blocks (no GFM plugin; MDX reads braces as code). Code blocks scroll inside their box at 360 px and can take keyboard focus.
+
+## Home page for nine paths
+
+- The hero's stack of plates now shows the nine paths (it showed the nine GenAI levels). The highlighted plate, labelled "Your path", is an example, like the old "You start here".
+- "Choose a path" is the main call to action, with "Find my level" beside it; the header keeps "Find my level" and adds Paths and Glossary to the navigation.
+- The sideways-scrolling level ladder became a strip of path cards linking to each roadmap. The numbers section counts paths, lessons, glossary terms and interview questions from the content files.
+- "Where this is going" now lists the owner's final-stage features by phase (see `docs/product-plan.md`), still labelled "Plans, not promises".

@@ -23,11 +23,12 @@ test("search engines are asked not to list the site before launch", async ({ pag
 const wcag = (page: import("@playwright/test").Page) =>
   new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
 
-test("the home page leads to the test, roadmap, courses and interview prep", async ({ page }) => {
+test("the home page leads to the paths, the test, courses and interview prep", async ({ page }) => {
   await page.goto("/");
   const main = page.getByRole("main");
   await expect(main.getByRole("link", { name: "Find my level" }).first()).toHaveAttribute("href", "/start");
-  await expect(main.getByRole("link", { name: "See the roadmap" })).toHaveAttribute("href", "/roadmap/genai-engineer");
+  await expect(main.getByRole("link", { name: "Choose a path" }).first()).toHaveAttribute("href", "/paths");
+  await expect(main.getByRole("link", { name: "Forward Deployed Engineer" })).toHaveAttribute("href", "/roadmap/forward-deployed-engineer");
   await expect(main.getByRole("link", { name: "Start practising" })).toHaveAttribute("href", "/practice");
   await expect(main.getByRole("link", { name: "How we rank courses" })).toHaveAttribute("href", "/how-we-rank");
   const nav = page.getByRole("banner");

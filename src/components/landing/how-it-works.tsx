@@ -2,12 +2,12 @@ import { ScrollScene } from "@/components/motion/scroll-scene";
 
 const STEPS = [
   {
-    title: "Take a ten-minute test.",
-    body: "Twelve questions that get harder when you are right and easier when you are not. No sign-up. It places you on one of nine levels.",
+    title: "Pick a path. Take a short test.",
+    body: "Choose from nine paths. On engineering paths, twelve questions that adapt to you skip what you already know. No sign-up.",
   },
   {
     title: "Get your next five steps.",
-    body: "Not a hundred links. Five steps from where you are, each with the one free course we would pick ourselves.",
+    body: "Not a hundred links. Five steps from where you are, each with our own lesson and the one free course we would pick.",
   },
   {
     title: "Prove it. Then move on.",
