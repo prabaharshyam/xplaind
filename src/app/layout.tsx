@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountLink } from "@/components/account-link";
+import { SiteHeader } from "@/components/site-header";
 import { allowIndexing } from "@/lib/indexing";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <SiteHeader />
         <div className="flex-1">{children}</div>
         <footer className="border-t border-zinc-200 px-4 py-6 text-sm dark:border-zinc-800">
           <nav aria-label="Footer" className="mx-auto flex max-w-2xl flex-wrap gap-x-6 gap-y-2">
@@ -29,6 +31,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </Link>
             <Link href="/roadmap/genai-engineer" className="underline-offset-2 hover:underline">
               Roadmap
+            </Link>
+            <Link href="/resources" className="underline-offset-2 hover:underline">
+              Courses
             </Link>
             <Link href="/interview" className="underline-offset-2 hover:underline">
               Interview questions

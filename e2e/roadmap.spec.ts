@@ -27,7 +27,7 @@ test.describe("roadmap (RM-1)", () => {
     for (const id of ["B1", "B2", "B3", "I1", "I2", "I3", "P1", "P2", "P3"]) {
       await expect(page.getByRole("heading", { level: 2, name: new RegExp(`^${id} `) })).toBeVisible();
     }
-    await expect(page.getByRole("link", { name: "Find my level" })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: "Find my level" })).toBeVisible();
     // the complete outline shows, including topics with no lesson yet
     await expect(page.getByText("Prompt injection defence")).toBeVisible();
     await expect(page.getByText("Coming soon").first()).toBeVisible();
@@ -93,7 +93,7 @@ test.describe("stop page (RM-2, RM-4, RM-7)", () => {
 
   test("passing the check marks the stop done; failing keeps it in progress", async ({ page }) => {
     await page.goto("/stop/what-is-ai");
-    const groups = page.getByRole("group");
+    const groups = page.getByRole("main").getByRole("group");
     const count = await groups.count();
     // answer every question with its first option, which is not always right
     for (let i = 0; i < count; i++) await groups.nth(i).getByRole("radio").first().check();

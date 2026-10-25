@@ -70,7 +70,7 @@ test.describe("practice (IQ-4, IQ-5)", () => {
   test("a quick quiz can be taken and scored", async ({ page }) => {
     await page.goto("/practice/agents");
     await page.getByRole("button", { name: "Start a quiz" }).click();
-    const groups = page.getByRole("group");
+    const groups = page.getByRole("main").getByRole("group");
     const n = await groups.count();
     expect(n).toBeGreaterThanOrEqual(3);
     for (let i = 0; i < n; i++) await groups.nth(i).getByRole("radio").first().check();

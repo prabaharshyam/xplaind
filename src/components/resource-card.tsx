@@ -49,8 +49,9 @@ export function ResourceCard({
   onOpen,
 }: {
   r: ResourceCardData;
-  role: "primary" | "alternate";
-  stopId: string;
+  role: "primary" | "alternate" | "listing";
+  /** The lesson the card sits on, for the click log. Omitted on the course list. */
+  stopId?: string;
   today?: string;
   onOpen?: () => void;
 }) {
@@ -68,7 +69,7 @@ export function ResourceCard({
   return (
     <article className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>
       <p className="text-xs font-medium tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
-        {role === "primary" ? "Start here" : "Alternative"}
+        {role === "primary" ? "Start here" : role === "alternate" ? "Alternative" : r.level}
       </p>
       <h3 id={`res-${r.id}`} className="mt-1 text-lg leading-7 font-semibold">
         {r.title}
@@ -94,7 +95,7 @@ export function ResourceCard({
       </dl>
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         <a
-          href={`/go/${r.id}?stop=${encodeURIComponent(stopId)}`}
+          href={stopId ? `/go/${r.id}?stop=${encodeURIComponent(stopId)}` : `/go/${r.id}`}
           target="_blank"
           rel="noopener"
           onClick={onOpen}

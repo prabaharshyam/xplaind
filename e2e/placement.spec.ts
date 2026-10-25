@@ -130,12 +130,12 @@ test.describe("placement test (PL-2, PL-3, PL-5)", () => {
 
   test("the result page without a saved result invites the learner to take the test", async ({ page }) => {
     await page.goto("/result");
-    await expect(page.getByRole("link", { name: "Find my level" })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: "Find my level" })).toBeVisible();
   });
 
   test("the whole flow works from the home page", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Find my level" }).click();
+    await page.getByRole("main").getByRole("link", { name: "Find my level" }).first().click();
     await expect(page).toHaveURL(/\/start$/);
   });
 });
