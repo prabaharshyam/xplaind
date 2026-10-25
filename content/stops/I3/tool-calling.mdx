@@ -8,6 +8,8 @@ hours: 3
 gap_tags: [tool-calling]
 primary_resource: claude-tool-use
 alternates: [hf-agents-course]
+format: explainer
+key_terms: [tool-calling, tool-schema, json-schema, agent]
 check:
   type: mcq
   question_ids: [tool-calling-1, tool-calling-2, tool-calling-3]
@@ -16,10 +18,72 @@ reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
 ---
 
-Read the overview and run the weather example with a fake weather function.
+## What it is
 
-**Do this**
+**Tool calling** (also called function calling) lets a model use your code. You describe tools to the model: their names, what they do and the inputs they take. When a question needs a tool, the model replies with a request to call it with specific arguments. Your code runs the tool, sends back the result, and the model uses it to answer.
 
-Give the model two tools, such as a calculator and a lookup in a small dictionary of facts. Ask questions that need neither, one, or both, and print each tool call it makes.
+The model never runs anything itself. Your code stays in control.
 
-**You are done when you can** explain who actually runs the tool: the model or your code.
+## How it works
+
+**Describe the tool.** Each tool has a name, a description and an input schema:
+
+```python
+tools = [{
+    "name": "get_order_status",
+    "description": "Look up an order's status and expected delivery date by order id. "
+                   "Use when the customer asks where their order is.",
+    "input_schema": {
+        "type": "object",
+        "properties": {"order_id": {"type": "string", "description": "Like ORD-12345678"}},
+        "required": ["order_id"],
+    },
+}]
+```
+
+The model decides when to call a tool mainly from its **name and description**, and fills arguments from the schema. Clear, specific descriptions matter more than anything else.
+
+**The round trip.**
+
+1. Send the user's message and the tool list.
+2. The model replies with a tool-use request, for example `get_order_status` with `{"order_id": "ORD-48213907"}`.
+3. Your code validates the arguments, runs the real function and gets a result.
+4. Send the result back in a tool-result message linked to that request.
+5. The model writes the final answer, or asks for another tool.
+
+**Errors are results too.** If the order does not exist or a service is down, send back a clear error message as the tool result ("No order found with id ORD-48213907; ask the customer to check the id"). The model can then recover, ask the user or apologise, instead of guessing.
+
+**Safety.** Validate arguments before running anything. Separate read-only tools from tools that change things, and require confirmation for risky actions. Treat tool results as data, not instructions.
+
+**Server-side tools.** Some providers also offer tools they run themselves (such as web search). For your own systems, you run the tools on your side.
+
+## A worked example
+
+A Gurugram fashion e-commerce site adds order tools to its support chat: `get_order_status`, `get_return_policy` and `start_return` (which needs the customer to confirm).
+
+A customer writes: "Where is my kurta order ORD-48213907? If it's late I want to return it."
+
+1. The model calls `get_order_status` with the id.
+2. The code returns: "Shipped 3 Nov, out for delivery today, Gurugram hub."
+3. The model replies that the order arrives today, and explains the 15-day return window by calling `get_return_policy`.
+4. It does not call `start_return`, because the order is not late; if the customer insists, it asks for confirmation first.
+
+When a customer types a wrong id, the tool returns a "not found" message and the model asks them to check their confirmation SMS.
+
+## Common mistakes
+
+- **Vague tool descriptions.** The model then calls the wrong tool or none.
+- **Running tools without validating arguments.**
+- **Swallowing errors.** Return them as clear tool results.
+- **Risky actions without confirmation.**
+- **Forgetting to send the tool result back.** The model cannot answer without it.
+
+## Practise
+
+Read the tool-use overview linked below.
+
+1. Give a model one read-only tool (for example, a weather lookup or a small product table) and complete the full round trip in code.
+2. Make the tool return an error for unknown inputs and show the model handling it.
+3. Add a second tool and test which one the model chooses for five different questions.
+
+**You are done when you can** explain who runs the tool, what the model uses to decide when to call it, and what to send back when it fails.

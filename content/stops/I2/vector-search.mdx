@@ -8,6 +8,8 @@ hours: 3
 gap_tags: [vector-search]
 primary_resource: hf-semantic-search-faiss
 alternates: [anthropic-contextual-retrieval]
+format: explainer
+key_terms: [vector-database, semantic-search, cosine-similarity, reranking]
 check:
   type: mcq
   question_ids: [vector-search-1, vector-search-2, vector-search-3]
@@ -16,8 +18,56 @@ reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
 ---
 
-Revisit the FAISS notebook and focus on building the index and searching it. Then read the contextual retrieval article to see how keyword search and reranking help.
+## What it is
 
-**Do this**
+**Vector search** finds the chunks whose embeddings are closest to the embedding of a question. It is the retrieval step in most RAG systems:
 
-Index the chunks from your chunking exercise and ask five questions. For each, print the top three chunks and mark whether the right one is there.
+1. Embed every chunk once and store the vectors in an **index**.
+2. At question time, embed the question with the same model.
+3. Return the **top-k** most similar chunks (for example the five closest).
+
+The store can be a library such as FAISS in your program, a database extension such as pgvector in PostgreSQL, or a dedicated vector database such as Qdrant, Weaviate or Pinecone.
+
+## How it works
+
+**Similarity.** Most systems use cosine similarity or dot product on normalised vectors: higher means more similar in meaning.
+
+**Exact versus approximate search.** Comparing the question with every vector is exact but slow for millions of chunks. Approximate nearest neighbour indexes (such as HNSW graphs) find almost the same results far faster. For a few thousand chunks, exact search is fine.
+
+**Top-k.** You choose how many results to return. Too few and the right chunk may be missed; too many and the prompt fills with noise. Five to ten is a common start; measure on your questions.
+
+**Metadata and filters.** Store document id, title, section, page, date and access groups with each vector. Filter inside the search (only this product, only current versions, only what this user may see).
+
+**Where vector search struggles.** Exact identifiers and rare terms: error codes such as "E-4012", policy numbers, product SKUs, uncommon names. Embeddings capture meaning, not exact strings. **Hybrid search** combines vector search with keyword search (BM25) to catch these.
+
+**Reranking.** A **reranker** is a slower, more accurate model that reads the question and each candidate chunk together and reorders them by relevance. Retrieve 20 to 50 candidates with vector or hybrid search, rerank, and keep the best five for the prompt.
+
+**Keeping the index in sync.** When documents change, delete their old vectors and add new ones; if you change the embedding model, rebuild everything.
+
+## A worked example
+
+A Hyderabad electronics retailer builds a support assistant over 3,000 product manuals and help articles.
+
+- Chunks are embedded with an open embedding model and stored in PostgreSQL with pgvector, with product model and document type as metadata.
+- For "my washing machine shows error E-4012 and won't drain", plain vector search returns general draining articles but misses the page that lists E-4012, because the code is a rare token.
+- They add keyword search and merge the two result lists; the error-code page now ranks first.
+- They add a reranker over the top 30; on a test of 60 questions, the right chunk appears in the top five 91% of the time, against 72% with vector search alone.
+- A filter on the customer's product model removes manuals for other models.
+
+## Common mistakes
+
+- **Embedding queries and chunks with different models.**
+- **Relying on vectors for codes and IDs.** Add keyword search.
+- **Picking top-k without testing.**
+- **Filtering after retrieval.** Filter inside the search.
+- **Forgetting to update or rebuild the index.**
+
+## Practise
+
+Work through the Hugging Face semantic search lesson linked below.
+
+1. Index 200 chunks of a document set with FAISS or pgvector and retrieve top-5 for ten questions.
+2. Add keyword search for questions with codes or names, merge the results, and compare.
+3. Add a reranker over the top 20 and measure the change on your ten questions.
+
+**You are done when you can** explain top-k, when vector search fails, and what a reranker adds.

@@ -8,6 +8,8 @@ hours: 4
 gap_tags: [agent-loop]
 primary_resource: anthropic-building-effective-agents
 alternates: [hf-agents-course]
+format: explainer
+key_terms: [agent, agent-loop, workflow, tool-calling]
 check:
   type: mcq
   question_ids: [agent-loop-1, agent-loop-2, agent-loop-3]
@@ -16,10 +18,72 @@ reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
 ---
 
-Read the article, then Unit 1 of the agents course.
+## What it is
 
-**Do this**
+An **agent** is a model running in a loop with tools: it decides what to do next, calls a tool, reads the result and decides again, until the task is done or it must stop. The loop is short to write; the hard part is making it reliable.
 
-Write the loop yourself without a framework: call the model with tools, run any tool calls, append the results, and repeat until the model answers without a tool call. Add a maximum number of steps.
+It helps to distinguish two designs, as Anthropic's "Building effective agents" article does:
 
-**You are done when you can** explain the difference between a workflow and an agent.
+- A **workflow**: your code decides the steps (first classify, then retrieve, then draft). The model fills in each step. Predictable and easy to test.
+- An **agent**: the model decides the steps and how many, choosing tools as it goes. Flexible for open-ended tasks, harder to predict.
+
+Use a workflow when the steps are known; use an agent when they are not.
+
+## How it works
+
+**The core loop.**
+
+```python
+messages = [{"role": "user", "content": task}]
+for step in range(MAX_STEPS):
+    reply = call_model(messages, tools=TOOLS)
+    messages.append({"role": "assistant", "content": reply.content})
+    if not reply.tool_calls:                 # the model is done
+        return reply.text
+    results = [run_tool(c.name, c.args) for c in reply.tool_calls]
+    messages.append({"role": "user", "content": results})
+raise StopIteration("Step limit reached; hand over to a person")
+```
+
+Each round: the model sees the task, everything so far and the tool list; it either answers or asks for tools; your code runs them and appends the results.
+
+**Stopping.** The loop ends when the model answers without requesting tools. Always add a **maximum number of steps** so a confused agent cannot loop forever, burning money and repeating actions; when hit, stop cleanly and hand over.
+
+**Good tools make good agents.** A few clear, well-described tools with helpful errors matter more than clever prompting.
+
+**The system prompt** tells the agent its goal, its tools' purpose, how to decide it is finished, and what it must never do without confirmation.
+
+**Start simple.** Many tasks work with a single model call plus retrieval, or a short workflow. Add agent loops when the number and order of steps truly vary.
+
+## A worked example
+
+A Bengaluru travel startup wants an assistant that answers "Plan a 3-day weekend in Coorg for two, under ₹25,000, from Bengaluru".
+
+Tools: `search_stays(location, dates, budget)`, `get_travel_options(from, to, date)`, `get_weather(location, dates)`.
+
+A run:
+
+1. The model calls `get_weather` for Coorg on the dates: light rain expected.
+2. It calls `get_travel_options`: a 6-hour drive or a bus.
+3. It calls `search_stays` with a budget of ₹14,000 for two nights: three homestays returned.
+4. It answers with a plan: drive, a homestay with a covered sit-out given the rain, two indoor-friendly activities, and a cost breakdown of about ₹22,000.
+
+Four model calls, three tool calls. With a cap of 10 steps, a run once looped on `search_stays` with slightly different budgets when nothing matched; it stopped at the cap and the app showed "We couldn't find stays in that budget; try other dates". The team then improved the tool to return "no stays under ₹X; cheapest is ₹Y", and the loop stopped looping.
+
+## Common mistakes
+
+- **Using an agent when a workflow would do.**
+- **No step limit.**
+- **Vague tools and errors.** The agent then guesses or loops.
+- **No stop condition in the instructions.**
+- **No logging of each step.** You cannot debug what you cannot see.
+
+## Practise
+
+Read Anthropic's "Building effective agents" linked below.
+
+1. Write the agent loop above with two simple tools and a step limit.
+2. Run five different tasks and print each step (tool and arguments) to see how the agent decides.
+3. Rewrite one task as a fixed workflow and compare reliability and cost.
+
+**You are done when you can** explain the agent loop, the difference between a workflow and an agent, and why the step limit matters.

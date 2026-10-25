@@ -8,6 +8,8 @@ hours: 6
 gap_tags: [rag-pipeline]
 primary_resource: anthropic-contextual-retrieval
 alternates: [hf-semantic-search-faiss]
+format: explainer
+key_terms: [rag, retrieval, grounding, citation]
 check:
   type: project
   brief: "Push a RAG app over 20 or more documents that answers with sources and says when it does not know. Include a README with five example questions, the answers and which source each came from. Submit the repository link."
@@ -16,11 +18,58 @@ reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
 ---
 
-Read the contextual retrieval article for what good looks like, then build the simplest version that works.
+## What it is
 
-**Steps**
+A **RAG app** (retrieval-augmented generation) answers questions from your own documents. For each question it:
 
-1. Load 20 or more documents and chunk them.
-2. Embed the chunks and build an index.
-3. For a question, retrieve the top chunks and pass them to the model with an instruction to answer only from them and cite the source.
-4. Make it say "I don't know" when the chunks do not contain the answer.
+1. **retrieves** the most relevant passages from an index of your documents;
+2. **augments** the prompt with those passages;
+3. **generates** an answer that uses only those passages and cites them.
+
+It is the most common way companies use language models on their own data, because it needs no model training and stays current when documents change.
+
+## How it works
+
+**Ingestion (once, then on updates).** Load documents, extract clean text, split into chunks with titles and page numbers, embed each chunk and store it in an index with its metadata.
+
+**Query time.**
+
+- Embed the question; retrieve the top candidates (vector search, ideally hybrid with keyword search); optionally rerank and keep the best five.
+- Build the prompt: instructions, the passages each labelled with an id and source, then the question.
+- Instruct the model: answer only from the passages; cite passage ids; if the passages do not contain the answer, say so.
+- Return the answer with its citations, linked to the source documents.
+
+**Contextual retrieval.** Chunks often lack context ("the limit is 45 days"). Prepending a short description of where the chunk sits in its document, and combining embeddings with keyword search, measurably reduces retrieval failures.
+
+**Saying "I don't know".** A trustworthy RAG app refuses when the documents are silent. Include unanswerable questions in your tests.
+
+**Evaluation.** Keep a fixed set of questions with expected sources and answers. Measure retrieval (recall at k) and answers (correctness, faithfulness) separately, and rerun after every change.
+
+**Freshness and access.** Re-index changed documents; filter out superseded ones; if users have different permissions, filter retrieval by what each user may see.
+
+## A worked example
+
+A college in Coimbatore builds an assistant for students' questions about academic regulations, fees, exams and scholarships, from 25 PDFs.
+
+- Ingestion: text extracted with page numbers, split by headings into about 400-token chunks with the document title and section prepended, embedded and stored in pgvector.
+- Retrieval: hybrid search (vectors plus keywords), top 20 reranked to 5.
+- Prompt: "Answer using only the passages. Cite like [2]. If the answer is not in the passages, say 'I could not find this in the college regulations' and suggest the office to contact."
+- Interface: the answer shows citations that open the PDF at the right page.
+
+Testing with 50 questions (including eight unanswerable): 42 correct with correct citations, 6 of the 8 unanswerable correctly refused. Two failures came from a fee circular that was a scanned image; after OCR, both were fixed. Students now ask the assistant before queuing at the office, and staff answer fewer repeat questions.
+
+## Common mistakes
+
+- **No citations.** Users cannot check, and errors go unnoticed.
+- **No refusal path.** The model guesses when documents are silent.
+- **Skipping retrieval evaluation.** Most failures are retrieval failures.
+- **Ignoring scanned documents and tables.** They need OCR and table-aware parsing.
+- **Indexing once and forgetting.** Documents change; re-index.
+
+## Practise
+
+Read Anthropic's contextual retrieval article linked below.
+
+This lesson's check is a project: push a RAG app over 20 or more documents that answers with sources and says when it does not know. Include a README with five example questions, the answers it gave and one failure you found and fixed.
+
+**You are done when you can** show cited answers, a correct refusal and how you measured retrieval.

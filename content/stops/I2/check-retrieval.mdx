@@ -8,6 +8,8 @@ hours: 3
 gap_tags: [retrieval-eval]
 primary_resource: ragas-metrics
 alternates: [hamel-evals]
+format: explainer
+key_terms: [recall-at-k, golden-set, retrieval, faithfulness]
 check:
   type: mcq
   question_ids: [check-retrieval-1, check-retrieval-2, check-retrieval-3]
@@ -16,8 +18,62 @@ reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
 ---
 
-Read the metric names and what each one checks. Skim the evals article for how teams use test sets.
+## What it is
 
-**Do this**
+Most wrong answers from a RAG system start with retrieval: the right passage was never found, so the model could not use it. **Checking retrieval** means measuring, with a fixed set of test questions, whether the right passages come back, separately from whether the final answer is good.
 
-Write 20 questions about your documents, each with the chunk that holds its answer. Measure how often that chunk appears in the top 3 (recall at 3). Change one thing, such as chunk size, and measure again.
+## How it works
+
+**Build a test set.** Collect 30 to 100 realistic questions with, for each, the passage or passages that contain the answer. Use real user questions where possible, and include easy, hard, vague and unanswerable ones. Keep the set fixed so you can compare changes fairly.
+
+**Retrieval metrics.**
+
+- **Recall at k**: for what share of questions does at least one correct passage appear in the top k results? Recall at 5 is a common headline number.
+- **Precision at k** or **context precision**: of the k passages retrieved, how many are actually relevant? Low precision fills prompts with noise.
+- **MRR** (mean reciprocal rank): rewards putting the right passage near the top.
+
+**Answer metrics**, measured separately:
+
+- **Faithfulness**: are the answer's claims supported by the retrieved passages?
+- **Answer correctness**: does it match the expected answer?
+
+Tools such as RAGAS compute these, often using a model as a judge; check a sample by hand.
+
+**Diagnose with the split.** If an answer is wrong:
+
+- right passage *not* retrieved → fix retrieval (chunking, embeddings, hybrid search, query rewriting, filters);
+- right passage retrieved but answer wrong → fix generation (prompt, grounding, model).
+
+**Run on every change.** Changing chunk size, the embedding model or top-k can help some questions and hurt others. The fixed set shows the net effect.
+
+## A worked example
+
+A Kochi bank's internal assistant answers staff questions from 900 circulars. Staff complain that answers are often wrong.
+
+The team writes 60 questions with the circular and paragraph that answer each. Results:
+
+- recall at 5: 63%;
+- faithfulness of answers: 0.92;
+- correctness: 58%.
+
+Faithfulness is high, so the model mostly says what retrieved passages say. Recall is low: the right passages often never arrive. Looking at the misses, most involve circular numbers ("as per RBI/2026-27/41") and recently revised circulars where older versions outrank new ones.
+
+Changes: hybrid search with keyword matching for circular numbers, and a filter excluding superseded circulars. Recall at 5 rises to 87% and correctness to 81%, measured on the same 60 questions.
+
+## Common mistakes
+
+- **Judging only final answers.** You cannot tell whether retrieval or generation failed.
+- **Changing the test set between runs.** Keep it fixed to compare.
+- **No unanswerable questions.** You need them to test refusals.
+- **Trusting automatic judges blindly.** Check a sample.
+- **Optimising recall while precision collapses.** Track both.
+
+## Practise
+
+Read the RAGAS metrics page linked below.
+
+1. Write 30 questions for your RAG app with the correct passage for each.
+2. Compute recall at 5 and precision at 5, and list the misses.
+3. Make one retrieval change and rerun on the same set.
+
+**You are done when you can** explain what recall at 5 measures, where to look first when the right chunk was not retrieved, and show before-and-after numbers.
