@@ -2,7 +2,7 @@
 import type { LevelId } from "@/lib/levels";
 import type { MapTopic } from "@/lib/roadmap/map";
 
-export type StopSummary = { id: string; level: LevelId; order: number; title: string; outcome: string; hours: number; gap_tags: string[] };
+export type StopSummary = { id: string; level: LevelId; title: string; outcome: string; hours: number; gap_tags: string[] };
 export type LevelSummary = {
   id: LevelId;
   name: string;

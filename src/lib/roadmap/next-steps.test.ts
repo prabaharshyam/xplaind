@@ -3,30 +3,35 @@ import type { LevelId } from "@/lib/levels";
 import { nextSteps, reviewStopFor } from "./next-steps";
 import type { RoadmapStop } from "./types";
 
-const stop = (id: string, level: LevelId, order: number, gap_tags: string[] = [], hours = 2): RoadmapStop => ({
+const stop = (id: string, level: LevelId, gap_tags: string[] = [], hours = 2): RoadmapStop => ({
   id,
   level,
-  order,
   hours,
   gap_tags,
 });
 
-// Two stops per level for B1 to I1, listed out of order on purpose.
+// Two stops per level for B1 to I1, in path order.
 const STOPS: RoadmapStop[] = [
-  stop("i1-b", "I1", 2),
-  stop("b1-a", "B1", 1, ["ai-basics"]),
-  stop("b2-b", "B2", 2, ["python-files"]),
-  stop("b1-b", "B1", 2, ["prompting"]),
-  stop("b3-a", "B3", 1, ["git"]),
-  stop("b2-a", "B2", 1, ["python-basics"]),
-  stop("i1-a", "I1", 1, ["tokens"]),
-  stop("b3-b", "B3", 2, ["pandas"]),
+  stop("b1-a", "B1", ["ai-basics"]),
+  stop("b1-b", "B1", ["prompting"]),
+  stop("b2-a", "B2", ["python-basics"]),
+  stop("b2-b", "B2", ["python-files"]),
+  stop("b3-a", "B3", ["git"]),
+  stop("b3-b", "B3", ["pandas"]),
+  stop("i1-a", "I1", ["tokens"]),
+  stop("i1-b", "I1"),
 ];
 const ids = (steps: { stopId: string }[]) => steps.map((s) => s.stopId);
 const none = new Set<string>();
 
 describe("nextSteps (RM-3)", () => {
-  it("lists five stops from the start level in ladder order when there are no gaps", () => {
+  it("follows the path's own order, not the level order", () => {
+    // A path may teach an I1 lesson before a B3 one, as the FDE path does.
+    const path = [stop("i1-a", "I1"), stop("b3-a", "B3"), stop("b1-a", "B1"), stop("i1-b", "I1")];
+    expect(ids(nextSteps({ stops: path, startLevel: "B3", gapTags: [], completed: none }))).toEqual(["i1-a", "b3-a", "i1-b"]);
+  });
+
+  it("lists five stops from the start level in path order when there are no gaps", () => {
     expect(ids(nextSteps({ stops: STOPS, startLevel: "B2", gapTags: [], completed: none }))).toEqual([
       "b2-a",
       "b2-b",
@@ -80,9 +85,9 @@ describe("nextSteps (RM-3)", () => {
 });
 
 describe("reviewStopFor (PL-4)", () => {
-  it("picks the easiest stop at or below the start level", () => {
-    const stops = [stop("late", "B2", 1, ["x"]), stop("early", "B1", 3, ["x"])];
-    expect(reviewStopFor(stops, "B3", "x")?.id).toBe("early");
+  it("picks the first stop in path order at or below the start level", () => {
+    const stops = [stop("late", "B2", ["x"]), stop("early", "B1", ["x"])];
+    expect(reviewStopFor(stops, "B3", "x")?.id).toBe("late");
     expect(reviewStopFor(stops, "B1", "x")?.id).toBe("early");
     expect(reviewStopFor([stops[0]], "B1", "x")).toBeUndefined();
   });

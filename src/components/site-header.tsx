@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const NAV = [
-  { href: "/roadmap/genai-engineer", label: "Roadmap" },
+  { href: "/paths", label: "Paths" },
   { href: "/resources", label: "Courses" },
   { href: "/interview", label: "Interview" },
   { href: "/practice", label: "Practice" },

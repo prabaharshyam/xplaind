@@ -24,7 +24,6 @@ export function roadmapData(): { goal: { id: string; name: string }; levels: Lev
     stops: stops.map((s) => ({
       id: s.id,
       level: s.level,
-      order: s.order,
       title: s.title,
       outcome: s.outcome,
       hours: s.hours,

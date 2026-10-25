@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { getContent } from "@/lib/content";
-import type { PublicQuestion } from "@/lib/placement/types";
-import { PlacementTest } from "./placement-test";
+import { DEFAULT_PATH_ID } from "@/lib/paths";
+import { getPath } from "@/lib/content";
+import { TestPage } from "./test-page";
 
 export const metadata: Metadata = {
   title: "Find my level",
@@ -9,20 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function StartPage() {
-  const content = getContent();
-  const goal = content.goals[0].data;
-  const bank: PublicQuestion[] = content.placement.map(({ data: q }) => ({
-    id: q.id,
-    level: q.level,
-    topic_tags: q.topic_tags,
-    stem: q.stem,
-    options: q.options,
-    correct: q.correct,
-    explanation: q.explanation,
-  }));
-  return (
-    <main className="mx-auto max-w-xl px-4 py-8">
-      <PlacementTest goal={{ id: goal.id, name: goal.name }} bank={bank} />
-    </main>
-  );
+  return <TestPage goal={getPath(DEFAULT_PATH_ID)!} />;
 }

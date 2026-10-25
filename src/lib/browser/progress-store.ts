@@ -1,15 +1,16 @@
-// Browser-only stop progress and the "Free only" preference (RM-7 to RM-9) for a
+// Browser-only stop progress, the chosen path and the "Free only" preference (RM-7 to RM-9) for a
 // signed-out learner. Slice S5 copies this into stop_progress on sign-in, so the
 // record mirrors that table. Holds stop ids and choices only, no personal data.
 import type { ProgressMap, StopProgress } from "@/lib/roadmap/types";
-import { syncStop } from "./account-sync";
+import { syncPath, syncStop } from "./account-sync";
 import { read, write } from "./storage";
 
 export { serverSnapshot, subscribe } from "./storage";
 
 export const PROGRESS_KEY = "xplaind.progress.v1";
 
-export type SavedProgress = { version: 1; stops: ProgressMap; freeOnly: boolean };
+/** `path` is the id of the path the learner chose; absent until they choose one. */
+export type SavedProgress = { version: 1; stops: ProgressMap; freeOnly: boolean; path?: string };
 
 const EMPTY: SavedProgress = { version: 1, stops: {}, freeOnly: false };
 
@@ -20,7 +21,8 @@ export function parseProgress(raw: string | null): SavedProgress {
   try {
     const v = JSON.parse(raw) as SavedProgress;
     if (!v || v.version !== 1 || typeof v.stops !== "object" || v.stops === null) return EMPTY;
-    return { version: 1, stops: v.stops, freeOnly: v.freeOnly === true };
+    const path = typeof v.path === "string" && /^[a-z0-9-]{1,64}$/.test(v.path) ? v.path : undefined;
+    return { version: 1, stops: v.stops, freeOnly: v.freeOnly === true, ...(path ? { path } : {}) };
   } catch {
     return EMPTY;
   }
@@ -48,3 +50,8 @@ export function clearStop(stopId: string): void {
 export const replaceStops = (stops: ProgressMap): void => update((p) => ({ ...p, stops }));
 
 export const setFreeOnly = (freeOnly: boolean): void => update((p) => ({ ...p, freeOnly }));
+
+export function setPath(path: string): void {
+  update((p) => ({ ...p, path }));
+  syncPath(path);
+}

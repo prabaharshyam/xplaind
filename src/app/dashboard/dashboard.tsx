@@ -6,8 +6,9 @@ import { NextStepsCard } from "@/components/next-steps-card";
 import { muted, secondaryButton, textLink } from "@/components/ui";
 import { weeklyStreak } from "@/lib/account/streak";
 import { claimDevice, type ClaimResult } from "@/lib/browser/claim";
-import { useAttempt, useProgress, useToday } from "@/lib/browser/hooks";
+import { useAttempt, useCurrentPathId, useProgress, useToday } from "@/lib/browser/hooks";
 import { type LevelId, levelIndex } from "@/lib/levels";
+import { DEFAULT_PATH_ID, type PathRef, roadmapHref, startFor, testHref } from "@/lib/paths";
 import { coverage } from "@/lib/roadmap/progress";
 import type { RoadmapStop } from "@/lib/roadmap/types";
 
@@ -15,12 +16,27 @@ type Level = { id: LevelId; name: string; draft_hours: number };
 type Stop = RoadmapStop & { title: string };
 
 /** AC-3. Claims the device's data first (AC-2), so the dashboard and this device agree. */
-export function Dashboard({ email, levels, stops }: { email: string | null; levels: Level[]; stops: Stop[] }) {
+export function Dashboard({
+  email,
+  levels,
+  paths,
+  stopsByPath,
+}: {
+  email: string | null;
+  levels: Level[];
+  paths: PathRef[];
+  stopsByPath: Record<string, Stop[]>;
+}) {
   const [claim, setClaim] = useState<ClaimResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { result } = useAttempt();
   const progress = useProgress();
   const today = useToday();
+  const pathId = useCurrentPathId(paths.map((p) => p.id));
+  const path = paths.find((p) => p.id === pathId)!;
+  const pathStops = stopsByPath[pathId] ?? [];
+  // Level progress and badges are measured on the nine-level GenAI ladder.
+  const stops = stopsByPath[DEFAULT_PATH_ID] ?? [];
 
   useEffect(() => {
     claimDevice().then(setClaim, (e: Error) => setError(e.message));
@@ -82,7 +98,31 @@ export function Dashboard({ email, levels, stops }: { email: string | null; leve
         </dl>
       </section>
 
-      {start && <NextStepsCard stops={stops} startLevel={start} gapTags={result?.gaps ?? []} />}
+      <section aria-labelledby="path-heading" className="flex flex-col gap-1">
+        <h2 id="path-heading" className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+          Your path
+        </h2>
+        <p className="text-xl font-semibold">
+          <Link href={roadmapHref(path.id)} className={textLink}>
+            {path.name}
+          </Link>
+        </p>
+        <p className="text-sm">
+          {coverage(pathStops, startFor(path, start), progress.stops).percent}% covered ·{" "}
+          <Link href="/paths" className={textLink}>
+            Change path
+          </Link>
+        </p>
+      </section>
+
+      {(start || path.placement === "none") && (
+        <NextStepsCard
+          stops={pathStops}
+          startLevel={startFor(path, start)}
+          gapTags={path.placement === "ladder" ? (result?.gaps ?? []) : []}
+          pathId={path.id}
+        />
+      )}
 
       <section aria-labelledby="levels-heading" className="flex flex-col gap-3">
         <h2 id="levels-heading" className="text-xl font-semibold">
@@ -134,7 +174,7 @@ export function Dashboard({ email, levels, stops }: { email: string | null; leve
       </section>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Link href="/start" className={secondaryButton}>
+        <Link href={testHref(path.placement === "ladder" ? path.id : DEFAULT_PATH_ID)} className={secondaryButton}>
           Take the test again
         </Link>
         <Link href="/settings" className={secondaryButton}>

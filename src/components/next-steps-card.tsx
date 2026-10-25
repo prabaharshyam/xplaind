@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useProgress } from "@/lib/browser/hooks";
 import type { LevelId } from "@/lib/levels";
+import { DEFAULT_PATH_ID, roadmapHref } from "@/lib/paths";
 import { nextSteps } from "@/lib/roadmap/next-steps";
 import { completedIds } from "@/lib/roadmap/progress";
 import type { RoadmapStop } from "@/lib/roadmap/types";
@@ -11,10 +12,25 @@ import { muted, textLink } from "./ui";
 
 type Stop = RoadmapStop & { title: string };
 
-/** RM-3. Shown on the result page now; the dashboard and weekly email reuse nextSteps(). */
-export function NextStepsCard({ stops, startLevel, gapTags }: { stops: Stop[]; startLevel: LevelId; gapTags: string[] }) {
+/**
+ * RM-3 for one path. `stops` are the path's lessons in path order. Shown on the
+ * result page, the dashboard and each path's roadmap.
+ */
+export function NextStepsCard({
+  stops,
+  startLevel,
+  gapTags,
+  pathId = DEFAULT_PATH_ID,
+}: {
+  stops: Stop[];
+  startLevel: LevelId;
+  gapTags: string[];
+  pathId?: string;
+}) {
   const progress = useProgress();
-  const steps = nextSteps({ stops, startLevel, gapTags, completed: completedIds(progress.stops) });
+  const completed = completedIds(progress.stops);
+  const steps = nextSteps({ stops, startLevel, gapTags, completed });
+  const allDone = stops.length > 0 && stops.every((s) => completed.has(s.id));
   const byId = new Map(stops.map((s) => [s.id, s]));
 
   return (
@@ -24,8 +40,9 @@ export function NextStepsCard({ stops, startLevel, gapTags }: { stops: Stop[]; s
       </h2>
       {steps.length === 0 ? (
         <p className="leading-7">
-          The steps from {startLevel} up are still being written. Meanwhile, browse{" "}
-          <Link href="/roadmap/genai-engineer" className={textLink}>
+          {allDone ? "You have done every written step on this path." : "The next steps are still being written."}{" "}
+          Meanwhile, browse{" "}
+          <Link href={roadmapHref(pathId)} className={textLink}>
             the whole roadmap
           </Link>
           .
@@ -46,7 +63,7 @@ export function NextStepsCard({ stops, startLevel, gapTags }: { stops: Stop[]; s
                   <span className="flex flex-col">
                     <span className="font-medium">{s.title}</span>
                     <span className={`text-sm ${muted}`}>
-                      {step.reason === "review" ? `Review for ${tagLabel(step.gapTag)} · ` : `${s.level} · `}
+                      {step.reason === "review" ? `Review for ${tagLabel(step.gapTag)} · ` : pathId === DEFAULT_PATH_ID ? `${s.level} · ` : ""}
                       about {s.hours} {s.hours === 1 ? "hour" : "hours"}
                     </span>
                   </span>
@@ -57,9 +74,9 @@ export function NextStepsCard({ stops, startLevel, gapTags }: { stops: Stop[]; s
         </ol>
       )}
       {steps.length > 0 && steps.length < 5 && (
-        <p className={`text-sm ${muted}`}>More steps are being written for the levels above.</p>
+        <p className={`text-sm ${muted}`}>More steps are being written for this path.</p>
       )}
-      <Link href="/roadmap/genai-engineer" className={textLink}>
+      <Link href={roadmapHref(pathId)} className={textLink}>
         See the whole roadmap
       </Link>
     </section>

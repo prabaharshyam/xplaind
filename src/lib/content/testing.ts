@@ -2,6 +2,7 @@
 // bundle, so each test can break exactly one thing.
 import type { Bundle } from "./types";
 import type {
+  Goal,
   Book,
   CheckQuestion,
   InterviewQuestion,
@@ -43,7 +44,6 @@ export const resource = (o: Partial<Resource> = {}): Resource => ({
 export const stop = (o: Partial<Stop> = {}): Stop => ({
   id: "stop-one",
   level: "B1",
-  order: 1,
   title: "Stop one",
   outcome: "Do the thing.",
   why_it_matters: "Because it is the base for what comes next.",
@@ -105,11 +105,26 @@ export const book = (o: Partial<Book> = {}): Book => ({
   ...o,
 });
 
+export const goal = (o: Partial<Goal> = {}): Goal => ({
+  id: "genai-engineer",
+  name: "GenAI Engineer",
+  tagline: "Build apps on language models.",
+  description: "Build.",
+  who_for: "Engineers.",
+  rank: 1,
+  coding: "yes",
+  layout: "levels",
+  placement: "ladder",
+  months: 9,
+  stages: LEVEL_IDS.map((id) => ({ id, lessons: id === "B1" ? ["stop-one"] : [], planned: [] })),
+  ...o,
+});
+
 /** Small and fully valid in development mode (not at launch size). */
 export function validBundle(): Bundle {
   const f = (file: string) => ({ file });
   return {
-    goals: [{ ...f("goals/g.yaml"), data: { id: "genai-engineer", name: "GenAI Engineer", description: "Build." } }],
+    goals: [{ ...f("goals/genai-engineer.yaml"), data: goal() }],
     levels: LEVEL_IDS.map((id) => ({
       ...f("levels/levels.yaml"),
       data: {

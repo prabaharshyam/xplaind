@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
 import { clearAttempt, parseAttempt, rawAttempt, serverSnapshot, subscribe } from "@/lib/browser/attempt-store";
 import { NextStepsCard } from "@/components/next-steps-card";
-import type { LevelId } from "@/lib/levels";
+import { type LevelId, levelIndex } from "@/lib/levels";
+import { DEFAULT_PATH_ID, type PathRef, currentPathId } from "@/lib/paths";
 import { hoursFromLevel, weeksAtPace } from "@/lib/placement/estimate";
 import { scoreAnswers } from "@/lib/placement/score";
 import { reviewStopFor } from "@/lib/roadmap/next-steps";
@@ -12,12 +13,23 @@ import type { PublicQuestion } from "@/lib/placement/types";
 import { splitStem, tagLabel } from "@/lib/text";
 
 type LevelInfo = { id: LevelId; name: string; can_do: string; draft_hours: number; exit_check: string };
-type StopInfo = { id: string; title: string; level: LevelId; order: number; hours: number; gap_tags: string[] };
+type StopInfo = { id: string; title: string; level: LevelId; hours: number; gap_tags: string[] };
 
 const linkButton =
   "inline-flex min-h-12 items-center justify-center rounded-lg px-5 py-3 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700";
 
-export function ResultView({ levels, stops, bank }: { levels: LevelInfo[]; stops: StopInfo[]; bank: PublicQuestion[] }) {
+export function ResultView({
+  levels,
+  paths,
+  stopsByPath,
+  bank,
+}: {
+  levels: LevelInfo[];
+  /** Paths that use the level test. */
+  paths: PathRef[];
+  stopsByPath: Record<string, StopInfo[]>;
+  bank: PublicQuestion[];
+}) {
   const raw = useSyncExternalStore(subscribe, rawAttempt, serverSnapshot);
   const attempt = useMemo(() => parseAttempt(raw), [raw]);
   const result = useMemo(() => (attempt ? scoreAnswers(attempt.answers) : null), [attempt]);
@@ -48,25 +60,31 @@ export function ResultView({ levels, stops, bank }: { levels: LevelInfo[]; stops
     );
   }
 
+  // The result follows the path the test was taken for.
+  const pathId = currentPathId(paths.map((p) => p.id), null, attempt.goal);
+  const path = paths.find((p) => p.id === pathId);
+  const stops = stopsByPath[pathId] ?? [];
+  const onDefault = pathId === DEFAULT_PATH_ID;
   const byId = new Map(levels.map((l) => [l.id, l]));
   const start = byId.get(result.startLevel);
   const passed = result.passedLevel ? byId.get(result.passedLevel) : null;
-  const hours = hoursFromLevel(levels, result.startLevel);
+  const hours = onDefault
+    ? hoursFromLevel(levels, result.startLevel)
+    : stops.filter((s) => levelIndex(s.level) >= levelIndex(result.startLevel)).reduce((n, s) => n + s.hours, 0);
   const weeks = weeksAtPace(hours, attempt.weeklyHours);
   const questions = new Map(bank.map((q) => [q.id, q]));
   const missed = attempt.answers.filter((a) => !a.correct && questions.has(a.questionId));
 
-  const titles = new Map(stops.map((s) => [s.id, s.title]));
-  /** The easiest stop at or below the start level that covers a gap tag. */
-  const stopFor = (tag: string) => {
-    const s = reviewStopFor(stops, result.startLevel, tag);
-    return s && { id: s.id, title: titles.get(s.id)! };
-  };
+  /** The first stop at or below the start level that covers a gap tag: on this path, else on the default path. */
+  const stopFor = (tag: string) =>
+    reviewStopFor(stops, result.startLevel, tag) ?? reviewStopFor(stopsByPath[DEFAULT_PATH_ID] ?? [], result.startLevel, tag);
 
   return (
     <div className="flex flex-col gap-8">
       <section aria-labelledby="result-heading" className="flex flex-col gap-3">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Your result</p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Your result{path && !onDefault ? ` for the ${path.name} path` : ""}
+        </p>
         <h1 id="result-heading" className="text-3xl font-semibold tracking-tight text-balance">
           {result.topOfLadder
             ? `You are at the top of the ladder: ${start?.name}`
@@ -92,7 +110,8 @@ export function ResultView({ levels, stops, bank }: { levels: LevelInfo[]; stops
           How long it takes
         </h2>
         <p className="leading-7">
-          About <strong>{hours} hours</strong> of material from {result.startLevel} to P3. At{" "}
+          About <strong>{hours} hours</strong> of {onDefault ? "material" : "written lessons"} from {result.startLevel}{" "}
+          {onDefault ? "to P3" : `to the end of the ${path?.name ?? ""} path`}. At{" "}
           {attempt.weeklyHours} hours a week that is about <strong>{weeks} weeks</strong>.
         </p>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -130,7 +149,7 @@ export function ResultView({ levels, stops, bank }: { levels: LevelInfo[]; stops
         )}
       </section>
 
-      <NextStepsCard stops={stops} startLevel={result.startLevel} gapTags={result.gaps} />
+      <NextStepsCard stops={stops} startLevel={result.startLevel} gapTags={result.gaps} pathId={pathId} />
 
       {missed.length > 0 && (
         <section aria-labelledby="missed-heading" className="flex flex-col gap-3">

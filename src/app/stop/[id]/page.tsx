@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { muted, textLink } from "@/components/ui";
-import { getContent, getLevel, getStop, getStops } from "@/lib/content";
+import { GENAI_PATH_ID, getContent, getLevel, getStop, getStops, pathsWithLesson } from "@/lib/content";
+import { roadmapHref } from "@/lib/paths";
 import { resourceCard } from "@/lib/content/cards";
 import { getInterviewViews } from "@/lib/content/interview";
 import type { CheckQuestionView } from "./stop-progress";
@@ -24,6 +25,8 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   if (!stop) notFound();
 
   const level = getLevel(stop.level);
+  const paths = pathsWithLesson(stop.id);
+  const onGenai = paths.some((p) => p.id === GENAI_PATH_ID);
   const interview = getInterviewViews().filter((q) => q.stop.id === stop.id);
   const cards = [stop.primary_resource, ...stop.alternates].map(resourceCard);
   const checks = new Map(getContent().checks.map(({ data: q }) => [q.id, q]));
@@ -41,19 +44,40 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
       <nav aria-label="Breadcrumb" className="text-sm">
-        <Link href="/roadmap/genai-engineer" className={textLink}>
-          Roadmap
-        </Link>
-        <span className={muted}> / </span>
-        <Link href={`/roadmap/genai-engineer/${stop.level.toLowerCase()}`} className={textLink}>
-          {stop.level} {level?.name}
-        </Link>
+        {onGenai ? (
+          <>
+            <Link href={roadmapHref(GENAI_PATH_ID)} className={textLink}>
+              Roadmap
+            </Link>
+            <span className={muted}> / </span>
+            <Link href={`/roadmap/genai-engineer/${stop.level.toLowerCase()}`} className={textLink}>
+              {stop.level} {level?.name}
+            </Link>
+          </>
+        ) : (
+          <Link href="/paths" className={textLink}>
+            Paths
+          </Link>
+        )}
       </nav>
       <p className={`mt-4 text-sm ${muted}`}>
         {stop.level} · {level?.name} · about {stop.hours} {stop.hours === 1 ? "hour" : "hours"}
       </p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight text-balance">{stop.title}</h1>
       <p className="mt-4 text-lg leading-8">{stop.outcome}</p>
+      {paths.length > 0 && (
+        <p className={`mt-3 text-sm ${muted}`}>
+          On {paths.length === 1 ? "the path" : "these paths"}:{" "}
+          {paths.map((p, i) => (
+            <span key={p.id}>
+              {i > 0 && ", "}
+              <Link href={roadmapHref(p.id)} className={textLink}>
+                {p.name}
+              </Link>
+            </span>
+          ))}
+        </p>
+      )}
 
       <h2 className="mt-8 text-xl font-semibold">Why it matters</h2>
       <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{stop.why_it_matters}</p>

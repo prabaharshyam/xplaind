@@ -5,7 +5,6 @@ import type { LevelId } from "@/lib/levels";
 export type RoadmapStop = {
   id: string;
   level: LevelId;
-  order: number;
   hours: number;
   gap_tags: readonly string[];
 };

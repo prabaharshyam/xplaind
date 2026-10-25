@@ -3,11 +3,11 @@
 // so a bad file fails `next build` instead of reaching a visitor.
 import path from "node:path";
 import { todayInIST } from "@/lib/dates";
-import { LEVEL_IDS, type LevelId } from "@/lib/levels";
+import type { LevelId } from "@/lib/levels";
 import { loadContent } from "./load";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
-import type { LevelDefinition, Resource, Stop } from "./schema";
+import type { Goal, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
 
 let cached: Bundle | undefined;
 
@@ -33,9 +33,33 @@ export const getResource = (id: string): Resource | undefined =>
 export const getLevel = (id: LevelId): LevelDefinition | undefined =>
   getContent().levels.find((l) => l.data.id === id)?.data;
 
-/** Stops in ladder order: by level, then by order within the level. */
-export function getStopsInOrder(): Stop[] {
-  return [...getStops()].sort(
-    (a, b) => LEVEL_IDS.indexOf(a.level) - LEVEL_IDS.indexOf(b.level) || a.order - b.order,
-  );
+export const GENAI_PATH_ID = "genai-engineer";
+
+/** Paths in the order the chooser shows them. */
+export const getPaths = (): Goal[] => getContent().goals.map((g) => g.data).sort((a, b) => a.rank - b.rank);
+export const getPath = (id: string): Goal | undefined => getPaths().find((g) => g.id === id);
+
+/** A stage with its name filled in from levels.yaml on a path laid out by level. */
+export type ResolvedStage = Omit<PathStage, "title" | "summary"> & { title: string; summary: string; project?: StageProject };
+
+export function pathStages(path: Goal): ResolvedStage[] {
+  return path.stages.map((st) => {
+    const level = path.layout === "levels" ? getLevel(st.id as LevelId) : undefined;
+    return { ...st, title: st.title ?? level?.name ?? st.id, summary: st.summary ?? level?.can_do ?? "" };
+  });
 }
+
+/** Every lesson on a path, in the order a learner takes them. */
+export function pathLessons(pathId: string): Stop[] {
+  const path = getPath(pathId);
+  if (!path) return [];
+  const byId = new Map(getStops().map((s) => [s.id, s]));
+  return path.stages.flatMap((st) => st.lessons.map((id) => byId.get(id)!));
+}
+
+/** The paths a lesson sits on, in chooser order. */
+export const pathsWithLesson = (lessonId: string): Goal[] =>
+  getPaths().filter((p) => p.stages.some((st) => st.lessons.includes(lessonId)));
+
+/** The GenAI Engineer path's lessons, in ladder order. */
+export const getStopsInOrder = (): Stop[] => pathLessons(GENAI_PATH_ID);

@@ -105,8 +105,8 @@ const ProjectCheck = z.strictObject({ type: z.literal("project"), brief: Text })
 export const StopFrontmatter = z
   .strictObject({
     id: Slug,
+    /** Difficulty on the shared nine-level ladder; also the folder the file sits in. */
     level: Level,
-    order: z.number().int().positive(),
     title: Text,
     outcome: Text,
     why_it_matters: Text.max(360),
@@ -246,9 +246,48 @@ export type LevelDefinition = z.infer<typeof LevelDefinition>;
 
 export const LevelsFile = z.strictObject({ levels: z.array(LevelDefinition) });
 
+/** A stage's closing project: the proof a learner shows an employer. */
+export const StageProject = z.strictObject({
+  title: Text,
+  brief: Text,
+  deliverables: z.array(Text).min(1),
+});
+export type StageProject = z.infer<typeof StageProject>;
+
+/** A topic on a path that has no lesson yet. Shows on the map as "being written". */
+export const PlannedTopic = z.strictObject({ title: Text, summary: Text.max(140) });
+
+/**
+ * One stage of a path: lessons in the order the learner takes them. On a path laid
+ * out by level, the stage id is the level id and its name comes from levels.yaml.
+ */
+export const PathStage = z.strictObject({
+  id: z.union([Level, Slug]),
+  title: Text.optional(),
+  summary: Text.max(200).optional(),
+  lessons: z.array(Slug),
+  planned: z.array(PlannedTopic).default([]),
+  project: StageProject.optional(),
+});
+export type PathStage = z.infer<typeof PathStage>;
+
+/**
+ * A path (the PRD calls it a goal): an ordered route through the shared lesson
+ * library. placement "ladder" means the level test can skip lessons below the
+ * learner's level; "none" means everyone starts at the first stage.
+ */
 export const Goal = z.strictObject({
   id: Slug,
   name: Text,
+  /** One line for the path chooser. */
+  tagline: Text.max(120),
   description: Text,
+  who_for: Text,
+  rank: z.number().int().positive(),
+  coding: z.enum(["none", "some", "yes"]),
+  layout: z.enum(["levels", "stages"]),
+  placement: z.enum(["ladder", "none"]),
+  months: z.number().positive(),
+  stages: z.array(PathStage).min(1),
 });
 export type Goal = z.infer<typeof Goal>;

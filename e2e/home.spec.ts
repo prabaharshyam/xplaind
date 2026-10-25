@@ -32,7 +32,7 @@ test("the home page leads to the test, roadmap, courses and interview prep", asy
   await expect(main.getByRole("link", { name: "How we rank courses" })).toHaveAttribute("href", "/how-we-rank");
   const nav = page.getByRole("banner");
   await nav.locator("summary").click(); // phone width: the links sit in the menu
-  for (const [name, href] of [["Courses", "/resources"], ["Interview", "/interview"], ["Practice", "/practice"], ["Roadmap", "/roadmap/genai-engineer"]]) {
+  for (const [name, href] of [["Courses", "/resources"], ["Interview", "/interview"], ["Practice", "/practice"], ["Paths", "/paths"]]) {
     await expect(nav.getByRole("link", { name, exact: true }).first()).toHaveAttribute("href", href);
   }
 });

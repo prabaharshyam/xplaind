@@ -3,6 +3,7 @@
 // nothing stored, so pages prerender cleanly and fill in after hydration.
 import { useMemo, useSyncExternalStore } from "react";
 import { todayInIST } from "@/lib/dates";
+import { currentPathId } from "@/lib/paths";
 import { scoreAnswers } from "@/lib/placement/score";
 import { parseAttempt, rawAttempt } from "./attempt-store";
 import { parsePractice, rawPractice } from "./practice-store";
@@ -33,4 +34,11 @@ const noSubscription = () => () => {};
 /** Today in India, or undefined while prerendering (the build does not know today). */
 export function useToday(): string | undefined {
   return useSyncExternalStore(noSubscription, todayInIST, () => undefined);
+}
+
+/** The learner's current path id, from this device's choice or last test. Default before hydration. */
+export function useCurrentPathId(known: readonly string[]): string {
+  const progress = useProgress();
+  const { attempt } = useAttempt();
+  return currentPathId(known, progress.path, attempt?.goal);
 }

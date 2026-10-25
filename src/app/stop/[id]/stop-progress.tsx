@@ -67,8 +67,8 @@ export function StopProgressPanel({ stopId, check }: { stopId: string; check: Ch
             </p>
           </>
         )}
-        <Link href="/roadmap/genai-engineer" className={`mt-2 ${textLink}`}>
-          See the whole roadmap
+        <Link href="/paths" className={`mt-2 ${textLink}`}>
+          See all paths
         </Link>
       </div>
     </div>

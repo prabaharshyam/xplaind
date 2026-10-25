@@ -29,8 +29,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/" className="underline-offset-2 hover:underline">
               Xplaind
             </Link>
-            <Link href="/roadmap/genai-engineer" className="underline-offset-2 hover:underline">
-              Roadmap
+            <Link href="/paths" className="underline-offset-2 hover:underline">
+              Paths
             </Link>
             <Link href="/resources" className="underline-offset-2 hover:underline">
               Courses

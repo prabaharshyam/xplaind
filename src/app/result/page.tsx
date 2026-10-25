@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { getContent, getStopsInOrder } from "@/lib/content";
+import { getContent, getPaths } from "@/lib/content";
+import { lessonsByPath, pathRef } from "@/lib/content/paths";
 import type { PublicQuestion } from "@/lib/placement/types";
 import { ResultView } from "./result-view";
 
 export const metadata: Metadata = {
   title: "Your level",
-  description: "Your starting level on the GenAI Engineer path.",
+  description: "Your starting level and next steps on your path.",
   robots: { index: false },
 };
 
@@ -18,14 +19,9 @@ export default function ResultPage() {
     draft_hours: l.draft_hours,
     exit_check: l.exit_check,
   }));
-  const stops = getStopsInOrder().map((s) => ({
-    id: s.id,
-    title: s.title,
-    level: s.level,
-    order: s.order,
-    hours: s.hours,
-    gap_tags: s.gap_tags,
-  }));
+  const tested = getPaths().filter((p) => p.placement === "ladder");
+  const all = lessonsByPath();
+  const stopsByPath = Object.fromEntries(tested.map((p) => [p.id, all[p.id]]));
   const bank: PublicQuestion[] = content.placement.map(({ data: q }) => ({
     id: q.id,
     level: q.level,
@@ -37,7 +33,7 @@ export default function ResultPage() {
   }));
   return (
     <main className="mx-auto max-w-xl px-4 py-8">
-      <ResultView levels={levels} stops={stops} bank={bank} />
+      <ResultView levels={levels} paths={tested.map(pathRef)} stopsByPath={stopsByPath} bank={bank} />
     </main>
   );
 }

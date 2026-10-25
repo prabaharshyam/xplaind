@@ -102,14 +102,8 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   }
 
   // ---- stops --------------------------------------------------------------
-  const orderSeen = new Map<string, string>();
   const referenced = new Set<string>();
   for (const { file, data: s } of bundle.stops) {
-    const key = `${s.level}:${s.order}`;
-    const firstOrder = orderSeen.get(key);
-    if (firstOrder) error(file, `order ${s.order} is already used at ${s.level} (${firstOrder})`);
-    else orderSeen.set(key, file);
-
     const refs = [s.primary_resource, ...s.alternates];
     if (new Set(refs).size !== refs.length) error(file, "primary_resource and alternates must all be different");
     for (const id of refs) {
@@ -143,6 +137,36 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
 
   for (const { file, data: r } of bundle.resources) {
     if (!referenced.has(r.id)) add("warning", file, `resource "${r.id}" is not used by any stop`);
+  }
+
+  // ---- paths --------------------------------------------------------------
+  const onAPath = new Set<string>();
+  for (const { file, data: g } of bundle.goals) {
+    const seen = new Set<string>();
+    const stageIds = g.stages.map((st) => st.id);
+    if (new Set(stageIds).size !== stageIds.length) error(file, "stage ids must be unique");
+    if (g.layout === "levels" && stageIds.join() !== LEVEL_IDS.join()) {
+      error(file, `a path laid out by level needs stages ${LEVEL_IDS.join(", ")} in that order`, "RM-1");
+    }
+    for (const st of g.stages) {
+      if (g.layout === "stages" && (!st.title || !st.summary)) error(file, `stage "${st.id}" needs a title and a summary`);
+      if (g.layout === "stages" && LEVEL_IDS.includes(st.id as LevelId)) error(file, `stage "${st.id}" is a level id; use a name`);
+      if (g.layout === "stages" && st.lessons.length === 0 && st.planned.length === 0) error(file, `stage "${st.id}" has no lessons and nothing planned`);
+      for (const id of st.lessons) {
+        const lesson = stopById.get(id);
+        if (!lesson) error(file, `lesson "${id}" does not exist`, "RM-2");
+        else if (g.layout === "levels" && lesson.data.level !== st.id) {
+          error(file, `lesson "${id}" is a ${lesson.data.level} lesson, listed at ${st.id}`, "RM-1");
+        }
+        if (seen.has(id)) error(file, `lesson "${id}" is listed twice on this path`);
+        seen.add(id);
+        onAPath.add(id);
+      }
+      if (st.planned.length > 0) gap(file, `stage "${st.id}" has ${st.planned.length} planned topics with no lesson yet`, "RM-2");
+    }
+  }
+  for (const { file, data: s } of bundle.stops) {
+    if (bundle.goals.length > 0 && !onAPath.has(s.id)) add("warning", file, `lesson "${s.id}" is not on any path`);
   }
 
   // ---- questions ----------------------------------------------------------

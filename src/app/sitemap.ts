@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getStops } from "@/lib/content";
+import { getPaths, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { INTERVIEW_TOPIC_IDS } from "@/lib/interview-topics";
 import { LEVEL_IDS } from "@/lib/levels";
@@ -12,7 +12,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const paths = [
     "/",
     "/start",
-    "/roadmap/genai-engineer",
+    "/paths",
+    ...getPaths().map((p) => `/roadmap/${p.id}`),
+    ...getPaths()
+      .filter((p) => p.placement === "ladder" && p.id !== "genai-engineer")
+      .map((p) => `/start/${p.id}`),
     ...LEVEL_IDS.map((l) => `/roadmap/genai-engineer/${l.toLowerCase()}`),
     ...getStops().map((s) => `/stop/${s.id}`),
     "/interview",

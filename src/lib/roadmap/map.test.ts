@@ -3,10 +3,10 @@ import { stageOf, topicsWithStops } from "./map";
 import type { RoadmapStop } from "./types";
 
 const topic = (id: string, optional = false) => ({ id, title: id, summary: "s", optional });
-const stop = (id: string, level: "B1" | "B2", order: number, gap_tags: string[]): RoadmapStop => ({ id, level, order, hours: 2, gap_tags });
+const stop = (id: string, level: "B1" | "B2", gap_tags: string[]): RoadmapStop => ({ id, level, hours: 2, gap_tags });
 
 describe("topicsWithStops (RM-1)", () => {
-  const stops = [stop("later", "B1", 2, ["a"]), stop("first", "B1", 1, ["a", "b"]), stop("other-level", "B2", 1, ["c"])];
+  const stops = [stop("first", "B1", ["a", "b"]), stop("later", "B1", ["a"]), stop("other-level", "B2", ["c"])];
 
   it("pairs each topic with the first stop at its level that teaches it", () => {
     expect(topicsWithStops("B1", [topic("a"), topic("b")], stops).map((t) => t.stopId)).toEqual(["first", "first"]);

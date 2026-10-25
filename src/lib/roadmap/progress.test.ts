@@ -68,10 +68,10 @@ describe("isProjectUrl", () => {
 
 describe("coverage (percent covered)", () => {
   const stops: RoadmapStop[] = [
-    { id: "b1", level: "B1", order: 1, hours: 2, gap_tags: [] },
-    { id: "b2a", level: "B2", order: 1, hours: 6, gap_tags: [] },
-    { id: "b2b", level: "B2", order: 2, hours: 2, gap_tags: [] },
-    { id: "b3", level: "B3", order: 1, hours: 2, gap_tags: [] },
+    { id: "b1", level: "B1", hours: 2, gap_tags: [] },
+    { id: "b2a", level: "B2", hours: 6, gap_tags: [] },
+    { id: "b2b", level: "B2", hours: 2, gap_tags: [] },
+    { id: "b3", level: "B3", hours: 2, gap_tags: [] },
   ];
 
   it("is weighted by hours and measured from the start level", () => {

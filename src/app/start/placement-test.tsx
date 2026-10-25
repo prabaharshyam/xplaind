@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -11,6 +12,7 @@ import {
   serverSnapshot,
   subscribe,
 } from "@/lib/browser/attempt-store";
+import { setPath } from "@/lib/browser/progress-store";
 import { todayInIST } from "@/lib/dates";
 import { DEFAULT_WEEKLY_HOURS, WEEKLY_HOUR_CHOICES } from "@/lib/placement/estimate";
 import { currentQuestion, startTest, submitAnswer, TEST_LENGTH } from "@/lib/placement/select";
@@ -57,6 +59,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         answers: state.answers,
       });
       clearTest();
+      setPath(test.goal);
       router.push("/result");
     } else {
       saveTest({ ...test, state });
@@ -77,8 +80,11 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         </div>
 
         <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Your goal</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Your path</p>
           <p className="font-medium">{goal.name}</p>
+          <Link href="/paths" className="text-sm text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
+            Choose a different path
+          </Link>
         </div>
 
         <fieldset>

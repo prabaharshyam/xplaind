@@ -42,7 +42,6 @@ tags: []
 const STOP = (extra = "") => `---
 id: s-one
 level: B1
-order: 1
 title: One
 outcome: Do it.
 why_it_matters: Because.

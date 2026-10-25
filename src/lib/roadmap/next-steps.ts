@@ -6,15 +6,12 @@ import type { NextStep, RoadmapStop } from "./types";
 export const NEXT_STEPS = 5;
 export const MAX_REVIEW_STEPS = 2;
 
-/** Ladder order: by level, then by order within the level. */
-export function byLadder(a: RoadmapStop, b: RoadmapStop): number {
-  return levelIndex(a.level) - levelIndex(b.level) || a.order - b.order;
-}
-
 /**
- * Up to two review stops for the learner's gaps first (gap order kept, easiest
- * stop at or below the start level that covers the tag), then incomplete stops
- * from the start level up, in ladder order. No stop appears twice.
+ * `stops` are one path's lessons in the order the path lists them. Up to two review
+ * stops for the learner's gaps come first (gap order kept, the first stop at or below
+ * the start level that covers the tag), then incomplete stops at or above the start
+ * level, in path order. No stop appears twice. On a path with no level test, pass
+ * the lowest level so nothing is skipped.
  */
 export function nextSteps(input: {
   stops: readonly RoadmapStop[];
@@ -25,8 +22,7 @@ export function nextSteps(input: {
 }): NextStep[] {
   const { stops, startLevel, gapTags, completed, count = NEXT_STEPS } = input;
   const start = levelIndex(startLevel);
-  const ladder = [...stops].sort(byLadder);
-  const open = ladder.filter((s) => !completed.has(s.id));
+  const open = stops.filter((s) => !completed.has(s.id));
   const out: NextStep[] = [];
   const taken = new Set<string>();
 
@@ -48,8 +44,6 @@ export function nextSteps(input: {
 }
 
 /** The review stop for one gap tag (PL-4), done or not. Used by the result page's gap list. */
-export function reviewStopFor(stops: readonly RoadmapStop[], startLevel: LevelId, tag: string): RoadmapStop | undefined {
-  return [...stops]
-    .sort(byLadder)
-    .find((s) => levelIndex(s.level) <= levelIndex(startLevel) && s.gap_tags.includes(tag));
+export function reviewStopFor<T extends RoadmapStop>(stops: readonly T[], startLevel: LevelId, tag: string): T | undefined {
+  return stops.find((s) => levelIndex(s.level) <= levelIndex(startLevel) && s.gap_tags.includes(tag));
 }

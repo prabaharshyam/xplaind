@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { getContent, getStopsInOrder } from "@/lib/content";
+import { getContent, getPaths } from "@/lib/content";
+import { lessonsByPath, pathRef } from "@/lib/content/paths";
 import { accountsEnabled } from "@/lib/supabase/config";
 import { currentUser, userClient } from "@/lib/supabase/server";
 import { Dashboard } from "./dashboard";
@@ -13,8 +14,7 @@ async function SignedIn() {
   const user = client ? await currentUser(client) : null;
   if (!user) redirect("/signin?next=/dashboard");
   const levels = getContent().levels.map(({ data: l }) => ({ id: l.id, name: l.name, draft_hours: l.draft_hours }));
-  const stops = getStopsInOrder().map((s) => ({ id: s.id, level: s.level, order: s.order, hours: s.hours, gap_tags: s.gap_tags, title: s.title }));
-  return <Dashboard email={user.email} levels={levels} stops={stops} />;
+  return <Dashboard email={user.email} levels={levels} paths={getPaths().map(pathRef)} stopsByPath={lessonsByPath()} />;
 }
 
 export default function DashboardPage() {

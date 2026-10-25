@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LAUNCH_MINIMUMS, coverage, validateBundle } from "./validate";
 import { isHumanName } from "./review";
-import { TODAY, book, check, interview, placement, resource, stop, validBundle } from "./testing";
+import { TODAY, book, check, goal, interview, placement, resource, stop, validBundle } from "./testing";
 import type { Bundle } from "./types";
 
 const run = (bundle: Bundle, launch = false) => validateBundle(bundle, { today: TODAY, launch });
@@ -22,8 +22,13 @@ describe("broken bundles fail", () => {
     ["a stop lists its primary resource as an alternate", (b) => (b.stops[0].data.alternates = ["res-one"]), /must all be different/],
     ["a stop's MCQ points to a question that does not exist", (b) => (b.stops[0].data.check = { type: "mcq", question_ids: ["chk-1", "chk-2", "missing"] }), /"missing" does not exist/],
     ["a stop uses another stop's check question", (b) => (b.checks[0].data.stop_id = "other"), /does not exist|belongs to stop/],
-    ["two stops share an id", (b) => b.stops.push(entry("stops/B1/dup.mdx", stop({ order: 2 }))), /duplicate stop id/],
-    ["two stops share an order at one level", (b) => b.stops.push(entry("stops/B1/two.mdx", stop({ id: "stop-two", order: 1 }))), /order 1 is already used/],
+    ["two stops share an id", (b) => b.stops.push(entry("stops/B1/dup.mdx", stop())), /duplicate stop id/],
+    ["a path lists a lesson that does not exist", (b) => b.goals[0].data.stages[0].lessons.push("ghost"), /lesson "ghost" does not exist/],
+    ["a path lists a lesson twice", (b) => b.goals[0].data.stages[1].lessons.push("stop-one"), /listed twice/],
+    ["a level-laid path lists a lesson at the wrong level (RM-1)", (b) => (b.goals[0].data.stages = b.goals[0].data.stages.map((st) => ({ ...st, lessons: st.id === "B2" ? ["stop-one"] : [] }))), /B1 lesson, listed at B2/],
+    ["a level-laid path is missing a level", (b) => b.goals[0].data.stages.pop(), /needs stages B1/],
+    ["a staged path has a stage with no title", (b) => b.goals.push(entry("goals/fde.yaml", goal({ id: "fde", layout: "stages", stages: [{ id: "one", lessons: ["stop-one"], planned: [] }] }))), /needs a title and a summary/],
+    ["a stage has nothing in it", (b) => b.goals.push(entry("goals/fde.yaml", goal({ id: "fde", layout: "stages", stages: [{ id: "one", title: "One", summary: "S.", lessons: [], planned: [] }] }))), /no lessons and nothing planned/],
     ["two resources share a link", (b) => b.resources.push(entry("resources/r2.yaml", resource({ id: "res-two" }))), /same url/],
     ["two resources share an id", (b) => b.resources.push(entry("resources/r3.yaml", resource({ url: "https://example.org/other" }))), /duplicate resource id/],
     ["an interview question points to a missing stop", (b) => (b.interview[0].data.stop_id = "ghost"), /stop "ghost" does not exist/],
@@ -89,7 +94,7 @@ describe("launch coverage (PL-1, RM-2, IQ-2)", () => {
       b.placement.push(entry(`questions/placement/p${n}.yaml`, placement({ id: `pq-${n}` })));
     }
     for (let n = 2; n <= LAUNCH_MINIMUMS.stopsPerLevel; n++) {
-      b.stops.push(entry(`stops/B1/s${n}.mdx`, stop({ id: `stop-${n}`, order: n, check: { type: "project", brief: "Do it." } })));
+      b.stops.push(entry(`stops/B1/s${n}.mdx`, stop({ id: `stop-${n}`, check: { type: "project", brief: "Do it." } })));
     }
     const b1Gaps = run(b, true).filter((i) => i.file === "coverage/B1");
     expect(b1Gaps).toEqual([]);
