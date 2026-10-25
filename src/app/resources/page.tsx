@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { muted, textLink } from "@/components/ui";
+import { PageHero } from "@/components/page-hero";
+import { textLink } from "@/components/ui";
 import { getContent, getPaths, getStops } from "@/lib/content";
 import { costLabel } from "@/lib/roadmap/cost";
 import { CourseDirectory, type DirectoryRow } from "./course-directory";
@@ -31,6 +32,7 @@ export default function ResourcesPage() {
       certificate: r.certificate,
       editorScore: r.editor_score,
       paths: [...new Set(usedBy.flatMap((s) => pathsOfLesson(s.id)))],
+      themes: [...new Set(usedBy.map((s) => s.theme))],
       whyPicked: r.why_picked,
       costLabel: cost.note ? `${cost.label} (${cost.note})` : cost.label,
       lessons: usedBy.slice(0, 3).map((s) => ({ id: s.id, title: s.title })),
@@ -39,20 +41,32 @@ export default function ResourcesPage() {
   const providers = new Set(rows.map((r) => r.provider)).size;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight">Free AI courses</h1>
-      <p className="mt-3 leading-7 text-zinc-700 dark:text-zinc-300">
-        {rows.length} courses, docs and books from {providers} providers, each chosen by hand for a lesson on one of our
-        paths. Free first; a price always shows the day we checked it. Want an exam to sit?{" "}
-        <Link href="/certifications" className={textLink}>
-          See AI certifications
-        </Link>
-        .
-      </p>
-      <p className={`mt-2 text-sm ${muted}`}>
-        We never take payment for a place on this list. <Link href="/how-we-rank" className={textLink}>How we choose</Link>.
-      </p>
-      <CourseDirectory rows={rows} paths={paths.map((p) => ({ id: p.id, name: p.name }))} />
+    <main>
+      <PageHero
+        theme="using-ai"
+        seed="courses"
+        icon="book"
+        eyebrow="Course directory"
+        title="Free AI courses, hand-picked"
+        lead={
+          <>
+            {rows.length} courses, docs and books from {providers} providers, including Google, Microsoft, AWS, NVIDIA,
+            OpenAI and Anthropic. Each one chosen for a lesson. Free first; a price always shows the day we checked it.
+          </>
+        }
+      >
+        <p className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+          <Link href="/certifications" className={textLink}>
+            AI certifications and exam fees
+          </Link>
+          <Link href="/how-we-rank" className={textLink}>
+            How we choose (we never take payment)
+          </Link>
+        </p>
+      </PageHero>
+      <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+        <CourseDirectory rows={rows} paths={paths.map((p) => ({ id: p.id, name: p.name }))} />
+      </div>
     </main>
   );
 }

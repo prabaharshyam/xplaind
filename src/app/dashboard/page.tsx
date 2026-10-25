@@ -5,7 +5,9 @@ import { getContent, getPaths } from "@/lib/content";
 import { lessonsByPath, pathRef } from "@/lib/content/paths";
 import { accountsEnabled } from "@/lib/supabase/config";
 import { currentUser, userClient } from "@/lib/supabase/server";
+import { PageHero } from "@/components/page-hero";
 import { Dashboard } from "./dashboard";
+import { ProgressOverview } from "./progress-overview";
 
 export const metadata: Metadata = { title: "Your dashboard", robots: { index: false } };
 
@@ -19,15 +21,19 @@ async function SignedIn() {
 
 export default function DashboardPage() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight">Your dashboard</h1>
+    <main>
+      <PageHero theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="XP, streak and badges from everything you have done on this device." />
+      <div className="mx-auto max-w-3xl px-4 py-8">
+      <ProgressOverview />
+      <h2 className="mt-10 text-xl font-semibold">Your account</h2>
       {accountsEnabled() ? (
         <Suspense fallback={<p className="mt-6">Loading your progress…</p>}>
           <SignedIn />
         </Suspense>
       ) : (
-        <p className="mt-4 leading-7">Accounts are coming soon. Your progress is saved on this device.</p>
+        <p className="mt-2 leading-7">Accounts are coming soon. Your progress is saved on this device.</p>
       )}
+      </div>
     </main>
   );
 }

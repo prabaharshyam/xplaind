@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PageHero } from "@/components/page-hero";
 import { card, muted, textLink } from "@/components/ui";
 import { getCertifications, getContent, getPath, getResource } from "@/lib/content";
 import { formatDay } from "@/lib/roadmap/cost";
@@ -23,13 +24,16 @@ export default function CertificationsPage() {
     .sort((a, b) => a.provider.localeCompare(b.provider) || a.title.localeCompare(b.title));
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight">AI certifications</h1>
-      <p className="mt-3 leading-7 text-zinc-700 dark:text-zinc-300">
-        A certification will not get you hired on its own; projects you can show will. A certification does help when a
-        job asks for one, or when you need a reason to finish a syllabus. The exams below cost money, but every one can be
-        prepared for with free courses.
-      </p>
+    <main>
+      <PageHero
+        theme="career"
+        seed="certifications"
+        icon="cert"
+        eyebrow="Certifications"
+        title="AI certifications"
+        lead="Exams from AWS, Microsoft, Google Cloud, NVIDIA and Databricks: who each suits, what it costs and the free courses that prepare you. A certification helps when a job asks for one; projects you can show matter more."
+      />
+      <div className="mx-auto max-w-3xl px-4 py-8">
 
       <h2 className="mt-10 text-xl font-semibold">Exams worth considering</h2>
       <ul className="mt-4 flex flex-col gap-4">
@@ -122,6 +126,7 @@ export default function CertificationsPage() {
           Browse every free course
         </Link>
       </p>
+      </div>
     </main>
   );
 }

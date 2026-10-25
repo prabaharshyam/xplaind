@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
+import { recordInterview } from "@/lib/browser/activity-store";
+import { XP } from "@/lib/game/xp";
+import { todayInIST } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
 import {
   type AnswerResult,
@@ -476,7 +479,14 @@ function Report({ questions, answers, onRetry }: { questions: SimQuestion[]; ans
   );
   const report = useMemo(() => sessionReport(questions, results), [questions, results]);
   const heading = useRef<HTMLHeadingElement>(null);
+  const recorded = useRef(false);
   useEffect(() => heading.current?.focus(), []);
+  // Count the session for XP and streaks: dates and scores only, never the answers.
+  useEffect(() => {
+    if (recorded.current) return;
+    recorded.current = true;
+    recordInterview({ on: todayInIST(), answered: report.answered, total: questions.length, averageScore: report.averageScore });
+  }, [report, questions.length]);
 
   const paceNote =
     report.pace === null
@@ -508,6 +518,9 @@ function Report({ questions, answers, onRetry }: { questions: SimQuestion[]; ans
         </dl>
         <p className="leading-7">
           <span className="font-medium">Pace:</span> {paceNote}.
+        </p>
+        <p className="w-fit rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          +{report.answered * XP.interviewAnswer + Math.round(report.averageScore * questions.length * XP.interviewScorePoint)} XP earned
         </p>
         <p className={`text-sm ${muted}`}>
           The score counts the key points your answer mentioned, by matching words. It cannot tell whether your

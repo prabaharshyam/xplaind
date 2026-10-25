@@ -21,7 +21,7 @@ const PATHS = [
 test.describe("paths", () => {
   test("the chooser lists all nine paths at 360px", async ({ page }) => {
     await page.goto("/paths");
-    await expect(page.getByRole("heading", { level: 1, name: "Choose a path" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Choose your AI role" })).toBeVisible();
     for (const name of PATHS) await expect(page.getByRole("heading", { level: 2, name, exact: true })).toBeVisible();
     expect(await overflow(page)).toBe(false);
     expect((await wcag(page)).violations).toEqual([]);

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DraftNote } from "@/components/draft-note";
+import { PageHero } from "@/components/page-hero";
 import { muted, textLink } from "@/components/ui";
 import { getGlossary, lessonsWithTerm } from "@/lib/content";
 
@@ -17,12 +18,10 @@ export default function GlossaryPage() {
   const letters = [...new Set(terms.map((t) => letterOf(t.term)))];
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight">AI glossary</h1>
-      <p className="mt-3 leading-7 text-zinc-700 dark:text-zinc-300">
-        {terms.length} terms in plain words. Each links to the lessons that teach it.
-      </p>
-      <div className="mt-4">
+    <main>
+      <PageHero theme="ai-basics" seed="glossary" icon="book" eyebrow="Glossary" title="AI glossary" lead={`${terms.length} AI terms in plain words. Each links to the lessons that teach it.`} />
+      <div className="mx-auto max-w-3xl px-4 py-8">
+      <div>
         <DraftNote />
       </div>
 
@@ -91,6 +90,7 @@ export default function GlossaryPage() {
           </dl>
         </section>
       ))}
+      </div>
     </main>
   );
 }

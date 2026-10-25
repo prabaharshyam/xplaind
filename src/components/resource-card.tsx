@@ -1,7 +1,9 @@
 // RM-4 resource card. A plain component: rendered on the server for the static
 // page and by the stop's client island when "Free only" reorders the list.
 import Link from "next/link";
+import { Cover } from "@/components/art/cover";
 import { costLabel, formatDay } from "@/lib/roadmap/cost";
+import type { ThemeId } from "@/lib/themes";
 import { muted, textLink } from "./ui";
 
 export type ResourceCardData = {
@@ -22,6 +24,8 @@ export type ResourceCardData = {
   verifiedOn: string | null;
   /** Null until the weekly link check (ED-5) has run. */
   linkCheckedOn: string | null;
+  /** The theme of the first lesson that uses it, for its cover art. */
+  theme?: ThemeId;
 };
 
 const languages = new Intl.DisplayNames(["en"], { type: "language" });
@@ -67,7 +71,9 @@ export function ResourceCard({
   ];
 
   return (
-    <article className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>
+    <article className="overflow-hidden rounded-2xl border border-zinc-200 sm:flex dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>
+      <Cover theme={r.theme ?? "ai-basics"} seed={r.id} className="h-24 shrink-0 sm:h-auto sm:w-36" iconSize={28} />
+      <div className="min-w-0 flex-1 p-4">
       <p className="text-xs font-medium tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
         {role === "primary" ? "Start here" : role === "alternate" ? "Alternative" : r.level}
       </p>
@@ -85,7 +91,7 @@ export function ResourceCard({
       <p className="mt-3 leading-7">
         <span className="font-medium">Why we picked it:</span> {r.why_picked}
       </p>
-      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm sm:grid-cols-[auto_1fr_auto_1fr]">
         {facts.map(([k, v]) => (
           <div key={k} className="contents">
             <dt className={muted}>{k}</dt>
@@ -106,6 +112,7 @@ export function ResourceCard({
         <Link href="/how-we-rank" className={`text-sm ${textLink}`}>
           How we rank
         </Link>
+      </div>
       </div>
     </article>
   );

@@ -30,7 +30,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               Xplaind
             </Link>
             <Link href="/paths" className="underline-offset-2 hover:underline">
-              Paths
+              Roadmaps
+            </Link>
+            <Link href="/topics" className="underline-offset-2 hover:underline">
+              Topics
             </Link>
             <Link href="/resources" className="underline-offset-2 hover:underline">
               Courses
@@ -52,6 +55,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </Link>
             <Link href="/glossary" className="underline-offset-2 hover:underline">
               Glossary
+            </Link>
+            <Link href="/dashboard" className="underline-offset-2 hover:underline">
+              Your progress
             </Link>
             <Link href="/how-we-rank" className="underline-offset-2 hover:underline">
               How we rank

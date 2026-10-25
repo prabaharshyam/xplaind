@@ -12,6 +12,7 @@ const item = (o: Partial<DirectoryItem>): DirectoryItem => ({
   certificate: false,
   editorScore: 4,
   paths: ["genai-engineer"],
+  themes: ["llm"],
   ...o,
 });
 
@@ -32,6 +33,7 @@ describe("filterDirectory (RM-2)", () => {
     expect(filterDirectory(list, { ...EMPTY_FILTER, band: "I" }).map((i) => i.id)).toEqual(["c", "d", "a"]);
     expect(filterDirectory(list, { ...EMPTY_FILTER, type: "repo" }).map((i) => i.id)).toEqual(["c"]);
     expect(filterDirectory(list, { ...EMPTY_FILTER, certificateOnly: true }).map((i) => i.id)).toEqual(["b"]);
+    expect(filterDirectory([...list, item({ id: "e", themes: ["agents"] })], { ...EMPTY_FILTER, theme: "agents" }).map((i) => i.id)).toEqual(["e"]);
   });
 
   it("searches title and provider, every word, ignoring case", () => {

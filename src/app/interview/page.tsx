@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PageHero } from "@/components/page-hero";
 import { primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { getPaths } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
@@ -16,13 +17,17 @@ export default function InterviewPage() {
   const questions = getInterviewViews();
   const paths = getPaths();
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight text-balance">AI interview questions</h1>
-      <p className="mt-3 leading-7 text-zinc-700 dark:text-zinc-300">
-        {questions.length} questions that AI interviews ask, each with a short answer you can say out loud, a deeper
-        answer, the follow-ups to expect and the mistakes to avoid. Each one links to the lesson that teaches it.
-      </p>
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+    <main>
+      <PageHero
+        theme="career"
+        seed="interview"
+        icon="mic"
+        eyebrow="Interview prep"
+        title="AI interview questions"
+        lead={`${questions.length} questions AI interviews ask, each with a short answer you can say out loud, a deeper answer, the follow-ups to expect and the mistakes to avoid.`}
+      />
+      <div className="mx-auto max-w-3xl px-4 py-8">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <Link href="/interview/simulator" className={primaryButton}>
           Try the mock interview
         </Link>
@@ -46,6 +51,7 @@ export default function InterviewPage() {
       </nav>
       <div className="mt-8">
         <InterviewList questions={questions} paths={paths.map((p) => ({ id: p.id, name: p.name }))} />
+      </div>
       </div>
     </main>
   );

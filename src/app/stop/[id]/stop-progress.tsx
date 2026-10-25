@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Celebrate } from "@/components/celebrate";
 import { McqQuiz, type McqQuestion } from "@/components/mcq-quiz";
+import { XP } from "@/lib/game/xp";
 import { muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { useProgress, useToday } from "@/lib/browser/hooks";
 import { clearStop, setStop } from "@/lib/browser/progress-store";
@@ -31,9 +33,14 @@ export function StopProgressPanel({ stopId, check }: { stopId: string; check: Ch
   const record = progress.stops[stopId] as StopProgress | undefined;
   const status = statusOf(progress.stops, stopId);
   const day = () => today ?? todayInIST();
+  const [party, setParty] = useState<{ xp: number; message: string } | null>(null);
+  const celebrate = (xp: number, message: string) => {
+    if (status !== "done") setParty({ xp, message });
+  };
 
   return (
     <div className="mt-3 flex flex-col gap-4">
+      {party && <Celebrate xp={party.xp} message={party.message} onDone={() => setParty(null)} />}
       <p aria-live="polite">
         <span className={muted}>Your status: </span>
         <span className="font-medium">{STATUS_TEXT[status]}</span>
@@ -42,9 +49,13 @@ export function StopProgressPanel({ stopId, check }: { stopId: string; check: Ch
       </p>
 
       {check.type === "mcq" ? (
-        <McqCheck stopId={stopId} questions={check.questions} />
+        <McqCheck
+          stopId={stopId}
+          questions={check.questions}
+          onPassed={(p) => celebrate(XP.lessonCheck + (p === 100 ? XP.perfectCheck : 0), p === 100 ? "Perfect score. Lesson done!" : "Lesson done!")}
+        />
       ) : (
-        <ProjectCheck stopId={stopId} brief={check.brief} savedUrl={record?.projectUrl} />
+        <ProjectCheck stopId={stopId} brief={check.brief} savedUrl={record?.projectUrl} onDone={() => celebrate(XP.lessonProject, "Your project is in. Lesson done!")} />
       )}
 
       <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
@@ -59,7 +70,14 @@ export function StopProgressPanel({ stopId, check }: { stopId: string; check: Ch
                 I am working on this
               </button>
             )}
-            <button type="button" className={secondaryButton} onClick={() => setStop(stopId, markDone("self_skipped", day()))}>
+            <button
+              type="button"
+              className={secondaryButton}
+              onClick={() => {
+                celebrate(XP.lessonSkipped, "Marked as known.");
+                setStop(stopId, markDone("self_skipped", day()));
+              }}
+            >
               I already know this
             </button>
             <p className={`text-sm ${muted}`}>
@@ -75,7 +93,7 @@ export function StopProgressPanel({ stopId, check }: { stopId: string; check: Ch
   );
 }
 
-function McqCheck({ stopId, questions }: { stopId: string; questions: CheckQuestionView[] }) {
+function McqCheck({ stopId, questions, onPassed }: { stopId: string; questions: CheckQuestionView[]; onPassed: (percent: number) => void }) {
   const progress = useProgress();
   return (
     <McqQuiz
@@ -83,12 +101,15 @@ function McqCheck({ stopId, questions }: { stopId: string; questions: CheckQuest
       intro={`${questions.length} quick questions. Get ${CHECK_PASS_PERCENT}% or more to finish this step.`}
       verdict={(p) => (passesCheck(p) ? "Step done. Well done." : `You need ${CHECK_PASS_PERCENT}% to finish. Review the answers and try again.`)}
       retryLabel="Try the check again"
-      onScored={(p) => setStop(stopId, afterCheck(progress.stops[stopId] as StopProgress | undefined, p, todayInIST()))}
+      onScored={(p) => {
+        if (passesCheck(p)) onPassed(p);
+        setStop(stopId, afterCheck(progress.stops[stopId] as StopProgress | undefined, p, todayInIST()));
+      }}
     />
   );
 }
 
-function ProjectCheck({ stopId, brief, savedUrl }: { stopId: string; brief: string; savedUrl?: string }) {
+function ProjectCheck({ stopId, brief, savedUrl, onDone }: { stopId: string; brief: string; savedUrl?: string; onDone: () => void }) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +124,7 @@ function ProjectCheck({ stopId, brief, savedUrl }: { stopId: string; brief: stri
           return;
         }
         setError(null);
+        onDone();
         setStop(stopId, markDone("project", todayInIST(), url.trim()));
         setUrl("");
       }}

@@ -6,9 +6,12 @@ import { muted, primaryButton, secondaryButton } from "@/components/ui";
 import { useAttempt, useCurrentPathId, useProgress } from "@/lib/browser/hooks";
 import { setPath } from "@/lib/browser/progress-store";
 import { type LevelId, levelIndex } from "@/lib/levels";
-import { type PathView, type StageView, startFor, testHref } from "@/lib/paths";
+import { type LessonSummary, type PathView, type StageView, startFor, testHref } from "@/lib/paths";
 import { coverage, statusOf } from "@/lib/roadmap/progress";
-import type { ProgressMap } from "@/lib/roadmap/types";
+import type { ProgressMap, StopStatus } from "@/lib/roadmap/types";
+import { Icon } from "@/components/art/icons";
+import { useTopicLink } from "@/components/roadmap/topic-drawer";
+import { themeOf } from "@/lib/themes";
 
 // A path laid out in stages, drawn as one metro line: each stage a station, each
 // lesson a stop, topics still being written as hollow stops, and the stage project
@@ -114,6 +117,7 @@ function Stage({
   start: LevelId | null;
 }) {
   const headingId = `${stageAnchor(stage.id)}-heading`;
+  const done = stage.lessons.filter((l) => statusOf(progress, l.id) === "done").length;
   return (
     <li id={stageAnchor(stage.id)} aria-labelledby={headingId} className="relative scroll-mt-20 pl-14">
       <span aria-hidden="true" className={`absolute top-6 bottom-0 left-5 w-1.5 -translate-x-1/2 rounded-full ${colour.rail}`} />
@@ -123,62 +127,84 @@ function Stage({
       >
         {n}
       </span>
-      <p className={`text-sm ${muted}`}>Stage {n}</p>
+      <p className={`text-sm ${muted}`}>
+        Stage {n} · {done} of {stage.lessons.length} done
+      </p>
       <h2 id={headingId} className="text-2xl font-semibold tracking-tight">
         {stage.title}
       </h2>
       <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{stage.summary}</p>
 
-      <ul className="mt-4 flex flex-col gap-2">
-        {stage.lessons.map((l) => {
-          const status = statusOf(progress, l.id);
-          const known = start !== null && levelIndex(l.level) < levelIndex(start) && status !== "done";
-          return (
-            <li key={l.id} className="relative">
-              <span
-                aria-hidden="true"
-                className={`absolute top-4 -left-11 size-4 rounded-full border-4 bg-white dark:bg-zinc-950 ${colour.ring} ${status === "done" ? colour.dot : ""}`}
-              />
-              <Link
-                href={`/stop/${l.id}`}
-                className="flex min-h-12 flex-col rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-emerald-700 dark:border-zinc-800 dark:hover:bg-zinc-900"
-              >
-                <span className="font-medium">{l.title}</span>
-                <span className={`text-sm ${muted}`}>
-                  {status === "done" ? "Done" : status === "in_progress" ? "In progress" : known ? "Below your level: optional" : "Ready to start"}{" "}
-                  · about {l.hours} {l.hours === 1 ? "hour" : "hours"}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
+      <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+        {stage.lessons.map((l) => (
+          <li key={l.id}>
+            <TopicNode lesson={l} status={statusOf(progress, l.id)} below={start !== null && levelIndex(l.level) < levelIndex(start)} />
+          </li>
+        ))}
         {stage.planned.map((t) => (
-          <li key={t.title} className="relative">
-            <span
-              aria-hidden="true"
-              className="absolute top-4 -left-11 size-4 rounded-full border-2 border-dashed border-zinc-500 bg-white dark:bg-zinc-950"
-            />
-            <div className="flex flex-col rounded-lg border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
-              <span className="font-medium">{t.title}</span>
-              <span className={`text-sm ${muted}`}>Being written · {t.summary}</span>
-            </div>
+          <li key={t.title} className="flex flex-col rounded-xl border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
+            <span className="font-medium">{t.title}</span>
+            <span className={`text-sm ${muted}`}>Being written · {t.summary}</span>
           </li>
         ))}
       </ul>
 
       {stage.project && (
-        <section aria-label={`Stage ${n} project`} className="mt-4 rounded-xl border-2 border-zinc-300 p-4 dark:border-zinc-700">
-          <p className={`text-sm font-semibold ${muted}`}>Stage project</p>
-          <h3 className="mt-1 text-lg font-semibold">{stage.project.title}</h3>
-          <p className="mt-2 leading-7">{stage.project.brief}</p>
-          <p className="mt-3 text-sm font-medium">What to show</p>
-          <ul className="mt-1 list-disc pl-5 leading-7">
-            {stage.project.deliverables.map((d) => (
-              <li key={d}>{d}</li>
-            ))}
-          </ul>
+        <section aria-label={`Stage ${n} project`} className="mt-4 flex gap-4 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/40">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-400 text-amber-950">
+            <Icon name="trophy" size={22} />
+          </span>
+          <div>
+            <p className={`text-sm font-semibold ${muted}`}>Stage project</p>
+            <h3 className="mt-0.5 text-lg font-semibold">{stage.project.title}</h3>
+            <p className="mt-2 leading-7">{stage.project.brief}</p>
+            <p className="mt-3 text-sm font-medium">What to show</p>
+            <ul className="mt-1 list-disc pl-5 leading-7">
+              {stage.project.deliverables.map((d) => (
+                <li key={d}>{d}</li>
+              ))}
+            </ul>
+          </div>
         </section>
       )}
     </li>
+  );
+}
+
+const STATUS_PILL = {
+  done: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200",
+  in_progress: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
+  not_started: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+} as const;
+
+/** One topic on the map: a link that opens the drawer, coloured by its theme. */
+export function TopicNode({ lesson, status, below }: { lesson: LessonSummary; status: StopStatus; below: boolean }) {
+  const link = useTopicLink(lesson.id);
+  const t = themeOf(lesson.theme ?? "ai-basics");
+  const label = status === "done" ? "Done" : status === "in_progress" ? "In progress" : below ? "Below your level: optional" : "Ready to start";
+  return (
+    <Link
+      href={`/stop/${lesson.id}`}
+      {...link}
+      className={`group flex h-full min-h-16 items-center gap-3 rounded-xl border bg-white p-3 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:bg-zinc-900 ${
+        status === "done" ? "border-emerald-500" : "border-zinc-200 dark:border-zinc-800"
+      } ${below && status !== "done" ? "opacity-80" : ""}`}
+    >
+      <span className="relative grid size-11 shrink-0 place-items-center rounded-lg text-white" style={{ background: `linear-gradient(135deg, ${t.from}, ${t.to})` }}>
+        <Icon name={t.icon} size={20} />
+        {status === "done" && (
+          <span aria-hidden="true" className="absolute -right-1.5 -bottom-1.5 grid size-5 place-items-center rounded-full bg-emerald-600 text-[11px] ring-2 ring-white dark:ring-zinc-900">
+            ✓
+          </span>
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium leading-6 group-hover:underline">{lesson.title}</span>
+        <span className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+          <span className={`rounded-full px-2 py-0.5 font-medium ${STATUS_PILL[status]}`}>{label}</span>
+          <span className={muted}>about {lesson.hours} {lesson.hours === 1 ? "hour" : "hours"}</span>
+        </span>
+      </span>
+    </Link>
   );
 }

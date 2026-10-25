@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTopicLink } from "@/components/roadmap/topic-drawer";
 import { muted, primaryButton, textLink } from "@/components/ui";
 import { useAttempt, useProgress } from "@/lib/browser/hooks";
 import { type LevelId, levelIndex } from "@/lib/levels";
@@ -307,13 +308,23 @@ function TopicStop({
       </div>
       <div className={`col-start-2 row-start-1 ${place}`}>
         {topic.stopId ? (
-          <Link href={`/stop/${topic.stopId}`} className={card}>
+          <TopicLink id={topic.stopId} className={card}>
             {body}
-          </Link>
+          </TopicLink>
         ) : (
           <div className={card}>{body}</div>
         )}
       </div>
     </li>
+  );
+}
+
+/** A topic's link: a plain click opens the drawer; it stays a real link for no-JS and new tabs. */
+function TopicLink({ id, className, children }: { id: string; className: string; children: React.ReactNode }) {
+  const link = useTopicLink(id);
+  return (
+    <Link href={`/stop/${id}`} {...link} className={className}>
+      {children}
+    </Link>
   );
 }

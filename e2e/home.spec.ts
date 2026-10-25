@@ -23,19 +23,34 @@ test("search engines are asked not to list the site before launch", async ({ pag
 const wcag = (page: import("@playwright/test").Page) =>
   new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
 
-test("the home page leads to the paths, the test, courses and interview prep", async ({ page }) => {
+test("the home page says what to do and leads to roadmaps, topics, courses and interviews", async ({ page }) => {
   await page.goto("/");
   const main = page.getByRole("main");
-  await expect(main.getByRole("link", { name: "Find my level" }).first()).toHaveAttribute("href", "/start");
-  await expect(main.getByRole("link", { name: "Choose a path" }).first()).toHaveAttribute("href", "/paths");
-  await expect(main.getByRole("link", { name: "Forward Deployed Engineer" })).toHaveAttribute("href", "/roadmap/forward-deployed-engineer");
-  await expect(main.getByRole("link", { name: "Start practising" })).toHaveAttribute("href", "/practice");
-  await expect(main.getByRole("link", { name: "How we rank courses" })).toHaveAttribute("href", "/how-we-rank");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Learn AI for the job you want");
+  await expect(main.getByRole("link", { name: "I’m new to AI" })).toHaveAttribute("href", "/roadmap/ai-for-beginners");
+  await expect(main.getByRole("link", { name: "I have an interview soon" })).toHaveAttribute("href", "/interview/simulator");
+  // the nine role roadmaps are right there, as cards
+  await expect(main.getByRole("link", { name: /^Forward Deployed Engineer/ })).toHaveAttribute("href", "/roadmap/forward-deployed-engineer");
+  await expect(main.getByRole("link", { name: /^Retrieval and RAG/ })).toHaveAttribute("href", "/topics/retrieval");
+  await expect(main.getByRole("heading", { name: "Sound familiar?" })).toBeVisible();
+  await expect(main.getByRole("link", { name: "Find my level" })).toHaveAttribute("href", "/start");
+  // the removed sections stay removed
+  await expect(page.getByText("Honest by design")).toHaveCount(0);
+  await expect(page.getByText("Where this is going")).toHaveCount(0);
   const nav = page.getByRole("banner");
   await nav.locator("summary").click(); // phone width: the links sit in the menu
-  for (const [name, href] of [["Courses", "/resources"], ["Interview", "/interview"], ["Mock interview", "/interview/simulator"], ["Blog", "/blog"], ["Paths", "/paths"]]) {
+  for (const [name, href] of [["Courses", "/resources"], ["Interview", "/interview"], ["Mock interview", "/interview/simulator"], ["Blog", "/blog"], ["Roadmaps", "/paths"], ["Topics", "/topics"]]) {
     await expect(nav.getByRole("link", { name, exact: true }).first()).toHaveAttribute("href", href);
   }
+});
+
+test("search finds lessons and opens them", async ({ page }) => {
+  await page.goto("/");
+  const box = page.getByRole("combobox", { name: /Search lessons/ });
+  await box.fill("build a rag");
+  await expect(page.getByRole("option").first()).toContainText("Build a RAG app");
+  await box.press("Enter");
+  await expect(page).toHaveURL(/\/stop\/rag-app$/);
 });
 
 test("the home page passes the accessibility scan once scrolled through", async ({ page }) => {
@@ -46,7 +61,7 @@ test("the home page passes the accessibility scan once scrolled through", async 
     await page.evaluate((y) => window.scrollTo(0, y), y);
     await page.waitForTimeout(30);
   }
-  await page.waitForTimeout(1200); // let the last reveals finish
+  await page.waitForTimeout(900); // let the last reveals finish
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });
@@ -55,8 +70,8 @@ test("with reduced motion, everything is visible and accessible at once", async 
   const context = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 360, height: 740 } });
   const page = await context.newPage();
   await page.goto("/");
-  await expect(page.getByText("Ten minutes from now, you will know your next step.")).toBeVisible();
-  expect(await page.locator(".lx-word").first().evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
+  await page.getByRole("heading", { name: "Sound familiar?" }).scrollIntoViewIfNeeded();
+  await expect(page.getByText("I freeze in interviews", { exact: false })).toBeVisible();
   expect((await wcag(page)).violations).toEqual([]);
   await context.close();
 });
@@ -64,11 +79,16 @@ test("with reduced motion, everything is visible and accessible at once", async 
 test("the course directory lists every course and filters them", async ({ page }) => {
   await page.goto("/resources");
   await expect(page.getByRole("heading", { level: 1, name: "Free AI courses" })).toBeVisible();
-  const items = page.getByRole("main").getByRole("listitem").filter({ has: page.getByRole("heading", { level: 2 }) });
-  const all = await items.count();
-  expect(all).toBeGreaterThan(200);
+  const items = page.getByRole("main").getByRole("article");
+  await expect(page.getByText(/^Showing 24 of \d{3}$/)).toBeVisible();
+  expect(await items.count()).toBe(24);
+  await page.getByRole("button", { name: "Show more courses" }).click();
+  expect(await items.count()).toBe(48);
+  await page.getByRole("button", { name: /Agents/, pressed: false }).click();
+  await expect(page.getByText(/^Showing \d+ of \d+ \(\d{3} in all\)$/)).toBeVisible();
+  await page.getByRole("button", { name: /All topics/ }).click();
   await page.getByLabel("Only courses with a certificate or badge").check();
-  await expect.poll(() => items.count()).toBeLessThan(all);
+  await expect(items.first().getByText("Certificate", { exact: true })).toBeVisible();
   await page.getByLabel("Search by title or provider").fill("Anthropic Academy");
   await expect(items.first()).toContainText("Anthropic Academy");
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);

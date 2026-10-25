@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PageHero } from "@/components/page-hero";
 import { getInterviewViews, quizPoolFor } from "@/lib/content/interview";
 import { PracticeView } from "./practice-view";
 
@@ -9,12 +10,11 @@ export const metadata: Metadata = {
 
 export default function PracticePage() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight">Practice</h1>
-      <p className="mt-3 mb-8 leading-7 text-zinc-700 dark:text-zinc-300">
-        Answer out loud, check yourself, and be honest with the rating. Questions you miss come back first.
-      </p>
-      <PracticeView topic={null} questions={getInterviewViews()} quizPool={quizPoolFor(null)} />
+    <main>
+      <PageHero theme="evals" seed="practice" icon="check" eyebrow="Interview prep" title="Practice" lead="Flashcards for interview questions: answer out loud, check yourself and rate it. Questions you miss come back first. Every rating earns XP." />
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <PracticeView topic={null} questions={getInterviewViews()} quizPool={quizPoolFor(null)} />
+      </div>
     </main>
   );
 }

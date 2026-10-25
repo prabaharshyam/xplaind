@@ -1,12 +1,13 @@
 import Link from "next/link";
+import { HeaderSearch, XpChip } from "./header-extras";
 
 const NAV = [
-  { href: "/paths", label: "Paths" },
+  { href: "/paths", label: "Roadmaps" },
+  { href: "/topics", label: "Topics" },
   { href: "/resources", label: "Courses" },
   { href: "/interview", label: "Interview" },
   { href: "/interview/simulator", label: "Mock interview" },
   { href: "/blog", label: "Blog" },
-  { href: "/glossary", label: "Glossary" },
 ];
 
 /** The site's top bar. A plain details element opens the phone menu, so it works without JavaScript. */
@@ -17,7 +18,7 @@ export function SiteHeader() {
         <Link href="/" className="text-[15px] font-semibold tracking-tight" aria-label="Xplaind home">
           Xplaind
         </Link>
-        <nav aria-label="Main" className="hidden items-center gap-7 text-[13px] text-zinc-700 md:flex dark:text-zinc-300">
+        <nav aria-label="Main" className="hidden items-center gap-6 text-[13px] text-zinc-700 md:flex dark:text-zinc-300">
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} className="hover:text-black dark:hover:text-white">
               {n.label}
@@ -25,11 +26,13 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <HeaderSearch />
+          <XpChip />
           <Link
-            href="/start"
-            className="site-cta inline-flex h-9 items-center rounded-full bg-black px-4 text-[13px] font-medium text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            href="/paths"
+            className="site-cta hidden sm:inline-flex h-9 items-center rounded-full bg-black px-4 text-[13px] font-medium text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
           >
-            Find my level
+            Start free
           </Link>
           <details className="group relative md:hidden">
             <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 [&::-webkit-details-marker]:hidden">

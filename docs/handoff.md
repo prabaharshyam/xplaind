@@ -88,3 +88,7 @@ GitHub login in the cloud workspace was invalid, so no pull request has been ope
 - `/llms.txt` for AI search engines.
 
 For the owner to review before launch: the 41 new resources and 7 certification records (open each link, confirm free or fee), the 99 new questions and rubrics, and the five blog posts. All are marked as drafts or unverified until then.
+
+## Update: redesign (owner feedback, 2026-10-25)
+
+New home page, cover art for every course, lesson and path, `/topics`, a topic drawer on every roadmap, interactive lesson pages, XP, streaks and badges, site search, and the courses page as a card grid. "Honest by design" and "Where this is going" are removed. Details and reasons are in `docs/decisions.md` under "Redesign for clarity and engagement".

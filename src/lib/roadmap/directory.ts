@@ -15,6 +15,8 @@ export type DirectoryItem = {
   editorScore: number;
   /** Path ids whose lessons use this course. */
   paths: string[];
+  /** Topic (theme) of the lessons that use it. */
+  themes: string[];
 };
 
 export type DirectoryFilter = {
@@ -24,10 +26,11 @@ export type DirectoryFilter = {
   band: string;
   type: string;
   certificateOnly: boolean;
+  theme: string;
 };
 
 export const ALL = "all";
-export const EMPTY_FILTER: DirectoryFilter = { query: "", pathId: ALL, band: ALL, type: ALL, certificateOnly: false };
+export const EMPTY_FILTER: DirectoryFilter = { query: "", pathId: ALL, band: ALL, type: ALL, certificateOnly: false, theme: ALL };
 
 const normalise = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "");
 
@@ -36,6 +39,7 @@ export function matches(item: DirectoryItem, f: DirectoryFilter): boolean {
   if (f.band !== ALL && !item.level.startsWith(f.band)) return false;
   if (f.type !== ALL && item.type !== f.type) return false;
   if (f.certificateOnly && !item.certificate) return false;
+  if (f.theme !== ALL && !item.themes.includes(f.theme)) return false;
   const words = normalise(f.query).split(/\s+/).filter(Boolean);
   const haystack = normalise(`${item.title} ${item.provider}`);
   return words.every((w) => haystack.includes(w));

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { muted, textLink } from "@/components/ui";
+import { PageHero } from "@/components/page-hero";
 import { getPaths } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import type { SimQuestion } from "@/lib/interview/analyse";
@@ -27,19 +26,21 @@ export default function SimulatorPage() {
     stop: q.stop,
   }));
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <nav aria-label="Breadcrumb" className="text-sm print:hidden">
-        <Link href="/interview" className={textLink}>
-          Interview questions
-        </Link>
-        <span className={muted}> / Mock interview</span>
-      </nav>
-      <h1 className="mt-4 text-3xl font-semibold tracking-tight text-balance">Mock interview</h1>
-      <p className="mt-3 mb-6 leading-7 text-zinc-700 dark:text-zinc-300 print:hidden">
-        Practise the way it happens: one question at a time, a clock running, and you answering out loud. Free, no
-        sign-in.
-      </p>
-      <Simulator questions={questions} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} />
+    <main>
+      <div className="print:hidden">
+        <PageHero
+          theme="client"
+          seed="simulator"
+          icon="mic"
+          eyebrow="Interview prep"
+          title="Mock interview"
+          lead="Practise the way it happens: one question at a time, a clock running, and you answering out loud. Then see what you covered and missed. Free, no sign-in."
+          crumbs={[{ href: "/interview", label: "Interview questions" }]}
+        />
+      </div>
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <Simulator questions={questions} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} />
+      </div>
     </main>
   );
 }

@@ -93,7 +93,7 @@ test.describe("stop page (RM-2, RM-4, RM-7)", () => {
 
   test("passing the check marks the stop done; failing keeps it in progress", async ({ page }) => {
     await page.goto("/stop/what-is-ai");
-    const groups = page.getByRole("main").getByRole("group");
+    const groups = page.locator("#check").getByRole("group"); // key terms are groups too (details)
     const count = await groups.count();
     // answer every question with its first option, which is not always right
     for (let i = 0; i < count; i++) await groups.nth(i).getByRole("radio").first().check();

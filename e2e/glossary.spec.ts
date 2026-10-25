@@ -22,7 +22,8 @@ test("an explainer lesson shows its sections, key terms and the course after the
   for (const h of ["What it is", "How it works", "A worked example", "Common mistakes", "Practise", "Key terms"]) {
     await expect(main.getByRole("heading", { level: 2, name: h })).toBeVisible();
   }
-  await expect(main.getByRole("link", { name: "Cosine similarity" })).toHaveAttribute("href", "/glossary#cosine-similarity");
+  await main.locator("summary", { hasText: "Cosine similarity" }).click(); // key terms open in place
+  await expect(main.getByRole("link", { name: "More in the glossary" }).first()).toHaveAttribute("href", "/glossary#cosine-similarity");
   await expect(main.getByRole("heading", { level: 2, name: "Go deeper: the best free course" })).toBeVisible();
   expect(await overflow(page)).toBe(false); // the code sample scrolls inside its box
   expect((await wcag(page)).violations).toEqual([]);
