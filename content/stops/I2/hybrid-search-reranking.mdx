@@ -1,0 +1,74 @@
+---
+id: hybrid-search-reranking
+level: I2
+title: "Hybrid search, reranking and filters"
+outcome: "Combine keyword and vector search, rerank the merged results with a cross-encoder and narrow searches with metadata filters."
+why_it_matters: "Plain vector search misses exact terms such as policy numbers, product codes and names, which are exactly what business users type. Hybrid search with reranking is the most common upgrade in production RAG, and a standard interview question."
+hours: 4
+gap_tags: []
+primary_resource: weaviate-hybrid-search
+alternates: [pinecone-rerankers, anthropic-contextual-retrieval]
+format: explainer
+key_terms: [hybrid-search, keyword-search, reranking, cross-encoder, reciprocal-rank-fusion, metadata-filter]
+check:
+  type: mcq
+  question_ids: [hybrid-search-reranking-1, hybrid-search-reranking-2, hybrid-search-reranking-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Vector search finds passages with similar meaning. Keyword search finds passages with the same words. Each fails where the other succeeds:
+
+- "How do I claim for a cracked phone screen?" Vector search finds the accidental damage clause even though it says "breakage of display". Keyword search may not.
+- "What does clause 7.3(b) say?" or "error E-4012" Keyword search nails it. Vector search returns vaguely similar clauses.
+
+**Hybrid search** runs both and merges the results. **Reranking** then takes the top 20 to 50 merged results and reorders them with a slower, more accurate model. **Metadata filters** restrict the search to the right slice first, such as one product, one state or documents in force after a date.
+
+## How it works
+
+**Keyword side.** Most systems use BM25, a formula that scores a passage higher when it contains the query's words, especially rare words, and does not over-reward long passages. PostgreSQL full-text search, Elasticsearch, OpenSearch and most vector databases offer it.
+
+**Vector side.** Embed the query and find the nearest chunk embeddings.
+
+**Fusion.** The two scores are on different scales, so you cannot just add them. Two common fixes: normalise each to 0 to 1 and take a weighted sum (an "alpha" of 0.5 weights them equally), or use reciprocal rank fusion, which ignores raw scores and rewards items ranked high in either list. RRF is simple and hard to break, so it is a good default.
+
+**Reranking.** An embedding model encodes query and passage separately, which is fast but loses detail. A **cross-encoder** reads them together and scores relevance directly. It is too slow to run on a million passages, but fine on 40. Retrieve wide with hybrid search, rerank, keep the top 5 for the prompt.
+
+**Filters.** Store fields such as `doc_type`, `state`, `effective_from` and `access_group` with every chunk. Apply them in the query so irrelevant or out-of-date documents never compete. Filters are also where per-user permissions are enforced, which a later lesson covers.
+
+## A worked example
+
+An insurance company in Chennai has 4,000 pages of policy wordings, endorsements and circulars. Agents ask questions such as "Is flood covered under HOME-PLUS for Chennai after the 2026 revision?"
+
+Your golden set has 60 questions with known source passages. You measure recall at 5 (the share of questions whose correct passage is in the top five):
+
+- vector search alone: 68%
+- BM25 alone: 61%
+- hybrid with RRF: 79%
+- hybrid, then a cross-encoder reranker over the top 40: 88%
+- the same, filtered to `product = HOME-PLUS` and `effective_from` after the revision: 93%
+
+Looking at failures shows why. Vector search missed questions naming endorsement codes like "END-17". BM25 missed paraphrases. The reranker fixed cases where the right passage was ranked eighth. The filter removed the superseded 2024 wording that had been outranking the current one.
+
+Reranking added about 180 milliseconds per query. The client accepted that for a 14-point gain in recall, and you wrote both numbers in the eval report.
+
+## Common mistakes
+
+- **Adding raw scores.** BM25 and cosine scores are on different scales; the larger one silently dominates. Normalise or use RRF.
+- **Reranking too few.** If the right passage is not in the candidate list, the reranker cannot rescue it. Retrieve 20 to 50, keep 3 to 8.
+- **No golden set.** Without measured recall you cannot tell whether hybrid search helped or just felt better.
+- **Filtering after retrieval.** Taking the top 5 and then dropping out-of-scope ones can leave you with nothing. Filter inside the search.
+- **Forgetting tokenisation for Indian text.** Keyword search on Tamil or Hindi needs an analyser that handles those scripts, or matches fail silently.
+
+## Practise
+
+Read the Weaviate article on hybrid search and Pinecone's piece on rerankers.
+
+1. Take your RAG app from the earlier lesson and build a golden set of 30 questions, a third of them with exact codes, names or numbers.
+2. Measure recall at 5 for vector only, BM25 only (the `rank_bm25` package is enough), and both merged with RRF.
+3. Add a free cross-encoder reranker (for example a small model from the sentence-transformers library) over the top 30 and measure again, along with the added latency.
+
+**You are done when you can** show a table of recall and latency for the four set-ups and explain which you would ship and why.

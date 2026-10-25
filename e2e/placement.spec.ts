@@ -20,6 +20,8 @@ const wcag = (page: Page) =>
 
 /** Answer whatever question is on screen: "right" picks the correct option, "idk" the last option. */
 async function answerCurrent(page: Page, how: "right" | "idk") {
+  // The intro screen's heading shows until the first question renders.
+  await expect(page.getByRole("heading", { level: 1 })).not.toHaveText("Find my level");
   const heading = (await page.getByRole("heading", { level: 1 }).textContent())!.trim();
   const code = (await page.locator("pre code").count()) ? ((await page.locator("pre code").textContent()) ?? "") : "";
   const q = byKey.get(`${heading}\n${code}`);

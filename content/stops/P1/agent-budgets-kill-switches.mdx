@@ -1,0 +1,75 @@
+---
+id: agent-budgets-kill-switches
+level: P1
+title: "Loop limits, budgets and kill switches"
+outcome: "Put hard limits on agent steps, tokens, time and spend per task, user and day, and build a kill switch that stops an agent or a feature at once."
+why_it_matters: "A looping agent can spend a month's budget overnight or send the same email five hundred times. Limits and a kill switch are cheap to build and are often the first thing a client's finance or risk team asks about."
+hours: 2
+gap_tags: []
+primary_resource: owasp-unbounded-consumption
+alternates: [anthropic-building-effective-agents]
+format: explainer
+key_terms: [budget-limit, kill-switch, rate-limit, cost-per-request]
+check:
+  type: mcq
+  question_ids: [agent-budgets-kill-switches-1, agent-budgets-kill-switches-2, agent-budgets-kill-switches-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Agents decide for themselves how many steps to take. Usually that is a strength. Sometimes the agent loops: a tool keeps failing and it keeps retrying, two agents keep handing work back and forth, or it keeps "improving" a draft. Without limits, a loop burns tokens, hammers downstream systems and repeats actions.
+
+Three controls prevent this:
+
+- **Loop limits**: a maximum number of steps or tool calls per task.
+- **Budgets**: caps on tokens, time and money per task, per user and per day, for the whole feature.
+- **Kill switches**: a fast, reliable way for an operator to stop an agent, a tool or a whole feature without a deploy.
+
+## How it works
+
+**Per-task limits.** Count steps and tool calls in the loop and stop at a cap chosen from real runs (if 95% of tasks finish in 12 steps, cap at 25). Track tokens and elapsed time too. On hitting a limit, stop cleanly: save state, tell the user what was done and what remains, and log it as a failure to investigate.
+
+**Repetition checks.** Detect the same tool called with the same arguments several times in a row, or the same error recurring, and stop early.
+
+**Per-user and daily budgets.** Count spend per user per day and refuse politely past the cap. Set a feature-wide daily cap with an alert at, say, 80%. Put these in a shared store (a database or cache), not in the agent's memory, so they hold across servers.
+
+**Provider-side limits.** Most model providers let you set spend limits or alerts per key or project. Use them as the last line of defence, not the only one.
+
+**Kill switches.** A configuration flag your code checks before every task, and ideally before every tool call, with levels: disable one tool (stop all refunds), disable the agent (fall back to a human queue or a simple form), disable the feature. Flip it from an admin screen or a config service without redeploying. Test it regularly, like a fire drill.
+
+**Idempotency for actions.** Give each action a unique key so a retried or looped "send refund" with the same key happens only once.
+
+## A worked example
+
+A Bengaluru edtech's homework-help agent ran fine for a month. Then, on a Sunday night, a change in a maths tool made it return an error for one type of question. The agent retried with small variations, and some students kept pressing "try again". By Monday morning one feature had spent ₹1.8 lakh, ten times a normal week.
+
+The fixes:
+
+- Per task: at most 15 steps, 60,000 tokens and 90 seconds. Three identical tool errors in a row ends the task with "I couldn't solve this one; your teacher can help."
+- Per student: ₹15 of model spend per day, shown as a friendly "come back tomorrow" message.
+- Feature: daily cap of ₹40,000, alert at ₹30,000 to the on-call engineer's phone.
+- Kill switch: an admin toggle per tool and for the whole agent, checked before every task. Turning off the agent shows a "homework help is resting" banner and keeps the rest of the app running.
+- Provider: a hard monthly spend limit on the API project as a backstop.
+
+Two weeks later a similar tool fault was stopped by the repetition check within minutes, costing ₹600, and the alert told the team before any student complained.
+
+## Common mistakes
+
+- **No step cap.** The single cheapest protection; add it first.
+- **Budgets held in memory.** Each server counts separately and the true total runs far past the cap. Use a shared store.
+- **A kill switch that needs a deploy.** In an incident you need seconds, not a build pipeline.
+- **Silent stops.** Tell the user what happened and log it; a stopped task is a bug to fix.
+- **Retrying non-idempotent actions.** Use idempotency keys so loops cannot repeat payments or messages.
+
+## Practise
+
+Read OWASP's entry on unbounded consumption.
+
+1. Add step, token and time caps to an agent you have built, with a clean stop message.
+2. Add a repetition check that ends a task after three identical tool errors, and trigger it with a deliberately broken tool.
+3. Add a per-user daily budget in a small database table and a kill switch read from a config file, and show both working.
+
+**You are done when you can** break a tool on purpose and show the agent stopping within your limits, with a log entry and an alert.

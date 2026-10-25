@@ -1,0 +1,83 @@
+---
+id: mcp-servers-clients
+level: I3
+title: "MCP servers and clients"
+outcome: "Explain how the Model Context Protocol connects AI apps to tools and data, build a small MCP server, and know the security questions to ask."
+why_it_matters: "MCP has become the common way to plug tools and company data into AI assistants and agents. Clients ask for \"an MCP server for our ticketing system\" by name, and FDE job posts list it. Building one is quick once you know the parts."
+hours: 4
+gap_tags: []
+primary_resource: anthropic-mcp-course
+alternates: [mcp-intro, dlai-mcp]
+format: explainer
+key_terms: [mcp, mcp-server, tool-calling, least-privilege]
+check:
+  type: mcq
+  question_ids: [mcp-servers-clients-1, mcp-servers-clients-2, mcp-servers-clients-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Every AI app used to need its own custom code for every tool: one integration for the ticketing system in the chat app, another in the coding assistant, another in the agent. The **Model Context Protocol** (MCP) is an open standard that fixes this. You wrap a system once as an **MCP server**; any **MCP client**, such as a desktop assistant, an IDE or your own agent, can then discover and use it.
+
+An MCP server can offer three kinds of thing:
+
+- **Tools**: actions the model can call, such as `search_tickets` or `create_invoice`.
+- **Resources**: data the app can read into context, such as a file, a record or a schema.
+- **Prompts**: reusable prompt templates a user can pick.
+
+## How it works
+
+**Roles.** The *host* is the AI application the user works in. Inside it, an MCP *client* holds a connection to each *server*. The client asks a server what it offers, passes the tool list to the model, and when the model calls a tool, the client sends the call to the right server and returns the result.
+
+**Transports.** A local server runs as a process on the same machine and talks over standard input and output, which suits desktop tools and developer machines. A remote server runs as a web service and talks over HTTP, which suits shared company systems and needs proper authentication, typically OAuth.
+
+**Building a server.** Official SDKs exist for Python, TypeScript and other languages. In Python a minimal server is a few lines:
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("tickets")
+
+@mcp.tool()
+def search_tickets(query: str, status: str = "open") -> list[dict]:
+    """Search support tickets by keywords. status is 'open' or 'closed'. Returns up to 10."""
+    return ticket_db.search(query, status=status, limit=10)
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+The function's name, type hints and docstring become the tool's schema, so the tool design advice from the earlier lesson applies directly.
+
+**Security.** An MCP server is code with access to real systems. Ask: who wrote it, what can it reach, which credentials does it use, and does it act as the user (respecting their permissions) or as an all-powerful service account? Tool descriptions and results flow into the model, so a malicious server or a poisoned record can carry prompt injection. Use least privilege, review third-party servers before installing them, and log every call.
+
+## A worked example
+
+A Pune manufacturing company's engineers use an AI assistant in their IDE and another in their chat tool. Both need access to the maintenance log database.
+
+Instead of two integrations, you build one remote MCP server with three tools: `find_machine` (by tag or name), `get_maintenance_history` (last N events for a machine) and `log_observation` (adds a note; writes only to a notes table). It authenticates each user through the company's single sign-on and queries the database with that user's own permissions, so a contractor sees only their plant.
+
+Both assistants connect to the same server. An engineer asks in chat: "When was CNC-14's spindle last serviced, and has anyone reported vibration since?" The assistant calls `find_machine`, then `get_maintenance_history`, and answers with dates and the names in the log. Every call appears in the server's audit log with user, tool and arguments.
+
+When IT later adds a new spare-parts system, they add a second MCP server, and both assistants gain the tools without any change to the assistants themselves.
+
+## Common mistakes
+
+- **Installing unknown servers.** A third-party server runs with whatever access you give it. Read the code or use trusted sources.
+- **One super-user credential.** If the server ignores the user's own permissions, every user can reach everything.
+- **Exposing the whole database.** Offer task-shaped tools, not a `run_sql` tool, unless the users are database administrators.
+- **Treating tool results as trusted.** Text from a ticket or document can contain injected instructions; the host must treat it as data.
+- **No logging.** You cannot investigate what an assistant did without a record of tool calls.
+
+## Practise
+
+Take Anthropic's free Introduction to Model Context Protocol course, or read the official introduction and a server quickstart.
+
+1. Build a local MCP server with two tools over a small SQLite database of your choice (books, fees, appointments).
+2. Connect it to an MCP-capable client and ask questions that need both tools.
+3. Add a write tool that only inserts into one table, log every call to a file, and try a prompt injection hidden in one record to see how your client handles it.
+
+**You are done when you can** explain host, client and server, show your server working in a real client, and name three security questions you would ask about any MCP server.

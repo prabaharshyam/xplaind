@@ -1,0 +1,73 @@
+---
+id: vectorless-retrieval
+level: I3
+title: "Long documents without vectors"
+outcome: "Retrieve from long, structured documents by having a model navigate their table of contents, and know when this beats vector search."
+why_it_matters: "Annual reports, regulations and contracts are long, cross-referenced and structured. Chunk-and-embed loses that structure, and clients notice when answers about \"note 14\" are wrong. Tree-based, reasoning-led retrieval is a newer approach worth knowing, and knowing its costs matters as much."
+hours: 3
+gap_tags: []
+primary_resource: pageindex-intro
+alternates: [pageindex-docs]
+format: explainer
+key_terms: [vectorless-retrieval, parent-child-chunking, context-window]
+check:
+  type: mcq
+  question_ids: [vectorless-retrieval-1, vectorless-retrieval-2, vectorless-retrieval-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Standard RAG cuts documents into chunks, embeds them and retrieves by similarity. That works well for many short documents. It works less well for one long, structured document, such as a 300-page annual report, an insurance regulation or a master services agreement, where:
+
+- the answer depends on where a passage sits ("in the notes to the consolidated statements, not the standalone ones");
+- the text says "as defined in section 2.4" and the definition is far away;
+- many passages look similar (every year's revenue table), so similarity cannot tell them apart.
+
+**Vectorless retrieval** keeps the document's structure. You build a tree from the table of contents (chapters, sections, sub-sections, each with a short summary) and let a model reason its way down: read the top level, choose the likely section, open it, choose again, and finally read the relevant pages. Open-source projects such as PageIndex package this idea.
+
+## How it works
+
+**Build the tree once.** Parse the document's headings into a hierarchy. For each node store the title, page range and a summary of a few lines, which a model can write during indexing. Scanned or badly formatted documents need cleaning first; the method is only as good as the structure it finds.
+
+**Navigate per question.** Give the model the question and the top-level nodes (titles and summaries only, which is cheap). Ask which nodes to open and why. Expand those, repeat until you reach leaf sections, then put their full text in the prompt and answer, citing sections and pages.
+
+**Follow references.** When a section says "see note 14", the model can request that node. Vectors cannot do this.
+
+**Costs.** Each question takes several model calls in sequence, so it is slower and pricier than one vector lookup. It suits a small number of long, high-value documents and questions where precision matters, such as an analyst asking about one company's filings. It does not suit searching 50,000 support articles; there, hybrid search wins.
+
+Many production systems combine the two: vector or keyword search to pick which documents matter, tree navigation inside each long one.
+
+## A worked example
+
+An equity research team in Mumbai asks: "What was the contingent liability for disputed GST demands at the end of FY2026, and has it grown?"
+
+The annual report runs to 320 pages. Plain vector search returns five chunks that mention GST and contingent liabilities, from the standalone statements, the consolidated statements, the directors' report and the previous year's comparison column. The model mixes standalone and consolidated figures and gives a wrong answer.
+
+With tree navigation:
+
+1. The model sees the top level: Corporate overview, Directors' report, Standalone financial statements, Consolidated financial statements. Analysts mean consolidated unless told otherwise, so it opens that.
+2. Inside: Balance sheet, Profit and loss, Cash flow, Notes. It opens Notes, then "Note 38: Contingent liabilities and commitments".
+3. The note has a table with both years and refers to Note 41 for the disputed tax details. The model opens Note 41 too.
+
+The answer cites Note 38 (page 241) and Note 41 (page 247) and gives both years from the same table. It took five model calls and about nine seconds, against under two seconds for vector RAG. The team is happy to wait for a correct answer they can check against the page.
+
+## Common mistakes
+
+- **Using it for everything.** For many short documents, tree search is slow and costly with no gain.
+- **Trusting a broken table of contents.** Scanned or poorly tagged PDFs give a flat or wrong tree. Check the tree before relying on it.
+- **Letting the model wander.** Cap the number of nodes it may open per question, or cost and latency grow without limit.
+- **Skipping evaluation.** Compare with your hybrid RAG on the same golden set; do not adopt a method because it sounds smarter.
+- **Losing page numbers.** Citations to page and section are the main benefit; keep them through every step.
+
+## Practise
+
+Read the PageIndex introduction and skim its docs for how the tree is built.
+
+1. Take one long public document, such as a listed company's annual report or a regulator's master circular. Build a tree of headings with page ranges, by hand for the top two levels if needed.
+2. Write ten questions that need the right section, including two that need a cross-reference.
+3. Answer them with your hybrid RAG and with a simple navigate-the-tree loop (at most six node openings). Compare correctness, latency and cost.
+
+**You are done when you can** say for which kind of question and document tree navigation won in your test, and what it cost.

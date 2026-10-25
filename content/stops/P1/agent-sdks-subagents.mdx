@@ -1,0 +1,71 @@
+---
+id: agent-sdks-subagents
+level: P1
+title: "Agent SDKs and sub-agents"
+outcome: "Know what vendor agent SDKs provide, when to use one instead of your own loop or a graph framework, and when splitting work across sub-agents pays off."
+why_it_matters: "Clients often have a preferred model vendor, and its agent SDK may be the fastest route to a working pilot. Knowing what the SDK handles, and when multiple agents help or just multiply cost, lets you choose quickly and defend the choice."
+hours: 3
+gap_tags: []
+primary_resource: anthropic-multi-agent
+alternates: [openai-agents-sdk, claude-agent-sdk]
+format: explainer
+key_terms: [agent-sdk, sub-agent, context-engineering, tracing]
+check:
+  type: mcq
+  question_ids: [agent-sdks-subagents-1, agent-sdks-subagents-2, agent-sdks-subagents-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+An **agent SDK** is a library, usually from a model provider, that gives you a ready agent loop: send messages, run the tools the model asks for, feed results back, repeat. Most add tracing, guardrails, session storage and ways for one agent to hand work to another. Examples include OpenAI's Agents SDK and Anthropic's Claude Agent SDK; Google and others offer similar kits.
+
+A **sub-agent** is an agent started by another agent to do one part of a task in its own fresh context, returning only a summary. A **multi-agent system** is any design where several agents cooperate: a lead agent delegating to workers, agents handing a conversation between them, or specialists reviewing each other's work.
+
+## How it works
+
+**What SDKs save you.** The loop itself is twenty lines; the value is everything around it: retries, streaming, parallel tool calls, tracing every step, guardrails on input and output, hand-offs, sessions. Some SDKs also ship built-in tools such as file editing, shell commands or web search, with a permission system.
+
+**Choosing.** Three common routes:
+
+- *Your own loop* when the task is narrow, you want full control and few dependencies.
+- *A vendor SDK* when the client is committed to that vendor and wants a pilot fast, especially if its built-in tools fit.
+- *A graph framework* (such as LangGraph) when you need explicit control flow, durable pauses for approval and model-vendor independence.
+
+Check how locked-in the SDK is to one vendor's models, how it stores sessions, and whether its traces export to the client's observability tools.
+
+**Sub-agents.** Their real benefit is context isolation. A lead agent researching a market can start five sub-agents, each searching one competitor with its own full context window, and receive five one-page summaries. The lead never sees the hundreds of pages read, so its own context stays clean. Sub-agents can also run in parallel, cutting wall-clock time.
+
+**The cost.** Each sub-agent has its own prompt, tools and history, so token use multiplies, often several times a single agent's. Coordination can fail too: two workers duplicate effort or a summary drops a key detail. Multi-agent designs pay off for broad, parallel, read-heavy tasks such as research; they rarely help tightly coupled tasks such as editing one codebase or filling in one form, where every step depends on the last.
+
+## A worked example
+
+A Hyderabad consulting firm wants due-diligence briefs on mid-sized Indian manufacturers: financials, legal cases, management, market and ESG news.
+
+A single agent took 40 minutes and often ran out of context halfway through the legal research, losing the earlier financial notes. You redesign:
+
+- A **lead agent** reads the request, writes a plan with five research areas and starts one **sub-agent** per area in parallel.
+- Each sub-agent has only the tools it needs: the legal one has a court-records search, the financial one a filings tool. Each returns a summary of at most 400 words with source links.
+- The lead merges the summaries, spots conflicts (two sources disagree on revenue) and asks the financial sub-agent one follow-up question.
+
+Wall-clock time drops to 9 minutes and coverage improves. Token use rises 3.5 times, which the firm accepts because each brief replaces two days of analyst work. You use the vendor's SDK because the firm already has an enterprise contract with that provider and its tracing shows every sub-agent's steps, which their quality team requires.
+
+## Common mistakes
+
+- **Multi-agent by default.** Start with one agent. Split only when context overflow or parallelism is the measured problem.
+- **Vague delegation.** "Research the legal side" produces overlap. Give each sub-agent a precise scope, output format and length limit.
+- **Ignoring token cost.** Measure cost per task before and after; multi-agent can multiply it.
+- **Locking in without noticing.** If the client may switch model vendors, check how much of your code depends on one SDK.
+- **No traces across agents.** When an answer is wrong you must see which sub-agent produced which claim.
+
+## Practise
+
+Read Anthropic's write-up of its multi-agent research system, and skim the docs of one agent SDK.
+
+1. Build a single-agent version of a research task (for example, "summarise the policies of three Indian states on EV subsidies") with a vendor SDK or your own loop.
+2. Rebuild it with a lead agent and one sub-agent per state, each returning at most 200 words with sources.
+3. Compare time, tokens and quality, and write three sentences on whether the split was worth it.
+
+**You are done when you can** explain when sub-agents help, what they cost, and what an SDK gives you beyond the basic loop.
