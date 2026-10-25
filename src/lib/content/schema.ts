@@ -120,6 +120,8 @@ export const StopFrontmatter = z
     gap_tags: z.array(Slug),
     primary_resource: Slug,
     alternates: z.array(Slug).max(2),
+    /** More free courses on the same topic, from other providers, shown under the main picks. */
+    more: z.array(Slug).max(6).default([]),
     check: z.discriminatedUnion("type", [McqCheck, ProjectCheck]),
     /**
      * "explainer": our own lesson text with the EXPLAINER_SECTIONS. "brief": a short
@@ -185,6 +187,16 @@ export const CheckQuestion = z
 export type CheckQuestion = z.infer<typeof CheckQuestion>;
 
 /** IQ-1. */
+/**
+ * One key point of a strong answer. The simulator marks it covered when the answer
+ * uses any of its keywords (lower case; a keyword may be a short phrase).
+ */
+export const RubricPoint = z.strictObject({
+  point: Text.max(140),
+  keywords: z.array(z.string().trim().toLowerCase().min(2)).min(1),
+});
+export type RubricPoint = z.infer<typeof RubricPoint>;
+
 export const InterviewQuestion = z
   .strictObject({
     id: Slug,
@@ -196,6 +208,10 @@ export const InterviewQuestion = z
     level: Level,
     topic: z.enum(INTERVIEW_TOPIC_IDS),
     stop_id: Slug,
+    /** VS-1: the key points a strong answer contains. The simulator checks a spoken answer against them. */
+    rubric: z.array(RubricPoint).min(3).max(6),
+    /** How long a spoken answer should take at most, as in a real interview. */
+    answer_seconds: z.number().int().min(60).max(180),
     ...reviewShape,
   })
   .superRefine((q, ctx) => {
@@ -333,3 +349,64 @@ export const Goal = z.strictObject({
   stages: z.array(PathStage).min(1),
 });
 export type Goal = z.infer<typeof Goal>;
+
+// ---------------------------------------------------------- certifications ---
+
+/**
+ * A paid certification exam from a large provider, with the free courses that
+ * prepare for it. RM-6: a fee always carries the date it was checked.
+ */
+export const Certification = z
+  .strictObject({
+    id: Slug,
+    name: Text,
+    provider: Text,
+    exam_code: Text.optional(),
+    level: Level,
+    /** Who it suits, in one or two sentences. */
+    audience: Text.max(300),
+    covers: Text.max(400),
+    format: Text.max(120),
+    fee_usd: z.number().positive().optional(),
+    /** Where the fee is not one number, say how it is set. */
+    fee_note: Text.max(160).optional(),
+    fee_checked_on: IsoDate.optional(),
+    official_url: HttpsUrl,
+    /** Free resources that prepare for it, best first. */
+    prep: z.array(Slug).min(1),
+    paths: z.array(Slug).min(1),
+    last_verified: IsoDate,
+    verified_by: Text,
+  })
+  .superRefine((c, ctx) => {
+    if (c.fee_usd !== undefined && !c.fee_checked_on) {
+      ctx.addIssue({ code: "custom", path: ["fee_checked_on"], message: "RM-6: a fee is never shown without its check date" });
+    }
+    if (c.fee_usd === undefined && !c.fee_note) {
+      ctx.addIssue({ code: "custom", path: ["fee_note"], message: "give fee_usd with its check date, or a fee_note" });
+    }
+  });
+export type Certification = z.infer<typeof Certification>;
+
+// ------------------------------------------------------------------- blog ---
+
+export const BLOG_DESCRIPTION_MAX = 170;
+
+/** Frontmatter of content/blog/<id>.mdx. The MDX body is the article. */
+export const BlogFrontmatter = z.strictObject({
+  id: Slug,
+  title: Text.max(90),
+  /** The search snippet: one or two sentences. */
+  description: Text.max(BLOG_DESCRIPTION_MAX),
+  published_on: IsoDate,
+  updated_on: IsoDate,
+  author: Text,
+  tags: z.array(Slug).min(1),
+  related_paths: z.array(Slug).default([]),
+  related_lessons: z.array(Slug).default([]),
+  /** Short questions and answers shown at the end and given to search engines. */
+  faq: z.array(z.strictObject({ q: Text, a: Text.max(600) })).default([]),
+  ...reviewShape,
+});
+export type BlogFrontmatter = z.infer<typeof BlogFrontmatter>;
+export type BlogPost = BlogFrontmatter & { body: string };

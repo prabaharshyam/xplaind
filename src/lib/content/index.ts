@@ -7,7 +7,7 @@ import type { LevelId } from "@/lib/levels";
 import { loadContent } from "./load";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
-import type { Goal, GlossaryTerm, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
+import type { BlogPost, Certification, Goal, GlossaryTerm, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
 
 let cached: Bundle | undefined;
 
@@ -72,3 +72,16 @@ export const getGlossary = (): GlossaryTerm[] =>
 
 /** Lessons that list a term among their key terms, in library order. */
 export const lessonsWithTerm = (termId: string): Stop[] => getStops().filter((s) => s.key_terms.includes(termId));
+
+/** Certifications, entry level first, then by provider. */
+export const getCertifications = (): Certification[] =>
+  getContent()
+    .certifications.map((c) => c.data)
+    .sort((a, b) => a.level.localeCompare(b.level) || a.provider.localeCompare(b.provider));
+
+/** Blog posts, newest first. */
+export const getBlogPosts = (): BlogPost[] =>
+  getContent()
+    .blog.map((b) => b.data)
+    .sort((a, b) => b.published_on.localeCompare(a.published_on) || a.title.localeCompare(b.title));
+export const getBlogPost = (id: string): BlogPost | undefined => getBlogPosts().find((b) => b.id === id);

@@ -6,7 +6,9 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { z } from "zod";
 import {
+  BlogFrontmatter,
   Book,
+  Certification,
   GlossaryTerm,
   CheckQuestion,
   Goal,
@@ -122,6 +124,38 @@ function loadStops(root: string, issues: Issue[]): Bundle["stops"] {
   return out;
 }
 
+function loadBlog(root: string, issues: Issue[]): Bundle["blog"] {
+  const out: Bundle["blog"] = [];
+  for (const rel of listFiles(path.join(root, "blog"))) {
+    const file = `blog/${rel}`;
+    if (!rel.endsWith(".mdx")) {
+      issues.push({ severity: "error", file, message: "unexpected file type here; use a .mdx file" });
+      continue;
+    }
+    const match = FRONTMATTER.exec(fs.readFileSync(path.join(root, file), "utf8"));
+    if (!match) {
+      issues.push({ severity: "error", file, message: "no frontmatter found; the file must start with a --- block" });
+      continue;
+    }
+    let raw: unknown;
+    try {
+      raw = parseYaml(match[1]);
+    } catch (e) {
+      issues.push({ severity: "error", file, message: `frontmatter YAML could not be read: ${(e as Error).message.split("\n")[0]}` });
+      continue;
+    }
+    const parsed = BlogFrontmatter.safeParse(raw);
+    if (!parsed.success) {
+      issues.push(...zodToIssues(file, parsed.error));
+      continue;
+    }
+    const stem = path.basename(rel, ".mdx");
+    if (stem !== parsed.data.id) issues.push({ severity: "error", file, message: `id "${parsed.data.id}" must match the file name "${stem}"` });
+    out.push({ file, data: { ...parsed.data, body: (match[2] ?? "").trim() } });
+  }
+  return out;
+}
+
 function loadLevels(root: string, issues: Issue[]): Bundle["levels"] {
   const file = "levels/levels.yaml";
   const abs = path.join(root, file);
@@ -155,5 +189,7 @@ export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   bundle.interview = loadYamlDir(root, "questions/interview", InterviewQuestion, issues);
   bundle.books = loadYamlDir(root, "books", Book, issues);
   bundle.glossary = loadYamlDir(root, "glossary", GlossaryTerm, issues);
+  bundle.certifications = loadYamlDir(root, "certifications", Certification, issues);
+  bundle.blog = loadBlog(root, issues);
   return { bundle, issues };
 }

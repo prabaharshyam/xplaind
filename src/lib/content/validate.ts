@@ -106,8 +106,8 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   // ---- stops --------------------------------------------------------------
   const referenced = new Set<string>();
   for (const { file, data: s } of bundle.stops) {
-    const refs = [s.primary_resource, ...s.alternates];
-    if (new Set(refs).size !== refs.length) error(file, "primary_resource and alternates must all be different");
+    const refs = [s.primary_resource, ...s.alternates, ...s.more];
+    if (new Set(refs).size !== refs.length) error(file, "primary_resource, alternates and more must all be different");
     for (const id of refs) {
       referenced.add(id);
       if (!resourceById.has(id)) error(file, `resource "${id}" does not exist`, "RM-2");
@@ -216,6 +216,30 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
       gap(file, `reviewed_by "${q.reviewed_by}" is not a person; a human must review this question before launch`, "IQ-6");
     }
     if (daysBetween(opts.today, q.reviewed_on) > 0) error(file, `reviewed_on ${q.reviewed_on} is in the future`, "IQ-6");
+  }
+
+  // ---- certifications -----------------------------------------------------
+  const resourceIds = new Set(bundle.resources.map((r) => r.data.id));
+  const goalIds = new Set(bundle.goals.map((g) => g.data.id));
+  for (const { file, data: c } of bundle.certifications) {
+    for (const id of c.prep) if (!resourceIds.has(id)) error(file, `prep resource "${id}" does not exist`, "RM-2");
+    for (const id of c.paths) if (!goalIds.has(id)) error(file, `path "${id}" does not exist`);
+    if (c.fee_checked_on && daysBetween(c.fee_checked_on, opts.today) > PRICE_STALE_DAYS) {
+      gap(file, `fee checked on ${c.fee_checked_on}; check it again`, "RM-6");
+    }
+    if (!isHumanName(c.verified_by)) gap(file, `verified_by "${c.verified_by}" is not a person; a human must confirm the exam page`, "ED-4");
+  }
+
+  // ---- blog ---------------------------------------------------------------
+  for (const { file, data: b } of bundle.blog) {
+    if (b.updated_on < b.published_on) error(file, "updated_on is before published_on");
+    if (daysBetween(opts.today, b.published_on) > 0) error(file, `published_on ${b.published_on} is in the future`);
+    for (const id of b.related_paths) if (!goalIds.has(id)) error(file, `related path "${id}" does not exist`);
+    for (const id of b.related_lessons) if (!stopById.has(id)) error(file, `related lesson "${id}" does not exist`);
+    if (/[{<]/.test(b.body.replace(/```[\s\S]*?```/g, "").replace(/`[^`]*`/g, ""))) {
+      error(file, "use no { or < outside code; MDX reads them as code");
+    }
+    if (!isHumanName(b.reviewed_by)) gap(file, `reviewed_by "${b.reviewed_by}" is not a person; a human must review this article`, "ED-9");
   }
 
   // ---- PL-4: every gap tag maps to a review stop ---------------------------

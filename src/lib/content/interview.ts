@@ -1,7 +1,7 @@
 // What interview and practice pages pass to their client islands. Node only.
 import { INTERVIEW_TOPIC_IDS, type InterviewTopicId } from "@/lib/interview-topics";
 import type { McqQuestion } from "@/components/mcq-quiz";
-import { getContent, getStop } from "./index";
+import { getContent, getStop, pathsWithLesson } from "./index";
 import { isHumanName } from "./review";
 import type { InterviewView } from "@/lib/interview/types";
 
@@ -20,6 +20,9 @@ export function getInterviewViews(): InterviewView[] {
         level: q.level,
         topic: q.topic,
         stop: { id: stop.id, title: stop.title },
+        paths: pathsWithLesson(stop.id).map((p) => p.id),
+        rubric: q.rubric,
+        answer_seconds: q.answer_seconds,
         reviewed: isHumanName(q.reviewed_by),
       };
     })

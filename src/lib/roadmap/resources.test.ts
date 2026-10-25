@@ -31,7 +31,7 @@ describe("orderResources (RM-2, RM-9)", () => {
 describe("ranking ignores affiliate and commission fields (ED-2)", () => {
   // Keep this test. Any function that picks or orders resources or stops lives in
   // one of these files, and none of them may read those fields.
-  const RANKING_FILES = ["resources.ts", "next-steps.ts", "progress.ts"];
+  const RANKING_FILES = ["resources.ts", "next-steps.ts", "progress.ts", "directory.ts"];
 
   for (const file of RANKING_FILES) {
     it(`${file} never mentions affiliate or commission`, () => {

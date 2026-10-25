@@ -1,5 +1,7 @@
 import type {
+  BlogPost,
   Book,
+  Certification,
   CheckQuestion,
   Goal,
   GlossaryTerm,
@@ -33,6 +35,8 @@ export type Bundle = {
   interview: Entry<InterviewQuestion>[];
   books: Entry<Book>[];
   glossary: Entry<GlossaryTerm>[];
+  certifications: Entry<Certification>[];
+  blog: Entry<BlogPost>[];
 };
 
 export const emptyBundle = (): Bundle => ({
@@ -45,4 +49,6 @@ export const emptyBundle = (): Bundle => ({
   interview: [],
   books: [],
   glossary: [],
+  certifications: [],
+  blog: [],
 });

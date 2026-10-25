@@ -2,6 +2,8 @@
 // bundle, so each test can break exactly one thing.
 import type { Bundle } from "./types";
 import type {
+  BlogPost,
+  Certification,
   Goal,
   GlossaryTerm,
   Book,
@@ -52,6 +54,7 @@ export const stop = (o: Partial<Stop> = {}): Stop => ({
   gap_tags: ["tag-one"],
   primary_resource: "res-one",
   alternates: [],
+  more: [],
   check: { type: "mcq", question_ids: ["chk-1", "chk-2", "chk-3"] },
   format: "brief",
   key_terms: [],
@@ -93,6 +96,46 @@ export const interview = (o: Partial<InterviewQuestion> = {}): InterviewQuestion
   level: "I2",
   topic: "rag",
   stop_id: "stop-one",
+  rubric: [
+    { point: "Retrieves relevant text first", keywords: ["retrieve", "search"] },
+    { point: "Answers from that text", keywords: ["ground", "context"] },
+    { point: "Evaluates retrieval", keywords: ["evaluate", "recall"] },
+  ],
+  answer_seconds: 90,
+  ...review,
+  ...o,
+});
+
+export const certification = (o: Partial<Certification> = {}): Certification => ({
+  id: "cert-one",
+  name: "Cert one",
+  provider: "Provider",
+  level: "B2",
+  audience: "Beginners.",
+  covers: "Basics.",
+  format: "90 minutes",
+  fee_usd: 100,
+  fee_checked_on: "2026-01-01",
+  official_url: "https://example.com/cert",
+  prep: ["res-one"],
+  paths: ["genai-engineer"],
+  last_verified: "2026-01-01",
+  verified_by: "Asha Rao",
+  ...o,
+});
+
+export const blogPost = (o: Partial<BlogPost> = {}): BlogPost => ({
+  id: "post-one",
+  title: "Post one",
+  description: "A post.",
+  published_on: "2026-01-01",
+  updated_on: "2026-01-01",
+  author: "Xplaind",
+  tags: ["learning"],
+  related_paths: [],
+  related_lessons: [],
+  faq: [],
+  body: "Plain text.",
   ...review,
   ...o,
 });
@@ -167,5 +210,7 @@ export function validBundle(): Bundle {
     interview: [{ ...f("questions/interview/iq-1.yaml"), data: interview() }],
     books: [{ ...f("books/book-1.yaml"), data: book() }],
     glossary: [{ ...f("glossary/term-one.yaml"), data: term() }, { ...f("glossary/term-two.yaml"), data: term({ id: "term-two", term: "Term two", related: ["term-one"] }) }],
+    certifications: [{ ...f("certifications/cert-one.yaml"), data: certification() }],
+    blog: [{ ...f("blog/post-one.mdx"), data: blogPost() }],
   };
 }

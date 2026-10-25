@@ -20,6 +20,31 @@ const MDX_COMPONENTS = {
   pre: (props: React.ComponentProps<"pre">) => <pre tabIndex={0} {...props} />,
 };
 
+/** Free courses from other providers on the same topic: a short list, after the main picks. */
+function MoreCourses({ stopId, courses }: { stopId: string; courses: ReturnType<typeof resourceCard>[] }) {
+  if (courses.length === 0) return null;
+  return (
+    <section aria-labelledby="more-courses" className="mt-6">
+      <h3 id="more-courses" className="font-semibold">
+        More free courses on this topic
+      </h3>
+      <ul className="mt-2 flex flex-col gap-2">
+        {courses.map((c) => (
+          <li key={c.id} className="leading-7">
+            <a href={`/go/${c.id}?stop=${encodeURIComponent(stopId)}`} target="_blank" rel="noopener" className={textLink}>
+              {c.title}
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>{" "}
+            <span className={`text-sm ${muted}`}>
+              {c.provider} · {c.hours} h{c.certificate ? " · certificate or badge" : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function generateStaticParams() {
   return getStops().map((s) => ({ id: s.id }));
 }
@@ -40,6 +65,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   const explainer = stop.format === "explainer";
   const interview = getInterviewViews().filter((q) => q.stop.id === stop.id);
   const cards = [stop.primary_resource, ...stop.alternates].map(resourceCard);
+  const more = stop.more.map(resourceCard);
   const checks = new Map(getContent().checks.map(({ data: q }) => [q.id, q]));
   const check =
     stop.check.type === "project"
@@ -121,11 +147,13 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
           <h2 className="mt-8 text-xl font-semibold">Go deeper: the best free course</h2>
           <StopResources stopId={stop.id} cards={cards} />
+          <MoreCourses stopId={stop.id} courses={more} />
         </>
       ) : (
         <>
           <h2 className="mt-8 text-xl font-semibold">Learn it</h2>
           <StopResources stopId={stop.id} cards={cards} />
+          <MoreCourses stopId={stop.id} courses={more} />
 
           <h2 className="mt-8 text-xl font-semibold">Do it</h2>
           <div className={PROSE}>
