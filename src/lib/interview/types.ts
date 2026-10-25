@@ -12,6 +12,12 @@ export type InterviewView = {
   level: LevelId;
   topic: InterviewTopicId;
   stop: { id: string; title: string };
+  /** Paths whose lessons include the question's lesson. */
+  paths: string[];
+  /** VS-1: key points a strong answer covers, with the words that show each one. */
+  rubric: { point: string; keywords: string[] }[];
+  /** The longest a spoken answer should run. */
+  answer_seconds: number;
   /** False until a person signs it off (IQ-6). Pages label drafts. */
   reviewed: boolean;
 };

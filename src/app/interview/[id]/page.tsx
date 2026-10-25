@@ -48,6 +48,19 @@ export default async function InterviewQuestionPage({ params }: PageProps<"/inte
         </p>
       ))}
 
+      <h2 className="mt-8 text-xl font-semibold">What a strong answer covers</h2>
+      <ul className="mt-2 list-disc pl-6 leading-7 [&_li]:mt-1">
+        {q.rubric.map((r) => (
+          <li key={r.point}>{r.point}</li>
+        ))}
+      </ul>
+      <p className="mt-3">
+        <Link href={`/interview/simulator?question=${q.id}`} className={textLink}>
+          Answer it out loud in the mock interview
+        </Link>{" "}
+        <span className={`text-sm ${muted}`}>about {Math.round(q.answer_seconds / 60 * 2) / 2} min</span>
+      </p>
+
       <h2 className="mt-8 text-xl font-semibold">Follow-ups to expect</h2>
       <ul className="mt-2 list-disc pl-6 leading-7 [&_li]:mt-1">
         {q.follow_ups.map((f) => (

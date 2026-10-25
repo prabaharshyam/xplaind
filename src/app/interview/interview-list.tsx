@@ -13,15 +13,43 @@ const select =
   "min-h-12 rounded-lg border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950";
 
 /** IQ-3: browse and filter by topic and level. */
-export function InterviewList({ questions }: { questions: InterviewView[] }) {
+export function InterviewList({
+  questions,
+  paths,
+  initialPath = "all",
+}: {
+  questions: InterviewView[];
+  /** Offer a path filter when given. */
+  paths?: { id: string; name: string }[];
+  initialPath?: string;
+}) {
   const [topic, setTopic] = useState("all");
   const [level, setLevel] = useState("all");
+  const [path, setPath] = useState(initialPath);
   const practice = usePractice();
-  const shown = questions.filter((q) => (topic === "all" || q.topic === topic) && (level === "all" || q.level === level));
+  const shown = questions.filter(
+    (q) =>
+      (topic === "all" || q.topic === topic) &&
+      (level === "all" || q.level === level) &&
+      (path === "all" || q.paths.includes(path)),
+  );
 
   return (
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {paths && (
+          <label className="flex flex-col gap-1 sm:col-span-2">
+            <span className="text-sm font-medium">Path</span>
+            <select className={select} value={path} onChange={(e) => setPath(e.target.value)}>
+              <option value="all">Every path</option>
+              {paths.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Topic</span>
           <select className={select} value={topic} onChange={(e) => setTopic(e.target.value)}>

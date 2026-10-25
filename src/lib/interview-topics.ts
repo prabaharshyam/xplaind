@@ -9,6 +9,13 @@ export const INTERVIEW_TOPICS = [
   { id: "approach-choice", label: "Prompting, RAG or fine-tuning" },
   { id: "system-design", label: "System design" },
   { id: "behavioral", label: "Behavioural" },
+  { id: "ai-literacy", label: "AI basics for everyone" },
+  { id: "deep-learning", label: "Deep learning" },
+  { id: "deployment", label: "Deployment and LLMOps" },
+  { id: "governance", label: "Responsible AI and governance" },
+  { id: "automation", label: "Automation workflows" },
+  { id: "product", label: "AI product management" },
+  { id: "client-delivery", label: "Client delivery" },
 ] as const;
 
 export type InterviewTopicId = (typeof INTERVIEW_TOPICS)[number]["id"];
