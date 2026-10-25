@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AccountLink } from "@/components/account-link";
 import { allowIndexing } from "@/lib/indexing";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/how-we-rank" className="underline-offset-2 hover:underline">
               How we rank
             </Link>
+            <AccountLink className="underline-offset-2 hover:underline" />
           </nav>
         </footer>
       </body>

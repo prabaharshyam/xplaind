@@ -1,6 +1,7 @@
 // Browser-only interview practice ratings (IQ-4) until sign-in exists (slice S5).
 // Holds question ids and ratings only, no personal data.
 import { isRating, type RatingRecord, type Ratings } from "@/lib/practice/queue";
+import { syncRating } from "./account-sync";
 import { read, write } from "./storage";
 
 export const PRACTICE_KEY = "xplaind.practice.v1";
@@ -29,4 +30,8 @@ export function parsePractice(raw: string | null): SavedPractice {
 export function rate(questionId: string, record: RatingRecord): void {
   const current = parsePractice(rawPractice());
   write(PRACTICE_KEY, JSON.stringify({ ...current, ratings: { ...current.ratings, [questionId]: record } }));
+  syncRating(questionId, record);
 }
+
+/** Replaces all ratings with the merged copy from the server, without sending anything back. */
+export const replaceRatings = (ratings: Ratings): void => write(PRACTICE_KEY, JSON.stringify({ version: 1, ratings }));

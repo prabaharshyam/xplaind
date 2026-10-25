@@ -35,7 +35,8 @@ Roadmap and level pages, full resource cards with cost labels, `/go/[resource-id
 
 1. Books (BK-1 to BK-3), once the owner has an Amazon Associates India tag. Interview questions and practice are done (S4).
 2. Lessons for optional topics, to reach 5 per level.
-3. S5 accounts and progress with Supabase (needs a Supabase project from the owner), then S6 link checker and admin, S7 landing, email and legal pages, S8 hardening and launch.
+3. Switch on accounts: the owner follows docs/supabase-setup.md; then test sign-in end to end. S5 code is done.
+4. S6 link checker and admin, S7 landing, email and legal pages, S8 hardening and launch.
 
 Write more stops as you go. `npm run content:validate -- --verbose` lists topic tags that have no review stop yet; that list is the outline for the stops still to write.
 
