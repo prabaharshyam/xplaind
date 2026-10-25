@@ -6,6 +6,16 @@ Written 2026-10-25 so a new Claude Code session can pick up without the earlier 
 
 Xplaind (xplaind.ai) is a free-first AI learning path for India. A short test places a learner on a nine-level ladder (B1 to P3) for a goal, first "GenAI Engineer". The site then shows the next five steps, each with the best free or low-cost course, a check and a project. There are interview questions, multiple-choice practice and books with disclosed affiliate links. No ads and no sponsored content. Owner: Shyam (prabaharshyam@gmail.com). The PRD in `docs/PRD.md` is a snapshot; the live copy is the Claude doc at https://claude.ai/artifact/Mv69GaZfM4gJn3TdcgyUq5.
 
+## Update, later on 2026-10-25: nine paths
+
+The owner widened the product from one path to nine; read `docs/product-plan.md`. Where the build stands now:
+
+- Nine paths in `content/goals/`, each an ordered route through one shared lesson library: GenAI Engineer, Forward Deployed Engineer, AI for Beginners, Agentic AI Expert, RAG Expert, AI Automation Specialist, LLMOps / AI Platform Engineer, AI Product Manager and ML Engineer. Every topic on every path has a lesson; nothing is left "being written".
+- 163 lessons, all in the explainer format (What it is, How it works, A worked example, Common mistakes, Practise), each with key terms, a free primary course and a check. 239 resources (links opened by Claude on 2026-10-25), 450 check questions, 261 glossary terms at `/glossary`.
+- Pages: `/paths` (chooser), `/roadmap/<path>` (staged map), `/start/<path>` (level test for ladder paths), home page rebuilt for nine paths.
+- Everything is still a draft for human review; launch mode lists about 1,200 sign-off gaps.
+- Not built yet, from the owner's final-stage list (phases in the product plan): bookmarks, guided projects with rubrics, curated AI news, newsletter and reminders, Tamil, adaptive tutoring and mock interviews (need model calls), portfolios, premium interview prep, college and company programmes, community contributions. Interview questions still cover the GenAI topics only.
+
 ## Standing rules from the owner
 
 - Do not ask learners their background (IT, marketing, sales). The test places the level. Ask only goal and weekly hours.
