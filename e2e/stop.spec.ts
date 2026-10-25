@@ -1,4 +1,7 @@
+import path from "node:path";
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { loadContent } from "../src/lib/content/load";
 
 const noHorizontalScroll = (page: import("@playwright/test").Page) =>
   page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
@@ -29,4 +32,16 @@ test("an unknown stop shows the not-found page and asks search engines to skip i
   await page.goto("/stop/does-not-exist");
   await expect(page.getByText("This page could not be found")).toBeVisible();
   await expect(page.locator('meta[name="robots"][content*="noindex"]').first()).toBeAttached();
+});
+
+test("every stop page fits a 360px phone and passes the accessibility scan", async ({ page }) => {
+  test.setTimeout(180_000);
+  const { bundle } = loadContent(path.resolve(__dirname, "../content"));
+  for (const { data: stop } of bundle.stops) {
+    await page.goto(`/stop/${stop.id}`);
+    await expect(page.getByRole("heading", { level: 1 }), stop.id).toHaveText(stop.title);
+    expect(await noHorizontalScroll(page), stop.id).toBe(false);
+    const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+    expect(violations, stop.id).toEqual([]);
+  }
 });

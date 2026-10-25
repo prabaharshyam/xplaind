@@ -66,7 +66,7 @@ test.describe("roadmap (RM-1)", () => {
     await expect(page.getByRole("link", { name: /Variables, loops and functions in Python/ })).toBeVisible();
     expect((await wcag(page)).violations).toEqual([]);
     await page.goto("/roadmap/genai-engineer/p2");
-    await expect(page.getByText("The steps for this level are being written.")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Deploy and monitor an LLM app/ })).toBeVisible();
     await page.goto("/roadmap/genai-engineer/x9");
     await expect(page.getByText("This page could not be found")).toBeVisible();
   });

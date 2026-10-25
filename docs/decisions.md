@@ -63,3 +63,13 @@ The six sample resources, three stops and six check questions exist to exercise 
 - **The full outline is new content: `topics` in `content/levels/levels.yaml`.** Five or six topics per level, 50 in all, one or two of each marked optional. A topic's id is the shared tag: placement questions use it and a stop lists it in `gap_tags`. All 33 placement tags became topics at their own level, and I added 17 more. Claude drafted them; they need the same review as the rest of the content.
 - **Topics without a lesson still show**, marked "Coming soon", so the map is complete from day one and the empty parts are honest.
 - **New validation rules:** a topic sits on one level only; every stop gap tag must be a topic at the stop's level or below; every placement tag must be a topic at the question's own level. A core topic with no stop yet is on the launch to-do list.
+
+## Lessons for every core topic (before interview questions, at the owner's choice)
+
+- **The owner chose to write lessons before interview questions**, so every question in slice S4 can link to a real lesson (IQ-2). Books are postponed until the owner joins Amazon Associates India; until then a book link with a "we earn a commission" label would be false.
+- **35 new lessons, 38 in all**: one for every core topic on the map. Optional topics (for example MCP, SQL, fine-tuning basics) have none yet.
+- **Every source was opened before use.** Each link was fetched from the build environment on 2026-10-25 and its title and content checked. `verified_by` says exactly that and stays a non-person value, because ED-4 wants a person to confirm access and price. YouTube blocks automated checks, so no new lesson links to a YouTube video.
+- **Sources are free first and mostly primary**: official docs (Python, Requests, packaging, Claude API), university courses (CS50, Python for Everybody, MIT Missing Semester, Helsinki), Kaggle and Hugging Face courses, and widely cited practitioner writing (Anthropic engineering, Hamel Husain, Eugene Yan, Chip Huyen, Simon Willison, OWASP). The Claude docs are used for the API lessons because they could be opened and checked; the lesson text says the ideas carry over to other providers.
+- **Checks:** 26 lessons end in three multiple-choice questions, nine hands-on lessons end in a project. All drafted by Claude and flagged for review.
+- **Launch gap:** the PRD asks for at least 5 lessons per level. Six levels have four, because they have four core topics. Writing lessons for their optional topics would close it.
+- **A browser test now opens every lesson page** at 360 px and runs the accessibility scan, so new lessons are checked automatically.

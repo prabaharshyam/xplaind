@@ -33,9 +33,10 @@ Roadmap and level pages, full resource cards with cost labels, `/go/[resource-id
 
 ## Next slices (from the PRD build plan)
 
-1. More stops: every level above B2 is still empty, so the roadmap is mostly "being written".
-2. S4 interview Q&A, MCQ practice and books (IQ-1 to IQ-6, BK-1 to BK-3).
-3. S5 accounts and progress with Supabase (needs a Supabase project from the owner), then S6 link checker and admin, S7 landing, email and legal pages, S8 hardening and launch.
+1. S4: interview questions linked to the new lessons, then MCQ practice. Books wait until the owner joins Amazon Associates India.
+2. Lessons for optional topics, to reach 5 per level.
+3. S4 interview Q&A, MCQ practice and books (IQ-1 to IQ-6, BK-1 to BK-3).
+4. S5 accounts and progress with Supabase (needs a Supabase project from the owner), then S6 link checker and admin, S7 landing, email and legal pages, S8 hardening and launch.
 
 Write more stops as you go. `npm run content:validate -- --verbose` lists topic tags that have no review stop yet; that list is the outline for the stops still to write.
 
