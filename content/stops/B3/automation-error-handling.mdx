@@ -1,0 +1,85 @@
+---
+id: automation-error-handling
+level: B3
+title: "Error handling and retries"
+outcome: "Make automations fail safely: retry temporary errors with backoff, stop on permanent ones, alert the right person with useful details, avoid duplicates on rerun and keep a record of what happened."
+why_it_matters: "Every automation fails eventually: an API is down, a password expires, a file has a strange format. The difference between a trusted automation and an abandoned one is whether failures are caught, explained and recoverable, without double payments or lost orders."
+hours: 2
+gap_tags: []
+primary_resource: n8n-error-handling
+alternates: [n8n-course-level-two]
+format: explainer
+key_terms: [retry-with-backoff, idempotency, rate-limit, monitoring]
+check:
+  type: mcq
+  question_ids: [automation-error-handling-1, automation-error-handling-2, automation-error-handling-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+**Error handling** is everything an automation does when a step fails:
+
+- **Retry** errors that are likely temporary.
+- **Stop** and record errors that will not fix themselves.
+- **Alert** a person with enough detail to act.
+- **Recover** safely, without duplicating actions, once the cause is fixed.
+- **Record** what happened for later review.
+
+## How it works
+
+**Know the kinds of error.**
+
+- *Temporary*: network blips, timeouts, rate limits (HTTP 429), server errors (500 to 504). Usually succeed on retry.
+- *Permanent*: wrong credentials (401, 403), bad input (400), missing records (404), invalid data. Retrying wastes time; fix the cause.
+- *Logic*: the automation ran but did the wrong thing, such as a field mapped wrongly. Only checks and monitoring catch these.
+
+**Retry with backoff.** Retry temporary errors a few times with growing waits (for example 5 seconds, 30 seconds, 2 minutes). Respect "Retry-After" headers. Cap the number of retries.
+
+**Idempotency.** Before creating something (an invoice, a payment, a message), check if it already exists, using a unique key such as the order id. Then retries and reruns never duplicate it.
+
+**Alerts that help.** Send to a channel the owner watches (email, Slack, Teams, WhatsApp): which workflow, which step, which record, the error message, and a link to the run. Group repeated alerts so one outage does not send 500 messages.
+
+**Dead-letter queue.** Put records that failed permanently into a "needs attention" list with the reason, so they can be fixed and reprocessed later instead of being lost.
+
+**Partial failures.** When processing 300 items, one bad item should not stop the other 299. Process items independently and collect failures.
+
+**Monitoring.** Track runs, failures and items processed per day. A workflow that suddenly processes zero items is often broken, even with no error.
+
+**Ownership and runbook.** Every automation has a named owner and a short note: what it does, common failures and fixes.
+
+## A worked example
+
+A Bengaluru logistics startup's automation sends delivery updates to customers by SMS and updates the order system, about 8,000 messages a day.
+
+Problems in the first month: the SMS provider rate-limited the workflow during evening peaks, some customers got two messages, and one day the workflow quietly processed nothing because a token had expired.
+
+Fixes:
+
+- Retries with backoff on 429 and 5xx responses from the SMS provider, honouring its Retry-After header, at most four attempts.
+- A unique key per message (order id plus status) checked before sending, so reruns never send duplicates.
+- Expired or invalid credentials stop the run at once and alert the owner with "token expired for SMS provider, renew at..." instead of retrying.
+- Failed records go to a "needs attention" sheet with the reason; a button reprocesses them after fixing.
+- A daily check alerts if fewer than 1,000 messages were sent by 8 pm.
+
+Duplicate messages disappear, and the next token expiry is fixed within 20 minutes because the alert said exactly what to do.
+
+## Common mistakes
+
+- **Retrying everything.** Permanent errors need fixing, not retries.
+- **No duplicate protection.** Retries and reruns create double actions.
+- **Alerts without details.** "Workflow failed" is not actionable.
+- **One bad item stops the whole batch.** Handle items independently.
+- **Watching only for errors.** A workflow doing nothing can look healthy.
+
+## Practise
+
+Read n8n's guide to error handling and revisit the error workflow part of the Level two course.
+
+1. Add retries with backoff to one API step in a workflow, and test with a deliberately failing endpoint.
+2. Add an idempotency check and a "needs attention" list for permanent failures.
+3. Create an alert that names the workflow, step, record and error, and a daily "too few items" check.
+
+**You are done when you can** break your workflow three ways (temporary error, permanent error, bad item) and show the right behaviour for each.
