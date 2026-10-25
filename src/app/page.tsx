@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-6 px-4 py-16">
@@ -11,7 +13,12 @@ export default function Home() {
         A short test finds your level. Then you get the next five steps, each
         with the best free or low-cost course. No ads, no paid placement.
       </p>
-      <p className="text-sm text-zinc-500">Building in public. Launching soon.</p>
+      <Link
+        href="/start"
+        className="inline-flex min-h-12 w-fit items-center justify-center rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+      >
+        Find my level
+      </Link>
     </main>
   );
 }

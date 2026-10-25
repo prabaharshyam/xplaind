@@ -23,3 +23,21 @@ Choices made while building that the PRD did not settle, or where the build forc
 ## Sample content is not verified
 
 The six sample resources, three stops and six check questions exist to exercise the pipeline. They were written from memory. I could not open the providers' pages from the build environment, so none of them has been checked for price, access, hours or certificate. Each says so in `verified_by` / `reviewed_by`, and launch mode fails until a person replaces those with their name after opening the page. The hours and "certificate" values are guesses.
+
+## Slice S2 (placement test)
+
+- **"I don't know" counts as an answer.** It is an attempt that is wrong, so it moves the staircase down and counts towards "at least 2 answered" in PL-3.
+- **Exactly two thirds passes.** The check uses whole numbers (`correct * 3 >= attempts * 2`), so 2 of 3 and 4 of 6 pass and 2 of 4 does not.
+- **The test can end before 12 questions.** PL-2 says 12, but also says no question repeats. A learner who keeps missing questions stays at B1, and a bank with 6 questions at B1 runs out after 8 answers (B3, B2, then six at B1). The engine then ends the test instead of repeating a question or asking from another level. With the launch target of 6 per level this happens only to learners who miss nearly everything, and B1 is the right result for them. If you would rather always ask 12, the bank needs about 10 B1 questions.
+- **Weekly hours choices are 3, 5, 10, 15 and 20**, with 5 selected. The PRD names weekly hours but not the options.
+- **Result page shows more than PL-5 asks for:** the questions the learner missed, with the right answer and the explanation. It teaches something the moment the test ends. It reads the bank in the browser, which already ships the answers (PRD: the test has no stakes).
+- **The next five steps are not on the result page yet.** That is RM-3 and arrives in slice S3 with its tests.
+- **A review link needs a stop.** A gap topic links to the easiest stop at or below the start level that lists the tag. Until stops are written, most topics show "A review step for this topic is coming."
+- **Browser storage.** A test in progress is saved as `xplaind.test.v1` so a refresh keeps the place. A finished result is `xplaind.attempt.v1`. Both hold question ids and choices only, no personal data. The result page is `noindex`.
+- **`isValidStaircase` and `gradeChoices`** are written now for slice S5: the server re-scores a claimed attempt from raw choices and rejects a sequence that could not have come from the staircase.
+
+### The draft question bank
+
+- 54 questions, 6 per level. Each is flagged `drafted_with_ai` and `UNREVIEWED`. They need a person who knows the subject to check every question, its correct answer, its level and its wording. The correct option's position rotates, so a, b, c and d are balanced.
+- Topic tags are a shared vocabulary of 33 tags. Each tag needs a review stop (PL-4); `npm run content:validate -- --verbose` lists the tags that have none yet. That list is a ready outline for the stops to write.
+- Levels are my judgement of difficulty. The PRD plans to retune them after the 50-tester soft launch (PL-7).
