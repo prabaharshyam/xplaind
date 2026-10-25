@@ -11,18 +11,19 @@ test("a stop page renders its lesson from MDX at 360px", async ({ page }) => {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/stop/what-is-ai");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("What AI, machine learning");
-  await expect(page.getByRole("heading", { name: "Learn it" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Go deeper: the best free course" })).toBeVisible();
   await expect(page.getByText("Start here")).toBeVisible();
-  // from the MDX body: a bold lead-in and a list
-  await expect(page.getByText("What to look for")).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: "A language model is trained" })).toBeVisible();
+  // from the MDX body: section headings, bold text and a list
+  await expect(page.getByRole("heading", { level: 2, name: "How it works" })).toBeVisible();
+  await expect(page.getByText("Rules versus learning.")).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "is the broad goal" })).toBeVisible();
   expect(await noHorizontalScroll(page)).toBe(false);
   expect(errors).toEqual([]);
 });
 
 test("a project check shows its brief", async ({ page }) => {
   await page.goto("/stop/use-an-assistant");
-  await expect(page.getByText("Write three different prompts")).toBeVisible();
+  await expect(page.getByText(/^Project: Pick a task from your own work/)).toBeVisible();
 });
 
 test("an unknown stop shows the not-found page and asks search engines to skip it", async ({ page }) => {

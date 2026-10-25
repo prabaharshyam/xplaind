@@ -8,6 +8,8 @@ hours: 2
 gap_tags: [tradeoffs]
 primary_resource: huyen-llm-production
 alternates: [eugeneyan-llm-patterns]
+format: explainer
+key_terms: [latency, cost-per-request, model-tiering, evals]
 check:
   type: mcq
   question_ids: [quality-cost-speed-1, quality-cost-speed-2, quality-cost-speed-3]
@@ -16,8 +18,72 @@ reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
 ---
 
-Reread the cost and latency sections of the essay.
+## What it is
 
-**Practise**
+Every LLM app trades three things against each other:
 
-For your design document, write three trade-offs as one line each: "We chose X over Y, which costs us A and gains us B, and we would revisit it if C."
+- **Quality**: how often answers are correct, complete and safe.
+- **Cost**: money per request and per month.
+- **Speed**: how long users wait.
+
+Bigger models, more retrieved context, rerankers, reflection steps and agent loops usually raise quality and also raise cost and latency. Good engineering makes these trade-offs visible and decides them on purpose, with the people who own the product.
+
+## How it works
+
+**Measure all three on the same test set.** For each option, record:
+
+- quality from your eval (by category, not only overall);
+- cost per request (tokens times prices);
+- latency at the median and the 95th percentile, and time to first token.
+
+**Put the options in a table.** For example: small model, large model, large model plus reranker. Then the trade-off becomes a business conversation: "the reranker improves accuracy from 82% to 88% and adds 400 ms per request at p95; worth it?"
+
+**Ask what quality matters.** For a casual chat, 85% may be fine; for medical or financial answers, quality and safety dominate. Weight errors by their consequences.
+
+**Look for free wins first.** Some changes improve speed or cost without hurting quality:
+
+- streaming (perceived speed);
+- prompt caching (cost and speed for repeated prefixes);
+- shorter outputs and prompts;
+- running independent steps in parallel;
+- removing unnecessary steps.
+
+**Route by difficulty.** Send simple requests to a fast, cheap model and hard ones to a strong model. Measure how often the router gets it wrong.
+
+**Set budgets.** Agree a latency budget (for example, first token under 1.5 s at p95) and a cost per request ceiling, then maximise quality within them.
+
+**Revisit.** Prices fall, models improve and usage grows; the best trade-off changes. Re-run the table every few months.
+
+## A worked example
+
+A Hyderabad health-insurance company's assistant answers policy questions for its call-centre agents.
+
+The team compares four options on 150 test questions:
+
+```text
+option                         accuracy   cost/request   p95 latency
+small model                      76%        Rs 0.08        1.6 s
+large model                      85%        Rs 0.60        3.9 s
+large model + reranker           89%        Rs 0.64        4.3 s
+router (small, hard -> large)    86%        Rs 0.24        2.8 s
+```
+
+The product owner's view: agents are on live calls, so latency matters a lot; wrong coverage answers cause complaints and refunds, so accuracy matters more. They choose the router plus the reranker for questions about exclusions and claims (the riskiest categories), reaching 88% overall at about ₹0.30 per request and 3.1 s at p95. Streaming makes the first words appear in under a second.
+
+## Common mistakes
+
+- **Optimising one dimension silently.** Show all three.
+- **Overall accuracy only.** Weight by error consequences and categories.
+- **Ignoring tail latency.** Users remember slow requests.
+- **Missing free wins.** Streaming and caching first.
+- **Never revisiting the decision.**
+
+## Practise
+
+Reread Chip Huyen's production article linked below, focusing on cost and latency.
+
+1. Build a table of quality, cost per request and p95 latency for two or three options in your app.
+2. Write a one-paragraph recommendation for a product owner, with the trade-off stated plainly.
+3. Apply one change that improves speed without hurting quality, and measure it.
+
+**You are done when you can** present a trade-off table and justify a choice in terms a non-engineer understands.

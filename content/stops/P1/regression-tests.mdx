@@ -8,6 +8,8 @@ hours: 2
 gap_tags: [regression-testing]
 primary_resource: hamel-evals
 alternates: []
+format: explainer
+key_terms: [regression-test, evals, ci-cd, golden-set]
 check:
   type: mcq
   question_ids: [regression-tests-1, regression-tests-2, regression-tests-3]
@@ -16,8 +18,56 @@ reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
 ---
 
-Reread the section on unit tests in the evals article.
+## What it is
 
-**Do this**
+A **regression** is when something that used to work stops working after a change. In LLM apps, regressions are common and quiet: a prompt tweak that fixes one case breaks three others; a model upgrade changes the output format; a new chunking setting improves most questions but loses one important document.
 
-Turn the code checks from your eval set into tests that run with one command, and add them to your project's CI so they run on every push. Make a change that breaks one case and watch it fail.
+**Regression tests** rerun your eval set automatically on every change so these breaks are caught before users see them.
+
+## How it works
+
+**Two tiers of tests.**
+
+- *Fast checks on every push* (seconds to a few minutes): code-level checks that are cheap and deterministic. Does the app start? Does the output parse as valid JSON? Are required fields present? Do known must-refuse inputs get refused? Do a small set of critical cases still pass?
+- *Fuller evals on important changes or nightly*: the whole test set with model judges, comparing scores by category against the current production version.
+
+**Compare against a baseline.** Store the scores of the current production version. A change passes if overall quality does not drop beyond a set tolerance and no critical category (safety, refusals, key customers' cases) drops at all.
+
+**Handle non-determinism.** Model outputs vary between runs. Use low temperature for tests where possible, judge on criteria rather than exact text, and for borderline cases run more than once.
+
+**Model upgrades are changes too.** When a provider releases a new model, or you consider switching, run the full eval. Decide from the results, not the release notes: a newer model may be better overall and worse on your specific cases.
+
+**Wire it into CI.** Run fast checks on every pull request; block merging on failure. Run the fuller eval before deploying a prompt or model change. Store results so you can see trends.
+
+**Add every bug.** Each production failure becomes a regression test case.
+
+## A worked example
+
+A Noida ed-tech company's quiz-generation feature creates multiple-choice questions from chapter text, as JSON.
+
+Their setup:
+
+- *On every push*: 15 chapters through the app; checks that every output is valid JSON with four options and one correct answer, no duplicate options, and that two chapters containing sensitive historical content produce no disallowed phrasing. Takes 90 seconds.
+- *Before deploying*: 120 chapters scored by a judge for factual accuracy and difficulty, compared with production by subject.
+
+A developer shortens the prompt to cut costs. Fast checks pass. The full eval shows accuracy unchanged for science but down 9 points for history, because the shortened prompt dropped an instruction to use only facts in the chapter. The change is reworked before release.
+
+Months later, the provider's newer model scores 3 points higher overall but produces a different JSON field order that one old client parser cannot handle; the fast checks catch it, and the parser is fixed before switching.
+
+## Common mistakes
+
+- **No automated tests for prompts.** Prompt changes are code changes.
+- **Exact-text comparisons.** Outputs vary; check properties and criteria.
+- **Only averages.** Protect critical categories separately.
+- **Upgrading models without running evals.**
+- **Not adding production bugs to the test set.**
+
+## Practise
+
+Revisit Hamel Husain's evals article linked below.
+
+1. Split your eval set into a fast tier (10 to 20 cases with code checks) and a full tier.
+2. Run the fast tier automatically on every push with a CI workflow.
+3. Make a change that improves one category and breaks another, and show that your setup catches it.
+
+**You are done when you can** show a pull request blocked by a failing regression check, and explain what decided whether to adopt a new model.

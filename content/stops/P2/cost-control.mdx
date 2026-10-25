@@ -8,6 +8,8 @@ hours: 2
 gap_tags: [cost-control]
 primary_resource: huyen-llm-production
 alternates: [claude-batch-processing]
+format: explainer
+key_terms: [cost-per-request, model-tiering, batch-api, budget-limit]
 check:
   type: mcq
   question_ids: [cost-control-1, cost-control-2, cost-control-3]
@@ -16,8 +18,61 @@ reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
 ---
 
-Read the cost and latency part of the essay, then the batch processing page.
+## What it is
 
-**Do this**
+LLM apps cost money on every request, and costs grow with users, longer prompts and agent loops. **Cost control** means knowing where the money goes and reducing it without hurting the user experience. The main levers are model choice, prompt size, output size, caching, batching and limits.
 
-For one of your apps, work out the average cost per request and per user per month from your logs. Write down three ways to cut it and estimate the saving of each.
+## How it works
+
+**Measure first.** Log tokens and cost for every call, tagged with feature, user and model. Then you can answer: which feature costs most? Which users? Which step of an agent? Monthly totals alone hide this; cost per user and per feature show where to act and whether a feature can pay for itself.
+
+**Model choice: the biggest lever.** Smaller models can cost many times less than the largest ones. For simple tasks such as classification, extraction from clean text, routing and short replies, a small model often matches a large one. Test each task on your eval set with two or three model sizes and use the cheapest that passes. Route only hard requests to the big model.
+
+**Prompt size.** Every request pays for its input. Trim system prompts, send fewer and shorter retrieved chunks, summarise long conversation history, and remove unused tool definitions.
+
+**Output size.** Output tokens usually cost more than input. Ask for concise formats and set `max_tokens`.
+
+**Caching.** Prompt caching for long shared prefixes; response caching for repeated questions.
+
+**Batching.** Work that can wait (nightly summaries, bulk classification, embedding a corpus) can go through batch APIs, which providers typically offer at a large discount in exchange for results within hours.
+
+**Limits.** Daily caps per user, step limits on agents, spending alerts and hard limits in the provider console.
+
+**Watch for surprises.** Retry storms, agents looping, a single huge document, or one heavy user can multiply costs overnight.
+
+## A worked example
+
+A Kolkata customer-service platform spends ₹6 lakh a month on model calls and wants to halve it.
+
+Logging by feature shows:
+
+- 45% on a nightly job that summarises 10,000 support tickets for team leads, which nobody reads before 10 am;
+- 35% on live chat replies;
+- 20% on ticket classification.
+
+Changes:
+
+- The nightly summaries move to the provider's batch API at a large discount, finishing well before morning.
+- Ticket classification switches from the large model to a small one; on 400 labelled tickets, accuracy drops from 94% to 93%, which the team accepts.
+- Live chat keeps the large model, but the system prompt is trimmed by 40% and cached, and replies are capped at 200 tokens.
+- A per-agent daily cap and a spending alert at 80% of budget are added.
+
+The next month's bill is ₹2.7 lakh, with no change in customer satisfaction scores.
+
+## Common mistakes
+
+- **Optimising without measuring by feature and user.**
+- **Using the largest model for everything.**
+- **Paying real-time prices for work that can wait.**
+- **Long prompts and unlimited outputs.**
+- **No alerts or caps.**
+
+## Practise
+
+Read Chip Huyen's article on building LLM applications for production linked below, especially the cost sections.
+
+1. Add cost logging per call with feature and user tags to one of your apps, and find the most expensive feature.
+2. Test that feature with a smaller model on your eval set and decide whether to switch.
+3. Move one non-urgent job to batch processing, or add a cap and an alert.
+
+**You are done when you can** show cost per feature and per user, and one change that cut cost without hurting your eval scores.
