@@ -2,6 +2,7 @@
 // (docs/PRD.md, "Data model"); add fields if needed but do not rename them.
 // Every object is strict, so a misspelled field in a YAML file fails the build.
 import { z } from "zod";
+import { INTERVIEW_TOPIC_IDS } from "@/lib/interview-topics";
 import { LEVEL_IDS } from "@/lib/levels";
 
 /**
@@ -177,7 +178,7 @@ export const InterviewQuestion = z
     follow_ups: z.array(Text).min(2).max(3),
     common_mistakes: z.array(Text),
     level: Level,
-    topic: Slug,
+    topic: z.enum(INTERVIEW_TOPIC_IDS),
     stop_id: Slug,
     ...reviewShape,
   })

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { McqQuiz, type McqQuestion } from "@/components/mcq-quiz";
 import { muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { useProgress, useToday } from "@/lib/browser/hooks";
 import { clearStop, setStop } from "@/lib/browser/progress-store";
@@ -9,22 +10,14 @@ import { todayInIST } from "@/lib/dates";
 import {
   CHECK_PASS_PERCENT,
   afterCheck,
-  checkPercent,
   isProjectUrl,
   markDone,
   passesCheck,
   statusOf,
 } from "@/lib/roadmap/progress";
 import type { StopProgress } from "@/lib/roadmap/types";
-import { splitStem } from "@/lib/text";
 
-export type CheckQuestionView = {
-  id: string;
-  stem: string;
-  options: { id: string; text: string }[];
-  correct: string;
-  explanation: string;
-};
+export type CheckQuestionView = McqQuestion;
 
 type Check = { type: "mcq"; questions: CheckQuestionView[] } | { type: "project"; brief: string };
 
@@ -84,91 +77,14 @@ export function StopProgressPanel({ stopId, check }: { stopId: string; check: Ch
 
 function McqCheck({ stopId, questions }: { stopId: string; questions: CheckQuestionView[] }) {
   const progress = useProgress();
-  const [chosen, setChosen] = useState<Record<string, string>>({});
-  const [result, setResult] = useState<number | null>(null);
-  const complete = questions.every((q) => chosen[q.id]);
-
-  function submit() {
-    const correct = questions.filter((q) => chosen[q.id] === q.correct).length;
-    const percent = checkPercent(correct, questions.length);
-    setResult(percent);
-    setStop(stopId, afterCheck(progress.stops[stopId] as StopProgress | undefined, percent, todayInIST()));
-  }
-
   return (
-    <form
-      className="flex flex-col gap-5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-    >
-      <p className="leading-7">
-        {questions.length} quick questions. Get {CHECK_PASS_PERCENT}% or more to finish this step.
-      </p>
-      {questions.map((q, n) => {
-        const { text, code } = splitStem(q.stem);
-        return (
-          <fieldset key={q.id} className="flex min-w-0 flex-col gap-2">
-            <legend className="mb-2 font-medium">
-              {n + 1}. {text}
-            </legend>
-            {code && (
-              <pre tabIndex={0} aria-label="Code" className="overflow-x-auto rounded-lg bg-zinc-100 p-3 font-mono text-sm leading-6 dark:bg-zinc-900">
-                <code>{code}</code>
-              </pre>
-            )}
-            {q.options.map((o) => {
-              const shownRight = result !== null && o.id === q.correct;
-              const shownWrong = result !== null && chosen[q.id] === o.id && o.id !== q.correct;
-              return (
-                <label
-                  key={o.id}
-                  className="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-zinc-300 p-3 has-[:checked]:border-emerald-700 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-700 dark:border-zinc-700"
-                >
-                  <input
-                    type="radio"
-                    name={`check-${q.id}`}
-                    className="mt-1.5 size-4 accent-emerald-700"
-                    checked={chosen[q.id] === o.id}
-                    disabled={result !== null}
-                    onChange={() => setChosen((c) => ({ ...c, [q.id]: o.id }))}
-                  />
-                  <span>
-                    {o.text}
-                    {shownRight && <span className="font-medium text-emerald-800 dark:text-emerald-400"> (right answer)</span>}
-                    {shownWrong && <span className="font-medium text-red-800 dark:text-red-400"> (your answer)</span>}
-                  </span>
-                </label>
-              );
-            })}
-            {result !== null && <p className={`text-sm leading-6 ${muted}`}>{q.explanation}</p>}
-          </fieldset>
-        );
-      })}
-      {result === null ? (
-        <button type="submit" className={primaryButton} disabled={!complete}>
-          Check my answers
-        </button>
-      ) : (
-        <div className="flex flex-col gap-3" role="status">
-          <p className="text-lg font-medium">
-            You scored {result}%.{" "}
-            {passesCheck(result) ? "Step done. Well done." : `You need ${CHECK_PASS_PERCENT}% to finish. Review the answers and try again.`}
-          </p>
-          <button
-            type="button"
-            className={secondaryButton}
-            onClick={() => {
-              setChosen({});
-              setResult(null);
-            }}
-          >
-            Try the check again
-          </button>
-        </div>
-      )}
-    </form>
+    <McqQuiz
+      questions={questions}
+      intro={`${questions.length} quick questions. Get ${CHECK_PASS_PERCENT}% or more to finish this step.`}
+      verdict={(p) => (passesCheck(p) ? "Step done. Well done." : `You need ${CHECK_PASS_PERCENT}% to finish. Review the answers and try again.`)}
+      retryLabel="Try the check again"
+      onScored={(p) => setStop(stopId, afterCheck(progress.stops[stopId] as StopProgress | undefined, p, todayInIST()))}
+    />
   );
 }
 

@@ -5,6 +5,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { todayInIST } from "@/lib/dates";
 import { scoreAnswers } from "@/lib/placement/score";
 import { parseAttempt, rawAttempt } from "./attempt-store";
+import { parsePractice, rawPractice } from "./practice-store";
 import { parseProgress, rawProgress } from "./progress-store";
 import { serverSnapshot, subscribe } from "./storage";
 
@@ -20,6 +21,11 @@ export function useAttempt() {
 export function useProgress() {
   const raw = useSyncExternalStore(subscribe, rawProgress, serverSnapshot);
   return useMemo(() => parseProgress(raw), [raw]);
+}
+
+export function usePractice() {
+  const raw = useSyncExternalStore(subscribe, rawPractice, serverSnapshot);
+  return useMemo(() => parsePractice(raw), [raw]);
 }
 
 const noSubscription = () => () => {};

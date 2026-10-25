@@ -73,3 +73,14 @@ The six sample resources, three stops and six check questions exist to exercise 
 - **Checks:** 26 lessons end in three multiple-choice questions, nine hands-on lessons end in a project. All drafted by Claude and flagged for review.
 - **Launch gap:** the PRD asks for at least 5 lessons per level. Six levels have four, because they have four core topics. Writing lessons for their optional topics would close it.
 - **A browser test now opens every lesson page** at 360 px and runs the accessibility scan, so new lessons are checked automatically.
+
+## Slice S4 (interview questions and practice; books postponed)
+
+- **Eight interview topics, fixed in code** (`src/lib/interview-topics.ts`), from IQ-2: LLM and transformer basics, ML basics, RAG, agents, evals, prompting versus RAG versus fine-tuning, system design, behavioural. The schema rejects any other topic, and validation counts every topic, so a topic with no questions shows up on the launch list.
+- **42 questions**, at least five per topic, each with a short answer of 60 words or fewer, a deeper answer, two or three follow-ups and common mistakes, linked to the lesson that teaches it. Behavioural questions link to the design-interview lesson, the closest fit. All drafted by Claude and flagged.
+- **Draft label (IQ-6).** IQ-6 says no unreviewed record is built into the site. In development mode drafts are built so the owner can see them, and every interview page and practice card says "Draft: written with AI help and not yet checked by a reviewer". Launch mode still fails on any unreviewed record, so nothing unreviewed can reach a launch build.
+- **Practice mode (IQ-4):** question, then the short answer, then the deeper answer, then a rating: got it, partly or missed. Ratings are saved in the browser as `xplaind.practice.v1`, shaped like the `practice_ratings` table (0 missed, 1 partly, 2 got it) for slice S5. The next round puts unrated questions first, then missed, partly and got it, oldest rating first within each. Spaced repetition (IQ-8) is release 2.
+- **Standalone MCQ sets (IQ-5)** are built from existing checks: a topic's quiz draws five random questions from the checks of the lessons its interview questions link to. No duplicate question bank to maintain. Quiz scores are not saved.
+- **URLs:** `/interview`, `/interview/[id]` (the id is a readable slug), `/practice` and `/practice/[topic]`, all static and all in the new `/sitemap.xml` (IQ-3). The sitemap uses `NEXT_PUBLIC_SITE_URL`, defaulting to `https://xplaind.in`, the domain the owner bought (the PRD says xplaind.ai). `robots.txt` names the sitemap only once indexing is allowed.
+- **The quiz UI is now one component** (`src/components/mcq-quiz.tsx`) shared by lesson checks and practice quizzes.
+- **Books (BK-1 to BK-3) are not built**, at the owner's choice, until an Amazon Associates India tag exists.

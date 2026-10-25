@@ -5,6 +5,7 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import { muted, textLink } from "@/components/ui";
 import { getContent, getLevel, getStop, getStops } from "@/lib/content";
 import { resourceCard } from "@/lib/content/cards";
+import { getInterviewViews } from "@/lib/content/interview";
 import type { CheckQuestionView } from "./stop-progress";
 import { StopProgressPanel } from "./stop-progress";
 import { StopResources } from "./stop-resources";
@@ -23,6 +24,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   if (!stop) notFound();
 
   const level = getLevel(stop.level);
+  const interview = getInterviewViews().filter((q) => q.stop.id === stop.id);
   const cards = [stop.primary_resource, ...stop.alternates].map(resourceCard);
   const checks = new Map(getContent().checks.map(({ data: q }) => [q.id, q]));
   const check =
@@ -66,6 +68,21 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
       <h2 className="mt-8 text-xl font-semibold">Check</h2>
       <StopProgressPanel stopId={stop.id} check={check} />
+
+      {interview.length > 0 && (
+        <>
+          <h2 className="mt-10 text-xl font-semibold">Interview questions on this</h2>
+          <ul className="mt-3 flex flex-col gap-2">
+            {interview.map((q) => (
+              <li key={q.id}>
+                <Link href={`/interview/${q.id}`} className={textLink}>
+                  {q.question}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </main>
   );
 }

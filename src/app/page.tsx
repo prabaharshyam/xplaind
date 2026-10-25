@@ -25,6 +25,12 @@ export default function Home() {
       >
         See the whole roadmap
       </Link>
+      <Link
+        href="/interview"
+        className="w-fit text-emerald-800 underline underline-offset-2 dark:text-emerald-400"
+      >
+        Prepare for interviews
+      </Link>
     </main>
   );
 }

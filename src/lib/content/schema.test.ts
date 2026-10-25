@@ -147,6 +147,11 @@ describe("Questions (PL-1, IQ-1, IQ-5)", () => {
     expect(PlacementQuestion.safeParse({ ...placement(), drafted_with_ai: undefined }).success).toBe(false);
   });
 
+  it("only allows the interview topics from IQ-2", () => {
+    expect(InterviewQuestion.safeParse({ ...interview(), topic: "cooking" }).success).toBe(false);
+    expect(InterviewQuestion.safeParse({ ...interview(), topic: "agents" }).success).toBe(true);
+  });
+
   it("limits an interview short answer to 60 words and needs 2 to 3 follow-ups", () => {
     const long = Array.from({ length: 61 }, () => "word").join(" ");
     expect(messages(InterviewQuestion.safeParse(interview({ short_answer: long })))).toContain("60 words");

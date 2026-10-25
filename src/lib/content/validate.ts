@@ -1,6 +1,7 @@
 // Cross-file content checks (ED-8). Pure: takes a loaded bundle, returns issues.
 // Per-file checks live in schema.ts; this file checks how the files fit together.
 import { daysBetween } from "@/lib/dates";
+import { INTERVIEW_TOPICS } from "@/lib/interview-topics";
 import { PRICE_STALE_DAYS } from "@/lib/roadmap/cost";
 import { LEVEL_IDS, type LevelId, levelIndex } from "@/lib/levels";
 import { isHumanName } from "./review";
@@ -196,9 +197,8 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
       if (!taught) gap(`coverage/${l.id}`, `core topic "${t.id}" has no stop at ${l.id} yet`, "RM-2");
     }
   }
-  const perTopic = new Map<string, number>();
-  for (const { data: q } of bundle.interview) perTopic.set(q.topic, (perTopic.get(q.topic) ?? 0) + 1);
-  for (const [topic, n] of perTopic) {
+  for (const { id: topic } of INTERVIEW_TOPICS) {
+    const n = bundle.interview.filter((q) => q.data.topic === topic).length;
     if (n < LAUNCH_MINIMUMS.interviewPerTopic) {
       gap(`coverage/interview/${topic}`, `${n} interview questions on "${topic}"; launch needs at least ${LAUNCH_MINIMUMS.interviewPerTopic}`, "IQ-2");
     }
