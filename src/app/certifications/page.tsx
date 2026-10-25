@@ -11,7 +11,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/certifications" },
 };
 
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+/** US dollars, labelled so nobody reads them as rupees. */
+const usd = (n: number) => `US$${n.toLocaleString("en-IN")}`;
 
 /** Paid exams with free prep (RM-6: a fee always shows its check date), then free certificates of completion. */
 export default function CertificationsPage() {
@@ -52,7 +53,7 @@ export default function CertificationsPage() {
                 <dt className="font-medium">Exam fee</dt>
                 <dd>
                   {c.fee_usd !== undefined && c.fee_checked_on
-                    ? `${usd.format(c.fee_usd)} plus tax (checked on ${formatDay(c.fee_checked_on)})`
+                    ? `${usd(c.fee_usd)} plus tax (checked on ${formatDay(c.fee_checked_on)})`
                     : c.fee_note}
                 </dd>
               </div>

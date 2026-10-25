@@ -33,7 +33,7 @@ test("the home page leads to the paths, the test, courses and interview prep", a
   await expect(main.getByRole("link", { name: "How we rank courses" })).toHaveAttribute("href", "/how-we-rank");
   const nav = page.getByRole("banner");
   await nav.locator("summary").click(); // phone width: the links sit in the menu
-  for (const [name, href] of [["Courses", "/resources"], ["Interview", "/interview"], ["Practice", "/practice"], ["Paths", "/paths"]]) {
+  for (const [name, href] of [["Courses", "/resources"], ["Interview", "/interview"], ["Mock interview", "/interview/simulator"], ["Blog", "/blog"], ["Paths", "/paths"]]) {
     await expect(nav.getByRole("link", { name, exact: true }).first()).toHaveAttribute("href", href);
   }
 });
@@ -61,10 +61,16 @@ test("with reduced motion, everything is visible and accessible at once", async 
   await context.close();
 });
 
-test("the courses page lists every course with its card", async ({ page }) => {
+test("the course directory lists every course and filters them", async ({ page }) => {
   await page.goto("/resources");
-  await expect(page.getByRole("heading", { level: 1, name: "Courses" })).toBeVisible();
-  expect(await page.getByRole("article").count()).toBeGreaterThan(40);
+  await expect(page.getByRole("heading", { level: 1, name: "Free AI courses" })).toBeVisible();
+  const items = page.getByRole("main").getByRole("listitem").filter({ has: page.getByRole("heading", { level: 2 }) });
+  const all = await items.count();
+  expect(all).toBeGreaterThan(200);
+  await page.getByLabel("Only courses with a certificate or badge").check();
+  await expect.poll(() => items.count()).toBeLessThan(all);
+  await page.getByLabel("Search by title or provider").fill("Anthropic Academy");
+  await expect(items.first()).toContainText("Anthropic Academy");
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });

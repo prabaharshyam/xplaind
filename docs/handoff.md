@@ -78,3 +78,13 @@ PW_CHROMIUM_PATH=/path/to/chromium npm run test:e2e   # only if a browser is pre
 ```
 
 GitHub login in the cloud workspace was invalid, so no pull request has been opened. Open one from `phase-1-build` to `main`: https://github.com/prabaharshyam/xplaind/pull/new/phase-1-build
+
+## Update, evening of 2026-10-25: courses, certifications, interviews, mock interview, blog
+
+- 41 courses from the owner's 32-platform list, attached to lessons; `/resources` is a filterable directory; `/certifications` lists seven exams with fees and their check date.
+- 141 interview questions (99 new), at least 16 per path, each with a rubric and time limit; `/interview/for/<path>` pages.
+- `/interview/simulator`: timed mock interview with browser speech-to-text (Space toggles the mic), typed fallback and an end report. No model calls, nothing stored.
+- `/blog` with five posts: how to learn AI, AI certifications, YouTube channels, learning AI without coding, interview preparation.
+- `/llms.txt` for AI search engines.
+
+For the owner to review before launch: the 41 new resources and 7 certification records (open each link, confirm free or fee), the 99 new questions and rubrics, and the five blog posts. All are marked as drafts or unverified until then.

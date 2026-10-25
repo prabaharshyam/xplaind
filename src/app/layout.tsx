@@ -38,8 +38,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/interview" className="underline-offset-2 hover:underline">
               Interview questions
             </Link>
+            <Link href="/interview/simulator" className="underline-offset-2 hover:underline">
+              Mock interview
+            </Link>
             <Link href="/practice" className="underline-offset-2 hover:underline">
               Practice
+            </Link>
+            <Link href="/certifications" className="underline-offset-2 hover:underline">
+              Certifications
+            </Link>
+            <Link href="/blog" className="underline-offset-2 hover:underline">
+              Blog
             </Link>
             <Link href="/glossary" className="underline-offset-2 hover:underline">
               Glossary

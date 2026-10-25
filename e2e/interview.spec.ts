@@ -14,12 +14,12 @@ const wcag = (page: Page) =>
 test.describe("interview questions (IQ-1, IQ-3)", () => {
   test("the list filters by topic and level", async ({ page }) => {
     await page.goto("/interview");
-    await expect(page.getByText(`${questions.length} questions`)).toBeVisible();
+    await expect(page.getByText(`${questions.length} questions`, { exact: true })).toBeVisible();
     await page.getByLabel("Topic").selectOption("rag");
     const rag = questions.filter((q) => q.topic === "rag").length;
-    await expect(page.getByText(`${rag} questions`)).toBeVisible();
+    await expect(page.getByText(`${rag} questions`, { exact: true })).toBeVisible();
     await page.getByLabel("Level").selectOption("P3");
-    await expect(page.getByText("0 questions")).toBeVisible();
+    await expect(page.getByText("0 questions", { exact: true })).toBeVisible();
     expect(await overflow(page)).toBe(false);
     expect((await wcag(page)).violations).toEqual([]);
   });
@@ -55,7 +55,7 @@ test.describe("practice (IQ-4, IQ-5)", () => {
     expect((await wcag(page)).violations).toEqual([]);
     await page.getByRole("button", { name: "Missed" }).click();
     await expect(page.getByText("Question 2 of")).toBeVisible();
-    await expect(page.getByText("1 of 5 practised: 0 got it, 0 partly, 1 missed")).toBeVisible();
+    await expect(page.getByText(/^1 of \d+ practised: 0 got it, 0 partly, 1 missed/)).toBeVisible();
 
     // the rating survives a reload, and the list shows it
     await page.goto("/interview");

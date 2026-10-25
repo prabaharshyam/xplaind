@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getPaths, getStops } from "@/lib/content";
+import { getBlogPosts, getPaths, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { INTERVIEW_TOPIC_IDS } from "@/lib/interview-topics";
 import { LEVEL_IDS } from "@/lib/levels";
@@ -20,10 +20,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...LEVEL_IDS.map((l) => `/roadmap/genai-engineer/${l.toLowerCase()}`),
     ...getStops().map((s) => `/stop/${s.id}`),
     "/interview",
+    "/interview/simulator",
+    ...getPaths().map((p) => `/interview/for/${p.id}`),
     ...getInterviewViews().map((q) => `/interview/${q.id}`),
     "/practice",
     ...INTERVIEW_TOPIC_IDS.map((t) => `/practice/${t}`),
     "/resources",
+    "/certifications",
+    "/blog",
+    ...getBlogPosts().map((b) => `/blog/${b.id}`),
     "/glossary",
     "/how-we-rank",
   ];

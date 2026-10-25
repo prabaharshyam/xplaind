@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   Book,
+  Certification,
   CheckQuestion,
   GlossaryTerm,
   InterviewQuestion,
@@ -182,5 +183,29 @@ describe("Book (BK, ED-8)", () => {
     const b = { ...book(), hosted_pdf_url: "https://example.org/book.pdf" };
     expect(messages(Book.safeParse(b))).toContain("ED-8");
     expect(Book.safeParse({ ...b, hosted_by: "The author" }).success).toBe(true);
+  });
+});
+
+describe("Certification (RM-6)", () => {
+  const base = {
+    id: "c", name: "C", provider: "P", level: "B2", audience: "A", covers: "C", format: "F",
+    official_url: "https://example.com", prep: ["r"], paths: ["p"], last_verified: "2026-01-01", verified_by: "Asha Rao",
+  };
+  it("rejects a fee without its check date", () => {
+    expect(Certification.safeParse({ ...base, fee_usd: 100 }).success).toBe(false);
+    expect(Certification.safeParse({ ...base, fee_usd: 100, fee_checked_on: "2026-01-01" }).success).toBe(true);
+  });
+  it("needs a fee or a note on how it is set", () => {
+    expect(Certification.safeParse(base).success).toBe(false);
+    expect(Certification.safeParse({ ...base, fee_note: "Set by country" }).success).toBe(true);
+  });
+});
+
+describe("Interview rubric (VS-1)", () => {
+  it("needs at least three key points and a time limit", () => {
+    const q = interview();
+    expect(InterviewQuestion.safeParse(q).success).toBe(true);
+    expect(InterviewQuestion.safeParse({ ...q, rubric: q.rubric.slice(0, 2) }).success).toBe(false);
+    expect(InterviewQuestion.safeParse({ ...q, answer_seconds: 30 }).success).toBe(false);
   });
 });
