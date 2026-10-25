@@ -7,7 +7,7 @@ import type { LevelId } from "@/lib/levels";
 import { loadContent } from "./load";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
-import type { Goal, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
+import type { Goal, GlossaryTerm, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
 
 let cached: Bundle | undefined;
 
@@ -63,3 +63,12 @@ export const pathsWithLesson = (lessonId: string): Goal[] =>
 
 /** The GenAI Engineer path's lessons, in ladder order. */
 export const getStopsInOrder = (): Stop[] => pathLessons(GENAI_PATH_ID);
+
+/** Glossary terms, A to Z. */
+export const getGlossary = (): GlossaryTerm[] =>
+  getContent()
+    .glossary.map((g) => g.data)
+    .sort((a, b) => a.term.localeCompare(b.term, "en", { sensitivity: "base" }));
+
+/** Lessons that list a term among their key terms, in library order. */
+export const lessonsWithTerm = (termId: string): Stop[] => getStops().filter((s) => s.key_terms.includes(termId));

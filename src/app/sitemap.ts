@@ -24,6 +24,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/practice",
     ...INTERVIEW_TOPIC_IDS.map((t) => `/practice/${t}`),
     "/resources",
+    "/glossary",
     "/how-we-rank",
   ];
   return paths.map((p) => ({ url: `${base}${p}` }));

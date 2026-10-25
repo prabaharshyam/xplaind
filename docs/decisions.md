@@ -119,3 +119,10 @@ The six sample resources, three stops and six check questions exist to exercise 
 - **The current path** is the one chosen on this device ("Make this my path"), else the one the last test was taken for, else GenAI Engineer. Signed in, choosing a path also updates `profiles.goal_id`.
 - **Progress carries across paths.** Progress is stored per lesson, so a lesson done on one path is done on every path that uses it.
 - **Planned topics are honest placeholders.** They show on the map as "Being written", count as launch gaps in `content:validate -- --launch`, and turn into lessons in later commits.
+
+## Explainer lessons and the glossary
+
+- **Explainer format.** A lesson with `format: explainer` carries our own teaching text with five sections in order: What it is, How it works, A worked example, Common mistakes, Practise. It is 500 to 1,500 words and lists at least two `key_terms` from the glossary. The page shows the text first, then the key terms, then the free course under "Go deeper", then the check. Release 1 lessons stay `format: brief` until rewritten, and each brief is a launch gap.
+- **Examples are Indian and original.** Worked examples use Indian settings (UPI payments, Chennai support teams, Hinglish queries) and are written for Xplaind, not adapted from a course.
+- **Glossary.** One YAML file per term under `content/glossary/`, with a definition of 45 words or fewer, an optional fuller explanation, other names and related terms. `/glossary` lists terms A to Z; each term links to the lessons that list it as a key term. Terms are drafts until a person reviews them.
+- **MDX limits.** Lessons avoid tables and curly braces outside code blocks (no GFM plugin; MDX reads braces as code). Code blocks scroll inside their box at 360 px and can take keyboard focus.

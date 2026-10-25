@@ -50,7 +50,7 @@ for (const c of coverage(bundle)) {
 }
 
 console.log(
-  `\n${bundle.stops.length} stops, ${bundle.resources.length} resources, ${bundle.placement.length} placement, ${bundle.checks.length} checks, ${bundle.interview.length} interview, ${bundle.books.length} books. Mode: ${launch ? "launch" : "development"}.`,
+  `\n${bundle.stops.length} stops, ${bundle.resources.length} resources, ${bundle.placement.length} placement, ${bundle.checks.length} checks, ${bundle.interview.length} interview, ${bundle.books.length} books, ${bundle.glossary.length} glossary terms, ${bundle.goals.length} paths. Mode: ${launch ? "launch" : "development"}.`,
 );
 console.log(errors.length ? `FAILED with ${errors.length} error(s).` : "OK: no errors.");
 process.exit(errors.length ? 1 : 0);

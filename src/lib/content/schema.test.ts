@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   Book,
   CheckQuestion,
+  GlossaryTerm,
   InterviewQuestion,
   PRICE_CAP_INR,
   PlacementQuestion,
   Resource,
   StopFrontmatter,
 } from "./schema";
-import { book, check, interview, placement, resource, stop } from "./testing";
+import { book, check, interview, placement, resource, stop, term } from "./testing";
 
 const messages = (r: { success: boolean; error?: { issues: { message: string }[] } }) =>
   (r.error?.issues ?? []).map((i) => i.message).join(" | ");
@@ -120,6 +121,11 @@ describe("Stop frontmatter (RM-2)", () => {
     expect(StopFrontmatter.safeParse({ ...base, check: { type: "project", brief: "Build it." } }).success).toBe(true);
   });
 
+  it("needs at least two key terms on an explainer", () => {
+    expect(messages(StopFrontmatter.safeParse({ ...base, format: "explainer", key_terms: ["one"] }))).toContain("at least 2 key terms");
+    expect(StopFrontmatter.safeParse({ ...base, format: "explainer", key_terms: ["one", "two"] }).success).toBe(true);
+  });
+
   it("needs a primary resource", () => {
     expect(StopFrontmatter.safeParse({ ...base, primary_resource: undefined }).success).toBe(false);
   });
@@ -157,6 +163,14 @@ describe("Questions (PL-1, IQ-1, IQ-5)", () => {
     expect(messages(InterviewQuestion.safeParse(interview({ short_answer: long })))).toContain("60 words");
     expect(InterviewQuestion.safeParse(interview({ follow_ups: ["one"] })).success).toBe(false);
     expect(InterviewQuestion.safeParse(interview({ follow_ups: ["1", "2", "3", "4"] })).success).toBe(false);
+  });
+});
+
+describe("Glossary term", () => {
+  it("keeps the definition short", () => {
+    const long = Array.from({ length: 46 }, () => "word").join(" ");
+    expect(messages(GlossaryTerm.safeParse(term({ definition: long })))).toContain("45 words");
+    expect(GlossaryTerm.safeParse(term()).success).toBe(true);
   });
 });
 

@@ -7,6 +7,7 @@ import { parse as parseYaml } from "yaml";
 import type { z } from "zod";
 import {
   Book,
+  GlossaryTerm,
   CheckQuestion,
   Goal,
   InterviewQuestion,
@@ -153,5 +154,6 @@ export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   bundle.checks = loadYamlDir(root, "questions/checks", CheckQuestion, issues);
   bundle.interview = loadYamlDir(root, "questions/interview", InterviewQuestion, issues);
   bundle.books = loadYamlDir(root, "books", Book, issues);
+  bundle.glossary = loadYamlDir(root, "glossary", GlossaryTerm, issues);
   return { bundle, issues };
 }

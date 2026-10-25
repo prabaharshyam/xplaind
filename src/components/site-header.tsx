@@ -5,6 +5,7 @@ const NAV = [
   { href: "/resources", label: "Courses" },
   { href: "/interview", label: "Interview" },
   { href: "/practice", label: "Practice" },
+  { href: "/glossary", label: "Glossary" },
 ];
 
 /** The site's top bar. A plain details element opens the phone menu, so it works without JavaScript. */

@@ -2,6 +2,7 @@ import type {
   Book,
   CheckQuestion,
   Goal,
+  GlossaryTerm,
   InterviewQuestion,
   LevelDefinition,
   PlacementQuestion,
@@ -31,6 +32,7 @@ export type Bundle = {
   checks: Entry<CheckQuestion>[];
   interview: Entry<InterviewQuestion>[];
   books: Entry<Book>[];
+  glossary: Entry<GlossaryTerm>[];
 };
 
 export const emptyBundle = (): Bundle => ({
@@ -42,4 +44,5 @@ export const emptyBundle = (): Bundle => ({
   checks: [],
   interview: [],
   books: [],
+  glossary: [],
 });

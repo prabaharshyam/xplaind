@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LAUNCH_MINIMUMS, coverage, validateBundle } from "./validate";
 import { isHumanName } from "./review";
-import { TODAY, book, check, goal, interview, placement, resource, stop, validBundle } from "./testing";
+import { TODAY, book, check, explainerBody, goal, interview, placement, resource, stop, validBundle } from "./testing";
 import type { Bundle } from "./types";
 
 const run = (bundle: Bundle, launch = false) => validateBundle(bundle, { today: TODAY, launch });
@@ -41,6 +41,11 @@ describe("broken bundles fail", () => {
     ["the levels are out of order", (b) => b.levels.reverse(), /exactly B1, B2/],
     ["a level is missing", (b) => b.levels.pop(), /exactly B1, B2/],
     ["there is no goal", (b) => (b.goals = []), /at least one goal/],
+    ["a key term is not in the glossary", (b) => (b.stops[0].data.key_terms = ["ghost-term"]), /key term "ghost-term" is not in the glossary/],
+    ["a glossary term relates to a missing term", (b) => (b.glossary[0].data.related = ["nope"]), /related term "nope"/],
+    ["an explainer misses a section", (b) => Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody().replace("## Common mistakes", "## Pitfalls") }), /missing Common mistakes/],
+    ["an explainer has its sections out of order", (b) => Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody().replace("## What it is", "## Tmp").replace("## How it works", "## What it is").replace("## Tmp", "## How it works") }), /must come in the order/],
+    ["an explainer is too short", (b) => Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody(100) }), /500 to 1500 words/],
   ];
 
   it.each(cases)("%s", (_name, mutate, pattern) => {
@@ -98,6 +103,14 @@ describe("launch coverage (PL-1, RM-2, IQ-2)", () => {
     }
     const b1Gaps = run(b, true).filter((i) => i.file === "coverage/B1");
     expect(b1Gaps).toEqual([]);
+  });
+
+  it("accepts a complete explainer and lists a brief as a launch gap", () => {
+    const b = validBundle();
+    expect(run(b, true).some((i) => /still a brief/.test(i.message))).toBe(true);
+    Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody(), key_terms: ["term-one", "term-two"] });
+    expect(errorsOf(b)).toEqual([]);
+    expect(run(b, true).some((i) => /still a brief/.test(i.message))).toBe(false);
   });
 
   it("lists a core topic with no stop, but not an optional one (RM-2)", () => {

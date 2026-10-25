@@ -8,6 +8,8 @@ hours: 3
 gap_tags: [embeddings]
 primary_resource: hf-semantic-search-faiss
 alternates: []
+format: explainer
+key_terms: [embedding, cosine-similarity, semantic-search, vector-database]
 check:
   type: mcq
   question_ids: [embeddings-1, embeddings-2, embeddings-3]
@@ -16,10 +18,64 @@ reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
 ---
 
-Work through the notebook. Run each cell and print the shape of the embeddings you create.
+## What it is
 
-**Do this**
+An embedding is a list of numbers that stands for the meaning of a piece of text. A sentence goes into an embedding model and comes out as, say, 384 or 1,536 numbers. The numbers on their own mean nothing to a person. What matters is how two lists compare: texts that mean similar things get lists that point in nearly the same direction, and unrelated texts get lists that point apart.
 
-Embed ten sentences, some about cricket and some about cooking, then for one query print the three closest sentences and their similarity scores.
+That is the trick behind semantic search. "How do I get my money back?" and "refund policy" share no words, yet their embeddings sit close together, so a search built on embeddings finds one from the other. A keyword search would miss it.
 
-**You are done when you can** explain why "car" and "automobile" end up close together.
+You will use embeddings for search, RAG, finding duplicate tickets, grouping customer feedback by theme and recommending similar items.
+
+## How it works
+
+1. **An embedding model reads the text.** It is a neural network trained on huge numbers of text pairs that should match (a question and its answer, a title and its article) and pairs that should not. Training pushes matching pairs closer together.
+2. **It outputs a vector.** Every text, short or long, becomes a vector of the same length for a given model. Different models give different lengths, and vectors from different models cannot be compared with each other.
+3. **You compare vectors with a similarity score.** The usual one is cosine similarity: 1 means pointing the same way, 0 means unrelated. Many libraries normalise vectors so a simple dot product gives the same ranking.
+4. **You store vectors to search later.** For a few thousand texts, a NumPy array is enough. For millions, a vector database such as pgvector, Qdrant or Pinecone finds the nearest vectors quickly using an approximate index.
+
+Two practical points. First, embed the query and the documents with the same model. Second, an embedding model has its own input limit, often a few hundred tokens, and quietly cuts off anything longer. That is one reason long documents are split into chunks before embedding.
+
+## A worked example
+
+Say an edtech support team in Chennai has 2,000 past tickets and wants to show agents similar solved tickets.
+
+```python
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+model = SentenceTransformer("all-MiniLM-L6-v2")   # small, free, runs on a laptop
+tickets = [
+    "Payment deducted but course not unlocked",
+    "Money taken twice for one order",
+    "Video keeps buffering on mobile data",
+    "Certificate shows the wrong name",
+]
+vectors = model.encode(tickets, normalize_embeddings=True)
+
+query = model.encode(["UPI debited, no access to the course"], normalize_embeddings=True)
+scores = vectors @ query.T            # dot product = cosine similarity here
+for i in np.argsort(-scores[:, 0])[:2]:
+    print(round(float(scores[i, 0]), 2), tickets[i])
+```
+
+The top result is the first ticket, even though the query says "UPI debited" and "no access" while the ticket says "payment deducted" and "not unlocked". The second is the double-charge ticket: also about money, so close, but less so. The buffering ticket comes last.
+
+Now try "certificate name spelling mistake". It should match the certificate ticket strongly and everything else weakly. If it does not, something is wrong with how you encode or compare.
+
+## Common mistakes
+
+- **Mixing models.** Vectors from two different embedding models live in different spaces. Re-embed everything when you switch models.
+- **Embedding whole documents.** A 30-page PDF squeezed into one vector loses detail, and text past the model's limit is dropped. Chunk first.
+- **Trusting the score as a probability.** A score of 0.62 is not "62% relevant". Scores are only useful for ranking, and good thresholds differ by model, so set any cut-off from your own data.
+- **Ignoring exact terms.** Embeddings are weak on order numbers, product codes and rare names. Pair them with keyword search when those matter.
+- **Not testing on your own text.** A model that tops a public leaderboard may do worse on Indian names, Hinglish or your domain's jargon. Check on twenty real queries before you choose.
+
+## Practise
+
+Work through the Hugging Face notebook linked below. Then do this:
+
+1. Embed twenty sentences: ten about cricket and ten about cooking.
+2. For three queries of your own, print the top three sentences and their scores.
+3. Add one query in Hinglish, such as "biryani kaise banate hain", and see whether it still finds the cooking sentences.
+
+**You are done when you can** explain to a friend why "car" and "automobile" end up close together, and name one kind of query where embeddings alone would fail.

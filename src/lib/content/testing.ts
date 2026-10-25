@@ -3,6 +3,7 @@
 import type { Bundle } from "./types";
 import type {
   Goal,
+  GlossaryTerm,
   Book,
   CheckQuestion,
   InterviewQuestion,
@@ -52,6 +53,8 @@ export const stop = (o: Partial<Stop> = {}): Stop => ({
   primary_resource: "res-one",
   alternates: [],
   check: { type: "mcq", question_ids: ["chk-1", "chk-2", "chk-3"] },
+  format: "brief",
+  key_terms: [],
   body: "Lesson text.",
   ...review,
   ...o,
@@ -120,6 +123,22 @@ export const goal = (o: Partial<Goal> = {}): Goal => ({
   ...o,
 });
 
+export const term = (o: Partial<GlossaryTerm> = {}): GlossaryTerm => ({
+  id: "term-one",
+  term: "Term one",
+  also: [],
+  definition: "A short plain definition.",
+  related: [],
+  ...review,
+  ...o,
+});
+
+/** An explainer body with every section, long enough to pass. */
+export const explainerBody = (words = 520): string => {
+  const filler = Array.from({ length: Math.ceil(words / 20) }, () => "Plain words that teach.").join(" ");
+  return ["What it is", "How it works", "A worked example", "Common mistakes", "Practise"].map((h) => `## ${h}\n\n${filler}`).join("\n\n");
+};
+
 /** Small and fully valid in development mode (not at launch size). */
 export function validBundle(): Bundle {
   const f = (file: string) => ({ file });
@@ -147,5 +166,6 @@ export function validBundle(): Bundle {
     })),
     interview: [{ ...f("questions/interview/iq-1.yaml"), data: interview() }],
     books: [{ ...f("books/book-1.yaml"), data: book() }],
+    glossary: [{ ...f("glossary/term-one.yaml"), data: term() }, { ...f("glossary/term-two.yaml"), data: term({ id: "term-two", term: "Term two", related: ["term-one"] }) }],
   };
 }

@@ -5,6 +5,7 @@ import { INTERVIEW_TOPICS } from "@/lib/interview-topics";
 import { PRICE_STALE_DAYS } from "@/lib/roadmap/cost";
 import { LEVEL_IDS, type LevelId, levelIndex } from "@/lib/levels";
 import { isHumanName } from "./review";
+import { EXPLAINER_MAX_WORDS, EXPLAINER_MIN_WORDS, EXPLAINER_SECTIONS, wordCount } from "./schema";
 import type { Bundle, Entry, Issue } from "./types";
 
 /** Launch minimums from the PRD. They fail the build only in launch mode. */
@@ -72,6 +73,7 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   uniqueIds("check question", bundle.checks);
   uniqueIds("interview question", bundle.interview);
   uniqueIds("book", bundle.books);
+  uniqueIds("glossary term", bundle.glossary);
 
   const resourceById = new Map(bundle.resources.map((r) => [r.data.id, r]));
   const stopById = new Map(bundle.stops.map((s) => [s.data.id, s]));
@@ -133,6 +135,33 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
       gap(file, `reviewed_by "${s.reviewed_by}" is not a person; a human must review this stop before launch`, "ED-9");
     }
     if (daysBetween(opts.today, s.reviewed_on) > 0) error(file, `reviewed_on ${s.reviewed_on} is in the future`, "ED-9");
+  }
+
+  // ---- lesson format and glossary -----------------------------------------
+  const termIds = new Set(bundle.glossary.map((g) => g.data.id));
+  for (const { file, data: s } of bundle.stops) {
+    for (const t of s.key_terms) if (!termIds.has(t)) error(file, `key term "${t}" is not in the glossary`);
+    if (s.format === "brief") {
+      gap(file, `lesson "${s.id}" is still a brief; write it as an explainer`, "RM-2");
+      continue;
+    }
+    const headings = [...s.body.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
+    const missing = EXPLAINER_SECTIONS.filter((h) => !headings.includes(h));
+    if (missing.length) error(file, `an explainer needs the sections ${EXPLAINER_SECTIONS.join(", ")}; missing ${missing.join(", ")}`);
+    else if (EXPLAINER_SECTIONS.map((h) => headings.indexOf(h)).some((at, i, all) => i > 0 && at < all[i - 1])) {
+      error(file, `explainer sections must come in the order ${EXPLAINER_SECTIONS.join(", ")}`);
+    }
+    const words = wordCount(s.body);
+    if (words < EXPLAINER_MIN_WORDS || words > EXPLAINER_MAX_WORDS) {
+      error(file, `an explainer is ${EXPLAINER_MIN_WORDS} to ${EXPLAINER_MAX_WORDS} words; this one is ${words}`);
+    }
+  }
+  for (const { file, data: g } of bundle.glossary) {
+    for (const r of g.related) {
+      if (r === g.id) error(file, "a term cannot be related to itself");
+      else if (!termIds.has(r)) error(file, `related term "${r}" is not in the glossary`);
+    }
+    if (!isHumanName(g.reviewed_by)) gap(file, `reviewed_by "${g.reviewed_by}" is not a person; a human must review this term`, "ED-9");
   }
 
   for (const { file, data: r } of bundle.resources) {

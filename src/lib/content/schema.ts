@@ -17,6 +17,12 @@ export const WHY_IT_MATTERS_MAX_WORDS = 60;
 
 export const wordCount = (text: string): number => text.trim().split(/\s+/).filter(Boolean).length;
 
+/** The sections an explainer lesson's body has, as level-2 headings, in this order. */
+export const EXPLAINER_SECTIONS = ["What it is", "How it works", "A worked example", "Common mistakes", "Practise"] as const;
+export const EXPLAINER_MIN_WORDS = 500;
+export const EXPLAINER_MAX_WORDS = 1500;
+export const GLOSSARY_DEFINITION_MAX_WORDS = 45;
+
 const IsoDate = z.iso.date();
 const Slug = z
   .string()
@@ -115,9 +121,19 @@ export const StopFrontmatter = z
     primary_resource: Slug,
     alternates: z.array(Slug).max(2),
     check: z.discriminatedUnion("type", [McqCheck, ProjectCheck]),
+    /**
+     * "explainer": our own lesson text with the EXPLAINER_SECTIONS. "brief": a short
+     * task that leans on the linked course; release 1 lessons, to be rewritten.
+     */
+    format: z.enum(["brief", "explainer"]).default("brief"),
+    /** Glossary ids this lesson teaches or relies on. */
+    key_terms: z.array(Slug).default([]),
     ...reviewShape,
   })
   .superRefine((s, ctx) => {
+    if (s.format === "explainer" && s.key_terms.length < 2) {
+      ctx.addIssue({ code: "custom", path: ["key_terms"], message: "an explainer lesson lists at least 2 key terms" });
+    }
     if (wordCount(s.why_it_matters) > WHY_IT_MATTERS_MAX_WORDS) {
       ctx.addIssue({
         code: "custom",
@@ -218,6 +234,32 @@ export const Book = z
     }
   });
 export type Book = z.infer<typeof Book>;
+
+// --------------------------------------------------------------- glossary ---
+
+/** One glossary entry (content/glossary/<id>.yaml). Plain words first, jargon second. */
+export const GlossaryTerm = z
+  .strictObject({
+    id: Slug,
+    term: Text,
+    /** Other names and spellings people search for. */
+    also: z.array(Text).default([]),
+    definition: Text,
+    /** A fuller plain-language explanation, with an everyday example. */
+    explanation: Text.max(900).optional(),
+    related: z.array(Slug).default([]),
+    ...reviewShape,
+  })
+  .superRefine((g, ctx) => {
+    if (wordCount(g.definition) > GLOSSARY_DEFINITION_MAX_WORDS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["definition"],
+        message: `a definition is ${GLOSSARY_DEFINITION_MAX_WORDS} words or fewer; put the rest in explanation`,
+      });
+    }
+  });
+export type GlossaryTerm = z.infer<typeof GlossaryTerm>;
 
 // ---------------------------------------------------------- goal & levels ---
 
