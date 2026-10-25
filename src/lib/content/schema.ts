@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { INTERVIEW_TOPIC_IDS } from "@/lib/interview-topics";
 import { LEVEL_IDS } from "@/lib/levels";
+import { THEME_IDS } from "@/lib/themes";
 
 /**
  * ED-1: hard cap for a paid resource, "about 10 US dollars". This is an
@@ -113,6 +114,8 @@ export const StopFrontmatter = z
     id: Slug,
     /** Difficulty on the shared nine-level ladder; also the folder the file sits in. */
     level: Level,
+    /** The lesson's visual theme: its icon and colours on maps, cards and covers. */
+    theme: z.enum(THEME_IDS),
     title: Text,
     outcome: Text,
     why_it_matters: Text.max(360),
@@ -341,6 +344,8 @@ export const Goal = z.strictObject({
   tagline: Text.max(120),
   description: Text,
   who_for: Text,
+  /** The path's visual theme on cards and its roadmap. */
+  theme: z.enum(THEME_IDS),
   rank: z.number().int().positive(),
   coding: z.enum(["none", "some", "yes"]),
   layout: z.enum(["levels", "stages"]),

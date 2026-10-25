@@ -47,6 +47,7 @@ export const resource = (o: Partial<Resource> = {}): Resource => ({
 export const stop = (o: Partial<Stop> = {}): Stop => ({
   id: "stop-one",
   level: "B1",
+  theme: "ai-basics",
   title: "Stop one",
   outcome: "Do the thing.",
   why_it_matters: "Because it is the base for what comes next.",
@@ -157,6 +158,7 @@ export const goal = (o: Partial<Goal> = {}): Goal => ({
   tagline: "Build apps on language models.",
   description: "Build.",
   who_for: "Engineers.",
+  theme: "llm",
   rank: 1,
   coding: "yes",
   layout: "levels",

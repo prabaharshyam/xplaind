@@ -1,6 +1,6 @@
 // Builds the data a resource card shows (RM-4) from content files. Node only.
 import type { ResourceCardData } from "@/components/resource-card";
-import { getResource } from "./index";
+import { getResource, getStops } from "./index";
 import { getLinkStatus } from "./link-status";
 import { isHumanName } from "./review";
 
@@ -24,5 +24,6 @@ export function resourceCard(id: string): ResourceCardData {
     // A draft written from memory is not a verification, so it shows no date.
     verifiedOn: isHumanName(r.verified_by) ? r.last_verified : null,
     linkCheckedOn: getLinkStatus()[r.id]?.checked_on ?? null,
+    theme: getStops().find((s) => s.primary_resource === id || s.alternates.includes(id) || s.more.includes(id))?.theme,
   };
 }

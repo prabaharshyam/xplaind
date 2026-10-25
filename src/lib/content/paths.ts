@@ -10,6 +10,7 @@ export const lessonSummary = (s: Stop): LessonSummary => ({
   level: s.level,
   hours: s.hours,
   gap_tags: s.gap_tags,
+  theme: s.theme,
 });
 
 export const pathRef = (p: Goal): PathRef => ({ id: p.id, name: p.name, placement: p.placement });
@@ -33,6 +34,7 @@ export function pathView(path: Goal): PathView {
     coding: path.coding,
     months: path.months,
     layout: path.layout,
+    theme: path.theme,
     stages,
     counts: {
       lessons: lessons.length,

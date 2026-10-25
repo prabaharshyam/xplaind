@@ -1,4 +1,5 @@
 // Which path a learner is on. Pure and safe in client code: no content loading.
+import type { ThemeId } from "@/lib/themes";
 import { type LevelId, LOWEST_LEVEL } from "@/lib/levels";
 
 export const DEFAULT_PATH_ID = "genai-engineer";
@@ -25,7 +26,16 @@ export const testHref = (pathId: string): string => (pathId === DEFAULT_PATH_ID 
 export const roadmapHref = (pathId: string): string => `/roadmap/${pathId}`;
 
 /** A lesson as a path's map shows it. */
-export type LessonSummary = { id: string; title: string; outcome: string; level: LevelId; hours: number; gap_tags: string[] };
+export type LessonSummary = {
+  id: string;
+  title: string;
+  outcome: string;
+  level: LevelId;
+  hours: number;
+  gap_tags: string[];
+  /** Visual theme (icon and colours). */
+  theme?: ThemeId;
+};
 
 export type StageView = {
   id: string;
@@ -43,6 +53,7 @@ export type PathView = PathRef & {
   coding: "none" | "some" | "yes";
   months: number;
   layout: "levels" | "stages";
+  theme?: ThemeId;
   stages: StageView[];
   /** Written lessons, topics still being written, and hours of written lessons. */
   counts: { lessons: number; planned: number; hours: number };

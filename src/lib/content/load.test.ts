@@ -42,6 +42,7 @@ tags: []
 const STOP = (extra = "") => `---
 id: s-one
 level: B1
+theme: ai-basics
 title: One
 outcome: Do it.
 why_it_matters: Because.
