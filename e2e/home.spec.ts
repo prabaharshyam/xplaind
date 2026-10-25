@@ -11,3 +11,10 @@ test("home page loads at 360px with no horizontal scroll", async ({ page }) => {
   expect(overflow).toBe(false);
   expect(errors).toEqual([]);
 });
+
+test("search engines are asked not to list the site before launch", async ({ page, request }) => {
+  await page.goto("/");
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+  const robots = await (await request.get("/robots.txt")).text();
+  expect(robots).toMatch(/Disallow: \/\s*$/m);
+});

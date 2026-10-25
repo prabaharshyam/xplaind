@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { allowIndexing } from "@/lib/indexing";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
@@ -8,6 +9,8 @@ export const metadata: Metadata = {
   title: { default: "Xplaind", template: "%s | Xplaind" },
   description:
     "A free-first path to learn AI. A short test finds your level, then you get the next five steps with the best free or low-cost course for each.",
+  // Not listed in search results until launch (see src/lib/indexing.ts).
+  ...(allowIndexing() ? {} : { robots: { index: false, follow: false } }),
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

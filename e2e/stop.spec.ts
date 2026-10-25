@@ -28,5 +28,5 @@ test("an unknown stop shows the not-found page and asks search engines to skip i
   // So assert what the visitor and crawlers see, not the first status code.
   await page.goto("/stop/does-not-exist");
   await expect(page.getByText("This page could not be found")).toBeVisible();
-  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+  await expect(page.locator('meta[name="robots"][content*="noindex"]').first()).toBeAttached();
 });
