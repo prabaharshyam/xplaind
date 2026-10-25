@@ -1,0 +1,76 @@
+---
+id: data-pipelines-ai
+level: P1
+title: "Data pipelines for AI"
+outcome: "Design the pipeline that keeps an AI system's data fresh: ETL or ELT, scheduled or change-driven updates, incremental indexing, and re-processing when parsers or embedding models change."
+why_it_matters: "A RAG system built on a one-off export goes stale within weeks, and stale answers erode trust faster than wrong ones. Clients expect the assistant to know about yesterday's circular. Pipelines are what make that true, and they are where most production RAG bugs live."
+hours: 4
+gap_tags: []
+primary_resource: dbt-etl-vs-elt
+alternates: [debezium-features]
+format: explainer
+key_terms: [etl, cdc, chunking, embedding]
+check:
+  type: mcq
+  question_ids: [data-pipelines-ai-1, data-pipelines-ai-2, data-pipelines-ai-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A **data pipeline** moves data from where it is created to where it is used, transforming it on the way. For an AI system the pipeline usually does: extract from sources (via connectors), parse documents, clean, chunk, embed, write to the index, and record what happened.
+
+Two classic shapes:
+
+- **ETL** (extract, transform, load): transform before writing to the destination.
+- **ELT** (extract, load, transform): land raw data in a warehouse or lake first, transform there. Common in modern analytics stacks.
+
+For RAG, a hybrid is typical: land raw documents and metadata in storage (so you can always re-process), then transform into chunks and embeddings for the index.
+
+**Change data capture (CDC)** streams every insert, update and delete from a database as events, so downstream systems such as a search index stay in sync within seconds instead of waiting for a nightly batch.
+
+## How it works
+
+**Keep the raw copy.** Store the original files and records with their source ids and versions. When you change the chunking or parser, you re-process from raw instead of re-fetching everything from the client's systems.
+
+**Stable ids.** Give each document a stable id (source system plus source id) and each chunk an id derived from it and its position. Updates then replace exactly the old chunks; deletions remove them.
+
+**Incremental indexing.** For each changed document: delete its old chunks, parse, chunk, embed and insert the new ones, in one step that cannot leave half a document indexed. Skip documents whose content hash has not changed.
+
+**Schedules and triggers.** Choose freshness per source: CDC or webhooks for records that change often and matter at once (ticket status, stock levels), every 15 minutes for document libraries, nightly for archives. Agree the freshness target with the client.
+
+**Version everything.** Record the parser, chunking settings and embedding model version with every chunk. When you upgrade the embedding model, all vectors must be rebuilt, because old and new vectors cannot be mixed. Build the new index alongside the old one, evaluate it, then switch over.
+
+**Orchestration.** Tools such as Airflow, Dagster, Prefect or the cloud's workflow service schedule steps, retry failures and show history. For small projects, a scheduled job with good logging is enough.
+
+**Pipeline health.** Track documents processed, failed, skipped as unchanged, chunks written, embedding cost, and the age of the newest document per source. Alert when freshness slips.
+
+## A worked example
+
+A Chennai port operator's assistant answers questions about tariffs, notices to shipping agents and berth schedules.
+
+- **Notices** (PDF circulars on a document portal): checked every 15 minutes. New or changed files land raw in storage, then are parsed, chunked and embedded. Old chunks for a changed notice are replaced in one transaction.
+- **Berth schedule** (a database table updated constantly): CDC streams changes; each change updates one small record in the index within seconds.
+- **Tariff book** (one large document, revised twice a year): processed on publication, with the effective date stored so retrieval can filter by date.
+
+In month four, you change chunking for tables to keep rows together. Because raw files and stable ids exist, a re-processing job rebuilds the notices index in a new collection overnight. The golden set improves from 84% to 90% on tariff questions, and you switch the alias to the new collection. Rollback would have been switching it back.
+
+## Common mistakes
+
+- **No raw copy.** Every re-processing means a slow, throttled re-fetch from the client.
+- **Unstable chunk ids.** Updates add new chunks without removing old ones, and duplicates pile up.
+- **Mixing embedding model versions.** Search quietly degrades. Rebuild and switch.
+- **Same schedule for everything.** Match freshness to how fast each source changes and how much it matters.
+- **No freshness alert.** A stuck pipeline looks fine until someone asks about yesterday's notice.
+
+## Practise
+
+Read dbt's ETL versus ELT piece and Debezium's feature overview.
+
+1. Restructure your RAG ingestion so raw files land in a folder or bucket first, each document gets a stable id and each chunk records parser and embedding versions.
+2. Make updates replace a document's old chunks and skip unchanged files by content hash. Show a changed file updating and a deleted file disappearing.
+3. Change the chunk size, rebuild into a new index, compare the two on your golden set and switch over.
+
+**You are done when you can** change the embedding model or chunking without downtime and prove the new index is better before switching.

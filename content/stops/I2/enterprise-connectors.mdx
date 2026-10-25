@@ -1,0 +1,75 @@
+---
+id: enterprise-connectors
+level: I2
+title: "Enterprise connectors"
+outcome: "Pull documents and records from SharePoint, Salesforce, SAP, Jira and cloud storage reliably: authentication, paging, rate limits, incremental sync, deletions and permissions."
+why_it_matters: "An assistant is only as useful as the data it can reach, and that data sits in a dozen business systems with their own APIs and quirks. Connector work is often half of an FDE project's engineering time, and the part clients notice when it breaks."
+hours: 4
+gap_tags: []
+primary_resource: microsoft-graph-overview
+alternates: []
+format: explainer
+key_terms: [connector, api, rate-limit, cdc]
+check:
+  type: mcq
+  question_ids: [enterprise-connectors-1, enterprise-connectors-2, enterprise-connectors-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A **connector** is the code that moves data between a business system and your AI system. Most enterprise AI projects need several:
+
+- **Documents**: SharePoint and OneDrive (through Microsoft Graph), Google Drive, Confluence, network file shares, cloud storage buckets.
+- **Records**: CRM systems such as Salesforce, ERPs such as SAP, ticketing such as Jira or ServiceNow, plus the client's own databases.
+- **Messages**: email and chat, used carefully because of privacy.
+
+You can build connectors yourself, use an integration platform (Airbyte, Fivetran and others offer many ready-made ones), or use the connectors bundled with a search or AI platform. Either way you must understand what they do.
+
+## How it works
+
+**Authentication.** Usually OAuth with an app registered by the client's IT team, scoped to read-only and to the sites, objects or projects agreed. Some systems use API keys or service users; store them in the secret manager.
+
+**Reading in pages.** APIs return results in pages with a cursor or next link. Loop until there are no more pages, and save the cursor so a failed run can resume.
+
+**Rate limits.** Every API limits calls per minute or per day; SharePoint and Salesforce throttle heavy users. Respect `Retry-After` headers, back off on 429 responses and spread big initial loads over off-peak hours.
+
+**Incremental sync.** The first run copies everything. Later runs fetch only changes since the last run, using change tokens (Microsoft Graph's delta queries), "modified since" filters or webhooks. Full re-reads of 200,000 documents every night are slow, costly and get you throttled.
+
+**Deletions.** Incremental feeds must tell you what was deleted, or deleted files stay searchable forever. Check that your method reports deletions; if not, run a periodic reconciliation that compares ids.
+
+**Permissions.** Read each item's access rights along with its content, for permission-aware retrieval.
+
+**Formats and metadata.** Keep source id, URL, title, author, modified time, path or object type and owner. These drive citations, filters and debugging.
+
+**Observability.** For each run record items read, added, changed, deleted, failed and time taken. Alert when a connector stops or failure counts jump.
+
+## A worked example
+
+A Gurugram consumer-goods company wants a sales assistant over SharePoint (product sheets, trade-scheme circulars) and Salesforce (accounts, opportunities).
+
+SharePoint: an app registration with read access to six sites. The first full sync of 38,000 files runs over two nights to stay under throttling limits. Afterwards, delta queries every 15 minutes return only changed and deleted items, typically 200 to 400 per run, which takes about a minute. Each item's permissions are read and stored.
+
+Salesforce: a read-only integration user limited to Account, Opportunity and Product objects. Records are pulled with a "modified since" query every 30 minutes and turned into short text summaries for retrieval, with the record id and owner kept as metadata.
+
+In week three, the regional team renames a SharePoint site and the delta token becomes invalid. The connector's error rate alert fires; the job falls back to a full re-scan of that site overnight, and nothing is missed. Your runbook for the client's IT team explains exactly this case.
+
+## Common mistakes
+
+- **Full re-syncs every time.** Use change tokens or modified-since queries.
+- **Ignoring deletions.** Deleted and expired documents keep getting quoted.
+- **Over-broad access.** Ask for read-only access to named sites and objects, not the whole tenant.
+- **No resume after failure.** A crash at page 9,000 should not restart from page 1.
+- **Silent connectors.** If nobody is alerted when a sync stops, the assistant quietly goes stale.
+
+## Practise
+
+Read the Microsoft Graph overview, then pick any API with paging that you can use for free (GitHub issues, a public dataset API, or Graph with a developer tenant).
+
+1. Write a connector that pulls all items with paging, honours rate limits and stores a cursor so it can resume.
+2. Add an incremental mode that fetches only items changed since the last run, and a check that detects deleted items.
+3. Record per-run counts (read, added, updated, deleted, failed) and print a one-line summary.
+
+**You are done when you can** run your connector twice in a row and show the second run fetching only what changed, including a deletion.

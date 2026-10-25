@@ -1,0 +1,76 @@
+---
+id: vllm-open-weights
+level: P2
+title: "Open-weight models with vLLM"
+outcome: "Serve an open-weight model on your own GPUs with vLLM: choose a model and GPU, size memory for weights and cache, use quantization, and expose an OpenAI-compatible API."
+why_it_matters: "When data cannot leave the building, or volume makes per-token pricing too costly, clients need open-weight models running on their own GPUs. vLLM is the most widely used open-source engine for this, and platform roles ask about it by name."
+hours: 5
+gap_tags: []
+primary_resource: vllm-quickstart
+alternates: [vllm-pagedattention, hf-quantization]
+format: explainer
+key_terms: [vllm, open-weight-model, quantization, self-hosting]
+check:
+  type: mcq
+  question_ids: [vllm-open-weights-1, vllm-open-weights-2, vllm-open-weights-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+**Open-weight models** publish their weights, so you can run them on your own hardware. **vLLM** is an open-source engine that serves such models efficiently on GPUs. Its two key ideas:
+
+- **PagedAttention**: it manages the memory that holds each request's attention cache in small pages, like an operating system manages memory, so far more requests fit on one GPU.
+- **Continuous batching**: new requests join the batch as soon as others finish, instead of waiting for a whole batch, which keeps the GPU busy.
+
+vLLM exposes an **OpenAI-compatible API**, so most client code and gateways work with it unchanged.
+
+## How it works
+
+**Choosing a model.** Start from the task and your evals, not leaderboards. Check the licence for commercial use, the languages it handles (Indian languages vary widely between models), context length and size. Smaller models (7 to 14 billion parameters) run on one GPU and are often enough for extraction, classification and grounded RAG answers.
+
+**Sizing memory.** A rough rule: weights need about 2 bytes per parameter at 16-bit precision. An 8-billion-parameter model needs about 16 GB for weights. On top of that, the attention (KV) cache grows with the number of concurrent requests and their context length. A 24 GB GPU can serve an 8B model with modest concurrency; a 70B model needs about 140 GB at 16-bit, so several GPUs or quantization.
+
+**Quantization.** Storing weights in 8 or 4 bits cuts memory by half or three quarters and often increases speed, with a small quality loss that you must measure on your own evals. Common formats include AWQ, GPTQ and FP8.
+
+**Running it.**
+
+```bash
+pip install vllm
+vllm serve Qwen/Qwen2.5-7B-Instruct --max-model-len 8192 --gpu-memory-utilization 0.90
+# now: POST http://localhost:8000/v1/chat/completions
+```
+
+Key settings: maximum context length (shorter means more concurrent requests fit), GPU memory share, tensor parallelism across several GPUs (`--tensor-parallel-size 2`) and quantization.
+
+**In production.** Run it in a container with the weights in a volume or baked into an internal image, behind your gateway, with health checks, metrics (tokens per second, queue length, cache usage) and autoscaling where GPUs allow. Pin the model revision and the vLLM version, and evaluate before every upgrade.
+
+## A worked example
+
+A Chennai insurance company must keep claim documents on its own servers. It wants extraction of 20 fields from claim forms and short grounded answers for its claims staff, about 30,000 requests a day.
+
+Evals on 300 real forms compare three open-weight models of 7 to 14 billion parameters against a frontier API. The best 14B model reaches 95% field accuracy against the API's 97%; the client accepts the gap for keeping data on-premises.
+
+Sizing: the 14B model at 16-bit needs about 28 GB for weights. With 4-bit AWQ quantization it needs about 9 GB, and the evals drop only to 94.5%. On a single 48 GB GPU, that leaves ample room for the KV cache at 8,000-token contexts, and a load test shows 40 concurrent requests at under 3 seconds each at p95. Two GPUs give headroom and redundancy.
+
+vLLM runs in containers on the client's Kubernetes cluster, behind the same gateway as before, so the application code changes only one model alias. Upgrades happen quarterly after the eval suite passes.
+
+## Common mistakes
+
+- **Picking a model from a leaderboard.** Test on your own data and languages.
+- **Forgetting the KV cache in sizing.** Weights fit, then the server fails under load. Size for concurrency.
+- **Quantizing without measuring.** Some tasks lose more quality than others. Run your evals.
+- **Ignoring licences.** Some open-weight licences restrict commercial use or large deployments.
+- **Unpinned versions.** A new model revision or engine release can change outputs. Pin and evaluate.
+
+## Practise
+
+Follow the vLLM quickstart on any GPU you can access (a free notebook GPU is enough for a small model), and read the PagedAttention post.
+
+1. Serve a small instruct model with vLLM and call it with an OpenAI-compatible client.
+2. Calculate the weight memory for a 7B, 14B and 70B model at 16-bit and 4-bit, and estimate how many GPUs each needs.
+3. Run your extraction or RAG golden set against the self-hosted model and an API model, and compare accuracy, latency and cost per 1,000 requests.
+
+**You are done when you can** serve a model behind an OpenAI-compatible endpoint and justify its size, quantization and GPU choice with numbers.
