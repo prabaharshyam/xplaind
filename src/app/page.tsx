@@ -19,6 +19,12 @@ export default function Home() {
       >
         Find my level
       </Link>
+      <Link
+        href="/roadmap/genai-engineer"
+        className="w-fit text-emerald-800 underline underline-offset-2 dark:text-emerald-400"
+      >
+        See the whole roadmap
+      </Link>
     </main>
   );
 }

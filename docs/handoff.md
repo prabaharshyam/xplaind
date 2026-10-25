@@ -27,9 +27,13 @@ Xplaind (xplaind.ai) is a free-first AI learning path for India. A short test pl
 - All 54 placement questions, 6 stops, 6 check questions and 6 sample resources were drafted by Claude and are flagged `UNREVIEWED` / `UNVERIFIED`. Launch mode fails until a person replaces those fields with their name after checking each item. Resource hours, certificate flags and prices were written from memory; the provider pages could not be opened from the build environment.
 - `PRICE_CAP_INR = 900` is an assumption about "about 10 US dollars".
 
+## S3 done (branch `claude/practical-albattani-im1h44`)
+
+Roadmap and level pages, full resource cards with cost labels, `/go/[resource-id]`, the next five steps on the result page, stop progress with the check quiz, project links and "I already know this", the "Free only" switch and a draft How we rank page. Progress is saved on the device until S5. See `docs/decisions.md`, slice S3.
+
 ## Next slices (from the PRD build plan)
 
-1. S3 roadmap and stops (RM-1 to RM-9, ED-2): roadmap pages, the pure next-five-steps function with tests, resource cards, cost labels, `/go/[resource-id]` with a 404 for unknown ids, and the test that ranking never reads affiliate fields. The resource card should show "not yet verified" instead of a date when `verified_by` is not a person (`isHumanName`).
+1. More stops: every level above B2 is still empty, so the roadmap is mostly "being written".
 2. S4 interview Q&A, MCQ practice and books (IQ-1 to IQ-6, BK-1 to BK-3).
 3. S5 accounts and progress with Supabase (needs a Supabase project from the owner), then S6 link checker and admin, S7 landing, email and legal pages, S8 hardening and launch.
 

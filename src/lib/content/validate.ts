@@ -1,6 +1,7 @@
 // Cross-file content checks (ED-8). Pure: takes a loaded bundle, returns issues.
 // Per-file checks live in schema.ts; this file checks how the files fit together.
 import { daysBetween } from "@/lib/dates";
+import { PRICE_STALE_DAYS } from "@/lib/roadmap/cost";
 import { LEVEL_IDS, type LevelId, levelIndex } from "@/lib/levels";
 import { isHumanName } from "./review";
 import type { Bundle, Entry, Issue } from "./types";
@@ -14,8 +15,6 @@ export const LAUNCH_MINIMUMS = {
 
 /** Re-verify a resource whose last_verified is older than this many days. */
 export const STALE_VERIFICATION_DAYS = 180;
-/** RM-6: after this many days the card says "price may have changed". */
-export const PRICE_STALE_DAYS = 60;
 
 export type ValidateOptions = {
   /** Today as YYYY-MM-DD in India. Passed in so tests are stable. */

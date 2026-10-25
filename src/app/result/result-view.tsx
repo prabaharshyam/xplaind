@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
 import { clearAttempt, parseAttempt, rawAttempt, serverSnapshot, subscribe } from "@/lib/browser/attempt-store";
-import { type LevelId, levelIndex } from "@/lib/levels";
+import { NextStepsCard } from "@/components/next-steps-card";
+import type { LevelId } from "@/lib/levels";
 import { hoursFromLevel, weeksAtPace } from "@/lib/placement/estimate";
 import { scoreAnswers } from "@/lib/placement/score";
+import { reviewStopFor } from "@/lib/roadmap/next-steps";
 import type { PublicQuestion } from "@/lib/placement/types";
 import { splitStem, tagLabel } from "@/lib/text";
 
 type LevelInfo = { id: LevelId; name: string; can_do: string; draft_hours: number; exit_check: string };
-type StopInfo = { id: string; title: string; level: LevelId; gap_tags: string[] };
+type StopInfo = { id: string; title: string; level: LevelId; order: number; hours: number; gap_tags: string[] };
 
 const linkButton =
   "inline-flex min-h-12 items-center justify-center rounded-lg px-5 py-3 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700";
@@ -54,11 +56,12 @@ export function ResultView({ levels, stops, bank }: { levels: LevelInfo[]; stops
   const questions = new Map(bank.map((q) => [q.id, q]));
   const missed = attempt.answers.filter((a) => !a.correct && questions.has(a.questionId));
 
+  const titles = new Map(stops.map((s) => [s.id, s.title]));
   /** The easiest stop at or below the start level that covers a gap tag. */
-  const stopFor = (tag: string) =>
-    stops
-      .filter((s) => levelIndex(s.level) <= levelIndex(result.startLevel) && s.gap_tags.includes(tag))
-      .sort((a, b) => levelIndex(a.level) - levelIndex(b.level))[0];
+  const stopFor = (tag: string) => {
+    const s = reviewStopFor(stops, result.startLevel, tag);
+    return s && { id: s.id, title: titles.get(s.id)! };
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -126,6 +129,8 @@ export function ResultView({ levels, stops, bank }: { levels: LevelInfo[]; stops
           </ul>
         )}
       </section>
+
+      <NextStepsCard stops={stops} startLevel={result.startLevel} gapTags={result.gaps} />
 
       {missed.length > 0 && (
         <section aria-labelledby="missed-heading" className="flex flex-col gap-3">

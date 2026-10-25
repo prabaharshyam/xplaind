@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
@@ -15,7 +16,22 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <div className="flex-1">{children}</div>
+        <footer className="border-t border-zinc-200 px-4 py-6 text-sm dark:border-zinc-800">
+          <nav aria-label="Footer" className="mx-auto flex max-w-2xl flex-wrap gap-x-6 gap-y-2">
+            <Link href="/" className="underline-offset-2 hover:underline">
+              Xplaind
+            </Link>
+            <Link href="/roadmap/genai-engineer" className="underline-offset-2 hover:underline">
+              Roadmap
+            </Link>
+            <Link href="/how-we-rank" className="underline-offset-2 hover:underline">
+              How we rank
+            </Link>
+          </nav>
+        </footer>
+      </body>
     </html>
   );
 }

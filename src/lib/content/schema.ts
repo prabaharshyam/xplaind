@@ -53,6 +53,7 @@ export const Resource = z
     language: z.string().default("en"),
     certificate: z.boolean(),
     affiliate: z.boolean().default(false),
+    affiliate_url: HttpsUrl.optional(), // RM-5: the tagged link /go uses; only when affiliate is true
     editor_score: z.number().min(0).max(5),
     why_picked: Text.max(280),
     last_verified: IsoDate,
@@ -64,6 +65,12 @@ export const Resource = z
     const issue = (path: string, message: string) =>
       ctx.addIssue({ code: "custom", path: [path], message });
 
+    if (r.affiliate && !r.affiliate_url) {
+      issue("affiliate_url", "RM-5: an affiliate resource needs affiliate_url, the tagged link /go redirects to");
+    }
+    if (!r.affiliate && r.affiliate_url) {
+      issue("affiliate_url", "RM-5: affiliate_url is only allowed when affiliate is true");
+    }
     if (r.cost === "paid" && r.price_inr === undefined) {
       issue("price_inr", "RM-6: a paid resource needs price_inr");
     }

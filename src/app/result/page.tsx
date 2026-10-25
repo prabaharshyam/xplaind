@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getContent } from "@/lib/content";
+import { getContent, getStopsInOrder } from "@/lib/content";
 import type { PublicQuestion } from "@/lib/placement/types";
 import { ResultView } from "./result-view";
 
@@ -18,7 +18,14 @@ export default function ResultPage() {
     draft_hours: l.draft_hours,
     exit_check: l.exit_check,
   }));
-  const stops = content.stops.map(({ data: s }) => ({ id: s.id, title: s.title, level: s.level, gap_tags: s.gap_tags }));
+  const stops = getStopsInOrder().map((s) => ({
+    id: s.id,
+    title: s.title,
+    level: s.level,
+    order: s.order,
+    hours: s.hours,
+    gap_tags: s.gap_tags,
+  }));
   const bank: PublicQuestion[] = content.placement.map(({ data: q }) => ({
     id: q.id,
     level: q.level,

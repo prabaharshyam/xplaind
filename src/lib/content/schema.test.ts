@@ -34,6 +34,13 @@ describe("Resource (ED-1, ED-4, ED-8, RM-6)", () => {
     expect(r.success).toBe(false);
   });
 
+  it("needs affiliate_url exactly when the resource is affiliate (RM-5)", () => {
+    const url = "https://example.org/course?tag=xplaind-21";
+    expect(messages(Resource.safeParse({ ...resource(), affiliate: true }))).toMatch(/needs affiliate_url/);
+    expect(Resource.safeParse({ ...resource(), affiliate: true, affiliate_url: url }).success).toBe(true);
+    expect(messages(Resource.safeParse({ ...resource(), affiliate_url: url }))).toMatch(/only allowed when affiliate/);
+  });
+
   it("rejects a missing last_verified date (ED-4)", () => {
     const { last_verified, ...rest } = resource();
     void last_verified;

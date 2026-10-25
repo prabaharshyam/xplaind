@@ -111,6 +111,23 @@ test.describe("placement test (PL-2, PL-3, PL-5)", () => {
     expect(await overflow(page)).toBe(false);
   });
 
+  test("no question is wider than a 360px phone, including long code lines", async ({ page }) => {
+    await page.goto("/start");
+    for (const q of bank) {
+      await page.evaluate(
+        ([id, level]) =>
+          localStorage.setItem(
+            "xplaind.test.v1",
+            JSON.stringify({ goal: "genai-engineer", weeklyHours: 5, state: { answers: [], level, currentId: id, done: false } }),
+          ),
+        [q.id, q.level],
+      );
+      await page.reload();
+      await expect(page.getByText("Question 1 of up to 12")).toBeVisible();
+      expect(await overflow(page), q.id).toBe(false);
+    }
+  });
+
   test("the result page without a saved result invites the learner to take the test", async ({ page }) => {
     await page.goto("/result");
     await expect(page.getByRole("link", { name: "Find my level" })).toBeVisible();

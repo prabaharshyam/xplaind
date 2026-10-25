@@ -135,7 +135,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         <div className="h-full bg-emerald-700" style={{ width: `${(answered / TEST_LENGTH) * 100}%` }} />
       </div>
 
-      <fieldset className="flex flex-col gap-3" key={question.id}>
+      <fieldset className="flex min-w-0 flex-col gap-3" key={question.id}>
         <legend className="mb-3">
           <h1 ref={headingRef} tabIndex={-1} className="text-xl leading-8 font-semibold outline-none">
             {text}
