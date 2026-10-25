@@ -1,0 +1,67 @@
+---
+id: latency-load-testing
+level: P2
+title: "Latency budgets and load testing"
+outcome: "Set a latency target per step, measure percentiles rather than averages, and load-test an AI service to find where it breaks before users do."
+why_it_matters: "\"It was fast in the demo\" is the most common last words of an AI pilot. Real traffic arrives in peaks, providers slow down and queues build. A latency budget and a load test turn launch-day panic into a known limit with a plan."
+hours: 3
+gap_tags: []
+primary_resource: google-sre-monitoring
+alternates: [locust-quickstart]
+format: explainer
+key_terms: [latency-budget, p95-latency, load-testing, rate-limit]
+check:
+  type: mcq
+  question_ids: [latency-load-testing-1, latency-load-testing-2, latency-load-testing-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A **latency budget** is the longest acceptable response time, broken down by step. For a chat assistant: first token within 1.5 seconds at the 95th percentile, full answer within 8 seconds. The budget then splits across steps: auth 50 ms, query rewrite 300 ms, retrieval and reranking 400 ms, model time to first token 700 ms.
+
+**Load testing** sends realistic traffic at the system, rising step by step, and records response times, errors and resource use, so you know the load at which it breaks and what breaks first.
+
+## How it works
+
+**Percentiles, not averages.** An average of 2 seconds can hide 5% of users waiting 15 seconds. Track the median (p50), the 95th (p95) and the 99th percentile (p99). Users remember the slow ones.
+
+**Budget by step.** Traces give you each step's timing. When the total misses the target, the budget shows which step to attack: a slow reranker, too many chunks, a large model where a small one would do, or a cold start.
+
+**AI-specific factors.** Output length dominates generation time, so shorter answers are faster. Time to first token depends on prompt length, so trim context. Provider latency varies by hour and region. Rate limits on tokens per minute cap throughput no matter how many servers you run; check them before a big launch and ask the provider for higher limits early.
+
+**Designing the test.** Model real behaviour: the mix of question types, think time between messages, typical prompt and answer lengths, and the expected peak (say, 300 concurrent users at 7 pm). Use tools such as Locust (Python) or k6. Ramp from low to beyond the expected peak, hold, and watch p95, error rate, CPU, memory, database connections and provider 429 responses.
+
+**Model costs in tests.** Load tests against real models cost real money and use up rate limits. Run most rounds against a fake model server that replies after a realistic delay, then one short, controlled test against the real provider.
+
+## A worked example
+
+A Jaipur state transport corporation is launching an AI assistant for bus bookings and complaints, expected to peak at 500 concurrent users during festival travel.
+
+The budget: first token under 2 s at p95, full answer under 10 s at p95, errors under 1%.
+
+Round 1, against a fake model with realistic delays: p95 first token rises from 1.1 s at 50 users to 6 s at 200 users. Traces show requests queuing for database connections: the pool size is 10. Raising it to 40 and adding an index on the route table brings p95 to 1.3 s at 500 users.
+
+Round 2, a 10-minute test against the real model at 300 users: provider 429 errors start at about 220 users. The token-per-minute limit is the ceiling. You request a higher limit two weeks ahead, add a fallback model through the gateway, and cap answer length at 200 tokens, which also cuts average generation time by a third.
+
+The final test meets the budget at 550 users. The launch day peak reaches 480 users without incident, and your report lists the next bottleneck (provider limits at about 700 users) so the client can plan.
+
+## Common mistakes
+
+- **Reporting averages.** Use p95 and p99.
+- **Testing one request at a time.** Concurrency problems (pools, locks, rate limits) only show under load.
+- **Unrealistic traffic.** Identical tiny prompts with no think time give misleading numbers.
+- **Burning money on real-model load tests.** Use a fake model for most rounds.
+- **Forgetting provider limits.** They are often the real ceiling. Check and raise them early.
+
+## Practise
+
+Read the Google SRE chapter on monitoring and Locust's first-test guide.
+
+1. Write a latency budget for your app, by step, using traces from ten real requests.
+2. Build a fake model endpoint that waits a realistic time and streams a fixed reply, and point your app at it.
+3. Load-test with Locust from 10 to 200 users, record p50, p95 and errors at each step, and find and fix the first bottleneck.
+
+**You are done when you can** show a chart of p95 against users, name the first bottleneck and the change that moved it.
