@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: google-sre-monitoring
 alternates: [locust-quickstart]
-format: explainer
+format: deep
 key_terms: [latency-budget, p95-latency, load-testing, rate-limit]
 check:
   type: mcq
   question_ids: [latency-load-testing-1, latency-load-testing-2, latency-load-testing-3]
+flashcards:
+  - q: "What is a latency budget?"
+    a: "The longest acceptable response time, split across steps such as auth, retrieval, reranking and model time to first token."
+  - q: "Why use percentiles instead of averages?"
+    a: "An average can hide a slow tail; p95 and p99 show what the slowest users experience."
+  - q: "What dominates generation time?"
+    a: "Output length. Shorter answers are faster."
+  - q: "What sets time to first token?"
+    a: "Mainly prompt length and provider latency, so trimming context helps."
+  - q: "Why can provider rate limits cap throughput?"
+    a: "Tokens-per-minute limits stop requests regardless of how many servers you run; raise them early."
+  - q: "What makes a load test realistic?"
+    a: "A real mix of question types, think time between messages, typical lengths and a ramp beyond the expected peak."
+  - q: "Why test mostly against a fake model?"
+    a: "Real-model load tests cost money and use up rate limits; a fake server with realistic delays finds most bottlenecks."
+  - q: "What should a load test watch?"
+    a: "p50, p95 and p99 latency, error rate, CPU, memory, database connections and provider 429 responses."
+exercise:
+  title: "Find the bottleneck"
+  setup: "A Lucknow exam board's results assistant must handle 2,000 concurrent students on results day. A first load test against a fake model shows p95 latency rising sharply after 300 users, with CPU at 30% and many requests waiting for database connections. A short test against the real model shows 429 errors from 900 users. Answers average 450 tokens."
+  questions:
+    - q: "What is the first bottleneck?"
+      a: "The database connection pool: requests queue for connections while CPU is mostly idle."
+    - q: "What fixes it?"
+      a: "Raise the pool size within the database's limits and add indexes for the results lookups, then re-test."
+    - q: "How do you handle the 429s?"
+      a: "Request a higher tokens-per-minute limit well before results day and add a fallback model through the gateway."
+    - q: "What would also help speed and the limit?"
+      a: "Shorter answers, capped at around 150 to 200 tokens, which cut generation time and tokens per minute."
+ask:
+  - "How do I load test an LLM application?"
+  - "What is p95 latency?"
+  - "How do I find the bottleneck in a slow AI app?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -24,6 +57,21 @@ reviewed_on: 2026-10-25
 A **latency budget** is the longest acceptable response time, broken down by step. For a chat assistant: first token within 1.5 seconds at the 95th percentile, full answer within 8 seconds. The budget then splits across steps: auth 50 ms, query rewrite 300 ms, retrieval and reranking 400 ms, model time to first token 700 ms.
 
 **Load testing** sends realistic traffic at the system, rising step by step, and records response times, errors and resource use, so you know the load at which it breaks and what breaks first.
+
+```text
+   LATENCY BUDGET (p95, first token 2 s)
+   auth 50 ms | rewrite 300 ms | retrieve + rerank 400 ms | model first token 700 ms | slack 550 ms
+
+   p95 first token vs concurrent users (fake model)
+   6 s |                    x  before: pool of 10 connections
+   4 s |               x
+   2 s |  x    x                                    budget -----------------
+   1 s |  o    o    o    o    o    o    o           after: pool 40 + index
+       +----+----+----+----+----+----+----
+          50  100  200  300  400  500  550 users
+```
+
+This lesson follows a state transport corporation in Jaipur preparing its booking assistant for festival-season traffic.
 
 ## How it works
 
@@ -37,6 +85,21 @@ A **latency budget** is the longest acceptable response time, broken down by ste
 
 **Model costs in tests.** Load tests against real models cost real money and use up rate limits. Run most rounds against a fake model server that replies after a realistic delay, then one short, controlled test against the real provider.
 
+**Common bottlenecks and fixes:**
+
+| Symptom under load | Likely cause | Fix |
+| --- | --- | --- |
+| Latency rises, CPU low | Waiting on database connections or locks | Larger pool, indexes, fewer queries |
+| CPU at 100% | Too few workers or heavy parsing | More workers, background jobs |
+| 429 errors | Provider rate limit | Higher limit, fallback model, shorter outputs |
+| Slow first token only | Long prompts | Trim context, cache the prefix |
+| Slow full answers | Long outputs | Cap answer length |
+| Errors after a minute | Timeouts set too low | Align timeouts across layers |
+
+**Building a fake model server.** Write a tiny service with the same API as the provider. It waits a realistic time before the first token, sampled from your traces, then streams a fixed reply at a typical token rate. Point the app at it with a setting. Now you can run load tests all day for free and find every bottleneck except the provider's own limits, which one short real test then checks.
+
+**Reporting the result.** Show a chart of p95 against users, the budget line, the bottleneck found at each round and the fix, and the next ceiling you expect. Clients value knowing where the system will break next, because it tells them what to plan for.
+
 ## A worked example
 
 A Jaipur state transport corporation is launching an AI assistant for bus bookings and complaints, expected to peak at 500 concurrent users during festival travel.
@@ -48,6 +111,12 @@ Round 1, against a fake model with realistic delays: p95 first token rises from 
 Round 2, a 10-minute test against the real model at 300 users: provider 429 errors start at about 220 users. The token-per-minute limit is the ceiling. You request a higher limit two weeks ahead, add a fallback model through the gateway, and cap answer length at 200 tokens, which also cuts average generation time by a third.
 
 The final test meets the budget at 550 users. The launch day peak reaches 480 users without incident, and your report lists the next bottleneck (provider limits at about 700 users) so the client can plan.
+
+| Round | Finding | Fix | Result |
+| --- | --- | --- | --- |
+| 1, fake model | p95 6 s at 200 users; connection pool of 10 | Pool of 40, route-table index | p95 1.3 s at 500 users |
+| 2, real model | 429s from about 220 users | Higher limit, fallback, 200-token cap | Budget met at 550 users |
+| Launch day | Peak 480 users | None needed | No incidents |
 
 ## Common mistakes
 

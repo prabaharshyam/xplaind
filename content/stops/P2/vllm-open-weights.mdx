@@ -10,11 +10,44 @@ gap_tags: []
 primary_resource: vllm-quickstart
 alternates: [vllm-pagedattention, hf-quantization]
 more: [nvidia-nim-intro, hf-llm-course]
-format: explainer
+format: deep
 key_terms: [vllm, open-weight-model, quantization, self-hosting]
 check:
   type: mcq
   question_ids: [vllm-open-weights-1, vllm-open-weights-2, vllm-open-weights-3]
+flashcards:
+  - q: "What are open-weight models?"
+    a: "Models whose weights are published, so you can run them on your own hardware under their licence terms."
+  - q: "What is vLLM?"
+    a: "An open-source engine that serves open-weight models efficiently on GPUs with an OpenAI-compatible API."
+  - q: "What does PagedAttention do?"
+    a: "Manages each request's attention cache in small pages, so far more requests fit in GPU memory."
+  - q: "What is continuous batching?"
+    a: "New requests join the running batch as others finish, keeping the GPU busy instead of waiting for a whole batch."
+  - q: "How should you choose an open-weight model?"
+    a: "From your own evals, checking the licence, supported languages including Indian ones, context length and size."
+  - q: "Why does maximum context length matter in vLLM?"
+    a: "A shorter limit leaves more memory for the cache, so more concurrent requests fit."
+  - q: "What should be pinned in production?"
+    a: "The model revision and the vLLM version, with evals before every upgrade."
+  - q: "Why does an OpenAI-compatible API help?"
+    a: "Existing client code and gateways work unchanged; switching often means changing only a model alias."
+exercise:
+  title: "Plan the self-hosting"
+  setup: "A Kochi hospital must keep patient discharge summaries on its own servers. It wants a model to draft summaries in English and Malayalam, about 8,000 requests a day, peaking at 25 concurrent requests with 6,000-token contexts. It has two 48 GB GPUs and a Kubernetes cluster. An engineer suggests picking the top model on a public leaderboard."
+  questions:
+    - q: "How should the model be chosen?"
+      a: "By running the hospital's own golden set in English and Malayalam on several open-weight models and checking licences."
+    - q: "What memory factors must sizing include?"
+      a: "Weights at the chosen precision plus the KV cache for 25 concurrent requests at 6,000 tokens, with headroom."
+    - q: "When is quantization acceptable?"
+      a: "When the evals, especially in Malayalam, show the quality loss is small enough for clinicians to accept."
+    - q: "How should it run in production?"
+      a: "vLLM in containers on the cluster behind the gateway, with health checks, metrics, pinned versions and quarterly evaluated upgrades."
+ask:
+  - "What is vLLM and why is it fast?"
+  - "Which open-source model should I self-host?"
+  - "How much GPU memory does a 14B model need?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -28,6 +61,19 @@ reviewed_on: 2026-10-25
 - **Continuous batching**: new requests join the batch as soon as others finish, instead of waiting for a whole batch, which keeps the GPU busy.
 
 vLLM exposes an **OpenAI-compatible API**, so most client code and gateways work with it unchanged.
+
+```text
+   client code / gateway  --(OpenAI-compatible API)-->  [vLLM server]
+                                                         |
+                       continuous batching: requests join and leave the batch every step
+                                                         |
+             GPU memory (48 GB):  [weights 4-bit, ~9 GB][ KV cache in pages ................ ]
+                                                          PagedAttention: no wasted gaps
+                                                         |
+   metrics: tokens per second | queue length | cache usage     pinned: model revision + vLLM version
+```
+
+This lesson follows an insurance company in Chennai that must keep claim documents on its own servers.
 
 ## How it works
 
@@ -49,6 +95,19 @@ Key settings: maximum context length (shorter means more concurrent requests fit
 
 **In production.** Run it in a container with the weights in a volume or baked into an internal image, behind your gateway, with health checks, metrics (tokens per second, queue length, cache usage) and autoscaling where GPUs allow. Pin the model revision and the vLLM version, and evaluate before every upgrade.
 
+**Key vLLM settings:**
+
+| Setting | Example | Effect |
+| --- | --- | --- |
+| `--max-model-len` | 8192 | Shorter limits leave more room for concurrent requests |
+| `--gpu-memory-utilization` | 0.90 | Share of GPU memory vLLM may use |
+| `--tensor-parallel-size` | 2 | Splits a model across GPUs in one machine |
+| `--quantization` | awq | Uses a quantized checkpoint to save memory |
+
+**Comparing with an API fairly.** Run the same golden set through the self-hosted model and an API model. Record accuracy by task and language, p95 latency under a realistic load test, and cost per 1,000 requests, including the GPUs' full monthly cost divided by actual volume. Self-hosting often looks cheap per token at full load and expensive at low use, so use the real expected volume. Write the result as a short table the client's team can sign off.
+
+**Operating it.** Watch the queue length and cache usage: a growing queue means you need more capacity or shorter contexts. Keep one spare GPU or replica so a failure or an upgrade does not stop service. Store the weights in an internal registry or volume, because downloading them at start-up from the internet is slow and may be blocked on locked-down networks.
+
 ## A worked example
 
 A Chennai insurance company must keep claim documents on its own servers. It wants extraction of 20 fields from claim forms and short grounded answers for its claims staff, about 30,000 requests a day.
@@ -58,6 +117,12 @@ Evals on 300 real forms compare three open-weight models of 7 to 14 billion para
 Sizing: the 14B model at 16-bit needs about 28 GB for weights. With 4-bit AWQ quantization it needs about 9 GB, and the evals drop only to 94.5%. On a single 48 GB GPU, that leaves ample room for the KV cache at 8,000-token contexts, and a load test shows 40 concurrent requests at under 3 seconds each at p95. Two GPUs give headroom and redundancy.
 
 vLLM runs in containers on the client's Kubernetes cluster, behind the same gateway as before, so the application code changes only one model alias. Upgrades happen quarterly after the eval suite passes.
+
+| Option | Field accuracy | Memory for weights | Notes |
+| --- | --- | --- | --- |
+| Frontier API | 97% | Not applicable | Data would leave the premises |
+| 14B model, 16-bit | 95% | About 28 GB | Fits, less room for the cache |
+| 14B model, 4-bit AWQ | 94.5% | About 9 GB | 40 concurrent requests under 3 s at p95; chosen |
 
 ## Common mistakes
 
