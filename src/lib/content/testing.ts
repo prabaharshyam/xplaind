@@ -188,7 +188,7 @@ export const explainerBody = (words = 520): string => {
 
 /** A deep lesson's body: the five sections, a text diagram and a table. */
 export const deepBody = (words = 1150): string =>
-  explainerBody(words).replace("## How it works\n\n", "## How it works\n\n```text\n[a] --> [b]\n```\n\n| Part | Job |\n| --- | --- |\n| a | b |\n\n");
+  explainerBody(words).replace("## How it works\n\n", "## How it works\n\n```text\n[a] --> [b]\n```\n\n```python\n# a comment, not a heading\n```\n\n| Part | Job |\n| --- | --- |\n| a | b |\n\n");
 
 export const deepExtras = {
   flashcards: Array.from({ length: 6 }, (_, i) => ({ q: `Question ${i + 1}?`, a: "A short answer." })),

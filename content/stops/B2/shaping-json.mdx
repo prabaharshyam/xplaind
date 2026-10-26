@@ -9,11 +9,44 @@ hours: 2
 gap_tags: []
 primary_resource: mdn-json
 alternates: [n8n-data]
-format: explainer
+format: deep
 key_terms: [json-schema, api, webhook, structured-output]
 check:
   type: mcq
   question_ids: [shaping-json-1, shaping-json-2, shaping-json-3]
+flashcards:
+  - q: "What is JSON?"
+    a: "JavaScript Object Notation: the text format apps use to exchange data, built from objects, arrays and simple values."
+  - q: "What is the difference between a JSON object and an array?"
+    a: "An object has named fields in curly braces, like a customer. An array is an ordered list of items in square brackets, like order lines."
+  - q: "How do you write the path to the first order line's price?"
+    a: "order.lines[0].price. Follow the names from the outside in, and number array items from 0."
+  - q: "Why split a list into items in an automation?"
+    a: "So each element, such as each order line, is handled by later steps one at a time, for example one sheet row per line."
+  - q: "Why must '1,199.00' be converted before adding?"
+    a: "It is text, not a number. Remove the comma and convert it, or totals will fail or be wrong."
+  - q: "Why keep PIN codes and phone numbers as text?"
+    a: "As numbers they can lose leading zeros or get rounded. They are identifiers, not quantities."
+  - q: "How should a workflow handle a missing or null field?"
+    a: "Decide in advance: use a default, skip the step, or send the record to a person, instead of letting the workflow fail."
+  - q: "What is a JSON schema?"
+    a: "A description of the shape JSON must have: which fields, their types and which are required. APIs and AI structured outputs use them."
+exercise:
+  title: "Read the payment webhook"
+  setup: "A payment gateway sends this JSON when a payment succeeds: an object 'event' with 'id' set to 'evt_5521', and 'payment' containing 'amount' set to '2,450.00', 'currency' 'INR', 'method' 'upi', 'customer' containing 'name' 'Rakesh Gupta', 'phone' '09812345678' and 'email' null, and 'notes' an array of two objects, each with 'key' and 'value', the first with key 'invoice' and value 'INV-207'."
+  questions:
+    - q: "Write the path to the customer's phone number."
+      a: "payment.customer.phone"
+    - q: "Write the path to the first note's value, and say what it is."
+      a: "payment.notes[0].value, which is 'INV-207'."
+    - q: "What two things must you do to the amount before adding it to a monthly total?"
+      a: "Remove the comma and convert the text to a number: '2,450.00' becomes 2450.0."
+    - q: "The email is null. What should the 'send receipt by email' step do?"
+      a: "Not fail. Skip the email, send the receipt by SMS instead, or flag the payment for a person, depending on the agreed rule."
+ask:
+  - "How do I find the path to a field in nested JSON?"
+  - "What does null mean in JSON?"
+  - "How do I loop over a list inside JSON in n8n?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -21,35 +54,99 @@ reviewed_on: 2026-10-25
 
 ## What it is
 
-**JSON** (JavaScript Object Notation) is the text format apps use to exchange data. It has a few building blocks:
+Almost every automation and AI application moves data between apps, and that data almost always travels as **JSON** (JavaScript Object Notation): a text format apps use to exchange structured data. If you can read and reshape JSON, you can connect almost anything to anything.
 
-- **Objects**: named fields in curly braces, such as a customer with name, phone and city.
-- **Arrays** (lists): items in square brackets, such as a list of order lines.
-- **Values**: text in quotes, numbers, true or false, and null (empty).
+JSON has three building blocks:
+
+| Building block | Looks like | Example |
+| --- | --- | --- |
+| **Object** | Named fields in curly braces | A customer with name, phone and city |
+| **Array** (list) | Items in square brackets | A list of order lines |
+| **Value** | Text in quotes, a number, true or false, or null (empty) | "Mysuru", 2, true, null |
 
 Objects and arrays nest inside each other. A payment webhook might contain an object for the payment, inside it an object for the customer, and inside that an array of notes.
 
+```text
+  order                         (object)
+   |-- id: "ORD-88213"
+   |-- customer                 (object)
+   |     |-- name: "Nisha Rao"
+   |     |-- phone: "9845012345"
+   |     +-- email: null
+   |-- lines                    (array)
+   |     |-- [0] sku, qty, price
+   |     +-- [1] sku, qty, price
+   +-- shipping                 (object)
+         |-- city: "Mysuru"
+         +-- pin: "570001"
+```
+
+This lesson follows an online tea store's order webhook as it becomes rows in a dispatch sheet and an SMS to the customer. By the end you will be able to take an unfamiliar JSON payload and pull out exactly what a workflow needs.
+
 ## How it works
 
-**Reading a path.** To reach a nested field you follow the path from the outside in: `payment.customer.phone`, or the first order line's price: `order.lines[0].price`. Arrays are numbered from 0.
+### Reading a path
 
-**Inspect real samples.** Always look at real payloads. n8n's output panel shows each item as a table, JSON or schema view; use it to find the exact path.
+To reach a nested field, follow the names from the outside in, joined by dots. Array items are numbered from **0** in square brackets.
 
-**Pick and rename.** Most workflows need only a few fields. Use a "set" or "edit fields" step to pick them and give them clear names (`customer_phone` instead of `payment.notes.contact_no`).
+| What you want | Path |
+| --- | --- |
+| The order id | `order.id` |
+| The customer's phone | `order.customer.phone` |
+| The first line's price | `order.lines[0].price` |
+| The second line's SKU | `order.lines[1].sku` |
+| The delivery PIN code | `order.shipping.pin` |
 
-**Lists to items.** If a field holds a list (order lines, attachments), split it so each element becomes its own item for later steps. To go back, aggregate items into a list.
+### Inspect real samples
 
-**Types.** Values may arrive as the wrong type: amounts as text ("1,250.00"), dates in different formats, phone numbers as numbers that lose a leading zero. Convert explicitly: remove commas before turning text into numbers, parse dates with a known format, keep ids and phone numbers as text.
+Never guess a path from documentation alone. Trigger a real or test event and look at the exact JSON received. In n8n, the output panel shows each item as a table, as raw JSON or as a schema; use it to find the exact path and copy it.
 
-**Missing values.** Fields may be absent or null for some records. Decide a default or a check: if `customer.email` is missing, skip the email step or send to a person, rather than failing.
+### Pick and rename
 
-**Building JSON for APIs.** When sending data to an API or an AI step, build the exact shape it expects. Check required fields and types against the API's documentation.
+Most workflows need only a handful of fields from a large payload. Use an "Edit Fields" or "Set" step to pick them and give them clear names: `customer_phone` instead of `payment.notes.contact_no`. Later steps become much easier to read and maintain.
 
-**A query tool for power users.** jq and JSONata are small languages for querying and reshaping JSON; many automation tools support similar expressions.
+### Lists to items, and back
+
+If a field holds a list, such as order lines or attachments, **split** it so each element becomes its own item for later steps. Then each line can become its own sheet row. To go back, **aggregate** items into a single list.
+
+```text
+  1 item: order with lines [A, B]
+           |
+        split lines
+           v
+  2 items: {order id, line A}   {order id, line B}
+           |
+        one sheet row each
+```
+
+Keep the fields you still need, such as the order id and city, on every split item.
+
+### Types
+
+Values often arrive as the wrong type:
+
+| Value received | Problem | Fix |
+| --- | --- | --- |
+| `"1,250.00"` | Text with a comma, not a number | Remove commas, then convert to a number |
+| `"03/11/2026"` | Is it 3 November or 11 March? | Parse with the format the provider documents |
+| `9845012345` as a number | Fine, but `0123` as a number loses its zero | Keep phone numbers, PIN codes and ids as text |
+| `"true"` | Text, not true or false | Compare as text, or convert |
+
+### Missing values
+
+Fields may be absent or `null` for some records. Decide in advance: use a default, skip a step, or route the record to a person. "If `customer.email` is null, skip the email step and send an SMS instead" is a rule; a workflow that crashes is not.
+
+### Building JSON for APIs and AI steps
+
+When you send data to an API or an AI step, you build the exact shape it expects. A **JSON schema** describes that shape: which fields, their types and which are required. Check your output against the API's documentation, and for AI structured outputs, against the schema you give the model.
+
+### Power tools
+
+`jq` and JSONata are small languages for querying and reshaping JSON. Many automation tools support similar expressions. You do not need them to start, but they help with complicated payloads.
 
 ## A worked example
 
-An e-commerce store's order webhook sends this (shortened):
+An online tea store in Bengaluru gets this webhook (shortened) when an order is placed:
 
 ```json
 {
@@ -68,27 +165,35 @@ An e-commerce store's order webhook sends this (shortened):
 
 The goal: one row per order line in the dispatch sheet, and an SMS to the customer.
 
-1. Split `order.lines` into items, keeping `order.id`, `customer.name`, `shipping.city` and `shipping.pin` on each.
-2. Convert `price` text to a number by removing commas; compute line total = qty × price.
-3. Keep `pin` as text so "570001" stays intact.
-4. For the SMS, use `customer.phone` with +91 added. Because `email` is null, skip the email step for this order.
+1. **Split** `order.lines` into items, keeping `order.id`, `customer.name`, `shipping.city` and `shipping.pin` on each.
+2. **Convert** `price` from text to a number by removing commas, then compute line total = qty × price.
+3. **Keep** `pin` as text, so "570001" stays exactly as it is.
+4. **SMS:** use `customer.phone` with +91 added. Because `email` is `null`, skip the email step for this order.
 
-The sheet gets two rows: Assam tea, 2 × ₹349 = ₹698; steel mug, 1 × ₹1,199 = ₹1,199.
+The dispatch sheet gets two rows:
+
+| Order | Customer | SKU | Qty | Price | Line total | City | PIN |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ORD-88213 | Nisha Rao | TEA-ASSAM-250 | 2 | 349 | 698 | Mysuru | 570001 |
+| ORD-88213 | Nisha Rao | MUG-STEEL | 1 | 1,199 | 1,199 | Mysuru | 570001 |
+
+Before the conversion step, the second line's total showed as an error because "1,199.00" was text. Before the null check, the workflow failed for every customer without an email, about one order in five.
 
 ## Common mistakes
 
-- **Guessing paths.** Inspect real samples.
+- **Guessing paths.** Inspect real samples and copy the exact path.
 - **Assuming one item when there is a list.** Split lists into items.
-- **Numbers as text.** "1,199.00" will not add up until converted.
+- **Leaving numbers as text.** "1,199.00" will not add up until converted.
 - **Dropping leading zeros.** Keep PIN codes, phone numbers and ids as text.
-- **Failing on missing fields.** Plan for nulls and absent fields.
+- **Failing on missing fields.** Plan for null and absent fields with a rule.
+- **Forgetting the array starts at 0.** The first item is `[0]`, not `[1]`.
 
 ## Practise
 
-Read MDN's guide to JSON and n8n's page on working with data.
+Read MDN's guide to JSON, linked below, and n8n's page on working with data.
 
-1. Take the sample above (or a real webhook sample) and write the path to five fields, including one inside the list.
-2. In n8n, split the order lines into items, convert prices to numbers and compute totals.
-3. Add a check that routes orders without a phone number to a person.
+1. **Paths.** Using the sample above or a real webhook sample, write the path to five fields, including one inside the list.
+2. **Reshape.** In n8n, split the order lines into items, convert prices to numbers and compute line totals.
+3. **Missing data.** Add a check that routes orders without a phone number to a person.
 
 **You are done when you can** take an unfamiliar JSON payload and, within ten minutes, extract and reshape the fields a workflow needs.

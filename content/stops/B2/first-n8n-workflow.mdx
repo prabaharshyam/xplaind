@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: n8n-course-level-one
 alternates: [n8n-quickstart, n8n-data]
-format: explainer
+format: deep
 key_terms: [n8n, trigger, workflow-node, automation]
 check:
   type: mcq
   question_ids: [first-n8n-workflow-1, first-n8n-workflow-2, first-n8n-workflow-3]
+flashcards:
+  - q: "What is n8n?"
+    a: "A workflow automation tool with a visual editor where you connect nodes on a canvas. It can run in n8n's cloud or on your own server."
+  - q: "What is a node in n8n?"
+    a: "One step in a workflow: a trigger, an app action like Gmail or Sheets, a core node like If or Code, or an AI node."
+  - q: "What are items in n8n?"
+    a: "The records that flow between nodes. Each item is a small JSON object, and most nodes run once per item."
+  - q: "Name four common triggers."
+    a: "A schedule, a webhook, a new email, a new form submission or sheet row, and a manual trigger for testing."
+  - q: "What is a credential in n8n?"
+    a: "Saved access to an app, through OAuth sign-in or an API key, stored encrypted and reused across workflows."
+  - q: "How do you use data from an earlier node?"
+    a: "Drag the field into the setting, or write an expression such as $json.email inside double curly braces."
+  - q: "What does pinning test data do?"
+    a: "It saves a sample output on a node, so you can rerun the rest of the workflow without triggering a new real event each time."
+  - q: "What is the executions list for?"
+    a: "It shows every run of an active workflow with its data and any errors, so you can see what happened and debug."
+exercise:
+  title: "Predict what each node outputs"
+  setup: "A workflow has four nodes. (1) A Google Sheets trigger fires on a new row: name ' priya nair ', phone '9876543210', course 'neet'. (2) An Edit Fields node trims spaces, capitalises the name and adds +91 to the phone. (3) An If node checks: course equals 'NEET'. (4) The true branch sends a Gmail message; the false branch posts to Telegram."
+  questions:
+    - q: "What does the Edit Fields node output for name and phone?"
+      a: "Name 'Priya Nair' and phone '+919876543210', with the extra spaces removed."
+    - q: "Which branch does this item go down, and why might that be a problem?"
+      a: "The false branch, because 'neet' in lower case does not equal 'NEET'. A NEET student gets the wrong message."
+    - q: "How would you fix the If node?"
+      a: "Compare in lower case on both sides, or turn on the option to ignore case, so 'neet', 'Neet' and 'NEET' all match."
+    - q: "After fixing, how do you retest without adding a new row each time?"
+      a: "Pin the trigger's test data, then run the workflow from the editor and inspect each node's input and output."
+ask:
+  - "What is the difference between a trigger and a node in n8n?"
+  - "How do expressions work in n8n?"
+  - "Should I use n8n cloud or self-host it?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -21,50 +54,113 @@ reviewed_on: 2026-10-25
 
 ## What it is
 
-**n8n** (pronounced "n-eight-n") is a workflow automation tool with a visual editor. You place **nodes** on a canvas and connect them: a trigger node starts the workflow, and each following node does one thing, such as reading a sheet, calling an app, transforming data, branching on a condition or calling an AI model. Data flows from node to node as a list of **items**, each a small JSON record.
+**n8n** (pronounced "n-eight-n") is a workflow automation tool with a visual editor. You place **nodes** on a canvas and connect them with arrows. A **trigger** node starts the workflow, and each following node does one thing: read a sheet, call an app, transform data, branch on a condition or call an AI model.
 
-You can use n8n's hosted cloud version or run it yourself (for example with Docker), which many companies prefer for data control.
+Data flows from node to node as a list of **items**. Each item is a small JSON record, like one row of a spreadsheet:
+
+```text
+  [Trigger: new sheet row]
+        |  items: [ { name: "Rohan", phone: "98xx", course: "JEE" } ]
+        v
+  [Edit Fields: tidy data]
+        |  items: [ { name: "Rohan", phone: "+9198xx", course: "JEE" } ]
+        v
+  [If: course is JEE?]
+     yes |                         no |
+         v                            v
+  [Gmail: JEE welcome]        [Gmail: NEET welcome]
+         \                           /
+          v                         v
+        [Telegram: tell counsellors]
+```
+
+You can use n8n's hosted cloud version or run it yourself, for example with Docker, which many companies prefer so their data stays on their own servers.
+
+This lesson follows Shalini, who manages admissions at a coaching institute in Jaipur, as she builds her first workflow. By the end you will build, test and activate one of your own.
 
 ## How it works
 
-**Triggers.** Common ones: a schedule (every day at 9 am), a webhook (another app calls a URL), a new email, a new form submission, a new row in Google Sheets, a manual trigger for testing.
+### Triggers
 
-**Nodes.** App nodes (Gmail, Google Sheets, Slack, Telegram, HubSpot, hundreds more), core nodes (HTTP Request for any API, Code, Set or Edit Fields, If, Switch, Merge, Loop), and AI nodes.
+Every workflow starts with exactly one trigger. Common ones:
 
-**Credentials.** Each app node needs a credential, usually by signing in with OAuth or pasting an API key. n8n stores them encrypted and reuses them across workflows. Use accounts with only the access the workflow needs.
+| Trigger | Fires when | Example use |
+| --- | --- | --- |
+| Schedule | A set time arrives | Send a daily report at 9 am |
+| Webhook | Another app calls a URL | A payment app reports a new payment |
+| Email (IMAP or Gmail) | A new email arrives | Process invoices sent to accounts@ |
+| Form or Sheets | A new submission or row appears | New admission enquiry |
+| Manual | You click "Test workflow" | Building and testing |
 
-**Mapping data.** In a node's settings you pick fields from earlier nodes, either by dragging them in or with expressions such as `{{ $json.email }}`. The output panel shows exactly what each node produced, which makes debugging easy.
+### Nodes
 
-**Testing.** Run the workflow step by step with sample data, inspect each node's input and output, and fix mapping problems. Pin test data on the trigger so you can rerun without sending a new email each time.
+Nodes come in three families:
 
-**Activating.** When it works, turn the workflow on. Production triggers then run automatically. The executions list shows every run with its data and any errors.
+- **App nodes:** Gmail, Google Sheets, Slack, Telegram, WhatsApp Business, HubSpot and hundreds more.
+- **Core nodes:** HTTP Request for any API, Code for small scripts, Edit Fields (also called Set) to change data, If and Switch to branch, Merge to combine, Loop to process in batches.
+- **AI nodes:** call a language model to extract, classify, summarise or draft, or build an agent.
+
+### Credentials
+
+Each app node needs a **credential**: saved access to that app, usually by signing in with OAuth or pasting an API key. n8n stores credentials encrypted and lets you reuse them across workflows. Use a dedicated account with only the access the workflow needs, not your personal admin account.
+
+### Mapping data between nodes
+
+In a node's settings you choose which data from earlier nodes to use. You can drag a field from the input panel, or write an **expression** in double curly braces, such as `{{ $json.email }}` for the current item's email field. The output panel shows exactly what each node produced, which makes mistakes easy to see.
+
+### Testing
+
+Run the workflow from the editor with sample data. Click each node to see its input and output, and fix mapping problems one node at a time. **Pin** the trigger's test data so you can rerun the whole workflow without sending a new email or adding a new row each time.
+
+### Activating
+
+When it works, switch the workflow to **active**. Production triggers then run on their own. The **executions list** shows every run with its data and any errors.
+
+```text
+   Build  -->  Test with pinned data  -->  Fix  -->  Activate  -->  Watch executions
+     ^                                     |
+     +-------------------------------------+
+```
 
 ## A worked example
 
-Shalini, who manages admissions for a coaching institute in Jaipur, gets enquiries through a Google Form. She builds her first workflow:
+Shalini manages admissions for a coaching institute in Jaipur. Enquiries arrive through a Google Form whose responses go into a sheet. Today, counsellors check the sheet once a day and call students the next morning. She builds her first workflow:
 
-1. **Google Sheets trigger**: fires when a new row is added to the form's response sheet.
-2. **Edit Fields node**: tidies the data: trims spaces, formats the phone number with +91, capitalises the name.
-3. **If node**: is the course "JEE" or "NEET"?
-4. **Gmail node** on each branch: sends a course-specific welcome email with the brochure link, using the student's name.
-5. **Telegram node**: posts "New JEE enquiry: Rohan Sharma, +91 98xxxxxx45, prefers evening batch" to the counsellors' group.
+| # | Node | What it does |
+| --- | --- | --- |
+| 1 | Google Sheets trigger | Fires when a new row is added to the responses sheet |
+| 2 | Edit Fields | Trims spaces, formats the phone with +91, capitalises the name |
+| 3 | If | Is the course "JEE" or "NEET"? |
+| 4 | Gmail (two branches) | Sends a course-specific welcome email with the brochure link, using the student's name |
+| 5 | Telegram | Posts "New JEE enquiry: Rohan Sharma, +91 98xxxxxx45, prefers evening batch" to the counsellors' group |
 
-She tests with three sample rows, notices the If node fails when students write "jee" in lower case, and fixes it by comparing in lower case. She activates the workflow. The next morning, the executions list shows 14 successful runs, and counsellors called new students within the hour instead of the next day.
+**Testing.** She pins three sample rows and runs the workflow. Two go through correctly. The third, where a student typed "jee" in lower case, goes down the wrong branch and gets the NEET email. She changes the If node to compare in lower case, and all three pass.
+
+She also tries an empty phone number. The Telegram message says "phone: undefined", which would confuse counsellors. She adds a default: "phone not given, reply by email".
+
+**Activating.** She switches the workflow on. The next morning the executions list shows 14 successful runs, and counsellors called new students within an hour instead of the next day.
+
+| Measure | Before | After |
+| --- | --- | --- |
+| Time from enquiry to welcome email | Next day, by hand | Under a minute |
+| Time to a counsellor's call | Next morning | Within an hour |
+| Enquiries missed | A few a week | None in the first week |
 
 ## Common mistakes
 
-- **Testing only the happy path.** Try empty fields, unusual spellings and duplicates.
+- **Testing only the happy path.** Try empty fields, unusual spellings, extra spaces and duplicates.
 - **Using your personal admin account for credentials.** Use a dedicated account with limited access.
-- **Hard-coding values that change.** Keep things like email templates or team chat IDs in one place you can edit.
-- **Forgetting to activate.** A workflow that only runs in test mode does nothing for users.
-- **No error alert.** Add one before relying on it (covered in later lessons).
+- **Hard-coding values that change.** Keep email templates, chat IDs and prices in one place you can edit.
+- **Forgetting to activate.** A workflow that only runs in test mode does nothing for anyone.
+- **No error alert.** Add an error workflow that messages you when a run fails, before you rely on it.
+- **Ignoring item counts.** A node that suddenly outputs zero items is a common silent failure; check the counts.
 
 ## Practise
 
-Do n8n's quickstart, then the Level one text course.
+Do n8n's quickstart, then the Level one text course linked below.
 
-1. Build a workflow with a trigger, at least one data-tidying node, a branch and two app actions, using test data.
-2. Break it on purpose with three bad inputs (missing field, odd spelling, duplicate) and fix each.
-3. Activate it and check the executions list after a few real or simulated runs.
+1. **Build.** Build a workflow with a trigger, at least one data-tidying node, a branch and two app actions, using pinned test data.
+2. **Break it.** Feed it three bad inputs: a missing field, an odd spelling and a duplicate. Fix each.
+3. **Activate.** Switch it on and check the executions list after a few real or simulated runs.
 
 **You are done when you can** explain each node's input and output in your workflow and show a successful automatic run.

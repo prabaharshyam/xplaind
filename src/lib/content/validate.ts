@@ -165,7 +165,7 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     }
     if (!/^```text\n/m.test(s.body)) error(file, "a deep lesson has at least one diagram in a ```text block");
     if (!/^\|.+\|\s*\n\|[\s:|-]+\|/m.test(s.body)) error(file, "a deep lesson has at least one table");
-    if (/^# /m.test(s.body)) error(file, "lesson text starts its headings at ##");
+    if (/^# /m.test(s.body.replace(/^```[\s\S]*?^```/gm, ""))) error(file, "lesson text starts its headings at ##");
   }
   for (const { file, data: g } of bundle.glossary) {
     for (const r of g.related) {
