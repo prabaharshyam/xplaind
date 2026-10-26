@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: anthropic-writing-tools
 alternates: [claude-tool-use]
-format: explainer
+format: deep
 key_terms: [tool-calling, tool-schema, json-schema]
 check:
   type: mcq
   question_ids: [agent-tool-design-1, agent-tool-design-2, agent-tool-design-3]
+flashcards:
+  - q: "What does a model see of a tool?"
+    a: "Only its name, description and parameter schema. From those it must choose the tool, fill the arguments and read the result."
+  - q: "What five traits do good agent tools share?"
+    a: "Few tools, one clear job each, names and descriptions that say when to use them, tight parameter types, and short actionable results and errors."
+  - q: "Why design tools by task rather than by API endpoint?"
+    a: "Models struggle to chain many fine-grained calls. One task-shaped tool means fewer chances to go wrong."
+  - q: "How do you constrain parameters?"
+    a: "Use enums for fixed choices, patterns for ids, sensible defaults and limits, so the model cannot invent values."
+  - q: "What should a tool result contain?"
+    a: "The few fields the task needs, in readable form, with ids for the next tool; large results paginated with a note saying so."
+  - q: "What makes a good tool error?"
+    a: "It says what went wrong and what to do next, such as the expected id format and to ask the user to check."
+  - q: "Why separate read tools from write tools?"
+    a: "So risky actions such as refunds and deletions can have approval and separate logging, while reads run freely."
+  - q: "What usually causes wrong tool choices?"
+    a: "Overlapping tools or unclear descriptions."
+exercise:
+  title: "Redesign the tool set"
+  setup: "A Chennai hospital's appointment assistant has these tools: get_patient, get_patient_v2, list_doctors, list_slots, list_departments, book (which also cancels if given cancel=true), and run_query(sql). Results are full database rows with 60 fields. When a slot is taken, book returns 'Error 409'. In tests the model picks the wrong tool in a fifth of tasks."
+  questions:
+    - q: "Which tools should be merged or removed?"
+      a: "Merge get_patient and get_patient_v2, combine doctor and slot listing into a find_slots tool, and remove run_query."
+    - q: "What is wrong with book doing both booking and cancelling?"
+      a: "Reading and acting are mixed with two actions in one tool, so approval and logging cannot target cancellations. Split book_slot and cancel_appointment."
+    - q: "How should results change?"
+      a: "Return only what the task needs, such as doctor, department, date, time and slot id, not 60 raw fields."
+    - q: "What should replace 'Error 409'?"
+      a: "A message like 'That slot was just taken. The next free slots with Dr Rao are 11:30 and 12:15; ask the patient which suits.'"
+ask:
+  - "How do I write a good tool description for an AI agent?"
+  - "How many tools should an agent have?"
+  - "Should I give my agent a SQL tool?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -24,6 +57,17 @@ reviewed_on: 2026-10-25
 When you give a model tools, it sees only their names, descriptions and parameter schemas. From that alone it must decide which tool fits, what arguments to pass and how to read the result. A tool designed for a human developer, such as a thin wrapper over every endpoint of an internal API, often confuses a model.
 
 Good agent tools share five traits: there are **few** of them, each does one **clear job**, names and descriptions say **when** to use them, parameters are **tightly typed**, and results and errors are **short and actionable**.
+
+```text
+   API-shaped (14 tools)                         task-shaped (3 tools)
+   get_booking, get_booking_v2,                  get_trip(booking_ref)            read
+   list_segments, get_pnr_status,       ==>      get_cancellation_quote(ref)      read
+   get_fare_rules, get_passengers,               cancel_trip(quote_id)            ACT: needs approval
+   create_refund_request, ...
+   wrong tool: 22%   calls per task: 4.1         wrong tool: 3%   calls per task: 2.3
+```
+
+This lesson follows a support agent at a travel company in Gurugram whose tools mirrored every endpoint of the booking API.
 
 ## How it works
 
@@ -40,6 +84,21 @@ Good agent tools share five traits: there are **few** of them, each does one **c
 **Separate reading from acting.** Tools that change things (refund, send, delete) should be distinct from tools that read, so you can require approval for them and log them separately.
 
 **Test tool use.** Write 20 realistic tasks and check which tools the model calls and with what arguments. Wrong tool choices usually mean overlapping tools or unclear descriptions.
+
+**A tool description checklist:**
+
+| Part | Weak | Strong |
+| --- | --- | --- |
+| Name | `get_data` | `get_trip` |
+| When to use | Missing | "Use first for any question about one trip" |
+| What it returns | Missing | "Flights, passengers, status, whether it can be cancelled online" |
+| What it does not do | Missing | "Does not cancel; use cancel_trip after a quote" |
+| Parameter | `id: string` | `booking_ref` with a 6-character pattern |
+| Error | "Error 400" | "No trip for ABC12; references are 6 letters or digits" |
+
+**Making one tool depend on another.** Requiring the quote id in `cancel_trip` is a small design trick with a big effect. The model cannot cancel without first fetching a quote, so the customer always hears the refund amount and fees before anything happens, and the approval screen can show the quote. Use the same idea wherever an action should follow a check: a payment that needs a verified invoice id, or an email that needs a draft id the user has seen.
+
+**Testing a tool set.** Run the same 20 tasks after every change to names, descriptions or schemas, and count three numbers: wrong tool chosen, invalid arguments, and calls per task. Small wording changes move these numbers more than people expect.
 
 ## A worked example
 

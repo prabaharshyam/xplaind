@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: langgraph-memory
 alternates: [lilianweng-agents]
-format: explainer
+format: deep
 key_terms: [agent-memory, context-window, checkpoint, pii]
 check:
   type: mcq
   question_ids: [agent-memory-1, agent-memory-2, agent-memory-3]
+flashcards:
+  - q: "Does a model remember earlier calls?"
+    a: "No. Each call sees only what you put in its context. Agent memory is what your code stores and feeds back."
+  - q: "What is short-term memory in an agent?"
+    a: "The current conversation and task state, such as messages, tool results and the plan, kept for one thread or session."
+  - q: "What is long-term memory?"
+    a: "Information kept across sessions, such as preferences, learned facts, past summaries and lessons from past tasks."
+  - q: "What are semantic, episodic and procedural memory?"
+    a: "Facts, records of what happened in past episodes, and knowledge of how to do things, often stored as instructions."
+  - q: "How do you keep long threads within the context window?"
+    a: "Keep the last turns, summarise older ones, and drop large tool results once used, while keeping the task and key decisions."
+  - q: "Why must every memory query be scoped?"
+    a: "Without a filter by user, team or client, one user can retrieve another's data."
+  - q: "What should be stored with each memory?"
+    a: "When it was created and where it came from, so you can judge if it is still true and explain it."
+  - q: "How should forgetting work?"
+    a: "Let users see and delete their memories, expire stale ones, and limit how long sensitive facts are kept."
+exercise:
+  title: "Design the memory"
+  setup: "A Jaipur coaching institute builds a study assistant for students preparing for exams. Students chat daily over months. The team wants the assistant to remember each student's exam date, weak topics and preferred language, and to refer to past mistakes. One engineer suggests sending the full chat history, now 2,000 messages for some students, with every request, and storing all messages from all students in one vector store."
+  questions:
+    - q: "What is wrong with sending the full history?"
+      a: "It grows cost and latency every turn, will exceed the context window, and buries what matters. Trim and summarise instead."
+    - q: "What should be stored as long-term memory?"
+      a: "Structured facts such as exam date, weak topics and language, plus short summaries of past mistakes, each with a source and date."
+    - q: "What must the shared vector store always do?"
+      a: "Filter every query by student id, with a test proving one student can never retrieve another's memories."
+    - q: "How should a student control their memories?"
+      a: "A page showing what the assistant remembers, with delete buttons, and expiry for facts that go stale such as an old exam date."
+ask:
+  - "How do AI agents remember things between conversations?"
+  - "How do I summarise long chat histories?"
+  - "How do I let users delete what an assistant remembers?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -28,6 +61,21 @@ A model call has no memory. Each call sees only what you put in its context. "Me
 
 Researchers sometimes split long-term memory further: **semantic** (facts), **episodic** (what happened in past episodes) and **procedural** (how to do things, often stored as instructions).
 
+```text
+   SHORT-TERM (one thread)                      LONG-TERM (across sessions)
+   thread 5521                                  store, always filtered by user id
+   +-----------------------------+              +---------------------------------------+
+   | summary of turns 1-24       |              | prefers 7-9 am delivery   (2026-10-02)|
+   | last 6 turns in full        |  <-- read -- | allergic to sulfa drugs   (2026-09-14)|
+   | cart, prescription, slot    |              | usual order: metformin... (monthly)   |
+   +-----------------------------+  -- write -> +---------------------------------------+
+            |                                              ^
+            v                                              | background job extracts facts
+      model call (fits the context window)          after each finished order
+```
+
+This lesson follows an online pharmacy in Kolkata building an assistant that helps customers reorder medicines.
+
 ## How it works
 
 **Short-term.** Store the thread's messages and state, usually keyed by a thread id, and reload them each turn. Frameworks call this a checkpointer. Long threads outgrow the context window, so you trim (keep the last N turns), summarise older turns into a short note, or drop large tool results once used. Keep the original task and key decisions even when trimming.
@@ -37,6 +85,17 @@ Researchers sometimes split long-term memory further: **semantic** (facts), **ep
 **Scope and isolation.** Every memory belongs to a scope: one user, one team, one client. Queries must filter by scope, always. A memory store without scoping is a data leak waiting to happen.
 
 **Forgetting.** Memories go stale ("prefers morning delivery" from two years ago) and some must be deletable on request under privacy law. Store when each memory was created and its source, let users see and delete theirs, and expire what no longer matters.
+
+**Where each kind of memory lives:**
+
+| Kind | Example | Store | Lifetime |
+| --- | --- | --- | --- |
+| Short-term | Messages and cart in this chat | Thread store keyed by thread id | The session |
+| Semantic | Delivery preference, allergy | Database table per user | Until changed, expired or deleted |
+| Episodic | Summary of last month's order chat | Vector store, filtered by user | Months |
+| Procedural | "Always check the prescription first" | System prompt or instructions file | Until the next release |
+
+**When to write memories.** Writing during the chat through a `save_memory` tool is immediate but lets the model decide what matters, and it sometimes saves noise. A background job after the conversation can be more careful: it reads the whole chat, extracts only facts that meet clear rules, and attaches the source. Many teams use both, with the tool limited to things the user explicitly asks to be remembered.
 
 ## A worked example
 
@@ -55,6 +114,12 @@ user 88213 | usual order: metformin 500, ...    | from orders, updated monthly
 Next month the customer types "same as last time". The agent fetches this user's memories, filtered by user id, proposes the usual order and the 7 to 9 am slot, and flags a new item for pharmacist review because of the stated allergy.
 
 The legal team asks how a customer deletes memories. You add a "What the assistant remembers about you" page with a delete button, and a rule that health facts are kept for at most a year unless reconfirmed.
+
+| Request | Without memory | With scoped memory |
+| --- | --- | --- |
+| "Same as last time" | "Which medicines do you need?" | Proposes the usual order and 7 to 9 am slot |
+| A new item in the cart | Added silently | Flagged for pharmacist review because of the stated allergy |
+| "Forget my address" | No way to do it | Deleted from the memory page |
 
 ## Common mistakes
 

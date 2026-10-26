@@ -10,11 +10,44 @@ gap_tags: []
 primary_resource: anthropic-mcp-course
 alternates: [mcp-intro, dlai-mcp]
 more: [anthropic-mcp-advanced]
-format: explainer
+format: deep
 key_terms: [mcp, mcp-server, tool-calling, least-privilege]
 check:
   type: mcq
   question_ids: [mcp-servers-clients-1, mcp-servers-clients-2, mcp-servers-clients-3]
+flashcards:
+  - q: "What problem does MCP solve?"
+    a: "Each AI app needed custom code per tool. With MCP, a system is wrapped once as a server and any MCP client can use it."
+  - q: "What three things can an MCP server offer?"
+    a: "Tools the model can call, resources the app can read into context, and prompts users can pick."
+  - q: "What are host, client and server?"
+    a: "The host is the AI app; inside it a client holds a connection to each server; the server exposes a system's tools and data."
+  - q: "What are MCP's two main transports?"
+    a: "Standard input and output for local servers on the same machine, and HTTP for remote servers, which need authentication such as OAuth."
+  - q: "How does a Python MCP tool get its schema?"
+    a: "From the function's name, type hints and docstring."
+  - q: "Why should an MCP server act as the user?"
+    a: "So the system applies the user's own permissions; a super-user credential lets every user reach everything."
+  - q: "Why is a run_sql tool usually a bad idea?"
+    a: "It exposes the whole database to whatever the model writes. Task-shaped tools limit what can happen."
+  - q: "How can MCP carry prompt injection?"
+    a: "Tool descriptions and results flow into the model, so a malicious server or poisoned record can carry hidden instructions."
+exercise:
+  title: "Review the MCP server"
+  setup: "A Kochi shipping company's IT team finds a free community MCP server for their ERP. It offers tools: run_sql(query), get_shipment(id), update_shipment(id, fields), and send_email(to, body). It connects with one admin database account set in a config file. It keeps no logs. Staff want to install it in their desktop assistants today."
+  questions:
+    - q: "What should IT check before installing it?"
+      a: "Who wrote it, what code it runs, what it can reach, how it authenticates, and whether it sends data anywhere else."
+    - q: "What is risky about the admin database account?"
+      a: "Every user gets admin access through the assistant. The server should act as each user with their own permissions."
+    - q: "Which tools should be removed or restricted?"
+      a: "Remove run_sql; restrict update_shipment to specific fields with approval; limit send_email to internal recipients or require approval."
+    - q: "What must be added before production use?"
+      a: "Logging of every call with user, tool and arguments, plus authentication through company sign-on."
+ask:
+  - "What is the Model Context Protocol in simple words?"
+  - "How do I build an MCP server in Python?"
+  - "Is it safe to install third-party MCP servers?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -29,6 +62,20 @@ An MCP server can offer three kinds of thing:
 - **Tools**: actions the model can call, such as `search_tickets` or `create_invoice`.
 - **Resources**: data the app can read into context, such as a file, a record or a schema.
 - **Prompts**: reusable prompt templates a user can pick.
+
+```text
+   HOSTS (AI apps)                 CLIENTS                     SERVERS (one per system)
+   +-----------------+                                         +---------------------------+
+   | IDE assistant   |--[client]---------------+-------------> | maintenance-log server    |
+   +-----------------+                          |               |  tools: find_machine,     |
+   +-----------------+                          |               |   get_maintenance_history,|
+   | chat assistant  |--[client]---------------+               |   log_observation         |
+   +-----------------+--[client]-----------------------------> | spare-parts server        |
+                                                                +---------------------------+
+   one server, many hosts: no new integration per app
+```
+
+This lesson follows a manufacturing company in Pune whose engineers use two different AI assistants on the same maintenance data.
 
 ## How it works
 
@@ -56,6 +103,28 @@ The function's name, type hints and docstring become the tool's schema, so the t
 
 **Security.** An MCP server is code with access to real systems. Ask: who wrote it, what can it reach, which credentials does it use, and does it act as the user (respecting their permissions) or as an all-powerful service account? Tool descriptions and results flow into the model, so a malicious server or a poisoned record can carry prompt injection. Use least privilege, review third-party servers before installing them, and log every call.
 
+**Local versus remote servers:**
+
+| Aspect | Local (standard input and output) | Remote (HTTP) |
+| --- | --- | --- |
+| Runs on | The user's machine | A company server or cloud |
+| Good for | Developer tools, local files | Shared company systems |
+| Authentication | The user's own machine access | OAuth, ideally through single sign-on |
+| Updates | Each user updates their copy | Update once for everyone |
+| Logging | Per machine | Central audit log |
+
+**Security questions for any server:**
+
+| Question | Why it matters |
+| --- | --- |
+| Who wrote it, and can we read the code? | A server runs with the access you give it |
+| What systems and data can it reach? | Limits the damage from a mistake or attack |
+| Does it act as the user or as a service account? | Decides whether user permissions apply |
+| Which tools write or send? | Those need tight limits or approval |
+| Are calls logged with user, tool and arguments? | Needed to investigate incidents |
+
+**Designing the tools.** The same advice as any agent tool applies: few, task-shaped tools with clear descriptions and helpful errors. Because many different hosts will use one server, good descriptions matter even more; you cannot tune a prompt in each host to make up for a vague tool. Keep write tools narrow, such as `log_observation` writing only to a notes table, so even a confused or manipulated model can do little harm.
+
 ## A worked example
 
 A Pune manufacturing company's engineers use an AI assistant in their IDE and another in their chat tool. Both need access to the maintenance log database.
@@ -65,6 +134,13 @@ Instead of two integrations, you build one remote MCP server with three tools: `
 Both assistants connect to the same server. An engineer asks in chat: "When was CNC-14's spindle last serviced, and has anyone reported vibration since?" The assistant calls `find_machine`, then `get_maintenance_history`, and answers with dates and the names in the log. Every call appears in the server's audit log with user, tool and arguments.
 
 When IT later adds a new spare-parts system, they add a second MCP server, and both assistants gain the tools without any change to the assistants themselves.
+
+| Event | What happened |
+| --- | --- |
+| Engineer asks about CNC-14 | Chat assistant called find_machine, then get_maintenance_history |
+| Contractor asks about another plant | The server's per-user permissions returned nothing |
+| Audit review | Every call listed with user, tool and arguments |
+| New spare-parts system | A second server added; both assistants gained its tools |
 
 ## Common mistakes
 
