@@ -1,5 +1,7 @@
+import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { loadContent } from "../src/lib/content/load";
 
 const wcag = (page: import("@playwright/test").Page) =>
   new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
@@ -107,4 +109,44 @@ test("topics can be marked Learning, Done or Skip on the map, and the counts, fi
   await expect(page.getByText("1 of 6 projects done.")).toBeVisible();
   await expect(first.getByRole("link", { name: "https://github.com/learner/doc-qa" })).toBeVisible();
   expect((await wcag(page)).violations).toEqual([]);
+});
+
+test("on every roadmap, a lesson opened from the drawer still responds to clicks", async ({ page }) => {
+  test.setTimeout(180_000);
+  const { bundle } = loadContent(path.resolve(__dirname, "../content"));
+  for (const { data: p } of bundle.goals) {
+    await page.goto(`/roadmap/${p.id}`);
+    await page.getByRole("tabpanel").getByRole("link", { name: /, (To do|Learning|Done|Skipped)$/ }).nth(1).click();
+    const drawer = page.getByRole("dialog");
+    await expect(drawer, p.id).toBeVisible();
+    await drawer.getByRole("link", { name: /Read the lesson/ }).click();
+    await expect(page, p.id).toHaveURL(/\/stop\//);
+    await expect(page.locator("dialog[open]"), p.id).toHaveCount(0);
+    // a plain HTML control and a React button on the lesson both respond
+    const terms = page.locator('section[aria-labelledby="terms-heading"] details').first();
+    if (await terms.count()) {
+      await terms.locator("summary").click();
+      await expect(terms, p.id).toHaveAttribute("open", "");
+    }
+    const check = page.locator("#try-it").getByRole("button", { name: "Check your answers" });
+    if (await check.count()) {
+      await check.click();
+      await expect(page.locator("#try-it").getByRole("region", { name: "Answers" }), p.id).toBeVisible();
+    }
+    const reveal = page.locator("#flashcards").getByRole("button", { name: "Reveal the answer" });
+    if (await reveal.count()) {
+      await reveal.click();
+      await expect(reveal, p.id).toHaveCount(0);
+    }
+  }
+});
+
+test("the top bar is light again after leaving the home page", async ({ page }) => {
+  await page.goto("/");
+  const header = page.locator(".site-header");
+  const dark = () => header.evaluate((h) => getComputedStyle(h).backgroundColor);
+  const onHome = await dark();
+  await page.locator('main a[href="/paths"]:visible').first().click();
+  await expect(page).toHaveURL(/\/paths$/);
+  await expect.poll(dark).not.toBe(onHome);
 });

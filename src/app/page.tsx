@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
+import { HomeHeaderTone } from "@/components/home/header-tone";
 import { RoleGrid, TopicChips } from "@/components/home/role-grid";
 import { MiniCourses, MiniInterview, MiniLesson, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
 import { JsonLd } from "@/components/json-ld";
@@ -96,6 +97,7 @@ export default function Home() {
       />
 
       {/* Hero: what this is, and the first thing to do, above the fold. */}
+      <HomeHeaderTone />
       <section className="home-hero relative overflow-hidden bg-[#070a12] text-white" aria-labelledby="hero-heading">
         <div
           aria-hidden="true"

@@ -37,6 +37,13 @@ export function TopicDrawerProvider({ details, children }: { details: Record<str
   useEffect(() => {
     if (id && !dialog.current?.open) dialog.current?.showModal();
   }, [id]);
+  // When the learner follows a link out of the drawer, the roadmap page may stay
+  // mounted but hidden (Cache Components). An open modal would then make the next
+  // page inert, so close it whenever this page's effects stop.
+  useEffect(() => {
+    const d = dialog.current;
+    return () => d?.close();
+  }, []);
   const close = () => dialog.current?.close();
   const detail = id ? details[id] : null;
 
