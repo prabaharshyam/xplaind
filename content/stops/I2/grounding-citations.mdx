@@ -1,0 +1,75 @@
+---
+id: grounding-citations
+level: I2
+theme: retrieval
+title: "Grounding, citations and refusing to guess"
+outcome: "Make a RAG system answer only from its sources, cite the passage behind each claim, and say plainly when the sources do not hold the answer."
+why_it_matters: "In a client deployment one confident wrong answer about a policy or a price can end trust in the whole system. Grounded answers with citations let users check, and a clean refusal is far better than a guess. Clients ask about this in the first demo."
+hours: 3
+gap_tags: []
+primary_resource: claude-citations
+alternates: [ragas-metrics]
+format: explainer
+key_terms: [grounding, citation, faithfulness, hallucination]
+check:
+  type: mcq
+  question_ids: [grounding-citations-1, grounding-citations-2, grounding-citations-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A RAG system retrieves passages and asks a model to answer from them. Nothing forces the model to stay inside those passages. It may blend in what it learned in training, fill gaps with plausible detail, or answer a question the documents never cover. **Grounding** is the set of techniques that keep the answer tied to the sources:
+
+- instructions that say to use only the provided passages;
+- **citations** that link each claim to the passage supporting it;
+- a clear **refusal** path when the passages do not contain the answer;
+- a check, automatic or human, that the answer is **faithful** to its sources.
+
+## How it works
+
+**Mark the sources.** Put each retrieved passage in the prompt with an id and its origin, for example `[3] Leave Policy v4, section 2.1, page 6`. Ids make citations possible and debugging easy.
+
+**Instruct precisely.** Tell the model: answer only from the passages; cite the id after each sentence that uses one; if the passages do not answer the question, say so and suggest who to ask. Show one short example of a cited answer and one of a refusal. Models follow examples better than rules.
+
+**Use built-in citations where available.** Several model APIs can return citations as structured data: the exact quoted span and which document it came from. This is more reliable than asking for bracketed numbers in text, because the API guarantees the quote exists in the source.
+
+**Check after generation.** Three practical checks, from cheap to thorough:
+
+1. Every cited id exists among the passages sent. Drop or flag answers that cite `[7]` when only five passages were sent.
+2. Quoted spans actually appear in the source text (a string match).
+3. A faithfulness score: a second model, or an eval library such as RAGAS, splits the answer into claims and checks each against the passages. Run this offline on your golden set, and on a sample of live traffic.
+
+**Design the refusal.** "I could not find this in the HR policies. For leave encashment questions, contact hr-help@..." is useful. "I don't know" alone is not. Track the refusal rate: too high means retrieval is failing; near zero on a hard golden set means the model is guessing.
+
+## A worked example
+
+A Bengaluru IT services firm wants an HR assistant over its leave, travel and reimbursement policies. In the pilot, an employee asks: "Can I carry forward unused sick leave?"
+
+The retrieved passages cover earned leave carry-forward (up to 45 days) but say nothing about sick leave. The first version answered: "Yes, you can carry forward up to 45 days of leave." That is wrong for sick leave, and stated as fact.
+
+You change three things. The prompt now requires a citation per sentence and includes a refusal example. You switch to the API's citation feature so every claim comes with a quoted span. And you add a check that flags answers whose claims have no citation.
+
+The new answer: "The policies I have cover carry-forward of earned leave: up to 45 days [Leave Policy v4, 3.2]. They do not say whether sick leave can be carried forward. Please check with HR at hr-help." The employee can click the citation and read the clause.
+
+On the 80-question golden set, faithfulness rises from 0.81 to 0.96 and the share of unanswerable questions answered with a refusal goes from 30% to 85%. Correct answers to answerable questions barely change. You report all three numbers to the client.
+
+## Common mistakes
+
+- **Citing the document, not the passage.** "Source: HR Policies.pdf" cannot be checked. Cite section and page.
+- **No unanswerable questions in the golden set.** Then you never measure guessing. Make at least a fifth of the set unanswerable from the documents.
+- **Trusting model-written citation numbers.** Models sometimes cite a passage that does not support the claim. Check citations automatically.
+- **Refusals with no next step.** Point the user to a person, a team or a form.
+- **Hiding sources from users.** Showing the quoted passage builds trust and lets users catch mistakes the system missed.
+
+## Practise
+
+Read the citations guide linked below, and the RAGAS page on faithfulness.
+
+1. Add ids and source labels to every passage your RAG app sends, and require a citation per sentence.
+2. Add ten unanswerable questions to your golden set. Measure how many your app refuses before and after adding a refusal example to the prompt.
+3. Write a check that rejects any answer citing a passage id that was not sent.
+
+**You are done when you can** show an answer where every sentence links to a real passage, and a refusal that tells the user where to go next.

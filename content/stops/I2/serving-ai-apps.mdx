@@ -1,0 +1,74 @@
+---
+id: serving-ai-apps
+level: I2
+theme: ops
+title: "Serving an AI app"
+outcome: "Run an AI API in production: workers, timeouts, streaming responses, health checks and graceful shutdown."
+why_it_matters: "A FastAPI app that works on your laptop can fall over with twenty real users: requests hang on slow model calls, workers block and nobody sees the first word for ten seconds. Serving it properly is the first step from pilot to production."
+hours: 4
+gap_tags: []
+primary_resource: fastapi-deployment
+alternates: [fastapi-custom-response]
+format: explainer
+key_terms: [uvicorn, streaming, latency, async-await]
+check:
+  type: mcq
+  question_ids: [serving-ai-apps-1, serving-ai-apps-2, serving-ai-apps-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Serving means running your application so real users can rely on it: started automatically, restarted when it crashes, able to handle many requests at once, and quick to show something even when the model is slow.
+
+For a Python AI service the usual stack is FastAPI for the app, **Uvicorn** as the server that runs it, several worker processes for parallelism, and something in front (a load balancer, an ingress or a platform such as Cloud Run) that handles HTTPS and spreads traffic.
+
+AI services have two special traits. Requests are slow, often 2 to 30 seconds, because they wait on model calls. And users tolerate that only if they see progress, which is why **streaming** matters.
+
+## How it works
+
+**Workers and concurrency.** One Uvicorn process with async endpoints can hold many requests that are waiting on the network. CPU-heavy work (parsing a PDF, running a local embedding model) blocks that process, so you run several workers, usually one or two per CPU core, or move heavy work to a background queue.
+
+**Timeouts everywhere.** Set a timeout on every model and tool call, on the request as a whole and at the load balancer, with the inner ones shorter than the outer ones. Return a clear 503 or 504 instead of hanging.
+
+**Streaming.** With `StreamingResponse` and server-sent events, you forward tokens to the client as the model produces them. Time to first token drops from the full generation time to well under a second. Handle client disconnects, so you stop paying for tokens nobody will read.
+
+**Health checks.** A cheap `/health` endpoint (process is up) and a `/ready` endpoint (dependencies such as the database are reachable) let the platform restart broken instances and send traffic only to ready ones. Do not call the model in a health check.
+
+**Graceful shutdown.** When the platform stops an instance for a deploy, it should stop accepting new requests and let in-flight ones finish within a grace period. Long streaming responses need a grace period longer than your typical generation.
+
+**Background work.** Jobs that take minutes, such as indexing a 500-page PDF, do not belong in a request. Accept the job, return an id at once, process it on a worker queue and let the client poll or receive a webhook.
+
+## A worked example
+
+A Lucknow edtech's doubt-solving assistant ran as one Uvicorn process. During evening study hours, students waited 12 seconds for any text, a third of requests timed out at the load balancer's 30 seconds, and uploads of handwritten notes for OCR froze the server for everyone.
+
+The changes:
+
+- Answers stream: the first words appear in about 700 milliseconds.
+- Four Uvicorn workers per container and two containers, behind the load balancer.
+- Timeouts: model call 25 s, request 28 s, load balancer 30 s. On timeout, the app sends "This is taking longer than usual; please try again" rather than a blank error.
+- OCR moved to a background queue. The upload returns a job id; the page shows "Reading your notes..." and fetches the result when ready.
+- `/ready` checks the database and queue; a broken container stops receiving traffic within 20 seconds.
+
+Timeouts fell from 33% to under 1% in the evening peak, and the number of students who gave up before seeing an answer fell by two thirds.
+
+## Common mistakes
+
+- **One worker in production.** A single blocked request stalls everyone. Run several and measure.
+- **No timeouts.** One hung model call holds a worker forever.
+- **Waiting for the full answer.** Without streaming, users stare at a spinner and leave.
+- **Health checks that call the model.** They cost money and fail when the provider is slow, taking healthy instances out.
+- **Long jobs inside requests.** Use a queue for anything that can take more than a few seconds of CPU.
+
+## Practise
+
+Read FastAPI's deployment concepts page and its custom responses page on streaming.
+
+1. Add a streaming endpoint to your FastAPI app that forwards model tokens to the client, and measure time to first token before and after.
+2. Add timeouts on the model call and the request, `/health` and `/ready` endpoints, and run with four workers.
+3. Move one slow task to a background job with a job id and a status endpoint.
+
+**You are done when you can** show time to first token under a second, a timeout returning a helpful error, and a slow job that no longer blocks other users.

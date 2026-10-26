@@ -1,0 +1,79 @@
+---
+id: llm-gateways
+level: P1
+theme: ops
+title: "LLM gateways"
+outcome: "Put a gateway in front of model providers to route requests, fall back when one fails, enforce rate limits and budgets per team, and track cost in one place."
+why_it_matters: "Once a client has several AI features and teams, each calling different providers with their own keys, nobody knows the total spend and one provider outage breaks everything. A gateway fixes both, and platform roles ask about it directly."
+hours: 3
+gap_tags: []
+primary_resource: litellm-gateway
+alternates: [routellm]
+format: explainer
+key_terms: [llm-gateway, fallback-model, rate-limit, budget-limit]
+check:
+  type: mcq
+  question_ids: [llm-gateways-1, llm-gateways-2, llm-gateways-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+An **LLM gateway** is a service that sits between your applications and the model providers. Applications call the gateway with one API format; the gateway forwards each request to the right provider and model, and handles the cross-cutting concerns once:
+
+- **Routing**: which model and provider serve this request.
+- **Fallbacks**: what to try when a provider errors, times out or rate-limits.
+- **Keys and access**: teams get gateway keys; the real provider keys live only in the gateway.
+- **Limits and budgets**: per team, per key, per user.
+- **Logging and cost**: every request, its tokens and its cost, in one place.
+- **Caching**: optional reuse of identical requests.
+
+Open-source options such as LiteLLM, commercial gateways, and the cloud providers' API management services all fill this role.
+
+## How it works
+
+**One interface.** Most gateways accept an OpenAI-compatible or similar request format and translate it for each provider, so switching a feature from one model to another is a configuration change, not a code change.
+
+**Routing rules.** Route by model alias (`summariser-default` points to a specific model you can change centrally), by team, by region (send Indian user data only to Indian-region endpoints) or by request features. Smarter routers send easy requests to cheap models; the next lesson covers this.
+
+**Fallbacks.** A chain such as: primary model in the Mumbai region; on timeout or 5xx, the same model in another region; on failure again, a different provider's comparable model. Fallbacks need care: the fallback model must be good enough for the task and allowed under the data rules.
+
+**Retries and timeouts.** The gateway retries with backoff on 429s and transient errors, and enforces timeouts, so every application does not reimplement it.
+
+**Budgets.** Each key carries a monthly or daily budget; requests past it are refused or downgraded. Alerts fire at thresholds.
+
+**The cost of a gateway.** It is one more service to run, secure and keep available; if it goes down, every AI feature does. Run it with at least two instances, health checks and its own monitoring.
+
+## A worked example
+
+A Bengaluru fintech has five AI features built by four teams. Each team has its own provider keys; finance sees one big monthly bill. A provider outage last month took down the customer chatbot for 50 minutes.
+
+You deploy a gateway with two instances on their Kubernetes cluster:
+
+- Every team gets a gateway key tagged with team and feature; provider keys are moved into the gateway's secret store and rotated.
+- Model aliases: `chat-default`, `extract-default`, `embed-default`, each pointing to a specific model, so upgrades happen centrally after evals pass.
+- Fallbacks for `chat-default`: same model in a second region, then a comparable model from a second provider approved by the compliance team.
+- Budgets: each feature has a monthly cap and an alert at 75%.
+- Logs: every request with team, feature, model, tokens, cost and latency go to their analytics store.
+
+The next provider incident causes 90 seconds of slower responses while the fallback takes over, instead of 50 minutes of errors. Finance gets a monthly cost report by feature for the first time, and it shows that one internal summarisation job uses 40% of spend. That team moves it to a batch job and a cheaper model.
+
+## Common mistakes
+
+- **A single gateway instance.** You have created a new single point of failure. Run several.
+- **Fallbacks to unapproved models or regions.** An outage should not silently send data somewhere it is not allowed to go.
+- **Model names hard-coded in apps.** Use aliases so upgrades and swaps are central.
+- **No per-feature attribution.** Cost reports by provider alone do not tell you what to fix.
+- **Gateway logs with full prompts and no masking.** The gateway becomes the biggest sensitive data store you have.
+
+## Practise
+
+Read the LiteLLM gateway docs and the RouteLLM post.
+
+1. Run an open-source gateway locally in Docker with two model providers (or two models from one provider) behind one alias.
+2. Configure a fallback, then break the primary (a wrong key) and show requests still succeed.
+3. Create two keys with different budgets and show the second is refused after its budget is spent.
+
+**You are done when you can** switch a feature's model without changing its code, and show a cost report by key.

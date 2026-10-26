@@ -1,0 +1,72 @@
+---
+id: advanced-retrieval
+level: I2
+theme: retrieval
+title: "Query rewriting, HyDE and parent-child chunks"
+outcome: "Fix the questions plain retrieval gets wrong: rewrite vague or compound queries, search with a hypothetical answer, and return whole sections while matching small chunks."
+why_it_matters: "Real users ask short, vague or two-part questions, and RAG systems that work in a demo fail on them. These three techniques fix most of the remaining misses once hybrid search is in place, and interviewers love asking when each one helps."
+hours: 3
+gap_tags: []
+primary_resource: weaviate-advanced-rag
+alternates: [hyde-paper]
+format: explainer
+key_terms: [query-rewriting, hyde, parent-child-chunking]
+check:
+  type: mcq
+  question_ids: [advanced-retrieval-1, advanced-retrieval-2, advanced-retrieval-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Even good hybrid search fails when the query and the document do not look alike. Three techniques change what you search with or what you return:
+
+- **Query rewriting**: a model turns the user's message into better search queries.
+- **HyDE** (hypothetical document embeddings): a model writes a plausible answer, and you search with that.
+- **Parent-child chunks**: you search over small chunks for precision, then give the model the larger section each came from.
+
+Each costs something, usually an extra model call or more tokens, so you add one only when your golden set shows the problem it fixes.
+
+## How it works
+
+**Query rewriting** handles several kinds of bad query:
+
+- *Follow-ups.* "And for senior citizens?" means nothing alone. Rewrite it with the chat history into "Fixed deposit interest rate for senior citizens".
+- *Compound questions.* "Compare the cancellation rules for Gold and Platinum cards" becomes two queries, one per card, with results merged.
+- *Jargon gaps.* Users write "PF withdrawal"; documents say "provident fund advance". A rewrite can add synonyms, or produce three phrasings ("multi-query") and merge the results.
+
+A small, fast model does this well. Log the rewrites: when retrieval fails, the rewrite is often why.
+
+**HyDE.** A question is short and phrased as a question; the passage that answers it is long and phrased as a statement. Their embeddings can sit far apart. HyDE asks a model to write a short, possibly wrong, answer, embeds that, and searches with it. The fake answer looks like the real passage, so it lands near it. It helps most when queries are short and documents are formal. It hurts when the model's guess is confidently off-topic, and it adds a model call before every search.
+
+**Parent-child chunks.** Small chunks (100 to 200 tokens) match precisely but often lack the surrounding context needed to answer: the exception two paragraphs later, the table header. Large chunks give context but match poorly. So index small "child" chunks, each storing the id of its "parent" (the section or page). Search children, then fetch and de-duplicate their parents for the prompt. A variant, sometimes called sentence-window retrieval, returns a few sentences either side of the match.
+
+## A worked example
+
+A Delhi bank's internal assistant answers staff questions about 900 pages of circulars. The golden set shows three failure clusters.
+
+*Follow-ups fail.* "What about NRIs?" after a question on home loan prepayment retrieves NRI account rules. You add a rewrite step using the last two turns: the query becomes "home loan prepayment charges for NRI borrowers". Recall at 5 on follow-up questions rises from 41% to 83%.
+
+*Short questions fail.* "KYC refresh period?" matches pages that mention KYC in passing. HyDE generates: "Customers classified as high risk must update KYC every two years, medium risk every eight years and low risk every ten years." Its embedding lands next to the actual periodic-update clause. Recall at 5 on short queries goes from 58% to 74%. On long, specific questions HyDE made no difference, so you route only queries under eight words through it.
+
+*Answers miss exceptions.* The right 150-token chunk is found, but the exception for priority-sector loans sits in the next paragraph, so answers are wrong. Switching to parent-child (children of 150 tokens, parents of one sub-section) fixes 9 of 11 such cases at the cost of about 40% more prompt tokens.
+
+## Common mistakes
+
+- **Adding everything at once.** You cannot tell which change helped. Add one, measure, keep or drop.
+- **Rewriting without the conversation.** A follow-up rewritten alone is still meaningless.
+- **Trusting HyDE's text.** The hypothetical answer is only a search key. Never show it to the user or let it into the final prompt.
+- **Huge parents.** Returning whole 20-page documents blows the context budget and buries the answer. Parents should be sections, not files.
+- **Ignoring latency.** Two extra model calls before retrieval can double response time. Use a small model and measure.
+
+## Practise
+
+Read Weaviate's advanced RAG guide and the HyDE paper's abstract and first figure.
+
+1. Add a query-rewrite step to your RAG app that uses the last two turns. Test it on five follow-up questions.
+2. Implement HyDE behind a switch and compare recall at 5 on your short and long questions separately.
+3. Re-index with 150-token children pointing to section-sized parents, and compare answer correctness on ten questions that need nearby context.
+
+**You are done when you can** say, from your own measurements, which technique fixed which kind of question and what each cost in latency or tokens.

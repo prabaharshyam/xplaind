@@ -1,0 +1,85 @@
+---
+id: linux-shell-ssh
+level: B3
+theme: code
+title: "Linux, the shell and SSH"
+outcome: "Work on a remote Linux server with confidence: move around, read logs, check processes and disk, write a small shell script and connect with SSH keys."
+why_it_matters: "Client systems run on Linux servers, often ones you cannot install tools on. When the AI service stops answering at 7 pm, you will SSH in, read the logs and find why. Comfort in the shell turns a crisis into a ten-minute fix."
+hours: 4
+gap_tags: []
+primary_resource: missing-semester-command-line
+alternates: [missing-semester-shell]
+format: explainer
+key_terms: [ssh, environment-variable, secrets-management]
+check:
+  type: mcq
+  question_ids: [linux-shell-ssh-1, linux-shell-ssh-2, linux-shell-ssh-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Nearly every server your AI system runs on is Linux, and you reach it through a text shell, usually Bash, over SSH. There is no desktop. You need a small, reliable set of skills:
+
+- moving around and reading files;
+- finding what is running and what is using the disk, memory or CPU;
+- reading logs as they arrive;
+- setting environment variables and running a script;
+- connecting securely with SSH keys.
+
+## How it works
+
+**Navigation and files.** `pwd`, `ls -la`, `cd`, `cat`, `less` for long files, `head` and `tail` for the start and end. `grep -i "timeout" app.log` finds lines; `grep -c` counts them. Pipes join small tools: `grep ERROR app.log | sort | uniq -c | sort -rn | head` lists the most common errors.
+
+**Processes and resources.** `ps aux | grep uvicorn` finds your service. `top` or `htop` shows live CPU and memory. `df -h` shows disk space and `du -sh *` shows which folders are large; full disks are a top cause of mystery outages. `free -h` shows memory.
+
+**Logs.** `tail -f app.log` follows a log as it grows. Services run by systemd log to the journal: `journalctl -u ai-assistant --since "1 hour ago"`. Containers: `docker logs -f container-name`.
+
+**Environment variables.** Programs read settings such as `DATABASE_URL` and API keys from the environment. `export NAME=value` sets one for the session; `env` lists them. Keep secrets in the environment or a secret manager, never in code or shell history.
+
+**Scripts.** A shell script is a file of commands. Start with `#!/usr/bin/env bash` and `set -euo pipefail` so it stops on the first error instead of carrying on with half-done work. Make it executable with `chmod +x`.
+
+**SSH.** `ssh-keygen -t ed25519` creates a key pair. You give the server your public key; the private key never leaves your machine. Then `ssh deploy@10.0.4.12` logs in without a password. A `~/.ssh/config` entry gives servers short names. Many companies route SSH through a jump host or bastion; `ssh -J bastion app-server` hops through it.
+
+**Permissions.** Files have owner, group and others, each with read, write and execute. `chmod 600` on a private key is required, or SSH refuses to use it. Use `sudo` only when needed, and think before pressing Enter after `rm -rf`.
+
+## A worked example
+
+A Pune logistics client reports that the delivery-query assistant stopped answering at 19:05. You connect:
+
+```bash
+ssh -J bastion.client.in deploy@assistant-01
+systemctl status ai-assistant        # active, but restarting every 30 seconds
+journalctl -u ai-assistant --since "19:00" | tail -50
+```
+
+The log shows `OSError: [Errno 28] No space left on device`. You check:
+
+```bash
+df -h /                     # 100% used
+sudo du -sh /var/* | sort -h | tail -3
+```
+
+`/var/log/ai-assistant` holds 38 GB: debug logging was left on after a test, and the logs were never rotated. You compress and remove old logs, set the level back to INFO, add a logrotate rule and restart. The service is answering by 19:20.
+
+In your incident note you write the cause, the fix and two follow-ups: a disk-space alert at 80% and a check in CI that the log level is not DEBUG in production.
+
+## Common mistakes
+
+- **Working as root by habit.** Mistakes become disasters. Use a normal user and `sudo` for single commands.
+- **Pasting secrets into the command line.** They land in shell history. Use environment files with restricted permissions or the client's secret manager.
+- **Editing production by hand and telling nobody.** The next deploy overwrites your fix. Put the change in code or config and write it down.
+- **Scripts without `set -euo pipefail`.** A failed step goes unnoticed and later steps damage data.
+- **Sharing private keys.** Each person and each machine gets its own key, so access can be removed cleanly.
+
+## Practise
+
+Watch or read the Missing Semester lectures on the shell and the command-line environment.
+
+1. On any Linux machine (a free cloud VM, WSL on Windows, or a Docker container), create a 500-line fake log with some ERROR lines, and list the top three error messages with one pipeline.
+2. Generate an SSH key, add it to a server or to GitHub, and connect without a password.
+3. Write a script with `set -euo pipefail` that checks disk usage and prints a warning above 80%.
+
+**You are done when you can** find which process or folder is filling a disk, and explain why the private key never leaves your machine.

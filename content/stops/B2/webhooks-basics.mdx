@@ -1,0 +1,76 @@
+---
+id: webhooks-basics
+level: B2
+theme: automation
+title: "Webhooks"
+outcome: "Use webhooks so one app tells another the moment something happens: how they work, how to receive and test them, how to secure them and how to handle repeats and failures."
+why_it_matters: "Webhooks are how payment gateways, e-commerce platforms, forms and CRMs notify your automations instantly instead of being polled every few minutes. Almost every serious automation uses them, and most webhook bugs come from a few avoidable mistakes."
+hours: 2
+gap_tags: []
+primary_resource: zapier-webhooks
+alternates: [n8n-webhook-node]
+format: explainer
+key_terms: [webhook, api, idempotency, trigger]
+check:
+  type: mcq
+  question_ids: [webhooks-basics-1, webhooks-basics-2, webhooks-basics-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A **webhook** is a message one app sends to a web address (URL) you provide, the moment something happens: "payment captured", "order placed", "form submitted", "ticket closed". It is like a doorbell: instead of checking the door every few minutes (polling), you are told when someone arrives.
+
+The message is usually an HTTP POST request with a JSON body describing the event.
+
+## How it works
+
+**Receiving.** Your automation tool gives you a URL, for example from n8n's Webhook node. You paste it into the sending app's settings and choose which events to send. When the event happens, the sender posts JSON to your URL and your workflow starts with that data.
+
+**Test versus production.** Many tools give a test URL (which works while you are watching in the editor) and a production URL (which works when the workflow is active). Use the right one in the sender's settings when you go live.
+
+**Inspect the payload.** Trigger a test event and look at the exact JSON received. Field names and nesting vary by provider; build your mappings from a real sample.
+
+**Respond quickly.** Senders expect a fast success response (usually within a few seconds). If you do slow work first, they may time out and retry. Reply immediately and do the work afterwards.
+
+**Retries and duplicates.** If your endpoint fails or is slow, most senders retry, sometimes several times over hours. You may therefore receive the same event more than once. Use the event's id to check whether you already processed it, so your actions are idempotent: a duplicate "payment captured" must not create two invoices.
+
+**Security.** Anyone who learns your URL could post fake events. Protect it:
+
+- verify the sender's signature (many providers sign each webhook with a shared secret; check it before trusting the data);
+- use a long, unguessable URL path and HTTPS;
+- where possible, re-fetch the object from the provider's API to confirm its state.
+
+**Missed events.** If your endpoint was down for longer than the sender's retry window, events may be lost. For important flows, run a daily reconciliation that compares records with the provider's API.
+
+## A worked example
+
+A Jaipur handicrafts store uses a payment gateway and wants an invoice emailed and a row added to its accounts sheet as soon as a payment succeeds.
+
+1. In n8n, a Webhook node gives a production URL. In the gateway's dashboard, the store owner adds the URL for "payment captured" events and copies the webhook secret into n8n.
+2. The first node verifies the signature using the secret; invalid requests stop there.
+3. The workflow responds "200 OK" immediately, then continues.
+4. It checks the payment id against the sheet; if already present, it stops (duplicate).
+5. Otherwise it creates the invoice, emails it and adds the row.
+
+During a festival sale, the n8n server restarts for two minutes; the gateway retries the missed events and the duplicate check prevents double invoices. A nightly reconciliation compares the day's captured payments from the gateway's API with the sheet and found none missing that week.
+
+## Common mistakes
+
+- **Using the test URL in production.** Events stop arriving once you close the editor.
+- **Trusting unsigned requests.** Verify signatures.
+- **Slow responses.** Senders retry, creating duplicates.
+- **No duplicate check.** Retries create double invoices, emails or orders.
+- **No reconciliation.** Long outages lose events silently.
+
+## Practise
+
+Read Zapier's explanation of webhooks and n8n's Webhook node docs.
+
+1. Create a webhook workflow in n8n and trigger it with a test request (from a form tool, or a command such as curl).
+2. Send the same event twice and add a duplicate check so the second does nothing.
+3. Add a shared-secret check and show a request with the wrong secret being rejected.
+
+**You are done when you can** explain why webhooks retry, show your duplicate check working and say how you would catch events missed during an outage.

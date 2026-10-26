@@ -1,0 +1,78 @@
+---
+id: batching-model-tiering
+level: P2
+theme: ops
+title: "Batching and model tiering"
+outcome: "Cut model costs without hurting quality: send easy requests to small models, escalate hard ones, and run work that can wait through discounted batch APIs."
+why_it_matters: "Model spend is often the largest running cost of an AI system, and it grows with success. Clients notice when the bill doubles. Tiering and batching routinely cut costs by half or more, and being able to show that is part of getting a pilot renewed."
+hours: 3
+gap_tags: []
+primary_resource: claude-batch-processing
+alternates: [routellm]
+format: explainer
+key_terms: [model-tiering, batch-api, cost-per-request, llm-gateway]
+check:
+  type: mcq
+  question_ids: [batching-model-tiering-1, batching-model-tiering-2, batching-model-tiering-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Two of the strongest cost levers for language-model systems:
+
+- **Model tiering** (or routing): not every request needs the most capable model. Classify, extract or answer simple questions with a small, cheap, fast model; send only the hard ones to a large one.
+- **Batching**: work that does not need an answer in seconds, such as nightly document tagging, summarising yesterday's tickets or re-embedding a corpus, goes through a **batch API**. Providers process batches within hours at a large discount, often around half the normal price.
+
+Both depend on knowing your traffic: what share of requests is easy, and what share can wait.
+
+## How it works
+
+**Tiering patterns.**
+
+- *Fixed by task*: each feature uses the cheapest model that passes its evals. Extraction from a standard form may need only a small model; drafting a legal summary may need a large one. This is the simplest and most common.
+- *Cascade*: try the small model first; check its output (confidence, a validator, a self-reported "unsure"); escalate to the large model only when the check fails.
+- *Router*: a classifier, or a small model, predicts difficulty and picks the model up front. Research systems such as RouteLLM learn this from preference data.
+
+Every route needs its own eval. The real question is not "is the small model good?" but "is it good enough on the requests we send it?"
+
+**Batching patterns.** Collect requests in a file (one JSON line per request with your own id), submit the batch, poll or get notified, then match results to ids. Design for partial failure: some items error and need resubmitting. Keep batch work idempotent so reruns are safe.
+
+**Other cost levers worth combining.** Prompt caching for long, repeated prefixes; shorter prompts and outputs (ask for exactly the fields you need); fewer retrieved chunks after reranking; caching identical answers.
+
+**Measure cost per successful task**, not just cost per call. A cheap model that fails half the time and needs a retry or a human may cost more overall.
+
+## A worked example
+
+A Pune HR-tech company screens resumes for its clients. Each resume gets structured extraction (name, skills, experience) and a fit summary against the job description. Volume: 400,000 resumes a month, mostly uploaded in bulk the evening before a hiring drive.
+
+Before: every resume went through a large model in real time. Monthly model spend: about ₹14 lakh.
+
+The redesign:
+
+1. Extraction moves to a small model with a strict JSON schema. On a golden set of 500 resumes, field accuracy is 97% against 98% for the large model; validation failures (2.5%) escalate to the large model.
+2. The fit summary stays on the large model, where the small one scored clearly worse in recruiter ratings.
+3. Bulk uploads go through the batch API overnight, at a discount. Only resumes added during the working day run in real time.
+4. The job description, identical for thousands of resumes, sits at the start of the prompt and is cached.
+
+Monthly spend falls to about ₹5 lakh. Recruiter ratings of the summaries are unchanged, and you report both numbers side by side in the monthly review.
+
+## Common mistakes
+
+- **Choosing the small model by vibe.** Run the evals for each route; cheap and wrong is expensive.
+- **Batching user-facing work.** Batches can take hours. Only batch what can wait.
+- **No escalation path.** A cascade without a reliable failure check sends bad answers onwards.
+- **Ignoring retries in the maths.** Count cost per successful task.
+- **Forgetting partial batch failures.** Some items always fail; plan the rerun.
+
+## Practise
+
+Read your provider's batch processing guide and the RouteLLM post.
+
+1. Pick one feature and evaluate a small and a large model on 50 golden cases. Record accuracy and cost per case for each.
+2. Build a cascade: small model first with a validator, escalating failures to the large model. Measure the blended accuracy and cost.
+3. Run 100 non-urgent requests through a batch API, handle any failed items, and compare the cost with real-time calls.
+
+**You are done when you can** show a before-and-after table of cost and quality for one feature and justify the split.

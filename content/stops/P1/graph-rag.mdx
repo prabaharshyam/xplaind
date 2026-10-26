@@ -1,0 +1,78 @@
+---
+id: graph-rag
+level: P1
+theme: retrieval
+title: "Graph RAG"
+outcome: "Know when a knowledge graph improves retrieval, how GraphRAG builds entities, relationships and community summaries from documents, and what it costs compared with ordinary RAG."
+why_it_matters: "Some questions need connections across many documents (\"which suppliers are linked to delayed shipments in the last quarter?\") or a view of a whole collection (\"what are the main themes in these 500 complaints?\"). Similarity search handles these badly. Graph RAG is one answer, and knowing when it is worth its cost matters."
+hours: 4
+gap_tags: []
+primary_resource: graphrag-blog
+alternates: [graphrag-docs]
+format: explainer
+key_terms: [graph-rag, knowledge-graph, rag, tco]
+check:
+  type: mcq
+  question_ids: [graph-rag-1, graph-rag-2, graph-rag-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Standard RAG retrieves passages similar to the question. Two kinds of questions defeat it:
+
+- **Multi-hop questions** that follow links: "Which projects share a contractor with the delayed Chennai metro package?" The facts sit in different documents and no single passage is similar to the question.
+- **Global questions** about a whole collection: "What are the recurring problems in last year's customer complaints?" No passage contains the answer; it emerges from many.
+
+**Graph RAG** adds a **knowledge graph**: entities (people, companies, products, places, events) as nodes and relationships between them as edges, extracted from the documents. Retrieval can then follow relationships and use pre-written summaries of groups of related entities. Microsoft's open-source GraphRAG is one well-known implementation; graph databases such as Neo4j are another route.
+
+## How it works
+
+**Indexing (GraphRAG style).**
+
+1. Chunk the documents as usual.
+2. Use a model to extract entities and relationships from each chunk, with short descriptions ("ABC Infra, contractor; supplies steel for Package 4").
+3. Merge duplicates ("ABC Infra Ltd" and "ABC Infrastructure").
+4. Detect **communities**: clusters of closely connected entities.
+5. Have a model write a summary of each community, at several levels of detail.
+
+**Querying.**
+
+- *Local search* for questions about specific entities: find the entities in the question, gather their neighbours, relationships and source chunks, and answer from that.
+- *Global search* for collection-wide questions: map the question over community summaries, then reduce the partial answers into one.
+
+**Costs.** Indexing calls a model on every chunk and every community, so it can cost many times more than embedding alone, and must be re-run or updated as documents change. Entity extraction makes mistakes; merges can join things that should stay separate. Queries, especially global ones, use many tokens.
+
+**When it is worth it.** Collections rich in entities and relationships (contracts, investigations, research literature, supplier networks, case files), where multi-hop or global questions are frequent and valuable. For most FAQ-style or policy-lookup assistants, hybrid search with good metadata is cheaper and enough.
+
+**Lighter alternatives.** Store extracted entities as metadata and filter on them; keep a small structured table of key relationships; generate summaries of document groups. Often these give most of the benefit.
+
+## A worked example
+
+A Mumbai infrastructure finance company reviews thousands of project reports, contractor agreements and site inspection notes. Analysts ask questions like "Which contractors appear in projects with cost overruns above 20%, and where else do they work?"
+
+Hybrid RAG answers single-project questions well but fails these: the facts are spread across hundreds of documents.
+
+A pilot builds a graph of projects, contractors, sub-contractors, locations and inspection findings from 3,000 documents. Indexing costs about 25 times the embedding-only pipeline, a one-time cost plus weekly updates. Entity merging needs a hand-built list of company name variants, because the same contractor appears under several spellings.
+
+On a 40-question test set of multi-hop and global questions, the graph approach answers 70% well, against 30% for hybrid RAG. On single-document questions it is no better. The company keeps both: questions are routed to graph search when they mention relationships across projects, and to hybrid RAG otherwise.
+
+## Common mistakes
+
+- **Graph RAG for simple lookups.** It adds cost without benefit.
+- **Ignoring entity resolution.** Duplicate or wrongly merged entities corrupt every answer that uses them.
+- **Forgetting updates.** A graph built once goes stale.
+- **No comparison.** Measure against hybrid RAG on the questions that matter.
+- **Losing citations.** Keep links from entities and summaries back to source chunks.
+
+## Practise
+
+Read Microsoft Research's GraphRAG post and skim the GraphRAG docs on local and global search.
+
+1. Take 30 to 50 related documents (news articles about one industry work well) and extract entities and relationships with a model into a simple table.
+2. Write five multi-hop or global questions and answer them with your hybrid RAG and with a small graph-based approach.
+3. Record the indexing cost and the answer quality for both.
+
+**You are done when you can** say for which questions a graph helped, by how much, and whether it was worth the indexing cost.

@@ -1,0 +1,88 @@
+---
+id: data-quality-pii
+level: I2
+theme: data
+title: "Data quality and personal data"
+outcome: "Check data before it reaches the model, and find and mask personal data such as names, phone numbers, Aadhaar and PAN numbers in documents, prompts and logs."
+why_it_matters: "Bad records produce confident wrong answers, and personal data in the wrong place creates legal risk under India's DPDP Act and other laws. Clients' data protection officers ask exactly how you handle both, and it is cheaper to build in than to bolt on."
+hours: 3
+gap_tags: []
+primary_resource: presidio
+alternates: [great-expectations]
+format: explainer
+key_terms: [data-masking, pii, dpdp-act, guardrails]
+check:
+  type: mcq
+  question_ids: [data-quality-pii-1, data-quality-pii-2, data-quality-pii-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Two related jobs that sit in every AI data pipeline:
+
+- **Data quality**: checking that data is complete, valid, consistent and current before you index it or send it to a model. Missing fields, duplicate records, impossible dates and garbled text all turn into wrong answers.
+- **Personal data handling**: finding personal data (names, phone numbers, emails, addresses, Aadhaar, PAN, bank account numbers, health details) and deciding for each place it flows whether to keep, mask, pseudonymise or drop it.
+
+## How it works
+
+**Quality checks as tests.** Write rules the data must meet, and run them on every batch:
+
+- required fields present (every claim has a policy number and a date);
+- values valid (dates not in the future, amounts positive, PIN codes six digits);
+- uniqueness (no duplicate invoice numbers);
+- freshness (the newest record is less than a day old);
+- text sanity (parsed pages have enough characters; no runs of garbled symbols).
+
+Libraries such as Great Expectations or simple pytest-style checks work. Decide per rule whether a failure blocks the batch, quarantines the bad records or only warns.
+
+**Finding personal data.** Combine:
+
+- *patterns* for structured identifiers: Indian mobile numbers, emails, PAN (five letters, four digits, one letter), Aadhaar (12 digits, ideally with its checksum), IFSC codes, GSTINs;
+- *named-entity recognition* for names, places and organisations, from tools such as Presidio or spaCy;
+- *context words* ("Aadhaar no.", "DOB") to raise confidence.
+
+No detector is perfect. Measure its recall on a labelled sample of real documents, especially Indian names and mixed-language text.
+
+**Choosing the treatment per flow.**
+
+- *Into the index*: often keep (staff need customer names), but restrict by permissions.
+- *Into prompts to an external model*: send only what the task needs; mask identifiers the answer does not require.
+- *Into logs and traces*: mask by default.
+- *Into test and staging data*: replace with realistic fakes (pseudonymise).
+
+**Reversible masking.** For some tasks you replace "Lakshmi Narayanan, 98400 12345" with "PERSON_1, PHONE_1" before the model call and swap the real values back into the answer afterwards. The model never sees the real data, yet the user gets a complete reply.
+
+## A worked example
+
+A Coimbatore hospital group wants an assistant that summarises discharge notes for follow-up calls. Notes include patient names, phone numbers, addresses, diagnoses and doctors' names.
+
+Quality checks reject notes with no discharge date, flag duplicates from a known double-export bug (3% of records) and quarantine 40 scanned notes whose OCR text is mostly symbols.
+
+For personal data, the data protection officer agrees:
+
+- The summariser needs the clinical content, not identity. Names, phone numbers, addresses and hospital ids are masked before the model call and restored in the summary shown to the nurse.
+- Logs and traces keep only masked text.
+- The staging environment uses synthetic notes generated from templates.
+
+Testing the detector on 200 hand-labelled notes finds 97% of phone numbers but only 81% of patient names, missing many Tamil names written in lowercase. Adding the hospital's own patient-name list as a lookup raises it to 98%. The DPO signs off with the measured figures in the design document.
+
+## Common mistakes
+
+- **Checking quality by eye once.** Data changes; automate the checks on every batch.
+- **Trusting a detector without measuring it.** Name detection on Indian data can be much weaker than vendors' English benchmarks.
+- **One rule for every flow.** The index, prompts, logs and test data need different treatments.
+- **Masking that breaks the task.** If the model needs a date to answer, masking it ruins the result. Decide per field.
+- **Forgetting free text.** Personal data hides in comments, notes and email bodies, not just in named columns.
+
+## Practise
+
+Read the Presidio overview and the Great Expectations introduction.
+
+1. Write five quality checks for a dataset of your choice and run them, quarantining failures to a separate file.
+2. Build a masking function with patterns for Indian mobile numbers, PAN and email plus a name detector, and test it on 30 sentences you write, including Indian names in two languages.
+3. Implement reversible masking around one model call and show the restored output.
+
+**You are done when you can** report your detector's measured recall per type of personal data, and show masked logs alongside a correct unmasked answer.

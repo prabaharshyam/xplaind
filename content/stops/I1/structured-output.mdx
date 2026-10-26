@@ -1,0 +1,95 @@
+---
+id: structured-output
+level: I1
+theme: llm
+title: "Get structured JSON output"
+outcome: "Make a model return JSON that matches a schema, and validate it before your code uses it."
+why_it_matters: "Programs cannot read a friendly paragraph. Getting reliable JSON out of a model is what turns a chat into a feature: a form filler, a classifier, a data extractor."
+hours: 2
+gap_tags: [structured-output]
+primary_resource: claude-structured-outputs
+alternates: []
+more: [openai-cookbook, claude-cookbooks]
+format: explainer
+key_terms: [structured-output, json-schema, pydantic]
+check:
+  type: mcq
+  question_ids: [structured-output-1, structured-output-2, structured-output-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Applications need data, not prose. If your code must read a price, a category or a list of items from the model's reply, ask for **structured output**: JSON that matches a defined shape (a **schema**). Then validate it before your code uses it.
+
+Most providers now offer features that constrain the model to produce valid JSON matching a schema, or use tool definitions to do the same.
+
+## How it works
+
+**Define the shape.** Decide the fields, their types and which are required. In Python, a Pydantic model is a convenient way:
+
+```python
+from pydantic import BaseModel, Field
+
+class Listing(BaseModel):
+    product: str
+    price_inr: int = Field(gt=0)
+    condition: str            # "new", "used" or "refurbished"
+    city: str | None = None
+```
+
+**Ask for it.** Either use the provider's structured-output feature with the schema, or tool calling with the schema as the tool's input, or, as a fallback, clear instructions plus an example of the exact JSON.
+
+**Validate.** Parse the reply and validate it against the schema:
+
+```python
+from pydantic import ValidationError
+
+try:
+    item = Listing.model_validate_json(reply_text)
+except ValidationError as err:
+    # log err, retry once with the error message, or send to a person
+    ...
+```
+
+Validation catches wrong types (the price as the text "about 500"), missing fields and values out of range.
+
+**Handle failures.** On a validation error: retry once, telling the model what was wrong; if it fails again, mark the item for human review. Never let invalid data into your database.
+
+**Allow "unknown".** Make fields optional or allow null where the input may not contain the information, and say so in the instructions. Otherwise the model may invent a value to fill the shape.
+
+**Use enums for categories.** A fixed list of allowed values ("new", "used", "refurbished") keeps categories consistent for later analysis.
+
+## A worked example
+
+An online marketplace in Jaipur receives seller listings as free text: "Selling my Samsung Galaxy S21, 2 yrs old, minor scratches, 18k negotiable, pickup Malviya Nagar".
+
+The pipeline asks the model for a `Listing` with product, price, condition and city, using the provider's structured output feature. Validation runs on every reply.
+
+Results on 500 listings:
+
+- 471 valid on the first try.
+- 18 had prices written as "18k" or "around 20,000"; the schema rejects text, the code retries once with the validation error, and 15 come back as integers (18000, 20000).
+- 11 still fail (no price in the listing at all, or two products in one post). They go to a moderator queue.
+
+Because nothing invalid reaches the database, the price filters and city search on the site keep working.
+
+## Common mistakes
+
+- **Parsing free text with string tricks.** Ask for JSON and validate.
+- **Skipping validation because "it is usually right".**
+- **Forcing every field.** Allow null for information that may be absent.
+- **Free-text categories.** Use a fixed list.
+- **Retrying forever.** Retry once with the error, then send to a person.
+
+## Practise
+
+Read the structured outputs guide linked below.
+
+1. Define a Pydantic model for an invoice, a job posting or a product listing.
+2. Extract it from ten messy real-world texts using structured output, and validate each.
+3. Add one retry with the validation error and a review list for the rest; report how many passed at each step.
+
+**You are done when you can** explain why validation is needed even with structured output, and show your pass rates.

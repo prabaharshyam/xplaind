@@ -1,0 +1,82 @@
+---
+id: files-tables-pdfs
+level: B3
+theme: data
+title: "Files, tables and PDFs"
+outcome: "Read the messy files clients actually send: CSV and Excel with odd encodings, nested JSON, and PDFs with text, tables and scans."
+why_it_matters: "AI projects start with a shared drive full of files. If you cannot reliably get the text and numbers out, nothing downstream works, and the client blames the AI. File handling is unglamorous and decides whether a project ships."
+hours: 4
+gap_tags: []
+primary_resource: pandas-io-tools
+alternates: [pypdf-extract-text]
+format: explainer
+key_terms: [document-parsing, ocr, encoding]
+check:
+  type: mcq
+  question_ids: [files-tables-pdfs-1, files-tables-pdfs-2, files-tables-pdfs-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Clients rarely hand you a clean database. They send a shared folder: Excel sheets with merged headers, CSVs exported from an old billing system, JSON from a vendor's API, and hundreds of PDFs, some digital and some scanned. Getting reliable text and numbers out of these is called document parsing, and it is the first real task on most AI projects.
+
+The work splits by file type:
+
+- **Tables** (CSV, Excel): read them with pandas, fix types, dates and encodings.
+- **JSON**: walk nested structures and flatten what you need.
+- **PDFs**: extract text from digital PDFs; use OCR for scanned ones; handle tables separately.
+
+## How it works
+
+**CSV and Excel.** `pd.read_csv` and `pd.read_excel` do most of the work, but the defaults assume tidy data. Real files need options: `encoding` when Tamil or Hindi names come out garbled (try `utf-8`, then `utf-8-sig`, then `cp1252`), `dtype=str` for columns such as PIN codes and phone numbers that must keep leading zeros, `parse_dates` with `dayfirst=True` for Indian date formats, `skiprows` for banner rows above the header, and `on_bad_lines="warn"` to see broken rows instead of crashing. Indian number formats ("1,25,000") need the commas removed before converting.
+
+**JSON.** `json.load` gives nested dictionaries and lists. `pd.json_normalize` flattens a list of records into a table, with dotted column names for nested fields.
+
+**PDFs.** A PDF is drawing instructions, not a document with paragraphs. Libraries such as pypdf or pdfplumber recover text from digital PDFs, but columns may interleave, headers and footers repeat on every page, and words can split oddly. A PDF that returns no text at all is probably a scan: it holds only images, so you need OCR (Tesseract, or a cloud document service). Tables need a table-aware tool (pdfplumber, Camelot) or a vision-capable model. Always record the page number with every piece of text, because citations later depend on it.
+
+**Checks.** After every extraction, count and compare: rows in versus rows out, pages with no text, totals that should match. Print five random samples and read them.
+
+## A worked example
+
+A Madurai hospital chain wants an assistant over its policies and its pharmacy price list. They send a ZIP.
+
+The price list CSV loads with mojibake in drug names. `encoding="utf-8-sig"` fixes it (the file starts with a byte-order mark from Excel). Item codes like "000412" lost their zeros; `dtype={"item_code": str}` keeps them. Prices such as "1,250.00" become numbers after `str.replace(",", "")`.
+
+Of 140 policy PDFs, pypdf extracts text from 122. You flag the 18 that return almost nothing:
+
+```python
+from pypdf import PdfReader
+
+for path in pdfs:
+    reader = PdfReader(path)
+    pages = [p.extract_text() or "" for p in reader.pages]
+    chars = sum(len(p) for p in pages)
+    if chars < 200 * len(pages):
+        needs_ocr.append(path)       # probably scanned
+    else:
+        for n, text in enumerate(pages, 1):
+            records.append({"file": path.name, "page": n, "text": text})
+```
+
+The 18 are scanned circulars. You run OCR on them and spot-check three against the images: the Tamil headers need the Tamil OCR language pack, which you add. Your notes for the client list exactly which files needed OCR and how many pages failed, so nobody is surprised when an answer about one circular is weaker.
+
+## Common mistakes
+
+- **Trusting defaults.** pandas guesses types; it will turn PIN codes into numbers and drop the leading zero. Set types for id-like columns.
+- **Ignoring encodings.** Garbled names in Indian scripts nearly always mean the wrong encoding, not a broken file.
+- **Assuming every PDF has text.** Scans return empty strings silently. Measure characters per page.
+- **Losing the page number.** Without it you cannot cite a source or debug a wrong answer.
+- **Never reading the output.** Five minutes reading samples finds problems no count will.
+
+## Practise
+
+Read the pandas IO page sections on CSV and Excel, and pypdf's text extraction page.
+
+1. Make a messy CSV yourself: a banner row, Indian-format numbers, dates as 05/11/2026, a PIN code column and a Tamil or Hindi name column saved with a byte-order mark. Load it correctly.
+2. Download three PDFs: a digital government circular, a scanned one and one with a table. Extract text with page numbers, and detect the scanned one automatically.
+3. Write a short report: files, pages, pages with no text, and what you would do about each.
+
+**You are done when you can** explain why a PDF can return empty text, and load a CSV that keeps leading zeros and reads Indian dates the right way round.

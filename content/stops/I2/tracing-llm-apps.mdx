@@ -1,0 +1,78 @@
+---
+id: tracing-llm-apps
+level: I2
+theme: ops
+title: "Tracing LLM apps"
+outcome: "Trace every request through retrieval, prompts, model calls and tools, with inputs, outputs, tokens, cost and timings, and use traces to debug wrong answers."
+why_it_matters: "When a client says \"the assistant gave a wrong answer to Ramesh yesterday\", you need to see exactly what it retrieved, what prompt it sent and what came back. Without traces you are guessing. With them, most AI bugs take minutes to find."
+hours: 3
+gap_tags: []
+primary_resource: langfuse-observability
+alternates: [otel-traces]
+format: explainer
+key_terms: [tracing, span, observability, cost-per-request]
+check:
+  type: mcq
+  question_ids: [tracing-llm-apps-1, tracing-llm-apps-2, tracing-llm-apps-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A **trace** records one request from start to finish. It is made of **spans**, one per step: the query rewrite, the retrieval, the reranker, each model call, each tool call. Every span stores its inputs, outputs, start and end times, and for model calls the model name, token counts and cost. Spans nest, so you see that the agent's third tool call happened inside the second model turn.
+
+Ordinary application logs tell you that something happened. Traces of an AI system tell you why it answered what it did. Open-source tools such as Langfuse and Arize Phoenix, commercial ones, and the cloud providers' own tools all store and display traces. Many are built on OpenTelemetry, the common standard for traces.
+
+## How it works
+
+**Instrument.** Most tools offer a decorator or a wrapper for the model client. Each decorated function becomes a span, and model calls record tokens and cost automatically. Add attributes that help later: user id (or a pseudonymous id), session id, app version, prompt version, the retrieved document ids and their scores.
+
+**Group.** A **session** groups the traces of one conversation; user ids let you look at everything one user experienced.
+
+**Mind the data.** Traces hold prompts and outputs, which can contain personal data. Mask or omit sensitive fields before they are sent, set a retention period, restrict who can view traces and prefer a self-hosted or in-region tool when the client requires it.
+
+**Use them.**
+
+- *Debug*: open the trace for a bad answer. Was the right passage retrieved? Was it in the prompt? Did the model ignore it?
+- *Measure*: latency by step, tokens and cost per request, error rates by model.
+- *Improve*: save interesting traces to a dataset; they become eval cases.
+
+**Sampling.** At high volume, keep all traces with errors or low feedback, and a sample of the rest.
+
+## A worked example
+
+A Bhubaneswar state-government helpdesk assistant answers citizens' questions about schemes. An official reports: "It told a farmer the PM-KISAN instalment is ₹4,000. It is ₹2,000."
+
+You search traces for that session and open the one in question:
+
+```text
+trace 8f3a  user=anon-5521  app=2.4.0  prompt=v17   3.8 s  ₹0.42
+  rewrite_query        0.4 s   "PM-KISAN instalment amount"
+  hybrid_search        0.3 s   top: doc 112 (0.71), doc 87 (0.69), doc 113 (0.66)
+  rerank               0.2 s   top: doc 87, doc 112, doc 113
+  generate             2.9 s   in 3,210 tok / out 182 tok
+```
+
+Doc 87 is a 2019 press note about a proposal to double the instalment. It ranked first after reranking, above the current scheme guideline. The model faithfully quoted it. The bug is not the model; it is a stale document without an effective date.
+
+You add `effective_from` metadata and a filter, re-run the trace's query in a test, and save this trace to the golden set so the case is tested from now on. The whole investigation took fifteen minutes because every step was recorded.
+
+## Common mistakes
+
+- **Logging only the final answer.** You cannot tell retrieval failures from generation failures.
+- **No version tags.** Without app and prompt versions on traces, you cannot connect a change to a quality drop.
+- **Tracing personal data unmasked.** Traces become a sensitive data store. Mask, restrict and expire.
+- **Never looking.** Traces are only useful if someone reads them; review a sample every week.
+- **Not turning failures into tests.** Every traced bad answer is a ready-made eval case.
+
+## Practise
+
+Read Langfuse's tracing overview and OpenTelemetry's page on traces.
+
+1. Add tracing to your RAG app with a free, self-hostable tool, recording rewrite, retrieval (with document ids and scores), reranking and generation as separate spans.
+2. Tag traces with an app version and a prompt version, and mask email addresses and phone numbers before sending.
+3. Ask ten questions, find the slowest step and the most expensive request, and save one bad answer's trace as an eval case.
+
+**You are done when you can** open any answer's trace and say which step caused a wrong answer.

@@ -1,0 +1,94 @@
+---
+id: errors-retries-cost
+level: I1
+theme: llm
+title: "Errors, retries and cost"
+outcome: "Handle rate limits and API errors with retries, and put a cap on what your app can spend."
+why_it_matters: "In production, APIs fail and bills grow. The engineers people trust are the ones whose apps retry sensibly, fail politely and never surprise anyone with a large bill."
+hours: 2
+gap_tags: [llm-cost-errors]
+primary_resource: claude-api-errors
+alternates: [claude-rate-limits]
+format: explainer
+key_terms: [rate-limit, retry-with-backoff, http-status-code, budget-limit]
+check:
+  type: mcq
+  question_ids: [errors-retries-cost-1, errors-retries-cost-2, errors-retries-cost-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Language model APIs fail sometimes, and they cost money on every call. A production-ready app handles both:
+
+- **Errors**: rate limits, overloaded servers, timeouts, bad requests, authentication problems.
+- **Retries**: trying again, the right way, for errors that are temporary.
+- **Cost caps**: limits that stop a bug or a heavy user from running up a large bill.
+
+## How it works
+
+**Sort errors into two kinds.**
+
+- *Worth retrying*: `429` rate limit, `500` and `503` server errors, provider "overloaded" errors, network timeouts. These often succeed a moment later.
+- *Not worth retrying unchanged*: `400` bad request (your input is wrong, for example too long or malformed), `401` invalid key, `403` not permitted, `404` unknown model. Retrying sends the same broken request again; fix the cause instead.
+
+**Retry with exponential backoff.** Wait, then retry; double the wait each time (1 s, 2 s, 4 s, 8 s), add a little randomness (jitter) so many clients do not retry at the same moment, and stop after a few attempts. If the response includes a `retry-after` header, wait that long. Many official SDKs retry automatically; check the default settings rather than adding a second retry layer on top.
+
+**Rate limits.** Providers limit requests and tokens per minute. Stay under them by limiting concurrency (how many calls run at once), spreading batch jobs out and using batch APIs for non-urgent work. Higher limits usually come with higher usage tiers.
+
+**Timeouts.** Set a timeout on every call so a stuck request does not hang your app.
+
+**Fallbacks.** For important features, decide what happens when calls keep failing: a cached answer, a simpler model, a friendly "please try again", or routing to a person.
+
+**Cost guards.**
+
+- Set a monthly spending limit or alerts in the provider's console: the simplest protection against a runaway bug.
+- Cap `max_tokens` on every call so one request cannot produce an enormous reply.
+- Limit requests per user per day.
+- Log tokens and cost per request so you can see where money goes.
+- Cap loops and retries; a bug that retries forever is a bug that spends forever.
+
+## A worked example
+
+Fatima's app summarises customer reviews for 300 small sellers each night. One morning she finds the job failed halfway and the bill was three times normal.
+
+The logs show: the provider returned `429` errors at peak; her code retried immediately and indefinitely, flooding the API; a review in Hindi with 40,000 characters of repeated emoji made one request enormous, and that request failed with `400` and was retried 200 times.
+
+Her fixes:
+
+```python
+import random, time
+
+RETRYABLE = {429, 500, 503, 529}
+
+def call_with_retry(send, max_attempts=5):
+    for attempt in range(max_attempts):
+        try:
+            return send()
+        except APIError as e:
+            if e.status not in RETRYABLE or attempt == max_attempts - 1:
+                raise
+            time.sleep(min(30, 2 ** attempt) + random.random())
+```
+
+She also truncates each review to 4,000 characters, sets `max_tokens=300` for summaries, runs at most five calls at a time, and sets a monthly spend limit with an alert at half. The next month's bill returns to normal and the nightly job completes.
+
+## Common mistakes
+
+- **Retrying everything.** 400 and 401 errors will not fix themselves.
+- **Retrying immediately and forever.** Back off, add jitter and stop.
+- **No spending limit or alerts.**
+- **No `max_tokens` cap.**
+- **Double retries.** Check what the SDK already does before adding your own.
+
+## Practise
+
+Read the API errors and rate limits pages linked below.
+
+1. Write a wrapper that retries only retryable errors with exponential backoff and jitter, and test it with a fake function that fails twice with 429 and then succeeds.
+2. Make it fail fast on a 400 error.
+3. Set a spending limit or alert on your API account and add `max_tokens` to every call in one of your apps.
+
+**You are done when you can** explain which errors to retry and how, and name three guards that cap what your app can spend.

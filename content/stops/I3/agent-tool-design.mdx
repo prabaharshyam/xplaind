@@ -1,0 +1,83 @@
+---
+id: agent-tool-design
+level: I3
+theme: agents
+title: "Designing tools for agents"
+outcome: "Design tools a model uses correctly: few and purposeful, clearly named and described, with tight parameters, useful results and errors the model can act on."
+why_it_matters: "An agent is only as good as its tools. Most agent failures in client pilots trace back to vague tool names, overlapping tools or results that drown the model in data. Tool design is cheap to get right and expensive to get wrong."
+hours: 3
+gap_tags: []
+primary_resource: anthropic-writing-tools
+alternates: [claude-tool-use]
+format: explainer
+key_terms: [tool-calling, tool-schema, json-schema]
+check:
+  type: mcq
+  question_ids: [agent-tool-design-1, agent-tool-design-2, agent-tool-design-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+When you give a model tools, it sees only their names, descriptions and parameter schemas. From that alone it must decide which tool fits, what arguments to pass and how to read the result. A tool designed for a human developer, such as a thin wrapper over every endpoint of an internal API, often confuses a model.
+
+Good agent tools share five traits: there are **few** of them, each does one **clear job**, names and descriptions say **when** to use them, parameters are **tightly typed**, and results and errors are **short and actionable**.
+
+## How it works
+
+**Choose tools by task, not by API.** If agents always look up a customer and then their open orders, one `get_customer_with_open_orders` tool beats two calls the model must chain. Fewer, higher-level tools mean fewer chances to go wrong.
+
+**Name and describe for the model.** `search_policies` with the description "Search current HR policies by keywords. Use for questions about leave, travel, reimbursements or conduct. Returns up to 5 passages with policy name and section." tells the model when to call it and what comes back. Say what the tool does not do, too.
+
+**Constrain parameters.** Use enums for fixed choices (`status: "open" | "closed"`), formats for ids (`pattern: ^ORD-\d{8}$`), sensible defaults and limits. Each loose string is a chance for the model to invent a value.
+
+**Return what the model needs.** Do not dump 200 fields of raw JSON. Return the few fields that matter, in readable form, with ids the model can pass to the next tool. Paginate or truncate large results and say so ("showing 10 of 312; refine the search").
+
+**Write errors as instructions.** "Error 400" teaches nothing. "No order found with id ORD-2026117. Order ids have 8 digits after ORD-; ask the user to check the id." lets the model recover.
+
+**Separate reading from acting.** Tools that change things (refund, send, delete) should be distinct from tools that read, so you can require approval for them and log them separately.
+
+**Test tool use.** Write 20 realistic tasks and check which tools the model calls and with what arguments. Wrong tool choices usually mean overlapping tools or unclear descriptions.
+
+## A worked example
+
+A Gurugram travel company's support agent first had 14 tools mirroring the booking API: `get_booking`, `get_booking_v2`, `list_segments`, `get_pnr_status`, `get_fare_rules`, `create_refund_request`, and more. In tests, the model picked the wrong one in 22% of tasks and often called `get_booking` and `get_booking_v2` both, doubling cost.
+
+You redesign around the support team's real tasks:
+
+```python
+{
+  "name": "get_trip",
+  "description": "Get a customer's trip by booking reference: flights, passengers, status, "
+                 "and whether it can be cancelled online. Use first for any question about one trip.",
+  "input_schema": {
+    "type": "object",
+    "properties": {"booking_ref": {"type": "string", "pattern": "^[A-Z0-9]{6}$"}},
+    "required": ["booking_ref"]
+  }
+}
+```
+
+The other tools become `get_cancellation_quote` (read-only: refund amount and fees) and `cancel_trip` (acting: requires the quote id, so the model must quote before cancelling). Results are short summaries, not raw API objects. An unknown reference returns "No trip found for ABC12. References are 6 letters or digits; ask the customer to read it from their e-ticket."
+
+Wrong tool choices drop to 3%, average tool calls per task fall from 4.1 to 2.3, and `cancel_trip` can now sit behind a human approval step.
+
+## Common mistakes
+
+- **One tool per API endpoint.** Models struggle to chain many fine-grained tools. Build for tasks.
+- **Overlapping tools.** Two tools that could both answer a question make the choice a coin toss.
+- **Raw, huge results.** They waste tokens and hide the relevant field. Return what the task needs.
+- **Silent failures.** Returning an empty list for an error leaves the model guessing. Say what went wrong and what to do.
+- **Mixing read and write.** You cannot put approval on just the risky actions if one tool does both.
+
+## Practise
+
+Read Anthropic's article on writing tools for agents and the tool-use overview in the docs.
+
+1. Pick a small domain (a library, a clinic's appointments, a college's fee records) and design three to five tools for an assistant, with full schemas.
+2. Write 15 realistic user tasks and run them against a model with your tools, logging every call and argument.
+3. Change one description or merge two tools to fix the most common mistake, and rerun.
+
+**You are done when you can** show your tool set, the before-and-after rate of wrong tool calls, and the error message that helped the model recover.

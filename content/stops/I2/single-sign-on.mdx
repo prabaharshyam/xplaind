@@ -1,0 +1,76 @@
+---
+id: single-sign-on
+level: I2
+theme: security
+title: "Single sign-on"
+outcome: "Plug an AI app into a company's login with OpenID Connect or SAML, read the user's identity and groups from tokens, and pass that identity safely to downstream systems."
+why_it_matters: "No enterprise will create separate passwords for your AI app. Single sign-on is a hard requirement in almost every client deployment, and the user's identity from sign-on is what later decides which documents they may see."
+hours: 4
+gap_tags: []
+primary_resource: okta-oauth-oidc-guide
+alternates: [auth0-oidc, auth0-saml]
+format: explainer
+key_terms: [sso, oauth, oidc, saml]
+check:
+  type: mcq
+  question_ids: [single-sign-on-1, single-sign-on-2, single-sign-on-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+**Single sign-on (SSO)** lets employees sign in once with their company account, through the company's identity provider (Microsoft Entra ID, Okta, Google Workspace, Ping and others), and reach every approved app without new passwords. When someone leaves, IT disables one account and access to everything stops.
+
+Three standards matter:
+
+- **OAuth 2.0**: lets an app act on a user's behalf with limited, revocable permission, using access tokens. On its own it is about permission, not identity.
+- **OpenID Connect (OIDC)**: a sign-in layer on top of OAuth 2.0. The app receives an **ID token** saying who the user is, with claims such as email, name and group memberships. Most new apps use OIDC.
+- **SAML 2.0**: an older, XML-based SSO standard. Many large Indian enterprises and government bodies still use it for internal apps.
+
+## How it works
+
+**The OIDC sign-in flow** (authorisation code flow with PKCE, the recommended one):
+
+1. The user opens your app; it redirects them to the identity provider.
+2. They sign in there, often with multi-factor authentication. Your app never sees their password.
+3. The provider redirects back with a short-lived code.
+4. Your server exchanges the code for an ID token and an access token.
+5. Your server verifies the token's signature, issuer, audience and expiry, then creates its own session.
+
+**Claims and groups.** The ID token can carry the user's groups or roles ("claims-officers-south", "hr-admins"). Ask the client's identity team to include the groups your app needs. These drive what the user may do in your app and, later, which documents they may retrieve.
+
+**Calling downstream systems as the user.** When your AI app needs data from another system (SharePoint, an internal API), the best pattern is to exchange the user's token for one scoped to that system ("on-behalf-of" flow), so the downstream system applies the user's own permissions. A shared service account bypasses those permissions.
+
+**Registering the app.** The client's identity team registers your app with the provider: its redirect URLs, which users or groups may use it and which claims to send. Expect this to take days, not minutes, at large companies. Start the request in week one.
+
+**Use a library.** Never write token validation yourself. Use the provider's SDK or a well-known library for your framework.
+
+## A worked example
+
+A Chennai automobile-parts manufacturer on Microsoft Entra ID wants your quality-documents assistant available to 1,200 plant staff.
+
+Week one: you send the identity team a one-page request: app name, redirect URLs for staging and production, the groups to include (`quality-engineers`, `plant-chennai`, `plant-pune`, `contractors`) and whether the app needs to call SharePoint on the user's behalf (yes, read-only).
+
+Your FastAPI backend uses a maintained OIDC library. After sign-in, it verifies the ID token and stores the user's id, email and groups in a session. Requests to SharePoint use an on-behalf-of token, so a Pune engineer can only retrieve documents their own SharePoint permissions allow.
+
+At go-live, contractors complain they cannot sign in. The token shows the `contractors` group is missing: the identity team had restricted the app to employees. One change in the provider's assignment fixes it. When a quality engineer leaves the company the following month, IT disables their account and their access to the assistant ends with no action from you.
+
+## Common mistakes
+
+- **Building your own login.** Clients will refuse it, and it duplicates their security controls badly.
+- **Skipping token validation steps.** Check signature, issuer, audience and expiry every time, with a library.
+- **Using OAuth access tokens as proof of identity.** Use the OIDC ID token for who the user is.
+- **One service account for all downstream calls.** Users can then see what their own permissions forbid.
+- **Asking for app registration late.** Identity teams have queues and approvals. Ask on day one.
+
+## Practise
+
+Read Okta's illustrated guide to OAuth and OIDC, then Auth0's pages on OIDC and SAML.
+
+1. Create a free developer account with an identity provider and register an app with a redirect URL.
+2. Add OIDC sign-in to your FastAPI app with a maintained library; print the verified claims after sign-in.
+3. Add a group claim and show one endpoint that only members of a chosen group can call.
+
+**You are done when you can** explain each step of the OIDC code flow and show your app rejecting a user outside the allowed group.

@@ -1,0 +1,93 @@
+---
+id: langgraph-basics
+level: I3
+theme: agents
+title: "LangGraph: agents as graphs"
+outcome: "Build an agent in LangGraph with explicit state, nodes and edges, checkpoints that let it pause and resume, and conditional routing."
+why_it_matters: "LangGraph is one of the most widely used agent frameworks in Indian and global job listings. Its graph model makes agent behaviour visible and testable, and its checkpoints are how you add human approval and recover from crashes."
+hours: 5
+gap_tags: []
+primary_resource: langchain-academy-langgraph
+alternates: [dlai-agents-langgraph]
+format: explainer
+key_terms: [langgraph, checkpoint, agent-loop, human-in-the-loop]
+check:
+  type: mcq
+  question_ids: [langgraph-basics-1, langgraph-basics-2, langgraph-basics-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+LangGraph is an open-source Python and JavaScript framework for building agents and multi-step AI workflows as **graphs**:
+
+- **State**: a typed object, such as a dictionary of messages, the current ticket and a draft reply, passed through the graph.
+- **Nodes**: functions that take the state and return updates. A node might call a model, call a tool, or run plain code.
+- **Edges**: which node runs next. Conditional edges choose based on the state, such as "if the model asked for a tool, go to the tool node; otherwise finish".
+- **Checkpointer**: saves the state after every step, so a run can pause, resume, be inspected or replayed.
+
+An agent loop is just a small graph: model node, tool node, and a conditional edge looping between them. A workflow is a graph with fixed edges. LangGraph lets you mix both in one system.
+
+## How it works
+
+You define the state type, add nodes, connect edges and compile:
+
+```python
+from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langgraph.checkpoint.memory import MemorySaver
+
+class State(TypedDict):
+    messages: Annotated[list, add_messages]   # new messages are appended, not replaced
+    category: str | None
+
+def classify(state: State) -> dict:
+    label = llm_classify(state["messages"][-1].content)
+    return {"category": label}
+
+def route(state: State) -> str:
+    return "billing" if state["category"] == "billing" else "general"
+
+g = StateGraph(State)
+g.add_node("classify", classify)
+g.add_node("billing", billing_agent)
+g.add_node("general", general_agent)
+g.add_edge(START, "classify")
+g.add_conditional_edges("classify", route, ["billing", "general"])
+g.add_edge("billing", END)
+g.add_edge("general", END)
+app = g.compile(checkpointer=MemorySaver())
+```
+
+Each invocation passes a `thread_id`; the checkpointer stores state per thread, so the next message in the same thread continues where it left off. In production you swap `MemorySaver` for a database-backed checkpointer such as PostgreSQL.
+
+**Interrupts** pause a run before or inside a node and wait for outside input, the basis of human approval. **Streaming** sends node-by-node updates to a UI. **Sub-graphs** let a node be a whole graph, useful for a specialist agent inside a larger flow.
+
+## A worked example
+
+A Chennai broadband provider wants an assistant for support tickets. Requirements: classify each ticket, handle billing questions with account tools, handle outage questions with a status tool, and get a supervisor's approval before any credit is applied.
+
+The graph: `classify` routes to `billing_agent` or `outage_agent`, each a small tool loop. If the billing agent proposes a credit, the graph routes to `approve_credit`, which interrupts. The supervisor sees the ticket, the proposed ₹300 credit and the agent's reason in their dashboard, approves or edits it, and the run resumes from the checkpoint to `apply_credit` and `reply`.
+
+Because state is checkpointed after every node, when the server restarts mid-ticket nothing is lost. When a customer complains about a reply, you load the thread's checkpoints and see exactly which node did what with which state. Tests call individual nodes with a hand-built state, so the routing logic is unit-tested without any model calls.
+
+## Common mistakes
+
+- **Putting everything in one giant node.** You lose the visibility and testability that are the point of a graph.
+- **State that grows without limit.** Appending every tool result forever bloats prompts. Trim or summarise in a node.
+- **In-memory checkpoints in production.** A restart loses every paused run. Use a persistent checkpointer.
+- **Using a graph where a function would do.** A fixed three-step pipeline does not need a framework.
+- **Ignoring versions.** The library moves fast; pin it and read the changelog before upgrading.
+
+## Practise
+
+Take LangChain Academy's free Introduction to LangGraph, at least the first three modules.
+
+1. Build the classify-then-route graph above for two categories of your choice, with a fake model for tests.
+2. Add a checkpointer and show that a second message in the same thread sees the first.
+3. Add an interrupt before a risky node, approve it from a script and resume.
+
+**You are done when you can** draw your graph, point to where state is saved, and resume a paused run after restarting your program.

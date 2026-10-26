@@ -1,0 +1,74 @@
+---
+id: serving-ml-models
+level: I2
+theme: ops
+title: "Serving a model"
+outcome: "Put a trained model into use, either as nightly batch scoring or as a real-time API, with consistent preprocessing, input validation, versioning, latency targets and safe rollout."
+why_it_matters: "A model in a notebook creates no value. Serving it reliably, with the same preprocessing as training and a safe way to roll out new versions, is where many ML projects stall. Employers look for engineers who can close this gap."
+hours: 3
+gap_tags: []
+primary_resource: bentoml-intro
+alternates: [fastapi-tutorial, rules-of-ml]
+more: [fsdl-course-2022]
+format: explainer
+key_terms: [batch-inference, inference, latency, model-registry]
+check:
+  type: mcq
+  question_ids: [serving-ml-models-1, serving-ml-models-2, serving-ml-models-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+**Serving** means making a model's predictions available where they are used. Two main patterns:
+
+- **Batch inference**: score many records on a schedule (nightly churn scores for all customers, weekly demand forecasts for every store) and write results to a table that other systems read.
+- **Real-time (online) inference**: an API that scores one request within milliseconds (fraud check at payment time, price suggestion as a seller types).
+
+Choose batch whenever the business can wait; it is simpler, cheaper and easier to monitor.
+
+## How it works
+
+**Package the whole prediction path.** The model alone is not enough; preprocessing and feature computation must be identical to training. Package them together (a scikit-learn pipeline, a saved preprocessing object, shared feature code) and version them with the model.
+
+**Batch.** A scheduled job loads the registered model, computes features as of the scoring time, predicts, writes results with the model version and timestamp, and logs counts and score distributions. Use an orchestrator or a simple scheduler.
+
+**Real-time.** A web service (for example FastAPI, or a model-serving framework such as BentoML) loads the model at start-up, validates each request's input with a schema, computes features (often from a feature store for things like "transactions in the last hour"), predicts and returns the score with the model version. Set latency budgets, timeouts and a fallback (a rule-based decision) if the model service fails.
+
+**Input validation.** Reject or flag requests with missing fields, wrong types or values outside training ranges. Silent garbage in gives silent garbage out.
+
+**Versioning and rollout.** Deploy new versions gradually: shadow mode (new model scores alongside the old without affecting decisions), then a canary (a small share of traffic), then full rollout. Compare outcomes and roll back if needed.
+
+**Performance.** Measure p95 latency and throughput. Smaller models, batching requests and precomputing features help. Tree models typically serve in milliseconds on a CPU.
+
+**Logging.** Log inputs (or their summaries), outputs and model version for monitoring and debugging, with personal data masked.
+
+## A worked example
+
+A Kolkata NBFC (non-banking finance company) has a trained default-risk model.
+
+- **Batch**: every night, all active loans are scored for early-warning risk; the collections team sees a ranked list each morning. The job logs the number of loans scored and the share in each risk band; an alert fires if the counts change sharply.
+- **Real-time**: at loan application, a FastAPI service scores the applicant in under 80 milliseconds at p95. It validates 42 input fields with a Pydantic model and computes bank-statement features with the same code used in training. If the service is down, the application is routed to manual review rather than auto-decided.
+- **Rollout**: version 7 runs in shadow mode for two weeks beside version 6. Its scores rank later defaults better on that period's applications, so it moves to 20% of traffic, then 100%. The registry keeps version 6 ready for rollback.
+
+One early bug: the service received income in lakhs from one partner channel and in rupees from another. Input range validation caught it on day one.
+
+## Common mistakes
+
+- **Real-time when batch would do.** It adds cost and complexity.
+- **Re-implementing preprocessing in the service.** Share code with training.
+- **No input validation.** Unit mismatches and missing fields silently ruin predictions.
+- **All-at-once deployment.** Use shadow and canary releases.
+- **No fallback.** Decide what happens when the model is unavailable.
+
+## Practise
+
+Read BentoML's introduction and the serving section of Google's Rules of ML; reuse what you learned in the FastAPI lesson.
+
+1. Write a batch scoring script that loads a saved pipeline, scores a CSV and writes results with the model version.
+2. Serve the same pipeline as a FastAPI endpoint with input validation and a latency measurement.
+3. Run a new model version in shadow mode on the same inputs and compare outputs.
+
+**You are done when you can** serve a model both ways with identical predictions for the same inputs, and explain your rollout plan.

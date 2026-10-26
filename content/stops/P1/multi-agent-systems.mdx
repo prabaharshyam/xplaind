@@ -1,0 +1,77 @@
+---
+id: multi-agent-systems
+level: P1
+theme: agents
+title: "Multi-agent systems"
+outcome: "Choose and build the main multi-agent patterns (supervisor with workers, hand-offs, and reviewer agents) and know the failure modes each brings."
+why_it_matters: "Teams reach for multiple agents early, often too early. Knowing which pattern fits a task, and what it costs in tokens and reliability, lets you design systems that work and defend them in design reviews and interviews."
+hours: 3
+gap_tags: []
+primary_resource: langchain-multi-agent
+alternates: [anthropic-multi-agent]
+format: explainer
+key_terms: [multi-agent-system, sub-agent, agent, tracing]
+check:
+  type: mcq
+  question_ids: [multi-agent-systems-1, multi-agent-systems-2, multi-agent-systems-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A **multi-agent system** splits a task across several agents, each with its own instructions, tools and context. Three patterns cover most real designs:
+
+- **Supervisor and workers**: a lead agent plans, delegates sub-tasks to worker agents (often as tools it can call) and combines their results.
+- **Hand-offs**: one agent handles a conversation until it reaches something outside its role, then passes control, with the context, to a specialist agent. Common in customer service: a front-desk agent hands billing questions to a billing agent.
+- **Generator and reviewer**: one agent produces work; another checks it against criteria and sends it back with feedback.
+
+The earlier lesson on sub-agents explained why splitting helps: clean contexts, specialised tools, parallel work. This lesson is about choosing and running the patterns.
+
+## How it works
+
+**Supervisor and workers.** The supervisor sees the user's goal and a list of workers described like tools ("research_competitor: researches one named company, returns a 200-word summary with sources"). It decides which to call, possibly in parallel, and writes the final answer. Strengths: parallelism, context isolation. Risks: vague delegation, duplicated work, lost details in summaries, high token use.
+
+**Hand-offs.** Each agent owns a domain with its own tools and permissions. A hand-off is itself a tool call ("transfer_to_billing") that moves the conversation. Strengths: each agent stays small and focused; permissions stay narrow (only the billing agent can issue refunds). Risks: ping-pong between agents, context lost on transfer, users repeating themselves.
+
+**Generator and reviewer.** The reviewer has a checklist or rubric and returns specific problems. Strengths: catches errors a single pass misses. Risks: endless loops (cap the rounds), reviewers that approve everything (test the reviewer on known bad drafts).
+
+**Shared state versus messages.** Agents can share a common state object (as in graph frameworks) or pass messages. Shared state makes debugging easier; messages keep agents more independent. Either way, trace every agent's steps under one request id.
+
+**When not to.** If the task is sequential and tightly coupled, one agent with good tools usually wins on cost and reliability. Measure a single-agent baseline first.
+
+## A worked example
+
+A Bengaluru bank's customer assistant handles balances, card blocks, loan queries and complaints.
+
+Version one, a single agent with 22 tools, chose wrong tools 9% of the time and could not be given refund permissions safely.
+
+Version two uses hand-offs:
+
+- A **front-desk agent** with read-only tools for balances and FAQs and a hand-off tool to each specialist.
+- A **cards agent** that can block cards (after confirming identity) but not move money.
+- A **loans agent** with read access to loan accounts and the prepayment calculator.
+- A **complaints agent** that records complaints in the grievance system with the regulator-mandated reference number.
+
+Each hand-off passes a short summary plus the last few turns, so customers do not repeat themselves. A rule stops more than two hand-offs in a row and routes to a human instead. Wrong tool choices drop to 2%, and the security team approves because each agent's permissions are narrow. Token use rises 30%, mainly from the summaries, which the bank accepts.
+
+A generator-reviewer pair is added only for complaint responses, where a reviewer agent checks tone and that the reference number and timelines are correct; it catches issues in 6% of drafts.
+
+## Common mistakes
+
+- **Many agents for a simple task.** Start with one; split when you measure a problem.
+- **Vague roles.** Overlapping agents argue or duplicate work. Write sharp role descriptions.
+- **Lossy hand-offs.** Pass a summary and recent turns, and test that users never need to repeat key details.
+- **No loop limits.** Agents can hand work back and forth forever.
+- **Traces per agent only.** One request must show every agent's steps together.
+
+## Practise
+
+Read the LangChain multi-agent guide and Anthropic's multi-agent research write-up.
+
+1. Build a front-desk agent that hands off to two specialists with different tools.
+2. Add a hand-off limit and a transfer to a human when it is reached.
+3. Compare it with a single agent holding all the tools on 20 test conversations: wrong-tool rate, tokens and user repetition.
+
+**You are done when you can** say which pattern you chose, why, and what it cost compared with one agent.

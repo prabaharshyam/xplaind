@@ -1,0 +1,75 @@
+---
+id: agent-memory
+level: I3
+theme: agents
+title: "Agent memory"
+outcome: "Give an agent the right memory: conversation state for the current task, long-term facts and past outcomes stored for later, and rules for what to forget."
+why_it_matters: "Users expect an assistant to remember what they said five minutes ago and, often, last week. Memory done badly leaks one user's data to another or bloats every prompt. Clients ask how memory works and where it is stored before they approve a pilot."
+hours: 3
+gap_tags: []
+primary_resource: langgraph-memory
+alternates: [lilianweng-agents]
+format: explainer
+key_terms: [agent-memory, context-window, checkpoint, pii]
+check:
+  type: mcq
+  question_ids: [agent-memory-1, agent-memory-2, agent-memory-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A model call has no memory. Each call sees only what you put in its context. "Memory" in an agent is everything your code stores and feeds back in:
+
+- **Short-term memory**: the current conversation and task state, such as messages so far, tool results and the plan. It lasts for one thread or session.
+- **Long-term memory**: information kept across sessions, such as a user's preferences, facts learned ("this customer's GSTIN is..."), summaries of past conversations and lessons from past tasks.
+
+Researchers sometimes split long-term memory further: **semantic** (facts), **episodic** (what happened in past episodes) and **procedural** (how to do things, often stored as instructions).
+
+## How it works
+
+**Short-term.** Store the thread's messages and state, usually keyed by a thread id, and reload them each turn. Frameworks call this a checkpointer. Long threads outgrow the context window, so you trim (keep the last N turns), summarise older turns into a short note, or drop large tool results once used. Keep the original task and key decisions even when trimming.
+
+**Long-term.** Decide what is worth remembering, then write it to a store: a database table for structured facts, or a vector store for free-text memories retrieved by similarity. Writing can happen in the moment (the agent calls a `save_memory` tool) or afterwards (a background job extracts facts from finished conversations). Reading happens at the start of a task: fetch the user's profile facts and the few memories most relevant to the request.
+
+**Scope and isolation.** Every memory belongs to a scope: one user, one team, one client. Queries must filter by scope, always. A memory store without scoping is a data leak waiting to happen.
+
+**Forgetting.** Memories go stale ("prefers morning delivery" from two years ago) and some must be deletable on request under privacy law. Store when each memory was created and its source, let users see and delete theirs, and expire what no longer matters.
+
+## A worked example
+
+A Kolkata online pharmacy builds an assistant that helps customers reorder medicines.
+
+Short-term: within a chat, the agent keeps the cart, the prescription it is checking and the delivery slot. After 30 turns the thread is summarised into: "Customer reordering monthly diabetes medicines; prescription Rx-5521 verified; cart has 3 items; waiting for slot choice." The full transcript stays in storage for audit, but only the summary and the last six turns go to the model.
+
+Long-term: after each order, a job extracts and saves facts with a source and date:
+
+```text
+user 88213 | prefers 7-9 am delivery           | from chat 2026-10-02
+user 88213 | allergic to sulfa drugs (stated)   | from chat 2026-09-14
+user 88213 | usual order: metformin 500, ...    | from orders, updated monthly
+```
+
+Next month the customer types "same as last time". The agent fetches this user's memories, filtered by user id, proposes the usual order and the 7 to 9 am slot, and flags a new item for pharmacist review because of the stated allergy.
+
+The legal team asks how a customer deletes memories. You add a "What the assistant remembers about you" page with a delete button, and a rule that health facts are kept for at most a year unless reconfirmed.
+
+## Common mistakes
+
+- **Stuffing the whole history into every prompt.** Cost and latency grow every turn and quality drops. Trim and summarise.
+- **No scoping.** One missing filter on user id and a customer sees another's prescriptions.
+- **Remembering everything.** Most chat content is noise. Save facts that will change future behaviour.
+- **Memories without a source or date.** You cannot judge whether a memory is still true or explain where it came from.
+- **No way to forget.** Users and regulators will ask. Build deletion in from the start.
+
+## Practise
+
+Read the LangGraph memory overview, and the memory section of Lilian Weng's agents post.
+
+1. Add short-term memory to a simple chat agent: store messages per thread id, and summarise when the thread passes 20 turns.
+2. Add a long-term store with a `save_memory` tool and a lookup at the start of each conversation, scoped by user id.
+3. Write a test proving user A can never retrieve user B's memories.
+
+**You are done when you can** explain where each kind of memory lives in your agent, how it is scoped and how a user would delete theirs.

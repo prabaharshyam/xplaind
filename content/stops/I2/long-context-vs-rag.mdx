@@ -1,0 +1,75 @@
+---
+id: long-context-vs-rag
+level: I2
+theme: retrieval
+title: "Long context or RAG"
+outcome: "Decide when to put whole documents into a long context window and when to retrieve, weighing accuracy, cost, latency and the number of documents."
+why_it_matters: "Context windows now hold hundreds of thousands of tokens, so clients ask: \"Why build retrieval at all?\" The honest answer depends on the size of the corpus, how often questions repeat and how accuracy holds up in long inputs. Being able to explain the trade-off is a common interview and design question."
+hours: 2
+gap_tags: []
+primary_resource: lost-in-the-middle
+alternates: [chroma-context-rot, claude-prompt-caching]
+format: explainer
+key_terms: [context-window, lost-in-the-middle, rag, caching]
+check:
+  type: mcq
+  question_ids: [long-context-vs-rag-1, long-context-vs-rag-2, long-context-vs-rag-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+There are two ways to give a model the information it needs:
+
+- **Long context**: put the whole document, or several, into the prompt and ask the question.
+- **Retrieval (RAG)**: search for the few most relevant passages and put only those in the prompt.
+
+Modern models accept very long inputs, so long context is often possible. Whether it is wise depends on accuracy, cost, latency and scale.
+
+## How it works
+
+**Accuracy in long inputs.** Models do not use all positions equally. Studies found that information in the middle of a long context is used less well than information near the start or end ("lost in the middle"), and that performance can degrade as inputs grow even on simple tasks. Newer models have improved, but you should test on your own documents and question types.
+
+**Cost.** You pay for every input token on every call. Sending a 200,000-token document per question costs far more than sending 3,000 tokens of retrieved passages. **Prompt caching** changes this: if the same long document is reused across many questions, cached input can be much cheaper and faster on later calls.
+
+**Latency.** Time to first token rises with input length. Long prompts make interactive use slower unless cached.
+
+**Scale.** A context window has a limit; a company's documents do not. Once the corpus is larger than the window, you must retrieve something, at least to pick which documents to send.
+
+**Rules of thumb.**
+
+- One or a few documents, many questions about them in a session, and questions that need the whole document (summaries, comparisons across sections): long context, ideally cached.
+- Large or growing collections, short factual questions, many users: RAG.
+- Middle ground: retrieve at the document level (find the right two contracts), then put those whole documents in context.
+
+**Hybrid habits.** Even with long context, put the instructions and the question at the end, ask for citations to sections or pages, and keep the documents in a consistent, labelled format.
+
+## A worked example
+
+A Chennai law firm wants an assistant for contract review. Two use cases:
+
+*Reviewing one contract.* A lawyer uploads a 60-page agreement (about 40,000 tokens) and asks a dozen questions: termination rights, indemnity caps, conflicts between clauses. Many answers need the whole document. You use long context with the contract cached. The first question takes 9 seconds; later ones take 2 to 3 seconds and cost much less because of the cache. On a test of 30 questions, long context scores 90% against 73% for chunk-based RAG, which missed cross-references between clauses.
+
+*Searching the firm's precedent library.* 25,000 past contracts, far beyond any context window. Lawyers ask "Find indemnity clauses capped at fees paid in the last 12 months in IT services contracts." You use hybrid retrieval with metadata filters to find the best 20 clauses, then a model summarises them with citations.
+
+The firm gets both, each where it fits.
+
+## Common mistakes
+
+- **Assuming long context is always more accurate.** Test it; accuracy can drop with length and position.
+- **Ignoring cost per question.** Long uncached prompts on every question become expensive at scale.
+- **Forgetting caching.** For repeated use of the same document it changes the economics.
+- **Putting the question first.** Place instructions and the question after the long material.
+- **"RAG is dead" thinking.** Large collections still need retrieval.
+
+## Practise
+
+Read the Lost in the Middle abstract, Chroma's context rot report and your provider's prompt caching guide.
+
+1. Pick one long document (an annual report or policy) and write 15 questions, some needing the whole document.
+2. Answer them with long context and with your RAG pipeline. Record accuracy, latency and cost for each.
+3. Repeat the long-context run with prompt caching and compare.
+
+**You are done when you can** recommend long context or RAG for a stated use case with your own numbers.

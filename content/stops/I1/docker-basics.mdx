@@ -1,0 +1,94 @@
+---
+id: docker-basics
+level: I1
+theme: ops
+title: "Docker and Compose"
+outcome: "Package an AI service in a container image, run it with the right settings, and start a local stack of several services with Docker Compose."
+why_it_matters: "Containers are how AI services move from your laptop to a client's servers or cloud without \"works on my machine\" problems. Almost every FDE and platform job description asks for Docker, and every deployment lesson after this one assumes it."
+hours: 4
+gap_tags: []
+primary_resource: docker-get-started
+alternates: [docker-compose-quickstart, missing-semester-shipping-code]
+format: explainer
+key_terms: [container, docker-image, dockerfile, docker-compose]
+check:
+  type: mcq
+  question_ids: [docker-basics-1, docker-basics-2, docker-basics-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A **container** is a running program packaged with everything it needs: the Python version, libraries, your code and its start command. It runs the same on your laptop, a colleague's machine, a client's server or a cloud service.
+
+You build a container from an **image**, and you build an image from a **Dockerfile**, a short recipe of steps. **Docker Compose** starts several containers together from one file, such as your API, a PostgreSQL database with pgvector and a Redis cache, wired up the way they will be in production.
+
+Containers are not virtual machines. They share the host's Linux kernel, so they start in seconds and use little memory.
+
+## How it works
+
+**Dockerfile.** Each line adds a layer:
+
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv sync --frozen --no-dev
+COPY src ./src
+USER 1000
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Docker caches layers. Copying the dependency files before the code means a code change does not reinstall every package, so rebuilds take seconds.
+
+**Build and run.** `docker build -t claims-api:1.4.0 .` builds and tags an image. `docker run -p 8000:8000 --env-file .env claims-api:1.4.0` runs it, mapping the container's port to yours and passing settings as environment variables. `docker ps`, `docker logs` and `docker exec -it name bash` let you look inside.
+
+**Data.** A container's own filesystem disappears when it is removed. Data that must survive, such as a database's files or a model cache, goes in a **volume**.
+
+**Compose.** A `compose.yaml` lists services, their images or build folders, ports, environment, volumes and which depend on which. `docker compose up` starts the lot; services reach each other by name, so your API connects to `postgres:5432`.
+
+**Registries.** Images are pushed to a registry (Docker Hub, GitHub Container Registry, or the client's cloud registry), and servers pull them from there. Tag each image with a version, not just `latest`, so you know exactly what is running and can roll back.
+
+## A worked example
+
+You are handing a document-search API to a Jaipur bank's IT team, who run everything on their own servers. They want one command to try it.
+
+```yaml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on: [db]
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+volumes:
+  pgdata:
+```
+
+They copy `.env.example` to `.env`, fill in the model key and a database password, run `docker compose up -d`, and open `localhost:8000/docs`. The API reaches the database at `db:5432`. When they restart the machine, the documents are still indexed because the database lives in the `pgdata` volume.
+
+Their security team scans the image and flags that it runs as root. The `USER 1000` line fixes it. They also ask for the image size: `python:3.12-slim` keeps it near 250 MB instead of over 1 GB with the full Python image.
+
+## Common mistakes
+
+- **Baking secrets into the image.** Anyone with the image can read them. Pass secrets at run time.
+- **Using `latest` in production.** You cannot tell what is running or roll back. Tag versions.
+- **Storing data inside the container.** It vanishes on the next deploy. Use volumes or a managed database.
+- **Running as root.** Many client security reviews reject it. Add a non-root user.
+- **Copying the whole folder first.** Every code change then reinstalls all packages. Copy dependency files, install, then copy code. Add a `.dockerignore` for `.git`, `.env` and data folders.
+
+## Practise
+
+Do Docker's Get started guide and the Compose quickstart.
+
+1. Write a Dockerfile for the FastAPI app from the REST API lesson, using a slim base image and a non-root user. Check the image size with `docker images`.
+2. Add a `compose.yaml` with your API and PostgreSQL with a volume. Restart everything and confirm the data survived.
+3. Change one line of code, rebuild, and confirm the dependency layer came from cache.
+
+**You are done when you can** explain the difference between an image and a container, and start your API and its database with one command on a fresh machine.

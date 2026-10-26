@@ -1,0 +1,15 @@
+// Types and helpers the roadmap's client islands share with its pages. No Node imports.
+import type { LevelId } from "@/lib/levels";
+import type { MapTopic } from "@/lib/roadmap/map";
+
+export type StopSummary = { id: string; level: LevelId; title: string; outcome: string; hours: number; gap_tags: string[] };
+export type LevelSummary = {
+  id: LevelId;
+  name: string;
+  can_do: string;
+  exit_check: string;
+  draft_hours: number;
+  topics: MapTopic[];
+};
+
+export const levelSlug = (level: LevelId) => level.toLowerCase();

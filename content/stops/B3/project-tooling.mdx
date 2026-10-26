@@ -1,0 +1,96 @@
+---
+id: project-tooling
+level: B3
+theme: code
+title: "Project tooling: environments, tests and logs"
+outcome: "Set up a Python project the way a team expects: an isolated environment, a pyproject.toml, a src layout, pytest tests and useful logs."
+why_it_matters: "A client's engineers will clone, run and change your code after you hand over. If setup takes a day, tests are missing and logs say nothing, they stop trusting the system. Good tooling is the cheapest form of trust."
+hours: 3
+gap_tags: []
+primary_resource: pytest-getting-started
+alternates: [packaging-projects-tutorial, python-logging-howto]
+more: [github-copilot-prompt-files, anthropic-claude-code-in-action]
+format: explainer
+key_terms: [unit-test, pytest, fixture, logging]
+check:
+  type: mcq
+  question_ids: [project-tooling-1, project-tooling-2, project-tooling-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Project tooling is everything around your code that lets someone else run it, change it safely and debug it. Four parts matter most:
+
+- an **isolated environment**, so the project's packages do not clash with anything else on the machine;
+- a **pyproject.toml** and a sensible folder layout, so the project installs the same way everywhere;
+- **tests** with pytest, so a change that breaks something fails loudly before it ships;
+- **logging**, so when something goes wrong in production you can see what happened.
+
+None of this is glamorous, and all of it is noticed when missing.
+
+## How it works
+
+**Environments.** Each project gets its own virtual environment. Tools such as `venv` with `pip`, or the faster `uv`, create one and install exactly the versions you pin. A lock file (`uv.lock`, or a pinned `requirements.txt`) records every version so another machine gets the same set.
+
+**Layout.** A common, safe shape is:
+
+```text
+loan-assistant/
+  pyproject.toml      # name, version, dependencies, tool settings
+  src/loan_assistant/ # your package
+  tests/              # pytest tests
+  README.md           # how to set up, run and test
+```
+
+The `src` folder stops tests from accidentally importing code that only works on your machine.
+
+**pytest.** A test is a function named `test_...` that uses plain `assert`. pytest finds and runs them all. Fixtures provide shared setup: a sample PDF, a temporary folder, a fake model client. For code that calls an LLM, test your own logic with a fake client that returns a fixed reply; keep real model calls for a separate, slower eval suite.
+
+**Logging.** `print` vanishes in production. The `logging` module gives each message a level (DEBUG, INFO, WARNING, ERROR), a time and the module it came from, and sends it wherever the platform collects logs. Use one logger per module, `log = logging.getLogger(__name__)`, configure output once at start-up, and log facts that help a stranger: which request, which document, how long, what failed.
+
+## A worked example
+
+You built an invoice extractor for a Coimbatore textile exporter. Their engineer, Karthik, must run it next month without you.
+
+He clones the repository and runs `uv sync`. The lock file installs the same versions you tested. He runs `uv run pytest` and sees twelve passing tests, including these:
+
+```python
+def test_total_matches_line_items(sample_invoice):
+    inv = parse_invoice(sample_invoice)
+    assert inv.total == sum(i.amount for i in inv.items)
+
+def test_rejects_gstin_with_wrong_length():
+    with pytest.raises(ValueError):
+        Invoice(gstin="33ABCDE1234", total=100, items=[])
+```
+
+`sample_invoice` is a fixture in `tests/conftest.py` that loads a small text file, so no real model call is needed.
+
+A month later an invoice fails in production. The log line reads:
+
+```text
+2026-11-20 10:14:03 WARNING loan_assistant.extract invoice=INV-8812 pages=3 field=total model_value="12,40,000.00" error="not a number"
+```
+
+Karthik sees at once that Indian digit grouping broke the number parser, adds a test for "12,40,000.00", fixes the parser and ships. Without the log he would have had a user complaint and no clue.
+
+## Common mistakes
+
+- **Installing into the system Python.** It works on your laptop and nowhere else. Always use a project environment.
+- **Unpinned versions.** A library releases a breaking change and a fresh install fails. Commit the lock file.
+- **Tests that call the real model.** They are slow, cost money and fail randomly. Fake the client in unit tests.
+- **Logging secrets or personal data.** Never log API keys, full documents or customer phone numbers. Log ids and sizes instead.
+- **A README that says "run main.py".** Write the exact commands to set up, test and run.
+
+## Practise
+
+Work through pytest's Get Started page, then the logging tutorial's basic section.
+
+1. Turn any script you have written into a project with `pyproject.toml`, a `src` layout and a `tests` folder.
+2. Write five tests, including one that uses a fixture and one that checks an error is raised.
+3. Replace every `print` with a logger call at a sensible level, and add one log line that would help debug a failure.
+
+**You are done when you can** hand the repository to a friend, have them run the tests with two commands from the README, and have them all pass.

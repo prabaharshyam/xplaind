@@ -1,0 +1,94 @@
+---
+id: cicd-github-actions
+level: I1
+theme: ops
+title: "CI/CD with GitHub Actions"
+outcome: "Set up a pipeline that tests every pull request, builds and pushes an image on merge, deploys to staging automatically and to production after approval, with a way to roll back."
+why_it_matters: "Manual deploys at a client go wrong at the worst time and leave no record. A pipeline makes every change tested, traceable and reversible, and it is the first thing a client's engineering lead looks for when deciding whether to take over your system."
+hours: 3
+gap_tags: []
+primary_resource: github-actions-quickstart
+alternates: [github-environments]
+format: explainer
+key_terms: [ci-cd, deployment-environment, regression-test, docker-image]
+check:
+  type: mcq
+  question_ids: [cicd-github-actions-1, cicd-github-actions-2, cicd-github-actions-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+**Continuous integration (CI)** runs checks on every change: lint, type checks, unit tests, and for AI systems a small eval suite. A change that fails does not merge.
+
+**Continuous delivery (CD)** takes a merged change through environments automatically: build an image, deploy to staging, run smoke tests, then deploy to production, often after a person approves.
+
+GitHub Actions is one common way to do both. Workflows are YAML files in `.github/workflows/` that run on events such as a pull request or a push to main. GitLab CI, Azure DevOps and Jenkins work similarly; clients will have their own choice.
+
+## How it works
+
+**Triggers and jobs.** A workflow runs on events (`pull_request`, `push` to main, a tag, a manual dispatch). It contains jobs; each job runs steps on a fresh machine, called a runner.
+
+**The CI job** checks out code, installs dependencies (with caching), runs lint, types and tests. For an AI app, add a small, fast eval: 20 golden questions against a fixed retrieval index, failing the build if accuracy drops below a threshold. Keep slow, costly evals for a nightly job.
+
+**The build job** builds the Docker image, tags it with the commit hash and pushes it to the client's registry.
+
+**Deploy jobs** use **environments**. A `staging` environment deploys automatically; a `production` environment requires a named reviewer's approval and has its own secrets. Secrets are stored in the CI system or fetched from the cloud at run time; never in the repository. Better still, let the runner sign in to the cloud with short-lived credentials through OpenID Connect instead of stored keys.
+
+**Rollback.** Because each deploy uses an image tagged with a commit, rolling back means redeploying the previous tag. Make it a single button or command and practise it.
+
+## A worked example
+
+You hand over a claims-assistant to a Kochi insurer's engineering team. Their lead, Anjali, wants every change tested and nothing in production without her team's sign-off.
+
+```yaml
+name: ci-cd
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check . && uv run mypy src && uv run pytest -q
+      - run: uv run python evals/smoke.py --min-accuracy 0.85
+  deploy-staging:
+    if: github.event_name == 'push'
+    needs: test
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./scripts/build_push_deploy.sh staging ${{ github.sha }}
+  deploy-production:
+    needs: deploy-staging
+    environment: production        # requires approval from the insurer's leads
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./scripts/build_push_deploy.sh production ${{ github.sha }}
+```
+
+A week later a teammate changes the prompt and the smoke eval drops from 0.89 to 0.78; CI fails and the PR cannot merge. Later a production deploy causes slow responses; Anjali redeploys the previous commit's image from the workflow page in two minutes, before most users notice.
+
+## Common mistakes
+
+- **Tests only on main.** Problems are found after merging. Run CI on pull requests.
+- **No eval in CI for prompt changes.** Prompt edits are code changes; test them.
+- **Secrets in workflow files.** Use the CI system's secrets or short-lived cloud credentials.
+- **Building different images per environment.** Build once, promote the same image through staging to production.
+- **A rollback nobody has tried.** Practise it before you need it.
+
+## Practise
+
+Follow GitHub's Actions quickstart and the page on deployment environments.
+
+1. Add a workflow that runs lint and tests on every pull request in one of your repositories.
+2. Add a job that builds and pushes your Docker image tagged with the commit hash on merges to main.
+3. Create staging and production environments, require your own approval for production, and practise a rollback to the previous image.
+
+**You are done when you can** show a failing PR blocked by CI, an approval gate before production, and a rollback you performed.

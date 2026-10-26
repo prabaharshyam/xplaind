@@ -1,0 +1,74 @@
+---
+id: permission-aware-rag
+level: P1
+theme: retrieval
+title: "Permission-aware RAG"
+outcome: "Make a RAG system return only passages the current user may see, by storing access rights with each chunk, filtering inside the search and keeping rights in sync with the source."
+why_it_matters: "The fastest way to end an enterprise AI project is for an intern's question to surface the CEO's salary letter. Every client with mixed-sensitivity documents will test this, and security teams make it a launch condition."
+hours: 4
+gap_tags: []
+primary_resource: azure-search-security-trimming
+alternates: [pinecone-rag-access-control, owasp-authorization-cheatsheet]
+format: explainer
+key_terms: [permission-aware-rag, rbac, metadata-filter, sso]
+check:
+  type: mcq
+  question_ids: [permission-aware-rag-1, permission-aware-rag-2, permission-aware-rag-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+A RAG system copies text from many sources into one index. Those sources had access rules: a SharePoint site open only to HR, a drive shared with one project team, a ticket visible to one customer's account manager. The index does not keep those rules unless you make it.
+
+**Permission-aware RAG** (also called security trimming or document-level access control) ensures that retrieval only ever returns passages the asking user is allowed to see in the original system. If the user cannot open the document in SharePoint, the assistant cannot quote it.
+
+## How it works
+
+**Capture rights at ingestion.** When you index a document, also fetch who may read it: users and groups from the source system's permissions. Store them on every chunk as metadata, for example `allowed_groups: ["hr-core", "leadership"]`, `allowed_users: [...]`.
+
+**Filter inside the search.** At query time, take the user's identity and groups from their verified sign-on token and add a filter: only chunks where `allowed_groups` overlaps the user's groups, or `allowed_users` contains them. The filter must run inside the vector or keyword search, before ranking, so restricted chunks never reach the candidate list. Filtering after retrieval leaks through scores, counts and timing, and can leave the user with no results.
+
+**Deny by default.** A chunk with missing permission data is visible to nobody until fixed. Never treat "no rule" as "public".
+
+**Keep rights in sync.** Permissions change daily: people join teams, files get shared, sites get locked. Re-sync rights on a schedule, or from change events, separately from content. Measure the lag and agree it with the client ("permission changes take effect within 15 minutes").
+
+**Groups get large.** Users can be in hundreds of groups, nested inside each other. Resolve nested groups at sign-in or index time, and cache them sensibly.
+
+**Alternative: check at the source.** For small result sets, you can retrieve candidates then ask the source system, as the user, whether they can open each document. This is always current but slower, and it still must happen before anything reaches the model.
+
+**Test it.** Build test users with different roles and a set of "must not see" questions, and run them in CI.
+
+## A worked example
+
+A Mumbai asset management company wants one assistant over research notes, HR policies, board papers and client agreements.
+
+At ingestion, a connector reads each SharePoint file and its permissions, expands groups and stores `allowed_groups` on every chunk. At query time, the API reads the user's groups from their OIDC token and adds the filter to the hybrid search.
+
+Testing with five personas:
+
+- An analyst asks "What was discussed about the merger in the last board meeting?" Zero board-paper chunks are retrieved; the assistant says it found no accessible documents on that topic.
+- A director asks the same question and gets an answer citing the board minutes.
+- An analyst asks "What is the notice period for senior managers?" The HR policy, open to all employees, is retrieved; the confidential salary bands file is not.
+
+During the pilot, the HR team restricts a draft policy. The permission sync runs every ten minutes, so for up to ten minutes the old rights apply. The client's security team accepts this window, in writing, and asks for an alert if a sync fails.
+
+## Common mistakes
+
+- **Filtering after retrieval.** Restricted chunks influence results and can leak. Filter inside the search.
+- **Treating missing permissions as public.** Deny by default.
+- **Syncing content but not rights.** A document locked down today stays visible in the index.
+- **Trusting identity from the request body.** Take user and groups only from a verified token.
+- **No negative tests.** Test what each persona must not see, not just what they should.
+
+## Practise
+
+Read Microsoft's security filter pattern and Pinecone's article on RAG with access control.
+
+1. Add an `allowed_groups` field to every chunk in your RAG index, with at least three groups across your documents.
+2. Read the user's groups from a (real or simulated) verified token and filter inside the search.
+3. Write five "must not see" tests across three personas and run them in your test suite.
+
+**You are done when you can** show two users asking the same question and getting different, correct answers, and a test proving a restricted document never reaches the model.

@@ -1,0 +1,76 @@
+---
+id: context-engineering
+level: P1
+theme: llm
+title: "Context engineering"
+outcome: "Decide what goes into a model's context on each turn: instructions, tools, examples, retrieved data, memory and tool results, and how to keep long tasks within budget."
+why_it_matters: "As agents run longer, quality depends less on clever prompts and more on what the model sees at each step. Context that is bloated, stale or missing the one key fact causes most agent failures. It is now a named skill in senior AI engineering roles."
+hours: 3
+gap_tags: []
+primary_resource: anthropic-context-engineering
+alternates: [claude-context-windows]
+more: [anthropic-agent-skills]
+format: explainer
+key_terms: [context-engineering, context-window, sub-agent, agent-memory]
+check:
+  type: mcq
+  question_ids: [context-engineering-1, context-engineering-2, context-engineering-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+Prompt engineering is about writing a good instruction. **Context engineering** is about everything the model sees on a given call: the system prompt, the tool definitions, examples, retrieved documents, memory, the conversation so far and the results of earlier tool calls. For a one-shot question these are small. For an agent working through fifty steps they pile up, and the question becomes: what should be in the window right now, and what should not?
+
+Context is a budget. Even models with very long windows do worse as the window fills with irrelevant material: they miss details, lose track of the goal and cost more per step.
+
+## How it works
+
+**System prompt at the right altitude.** Too vague ("be helpful") gives no guidance; too rigid (pages of if-then rules) breaks on cases you did not foresee. Aim for clear principles, the main steps and a few examples, organised under headings.
+
+**Lean tools.** Every tool definition costs tokens on every call and every overlapping tool costs accuracy. Offer only the tools the current task needs.
+
+**Just-in-time retrieval.** Rather than loading every document up front, give the agent ways to look things up (search, open file, read record) and let it pull what it needs when it needs it. Keep lightweight references, such as file paths or record ids, in context, and fetch the content on demand.
+
+**Clear old tool results.** A 5,000-token search result used three steps ago is dead weight. Drop or shrink old results once they have been used, keeping a one-line note of what was found.
+
+**Compaction.** When the context nears its limit, summarise the history into a short state: the goal, decisions made, open questions, key facts. Start fresh with that summary.
+
+**Structured notes.** For long tasks, have the agent keep a notes file or to-do list outside the context and reread it, so progress survives compaction.
+
+**Sub-agents.** Give a sub-task to a sub-agent with its own clean context and take back only its summary.
+
+## A worked example
+
+An agent for a Chennai GST consultancy reconciles a client's purchase register against supplier filings: thousands of invoices, mismatches to explain and a final report.
+
+The first version loaded the whole register, the whole filing data and twelve tools into context. It hit the window limit after forty invoices, and even before that it confused suppliers with similar names.
+
+The redesign:
+
+- The system prompt explains the reconciliation rules and the report format with one worked mismatch.
+- Only four tools: `list_mismatches(page)`, `get_invoice(id)`, `get_supplier_filing(gstin, period)` and `write_note(text)`.
+- The agent works one page of 20 mismatches at a time. After each, it writes a note ("Page 3: 14 resolved as timing differences, 4 supplier not filed, 2 need client input: INV-7781, INV-7790") and old tool results are cleared.
+- Every 100 mismatches, the history is compacted into a summary of totals and open items.
+
+The agent now handles 3,000 mismatches in one run. Cost per invoice falls by 70%, and the error rate on supplier matching drops because the model only ever sees the records for the case in hand.
+
+## Common mistakes
+
+- **Loading everything just in case.** More context is not better context. Retrieve on demand.
+- **Keeping every tool result forever.** Clear or summarise results once used.
+- **Compacting away the goal.** A summary must keep the task, constraints and open items, not just recent events.
+- **Twenty tools for a five-tool task.** Each one costs tokens and invites wrong choices.
+- **Never looking at the actual context.** Log and read what the model received on failing steps; the cause is usually visible.
+
+## Practise
+
+Read Anthropic's article on context engineering for agents and the context windows page.
+
+1. Take any agent you have built and log the full context sent on its last step. Count tokens by part: system prompt, tools, history, tool results.
+2. Add clearing of old tool results and a compaction step when context passes a threshold you choose.
+3. Run the same five tasks before and after and compare tokens per task and task success.
+
+**You are done when you can** show where your agent's tokens go, and one change that cut them without hurting results.

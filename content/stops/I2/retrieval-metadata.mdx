@@ -1,0 +1,80 @@
+---
+id: retrieval-metadata
+level: I2
+theme: retrieval
+title: "Metadata that helps retrieval"
+outcome: "Store the metadata that makes retrieval precise (source, section path, dates, type, owner, language, access) and add generated metadata such as summaries and likely questions where it helps."
+why_it_matters: "Metadata turns a pile of chunks into a searchable library: it powers filters, citations, freshness, permissions and better matching. It costs little to collect at ingestion and is painful to add later, so experienced RAG engineers design it first."
+hours: 2
+gap_tags: []
+primary_resource: llamaindex-metadata
+alternates: [azure-search-security-trimming]
+format: explainer
+key_terms: [metadata-filter, citation, permission-aware-rag, chunking]
+check:
+  type: mcq
+  question_ids: [retrieval-metadata-1, retrieval-metadata-2, retrieval-metadata-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+**Metadata** is information about a chunk rather than its text. In RAG it does five jobs:
+
+- **Filters**: restrict searches by product, region, document type, language or date.
+- **Citations**: say exactly where an answer came from (document, section, page, link).
+- **Freshness**: prefer or require current versions, drop superseded ones.
+- **Permissions**: decide who may see a chunk.
+- **Better matching**: add context the chunk text lacks, such as the document title or section path.
+
+## How it works
+
+**Collect at ingestion.** For every chunk store at least:
+
+- document id, title, source system and link;
+- section path ("Leave Policy > Earned leave > Carry forward") and page;
+- document type (policy, circular, FAQ, contract);
+- dates: published, effective from, effective to, last modified;
+- language;
+- owner or department;
+- access groups.
+
+**Contextual text.** A chunk that says "This limit is 45 days" is hard to retrieve. Prepend the title and section path to the text that gets embedded ("Leave Policy v4 > Earned leave > Carry forward: This limit is 45 days"), or have a model write a one-sentence context for each chunk. This kind of contextual enrichment can cut retrieval failures noticeably.
+
+**Generated metadata.** A model can add a short summary, keywords or questions each chunk answers. Embedding likely questions helps when users phrase things very differently from the documents. It costs a model call per chunk at ingestion, so measure the gain on your golden set first.
+
+**Filters from the query.** Some filters come from the user's context (their region, their access groups). Others can be inferred from the question with a small model ("leave rules for Karnataka from 2026" becomes region = KA, effective after 2026-01-01). Infer conservatively: a wrong filter hides the right answer.
+
+**Freshness rules.** Store effective dates and a "superseded by" link. Filter out superseded documents by default, unless the user asks about history.
+
+**Consistency.** Use fixed vocabularies (department names, document types, region codes) so filters match. Validate metadata at ingestion like any other data.
+
+## A worked example
+
+A Bengaluru IT company's HR assistant serves employees in five states. Leave and holiday rules differ by state, and policies are revised each year.
+
+Before: chunks carried only the file name. The assistant mixed Karnataka and Maharashtra holiday lists and sometimes quoted last year's policy.
+
+After re-ingestion, each chunk carries state, policy type, effective dates, version, section path and access groups. The employee's state comes from their sign-on profile and is applied as a filter unless they ask about another state. Superseded versions are excluded by default. Embedded text starts with the title and section path.
+
+On the 100-question golden set, correct answers rise from 71% to 90%. Citations now read "Leave Policy 2026, Karnataka, section 3.2, page 4", and HR staff can check them in seconds.
+
+## Common mistakes
+
+- **Only a file name.** You cannot filter, cite properly or handle versions.
+- **Free-text metadata values.** "HR", "Human Resources" and "hr dept" break filters. Use fixed lists.
+- **No effective dates.** Old versions keep winning.
+- **Aggressive inferred filters.** A wrongly inferred filter hides the right answer; prefer user context and ask when unsure.
+- **Generating metadata without measuring.** It costs money at ingestion; prove it helps.
+
+## Practise
+
+Read LlamaIndex's page on metadata extraction and Microsoft's security filter pattern.
+
+1. Re-ingest your RAG documents with title, section path, type, dates and language on every chunk.
+2. Prepend title and section path to the embedded text and compare recall at 5 before and after.
+3. Add a "superseded" flag to one document's old version and show that filtering removes it from answers.
+
+**You are done when you can** show an answer with a precise citation and a question where a metadata filter fixed a wrong answer.

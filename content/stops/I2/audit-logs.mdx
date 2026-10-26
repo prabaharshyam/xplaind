@@ -1,0 +1,77 @@
+---
+id: audit-logs
+level: I2
+theme: security
+title: "Audit logs"
+outcome: "Record who asked what, which data the AI system touched, what it answered or did and why, in a tamper-resistant log that supports investigations and audits without leaking personal data."
+why_it_matters: "Regulated clients such as banks, insurers and hospitals must be able to reconstruct any AI decision months later. Auditors, regulators and the client's own risk team will ask for it. Without an audit log, a pilot cannot become production."
+hours: 3
+gap_tags: []
+primary_resource: owasp-logging-cheatsheet
+alternates: [langfuse-observability]
+format: explainer
+key_terms: [audit-log, logging, tracing, pii]
+check:
+  type: mcq
+  question_ids: [audit-logs-1, audit-logs-2, audit-logs-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+An **audit log** is a record of significant events: who did what, when, to which data, and with what result. It differs from application logs and traces:
+
+- **Application logs** help engineers debug. They are noisy, short-lived and may change format freely.
+- **Traces** show the internal steps of a request in detail, for engineering and quality work.
+- **Audit logs** answer accountability questions: "Who asked the assistant about account 4471 on 3 March, what did it show them and did anyone approve the refund?" They must be complete, consistent, protected from tampering and kept for a defined period.
+
+For AI systems, audit events usually include sign-ins, every question and answer (or a reference to them), documents retrieved, tool actions taken, approvals and rejections, configuration changes (prompt, model, permissions) and admin actions.
+
+## How it works
+
+**A fixed event shape.** Each event has a timestamp in a stated time zone, the actor (user id, service, or "agent on behalf of user X"), the action, the target (document ids, record ids), the outcome, a request or trace id to link to details, and the versions in force (app, prompt, model).
+
+**What not to record.** Never log passwords, tokens or full card numbers. Decide deliberately about personal data: often you store ids and hashes in the audit log, and keep full text in a separate, more restricted store with a shorter retention, linked by id. Follow the client's retention policy and the law; India's DPDP Act requires that personal data is not kept longer than needed.
+
+**Tamper resistance.** Write audit events to an append-only store that application code cannot edit or delete: a write-once storage bucket with retention locks, a managed audit service, or a separate log account. Restrict who can read the log, and log access to the log itself.
+
+**Make it queryable.** Investigations need answers in minutes: "all actions on this customer record in March", "every refund the agent proposed that a person approved". Store events in a format your client's tools can search.
+
+**Clock and identity.** Use synchronised clocks and the verified identity from sign-on, never a name the user typed.
+
+## A worked example
+
+A Kochi cooperative bank uses an AI agent to help staff draft responses to loan-restructuring requests. Six months later a borrower complains that their request was rejected unfairly, and the bank's ombudsman office asks for the full history.
+
+Because every event was audited, the bank's compliance officer can produce, in an hour:
+
+```text
+2026-05-03 11:02:14 IST  user=emp-2213 (branch: Aluva)  action=ask
+    request=req-88a1 trace=tr-71f0 customer=CUST-4471 prompt=v12 model=alias:chat-default(2026-04)
+2026-05-03 11:02:19 IST  agent(on behalf of emp-2213)  action=retrieve
+    docs=[policy-restructuring-v6#s4, cust-4471-statement-2026-04]
+2026-05-03 11:02:31 IST  agent  action=propose  type=reject_restructuring  reason_ref=tr-71f0
+2026-05-03 11:09:47 IST  user=emp-0457 (manager)  action=approve  proposal=req-88a1
+```
+
+The history shows that the policy version used had since been revised, and that a manager approved the AI's recommendation within seven minutes. The bank reopens the case, and adds a rule that restructuring rejections need a written note from the approver. The audit log did not prevent the mistake, but it made it visible, fixable and explainable to the ombudsman.
+
+## Common mistakes
+
+- **Using debug logs as the audit trail.** They are incomplete, editable and rotated away.
+- **Recording everything in full.** Full prompts with personal data in a long-retention log create a new privacy risk. Store references and keep full text separately with shorter retention.
+- **Editable storage.** If an administrator can delete entries quietly, the log proves little.
+- **No version information.** Without prompt and model versions you cannot explain why the system behaved as it did then.
+- **Logging the agent as the actor.** Always record on whose behalf it acted, and who approved.
+
+## Practise
+
+Read the OWASP Logging Cheat Sheet, especially the sections on what to log and what to exclude.
+
+1. Define an audit event schema for your AI app with the fields above, and emit events for ask, retrieve, tool action, approval and configuration change.
+2. Write them to an append-only store (for example a cloud bucket with object lock, or a separate database table with insert-only permissions).
+3. Write two queries an investigator would need: all events for one customer id in a date range, and every agent action approved by a given manager.
+
+**You are done when you can** reconstruct one request's full story from your audit log alone, without reading application logs.

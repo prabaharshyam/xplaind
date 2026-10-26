@@ -1,0 +1,79 @@
+---
+id: cross-validation-leakage
+level: I1
+theme: ml
+title: "Cross-validation and leakage"
+outcome: "Estimate model performance honestly: train, validation and test splits, k-fold and time-based cross-validation, grouped splits, and how to find and prevent data leakage with pipelines."
+why_it_matters: "The most common reason ML models disappoint in production is that they were evaluated dishonestly. A model that scored 0.95 in a notebook and 0.70 in the real world almost always suffered from a bad split or leakage. Getting this right is a core ML engineering skill and an interview staple."
+hours: 3
+gap_tags: []
+primary_resource: sklearn-cross-validation
+alternates: [sklearn-pitfalls, kaggle-intermediate-ml]
+format: explainer
+key_terms: [cross-validation, data-leakage, overfitting, feature-engineering]
+check:
+  type: mcq
+  question_ids: [cross-validation-leakage-1, cross-validation-leakage-2, cross-validation-leakage-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+To know how a model will perform on new data, you must test it on data it never learned from, under conditions like real use.
+
+- **Train, validation, test**: train on one part, tune choices on a validation part, and report final performance once on a test part kept untouched until the end.
+- **Cross-validation**: repeat training and validation on several different splits (folds) and average, for a more stable estimate when data is limited.
+- **Data leakage**: any way information from the validation or test data, or from the future, reaches training, making results look better than they will be.
+
+## How it works
+
+**k-fold cross-validation.** Split the data into k folds (often 5). Train on k minus 1, validate on the remaining one; repeat k times. For classification, stratified folds keep class proportions equal.
+
+**Time-based splits.** When data has time order (transactions, demand, churn), random splits leak the future into training. Train on earlier periods and validate on later ones; time-series cross-validation rolls this window forward.
+
+**Grouped splits.** If the same customer, patient or store appears in many rows, keep all of its rows in the same fold. Otherwise the model memorises individuals and looks better than it is on new ones.
+
+**Common sources of leakage.**
+
+- *Preprocessing on all data*: scaling, imputing or target encoding computed before splitting uses information from validation rows. Fit preprocessing on the training fold only; scikit-learn **pipelines** do this automatically inside cross-validation.
+- *Future features*: features computed with information after the prediction time.
+- *Target proxies*: columns that are consequences of the outcome (a "closed reason" field when predicting churn).
+- *Duplicates*: the same record appearing in train and test.
+- *Tuning on the test set*: choosing models by test score turns it into a validation set; final results become optimistic.
+
+**Signs of leakage.** Validation scores that are surprisingly high; a single feature with overwhelming importance; a large drop when scoring on a truly new period.
+
+**Final check.** Before launch, score the model on the most recent period it never saw, ideally exactly as it will run in production.
+
+## A worked example
+
+A Chennai hospital network predicts 30-day readmission from discharge records.
+
+The first notebook reported AUC 0.91 with random 5-fold cross-validation. Concerns:
+
+1. Many patients have several admissions. With random folds, the same patient appeared in training and validation. **Grouped folds by patient**: AUC 0.83.
+2. Missing lab values were filled with the mean computed on the whole dataset before splitting. Moving imputation into a pipeline: AUC 0.82.
+3. A feature "follow-up appointment cancelled" was sometimes recorded after readmission. Removing it: AUC 0.78.
+4. Training on 2023 to 2025 admissions and testing on the first half of 2026: AUC 0.77.
+
+The honest number, 0.77, is what the clinical team planned around. In the six-month pilot, live AUC was 0.76.
+
+## Common mistakes
+
+- **Random splits on time-ordered data.**
+- **The same entity in train and test.** Group by customer, patient or store.
+- **Preprocessing before splitting.** Use pipelines.
+- **Repeatedly checking the test set.** Keep it for the final report.
+- **Ignoring suspiciously good scores.** Investigate before celebrating.
+
+## Practise
+
+Read scikit-learn's cross-validation guide and common pitfalls page, and do the cross-validation and leakage lessons in Kaggle's Intermediate ML.
+
+1. On a dataset with repeated entities or time order, compare random k-fold with grouped or time-based splits.
+2. Show leakage from fitting a scaler on all data, then fix it with a pipeline.
+3. Keep a final test set aside, tune on cross-validation only, and report the test score once.
+
+**You are done when you can** explain which split matches your use case and show a score that dropped when you removed a leak.

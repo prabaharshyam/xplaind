@@ -1,0 +1,79 @@
+---
+id: planning-reflection
+level: I3
+theme: agents
+title: "Planning and reflection"
+outcome: "Choose between ReAct, plan-then-execute and reflection for an agent task, and know what each costs in calls, latency and reliability."
+why_it_matters: "Agents that act step by step without a plan wander, and agents that never check their work ship mistakes. Knowing when a plan or a self-check pays for itself is what separates a reliable agent from a demo. It comes up in every agent design interview."
+hours: 3
+gap_tags: []
+primary_resource: lilianweng-agents
+alternates: [hf-agents-react]
+format: explainer
+key_terms: [react, planning, reflection, agent-loop]
+check:
+  type: mcq
+  question_ids: [planning-reflection-1, planning-reflection-2, planning-reflection-3]
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
+reviewed_on: 2026-10-25
+---
+
+## What it is
+
+An agent loop decides one step at a time. Three patterns shape how those decisions are made:
+
+- **ReAct** (reason, act): think briefly, call a tool, read the result, think again. Flexible and simple; the default in most frameworks.
+- **Plan-then-execute**: first write a full plan of steps, then carry them out, revising the plan only when something unexpected happens.
+- **Reflection**: after producing a result (or periodically), the agent critiques it against the goal or a checklist and fixes what falls short.
+
+They combine: a plan, executed with ReAct-style steps, with a reflection pass before the final answer.
+
+## How it works
+
+**ReAct.** Each turn the model writes a short thought ("I need the order status before I can answer"), then a tool call, then sees the observation. It adapts quickly to what it finds. Its weakness is drift on long tasks: after fifteen steps it can forget the original goal or repeat itself.
+
+**Plan-then-execute.** The model, often a stronger one, writes a numbered plan once. A cheaper model or plain code executes each step. Plans make long tasks more predictable, are easy to show a user or approver ("here is what I will do"), and cut cost because the expensive model runs once. The weakness is rigidity: when step 3 reveals something new, the agent must notice and re-plan rather than plough on.
+
+**Reflection.** A second pass asks: does this result meet the requirements? Are the numbers consistent? Did I answer every part? It can be the same model with a critique prompt, a different model, or deterministic checks (tests pass, totals add up, JSON validates). Deterministic checks are cheapest and most reliable; use a model critique only where rules cannot judge.
+
+**Cost and limits.** Each pattern adds calls. Reflection loops need a cap (say, two revision rounds) or they can loop forever on a requirement the model cannot meet.
+
+## A worked example
+
+A Bengaluru venture fund wants an agent that prepares a one-page brief on a startup from public sources: funding history, founders, product, competitors and red flags.
+
+*Version 1, pure ReAct.* It searches, reads, searches again. On half the companies it spends 25 steps on funding news and never reaches competitors. Briefs are uneven.
+
+*Version 2, plan-then-execute.* A planning call produces:
+
+```text
+1. Find the company's website and product description.
+2. Find funding rounds (amount, date, lead investor) from news and filings.
+3. Identify founders and their backgrounds.
+4. List three to five competitors.
+5. Look for red flags: lawsuits, layoffs, regulatory action.
+6. Write the brief in the template.
+```
+
+Each step runs a short ReAct loop with a cap of five tool calls. Every section is now covered and the average cost drops by a third, because steps use a smaller model.
+
+*Version 3, adding reflection.* Analysts find funding totals that do not match the rounds listed. A reflection step checks the draft against a checklist: totals equal the sum of rounds, every claim has a source link, every section is filled. Code checks the arithmetic; a model checks for unsourced claims. Failures go back for one revision. Unsourced claims fall from 11% to 2% of sentences.
+
+## Common mistakes
+
+- **Planning for trivial tasks.** A two-step lookup does not need a plan; it just adds a call.
+- **Plans that never change.** When a step's result contradicts the plan, the agent must re-plan, not continue blindly.
+- **Endless self-critique.** Cap reflection rounds, and stop when the critique repeats itself.
+- **Model critique where code would do.** If a rule can check it (sums, schemas, tests), use the rule.
+- **Hiding the plan.** Showing users the plan builds trust and lets them correct the course early.
+
+## Practise
+
+Read the planning and reflection sections of Lilian Weng's post and the Hugging Face unit on ReAct.
+
+1. Build a small research agent that answers "Compare three Indian EV two-wheeler makers on price, range and service network" with plain ReAct. Log the steps.
+2. Add a planning call and per-step limits. Compare coverage, steps and cost over five runs.
+3. Add one deterministic check and one model critique before the final answer, with at most one revision.
+
+**You are done when you can** show the three versions' step counts, costs and quality side by side and justify which you would ship.
