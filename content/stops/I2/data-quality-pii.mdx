@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: presidio
 alternates: [great-expectations]
-format: explainer
+format: deep
 key_terms: [data-masking, pii, dpdp-act, guardrails]
 check:
   type: mcq
   question_ids: [data-quality-pii-1, data-quality-pii-2, data-quality-pii-3]
+flashcards:
+  - q: "What does data quality checking mean?"
+    a: "Checking data is complete, valid, consistent and current before indexing it or sending it to a model."
+  - q: "Name five kinds of data quality rule."
+    a: "Required fields present, valid values, uniqueness, freshness, and text sanity such as enough characters per parsed page."
+  - q: "What three outcomes can a failed rule trigger?"
+    a: "Block the whole batch, quarantine the bad records, or only warn."
+  - q: "How do you find structured identifiers like PAN or Aadhaar?"
+    a: "With patterns: PAN is five letters, four digits and a letter; Aadhaar is 12 digits with a checksum; also mobiles, emails, IFSC codes and GSTINs."
+  - q: "What is named-entity recognition used for?"
+    a: "Finding names, places and organisations in free text, which patterns cannot catch."
+  - q: "What is pseudonymisation?"
+    a: "Replacing real personal data with realistic fakes or tokens, for example in test and staging data."
+  - q: "What is reversible masking?"
+    a: "Replacing personal data with placeholders like PERSON_1 before the model call, then swapping the real values back into the answer."
+  - q: "Why measure the PII detector's recall?"
+    a: "No detector is perfect, especially on Indian names and mixed-language text. Measured recall shows how much personal data slips through."
+exercise:
+  title: "Decide the treatment"
+  setup: "A bank in Hyderabad builds an assistant that drafts replies to customer complaint emails. Emails contain names, mobile numbers, account numbers, PAN numbers and sometimes Aadhaar numbers. Data flows: (1) emails indexed so staff can search past complaints; (2) the email text sent to an external model to draft a reply; (3) application logs and traces; (4) a staging environment for testing."
+  questions:
+    - q: "What treatment fits flow (1)?"
+      a: "Keep the data, since staff need it, but restrict search by permissions and mask Aadhaar numbers, which the task does not need."
+    - q: "What treatment fits flow (2)?"
+      a: "Reversible masking: replace names, numbers, account numbers, PAN and Aadhaar with placeholders before the call, then restore them in the draft."
+    - q: "What about flows (3) and (4)?"
+      a: "Logs and traces: masked by default. Staging: realistic fake data, never real customer emails."
+    - q: "The detector finds 99% of PAN numbers but 85% of names. What should the team do?"
+      a: "Improve name detection, for example with the bank's customer-name list as a lookup, and re-measure on labelled emails before launch."
+ask:
+  - "How do I detect personal data in Indian documents?"
+  - "What is the difference between masking and pseudonymisation?"
+  - "Can I send customer data to an external AI model?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -25,6 +58,23 @@ Two related jobs that sit in every AI data pipeline:
 
 - **Data quality**: checking that data is complete, valid, consistent and current before you index it or send it to a model. Missing fields, duplicate records, impossible dates and garbled text all turn into wrong answers.
 - **Personal data handling**: finding personal data (names, phone numbers, emails, addresses, Aadhaar, PAN, bank account numbers, health details) and deciding for each place it flows whether to keep, mask, pseudonymise or drop it.
+
+```text
+  raw records
+      |
+      v
+  [quality checks] -- fail --> quarantine / block / warn
+      |
+      v
+  [find personal data: patterns + NER + context words]
+      |
+      +--> index:            keep, restrict by permissions
+      +--> external model:   mask only what the task doesn't need
+      +--> logs and traces:  mask by default
+      +--> staging and tests: replace with realistic fakes
+```
+
+This lesson follows a hospital group in Coimbatore building a discharge-note summariser for follow-up calls.
 
 ## How it works
 
@@ -55,6 +105,19 @@ No detector is perfect. Measure its recall on a labelled sample of real document
 
 **Reversible masking.** For some tasks you replace "Lakshmi Narayanan, 98400 12345" with "PERSON_1, PHONE_1" before the model call and swap the real values back into the answer afterwards. The model never sees the real data, yet the user gets a complete reply.
 
+**Indian identifier patterns, in words:**
+
+| Identifier | Pattern | Extra check |
+| --- | --- | --- |
+| Mobile number | 10 digits starting 6 to 9, often with +91 | Context words like "mob", "ph" |
+| PAN | 5 letters, 4 digits, 1 letter | The fourth letter shows the holder type |
+| Aadhaar | 12 digits, often in groups of four | Verhoeff checksum |
+| IFSC | 4 letters, a zero, 6 letters or digits | Bank code list |
+| GSTIN | 15 characters starting with a 2-digit state code | Contains the PAN |
+| PIN code | 6 digits | Valid first digit |
+
+**Masking in practice.** Reversible masking keeps a mapping, such as PERSON_1 to the real name, only in memory for the length of the request. The prompt says "PERSON_1 was discharged on...", the model writes "Call PERSON_1 to check...", and the code swaps the real name back before the nurse sees it. The external model never receives the identity, and the mapping is never logged.
+
 ## A worked example
 
 A Coimbatore hospital group wants an assistant that summarises discharge notes for follow-up calls. Notes include patient names, phone numbers, addresses, diagnoses and doctors' names.
@@ -68,6 +131,14 @@ For personal data, the data protection officer agrees:
 - The staging environment uses synthetic notes generated from templates.
 
 Testing the detector on 200 hand-labelled notes finds 97% of phone numbers but only 81% of patient names, missing many Tamil names written in lowercase. Adding the hospital's own patient-name list as a lookup raises it to 98%. The DPO signs off with the measured figures in the design document.
+
+| Check | Finding | Action |
+| --- | --- | --- |
+| Missing discharge date | Some notes | Rejected |
+| Duplicate exports | 3% of records | Flagged and removed |
+| Garbled OCR text | 40 scanned notes | Quarantined for re-scan |
+| Phone number detection | 97% found | Accepted |
+| Patient name detection | 81%, then 98% with the hospital's name list | Accepted after the fix |
 
 ## Common mistakes
 

@@ -9,11 +9,44 @@ hours: 4
 gap_tags: []
 primary_resource: docling
 alternates: [unstructured-parse-pdf, pypdf-extract-text]
-format: explainer
+format: deep
 key_terms: [document-parsing, ocr, layout-analysis, chunking]
 check:
   type: mcq
   question_ids: [document-parsing-ocr-1, document-parsing-ocr-2, document-parsing-ocr-3]
+flashcards:
+  - q: "What is document parsing for RAG?"
+    a: "Turning files into text and structure: paragraphs in reading order, headings, intact tables and page numbers for citations."
+  - q: "What are the three main parsing approaches?"
+    a: "Text extraction from digital files, OCR for scans and photos, and layout-aware parsing that detects headings, columns, tables and reading order."
+  - q: "How can you tell a PDF page is probably a scan?"
+    a: "It has very few extractable characters, because the page is an image."
+  - q: "What goes wrong with two-column pages in simple extraction?"
+    a: "Text is read across both columns line by line, mixing unrelated sentences."
+  - q: "How should tables be turned into text for RAG?"
+    a: "Keep headers with values, for example one line per row: 'Plan Gold: premium ₹12,450, sum insured ₹5,00,000', and keep a table or whole rows in one chunk."
+  - q: "What affects OCR accuracy?"
+    a: "Image resolution, skew, shadows, stamps, handwriting, and whether the OCR supports and is set to the document's languages."
+  - q: "Why remove repeated headers and footers?"
+    a: "They appear on every page and pollute every chunk and its embedding."
+  - q: "What should you track per parsed document?"
+    a: "Pages, characters per page, tables found and OCR confidence, plus a sample compared with the original."
+exercise:
+  title: "Diagnose the garbled answers"
+  setup: "A Bengaluru property firm's RAG assistant answers questions about 300 lease agreements. Answers about rent escalation are often wrong though retrieval finds the right pages. Inspection shows: rent schedules are tables that come out as one jumbled line; older leases are scanned with Kannada and English text; every page has the firm's letterhead and 'Confidential' footer; and the clause numbering is lost."
+  questions:
+    - q: "How should the rent schedules be parsed?"
+      a: "With a layout-aware or table-aware parser, converting each row to text with its headers, such as 'Year 3: monthly rent ₹1,15,000', kept in one chunk."
+    - q: "What should be done for the scanned leases?"
+      a: "Detect them by low characters per page, run OCR with Kannada and English enabled, keep confidence scores and spot-check pages."
+    - q: "How do you deal with the letterhead and footer?"
+      a: "Detect lines repeated on most pages and strip them before chunking."
+    - q: "Why does losing clause numbering matter?"
+      a: "Citations and questions refer to clauses, such as 'clause 7.2'. Keep headings and clause numbers in the section path stored with each chunk."
+ask:
+  - "Which tools are good for parsing PDFs for RAG?"
+  - "How do I handle tables in PDFs?"
+  - "How do I OCR documents in Indian languages?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -26,6 +59,27 @@ reviewed_on: 2026-10-25
 - **Text extraction** from digital PDFs and Office files: fast and cheap, but blind to layout.
 - **OCR** (optical character recognition) for scans and photos: turns images of text into text.
 - **Layout-aware parsing**: models that detect headings, columns, tables, figures and reading order, then extract each part properly. Open-source tools such as Docling and Unstructured, and cloud document services, do this. Vision-language models can also read pages directly.
+
+```text
+   file
+    |
+    v
+  what type?  digital PDF / scan / mixed / Word / slides / image
+    |
+    +-- digital --> text extraction or layout-aware parser
+    +-- scan    --> OCR (set languages) or a vision-language model
+    |
+    v
+  layout: columns -> reading order, headings -> section path, tables -> rows with headers
+    |
+    v
+  clean: strip repeated headers, footers, page numbers, watermarks
+    |
+    v
+  chunks with metadata: document, section path, page, OCR confidence
+```
+
+This lesson follows an insurance company in Kochi whose assistant found the right pages but still answered wrongly.
 
 ## How it works
 
@@ -43,6 +97,19 @@ reviewed_on: 2026-10-25
 
 **Check the output.** Sample pages and compare with the originals, especially tables and scanned pages. Track per document: pages, characters per page, tables found, OCR confidence.
 
+**What each approach handles:**
+
+| Problem | Text extraction | OCR | Layout-aware parsing |
+| --- | --- | --- | --- |
+| Digital text | Yes | Not needed | Yes |
+| Scanned pages | No: empty text | Yes | Yes, with OCR built in |
+| Two columns | Often mixed up | Often mixed up | Correct reading order |
+| Tables | Flattened | Flattened | Rows and columns kept |
+| Headings | Lost as plain text | Lost | Detected |
+| Speed and cost | Fastest, cheapest | Slower | Slowest, most accurate |
+
+A practical pattern: run cheap text extraction first, then send only pages that fail checks, such as low character counts or detected tables, through layout-aware parsing or OCR. That keeps cost down on large document sets.
+
 ## A worked example
 
 A Kochi insurance company's RAG assistant gives wrong answers about premiums and exclusions. Retrieval logs show the right pages are found, but the text is garbled.
@@ -58,6 +125,14 @@ You switch to a layout-aware parser for all PDFs, with OCR enabled for English a
 
 On the 80-question golden set, correct answers rise from 62% to 84% without any change to retrieval or prompts. Twelve pages still have OCR confidence below the threshold; you list them for the client, who supplies better scans for nine.
 
+| Problem found | Fix | |
+| --- | --- | --- |
+| Two-column wordings merged | Layout-aware parser | |
+| Flattened premium tables | One line per row, headers repeated | |
+| 70 scanned endorsements | OCR for English and Malayalam | |
+| Repeated header and footer | Stripped before chunking | |
+| Result on the 80-question golden set | 62% to 84% correct, with no change to retrieval or prompts | |
+
 ## Common mistakes
 
 - **One extractor for everything.** Scans, digital PDFs and slides need different handling.
@@ -65,6 +140,8 @@ On the 80-question golden set, correct answers rise from 62% to 84% without any 
 - **Ignoring reading order.** Multi-column pages are common in policies, circulars and reports.
 - **English-only OCR.** Set the languages your documents use.
 - **Never comparing output with the page.** Ten minutes of spot checks finds most parsing bugs.
+
+- **Never looking at the parsed text.** Print a few parsed pages next to the original before indexing anything.
 
 ## Practise
 

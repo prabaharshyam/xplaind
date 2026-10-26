@@ -9,11 +9,44 @@ hours: 4
 gap_tags: []
 primary_resource: okta-oauth-oidc-guide
 alternates: [auth0-oidc, auth0-saml]
-format: explainer
+format: deep
 key_terms: [sso, oauth, oidc, saml]
 check:
   type: mcq
   question_ids: [single-sign-on-1, single-sign-on-2, single-sign-on-3]
+flashcards:
+  - q: "What is single sign-on?"
+    a: "Signing in once with a company account through the identity provider to reach every approved app, without new passwords."
+  - q: "What is the difference between OAuth 2.0 and OpenID Connect?"
+    a: "OAuth 2.0 grants limited permission through access tokens; OIDC adds sign-in, with an ID token saying who the user is."
+  - q: "What is SAML 2.0?"
+    a: "An older XML-based SSO standard still used by many large enterprises and government bodies."
+  - q: "Which OIDC flow is recommended for web apps?"
+    a: "The authorisation code flow with PKCE: redirect to the provider, receive a code, and exchange it on the server for tokens."
+  - q: "What must be checked when validating an ID token?"
+    a: "Signature, issuer, audience and expiry, every time, using a maintained library."
+  - q: "What are group claims used for?"
+    a: "Deciding what the user may do in your app and which documents they may retrieve."
+  - q: "What is the on-behalf-of flow?"
+    a: "Exchanging the user's token for one scoped to a downstream system, so that system applies the user's own permissions."
+  - q: "Why request app registration early?"
+    a: "Identity teams at large companies have queues and approvals; registration can take days or weeks."
+exercise:
+  title: "Plan the sign-in"
+  setup: "You are deploying a contracts assistant for a Mumbai conglomerate that uses Okta. It must be used by the legal team and some finance staff, must read contracts from Box with each user's own permissions, and the client's security team has said the app must not store any passwords. Your first build uses a shared Box service account and email-and-password login."
+  questions:
+    - q: "What should replace the email-and-password login?"
+      a: "OIDC sign-in through Okta with the code flow and PKCE, using a maintained library, so the app never handles passwords."
+    - q: "What should the app registration request include?"
+      a: "Redirect URLs for staging and production, the allowed groups such as legal and finance-contracts, the claims needed, and Box access."
+    - q: "What is wrong with the shared Box service account?"
+      a: "It bypasses user permissions, so a finance user could see contracts only legal may see. Use user-delegated access instead."
+    - q: "How do you restrict the assistant to legal and finance staff?"
+      a: "Assign only those groups in Okta and check the group claim in the app, rejecting users outside them."
+ask:
+  - "What is the difference between OAuth and OpenID Connect?"
+  - "How does the OIDC code flow with PKCE work?"
+  - "Should I use SAML or OIDC?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -28,6 +61,23 @@ Three standards matter:
 - **OAuth 2.0**: lets an app act on a user's behalf with limited, revocable permission, using access tokens. On its own it is about permission, not identity.
 - **OpenID Connect (OIDC)**: a sign-in layer on top of OAuth 2.0. The app receives an **ID token** saying who the user is, with claims such as email, name and group memberships. Most new apps use OIDC.
 - **SAML 2.0**: an older, XML-based SSO standard. Many large Indian enterprises and government bodies still use it for internal apps.
+
+```text
+   user           your app (server)            identity provider (Entra ID, Okta)
+    |  open app        |                                |
+    |----------------->|  redirect to sign in           |
+    |<-----------------|------------------------------->|
+    |  password + MFA  (only the provider sees these)   |
+    |-------------------------------------------------->|
+    |  redirect back with a short-lived code            |
+    |<--------------------------------------------------|
+    |----------------->|  exchange code for tokens  --->|
+                       |<--- ID token (who) + access token (what)
+                       |  verify signature, issuer, audience, expiry
+                       |  create session with user id, email, groups
+```
+
+This lesson follows a quality-documents assistant rolled out to plant staff at an automobile-parts manufacturer in Chennai.
 
 ## How it works
 
@@ -47,6 +97,19 @@ Three standards matter:
 
 **Use a library.** Never write token validation yourself. Use the provider's SDK or a well-known library for your framework.
 
+**Which standard to expect:**
+
+| Situation | Likely standard | Notes |
+| --- | --- | --- |
+| New web app, modern provider | OIDC | Simplest, JSON tokens, good libraries |
+| Large enterprise, older internal apps | SAML 2.0 | XML assertions; use a library or a gateway |
+| App calling an API for the user | OAuth 2.0 access tokens | Scope them narrowly |
+| AI app reading SharePoint or Box | OIDC sign-in plus on-behalf-of | The downstream system applies user permissions |
+
+**The registration request.** A one-page request saves days of back-and-forth. Include the app's name and purpose, redirect URLs for each environment, the groups that may use it, the claims needed (email, name, groups), whether the app calls other systems on the user's behalf and with what scopes, and a technical contact. Ask the identity team which groups already exist rather than inventing new ones, because creating and filling groups is often the slowest step.
+
+**Sessions after sign-in.** Once tokens are verified, keep a server-side session with a sensible lifetime, such as eight hours for plant shifts, and re-check group membership when the session renews. When IT disables an account, the next renewal fails and access ends.
+
 ## A worked example
 
 A Chennai automobile-parts manufacturer on Microsoft Entra ID wants your quality-documents assistant available to 1,200 plant staff.
@@ -56,6 +119,12 @@ Week one: you send the identity team a one-page request: app name, redirect URLs
 Your FastAPI backend uses a maintained OIDC library. After sign-in, it verifies the ID token and stores the user's id, email and groups in a session. Requests to SharePoint use an on-behalf-of token, so a Pune engineer can only retrieve documents their own SharePoint permissions allow.
 
 At go-live, contractors complain they cannot sign in. The token shows the `contractors` group is missing: the identity team had restricted the app to employees. One change in the provider's assignment fixes it. When a quality engineer leaves the company the following month, IT disables their account and their access to the assistant ends with no action from you.
+
+| Event | What happened | Who fixed it |
+| --- | --- | --- |
+| Week one | Registration request sent | You, to the identity team |
+| Go-live | Contractors could not sign in | Identity team added the group assignment |
+| A month later | An engineer left the company | IT disabled one account; access ended automatically |
 
 ## Common mistakes
 

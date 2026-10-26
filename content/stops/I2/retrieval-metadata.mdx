@@ -9,11 +9,44 @@ hours: 2
 gap_tags: []
 primary_resource: llamaindex-metadata
 alternates: [azure-search-security-trimming]
-format: explainer
+format: deep
 key_terms: [metadata-filter, citation, permission-aware-rag, chunking]
 check:
   type: mcq
   question_ids: [retrieval-metadata-1, retrieval-metadata-2, retrieval-metadata-3]
+flashcards:
+  - q: "What is metadata in RAG?"
+    a: "Information about a chunk rather than its text, such as document, section, page, dates, type, language and access groups."
+  - q: "What five jobs does metadata do?"
+    a: "Filters, citations, freshness, permissions, and better matching by adding context the chunk text lacks."
+  - q: "What is contextual text for a chunk?"
+    a: "The title and section path, or a one-sentence model-written context, prepended to the chunk before embedding."
+  - q: "Why use fixed vocabularies for metadata?"
+    a: "So filters match: 'HR', 'Human Resources' and 'hr dept' as free text break filtering."
+  - q: "How should superseded documents be handled?"
+    a: "Store effective dates and a 'superseded by' link, and filter superseded versions out by default unless the user asks about history."
+  - q: "Where can filters come from?"
+    a: "From the user's context, such as their state or access groups, or inferred from the question by a small model."
+  - q: "Why infer filters conservatively?"
+    a: "A wrong filter hides the right answer completely. Prefer user context and ask when unsure."
+  - q: "What is generated metadata, and what is its cost?"
+    a: "Summaries, keywords or likely questions written by a model per chunk; it costs a model call per chunk at ingestion, so measure the gain."
+exercise:
+  title: "Design the metadata"
+  setup: "A Bhopal state-government department builds an assistant over 6,000 government orders and circulars, in Hindi and English, issued since 2015. Many orders amend or cancel earlier ones. Some files are marked for internal use only. Officers ask questions like 'current TA rates for district officers' and 'what did the 2019 order on transfers say?'"
+  questions:
+    - q: "Which metadata fields matter most here?"
+      a: "Order number, issue date, effective dates, amends or supersedes links, subject, department, language, section and page, and access level."
+    - q: "How should the 'current TA rates' question be handled?"
+      a: "Filter to orders currently in force and exclude superseded ones, then cite the latest order with its number and date."
+    - q: "How should the '2019 order' question be handled?"
+      a: "Here the user asks about history, so include superseded orders and filter by issue year 2019."
+    - q: "What should happen with internal-only files?"
+      a: "Store an access level with each chunk and filter by the officer's clearance inside the search."
+ask:
+  - "What metadata should I store with each chunk?"
+  - "How do I handle document versions in RAG?"
+  - "Should I generate questions for each chunk?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -28,6 +61,23 @@ reviewed_on: 2026-10-25
 - **Freshness**: prefer or require current versions, drop superseded ones.
 - **Permissions**: decide who may see a chunk.
 - **Better matching**: add context the chunk text lacks, such as the document title or section path.
+
+```text
+  chunk text:  "This limit is 45 days."         <- hard to find on its own
+
+  stored with it:
+  +-------------------------------------------------------------+
+  | doc: Leave Policy 2026 (v4)     type: policy   lang: en     |
+  | section: Leave Policy > Earned leave > Carry forward        |
+  | page: 4    state: KA    effective: 2026-01-01 to (open)     |
+  | superseded_by: none     access: all-employees               |
+  +-------------------------------------------------------------+
+
+  embedded text: "Leave Policy 2026 > Earned leave > Carry forward: This limit is 45 days."
+  query filter:  state = user's state AND not superseded AND access in user's groups
+```
+
+This lesson follows an HR assistant at an IT company in Bengaluru serving employees in five states.
 
 ## How it works
 
@@ -51,6 +101,21 @@ reviewed_on: 2026-10-25
 
 **Consistency.** Use fixed vocabularies (department names, document types, region codes) so filters match. Validate metadata at ingestion like any other data.
 
+**A chunk record in practice:**
+
+| Field | Example | Used for |
+| --- | --- | --- |
+| `doc_id`, `title`, `url` | `HR-LP-2026`, Leave Policy 2026 | Citations and links |
+| `section_path`, `page` | Earned leave, Carry forward; page 4 | Precise citations, contextual text |
+| `doc_type` | `policy` | Filters |
+| `state` | `KA` | Filters from the user's profile |
+| `effective_from`, `effective_to` | 2026-01-01, open | Freshness |
+| `superseded_by` | none | Dropping old versions |
+| `language` | `en` | Filters, choosing analysers |
+| `access_groups` | `all-employees` | Permissions |
+
+**Validating metadata.** Treat metadata like any other data. At ingestion, check that required fields exist, that values come from the fixed lists, and that effective dates make sense, such as an end date after a start date. Reject or quarantine chunks that fail, and report counts per run. A single document tagged "Karnatka" instead of "KA" silently disappears from every Karnataka employee's search.
+
 ## A worked example
 
 A Bengaluru IT company's HR assistant serves employees in five states. Leave and holiday rules differ by state, and policies are revised each year.
@@ -60,6 +125,15 @@ Before: chunks carried only the file name. The assistant mixed Karnataka and Mah
 After re-ingestion, each chunk carries state, policy type, effective dates, version, section path and access groups. The employee's state comes from their sign-on profile and is applied as a filter unless they ask about another state. Superseded versions are excluded by default. Embedded text starts with the title and section path.
 
 On the 100-question golden set, correct answers rise from 71% to 90%. Citations now read "Leave Policy 2026, Karnataka, section 3.2, page 4", and HR staff can check them in seconds.
+
+| Measure on 100 questions | Before | After |
+| --- | --- | --- |
+| Correct answers | 71% | 90% |
+| Answers quoting the wrong state | 9 | 0 |
+| Answers quoting last year's policy | 7 | 1 |
+| Citation format | File name only | Document, state, section, page |
+
+**How the filter decision works.** When an employee in Bengaluru asks "how many holidays in October?", the assistant applies `state = KA` from their sign-on profile. When they ask "holidays in Pune office in October", a small model spots the different state, and the assistant asks "Do you mean the Maharashtra holiday list?" before filtering. Asking costs one tap; a wrong silent filter would have cost a wrong answer.
 
 ## Common mistakes
 

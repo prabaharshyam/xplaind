@@ -9,11 +9,44 @@ hours: 2
 gap_tags: []
 primary_resource: lost-in-the-middle
 alternates: [chroma-context-rot, claude-prompt-caching]
-format: explainer
+format: deep
 key_terms: [context-window, lost-in-the-middle, rag, caching]
 check:
   type: mcq
   question_ids: [long-context-vs-rag-1, long-context-vs-rag-2, long-context-vs-rag-3]
+flashcards:
+  - q: "What is the difference between long context and RAG?"
+    a: "Long context puts whole documents in the prompt; RAG retrieves only the most relevant passages and sends those."
+  - q: "What is 'lost in the middle'?"
+    a: "The finding that models use information in the middle of a long input less well than information near the start or end."
+  - q: "How does input length affect cost and speed?"
+    a: "You pay for every input token on every call, and time to first token rises with input length."
+  - q: "How does prompt caching change the trade-off?"
+    a: "When the same long document is reused across questions, cached input is much cheaper and faster after the first call."
+  - q: "When is long context the better choice?"
+    a: "For one or a few documents, many questions in a session, and questions needing the whole document such as summaries and cross-references."
+  - q: "When is RAG the better choice?"
+    a: "For large or growing collections, short factual questions and many users."
+  - q: "What is the middle-ground approach?"
+    a: "Retrieve at the document level to find the right few documents, then put those whole documents in context."
+  - q: "Where should the question go in a long prompt?"
+    a: "After the long material, together with the instructions."
+exercise:
+  title: "Pick the approach"
+  setup: "Three requests reach an AI team at a Pune engineering firm: (A) a manager wants to ask 20 questions about one 120-page tender document this afternoon, including 'Which clauses conflict with our standard terms?'; (B) 3,000 field engineers want quick answers from 18,000 equipment manuals that change weekly; (C) a lawyer wants to compare the indemnity terms across the five contracts with one client, out of 4,000 contracts in the system."
+  questions:
+    - q: "Which approach fits (A), and why?"
+      a: "Long context with caching: one document, many questions in a session, and conflict questions that need the whole document."
+    - q: "Which approach fits (B)?"
+      a: "RAG: the collection is far too large for any context window, changes weekly, and questions are short and factual."
+    - q: "Which approach fits (C)?"
+      a: "The middle ground: retrieve the five contracts by client metadata, then put those whole contracts in context for the comparison."
+    - q: "How should the team confirm choice (A) before relying on it?"
+      a: "Write test questions with known answers, run them with long context and with RAG, and compare accuracy, latency and cost."
+ask:
+  - "Is RAG still needed with long context models?"
+  - "How does prompt caching work?"
+  - "What is context rot?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -27,6 +60,22 @@ There are two ways to give a model the information it needs:
 - **Retrieval (RAG)**: search for the few most relevant passages and put only those in the prompt.
 
 Modern models accept very long inputs, so long context is often possible. Whether it is wise depends on accuracy, cost, latency and scale.
+
+```text
+  Long context                                 RAG
+  +---------------------------------+          +-----------------+
+  | whole contract (40,000 tokens)  |          | [chunk 12]      |   3,000 tokens
+  | ............................... |          | [chunk 37]      |
+  | ............................... |          | [chunk 41]      |
+  | instructions + question (end)   |          | question        |
+  +---------------------------------+          +-----------------+
+   sees everything, cross-references            cheap, fast, scales to millions
+   costly unless cached, slower                 misses what retrieval misses
+
+  Middle ground:  find the right 2 documents  -->  send them whole
+```
+
+This lesson follows a law firm in Chennai building a contract-review assistant with two very different uses.
 
 ## How it works
 
@@ -46,6 +95,22 @@ Modern models accept very long inputs, so long context is often possible. Whethe
 
 **Hybrid habits.** Even with long context, put the instructions and the question at the end, ask for citations to sections or pages, and keep the documents in a consistent, labelled format.
 
+**Comparing the options:**
+
+| Factor | Long context | RAG |
+| --- | --- | --- |
+| Corpus size | Up to the context window | Unlimited |
+| Questions needing the whole document | Strong | Weak, depends on chunking |
+| Short factual lookups | Fine but costly | Strong |
+| Cost per question | High uncached, lower with caching | Low |
+| Latency | Higher, lower with caching | Low |
+| Changing documents | Resend each time | Re-index changed items |
+| Engineering effort | Low | Higher: chunking, indexing, retrieval tuning |
+
+**A worked cost comparison.** Suppose input costs a fixed price per million tokens. Sending a 40,000-token contract with each of 12 questions means about 480,000 input tokens. With caching, later calls read the cached contract at a fraction of the normal price, so the total can drop to around a quarter. RAG sends about 3,000 tokens per question, 36,000 in total, which is cheaper still but scored worse on cross-reference questions. The right choice weighs accuracy against these costs for the task at hand, not cost alone.
+
+**Testing on your own documents.** Published studies give warnings, not answers. Write questions where the answer sits early, in the middle and late in the document, and questions that need two distant sections. Run them both ways and read the failures.
+
 ## A worked example
 
 A Chennai law firm wants an assistant for contract review. Two use cases:
@@ -55,6 +120,11 @@ A Chennai law firm wants an assistant for contract review. Two use cases:
 *Searching the firm's precedent library.* 25,000 past contracts, far beyond any context window. Lawyers ask "Find indemnity clauses capped at fees paid in the last 12 months in IT services contracts." You use hybrid retrieval with metadata filters to find the best 20 clauses, then a model summarises them with citations.
 
 The firm gets both, each where it fits.
+
+| Use case | Approach | Accuracy | Notes |
+| --- | --- | --- | --- |
+| Reviewing one 60-page contract | Long context, cached | 90% | Chunk-based RAG scored 73% |
+| Searching 25,000 precedents | Hybrid retrieval with filters | Measured by recall | Far beyond any window |
 
 ## Common mistakes
 

@@ -9,11 +9,44 @@ hours: 3
 gap_tags: [vector-search]
 primary_resource: hf-semantic-search-faiss
 alternates: [anthropic-contextual-retrieval]
-format: explainer
+format: deep
 key_terms: [vector-database, semantic-search, cosine-similarity, reranking]
 check:
   type: mcq
   question_ids: [vector-search-1, vector-search-2, vector-search-3]
+flashcards:
+  - q: "What is vector search?"
+    a: "Finding the chunks whose embeddings are closest to the question's embedding; the retrieval step in most RAG systems."
+  - q: "What is top-k?"
+    a: "The number of closest results returned. Too few misses the right chunk; too many fills the prompt with noise."
+  - q: "What is the difference between exact and approximate search?"
+    a: "Exact compares with every vector and is slow at scale; approximate indexes such as HNSW find nearly the same results far faster."
+  - q: "Name three places to store vectors."
+    a: "A library such as FAISS, a database extension such as pgvector, or a vector database such as Qdrant, Weaviate or Pinecone."
+  - q: "Where does vector search struggle?"
+    a: "On exact identifiers and rare terms: error codes, policy numbers, SKUs and uncommon names."
+  - q: "What does a reranker add?"
+    a: "It reads the question and each candidate together and reorders them more accurately than embedding similarity."
+  - q: "Why filter inside the search?"
+    a: "So only eligible chunks, such as the right product, current versions or permitted documents, compete for the top-k."
+  - q: "What must happen when you change embedding models?"
+    a: "Rebuild the whole index, because vectors from different models cannot be compared."
+exercise:
+  title: "Tune the retrieval"
+  setup: "A Coimbatore pump manufacturer's service assistant indexes 1,800 manuals in pgvector. Problems: (1) 'fault code P-27 on model KX-5' returns general troubleshooting pages; (2) answers sometimes come from manuals for other pump models; (3) with top-k of 2, the right chunk is often missing; with top-k of 20 sent to the model, answers wander; (4) after the team switched embedding models last week, results got much worse."
+  questions:
+    - q: "How do you fix (1)?"
+      a: "Add keyword search for codes and model numbers and merge it with vector search."
+    - q: "How do you fix (2)?"
+      a: "Store the pump model as metadata and filter by it inside the search."
+    - q: "How do you resolve (3)?"
+      a: "Retrieve 20 to 30 candidates, rerank them, and send the best five to the model; check recall on a test set."
+    - q: "What probably caused (4)?"
+      a: "Old chunks were embedded with the previous model and queries with the new one. Rebuild the index with the new model."
+ask:
+  - "What is HNSW and how does it work?"
+  - "Should I use pgvector or a dedicated vector database?"
+  - "How do I choose top-k?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -28,6 +61,21 @@ reviewed_on: 2026-10-25
 3. Return the **top-k** most similar chunks (for example the five closest).
 
 The store can be a library such as FAISS in your program, a database extension such as pgvector in PostgreSQL, or a dedicated vector database such as Qdrant, Weaviate or Pinecone.
+
+```text
+  INDEX (once)                                  QUERY (each question)
+  chunk 1 --embed--> [0.12, -0.40, ...]         "washing machine E-4012 won't drain"
+  chunk 2 --embed--> [0.33,  0.08, ...]                  | embed (same model)
+  ...                                                     v
+  chunk N --embed--> [-0.21, 0.55, ...]         [0.30, 0.10, ...]
+          + metadata: product, type, page                 |
+                                                          v
+                         nearest neighbours (filtered by product model)
+                                  |
+                       top 30 --> [rerank] --> top 5 --> prompt
+```
+
+This lesson follows a support assistant at an electronics retailer in Hyderabad, built over product manuals and help articles.
 
 ## How it works
 
@@ -45,6 +93,20 @@ The store can be a library such as FAISS in your program, a database extension s
 
 **Keeping the index in sync.** When documents change, delete their old vectors and add new ones; if you change the embedding model, rebuild everything.
 
+**Choosing a store:**
+
+| Store | Best for | Trade-offs |
+| --- | --- | --- |
+| FAISS in your program | Experiments, offline jobs | No database features; you manage persistence |
+| pgvector in PostgreSQL | Apps already on Postgres, up to millions of chunks | One system for data, metadata and vectors |
+| Dedicated vector database | Very large indexes, heavy traffic | Another system to run and secure |
+
+**How an approximate index works.** HNSW builds a graph where each vector links to some of its near neighbours, in layers from coarse to fine. A search starts at the top layer, jumps towards vectors closer to the query, and refines in lower layers. It checks a small fraction of the vectors yet usually finds almost all of the true nearest ones. Settings trade speed against how many true neighbours are found, so measure recall when you change them.
+
+**Choosing top-k with evidence.** Build a test set of questions with the chunk that should be found. Measure recall at 1, 5, 10 and 30. If recall at 30 is much higher than at 5, retrieve more and add a reranker. If it is low even at 30, the problem is earlier: parsing, chunking or the embedding model.
+
+**Keeping the index in sync, in practice.** Give every chunk an id built from its document id and position, such as `manual-KX5-p12-c3`. When a document changes, delete all chunks with that document id and insert the new ones in one transaction, so searches never see half an update. Record the embedding model name with every vector. A nightly check that counts vectors per model catches the mistake in the exercise above, where old and new embeddings were mixed in one index.
+
 ## A worked example
 
 A Hyderabad electronics retailer builds a support assistant over 3,000 product manuals and help articles.
@@ -54,6 +116,15 @@ A Hyderabad electronics retailer builds a support assistant over 3,000 product m
 - They add keyword search and merge the two result lists; the error-code page now ranks first.
 - They add a reranker over the top 30; on a test of 60 questions, the right chunk appears in the top five 91% of the time, against 72% with vector search alone.
 - A filter on the customer's product model removes manuals for other models.
+
+| Set-up on 60 questions | Right chunk in top five |
+| --- | --- |
+| Vector search alone | 72% |
+| Plus keyword search, merged | Error-code questions fixed |
+| Plus reranker over top 30 | 91% |
+| Plus product-model filter | Wrong-model manuals removed |
+
+**What the retailer kept.** The team now runs its 60-question test after every change to chunking, embeddings, top-k or the reranker, and keeps the results in a table in the repository, so nobody has to remember why a setting was chosen.
 
 ## Common mistakes
 

@@ -10,11 +10,44 @@ gap_tags: [rag-pipeline]
 primary_resource: anthropic-contextual-retrieval
 alternates: [hf-semantic-search-faiss]
 more: [pinecone-rag-series, claude-cookbooks, ms-genai-for-beginners]
-format: explainer
+format: deep
 key_terms: [rag, retrieval, grounding, citation]
 check:
   type: project
   brief: "Push a RAG app over 20 or more documents that answers with sources and says when it does not know. Include a README with five example questions, the answers and which source each came from. Submit the repository link."
+flashcards:
+  - q: "What are the three steps of RAG?"
+    a: "Retrieve relevant passages, augment the prompt with them, and generate an answer that uses and cites only those passages."
+  - q: "Why do companies choose RAG over training a model?"
+    a: "It needs no training and stays current when documents change; you re-index instead of retraining."
+  - q: "What happens at ingestion?"
+    a: "Load documents, extract clean text, chunk with titles and pages, embed each chunk and store it with metadata."
+  - q: "What is contextual retrieval?"
+    a: "Adding a short description of where a chunk sits in its document before embedding, combined with keyword search, to reduce retrieval failures."
+  - q: "Why must a RAG app be able to refuse?"
+    a: "When the documents are silent, a model without a refusal path guesses, and users cannot tell."
+  - q: "How should you evaluate a RAG app?"
+    a: "With a fixed question set with expected sources and answers, measuring retrieval (recall at k) and answers (correctness, faithfulness) separately."
+  - q: "Where do most RAG failures come from?"
+    a: "Retrieval: the right passage was never found, often because of parsing, chunking or missing keyword search."
+  - q: "How do you keep a RAG app current and safe?"
+    a: "Re-index changed documents, filter superseded ones, and filter retrieval by each user's permissions."
+exercise:
+  title: "Plan the RAG app"
+  setup: "A Visakhapatnam port authority wants a staff assistant over 120 documents: tariff schedules (tables), standard operating procedures, scanned older circulars and a monthly notice that replaces the previous month's. Staff have different clearance levels. The first prototype answers well in a demo but nobody has measured it."
+  questions:
+    - q: "What must ingestion handle specially?"
+      a: "Tables in the tariff schedules, OCR for scanned circulars, and keeping headings and page numbers for citations."
+    - q: "How do you deal with the monthly notice?"
+      a: "Store effective dates, mark the previous notice superseded, and filter superseded documents out by default."
+    - q: "How do clearance levels affect retrieval?"
+      a: "Store access groups with each chunk and filter retrieval by the user's groups, so restricted passages never reach the prompt."
+    - q: "What should the first test set contain?"
+      a: "About 50 real staff questions with expected sources and answers, including at least ten unanswerable ones."
+ask:
+  - "How do I build my first RAG app?"
+  - "Which vector database should I use for RAG?"
+  - "How do I evaluate a RAG system?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -29,6 +62,19 @@ A **RAG app** (retrieval-augmented generation) answers questions from your own d
 3. **generates** an answer that uses only those passages and cites them.
 
 It is the most common way companies use language models on their own data, because it needs no model training and stays current when documents change.
+
+```text
+  INGESTION (once, then on updates)
+  PDFs --> [extract text, OCR] --> [chunk by heading, ~400 tokens, title + section]
+       --> [embed] --> index (pgvector) with metadata: doc, page, section, dates
+
+  QUERY TIME
+  question --> [hybrid search: vectors + keywords] --> top 20 --> [rerank] --> top 5
+           --> prompt: instructions + [1]..[5] with sources + question
+           --> model --> answer with citations [2][4]  or  "I could not find this..."
+```
+
+This lesson follows a college in Coimbatore building an assistant for students' questions about regulations, fees, exams and scholarships.
 
 ## How it works
 
@@ -49,6 +95,38 @@ It is the most common way companies use language models on their own data, becau
 
 **Freshness and access.** Re-index changed documents; filter out superseded ones; if users have different permissions, filter retrieval by what each user may see.
 
+**A minimal query function:**
+
+```python
+def answer(question, user):
+    hits = hybrid_search(question, k=20, filters={"access": user.groups})
+    top = rerank(question, hits)[:5]
+    passages = "\n\n".join(
+        f"[{i+1}] {h.title}, section {h.section}, page {h.page}\n{h.text}"
+        for i, h in enumerate(top)
+    )
+    prompt = (
+        "Answer using only the passages. Cite like [2] after each sentence. "
+        "If the passages do not answer the question, say so and name the office to contact.\n\n"
+        f"Passages:\n{passages}\n\nQuestion: {question}"
+    )
+    return call_model(prompt), top
+```
+
+Returning `top` along with the answer lets the interface link each citation to its document and page, and lets your logs show what was retrieved when an answer goes wrong.
+
+**What to measure first:**
+
+| Measure | Question it answers | Target to aim for |
+| --- | --- | --- |
+| Recall at 5 | Is the right passage retrieved? | Above 85% on the golden set |
+| Correctness | Is the answer right? | Agreed with the client |
+| Faithfulness | Is every claim supported by a passage? | Above 0.9 |
+| Refusal rate on unanswerable questions | Does it admit when documents are silent? | Above 75% |
+| Latency | Is it fast enough? | First words within 2 seconds |
+
+**Debugging a wrong answer.** Look at the retrieved passages first. If the right passage is missing, the problem is ingestion or retrieval: parsing, chunking, filters or search. If it is present and the answer is still wrong, the problem is the prompt or the model. This one check halves the time spent guessing.
+
 ## A worked example
 
 A college in Coimbatore builds an assistant for students' questions about academic regulations, fees, exams and scholarships, from 25 PDFs.
@@ -59,6 +137,14 @@ A college in Coimbatore builds an assistant for students' questions about academ
 - Interface: the answer shows citations that open the PDF at the right page.
 
 Testing with 50 questions (including eight unanswerable): 42 correct with correct citations, 6 of the 8 unanswerable correctly refused. Two failures came from a fee circular that was a scanned image; after OCR, both were fixed. Students now ask the assistant before queuing at the office, and staff answer fewer repeat questions.
+
+| Test set of 50 questions | Result |
+| --- | --- |
+| Answerable questions answered correctly with right citations | 42 of 42 after the OCR fix |
+| Unanswerable questions correctly refused | 6 of 8 |
+| Failures traced to a scanned fee circular | 2, fixed by OCR |
+
+**What the college learned.** The biggest single gain came from parsing, not from the model: once the scanned fee circular was readable, two wrong answers became right. Citations that opened the PDF at the right page made the office staff trust the assistant enough to point students to it, which is how usage grew.
 
 ## Common mistakes
 

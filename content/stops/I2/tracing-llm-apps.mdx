@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: langfuse-observability
 alternates: [otel-traces]
-format: explainer
+format: deep
 key_terms: [tracing, span, observability, cost-per-request]
 check:
   type: mcq
   question_ids: [tracing-llm-apps-1, tracing-llm-apps-2, tracing-llm-apps-3]
+flashcards:
+  - q: "What is a trace?"
+    a: "A record of one request from start to finish, made of nested spans, one per step, with inputs, outputs and timings."
+  - q: "What does a model-call span record?"
+    a: "Inputs, outputs, start and end times, the model name, token counts and cost."
+  - q: "How do traces differ from ordinary logs?"
+    a: "Logs say something happened; traces show each step's inputs and outputs, so you can see why the system answered as it did."
+  - q: "What attributes help most when debugging?"
+    a: "A pseudonymous user id, session id, app version, prompt version, and retrieved document ids with scores."
+  - q: "What privacy steps do traces need?"
+    a: "Mask or omit personal data before sending, set a retention period, restrict viewers, and use an in-region tool when required."
+  - q: "How should traces be sampled at high volume?"
+    a: "Keep all traces with errors or poor feedback, and a sample of the rest."
+  - q: "What is the first question when opening a bad answer's trace?"
+    a: "Was the right passage retrieved and put in the prompt? That separates retrieval failures from generation failures."
+  - q: "What is OpenTelemetry?"
+    a: "The common open standard for traces, which many AI tracing tools build on."
+exercise:
+  title: "Read the trace"
+  setup: "A Jaipur bank's assistant told a customer the fixed-deposit rate for senior citizens is 7.1%; the current rate is 7.6%. The trace shows: rewrite_query 0.3 s 'senior citizen FD rate'; hybrid_search top: doc 'FD rates April 2026' (0.74), 'FD rates October 2026' (0.72); rerank keeps the April document first; generate 2.1 s quotes 7.1% from the April document. The trace has no prompt version tag."
+  questions:
+    - q: "Is this a model failure or a retrieval failure?"
+      a: "Retrieval. The model faithfully quoted the top passage, which was an out-of-date rate sheet."
+    - q: "What fix does the trace point to?"
+      a: "Store effective dates with rate sheets and filter superseded ones, so only the October sheet is eligible."
+    - q: "What is missing from the trace, and why does it matter?"
+      a: "The prompt version. Without it, you cannot tell whether a recent prompt change played a part."
+    - q: "What should happen to this trace afterwards?"
+      a: "Save it as an eval case in the golden set, so stale-rate retrieval is tested from now on."
+ask:
+  - "What should I record in an LLM trace?"
+  - "Which tools can I use for tracing LLM apps?"
+  - "How do I keep personal data out of traces?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -24,6 +57,17 @@ reviewed_on: 2026-10-25
 A **trace** records one request from start to finish. It is made of **spans**, one per step: the query rewrite, the retrieval, the reranker, each model call, each tool call. Every span stores its inputs, outputs, start and end times, and for model calls the model name, token counts and cost. Spans nest, so you see that the agent's third tool call happened inside the second model turn.
 
 Ordinary application logs tell you that something happened. Traces of an AI system tell you why it answered what it did. Open-source tools such as Langfuse and Arize Phoenix, commercial ones, and the cloud providers' own tools all store and display traces. Many are built on OpenTelemetry, the common standard for traces.
+
+```text
+  trace 8f3a  (one citizen question)                          3.8 s   ₹0.42
+  ├─ rewrite_query      0.4 s   in: question    out: search text
+  ├─ hybrid_search      0.3 s   out: doc ids + scores
+  ├─ rerank             0.2 s   out: reordered ids
+  └─ generate           2.9 s   model, tokens in/out, cost, output text
+       tags: user=anon-5521  session=s-901  app=2.4.0  prompt=v17
+```
+
+This lesson follows a state-government helpdesk assistant in Bhubaneswar that gave a farmer the wrong scheme amount.
 
 ## How it works
 
@@ -40,6 +84,19 @@ Ordinary application logs tell you that something happened. Traces of an AI syst
 - *Improve*: save interesting traces to a dataset; they become eval cases.
 
 **Sampling.** At high volume, keep all traces with errors or low feedback, and a sample of the rest.
+
+**What each tool type offers:**
+
+| Option | Strengths | Consider when |
+| --- | --- | --- |
+| Open-source, self-hosted (Langfuse, Phoenix) | Data stays with you; free to run | The client needs in-region or on-premises data |
+| Commercial hosted tools | Less to operate; extra analysis features | Speed matters and data rules allow it |
+| Cloud provider's tracing | Fits the existing cloud stack | The app already runs on that cloud |
+| Plain OpenTelemetry with your own store | Full control, standard format | You already run observability tooling |
+
+**A weekly trace review.** Set aside thirty minutes each week. Pull traces with poor user feedback, errors or unusually high cost, and a random sample of ordinary ones. For each bad answer, note the failing step: query rewrite, retrieval, reranking, prompt or model. Count the notes. After a few weeks the counts show where engineering effort pays off, and the saved traces become a growing set of eval cases grounded in real use.
+
+**Cost and latency by step.** Because every span records time and tokens, totals by step are easy to chart. Teams are often surprised: a query-rewrite call on a large model can cost more than the answer itself, or a reranker can add more delay than the model does.
 
 ## A worked example
 
@@ -58,6 +115,13 @@ trace 8f3a  user=anon-5521  app=2.4.0  prompt=v17   3.8 s  ₹0.42
 Doc 87 is a 2019 press note about a proposal to double the instalment. It ranked first after reranking, above the current scheme guideline. The model faithfully quoted it. The bug is not the model; it is a stale document without an effective date.
 
 You add `effective_from` metadata and a filter, re-run the trace's query in a test, and save this trace to the golden set so the case is tested from now on. The whole investigation took fifteen minutes because every step was recorded.
+
+| Step in the investigation | Time taken |
+| --- | --- |
+| Find the session's trace by user and time | 2 minutes |
+| See that a 2019 press note ranked first | 3 minutes |
+| Add effective dates and a filter, re-run the query | 8 minutes |
+| Save the trace as a golden-set case | 2 minutes |
 
 ## Common mistakes
 

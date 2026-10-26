@@ -10,11 +10,44 @@ gap_tags: [embeddings]
 primary_resource: hf-semantic-search-faiss
 alternates: []
 more: [pinecone-rag-series, hf-llm-course]
-format: explainer
+format: deep
 key_terms: [embedding, cosine-similarity, semantic-search, vector-database]
 check:
   type: mcq
   question_ids: [embeddings-1, embeddings-2, embeddings-3]
+flashcards:
+  - q: "What is an embedding?"
+    a: "A list of numbers that stands for the meaning of a piece of text, so texts with similar meanings get vectors pointing in similar directions."
+  - q: "Why can embeddings find 'refund policy' from 'how do I get my money back'?"
+    a: "The two texts share no words but have similar meanings, so their vectors sit close together."
+  - q: "What is cosine similarity?"
+    a: "A score comparing the direction of two vectors: 1 means the same direction, around 0 means unrelated."
+  - q: "Can you compare vectors from two different embedding models?"
+    a: "No. Each model has its own space. Switching models means re-embedding everything."
+  - q: "Why chunk long documents before embedding?"
+    a: "One vector for a long document loses detail, and text past the model's input limit is silently cut off."
+  - q: "Is a similarity score of 0.62 a 62% chance of relevance?"
+    a: "No. Scores are only for ranking, and good thresholds differ by model, so set cut-offs from your own data."
+  - q: "Where are embeddings weak?"
+    a: "On exact terms such as order numbers, product codes and rare names. Pair them with keyword search for those."
+  - q: "When do you need a vector database?"
+    a: "When you have millions of vectors. For a few thousand, a NumPy array and a dot product are enough."
+exercise:
+  title: "Choose the embedding setup"
+  setup: "A Jaipur travel company wants semantic search over 15,000 FAQ answers and 40,000 customer reviews, in English and Hindi. Queries include 'refund kab milega', 'cancel my Goa trip' and booking ids like 'TRV-88213'. An engineer suggests embedding each review as one vector, using a top English-only leaderboard model, and showing results above a score of 0.7."
+  questions:
+    - q: "What is wrong with the model choice?"
+      a: "Customers write in Hindi and Hinglish. Choose a multilingual model and test candidates on twenty real queries before deciding."
+    - q: "How will the booking id query fail, and what fixes it?"
+      a: "Embeddings are weak on exact codes. Add keyword search, or route id-shaped queries to a direct lookup."
+    - q: "Is the 0.7 threshold sensible?"
+      a: "Not without evidence. Thresholds differ by model; pick one by checking scores on labelled relevant and irrelevant pairs."
+    - q: "Do 55,000 texts need a vector database?"
+      a: "Not necessarily. A normalised NumPy array or pgvector in the existing Postgres handles it; a dedicated database is optional."
+ask:
+  - "How do embeddings capture meaning?"
+  - "Which embedding model should I use for Indian languages?"
+  - "What is the difference between cosine similarity and dot product?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -28,6 +61,21 @@ That is the trick behind semantic search. "How do I get my money back?" and "ref
 
 You will use embeddings for search, RAG, finding duplicate tickets, grouping customer feedback by theme and recommending similar items.
 
+```text
+  "How do I get my money back?"  --[embedding model]-->  [0.12, -0.40, 0.88, ...]  \
+                                                                                      > close: similar meaning
+  "Refund policy"                --[embedding model]-->  [0.10, -0.37, 0.91, ...]  /
+
+  "Video buffers on mobile data" --[embedding model]-->  [-0.65, 0.22, 0.05, ...]     far: different meaning
+
+        meaning space (squashed to 2-D)
+            refund *  * money back
+                        * double charge
+                                            * buffering
+```
+
+This lesson follows a support team at an edtech company in Chennai that wants agents to see similar solved tickets.
+
 ## How it works
 
 1. **An embedding model reads the text.** It is a neural network trained on huge numbers of text pairs that should match (a question and its answer, a title and its article) and pairs that should not. Training pushes matching pairs closer together.
@@ -36,6 +84,16 @@ You will use embeddings for search, RAG, finding duplicate tickets, grouping cus
 4. **You store vectors to search later.** For a few thousand texts, a NumPy array is enough. For millions, a vector database such as pgvector, Qdrant or Pinecone finds the nearest vectors quickly using an approximate index.
 
 Two practical points. First, embed the query and the documents with the same model. Second, an embedding model has its own input limit, often a few hundred tokens, and quietly cuts off anything longer. That is one reason long documents are split into chunks before embedding.
+
+**Choosing a model:**
+
+| Option | Size and cost | Good for |
+| --- | --- | --- |
+| Small open model (such as MiniLM) | Runs on a laptop, free | Prototypes, English text, thousands of items |
+| Larger open multilingual model | Needs a GPU for speed, free to run | Indian languages, Hinglish, better quality |
+| Hosted embedding API | Pay per token, no servers | Fast start, large scale, managed updates |
+
+**Testing before you choose.** Collect twenty real queries with the ticket or passage that should come first for each. Embed everything with two or three candidate models and count how often the right item lands in the top three. This takes an afternoon and beats any public leaderboard, because it uses your users' words, spellings and languages. Repeat the test whenever you consider switching models, since a switch means re-embedding the whole collection.
 
 ## A worked example
 
@@ -63,6 +121,8 @@ for i in np.argsort(-scores[:, 0])[:2]:
 The top result is the first ticket, even though the query says "UPI debited" and "no access" while the ticket says "payment deducted" and "not unlocked". The second is the double-charge ticket: also about money, so close, but less so. The buffering ticket comes last.
 
 Now try "certificate name spelling mistake". It should match the certificate ticket strongly and everything else weakly. If it does not, something is wrong with how you encode or compare.
+
+**What the team measured.** On 30 real agent queries, the small English model put the right ticket in the top three 22 times. A multilingual model did it 27 times, mostly by catching queries written in Tamil-English mix such as "payment cut aachu, course open aagala". The team chose the multilingual model and kept a keyword search for order ids, which neither model handled well.
 
 ## Common mistakes
 

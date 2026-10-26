@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: owasp-logging-cheatsheet
 alternates: [langfuse-observability]
-format: explainer
+format: deep
 key_terms: [audit-log, logging, tracing, pii]
 check:
   type: mcq
   question_ids: [audit-logs-1, audit-logs-2, audit-logs-3]
+flashcards:
+  - q: "What is an audit log?"
+    a: "A record of significant events: who did what, when, to which data and with what result, kept for accountability."
+  - q: "How do audit logs differ from application logs and traces?"
+    a: "Application logs and traces help engineers debug and change freely. Audit logs answer accountability questions and must be complete, consistent and tamper-resistant."
+  - q: "What events should an AI system audit?"
+    a: "Sign-ins, questions and answers or references to them, documents retrieved, tool actions, approvals and rejections, configuration changes and admin actions."
+  - q: "What fields should every audit event have?"
+    a: "Timestamp with time zone, actor, action, target, outcome, a request or trace id, and the app, prompt and model versions in force."
+  - q: "What must never be in an audit log?"
+    a: "Passwords, tokens and full card numbers. Personal data is usually stored as ids or hashes, with full text in a more restricted store."
+  - q: "How do you make audit logs tamper-resistant?"
+    a: "Write them to an append-only store that application code cannot edit or delete, restrict who can read them, and log access to the log itself."
+  - q: "Why use the identity from single sign-on?"
+    a: "So the actor is verified, not a name the user typed, which makes the record trustworthy."
+  - q: "How does the DPDP Act affect audit logs?"
+    a: "Personal data must not be kept longer than needed, so define retention and store personal details separately with shorter retention where possible."
+exercise:
+  title: "Write the audit events"
+  setup: "A hospital in Lucknow uses an AI assistant to draft insurance pre-authorisation letters. Dr Rao (user id doc-118) asks for a draft for patient P-5521 at 10:15 IST; the assistant retrieves the patient's admission note and the insurer's policy document; it drafts a letter; at 10:40 the billing manager (user id bil-007) edits the amount and approves sending it."
+  questions:
+    - q: "How many audit events should this produce, and what are they?"
+      a: "At least four: Dr Rao's request, the retrieval of two documents, the draft proposal, and the billing manager's edit and approval."
+    - q: "How should the agent's actions be attributed?"
+      a: "As 'agent on behalf of doc-118', so it is clear the AI acted for Dr Rao, not on its own."
+    - q: "What should the retrieval event record, and what should it not?"
+      a: "Document ids and versions, such as the policy document version. Not the full medical note text; link to it by id in a restricted store."
+    - q: "Why record the prompt and model versions?"
+      a: "If the letter is later disputed, you can show exactly which prompt and model produced the draft, and whether they have changed since."
+ask:
+  - "What is the difference between logs, traces and audit logs?"
+  - "What should an AI system record in its audit log?"
+  - "How long should audit logs be kept?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -29,6 +62,20 @@ An **audit log** is a record of significant events: who did what, when, to which
 
 For AI systems, audit events usually include sign-ins, every question and answer (or a reference to them), documents retrieved, tool actions taken, approvals and rejections, configuration changes (prompt, model, permissions) and admin actions.
 
+```text
+   Application logs        Traces                    Audit logs
+ +-----------------+   +----------------------+   +--------------------------+
+ | for: engineers  |   | for: quality, debug  |   | for: compliance, disputes|
+ | noisy, short    |   | every internal step  |   | who did what, when, to   |
+ | format changes  |   | of a request         |   | what, result             |
+ | days of history |   | weeks of history     |   | fixed shape, append-only |
+ +-----------------+   +----------------------+   | years, per policy        |
+                                                  +--------------------------+
+         linked by request id and trace id
+```
+
+This lesson follows a cooperative bank in Kochi that must explain to its ombudsman how an AI-assisted loan decision was made.
+
 ## How it works
 
 **A fixed event shape.** Each event has a timestamp in a stated time zone, the actor (user id, service, or "agent on behalf of user X"), the action, the target (document ids, record ids), the outcome, a request or trace id to link to details, and the versions in force (app, prompt, model).
@@ -40,6 +87,20 @@ For AI systems, audit events usually include sign-ins, every question and answer
 **Make it queryable.** Investigations need answers in minutes: "all actions on this customer record in March", "every refund the agent proposed that a person approved". Store events in a format your client's tools can search.
 
 **Clock and identity.** Use synchronised clocks and the verified identity from sign-on, never a name the user typed.
+
+**An audit event, field by field:**
+
+| Field | Example | Why |
+| --- | --- | --- |
+| Timestamp | `2026-05-03 11:02:14 IST` | When, in a stated time zone |
+| Actor | `user=emp-2213` or `agent (on behalf of emp-2213)` | Who, verified through sign-on |
+| Action | `ask`, `retrieve`, `propose`, `approve` | What happened |
+| Target | `customer=CUST-4471`, document ids | To what |
+| Outcome | `success`, `rejected`, `error` | With what result |
+| Links | `request=req-88a1 trace=tr-71f0` | Where to find details |
+| Versions | `prompt=v12 model=...` | What configuration produced it |
+
+**Retention and access in practice.** Agree retention with the client's compliance team before launch: for example, audit events for eight years to match financial record rules, full question and answer text for 180 days in a restricted store, and application logs for 30 days. Give read access to the audit log to a small named group, such as compliance and security, not to the whole engineering team, and review that list every quarter.
 
 ## A worked example
 
@@ -58,6 +119,8 @@ Because every event was audited, the bank's compliance officer can produce, in a
 
 The history shows that the policy version used had since been revised, and that a manager approved the AI's recommendation within seven minutes. The bank reopens the case, and adds a rule that restructuring rejections need a written note from the approver. The audit log did not prevent the mistake, but it made it visible, fixable and explainable to the ombudsman.
 
+**What the bank changed afterwards.** Beyond the written-note rule, the bank added an alert when an approval follows an AI recommendation within two minutes on high-impact decisions, a sign of rubber-stamping, and a monthly report of how often managers override the agent's proposals.
+
 ## Common mistakes
 
 - **Using debug logs as the audit trail.** They are incomplete, editable and rotated away.
@@ -65,6 +128,8 @@ The history shows that the policy version used had since been revised, and that 
 - **Editable storage.** If an administrator can delete entries quietly, the log proves little.
 - **No version information.** Without prompt and model versions you cannot explain why the system behaved as it did then.
 - **Logging the agent as the actor.** Always record on whose behalf it acted, and who approved.
+
+- **Auditing only failures.** Disputes are usually about decisions that "worked". Record successful actions and approvals too.
 
 ## Practise
 

@@ -9,11 +9,44 @@ hours: 2
 gap_tags: []
 primary_resource: mlflow-prompt-registry
 alternates: [hamel-evals]
-format: explainer
+format: deep
 key_terms: [prompt-registry, regression-test, ci-cd, audit-log]
 check:
   type: mcq
   question_ids: [versioning-prompts-models-1, versioning-prompts-models-2, versioning-prompts-models-3]
+flashcards:
+  - q: "What besides code shapes an AI system's behaviour?"
+    a: "Prompts, the model and its snapshot, settings such as temperature, tool definitions and the retrieval configuration."
+  - q: "Where should prompts live?"
+    a: "In version control or a prompt registry, with changes reviewed and tested, not scattered strings or dashboard edits."
+  - q: "What does a prompt registry alias do?"
+    a: "The app asks for a prompt by alias, such as 'production'; moving the alias deploys or rolls back without a code release."
+  - q: "Why pin model snapshots?"
+    a: "Floating aliases can change behaviour when the provider updates the model, without any change on your side."
+  - q: "What is a release identifier?"
+    a: "One id bundling prompt versions, model, settings and index version, recorded in every trace and audit event."
+  - q: "What gate should every prompt change pass?"
+    a: "The golden set in CI, compared with the current release on quality, cost and latency."
+  - q: "How should provider deprecations be handled?"
+    a: "Track retirement dates, test the replacement early, and ship the switch as a normal tested release."
+  - q: "What does good rollback look like?"
+    a: "One action, such as moving an alias or redeploying the previous tag, done in minutes."
+exercise:
+  title: "Find what changed"
+  setup: "A Kochi travel company's booking assistant started recommending the wrong refund rules on Tuesday. Since Monday: the marketing team edited the system prompt in an admin panel; the gateway alias 'chat-default' started pointing to a newer model; and the index was rebuilt with a new chunk size. Traces record only the model alias."
+  questions:
+    - q: "Why can't the team tell which change caused the problem?"
+      a: "Three things changed without versions, and traces record only a floating alias, so nothing links answers to a specific combination."
+    - q: "What is the fastest way to restore service?"
+      a: "Restore the last known good combination: previous prompt, previous model snapshot and previous index, then test changes one at a time."
+    - q: "What should every trace record from now on?"
+      a: "A release id covering prompt versions, model snapshot, settings and index version."
+    - q: "How do you prevent unreviewed prompt edits?"
+      a: "Move prompts into the repository or a registry with owners, and require golden-set checks before promotion."
+ask:
+  - "How do I version prompts?"
+  - "What is a prompt registry?"
+  - "How do I prepare for a model deprecation?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -31,6 +64,23 @@ An AI system's behaviour depends on more than code:
 
 Versioning means each of these has an identifier, changes go through review and tests, the live combination is recorded with every request, and any previous combination can be restored.
 
+```text
+  release assistant-2026.11.3
+  +------------------------------------------------------+
+  | prompts:   support-system v12, refund-rules v4        |
+  | model:     dated snapshot (pinned, not floating)      |
+  | settings:  temperature 0.2, max tokens 800            |
+  | tools:     lookup_order v3, create_ticket v2          |
+  | retrieval: index 2026-11-01, chunks 400, top-k 5      |
+  +------------------------------------------------------+
+        | recorded in every trace and audit event
+        v
+  change --> golden set in CI --> staging --> production alias
+                                          <-- rollback: move alias back
+```
+
+This lesson follows the support assistant at a fintech in Gurugram, where three teams edited prompts directly in production.
+
 ## How it works
 
 **Prompts in version control.** Store prompts as files in the repository (or in a prompt registry), not as strings scattered through code or edited in a dashboard. Changes go through pull requests with evals in CI.
@@ -47,6 +97,20 @@ Versioning means each of these has an identifier, changes go through review and 
 
 **Rollback.** Keep the previous release ready. Rolling back should be one action: move the alias or redeploy the previous tag.
 
+**What to version and how:**
+
+| Part | How to version it | Typical change |
+| --- | --- | --- |
+| Prompts | Files in Git or a registry with numbered versions | Wording, examples, rules |
+| Model | Pinned dated snapshot, or a reviewed gateway alias | Upgrade to a newer model |
+| Settings | Config file in Git | Temperature, max tokens |
+| Tool definitions | Code in Git | New parameter or tool |
+| Retrieval | Index version and config in Git | Chunk size, top-k, reranker |
+
+**Change one thing at a time.** When a release changes the prompt, the model and the index together and quality drops, nobody can say which change did it. Ship them as separate releases where possible, each through the golden set. When several must ship together, such as a model switch that needs prompt adjustments, run the golden set on each step in staging so the effect of each part is known before production.
+
+**Model switches.** Treat a new model as a release candidate: run the full golden set, compare cost and latency, check refusals and tone on sample conversations in each language you serve, and roll out gradually. Prompts tuned for one model often need small changes for the next.
+
 ## A worked example
 
 A Gurugram fintech's support assistant had prompts edited directly in an admin panel by three teams. One Friday, complaint volume doubled. Nobody could say what had changed; traces showed only the model name.
@@ -61,6 +125,13 @@ The fix:
 
 Two months later a new prompt version passes evals but customer feedback dips in Hindi conversations. Traces show the dip started with release 2026.12.2. The team moves the alias back to 2026.12.1 in a minute, then adds 25 Hindi cases to the golden set, which reveal the problem. The fixed version ships the next day.
 
+| Event | Before versioning | After versioning |
+| --- | --- | --- |
+| Complaint spike | Nobody knew what changed | Traces pointed to release 2026.12.2 |
+| Rollback | Hours of guesswork | Alias moved back in a minute |
+| Root cause | Unknown | 25 new Hindi golden cases revealed it |
+| Fix shipped | Unclear | The next day, through CI |
+
 ## Common mistakes
 
 - **Prompts edited in production dashboards without review.** Changes become invisible.
@@ -68,6 +139,9 @@ Two months later a new prompt version passes evals but customer feedback dips in
 - **Versions not in traces.** You cannot link a quality change to a release.
 - **No golden-set gate.** Prompt changes are code changes; test them.
 - **Ignoring deprecation dates.** A forced last-minute switch is a risky release.
+
+- **Changing several parts in one release.** When quality drops, you cannot tell which part caused it.
+- **No owner per prompt.** Someone must approve each change and answer for its effect.
 
 ## Practise
 
