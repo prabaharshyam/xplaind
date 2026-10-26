@@ -9,11 +9,44 @@ hours: 2
 gap_tags: [regression-testing]
 primary_resource: hamel-evals
 alternates: []
-format: explainer
+format: deep
 key_terms: [regression-test, evals, ci-cd, golden-set]
 check:
   type: mcq
   question_ids: [regression-tests-1, regression-tests-2, regression-tests-3]
+flashcards:
+  - q: "What is a regression in an LLM app?"
+    a: "Something that used to work stops working after a change, such as a prompt tweak, model upgrade or new chunking setting."
+  - q: "What are the two tiers of regression tests?"
+    a: "Fast deterministic checks on every push, and fuller evals with judges before deploys or nightly."
+  - q: "What do fast checks typically cover?"
+    a: "The app starts, outputs parse, required fields exist, must-refuse inputs are refused, and a few critical cases pass."
+  - q: "How does a change pass the fuller eval?"
+    a: "Overall quality stays within a set tolerance of production, and no critical category drops at all."
+  - q: "How do you handle non-deterministic outputs in tests?"
+    a: "Use low temperature, judge on criteria rather than exact text, and run borderline cases more than once."
+  - q: "Why are model upgrades treated as changes?"
+    a: "A newer model can be better overall and worse on your specific cases or formats; decide from your evals."
+  - q: "Where should regression tests run?"
+    a: "In CI: fast checks on every pull request, blocking merges on failure, and the full eval before deploying."
+  - q: "What happens to every production bug?"
+    a: "It becomes a new regression test case."
+exercise:
+  title: "Set up the gates"
+  setup: "A Chennai insurtech's claims-summary feature returns JSON with fields claim_id, summary and risk_flags. Changes to prompts are made directly and checked by reading two outputs. Last month, a prompt change made risk_flags empty for motor claims, and a provider's model update changed date formats, breaking a downstream report. Both reached production."
+  questions:
+    - q: "What fast checks belong on every push?"
+      a: "Valid JSON with all three fields, date formats as expected, non-empty risk_flags where test cases expect them, and a few critical claims."
+    - q: "What would have caught the motor-claims problem?"
+      a: "The full eval scored by category, with motor claims as a category whose results cannot drop."
+    - q: "How should model updates be handled?"
+      a: "Pin model versions, and run the full eval plus fast checks before switching to any new version."
+    - q: "What should happen to these two incidents?"
+      a: "Each becomes test cases: motor claims expecting flags, and a date-format check used by the downstream report."
+ask:
+  - "How do I test prompt changes before deploying?"
+  - "How do I handle non-deterministic outputs in tests?"
+  - "Should I upgrade to a newer model version?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -24,6 +57,23 @@ reviewed_on: 2026-10-25
 A **regression** is when something that used to work stops working after a change. In LLM apps, regressions are common and quiet: a prompt tweak that fixes one case breaks three others; a model upgrade changes the output format; a new chunking setting improves most questions but loses one important document.
 
 **Regression tests** rerun your eval set automatically on every change so these breaks are caught before users see them.
+
+```text
+   pull request (prompt, model, retrieval or code change)
+        |
+        v
+   FAST TIER (every push, ~90 s)                    blocks merge on failure
+   app starts | JSON valid | 4 options, 1 answer | no duplicates | must-refuse cases | 15 critical cases
+        |
+        v
+   FULL TIER (before deploy or nightly)
+   120 cases, judge scores by category  vs  production baseline
+   overall within tolerance?  AND  no critical category down?  --> deploy
+        |
+   production bugs --> new test cases (both tiers as fits)
+```
+
+This lesson follows a quiz-generation feature at an edtech company in Noida that turns chapter text into multiple-choice questions.
 
 ## How it works
 
@@ -42,6 +92,18 @@ A **regression** is when something that used to work stops working after a chang
 
 **Add every bug.** Each production failure becomes a regression test case.
 
+**What goes in each tier:**
+
+| Tier | Runs | Contents | Time |
+| --- | --- | --- | --- |
+| Fast | Every push | Code checks on a small set, critical cases, must-refuse inputs | Seconds to minutes |
+| Full | Before deploy, nightly | Whole test set, judges, comparison by category | Minutes to an hour |
+| Model candidate | When a new model appears | Full tier plus format checks used downstream | As long as needed |
+
+**A CI workflow in words.** On each pull request, install dependencies, start the app with test settings, run the fast tier, and fail the job if any check fails. On merge to the main branch, or on a label such as "run full eval", run the full tier, compare scores with the stored production baseline by category, post a table to the pull request, and fail if a critical category dropped. Store every run's results with the commit, so you can chart quality over time and spot slow decline.
+
+**Setting tolerances.** Run the full tier several times on the same version to see how much scores move from randomness alone. Set the overall tolerance just above that noise. For critical categories, such as safety and refusals, allow no drop at all, and add more cases there so a single failure is clearly visible.
+
 ## A worked example
 
 A Noida ed-tech company's quiz-generation feature creates multiple-choice questions from chapter text, as JSON.
@@ -55,6 +117,11 @@ A developer shortens the prompt to cut costs. Fast checks pass. The full eval sh
 
 Months later, the provider's newer model scores 3 points higher overall but produces a different JSON field order that one old client parser cannot handle; the fast checks catch it, and the parser is fixed before switching.
 
+| Change | Fast tier | Full tier | Decision |
+| --- | --- | --- | --- |
+| Shortened prompt to save cost | Passed | History accuracy down 9 points | Reworked before release |
+| Newer provider model | Caught a JSON field-order change breaking an old parser | 3 points higher overall | Parser fixed, then switched |
+
 ## Common mistakes
 
 - **No automated tests for prompts.** Prompt changes are code changes.
@@ -62,6 +129,8 @@ Months later, the provider's newer model scores 3 points higher overall but prod
 - **Only averages.** Protect critical categories separately.
 - **Upgrading models without running evals.**
 - **Not adding production bugs to the test set.**
+
+- **Letting the fast tier grow slow.** If it takes more than a few minutes, people skip it. Move slow cases to the full tier.
 
 ## Practise
 

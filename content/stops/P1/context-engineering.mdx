@@ -10,11 +10,44 @@ gap_tags: []
 primary_resource: anthropic-context-engineering
 alternates: [claude-context-windows]
 more: [anthropic-agent-skills]
-format: explainer
+format: deep
 key_terms: [context-engineering, context-window, sub-agent, agent-memory]
 check:
   type: mcq
   question_ids: [context-engineering-1, context-engineering-2, context-engineering-3]
+flashcards:
+  - q: "What is context engineering?"
+    a: "Deciding everything the model sees on each call: system prompt, tools, examples, retrieved documents, memory, history and tool results."
+  - q: "Why treat context as a budget?"
+    a: "Models do worse as the window fills with irrelevant material: they miss details, lose the goal and cost more per step."
+  - q: "What is the right altitude for a system prompt?"
+    a: "Clear principles, the main steps and a few examples under headings: neither vague nor pages of rigid rules."
+  - q: "What is just-in-time retrieval?"
+    a: "Keeping light references such as file paths or ids in context and letting the agent fetch content when it needs it."
+  - q: "Why clear old tool results?"
+    a: "A large result used several steps ago is dead weight; replace it with a one-line note of what was found."
+  - q: "What is compaction?"
+    a: "Summarising the history into the goal, decisions, open questions and key facts when context nears its limit, then continuing from that."
+  - q: "Why keep structured notes outside the context?"
+    a: "A notes file or to-do list lets progress survive compaction on long tasks."
+  - q: "What is the first debugging step for a failing agent step?"
+    a: "Log and read the exact context the model received; the cause is usually visible there."
+exercise:
+  title: "Trim the context"
+  setup: "A Mumbai legal-tech agent reviews a company's 400 vendor contracts for renewal dates and penalty clauses. Each step currently sends: a 6,000-token system prompt of if-then rules, 18 tool definitions, every contract read so far in full, and every search result. After about 25 contracts it slows sharply, starts mixing up vendors, and then hits the context limit."
+  questions:
+    - q: "How would you change the system prompt?"
+      a: "Rewrite it as clear principles, the steps of a review and one worked example, much shorter than the rule list."
+    - q: "How should contracts reach the model?"
+      a: "One at a time, fetched on demand by id, with only that contract's relevant sections in context."
+    - q: "What happens to old results?"
+      a: "After each contract, write a one-line note of findings to a notes file and clear the contract text and search results."
+    - q: "What keeps the task on track over 400 contracts?"
+      a: "Periodic compaction into totals and open items, plus the notes file the agent rereads, so the goal and progress survive."
+ask:
+  - "What is the difference between prompt engineering and context engineering?"
+  - "How do I stop my agent's context from growing too large?"
+  - "What should a compaction summary keep?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -25,6 +58,21 @@ reviewed_on: 2026-10-25
 Prompt engineering is about writing a good instruction. **Context engineering** is about everything the model sees on a given call: the system prompt, the tool definitions, examples, retrieved documents, memory, the conversation so far and the results of earlier tool calls. For a one-shot question these are small. For an agent working through fifty steps they pile up, and the question becomes: what should be in the window right now, and what should not?
 
 Context is a budget. Even models with very long windows do worse as the window fills with irrelevant material: they miss details, lose track of the goal and cost more per step.
+
+```text
+   context window on step 37 (before)          context window on step 37 (after)
+   +-----------------------------------+        +-----------------------------------+
+   | system prompt (rules, 6k tokens)  |        | system prompt (principles, 1.5k)  |
+   | 12 tool definitions               |        | 4 tool definitions                |
+   | whole purchase register           |        | notes: pages 1-2 resolved, open:  |
+   | whole supplier filings            |        |   INV-7781, INV-7790              |
+   | 36 old tool results               |        | current page: 20 mismatches       |
+   | ... window full                   |        | 2 fresh tool results              |
+   +-----------------------------------+        +-----------------------------------+
+     confused suppliers, hit the limit            3,000 mismatches in one run
+```
+
+This lesson follows a GST reconciliation agent at a consultancy in Chennai.
 
 ## How it works
 
@@ -42,6 +90,20 @@ Context is a budget. Even models with very long windows do worse as the window f
 
 **Sub-agents.** Give a sub-task to a sub-agent with its own clean context and take back only its summary.
 
+**Where the tokens go:**
+
+| Part | Typical problem | Fix |
+| --- | --- | --- |
+| System prompt | Pages of rules for rare cases | Principles, steps, one or two examples |
+| Tool definitions | Many overlapping tools | Only the tools this task needs |
+| Retrieved documents | Everything loaded up front | Fetch on demand by id |
+| Tool results | Kept forever | Clear after use, keep a one-line note |
+| History | Grows every turn | Compact into a state summary |
+
+**Writing a good compaction summary.** A summary replaces everything before it, so it must carry what the agent needs to continue: the original task and constraints in full, decisions made and why, results so far as totals, open items with their ids, and the next step. Leave out the narration of how each step was done. Test compaction by running a task with and without it and checking the final results match; if the compacted run forgets a constraint, the summary prompt is missing a section.
+
+**Measuring the effect.** Log token counts by part on every step for a handful of tasks, before and after each change. Watch three numbers: tokens per task, cost per task and task success. A change that cuts tokens but lowers success has removed something the model needed.
+
 ## A worked example
 
 An agent for a Chennai GST consultancy reconciles a client's purchase register against supplier filings: thousands of invoices, mismatches to explain and a final report.
@@ -56,6 +118,12 @@ The redesign:
 - Every 100 mismatches, the history is compacted into a summary of totals and open items.
 
 The agent now handles 3,000 mismatches in one run. Cost per invoice falls by 70%, and the error rate on supplier matching drops because the model only ever sees the records for the case in hand.
+
+| Measure | First version | Redesign |
+| --- | --- | --- |
+| Mismatches handled per run | About 40, then the window filled | 3,000 |
+| Cost per invoice | Baseline | 70% lower |
+| Supplier matching errors | Frequent confusion of similar names | Rare |
 
 ## Common mistakes
 

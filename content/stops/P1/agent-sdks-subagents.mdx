@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: anthropic-multi-agent
 alternates: [openai-agents-sdk, claude-agent-sdk]
-format: explainer
+format: deep
 key_terms: [agent-sdk, sub-agent, context-engineering, tracing]
 check:
   type: mcq
   question_ids: [agent-sdks-subagents-1, agent-sdks-subagents-2, agent-sdks-subagents-3]
+flashcards:
+  - q: "What is an agent SDK?"
+    a: "A library, usually from a model provider, that provides the agent loop plus tracing, guardrails, sessions and hand-offs."
+  - q: "What does an SDK give you beyond the basic loop?"
+    a: "Retries, streaming, parallel tool calls, step tracing, guardrails, hand-offs, sessions and sometimes built-in tools with permissions."
+  - q: "What is a sub-agent?"
+    a: "An agent started by another to do one part of a task in its own fresh context, returning only a summary."
+  - q: "What is the main benefit of sub-agents?"
+    a: "Context isolation: each works with a full context window, and the lead receives only summaries. They can also run in parallel."
+  - q: "What do sub-agents cost?"
+    a: "Token use multiplies, often several times a single agent's, and coordination can fail through duplication or lost details."
+  - q: "Which tasks suit multi-agent designs?"
+    a: "Broad, parallel, read-heavy tasks such as research; not tightly coupled tasks where each step depends on the last."
+  - q: "How should work be delegated to a sub-agent?"
+    a: "With a precise scope, output format and length limit, and only the tools that part needs."
+  - q: "What should you check before choosing a vendor SDK?"
+    a: "Lock-in to one vendor's models, how sessions are stored, and whether traces export to the client's observability tools."
+exercise:
+  title: "Single agent or sub-agents?"
+  setup: "Three proposals at a Gurugram consultancy: (A) compare 12 Indian states' solar policies, reading long government documents for each; (B) fill a 40-field client onboarding form from one uploaded PDF; (C) refactor one 3,000-line Python module. A single-agent prototype of (A) runs out of context after five states. The client uses one model vendor under an enterprise contract and requires every step to appear in its observability tool."
+  questions:
+    - q: "Which proposal benefits from sub-agents, and how?"
+      a: "(A): one sub-agent per state in parallel, each returning a fixed-format summary of about 300 words with sources, merged by a lead."
+    - q: "Why not sub-agents for (B) and (C)?"
+      a: "Both are tightly coupled: each step depends on the others, so splitting adds cost and coordination errors without benefit."
+    - q: "What should the team measure for (A)?"
+      a: "Time, tokens and quality per brief, single-agent against sub-agents."
+    - q: "What decides the SDK choice?"
+      a: "The vendor SDK suits the existing contract, if its traces export to the client's observability tool and lock-in is acceptable."
+ask:
+  - "When should I use sub-agents?"
+  - "What is the difference between an agent SDK and LangGraph?"
+  - "How much more do multi-agent systems cost?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -24,6 +57,21 @@ reviewed_on: 2026-10-25
 An **agent SDK** is a library, usually from a model provider, that gives you a ready agent loop: send messages, run the tools the model asks for, feed results back, repeat. Most add tracing, guardrails, session storage and ways for one agent to hand work to another. Examples include OpenAI's Agents SDK and Anthropic's Claude Agent SDK; Google and others offer similar kits.
 
 A **sub-agent** is an agent started by another agent to do one part of a task in its own fresh context, returning only a summary. A **multi-agent system** is any design where several agents cooperate: a lead agent delegating to workers, agents handing a conversation between them, or specialists reviewing each other's work.
+
+```text
+                        [lead agent]  plan: 5 research areas
+         +-------------+-------------+-------------+-------------+
+         v             v             v             v             v
+   [financials]    [legal]     [management]    [market]       [ESG]      in parallel,
+   filings tool  court search   news search   reports tool  news search  each with its
+         |             |             |             |             |        own context
+         +------ summaries of at most 400 words with sources ----+
+                                     |
+                                     v
+                [lead merges, spots conflicts, asks one follow-up] --> brief
+```
+
+This lesson follows a consulting firm in Hyderabad producing due-diligence briefs on mid-sized manufacturers.
 
 ## How it works
 
@@ -41,6 +89,18 @@ Check how locked-in the SDK is to one vendor's models, how it stores sessions, a
 
 **The cost.** Each sub-agent has its own prompt, tools and history, so token use multiplies, often several times a single agent's. Coordination can fail too: two workers duplicate effort or a summary drops a key detail. Multi-agent designs pay off for broad, parallel, read-heavy tasks such as research; they rarely help tightly coupled tasks such as editing one codebase or filling in one form, where every step depends on the last.
 
+**Three routes compared:**
+
+| Route | Best when | Watch out for |
+| --- | --- | --- |
+| Your own loop | Narrow task, full control, few dependencies | You build tracing, retries and sessions yourself |
+| Vendor SDK | Committed to one vendor, fast pilot, built-in tools fit | Lock-in; check trace export |
+| Graph framework | Explicit control flow, durable approval pauses, vendor independence | More concepts to learn |
+
+**Writing a delegation brief.** Each sub-agent's instructions should state the area and its boundaries ("legal cases in Indian courts since 2020; not regulatory filings, which another agent covers"), the tools it has, the output format with headings, a word limit, and a rule to include a source link for every claim. Ask for a short "open questions" list at the end, so the lead knows what is uncertain. Clear briefs prevent the two commonest failures: overlapping work and summaries that drop the one detail that mattered.
+
+**Measuring whether the split paid off.** Run the same ten requests both ways. Record wall-clock time, total tokens, cost, and a quality score from a reviewer using a fixed rubric. A split that is faster and better but four times the cost may still be right, as here, when each brief replaces days of analyst time. The decision belongs in writing with the numbers.
+
 ## A worked example
 
 A Hyderabad consulting firm wants due-diligence briefs on mid-sized Indian manufacturers: financials, legal cases, management, market and ESG news.
@@ -52,6 +112,13 @@ A single agent took 40 minutes and often ran out of context halfway through the 
 - The lead merges the summaries, spots conflicts (two sources disagree on revenue) and asks the financial sub-agent one follow-up question.
 
 Wall-clock time drops to 9 minutes and coverage improves. Token use rises 3.5 times, which the firm accepts because each brief replaces two days of analyst work. You use the vendor's SDK because the firm already has an enterprise contract with that provider and its tracing shows every sub-agent's steps, which their quality team requires.
+
+| Measure | Single agent | Lead plus five sub-agents |
+| --- | --- | --- |
+| Time per brief | About 40 minutes | About 9 minutes |
+| Context overflow | Often, during legal research | None |
+| Token use | Baseline | About 3.5 times |
+| Coverage of the five areas | Uneven | Complete |
 
 ## Common mistakes
 

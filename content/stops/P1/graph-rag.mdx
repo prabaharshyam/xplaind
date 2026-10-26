@@ -9,11 +9,44 @@ hours: 4
 gap_tags: []
 primary_resource: graphrag-blog
 alternates: [graphrag-docs]
-format: explainer
+format: deep
 key_terms: [graph-rag, knowledge-graph, rag, tco]
 check:
   type: mcq
   question_ids: [graph-rag-1, graph-rag-2, graph-rag-3]
+flashcards:
+  - q: "Which two kinds of question defeat standard RAG?"
+    a: "Multi-hop questions that follow links across documents, and global questions about a whole collection."
+  - q: "What is a knowledge graph in Graph RAG?"
+    a: "Entities such as companies, people and projects as nodes, and relationships between them as edges, extracted from documents."
+  - q: "What are communities in GraphRAG?"
+    a: "Clusters of closely connected entities, each summarised by a model at several levels of detail."
+  - q: "What is the difference between local and global search?"
+    a: "Local search gathers a question's entities, neighbours and source chunks; global search maps over community summaries and combines the answers."
+  - q: "What does Graph RAG indexing cost?"
+    a: "Model calls on every chunk and community, often many times the cost of embedding alone, plus updates as documents change."
+  - q: "What is entity resolution, and why does it matter?"
+    a: "Merging variants such as 'ABC Infra Ltd' and 'ABC Infrastructure'; wrong merges or duplicates corrupt every answer using them."
+  - q: "When is Graph RAG worth it?"
+    a: "For entity-rich collections such as contracts, investigations and supplier networks, where multi-hop or global questions are frequent and valuable."
+  - q: "What are lighter alternatives?"
+    a: "Entity metadata for filtering, a small table of key relationships, or summaries of document groups."
+exercise:
+  title: "Graph or not?"
+  setup: "Three assistants at a Delhi conglomerate: (A) HR policy questions over 200 policy documents; (B) an investigations team linking 8,000 vendor invoices, emails and audit reports to find related parties; (C) a strategy team asking 'what themes recur in two years of customer feedback?' over 50,000 comments."
+  questions:
+    - q: "Which assistant should stay with hybrid RAG?"
+      a: "(A): policy lookups are single-document questions where graphs add cost without benefit."
+    - q: "Why does (B) suit a knowledge graph?"
+      a: "Questions follow relationships between vendors, people and payments across many documents: classic multi-hop."
+    - q: "How would you approach (C)?"
+      a: "Global search over community or group summaries, or a lighter alternative such as clustering comments and summarising each cluster."
+    - q: "What must the team in (B) invest in first?"
+      a: "Entity resolution for vendor and person names, and links back to source documents for every relationship."
+ask:
+  - "What is GraphRAG and how does it work?"
+  - "When should I use a knowledge graph for RAG?"
+  - "What is the difference between local and global search in GraphRAG?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -27,6 +60,22 @@ Standard RAG retrieves passages similar to the question. Two kinds of questions 
 - **Global questions** about a whole collection: "What are the recurring problems in last year's customer complaints?" No passage contains the answer; it emerges from many.
 
 **Graph RAG** adds a **knowledge graph**: entities (people, companies, products, places, events) as nodes and relationships between them as edges, extracted from the documents. Retrieval can then follow relationships and use pre-written summaries of groups of related entities. Microsoft's open-source GraphRAG is one well-known implementation; graph databases such as Neo4j are another route.
+
+```text
+   documents --> chunks --> [model extracts entities + relationships]
+                                     |
+                                     v
+       (Project: Metro Pkg 4) --contractor--> (ABC Infra) --also on--> (Project: Pune Ring Road)
+               |                                  |
+           overrun 27%                    sub-contracts to (XYZ Steel)
+                                     |
+                       communities detected and summarised
+                                     |
+          question --> local search: entities + neighbours + source chunks
+                   --> global search: map over community summaries, then reduce
+```
+
+This lesson follows an infrastructure finance company in Mumbai whose analysts ask questions that span hundreds of project documents.
 
 ## How it works
 
@@ -49,6 +98,21 @@ Standard RAG retrieves passages similar to the question. Two kinds of questions 
 
 **Lighter alternatives.** Store extracted entities as metadata and filter on them; keep a small structured table of key relationships; generate summaries of document groups. Often these give most of the benefit.
 
+**Standard RAG versus Graph RAG:**
+
+| Aspect | Hybrid RAG | Graph RAG |
+| --- | --- | --- |
+| Single-document questions | Strong | No better |
+| Multi-hop questions | Weak | Strong |
+| Collection-wide questions | Weak | Strong with community summaries |
+| Indexing cost | Embeddings only | Model calls per chunk and community |
+| Updates | Re-embed changed chunks | Re-extract and re-merge |
+| Failure risk | Missed passages | Wrong extractions and merges |
+
+**Routing between the two.** Few teams replace hybrid RAG; they add a graph for the questions it cannot answer. A small classifier, or a model call, decides whether a question mentions relationships across entities ("which contractors also work on...", "who else is linked to...") or is about the whole collection ("what are the recurring..."). Those go to graph search; everything else goes to hybrid RAG. Log the route for each question so you can check the router's mistakes on the test set.
+
+**Keeping citations.** Every entity, relationship and community summary should keep links to the chunks it came from. Answers can then cite real documents, and analysts can check whether an extracted relationship is actually stated or was invented during extraction.
+
 ## A worked example
 
 A Mumbai infrastructure finance company reviews thousands of project reports, contractor agreements and site inspection notes. Analysts ask questions like "Which contractors appear in projects with cost overruns above 20%, and where else do they work?"
@@ -58,6 +122,13 @@ Hybrid RAG answers single-project questions well but fails these: the facts are 
 A pilot builds a graph of projects, contractors, sub-contractors, locations and inspection findings from 3,000 documents. Indexing costs about 25 times the embedding-only pipeline, a one-time cost plus weekly updates. Entity merging needs a hand-built list of company name variants, because the same contractor appears under several spellings.
 
 On a 40-question test set of multi-hop and global questions, the graph approach answers 70% well, against 30% for hybrid RAG. On single-document questions it is no better. The company keeps both: questions are routed to graph search when they mention relationships across projects, and to hybrid RAG otherwise.
+
+| Measure | Hybrid RAG | Graph approach |
+| --- | --- | --- |
+| Multi-hop and global questions answered well, of 40 | 30% | 70% |
+| Single-document questions | Good | No better |
+| Indexing cost | Baseline | About 25 times, plus weekly updates |
+| Extra work | None | A hand-built list of contractor name variants |
 
 ## Common mistakes
 

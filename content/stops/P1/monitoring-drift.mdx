@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: evidently-intro
 alternates: [rules-of-ml, made-with-ml]
-format: explainer
+format: deep
 key_terms: [drift, concept-drift, monitoring, online-evaluation]
 check:
   type: mcq
   question_ids: [monitoring-drift-1, monitoring-drift-2, monitoring-drift-3]
+flashcards:
+  - q: "What four layers does model monitoring watch?"
+    a: "Service health, data quality and input drift, prediction drift, and performance once true outcomes arrive."
+  - q: "What is the difference between data drift and concept drift?"
+    a: "Data drift means inputs changed; concept drift means the relationship between inputs and outcomes changed."
+  - q: "What is a monitoring baseline?"
+    a: "Saved statistics of training and validation data, such as feature and score distributions, to compare live data against."
+  - q: "Why watch prediction rates daily?"
+    a: "A sudden jump in approvals or positive predictions often reveals an upstream bug long before outcomes arrive."
+  - q: "How do you monitor when labels arrive late?"
+    a: "Track performance as labels arrive, and use proxies such as complaints, overrides or early behaviour meanwhile."
+  - q: "Why monitor by segment?"
+    a: "Drift often starts in one region, channel or partner and is hidden in overall numbers."
+  - q: "What is a feedback loop in monitoring?"
+    a: "The model changes the data it later learns from, such as never seeing outcomes for blocked transactions."
+  - q: "How do you keep unbiased labels despite feedback loops?"
+    a: "Keep a small random holdout or human-review sample that bypasses the model's decision."
+exercise:
+  title: "Read the dashboard"
+  setup: "A Hyderabad insurer's claim-fraud model flags about 4% of claims each day. On Monday, flags jump to 15% for claims from one hospital network, while all other sources stay near 4%. Drift reports show the 'days between admission and claim' feature for that network is now always 0. Separately, over six months, the share of flagged claims later confirmed as fraud has slowly fallen from 40% to 28%."
+  questions:
+    - q: "What probably caused Monday's jump?"
+      a: "An upstream data change: the network's feed stopped sending admission dates correctly, so the feature reads 0."
+    - q: "What is the right immediate response?"
+      a: "Contain: route that network's claims to a fallback model or rules without the feature, and ask the network or data team to fix the feed."
+    - q: "What does the slow fall from 40% to 28% suggest?"
+      a: "Concept drift or changing fraud patterns: the model's flags are less precise. It is a trigger to investigate and retrain."
+    - q: "How should a retrained model reach production?"
+      a: "Through the same evaluation and promotion checks, compared with the current model, then shadow and canary stages."
+ask:
+  - "What is the difference between data drift and concept drift?"
+  - "What is the population stability index?"
+  - "How often should I retrain a model?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -29,6 +62,21 @@ Model monitoring watches four layers:
 - **Performance**: when true outcomes arrive, is accuracy still where it was, overall and by segment?
 
 **Data drift** means inputs changed; **concept drift** means the relationship between inputs and outcomes changed (the same features now predict differently, as when fraud patterns shift).
+
+```text
+   LAYER                CHECKED                         CATCHES
+   service health       latency, errors (every minute)  outages
+   inputs               schema, missing rates, drift    upstream bugs, new data shapes
+                        per feature vs baseline (daily)
+   predictions          approval rate by partner/city   sudden behaviour change
+                        (daily)
+   performance          default rate by month and       slow decay, concept drift
+                        segment (as labels arrive)
+
+   alert -> owner -> runbook: investigate | fallback | roll back | retrain
+```
+
+This lesson follows a buy-now-pay-later company in Bengaluru whose credit model approves small loans at checkout.
 
 ## How it works
 
@@ -48,6 +96,20 @@ Model monitoring watches four layers:
 
 **Feedback loops.** Models can change the data they later learn from: a fraud model that blocks transactions means you never see whether they were fraud. Keep a small random holdout or human review sample to get unbiased labels.
 
+**Alert thresholds with severities:**
+
+| Signal | Threshold | Severity | Response |
+| --- | --- | --- | --- |
+| Error rate | Above 1% for 5 minutes | High | Page on-call; check service |
+| Feature missing rate | Doubles vs baseline | Medium | Investigate the source |
+| Approval rate by partner | Changes by over 10 points in a day | High | Check inputs; fallback model if needed |
+| Drift score on a key feature | Above the agreed limit for 3 days | Medium | Review; consider retraining |
+| Default rate by segment | Above plan for two months | Medium | Retrain with recent data |
+
+**Reading a drift score.** The population stability index compares how a feature's values fall into buckets in training data versus live data. Small values mean little change; larger values mean a real shift. Treat it as a pointer, not a verdict: a shift in a feature the model barely uses may not matter, while a small shift in its most important feature might. Check feature importance alongside drift before acting.
+
+**Writing the runbook.** For each alert, write who owns it, the first three things to check, how to switch to the fallback, and when to roll back. Keep the fallback ready and tested, such as a simpler model without the troublesome feature or a rules policy, so containment takes minutes.
+
 ## A worked example
 
 A Bengaluru BNPL (buy now, pay later) company's credit model approves small loans at checkout.
@@ -64,6 +126,11 @@ In March, the approval rate for one large e-commerce partner jumps from 61% to 7
 Separately, a slow rise in defaults among first-time borrowers in tier-3 cities over four months triggers a retraining with recent data and a new feature for repayment behaviour on earlier small loans. The retrained model passes promotion checks and is rolled out through shadow and canary stages.
 
 A 2% random sample of borderline applicants is approved regardless of score, so the company keeps learning about the applicants the model would otherwise reject.
+
+| Event | Detected by | Response | Time |
+| --- | --- | --- | --- |
+| Partner approvals jumped from 61% to 79% | Approval-rate alert, then input drift | Fallback model for that partner | Two hours |
+| First-time tier-3 borrowers defaulting more | Performance by segment over four months | Retrained with a new feature, shadow then canary | Weeks |
 
 ## Common mistakes
 

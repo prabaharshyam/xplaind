@@ -9,11 +9,44 @@ hours: 4
 gap_tags: []
 primary_resource: azure-search-security-trimming
 alternates: [pinecone-rag-access-control, owasp-authorization-cheatsheet]
-format: explainer
+format: deep
 key_terms: [permission-aware-rag, rbac, metadata-filter, sso]
 check:
   type: mcq
   question_ids: [permission-aware-rag-1, permission-aware-rag-2, permission-aware-rag-3]
+flashcards:
+  - q: "What is permission-aware RAG?"
+    a: "Making retrieval return only passages the asking user may see in the original system, also called security trimming."
+  - q: "How are permissions captured?"
+    a: "At ingestion, read each document's users and groups from the source and store them on every chunk as metadata."
+  - q: "Why must the permission filter run inside the search?"
+    a: "Filtering after retrieval lets restricted chunks influence results and leak through scores, counts and timing, and can leave nothing."
+  - q: "What does deny by default mean here?"
+    a: "A chunk with missing permission data is visible to nobody until fixed; no rule never means public."
+  - q: "Why sync rights separately from content?"
+    a: "Permissions change daily; a document locked today must disappear from results even if its text has not changed."
+  - q: "Where must the user's identity and groups come from?"
+    a: "Only from a verified sign-on token, never from the request body."
+  - q: "What is the check-at-source alternative?"
+    a: "Retrieve candidates, then ask the source system as the user whether each may be opened, before anything reaches the model."
+  - q: "What tests does permission-aware RAG need?"
+    a: "Personas with different roles and 'must not see' questions, run in CI."
+exercise:
+  title: "Find the leaks"
+  setup: "A Gurugram consulting firm's knowledge assistant indexes 40,000 SharePoint files. The current design: chunks have no permission data; the API reads the user's department from a field in the request; retrieval takes the top 20 chunks and then removes any from folders marked 'Confidential' by name; and the index is rebuilt monthly. A junior analyst received an answer quoting a partner-only pricing memo."
+  questions:
+    - q: "What is the root cause of the leak?"
+      a: "No permissions stored on chunks, so retrieval cannot respect source access rules; the folder-name rule missed the memo."
+    - q: "How should identity be handled?"
+      a: "Take the user and groups from the verified sign-on token, not from a request field anyone can change."
+    - q: "How should filtering change?"
+      a: "Store allowed users and groups on every chunk and filter inside the search, denying chunks with missing permission data."
+    - q: "What sync and tests are needed?"
+      a: "Permission sync every few minutes from change events or a schedule, plus persona tests that prove the memo never reaches an analyst."
+ask:
+  - "How do I add access control to a RAG system?"
+  - "What is security trimming?"
+  - "How do I sync SharePoint permissions into a vector database?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -24,6 +57,20 @@ reviewed_on: 2026-10-25
 A RAG system copies text from many sources into one index. Those sources had access rules: a SharePoint site open only to HR, a drive shared with one project team, a ticket visible to one customer's account manager. The index does not keep those rules unless you make it.
 
 **Permission-aware RAG** (also called security trimming or document-level access control) ensures that retrieval only ever returns passages the asking user is allowed to see in the original system. If the user cannot open the document in SharePoint, the assistant cannot quote it.
+
+```text
+   INGESTION                                   QUERY
+   SharePoint file + permissions               user signs in --> verified token: user, groups
+        |                                                          |
+        v                                                          v
+   chunk text + allowed_groups: [hr-core, leadership]      search WITH filter:
+              + allowed_users: [...]                       allowed_groups ∩ user groups ≠ ∅
+              (missing? -> visible to nobody)              (inside the search, before ranking)
+        |                                                          |
+   rights re-synced every 10 minutes                       only permitted chunks --> model
+```
+
+This lesson follows an assistant at an asset management company in Mumbai over research notes, HR policies, board papers and client agreements.
 
 ## How it works
 
@@ -41,6 +88,19 @@ A RAG system copies text from many sources into one index. Those sources had acc
 
 **Test it.** Build test users with different roles and a set of "must not see" questions, and run them in CI.
 
+**Where to enforce access:**
+
+| Approach | How it works | Strengths | Weaknesses |
+| --- | --- | --- | --- |
+| Filter in the index | Permissions stored on chunks; filter in the search | Fast, scales | Needs permission sync; small lag |
+| Check at source | Ask the source system per candidate | Always current | Slower; more calls |
+| Separate indexes per group | One index for each audience | Simple for a few groups | Breaks down with many groups |
+| Filter after retrieval | Drop restricted results at the end | None worth having | Leaks and empty results |
+
+**Persona tests in CI.** Create test users for each role, such as analyst, HR staff, director and contractor, with known group memberships. For each, write questions with documents they must see and documents they must never see. Assert on the retrieved chunk ids, not on the model's answer, because the danger is a restricted chunk entering the prompt at all. Run these tests on every change to ingestion, search or the permission sync.
+
+**Agreeing the sync window.** Permission changes cannot take effect instantly in an index. Measure the real lag, agree it with the client's security team in writing, and alert when a sync fails or runs late. For the most sensitive sources, such as board papers, consider checking at source as a second layer.
+
 ## A worked example
 
 A Mumbai asset management company wants one assistant over research notes, HR policies, board papers and client agreements.
@@ -54,6 +114,12 @@ Testing with five personas:
 - An analyst asks "What is the notice period for senior managers?" The HR policy, open to all employees, is retrieved; the confidential salary bands file is not.
 
 During the pilot, the HR team restricts a draft policy. The permission sync runs every ten minutes, so for up to ten minutes the old rights apply. The client's security team accepts this window, in writing, and asks for an alert if a sync fails.
+
+| Persona | Question | Result |
+| --- | --- | --- |
+| Analyst | "What was discussed about the merger at the last board meeting?" | No board-paper chunks; told no accessible documents found |
+| Director | Same question | Answer citing the board minutes |
+| Analyst | "Notice period for senior managers?" | HR policy retrieved; salary bands file not |
 
 ## Common mistakes
 

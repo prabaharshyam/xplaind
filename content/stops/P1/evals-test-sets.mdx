@@ -9,11 +9,44 @@ hours: 5
 gap_tags: [evals]
 primary_resource: hamel-evals
 alternates: [eugeneyan-llm-patterns]
-format: explainer
+format: deep
 key_terms: [evals, golden-set, regression-test, llm-as-judge]
 check:
   type: project
   brief: "Push an eval script and a test set of at least 30 cases for one of your apps, with a README showing the score before and after one change and what the change was. Submit the repository link."
+flashcards:
+  - q: "What are evals?"
+    a: "Repeatable tests that run an AI app on a fixed test set and score each output, so every change gets a comparable number."
+  - q: "Where should test cases come from?"
+    a: "Real inputs such as logs, tickets and documents, plus known hard cases and every past failure."
+  - q: "What four kinds of case should a test set cover?"
+    a: "Common cases, edge cases, cases that should be refused or escalated, and past failures."
+  - q: "What are the ways to define 'good' per case?"
+    a: "An exact expected value, required facts or citations, things the answer must not do, or a rubric applied by a person or model judge."
+  - q: "What is the cheapest reliable scoring order?"
+    a: "Code checks first, then calibrated model judges for open-ended quality, then human review of a sample."
+  - q: "Why read outputs before writing scorers?"
+    a: "The most useful evals come from observed failure patterns, not generic metrics."
+  - q: "Why report scores by category?"
+    a: "A change can raise the average while breaking a critical category such as refusals or escalations."
+  - q: "How do you keep a test set useful?"
+    a: "Add new failures, retire cases that no longer reflect reality, and avoid tuning so hard on it that it stops representing users."
+exercise:
+  title: "Build the eval"
+  setup: "A Lucknow hospital's appointment assistant answers WhatsApp messages in Hindi and English. The team changes prompts after trying three or four messages by hand. Last week a change made it give medicine dosage advice, which it must never do, and nobody noticed for two days."
+  questions:
+    - q: "Where should the first test cases come from?"
+      a: "Anonymised real WhatsApp messages in both languages, covering bookings, cancellations, directions and questions needing a doctor."
+    - q: "What code checks would you add?"
+      a: "No dosage or medicine advice patterns, correct booking ids when present, and escalation marked for medical questions."
+    - q: "How should a model judge be used?"
+      a: "For politeness and completeness, with its grades compared against two staff members' on about 30 replies before trusting it."
+    - q: "What would have caught last week's problem?"
+      a: "A category of medical-advice cases that must always escalate, checked on every change, with results reported per category."
+ask:
+  - "How do I start writing evals for my AI app?"
+  - "How many test cases do I need?"
+  - "How do I know if my model judge is reliable?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -22,6 +55,22 @@ reviewed_on: 2026-10-25
 ## What it is
 
 **Evals** are repeatable tests for an AI application. You run the app on a fixed **test set** of realistic inputs and score each output, so every change (a new prompt, model or retrieval setting) gets a number you can compare with the last one. Without evals, teams change prompts by feel and cannot tell whether they made things better or worse.
+
+```text
+   real inputs (logs, tickets)  +  hard cases  +  past failures
+                    |
+                    v
+          test set: 60 cases in categories
+          routine 35 | claims 10 | complaints 8 | must escalate 7
+                    |
+                    v
+   [app version N] --> outputs --> scorers: code checks -> model judge -> human sample
+                    |
+                    v
+   results table by version and category  -->  ship only if no category gets worse
+```
+
+This lesson follows a policyholder email assistant at an insurance broker in Pune, where the team argued about which prompt was better.
 
 ## How it works
 
@@ -47,6 +96,22 @@ reviewed_on: 2026-10-25
 
 **Keep it alive.** Add new cases as users find new problems; retire cases that no longer reflect reality; never tune so hard on the set that it stops representing users.
 
+**A results table that settles arguments:**
+
+| Version | Judge score | Escalations caught | Policy number kept | Promised approval |
+| --- | --- | --- | --- | --- |
+| Old prompt | 71% | 4 of 7 | 58 of 60 | 0 |
+| New prompt | 78% | 3 of 7 | 59 of 60 | 0 |
+| With escalation rules | 80% | 7 of 7 | 60 of 60 | 0 |
+
+**Reading outputs first.** Before writing a single scorer, run the app on 50 to 100 real inputs and read every output. Write a short note for each bad one: "ignored the second question", "invented a policy clause", "too formal for a complaint". Group the notes. The biggest groups become your first evals, written as code checks where possible. This step often takes an afternoon and saves weeks of measuring the wrong things.
+
+**Making it one command.** An eval nobody runs is no eval. Put the test set in the repository, write a script that runs every case and prints the table, and run it in CI on every prompt, model or retrieval change. Save each run's results with the version so you can compare any two.
+
+**How many cases.** Thirty well-chosen cases catch most big regressions; a hundred give stable numbers by category. What matters more than size is coverage: every category users care about, and enough cases in critical categories, such as escalations, that one miss is visible. With seven escalation cases, one miss is a 14-point drop that nobody can ignore. Grow the set as the product grows, and split off a small "smoke" set of about ten cases that runs in seconds for quick checks while you work.
+
+**Calibrating a model judge.** Have two people grade 30 outputs with the same rubric, then have the judge grade them. Compare. If agreement is low, the rubric is usually unclear: rewrite it with examples of pass and fail, and test again. Recheck agreement whenever you change the judge's model or prompt.
+
 ## A worked example
 
 A Pune insurance broker's assistant drafts replies to policyholder emails. The team argues about whether a new prompt is better.
@@ -58,6 +123,8 @@ They build an eval:
 - A model judge with a rubric (accurate to the policy wording, answers every question, polite), calibrated against two staff members' grades on 30 replies (85% agreement).
 
 Results: the old prompt scores 71% on the judge and misses 3 of 7 escalations; the new prompt scores 78% but misses 4 escalations. Neither is acceptable. A third version adds explicit escalation rules: 80% and 7 of 7 escalations caught. The table settles the argument in an afternoon.
+
+**What the broker kept.** The team now adds every complaint about a bad reply as a new case, with its category. After three months the set has grown from 60 to 140 cases, and arguments about prompts are settled by the table, usually in minutes.
 
 ## Common mistakes
 

@@ -9,11 +9,44 @@ hours: 5
 gap_tags: []
 primary_resource: kubernetes-basics
 alternates: [helm-quickstart]
-format: explainer
+format: deep
 key_terms: [kubernetes, pod, helm, container]
 check:
   type: mcq
   question_ids: [kubernetes-helm-basics-1, kubernetes-helm-basics-2, kubernetes-helm-basics-3]
+flashcards:
+  - q: "What does Kubernetes do?"
+    a: "Runs containers across a cluster and keeps reality matching your description: starting, restarting, moving and load-balancing them."
+  - q: "What is Helm?"
+    a: "A package manager that bundles an app's Kubernetes files into a chart with adjustable values for each environment."
+  - q: "What is the difference between a Pod and a Deployment?"
+    a: "A pod is one disposable set of running containers; a Deployment says how many pods of which image to run and how to roll out updates."
+  - q: "What does a Service do?"
+    a: "Gives a stable name and address that sends traffic to whichever pods are healthy."
+  - q: "What are resource requests and limits?"
+    a: "Requests are what a container is guaranteed; limits are the most it may use. Exceeding the memory limit kills it as OOMKilled."
+  - q: "What do liveness and readiness probes do?"
+    a: "Liveness tells Kubernetes the pod is alive; readiness tells it the pod can receive traffic."
+  - q: "How do you roll back a Helm release?"
+    a: "With helm rollback, which returns to the previous release's settings and image."
+  - q: "Why avoid the 'latest' image tag?"
+    a: "You cannot tell which version is running, so rollbacks and audits become guesswork."
+exercise:
+  title: "Read the cluster"
+  setup: "You deployed a document-classification API to a Gurugram insurer's Kubernetes cluster with Helm. After an upgrade: users get errors for about a minute after every deploy; one pod shows CrashLoopBackOff; the image tag in the chart is 'latest'; and a colleague fixed an environment variable with kubectl edit last week, which disappeared after today's upgrade."
+  questions:
+    - q: "What likely causes the errors after each deploy?"
+      a: "A missing readiness probe: traffic reaches new pods before they finish loading the model. Add a probe on /ready."
+    - q: "How do you investigate the CrashLoopBackOff pod?"
+      a: "kubectl describe pod for the last state and events, and kubectl logs with --previous for the crashed container's output."
+    - q: "What should replace the 'latest' tag?"
+      a: "A specific version tag such as classify-api:1.4.2, so rollbacks and audits know exactly what runs."
+    - q: "Why did the kubectl edit fix vanish, and what is the right way?"
+      a: "Helm upgrade re-applied the chart. Put the change in the chart's values and upgrade."
+ask:
+  - "What is the difference between a Pod, a Deployment and a Service?"
+  - "How do I debug a pod that keeps restarting?"
+  - "What is a Helm chart?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -26,6 +59,26 @@ reviewed_on: 2026-10-25
 **Helm** packages all the Kubernetes files for an app into a **chart** with adjustable values, so the same chart installs into staging and production with different settings.
 
 As an FDE you mostly work at the edge of Kubernetes: you ship an image and a chart or a few YAML files, and the client's platform team runs the cluster.
+
+```text
+   outside traffic (HTTPS)
+          |
+          v
+     [Ingress]  contracts.bank.example
+          |
+          v
+     [Service]  contracts-api  (stable name, sends to ready pods only)
+       /    |    \
+      v     v     v
+   [Pod]  [Pod]  [Pod]      <- managed by a Deployment: 3 replicas, image contracts-api:2.3.1
+   each: requests 500m CPU / 1Gi, limits 1 CPU / 2Gi, probes /health and /ready
+      ^
+      | env from ConfigMap (settings) and Secret (model key, created by the platform team)
+
+   Helm chart + values-staging.yaml / values-prod.yaml  -->  helm upgrade / helm rollback
+```
+
+This lesson follows a contract-analysis API deployed to a bank's Kubernetes platform in Mumbai.
 
 ## How it works
 
@@ -42,6 +95,20 @@ Each container declares **requests** (what it is guaranteed) and **limits** (the
 
 You interact with `kubectl`: `get pods`, `describe pod`, `logs`, `rollout status`, `rollout undo`. With Helm: `helm install`, `helm upgrade --values prod.yaml`, `helm rollback`.
 
+**Common pod states and what to do:**
+
+| State | Usually means | First command |
+| --- | --- | --- |
+| Pending | No machine has room for the requests | `kubectl describe pod` for scheduling events |
+| ImagePullBackOff | Wrong image name, tag or registry access | Check the tag and the registry secret |
+| CrashLoopBackOff | The app exits on start | `kubectl logs --previous` |
+| OOMKilled | Memory limit exceeded | Measure peak memory; raise the limit or reduce use |
+| Running but not ready | Readiness probe failing | Check the `/ready` endpoint and its dependencies |
+
+**Choosing requests and limits.** Measure before you set them. Run a load test with realistic inputs, including the largest documents users send, and watch memory and CPU per pod. Set requests near normal use and memory limits comfortably above the peak you saw. Too-low requests let the cluster pack pods too tightly; too-low limits kill pods on big inputs. Agree the numbers with the platform team, because they pay for the machines.
+
+**Working with the platform team.** Ask early what they provide: the namespace, ingress setup, how Secrets are created, which registries are allowed, monitoring and log collection. Many platform teams have a standard chart or policies, such as required labels and resource limits, and a deploy that ignores them will be rejected.
+
 ## A worked example
 
 You deploy a contract-analysis API for a Mumbai bank on its Kubernetes platform. The platform team gives you a namespace and asks for a Helm chart.
@@ -57,6 +124,14 @@ kubectl logs contracts-api-7d9c-xk2lp -n contracts --previous
 ```
 
 `OOMKilled`: the new version loads a larger tokenizer and a PDF library that peak at 2.4 GB on big contracts. You roll back with `helm rollback contracts-api` so users are unaffected, raise the limit to 3Gi after agreeing it with the platform team, and add a test with a 300-page contract to CI so the next memory jump is caught before deploy.
+
+| Step | Command or change |
+| --- | --- |
+| Spot the restarts | `kubectl get pods -n contracts` |
+| Find the reason | `kubectl describe pod ...` showed OOMKilled |
+| Protect users | `helm rollback contracts-api` |
+| Fix | Memory limit raised to 3Gi, agreed with the platform team |
+| Prevent | A 300-page contract test added to CI |
 
 ## Common mistakes
 

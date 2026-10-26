@@ -10,11 +10,44 @@ gap_tags: []
 primary_resource: dbt-etl-vs-elt
 alternates: [debezium-features]
 more: [databricks-free-edition]
-format: explainer
+format: deep
 key_terms: [etl, cdc, chunking, embedding]
 check:
   type: mcq
   question_ids: [data-pipelines-ai-1, data-pipelines-ai-2, data-pipelines-ai-3]
+flashcards:
+  - q: "What does a data pipeline for an AI system usually do?"
+    a: "Extract from sources, parse, clean, chunk, embed, write to the index and record what happened."
+  - q: "What is the difference between ETL and ELT?"
+    a: "ETL transforms before loading into the destination; ELT lands raw data first and transforms it there."
+  - q: "What is change data capture?"
+    a: "Streaming every insert, update and delete from a database as events, so indexes stay in sync within seconds."
+  - q: "Why keep a raw copy of every document?"
+    a: "So you can re-process after changing parsing or chunking without slowly re-fetching from the client's systems."
+  - q: "Why do chunks need stable ids?"
+    a: "So an update replaces exactly the old chunks and a deletion removes them, instead of duplicates piling up."
+  - q: "How should freshness be chosen?"
+    a: "Per source, by how fast it changes and how much it matters: CDC for live records, minutes for libraries, nightly for archives."
+  - q: "What must happen when the embedding model changes?"
+    a: "Rebuild all vectors into a new index, evaluate it, then switch over; old and new vectors cannot be mixed."
+  - q: "What should pipeline health tracking include?"
+    a: "Documents processed, failed and skipped, chunks written, embedding cost, and the age of the newest document per source."
+exercise:
+  title: "Fix the pipeline"
+  setup: "A Kanpur leather exporter's RAG assistant indexes product specs from SharePoint and order status from the ERP. Problems: re-processing after a chunking change means re-downloading 20,000 files over three days; edited specs appear twice in results; order status in answers is a day old because indexing runs nightly; and after a new embedding model was switched on for new documents only, search got worse."
+  questions:
+    - q: "How do you avoid the three-day re-download?"
+      a: "Land raw files in storage with source ids and versions, and re-process from that copy."
+    - q: "Why do edited specs appear twice, and what fixes it?"
+      a: "Chunks lack stable ids, so updates add new chunks without deleting old ones. Use ids from document id and position, and replace in one step."
+    - q: "How should order status stay current?"
+      a: "Use change data capture or frequent incremental updates for the ERP table, so changes reach the index within seconds or minutes."
+    - q: "What went wrong with the embedding model switch?"
+      a: "Old and new vectors were mixed. Rebuild everything with the new model in a new index, evaluate, then switch."
+ask:
+  - "What is the difference between ETL and ELT?"
+  - "How do I keep a RAG index in sync with source systems?"
+  - "How do I change embedding models without downtime?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -33,6 +66,18 @@ For RAG, a hybrid is typical: land raw documents and metadata in storage (so you
 
 **Change data capture (CDC)** streams every insert, update and delete from a database as events, so downstream systems such as a search index stay in sync within seconds instead of waiting for a nightly batch.
 
+```text
+   sources                 raw store                    processing                      index
+   notices portal  --15m-->  files + ids    --> parse -> chunk -> embed  -->  collection v2  <-- alias "live"
+   berth table     --CDC-->  change events  --> update one record      -->        |
+   tariff book     --on publication-->      --> with effective date    -->        |
+                                                                                   |
+   every chunk records: doc id + position, parser v3, chunking v2, embedding model e5
+   health: processed / failed / skipped unchanged / newest document age per source
+```
+
+This lesson follows the assistant of a port operator in Chennai answering questions about tariffs, notices and berth schedules.
+
 ## How it works
 
 **Keep the raw copy.** Store the original files and records with their source ids and versions. When you change the chunking or parser, you re-process from raw instead of re-fetching everything from the client's systems.
@@ -49,6 +94,19 @@ For RAG, a hybrid is typical: land raw documents and metadata in storage (so you
 
 **Pipeline health.** Track documents processed, failed, skipped as unchanged, chunks written, embedding cost, and the age of the newest document per source. Alert when freshness slips.
 
+**Matching freshness to sources:**
+
+| Source | Changes | Matters | Method |
+| --- | --- | --- | --- |
+| Berth schedule table | Constantly | At once | Change data capture |
+| Notices portal | Daily | Within the hour | Check every 15 minutes |
+| Tariff book | Twice a year | On publication | Process on publication |
+| Archive of old circulars | Rarely | Low | Nightly or weekly |
+
+**Switching indexes safely.** Build the new index alongside the live one, under a new name. Run the golden set against both and compare by category, not only overall. If the new one wins, point the alias the application reads to the new collection; the switch takes a second and needs no deploy. Keep the old collection for a week so rollback is the same one-second change. Delete it only once the new index has run cleanly in production.
+
+**Atomic updates.** Updating a document means deleting its old chunks and inserting new ones. Do both in one transaction, or write the new chunks first and then delete the old ones by version, so a search never sees half a document or none. Skipping files whose content hash has not changed keeps embedding costs down, often by more than 90% on document libraries that change slowly.
+
 ## A worked example
 
 A Chennai port operator's assistant answers questions about tariffs, notices to shipping agents and berth schedules.
@@ -58,6 +116,12 @@ A Chennai port operator's assistant answers questions about tariffs, notices to 
 - **Tariff book** (one large document, revised twice a year): processed on publication, with the effective date stored so retrieval can filter by date.
 
 In month four, you change chunking for tables to keep rows together. Because raw files and stable ids exist, a re-processing job rebuilds the notices index in a new collection overnight. The golden set improves from 84% to 90% on tariff questions, and you switch the alias to the new collection. Rollback would have been switching it back.
+
+| Change | Before | After |
+| --- | --- | --- |
+| Table-aware chunking | 84% on tariff questions | 90% on tariff questions |
+| Rebuild time for notices | Days of re-fetching | Overnight, from the raw copy |
+| Switch to the new index | Not possible safely | Alias change, rollback ready |
 
 ## Common mistakes
 

@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: hf-4bit-quantization
 alternates: [hf-quantization, vllm-pagedattention]
-format: explainer
+format: deep
 key_terms: [gpu, kv-cache, quantization, vllm]
 check:
   type: mcq
   question_ids: [gpus-quantization-1, gpus-quantization-2, gpus-quantization-3]
+flashcards:
+  - q: "What limits running a language model on your own GPU?"
+    a: "GPU memory for weights and the KV cache, and memory bandwidth, which usually limits generation speed."
+  - q: "How much memory do weights need?"
+    a: "Parameters times bytes per parameter: about 2 bytes at 16-bit, 1 at 8-bit and 0.5 at 4-bit, so a 7B model needs about 14, 7 or 4 GB."
+  - q: "What is the KV cache?"
+    a: "Stored attention keys and values for every token of every active request; it grows with context length and concurrency."
+  - q: "Why can the KV cache matter more than weights?"
+    a: "Many concurrent long requests can need more memory than the weights themselves, which limits how many users fit."
+  - q: "What is quantization?"
+    a: "Storing weights, and sometimes the cache, with fewer bits, cutting memory and often raising speed at some quality cost."
+  - q: "Why rerun evals after quantizing?"
+    a: "Some tasks, such as maths, code and Indian-language text, can lose more quality than averages suggest."
+  - q: "When are model copies better than tensor parallelism?"
+    a: "When the model fits on one GPU: separate copies are simpler and usually scale throughput better."
+  - q: "What is the trade-off between throughput and latency?"
+    a: "Larger batches give more tokens per second overall but slower responses for each user."
+exercise:
+  title: "Size the deployment"
+  setup: "A Pune insurer wants to self-host an 8B model for claims summarisation. Peak load tests show 30 active requests, each with up to 4,000 tokens of context. The available GPUs in its cloud region are 24 GB and 80 GB cards. At 16-bit, the model's KV cache needs about 0.13 MB per token in its configuration. A 4-bit version scores 1 point lower on the team's eval; an FP8 version scores the same as 16-bit but needs newer GPUs."
+  questions:
+    - q: "How much memory do the 16-bit weights need?"
+      a: "About 16 GB: 8 billion parameters times 2 bytes."
+    - q: "How much KV cache does the peak need?"
+      a: "About 30 × 4,000 × 0.13 MB, roughly 15.6 GB."
+    - q: "Will 16-bit fit on one 24 GB card?"
+      a: "No: weights plus cache are about 32 GB. An 80 GB card fits it, or 4-bit weights of about 4 to 5 GB fit on a 24 GB card."
+    - q: "How would you choose between the options?"
+      a: "Compare cost and the eval: if a 1-point loss is acceptable, 4-bit on 24 GB cards is cheapest; otherwise 16-bit or FP8 on larger cards."
+ask:
+  - "How much GPU memory do I need to run an LLM?"
+  - "What is the KV cache?"
+  - "Does quantization hurt model quality?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -29,6 +62,20 @@ Running a language model on your own hardware is mostly a question of **GPU memo
 
 **Quantization** stores weights (and sometimes the cache) with fewer bits, such as 8 or 4 instead of 16, reducing memory and often increasing speed, at some cost in quality.
 
+```text
+   ONE 48 GB GPU, 14B model
+   +---------------------------------------------------------------+
+   | weights 16-bit: 28 GB          | KV cache: 20 GB  -> ~25 users |
+   +---------------------------------------------------------------+
+   | weights 4-bit: 9 GB | KV cache: 35 GB                -> ~45 users |
+   +---------------------------------------------------------------+
+
+   memory for weights ≈ parameters × bytes per parameter
+   KV cache ≈ tokens per request × active requests × cache size per token
+```
+
+This lesson follows an analytics firm in Hyderabad sizing GPUs for a self-hosted extraction model.
+
 ## How it works
 
 **Weights.** Memory ≈ parameters × bytes per parameter. A 7B model: about 14 GB at 16-bit, 7 GB at 8-bit, 3.5 to 4 GB at 4-bit. A 70B model: about 140 GB at 16-bit, so several GPUs, or about 35 to 40 GB at 4-bit.
@@ -43,6 +90,19 @@ Running a language model on your own hardware is mostly a question of **GPU memo
 
 **Throughput versus latency.** Larger batches give more tokens per second overall but slower responses per user. Tune batch size and concurrency against your latency budget.
 
+**Weight memory at a glance:**
+
+| Model size | 16-bit | 8-bit | 4-bit |
+| --- | --- | --- | --- |
+| 7B | about 14 GB | about 7 GB | about 4 GB |
+| 14B | about 28 GB | about 14 GB | about 8 to 9 GB |
+| 32B | about 64 GB | about 32 GB | about 18 to 20 GB |
+| 70B | about 140 GB | about 70 GB | about 35 to 40 GB |
+
+**Estimating the KV cache.** A model's configuration lists its layers, key-value heads and head size. Cache per token is roughly 2 (keys and values) × layers × key-value heads × head size × bytes per value. Multiply by the context length you allow and by peak active requests, measured in a load test rather than guessed from user numbers. Leave some memory free for the engine's working space. This arithmetic, done before buying or reserving GPUs, prevents the most expensive sizing mistakes.
+
+**Choosing a quantization.** Start from the highest precision that fits your budget. Try FP8 if the GPUs support it, then 8-bit, then 4-bit weight-only methods. For each, run your own eval and a short load test, and record quality, memory, tokens per second and latency at peak. Pick the cheapest option whose quality loss your client accepts in writing.
+
 ## A worked example
 
 A Hyderabad analytics firm wants to self-host an extraction model for 200 concurrent users with prompts of up to 6,000 tokens.
@@ -52,6 +112,11 @@ Candidate: a 14B instruct model. At 16-bit, weights need about 28 GB. KV cache e
 Evals: 16-bit scores 95.1% field accuracy; 4-bit scores 94.6%. Accepted.
 
 Plan: three 48 GB GPUs, each running its own copy of the 4-bit model behind a load balancer, sized for the measured peak with one GPU of headroom. This costs about a third of the original proposal of two 80 GB GPUs running a 16-bit model with tensor parallelism, with better throughput for this workload.
+
+| Option | GPUs | Field accuracy | Relative cost |
+| --- | --- | --- | --- |
+| 16-bit with tensor parallelism | Two 80 GB | 95.1% | 3 |
+| 4-bit AWQ, three copies | Three 48 GB | 94.6% | 1 |
 
 ## Common mistakes
 

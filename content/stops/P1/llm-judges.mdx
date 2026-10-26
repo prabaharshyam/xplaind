@@ -9,11 +9,44 @@ hours: 3
 gap_tags: [llm-judges]
 primary_resource: eugeneyan-llm-patterns
 alternates: [hamel-evals]
-format: explainer
+format: deep
 key_terms: [llm-as-judge, evals, golden-set, bias]
 check:
   type: mcq
   question_ids: [llm-judges-1, llm-judges-2, llm-judges-3]
+flashcards:
+  - q: "What is an LLM judge?"
+    a: "A language model asked to grade another model's output against a rubric, used where code checks cannot judge."
+  - q: "What makes a good judge rubric?"
+    a: "One narrow, specific question at a time, a yes or no or small labelled scale, and a short reason asked for first."
+  - q: "What must you give the judge?"
+    a: "The question, the output and the reference it needs: passages for faithfulness, expected answers, or the policy."
+  - q: "How do you check a judge before trusting it?"
+    a: "Have people grade 30 to 100 outputs with the same rubric and measure how often the judge agrees."
+  - q: "What is position bias?"
+    a: "When comparing two answers, judges often favour one position. Swap the order and count only consistent verdicts."
+  - q: "What is length bias?"
+    a: "Judges tend to rate longer answers higher even when they are not better."
+  - q: "When should code be used instead of a judge?"
+    a: "For exact values, JSON validity, required fields, word limits, citations present and banned phrases."
+  - q: "How can judge costs be kept down?"
+    a: "Use smaller models where agreement stays high, and run judges offline or on samples."
+exercise:
+  title: "Fix the judge"
+  setup: "A Bengaluru support team uses a judge prompt: 'Rate this reply from 1 to 10 for quality.' Scores average 8.7 even for replies customers complained about. In A-versus-B tests, the judge picks reply A 68% of the time. Longer replies score higher. The judge also checks whether replies include the ticket number, which it gets wrong now and then."
+  questions:
+    - q: "What is wrong with the rubric?"
+      a: "A vague 1-to-10 quality scale. Replace it with specific yes-or-no questions, such as 'Does the reply answer every question in the email?'"
+    - q: "How do you handle the 68% preference for A?"
+      a: "Position bias: run each comparison in both orders and count only verdicts that agree."
+    - q: "How do you handle the length effect?"
+      a: "Add a word limit checked by code, and a rubric line saying length is not a quality."
+    - q: "What should check the ticket number?"
+      a: "Code: a simple pattern match is exact, free and consistent."
+ask:
+  - "How do I build a reliable LLM-as-a-judge?"
+  - "What biases do LLM judges have?"
+  - "How many human grades do I need to calibrate a judge?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -24,6 +57,21 @@ reviewed_on: 2026-10-25
 An **LLM judge** is a language model asked to grade another model's output: "Is this answer faithful to the passages? Answer yes or no with a reason", or "Rate this reply from 1 to 5 against this rubric". Judges make it possible to evaluate open-ended outputs (summaries, explanations, replies) at scale, where code checks cannot.
 
 But a judge is itself a model, with errors and biases. It must be checked before its scores are trusted.
+
+```text
+   case: excerpt + summary
+          |
+          +--> [code checks]  word limit 150? citation present?        exact, free
+          |
+          +--> [judge]  "List unsupported statements, then SUPPORTED/UNSUPPORTED"
+          |
+          v
+   calibration: 80 summaries graded by two lawyers
+                judge agrees on 74  -> 92.5%  -> trusted for this rubric
+   pairwise tests: show A,B and B,A -> keep only consistent verdicts
+```
+
+This lesson follows a legal-tech startup in Chennai measuring whether its judgment summaries contain unsupported claims.
 
 ## How it works
 
@@ -44,6 +92,23 @@ But a judge is itself a model, with errors and biases. It must be checked before
 
 **Cost.** Judges add model calls per case. Use smaller models where agreement stays high, and run judges offline or on samples.
 
+**Biases and their fixes:**
+
+| Bias | What it looks like | Fix |
+| --- | --- | --- |
+| Position | Picks the first shown answer more often | Run both orders; keep consistent verdicts |
+| Length | Longer answers score higher | Word limit in code; rubric says length is not quality |
+| Self-preference | Rates its own family's outputs higher | Use a judge from a different family, or check against people |
+| Leniency | Most outputs pass | Include clearly bad examples; ask for problems before the verdict |
+
+**Computing agreement.** For a yes-or-no judge, agreement is the share of cases where the judge and the human label match. Look at the disagreements, not only the rate: if the judge passes outputs people fail, it is too lenient and real problems will slip through. Track the two kinds of disagreement separately, and aim for high agreement on the failures, since those are what the eval exists to catch.
+
+**Writing the judge prompt.** State the one question, give the reference material, define pass and fail with one short example of each, and ask the judge to list evidence before answering. Asking for a reason first tends to make verdicts more consistent and makes disagreements easier to understand when you read them.
+
+**Choosing the judge model.** Start with a strong model to set the agreement level, then try a smaller, cheaper one on the same calibration set. If agreement stays within a couple of points, use the smaller one for routine runs and keep the strong one for spot checks. Pin the judge's model version like any other dependency: a silent model update can shift scores and make this month's numbers incomparable with last month's.
+
+**Where judges fit in the pipeline.** Run code checks first and skip the judge for outputs that already fail them, which saves calls. Run the judge on every case in offline evals, and on a small random sample of live traffic for online monitoring. Send judge failures in production to a review queue, where people confirm or overturn them, and add the confirmed ones to the test set.
+
 ## A worked example
 
 A Chennai legal-tech startup summarises court judgments. They want to measure whether summaries contain unsupported claims.
@@ -54,6 +119,12 @@ A Chennai legal-tech startup summarises court judgments. They want to measure wh
 - They also find the judge rated longer summaries higher. They add a code check for a 150-word limit and a rubric line saying length is not a quality.
 
 The faithfulness judge now runs on every model or prompt change, and lawyers spot-check 20 cases a month.
+
+| Finding | Fix | Result |
+| --- | --- | --- |
+| Judge agreed with lawyers on 74 of 80 | None needed | Trusted for faithfulness |
+| Picked the first summary 63% of the time | Both orders, consistent verdicts only | Fair comparisons |
+| Rated longer summaries higher | 150-word limit in code; rubric line on length | Length no longer rewarded |
 
 ## Common mistakes
 

@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: hf-multimodal-rag
 alternates: [docling]
-format: explainer
+format: deep
 key_terms: [multimodal-rag, vision-language-model, document-parsing, ocr]
 check:
   type: mcq
   question_ids: [multimodal-rag-1, multimodal-rag-2, multimodal-rag-3]
+flashcards:
+  - q: "What is multimodal RAG?"
+    a: "Retrieving and answering from content that is not plain text: slides, charts, tables, scans, diagrams and photos."
+  - q: "What are the two main approaches?"
+    a: "Convert visual content to text and use normal RAG, or retrieve page images directly and send them to a vision-language model."
+  - q: "What are the pros and cons of converting to text?"
+    a: "Cheap queries, works with any text model, easy to cite; but descriptions lose detail and you must decide in advance what matters."
+  - q: "What are the pros and cons of image retrieval?"
+    a: "Keeps layout, charts and visual detail without OCR errors; but larger indexes, more tokens and slower queries."
+  - q: "What is ColPali?"
+    a: "An approach that embeds page images directly for retrieval, without OCR."
+  - q: "Why be careful with chart readings?"
+    a: "Vision models can misread small text and numbers; cite the page and check key values against underlying data."
+  - q: "Why keep image resolution high enough?"
+    a: "Small labels, tags and handwriting disappear at low resolution, and the model cannot answer about them."
+  - q: "What must the golden set include for multimodal work?"
+    a: "Questions that need the visual content, so you can tell whether the multimodal route helped."
+exercise:
+  title: "Choose the route"
+  setup: "A Bengaluru real-estate investment firm wants an assistant over 2,000 documents: quarterly investor decks with charts, scanned lease agreements, site inspection photos, and Excel-generated PDF tables of rents. Analysts ask questions like 'what was occupancy in the Q2 chart for the Whitefield park?' and 'what is the lock-in period in the lease for unit 4B?'"
+  questions:
+    - q: "Which route suits the scanned leases?"
+      a: "Convert to text with OCR, because analysts search clause text and need exact wording and citations."
+    - q: "Which route suits the investor deck charts?"
+      a: "Image retrieval with a vision-language model, citing the slide, and checking key values against the source spreadsheets where they exist."
+    - q: "How should the rent tables be handled?"
+      a: "Extract them into structured text with headers kept for each row, not as images."
+    - q: "How would you decide the split with evidence?"
+      a: "Build a golden set with questions per content type, run both routes, and compare accuracy, latency and cost by type."
+ask:
+  - "How do I build RAG over PDFs with charts and images?"
+  - "What is a vision-language model?"
+  - "Should I OCR documents or use image embeddings?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -27,6 +60,20 @@ reviewed_on: 2026-10-25
 - **Retrieve images directly.** Index each page as an image using a multimodal embedding model (approaches such as ColPali embed page images without OCR), retrieve the most relevant page images, and send them to a **vision-language model** to answer.
 
 Many systems combine them.
+
+```text
+   CONVERT TO TEXT                                 RETRIEVE IMAGES
+   scan  --OCR------------> text  \                page --render--> image --multimodal embed--> index
+   chart --VLM describes--> text   > text index         |
+   table --extract--------> text  /    |               question --embed--> top 3 page images
+                                        v                                     |
+                    normal RAG answer, cheap                vision-language model answers from images
+
+   HYBRID: forms -> OCR text   |   photos, diagrams, slides -> image retrieval
+           answers show the page thumbnail for checking
+```
+
+This lesson follows a chemicals manufacturer in Vadodara whose engineers query 15 years of maintenance reports full of scans, photos and diagrams.
 
 ## How it works
 
@@ -50,6 +97,21 @@ Pros: keeps layout, charts and visual details; no OCR errors. Cons: larger index
 
 **Practical cautions.** Vision models can misread small text and numbers in charts; ask for citations to the page and, where numbers matter, check them against the underlying data if it exists. Keep images at sufficient resolution.
 
+**Choosing by content type:**
+
+| Content | Better route | Why |
+| --- | --- | --- |
+| Text-heavy scans and forms | OCR to text | Exact wording, cheap, searchable |
+| Tables | Extract to structured text | Rows and headers kept for precise answers |
+| Charts | Image route, or a careful description | Values and trends live in the picture |
+| Diagrams and drawings | Image route | Labels, positions and connections matter |
+| Photos | Image route | Detail is hard to predict in a caption |
+| Slides | Image route | Layout carries meaning |
+
+**Writing descriptions that help.** If you use the text route for visuals, ask the vision model for what users will ask about, not a general caption. For a chart: title, axes, units, every labelled value and the main trend. For a piping diagram: equipment tags, valve states and connections. Store the page number with every description. A focused description prompt, tested on a few pages against the golden set, can close much of the gap with the image route at a fraction of the query cost.
+
+**Showing the evidence.** With visual content, a citation is more useful as a thumbnail of the page or slide. Engineers and analysts can glance at the image and confirm the answer, which also catches the model's occasional misreadings of small numbers.
+
 ## A worked example
 
 A Vadodara chemicals manufacturer wants its plant engineers to query 15 years of maintenance reports: scanned forms, photos of equipment, piping diagrams and slide decks from root-cause reviews.
@@ -60,6 +122,12 @@ You test both routes on 60 questions:
 - *Image retrieval*: page images embedded with a multimodal retriever; top three pages sent to a vision-language model. 79% correct. Failures: tiny handwritten notes on scans.
 
 You ship a hybrid: scanned forms go through OCR (their text fields are what engineers search), while photos, diagrams and slides are retrieved as images. Answers show the page thumbnail so engineers can check. Query cost is about four times the text-only route, which the client accepts for the jump in accuracy on the questions that matter most to them.
+
+| Route on 60 questions | Correct | Main failures | Query cost |
+| --- | --- | --- | --- |
+| Convert to text | 58% | Missed details such as circled valve tags | 1 |
+| Image retrieval | 79% | Tiny handwritten notes | About 4 |
+| Hybrid by content type | Shipped | OCR for forms, images for photos and diagrams | Between the two |
 
 ## Common mistakes
 
