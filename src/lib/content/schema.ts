@@ -22,6 +22,10 @@ export const wordCount = (text: string): number => text.trim().split(/\s+/).filt
 export const EXPLAINER_SECTIONS = ["What it is", "How it works", "A worked example", "Common mistakes", "Practise"] as const;
 export const EXPLAINER_MIN_WORDS = 500;
 export const EXPLAINER_MAX_WORDS = 1500;
+/** A deep lesson has the same sections, written at roadmap.sh-pack depth, with a diagram and a table. */
+export const DEEP_MIN_WORDS = 1100;
+export const DEEP_MAX_WORDS = 3000;
+export const FLASHCARD_ANSWER_MAX_WORDS = 70;
 export const GLOSSARY_DEFINITION_MAX_WORDS = 45;
 
 const IsoDate = z.iso.date();
@@ -108,6 +112,15 @@ const McqCheck = z.strictObject({
 });
 const ProjectCheck = z.strictObject({ type: z.literal("project"), brief: Text });
 
+/** "Test your understanding": a question and a short answer, revealed on demand. */
+export const Flashcard = z.strictObject({ q: Text.max(200), a: Text });
+/** "Predict / try it": a short scenario, questions to answer first, then "Check your answers". */
+export const Exercise = z.strictObject({
+  title: Text.max(80),
+  setup: Text,
+  questions: z.array(z.strictObject({ q: Text, a: Text })).min(3).max(6),
+});
+
 /** Frontmatter of content/stops/<level>/<id>.mdx. The MDX body is the lesson text. */
 export const StopFrontmatter = z
   .strictObject({
@@ -130,13 +143,29 @@ export const StopFrontmatter = z
      * "explainer": our own lesson text with the EXPLAINER_SECTIONS. "brief": a short
      * task that leans on the linked course; release 1 lessons, to be rewritten.
      */
-    format: z.enum(["brief", "explainer"]).default("brief"),
+    format: z.enum(["brief", "explainer", "deep"]).default("brief"),
     /** Glossary ids this lesson teaches or relies on. */
     key_terms: z.array(Slug).default([]),
+    /** Deep lessons: 6 to 10 cards for "Test your understanding". */
+    flashcards: z.array(Flashcard).max(10).default([]),
+    /** Deep lessons: a "predict" or "try it" exercise with answers. */
+    exercise: Exercise.optional(),
+    /** Deep lessons: questions the AI tutor suggests for this lesson. */
+    ask: z.array(Text.max(90)).max(4).default([]),
     ...reviewShape,
   })
   .superRefine((s, ctx) => {
-    if (s.format === "explainer" && s.key_terms.length < 2) {
+    if (s.format === "deep") {
+      if (s.flashcards.length < 6) ctx.addIssue({ code: "custom", path: ["flashcards"], message: "a deep lesson has 6 to 10 flashcards" });
+      if (!s.exercise) ctx.addIssue({ code: "custom", path: ["exercise"], message: "a deep lesson has an exercise" });
+      if (s.ask.length < 3) ctx.addIssue({ code: "custom", path: ["ask"], message: "a deep lesson suggests 3 or 4 questions for the AI tutor" });
+    }
+    for (const [i, c] of s.flashcards.entries()) {
+      if (wordCount(c.a) > FLASHCARD_ANSWER_MAX_WORDS) {
+        ctx.addIssue({ code: "custom", path: ["flashcards", i, "a"], message: `a flashcard answer is ${FLASHCARD_ANSWER_MAX_WORDS} words or fewer` });
+      }
+    }
+    if (s.format !== "brief" && s.key_terms.length < 2) {
       ctx.addIssue({ code: "custom", path: ["key_terms"], message: "an explainer lesson lists at least 2 key terms" });
     }
     if (wordCount(s.why_it_matters) > WHY_IT_MATTERS_MAX_WORDS) {

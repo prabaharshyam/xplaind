@@ -5,7 +5,7 @@ import { INTERVIEW_TOPICS } from "@/lib/interview-topics";
 import { PRICE_STALE_DAYS } from "@/lib/roadmap/cost";
 import { LEVEL_IDS, type LevelId, levelIndex } from "@/lib/levels";
 import { isHumanName } from "./review";
-import { EXPLAINER_MAX_WORDS, EXPLAINER_MIN_WORDS, EXPLAINER_SECTIONS, wordCount } from "./schema";
+import { DEEP_MAX_WORDS, DEEP_MIN_WORDS, EXPLAINER_MAX_WORDS, EXPLAINER_MIN_WORDS, EXPLAINER_SECTIONS, wordCount } from "./schema";
 import type { Bundle, Entry, Issue } from "./types";
 
 /** Launch minimums from the PRD. They fail the build only in launch mode. */
@@ -152,9 +152,20 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
       error(file, `explainer sections must come in the order ${EXPLAINER_SECTIONS.join(", ")}`);
     }
     const words = wordCount(s.body);
-    if (words < EXPLAINER_MIN_WORDS || words > EXPLAINER_MAX_WORDS) {
-      error(file, `an explainer is ${EXPLAINER_MIN_WORDS} to ${EXPLAINER_MAX_WORDS} words; this one is ${words}`);
+    if (s.format === "explainer") {
+      if (words < EXPLAINER_MIN_WORDS || words > EXPLAINER_MAX_WORDS) {
+        error(file, `an explainer is ${EXPLAINER_MIN_WORDS} to ${EXPLAINER_MAX_WORDS} words; this one is ${words}`);
+      }
+      gap(file, `lesson "${s.id}" is a short explainer; rewrite it as a deep lesson`, "RM-2");
+      continue;
     }
+    // Deep lessons: longer, with a text diagram and a table, like a roadmap.sh pack lesson.
+    if (words < DEEP_MIN_WORDS || words > DEEP_MAX_WORDS) {
+      error(file, `a deep lesson is ${DEEP_MIN_WORDS} to ${DEEP_MAX_WORDS} words; this one is ${words}`);
+    }
+    if (!/^```text\n/m.test(s.body)) error(file, "a deep lesson has at least one diagram in a ```text block");
+    if (!/^\|.+\|\s*\n\|[\s:|-]+\|/m.test(s.body)) error(file, "a deep lesson has at least one table");
+    if (/^# /m.test(s.body)) error(file, "lesson text starts its headings at ##");
   }
   for (const { file, data: g } of bundle.glossary) {
     for (const r of g.related) {

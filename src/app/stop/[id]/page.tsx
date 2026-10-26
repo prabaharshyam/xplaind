@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import remarkGfm from "remark-gfm";
 import { muted, textLink } from "@/components/ui";
 import { GENAI_PATH_ID, getContent, getGlossary, getLevel, getStop, getStops, pathLessons, pathsWithLesson } from "@/lib/content";
 import { Cover } from "@/components/art/cover";
@@ -16,16 +17,20 @@ import type { CheckQuestionView } from "./stop-progress";
 import { StopProgressPanel } from "./stop-progress";
 import { StopResources } from "./stop-resources";
 import { LessonTutor } from "./lesson-tutor";
+import { LessonExercise } from "./lesson-exercise";
+import { PathLessons } from "./path-lessons";
+import { Flashcards } from "@/components/flashcards";
 import { aiEnabled } from "@/lib/ai/settings";
 
 /** Lesson text: headings, lists, code and tables styled without a typography plugin. Code scrolls inside its box at 360px. */
 const PROSE =
-  "mt-2 leading-7 [&_h2]:mt-10 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:font-semibold [&_li]:mt-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mt-3 [&_ul]:list-disc [&_ul]:pl-6 [&_strong]:font-semibold [&_blockquote]:mt-3 [&_blockquote]:border-l-4 [&_blockquote]:border-zinc-300 [&_blockquote]:pl-4 [&_blockquote]:text-zinc-700 dark:[&_blockquote]:border-zinc-700 dark:[&_blockquote]:text-zinc-300 [&_pre]:mt-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-zinc-100 [&_pre]:p-3 [&_pre]:text-sm dark:[&_pre]:bg-zinc-900 [&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-zinc-100 [&_:not(pre)>code]:px-1 dark:[&_:not(pre)>code]:bg-zinc-900 [&_table]:mt-3 [&_table]:block [&_table]:overflow-x-auto [&_td]:border [&_td]:border-zinc-300 [&_td]:p-2 [&_th]:border [&_th]:border-zinc-300 [&_th]:p-2 [&_th]:text-left dark:[&_td]:border-zinc-700 dark:[&_th]:border-zinc-700";
+  "mt-2 leading-7 [&_h2]:mt-10 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:font-semibold [&_li]:mt-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mt-3 [&_ul]:list-disc [&_ul]:pl-6 [&_strong]:font-semibold [&_blockquote]:mt-3 [&_blockquote]:border-l-4 [&_blockquote]:border-zinc-300 [&_blockquote]:pl-4 [&_blockquote]:text-zinc-700 dark:[&_blockquote]:border-zinc-700 dark:[&_blockquote]:text-zinc-300 [&_pre]:mt-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-zinc-100 [&_pre]:p-3 [&_pre]:text-sm dark:[&_pre]:bg-zinc-900 [&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-zinc-100 [&_:not(pre)>code]:px-1 dark:[&_:not(pre)>code]:bg-zinc-900 [&_table]:mt-3 [&_table]:block [&_table]:overflow-x-auto [&_td]:border [&_td]:border-zinc-300 [&_td]:p-2 [&_th]:border [&_th]:border-zinc-300 [&_th]:p-2 [&_th]:text-left dark:[&_td]:border-zinc-700 dark:[&_th]:border-zinc-700 [&_table]:w-full [&_table]:border-collapse [&_th]:bg-zinc-100 dark:[&_th]:bg-zinc-900 [&_pre:has(>code.language-text)]:bg-zinc-950 [&_pre:has(>code.language-text)]:p-4 [&_pre:has(>code.language-text)]:leading-6 [&_pre:has(>code.language-text)]:text-emerald-100 dark:[&_pre:has(>code.language-text)]:bg-black";
 
 /** Code blocks scroll sideways on phones, so keyboard users must be able to focus them (WCAG 2.1.1). */
 const MDX_COMPONENTS = {
   pre: (props: React.ComponentProps<"pre">) => <pre tabIndex={0} {...props} />,
 };
+const MDX_OPTIONS = { mdxOptions: { remarkPlugins: [remarkGfm] } };
 
 const SECTION_ICON: Record<string, IconName> = {
   "What it is": "compass",
@@ -95,7 +100,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   const paths = pathsWithLesson(stop.id);
   const onGenai = paths.some((p) => p.id === GENAI_PATH_ID);
   const terms = stop.key_terms.map((id) => getGlossary().find((g) => g.id === id)!);
-  const explainer = stop.format === "explainer";
+  const explainer = stop.format !== "brief";
   const interview = getInterviewViews().filter((q) => q.stop.id === stop.id);
   const cards = [stop.primary_resource, ...stop.alternates].map(resourceCard);
   const more = stop.more.map(resourceCard);
@@ -116,6 +121,8 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   const navSections: SectionLink[] = [
     { id: "why", title: "Why it matters", icon: "star" },
     ...sections.map((sec) => ({ id: slug(sec.title), title: sec.title, icon: SECTION_ICON[sec.title] ?? ("book" as const) })),
+    ...(stop.exercise ? [{ id: "try-it", title: stop.exercise.title, icon: "bolt" as const }] : []),
+    ...(stop.flashcards.length ? [{ id: "flashcards", title: "Test your understanding", icon: "check" as const }] : []),
     { id: "courses", title: "Best free course", icon: "book" },
     { id: "check", title: "Quick check", icon: "check" },
     { id: "tutor", title: "Ask the AI tutor", icon: "sparkles" },
@@ -173,7 +180,9 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
       <div className="mx-auto grid max-w-6xl gap-8 px-4 pb-16 md:px-6 lg:grid-cols-[1fr_260px]">
         <div className="min-w-0 lg:order-2">
-          <LessonNav sections={navSections} />
+          <LessonNav sections={navSections}>
+            {home && <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />}
+          </LessonNav>
         </div>
         <div className="min-w-0 pt-6 lg:order-1 lg:pt-10">
           {paths.length > 0 && (
@@ -217,7 +226,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
                   </span>
                 </h2>
                 <div className={PROSE}>
-                  <MDXRemote source={sec.body} components={MDX_COMPONENTS} />
+                  <MDXRemote source={sec.body} components={MDX_COMPONENTS} options={MDX_OPTIONS} />
                 </div>
               </section>
             ))
@@ -225,9 +234,27 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             <section className="mt-6">
               <h2 className="text-xl font-semibold">Do it</h2>
               <div className={PROSE}>
-                <MDXRemote source={stop.body} components={MDX_COMPONENTS} />
+                <MDXRemote source={stop.body} components={MDX_COMPONENTS} options={MDX_OPTIONS} />
               </div>
             </section>
+          )}
+
+          {stop.exercise && (
+            <section id="try-it" aria-labelledby="try-it-h" className="mt-6 scroll-mt-24 rounded-2xl border-2 border-dashed border-amber-400 bg-amber-50/60 p-5 md:p-6 dark:border-amber-700 dark:bg-amber-950/20">
+              <h2 id="try-it-h" className="flex items-center gap-3 text-xl font-semibold">
+                <span className="grid size-9 place-items-center rounded-xl bg-amber-400 text-amber-950">
+                  <Icon name="bolt" size={18} />
+                </span>
+                {stop.exercise.title}
+              </h2>
+              <LessonExercise setup={stop.exercise.setup} questions={stop.exercise.questions} />
+            </section>
+          )}
+
+          {stop.flashcards.length > 0 && (
+            <div id="flashcards" className="mt-6 scroll-mt-24">
+              <Flashcards cards={stop.flashcards} storageKey={`xplaind.cards.${stop.id}`} />
+            </div>
           )}
 
           {terms.length > 0 && (
@@ -279,7 +306,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </h2>
             <p className={`mt-1 text-sm ${muted}`}>It has read this lesson and answers questions about it, with new examples.</p>
             <div className="mt-4">
-              <LessonTutor enabled={aiEnabled()} lessonId={stop.id} title={stop.title} />
+              <LessonTutor enabled={aiEnabled()} lessonId={stop.id} title={stop.title} starters={stop.ask} />
             </div>
           </section>
 
@@ -301,6 +328,12 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
                 ))}
               </ul>
             </section>
+          )}
+
+          {home && (
+            <div className="lg:hidden">
+              <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />
+            </div>
           )}
 
           {(prev || next) && home && (

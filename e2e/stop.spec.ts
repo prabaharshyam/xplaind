@@ -13,12 +13,38 @@ test("a stop page renders its lesson from MDX at 360px", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toContainText("What AI, machine learning");
   await expect(page.getByRole("heading", { name: "Go deeper: the best free course" })).toBeVisible();
   await expect(page.getByText("Start here")).toBeVisible();
-  // from the MDX body: section headings, bold text and a list
+  // from the MDX body: section headings, sub-headings, a list, a table and a text diagram
   await expect(page.getByRole("heading", { level: 2, name: "How it works" })).toBeVisible();
-  await expect(page.getByText("Rules versus learning.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: "Rules versus learning" })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "is the broad goal" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Rule-based software" })).toBeVisible();
+  await expect(page.locator("pre code.language-text").first()).toContainText("Machine learning (ML)");
   expect(await noHorizontalScroll(page)).toBe(false);
   expect(errors).toEqual([]);
+});
+
+test("a deep lesson has an exercise with answers, flashcards that remember, and path lessons", async ({ page }) => {
+  await page.goto("/stop/what-is-ai");
+  const tryIt = page.getByRole("region", { name: "Sort the AI in Asha's day" });
+  await expect(tryIt.getByRole("listitem").filter({ hasText: "Which is not AI at all?" })).toBeVisible();
+  await tryIt.getByRole("button", { name: "Check your answers" }).click();
+  await expect(tryIt.getByRole("region", { name: "Answers" })).toContainText("spreadsheet formula");
+
+  const cards = page.getByRole("region", { name: /Test your understanding/ });
+  await expect(cards.getByText("0 of 8")).toBeVisible();
+  await cards.getByRole("button", { name: "Reveal the answer" }).click();
+  await expect(cards.getByText(/human judgement/)).toBeVisible();
+  await cards.getByRole("button", { name: "Already knew that" }).click();
+  await cards.getByRole("button", { name: "Didn't know that" }).click();
+  await expect(cards.getByText("2 of 8")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("region", { name: /Test your understanding/ }).getByText("2 of 8")).toBeVisible();
+  await page.getByRole("region", { name: /Test your understanding/ }).getByRole("button", { name: "Reset" }).click();
+  await expect(page.getByRole("region", { name: /Test your understanding/ }).getByText("0 of 8")).toBeVisible();
+
+  // on a phone, the path's lesson list sits at the end of the lesson
+  await page.getByText(/^Lessons on GenAI Engineer/).last().click();
+  await expect(page.getByRole("link", { name: "What AI, machine learning and a language model are" }).last()).toHaveAttribute("aria-current", "page");
 });
 
 test("a project check shows its brief", async ({ page }) => {

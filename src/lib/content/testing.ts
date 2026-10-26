@@ -58,6 +58,8 @@ export const stop = (o: Partial<Stop> = {}): Stop => ({
   more: [],
   check: { type: "mcq", question_ids: ["chk-1", "chk-2", "chk-3"] },
   format: "brief",
+  flashcards: [],
+  ask: [],
   key_terms: [],
   body: "Lesson text.",
   ...review,
@@ -182,6 +184,16 @@ export const term = (o: Partial<GlossaryTerm> = {}): GlossaryTerm => ({
 export const explainerBody = (words = 520): string => {
   const filler = Array.from({ length: Math.ceil(words / 20) }, () => "Plain words that teach.").join(" ");
   return ["What it is", "How it works", "A worked example", "Common mistakes", "Practise"].map((h) => `## ${h}\n\n${filler}`).join("\n\n");
+};
+
+/** A deep lesson's body: the five sections, a text diagram and a table. */
+export const deepBody = (words = 1150): string =>
+  explainerBody(words).replace("## How it works\n\n", "## How it works\n\n```text\n[a] --> [b]\n```\n\n| Part | Job |\n| --- | --- |\n| a | b |\n\n");
+
+export const deepExtras = {
+  flashcards: Array.from({ length: 6 }, (_, i) => ({ q: `Question ${i + 1}?`, a: "A short answer." })),
+  exercise: { title: "Predict it", setup: "A scenario.", questions: [1, 2, 3].map((n) => ({ q: `Q${n}?`, a: `A${n}.` })) },
+  ask: ["Why?", "How?", "What next?"],
 };
 
 /** Small and fully valid in development mode (not at launch size). */

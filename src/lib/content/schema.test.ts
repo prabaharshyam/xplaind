@@ -127,6 +127,19 @@ describe("Stop frontmatter (RM-2)", () => {
     expect(StopFrontmatter.safeParse({ ...base, format: "explainer", key_terms: ["one", "two"] }).success).toBe(true);
   });
 
+  it("needs flashcards, an exercise and tutor questions on a deep lesson", () => {
+    const deep = { ...base, format: "deep", key_terms: ["one", "two"] };
+    const msgs = messages(StopFrontmatter.safeParse(deep));
+    expect(msgs).toContain("6 to 10 flashcards");
+    expect(msgs).toContain("has an exercise");
+    expect(msgs).toContain("3 or 4 questions");
+    const cards = Array.from({ length: 6 }, () => ({ q: "Q?", a: "A." }));
+    const exercise = { title: "T", setup: "S", questions: [1, 2, 3].map(() => ({ q: "Q?", a: "A." })) };
+    expect(StopFrontmatter.safeParse({ ...deep, flashcards: cards, exercise, ask: ["a", "b", "c"] }).success).toBe(true);
+    const long = [{ q: "Q?", a: "word ".repeat(71) }, ...cards.slice(1)];
+    expect(messages(StopFrontmatter.safeParse({ ...deep, flashcards: long, exercise, ask: ["a", "b", "c"] }))).toContain("70 words");
+  });
+
   it("needs a primary resource", () => {
     expect(StopFrontmatter.safeParse({ ...base, primary_resource: undefined }).success).toBe(false);
   });
