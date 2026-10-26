@@ -10,11 +10,44 @@ gap_tags: [structured-output]
 primary_resource: claude-structured-outputs
 alternates: []
 more: [openai-cookbook, claude-cookbooks]
-format: explainer
+format: deep
 key_terms: [structured-output, json-schema, pydantic]
 check:
   type: mcq
   question_ids: [structured-output-1, structured-output-2, structured-output-3]
+flashcards:
+  - q: "What is structured output?"
+    a: "Model replies in JSON that matches a defined shape, called a schema, so code can read fields reliably."
+  - q: "What three ways can you get structured output?"
+    a: "The provider's structured-output feature with a schema, tool calling with the schema as the tool's input, or clear instructions with an exact JSON example as a fallback."
+  - q: "Why validate even when using structured output?"
+    a: "Schemas enforce shape and types, but values can still be wrong or out of range, and fallbacks may not be constrained at all."
+  - q: "What should happen on a validation error?"
+    a: "Retry once with the error message so the model can fix it; if it fails again, send the item to a person. Never store invalid data."
+  - q: "Why allow null for some fields?"
+    a: "If the input may not contain the information, a required field pushes the model to invent a value."
+  - q: "Why use enums for categories?"
+    a: "A fixed list of allowed values keeps categories consistent for filters, reports and analysis."
+  - q: "What does Pydantic's model_validate_json do?"
+    a: "Parses JSON text and checks it against the model, raising a ValidationError that names each failing field."
+  - q: "What is a JSON schema?"
+    a: "A description of a JSON shape: fields, types, required fields and allowed values, used by providers to constrain output."
+exercise:
+  title: "Design the schema"
+  setup: "A recruitment startup in Noida extracts job postings from WhatsApp messages like: 'Hiring 3 delivery executives in Gurgaon, 18k-22k pm + incentives, bike must, call 98xxxxxx10'. Some posts have no salary, some give a range, some list two roles. The site filters by city, role type (full-time, part-time, contract) and minimum salary."
+  questions:
+    - q: "How should salary be represented?"
+      a: "Two optional integer fields, salary_min_inr and salary_max_inr, monthly, null when not given. '18k-22k' becomes 18000 and 22000."
+    - q: "How should role type be represented, and why?"
+      a: "An enum of full-time, part-time and contract, with null if unclear, so the site filter works consistently."
+    - q: "How should posts listing two roles be handled?"
+      a: "Make the top level a list of postings, so one message can produce two records, or route such messages to a moderator."
+    - q: "What should happen if validation fails twice for a message?"
+      a: "It goes to a moderator queue with the original message, and nothing invalid is saved."
+ask:
+  - "What is the difference between structured output and tool calling?"
+  - "How do I validate AI output with Pydantic?"
+  - "Why does my model invent values for missing fields?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -25,6 +58,22 @@ reviewed_on: 2026-10-25
 Applications need data, not prose. If your code must read a price, a category or a list of items from the model's reply, ask for **structured output**: JSON that matches a defined shape (a **schema**). Then validate it before your code uses it.
 
 Most providers now offer features that constrain the model to produce valid JSON matching a schema, or use tool definitions to do the same.
+
+```text
+  messy text                     schema                      validated record
+ "Selling my Samsung      +-----------------------+      {"product": "Samsung Galaxy S21",
+  Galaxy S21, 2 yrs old,  | product: str          |       "price_inr": 18000,
+  minor scratches, 18k    | price_inr: int > 0    | -->   "condition": "used",
+  negotiable, pickup      | condition: enum       |       "city": "Jaipur"}
+  Malviya Nagar"          | city: str or null     |
+                          +-----------------------+
+           |                       |
+           +----> model ----> JSON ---> validate ---> ok: save
+                                          |
+                                       fails: retry once with error -> fails again: moderator
+```
+
+This lesson follows an online marketplace in Jaipur turning free-text seller listings into searchable records.
 
 ## How it works
 
@@ -62,6 +111,20 @@ Validation catches wrong types (the price as the text "about 500"), missing fiel
 
 **Use enums for categories.** A fixed list of allowed values ("new", "used", "refurbished") keeps categories consistent for later analysis.
 
+**Schema design choices:**
+
+| Field kind | Good design | Avoid |
+| --- | --- | --- |
+| Money | Integer rupees with a range check, such as `price_inr: int > 0` | Text like "18k" |
+| Category | Enum of allowed values | Free text that varies |
+| Information that may be missing | Optional, null allowed, and say so in the instructions | Required fields that force invention |
+| Repeating items | A list of objects | Numbered fields like item1, item2 |
+| Dates | ISO dates, validated | Free-form dates in mixed formats |
+
+**Retry with the error, not blindly.** When validation fails, send the model its previous reply and the exact validation message, such as "price_inr: input should be a valid integer, got '18k'". Most errors are fixed in one retry. Retrying without the error usually repeats the same mistake.
+
+**Check values, not just types.** A schema can confirm that `price_inr` is a positive integer, but not that ₹18,000 is plausible for a two-year-old phone. Add business checks after validation: prices within a sensible range for the category, cities from a known list, dates not in the future. Values that pass the schema but fail a business check go to review just like invalid ones. This two-layer approach, schema first and business rules second, is the same pattern used for invoice extraction and almost every other structured-output pipeline.
+
 ## A worked example
 
 An online marketplace in Jaipur receives seller listings as free text: "Selling my Samsung Galaxy S21, 2 yrs old, minor scratches, 18k negotiable, pickup Malviya Nagar".
@@ -76,6 +139,15 @@ Results on 500 listings:
 
 Because nothing invalid reaches the database, the price filters and city search on the site keep working.
 
+| Step | Listings | Share |
+| --- | --- | --- |
+| Valid on first try | 471 | 94% |
+| Fixed by one retry with the error | 15 | 3% |
+| Sent to moderators | 14 | 3% |
+| Invalid records in the database | 0 | 0% |
+
+**Why moderators liked it.** The 14 listings that reached moderators arrived with the original text, the model's attempt and the exact validation error, so each took seconds to fix. Before the pipeline, moderators fixed hundreds of listings a day by hand.
+
 ## Common mistakes
 
 - **Parsing free text with string tricks.** Ask for JSON and validate.
@@ -83,6 +155,8 @@ Because nothing invalid reaches the database, the price filters and city search 
 - **Forcing every field.** Allow null for information that may be absent.
 - **Free-text categories.** Use a fixed list.
 - **Retrying forever.** Retry once with the error, then send to a person.
+
+- **Changing the schema without updating tests.** Keep a set of sample inputs with expected outputs and rerun it whenever the schema changes.
 
 ## Practise
 

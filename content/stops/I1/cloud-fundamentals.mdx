@@ -9,11 +9,44 @@ hours: 6
 gap_tags: []
 primary_resource: azure-fundamentals-cloud-concepts
 alternates: [azure-fundamentals-architecture, google-cloud-getting-started]
-format: explainer
+format: deep
 key_terms: [region, iam, data-residency, container]
 check:
   type: mcq
   question_ids: [cloud-fundamentals-1, cloud-fundamentals-2, cloud-fundamentals-3]
+flashcards:
+  - q: "What six kinds of cloud service does an AI deployment usually use?"
+    a: "Compute, storage, databases, networking, identity and access, and managed AI model services."
+  - q: "What is the difference between a region and a zone?"
+    a: "A region is a geographic location, such as Mumbai. A zone is a separate data centre within it; spreading across zones adds resilience."
+  - q: "How do you choose a region?"
+    a: "By data residency rules, which models are offered there, and latency to users, in that order of importance for most clients."
+  - q: "What is the fastest safe compute choice for most AI APIs?"
+    a: "Serverless containers, such as Cloud Run, Azure Container Apps or AWS App Runner: you give an image and get a URL."
+  - q: "Why should a database have no public address?"
+    a: "So it can only be reached from the app's private network. Public databases are the most common serious cloud mistake."
+  - q: "What is IAM?"
+    a: "Identity and access management: who and what may do which actions on which resources."
+  - q: "Why give services their own identities instead of access keys?"
+    a: "Service identities get short-lived credentials automatically, with only the permissions they need, so there are no long-lived keys to leak."
+  - q: "Why do clients often prefer a cloud's managed models?"
+    a: "The data stays under their existing cloud contract, region and security controls."
+exercise:
+  title: "Review a cloud design"
+  setup: "A teammate's design for a Mumbai NBFC's loan-document assistant on AWS: a virtual machine in the Singapore region because it was cheaper; PostgreSQL with a public IP and a password in the code; the app uses the admin's personal access key; no budget alert; documents in an S3 bucket set to public 'so the app can read them'."
+  questions:
+    - q: "What is wrong with the Singapore region?"
+      a: "Data residency: financial clients often must keep data in India, and RBI-regulated firms have strict rules. Use an Indian region after checking model availability."
+    - q: "How should the database be set up instead?"
+      a: "No public address, in a private subnet, reachable only from the app, with its password in a secret manager, not in code."
+    - q: "What should replace the admin's personal access key?"
+      a: "An IAM role for the app with only the permissions it needs, such as reading one bucket, with no stored keys."
+    - q: "How should the app read documents without a public bucket?"
+      a: "Keep the bucket private and grant the app's role read access to it. Public buckets expose customer documents to anyone."
+ask:
+  - "Which cloud should I learn first?"
+  - "What is data residency and why does it matter in India?"
+  - "How do I estimate cloud costs for an AI app?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -32,6 +65,24 @@ You do not need every service. An AI deployment uses about six kinds:
 - **Identity and access**: who can do what.
 - **Managed AI**: hosted model APIs from the cloud, which may matter for data agreements.
 
+```text
+  Indian region (for example, Mumbai)
+ +-----------------------------------------------------------+
+ |  Virtual network                                          |
+ |   public subnet          private subnets                  |
+ |  +--------------+      +-----------------+  +-----------+ |
+ |  | load balancer| ---> | serverless      |->| managed   | |
+ |  | HTTPS        |      | containers (app)|  | PostgreSQL| |
+ |  +--------------+      +-----------------+  +-----------+ |
+ |         ^                    |    |                       |
+ |         |                    |    +--> object storage     |
+ |      users                   +-------> managed model API  |
+ |   (company SSO)        app identity: least-privilege role |
+ +-----------------------------------------------------------+
+```
+
+This lesson follows a pharma company in Hyderabad as you design its document assistant on Azure.
+
 ## How it works
 
 **Regions and zones.** Each region (Mumbai, Hyderabad, Pune, Delhi and others in India, depending on the provider) has several zones, separate data centres. Spread instances across zones for resilience. Pick the region by latency to users, by data residency rules and by which models are offered there.
@@ -48,6 +99,20 @@ You do not need every service. An AI deployment uses about six kinds:
 
 **Cost.** Compute, managed databases, data transfer out and model tokens make up most bills. Use the provider's pricing calculator before you build, and set a budget alert on day one.
 
+**The same building blocks, three names:**
+
+| Building block | AWS | Azure | Google Cloud |
+| --- | --- | --- | --- |
+| Serverless containers | App Runner, ECS Fargate | Container Apps | Cloud Run |
+| Managed Kubernetes | EKS | AKS | GKE |
+| Object storage | S3 | Blob Storage | Cloud Storage |
+| Managed PostgreSQL | RDS, Aurora | Azure Database for PostgreSQL | Cloud SQL, AlloyDB |
+| Service identity | IAM role | Managed identity | Service account |
+| Secrets | Secrets Manager | Key Vault | Secret Manager |
+| Managed models | Bedrock | Azure OpenAI, AI Foundry | Vertex AI |
+
+Learn one cloud properly, then use a table like this to translate.
+
 ## A worked example
 
 A Hyderabad pharma company on Azure wants a document assistant for its regulatory team. Requirements: data stays in India, no public database, sign-in with company accounts.
@@ -62,6 +127,16 @@ Your design:
 
 The client's cloud team approves in one review, mainly because every choice matches their existing patterns.
 
+| Line of the monthly estimate | What drives it | How to reduce it |
+| --- | --- | --- |
+| Container Apps | Instances and hours running | Scale to one instance at night |
+| PostgreSQL | Instance size, storage | Start small; scale with measured load |
+| Blob Storage | Gigabytes stored | Archive old versions |
+| Data transfer | Data leaving the cloud | Keep traffic inside the region |
+| Model tokens | Requests × tokens | Shorter prompts, caching, routing easy questions to a smaller model |
+
+**Why the review went smoothly.** The client's cloud team rejects most outside designs on the same three points: public endpoints, stored keys and regions outside India. Your design avoided all three, used services their team already ran, and came with a diagram showing every network boundary. Their only change was a naming convention for resources.
+
 ## Common mistakes
 
 - **Learning three clouds shallowly.** Learn one properly; translating names to another takes a day.
@@ -69,6 +144,8 @@ The client's cloud team approves in one review, mainly because every choice matc
 - **Long-lived access keys in code.** Use service identities and short-lived credentials.
 - **Ignoring data transfer and model costs.** They can exceed compute. Estimate them.
 - **Picking a region for latency alone.** Check residency rules and model availability first.
+
+- **No budget alert.** A forgotten GPU machine or a runaway loop can cost lakhs in a weekend. Set alerts on the first day.
 
 ## Practise
 

@@ -9,11 +9,44 @@ hours: 4
 gap_tags: []
 primary_resource: docker-get-started
 alternates: [docker-compose-quickstart, missing-semester-shipping-code]
-format: explainer
+format: deep
 key_terms: [container, docker-image, dockerfile, docker-compose]
 check:
   type: mcq
   question_ids: [docker-basics-1, docker-basics-2, docker-basics-3]
+flashcards:
+  - q: "What is a container?"
+    a: "A running program packaged with everything it needs, such as the Python version, libraries, code and start command, so it runs the same anywhere."
+  - q: "What is the difference between an image and a container?"
+    a: "An image is the packaged recipe result, stored and shared. A container is a running instance of an image."
+  - q: "What is a Dockerfile?"
+    a: "A short recipe of steps, each adding a layer, used to build an image."
+  - q: "Why copy dependency files before the code in a Dockerfile?"
+    a: "Docker caches layers. Then a code change does not reinstall every package, so rebuilds take seconds."
+  - q: "What is a volume?"
+    a: "Storage that survives when a container is removed, used for database files or caches."
+  - q: "What does Docker Compose do?"
+    a: "Starts several containers together from one file, wired up by name, such as an API and its database."
+  - q: "Why not use the latest tag in production?"
+    a: "You cannot tell what is running or roll back. Tag images with versions or commit hashes."
+  - q: "Why run containers as a non-root user?"
+    a: "It limits damage if the container is compromised, and many client security reviews require it."
+exercise:
+  title: "Review this Dockerfile"
+  setup: "A teammate's Dockerfile for an AI API: FROM python:3.12 (the full image); COPY . . as the first step; RUN pip install -r requirements.txt; ENV ANTHROPIC_API_KEY=sk-ant-...; CMD python main.py. They deploy it as myapi:latest. The PostgreSQL container in compose.yaml has no volume."
+  questions:
+    - q: "What is the most serious problem?"
+      a: "The API key is baked into the image. Anyone with the image can read it. Remove it, rotate the key, and pass it at run time."
+    - q: "Why are rebuilds slow, and how do you fix it?"
+      a: "COPY . . first means any code change invalidates the install layer. Copy requirements.txt, install, then copy the code. Add a .dockerignore."
+    - q: "What happens to the database data on the next deploy?"
+      a: "It is lost, because it lives inside the container. Add a named volume for the database's data folder."
+    - q: "Name two other improvements."
+      a: "Use python:3.12-slim for a much smaller image, add a non-root USER, and tag images with versions instead of latest."
+ask:
+  - "What is the difference between Docker and a virtual machine?"
+  - "How do I make my Docker image smaller?"
+  - "How do containers talk to each other in Docker Compose?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -26,6 +59,24 @@ A **container** is a running program packaged with everything it needs: the Pyth
 You build a container from an **image**, and you build an image from a **Dockerfile**, a short recipe of steps. **Docker Compose** starts several containers together from one file, such as your API, a PostgreSQL database with pgvector and a Redis cache, wired up the way they will be in production.
 
 Containers are not virtual machines. They share the host's Linux kernel, so they start in seconds and use little memory.
+
+```text
+  Dockerfile  --docker build-->  Image (tagged claims-api:1.4.0)
+                                    |
+                     docker push    |   docker run / compose up
+                                    v
+  Registry  <-------------------  Image  ------------------>  Container(s)
+  (Docker Hub, GHCR,                                          running on a
+   cloud registry)                                            laptop, server
+                                                              or cloud
+
+  Virtual machine: whole OS per app      Container: shares the host kernel
+  [app][libs][guest OS][hypervisor]      [app][libs] [app][libs]
+  minutes to start, GBs of RAM           [ container runtime ][ host OS ]
+                                         seconds to start, MBs of RAM
+```
+
+This lesson follows the handover of a document-search API to a bank's IT team in Jaipur, who run everything on their own servers.
 
 ## How it works
 
@@ -51,6 +102,23 @@ Docker caches layers. Copying the dependency files before the code means a code 
 
 **Registries.** Images are pushed to a registry (Docker Hub, GitHub Container Registry, or the client's cloud registry), and servers pull them from there. Tag each image with a version, not just `latest`, so you know exactly what is running and can roll back.
 
+**Everyday commands:**
+
+| Command | What it does |
+| --- | --- |
+| `docker build -t name:tag .` | Build an image from the Dockerfile here |
+| `docker run -p 8000:8000 name:tag` | Run it, mapping a port |
+| `docker ps` | List running containers |
+| `docker logs -f name` | Follow a container's logs |
+| `docker exec -it name bash` | Open a shell inside a running container |
+| `docker images` | List images and their sizes |
+| `docker compose up -d` | Start every service in compose.yaml in the background |
+| `docker compose down` | Stop and remove them (volumes are kept) |
+
+**Debugging a container that will not start.** First, `docker logs` on it: most failures are a missing environment variable, a wrong start command or a port already in use. If it exits instantly, run it with a shell instead of the normal command to look around. If it starts but cannot reach the database, remember that inside Compose the database is at its service name, such as `db`, not `localhost`, because each container has its own network address.
+
+**Images for AI apps.** AI images get large fast: machine learning libraries, model files and system packages add up. Keep model weights out of the image where you can and download them to a volume at start-up, or call a hosted model instead. Use multi-stage builds when you need compilers only to install packages: build in one stage, copy the results into a slim final stage. Smaller images pull faster, start faster and give security scanners less to complain about.
+
 ## A worked example
 
 You are handing a document-search API to a Jaipur bank's IT team, who run everything on their own servers. They want one command to try it.
@@ -75,6 +143,14 @@ They copy `.env.example` to `.env`, fill in the model key and a database passwor
 
 Their security team scans the image and flags that it runs as root. The `USER 1000` line fixes it. They also ask for the image size: `python:3.12-slim` keeps it near 250 MB instead of over 1 GB with the full Python image.
 
+| Review point from the bank | Before | After |
+| --- | --- | --- |
+| Runs as root | Yes | No: `USER 1000` |
+| Image size | Over 1 GB with the full Python image | About 250 MB with `python:3.12-slim` |
+| Secrets in the image | None, passed through `.env` at run time | Confirmed by their scanner |
+| Data after restart | Kept, in the `pgdata` volume | Kept |
+| Version running | Tagged `1.4.0` | Rollback to `1.3.2` tested |
+
 ## Common mistakes
 
 - **Baking secrets into the image.** Anyone with the image can read them. Pass secrets at run time.
@@ -82,6 +158,8 @@ Their security team scans the image and flags that it runs as root. The `USER 10
 - **Storing data inside the container.** It vanishes on the next deploy. Use volumes or a managed database.
 - **Running as root.** Many client security reviews reject it. Add a non-root user.
 - **Copying the whole folder first.** Every code change then reinstalls all packages. Copy dependency files, install, then copy code. Add a `.dockerignore` for `.git`, `.env` and data folders.
+
+- **One giant container for everything.** Keep the API, database and cache as separate services so each can be restarted, scaled and upgraded on its own.
 
 ## Practise
 

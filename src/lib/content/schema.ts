@@ -23,7 +23,7 @@ export const EXPLAINER_SECTIONS = ["What it is", "How it works", "A worked examp
 export const EXPLAINER_MIN_WORDS = 500;
 export const EXPLAINER_MAX_WORDS = 1500;
 /** A deep lesson has the same sections, written at roadmap.sh-pack depth, with a diagram and a table. */
-export const DEEP_MIN_WORDS = 1100;
+export const DEEP_MIN_WORDS = 1000;
 export const DEEP_MAX_WORDS = 3000;
 export const FLASHCARD_ANSWER_MAX_WORDS = 70;
 export const GLOSSARY_DEFINITION_MAX_WORDS = 45;

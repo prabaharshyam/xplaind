@@ -10,11 +10,44 @@ gap_tags: [tokens-context]
 primary_resource: claude-context-windows
 alternates: [claude-token-counting]
 more: [hf-llm-course]
-format: explainer
+format: deep
 key_terms: [token, context-window, cost-per-request, tokenizer]
 check:
   type: mcq
   question_ids: [tokens-and-context-1, tokens-and-context-2, tokens-and-context-3]
+flashcards:
+  - q: "What is a token?"
+    a: "A small piece of text from the model's vocabulary: often a common word, sometimes part of a word, a number or punctuation."
+  - q: "Roughly how many English words are 100 tokens?"
+    a: "About 75 words. Indian scripts such as Hindi or Tamil often need more tokens for the same meaning."
+  - q: "What is the context window?"
+    a: "The maximum number of tokens in one call, counting everything sent plus the reply."
+  - q: "What fills the context window in a chat app?"
+    a: "The system prompt, the whole conversation so far, documents or retrieved passages, tool definitions and results, and the reply up to max_tokens."
+  - q: "Why do long chats get more expensive per turn?"
+    a: "The API has no memory, so every turn resends the whole history as input tokens."
+  - q: "How do you estimate a call's cost?"
+    a: "Input tokens times the input price plus output tokens times the output price. Output tokens usually cost several times more."
+  - q: "Name three ways to stay inside the context window."
+    a: "Summarise or trim old turns, retrieve only relevant passages, set max_tokens, and truncate oversized inputs with a warning."
+  - q: "What does prompt caching do?"
+    a: "Makes a repeated, identical beginning of a prompt, such as a long system prompt, much cheaper and faster on later calls."
+exercise:
+  title: "Estimate the conversation cost"
+  setup: "A chatbot has a 1,000-token system prompt. Each user question is about 100 tokens and each answer about 200 tokens. History is resent every turn. Assume ₹0.0003 per input token and ₹0.0015 per output token."
+  questions:
+    - q: "How many input tokens does turn 1 send?"
+      a: "1,000 system + 100 question = 1,100 input tokens."
+    - q: "How many input tokens does turn 5 send?"
+      a: "1,000 system + 4 earlier turns × 300 (question plus answer) + 100 new question = 2,300 input tokens."
+    - q: "What does turn 5 cost?"
+      a: "Input 2,300 × ₹0.0003 = ₹0.69; output 200 × ₹0.0015 = ₹0.30; about ₹0.99."
+    - q: "Name two changes that would cut the cost of long chats."
+      a: "Cache the system prompt, and summarise history after a few turns so each turn resends a short summary instead of every message."
+ask:
+  - "Why do Hindi messages cost more tokens?"
+  - "What happens when a conversation exceeds the context window?"
+  - "How does prompt caching save money?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -27,6 +60,20 @@ Language models read and write **tokens**, small pieces of text: often a whole c
 - **Price**: providers charge per million input tokens and per million output tokens; output tokens usually cost several times more.
 - **Limits**: the **context window** is the maximum number of tokens in one call, counting everything sent and the reply.
 - **Speed**: more output tokens take longer to generate.
+
+```text
+  One API call's context window
+ +----------------------------------------------------------------+
+ | system prompt            | 1,200 tokens  (same every call)     |
+ | conversation history     | 3,000 tokens  (grows every turn)    |
+ | retrieved passages       |   800 tokens                        |
+ | new user message         |   150 tokens  (Tamil: more tokens)  |
+ | reply, up to max_tokens  |   300 tokens                        |
+ +----------------------------------------------------------------+
+   all of it is counted, and all of the input is paid for, every call
+```
+
+This lesson follows an e-learning company in Chennai building a doubt-solving chatbot in Tamil and English.
 
 ## How it works
 
@@ -50,6 +97,19 @@ As a conversation grows, every turn resends more history, so cost per turn rises
 
 **Caching.** If many calls share a long, identical beginning (a big system prompt or a document), prompt caching can make repeated input much cheaper and faster. A later lesson covers it.
 
+**How cost grows with conversation length** (1,200-token system prompt, 100-token questions, 250-token answers, history resent):
+
+| Turn | Input tokens sent | Of which history |
+| --- | --- | --- |
+| 1 | 1,300 | 0 |
+| 3 | 2,000 | 700 |
+| 6 | 3,050 | 1,750 |
+| 10 | 4,450 | 3,150 |
+
+By turn 10, most of what you pay for is history. Summarising older turns into a short paragraph keeps the input roughly flat, and caching the system prompt makes its 1,200 tokens much cheaper on every call after the first.
+
+**Count before you send.** For anything a user can paste, such as a document or a long message, count tokens before calling the model. If it is too long, either retrieve only the relevant parts, summarise it first, or tell the user plainly that it is too long. Failing with a clear message is far better than a silent cut-off or a surprise bill.
+
 ## A worked example
 
 A Chennai e-learning company builds a doubt-solving chatbot for Class 10 students in Tamil and English.
@@ -63,6 +123,8 @@ Measurements from a week of testing:
 
 At their model's prices, a ten-turn chat cost about four times as much as a two-turn chat, mostly from resent history. They change three things: summarise history after six turns, cache the system prompt, and cap answers at 300 tokens. Average cost per conversation falls by 55%, and Tamil users no longer hit the context limit in long sessions.
 
+**Why Tamil users hit the limit first.** The same question took about two and a half times as many tokens in Tamil as in English, and answers in Tamil were longer in tokens too. In long revision sessions, Tamil conversations reached the context limit after about 40 turns, while English ones rarely did. Summarising history after six turns fixed this for both, and it also made the bot answer faster, because shorter inputs are processed more quickly. The team now tests every prompt change with both Tamil and English conversations, and reports cost per conversation separately for each language, so a change that is cheap in English but expensive in Tamil is caught before it ships.
+
 ## Common mistakes
 
 - **Counting words instead of tokens.** Prices and limits are in tokens, and Indian languages use more.
@@ -70,6 +132,8 @@ At their model's prices, a ten-turn chat cost about four times as much as a two-
 - **Ignoring output price.** Output tokens usually cost more.
 - **No `max_tokens`.** Replies can be long and costly.
 - **Stuffing whole documents in.** Retrieve what is relevant.
+
+- **Assuming a bigger context window solves everything.** Very long inputs cost more, are slower, and details in the middle are often missed. Send what is relevant, not everything you have.
 
 ## Practise
 

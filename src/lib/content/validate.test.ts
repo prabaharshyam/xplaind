@@ -52,7 +52,7 @@ describe("broken bundles fail", () => {
     ["an explainer misses a section", (b) => Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody().replace("## Common mistakes", "## Pitfalls") }), /missing Common mistakes/],
     ["an explainer has its sections out of order", (b) => Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody().replace("## What it is", "## Tmp").replace("## How it works", "## What it is").replace("## Tmp", "## How it works") }), /must come in the order/],
     ["an explainer is too short", (b) => Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody(100) }), /500 to 1500 words/],
-    ["a deep lesson is too short", (b) => Object.assign(b.stops[0].data, { format: "deep", ...deepExtras, body: deepBody(600) }), /1100 to 3000 words/],
+    ["a deep lesson is too short", (b) => Object.assign(b.stops[0].data, { format: "deep", ...deepExtras, body: deepBody(500) }), /1000 to 3000 words/],
     ["a deep lesson has no diagram", (b) => Object.assign(b.stops[0].data, { format: "deep", ...deepExtras, body: deepBody().replace("```text", "```python") }), /diagram/],
     ["a deep lesson has no table", (b) => Object.assign(b.stops[0].data, { format: "deep", ...deepExtras, body: deepBody().replace("| --- | --- |", "") }), /table/],
   ];

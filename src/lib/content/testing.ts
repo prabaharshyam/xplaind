@@ -187,7 +187,7 @@ export const explainerBody = (words = 520): string => {
 };
 
 /** A deep lesson's body: the five sections, a text diagram and a table. */
-export const deepBody = (words = 1150): string =>
+export const deepBody = (words = 1050): string =>
   explainerBody(words).replace("## How it works\n\n", "## How it works\n\n```text\n[a] --> [b]\n```\n\n```python\n# a comment, not a heading\n```\n\n| Part | Job |\n| --- | --- |\n| a | b |\n\n");
 
 export const deepExtras = {

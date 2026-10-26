@@ -9,11 +9,44 @@ hours: 3
 gap_tags: []
 primary_resource: github-actions-quickstart
 alternates: [github-environments]
-format: explainer
+format: deep
 key_terms: [ci-cd, deployment-environment, regression-test, docker-image]
 check:
   type: mcq
   question_ids: [cicd-github-actions-1, cicd-github-actions-2, cicd-github-actions-3]
+flashcards:
+  - q: "What is continuous integration (CI)?"
+    a: "Running checks such as lint, type checks, unit tests and a small eval on every change, so a failing change cannot merge."
+  - q: "What is continuous delivery (CD)?"
+    a: "Taking a merged change through environments automatically: build an image, deploy to staging, smoke test, then production, often after approval."
+  - q: "Where do GitHub Actions workflows live?"
+    a: "As YAML files in .github/workflows/, running on events such as a pull request or a push to main."
+  - q: "Why add a small eval to CI for an AI app?"
+    a: "Prompt and retrieval changes are code changes. A fast eval on golden questions catches quality drops before merging."
+  - q: "What is a deployment environment in GitHub Actions?"
+    a: "A named target such as staging or production, with its own secrets and rules, such as required reviewers before deploy."
+  - q: "Why build one image and promote it?"
+    a: "So production runs exactly what was tested in staging. Rebuilding per environment can introduce differences."
+  - q: "What is OpenID Connect used for in CI?"
+    a: "Letting the runner sign in to the cloud with short-lived credentials, instead of storing long-lived keys as secrets."
+  - q: "How does tagging images with the commit hash help rollback?"
+    a: "Rolling back is just redeploying the previous commit's image, which can be a single button or command."
+exercise:
+  title: "Find the gaps in this pipeline"
+  setup: "A Gurugram startup's pipeline: CI runs only on pushes to main, not on pull requests. Tests run, but there is no eval. The AWS access key is pasted into the workflow file. The deploy job rebuilds the Docker image separately for staging and production. Nobody has ever rolled back."
+  questions:
+    - q: "What is the risk of running CI only on main?"
+      a: "Broken changes are found after they merge. Run CI on pull requests so failures block the merge."
+    - q: "What should replace the pasted AWS key?"
+      a: "Remove it and rotate it now, then use OpenID Connect for short-lived credentials, or at least the CI system's encrypted secrets."
+    - q: "Why is rebuilding the image for each environment a problem?"
+      a: "Production may get a different image from the one tested in staging. Build once, tag with the commit, promote the same image."
+    - q: "What two additions matter most for an AI app here?"
+      a: "A small eval in CI that fails below a threshold, and a practised rollback to the previous image."
+ask:
+  - "What is the difference between CI and CD?"
+  - "How do I test prompt changes in CI?"
+  - "How do I store secrets in GitHub Actions safely?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -27,6 +60,26 @@ reviewed_on: 2026-10-25
 
 GitHub Actions is one common way to do both. Workflows are YAML files in `.github/workflows/` that run on events such as a pull request or a push to main. GitLab CI, Azure DevOps and Jenkins work similarly; clients will have their own choice.
 
+```text
+  Pull request                 Merge to main
+      |                              |
+      v                              v
+ [CI: lint, types,          [Build image, tag = commit hash]
+  tests, smoke eval]                 |
+      |                              v
+  pass? -- no --> blocked     [Deploy to staging] --> [smoke tests]
+      |                              |
+     yes --> can merge               v
+                              [Approval by a named reviewer]
+                                     |
+                                     v
+                              [Deploy same image to production]
+                                     |
+                         problem? --> redeploy previous tag
+```
+
+This lesson follows the handover of a claims assistant to an insurer's engineering team in Kochi.
+
 ## How it works
 
 **Triggers and jobs.** A workflow runs on events (`pull_request`, `push` to main, a tag, a manual dispatch). It contains jobs; each job runs steps on a fresh machine, called a runner.
@@ -38,6 +91,23 @@ GitHub Actions is one common way to do both. Workflows are YAML files in `.githu
 **Deploy jobs** use **environments**. A `staging` environment deploys automatically; a `production` environment requires a named reviewer's approval and has its own secrets. Secrets are stored in the CI system or fetched from the cloud at run time; never in the repository. Better still, let the runner sign in to the cloud with short-lived credentials through OpenID Connect instead of stored keys.
 
 **Rollback.** Because each deploy uses an image tagged with a commit, rolling back means redeploying the previous tag. Make it a single button or command and practise it.
+
+**What runs where, and how often:**
+
+| Check | When | Typical time | Fails the build? |
+| --- | --- | --- | --- |
+| Lint and format | Every PR | Seconds | Yes |
+| Type checks | Every PR | Under a minute | Yes |
+| Unit tests with a fake model | Every PR | 1 to 3 minutes | Yes |
+| Smoke eval, 20 golden questions | Every PR touching prompts or retrieval | 1 to 2 minutes | Yes, below a threshold |
+| Full eval, hundreds of cases | Nightly | 10 to 60 minutes | Alerts the team |
+| Load test | Before major releases | Varies | Blocks release if too slow |
+
+**Caching.** Installing dependencies on every run is slow. Cache them, keyed on the lock file, so CI takes minutes, not ten. Fast CI gets used; slow CI gets bypassed.
+
+**Branch protection.** In the repository settings, require the CI job to pass and at least one review before merging to main. Without this, CI is only advice.
+
+**Secrets in practice.** The workflow needs some secrets: a model API key for the smoke eval, credentials to push images, credentials to deploy. Store them in the repository's or environment's secret settings, where they are encrypted and hidden in logs. Give each environment its own secrets, so a staging key can never touch production. For cloud access, prefer OpenID Connect: the cloud trusts the specific repository and branch, and issues a credential that expires within the hour. There is then no long-lived key to leak at all.
 
 ## A worked example
 
@@ -75,6 +145,8 @@ jobs:
 
 A week later a teammate changes the prompt and the smoke eval drops from 0.89 to 0.78; CI fails and the PR cannot merge. Later a production deploy causes slow responses; Anjali redeploys the previous commit's image from the workflow page in two minutes, before most users notice.
 
+**What changed for the insurer's team.** Before the pipeline, deploys happened when someone remembered, from a laptop, and nobody was sure which version was live. After it, every production version is a commit hash shown on the workflow page, every deploy has a named approver, and the smoke eval has blocked three prompt changes in two months that would each have reduced answer quality. Anjali says the most useful part is not speed but certainty: when a claims manager reports a bad answer, the team can say exactly which code and prompt produced it.
+
 ## Common mistakes
 
 - **Tests only on main.** Problems are found after merging. Run CI on pull requests.
@@ -82,6 +154,9 @@ A week later a teammate changes the prompt and the smoke eval drops from 0.89 to
 - **Secrets in workflow files.** Use the CI system's secrets or short-lived cloud credentials.
 - **Building different images per environment.** Build once, promote the same image through staging to production.
 - **A rollback nobody has tried.** Practise it before you need it.
+
+- **Flaky tests left in place.** A test that fails randomly teaches people to rerun CI until it passes, and then real failures get ignored too. Fix or remove flaky tests quickly.
+- **Evals that call a live model on every PR without a budget.** Keep the PR eval small and cheap, cache what you can, and run the full suite on a schedule.
 
 ## Practise
 
