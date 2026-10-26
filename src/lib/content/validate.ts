@@ -74,6 +74,7 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   uniqueIds("interview question", bundle.interview);
   uniqueIds("book", bundle.books);
   uniqueIds("glossary term", bundle.glossary);
+  uniqueIds("guided project", bundle.projects);
 
   const resourceById = new Map(bundle.resources.map((r) => [r.data.id, r]));
   const stopById = new Map(bundle.stops.map((s) => [s.data.id, s]));
@@ -239,6 +240,33 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
       gap(file, `fee checked on ${c.fee_checked_on}; check it again`, "RM-6");
     }
     if (!isHumanName(c.verified_by)) gap(file, `verified_by "${c.verified_by}" is not a person; a human must confirm the exam page`, "ED-4");
+  }
+
+  // ---- guided projects (GP-1, GP-4) ---------------------------------------
+  const projectById = new Map(bundle.projects.map((p) => [p.data.id, p]));
+  const guided = new Set<string>();
+  for (const { file, data: g } of bundle.goals) {
+    for (const st of g.stages) {
+      if (!st.guide) continue;
+      const guide = projectById.get(st.guide);
+      if (!guide) error(file, `stage "${st.id}" links guided project "${st.guide}", which does not exist`, "GP-4");
+      else if (st.project && st.project.title !== guide.data.title) {
+        error(file, `stage "${st.id}" project "${st.project.title}" and its guide "${guide.data.title}" must have the same title`, "GP-4");
+      }
+      guided.add(st.guide);
+    }
+  }
+  for (const { file, data: p } of bundle.projects) {
+    if (!guided.has(p.id)) error(file, `guided project "${p.id}" is not linked from any path stage`, "GP-4");
+    for (const id of p.lessons) if (!stopById.has(id)) error(file, `lesson "${id}" does not exist`, "GP-1");
+    if (new Set(p.lessons).size !== p.lessons.length) error(file, "a lesson is listed twice", "GP-1");
+    const titles = p.steps.map((st) => st.title);
+    if (new Set(titles).size !== titles.length) error(file, "step titles must be unique", "GP-1");
+    if (/https?:\/\//.test(JSON.stringify([p.steps, p.rubric, p.summary]))) {
+      error(file, "guided projects link to lessons and courses, not to raw web addresses", "GP-1");
+    }
+    if (!isHumanName(p.reviewed_by)) gap(file, `reviewed_by "${p.reviewed_by}" is not a person; a human must review this project`, "ED-9");
+    if (daysBetween(opts.today, p.reviewed_on) > 0) error(file, `reviewed_on ${p.reviewed_on} is in the future`, "ED-9");
   }
 
   // ---- blog ---------------------------------------------------------------

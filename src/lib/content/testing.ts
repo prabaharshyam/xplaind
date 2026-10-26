@@ -6,6 +6,7 @@ import type {
   Certification,
   Goal,
   GlossaryTerm,
+  GuidedProject,
   Book,
   CheckQuestion,
   InterviewQuestion,
@@ -226,5 +227,25 @@ export function validBundle(): Bundle {
     glossary: [{ ...f("glossary/term-one.yaml"), data: term() }, { ...f("glossary/term-two.yaml"), data: term({ id: "term-two", term: "Term two", related: ["term-one"] }) }],
     certifications: [{ ...f("certifications/cert-one.yaml"), data: certification() }],
     blog: [{ ...f("blog/post-one.mdx"), data: blogPost() }],
+    projects: [],
   };
 }
+
+/** A small valid guided project (GP-1). */
+export const guidedProject = (o: Partial<GuidedProject> = {}): GuidedProject => ({
+  id: "project-one",
+  title: "A small project",
+  summary: "Build a small thing.",
+  difficulty: "starter",
+  hours: 4,
+  lessons: ["stop-one"],
+  you_will_need: ["A laptop"],
+  steps: [1, 2, 3, 4].map((n) => ({ title: `Step ${n}`, body: "Do it.", done_when: "It works." })),
+  rubric: [1, 2, 3, 4].map((n) => ({ criterion: `Criterion ${n}`, strong: "Good.", weak: "Not good." })),
+  deliverables: ["A repository"],
+  stretch: [],
+  drafted_with_ai: true,
+  reviewed_by: "Priya Raman",
+  reviewed_on: TODAY,
+  ...o,
+});

@@ -10,6 +10,7 @@ import {
   Book,
   Certification,
   GlossaryTerm,
+  GuidedProject,
   CheckQuestion,
   Goal,
   InterviewQuestion,
@@ -191,5 +192,6 @@ export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   bundle.glossary = loadYamlDir(root, "glossary", GlossaryTerm, issues);
   bundle.certifications = loadYamlDir(root, "certifications", Certification, issues);
   bundle.blog = loadBlog(root, issues);
+  bundle.projects = loadYamlDir(root, "projects", GuidedProject, issues);
   return { bundle, issues };
 }

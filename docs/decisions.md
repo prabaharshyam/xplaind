@@ -170,7 +170,7 @@ The owner asked for the AI features in the screenshot they shared (generate a co
 - **Privacy page.** When the privacy page (PV-3) is written, it must name Anthropic as a processor for AI features: what is sent (the learner's typed text, and for the coach a short progress summary shown on the page), why, and that we keep no copy.
 - **Where each feature lives.** `/ai` lists them. `/ai/roadmap` (generator, hand editing and "change it with AI"), `/ai/course` (outline first, each lesson written when opened, with a diagram, a quiz and flashcards), `/ai/coach`, the tutor at the end of every lesson (grounded in that lesson's text), and "Get AI feedback" on each answer in the mock interview report (IQ-7). "Deep-dive guides" are our own lessons, being rewritten to a deeper format; they are editorial content, not generated at run time.
 
-## Topic tracking and one roadmap design (2026-10-27, owner's request)
+## Topic tracking and one roadmap design (2026-10-26, owner's request)
 
 - **Learning, Done and Skip on every topic, as on roadmap.sh.** The owner chose a one-tap Done, so RM-7 is amended: a stop is also done when the learner marks it done. It is stored as `done_how = 'self_marked'` (migration `20261027000000_self_marked.sql`), counted apart from passed checks, earns 20 XP against 50 for a check, and never earns a level badge (AC-6). Skip is RM-8's "I already know this" (`self_skipped`). Picking Done keeps a passed check or a project. Tapping the active choice again puts the topic back to "to do".
 - **The controls appear in three places:** on each topic card on the map (behind a "Mark" button, so the map stays calm), in the topic drawer, and at the top and bottom of each lesson page.
@@ -179,8 +179,15 @@ The owner asked for the AI features in the screenshot they shared (generate a co
 - **A Projects tab on every roadmap** lists each stage's project with its brief and deliverables, how much of the stage is finished, and "ready to build" at 70% of the stage. Learners can mark a project as building, or done with a link. Project progress is kept on this device only for now; syncing it needs a new user table, so it waits for a PRD data-model change.
 - **Lesson widgets keep working when storage is blocked.** Values that cannot be saved stay in memory for the visit, so flashcards and other saved controls still respond in private windows or with site data blocked.
 
-## Mock interview analysis (2026-10-27, owner's request)
+## Mock interview analysis (2026-10-26, owner's request)
 
 - **Every answer is analysed, without a model.** The report now scores understanding from 0 to 100 per answer: key points covered (70%), closeness to the reference answer's key terms (20%) and structure (10%: a clear definition, an example, a trade-off, real use). Covered points quote the learner's own sentence as evidence. Answers are grouped by topic into "concept by concept" understanding, with the lessons to revisit for weak concepts. All of this is pure code in `src/lib/interview/analyse.ts`, with tests.
 - **One AI review per interview, not one per answer.** Signed-in learners can ask Claude to review the whole interview in a single call (`/api/ai/interview`, kind `interview`, 3 a day). It judges meaning rather than words: what was right, what was wrong or misleading with the correction, which rubric points were missed, a stronger answer, and strengths, gaps and next steps for the session. It replaces the per-answer grade button, which cost one call per question. It needs the learner's tap, because it sends their answers to Anthropic.
 - **The word-matching analysis says what it cannot do:** it cannot tell a wrong statement from a right one. The report says so and points to the AI review when AI is on.
+
+## Guided projects (2026-10-26, owner's choice for the next phase)
+
+- **Every roadmap project is a guided project (GP-1 to GP-4).** 22 guides in `content/projects`: one per GenAI level, one per FDE stage, and each other path's capstone. Each has a summary, difficulty, hours, the lessons it uses, what you will need, 4 to 8 steps (what to do, a hint, "done when"), a 4 to 6 point rubric with strong and weak examples, deliverables and stretch goals. They are drafted with AI and flagged for review like lessons.
+- **Stages link guides with `guide: <id>`.** Validation fails if a link points nowhere, a guide is not linked, a lesson is missing, or a stage's project title differs from its guide's. GenAI levels now show their guide's title on the map instead of the bare exit check.
+- **One progress record per guide.** Steps ticked, rubric criteria met and the submitted link are stored under `guide/<id>`, so a guide shared by two paths counts once, and the roadmap's Projects tab, the project page and `/projects` all agree. Still device-only, as GP-4 says.
+- **No raw web links in steps.** Guides point to lessons, which carry the checked course links (RM-4), so no unchecked link reaches a learner through a project.

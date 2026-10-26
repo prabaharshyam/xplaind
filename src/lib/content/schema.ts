@@ -344,6 +344,41 @@ export const StageProject = z.strictObject({
 });
 export type StageProject = z.infer<typeof StageProject>;
 
+/**
+ * GP-1: a guided project, content/projects/<id>.yaml. Steps take the learner from an
+ * empty folder to the deliverables; the rubric is what a reviewer would check.
+ */
+export const ProjectStep = z.strictObject({
+  title: Text,
+  body: Text,
+  hint: Text.optional(),
+  /** How the learner knows the step is finished. */
+  done_when: Text,
+});
+export const RubricItem = z.strictObject({
+  criterion: Text,
+  /** What a strong submission does. */
+  strong: Text,
+  /** What a weak one does. */
+  weak: Text,
+});
+export const GuidedProject = z.strictObject({
+  id: Slug,
+  title: Text,
+  summary: Text.max(400),
+  difficulty: z.enum(["starter", "intermediate", "advanced"]),
+  hours: z.number().int().min(1).max(80),
+  /** Lessons the project puts to use, in the order they come up. */
+  lessons: z.array(Slug).min(2),
+  you_will_need: z.array(Text).min(1),
+  steps: z.array(ProjectStep).min(4, "GP-1: a guided project needs 4 to 8 steps").max(8, "GP-1: a guided project needs 4 to 8 steps"),
+  rubric: z.array(RubricItem).min(4, "GP-1: a rubric needs 4 to 6 criteria").max(6, "GP-1: a rubric needs 4 to 6 criteria"),
+  deliverables: z.array(Text).min(1),
+  stretch: z.array(Text).default([]),
+  ...reviewShape,
+});
+export type GuidedProject = z.infer<typeof GuidedProject>;
+
 /** A topic on a path that has no lesson yet. Shows on the map as "being written". */
 export const PlannedTopic = z.strictObject({ title: Text, summary: Text.max(140) });
 
@@ -358,6 +393,8 @@ export const PathStage = z.strictObject({
   lessons: z.array(Slug),
   planned: z.array(PlannedTopic).default([]),
   project: StageProject.optional(),
+  /** GP-4: the guided project for this stage, an id in content/projects. */
+  guide: Slug.optional(),
 });
 export type PathStage = z.infer<typeof PathStage>;
 

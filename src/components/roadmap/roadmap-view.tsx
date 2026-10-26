@@ -434,7 +434,7 @@ function ProjectsTab({
   progress: ProgressMap;
   saved: Record<string, ProjectProgress>;
 }) {
-  const done = sections.filter((s) => saved[projectKey(pathId, s.id)]?.status === "done").length;
+  const done = sections.filter((s) => saved[projectKey(pathId, s.id, s.project?.guide)]?.status === "done").length;
   if (sections.length === 0) return <p className={muted}>This roadmap has no projects yet.</p>;
   return (
     <div className="flex flex-col gap-4">
@@ -446,7 +446,7 @@ function ProjectsTab({
       </p>
       <ol className="flex flex-col gap-4">
         {sections.map((s, i) => (
-          <ProjectCard key={s.id} n={i + 1} pathId={pathId} section={s} progress={progress} record={saved[projectKey(pathId, s.id)]} />
+          <ProjectCard key={s.id} n={i + 1} pathId={pathId} section={s} progress={progress} record={saved[projectKey(pathId, s.id, s.project?.guide)]} />
         ))}
       </ol>
     </div>
@@ -470,7 +470,7 @@ function ProjectCard({
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const project = section.project!;
-  const key = projectKey(pathId, section.id);
+  const key = projectKey(pathId, section.id, project.guide);
   const ids = section.topics.flatMap((t) => (t.stopId ? [t.stopId] : []));
   const c = stateCounts(ids, progress);
   const ready = c.percent >= 70;
@@ -494,6 +494,12 @@ function ProjectCard({
         </div>
       </div>
       <p className="leading-7">{project.brief}</p>
+      {project.guide && (
+        <Link href={`/projects/${project.guide}`} className={`w-fit gap-2 ${primaryButton}`}>
+          <Icon name="map" size={18} /> Open the step-by-step guide
+          {record?.steps?.length ? <span className="sr-only"> ({record.steps.length} steps ticked)</span> : null}
+        </Link>
+      )}
       {project.deliverables.length > 0 && (
         <div>
           <p className="text-sm font-medium">What to show</p>
@@ -525,7 +531,7 @@ function ProjectCard({
       )}
       <div className="flex flex-wrap items-center gap-2">
         {state !== "building" && state !== "done" && (
-          <button type="button" className={secondaryButton} onClick={() => setProject(key, { status: "building", updatedOn: day() })}>
+          <button type="button" className={secondaryButton} onClick={() => setProject(key, { ...record, status: "building", updatedOn: day() })}>
             I am building this
           </button>
         )}
@@ -546,7 +552,7 @@ function ProjectCard({
               return;
             }
             setError(null);
-            setProject(key, { status: "done", url: url.trim(), updatedOn: day() });
+            setProject(key, { ...record, status: "done", url: url.trim(), updatedOn: day() });
           }}
         >
           <label className="flex flex-1 flex-col gap-1 text-sm font-medium">

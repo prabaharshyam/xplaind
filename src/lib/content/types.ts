@@ -5,6 +5,7 @@ import type {
   CheckQuestion,
   Goal,
   GlossaryTerm,
+  GuidedProject,
   InterviewQuestion,
   LevelDefinition,
   PlacementQuestion,
@@ -37,6 +38,7 @@ export type Bundle = {
   glossary: Entry<GlossaryTerm>[];
   certifications: Entry<Certification>[];
   blog: Entry<BlogPost>[];
+  projects: Entry<GuidedProject>[];
 };
 
 export const emptyBundle = (): Bundle => ({
@@ -51,4 +53,5 @@ export const emptyBundle = (): Bundle => ({
   glossary: [],
   certifications: [],
   blog: [],
+  projects: [],
 });

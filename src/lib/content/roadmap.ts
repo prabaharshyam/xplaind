@@ -3,7 +3,7 @@ import { type LevelId, isLevelId } from "@/lib/levels";
 import { roadmapHref } from "@/lib/paths";
 import { topicsWithStops } from "@/lib/roadmap/map";
 import type { RoadmapModel, RoadmapSection, RoadmapTopic } from "@/lib/roadmap/view";
-import { getLevel, getStopsInOrder } from "./index";
+import { getLevel, getProject, getStopsInOrder, pathStages } from "./index";
 import { pathView } from "./paths";
 import type { Goal } from "./schema";
 
@@ -11,6 +11,12 @@ export function roadmapModel(path: Goal): RoadmapModel {
   const view = pathView(path);
   const byLevel = path.layout === "levels";
   const ladder = byLevel ? getStopsInOrder() : [];
+  const guides = new Map(
+    pathStages(path).flatMap((st) => {
+      const g = st.guide ? getProject(st.guide) : undefined;
+      return g ? [[st.id, g] as const] : [];
+    }),
+  );
   const sections: RoadmapSection[] = view.stages.map((st, i) => {
     const lessons: RoadmapTopic[] = st.lessons.map((l) => ({
       key: l.id,
@@ -29,7 +35,14 @@ export function roadmapModel(path: Goal): RoadmapModel {
           .filter((t) => t.stopId === null)
           .map((t) => ({ key: `${st.id}:${t.id}`, title: t.title, summary: t.summary, stopId: null, optional: t.optional, level: level.id, hours: null, theme: null }))
       : st.planned.map((t, j) => ({ key: `${st.id}:planned-${j}`, title: t.title, summary: t.summary, stopId: null, optional: false, level: null, hours: null, theme: null }));
-    const project = st.project ?? (level ? { title: `${level.id} ${level.name} project`, brief: `${level.exit_check}.`, deliverables: [] } : null);
+    const guide = guides.get(st.id);
+    const project = guide
+      ? { title: guide.title, brief: guide.summary, deliverables: guide.deliverables, guide: guide.id }
+      : st.project
+        ? { ...st.project, guide: null }
+        : level
+          ? { title: `${level.id} ${level.name} project`, brief: `${level.exit_check}.`, deliverables: [], guide: null }
+          : null;
     return {
       id: st.id,
       code: level ? level.id : String(i + 1),

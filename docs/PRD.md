@@ -145,6 +145,17 @@ The structure is goal, then levels, then stops, then resources. A stop is one le
 
 A Meta Llama certificate exists on Coursera, but it sits under a paid Coursera Plus plan, so it probably fails the low-cost rule.
 
+## Guided projects
+
+Added at the owner's request (2026-10-26). Each stage's closing project becomes a guided project: the proof a learner shows an employer, with enough structure that a beginner can finish it alone.
+
+| ID | Requirement | Acceptance criteria |
+| --- | --- | --- |
+| GP-1 | Content. A guided project is a file in content/projects with a summary, difficulty, hours, the lessons it uses, what you will need, 4 to 8 steps (each with what to do, an optional hint and "done when"), a rubric of 4 to 6 criteria (what strong and weak look like), deliverables and stretch goals. It is flagged as drafted with AI and needs a person's sign-off before launch (ED-9) | Content validation fails on a missing lesson, a wrong step or rubric count, or a raw web address in the steps |
+| GP-2 | Project page /projects/\[id\]. Show the brief, the lessons it uses as links, the steps as a checklist with hints, the rubric as a self-check, the deliverables, and a place to submit the project link | Works signed out; ticks and the link are kept on the device; WCAG 2.1 AA |
+| GP-3 | Projects index /projects. List every guided project with its path, difficulty and hours, filterable by path and difficulty | Renders from content files with no database call |
+| GP-4 | Each path stage that has a project links its guide, and the roadmap's Projects tab opens it. Project progress stays on the device until a user table for it is added to the data model | Validation fails if a stage links a guide that does not exist, or a guide is not linked from any stage |
+
 ## Interview Q&A, MCQs and books
 
 Interview prep is the entry point and the reason to share the site. Release 1 is read-and-check practice; typed-answer grading follows in release 2 and the voice simulator in release 3. The topic list comes from what the r/LLMDevs poster said interviewers test: transformers, RAG, agents, fine-tuning versus prompting versus RAG, evals, system design and behavioral questions ([thread](https://reddit.sentinel-team.org/posts/1sn7hc8/snapshots/2026-04-17T05%3A37%3A44.74927Z)).
@@ -158,7 +169,7 @@ Interview prep is the entry point and the reason to share the site. Release 1 is
 | IQ-5 | MCQ practice. Each stop's check is 3 to 5 MCQs; interview topics also have standalone MCQ sets | At least 3 MCQs per stop; each has an explanation |
 | IQ-6 | Review rule. Any text drafted with an AI tool must be reviewed and signed by a person before it is published | The publish check reads reviewed\_by; no unreviewed record is built into the site |
 | IQ-7 | Release 2: typed-answer grader. The learner types an answer; a small model scores it 0 to 5 against the reference answer and a rubric, and returns what was missing. Daily cap per learner, treat the typed text as data not instructions, log token cost | A user cannot exceed the cap; an answer that says "ignore your instructions" is graded as an answer |
-| IQ-7a | Mock interview review (added 2026-10-27 at the owner's request). Every answer in a mock interview is analysed in the browser without a model: key points covered with the learner's own words as evidence, closeness to the reference answer, structure (definition, example, trade-off, real use), an understanding score per answer and per concept, and lessons to revisit. Signed-in learners can add one AI review of the whole interview that grades every answer for meaning, lists what was right, wrong and missing, and sums up strengths, gaps and next steps. Daily cap of 3 reviews, answers treated as data | The report shows understanding per answer and per concept with no model call; the AI review is one call per interview and respects the caps |
+| IQ-7a | Mock interview review (added 2026-10-26 at the owner's request). Every answer in a mock interview is analysed in the browser without a model: key points covered with the learner's own words as evidence, closeness to the reference answer, structure (definition, example, trade-off, real use), an understanding score per answer and per concept, and lessons to revisit. Signed-in learners can add one AI review of the whole interview that grades every answer for meaning, lists what was right, wrong and missing, and sums up strengths, gaps and next steps. Daily cap of 3 reviews, answers treated as data | The report shows understanding per answer and per concept with no model call; the AI review is one call per interview and respects the caps |
 | IQ-8 | Release 2: spaced repetition. Questions rated "partly" or "missed" return after 1, 3, 7 and 21 days | The practice queue is ordered by due date |
 
 **Books**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LAUNCH_MINIMUMS, coverage, validateBundle } from "./validate";
 import { isHumanName } from "./review";
-import { TODAY, book, check, deepBody, deepExtras, explainerBody, goal, interview, placement, resource, stop, validBundle } from "./testing";
+import { TODAY, book, check, deepBody, deepExtras, explainerBody, goal, guidedProject, interview, placement, resource, stop, validBundle } from "./testing";
 import type { Bundle } from "./types";
 
 const run = (bundle: Bundle, launch = false) => validateBundle(bundle, { today: TODAY, launch });
@@ -197,5 +197,30 @@ describe("a book and an interview question in the bundle", () => {
     b.books.push(entry("books/b2.yaml", book({ id: "book-2" })));
     b.interview.push(entry("questions/interview/iq-2.yaml", interview({ id: "iq-2" })));
     expect(errorsOf(b)).toEqual([]);
+  });
+});
+
+describe("guided projects (GP-1, GP-4)", () => {
+  const withGuide = (stageGuide: string | undefined, projects = [guidedProject()]) => {
+    const b = validBundle();
+    const g = b.goals[0].data;
+    b.goals[0] = { ...b.goals[0], data: { ...g, stages: g.stages.map((st) => (st.id === "B1" ? { ...st, guide: stageGuide } : st)) } };
+    b.projects = projects.map((data) => ({ file: `projects/${data.id}.yaml`, data }));
+    return b;
+  };
+
+  it("accepts a guide linked from a stage", () => {
+    expect(errorsOf(withGuide("project-one"))).toEqual([]);
+  });
+
+  it("rejects a missing guide, an unlinked guide and unknown lessons", () => {
+    expect(errorsOf(withGuide("nope", [])).map((e) => e.rule)).toContain("GP-4");
+    expect(errorsOf(withGuide(undefined)).map((e) => e.message)).toContain('guided project "project-one" is not linked from any path stage');
+    expect(errorsOf(withGuide("project-one", [guidedProject({ lessons: ["ghost"] })])).map((e) => e.message)).toContain('lesson "ghost" does not exist');
+  });
+
+  it("keeps raw links out of steps", () => {
+    const p = guidedProject({ steps: guidedProject().steps.map((st, i) => (i === 0 ? { ...st, body: "See https://example.com" } : st)) });
+    expect(errorsOf(withGuide("project-one", [p])).map((e) => e.rule)).toContain("GP-1");
   });
 });

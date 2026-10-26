@@ -30,7 +30,7 @@ test.describe("roadmap (RM-1)", () => {
     await expect(page.getByRole("main").getByRole("link", { name: "Find my level" })).toBeVisible();
     // the complete outline shows, including topics with no lesson yet, and each level's project
     await expect(page.getByText("Coming soon").nth(1)).toBeVisible();
-    await expect(page.getByRole("button", { name: /Level project.*B1 AI newcomer project/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Level project.*Three checked prompts for a real work task/ })).toBeVisible();
     await expect(page.getByRole("tab", { name: /Projects \(9\)/ })).toBeVisible();
     expect(await overflow(page)).toBe(false);
     expect((await wcag(page)).violations).toEqual([]);

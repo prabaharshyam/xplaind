@@ -16,7 +16,8 @@ export type RoadmapTopic = {
   theme: ThemeId | null;
 };
 
-export type RoadmapProject = { title: string; brief: string; deliverables: string[] };
+/** `guide` is the guided project id (GP-4), when the project has a step-by-step guide. */
+export type RoadmapProject = { title: string; brief: string; deliverables: string[]; guide: string | null };
 
 export type RoadmapSection = {
   id: string;
@@ -42,5 +43,7 @@ export const roadmapStopIds = (m: RoadmapModel): string[] => [
   ...new Set(m.sections.flatMap((s) => s.topics.flatMap((t) => (t.stopId ? [t.stopId] : [])))),
 ];
 
-/** Key for a section's project in the learner's saved progress. */
-export const projectKey = (pathId: string, sectionId: string): string => `${pathId}/${sectionId}`;
+/** Key for a project in the learner's saved progress. A guide has one record, whichever path links it. */
+export const projectKey = (pathId: string, sectionId: string, guide?: string | null): string =>
+  guide ? guideKey(guide) : `${pathId}/${sectionId}`;
+export const guideKey = (guide: string): string => `guide/${guide}`;
