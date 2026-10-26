@@ -2,7 +2,11 @@
 // can be blocked, full or empty (private windows, etc.).
 const CHANGE_EVENT = "xplaind:storage";
 
+/** Values that could not be saved to localStorage, kept for this visit so buttons still respond. */
+const memory = new Map<string, string | null>();
+
 export function read(key: string): string | null {
+  if (memory.has(key)) return memory.get(key) ?? null;
   try {
     return window.localStorage.getItem(key);
   } catch {
@@ -14,8 +18,10 @@ export function write(key: string, value: string | null): void {
   try {
     if (value === null) window.localStorage.removeItem(key);
     else window.localStorage.setItem(key, value);
+    memory.delete(key);
   } catch {
-    // Storage unavailable: the page keeps working for this visit.
+    // Storage blocked or full: keep the value in memory, so the page keeps working for this visit.
+    memory.set(key, value);
   }
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }

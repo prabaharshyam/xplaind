@@ -72,3 +72,44 @@ test("every stop page fits a 360px phone and passes the accessibility scan", asy
     expect(violations, stop.id).toEqual([]);
   }
 });
+
+/** Test your understanding, Try it and Key terms respond to clicks on a lesson page. */
+async function exerciseWidgets(page: import("@playwright/test").Page, id: string) {
+  const cards = page.locator("#flashcards");
+  await cards.getByRole("button", { name: "Reveal the answer" }).click();
+  await expect(cards.getByRole("button", { name: "Reveal the answer" }), id).toHaveCount(0);
+  await cards.getByRole("button", { name: "Already knew that" }).click();
+  await expect(cards.getByText(/^1 of \d+$/), id).toBeVisible();
+  await cards.getByRole("button", { name: "Reset" }).click();
+
+  const tryIt = page.locator("#try-it");
+  await tryIt.getByRole("button", { name: "Check your answers" }).click();
+  await expect(tryIt.getByRole("region", { name: "Answers" }), id).toBeVisible();
+
+  const term = page.locator('section[aria-labelledby="terms-heading"] details').first();
+  if (await term.count()) {
+    await term.locator("summary").click();
+    await expect(term, id).toHaveAttribute("open", "");
+  }
+}
+
+test("on every lesson, the flashcards, Try it and key terms respond", async ({ page }) => {
+  test.setTimeout(420_000);
+  const { bundle } = loadContent(path.resolve(__dirname, "../content"));
+  for (const { data: stop } of bundle.stops) {
+    if (!stop.exercise || stop.flashcards.length === 0) continue;
+    await page.goto(`/stop/${stop.id}`);
+    await exerciseWidgets(page, stop.id);
+  }
+});
+
+test("the lesson widgets still work when the browser blocks storage", async ({ page }) => {
+  await page.addInitScript(() => {
+    const blocked = () => {
+      throw new DOMException("blocked", "SecurityError");
+    };
+    Object.defineProperty(window, "localStorage", { get: blocked });
+  });
+  await page.goto("/stop/kpi-that-matters");
+  await exerciseWidgets(page, "kpi-that-matters");
+});
