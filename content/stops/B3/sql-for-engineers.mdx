@@ -9,11 +9,44 @@ hours: 5
 gap_tags: []
 primary_resource: sqlbolt
 alternates: [postgres-window-functions, use-the-index-luke]
-format: explainer
+format: deep
 key_terms: [sql-join, window-function, database-index]
 check:
   type: mcq
   question_ids: [sql-for-engineers-1, sql-for-engineers-2, sql-for-engineers-3]
+flashcards:
+  - q: "What is the difference between an inner join and a left join?"
+    a: "An inner join keeps only rows that match on both sides. A left join keeps every row from the left table and leaves blanks where the right has no match."
+  - q: "How do you find customers who have never ordered?"
+    a: "LEFT JOIN customers to orders, then keep rows WHERE orders.id IS NULL."
+  - q: "What is the difference between WHERE and HAVING?"
+    a: "WHERE filters rows before grouping. HAVING filters groups after GROUP BY, for example HAVING COUNT(*) > 5."
+  - q: "What is the difference between GROUP BY and a window function?"
+    a: "GROUP BY collapses rows into one row per group. A window function computes across related rows but keeps every row."
+  - q: "What does ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at) do?"
+    a: "Numbers each customer's rows in time order, starting at 1, so you can pick each customer's first row."
+  - q: "What does LAG do?"
+    a: "Returns a value from the previous row in the window, such as the previous order date, so you can compare row to row."
+  - q: "What is an index?"
+    a: "A structure that lets the database jump to matching rows instead of reading every row. It speeds up reads and slightly slows writes."
+  - q: "What does EXPLAIN ANALYZE show?"
+    a: "How the database actually ran a query: whether it used an index or scanned the whole table, and how long each step took."
+exercise:
+  title: "Spot the bug in each query"
+  setup: "A Chennai grocery app has tables customers(id, city), orders(id, customer_id, total, created_at) and order_items(id, order_id, sku, qty). Four queries from a new analyst: (A) SUM(o.total) after joining orders to order_items, grouped by city. (B) A report of order counts per customer using an inner join from customers to orders, meant to include customers with zero orders. (C) SELECT city, COUNT(*) FROM ... WHERE COUNT(*) > 100 GROUP BY city. (D) A query filtering orders by created_at that takes 50 seconds on 40 million rows."
+  questions:
+    - q: "Why is total sales in (A) too high?"
+      a: "Each order is repeated once per item after the join, so its total is added several times. Sum totals from orders alone, or aggregate items before joining."
+    - q: "What is wrong with (B)?"
+      a: "An inner join drops customers with no orders. Use LEFT JOIN and COUNT(o.id), which counts zero for them."
+    - q: "How do you fix (C)?"
+      a: "Move the condition to HAVING COUNT(*) > 100, after GROUP BY city. WHERE cannot use aggregates."
+    - q: "How do you investigate and speed up (D)?"
+      a: "Run EXPLAIN ANALYZE to confirm a full table scan, then add an index on orders(created_at) and check the plan and time again."
+ask:
+  - "What is the difference between GROUP BY and a window function?"
+  - "When should I add an index to a database?"
+  - "How do I find duplicate rows with SQL?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -21,31 +54,94 @@ reviewed_on: 2026-10-25
 
 ## What it is
 
-SQL is the language for asking questions of relational databases such as PostgreSQL, MySQL and SQL Server. Almost every company you work with keeps customers, orders, tickets and payments in one. As a forward deployed engineer you will use SQL to:
+Almost every company you will work with keeps its customers, orders, tickets and payments in a relational database such as PostgreSQL, MySQL or SQL Server. **SQL** is the language for asking those databases questions. For an AI engineer, SQL is not optional. You use it to:
 
-- pull the data an AI system needs, such as past tickets with their resolutions;
-- measure the baseline before you build ("how long do refunds take today?");
-- check whether the system helped after it ships.
+- **pull the data** an AI system needs, such as past tickets with their resolutions;
+- **measure the baseline** before you build: "how long do refunds take today?";
+- **check whether the system helped** after it ships.
 
-Four ideas cover most of this work: **joins**, **grouping**, **window functions** and **indexes**.
+Four ideas cover most of this work:
+
+| Idea | What it does | Typical use |
+| --- | --- | --- |
+| **Joins** | Combine tables on a matching column | Orders with their customers' cities |
+| **GROUP BY** | One row per group, with totals or averages | Refunds per city |
+| **Window functions** | Calculate across related rows, keeping every row | Each customer's first ticket; moving averages |
+| **Indexes** | Make lookups fast | Turning a 40-second query into 2 seconds |
+
+```text
+   customers               orders                  refunds
+ +----+--------+      +----+-------------+      +----+----------+------------+
+ | id | city   |<-----| id | customer_id |<-----| id | order_id | created_at |
+ +----+--------+      +----+-------------+      +----+----------+------------+
+          joined on matching ids to answer: "refunds per city"
+```
+
+This lesson follows a food delivery company in Hyderabad as you measure its refund baseline before building an AI assistant. By the end you will answer business questions with joins, grouping and window functions, and speed up a slow query.
 
 ## How it works
 
-**Joins** combine tables on a matching column. An inner join keeps only rows that match on both sides. A left join keeps every row from the left table and fills in blanks where the right side has no match, which is how you find customers with no orders, or tickets with no reply.
+### Joins
 
-**GROUP BY** collapses rows into one row per group and computes aggregates: `COUNT`, `SUM`, `AVG`. Filter rows before grouping with `WHERE`; filter groups after with `HAVING`.
+A join combines tables on a matching column.
 
-**Window functions** compute across related rows without collapsing them. `ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at)` numbers each customer's tickets in order, so you can pick the first one. `AVG(amount) OVER (ORDER BY day ROWS 6 PRECEDING)` gives a seven-day moving average. Ranking, running totals and "compared with the previous row" (`LAG`) are all window functions.
+| Join | Keeps | Use for |
+| --- | --- | --- |
+| `JOIN` (inner) | Only rows that match on both sides | Orders that have a customer |
+| `LEFT JOIN` | Every row from the left table; blanks where the right has no match | Customers with no orders; tickets with no reply |
 
-**Indexes** are what make queries fast. Without one, the database reads every row to find matches. An index on `tickets(customer_id)` lets it jump straight to one customer's rows. Indexes speed up reads and slow down writes a little, so you add them for the columns you filter and join on most. `EXPLAIN ANALYZE` before a query shows whether the database used an index or scanned the whole table, and how long each step took.
+```sql
+-- customers who have never ordered
+SELECT c.id, c.city
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE o.id IS NULL;
+```
+
+### GROUP BY
+
+`GROUP BY` collapses rows into one row per group and computes aggregates: `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`. Filter rows **before** grouping with `WHERE`; filter groups **after** with `HAVING`:
+
+```sql
+SELECT city, COUNT(*) AS refunds
+FROM refunds r JOIN orders o ON o.id = r.order_id
+JOIN customers c ON c.id = o.customer_id
+WHERE r.created_at >= DATE '2026-07-01'
+GROUP BY city
+HAVING COUNT(*) > 100;
+```
+
+### Window functions
+
+Window functions calculate across related rows **without** collapsing them:
+
+| Function | Example | Gives |
+| --- | --- | --- |
+| `ROW_NUMBER()` | `OVER (PARTITION BY customer_id ORDER BY created_at)` | 1, 2, 3 for each customer's rows in time order |
+| `LAG(col)` | `OVER (PARTITION BY customer_id ORDER BY created_at)` | The previous row's value, for row-to-row comparison |
+| `SUM(col)` | `OVER (ORDER BY day)` | A running total |
+| `AVG(col)` | `OVER (ORDER BY day ROWS 6 PRECEDING)` | A seven-day moving average |
+
+`PARTITION BY` splits rows into groups, like `GROUP BY`, but every row stays in the result.
+
+### Indexes and query plans
+
+Without an index, the database reads every row to find matches: a **sequential scan**. An index on `refunds(created_at)` lets it jump straight to the right rows.
+
+```text
+  No index: read 30,000,000 rows, keep 2,000,000       -> 40 s
+  Index on created_at: jump to July 1, read forward    ->  2 s
+```
+
+Indexes speed up reads and slow down writes a little, so add them for the columns you filter and join on most. Run `EXPLAIN ANALYZE` before a query to see whether the database used an index or scanned the whole table, and how long each step took.
 
 ## A worked example
 
-A Hyderabad food delivery company wants an AI assistant for refund requests. First, the baseline: how long does a refund take today, by city?
+A food delivery company in Hyderabad wants an AI assistant for refund requests. Before building anything, you need the baseline: how long does a refund take today, by city?
 
 ```sql
 SELECT c.city,
-       COUNT(*)                                       AS refunds,
+       COUNT(*) AS refunds,
        ROUND(AVG(EXTRACT(EPOCH FROM r.resolved_at - r.created_at) / 3600), 1) AS avg_hours
 FROM refunds r
 JOIN orders o    ON o.id = r.order_id
@@ -55,7 +151,7 @@ GROUP BY c.city
 ORDER BY avg_hours DESC;
 ```
 
-Next: for the assistant's examples, you want each customer's first refund request only, to avoid repeat complainers dominating.
+Next, for the assistant's training examples, you want each customer's **first** refund request only, so repeat complainers do not dominate:
 
 ```sql
 SELECT *
@@ -67,22 +163,31 @@ FROM (
 WHERE n = 1;
 ```
 
-The first query takes 40 seconds on 30 million rows. `EXPLAIN ANALYZE` shows a sequential scan on `refunds` for the date filter. After `CREATE INDEX ON refunds (created_at)`, it takes under two seconds. You write both numbers in your notes: they are the baseline your assistant must beat, and the index is a quick win that earns goodwill with the client's data team.
+**The slow query.** The baseline query takes 40 seconds on 30 million rows. `EXPLAIN ANALYZE` shows a sequential scan on `refunds` for the date filter. You ask the client's data team, who agree to `CREATE INDEX ON refunds (created_at)` on the read replica. The query now takes under two seconds.
+
+| City | Refunds since July | Average hours to resolve |
+| --- | --- | --- |
+| Hyderabad | 48,200 | 31.4 |
+| Vijayawada | 9,800 | 27.9 |
+| Warangal | 4,100 | 22.6 |
+
+You write the numbers and the query times in your notes. The table is the baseline your assistant must beat, and the index is a quick win that earns goodwill with the client's data team.
 
 ## Common mistakes
 
-- **Joining and multiplying.** Joining orders to order items then summing order totals counts each order once per item. Aggregate at the right level before joining.
-- **Inner join when you needed a left join.** Customers with no orders silently disappear from your report.
+- **Joining and multiplying.** Joining orders to order items, then summing order totals, counts each order once per item. Aggregate at the right level before joining.
+- **Inner join when you needed a left join.** Customers with no orders silently disappear from the report.
 - **Filtering aggregates in WHERE.** `WHERE COUNT(*) > 5` fails; use `HAVING`.
 - **Running heavy queries on the production database.** Ask for a read replica or an export. Slowing the client's live app is a bad first week.
-- **Indexing everything.** Each index costs storage and write speed. Add indexes for real, slow queries, and check with `EXPLAIN ANALYZE`.
+- **Indexing everything.** Each index costs storage and write speed. Add them for real, slow queries, and confirm with `EXPLAIN ANALYZE`.
+- **Comparing dates with text.** Use proper date types and literals such as `DATE '2026-07-01'`.
 
 ## Practise
 
-Do SQLBolt lessons 1 to 12 in the browser, then read the PostgreSQL window functions page.
+Do SQLBolt lessons 1 to 12 in the browser, linked below, then read the PostgreSQL page on window functions.
 
-1. In any free PostgreSQL (a local Docker container works), create `customers`, `orders` and `refunds` tables and insert a few hundred rows of made-up data.
-2. Write the baseline query above, and a query listing customers who have never ordered.
-3. Use `LAG` to show, for each refund, how many days passed since that customer's previous refund.
+1. **Set up.** In any free PostgreSQL, such as a local Docker container, create `customers`, `orders` and `refunds` tables and insert a few hundred rows of made-up data.
+2. **Baseline.** Write the baseline query above, and a query listing customers who have never ordered.
+3. **Window.** Use `LAG` to show, for each refund, how many days passed since that customer's previous refund.
 
 **You are done when you can** explain the difference between GROUP BY and a window function in one sentence, and show a query that got faster after you added an index.

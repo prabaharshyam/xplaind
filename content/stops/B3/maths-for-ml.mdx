@@ -9,11 +9,44 @@ hours: 6
 gap_tags: []
 primary_resource: 3b1b-linear-algebra
 alternates: [3b1b-calculus, mml-book]
-format: explainer
+format: deep
 key_terms: [vector, matrix, gradient-descent, probability-distribution]
 check:
   type: mcq
   question_ids: [maths-for-ml-1, maths-for-ml-2, maths-for-ml-3]
+flashcards:
+  - q: "Which three areas of maths carry most of machine learning?"
+    a: "Linear algebra (vectors and matrices), calculus (derivatives and gradients) and probability (describing uncertainty)."
+  - q: "What is a vector in machine learning?"
+    a: "A list of numbers describing one thing, such as a customer's income, age and number of purchases, or a text embedding."
+  - q: "What does the dot product of two vectors tell you?"
+    a: "Multiply matching entries and add them up. A large value means they point in a similar direction, which is how similarity search works."
+  - q: "What is a gradient?"
+    a: "A vector of derivatives showing how the error changes with each weight. It points uphill; models step the opposite way to reduce error."
+  - q: "What is gradient descent?"
+    a: "Training by repeatedly taking small steps downhill on the loss, adjusting the weights, until the error stops falling."
+  - q: "What happens if the learning rate is too high or too low?"
+    a: "Too high and training jumps around or explodes. Too low and it crawls and may stop early."
+  - q: "What is backpropagation?"
+    a: "The chain rule applied efficiently to compute how the final error depends on every weight in a stacked network."
+  - q: "Why does a rare event produce many false alarms, even with an accurate test?"
+    a: "Most cases are negative, so even a small false-alarm rate applied to them outnumbers the true positives. This is Bayes' rule and the base rate."
+exercise:
+  title: "Work it out by hand"
+  setup: "Three customers of a Jaipur clothing store are described by vectors of (visits per month, average spend in thousands, discount use from 0 to 1): A = (4, 2, 0.5), B = (5, 2.5, 0.6), C = (1, 8, 0). A fraud model flags 5% of genuine payments by mistake and catches 95% of fraud; 1 in 200 payments is fraud."
+  questions:
+    - q: "Compute the dot product of A and B, and of A and C."
+      a: "A·B = 4×5 + 2×2.5 + 0.5×0.6 = 20 + 5 + 0.3 = 25.3. A·C = 4×1 + 2×8 + 0 = 4 + 16 = 20."
+    - q: "Which pair looks more similar in behaviour, and why does scale matter here?"
+      a: "A and B: similar visits, spend and discounts. Raw dot products are affected by scale, so cosine similarity or scaled features compare direction more fairly."
+    - q: "Out of 10,000 payments, how many frauds are caught and how many genuine payments are flagged?"
+      a: "50 are fraud, so about 47 or 48 are caught. 9,950 are genuine, so about 497 are flagged wrongly."
+    - q: "What share of flagged payments are actually fraud?"
+      a: "About 48 out of 545, under 10%. Most alarms are false, so flags should trigger a check, not an automatic block."
+ask:
+  - "How much maths do I really need for machine learning?"
+  - "What is gradient descent in simple words?"
+  - "What is Bayes' rule and why does it matter?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -21,54 +54,135 @@ reviewed_on: 2026-10-25
 
 ## What it is
 
-Three areas of maths carry most of machine learning:
+People often put off machine learning because of the maths. You do not need to be a mathematician. You need **intuition** for three areas, and the ability to follow a formula when you meet one:
 
-- **Linear algebra**: data as **vectors** (lists of numbers) and **matrices** (tables of numbers), and operations on them. A customer is a vector of features; a dataset is a matrix; a model's weights are matrices.
-- **Calculus**: how a quantity changes when you nudge its inputs. Models learn by following the **gradient**, the direction in which the error falls fastest.
-- **Probability**: describing uncertainty. Models output probabilities, data has distributions, and evaluation is about how likely results are to hold.
+| Area | Core idea | Where it shows up in ML |
+| --- | --- | --- |
+| **Linear algebra** | Data as **vectors** (lists of numbers) and **matrices** (tables of numbers), and operations on them | A customer is a vector of features; a dataset is a matrix; a model's weights are matrices |
+| **Calculus** | How a quantity changes when you nudge its inputs | Models learn by following the **gradient**, the direction in which the error falls fastest |
+| **Probability** | Describing uncertainty | Models output probabilities; data has distributions; evaluation asks how likely results are to hold |
 
-Aim for intuition and the ability to follow a formula, not proofs.
+```text
+     Linear algebra             Calculus                  Probability
+   +----------------+     +------------------+      +------------------+
+   | data, weights  |     | how error changes|      | how sure are we? |
+   | as vectors and | --> | when weights move| -->  | outputs, base    |
+   | matrices       |     | (gradients)      |      | rates, Bayes     |
+   +----------------+     +------------------+      +------------------+
+      what a model          how it learns             how to read and
+      computes                                        trust its output
+```
+
+This lesson follows a fintech in Hyderabad as it trains a simple loan-default model and learns, the hard way, why scale and base rates matter. By the end you will explain gradient descent with a sketch and say why rare events produce mostly false alarms.
 
 ## How it works
 
-**Vectors and similarity.** Two vectors pointing in a similar direction are similar. The dot product multiplies matching entries and adds them: a large value means similar direction. This is how recommendation and embedding search measure similarity.
+### Vectors and similarity
 
-**Matrices as transformations.** Multiplying a vector by a matrix transforms it: rotating, stretching, mixing features. A layer of a neural network is a matrix multiplication followed by a simple non-linear function. Shapes must match: a (100 × 20) data matrix times a (20 × 1) weight vector gives 100 predictions.
+A **vector** is a list of numbers describing one thing. Two vectors pointing in a similar direction describe similar things. The **dot product** multiplies matching entries and adds them up:
 
-**Derivatives and gradients.** A derivative says how much the output changes when one input changes slightly. With many inputs, the gradient collects all these derivatives into a vector pointing uphill. **Gradient descent** takes small steps downhill on the loss (the error), repeatedly, until it stops improving. The **learning rate** is the step size: too large and training jumps around or explodes; too small and it crawls.
+```text
+  a = (3, 1, 2)      b = (2, 0, 4)
+  a . b = 3*2 + 1*0 + 2*4 = 6 + 0 + 8 = 14
+```
 
-**The chain rule.** When functions are stacked, as in neural networks, the chain rule computes how the final error depends on early weights. Backpropagation is the chain rule applied efficiently.
+A large dot product means a similar direction. **Cosine similarity** divides by the vectors' lengths, so only direction counts, not size. This is how recommendation systems and embedding search measure "similar".
 
-**Probability.** A probability distribution says how likely each value is. Expected value is the long-run average. Conditional probability ("probability of default given income below ₹25,000") is the heart of classification. Bayes' rule updates beliefs with evidence and explains why rare events produce many false alarms even with accurate tests.
+### Matrices as transformations
 
-**Scaling.** Features on very different scales (income in lakhs, age in years) make gradient descent zigzag. Standardising features to similar scales helps many models train faster and better.
+Multiplying a vector by a matrix transforms it: rotating, stretching or mixing features. A layer of a neural network is a matrix multiplication followed by a simple non-linear function.
+
+**Shapes must match.** A matrix with 100 rows and 20 columns, times a vector of 20 weights, gives 100 predictions:
+
+```text
+   data X            weights w        predictions
+  (100 x 20)    x     (20 x 1)    =    (100 x 1)
+       ^^                ^^
+       these must be equal
+```
+
+Most matrix bugs in code are shape mismatches. Print the shapes.
+
+### Derivatives and gradients
+
+A **derivative** says how much the output changes when one input changes slightly. With many inputs, the **gradient** collects all those derivatives into a vector that points uphill.
+
+**Gradient descent** trains a model by taking small steps downhill on the **loss**, the measure of error, again and again until it stops improving:
+
+```text
+   loss
+    |  *
+    |    *                        too-large steps bounce around:
+    |      *                          *       *
+    |        *  *                    *   *   *   *
+    |            * * * * --           (never settles)
+    +--------------------------> steps
+          small, steady steps
+```
+
+The **learning rate** is the step size. Too large and training jumps around or explodes; too small and it crawls. Watch the loss curve and adjust.
+
+### The chain rule and backpropagation
+
+Neural networks stack many functions. The **chain rule** computes how the final error depends on early weights, through all the layers in between. **Backpropagation** is the chain rule applied efficiently, which is what makes training large networks possible.
+
+### Probability
+
+- A **probability distribution** says how likely each value is.
+- **Expected value** is the long-run average.
+- **Conditional probability**, such as "probability of default given income below ₹25,000", is the heart of classification.
+- **Bayes' rule** updates beliefs with evidence, and explains why rare events produce many false alarms even with accurate tests.
+
+### Scaling
+
+If one feature ranges up to 400 and another stays below 1, gradient descent zigzags and trains slowly or unstably. **Standardising** features, so each has a similar range, helps many models train faster and better.
+
+| Feature | Raw range | After standardising |
+| --- | --- | --- |
+| EMI as a share of income | 0.05 to 0.9 | about -2 to +2 |
+| Missed payments last year | 0 to 12 | about -2 to +2 |
+| Months at current job | 1 to 400 | about -2 to +2 |
 
 ## A worked example
 
-A Hyderabad fintech predicts monthly EMI default risk with a simple model:
+A fintech in Hyderabad predicts monthly EMI default risk with a simple model:
 
-score = w1 × (EMI ÷ income) + w2 × (missed payments last year) + w3 × (months at current job) + b
+```text
+score = w1 x (EMI / income) + w2 x (missed payments last year)
+      + w3 x (months at current job) + b
+```
 
-Each applicant is a vector of three features; the weights w1, w2, w3 and b form the model. Training starts with random weights, computes predictions for 50,000 past loans, measures the loss (how far predictions are from what actually happened), computes the gradient (how the loss changes with each weight) and nudges each weight downhill. After a few hundred steps the loss stops falling.
+**Vectors and weights.** Each applicant is a vector of three features. The weights w1, w2, w3 and b form the model.
 
-When training was unstable at first, the cause was scale: "months at job" ranged up to 400 while the EMI ratio was below 1. Standardising features fixed it.
+**Training.** It starts with random weights, predicts for 50,000 past loans, measures the loss (how far predictions are from what actually happened), computes the gradient (how the loss changes with each weight), and nudges each weight downhill. After a few hundred steps, the loss stops falling.
 
-Bayes in practice: if 2% of applicants default and the model catches 90% of defaulters with a 10% false-alarm rate, then of every 1,000 applicants, about 18 defaulters are flagged and about 98 good applicants are flagged wrongly. Most flagged applicants are not defaulters, which is why the bank uses the score to prioritise review, not to reject automatically.
+**The first problem: scale.** At first training was unstable: the loss jumped around. "Months at job" ranged up to 400, while the EMI ratio was below 1, so one weight needed tiny steps and another large ones. Standardising all three features fixed it.
+
+**The second lesson: base rates.** Suppose 2% of applicants default, the model catches 90% of defaulters, and it wrongly flags 10% of good applicants. Out of 1,000 applicants:
+
+| | Will default | Will not default | Total |
+| --- | --- | --- | --- |
+| Count | 20 | 980 | 1,000 |
+| Flagged by the model | 18 (90% of 20) | 98 (10% of 980) | 116 |
+| Not flagged | 2 | 882 | 884 |
+
+Of the 116 flagged applicants, only 18, about one in six, will actually default. Most flags are false alarms, simply because good applicants are so much more common. That is why the bank uses the score to **prioritise review**, not to reject automatically.
 
 ## Common mistakes
 
-- **Trying to master all the maths first.** Learn intuition, then deepen as needed.
-- **Ignoring shapes.** Most matrix bugs are shape mismatches; print shapes.
-- **Learning rate guesses.** Watch the loss curve; adjust.
+- **Trying to master all the maths first.** Learn intuition, then deepen as you need it.
+- **Ignoring shapes.** Most matrix bugs are shape mismatches; print the shapes.
+- **Guessing the learning rate.** Watch the loss curve and adjust.
 - **Unscaled features.** Standardise for gradient-based models.
 - **Ignoring base rates.** Rare events plus imperfect models mean many false alarms.
+- **Reading a probability as a certainty.** A 0.8 score means likely, not definite.
 
 ## Practise
 
-Watch the first chapters of 3Blue1Brown's Essence of Linear Algebra and Essence of Calculus; keep Mathematics for Machine Learning as a reference.
+Watch the first chapters of 3Blue1Brown's Essence of Linear Algebra, linked below, and Essence of Calculus; keep Mathematics for Machine Learning as a reference.
 
-1. In Python with NumPy, compute the dot product and cosine similarity of three customer vectors and say which two are most similar.
-2. Implement gradient descent by hand for a straight-line fit on 20 points; plot the loss over steps for three learning rates.
-3. Redo the Bayes calculation above for a disease affecting 1 in 1,000 people with a 95%-accurate test.
+1. **Similarity.** In Python with NumPy, compute the dot product and cosine similarity of three customer vectors and say which two are most similar.
+2. **Gradient descent.** Implement gradient descent by hand for a straight-line fit on 20 points, and plot the loss over steps for three learning rates.
+3. **Bayes.** Redo the base-rate table for a disease affecting 1 in 1,000 people with a test that is 95% accurate both ways.
 
 **You are done when you can** explain gradient descent and the effect of the learning rate with a sketch, and why a rare condition produces mostly false positives.

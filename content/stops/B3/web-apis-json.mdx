@@ -9,11 +9,44 @@ hours: 3
 gap_tags: [web-apis]
 primary_resource: requests-quickstart
 alternates: [py4e-web-services]
-format: explainer
+format: deep
 key_terms: [api, json, http-status-code, rest-api]
 check:
   type: mcq
   question_ids: [web-apis-json-1, web-apis-json-2, web-apis-json-3]
+flashcards:
+  - q: "What is a web API?"
+    a: "A way for your program to ask another service for data or actions over the internet, by sending an HTTP request to a URL."
+  - q: "What do status codes 200, 401, 404 and 429 mean?"
+    a: "200 it worked; 401 not signed in (often a missing or wrong key); 404 the URL or item does not exist; 429 too many requests, slow down."
+  - q: "What do 500 to 504 status codes usually mean?"
+    a: "The server failed. These errors are often temporary and may succeed on a retry."
+  - q: "What does r.json() do?"
+    a: "Turns the JSON text in the reply into Python dictionaries and lists you can read, such as data['current']['temp_c']."
+  - q: "Why must every request have a timeout?"
+    a: "Without one, a request to a slow or broken server can hang forever and freeze your program."
+  - q: "Where should API keys go?"
+    a: "In environment variables read with os.environ, never written in code you share."
+  - q: "What is the difference between params and json in requests?"
+    a: "params adds query parameters to the URL for GET requests. json sends a JSON body, usually with POST."
+  - q: "What does raise_for_status() do?"
+    a: "Raises an error if the status code is a 4xx or 5xx, so your code does not carry on with an error reply."
+exercise:
+  title: "Debug the API call"
+  setup: "Arjun in Pune calls a public holidays API with requests.get(url, params={'country': 'IN', 'year': 2026}). Four runs give: (1) status 401 with the message 'missing API key'; (2) after fixing that, status 200, but data['holidays'][0]['name'] raises KeyError because the real JSON is a list at the top level; (3) the program hangs for minutes when the API is slow; (4) running it in a loop for 50 cities gives status 429 after the 30th call."
+  questions:
+    - q: "What is the likely cause of (1), and the safe fix?"
+      a: "The key was not sent or not set. Read it from an environment variable and send it in the header the API documents."
+    - q: "How should he handle (2)?"
+      a: "Print the whole reply first to see its shape. If the top level is a list, read data[0]['name'] instead."
+    - q: "What prevents (3)?"
+      a: "Passing timeout=10 (or similar) to requests.get, and handling the timeout error with a clear message."
+    - q: "What does (4) mean, and what should he do?"
+      a: "He hit the rate limit. Slow down, wait and retry with backoff, and respect any Retry-After header."
+ask:
+  - "What is a REST API in simple words?"
+  - "How do I keep my API key safe in Python?"
+  - "What do HTTP status codes mean?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -21,13 +54,30 @@ reviewed_on: 2026-10-25
 
 ## What it is
 
-A **web API** lets your program ask another service for data or actions over the internet. You send an HTTP request to a URL; the service replies with a **status code** (did it work?) and usually a body in **JSON** (the data).
+Your program does not have to know everything itself. A **web API** lets it ask another service for data or actions over the internet: today's weather, a map route, a payment's status, government open data, or an answer from an AI model. Every AI model provider works this way, so calling an API from Python is the core skill behind calling language models later.
 
-Weather, maps, payments, government open data and every AI model provider work this way. Calling an API from Python is the core skill behind calling language models later.
+You send an **HTTP request** to a URL. The service replies with:
+
+- a **status code**: did it work?
+- usually a body in **JSON**: the data.
+
+```text
+  Your Python program                                   Weather service
+ +---------------------+   GET /weather?city=Chennai   +-----------------+
+ | requests.get(...)   | ----------------------------> |                 |
+ |                     |   headers: X-API-Key: ...     |                 |
+ |                     |                               |                 |
+ |                     | <---------------------------- |                 |
+ | r.status_code = 200 |   200 OK                      |                 |
+ | r.json()            |   {"city": "Chennai",         |                 |
+ +---------------------+    "temp_c": 31.5}            +-----------------+
+```
+
+This lesson follows Anita, who builds a small air-quality dashboard for her city. By the end you will call a public API, check the status and read nested JSON safely.
 
 ## How it works
 
-**The requests library.**
+### The requests library
 
 ```python
 import requests
@@ -36,33 +86,84 @@ r = requests.get("https://api.example.com/weather",
                  params={"city": "Chennai"}, timeout=10)
 print(r.status_code)
 data = r.json()          # JSON text becomes Python dictionaries and lists
-print(data["temperature"])
+print(data["temp_c"])
 ```
 
-**Status codes.**
+`params` adds query parameters to the URL, so this request goes to `.../weather?city=Chennai`.
 
-- `200` OK: it worked.
-- `400` bad request: something about your request is wrong.
-- `401` or `403`: not signed in, or not allowed.
-- `404` not found: the URL or the item does not exist.
-- `429` too many requests: slow down.
-- `500` to `504`: the server failed; often temporary.
+### Status codes
 
-Check before using the data: `r.raise_for_status()` raises an error for 4xx and 5xx codes.
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `200` | OK: it worked | Use the data |
+| `400` | Bad request: something about your request is wrong | Check parameters and body |
+| `401` / `403` | Not signed in, or not allowed | Check the API key and permissions |
+| `404` | Not found | Check the URL or the item id |
+| `429` | Too many requests | Slow down; wait and retry |
+| `500` to `504` | The server failed | Often temporary; retry later |
 
-**JSON in Python.** `r.json()` turns the reply into dictionaries (for JSON objects) and lists (for arrays). Read nested values step by step: `data["current"]["temp_c"]`. Print the whole reply first to see its shape.
+Check before using the data. `r.raise_for_status()` raises an error for 4xx and 5xx codes, so your code does not carry on with an error reply as if it were data.
 
-**Parameters, headers and bodies.** Query parameters go in `params`. API keys usually go in headers: `headers={"Authorization": "Bearer ..."}`. Sending data uses `requests.post(url, json={...})`.
+### JSON in Python
 
-**Timeouts.** Without `timeout=`, a request to a slow or broken server can hang forever, freezing your program. Always set one.
+`r.json()` turns the reply into dictionaries (for JSON objects) and lists (for JSON arrays). Read nested values step by step:
 
-**Keys and secrets.** Never write API keys in code you share. Read them from an environment variable: `os.environ["WEATHER_API_KEY"]`.
+```python
+data["current"]["temp_c"]          # an object inside an object
+data["results"][0]["location"]     # the first item of a list
+```
 
-**Limits.** Most APIs limit requests per minute and may charge per call. Read the documentation's limits section.
+Always print the whole reply once, to see its real shape, before writing code that reads it.
+
+### Parameters, headers and bodies
+
+| Part | Used for | Example |
+| --- | --- | --- |
+| `params` | Query parameters on the URL | `params={"city": "Pune"}` |
+| `headers` | Keys, content type and other metadata | `headers={"Authorization": "Bearer ..."}` |
+| `json` | A JSON body you send, usually with POST | `requests.post(url, json={"text": "..."})` |
+
+### Timeouts
+
+Without `timeout=`, a request to a slow or broken server can hang **forever**, freezing your program or your whole automation. Always set one, and handle `requests.Timeout`.
+
+### Keys and secrets
+
+Never write API keys in code you share or commit. Read them from an environment variable:
+
+```python
+import os
+key = os.environ["AQ_KEY"]
+```
+
+### Retrying safely
+
+Some failures fix themselves. A `429` or a `503` often succeeds a few seconds later. A simple, polite retry looks like this:
+
+```python
+import time
+
+for attempt in range(3):
+    r = requests.get(url, params=params, timeout=10)
+    if r.status_code not in (429, 500, 502, 503, 504):
+        break
+    wait = int(r.headers.get("Retry-After", 2 ** attempt))
+    time.sleep(wait)
+```
+
+It retries only errors that are likely temporary, waits longer each time, and respects the server's `Retry-After` header if it sends one. Never retry a `401` or `404`: the request itself is wrong, and repeating it changes nothing.
+
+### Reading API documentation
+
+Every API's documentation answers the same questions, usually in this order: the **base URL**, how to **authenticate** (which header carries the key), the **endpoints** (paths such as `/latest` or `/holidays`), each endpoint's **parameters**, an **example response**, the **error codes** it uses, and its **rate limits**. Read these sections before writing code, and copy the example response into a file so you can test your parsing without calling the API every time. Calling an AI model's API later is exactly the same process: find the endpoint, send the key in a header, post a JSON body and read the JSON reply.
+
+### Limits and cost
+
+Most APIs limit requests per minute and some charge per call. Read the documentation's limits section, and when you get a `429`, wait and retry with growing delays instead of hammering the server.
 
 ## A worked example
 
-Anita is building a small dashboard of air quality for her city. She uses a free public API that returns current readings for a location.
+Anita is building a small dashboard of air quality for her city. She uses a public API that returns current readings for a location.
 
 ```python
 import os, requests
@@ -73,16 +174,23 @@ r = requests.get(url, params={"city": "Delhi"},
 
 if r.status_code == 200:
     for reading in r.json()["results"][:5]:
-        print(reading["location"], reading["parameter"], reading["value"])
+        print(reading["location"], reading["parameter"], reading.get("value", "no reading"))
 elif r.status_code == 429:
     print("Rate limited; try again in a minute")
 else:
     print("Request failed:", r.status_code, r.text[:200])
 ```
 
-The first run returns 401: she had not exported her key in the new terminal. After `export AQ_KEY=...` it returns 200 and five readings. She prints the full JSON once to discover that some locations lack a `value` field, and adds a check for it.
+(The URL here is illustrative; the lesson's resource shows real, working examples.)
 
-(The URL here is illustrative; the lesson's resource shows real, working requests examples.)
+| Run | What happened | Cause | Fix |
+| --- | --- | --- | --- |
+| 1 | `401 Unauthorized` | Her key was not set in the new terminal | `export AQ_KEY=...` before running |
+| 2 | `200`, then `KeyError: 'value'` on one location | Some locations have no `value` field | Printed the full JSON; used `.get("value", "no reading")` |
+| 3 | Hung for minutes | She had removed `timeout=` while testing | Put `timeout=10` back |
+| 4 | Five readings printed | Working | Ready for the dashboard |
+
+Printing the full JSON once, on the second run, saved her an hour of guessing.
 
 ## Common mistakes
 
@@ -91,13 +199,14 @@ The first run returns 401: she had not exported her key in the new terminal. Aft
 - **Guessing the JSON shape.** Print it and read it first.
 - **API keys in code.** Use environment variables.
 - **Ignoring rate limits.** Respect them, or you get blocked.
+- **Assuming every field is always present.** Use `.get()` with a default for optional fields.
 
 ## Practise
 
-Read the requests library's quickstart linked below.
+Read the requests library's quickstart, linked below.
 
-1. Call a free public API (for example a public holidays API or an Indian open data API) and print three values from the JSON.
-2. Handle 404, 429 and a timeout with clear messages.
-3. Move any key into an environment variable and confirm the code still works.
+1. **Call.** Call a free public API, such as a public holidays API or an Indian open data API, and print three values from the JSON.
+2. **Handle errors.** Handle 404, 429 and a timeout with clear messages.
+3. **Secure the key.** Move any key into an environment variable and confirm the code still works.
 
 **You are done when you can** call an API, check the status, read nested JSON safely and explain why every request needs a timeout.

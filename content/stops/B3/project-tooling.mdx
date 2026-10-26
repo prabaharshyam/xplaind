@@ -10,11 +10,44 @@ gap_tags: []
 primary_resource: pytest-getting-started
 alternates: [packaging-projects-tutorial, python-logging-howto]
 more: [github-copilot-prompt-files, anthropic-claude-code-in-action]
-format: explainer
+format: deep
 key_terms: [unit-test, pytest, fixture, logging]
 check:
   type: mcq
   question_ids: [project-tooling-1, project-tooling-2, project-tooling-3]
+flashcards:
+  - q: "What are the four parts of project tooling that matter most?"
+    a: "An isolated environment, a pyproject.toml with a sensible layout, tests with pytest, and logging."
+  - q: "What is pyproject.toml?"
+    a: "The file that describes a Python project: its name, version, dependencies and tool settings, so it installs the same way everywhere."
+  - q: "Why use a src layout?"
+    a: "Putting the package in src/ stops tests from accidentally importing code that only works from your own folder."
+  - q: "What does a lock file do?"
+    a: "Records the exact version of every package, including sub-dependencies, so another machine installs the same set."
+  - q: "What is a pytest fixture?"
+    a: "Shared setup a test asks for by name, such as a sample PDF, a temporary folder or a fake model client."
+  - q: "How should unit tests handle code that calls an LLM?"
+    a: "Use a fake client that returns a fixed reply to test your own logic. Keep real model calls for a separate, slower evaluation suite."
+  - q: "Why use logging instead of print in production?"
+    a: "Log messages have a level, a time and a source, and go wherever the platform collects logs. Print output is usually lost."
+  - q: "What should never appear in logs?"
+    a: "API keys, passwords, full documents and personal data such as phone numbers. Log ids, sizes and timings instead."
+exercise:
+  title: "Review a teammate's project"
+  setup: "A teammate in a Gurugram AI startup hands you a project for a resume-screening helper. You find: all code in one file main.py; no tests; dependencies installed into the system Python with no requirements or lock file; print statements like print('done') and print(api_key) for debugging; and a README that says only 'run main.py'."
+  questions:
+    - q: "What is the most urgent problem to fix?"
+      a: "print(api_key): the secret may already be in logs or terminal history. Remove it and rotate the key, then never log secrets."
+    - q: "What should replace the system-Python install?"
+      a: "A project virtual environment, with dependencies listed in pyproject.toml and a lock file or pinned requirements committed."
+    - q: "What two kinds of test would you add first?"
+      a: "Unit tests for the parsing and scoring logic using a fake model client, and a test that a malformed resume raises a clear error."
+    - q: "What should the README say?"
+      a: "The exact commands to set up the environment, set the API key as an environment variable, run the tests and run the tool."
+ask:
+  - "What is the difference between requirements.txt and pyproject.toml?"
+  - "How do I test code that calls an LLM?"
+  - "What should I log in a production AI app?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -22,40 +55,102 @@ reviewed_on: 2026-10-25
 
 ## What it is
 
-Project tooling is everything around your code that lets someone else run it, change it safely and debug it. Four parts matter most:
+Code that works on your laptop is the start, not the finish. **Project tooling** is everything around your code that lets someone else run it, change it safely and debug it at 2 am. Four parts matter most:
 
-- an **isolated environment**, so the project's packages do not clash with anything else on the machine;
-- a **pyproject.toml** and a sensible folder layout, so the project installs the same way everywhere;
-- **tests** with pytest, so a change that breaks something fails loudly before it ships;
-- **logging**, so when something goes wrong in production you can see what happened.
+| Part | What it gives you | Without it |
+| --- | --- | --- |
+| **An isolated environment** | The project's packages do not clash with anything else | "Works on my machine" |
+| **pyproject.toml and a sensible layout** | The project installs the same way everywhere | Nobody knows how to set it up |
+| **Tests with pytest** | A change that breaks something fails loudly before it ships | Bugs found by users |
+| **Logging** | When something goes wrong in production, you can see what happened | Guessing |
 
-None of this is glamorous, and all of it is noticed when missing.
+None of this is glamorous. All of it is noticed when missing, usually by the client's engineer the week after you hand over.
+
+This lesson follows an invoice extractor you built for a textile exporter in Coimbatore, as their engineer, Karthik, takes it over. By the end your projects will be ones a stranger can set up, test and debug from the README alone.
 
 ## How it works
 
-**Environments.** Each project gets its own virtual environment. Tools such as `venv` with `pip`, or the faster `uv`, create one and install exactly the versions you pin. A lock file (`uv.lock`, or a pinned `requirements.txt`) records every version so another machine gets the same set.
+### Environments and lock files
 
-**Layout.** A common, safe shape is:
+Each project gets its own virtual environment. Tools such as `venv` with `pip`, or the faster `uv`, create one and install exactly the versions you pin. A **lock file**, such as `uv.lock` or a fully pinned `requirements.txt`, records the exact version of every package, including the packages your packages depend on, so another machine gets exactly the same set.
+
+### Layout
+
+A common, safe shape for a Python project:
 
 ```text
-loan-assistant/
-  pyproject.toml      # name, version, dependencies, tool settings
-  src/loan_assistant/ # your package
-  tests/              # pytest tests
-  README.md           # how to set up, run and test
+invoice-extractor/
+  pyproject.toml           # name, version, dependencies, tool settings
+  uv.lock                  # exact versions of everything
+  README.md                # how to set up, test and run
+  src/invoice_extractor/   # your package
+      __init__.py
+      extract.py
+      models.py
+  tests/                   # pytest tests
+      conftest.py          # shared fixtures
+      test_extract.py
+      fixtures/sample_invoice.txt
 ```
 
-The `src` folder stops tests from accidentally importing code that only works on your machine.
+The `src` folder stops tests from accidentally importing code that only works from your own folder. `pyproject.toml` replaces a pile of older files such as `setup.py` and holds settings for tools like pytest and linters in one place.
 
-**pytest.** A test is a function named `test_...` that uses plain `assert`. pytest finds and runs them all. Fixtures provide shared setup: a sample PDF, a temporary folder, a fake model client. For code that calls an LLM, test your own logic with a fake client that returns a fixed reply; keep real model calls for a separate, slower eval suite.
+### pytest
 
-**Logging.** `print` vanishes in production. The `logging` module gives each message a level (DEBUG, INFO, WARNING, ERROR), a time and the module it came from, and sends it wherever the platform collects logs. Use one logger per module, `log = logging.getLogger(__name__)`, configure output once at start-up, and log facts that help a stranger: which request, which document, how long, what failed.
+A test is a function whose name starts with `test_`, using plain `assert`. pytest finds and runs them all:
+
+```python
+def test_total_matches_line_items(sample_invoice):
+    inv = parse_invoice(sample_invoice)
+    assert inv.total == sum(i.amount for i in inv.items)
+```
+
+**Fixtures** provide shared setup that tests ask for by name: a sample PDF, a temporary folder, a fake model client. They live in `tests/conftest.py`.
+
+### Testing code that calls a model
+
+Real model calls in unit tests are slow, cost money and give slightly different answers each time, so tests fail randomly. Instead:
+
+```text
+   Unit tests (fast, every commit)          Evaluation suite (slower, scheduled)
+ +---------------------------------+      +----------------------------------+
+ | your parsing, validation,       |      | real model on a golden set of    |
+ | scoring logic                   |      | 50-200 examples                  |
+ | fake client returns fixed reply |      | scores quality, tracks over time |
+ +---------------------------------+      +----------------------------------+
+```
+
+Test your own logic with a fake client; measure the model's quality separately.
+
+### Logging
+
+`print` output vanishes in production. The `logging` module gives each message a **level**, a time and the module it came from, and sends it wherever the platform collects logs.
+
+| Level | Use for |
+| --- | --- |
+| DEBUG | Detail for developers, off in production |
+| INFO | Normal events: a request handled, a file processed |
+| WARNING | Something odd but handled: a retry, a bad input skipped |
+| ERROR | Something failed and needs attention |
+
+Use one logger per module, `log = logging.getLogger(__name__)`, configure output once at start-up, and log facts that help a stranger: which request, which document, how long it took, what failed.
+
+### The README
+
+A good README lets a stranger go from clone to passing tests without asking you anything. It has the exact commands, in order: set up the environment, set any environment variables (without real secret values), run the tests, run the tool. Write it, then test it yourself in a fresh folder; most READMEs break on the second line.
 
 ## A worked example
 
-You built an invoice extractor for a Coimbatore textile exporter. Their engineer, Karthik, must run it next month without you.
+You built an invoice extractor for a textile exporter in Coimbatore. Next month their engineer, Karthik, must run and maintain it without you.
 
-He clones the repository and runs `uv sync`. The lock file installs the same versions you tested. He runs `uv run pytest` and sees twelve passing tests, including these:
+**Day one.** He clones the repository and follows the README:
+
+```text
+uv sync            # installs the exact locked versions
+uv run pytest      # 12 passed
+```
+
+The lock file installs the same versions you tested. Two of the twelve tests:
 
 ```python
 def test_total_matches_line_items(sample_invoice):
@@ -69,13 +164,20 @@ def test_rejects_gstin_with_wrong_length():
 
 `sample_invoice` is a fixture in `tests/conftest.py` that loads a small text file, so no real model call is needed.
 
-A month later an invoice fails in production. The log line reads:
+**A month later.** An invoice fails in production. The log line reads:
 
 ```text
-2026-11-20 10:14:03 WARNING loan_assistant.extract invoice=INV-8812 pages=3 field=total model_value="12,40,000.00" error="not a number"
+2026-11-20 10:14:03 WARNING invoice_extractor.extract invoice=INV-8812 pages=3 field=total model_value="12,40,000.00" error="not a number"
 ```
 
-Karthik sees at once that Indian digit grouping broke the number parser, adds a test for "12,40,000.00", fixes the parser and ships. Without the log he would have had a user complaint and no clue.
+Karthik sees at once that Indian digit grouping broke the number parser. He adds a test for "12,40,000.00", fixes the parser, sees all 13 tests pass and ships.
+
+| Without tooling | With tooling |
+| --- | --- |
+| "It fails sometimes," from a user | A log line naming the invoice, field and value |
+| No way to check a fix | A new test that fails before the fix and passes after |
+| Different package versions on the server | The same locked versions everywhere |
+| Karthik messages you on WhatsApp | Karthik fixes it in 20 minutes alone |
 
 ## Common mistakes
 
@@ -83,14 +185,15 @@ Karthik sees at once that Indian digit grouping broke the number parser, adds a 
 - **Unpinned versions.** A library releases a breaking change and a fresh install fails. Commit the lock file.
 - **Tests that call the real model.** They are slow, cost money and fail randomly. Fake the client in unit tests.
 - **Logging secrets or personal data.** Never log API keys, full documents or customer phone numbers. Log ids and sizes instead.
-- **A README that says "run main.py".** Write the exact commands to set up, test and run.
+- **A README that says "run main.py".** Write the exact commands to set up, test and run, and test them yourself.
+- **Leaving DEBUG logging on in production.** It fills disks and can leak data.
 
 ## Practise
 
-Work through pytest's Get Started page, then the logging tutorial's basic section.
+Work through pytest's Get Started page, linked below, then the basic section of Python's logging tutorial.
 
-1. Turn any script you have written into a project with `pyproject.toml`, a `src` layout and a `tests` folder.
-2. Write five tests, including one that uses a fixture and one that checks an error is raised.
-3. Replace every `print` with a logger call at a sensible level, and add one log line that would help debug a failure.
+1. **Restructure.** Turn any script you have written into a project with `pyproject.toml`, a `src` layout and a `tests` folder.
+2. **Test.** Write five tests, including one that uses a fixture and one that checks an error is raised.
+3. **Log.** Replace every `print` with a logger call at a sensible level, and add one log line that would help debug a failure.
 
 **You are done when you can** hand the repository to a friend, have them run the tests with two commands from the README, and have them all pass.

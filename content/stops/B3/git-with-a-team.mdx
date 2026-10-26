@@ -10,11 +10,44 @@ gap_tags: []
 primary_resource: github-flow
 alternates: [pro-git-branching]
 more: [anthropic-claude-code-in-action]
-format: explainer
+format: deep
 key_terms: [git-branch, pull-request, merge-conflict, code-review]
 check:
   type: mcq
   question_ids: [git-with-a-team-1, git-with-a-team-2, git-with-a-team-3]
+flashcards:
+  - q: "What is the team routine for changing shared code with Git?"
+    a: "Create a branch, make small commits, push and open a pull request, get a review and passing checks, fix what is flagged, then merge."
+  - q: "What is a branch?"
+    a: "A cheap label pointing at a commit, used to work on one change without touching the shared main branch."
+  - q: "What makes a good commit message?"
+    a: "It says what changed and why, in one line, often with a ticket id, such as 'MD-214: retry market data calls on 429 and 503'."
+  - q: "What should a pull request description include?"
+    a: "What changed, why, how you tested it, and anything risky, plus a link to the ticket and screenshots for visible changes."
+  - q: "Why keep pull requests small?"
+    a: "Reviewers read small changes carefully. Huge ones get skimmed, and bugs slip through."
+  - q: "What is a merge conflict?"
+    a: "When two branches change the same lines, Git cannot pick a result and marks both versions in the file for a person to decide."
+  - q: "How do you resolve a merge conflict?"
+    a: "Edit the file to the correct final version using both sides, remove the conflict markers, run the tests, then add and commit."
+  - q: "Why never force-push a shared branch?"
+    a: "It rewrites history that teammates already have, which can lose their work and break their copies."
+exercise:
+  title: "Resolve this conflict"
+  setup: "You and Priya both changed config.py on a project for a Kochi logistics client. Your branch changed the retry setting from 'RETRIES = 3' to 'RETRIES = 5'. Priya's change, already merged into main, renamed the same line to 'MAX_RETRIES = 3' and updated every use of it. When you merge main into your branch, Git shows the conflict markers with HEAD containing 'RETRIES = 5' and main containing 'MAX_RETRIES = 3'."
+  questions:
+    - q: "Which side is your work and which is Priya's?"
+      a: "HEAD is your branch, with RETRIES = 5. The main side is Priya's merged change, with MAX_RETRIES = 3."
+    - q: "What should the final line be?"
+      a: "MAX_RETRIES = 5. Keep her new name, used everywhere else now, and your new value."
+    - q: "What would go wrong if you just kept your side?"
+      a: "The code would define RETRIES while the rest uses MAX_RETRIES, so it would break or silently use the wrong value. Her rename would be undone."
+    - q: "What must you do after editing the file?"
+      a: "Remove the conflict markers, run the tests, then git add config.py and commit the merge, and push."
+ask:
+  - "What is the difference between merge and rebase?"
+  - "How do I write a good pull request?"
+  - "What should I do if I committed a secret to Git?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -22,7 +55,17 @@ reviewed_on: 2026-10-25
 
 ## What it is
 
-Git records every change to a codebase. On your own, you mostly commit and push. On a team, the main branch is shared and must always work, so everyone follows a routine:
+Git records every change to a codebase. On your own, you mostly commit and push. On a team, the **main** branch is shared and must always work, because other people, and often a live product, depend on it. So teams follow a routine:
+
+```text
+   main  o------------o------------------------o------> (always works)
+          \                                   /
+   branch  o---o---o  push  -->  pull request  merge
+           your small    |       review +
+           commits       |       automated checks
+                         v
+                   teammates comment, you fix
+```
 
 1. Create a **branch** for one piece of work.
 2. Make small **commits** with clear messages.
@@ -32,17 +75,53 @@ Git records every change to a codebase. On your own, you mostly commit and push.
 
 When two people change the same lines, Git raises a **merge conflict**, and a person decides the result.
 
+This lesson follows you, three weeks into a project for a brokerage in Mumbai, as you add retries to a market-data client, get reviewed and resolve a conflict with a teammate's change. By the end you will be comfortable with every step.
+
 ## How it works
 
-**Branches** are cheap labels pointing at a commit. `git switch -c fix/gst-rounding` creates one and moves you onto it. Name branches for what they do.
+### Branches
 
-**Commits** should each do one thing and say why. "Fix GST rounding to two decimals for invoices over ₹1 lakh" beats "fix". Many teams follow a format such as a ticket id prefix, so check the client's convention before your first commit.
+Branches are cheap labels pointing at a commit. `git switch -c fix/gst-rounding` creates one and moves you onto it. Name branches for what they do:
 
-**Pull requests** carry the context a reviewer needs: what changed, why, how you tested it and anything risky. Keep them small; a 200-line PR gets a careful review, a 3,000-line one gets a rubber stamp. Link the ticket. Screenshots help for anything visible.
+| Prefix | Use for | Example |
+| --- | --- | --- |
+| `feat/` | A new feature | `feat/retry-market-data` |
+| `fix/` | A bug fix | `fix/gst-rounding` |
+| `docs/` | Documentation | `docs/setup-guide` |
+| `chore/` | Tooling, dependencies | `chore/update-pandas` |
 
-**Review** goes both ways. When reviewing, check behaviour and risk before style. When reviewed, answer every comment, change the code or explain why not, and never take it personally.
+Check the client's naming convention before your first branch.
 
-**Staying current.** While your PR waits, main moves on. Bring it in with `git merge main` (or `git rebase main` if the team rebases). If the same lines changed, Git marks the conflict in the file:
+### Commits
+
+Each commit should do one thing and say why:
+
+| Weak | Strong |
+| --- | --- |
+| "fix" | "Fix GST rounding to two decimals for invoices over ₹1 lakh" |
+| "wip" | "Add retry wrapper for market data client (no callers yet)" |
+| "changes" | "MD-214: retry market data calls with backoff on 429 and 503" |
+
+Many teams prefix messages with a ticket id. In six months, a clear history is how anyone, including you, understands why code looks the way it does.
+
+### Pull requests
+
+A PR carries the context a reviewer needs:
+
+- **What** changed and **why**.
+- **How you tested** it.
+- **Anything risky**: performance, security, behaviour changes.
+- A link to the ticket, and screenshots for anything visible.
+
+Keep PRs small. A 200-line PR gets a careful review; a 3,000-line one gets a rubber stamp and hides bugs.
+
+### Review goes both ways
+
+When **reviewing**, check behaviour and risk before style: does it do the right thing, what could break, is it tested? When **being reviewed**, answer every comment, either by changing the code or explaining why not, and never take it personally. Review is about the code, not you.
+
+### Staying current and resolving conflicts
+
+While your PR waits, main moves on. Bring the new main into your branch with `git merge main`, or `git rebase main` if the team prefers rebasing. If the same lines changed on both sides, Git marks the conflict in the file:
 
 ```text
 <<<<<<< HEAD
@@ -52,13 +131,19 @@ TAX_RATE = Decimal("0.18")
 >>>>>>> main
 ```
 
-You edit the file to the correct final version, remove the markers, run the tests, then `git add` and commit.
+The top part is your branch; the bottom is main. You edit the file to the correct **final** version, which often combines both, remove the markers, run the tests, then `git add` and commit.
 
-**Protected branches.** Clients often block direct pushes to main and require a review and passing checks. Never work around this, and never force-push a branch someone else is using: it rewrites history under their feet.
+### Protected branches and history
+
+Clients often **protect** main: no direct pushes, a review and passing checks required. Never work around this. And never **force-push** a branch someone else is using: it rewrites history under their feet and can lose their work.
+
+### Secrets
+
+An API key committed to Git stays in the history even after you delete the file. Keep secrets in environment variables, list secret files in `.gitignore`, and if a key ever leaks, **rotate it at once**, then clean up.
 
 ## A worked example
 
-You are three weeks into a project with a Mumbai brokerage. Your task: add retries to the market-data client.
+You are three weeks into a project with a brokerage in Mumbai. Your ticket, MD-214: add retries to the market-data client, which sometimes gets rate-limited at market open.
 
 ```text
 git switch main && git pull
@@ -69,24 +154,38 @@ git commit -m "MD-214: retry market data calls with backoff on 429 and 503"
 git push -u origin feat/retry-market-data
 ```
 
-Your PR description says what changed, that you tested with a fake server returning 429 twice, and that retries add up to 7 seconds in the worst case, a risk for the 10-second dashboard timeout. The reviewer, Farhan, asks you to cap retries at 3 seconds. You change it, reply "Done, capped at 3s total, test added", and push.
+**The PR.** Your description says what changed, that you tested with a fake server returning 429 twice, and flags a risk: in the worst case, retries add up to 7 seconds, and the dashboard times out at 10 seconds.
 
-Meanwhile Priya merged a change to the same client. Your branch now conflicts. You merge main, resolve the conflict by keeping her new timeout setting and your retry wrapper, run the tests, push. Checks go green, Farhan approves, you merge and delete the branch.
+**The review.** Farhan, the reviewer, asks you to cap the total retry time at 3 seconds. You change it, add a test for the cap, reply "Done, capped at 3s total, test added", and push.
+
+**The conflict.** Meanwhile Priya merged a change to the same client that added a configurable timeout. Your branch now conflicts. You merge main, read both sides, keep her new timeout setting **and** your retry wrapper, run the tests, and push.
+
+| Step | Command or action | Result |
+| --- | --- | --- |
+| Start | `git switch -c feat/retry-market-data` | Your own branch |
+| Save work | `git commit -m "MD-214: ..."` | One clear commit |
+| Share | `git push -u origin ...` and open a PR | Review and checks start |
+| Review fix | New commit capping retries at 3 s | Farhan's comment resolved |
+| Conflict | `git merge main`, edit, test, commit | Both changes kept |
+| Finish | Checks green, approval, merge, delete branch | Main has your feature |
+
+Checks go green, Farhan approves, you merge and delete the branch.
 
 ## Common mistakes
 
-- **Huge pull requests.** Split the work. Reviewers miss bugs in long diffs.
-- **Commit messages like "wip" and "changes".** In six months nobody, including you, will know why.
-- **Committing secrets.** An API key in history stays there even after you delete the file. Use environment variables and a `.gitignore`; if a key leaks, rotate it at once.
+- **Huge pull requests.** Split the work; reviewers miss bugs in long diffs.
+- **Commit messages like "wip" and "changes".** Nobody will know why later.
+- **Committing secrets.** Use environment variables and `.gitignore`; rotate any leaked key at once.
 - **Resolving conflicts blindly.** Accepting "mine" for every conflict drops a teammate's fix. Read both sides.
 - **Force-pushing shared branches.** Only rewrite history on branches nobody else uses.
+- **Letting a branch go stale for weeks.** Merge main in regularly so conflicts stay small.
 
 ## Practise
 
-Read GitHub flow and the Pro Git chapter on basic branching and merging.
+Read GitHub flow, linked below, and the Pro Git chapter on basic branching and merging.
 
-1. In a repository of your own, make a branch, two small commits and a pull request with a proper description.
-2. Create a conflict on purpose: change the same line on main and on your branch, then merge and resolve it.
-3. Review a friend's PR (or an open-source one) and leave two useful comments.
+1. **A real PR.** In a repository of your own, make a branch, two small commits and a pull request with a proper description.
+2. **A conflict.** Create one on purpose: change the same line on main and on your branch, then merge and resolve it.
+3. **Review.** Review a friend's PR, or an open-source one, and leave two useful comments.
 
 **You are done when you can** resolve a merge conflict without fear and write a PR description a stranger could review.

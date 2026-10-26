@@ -9,11 +9,44 @@ hours: 5
 gap_tags: []
 primary_resource: statquest
 alternates: [google-ml-crash-course]
-format: explainer
+format: deep
 key_terms: [mean-median, probability-distribution, evals, bias]
 check:
   type: mcq
   question_ids: [statistics-for-ml-1, statistics-for-ml-2, statistics-for-ml-3]
+flashcards:
+  - q: "Why is the median often more typical than the mean?"
+    a: "The mean is pulled by extreme values; the median is not. Income, order values and claim amounts are usually skewed."
+  - q: "Which spread measure suits skewed data?"
+    a: "Percentiles, such as the 90th or 99th. The standard deviation suits roughly symmetric data."
+  - q: "What is selection bias?"
+    a: "When the data collected favours some cases, such as only approved loans or only customers who complained, so models fail on everyone else."
+  - q: "Why is correlation not causation?"
+    a: "Two things can move together because a third factor drives both, like ice-cream sales and drownings both rising in summer."
+  - q: "What does a confidence interval express?"
+    a: "The range a measured number could plausibly take on another sample. Small samples give wide intervals."
+  - q: "What is bootstrapping?"
+    a: "Estimating uncertainty by resampling your test set many times with replacement and recomputing the metric each time."
+  - q: "What is an A/B test?"
+    a: "Randomly splitting users so half see the old version and half the new, then comparing a pre-chosen metric."
+  - q: "Name three rules for a fair A/B test."
+    a: "Decide the sample size and metric in advance, run for full weeks, and do not stop early because the result looks good."
+exercise:
+  title: "Challenge the report"
+  setup: "A Bengaluru edtech's data team reports: (1) 'Average course fee paid is ₹18,500', from data where most fees are ₹2,000 to ₹8,000 and a few corporate deals are ₹5 lakh. (2) 'Students who use the AI tutor score 12% higher, so the tutor causes better scores.' (3) 'The new model is better: 88% accuracy versus 87%', measured on 150 test questions. (4) 'Conversion rose after launch', comparing October (Diwali offers) with September."
+  questions:
+    - q: "What is misleading about (1), and what should be reported?"
+      a: "The mean is pulled up by a few huge corporate deals. Report the median and a percentile range, and show the corporate deals separately."
+    - q: "Why does (2) not prove the tutor causes better scores?"
+      a: "Motivated students may both use the tutor more and score higher. To show cause, run an experiment where access is randomised."
+    - q: "Why is (3) not convincing?"
+      a: "On 150 questions, a 1-point difference is well inside the uncertainty; the confidence intervals of the two models overlap heavily."
+    - q: "What is wrong with (4), and how should it be tested?"
+      a: "October had festival offers, so the months are not comparable. Run a randomised A/B test over the same period."
+ask:
+  - "When should I use the median instead of the mean?"
+  - "How do I run a fair A/B test?"
+  - "What is a confidence interval in simple words?"
 drafted_with_ai: true
 reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
 reviewed_on: 2026-10-25
@@ -21,54 +54,117 @@ reviewed_on: 2026-10-25
 
 ## What it is
 
-Statistics is the toolkit for learning from data under uncertainty. For ML engineering, five areas matter most:
+Machine learning is learning from data, and data is noisy, skewed and incomplete. **Statistics** is the toolkit for learning from data under uncertainty without fooling yourself. For ML engineering, five areas come up daily:
 
-- **Describing data**: averages, spread and shape.
-- **Sampling**: whether your data represents the population you care about.
-- **Relationships**: correlation and why it is not causation.
-- **Uncertainty**: how sure you are about a number, with confidence intervals.
-- **Experiments**: A/B tests to measure whether a change really helps.
+| Area | Question it answers | Typical mistake it prevents |
+| --- | --- | --- |
+| **Describing data** | What is typical, and how spread out? | Reporting a misleading average |
+| **Sampling** | Does our data represent the people we care about? | A model that fails in tier-3 towns |
+| **Relationships** | Do these move together, and does one cause the other? | Claiming a feature causes an outcome |
+| **Uncertainty** | How sure are we about this number? | Celebrating a 1-point gain that is noise |
+| **Experiments** | Did our change really help? | Crediting a festival sale to a new model |
+
+```text
+  Order values (skewed: most small, a few huge)
+
+  count
+   |  ####
+   |  ########
+   |  ##########
+   |  ######
+   |  ###
+   |  #                                         #
+   +----------------------------------------------- value
+      ^ median ₹780                    ^ mean ₹1,240 pulled right by a few big orders
+```
+
+This lesson follows the data team of an e-commerce company in Mumbai as a claim that a new recommendation model "raised order value by ₹70" turns out, under proper statistics, to be a much smaller, real gain. By the end you will be able to design a fair A/B test and explain why small test sets mislead.
 
 ## How it works
 
-**Averages and spread.** The mean is pulled by extreme values; the median is not. Indian income, order values and claim amounts are usually skewed, so the median is often more typical. Spread: the standard deviation for roughly symmetric data, percentiles (such as the 90th) for skewed data. Always plot a histogram before summarising.
+### Averages and spread
 
-**Distributions.** Many quantities are roughly normal (bell-shaped), but many in business are skewed or have long tails. Counts of rare events often follow other distributions. The shape decides which summaries and models make sense.
+The **mean** adds everything up and divides. It is pulled by extreme values. The **median** is the middle value when sorted. It is not.
 
-**Sampling.** A model trained on metro customers may fail in tier-3 towns. Ask: who is missing from this data? Was it collected in a way that favours some cases (only customers who complained, only approved loans)? Selection bias quietly breaks models.
+Indian income, order values and insurance claims are usually **skewed**: most values are small and a few are huge. So the median is often more typical. For spread:
 
-**Correlation and causation.** Two things moving together does not mean one causes the other. Ice-cream sales and drowning both rise in summer. A model can use correlations to predict, but you need experiments or careful methods to claim causes, for example that a discount increased retention.
+| Data shape | Average to use | Spread to use |
+| --- | --- | --- |
+| Roughly symmetric, bell-shaped | Mean | Standard deviation |
+| Skewed, long tail | Median | Percentiles, such as the 90th and 99th |
 
-**Confidence intervals.** A measured accuracy of 87% on 200 test examples could easily be 82% or 92% on another sample. Confidence intervals express this range. Small test sets give wide intervals; do not celebrate a 1-point gain on 200 examples.
+Always plot a histogram before you summarise.
 
-**A/B tests.** To know whether a new model helps, randomly split users: half see the old, half the new. Compare a pre-chosen metric. Decide the sample size in advance, run for full weeks (to cover weekly patterns), and do not stop early because the result looks good. Watch guardrail metrics too.
+### Distributions
+
+Many quantities are roughly **normal** (bell-shaped), such as measurement errors. Many business quantities are skewed or have long tails. Counts of rare events follow other shapes. The shape decides which summaries and models make sense.
+
+### Sampling
+
+A model trained on metro customers may fail in tier-3 towns. Ask: **who is missing from this data?** Was it collected in a way that favours some cases, such as only customers who complained, or only loans that were approved (so you never see how rejected applicants would have repaid)? This **selection bias** quietly breaks models after launch.
+
+### Correlation and causation
+
+Two things moving together does not mean one causes the other. Ice-cream sales and drownings both rise in summer: heat drives both. A model can use correlations to **predict**, but to claim a **cause**, for example that a discount increased retention, you need an experiment or careful causal methods.
+
+### Confidence intervals
+
+A measured accuracy of 87% on 200 test examples could easily be 82% or 92% on another sample of 200. A **confidence interval** expresses this range.
+
+```text
+  Accuracy on 200 examples, with 95% intervals:
+  Model A  87%   |-------[====*====]-------|   about 82% to 92%
+  Model B  88%    |-------[====*====]-------|  about 83% to 93%
+                  heavily overlapping: no clear winner
+```
+
+Small test sets give wide intervals. Do not celebrate a 1-point gain on 200 examples. One practical way to compute an interval is **bootstrapping**: resample the test set many times with replacement, recompute the metric each time, and look at the middle 95% of results.
+
+### A/B tests
+
+To know whether a new model helps, **randomly** split users: half see the old version, half the new. Compare a metric you chose in advance.
+
+| Rule | Why |
+| --- | --- |
+| Decide the metric and sample size in advance | Otherwise you pick whichever number looks good |
+| Randomise who sees which version | So the groups differ only by the change |
+| Run for full weeks | Weekday and weekend behaviour differ |
+| Do not stop early because it looks good | Early results swing; stopping on a high inflates the effect |
+| Watch guardrail metrics | A gain in order value should not come with more returns or complaints |
 
 ## A worked example
 
-A Mumbai e-commerce company's data team reports that a new recommendation model raised average order value from ₹1,240 to ₹1,310.
+A Mumbai e-commerce company's data team reports that a new recommendation model raised average order value from ₹1,240 to ₹1,310: a ₹70 gain. Leadership is ready to celebrate. You check it.
 
-Checking it:
+**Averages.** Order values are skewed. A few large electronics orders moved the mean. The median rose only from ₹780 to ₹790.
 
-- **Averages**: order values are skewed; a few large electronics orders moved the mean. The median rose only from ₹780 to ₹790.
-- **Sampling**: the comparison was last month (old model) against this month (new model), which included a festival sale. Not a fair comparison.
-- **Proper test**: a two-week A/B test with 200,000 users per group, randomised, with the median order value and conversion rate as metrics. Result: median order value up ₹18 (a 95% confidence interval of ₹6 to ₹30), conversion unchanged.
+**Sampling.** The comparison was last month, with the old model, against this month, with the new one. This month included a festival sale. The two months are not comparable.
 
-The model does help, but by much less than the first report claimed. Leadership decides the gain still justifies rollout, now with honest numbers.
+**A proper test.** The team runs a two-week A/B test: 200,000 users per group, randomly assigned, with median order value and conversion rate chosen as metrics in advance, and returns as a guardrail.
+
+| Measure | Old model | New model | Difference (95% interval) |
+| --- | --- | --- | --- |
+| Median order value | ₹781 | ₹799 | +₹18 (₹6 to ₹30) |
+| Conversion rate | 3.42% | 3.43% | No clear change |
+| Return rate (guardrail) | 6.1% | 6.0% | No clear change |
+
+The model does help, but by about a quarter of what the first report claimed. Leadership decides the gain still justifies rolling it out, now with honest numbers, and the team adds "A/B test before claiming impact" to its launch checklist.
 
 ## Common mistakes
 
 - **Reporting the mean of skewed data.** Look at the median and a histogram.
-- **Comparing different time periods.** Seasons and festivals change everything; randomise.
+- **Comparing different time periods.** Seasons and festivals change everything; randomise instead.
 - **Ignoring who is missing from the data.** Selection bias breaks models later.
-- **Treating correlation as causation.**
+- **Treating correlation as causation.** Prediction is not proof of cause.
 - **Small test sets and tiny gains.** Check the confidence interval before claiming improvement.
+- **Peeking and stopping A/B tests early.** Decide the duration in advance and stick to it.
 
 ## Practise
 
-Watch StatQuest videos on histograms, mean versus median, confidence intervals and A/B testing, and the data module of Google's ML Crash Course.
+Watch StatQuest's videos on histograms, mean versus median, confidence intervals and A/B testing, linked below, and the data module of Google's Machine Learning Crash Course.
 
-1. Load any public dataset with a money column. Plot a histogram, and compare mean and median.
-2. Compute a 95% confidence interval for a model's accuracy on 200 test examples by bootstrapping (resampling the test set many times).
-3. Design an A/B test for a change you care about: metric, guardrails, sample size estimate and duration.
+1. **Mean versus median.** Load any public dataset with a money column. Plot a histogram, and compare the mean and the median.
+2. **Bootstrap.** Compute a 95% confidence interval for a model's accuracy on 200 test examples by resampling the test set 1,000 times.
+3. **Design a test.** Design an A/B test for a change you care about: the metric, guardrails, a sample size estimate and the duration.
 
 **You are done when you can** explain why a 1-point accuracy gain on 200 examples is not convincing, and design a fair A/B test.
