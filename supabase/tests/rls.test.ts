@@ -131,6 +131,42 @@ describe("rate limits (SC-3)", () => {
   });
 });
 
+describe("AI spend guard (CO-1)", () => {
+  const reserve = async (user: string, kind: string, day: string, dailyMax: number, cap: number) =>
+    (await q("select public.ai_reserve($1, $2, $3, '2026-10-01', $4, $5) as r", [user, kind, day, dailyMax, cap])).rows[0].r;
+
+  it("counts calls and refuses at the learner's daily cap for that kind", async () => {
+    const got: string[] = [];
+    for (let i = 0; i < 3; i++) got.push(await reserve(A, "roadmap", "2026-10-26", 2, 20));
+    expect(got).toEqual(["ok", "ok", "day"]);
+    expect(await reserve(A, "tutor", "2026-10-26", 2, 20)).toBe("ok");
+    expect(await reserve(A, "roadmap", "2026-10-27", 2, 20)).toBe("ok");
+  });
+
+  it("records tokens and cost, and refuses everyone once the month's spend reaches the cap", async () => {
+    await q("select public.ai_record($1, 'roadmap', '2026-10-26', 1200, 3400, 19.5)", [A]);
+    const row = (await q("select tokens_in, tokens_out, cost_usd::float as cost from ai_usage where user_id = $1 and kind = 'roadmap' and day = '2026-10-26'", [A])).rows[0];
+    expect(row).toEqual({ tokens_in: 1200, tokens_out: 3400, cost: 19.5 });
+    expect(await reserve(B, "coach", "2026-10-26", 5, 20)).toBe("ok");
+    await q("select public.ai_record($1, 'coach', '2026-10-26', 10, 10, 0.5)", [B]);
+    expect(await reserve(B, "coach", "2026-10-26", 5, 20)).toBe("month");
+    expect(await reserve(A, "tutor", "2026-10-26", 5, 20)).toBe("month");
+    expect(await reserve(A, "tutor", "2026-10-26", 5, 25)).toBe("ok");
+  });
+
+  it("learners cannot call the guard functions or write usage", async () => {
+    for (const sql of [
+      "select public.ai_reserve($1, 'x', '2026-10-26', '2026-10-01', 99, 999)",
+      "select public.ai_record($1, 'x', '2026-10-26', 0, 0, -100)",
+      "insert into ai_usage (user_id, day, kind) values ($1, '2026-10-28', 'x')",
+      "update ai_usage set cost_usd = 0 where user_id = $1",
+    ]) {
+      const err = await fails(asUser(db.client, A, () => q(sql, [A])));
+      expect(err.code, sql).toBe(PERMISSION_DENIED);
+    }
+  });
+});
+
 describe("account deletion (AC-11)", () => {
   it("removes every row of the learner and only theirs", async () => {
     await q("delete from auth.users where id = $1", [B]);

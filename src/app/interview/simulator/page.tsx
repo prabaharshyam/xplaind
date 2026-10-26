@@ -3,6 +3,7 @@ import { PageHero } from "@/components/page-hero";
 import { getPaths } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import type { SimQuestion } from "@/lib/interview/analyse";
+import { aiEnabled } from "@/lib/ai/settings";
 import { Simulator } from "./simulator";
 
 export const metadata: Metadata = {
@@ -39,7 +40,7 @@ export default function SimulatorPage() {
         />
       </div>
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <Simulator questions={questions} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} />
+        <Simulator questions={questions} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} aiOn={aiEnabled()} />
       </div>
     </main>
   );

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { AiGrade } from "@/components/ai/ai-grade";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { recordInterview } from "@/lib/browser/activity-store";
 import { XP } from "@/lib/game/xp";
@@ -62,7 +63,7 @@ type Answer = { text: string; seconds: number };
  * the microphone on and off) or by typing; at the end they get a report on the key
  * points covered and on delivery. Everything stays in this browser tab.
  */
-export function Simulator({ questions, paths }: { questions: SimQuestion[]; paths: { id: string; name: string }[] }) {
+export function Simulator({ questions, paths, aiOn = false }: { questions: SimQuestion[]; paths: { id: string; name: string }[]; aiOn?: boolean }) {
   const search = useSearch();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const fixedQuestion = questions.find((q) => q.id === params.get("question")) ?? null;
@@ -116,6 +117,7 @@ export function Simulator({ questions, paths }: { questions: SimQuestion[]; path
         questions={session}
         answers={answers}
         onRetry={() => setStage({ kind: "setup" })}
+        aiOn={aiOn}
       />
     );
   }
@@ -472,7 +474,7 @@ const LENGTH_NOTE: Record<AnswerResult["delivery"]["length"], string> = {
   "ran-out": "Ran out of time",
 };
 
-function Report({ questions, answers, onRetry }: { questions: SimQuestion[]; answers: Answer[]; onRetry: () => void }) {
+function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[]; answers: Answer[]; onRetry: () => void; aiOn: boolean }) {
   const results = useMemo(
     () => questions.map((q, i) => analyseAnswer(q, answers[i]?.text ?? "", answers[i]?.seconds ?? 0)),
     [questions, answers],
@@ -582,6 +584,7 @@ function Report({ questions, answers, onRetry }: { questions: SimQuestion[]; ans
                 <p className="mt-3 text-sm font-medium">A strong short answer</p>
                 <p className="mt-1 rounded-lg bg-zinc-100 p-3 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
               </details>
+              <AiGrade enabled={aiOn} questionId={q.id} answer={answers[i]?.text ?? ""} />
               <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 <Link href={`/interview/${q.id}`} className={textLink}>
                   Full answer and follow-ups

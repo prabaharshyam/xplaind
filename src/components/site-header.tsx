@@ -3,6 +3,7 @@ import { HeaderSearch, XpChip } from "./header-extras";
 
 const NAV = [
   { href: "/paths", label: "Roadmaps" },
+  { href: "/ai", label: "AI tools" },
   { href: "/topics", label: "Topics" },
   { href: "/resources", label: "Courses" },
   { href: "/interview", label: "Interview" },

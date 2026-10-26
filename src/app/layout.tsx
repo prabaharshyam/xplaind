@@ -44,6 +44,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/interview/simulator" className="underline-offset-2 hover:underline">
               Mock interview
             </Link>
+            <Link href="/ai" className="underline-offset-2 hover:underline">
+              AI tools
+            </Link>
             <Link href="/practice" className="underline-offset-2 hover:underline">
               Practice
             </Link>

@@ -92,3 +92,9 @@ For the owner to review before launch: the 41 new resources and 7 certification 
 ## Update: redesign (owner feedback, 2026-10-25)
 
 New home page, cover art for every course, lesson and path, `/topics`, a topic drawer on every roadmap, interactive lesson pages, XP, streaks and badges, site search, and the courses page as a card grid. "Honest by design" and "Where this is going" are removed. Details and reasons are in `docs/decisions.md` under "Redesign for clarity and engagement".
+
+## Update, 2026-10-26: AI features (branch `claude/practical-albattani-im1h44`, restarted from main after PR 1 merged)
+
+- `/ai` hub; `/ai/roadmap` generator with a visual editor and "change it with AI"; `/ai/course` course generator; `/ai/coach`; an AI tutor at the end of every lesson; "Get AI feedback" in the mock interview report. Guards, caps and reasons: `docs/decisions.md`, "AI features with Claude".
+- New migration `20261026000000_ai_guard.sql` (`ai_usage.cost_usd`, `ai_reserve`, `ai_record`), with database tests.
+- **For the owner, to switch AI on:** finish the Supabase setup (accounts must work first), run the new migration, then in Vercel → Project → Settings → Environment Variables add `ANTHROPIC_API_KEY` (your key; never paste it in chat or the repo), `AI_MONTHLY_CAP_USD=20`, and redeploy. In the Anthropic Console, set a monthly spend limit of US$20 as the hard stop. To switch AI off at once, set `AI_KILL_SWITCH=true` and redeploy.

@@ -15,6 +15,8 @@ import { getInterviewViews } from "@/lib/content/interview";
 import type { CheckQuestionView } from "./stop-progress";
 import { StopProgressPanel } from "./stop-progress";
 import { StopResources } from "./stop-resources";
+import { LessonTutor } from "./lesson-tutor";
+import { aiEnabled } from "@/lib/ai/settings";
 
 /** Lesson text: headings, lists, code and tables styled without a typography plugin. Code scrolls inside its box at 360px. */
 const PROSE =
@@ -116,6 +118,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
     ...sections.map((sec) => ({ id: slug(sec.title), title: sec.title, icon: SECTION_ICON[sec.title] ?? ("book" as const) })),
     { id: "courses", title: "Best free course", icon: "book" },
     { id: "check", title: "Quick check", icon: "check" },
+    { id: "tutor", title: "Ask the AI tutor", icon: "sparkles" },
   ];
   const home = paths[0];
   const order = home ? pathLessons(home.id) : [];
@@ -268,6 +271,16 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               </span>
             </h2>
             <StopProgressPanel stopId={stop.id} check={check} />
+          </section>
+
+          <section id="tutor" aria-labelledby="tutor-h" className="mt-8 scroll-mt-24 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5 md:p-6 dark:border-violet-900 dark:from-violet-950/30 dark:to-fuchsia-950/20">
+            <h2 id="tutor-h" className="flex items-center gap-2 text-xl font-semibold">
+              <Icon name="sparkles" size={22} className="text-violet-700 dark:text-violet-300" /> Stuck? Ask the AI tutor
+            </h2>
+            <p className={`mt-1 text-sm ${muted}`}>It has read this lesson and answers questions about it, with new examples.</p>
+            <div className="mt-4">
+              <LessonTutor enabled={aiEnabled()} lessonId={stop.id} title={stop.title} />
+            </div>
           </section>
 
           {interview.length > 0 && (
