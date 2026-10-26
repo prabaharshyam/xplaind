@@ -77,6 +77,11 @@ describe("row-level security (SC-2, AC-4)", () => {
     });
   });
 
+  it("accepts a one-tap done as self_marked and rejects unknown done_how values (RM-7)", async () => {
+    await asUser(db.client, A, () => q("insert into stop_progress (user_id, stop_id, status, done_how) values ($1, 'llm-apis', 'done', 'self_marked')", [A]));
+    await fails(asUser(db.client, A, () => q("insert into stop_progress (user_id, stop_id, status, done_how) values ($1, 'rag-app', 'done', 'guessed')", [A])));
+  });
+
   it("learners cannot write rows only the server may write", async () => {
     for (const [table, sql] of [
       ["quiz_attempts", "insert into quiz_attempts (user_id, goal_id, quiz_version, answers, start_level) values ($1, 'g', 'v1', '[]', 'P3')"],

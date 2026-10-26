@@ -127,7 +127,7 @@ The structure is goal, then levels, then stops, then resources. A stop is one le
 | RM-4 | Resource card. Show provider, title, cost label, hours, language, certificate yes or no, level, last-verified date, link-check date, "why we picked it", and an affiliate label when it applies | Every field renders; a missing last-verified date fails validation |
 | RM-5 | Outbound route /go/\[resource-id\]. Log the click (resource, stop, level, no personal data), then redirect. Add an affiliate tag only when the resource is marked affiliate, and always show the label on the card | Works with JavaScript off; the log holds no email or IP address |
 | RM-6 | Cost labels: "Free"; "Free to learn, paid certificate"; or a price in rupees with "price checked on \[date\]". If the price date is over 60 days old, show "price may have changed" | A price is never shown without its check date |
-| RM-7 | Completion. A stop is done when the learner passes its check (70% or more) or submits a project link. Release 1 trusts self-reports | Three states: not started, in progress, done |
+| RM-7 | Completion. A stop is done when the learner passes its check (70% or more), submits a project link, or marks it done with one tap (recorded as self-marked). Release 1 trusts self-reports | Three states: not started, in progress, done. Self-marked stops are counted separately from checked ones and do not earn level badges |
 | RM-8 | "I already know this". The learner can skip a stop. It counts as done, is flagged as self-skipped, and the re-test can contradict it | Skipped stops are counted separately in analytics |
 | RM-9 | Preference toggle "Free only". When on, paid resources move below free alternates and are not the primary | The toggle persists for signed-in learners |
 
@@ -301,7 +301,7 @@ create table stop_progress (
   user_id uuid not null references auth.users on delete cascade,
   stop_id text not null,
   status text not null check (status in ('in_progress','done')),
-  done_how text check (done_how in ('check','project','self_skipped')),
+  done_how text check (done_how in ('check','project','self_marked','self_skipped')),
   check_score smallint, project_url text,
   updated_at timestamptz not null default now(),
   primary key (user_id, stop_id)

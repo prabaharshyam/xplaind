@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { afterCheck, checkPercent, completedIds, coverage, isProjectUrl, markDone, passesCheck, statusOf } from "./progress";
+import { afterCheck, checkPercent, completedIds, coverage, isProjectUrl, markDone, passesCheck, recordFor, stateCounts, statusOf, topicStateOf } from "./progress";
 import type { ProgressMap, RoadmapStop } from "./types";
 
 const T = "2026-10-25";
@@ -86,5 +86,33 @@ describe("coverage (percent covered)", () => {
 
   it("is 0 when no stops are written from the start level", () => {
     expect(coverage(stops, "P3", {})).toEqual({ doneHours: 0, totalHours: 0, percent: 0, done: 0, skipped: 0, total: 0 });
+  });
+});
+
+describe("roadmap topic states (RM-7 as amended, RM-8)", () => {
+  const T2 = "2026-10-27";
+  it("maps progress records to to do, learning, done and skipped", () => {
+    const progress: ProgressMap = {
+      a: { status: "in_progress", updatedOn: T2 },
+      b: markDone("self_marked", T2),
+      c: markDone("self_skipped", T2),
+      d: { status: "done", how: "check", score: 80, updatedOn: T2 },
+    };
+    expect(["a", "b", "c", "d", "e"].map((id) => topicStateOf(progress, id))).toEqual(["learning", "done", "skipped", "done", "todo"]);
+  });
+
+  it("stores a one-tap done as self-marked, but keeps a passed check", () => {
+    expect(recordFor(undefined, "done", T2)).toEqual({ status: "done", how: "self_marked", updatedOn: T2 });
+    const checked = { status: "done", how: "check", score: 90, updatedOn: "2026-10-01" } as const;
+    expect(recordFor(checked, "done", T2)).toBe(checked);
+    expect(recordFor(undefined, "skipped", T2)).toEqual({ status: "done", how: "self_skipped", updatedOn: T2 });
+    expect(recordFor(checked, "learning", T2)).toEqual({ status: "in_progress", score: 90, updatedOn: T2 });
+    expect(recordFor(checked, "todo", T2)).toBeNull();
+  });
+
+  it("counts states and treats done and skipped as finished", () => {
+    const progress: ProgressMap = { a: markDone("self_marked", T2), b: markDone("self_skipped", T2), c: { status: "in_progress", updatedOn: T2 } };
+    expect(stateCounts(["a", "b", "c", "d"], progress)).toEqual({ todo: 1, learning: 1, done: 1, skipped: 1, total: 4, percent: 50 });
+    expect(stateCounts([], {}).percent).toBe(0);
   });
 });

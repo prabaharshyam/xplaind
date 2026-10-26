@@ -12,7 +12,7 @@ const Id = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(80);
 
 export const StopProgressInput = z.strictObject({
   status: z.enum(["in_progress", "done"]),
-  how: z.enum(["check", "project", "self_skipped"]).optional(),
+  how: z.enum(["check", "project", "self_marked", "self_skipped"]).optional(),
   score: z.number().int().min(0).max(100).optional(),
   projectUrl: z.url().max(500).optional(),
   updatedOn: IsoDate,

@@ -20,6 +20,7 @@ import { LessonTutor } from "./lesson-tutor";
 import { LessonExercise } from "./lesson-exercise";
 import { PathLessons } from "./path-lessons";
 import { Flashcards } from "@/components/flashcards";
+import { TopicStatus } from "@/components/roadmap/topic-status";
 import { aiEnabled } from "@/lib/ai/settings";
 
 /** Lesson text: headings, lists, code and tables styled without a typography plugin. Code scrolls inside its box at 360px. */
@@ -200,6 +201,11 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </p>
           )}
 
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <span className="text-sm font-medium">Track this topic</span>
+            <TopicStatus stopId={stop.id} title={stop.title} label={`Track ${stop.title}`} />
+          </div>
+
           <section id="why" aria-labelledby="why-h" className="mt-6 scroll-mt-24 rounded-2xl border-l-4 border-amber-400 bg-amber-50 p-5 dark:bg-amber-950/40">
             <h2 id="why-h" className="flex items-center gap-2 text-lg font-semibold">
               <Icon name="star" size={20} className="text-amber-600" /> Why it matters
@@ -298,7 +304,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
                 +{xpToEarn} XP
               </span>
             </h2>
-            <StopProgressPanel stopId={stop.id} check={check} />
+            <StopProgressPanel stopId={stop.id} title={stop.title} check={check} />
           </section>
 
           <section id="tutor" aria-labelledby="tutor-h" className="mt-8 scroll-mt-24 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5 md:p-6 dark:border-violet-900 dark:from-violet-950/30 dark:to-fuchsia-950/20">

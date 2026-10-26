@@ -9,8 +9,11 @@ export { serverSnapshot, subscribe } from "./storage";
 
 export const PROGRESS_KEY = "xplaind.progress.v1";
 
+/** A roadmap stage's project, keyed by `projectKey(path, stage)`. Kept on this device only. */
+export type ProjectProgress = { status: "building" | "done"; url?: string; updatedOn: string };
+
 /** `path` is the id of the path the learner chose; absent until they choose one. */
-export type SavedProgress = { version: 1; stops: ProgressMap; freeOnly: boolean; path?: string };
+export type SavedProgress = { version: 1; stops: ProgressMap; freeOnly: boolean; path?: string; projects?: Record<string, ProjectProgress> };
 
 const EMPTY: SavedProgress = { version: 1, stops: {}, freeOnly: false };
 
@@ -22,10 +25,22 @@ export function parseProgress(raw: string | null): SavedProgress {
     const v = JSON.parse(raw) as SavedProgress;
     if (!v || v.version !== 1 || typeof v.stops !== "object" || v.stops === null) return EMPTY;
     const path = typeof v.path === "string" && /^[a-z0-9-]{1,64}$/.test(v.path) ? v.path : undefined;
-    return { version: 1, stops: v.stops, freeOnly: v.freeOnly === true, ...(path ? { path } : {}) };
+    const projects = parseProjects(v.projects);
+    return { version: 1, stops: v.stops, freeOnly: v.freeOnly === true, ...(path ? { path } : {}), ...(projects ? { projects } : {}) };
   } catch {
     return EMPTY;
   }
+}
+
+function parseProjects(raw: unknown): Record<string, ProjectProgress> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, ProjectProgress> = {};
+  for (const [key, p] of Object.entries(raw as Record<string, Partial<ProjectProgress>>)) {
+    if ((p?.status === "building" || p?.status === "done") && typeof p.updatedOn === "string") {
+      out[key] = { status: p.status, updatedOn: p.updatedOn, ...(typeof p.url === "string" ? { url: p.url } : {}) };
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function update(change: (p: SavedProgress) => SavedProgress): void {
@@ -54,4 +69,14 @@ export const setFreeOnly = (freeOnly: boolean): void => update((p) => ({ ...p, f
 export function setPath(path: string): void {
   update((p) => ({ ...p, path }));
   syncPath(path);
+}
+
+/** Saves a stage project's state, or clears it with null. */
+export function setProject(key: string, record: ProjectProgress | null): void {
+  update((p) => {
+    const projects = { ...p.projects };
+    if (record) projects[key] = record;
+    else delete projects[key];
+    return { ...p, projects };
+  });
 }

@@ -4,11 +4,8 @@ import Link from "next/link";
 import { type MouseEvent, type ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
-import { useProgress, useToday } from "@/lib/browser/hooks";
-import { clearStop, setStop } from "@/lib/browser/progress-store";
 import type { DrawerCourse, TopicDetail } from "@/lib/content/drawer";
-import { todayInIST } from "@/lib/dates";
-import { markDone, statusOf } from "@/lib/roadmap/progress";
+import { TopicStatus } from "./topic-status";
 import { themeOf } from "@/lib/themes";
 
 const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
@@ -77,28 +74,9 @@ export function useTopicLink(id: string) {
 }
 
 function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
-  const progress = useProgress();
-  const today = useToday();
-  const status = statusOf(progress.stops, d.id);
-  const day = () => today ?? todayInIST();
   const theme = themeOf(d.theme);
   const best = d.courses.filter((c) => c.pick === "best");
   const also = d.courses.filter((c) => c.pick === "also");
-
-  const statusButton = (label: string, active: boolean, onClick: () => void, icon: "book" | "check" | "play") => (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`flex min-h-10 items-center gap-1.5 rounded-full border px-3 text-sm font-medium ${
-        active
-          ? "border-emerald-700 bg-emerald-700 text-white"
-          : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-      }`}
-    >
-      <Icon name={icon} size={15} /> {label}
-    </button>
-  );
 
   return (
     <div className="flex min-h-full flex-col">
@@ -124,18 +102,12 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
           <p className="mt-2 text-lg leading-7">{d.outcome}</p>
         </div>
 
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Your status">
-          {statusButton("Learning", status === "in_progress", () => setStop(d.id, { status: "in_progress", updatedOn: day() }), "play")}
-          {statusButton("Done", status === "done", () => setStop(d.id, markDone("self_skipped", day())), "check")}
-          {status !== "not_started" && (
-            <button type="button" onClick={() => clearStop(d.id)} className="min-h-10 px-2 text-sm text-zinc-600 underline underline-offset-2 dark:text-zinc-400">
-              Reset
-            </button>
-          )}
+        <div>
+          <TopicStatus stopId={d.id} title={d.title} />
+          <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+            Done and Skip are your own call. Pass the lesson&apos;s check for full XP and level badges.
+          </p>
         </div>
-        <p className="-mt-3 text-xs text-zinc-600 dark:text-zinc-400">
-          Marking it done here counts as &ldquo;I already know this&rdquo;. Pass the lesson&apos;s check for full XP.
-        </p>
 
         <section aria-labelledby="why-h" className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-900">
           <h3 id="why-h" className="font-semibold">

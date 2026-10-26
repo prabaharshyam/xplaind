@@ -98,3 +98,9 @@ New home page, cover art for every course, lesson and path, `/topics`, a topic d
 - `/ai` hub; `/ai/roadmap` generator with a visual editor and "change it with AI"; `/ai/course` course generator; `/ai/coach`; an AI tutor at the end of every lesson; "Get AI feedback" in the mock interview report. Guards, caps and reasons: `docs/decisions.md`, "AI features with Claude".
 - New migration `20261026000000_ai_guard.sql` (`ai_usage.cost_usd`, `ai_reserve`, `ai_record`), with database tests.
 - **For the owner, to switch AI on:** finish the Supabase setup (accounts must work first), run the new migration, then in Vercel → Project → Settings → Environment Variables add `ANTHROPIC_API_KEY` (your key; never paste it in chat or the repo), `AI_MONTHLY_CAP_USD=20`, and redeploy. In the Anthropic Console, set a monthly spend limit of US$20 as the hard stop. To switch AI off at once, set `AI_KILL_SWITCH=true` and redeploy.
+
+### Topic tracking and one roadmap design (2026-10-27)
+
+- New migration `20261027000000_self_marked.sql` allows `done_how = 'self_marked'` for one-tap Done (RM-7 as amended). **Owner:** run it with the other migrations when you set up Supabase; until then progress is kept on the device only, as before.
+- Every roadmap now uses the same design, with Learning, Done and Skip on each topic, filters by status, "Hide done and skipped" and a Projects tab. Project progress is device-only for now.
+
