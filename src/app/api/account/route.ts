@@ -10,6 +10,9 @@ export async function DELETE() {
 
   const { error: subError } = await admin.from("email_subscriptions").delete().eq("user_id", user.id);
   if (!subError && user.email) await admin.from("email_subscriptions").delete().eq("email", user.email);
+  // RD-2: checklist download details go with the account.
+  await admin.from("roadmap_downloads").delete().eq("user_id", user.id);
+  if (user.email) await admin.from("roadmap_downloads").delete().eq("email", user.email);
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error || subError) return problem(500, "Could not delete the account. Nothing was removed from your sign-in.");
   await client.auth.signOut();

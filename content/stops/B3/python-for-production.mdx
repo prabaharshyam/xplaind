@@ -141,7 +141,10 @@ A lending startup in Bengaluru wants fields extracted from loan enquiry emails w
 **Validating the reply:**
 
 ```python
+import logging
 from pydantic import BaseModel, Field, ValidationError
+
+log = logging.getLogger(__name__)
 
 class Enquiry(BaseModel):
     name: str
@@ -162,14 +165,21 @@ def parse(reply: str) -> Enquiry | None:
 **Processing 200 emails.** Calling the model one at a time takes 200 times the latency: about 7 minutes at 2 seconds each. With `httpx.AsyncClient` and `asyncio.gather`, the emails are sent concurrently, and a **semaphore** limits how many are in flight at once, so the startup stays under the provider's rate limit:
 
 ```python
+import asyncio
+import httpx
+
 sem = asyncio.Semaphore(10)
 
 async def extract(client, email):
     async with sem:
-        reply = await call_model(client, email)
+        reply = await call_model(client, email)   # your async model call
         return parse(reply)
 
-results = await asyncio.gather(*(extract(client, e) for e in emails))
+async def main(emails):
+    async with httpx.AsyncClient(timeout=30) as client:
+        return await asyncio.gather(*(extract(client, e) for e in emails))
+
+results = asyncio.run(main(emails))
 ```
 
 | Approach | Time for 200 emails | Rate-limit risk |

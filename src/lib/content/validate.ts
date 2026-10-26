@@ -17,6 +17,9 @@ export const LAUNCH_MINIMUMS = {
 
 /** Re-verify a resource whose last_verified is older than this many days. */
 export const STALE_VERIFICATION_DAYS = 180;
+/** IQ-8: a role's Top 25, of which at least 12 test judgement rather than definitions. */
+export const TOP_INTERVIEW = 25;
+export const TOP_PRACTICAL = 12;
 
 export type ValidateOptions = {
   /** Today as YYYY-MM-DD in India. Passed in so tests are stable. */
@@ -267,6 +270,34 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     }
     if (!isHumanName(p.reviewed_by)) gap(file, `reviewed_by "${p.reviewed_by}" is not a person; a human must review this project`, "ED-9");
     if (daysBetween(opts.today, p.reviewed_on) > 0) error(file, `reviewed_on ${p.reviewed_on} is in the future`, "ED-9");
+  }
+
+  // ---- IQ-8: each role's Top 25 interview questions -------------------------
+  const interviewById = new Map(bundle.interview.map((q) => [q.data.id, q.data]));
+  for (const { file, data: g } of bundle.goals) {
+    const top = g.top_interview;
+    if (top.length === 0) {
+      gap(file, `no Top ${TOP_INTERVIEW} interview questions yet`, "IQ-8");
+      continue;
+    }
+    if (top.length !== TOP_INTERVIEW) {
+      error(file, `top_interview lists ${top.length} questions; a role needs exactly ${TOP_INTERVIEW}`, "IQ-8");
+      continue;
+    }
+    if (new Set(top).size !== top.length) error(file, "top_interview lists a question twice", "IQ-8");
+    const lessons = new Set(g.stages.flatMap((st) => st.lessons));
+    let practical = 0;
+    for (const id of top) {
+      const q = interviewById.get(id);
+      if (!q) {
+        error(file, `top_interview question "${id}" does not exist`, "IQ-8");
+        continue;
+      }
+      if (!q.example) error(file, `top_interview question "${id}" needs an example to tell in the interview`, "IQ-8");
+      if (!lessons.has(q.stop_id)) error(file, `top_interview question "${id}" links lesson "${q.stop_id}", which is not on this path`, "IQ-8");
+      if (q.kind !== "concept") practical++;
+    }
+    if (practical < TOP_PRACTICAL) error(file, `top_interview has ${practical} scenario, use-case or real-life questions; it needs at least ${TOP_PRACTICAL}`, "IQ-8");
   }
 
   // ---- blog ---------------------------------------------------------------

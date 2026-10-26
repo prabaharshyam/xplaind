@@ -18,8 +18,8 @@ flashcards:
   - q: "What is document parsing?"
     a: "Getting reliable text and numbers out of real files such as CSV, Excel, JSON and PDFs. It is the first real task on most AI projects."
   - q: "Why do Tamil or Hindi names come out garbled in a CSV?"
-    a: "The file was read with the wrong encoding. Try utf-8, then utf-8-sig (for files from Excel with a byte-order mark), then cp1252."
-  - q: "How do you keep leading zeros in PIN codes and item codes?"
+    a: "The file was read with the wrong encoding, usually UTF-8 text decoded as cp1252 or Latin-1. Read it as utf-8, or utf-8-sig if it starts with an Excel byte-order mark. cp1252 cannot hold Indian scripts."
+  - q: "How do you keep leading zeros in branch codes and item codes?"
     a: "Read those columns as text, for example with dtype=str in pandas, instead of letting pandas turn them into numbers."
   - q: "How do you read Indian dates like 05/11/2026 correctly?"
     a: "Parse with dayfirst=True, so it means 5 November, not 11 May."
@@ -36,7 +36,7 @@ exercise:
   setup: "A cooperative bank in Thrissur sends a folder for an assistant project: (1) members.csv, where Malayalam names show as 'à´°à´¾à´®àµ', (2) the same file where branch codes like '0042' appear as 42, (3) loans.xlsx with two banner rows above the header and amounts like '2,50,000', (4) 60 circular PDFs, of which 9 return almost no text, (5) a rates PDF where the interest table comes out as one long jumbled line."
   questions:
     - q: "What is wrong with (1), and the first fix to try?"
-      a: "The encoding. Read it with encoding='utf-8-sig' (Excel often adds a byte-order mark), or try utf-8."
+      a: "The encoding. Those characters are UTF-8 bytes decoded as cp1252. Read the file with encoding='utf-8', or 'utf-8-sig' if it starts with an Excel byte-order mark."
     - q: "How do you fix (2) and (3)?"
       a: "Read branch codes as text with dtype. For the Excel file, skip the two banner rows and remove commas from amounts before converting to numbers."
     - q: "What are the 9 PDFs in (4), and what do you do?"
@@ -92,8 +92,8 @@ This lesson follows a hospital chain in Madurai whose policies and pharmacy pric
 
 | Problem | Option |
 | --- | --- |
-| Tamil or Hindi names come out garbled | `encoding`: try `utf-8`, then `utf-8-sig`, then `cp1252` |
-| PIN codes and phone numbers lose leading zeros | `dtype={"pin": str}` for id-like columns |
+| Tamil or Hindi names come out garbled | `encoding="utf-8"`, or `"utf-8-sig"` for an Excel byte-order mark. Garbling usually means UTF-8 was read as `cp1252`, which cannot hold Indian scripts |
+| Item codes, branch codes and landline numbers lose leading zeros | `dtype={"item_code": str}` for id-like columns |
 | Dates like 05/11/2026 | `parse_dates` with `dayfirst=True` |
 | Banner rows above the header | `skiprows` |
 | Broken rows crash the load | `on_bad_lines="warn"` to see them |
@@ -124,12 +124,16 @@ After every extraction, count and compare: rows in versus rows out, pages with n
 
 A hospital chain in Madurai wants an assistant over its policies and its pharmacy price list. They send a ZIP file.
 
-**The price list CSV.** It loads with garbled drug names. `encoding="utf-8-sig"` fixes it: the file starts with a byte-order mark added by Excel. Item codes like "000412" lost their zeros; `dtype={"item_code": str}` keeps them. Prices such as "1,250.00" become numbers after removing commas.
+**The price list CSV.** Tamil drug names come out garbled, because the old loading script set `encoding="cp1252"`. The file is really UTF-8 with a byte-order mark added by Excel, so `encoding="utf-8-sig"` fixes it. Item codes like "000412" lost their zeros; `dtype={"item_code": str}` keeps them. Prices such as "1,250.00" become numbers after removing commas.
 
 **The policy PDFs.** Of 140 PDFs, pypdf extracts text from 122. A quick check flags the 18 that return almost nothing:
 
 ```python
+from pathlib import Path
 from pypdf import PdfReader
+
+pdfs = sorted(Path("policies").glob("*.pdf"))
+needs_ocr, records = [], []
 
 for path in pdfs:
     reader = PdfReader(path)
@@ -155,7 +159,7 @@ The notes for the client list exactly which files needed OCR and which pages fai
 
 ## Common mistakes
 
-- **Trusting defaults.** pandas guesses types and will turn PIN codes into numbers, dropping the leading zero. Set types for id-like columns.
+- **Trusting defaults.** pandas guesses types and will turn item codes like 000412 into numbers, dropping the leading zeros. Set types for id-like columns.
 - **Ignoring encodings.** Garbled names in Indian scripts nearly always mean the wrong encoding, not a broken file.
 - **Assuming every PDF has text.** Scans return empty strings silently. Measure characters per page.
 - **Losing the page number.** Without it you cannot cite a source or debug a wrong answer.
@@ -166,7 +170,7 @@ The notes for the client list exactly which files needed OCR and which pages fai
 
 Read the pandas IO page sections on CSV and Excel, linked below, and pypdf's text extraction page.
 
-1. **A messy CSV.** Make one yourself: a banner row, Indian-format numbers, dates like 05/11/2026, a PIN code column and a Tamil or Hindi name column saved with a byte-order mark. Load it correctly.
+1. **A messy CSV.** Make one yourself: a banner row, Indian-format numbers, dates like 05/11/2026, an item-code column with leading zeros and a Tamil or Hindi name column saved with a byte-order mark. Load it correctly.
 2. **Three PDFs.** Download a digital government circular, a scanned one and one with a table. Extract text with page numbers, and detect the scanned one automatically.
 3. **A report.** Write a short report: files, pages, pages with no text, and what you would do about each.
 

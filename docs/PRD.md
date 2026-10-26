@@ -181,6 +181,15 @@ Added at the owner's request (2026-10-26). A learner tests themselves on their o
 | MB-3 | The test is timed and ends itself when time runs out. The report shows the score, each question with the learner's answer, the right answer, the explanation and the quote with its chapter and page, a score per chapter, the chapters where the learner is strong (80% or more on two or more questions) and the ones to focus on (under 60%) with the pages to reread. The report downloads as a PDF | Pure scoring function with tests; the download is a real PDF file |
 | MB-4 | Tests and results are kept on the device only, at most 10. The book, its excerpts and the answers are never stored on the server | Stored shape is checked on every read; a malformed entry is dropped |
 
+## Roadmap checklist download
+
+Added at the owner's request (2026-10-26).
+
+| ID | Requirement | Acceptance criteria |
+| --- | --- | --- |
+| RD-1 | Every roadmap downloads as a printable PDF checklist: each section with a box per topic (hours, optional, coming soon), the section project with its deliverables, space for start and target dates and notes, and topics already done or skipped ticked | Made in the browser; works at 360 px |
+| RD-2 | Before the first download the learner gives name, email, professional experience and, optionally, a phone number, and agrees to the stated consent text. Details go to a server-only table with row-level security, are deleted with the account and included in the data export. A learner who says they are under 18 downloads without giving details and nothing is sent (PV-2). Details are asked once per device | RLS test; the API validates every field; the under-18 path sends no request |
+
 ## Interview Q&A, MCQs and books
 
 Interview prep is the entry point and the reason to share the site. Release 1 is read-and-check practice; typed-answer grading follows in release 2 and the voice simulator in release 3. The topic list comes from what the r/LLMDevs poster said interviewers test: transformers, RAG, agents, fine-tuning versus prompting versus RAG, evals, system design and behavioral questions ([thread](https://reddit.sentinel-team.org/posts/1sn7hc8/snapshots/2026-04-17T05%3A37%3A44.74927Z)).
@@ -195,6 +204,7 @@ Interview prep is the entry point and the reason to share the site. Release 1 is
 | IQ-6 | Review rule. Any text drafted with an AI tool must be reviewed and signed by a person before it is published | The publish check reads reviewed\_by; no unreviewed record is built into the site |
 | IQ-7 | Release 2: typed-answer grader. The learner types an answer; a small model scores it 0 to 5 against the reference answer and a rubric, and returns what was missing. Daily cap per learner, treat the typed text as data not instructions, log token cost | A user cannot exceed the cap; an answer that says "ignore your instructions" is graded as an answer |
 | IQ-7a | Mock interview review (added 2026-10-26 at the owner's request). Every answer in a mock interview is analysed in the browser without a model: key points covered with the learner's own words as evidence, closeness to the reference answer, structure (definition, example, trade-off, real use), an understanding score per answer and per concept, and lessons to revisit. Signed-in learners can add one AI review of the whole interview that grades every answer for meaning, lists what was right, wrong and missing, and sums up strengths, gaps and next steps. Daily cap of 3 reviews, answers treated as data | The report shows understanding per answer and per concept with no model call; the AI review is one call per interview and respects the caps |
+| IQ-8 | Top 25 per role (added 2026-10-26 at the owner's request). Each role has 25 interview questions on one page, in study order, at least 12 of them scenario, use-case or real-life questions. Each shows the short answer, the explanation, an example the learner can tell in a real interview, follow-ups and mistakes to avoid. The page prints or saves as PDF | Validation fails unless every role lists exactly 25 existing questions on its own lessons, each with an example, and at least 12 practical ones |
 | IQ-8 | Release 2: spaced repetition. Questions rated "partly" or "missed" return after 1, 3, 7 and 21 days | The practice queue is ordered by due date |
 
 **Books**
@@ -222,7 +232,7 @@ Keep gamification light. In a Belgian study of 6,592 adults, which the idea vali
 | AC-7 | Level card: an image of 1200 by 630 pixels showing level, goal, weeks active and the site URL, with an optional first name. Sharing is opt-in and the link is unguessable | The card holds no email, photo or exact dates; the learner can delete it |
 | AC-8 | Weekly email on a fixed weekday and time chosen by you: the next step, a progress line, and an unsubscribe link, plus the List-Unsubscribe header. Sent only to learners who gave consent | An unsubscribe takes effect before the next send |
 | AC-9 | Landing and in-app email capture uses double opt-in. Store the consent text shown, the timestamp and the source page | A row exists for every sent email address, with consent evidence |
-| AC-10 | WhatsApp in release 1 is a link to a public WhatsApp Channel. No phone numbers are collected. Direct messages to individuals need the WhatsApp Business API and are a release 2 decision | No phone field exists in release 1; I have not checked current WhatsApp Business API pricing |
+| AC-10 | WhatsApp in release 1 is a link to a public WhatsApp Channel. No WhatsApp messages are sent to individuals; that needs the WhatsApp Business API and is a release 2 decision. Amended 2026-10-26: an optional phone number may be given with consent on the roadmap checklist download (RD-2), and nothing else collects one | The only phone field is the optional one in roadmap_downloads |
 | AC-11 | Settings: delete account and export my data as JSON | Deletion removes the learner's rows in the same request |
 
 ## Editorial rules, link checks and admin
@@ -432,7 +442,7 @@ Release 1 makes no language-model calls at run time, which keeps the first month
 
 | ID | Requirement | Acceptance criteria |
 | --- | --- | --- |
-| PV-1 | Collect only email, goal, weekly hours, level, progress and an optional first name for the level card. No phone number, photo, government ID or precise location | The schema holds no other personal fields |
+| PV-1 | Collect only email, goal, weekly hours, level, progress, an optional first name for the level card, and, for a roadmap checklist download, name, email, professional experience and an optional phone number given with consent (RD-2, amended 2026-10-26 at the owner's request). No photo, government ID or precise location | The schema holds no other personal fields |
 | PV-2 | Under-18 path. No account and nothing stored on the server. Analytics for signed-out visitors uses no cookies and no user identifier | Choosing "under 18" never reaches the profiles or quiz\_attempts tables |
 | PV-3 | The privacy page names every processor (hosting, Supabase, email service, analytics), the purpose and retention of each data type, and how to delete data. Unconfirmed email signups are deleted after 7 days | Page exists before the first public signup; a scheduled job deletes stale rows |
 | SC-1 | Secrets live only in environment settings, never in the repository | A secret scan runs in CI |

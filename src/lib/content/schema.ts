@@ -229,10 +229,15 @@ export const RubricPoint = z.strictObject({
 });
 export type RubricPoint = z.infer<typeof RubricPoint>;
 
+/** IQ-8: what an interviewer is testing with the question. */
+export const INTERVIEW_KINDS = ["concept", "scenario", "use-case", "real-life"] as const;
+export type InterviewKind = (typeof INTERVIEW_KINDS)[number];
+
 export const InterviewQuestion = z
   .strictObject({
     id: Slug,
     question: Text,
+    kind: z.enum(INTERVIEW_KINDS).default("concept"),
     short_answer: Text,
     deeper_answer: Text,
     follow_ups: z.array(Text).min(2).max(3),
@@ -244,6 +249,8 @@ export const InterviewQuestion = z
     rubric: z.array(RubricPoint).min(3).max(6),
     /** How long a spoken answer should take at most, as in a real interview. */
     answer_seconds: z.number().int().min(60).max(180),
+    /** IQ-8: a concrete example to tell in the interview, in the candidate's own voice. Required for a Top 25 question. */
+    example: Text.max(1200).optional(),
     ...reviewShape,
   })
   .superRefine((q, ctx) => {
@@ -418,6 +425,8 @@ export const Goal = z.strictObject({
   placement: z.enum(["ladder", "none"]),
   months: z.number().positive(),
   stages: z.array(PathStage).min(1),
+  /** IQ-8: the role's Top 25 interview questions, in the order to study them. */
+  top_interview: z.array(Slug).default([]),
 });
 export type Goal = z.infer<typeof Goal>;
 

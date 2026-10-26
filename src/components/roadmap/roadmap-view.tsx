@@ -17,6 +17,7 @@ import { type StateCounts, type TopicState, coverage, isProjectUrl, stateCounts,
 import type { ProgressMap } from "@/lib/roadmap/types";
 import { type RoadmapModel, type RoadmapSection, type RoadmapTopic, projectKey, roadmapStopIds } from "@/lib/roadmap/view";
 import { themeOf } from "@/lib/themes";
+import { DownloadChecklist } from "./download-checklist";
 
 // One roadmap design for every path (RM-1). A spine runs down the page; each section
 // is a station on it with its topics on either side. Every topic shows the learner's
@@ -104,6 +105,7 @@ export function RoadmapView({ model, lessons, known }: { model: RoadmapModel; le
   return (
     <div className="flex flex-col gap-6">
       <ProgressSummary counts={counts} filter={filter} onFilter={setFilter} />
+      <DownloadChecklist model={model} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
       <section aria-labelledby="path-status" className="flex flex-col gap-3 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">

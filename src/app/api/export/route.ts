@@ -19,6 +19,10 @@ export async function GET() {
   const byEmail = user.email ? await admin.from("email_subscriptions").select(columns).eq("email", user.email) : { data: [] };
   const subs = new Map([...(byUser.data ?? []), ...(byEmail.data ?? [])].map((r) => [r.id, r]));
   out.email_subscriptions = [...subs.values()];
+  const dl = "id,created_at,path_id,name,email,phone,experience,consent_text";
+  const dlByUser = await admin.from("roadmap_downloads").select(dl).eq("user_id", user.id);
+  const dlByEmail = user.email ? await admin.from("roadmap_downloads").select(dl).eq("email", user.email) : { data: [] };
+  out.roadmap_downloads = [...new Map([...(dlByUser.data ?? []), ...(dlByEmail.data ?? [])].map((r) => [r.id, r])).values()];
 
   return new Response(JSON.stringify(out, null, 2), {
     headers: {

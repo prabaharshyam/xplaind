@@ -106,6 +106,7 @@ export const interview = (o: Partial<InterviewQuestion> = {}): InterviewQuestion
     { point: "Evaluates retrieval", keywords: ["evaluate", "recall"] },
   ],
   answer_seconds: 90,
+  kind: "concept",
   ...review,
   ...o,
 });
@@ -168,6 +169,7 @@ export const goal = (o: Partial<Goal> = {}): Goal => ({
   placement: "ladder",
   months: 9,
   stages: LEVEL_IDS.map((id) => ({ id, lessons: id === "B1" ? ["stop-one"] : [], planned: [] })),
+  top_interview: [],
   ...o,
 });
 

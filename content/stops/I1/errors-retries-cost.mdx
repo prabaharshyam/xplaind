@@ -131,15 +131,19 @@ Her fixes:
 
 ```python
 import random, time
+import anthropic
 
-RETRYABLE = {429, 500, 503, 529}
+RETRYABLE = {429, 500, 503, 529}   # 529 is Anthropic's "overloaded"
 
+# Create the client with anthropic.Anthropic(max_retries=0),
+# so the SDK's own retries do not stack on top of these.
 def call_with_retry(send, max_attempts=5):
     for attempt in range(max_attempts):
         try:
             return send()
-        except APIError as e:
-            if e.status not in RETRYABLE or attempt == max_attempts - 1:
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            status = getattr(e, "status_code", None)   # None for timeouts and network errors
+            if (status is not None and status not in RETRYABLE) or attempt == max_attempts - 1:
                 raise
             time.sleep(min(30, 2 ** attempt) + random.random())
 ```
@@ -152,7 +156,7 @@ She also truncates each review to 4,000 characters, sets `max_tokens=300` for su
 | Retrying a 400 error 200 times | Fail fast on 400, 401, 403, 404 | One failure logged, not 200 |
 | A 40,000-character review | Truncate input to 4,000 characters | Request size capped |
 | Long summaries | `max_tokens=300` | Output size capped |
-| 50 calls at once | At most five at a time | Under the rate limit |
+| Too many calls at once | At most five at a time | Under the rate limit |
 | No spending guard | Monthly limit with an alert at 50% | A runaway bill is stopped early |
 
 ## Common mistakes

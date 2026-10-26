@@ -30,6 +30,7 @@ beforeAll(async () => {
   }
   await q("insert into email_subscriptions (email, user_id, source, consent_text, consent_at) values ('a@example.com', $1, 'landing', 'Yes, email me', now())", [A]);
   await q("insert into resource_clicks (resource_id, stop_id, level) values ('cs50p', 'python-basics', 'B2')");
+  await q("insert into roadmap_downloads (path_id, name, email, experience, consent_text, user_id) values ('genai-engineer', 'Asha', 'a@example.com', 'fresher', 'Yes', $1)", [A]);
 }, 60_000);
 
 afterAll(async () => {
@@ -49,7 +50,7 @@ describe("row-level security (SC-2, AC-4)", () => {
   }
 
   it("a signed-out visitor sees nothing and can write nothing", async () => {
-    for (const table of [...OWNED, "email_subscriptions", "resource_clicks", "rate_limits"]) {
+    for (const table of [...OWNED, "email_subscriptions", "resource_clicks", "rate_limits", "roadmap_downloads"]) {
       const err = await fails(asUser(db.client, null, () => q(`select * from ${table}`)));
       expect(err.code, table).toBe(PERMISSION_DENIED);
     }
@@ -105,7 +106,7 @@ describe("row-level security (SC-2, AC-4)", () => {
   });
 
   it("server-only tables are closed to learners", async () => {
-    for (const table of ["email_subscriptions", "resource_clicks", "rate_limits"]) {
+    for (const table of ["email_subscriptions", "resource_clicks", "rate_limits", "roadmap_downloads"]) {
       const err = await fails(asUser(db.client, A, () => q(`select * from ${table}`)));
       expect(err.code, table).toBe(PERMISSION_DENIED);
     }
@@ -125,6 +126,23 @@ describe("constraints", () => {
     await fails(q("insert into stop_progress (user_id, stop_id, status, done_how, check_score) values ($1, 'c1', 'done', 'check', 101)", [A]));
     await fails(q("insert into stop_progress (user_id, stop_id, status, done_how, project_url) values ($1, 'c2', 'done', 'project', 'javascript:alert(1)')", [A]));
     await fails(q("insert into stop_progress (user_id, stop_id, status, done_how) values ($1, 'c3', 'in_progress', 'check')", [A]));
+  });
+});
+
+describe("roadmap downloads (RD-2)", () => {
+  it("visitors and learners cannot write a download row, even their own", async () => {
+    const row = "('genai-engineer', 'X', 'x@example.com', 'student', 'Yes')";
+    await fails(asUser(db.client, null, () => q(`insert into roadmap_downloads (path_id, name, email, experience, consent_text) values ${row}`)));
+    await fails(asUser(db.client, A, () => q(`insert into roadmap_downloads (path_id, name, email, experience, consent_text) values ${row}`)));
+  });
+
+  it("rejects a bad email, a bad phone and an unknown experience band", async () => {
+    const ins = (email: string, phone: string | null, exp: string) =>
+      q("insert into roadmap_downloads (path_id, name, email, phone, experience, consent_text) values ('p', 'N', $1, $2, $3, 'Yes')", [email, phone, exp]);
+    await fails(ins("not-an-email", null, "student"));
+    await fails(ins("n@example.com", "12ab", "student"));
+    await fails(ins("n@example.com", null, "wizard"));
+    await ins("n@example.com", "+919876543210", "1-3");
   });
 });
 

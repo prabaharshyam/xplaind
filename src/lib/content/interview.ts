@@ -1,7 +1,7 @@
 // What interview and practice pages pass to their client islands. Node only.
 import { INTERVIEW_TOPIC_IDS, type InterviewTopicId } from "@/lib/interview-topics";
 import type { McqQuestion } from "@/components/mcq-quiz";
-import { getContent, getStop, pathsWithLesson } from "./index";
+import { getContent, getPath, getStop, pathsWithLesson } from "./index";
 import { isHumanName } from "./review";
 import type { InterviewView } from "@/lib/interview/types";
 
@@ -23,10 +23,19 @@ export function getInterviewViews(): InterviewView[] {
         paths: pathsWithLesson(stop.id).map((p) => p.id),
         rubric: q.rubric,
         answer_seconds: q.answer_seconds,
+        kind: q.kind,
+        example: q.example ?? null,
         reviewed: isHumanName(q.reviewed_by),
       };
     })
     .sort((a, b) => order(a.topic) - order(b.topic));
+}
+
+/** IQ-8: a role's Top 25, in the order the path lists them. */
+export function topInterview(pathId: string): InterviewView[] {
+  const ids = getPath(pathId)?.top_interview ?? [];
+  const byId = new Map(getInterviewViews().map((q) => [q.id, q]));
+  return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
 export const getInterviewView = (id: string): InterviewView | undefined => getInterviewViews().find((q) => q.id === id);
