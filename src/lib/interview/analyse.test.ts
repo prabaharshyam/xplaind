@@ -8,7 +8,9 @@ import {
   findKeyword,
   normalise,
   pickQuestions,
+  referenceMatch,
   sessionReport,
+  structure,
 } from "./analyse";
 
 const q = (o: Partial<SimQuestion> = {}): SimQuestion => ({
@@ -117,5 +119,54 @@ describe("pickQuestions", () => {
     const a = pickQuestions(pool, { pathId: null, count: 4, seed: 7 }).map((p) => p.id);
     expect(pickQuestions(pool, { pathId: null, count: 4, seed: 7 }).map((p) => p.id)).toEqual(a);
     expect(new Set(a).size).toBe(4);
+  });
+});
+
+describe("understanding analysis", () => {
+  const rag = q({
+    short_answer: "RAG retrieves relevant passages from your documents and gives them to the model as context, so answers are grounded and cite sources.",
+    deeper_answer: "Retrieval finds chunks by embedding search; the model answers only from the retrieved context and cites each passage. It is cheaper to update than fine-tuning.",
+  });
+
+  it("quotes the learner's own sentence as evidence for a covered point", () => {
+    const r = analyseAnswer(rag, "RAG is a pattern. First we search the documents for relevant chunks. Then the model answers.", 30);
+    expect(r.points[0]).toMatchObject({ covered: true, evidence: "First we search the documents for relevant chunks." });
+  });
+
+  it("measures closeness to the reference without crediting the question's own words", () => {
+    const m = referenceMatch("We embed chunks, search them, and the model cites the retrieved passages.", rag.short_answer + " " + rag.deeper_answer!, rag.question);
+    expect(m.score).toBeGreaterThan(0.3);
+    expect(m.matched).toEqual(expect.arrayContaining(["retrieves", "passages"]));
+    expect(referenceMatch("What is RAG? RAG.", rag.short_answer, rag.question).score).toBe(0);
+  });
+
+  it("spots a definition, an example, a trade-off and real use", () => {
+    expect(structure("RAG is a way to ground answers. For example, a bank's policy bot. But it adds latency, so we measure it in production.")).toEqual({
+      definition: true,
+      example: true,
+      tradeoff: true,
+      practice: true,
+    });
+    expect(structure("Search stuff.")).toEqual({ definition: false, example: false, tradeoff: false, practice: false });
+  });
+
+  it("bands a strong, a partial and a missing answer", () => {
+    const strong = analyseAnswer(
+      rag,
+      "RAG is retrieval-augmented generation. We search the documents, ground the model in that context and cite every source. For example a policy bot. But unlike fine-tuning it is cheap to update.",
+      50,
+    );
+    expect(strong.band).toBe("strong");
+    expect(analyseAnswer(rag, "It searches documents somehow and that is about it really.", 20).band).toMatch(/partial|weak/);
+    expect(analyseAnswer(rag, "", 0)).toMatchObject({ band: "none", understanding: 0 });
+  });
+
+  it("groups the session into concepts, strongest first, with lessons to revisit", () => {
+    const other = q({ id: "evals", topic: "evals", stop: { id: "evals-test-sets", title: "Evals" } });
+    const results = [analyseAnswer(rag, "We search, ground in context and cite the source, unlike fine-tuning.", 40), analyseAnswer(other, "No idea.", 5)];
+    const report = sessionReport([rag, other], results);
+    expect(report.concepts.map((c) => c.topic)).toEqual(["rag", "evals"]);
+    expect(report.concepts[1].lessons).toEqual([{ id: "evals-test-sets", title: "Evals" }]);
+    expect(report.understanding).toBe(Math.round((results[0].understanding + results[1].understanding) / 2));
   });
 });

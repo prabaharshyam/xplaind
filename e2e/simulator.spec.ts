@@ -28,9 +28,16 @@ test("a typed mock interview ends with a report on key points", async ({ page })
   }
 
   await expect(page.getByRole("heading", { name: "Your interview report" })).toBeFocused();
-  await expect(page.getByText("Answered").locator("..")).toContainText("2 of 3");
+  await expect(page.getByText("Answered", { exact: true }).locator("..")).toContainText("2 of 3");
   await expect(page.getByRole("heading", { name: "Fix these first" })).toBeVisible();
-  expect(await page.getByText(/^(Covered|Missed): /).count()).toBeGreaterThan(5);
+  // the analysis: overall and per-concept understanding, evidence from the answer, closeness and structure
+  await expect(page.getByRole("meter", { name: "Overall understanding" })).not.toHaveAttribute("aria-valuenow", "0");
+  await expect(page.getByRole("heading", { name: "Concept by concept" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What you covered" }).first()).toBeVisible();
+  await expect(page.getByText(/^You said: “/).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Compared with the model answer: \d+% of its key terms$/ }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How you built the answer" }).first()).toBeVisible();
+  await expect(page.getByText("Not answered").first()).toBeVisible(); // the skipped question
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });
@@ -95,5 +102,5 @@ test("Space turns a (fake) microphone on and off and the words land in the answe
   await expect(page.getByRole("button", { name: /Speak more/ })).toHaveAttribute("aria-pressed", "false");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Your interview report" })).toBeVisible();
-  await expect(page.getByText("Covered: Retrieves relevant text from your documents")).toBeAttached();
+  await expect(page.getByRole("listitem").filter({ hasText: "Retrieves relevant text from your documents" }).filter({ hasText: "You said:" })).toBeVisible();
 });

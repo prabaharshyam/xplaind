@@ -13,12 +13,13 @@ export const metadata: Metadata = {
   alternates: { canonical: "/interview/simulator" },
 };
 
-/** The mock interview: the release 3 flow, browser-only and without model calls (release 1 rule). */
+/** The mock interview: answers are analysed in the browser; signed-in learners can add an AI review (IQ-7). */
 export default function SimulatorPage() {
   const questions: SimQuestion[] = getInterviewViews().map((q) => ({
     id: q.id,
     question: q.question,
     short_answer: q.short_answer,
+    deeper_answer: q.deeper_answer,
     level: q.level,
     topic: q.topic,
     paths: q.paths,

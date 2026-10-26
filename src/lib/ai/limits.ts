@@ -1,7 +1,7 @@
 // CO-1: what AI calls may cost. Pure: no network, no database. The owner set a
 // US$20 monthly cap; per-learner daily caps keep one account from using it up.
 
-export const AI_KINDS = ["roadmap", "course", "course-lesson", "coach", "tutor", "grade"] as const;
+export const AI_KINDS = ["roadmap", "course", "course-lesson", "coach", "tutor", "grade", "interview"] as const;
 export type AiKind = (typeof AI_KINDS)[number];
 
 /** Calls one learner may make per India day, per feature. Grades follow the PRD's 5 (CO-1). */
@@ -12,6 +12,8 @@ export const DAILY_LIMIT: Record<AiKind, number> = {
   coach: 20,
   tutor: 30,
   grade: 5,
+  /** A whole mock interview reviewed in one call. */
+  interview: 3,
 };
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
