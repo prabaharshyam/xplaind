@@ -6,7 +6,7 @@ import { ProjectList, type ProjectCardView } from "./project-list";
 export const metadata: Metadata = {
   title: "Guided AI projects: build a portfolio step by step",
   description:
-    "Free, step-by-step AI projects for every role: a brief, steps with hints, a rubric to check your work and the lessons each one uses. Build the portfolio employers ask for.",
+    "Step-by-step AI projects for every role: a brief, steps with hints, a rubric to check your work and the lessons each one uses. Build the portfolio employers ask for.",
   alternates: { canonical: "/projects" },
 };
 

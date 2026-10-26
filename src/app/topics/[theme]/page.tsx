@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: PageProps<"/topics/[theme]">)
   const t = themeOf(id);
   const lessons = lessonsOf(id);
   return {
-    title: `${t.label}: free lessons, in order`,
+    title: `${t.label}: lessons, in order`,
     description: `Learn ${t.label.toLowerCase()} for free: ${lessons.length} plain-English lessons, from ${lessons[0]?.title ?? ""} onwards, each with the best free course and a quick check.`,
     alternates: { canonical: `/topics/${id}` },
   };

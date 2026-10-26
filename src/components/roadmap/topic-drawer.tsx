@@ -139,8 +139,8 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
           <Icon name="book" size={18} /> Read the lesson and take the check
         </Link>
 
-        <CourseList title="Best free course" items={best} tone="text-emerald-800 dark:text-emerald-400" />
-        {also.length > 0 && <CourseList title="More free resources" items={also} tone="text-zinc-700 dark:text-zinc-300" />}
+        <CourseList title="Best course" items={best} tone="text-emerald-800 dark:text-emerald-400" />
+        {also.length > 0 && <CourseList title="More resources" items={also} tone="text-zinc-700 dark:text-zinc-300" />}
 
         {d.questions > 0 && (
           <Link href={`/stop/${d.id}#interview`} className="text-emerald-800 underline underline-offset-2 dark:text-emerald-400">

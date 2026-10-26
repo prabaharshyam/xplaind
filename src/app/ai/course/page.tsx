@@ -6,7 +6,7 @@ import { CourseStudio } from "./course-studio";
 export const metadata: Metadata = {
   title: "Generate a course on anything with AI",
   description:
-    "Type any topic and get a personal course at your level: modules, lessons with examples and diagrams, a quiz and flashcards. Free for signed-in learners.",
+    "Type any topic and get a personal course at your level: modules, lessons with examples and diagrams, a quiz and flashcards. For signed-in learners.",
   alternates: { canonical: "/ai/course" },
 };
 

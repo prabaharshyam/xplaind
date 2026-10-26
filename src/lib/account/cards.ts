@@ -17,7 +17,7 @@ export async function getPublicCard(id: string): Promise<PublicCard | null> {
   return {
     level: data.level,
     levelName: getLevel(data.level)?.name ?? "",
-    goal: data.goal_id === "genai-engineer" ? "GenAI Engineer" : data.goal_id,
+    goal: data.goal_id === "genai-engineer" ? "Generative AI & LLM Engineer" : data.goal_id,
     weeksActive: data.weeks_active,
     name: data.display_name,
     site: new URL(siteUrl()).host,

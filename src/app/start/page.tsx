@@ -5,7 +5,7 @@ import { TestPage } from "./test-page";
 
 export const metadata: Metadata = {
   title: "Find my level",
-  description: "A short test finds your level on the GenAI Engineer path. No sign-up needed.",
+  description: "A short test finds your level, so your roadmap skips what you already know. No sign-up needed.",
 };
 
 export default function StartPage() {

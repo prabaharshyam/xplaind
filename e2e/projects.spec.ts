@@ -11,7 +11,7 @@ test.use({ viewport: { width: 360, height: 740 } });
 test("the projects index lists every guided project and filters by role and difficulty (GP-3)", async ({ page }) => {
   await page.goto("/projects");
   await expect(page.getByRole("heading", { level: 1, name: "Guided projects" })).toBeVisible();
-  await expect(page.getByText("22 projects")).toBeVisible();
+  await expect(page.getByText("23 projects")).toBeVisible();
   await page.getByLabel("Role").selectOption("forward-deployed-engineer");
   await expect(page.getByText("6 projects")).toBeVisible();
   await page.getByLabel("Difficulty").selectOption("intermediate");
@@ -24,7 +24,7 @@ test("the projects index lists every guided project and filters by role and diff
 test("a guided project's steps, rubric and submission are kept and show on the roadmap (GP-2, GP-4)", async ({ page }) => {
   await page.goto("/projects/document-qa-api");
   await expect(page.getByRole("heading", { level: 1, name: "A document question-answering API" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Forward Deployed Engineer: Engineering foundations" })).toHaveAttribute("href", "/roadmap/forward-deployed-engineer#projects");
+  await expect(page.getByRole("link", { name: "Forward Deployed Engineer (FDE): Engineering foundations" })).toHaveAttribute("href", "/roadmap/forward-deployed-engineer#projects");
   await page.getByText("Show a hint").first().click();
   await page.getByLabel("I have done this step").nth(0).check();
   await page.getByLabel("I have done this step").nth(1).check();

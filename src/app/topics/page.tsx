@@ -6,7 +6,7 @@ import { getStops } from "@/lib/content";
 import { THEMES } from "@/lib/themes";
 
 export const metadata: Metadata = {
-  title: "AI topics: free lessons on RAG, agents, Python, ML and more",
+  title: "AI topics: lessons on RAG, agents, Python, ML and more",
   description: "Every Xplaind lesson grouped by topic: language models, RAG, agents, evaluation, deployment, machine learning, automation, product and more.",
   alternates: { canonical: "/topics" },
 };

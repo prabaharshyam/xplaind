@@ -7,7 +7,7 @@ import { getBlogPosts } from "@/lib/content";
 import { formatDay } from "@/lib/roadmap/cost";
 
 export const metadata: Metadata = {
-  title: "Blog: how to learn AI, free courses and careers",
+  title: "Blog: how to learn AI, courses and careers",
   description:
     "Plain guides on learning AI: where to start, free certifications from big tech, YouTube channels worth your time, and how to prepare for AI interviews in India.",
   alternates: { canonical: "/blog" },
@@ -19,7 +19,7 @@ export default function BlogIndex() {
   const posts = getBlogPosts();
   return (
     <main>
-      <PageHero theme="using-ai" seed="blog" icon="book" eyebrow="Guides" title="Blog" lead="Guides on learning AI for free, choosing a role and getting hired. No sponsored posts." />
+      <PageHero theme="using-ai" seed="blog" icon="book" eyebrow="Guides" title="Blog" lead="Guides on learning AI, choosing a role and getting hired. No sponsored posts." />
       <ul className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:grid-cols-2 lg:grid-cols-3 md:px-6">
         {posts.map((p, i) => (
           <li key={p.id} className="lx-rise">

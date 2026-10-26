@@ -11,7 +11,7 @@ test("a stop page renders its lesson from MDX at 360px", async ({ page }) => {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/stop/what-is-ai");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("What AI, machine learning");
-  await expect(page.getByRole("heading", { name: "Go deeper: the best free course" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Go deeper: the best course" })).toBeVisible();
   await expect(page.getByText("Start here")).toBeVisible();
   // from the MDX body: section headings, sub-headings, a list, a table and a text diagram
   await expect(page.getByRole("heading", { level: 2, name: "How it works" })).toBeVisible();
@@ -43,7 +43,7 @@ test("a deep lesson has an exercise with answers, flashcards that remember, and 
   await expect(page.getByRole("region", { name: /Test your understanding/ }).getByText("0 of 8")).toBeVisible();
 
   // on a phone, the path's lesson list sits at the end of the lesson
-  await page.getByText(/^Lessons on GenAI Engineer/).last().click();
+  await page.getByText(/^Lessons on /).last().click();
   await expect(page.getByRole("link", { name: "What AI, machine learning and a language model are" }).last()).toHaveAttribute("aria-current", "page");
 });
 

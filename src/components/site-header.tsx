@@ -33,7 +33,7 @@ export function SiteHeader() {
             href="/paths"
             className="site-cta hidden sm:inline-flex h-9 items-center rounded-full bg-black px-4 text-[13px] font-medium text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
           >
-            Start free
+            Get started
           </Link>
           <details className="group relative md:hidden">
             <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 [&::-webkit-details-marker]:hidden">

@@ -9,7 +9,7 @@ import { Simulator } from "./simulator";
 export const metadata: Metadata = {
   title: "AI mock interview: answer out loud, get a report",
   description:
-    "A free, timed AI interview simulator. Answer real AI interview questions out loud or by typing, within 1 to 2 minutes each, then see which key points you covered, your pace and what to fix.",
+    "A timed AI interview simulator. Answer real AI interview questions out loud or by typing, within 1 to 2 minutes each, then see which key points you covered, your pace and what to fix.",
   alternates: { canonical: "/interview/simulator" },
 };
 
@@ -36,7 +36,7 @@ export default function SimulatorPage() {
           icon="mic"
           eyebrow="Interview prep"
           title="Mock interview"
-          lead="Practise the way it happens: one question at a time, a clock running, and you answering out loud. Then see what you covered and missed. Free, no sign-in."
+          lead="Practise the way it happens: one question at a time, a clock running, and you answering out loud. Then see what you covered and missed. No sign-in."
           crumbs={[{ href: "/interview", label: "Interview questions" }]}
         />
       </div>

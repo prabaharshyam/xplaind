@@ -23,7 +23,7 @@ test.describe("roadmap (RM-1)", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto("/roadmap/genai-engineer");
-    await expect(page.getByRole("heading", { level: 1, name: "GenAI Engineer" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Generative AI & LLM Engineer" })).toBeVisible();
     for (const id of ["B1", "B2", "B3", "I1", "I2", "I3", "P1", "P2", "P3"]) {
       await expect(page.getByRole("heading", { level: 2, name: new RegExp(`^${id} `) })).toBeVisible();
     }

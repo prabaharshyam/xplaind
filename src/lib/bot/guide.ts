@@ -62,7 +62,7 @@ export const SITE_GUIDE: BotEntry[] = [
   {
     k: "guide",
     t: "Find the best course for a topic",
-    a: "Each lesson names the one free course we think teaches it best, with why. The Courses page lists them all. Paid ones show the price and the date we checked it.",
+    a: "Each lesson names the one course we think teaches it best, with why. The Courses page lists them all. Paid ones show the price and the date we checked it.",
     h: "/resources",
     w: "course free certificate udemy coursera youtube video learn resource",
   },
@@ -103,8 +103,8 @@ export const SITE_GUIDE: BotEntry[] = [
   },
   {
     k: "guide",
-    t: "Do I need an account? Is it free?",
-    a: "Everything is free and works without an account: progress is saved in your browser. Sign in with your email to keep it across devices and to use the AI tools. Learners under 18 use the site without an account.",
+    t: "Do I need an account?",
+    a: "The site works without an account: progress is saved in your browser. Sign in with your email to keep it across devices and to use the AI tools. Learners under 18 use the site without an account.",
     h: "/signin",
     w: "account sign signin login free cost price pay money register",
   },

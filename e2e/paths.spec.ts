@@ -7,15 +7,15 @@ const wcag = (page: Page) =>
   new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
 
 const PATHS = [
-  "GenAI Engineer",
-  "Forward Deployed Engineer",
-  "AI for Beginners",
-  "Agentic AI Expert",
-  "RAG Expert",
-  "AI Automation Specialist",
-  "LLMOps / AI Platform Engineer",
+  "AI Engineer",
+  "Generative AI & LLM Engineer",
+  "Forward Deployed Engineer (FDE)",
   "AI Product Manager",
-  "ML Engineer",
+  "Agentic AI Engineer",
+  "AI Automation Specialist",
+  "AI Governance & Compliance Specialist",
+  "Machine Learning Engineer",
+  "MLOps Engineer",
 ];
 
 test.describe("paths", () => {
@@ -31,7 +31,7 @@ test.describe("paths", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto("/roadmap/forward-deployed-engineer");
-    await expect(page.getByRole("heading", { level: 1, name: "Forward Deployed Engineer" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Forward Deployed Engineer (FDE)" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "Engineering foundations" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "FDE craft and capstone" })).toBeVisible();
     await expect(page.getByText("Stage project").first()).toBeVisible();
@@ -42,7 +42,7 @@ test.describe("paths", () => {
   });
 
   test("choosing a path keeps it on this device and follows it to the chooser and lessons", async ({ page }) => {
-    await page.goto("/roadmap/ai-for-beginners");
+    await page.goto("/roadmap/ai-governance-specialist");
     await expect(page.getByRole("main").getByRole("link", { name: "Find my level" })).toHaveCount(0); // no test on this path
     await page.getByRole("button", { name: "Make this my path" }).click();
     await expect(page.getByRole("heading", { name: "This is your path" })).toBeVisible();
@@ -50,10 +50,10 @@ test.describe("paths", () => {
     await expect(page.getByRole("region", { name: "Your next five steps" }).getByRole("link").first()).toHaveAttribute("href", "/stop/what-is-ai");
 
     await page.goto("/paths");
-    await expect(page.getByText("Your path is AI for Beginners.")).toBeVisible();
+    await expect(page.getByText("Your path is AI Governance & Compliance Specialist.")).toBeVisible();
 
     await page.goto("/stop/what-is-ai");
-    await expect(page.getByRole("main").getByRole("link", { name: "AI for Beginners" })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: "AI Governance & Compliance Specialist" })).toBeVisible();
   });
 
   test("the level test can be taken for another path", async ({ page }) => {
@@ -70,7 +70,7 @@ test.describe("paths", () => {
       );
     });
     await page.goto("/result");
-    await expect(page.getByText("Your result for the Forward Deployed Engineer path")).toBeVisible();
+    await expect(page.getByText("Your result for the Forward Deployed Engineer (FDE) path")).toBeVisible();
     const steps = page.getByRole("region", { name: "Your next five steps" }).getByRole("link");
     await expect(steps.first()).toHaveAttribute("href", "/stop/python-for-production");
   });

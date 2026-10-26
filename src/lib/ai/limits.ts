@@ -59,7 +59,7 @@ export function positiveNumber(value: string | undefined, fallback: number): num
 
 export const LIMIT_MESSAGE = {
   day: "You have used today's AI turns for this feature. They reset at midnight India time, so try again tomorrow.",
-  month: "Our free AI budget for this month is used up. It resets on the 1st. Everything else on Xplaind still works.",
+  month: "This month's AI allowance is used up. It resets on the 1st. Everything else on Xplaind still works.",
   off: "AI features are switched off for now. Everything else on Xplaind still works.",
 } as const;
 

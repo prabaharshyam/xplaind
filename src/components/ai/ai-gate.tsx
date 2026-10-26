@@ -36,7 +36,7 @@ export function AiGate({ access, next, children }: { access: AiAccess; next: str
           <Icon name="lock" size={18} /> Sign in to use AI features
         </p>
         <p className="mt-1 text-zinc-700 dark:text-zinc-300">
-          AI features are free for signed-in learners aged 18 or over, with a small daily allowance so everyone gets a turn.
+          AI features are for signed-in learners aged 18 or over, with a daily allowance so everyone gets a turn.
         </p>
         <Link href={`/signin?next=${encodeURIComponent(next)}`} className={`${primaryButton} mt-4`}>
           Sign in with email

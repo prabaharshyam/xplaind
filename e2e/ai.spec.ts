@@ -67,7 +67,7 @@ test("a saved roadmap opens, can be ticked off and edited by hand", async ({ pag
   await page.reload();
   await page.getByRole("button", { name: /From zero to RAG engineer/ }).click();
   await expect(page.getByRole("heading", { level: 2, name: "From zero to RAG engineer" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Read our free lesson" })).toHaveAttribute("href", "/stop/python-basics");
+  await expect(page.getByRole("link", { name: "Read our lesson" })).toHaveAttribute("href", "/stop/python-basics");
   expect((await wcag(page)).violations).toEqual([]);
   expect(await overflow(page)).toBe(false);
 

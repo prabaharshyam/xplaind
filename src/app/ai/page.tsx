@@ -8,12 +8,12 @@ import type { IconName } from "@/lib/themes";
 export const metadata: Metadata = {
   title: "AI tools to learn AI faster: roadmap generator, course generator, coach and tutor",
   description:
-    "Free AI tools for learners: generate a personal AI roadmap, a course on any topic, get coaching, ask a tutor inside every lesson, and get AI feedback on interview answers.",
+    "AI tools for learners: generate a personal AI roadmap, a course on any topic, get coaching, ask a tutor inside every lesson, and get AI feedback on interview answers.",
   alternates: { canonical: "/ai" },
 };
 
 const TOOLS: { href: string; title: string; text: string; icon: IconName; tone: string; tag: string }[] = [
-  { href: "/ai/roadmap", title: "AI roadmap generator", text: "Your goal, level and hours in; a stage-by-stage plan linked to free lessons out. Tick topics off as you go.", icon: "map", tone: "from-violet-600 to-fuchsia-500", tag: "Most popular" },
+  { href: "/ai/roadmap", title: "AI roadmap generator", text: "Your goal, level and hours in; a stage-by-stage plan linked to our lessons out. Tick topics off as you go.", icon: "map", tone: "from-violet-600 to-fuchsia-500", tag: "Most popular" },
   { href: "/ai/roadmap", title: "Change your roadmap with AI", text: "“Make it shorter”, “add interview prep”, “weekends only”. Say it in plain words and the roadmap is rewritten. Or edit it by hand.", icon: "flow", tone: "from-fuchsia-600 to-orange-500", tag: "Editor" },
   { href: "/ai/course", title: "Generate a course on anything", text: "Any topic at your level: modules, then lessons with examples, a diagram, a quiz and flashcards, written when you open them.", icon: "book", tone: "from-sky-600 to-indigo-600", tag: "New" },
   { href: "/ai/coach", title: "Personal AI coach", text: "Plans your week, keeps you going and answers career questions, knowing what you have already done.", icon: "people", tone: "from-emerald-600 to-teal-500", tag: "Coach" },
@@ -32,7 +32,7 @@ export default function AiToolsPage() {
         icon="sparkles"
         eyebrow="AI tools"
         title="Learn faster with AI that knows our lessons"
-        lead="Seven AI helpers built on Claude, an AI model from Anthropic. Free for signed-in learners aged 18 or over, with a fair daily allowance."
+        lead="Seven AI helpers built on Claude, an AI model from Anthropic. For signed-in learners aged 18 or over, with a fair daily allowance."
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         {!on && (
@@ -61,7 +61,7 @@ export default function AiToolsPage() {
             How the AI tools work
           </h2>
           {[
-            ["Free, with a daily allowance", "Each learner gets a few roadmaps, courses and grades a day, and more tutor and coach messages. It resets at midnight India time."],
+            ["A daily allowance", "Each learner gets a few roadmaps, courses and grades a day, and more tutor and coach messages. It resets at midnight India time."],
             ["Your words are data, not commands", "What you type is sent to Anthropic only to write your answer. It is never used to rank courses, and we never sell it."],
             ["AI can be wrong", "Generated roadmaps, courses and answers are a starting point, not the last word. Check anything important against a trusted source."],
           ].map(([h, p]) => (

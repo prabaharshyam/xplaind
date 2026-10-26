@@ -16,7 +16,7 @@ test("a roadmap topic opens a drawer where it can be marked done, without leavin
   const drawer = page.getByRole("dialog", { name: "Build a RAG app" });
   await expect(drawer).toBeVisible();
   await expect(page).toHaveURL(/\/roadmap\/forward-deployed-engineer$/);
-  await expect(drawer.getByText("Best free course")).toBeVisible();
+  await expect(drawer.getByText("Best course", { exact: true })).toBeVisible();
   expect((await wcag(page)).violations).toEqual([]);
   await drawer.getByRole("button", { name: "Done", exact: true }).click();
   await expect(drawer.getByRole("button", { name: "Done", exact: true })).toHaveAttribute("aria-pressed", "true");

@@ -173,7 +173,7 @@ function RoadmapForm({ onMade }: { onMade: (id: string) => void }) {
         <Icon name="sparkles" size={18} className="mr-2" /> Generate my roadmap
       </button>
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Made by Claude, an AI model from Anthropic, using only what you type here. Check anything important. We link our own free lessons where they fit.
+        Made by Claude, an AI model from Anthropic, using only what you type here. Check anything important. We link our own lessons where they fit.
       </p>
     </form>
   );
@@ -309,7 +309,7 @@ function RoadmapView({ saved, access, onClose }: { saved: SavedRoadmap; access: 
                         <span className="text-zinc-600 dark:text-zinc-400">about {t.hours} h</span>
                         {t.lessonId && (
                           <Link href={`/stop/${t.lessonId}`} className="font-medium text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
-                            Read our free lesson
+                            Read our lesson
                           </Link>
                         )}
                       </p>

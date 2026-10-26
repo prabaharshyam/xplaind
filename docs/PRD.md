@@ -6,6 +6,11 @@ This PRD specifies release 1 of Xplaind (xplaind.ai) for building with Claude Co
 
 Release 1 is about eight weeks of work, and a one-week landing page (release 0) goes live first. The voice interview simulator is release 3, not release 1.
 
+## Amendments, 2026-10-26 (owner's request)
+
+- **Nine roles.** The site offers exactly these roadmaps, in this order: AI Engineer; Generative AI & LLM Engineer; Forward Deployed Engineer (FDE); AI Product Manager; Agentic AI Engineer; AI Automation Specialist; AI Governance & Compliance Specialist; Machine Learning Engineer; MLOps Engineer. The home page shows all nine first. The nine-level ladder below is the Generative AI & LLM Engineer path (id `genai-engineer`), which now includes the retrieval lessons. AI for Beginners and RAG Expert are retired, and LLMOps became MLOps Engineer. Their old links redirect to the closest new roadmap.
+- **Positioning.** The owner asked that Xplaind not call itself free, because people value free things less. Pages no longer say "free" about Xplaind itself. "Free first" below still governs how courses are chosen and ranked, and course cards still show each course's real cost (RM-6).
+
 ## Product summary and evidence
 
 Xplaind helps India prepare for AI. A learner takes a short test, is placed on a nine-level ladder, and sees the next five steps, each with the best free or low-cost course, a check and a project. Interview practice lives in the same product.

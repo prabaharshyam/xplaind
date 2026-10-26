@@ -73,7 +73,7 @@ export function pathLessons(pathId: string): Stop[] {
 export const pathsWithLesson = (lessonId: string): Goal[] =>
   getPaths().filter((p) => p.stages.some((st) => st.lessons.includes(lessonId)));
 
-/** The GenAI Engineer path's lessons, in ladder order. */
+/** The Generative AI & LLM Engineer path's lessons, in ladder order. */
 export const getStopsInOrder = (): Stop[] => pathLessons(GENAI_PATH_ID);
 
 /** Glossary terms, A to Z. */

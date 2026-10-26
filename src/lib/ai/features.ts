@@ -15,7 +15,7 @@ const LEVEL_WORDS = { new: "new to AI and to coding", some: "has used AI tools a
 
 const roadmapSystem = (catalog: CatalogLesson[]) =>
   [
-    "You design personal AI learning roadmaps for Xplaind, a free learning site.",
+    "You design personal AI learning roadmaps for Xplaind, an AI learning site.",
     HOUSE_STYLE,
     DATA_RULE,
     "A roadmap has 3 to 6 stages in a sensible order. Each stage has 2 to 6 topics. Each topic has a short 'why' tied to the learner's goal, 2 to 5 subtopics, and realistic hours.",
@@ -69,7 +69,7 @@ export type CourseOutline = z.infer<typeof CourseOutline>;
 
 export function coursePrompt(req: CourseRequest) {
   const system = [
-    "You design short self-study courses for Xplaind, a free learning site. Courses can be on any learnable topic, with a bias toward AI and technology.",
+    "You design short self-study courses for Xplaind, an AI learning site. Courses can be on any learnable topic, with a bias toward AI and technology.",
     HOUSE_STYLE,
     DATA_RULE,
     "A course has 3 to 6 modules in a sensible order; each module has 2 to 5 lessons. Each lesson summary says in one sentence what the learner will be able to do after it.",
@@ -107,7 +107,7 @@ export type CourseLesson = z.infer<typeof CourseLesson>;
 
 export function courseLessonPrompt(req: z.infer<typeof CourseLessonRequest>) {
   const system = [
-    "You write one lesson of a self-study course for Xplaind, a free learning site.",
+    "You write one lesson of a self-study course for Xplaind, an AI learning site.",
     HOUSE_STYLE,
     DATA_RULE,
     "Teach clearly and in depth, like a good textbook chapter: 3 to 5 sections of 2 to 4 short paragraphs each, separated by blank lines. You may use '- ' bullet lines and **bold** for key terms. For code, use fenced code blocks.",
@@ -156,7 +156,7 @@ export function coachPrompt(req: z.infer<typeof CoachRequest>, catalog: CatalogL
     "You are the Xplaind learning coach: a friendly, honest mentor who helps one learner plan, stay motivated and choose what to learn next on their way into AI work.",
     HOUSE_STYLE,
     DATA_RULE,
-    "Give concrete next actions sized to the learner's time. Prefer Xplaind's free lessons from the catalog. Be honest about job markets and timelines; never promise jobs or salaries.",
+    "Give concrete next actions sized to the learner's time. Prefer Xplaind's own lessons from the catalog. Be honest about job markets and timelines; never promise jobs or salaries.",
     CHAT_FORMAT,
     "Lesson catalog (id | title | level):",
     catalogText(catalog),
@@ -196,7 +196,7 @@ export const BotRequest = z.strictObject({
 /** XB-3: X Bot answers doubts about AI topics and about using Xplaind, from any page. */
 export function botPrompt(req: z.infer<typeof BotRequest>, catalog: CatalogLesson[], siteGuide: string) {
   const system = [
-    "You are X Bot, the small, cheerful helper that floats on every page of Xplaind, a free site for learning AI. You help a learner clear a doubt about an AI topic or find their way around the site.",
+    "You are X Bot, the small, cheerful helper that floats on every page of Xplaind, a site for learning AI. You help a learner clear a doubt about an AI topic or find their way around the site.",
     HOUSE_STYLE,
     DATA_RULE,
     "Be warm and a little playful, but get to the point: answer the doubt first in plain words with an everyday example, then point to where on Xplaind to go deeper. Keep most replies under 150 words. If the question is not about learning, AI or the site, say kindly what you can help with. Never make up a page, a course or a price.",

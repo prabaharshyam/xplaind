@@ -7,9 +7,9 @@ const wcag = (page: import("@playwright/test").Page) =>
 test.use({ viewport: { width: 360, height: 740 } });
 
 test("a typed mock interview ends with a report on key points", async ({ page }) => {
-  await page.goto("/interview/simulator?path=rag-expert");
+  await page.goto("/interview/simulator?path=genai-engineer");
   await expect(page.getByRole("heading", { level: 1, name: "Mock interview" })).toBeVisible();
-  await expect(page.getByLabel("Role")).toHaveValue("rag-expert");
+  await expect(page.getByLabel("Role")).toHaveValue("genai-engineer");
   expect((await wcag(page)).violations).toEqual([]);
   await page.getByRole("radio", { name: "3" }).check();
   // Headless Chromium has no speech service, so start in typing mode.
@@ -51,8 +51,8 @@ test("a single question can be practised from its page", async ({ page }) => {
 
 test("each role has its own interview page", async ({ page }) => {
   await page.goto("/interview/for/forward-deployed-engineer");
-  await expect(page.getByRole("heading", { level: 1, name: "Forward Deployed Engineer interview questions" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Start a Forward Deployed Engineer mock interview/ })).toHaveAttribute(
+  await expect(page.getByRole("heading", { level: 1, name: "Forward Deployed Engineer (FDE) interview questions" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Start a Forward Deployed Engineer \(FDE\) mock interview/ })).toHaveAttribute(
     "href",
     "/interview/simulator?path=forward-deployed-engineer",
   );

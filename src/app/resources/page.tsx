@@ -7,9 +7,9 @@ import { costLabel } from "@/lib/roadmap/cost";
 import { CourseDirectory, type DirectoryRow } from "./course-directory";
 
 export const metadata: Metadata = {
-  title: "Free AI courses and certificates, filtered by path and level",
+  title: "AI courses and certificates, filtered by path and level",
   description:
-    "Every free AI course we recommend, from Google, Microsoft, AWS, NVIDIA, OpenAI, Anthropic, Hugging Face, DeepLearning.AI and more. Filter by path, level and certificate.",
+    "Every AI course we recommend, from Google, Microsoft, AWS, NVIDIA, OpenAI, Anthropic, Hugging Face, DeepLearning.AI and more. Filter by path, level and certificate.",
   alternates: { canonical: "/resources" },
 };
 
@@ -47,7 +47,7 @@ export default function ResourcesPage() {
         seed="courses"
         icon="book"
         eyebrow="Course directory"
-        title="Free AI courses, hand-picked"
+        title="AI courses, hand-picked"
         lead={
           <>
             {rows.length} courses, docs and books from {providers} providers, including Google, Microsoft, AWS, NVIDIA,

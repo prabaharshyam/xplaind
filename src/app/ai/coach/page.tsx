@@ -6,7 +6,7 @@ import { Coach } from "./coach";
 
 export const metadata: Metadata = {
   title: "Personal AI learning coach",
-  description: "A free AI coach that knows your progress, plans your week and answers career questions about learning AI in India.",
+  description: "An AI coach that knows your progress, plans your week and answers career questions about learning AI in India.",
   alternates: { canonical: "/ai/coach" },
 };
 
@@ -20,7 +20,7 @@ export default function CoachPage() {
         icon="people"
         eyebrow="Personal AI coach"
         title="A coach that knows where you are"
-        lead="Ask what to learn next, how to fit study into your week, or how to get hired. Your coach sees your progress and points you to the right free lessons."
+        lead="Ask what to learn next, how to fit study into your week, or how to get hired. Your coach sees your progress and points you to the right lessons."
         crumbs={[{ href: "/ai", label: "AI tools" }]}
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">

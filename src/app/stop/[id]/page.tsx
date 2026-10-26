@@ -66,7 +66,7 @@ function MoreCourses({ stopId, courses }: { stopId: string; courses: ReturnType<
   return (
     <section aria-labelledby="more-courses" className="mt-6">
       <h3 id="more-courses" className="font-semibold">
-        More free courses on this topic
+        More courses on this topic
       </h3>
       <ul className="mt-2 flex flex-col gap-2">
         {courses.map((c) => (
@@ -125,7 +125,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
     ...sections.map((sec) => ({ id: slug(sec.title), title: sec.title, icon: SECTION_ICON[sec.title] ?? ("book" as const) })),
     ...(stop.exercise ? [{ id: "try-it", title: stop.exercise.title, icon: "bolt" as const }] : []),
     ...(stop.flashcards.length ? [{ id: "flashcards", title: "Test your understanding", icon: "check" as const }] : []),
-    { id: "courses", title: "Best free course", icon: "book" },
+    { id: "courses", title: "Best course", icon: "book" },
     { id: "check", title: "Quick check", icon: "check" },
     { id: "tutor", title: "Ask the AI tutor", icon: "sparkles" },
   ];
@@ -293,7 +293,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
           <section id="courses" aria-labelledby="courses-h" className="mt-8 scroll-mt-24">
             <h2 id="courses-h" className="text-xl font-semibold">
-              {explainer ? "Go deeper: the best free course" : "Learn it"}
+              {explainer ? "Go deeper: the best course" : "Learn it"}
             </h2>
             <StopResources stopId={stop.id} cards={cards} />
             <MoreCourses stopId={stop.id} courses={more} />

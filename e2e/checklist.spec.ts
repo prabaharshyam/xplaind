@@ -9,17 +9,17 @@ const overflow = (page: import("@playwright/test").Page) =>
 test.use({ viewport: { width: 360, height: 740 } });
 
 test("a roadmap downloads as a printable checklist after the learner gives their details (RD-1, RD-2)", async ({ page }) => {
-  await page.goto("/roadmap/ai-for-beginners");
+  await page.goto("/roadmap/ai-product-manager");
   await page.getByRole("button", { name: "Download as a printable checklist (PDF)" }).click();
-  const form = page.getByRole("region", { name: "Get the AI for Beginners checklist" });
+  const form = page.getByRole("region", { name: "Get the AI Product Manager checklist" });
   await expect(form).toBeVisible();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 
   await form.getByRole("button", { name: "Save and download" }).click();
   await expect(form.getByRole("alert")).toHaveText("Please enter your name.");
-  await form.getByLabel("Name").fill("Asha Rao");
-  await form.getByLabel("Email").fill("asha@example.com");
+  await form.getByLabel("Name", { exact: true }).fill("Asha Rao");
+  await form.getByLabel("Email", { exact: true }).fill("asha@example.com");
   await form.getByLabel("Phone (optional)").fill("12");
   await form.getByLabel("Professional experience").selectOption("fresher");
   await form.getByRole("checkbox", { name: /Xplaind may keep my details/ }).check();
@@ -29,13 +29,13 @@ test("a roadmap downloads as a printable checklist after the learner gives their
 
   const first = page.waitForEvent("download");
   await form.getByRole("button", { name: "Save and download" }).click();
-  expect((await first).suggestedFilename()).toBe("xplaind-ai-for-beginners-checklist.pdf");
+  expect((await first).suggestedFilename()).toBe("xplaind-ai-product-manager-checklist.pdf");
   await expect(form).toBeHidden();
 
   // Details are asked once per device.
   const again = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download as a printable checklist (PDF)" }).click();
-  expect((await again).suggestedFilename()).toBe("xplaind-ai-for-beginners-checklist.pdf");
+  expect((await again).suggestedFilename()).toBe("xplaind-ai-product-manager-checklist.pdf");
 });
 
 test("an under-18 learner downloads the checklist without giving any details (PV-2)", async ({ page }) => {
