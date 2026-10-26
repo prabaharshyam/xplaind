@@ -170,6 +170,17 @@ Added at the owner's request (2026-10-26): a friendly helper on every page, and 
 | MO-3 | Cards and page pictures tilt a few degrees toward the pointer | Mouse and trackpad only, not touch |
 | MO-4 | Every animation stops under prefers-reduced-motion: reduce | Checked in the stylesheet: each effect sits behind a no-preference query |
 
+## Ask me from my book
+
+Added at the owner's request (2026-10-26). A learner tests themselves on their own textbook or notes, a retrieval-grounded quiz on material we do not host.
+
+| ID | Requirement | Acceptance criteria |
+| --- | --- | --- |
+| MB-1 | The learner picks a PDF with selectable text, or a .txt or .md file, up to 60 MB. It is read in the browser, split into excerpts of about 250 words, each labelled with its page and its chapter from the PDF's bookmarks (or ten-page parts when there are none). Contents pages and number tables are skipped. The learner chooses the chapters, the difficulty (easy recall, medium understanding, hard apply and compare), 5 to 25 questions and 5 to 60 minutes | The file never leaves the browser; a scanned book with no text gets a clear message; works at 360 px and passes WCAG 2.1 AA |
+| MB-2 | Questions are written by AI from excerpts spread over the chosen chapters in proportion to their length, at most 30 excerpts a test. Each question has 4 options, an explanation and a quote of 8 to 40 words copied from its excerpt. The server keeps a question only if the quote is found in the excerpt it cites, so every answer can be found in the book. Signed-in learners aged 18 or over only, 5 tests a day, under the AI guards (CO-1, SC-5) | Unit tests for excerpt spread, the quote check and the prompt; under-18s and signed-out visitors can read a book but not generate (PV-2) |
+| MB-3 | The test is timed and ends itself when time runs out. The report shows the score, each question with the learner's answer, the right answer, the explanation and the quote with its chapter and page, a score per chapter, the chapters where the learner is strong (80% or more on two or more questions) and the ones to focus on (under 60%) with the pages to reread. The report downloads as a PDF | Pure scoring function with tests; the download is a real PDF file |
+| MB-4 | Tests and results are kept on the device only, at most 10. The book, its excerpts and the answers are never stored on the server | Stored shape is checked on every read; a malformed entry is dropped |
+
 ## Interview Q&A, MCQs and books
 
 Interview prep is the entry point and the reason to share the site. Release 1 is read-and-check practice; typed-answer grading follows in release 2 and the voice simulator in release 3. The topic list comes from what the r/LLMDevs poster said interviewers test: transformers, RAG, agents, fine-tuning versus prompting versus RAG, evals, system design and behavioral questions ([thread](https://reddit.sentinel-team.org/posts/1sn7hc8/snapshots/2026-04-17T05%3A37%3A44.74927Z)).

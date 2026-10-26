@@ -18,6 +18,7 @@ const TOOLS: { href: string; title: string; text: string; icon: IconName; tone: 
   { href: "/ai/course", title: "Generate a course on anything", text: "Any topic at your level: modules, then lessons with examples, a diagram, a quiz and flashcards, written when you open them.", icon: "book", tone: "from-sky-600 to-indigo-600", tag: "New" },
   { href: "/ai/coach", title: "Personal AI coach", text: "Plans your week, keeps you going and answers career questions, knowing what you have already done.", icon: "people", tone: "from-emerald-600 to-teal-500", tag: "Coach" },
   { href: "/topics", title: "AI tutor in every lesson", text: "Stuck on a lesson? Ask the tutor at the bottom of the page. It has read the lesson and explains it another way.", icon: "chat", tone: "from-amber-500 to-rose-500", tag: "In lessons" },
+  { href: "/ai/book", title: "Ask me from my book", text: "Upload your textbook or notes and get a timed MCQ test written from it. The report shows each answer on its page and what to reread.", icon: "book", tone: "from-teal-600 to-violet-600", tag: "New" },
   { href: "/interview/simulator", title: "AI interview feedback", text: "After a mock interview, get each answer graded against the key points, with a stronger version to learn from.", icon: "mic", tone: "from-rose-600 to-pink-500", tag: "Interview prep" },
 ];
 
@@ -31,7 +32,7 @@ export default function AiToolsPage() {
         icon="sparkles"
         eyebrow="AI tools"
         title="Learn faster with AI that knows our lessons"
-        lead="Six AI helpers built on Claude, an AI model from Anthropic. Free for signed-in learners aged 18 or over, with a fair daily allowance."
+        lead="Seven AI helpers built on Claude, an AI model from Anthropic. Free for signed-in learners aged 18 or over, with a fair daily allowance."
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         {!on && (

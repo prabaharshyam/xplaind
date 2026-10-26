@@ -405,3 +405,98 @@ export function cleanInterviewReview(r: InterviewReview, asked: ReviewQuestion[]
     answers,
   };
 }
+
+// ---------------------------------------------------- ask me from my book --
+
+export const BookExcerpt = z.strictObject({
+  id: z.string().regex(/^c\d{1,6}$/),
+  page: z.number().int().min(1).max(100_000),
+  section: z.string().max(160),
+  text: z.string().min(1).max(2000),
+});
+export type BookExcerpt = z.infer<typeof BookExcerpt>;
+
+export const BookRequest = z.strictObject({
+  book: z.string().max(160),
+  difficulty: z.enum(["easy", "medium", "hard"]),
+  count: z.number().int().min(3).max(25),
+  excerpts: z.array(BookExcerpt).min(1).max(30),
+});
+
+export const BookOutput = z.object({
+  questions: z.array(
+    z.object({
+      excerpt_id: z.string(),
+      question: z.string(),
+      options: z.array(z.string()),
+      answer_index: z.number(),
+      explanation: z.string(),
+      quote: z.string(),
+    }),
+  ),
+});
+export type BookOutput = z.infer<typeof BookOutput>;
+
+const DIFFICULTY_RULE: Record<z.infer<typeof BookRequest>["difficulty"], string> = {
+  easy: "Easy: test recall of a fact, term or definition stated plainly in the excerpt.",
+  medium: "Medium: test understanding, such as why something happens, what a term means in context, or which statement the excerpt supports.",
+  hard: "Hard: test application or comparison, such as applying the idea to a new case or telling apart two close ideas, still answerable from the excerpt alone.",
+};
+
+/** MB-2: multiple-choice questions written only from the learner's own excerpts, each with an exact quote. */
+export function bookPrompt(req: z.infer<typeof BookRequest>) {
+  const system = [
+    "You write multiple-choice questions that test whether a learner has understood a book they are studying. You get numbered excerpts from it.",
+    HOUSE_STYLE,
+    DATA_RULE,
+    "Every question must be answerable from one excerpt alone; never use outside knowledge, and never ask about page numbers, the author or the book's layout. Spread the questions over the excerpts, one question per excerpt where possible, skipping any excerpt that has nothing worth testing (a list of references, a copyright notice, a table of contents).",
+    DIFFICULTY_RULE[req.difficulty],
+    "Each question has exactly 4 options of similar length, one correct; wrong options must be plausible to someone who skimmed. Vary which position is correct. explanation: one or two sentences on why the answer is right, in your own words.",
+    "quote: copy 8 to 40 words exactly, character for character, from the excerpt that supports the answer, so the learner can find it in the book. Do not change, join or shorten words inside the quote. excerpt_id: the id of that excerpt.",
+  ].join("\n\n");
+  const user = [
+    `Write ${req.count} questions.`,
+    asData("book_title", req.book, 160),
+    ...req.excerpts.map((e) => asData(`excerpt_${e.id}`, `[${e.id}] ${e.section}, page ${e.page}\n${e.text}`, 2000)),
+  ].join("\n\n");
+  return { system, messages: [{ role: "user" as const, content: user }], schema: BookOutput };
+}
+
+/** Whitespace, quote marks and dashes the model may normalise when it copies text. */
+const looseText = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[‘’`´]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[‐-―]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** True when the quote really appears in the excerpt, so a "grounded" answer is grounded. */
+export function quoteIn(quote: string, text: string): boolean {
+  const q = looseText(quote).replace(/^["'.…]+|["'.…]+$/g, "").trim();
+  return q.split(" ").length >= 5 && looseText(text).includes(q);
+}
+
+/**
+ * MB-2: keeps only well-formed questions whose quote is found in the excerpt they cite,
+ * at most one per identical question, in excerpt order, up to the number asked for.
+ */
+export function cleanBookQuestions(out: BookOutput, excerpts: BookExcerpt[], count: number) {
+  const byId = new Map(excerpts.map((e) => [e.id, e]));
+  const seen = new Set<string>();
+  const kept = out.questions.flatMap((q) => {
+    const e = byId.get(q.excerpt_id);
+    const options = q.options.map((o) => line(o, 300)).filter(Boolean);
+    const answer = Math.round(q.answer_index);
+    const question = line(q.question, 500);
+    const key = question.toLowerCase();
+    if (!e || options.length !== 4 || new Set(options).size !== 4 || !(answer >= 0 && answer < 4) || !question || seen.has(key) || !quoteIn(q.quote, e.text)) return [];
+    seen.add(key);
+    return [{ question, options, answer, explanation: clip(q.explanation, 600), quote: clip(q.quote, 400), page: e.page, section: e.section, order: excerpts.indexOf(e) }];
+  });
+  return kept
+    .sort((a, b) => a.order - b.order)
+    .slice(0, count)
+    .map((q, i) => ({ id: `q${i + 1}`, question: q.question, options: q.options, answer: q.answer, explanation: q.explanation, quote: q.quote, page: q.page, section: q.section }));
+}

@@ -39,7 +39,7 @@ test("the home page says what to do and leads to roadmaps, topics, courses and i
   await expect(page.getByText("Where this is going")).toHaveCount(0);
   const nav = page.getByRole("banner");
   await nav.locator("summary").click(); // phone width: the links sit in the menu
-  for (const [name, href] of [["Courses", "/resources"], ["Interview", "/interview"], ["Mock interview", "/interview/simulator"], ["Blog", "/blog"], ["Roadmaps", "/paths"], ["Topics", "/topics"]]) {
+  for (const [name, href] of [["Courses", "/resources"], ["Practice", "/practice"], ["Mock interview", "/interview/simulator"], ["Blog", "/blog"], ["Roadmaps", "/paths"], ["Topics", "/topics"]]) {
     await expect(nav.getByRole("link", { name, exact: true }).first()).toHaveAttribute("href", href);
   }
 });

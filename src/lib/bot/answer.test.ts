@@ -60,7 +60,7 @@ describe("X Bot instant answers (XB-2)", () => {
   });
 
   it("only links to pages that exist", () => {
-    const pages = ["/paths", "/start", "/dashboard", "/interview/simulator", "/interview", "/practice", "/projects", "/resources", "/certifications", "/glossary", "/topics", "/ai", "/signin", "/how-we-rank", "/blog", "/settings"];
+    const pages = ["/paths", "/start", "/dashboard", "/interview/simulator", "/interview", "/practice", "/projects", "/resources", "/certifications", "/glossary", "/topics", "/ai", "/ai/book", "/signin", "/how-we-rank", "/blog", "/settings"];
     for (const g of SITE_GUIDE) expect(pages).toContain(g.h);
   });
 });

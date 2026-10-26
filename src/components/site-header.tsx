@@ -6,7 +6,7 @@ const NAV = [
   { href: "/ai", label: "AI tools" },
   { href: "/topics", label: "Topics" },
   { href: "/resources", label: "Courses" },
-  { href: "/interview", label: "Interview" },
+  { href: "/practice", label: "Practice" },
   { href: "/interview/simulator", label: "Mock interview" },
   { href: "/blog", label: "Blog" },
 ];

@@ -28,6 +28,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/ai/roadmap",
     "/ai/course",
     "/ai/coach",
+    "/ai/book",
     ...getPaths().map((p) => `/interview/for/${p.id}`),
     ...getInterviewViews().map((q) => `/interview/${q.id}`),
     "/practice",

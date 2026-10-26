@@ -89,6 +89,13 @@ export const SITE_GUIDE: BotEntry[] = [
   },
   {
     k: "guide",
+    t: "Test yourself on your own book",
+    a: "Ask me from my book turns your PDF or notes into a timed MCQ test. Choose chapters, difficulty, number of questions and time; the report quotes the page for each answer and says what to reread.",
+    h: "/ai/book",
+    w: "book pdf textbook notes upload mcq quiz test exam chapter study",
+  },
+  {
+    k: "guide",
     t: "Use the AI tools",
     a: "Signed-in learners aged 18 or over can generate a roadmap or a course on any topic, chat with a learning coach, and get AI feedback on interview answers, within a small daily allowance.",
     h: "/ai",
