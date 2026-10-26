@@ -21,7 +21,7 @@ export const THEMES = [
 
 export type ThemeId = (typeof THEMES)[number]["id"];
 export type Theme = (typeof THEMES)[number];
-export type IconName = Theme["icon"] | "map" | "mic" | "book" | "trophy" | "fire" | "play" | "tick" | "skip" | "cert" | "lock" | "compass";
+export type IconName = Theme["icon"] | "map" | "mic" | "book" | "trophy" | "fire" | "play" | "tick" | "skip" | "cert" | "lock" | "compass" | "close" | "send";
 
 export const THEME_IDS = THEMES.map((t) => t.id) as [ThemeId, ...ThemeId[]];
 export const themeOf = (id: string): Theme => THEMES.find((t) => t.id === id) ?? THEMES[0];

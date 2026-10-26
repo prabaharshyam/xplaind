@@ -156,6 +156,20 @@ Added at the owner's request (2026-10-26). Each stage's closing project becomes 
 | GP-3 | Projects index /projects. List every guided project with its path, difficulty and hours, filterable by path and difficulty | Renders from content files with no database call |
 | GP-4 | Each path stage that has a project links its guide, and the roadmap's Projects tab opens it. Project progress stays on the device until a user table for it is added to the data model | Validation fails if a stage links a guide that does not exist, or a guide is not linked from any stage |
 
+## X Bot and motion
+
+Added at the owner's request (2026-10-26): a friendly helper on every page, and smooth, light motion across the site.
+
+| ID | Requirement | Acceptance criteria |
+| --- | --- | --- |
+| XB-1 | X Bot, a small animated mascot, floats in the bottom corner of every page except the mock interview (the voice simulator flow, step 3: nobody coaches during the interview). It opens a chat panel that works with the keyboard and a screen reader and closes with Escape | Opens and closes at 360 px without horizontal scroll; WCAG 2.1 AA with the panel open; focus returns to the launcher |
+| XB-2 | Instant answers for everyone, with no account and no model call: X Bot matches the question against the glossary, lessons, interview questions, guided projects, roadmaps and short how-to notes on using the site, shows the best answer and links to read next, and says so when it finds nothing. It never ranks courses (ED-2) | Pure, unit-tested matcher; the index is prerendered from the content files; nothing is stored, on the device or the server |
+| XB-3 | AI answers for signed-in learners aged 18 or over when AI is on, under the AI guards (CO-1, SC-5): 30 a day, the current page sent as context, the learner's words wrapped as data, lesson links checked against the catalog. Under-18s and signed-out visitors keep XB-2 only (PV-2) | Prompt test; the route uses the shared caps and kill switch |
+| MO-1 | A route change plays a short rise-in of the new page | Never fades text, so contrast holds at every frame |
+| MO-2 | Cards rise and tip into place as they scroll into view, page pictures tip back as they scroll away, and long reads show a reading-progress bar | Scroll-driven CSS only where the browser supports it; position and angle only, never opacity; no horizontal scroll at 360 px |
+| MO-3 | Cards and page pictures tilt a few degrees toward the pointer | Mouse and trackpad only, not touch |
+| MO-4 | Every animation stops under prefers-reduced-motion: reduce | Checked in the stylesheet: each effect sits behind a no-preference query |
+
 ## Interview Q&A, MCQs and books
 
 Interview prep is the entry point and the reason to share the site. Release 1 is read-and-check practice; typed-answer grading follows in release 2 and the voice simulator in release 3. The topic list comes from what the r/LLMDevs poster said interviewers test: transformers, RAG, agents, fine-tuning versus prompting versus RAG, evals, system design and behavioral questions ([thread](https://reddit.sentinel-team.org/posts/1sn7hc8/snapshots/2026-04-17T05%3A37%3A44.74927Z)).

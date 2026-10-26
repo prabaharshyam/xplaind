@@ -138,6 +138,8 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
   return (
     <main>
+      {/* MO-2: a reading-progress bar under the top bar. */}
+      <div aria-hidden="true" className="lx-progress" />
       <header className="relative overflow-hidden text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}>
         <Cover theme={stop.theme} seed={stop.id} className="absolute inset-0 opacity-60 [&>div:last-child]:hidden" />
         <div className="relative mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 md:flex-row md:items-end md:justify-between md:px-6 md:py-12">

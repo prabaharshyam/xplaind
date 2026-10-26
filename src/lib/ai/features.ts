@@ -185,6 +185,35 @@ export function tutorPrompt(lesson: { title: string; outcome: string; body: stri
   return { system, messages: chatMessages(turns), schema: ChatReply };
 }
 
+// ------------------------------------------------------------------ x bot --
+
+export const BotRequest = z.strictObject({
+  turns: z.array(ChatTurn).min(1).max(30),
+  /** The page the learner is on, so X Bot can talk about it. */
+  page: z.strictObject({ path: z.string().max(200), title: z.string().max(200) }),
+});
+
+/** XB-3: X Bot answers doubts about AI topics and about using Xplaind, from any page. */
+export function botPrompt(req: z.infer<typeof BotRequest>, catalog: CatalogLesson[], siteGuide: string) {
+  const system = [
+    "You are X Bot, the small, cheerful helper that floats on every page of Xplaind, a free site for learning AI. You help a learner clear a doubt about an AI topic or find their way around the site.",
+    HOUSE_STYLE,
+    DATA_RULE,
+    "Be warm and a little playful, but get to the point: answer the doubt first in plain words with an everyday example, then point to where on Xplaind to go deeper. Keep most replies under 150 words. If the question is not about learning, AI or the site, say kindly what you can help with. Never make up a page, a course or a price.",
+    CHAT_FORMAT,
+    "Pages on Xplaind (path | what it is for):",
+    siteGuide,
+    "Lesson catalog (id | title | level):",
+    catalogText(catalog),
+  ].join("\n\n");
+  const messages = chatMessages(req.turns);
+  if (messages.length) {
+    const here = `${asData("current_page_path", req.page.path, 200)}\n${asData("current_page_title", req.page.title, 200)}`;
+    messages[0] = { role: "user", content: `${here}\n\n${messages[0].content}` };
+  }
+  return { system, messages, schema: ChatReply };
+}
+
 // ------------------------------------------------------------------ grade --
 
 export const GradeRequest = z.strictObject({ questionId: z.string().max(80), answer: z.string().trim().min(1).max(4000) });

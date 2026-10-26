@@ -22,8 +22,8 @@ export default function BlogIndex() {
       <PageHero theme="using-ai" seed="blog" icon="book" eyebrow="Guides" title="Blog" lead="Guides on learning AI for free, choosing a role and getting hired. No sponsored posts." />
       <ul className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:grid-cols-2 lg:grid-cols-3 md:px-6">
         {posts.map((p, i) => (
-          <li key={p.id}>
-            <Link
+          <li key={p.id} className="lx-rise">
+            <Link data-tilt
               href={`/blog/${p.id}`}
               className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-zinc-800 dark:bg-zinc-900"
             >

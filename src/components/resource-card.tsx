@@ -71,7 +71,7 @@ export function ResourceCard({
   ];
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-zinc-200 sm:flex dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>
+    <article className="lx-rise overflow-hidden rounded-2xl border border-zinc-200 sm:flex dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>
       <Cover theme={r.theme ?? "ai-basics"} seed={r.id} className="h-24 shrink-0 sm:h-auto sm:w-36" iconSize={28} />
       <div className="min-w-0 flex-1 p-4">
       <p className="text-xs font-medium tracking-wide text-zinc-600 uppercase dark:text-zinc-400">

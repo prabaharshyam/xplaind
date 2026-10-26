@@ -321,7 +321,7 @@ function Section({
       {shown.length > 0 ? (
         <ul className="mt-5 grid gap-3 pl-14 md:grid-cols-2 md:gap-x-16 md:pl-0">
           {shown.map((t, i) => (
-            <li key={t.key} className="relative">
+            <li key={t.key} className="lx-rise relative">
               {/* connector to the spine */}
               <span
                 aria-hidden="true"
@@ -479,7 +479,7 @@ function ProjectCard({
   const headingId = `project-${section.id}`;
 
   return (
-    <li aria-labelledby={headingId} className="flex flex-col gap-3 rounded-2xl border border-zinc-200 p-4 md:p-5 dark:border-zinc-800">
+    <li aria-labelledby={headingId} className="lx-rise flex flex-col gap-3 rounded-2xl border border-zinc-200 p-4 md:p-5 dark:border-zinc-800">
       <div className="flex items-start gap-3">
         <span className={`grid size-11 shrink-0 place-items-center rounded-xl ${state === "done" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"}`}>
           <Icon name={state === "done" ? "tick" : "trophy"} size={22} />

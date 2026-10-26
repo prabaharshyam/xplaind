@@ -44,7 +44,12 @@ export function PageHero({
           {lead && <div className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">{lead}</div>}
           {children && <div className="mt-5">{children}</div>}
         </div>
-        <Cover theme={theme} seed={seed} icon={icon} className="h-36 w-full shrink-0 rounded-3xl shadow-xl md:h-48 md:w-80" iconSize={52} />
+        {/* MO-2, MO-3: the picture floats, tilts toward the pointer and tips back as the page scrolls. */}
+        <div className="lx-hero-art shrink-0 [perspective:1000px]">
+          <div data-tilt="12" className="lx-bob">
+            <Cover theme={theme} seed={seed} icon={icon} className="h-36 w-full rounded-3xl shadow-xl md:h-48 md:w-80" iconSize={52} />
+          </div>
+        </div>
       </div>
     </header>
   );

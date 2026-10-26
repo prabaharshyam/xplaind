@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { AccountLink } from "@/components/account-link";
+import { XBot } from "@/components/bot/x-bot";
+import { MotionEffects, PageEnter } from "@/components/motion/motion-effects";
 import { SiteHeader } from "@/components/site-header";
+import { aiEnabled } from "@/lib/ai/settings";
 import { allowIndexing } from "@/lib/indexing";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
@@ -23,7 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <SiteHeader />
-        <div className="flex-1">{children}</div>
+        <div id="page" className="flex-1">
+          {children}
+        </div>
         <footer className="border-t border-zinc-200 px-4 py-6 text-sm dark:border-zinc-800">
           <nav aria-label="Footer" className="mx-auto flex max-w-2xl flex-wrap gap-x-6 gap-y-2">
             <Link href="/" className="underline-offset-2 hover:underline">
@@ -71,6 +77,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <AccountLink className="underline-offset-2 hover:underline" />
           </nav>
         </footer>
+        <MotionEffects />
+        {/* These read the URL, so pages with dynamic URLs render them in the browser. */}
+        <Suspense fallback={null}>
+          <PageEnter />
+          <XBot aiOn={aiEnabled()} />
+        </Suspense>
       </body>
     </html>
   );

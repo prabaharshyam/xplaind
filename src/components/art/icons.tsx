@@ -32,6 +32,8 @@ const SHAPES: Record<IconName, Shape> = {
   cert: { d: "M8 7h8 M8 10h5 M10 15l-1 6 3-2 3 2-1-6", rects: [[5, 3, 14, 12, 2]] },
   lock: { d: "M8 11V7a4 4 0 018 0v4", rects: [[5, 11, 14, 10, 2]] },
   compass: { d: "M15.5 8.5l-2 5-5 2 2-5z", circles: [[12, 12, 9]] },
+  close: { d: "M6 6l12 12 M18 6L6 18" },
+  send: { d: "M4 12h15 M13 6l6 6-6 6" },
 };
 
 export function Icon({
