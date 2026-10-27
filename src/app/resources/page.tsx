@@ -5,6 +5,7 @@ import { textLink } from "@/components/ui";
 import { getContent, getPaths, getStops } from "@/lib/content";
 import { costLabel } from "@/lib/roadmap/cost";
 import { CourseDirectory, type DirectoryRow } from "./course-directory";
+import { kindLabel } from "@/lib/content/media";
 
 export const metadata: Metadata = {
   title: "AI courses and certificates, filtered by path and level",
@@ -26,6 +27,8 @@ export default function ResourcesPage() {
       title: r.title,
       provider: r.provider,
       type: r.type,
+      kindLabel: kindLabel(r),
+      notice: r.notice ?? null,
       level: r.level,
       cost: r.cost,
       hours: r.hours,

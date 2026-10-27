@@ -1,5 +1,6 @@
 "use client";
 
+import { ResourceNotice } from "@/components/resource-card";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Cover } from "@/components/art/cover";
@@ -12,6 +13,10 @@ export type DirectoryRow = DirectoryItem & {
   costLabel: string;
   /** Up to three lessons that use it, for the "Used in" line. */
   lessons: { id: string; title: string }[];
+  /** "Video lesson", "Course" and so on (media.ts). */
+  kindLabel: string;
+  /** A warning to show under the link, such as an age limit. */
+  notice: string | null;
 };
 
 const BANDS = [
@@ -173,7 +178,7 @@ function CourseCard({ r }: { r: DirectoryRow }) {
       <div className="relative">
         <Cover theme={theme} seed={r.id} className="h-32" iconSize={34} label={r.provider} />
         <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur">
-          {TYPE_LABEL[r.type] ?? r.type}
+          {r.kindLabel}
         </span>
         {r.certificate && (
           <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-amber-300 px-2.5 py-0.5 text-xs font-semibold text-amber-950">
@@ -191,6 +196,7 @@ function CourseCard({ r }: { r: DirectoryRow }) {
             <span className="sr-only"> (opens in a new tab)</span>
           </a>
         </h2>
+        {r.notice && <ResourceNotice text={r.notice} compact />}
         <p className="mt-2 line-clamp-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{r.whyPicked}</p>
         <p className="mt-3 flex flex-wrap gap-1.5 text-xs">
           <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">{r.costLabel}</span>

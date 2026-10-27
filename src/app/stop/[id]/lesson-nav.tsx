@@ -10,7 +10,7 @@ export type SectionLink = { id: string; title: string; icon: IconName };
  * "On this page", with a tick for each section the learner has scrolled through
  * and a reading bar. Desktop: a sticky side panel. Phone: a slim bar under the header.
  */
-export function LessonNav({ sections, children }: { sections: SectionLink[]; children?: ReactNode }) {
+export function LessonNav({ sections, top, children }: { sections: SectionLink[]; top?: ReactNode; children?: ReactNode }) {
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [current, setCurrent] = useState<string | null>(null);
 
@@ -38,7 +38,8 @@ export function LessonNav({ sections, children }: { sections: SectionLink[]; chi
         <div className="h-full bg-emerald-600 transition-[width] duration-500" style={{ width: `${percent}%` }} />
       </div>
       <div className="hidden lg:block lg:h-full lg:pt-10">
-        <div className="sticky top-20">
+        <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col gap-4 overflow-y-auto pb-4">
+          {top}
           <nav aria-label="On this page" className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
             <p className="text-sm font-semibold">On this page</p>
             <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">

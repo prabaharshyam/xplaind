@@ -10,6 +10,7 @@ import { Icon } from "@/components/art/icons";
 import { XP } from "@/lib/game/xp";
 import { type IconName, themeOf } from "@/lib/themes";
 import { LessonNav, type SectionLink } from "./lesson-nav";
+import { LearnPanel } from "./learn-panel";
 import { roadmapHref } from "@/lib/paths";
 import { resourceCard } from "@/lib/content/cards";
 import { getInterviewViews } from "@/lib/content/interview";
@@ -66,7 +67,7 @@ function MoreCourses({ stopId, courses }: { stopId: string; courses: ReturnType<
   return (
     <section aria-labelledby="more-courses" className="mt-6">
       <h3 id="more-courses" className="font-semibold">
-        More courses on this topic
+        More to learn on this topic
       </h3>
       <ul className="mt-2 flex flex-col gap-2">
         {courses.map((c) => (
@@ -76,7 +77,7 @@ function MoreCourses({ stopId, courses }: { stopId: string; courses: ReturnType<
               <span className="sr-only"> (opens in a new tab)</span>
             </a>{" "}
             <span className={`text-sm ${muted}`}>
-              {c.provider} · {c.hours} h{c.certificate ? " · certificate or badge" : ""}
+              {c.kindLabel} · {c.provider} · {c.hours} h{c.certificate ? " · certificate" : ""}
             </span>
           </li>
         ))}
@@ -184,7 +185,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
       <div className="mx-auto grid max-w-6xl gap-8 px-4 pb-16 md:px-6 lg:grid-cols-[1fr_260px]">
         <div className="min-w-0 lg:order-2">
-          <LessonNav sections={navSections}>
+          <LessonNav sections={navSections} top={<LearnPanel stopId={stop.id} items={[...cards, ...more]} headingId="learn-side" />}>
             {home && <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />}
           </LessonNav>
         </div>
@@ -206,6 +207,11 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
             <span className="text-sm font-medium">Track this topic</span>
             <TopicStatus stopId={stop.id} title={stop.title} label={`Track ${stop.title}`} />
+          </div>
+
+          {/* On phones the side panel sits here, near the top, so the videos are seen first. */}
+          <div className="mt-4 lg:hidden">
+            <LearnPanel stopId={stop.id} items={[...cards, ...more]} headingId="learn-top" />
           </div>
 
           <section id="why" aria-labelledby="why-h" className="mt-6 scroll-mt-24 rounded-2xl border-l-4 border-amber-400 bg-amber-50 p-5 dark:bg-amber-950/40">

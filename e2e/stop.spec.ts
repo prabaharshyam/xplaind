@@ -12,7 +12,7 @@ test("a stop page renders its lesson from MDX at 360px", async ({ page }) => {
   await page.goto("/stop/what-is-ai");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("What AI, machine learning");
   await expect(page.getByRole("heading", { name: "Go deeper: the best course" })).toBeVisible();
-  await expect(page.getByText("Start here")).toBeVisible();
+  await expect(page.locator("#courses").getByText("Start here")).toBeVisible();
   // from the MDX body: section headings, sub-headings, a list, a table and a text diagram
   await expect(page.getByRole("heading", { level: 2, name: "How it works" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "Rules versus learning" })).toBeVisible();

@@ -3,6 +3,7 @@ import { costLabel } from "@/lib/roadmap/cost";
 import type { ThemeId } from "@/lib/themes";
 import { getGlossary, getResource, getStop } from "./index";
 import { getInterviewViews } from "./interview";
+import { type Embed, kindLabel, youtubeEmbed } from "./media";
 
 export type DrawerCourse = {
   id: string;
@@ -13,6 +14,9 @@ export type DrawerCourse = {
   hours: number;
   certificate: boolean;
   pick: "best" | "also";
+  kindLabel: string;
+  embed: Embed | null;
+  notice: string | null;
 };
 
 export type TopicDetail = {
@@ -58,6 +62,9 @@ export function topicDetails(lessonIds: readonly string[]): Record<string, Topic
           hours: r.hours,
           certificate: r.certificate,
           pick: i === 0 ? "best" : "also",
+          kindLabel: kindLabel(r),
+          embed: youtubeEmbed(r.url),
+          notice: r.notice ?? null,
         };
       }),
     };

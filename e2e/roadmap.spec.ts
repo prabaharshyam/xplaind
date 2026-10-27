@@ -80,10 +80,10 @@ test.describe("stop page (RM-2, RM-4, RM-7)", () => {
     for (const label of ["Cost", "Time", "Language", "Certificate", "Level", "Last verified", "Link checked"]) {
       await expect(card.getByText(label, { exact: true })).toBeVisible();
     }
-    // sample resources are drafts, so no verification date is claimed
-    await expect(card.getByText("Not yet verified")).toBeVisible();
+    // the owner verified every resource, so a date is shown, never "Not yet verified"
+    await expect(card.getByText("Not yet verified")).toHaveCount(0);
     await expect(card.getByRole("link", { name: "How we rank" })).toHaveAttribute("href", "/how-we-rank");
-    await expect(card.getByRole("link", { name: /^Watch the video|^Open the course/ })).toHaveAttribute(
+    await expect(card.getByRole("link", { name: /^Watch the video|^Open the course|^Open on YouTube|^Open it|^Read/ })).toHaveAttribute(
       "href",
       /^\/go\/[a-z0-9-]+\?stop=what-is-ai$/,
     );

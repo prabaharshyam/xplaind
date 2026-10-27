@@ -68,6 +68,8 @@ export const Resource = z
     affiliate_url: HttpsUrl.optional(), // RM-5: the tagged link /go uses; only when affiliate is true
     editor_score: z.number().min(0).max(5),
     why_picked: Text.max(280),
+    /** A warning shown right under the link, such as an age limit on the provider's site. */
+    notice: Text.max(240).optional(),
     last_verified: IsoDate,
     verified_by: Text,
     hosted_by: Text.optional(), // required when the link is a PDF (ED-8)

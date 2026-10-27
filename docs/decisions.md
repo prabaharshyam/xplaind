@@ -227,3 +227,15 @@ The owner asked for the AI features in the screenshot they shared (generate a co
   - **Redirects:** `/roadmap`, `/interview/for` and `/interview/top` for llmops-engineer → mlops-engineer, rag-expert → genai-engineer, ai-for-beginners → ai-engineer.
 - **Ids kept where possible.** Changing `genai-engineer` or `agentic-ai-expert` would break saved progress (the chosen path is stored by id), the level pages and level cards. Only the names changed.
 - **"Free".** The site no longer calls Xplaind free: not in the hero, the header button ("Get started"), page titles, the FAQ, the AI tools pages or the AI prompts. Facts about third-party courses stay, such as a course's cost label, the "Free only" filter and "free certificate" details, because they are true and RM-6 needs prices shown. The project's `CLAUDE.md` still opens with "Free-first AI learning path"; that line describes how courses are chosen, and the owner may want to reword it.
+
+## Video lessons, labels and launch sign-off (2026-10-27, owner's request)
+
+- **Watch & learn panel.** Every lesson lists its video lessons and courses at the top of the right-hand column. On phones the panel sits just under "Track this topic", so learners see at once that there is something to watch. The full course cards stay further down the lesson.
+- **YouTube plays on the page.** For a YouTube video or playlist, a "Watch here" button opens a player window on Xplaind. It uses YouTube's privacy-enhanced embed (`youtube-nocookie.com`) and loads nothing from YouTube until the learner presses play. That keeps to the "no tracking scripts" rule for everyone who never watches. Closing the window removes the player, which stops the video. A channel link, such as StatQuest, cannot be embedded, so it opens on YouTube.
+- **Labels.** These are computed in `media.ts`, not stored:
+  - anything on YouTube is a "Video lesson";
+  - Google Skills paths are "Google's video lessons", no longer marked as certificates, because skill badges are not certifications;
+  - other videos without a certificate are a "Short video lesson";
+  - everything else keeps its type, such as "Course" or "Article".
+- **Notices.** A resource can carry a `notice`, shown right under its link everywhere it appears. The Northwestern deepfake study uses one, because its site asks participants to be 18 or older.
+- **Sign-off.** The owner confirmed that the content is reviewed. The `reviewed_by` and `verified_by` fields now name the owner, dated 2026-10-27, so the draft labels disappear and launch-mode validation passes. Future edits on the live site should update those fields when a person changes a record.

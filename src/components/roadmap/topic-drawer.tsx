@@ -5,6 +5,8 @@ import { type MouseEvent, type ReactNode, createContext, useCallback, useContext
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
 import type { DrawerCourse, TopicDetail } from "@/lib/content/drawer";
+import { ResourceNotice } from "@/components/resource-card";
+import { WatchButton } from "@/components/video-player";
 import { TopicStatus } from "./topic-status";
 import { themeOf } from "@/lib/themes";
 
@@ -160,7 +162,7 @@ function CourseList({ title, items, tone }: { title: string; items: DrawerCourse
       </h3>
       <ul className="mt-3 flex flex-col gap-3">
         {items.map((c) => {
-          const badge = TYPE_BADGE[c.type] ?? TYPE_BADGE.course;
+          const badge = { ...(TYPE_BADGE[c.type] ?? TYPE_BADGE.course), label: c.kindLabel };
           return (
             <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
@@ -171,6 +173,14 @@ function CourseList({ title, items, tone }: { title: string; items: DrawerCourse
               <span className="w-full text-sm text-zinc-600 dark:text-zinc-400">
                 {c.provider} · {c.cost} · about {c.hours} h{c.certificate ? " · certificate" : ""}
               </span>
+              {c.embed && (
+                <WatchButton
+                  embed={c.embed}
+                  title={c.title}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-rose-600 px-3 text-xs font-semibold text-white hover:bg-rose-700"
+                />
+              )}
+              {c.notice && <ResourceNotice text={c.notice} compact />}
             </li>
           );
         })}

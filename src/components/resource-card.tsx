@@ -2,6 +2,8 @@
 // page and by the stop's client island when "Free only" reorders the list.
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
+import { WatchButton } from "@/components/video-player";
+import { type Embed, openLabel } from "@/lib/content/media";
 import { costLabel, formatDay } from "@/lib/roadmap/cost";
 import type { ThemeId } from "@/lib/themes";
 import { muted, textLink } from "./ui";
@@ -26,6 +28,12 @@ export type ResourceCardData = {
   linkCheckedOn: string | null;
   /** The theme of the first lesson that uses it, for its cover art. */
   theme?: ThemeId;
+  /** "Video lesson", "Course" and so on (media.ts). */
+  kindLabel: string;
+  /** Set when it can play on the page. */
+  embed: Embed | null;
+  /** A warning shown right under the link, such as an age limit. */
+  notice?: string;
 };
 
 const languages = new Intl.DisplayNames(["en"], { type: "language" });
@@ -35,14 +43,6 @@ const languageName = (code: string) => {
   } catch {
     return code;
   }
-};
-
-const OPEN_LABEL: Record<string, string> = {
-  course: "Open the course",
-  video: "Watch the video",
-  article: "Read the article",
-  book: "Open the book",
-  docs: "Read the docs",
 };
 
 export function ResourceCard({
@@ -81,7 +81,7 @@ export function ResourceCard({
         {r.title}
       </h3>
       <p className={`text-sm ${muted}`}>
-        {r.provider} · {r.type}
+        {r.provider} · {r.kindLabel}
       </p>
       {r.affiliate && (
         <p className="mt-2 w-fit rounded bg-amber-100 px-2 py-0.5 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
@@ -100,20 +100,40 @@ export function ResourceCard({
         ))}
       </dl>
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {r.embed && <WatchButton embed={r.embed} title={r.title} onWatch={onOpen} />}
         <a
           href={stopId ? `/go/${r.id}?stop=${encodeURIComponent(stopId)}` : `/go/${r.id}`}
           target="_blank"
           rel="noopener"
           onClick={onOpen}
-          className="inline-flex min-h-12 items-center rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+          className={
+            r.embed
+              ? `text-sm ${textLink}`
+              : "inline-flex min-h-12 items-center rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+          }
         >
-          {OPEN_LABEL[r.type] ?? "Open it"}<span className="sr-only"> {r.title} (opens in a new tab)</span>
+          {r.embed ? "Open on YouTube" : openLabel(r.kindLabel)}
+          <span className="sr-only"> {r.title} (opens in a new tab)</span>
         </a>
         <Link href="/how-we-rank" className={`text-sm ${textLink}`}>
           How we rank
         </Link>
       </div>
+      {r.notice && <ResourceNotice text={r.notice} />}
       </div>
     </article>
+  );
+}
+
+/** A warning shown right under a resource's link, such as an age limit on the provider's site. */
+export function ResourceNotice({ text, compact = false }: { text: string; compact?: boolean }) {
+  return (
+    <p role="note" className={`flex gap-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 ${compact ? "mt-1.5 px-2 py-1.5 text-xs" : "mt-3 px-3 py-2 text-sm"}`}>
+      <span aria-hidden="true" className="font-bold">!</span>
+      <span>
+        <span className="font-semibold">Please note: </span>
+        {text}
+      </span>
+    </p>
   );
 }
