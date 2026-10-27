@@ -10,72 +10,187 @@ gap_tags: []
 primary_resource: huyenchip-genai-platform
 alternates: [eugeneyan-llm-patterns]
 more: [ms-genai-for-beginners, google-genai-leader-path, dlai-ai-for-everyone]
-format: explainer
+format: deep
 key_terms: [large-language-model, rag, tool-calling, guardrails, evals]
 check:
   type: mcq
   question_ids: [how-ai-products-work-1, how-ai-products-work-2, how-ai-products-work-3]
+flashcards:
+  - q: "Name the main parts of a typical AI product."
+    a: "Interface, context assembly, retrieval, the model, tools, guardrails, human checkpoints, and evaluation and monitoring."
+  - q: "What is context assembly?"
+    a: "Putting together everything the model sees for one request: the system prompt, the user's input, conversation history and fetched information."
+  - q: "What does retrieval (RAG) add?"
+    a: "Current and private facts from the company's documents or data, fetched for each request, so the model does not rely on memory alone."
+  - q: "What are tools in an AI product?"
+    a: "Actions the model can request, such as looking up an order or creating a ticket, which the system runs and returns results for."
+  - q: "What are guardrails?"
+    a: "Checks on input and output, such as topic limits, personal-data filters, policy rules and format checks."
+  - q: "Where do most wrong answers come from?"
+    a: "Missing or outdated information, unclear instructions, or no check on the output, more often than a weak model."
+  - q: "What drives the cost of each request?"
+    a: "Model tokens in and out, retrieval, tools and infrastructure. Long prompts, long answers and big models cost more."
+  - q: "What does a product manager decide in an AI product?"
+    a: "The user problem, the success metric, which actions need approval, which failures are acceptable, the budget per request and what evaluation must cover."
+exercise:
+  title: "Trace the wrong answer"
+  setup: "A food-delivery app in Delhi has an AI assistant for refund questions. A customer asked 'My biryani arrived cold, can I get a refund?' and the assistant replied 'Yes, a full refund of ₹420 has been processed.' No refund was processed. The engineers find: retrieval returned the current refund policy correctly; the model has a tool called create_refund that needs approval for amounts over ₹200; the approval step was skipped because of a configuration bug; the reply said 'processed' because the model assumed the tool call succeeded."
+  questions:
+    - q: "Which part of the product failed first?"
+      a: "The human checkpoint, the approval step for refunds over ₹200, which was skipped because of a configuration bug."
+    - q: "Which second failure made the reply wrong?"
+      a: "The model told the customer the refund was processed without confirming the tool's result. The reply should be based on what the tool actually returned."
+    - q: "Was a better model the fix? Why or why not?"
+      a: "No. Retrieval worked and the model's reasoning was fine. The failures were in the approval step and in checking tool results."
+    - q: "What should be added to evaluation?"
+      a: "Test cases where a refund needs approval or fails, checking that the assistant says it is pending or failed, never 'processed'."
+ask:
+  - "What is the difference between RAG and fine-tuning?"
+  - "Why do AI products give wrong answers?"
+  - "What decides the cost of an AI feature?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
-Most AI products built on language models share the same parts. Think of a request flowing through them:
+From the outside, an AI product looks like a chat box that answers questions. Inside, it is a small system of parts, and when it goes wrong, the fix depends on **which part** failed. Product managers who can draw the parts can have useful conversations with engineers. Those who cannot end up asking for "a better model" every time.
 
-1. **Interface**: chat, a button in an existing app, an email, a WhatsApp message, an API.
-2. **Context assembly**: the system prompt (instructions), the user's input, conversation history, and information fetched for this request.
-3. **Retrieval**: searching the company's documents or data for relevant facts (RAG).
-4. **Model**: the language model that produces the answer, often chosen per task.
-5. **Tools**: actions the model can request, such as looking up an order or creating a ticket.
-6. **Guardrails**: checks on input and output: topic limits, personal data, policy rules, format.
-7. **Human checkpoints**: review or approval where mistakes are costly.
-8. **Evaluation and monitoring**: test sets before release, and quality, cost and feedback tracking after.
+Most AI products built on language models share the same parts. Follow one request through them:
+
+```text
+  User
+   |
+   v
+ [1 Interface] chat, in-app button, email, WhatsApp, API
+   |
+   v
+ [2 Context assembly] system prompt + user input + history
+   |                         ^
+   |                         |
+   |                  [3 Retrieval] search company documents and data
+   v
+ [6 Guardrails: input] topic limits, personal data, injection checks
+   |
+   v
+ [4 Model] writes the answer, or asks to use a tool
+   |      \
+   |       --> [5 Tools] look up an order, create a ticket --> result back
+   v
+ [6 Guardrails: output] policy rules, format, no promises it can't keep
+   |
+   v
+ [7 Human checkpoint] review or approve, where mistakes are costly
+   |
+   v
+  Answer to user   ------->  [8 Evaluation and monitoring] quality, cost, feedback
+```
+
+| Part | What it does | If it fails |
+| --- | --- | --- |
+| **Interface** | Where the user meets the product | Confusing or hidden feature |
+| **Context assembly** | Puts together instructions, input and history | Model misunderstands the task |
+| **Retrieval (RAG)** | Fetches relevant facts from company data | Wrong or outdated answers |
+| **Model** | Produces the answer | Weak reasoning on hard tasks |
+| **Tools** | Actions the model can request | Wrong action, or none |
+| **Guardrails** | Checks on input and output | Unsafe or off-policy replies |
+| **Human checkpoints** | Review or approval for costly cases | Costly mistakes reach customers |
+| **Evaluation and monitoring** | Test sets before release; tracking after | Problems found by customers, not you |
+
+This lesson follows Ritu, a product manager at a bank in Mumbai, as she traces why the bank's assistant promised a customer a fee waiver that never happened. By the end you will be able to explain, using the picture, why an answer was wrong and what should change.
 
 ## How it works
 
-**Where quality comes from.** Wrong answers usually come from one of: missing or outdated information (retrieval and data), unclear instructions (prompt), a model too weak for the task, or no check on the output. When something goes wrong, ask which part failed before asking for "a better model".
+### Where quality comes from
 
-**Where cost comes from.** Each request costs model tokens (input and output), plus retrieval, tools and infrastructure. Long prompts and long answers cost more. Bigger models cost more per token. Caching and routing easy requests to small models cut cost.
+Wrong answers usually come from one of four places:
 
-**Where risk comes from.** Wrong answers stated confidently, actions taken without checks, personal data exposed, prompt injection through documents, and unfair outcomes. Guardrails, permissions, human review and evaluation are the controls.
+1. **Missing or outdated information**: retrieval found the wrong document, or the right one does not exist.
+2. **Unclear instructions**: the system prompt does not say what to do in this situation.
+3. **A model too weak for the task**: possible, but less common than people think.
+4. **No check on the output**: nothing caught the mistake before the user saw it.
 
-**Prompting, RAG or fine-tuning.** Instructions and examples change behaviour quickly and cheaply. Retrieval gives the model current, private facts. Fine-tuning teaches a style or narrow skill but is slower and costlier to change. Most products start with prompting and retrieval.
+When something goes wrong, ask which part failed before asking for a bigger model.
 
-**Agents.** When the model decides a sequence of tool calls itself, the product is an agent. Agents are more flexible and harder to predict, so they need limits, logs and approvals.
+### Where cost comes from
 
-**The PM's levers.** You decide the user problem, the success metric, which actions need approval, which failures are acceptable, the budget per request, and what the evaluation set must cover. Engineers decide how; you decide what and how good.
+Each request costs:
+
+- **model tokens**, for both the input (prompt, history, retrieved text) and the output;
+- retrieval, tools and infrastructure.
+
+Long prompts and long answers cost more. Bigger models cost more per token. Two common savings: **caching** repeated parts of prompts, and **routing** easy requests to smaller, cheaper models.
+
+### Where risk comes from
+
+Confident wrong answers, actions taken without checks, personal data exposed, **prompt injection** (instructions hidden inside documents or emails the model reads), and unfair outcomes. The controls are guardrails, permissions on tools, human review and evaluation.
+
+### Prompting, retrieval or fine-tuning?
+
+| Approach | What it changes | Speed and cost to change | Use when |
+| --- | --- | --- | --- |
+| **Prompting** | Instructions and examples | Fast, cheap | Behaviour, tone, format |
+| **Retrieval (RAG)** | Facts the model sees per request | Medium | Current or private information |
+| **Fine-tuning** | The model's habits through training | Slow, costlier | A narrow style or skill at scale |
+
+Most products start with prompting and retrieval, and many never need fine-tuning.
+
+### Agents
+
+When the model decides a whole sequence of tool calls itself, the product is an **agent**. Agents are flexible but harder to predict, so they need limits on what they can do, logs of every step and approvals for risky actions. Use fixed workflows where they work, and agents where the flexibility pays.
+
+### The product manager's levers
+
+Engineers decide **how**. You decide **what and how good**:
+
+- the user problem and the success metric;
+- which actions need approval;
+- which failures are acceptable and which are not;
+- the budget per request;
+- what the evaluation set must cover.
 
 ## A worked example
 
-A Mumbai bank's product manager, Ritu, owns a feature that answers customers' questions about credit card charges in the mobile app.
+Ritu is the product manager for a feature in a Mumbai bank's mobile app that answers customers' questions about credit card charges.
 
-Complaint: the assistant told a customer an annual fee would be waived, but it was not.
+**The complaint.** The assistant told a customer that their annual fee of ₹2,500 would be waived. It was not, and the customer was charged.
 
-Using the picture, Ritu and the engineers trace the request:
+Ritu and the engineers trace the request through the parts:
 
-- Interface: in-app chat. Fine.
-- Retrieval: returned last year's fee-waiver offer document, which had expired. **Cause found.**
-- Model: answered faithfully from the wrong document.
-- Guardrails: no rule stopped promises about fees.
+| Part | What they found | Problem? |
+| --- | --- | --- |
+| Interface | In-app chat, working normally | No |
+| Context assembly | System prompt said to answer from bank documents only | No |
+| Retrieval | Returned last year's fee-waiver offer, which had expired | **Yes: the cause** |
+| Model | Answered faithfully from the document it was given | No |
+| Guardrails | No rule stopped promises about fees | **Yes: a missing control** |
+| Evaluation | No test questions involved expired offers | **Yes: a gap** |
 
-Fixes, by part: retrieval filters by offer dates; a guardrail blocks the assistant from promising waivers, replacing it with "you may be eligible; here is how to check"; the evaluation set gains 30 fee questions including expired offers. Ritu also adds a metric: complaints about wrong fee information per 10,000 chats.
+**Fixes, by part:**
+
+- **Retrieval:** filter documents by their valid-from and valid-until dates, so expired offers are never returned.
+- **Guardrails:** block the assistant from promising waivers or refunds; it says instead, "You may be eligible. Here is how to check," with a link.
+- **Evaluation:** add 30 fee questions, including expired and future offers, to the test set.
+- **Monitoring:** a new metric, complaints about wrong fee information per 10,000 chats, reviewed weekly.
+
+Nobody needed a different model. The answer was wrong because of what the model was given and what nobody checked.
 
 ## Common mistakes
 
-- **Blaming the model for every error.** Most come from data, retrieval or missing checks.
-- **Treating the prompt as a secret sauce.** It is one part; evaluation and data matter more.
-- **Ignoring cost per request.** A feature loved by users can lose money at scale.
+- **Blaming the model for every error.** Many come from data, retrieval or missing checks.
+- **Treating the prompt as secret sauce.** It is one part; evaluation and data matter more.
+- **Ignoring cost per request.** A feature users love can lose money at scale.
 - **No evaluation set.** Without one, every change is a guess.
-- **Agents by default.** Use fixed workflows where they work; agents where flexibility pays.
+- **Agents by default.** Use fixed workflows where they work.
+- **No owner for the documents.** Retrieval is only as good as the content behind it.
 
 ## Practise
 
-Read Chip Huyen's "Building a Generative AI Platform" and skim Eugene Yan's LLM patterns.
+Read Chip Huyen's "Building a Generative AI Platform", linked below, and skim Eugene Yan's patterns for building LLM-based systems.
 
-1. Pick an AI feature you use (a banking chatbot, a shopping assistant, an email writer) and draw its likely parts.
-2. For three possible failures of that feature, name which part probably caused each and one fix.
-3. List the decisions a PM should make for it: metric, approval points, acceptable errors, budget per request.
+1. **Draw it.** Pick an AI feature you use, such as a banking chatbot, a shopping assistant or an email writer, and draw its likely parts.
+2. **Trace failures.** For three possible failures of that feature, name the part that probably caused each and one fix.
+3. **Your decisions.** List the decisions a product manager should make for it: metric, approval points, acceptable errors and budget per request.
 
 **You are done when you can** explain to an engineer, using the picture, why an answer was wrong and what you want changed.

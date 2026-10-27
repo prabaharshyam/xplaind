@@ -9,14 +9,47 @@ hours: 2
 gap_tags: []
 primary_resource: dvc-get-started
 alternates: [made-with-ml]
-format: explainer
+format: deep
 key_terms: [data-versioning, experiment-tracking, model-registry, etl]
 check:
   type: mcq
   question_ids: [data-versioning-1, data-versioning-2, data-versioning-3]
+flashcards:
+  - q: "What is data versioning?"
+    a: "Tracking versions of datasets and the steps that produce them, the way Git tracks code, so models can be reproduced and compared."
+  - q: "Why don't large data files go directly into Git?"
+    a: "Git handles large binary files badly. Tools such as DVC keep the data in cloud storage and small pointer files in Git."
+  - q: "What does 'immutable snapshot' mean for a dataset?"
+    a: "Once created, a dataset version is never changed in place. Changes produce a new version with a new id."
+  - q: "What is lineage?"
+    a: "The chain linking a production prediction to its model, the training run, the data version and the pipeline code."
+  - q: "What should you compare between two data versions?"
+    a: "Row counts, label balance, feature distributions, schema changes and sample diffs."
+  - q: "Why version labels too?"
+    a: "Labels change with corrections, new guidelines and late outcomes, and those changes alter what the model learns."
+  - q: "How do erasure requests affect versioned data?"
+    a: "Old versions still contain personal data, so deletion must propagate, for example by rebuilding affected versions without the records."
+  - q: "What is enough for a small team?"
+    a: "Dated folders in cloud storage with a manifest (row counts, hash, source query, pipeline commit) and the path logged in each training run."
+exercise:
+  title: "Trace the regression"
+  setup: "A churn model at an OTT platform in Mumbai had recall 0.68 last month. After retraining on new data, recall is 0.54. Version manifests show: last month's dataset had 1.2 million rows and 9% churners; this month's has 1.1 million rows and 4% churners. The pipeline code changed in a merge three weeks ago that 'tidied up' the subscription status join."
+  questions:
+    - q: "Which number in the manifests is the biggest warning sign?"
+      a: "The churn share fell from 9% to 4%. A real drop that large in one month is unlikely; a label or join problem is more likely."
+    - q: "Where would you look first?"
+      a: "At the pipeline change to the subscription status join, comparing how churners are labelled in both versions on a sample of users."
+    - q: "How do you recover a good model while investigating?"
+      a: "Keep or roll back to last month's model, which is linked to last month's data version, until the pipeline is fixed."
+    - q: "What check would catch this automatically next time?"
+      a: "A data check that fails if the label share changes by more than an agreed amount between versions without an explanation."
+ask:
+  - "What is DVC and do I need it?"
+  - "How do I reproduce an old machine learning model?"
+  - "How do I handle data deletion requests with versioned datasets?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -29,6 +62,25 @@ reviewed_on: 2026-10-25
 - show auditors the data behind a decision.
 
 Large files do not belong directly in Git. Tools such as DVC store the data in cloud storage and keep small pointer files in Git. Data lakes and warehouses offer table versioning ("time travel") too.
+
+```text
+   raw data (sources)            pipeline code (Git commit a1b2c3)
+          \                         /
+           v                       v
+      [build dataset] ---------> data v2026-10-01  (manifest: rows, hash, query, commit)
+                                    |
+                                    v
+                             [training run 412]  logs data version + code version
+                                    |
+                                    v
+                             [model registry: fraud-model v7]
+                                    |
+                                    v
+                              production predictions
+       lineage: any prediction --> model v7 --> run 412 --> data v2026-10-01 --> commit a1b2c3
+```
+
+This lesson follows a health-insurance company in Chennai whose fraud model got worse after retraining.
 
 ## How it works
 
@@ -46,6 +98,23 @@ Large files do not belong directly in Git. Tools such as DVC store the data in c
 
 **Keep it practical.** For small teams, dated folders in cloud storage with a manifest (row counts, hash, source query, pipeline commit) plus logging the path in each run may be enough. Adopt a tool as volume and team size grow.
 
+**A manifest for each dataset version:**
+
+| Field | Example |
+| --- | --- |
+| Version id | `claims-train-2026-10-01` |
+| Content hash | `sha256:9f2c...` |
+| Rows | 812,440 |
+| Positive label share | 2.3% |
+| Source query or tables | `claims_v3 joined with investigations` |
+| Pipeline commit | `a1b2c3d` |
+| Created by and date | `pipeline-bot, 2026-10-01` |
+| Notes | "Relabelled 1,200 claims after the audit of July" |
+
+Write the manifest automatically when the dataset is built, store it next to the data, and print a comparison with the previous manifest in the pull request that triggered the build. A reviewer who sees "positive label share: 2.3% to 1.1%" asks the right question before training starts.
+
+**Choosing a tool.** For a team of two or three, dated folders and a manifest are enough. DVC adds pointer files in Git and commands to pull and push data, which helps once several people train models. Lakehouse table formats such as Delta Lake and Apache Iceberg add "time travel", so you can query a table as it was on a given date, which suits teams whose training data already lives in a warehouse. Whatever you choose, the rule is the same: a training run must record exactly which data version it used, and that version must never change afterwards.
+
 ## A worked example
 
 A Chennai health-insurance company retrains its claim-fraud model and finds recall dropped from 0.72 to 0.61.
@@ -59,9 +128,11 @@ They fix the pipeline, rebuild the dataset as a new version, retrain and recover
 
 Later, a customer's erasure request requires deleting their records. The team rebuilds the affected training versions without them, records the change, and confirms the rebuilt model's metrics are unchanged.
 
+**What the team kept.** The fix took a day because the evidence was already there: two manifests side by side showed the label share change, and the pipeline commit in each manifest pointed straight at the refactor. Without versioning, the same investigation usually takes weeks of guessing, or never happens, and the weaker model quietly ships.
+
 ## Common mistakes
 
-- **Overwriting datasets in place.** You lose the ability to compare or reproduce.
+- **Overwriting datasets in place.** You lose the ability to compare or reproduce. Always write a new version with a new id, even for a one-row fix.
 - **Versioning data but not the pipeline.** You cannot explain how data was produced.
 - **No link from model to data.** Log the data version in every run.
 - **Ignoring label changes.** They change models as much as feature changes.

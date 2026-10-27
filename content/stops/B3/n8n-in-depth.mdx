@@ -9,73 +9,173 @@ hours: 5
 gap_tags: []
 primary_resource: n8n-course-level-two
 alternates: [n8n-hosting, n8n-ai]
-format: explainer
+format: deep
 key_terms: [n8n, workflow-node, idempotency, rate-limit]
 check:
   type: mcq
   question_ids: [n8n-in-depth-1, n8n-in-depth-2, n8n-in-depth-3]
+flashcards:
+  - q: "What is a sub-workflow in n8n?"
+    a: "A reusable workflow called from others, like a function, for shared logic such as 'look up a customer' or 'send an alert'."
+  - q: "How do you respect an API's rate limit in n8n?"
+    a: "Process items in batches with Loop Over Items and add a Wait node between batches, and page through large results."
+  - q: "What does the Merge node do?"
+    a: "Combines items from two branches, by position or by a matching field such as email or order id."
+  - q: "When should you use a Code node?"
+    a: "For small bits of logic the visual nodes do not cover, such as unusual formats or date maths. Keep it short and commented."
+  - q: "Why use a structured output parser with an AI node?"
+    a: "So later nodes get reliable, named fields instead of free text that changes shape from run to run."
+  - q: "What makes a write idempotent?"
+    a: "Checking whether the record already exists before creating it, so rerunning the workflow never creates duplicates."
+  - q: "What does an error workflow do?"
+    a: "Runs automatically when another workflow fails, and alerts someone with the workflow, the failing node and a link to the execution."
+  - q: "What do you take on when you self-host n8n?"
+    a: "Backups of its database, updates, security and scaling, for example queue mode with workers for high volume."
+exercise:
+  title: "Plan a reconciliation workflow"
+  setup: "A pharmacy chain in Nagpur wants a nightly n8n workflow that compares 3,000 sales from its POS API with UPI settlements from its payment gateway's API, which allows 5 requests per second and returns at most 100 records per page. Mismatches should go to a sheet, and the finance head gets a summary on Teams. The workflow may be rerun if something fails."
+  questions:
+    - q: "How do you fetch 3,000 settlements without breaking the limit?"
+      a: "Page through results 100 at a time and loop over pages in batches, with a Wait node so you stay under 5 requests per second."
+    - q: "Which node matches sales to settlements?"
+      a: "The Merge node, matching on a shared field such as the order or transaction id."
+    - q: "How do you make sure a rerun does not add the same mismatch twice?"
+      a: "Before writing a row, check if a row for that transaction already exists, in a sub-workflow used for every write."
+    - q: "What should happen if the gateway API is down at night?"
+      a: "Retries on that node, then the error workflow alerts the finance-ops channel with the execution link, so someone can rerun it later."
+ask:
+  - "How do I handle rate limits in n8n?"
+  - "When should I use a sub-workflow?"
+  - "Should I self-host n8n or use n8n cloud?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
-Real business automations go beyond a trigger and three nodes. They process many records, call APIs with limits, combine data from several sources, include AI steps, and must keep running when something fails. n8n has the building blocks for this:
+Your first n8n workflow had a trigger and a few nodes. Real business automations go further: they process thousands of records, call APIs with strict limits, combine data from several systems, include AI steps, and must keep working when something fails at 3 am.
 
-- **Sub-workflows**: reusable workflows called from others, like functions.
-- **Loops and batches**: process items in groups to respect API limits.
-- **Merge and split**: combine data from two sources or split lists into items.
-- **Code nodes**: small JavaScript or Python snippets for logic the visual nodes do not cover.
-- **AI nodes**: model calls, structured output parsers and agent nodes with tools.
-- **Error workflows**: run when any workflow fails, to alert someone.
+n8n has building blocks for each of these:
+
+| Building block | What it is for |
+| --- | --- |
+| **Sub-workflows** | Reusable workflows called from others, like functions |
+| **Loops and batches** | Processing items in groups to respect API limits |
+| **Merge and split** | Combining data from two sources, or splitting lists into items |
+| **Code nodes** | Small JavaScript or Python snippets for logic the visual nodes do not cover |
+| **AI nodes** | Model calls, structured output parsers, and agent nodes with tools |
+| **Error workflows** | Running when a workflow that names them in its settings fails, to alert someone |
+
+```text
+  [Schedule 6 am]
+        |
+        +--> [Shopify: orders, page by page] -----------+
+        |                                                |
+        +--> [Gateway: settlements, batch + wait] -------+
+                                                         v
+                                               [Merge on order id]
+                                                         |
+                                                 [Code: flag mismatches]
+                                                         |
+                                         [Sub-workflow: write row if new]
+                                                         |
+                                          [AI: explain each mismatch]
+                                                         |
+                                                 [Slack: summary]
+
+  Any failure --> [Error workflow: alert finance-ops with execution link]
+```
+
+This lesson follows a skincare brand in Bengaluru as it automates daily order reconciliation. By the end you will build workflows that handle volume, limits, AI and failure.
 
 ## How it works
 
-**Structure.** Keep each workflow focused. Put shared logic, such as "look up a customer" or "send an alert", in sub-workflows. Name nodes clearly ("Get open orders from Shopify", not "HTTP Request 3").
+### Structure
 
-**Volume and limits.** Use Loop Over Items with a batch size and a Wait node to stay within API rate limits. For large jobs, page through results rather than fetching everything at once.
+Keep each workflow focused on one job. Put shared logic, such as "look up a customer" or "send an alert", in **sub-workflows** that other workflows call. Name nodes clearly: "Get open orders from Shopify", not "HTTP Request 3". A colleague, or you in three months, should understand the workflow from the canvas.
 
-**Merging data.** The Merge node combines items from two branches by position or by a matching field (for example, matching sheet rows to CRM contacts by email).
+### Volume and rate limits
 
-**Code nodes.** Useful for parsing unusual formats, date maths or Indian number formatting. Keep them short and commented; complex logic is harder to maintain here than in a proper service.
+Many APIs limit how many requests you can make per second or minute, and return at most a page of results at a time. Use:
 
-**AI steps.** Use a model node with a clear prompt and a structured output parser so later nodes get reliable fields. Agent nodes can call tools (other nodes or sub-workflows) for multi-step tasks; apply the same caution as any agent: limited tools, limits on steps, and approval for risky actions.
+- **pagination**, to fetch results page by page instead of all at once;
+- **Loop Over Items** with a batch size, to process items in groups;
+- a **Wait** node between batches, to stay under the limit.
 
-**Reliability.** Set retries on flaky nodes. Make writes idempotent (check whether a record already exists before creating it) so reruns do not create duplicates. Attach an error workflow that posts to your team chat with the workflow name, the failing node and a link to the execution.
+```text
+  3,000 items --> [batch of 100] --> [API calls] --> [wait 1 s] --> next batch
+```
 
-**Maintainability.** Export workflows as JSON into Git, or use n8n's source control features where available. Keep separate development and production instances or projects. Store credentials per environment.
+### Merging data
 
-**Self-hosting basics.** Running n8n yourself with Docker gives data control. You then own backups of its database, updates, security and scaling (queue mode with workers for high volume).
+The **Merge** node combines items from two branches, either by position or by a matching field, such as matching sheet rows to CRM contacts by email, or orders to payments by order id.
+
+### Code nodes
+
+Useful for parsing unusual formats, date maths, or formatting amounts the Indian way (₹1,25,000). Keep them short and commented. Complex logic is hard to test and maintain inside a code node; move it to a proper service if it grows.
+
+### AI steps
+
+Use a model node with a clear prompt and a **structured output parser**, so later nodes get reliable, named fields rather than free text. **Agent nodes** can call tools, such as other nodes or sub-workflows, for multi-step tasks. Treat them like any agent: give them only the tools they need, limit the number of steps, and require approval for risky actions such as payments.
+
+### Reliability
+
+| Practice | Why |
+| --- | --- |
+| Retries on flaky nodes | Temporary API errors fix themselves on a second try |
+| Idempotent writes | Check whether a record already exists before creating it, so reruns never duplicate |
+| An error workflow | Posts to your team chat with the workflow name, failing node and execution link |
+| Item-count checks | Catch runs that quietly process nothing |
+
+### Maintainability
+
+Export workflows as JSON into Git, or use n8n's source control features where available. Keep separate development and production instances or projects, and store credentials per environment. Test changes in development before touching production.
+
+### Self-hosting basics
+
+Running n8n yourself, for example with Docker, gives you control over data. You then own backups of its database, updates, security and scaling. For high volume, **queue mode** runs executions on separate worker processes.
 
 ## A worked example
 
-A Bengaluru D2C skincare brand automates daily order reconciliation between its Shopify store, its payment gateway and its accounting sheet, about 1,500 orders a day.
+A D2C skincare brand in Bengaluru sells about 1,500 orders a day through its Shopify store. Every morning, the finance team spends two hours matching orders against payment gateway settlements and the accounting sheet. They automate it:
 
-- **Main workflow**, scheduled at 6 am: fetch yesterday's orders from Shopify in pages of 250; fetch settlements from the payment gateway's API in batches with a 1-second wait to respect its limit.
-- **Merge** orders and settlements on order id.
-- **Code node**: flag mismatches (amount differs, settlement missing, refund not recorded) and format amounts in Indian style.
-- **Sub-workflow** "write to accounting sheet": checks if a row for the order exists before adding, so reruns are safe.
-- **AI node**: for each mismatch, write a one-line explanation for the finance team from the order and settlement data.
-- **Slack message** with totals and a link to the mismatch sheet.
-- **Error workflow**: any failure alerts the finance-ops channel with the execution link.
+| # | Node | What it does |
+| --- | --- | --- |
+| 1 | Schedule trigger | Runs at 6 am |
+| 2 | Shopify | Fetches yesterday's orders in pages of 250 |
+| 3 | HTTP Request in a loop | Fetches settlements from the payment gateway's API in batches, with a 1-second wait to respect its limit |
+| 4 | Merge | Joins orders and settlements on order id |
+| 5 | Code | Flags mismatches: amount differs, settlement missing, refund not recorded; formats amounts in Indian style |
+| 6 | Sub-workflow "write to accounting sheet" | Checks if a row for the order exists before adding, so reruns are safe |
+| 7 | AI node with structured output | Writes a one-line explanation of each mismatch for the finance team |
+| 8 | Slack | Posts totals and a link to the mismatch sheet |
+| + | Error workflow | Alerts the finance-ops channel with the execution link on any failure |
 
-The finance team's two hours of morning reconciliation becomes 15 minutes of reviewing flagged cases. When the payment gateway's API was down one morning, the error alert fired, and a rerun at 9 am completed without duplicates.
+**Results:**
+
+| Measure | Before | After |
+| --- | --- | --- |
+| Finance team's morning reconciliation | About 2 hours | About 15 minutes reviewing flagged cases |
+| Mismatches found per day | Varied, some missed | 20 to 40, all listed with a reason |
+
+**A bad morning.** One day the payment gateway's API was down at 6 am. The node retried three times, then the error workflow posted the alert with a link to the failed execution. The team reran the workflow at 9 am. Because every write checked for an existing row first, the rerun completed with no duplicates.
 
 ## Common mistakes
 
 - **One giant workflow.** Split it into sub-workflows with clear names.
-- **Ignoring rate limits.** Batch and wait.
+- **Ignoring rate limits.** Paginate, batch and wait.
 - **Non-idempotent writes.** Reruns create duplicates.
 - **Logic buried in big code nodes.** Keep code small; move complex logic to a service.
 - **No version control or test instance.** Changes to production break things silently.
+- **AI output as free text.** Use a structured output parser so later steps get reliable fields.
 
 ## Practise
 
-Complete n8n's Level two text course and read the hosting overview.
+Complete n8n's N8N102 Integrations course, linked below, and read the hosting overview.
 
-1. Build a workflow that processes at least 100 items from an API or sheet in batches, with a wait between batches.
-2. Add a merge of two data sources, a sub-workflow for writing records that checks for existing rows, and an AI step with structured output.
-3. Add an error workflow that alerts you, break a node on purpose, and confirm the alert and a clean rerun.
+1. **Volume.** Build a workflow that processes at least 100 items from an API or sheet in batches, with a wait between batches.
+2. **Merge, write, AI.** Add a merge of two data sources, a sub-workflow for writing records that checks for existing rows, and an AI step with structured output.
+3. **Failure.** Add an error workflow that alerts you, break a node on purpose, and confirm the alert and a clean rerun. Error workflows do not run for manual test runs, so let the workflow run on its trigger.
 
 **You are done when you can** rerun your workflow twice in a row without creating duplicates, and show an error alert with a link to the failed execution.

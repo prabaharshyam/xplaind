@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { Celebrate } from "@/components/celebrate";
 import { McqQuiz, type McqQuestion } from "@/components/mcq-quiz";
+import { TopicStatus } from "@/components/roadmap/topic-status";
 import { XP } from "@/lib/game/xp";
-import { muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
-import { useProgress, useToday } from "@/lib/browser/hooks";
-import { clearStop, setStop } from "@/lib/browser/progress-store";
+import { muted, primaryButton, textLink } from "@/components/ui";
+import { useProgress } from "@/lib/browser/hooks";
+import { setStop } from "@/lib/browser/progress-store";
 import { todayInIST } from "@/lib/dates";
 import {
   CHECK_PASS_PERCENT,
@@ -24,15 +25,13 @@ export type CheckQuestionView = McqQuestion;
 type Check = { type: "mcq"; questions: CheckQuestionView[] } | { type: "project"; brief: string };
 
 const STATUS_TEXT = { not_started: "Not started", in_progress: "In progress", done: "Done" } as const;
-const HOW_TEXT = { check: "passed the check", project: "project submitted", self_skipped: "you said you already know this" } as const;
+const HOW_TEXT = { check: "passed the check", project: "project submitted", self_marked: "you marked it done", self_skipped: "you said you already know this" } as const;
 
 /** RM-7 and RM-8: status, the check or project, and "I already know this". Saved on this device. */
-export function StopProgressPanel({ stopId, check }: { stopId: string; check: Check }) {
+export function StopProgressPanel({ stopId, title, check }: { stopId: string; title: string; check: Check }) {
   const progress = useProgress();
-  const today = useToday();
   const record = progress.stops[stopId] as StopProgress | undefined;
   const status = statusOf(progress.stops, stopId);
-  const day = () => today ?? todayInIST();
   const [party, setParty] = useState<{ xp: number; message: string } | null>(null);
   const celebrate = (xp: number, message: string) => {
     if (status !== "done") setParty({ xp, message });
@@ -59,32 +58,11 @@ export function StopProgressPanel({ stopId, check }: { stopId: string; check: Ch
       )}
 
       <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-        {status === "done" ? (
-          <button type="button" className={secondaryButton} onClick={() => clearStop(stopId)}>
-            Mark as not done
-          </button>
-        ) : (
-          <>
-            {status === "not_started" && (
-              <button type="button" className={secondaryButton} onClick={() => setStop(stopId, { status: "in_progress", updatedOn: day() })}>
-                I am working on this
-              </button>
-            )}
-            <button
-              type="button"
-              className={secondaryButton}
-              onClick={() => {
-                celebrate(XP.lessonSkipped, "Marked as known.");
-                setStop(stopId, markDone("self_skipped", day()));
-              }}
-            >
-              I already know this
-            </button>
-            <p className={`text-sm ${muted}`}>
-              Skipping marks the step as done. A later test can show it again if you miss its questions.
-            </p>
-          </>
-        )}
+        <p className="text-sm font-medium">Or set it yourself</p>
+        <TopicStatus stopId={stopId} title={title} />
+        <p className={`text-sm ${muted}`}>
+          Done and Skip count towards your roadmap. Skip means you already know it; a later test can show it again if you miss its questions.
+        </p>
         <Link href="/paths" className={`mt-2 ${textLink}`}>
           See all paths
         </Link>

@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: litellm-gateway
 alternates: [routellm]
-format: explainer
+format: deep
 key_terms: [llm-gateway, fallback-model, rate-limit, budget-limit]
 check:
   type: mcq
   question_ids: [llm-gateways-1, llm-gateways-2, llm-gateways-3]
+flashcards:
+  - q: "What is an LLM gateway?"
+    a: "A service between applications and model providers that handles routing, fallbacks, keys, budgets, logging and caching in one place."
+  - q: "Why use model aliases?"
+    a: "Apps call names like chat-default; the gateway maps them to a specific model, so upgrades happen centrally without code changes."
+  - q: "What is a fallback chain?"
+    a: "An ordered list of alternatives tried on errors or timeouts, such as the same model in another region, then an approved second provider."
+  - q: "What must a fallback model satisfy?"
+    a: "It must be good enough for the task and allowed under the data rules, including region."
+  - q: "How do gateways improve key security?"
+    a: "Teams get gateway keys; real provider keys live only in the gateway's secret store and can be rotated centrally."
+  - q: "What do per-feature budgets give you?"
+    a: "Caps and alerts per team or feature, and cost reports that show what to fix."
+  - q: "What is the main risk of a gateway?"
+    a: "It becomes a single point of failure for every AI feature, so run several instances with health checks and monitoring."
+  - q: "Why mask prompts in gateway logs?"
+    a: "The gateway sees every request, so unmasked logs make it the largest sensitive data store you have."
+exercise:
+  title: "Plan the gateway"
+  setup: "A Pune healthtech has three AI features: a symptom-intake chatbot for patients in India, a coding assistant for its engineers, and a nightly job summarising doctor notes. Each team calls providers directly with its own keys. Patient data must stay in India. Last month a provider's rate limit took the chatbot down for 30 minutes, and nobody knows which feature drives the ₹9 lakh monthly bill."
+  questions:
+    - q: "What should the gateway do with provider keys?"
+      a: "Hold them in its secret store, rotate them, and give each feature its own gateway key tagged with team and feature."
+    - q: "What fallback suits the patient chatbot?"
+      a: "The same model in another Indian region, then an approved comparable model hosted in India, never a region outside India."
+    - q: "How does the gateway answer the bill question?"
+      a: "By logging tokens and cost per key and feature, giving a monthly report that shows each feature's share."
+    - q: "How should the gateway itself be run?"
+      a: "At least two instances behind a load balancer, with health checks, its own monitoring and masked logs."
+ask:
+  - "What is an LLM gateway and do I need one?"
+  - "How do I set up model fallbacks?"
+  - "How do I track AI costs by team?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -32,6 +65,20 @@ An **LLM gateway** is a service that sits between your applications and the mode
 
 Open-source options such as LiteLLM, commercial gateways, and the cloud providers' API management services all fill this role.
 
+```text
+   chatbot ----key A--+
+   extraction --key B-+--> [GATEWAY x2]  alias chat-default -> model X (Mumbai)
+   summariser --key C-+        |            fallback 1: model X (second region)
+   search -----key D--+        |            fallback 2: approved model Y (provider 2)
+                               |
+               budgets per key | retries + timeouts | masked logs: team, feature, model,
+               alerts at 75%   |                    | tokens, cost, latency
+                               v
+                    provider keys only here (secret store, rotated)
+```
+
+This lesson follows a fintech in Bengaluru where five AI features from four teams each called providers directly.
+
 ## How it works
 
 **One interface.** Most gateways accept an OpenAI-compatible or similar request format and translate it for each provider, so switching a feature from one model to another is a configuration change, not a code change.
@@ -46,6 +93,22 @@ Open-source options such as LiteLLM, commercial gateways, and the cloud provider
 
 **The cost of a gateway.** It is one more service to run, secure and keep available; if it goes down, every AI feature does. Run it with at least two instances, health checks and its own monitoring.
 
+**Gateway features and the problems they solve:**
+
+| Feature | Problem it solves |
+| --- | --- |
+| One request format | Each team writing code for each provider |
+| Model aliases | Model names hard-coded in many apps |
+| Fallbacks | One provider outage taking a feature down |
+| Central keys | Provider keys scattered across teams and laptops |
+| Budgets per key | One feature quietly using most of the spend |
+| Unified logs | No view of cost, latency or errors across features |
+| Caching | Paying again for identical requests |
+
+**Testing fallbacks.** A fallback that has never fired may not work. In staging, break the primary on purpose, with a wrong key or a blocked endpoint, and check that requests succeed through the next option, that latency stays acceptable, and that logs record which model actually served each request. Repeat after every change to the chain. Also run the feature's evals against each fallback model, so you know what quality users get during an outage.
+
+**Rolling out a gateway.** Move one low-risk feature first, compare its errors, latency and cost with before, then migrate the others one at a time. Keep each team's old direct keys working for a short overlap, then revoke them, so the gateway becomes the only path to providers.
+
 ## A worked example
 
 A Bengaluru fintech has five AI features built by four teams. Each team has its own provider keys; finance sees one big monthly bill. A provider outage last month took down the customer chatbot for 50 minutes.
@@ -59,6 +122,13 @@ You deploy a gateway with two instances on their Kubernetes cluster:
 - Logs: every request with team, feature, model, tokens, cost and latency go to their analytics store.
 
 The next provider incident causes 90 seconds of slower responses while the fallback takes over, instead of 50 minutes of errors. Finance gets a monthly cost report by feature for the first time, and it shows that one internal summarisation job uses 40% of spend. That team moves it to a batch job and a cheaper model.
+
+| Measure | Before the gateway | After |
+| --- | --- | --- |
+| Effect of a provider incident | 50 minutes of chatbot errors | 90 seconds of slower responses |
+| Provider keys | Held by four teams | Only in the gateway, rotated |
+| Cost visibility | One monthly bill | Report by team and feature |
+| Biggest finding | Unknown | A summary job using 40% of spend, moved to batch and a cheaper model |
 
 ## Common mistakes
 

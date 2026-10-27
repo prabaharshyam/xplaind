@@ -41,6 +41,8 @@ export default async function BlogPostPage({ params }: PageProps<"/blog/[slug]">
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
+      {/* MO-2: a reading-progress bar under the top bar. */}
+      <div aria-hidden="true" className="lx-progress" />
       <JsonLd
         data={{
           "@context": "https://schema.org",

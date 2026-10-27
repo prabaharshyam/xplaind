@@ -9,25 +9,72 @@ hours: 4
 gap_tags: [pandas-basics]
 primary_resource: kaggle-learn-pandas
 alternates: []
-format: explainer
+format: deep
 key_terms: [dataframe, csv, python]
 check:
   type: mcq
   question_ids: [pandas-tables-1, pandas-tables-2, pandas-tables-3]
+flashcards:
+  - q: "What is a DataFrame?"
+    a: "pandas' table object: rows and named columns, like a spreadsheet you control with code."
+  - q: "What do head, info and describe show?"
+    a: "head shows the first rows, info shows columns, types and missing values, and describe gives quick statistics for number columns."
+  - q: "How do you filter rows on two conditions?"
+    a: "Use & or | with brackets around each condition, such as df[(df['city'] == 'Pune') & (df['sales'] > 5000)]."
+  - q: "What is NaN?"
+    a: "'Not a number': how pandas marks a missing or unreadable value. Find them with df.isna().sum()."
+  - q: "Why might a sales column fail to sum?"
+    a: "It was read as text, for example because of commas like '1,250'. Remove commas and convert with pd.to_numeric."
+  - q: "What does groupby do?"
+    a: "Splits rows into groups by one or more columns, then summarises each group, such as total sales per city."
+  - q: "What does a left merge keep?"
+    a: "Every row of the left table, adding matching columns from the right and leaving blanks where there is no match."
+  - q: "How should you read Indian dates like 05/11/2026?"
+    a: "With dayfirst=True or an explicit format, so it means 5 November, not 11 May."
+exercise:
+  title: "Answer the owner's questions"
+  setup: "A chain of four bakeries in Kolkata exports October sales to sales.csv with columns date (like 05/10/2026), store, item, category, qty and amount (text like '1,250'). The owner asks: (1) total sales per store, (2) the top 3 items in the 'Cakes' category by amount, (3) how many rows have unreadable amounts, (4) daily totals for the Park Street store."
+  questions:
+    - q: "What must you do to the amount column before any totals?"
+      a: "df['amount'] = pd.to_numeric(df['amount'].str.replace(',', ''), errors='coerce'), so text becomes numbers and bad values become NaN."
+    - q: "Write the code for question (1)."
+      a: "df.groupby('store')['amount'].sum().sort_values(ascending=False)"
+    - q: "Write the code for question (3)."
+      a: "df['amount'].isna().sum(), after the conversion with errors='coerce'."
+    - q: "What must you do to the date column for question (4)?"
+      a: "Convert it with pd.to_datetime(df['date'], dayfirst=True), filter to Park Street, then group by date and sum the amount."
+ask:
+  - "How do I clean a messy CSV with pandas?"
+  - "What is the difference between merge and concat?"
+  - "How do I group by month in pandas?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
-**pandas** is the Python library for working with tables. Its main object, the **DataFrame**, holds rows and named columns, like a spreadsheet you can control with code. With a few lines you can load a CSV or Excel file, clean it, filter rows, group and summarise, join tables and save the result.
+Most data in business lives in tables: sales exports, customer lists, attendance sheets, survey results. **pandas** is the Python library for working with tables. Its main object, the **DataFrame**, holds rows and named columns, like a spreadsheet you control with code.
 
-For AI work, pandas is how you prepare data, inspect model outputs and build evaluation reports.
+```text
+            DataFrame: df
+   index | date       | store       | item         | amount
+  -------+------------+-------------+--------------+--------
+     0   | 2026-10-01 | RS Puram    | Glucometer   | 1250.0
+     1   | 2026-10-01 | Gandhipuram | Paracetamol  |   40.0
+     2   | 2026-10-02 | RS Puram    | Insulin pen  | 2100.0
+          ^ columns have names; rows have an index
+```
+
+With a few lines you can load a CSV or Excel file, clean it, filter rows, group and summarise, join tables and save the result. Unlike a spreadsheet, the steps are written down, so next month's report is one command, not a day of clicking.
+
+For AI work, pandas is how you prepare training data, inspect model outputs and build evaluation reports.
+
+This lesson follows Lakshmi, who manages five pharmacies in Coimbatore, as she turns a monthly 40,000-row export into answers in seconds. By the end you will load a messy CSV, clean it and produce a grouped summary you can rerun.
 
 ## How it works
 
-**Load and look.**
+### Load and look
 
 ```python
 import pandas as pd
@@ -38,45 +85,101 @@ df.info()           # columns, types, missing values
 df.describe()       # quick statistics for number columns
 ```
 
-**Select columns and filter rows.**
+Always look before you calculate. `info()` tells you if a column you expected to be numbers was read as text.
+
+### Select columns and filter rows
 
 ```python
-df["city"]                         # one column
-df[["city", "sales"]]              # several columns
-df[df["age"] > 30]                 # rows where age is above 30
-df[(df["city"] == "Pune") & (df["sales"] > 5000)]
+df["city"]                                        # one column
+df[["city", "sales"]]                             # several columns
+df[df["age"] > 30]                                # rows where age is above 30
+df[(df["city"] == "Pune") & (df["sales"] > 5000)] # two conditions
 ```
 
-Use `&` and `|` with brackets around each condition.
+Use `&` for "and" and `|` for "or", with brackets around each condition. Plain `and` and `or` do not work here.
 
-**Missing values.** Empty cells appear as `NaN` (not a number). Find them with `df.isna().sum()`; fill with `fillna` or drop rows with `dropna`, deciding deliberately which makes sense.
+### Missing values
 
-**New columns.**
+Empty or unreadable cells appear as **NaN** ("not a number"). Find them with `df.isna().sum()`. Then decide deliberately: fill them with `fillna`, drop the rows with `dropna`, or flag them for someone to check.
+
+### Fix types
+
+| Problem | Fix |
+| --- | --- |
+| Amounts like "1,250" read as text | `pd.to_numeric(df["amount"].str.replace(",", ""), errors="coerce")` |
+| Dates like 05/11/2026 | `pd.to_datetime(df["date"], dayfirst=True)` |
+| Item codes losing leading zeros | `pd.read_csv(..., dtype={"item_code": str})` |
+
+`errors="coerce"` turns anything unreadable into NaN instead of crashing, so you can count and report bad rows.
+
+### New columns
 
 ```python
 df["gst"] = df["sales"] * 0.18
 df["month"] = pd.to_datetime(df["date"], dayfirst=True).dt.month
 ```
 
-**Group and summarise.**
+### Group and summarise
 
 ```python
-df.groupby("city")["sales"].sum()              # total sales per city
+df.groupby("city")["sales"].sum()                                # total per city
 df.groupby(["city", "month"])["sales"].agg(["sum", "mean", "count"])
 ```
 
-**Sort and save.**
+```text
+   all rows  --> split by city -->  Pune: [..]  Nagpur: [..]  Nashik: [..]
+                                       |            |              |
+                                     sum()        sum()          sum()
+                                       v            v              v
+                                   Pune 4.2L   Nagpur 3.1L   Nashik 2.7L
+```
+
+### Sort and save
 
 ```python
 df.sort_values("sales", ascending=False).head(10)
 df.to_csv("clean_sales.csv", index=False)
 ```
 
-**Join tables.** `pd.merge(orders, customers, on="customer_id", how="left")` adds customer details to orders, keeping orders without a match.
+### Reshape with pivot tables
+
+Spreadsheet users love pivot tables, and pandas has them too:
+
+```python
+df.pivot_table(index="store", columns="month", values="amount", aggfunc="sum")
+```
+
+This gives one row per store and one column per month, with totals in each cell. It is often the clearest way to show a trend to a manager. Add `margins=True` for row and column totals.
+
+### Work with dates
+
+Once a column is a real date, pandas can do a lot with it:
+
+```python
+df["date"] = pd.to_datetime(df["date"], dayfirst=True)
+df["weekday"] = df["date"].dt.day_name()             # Monday, Tuesday...
+weekly = df.set_index("date").resample("W")["amount"].sum()
+```
+
+`resample("W")` adds up sales week by week; use `"MS"` for calendar months. This is how you spot that Sunday sales are always low, or that the week before Diwali is the year's peak.
+
+### Join tables
+
+```python
+pd.merge(orders, customers, on="customer_id", how="left")
+```
+
+| `how=` | Keeps |
+| --- | --- |
+| `"inner"` | Only rows that match in both tables |
+| `"left"` | Every row of the left table, with blanks where there is no match |
+| `"outer"` | Every row of both tables |
+
+Inner joins can drop rows silently. Check row counts before and after merging.
 
 ## A worked example
 
-Lakshmi manages a chain of five pharmacies in Coimbatore and receives a monthly sales export of 40,000 rows.
+Lakshmi manages a chain of five pharmacies in Coimbatore. Each month she receives a sales export of about 40,000 rows and used to spend a day summarising it in a spreadsheet.
 
 ```python
 df = pd.read_csv("sales_oct.csv")
@@ -92,22 +195,36 @@ top_items = (df[df["category"] == "Diabetes care"]
 print(top_items)
 ```
 
-She finds 37 rows where the amount column contained "NA" from a till error, reports them to the store, and learns that the RS Puram store sold 40% more diabetes-care products than the others, which leads her to adjust stock across stores. The analysis that took her a day in a spreadsheet now runs in seconds each month.
+**What she learns:**
+
+| Question | Answer |
+| --- | --- |
+| Rows with unreadable amounts | 37, all "NA" from one till's error; reported to that store |
+| Highest-selling store | RS Puram |
+| Diabetes-care sales at RS Puram compared with the others | About 40% higher |
+| Top diabetes-care item | Glucometer strips |
+
+The 40% gap leads her to move stock of diabetes-care products between stores, so the other branches stop running out while RS Puram stops overstocking. The analysis that took her a day now runs in seconds each month, and because the steps are in code, November's report is the same script with a new file name.
+
+### Check your work
+
+Before you send numbers to anyone, check them. Compare the grand total with the total in the source system. Count rows before and after every filter and merge, and explain any change. Look at the five largest and five smallest values for mistakes, such as a price entered in paise instead of rupees. And recompute one number by hand. These checks take a few minutes and save you from the embarrassment of a wrong report reaching the owner.
 
 ## Common mistakes
 
-- **Not checking types.** Numbers read as text (because of commas) cannot be summed. Convert them.
-- **Ignoring missing values.** Decide whether to fill, drop or flag them.
+- **Not checking types.** Numbers read as text, because of commas, cannot be summed. Convert them.
+- **Ignoring missing values.** Decide whether to fill, drop or flag them, and say which.
 - **Wrong date order.** Indian dates are day first; use `dayfirst=True` or an explicit format.
 - **Using `and` instead of `&` in filters.** Use `&` and `|` with brackets.
 - **Inner joins that drop rows silently.** Check row counts before and after merging.
+- **Editing the original file.** Save cleaned data to a new file and keep the raw export untouched.
 
 ## Practise
 
-Work through Kaggle's free pandas course linked below.
+Work through Kaggle's free pandas course, linked below.
 
-1. Load a public CSV (an Indian government open data file works well), check types and missing values, and fix two problems.
-2. Answer three questions with `groupby`, such as totals by state, the top five categories and the monthly trend.
-3. Merge it with a second table and confirm the row count is what you expect.
+1. **Clean.** Load a public CSV, such as an Indian government open data file, check types and missing values, and fix two problems.
+2. **Group.** Answer three questions with `groupby`, such as totals by state, the top five categories and the monthly trend.
+3. **Merge.** Merge it with a second table and confirm the row count is what you expect.
 
 **You are done when you can** load a messy CSV, clean it, and produce a grouped summary with code you could rerun next month.

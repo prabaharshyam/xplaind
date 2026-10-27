@@ -5,7 +5,7 @@ import { INTERVIEW_TOPICS } from "@/lib/interview-topics";
 import { PRICE_STALE_DAYS } from "@/lib/roadmap/cost";
 import { LEVEL_IDS, type LevelId, levelIndex } from "@/lib/levels";
 import { isHumanName } from "./review";
-import { EXPLAINER_MAX_WORDS, EXPLAINER_MIN_WORDS, EXPLAINER_SECTIONS, wordCount } from "./schema";
+import { DEEP_MAX_WORDS, DEEP_MIN_WORDS, EXPLAINER_MAX_WORDS, EXPLAINER_MIN_WORDS, EXPLAINER_SECTIONS, wordCount } from "./schema";
 import type { Bundle, Entry, Issue } from "./types";
 
 /** Launch minimums from the PRD. They fail the build only in launch mode. */
@@ -17,6 +17,9 @@ export const LAUNCH_MINIMUMS = {
 
 /** Re-verify a resource whose last_verified is older than this many days. */
 export const STALE_VERIFICATION_DAYS = 180;
+/** IQ-8: a role's Top 25, of which at least 12 test judgement rather than definitions. */
+export const TOP_INTERVIEW = 25;
+export const TOP_PRACTICAL = 12;
 
 export type ValidateOptions = {
   /** Today as YYYY-MM-DD in India. Passed in so tests are stable. */
@@ -74,6 +77,7 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   uniqueIds("interview question", bundle.interview);
   uniqueIds("book", bundle.books);
   uniqueIds("glossary term", bundle.glossary);
+  uniqueIds("guided project", bundle.projects);
 
   const resourceById = new Map(bundle.resources.map((r) => [r.data.id, r]));
   const stopById = new Map(bundle.stops.map((s) => [s.data.id, s]));
@@ -152,9 +156,20 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
       error(file, `explainer sections must come in the order ${EXPLAINER_SECTIONS.join(", ")}`);
     }
     const words = wordCount(s.body);
-    if (words < EXPLAINER_MIN_WORDS || words > EXPLAINER_MAX_WORDS) {
-      error(file, `an explainer is ${EXPLAINER_MIN_WORDS} to ${EXPLAINER_MAX_WORDS} words; this one is ${words}`);
+    if (s.format === "explainer") {
+      if (words < EXPLAINER_MIN_WORDS || words > EXPLAINER_MAX_WORDS) {
+        error(file, `an explainer is ${EXPLAINER_MIN_WORDS} to ${EXPLAINER_MAX_WORDS} words; this one is ${words}`);
+      }
+      gap(file, `lesson "${s.id}" is a short explainer; rewrite it as a deep lesson`, "RM-2");
+      continue;
     }
+    // Deep lessons: longer, with a text diagram and a table, like a roadmap.sh pack lesson.
+    if (words < DEEP_MIN_WORDS || words > DEEP_MAX_WORDS) {
+      error(file, `a deep lesson is ${DEEP_MIN_WORDS} to ${DEEP_MAX_WORDS} words; this one is ${words}`);
+    }
+    if (!/^```text\n/m.test(s.body)) error(file, "a deep lesson has at least one diagram in a ```text block");
+    if (!/^\|.+\|\s*\n\|[\s:|-]+\|/m.test(s.body)) error(file, "a deep lesson has at least one table");
+    if (/^# /m.test(s.body.replace(/^```[\s\S]*?^```/gm, ""))) error(file, "lesson text starts its headings at ##");
   }
   for (const { file, data: g } of bundle.glossary) {
     for (const r of g.related) {
@@ -228,6 +243,61 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
       gap(file, `fee checked on ${c.fee_checked_on}; check it again`, "RM-6");
     }
     if (!isHumanName(c.verified_by)) gap(file, `verified_by "${c.verified_by}" is not a person; a human must confirm the exam page`, "ED-4");
+  }
+
+  // ---- guided projects (GP-1, GP-4) ---------------------------------------
+  const projectById = new Map(bundle.projects.map((p) => [p.data.id, p]));
+  const guided = new Set<string>();
+  for (const { file, data: g } of bundle.goals) {
+    for (const st of g.stages) {
+      if (!st.guide) continue;
+      const guide = projectById.get(st.guide);
+      if (!guide) error(file, `stage "${st.id}" links guided project "${st.guide}", which does not exist`, "GP-4");
+      else if (st.project && st.project.title !== guide.data.title) {
+        error(file, `stage "${st.id}" project "${st.project.title}" and its guide "${guide.data.title}" must have the same title`, "GP-4");
+      }
+      guided.add(st.guide);
+    }
+  }
+  for (const { file, data: p } of bundle.projects) {
+    if (!guided.has(p.id)) error(file, `guided project "${p.id}" is not linked from any path stage`, "GP-4");
+    for (const id of p.lessons) if (!stopById.has(id)) error(file, `lesson "${id}" does not exist`, "GP-1");
+    if (new Set(p.lessons).size !== p.lessons.length) error(file, "a lesson is listed twice", "GP-1");
+    const titles = p.steps.map((st) => st.title);
+    if (new Set(titles).size !== titles.length) error(file, "step titles must be unique", "GP-1");
+    if (/https?:\/\//.test(JSON.stringify([p.steps, p.rubric, p.summary]))) {
+      error(file, "guided projects link to lessons and courses, not to raw web addresses", "GP-1");
+    }
+    if (!isHumanName(p.reviewed_by)) gap(file, `reviewed_by "${p.reviewed_by}" is not a person; a human must review this project`, "ED-9");
+    if (daysBetween(opts.today, p.reviewed_on) > 0) error(file, `reviewed_on ${p.reviewed_on} is in the future`, "ED-9");
+  }
+
+  // ---- IQ-8: each role's Top 25 interview questions -------------------------
+  const interviewById = new Map(bundle.interview.map((q) => [q.data.id, q.data]));
+  for (const { file, data: g } of bundle.goals) {
+    const top = g.top_interview;
+    if (top.length === 0) {
+      gap(file, `no Top ${TOP_INTERVIEW} interview questions yet`, "IQ-8");
+      continue;
+    }
+    if (top.length !== TOP_INTERVIEW) {
+      error(file, `top_interview lists ${top.length} questions; a role needs exactly ${TOP_INTERVIEW}`, "IQ-8");
+      continue;
+    }
+    if (new Set(top).size !== top.length) error(file, "top_interview lists a question twice", "IQ-8");
+    const lessons = new Set(g.stages.flatMap((st) => st.lessons));
+    let practical = 0;
+    for (const id of top) {
+      const q = interviewById.get(id);
+      if (!q) {
+        error(file, `top_interview question "${id}" does not exist`, "IQ-8");
+        continue;
+      }
+      if (!q.example) error(file, `top_interview question "${id}" needs an example to tell in the interview`, "IQ-8");
+      if (!lessons.has(q.stop_id)) error(file, `top_interview question "${id}" links lesson "${q.stop_id}", which is not on this path`, "IQ-8");
+      if (q.kind !== "concept") practical++;
+    }
+    if (practical < TOP_PRACTICAL) error(file, `top_interview has ${practical} scenario, use-case or real-life questions; it needs at least ${TOP_PRACTICAL}`, "IQ-8");
   }
 
   // ---- blog ---------------------------------------------------------------

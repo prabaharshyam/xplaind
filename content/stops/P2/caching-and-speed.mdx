@@ -9,14 +9,47 @@ hours: 2
 gap_tags: [caching-latency]
 primary_resource: claude-prompt-caching
 alternates: [claude-streaming]
-format: explainer
+format: deep
 key_terms: [caching, streaming, latency, token]
 check:
   type: mcq
   question_ids: [caching-and-speed-1, caching-and-speed-2, caching-and-speed-3]
+flashcards:
+  - q: "What is prompt caching?"
+    a: "The provider stores the processed form of a long unchanging prompt prefix, so later requests starting the same way are cheaper and faster."
+  - q: "How should a prompt be ordered for caching?"
+    a: "Stable content first: system prompt, tools, reference documents; changing content last: the question and recent turns."
+  - q: "What breaks a prompt cache?"
+    a: "Any change in the prefix, such as a timestamp or user name near the start."
+  - q: "What is response caching?"
+    a: "Storing answers keyed by the normalised request and versions, and returning them for repeated requests without a model call."
+  - q: "When must response caches not be shared?"
+    a: "When answers contain personal or permission-dependent data."
+  - q: "What is the risk of semantic caching?"
+    a: "Near-identical questions can need different answers, so similar-match caching can return wrong ones."
+  - q: "What does streaming improve?"
+    a: "Perceived speed: users see the first words within a second or two, though total generation time is the same."
+  - q: "Name three other speed levers."
+    a: "Shorter outputs, smaller models for simple steps, and running independent calls in parallel."
+exercise:
+  title: "Speed it up"
+  setup: "A Noida tax-filing app's assistant answers questions about a user's uploaded Form 16 and the tax rules. Each request currently starts with today's date and the user's name, then the 8,000-token tax rules, then the user's Form 16, then the question. Answers take 7 seconds to appear in full. Many users ask the same general questions, such as 'what is the standard deduction?'"
+  questions:
+    - q: "How should the prompt be reordered for caching?"
+      a: "Tax rules first, then the user's Form 16, then the date, name and question at the end."
+    - q: "What can be response-cached, and what not?"
+      a: "General questions about the rules can be cached by rules version; answers about a user's own Form 16 must not be shared."
+    - q: "What fixes the 7-second wait?"
+      a: "Streaming the answer so the first words appear within a second or two, plus shorter answers where possible."
+    - q: "When must the response cache be cleared?"
+      a: "When the tax rules change, for example a new budget, by keying the cache on the rules version."
+ask:
+  - "How does prompt caching work?"
+  - "What is semantic caching and is it safe?"
+  - "How do I make my LLM app feel faster?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -26,6 +59,21 @@ Three techniques cut cost and waiting time in LLM apps:
 - **Prompt caching**: the provider stores the processed form of a long, unchanging beginning of a prompt (system prompt, a document, tool definitions), so later requests that start the same way are cheaper and faster.
 - **Response caching**: your app stores answers and returns them directly when the same (or an equivalent) request comes again, skipping the model call entirely.
 - **Streaming**: sending the reply to the user token by token as it is generated, so they start reading almost at once.
+
+```text
+   REQUEST LAYOUT FOR PROMPT CACHING
+   +-----------------------------------------------+-----------------------+
+   | instructions | tools | 40-page contract       | question 3            |
+   |        stable prefix (cached after first call)| changes every request |
+   +-----------------------------------------------+-----------------------+
+     question 1: full price, 9 s        question 2+: cached prefix, first token ~2 s
+
+   RESPONSE CACHE   key = normalised question + template version + model version
+                    hit  --> answer instantly, no model call
+                    miss --> model --> stream tokens to the screen
+```
+
+This lesson follows a contract assistant at a legal-tech company in Chennai, where lawyers ask about ten questions per uploaded agreement.
 
 ## How it works
 
@@ -39,9 +87,21 @@ Caches expire after a period of no use; check your provider's rules on minimum l
 
 **Response caching.** Store the answer keyed by the normalised request (and the prompt and model version). Good for repeated, identical questions: FAQ answers, product descriptions, translations of fixed text. Set expiry times, invalidate when underlying data changes, and never share cached answers across users when they contain personal or permission-dependent data. "Semantic caching" matches similar rather than identical questions; use it carefully, because near-identical questions can need different answers.
 
-**Streaming.** Total generation time does not change, but users see the first words in well under a second instead of waiting for the full reply. Perceived speed improves enormously, and users can stop reading or cancel early. Handle errors and disconnections mid-stream.
+**Streaming.** Total generation time does not change, but users usually see the first words within a second or two instead of waiting for the full reply. Perceived speed improves enormously, and users can stop reading or cancel early. Handle errors and disconnections mid-stream.
 
 **Other speed levers.** Shorter outputs (generation time grows with length); smaller models for simple steps; fewer sequential model calls; running independent calls in parallel; retrieving fewer, better chunks.
+
+**The three techniques compared:**
+
+| Technique | Saves | Works when | Watch out for |
+| --- | --- | --- | --- |
+| Prompt caching | Input cost and time to first token | Long identical prefixes reused soon | Prefix changes; cache expiry |
+| Response caching | The whole model call | Identical repeated questions | Personal data; stale answers |
+| Streaming | Perceived waiting time | Chat and long answers | Mid-stream errors and disconnects |
+
+**Checking the cache works.** Providers report cached input tokens in each response's usage data. Log them. After reordering a prompt, send five requests in a row and confirm the cached count rises from the second request. If it stays at zero, something variable still sits in the prefix, often a timestamp, a request id, or tool definitions listed in a changing order.
+
+**Invalidating response caches.** Include every input that changes the answer in the key: the question, the template or document version, the prompt version and the model. Set an expiry even for stable answers, and clear entries when the source changes. A cached wrong answer is worse than a slow right one, because it repeats until someone notices.
 
 ## A worked example
 
@@ -56,6 +116,14 @@ After:
 - Common questions about the firm's own standard template ("What is the notice period in our standard NDA?") are answered from a response cache keyed by template version.
 
 Cost per contract session falls by about 70%, and lawyers stop complaining that the tool is slow.
+
+| Measure per contract session | Before | After |
+| --- | --- | --- |
+| Time to first token, later questions | About 9 s to full answer | About 2 s, then streamed |
+| Input tokens billed in full | Every question | Mostly cached after the first |
+| Cost | Baseline | About 70% lower |
+
+**What changed for the lawyers.** The first question on a new contract still takes the full time, because the cache is empty. Every later question is faster and cheaper, and the streamed text means lawyers start reading at once. The team added a short note under the first answer, "Later questions on this contract will be faster", which stopped people judging the tool by its slowest moment.
 
 ## Common mistakes
 

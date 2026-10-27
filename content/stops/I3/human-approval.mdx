@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: langgraph-interrupts
 alternates: [dlai-agents-langgraph]
-format: explainer
+format: deep
 key_terms: [human-in-the-loop, checkpoint, agent]
 check:
   type: mcq
   question_ids: [human-approval-1, human-approval-2, human-approval-3]
+flashcards:
+  - q: "What is a human approval step?"
+    a: "A pause before an agent's action takes effect, showing a person what and why, continuing only when they approve, edit or reject it."
+  - q: "Which actions need approval?"
+    a: "Costly, irreversible, external or regulated ones: payments, refunds, customer messages, record changes, deletions, legal or medical decisions."
+  - q: "How do you decide approval rules?"
+    a: "Rate every tool read-only, reversible or irreversible and external; always approve the last, use thresholds for the middle, never for reads."
+  - q: "What does pausing durably mean?"
+    a: "Saving the agent's state and ending the run as interrupted, so it can resume hours later without holding a process open."
+  - q: "What should an approval screen show?"
+    a: "The action in plain words, the agent's reason, the evidence used, and one-click approve, edit and reject."
+  - q: "Why let approvers edit?"
+    a: "Edits fix the action without starting over, and they are the best data on where the agent is wrong."
+  - q: "What signals rubber-stamping?"
+    a: "Falling decision times with no edits or rejections, often on screens without enough evidence."
+  - q: "What should happen if nobody responds to an approval?"
+    a: "Remind, escalate or cancel safely. Never approve by default."
+exercise:
+  title: "Write the approval rules"
+  setup: "A Hyderabad property-management company's agent handles tenant requests. Its tools: read_lease, read_payment_history, schedule_plumber (can be rescheduled free), waive_late_fee (amount), send_notice_to_tenant, and terminate_lease. Managers are often on site visits and respond within two to six hours."
+  questions:
+    - q: "Which tools need no approval?"
+      a: "read_lease and read_payment_history, which only read, and schedule_plumber, which is reversible at no cost."
+    - q: "How should waive_late_fee be handled?"
+      a: "Auto-approve small waivers below a threshold, such as ₹500 for a first late payment, and send larger ones for approval."
+    - q: "How should send_notice_to_tenant and terminate_lease be handled?"
+      a: "Always approval: notices are external and formal; termination is irreversible and legal, and may best go to a person entirely."
+    - q: "Given managers' response times, what must the system support?"
+      a: "Durable pauses for hours, reminders, escalation to another manager after a set time, and safe cancellation, never default approval."
+ask:
+  - "When should an AI agent ask a human for approval?"
+  - "How do I pause and resume an agent?"
+  - "How do I design a good approval screen?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -25,9 +58,30 @@ A **human approval step** pauses an agent before an action takes effect, shows a
 
 Approval is for actions that are costly, irreversible, external or regulated: refunds and payments, emails and messages to customers, changes to records, deleting anything, anything that touches legal or medical decisions. Reading data rarely needs approval.
 
+```text
+   agent proposes: refund ₹2,499 for order 7781
+          |
+          v
+   [risk rules]  read? -> run   small reversible? -> run   refund over limit? -> PAUSE
+          |
+          v
+   state saved (checkpoint)  --> run ends "interrupted"
+          |
+          v
+   approval card: action + reason + evidence   [Approve] [Edit amount] [Reject + reason]
+          |                                       (no reply in 4 h -> remind -> escalate)
+          v
+   resume from checkpoint with the decision --> act --> tell the customer
+          |
+          v
+   log: decision, edit, reason, seconds to decide
+```
+
+This lesson follows a returns and refunds agent at an e-commerce company in Jaipur.
+
 ## How it works
 
-**Classify actions by risk.** List every tool and rate it: read-only, reversible internal change, irreversible or external. A simple rule set decides what needs approval: always for irreversible or external actions; for others above a threshold (refunds over ₹2,000); never for reads.
+**Classify actions by risk.** List every tool and rate it: read-only, reversible internal change, irreversible or external. A simple rule set decides what needs approval: always for irreversible or external actions; for others above a threshold (such as refunds over ₹1,000); never for reads.
 
 **Pause durably.** The agent must stop and wait, possibly for hours, without holding a server process open. Frameworks with checkpoints do this: state is saved, the run ends in an "interrupted" state, and a later call resumes from the same point with the person's decision.
 
@@ -39,6 +93,20 @@ Approval is for actions that are costly, irreversible, external or regulated: re
 
 **Timeouts and escalation.** Decide what happens if nobody responds: remind, escalate to another approver, or cancel safely. Never default to "approve".
 
+**A risk table for one agent:**
+
+| Tool | Type | Rule |
+| --- | --- | --- |
+| `read_order` | Read-only | Never needs approval |
+| `issue_return_label` | Reversible | Auto-approved |
+| `refund` up to ₹1,000, order under 30 days | Money, small | Auto-approved |
+| `refund`, any other case | Money | Support lead approves |
+| Any message mentioning legal action | Legal risk | Handed to a person entirely |
+
+**Designing the card.** Put the decision first, in one sentence with the amount and the recipient. Below it, give the reason the agent gave and the evidence, such as the customer's photo and the policy clause with its number. Keep buttons large and labelled with outcomes. Make "Reject" ask for a reason from a short list plus free text, because those reasons are what you will analyse later. Test the card with real approvers: if they open another system to decide, the card is missing something.
+
+**Loosening with evidence.** Approval is not permanent. After a month or two of data, look at each rule's approval, edit and rejection rates. Where people approve almost everything without edits, raise the threshold a little and watch complaints. Where they edit often, improve the agent's examples first.
+
 ## A worked example
 
 An e-commerce company in Jaipur deploys an agent to handle return and refund requests.
@@ -48,6 +116,14 @@ Risk rules: reading orders needs no approval; issuing a return label is reversib
 The approval card reads: "Refund ₹2,499 for order 7781 (blue kurta, size M). Customer says it arrived torn; photo attached. Policy 4.2 allows full refund for damage reported within 7 days; reported on day 3." Approve, Edit amount, Reject with reason.
 
 In the first month, leads approve 91%, edit 6% (mostly partial refunds where only one item of a set was damaged) and reject 3% (photos showing no damage). Median decision time is 40 seconds. You add the edit cases to the agent's examples, after which edits fall to 2%. With that evidence, the client raises the auto-approve threshold to ₹1,500, which removes a third of approvals without increasing complaints.
+
+| Measure, first month | Value | Action taken |
+| --- | --- | --- |
+| Approved as proposed | 91% | None |
+| Edited | 6%, mostly partial refunds | Edit cases added to examples; edits fell to 2% |
+| Rejected | 3%, photos showing no damage | Reasons reviewed weekly |
+| Median time to decide | 40 seconds | Card judged clear enough |
+| Auto-approve threshold | Raised from ₹1,000 to ₹1,500 | A third fewer approvals, no rise in complaints |
 
 ## Common mistakes
 

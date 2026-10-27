@@ -10,6 +10,7 @@ export const XP = {
   lessonCheck: 50,
   lessonProject: 80,
   lessonSkipped: 10,
+  lessonSelfMarked: 20,
   perfectCheck: 20,
   practiceRating: 5,
   interviewAnswer: 10,
@@ -35,6 +36,7 @@ export function xpOf({ stops, ratings, interviews }: GameInputs): number {
     if (s.status !== "done") continue;
     if (s.how === "project") xp += XP.lessonProject;
     else if (s.how === "self_skipped") xp += XP.lessonSkipped;
+    else if (s.how === "self_marked") xp += XP.lessonSelfMarked;
     else xp += XP.lessonCheck;
     if (s.how === "check" && s.score === 100) xp += XP.perfectCheck;
   }

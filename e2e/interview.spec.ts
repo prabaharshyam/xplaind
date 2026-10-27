@@ -32,7 +32,7 @@ test.describe("interview questions (IQ-1, IQ-3)", () => {
       for (const h of ["Short answer", "Deeper answer", "Follow-ups to expect", "Common mistakes", "Learn it"]) {
         await expect(page.getByRole("heading", { name: h, exact: true }), `${q.id}: ${h}`).toBeVisible();
       }
-      await expect(page.getByText("Draft: written with AI help"), q.id).toBeVisible();
+      await expect(page.getByText("Draft: written with AI help"), q.id).toHaveCount(0); // signed off by the owner
       expect(await overflow(page), q.id).toBe(false);
       expect((await wcag(page)).violations, q.id).toEqual([]);
     }

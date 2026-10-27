@@ -7,7 +7,7 @@ import type { LevelId } from "@/lib/levels";
 import { loadContent } from "./load";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
-import type { BlogPost, Certification, Goal, GlossaryTerm, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
+import type { BlogPost, Certification, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
 
 let cached: Bundle | undefined;
 
@@ -35,6 +35,18 @@ export const getLevel = (id: LevelId): LevelDefinition | undefined =>
 
 export const GENAI_PATH_ID = "genai-engineer";
 
+/** GP-3: guided projects, in path order then file order. */
+export const getProjects = (): GuidedProject[] => getContent().projects.map((p) => p.data);
+export const getProject = (id: string): GuidedProject | undefined => getProjects().find((p) => p.id === id);
+
+/** The path stages that link a guided project (GP-4). */
+export const stagesWithGuide = (projectId: string): { path: Goal; stageId: string; stageTitle: string }[] =>
+  getPaths().flatMap((path) =>
+    pathStages(path)
+      .filter((st) => st.guide === projectId)
+      .map((st) => ({ path, stageId: st.id, stageTitle: st.title })),
+  );
+
 /** Paths in the order the chooser shows them. */
 export const getPaths = (): Goal[] => getContent().goals.map((g) => g.data).sort((a, b) => a.rank - b.rank);
 export const getPath = (id: string): Goal | undefined => getPaths().find((g) => g.id === id);
@@ -61,7 +73,7 @@ export function pathLessons(pathId: string): Stop[] {
 export const pathsWithLesson = (lessonId: string): Goal[] =>
   getPaths().filter((p) => p.stages.some((st) => st.lessons.includes(lessonId)));
 
-/** The GenAI Engineer path's lessons, in ladder order. */
+/** The Generative AI & LLM Engineer path's lessons, in ladder order. */
 export const getStopsInOrder = (): Stop[] => pathLessons(GENAI_PATH_ID);
 
 /** Glossary terms, A to Z. */

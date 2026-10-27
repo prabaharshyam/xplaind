@@ -4,19 +4,52 @@ level: I2
 theme: retrieval
 title: "Enterprise connectors"
 outcome: "Pull documents and records from SharePoint, Salesforce, SAP, Jira and cloud storage reliably: authentication, paging, rate limits, incremental sync, deletions and permissions."
-why_it_matters: "An assistant is only as useful as the data it can reach, and that data sits in a dozen business systems with their own APIs and quirks. Connector work is often half of an FDE project's engineering time, and the part clients notice when it breaks."
+why_it_matters: "An assistant is only as useful as the data it can reach, and that data sits in a dozen business systems with their own APIs and quirks. Connector work often takes a large share of an FDE project's engineering time, and the part clients notice when it breaks."
 hours: 4
 gap_tags: []
 primary_resource: microsoft-graph-overview
 alternates: []
-format: explainer
+format: deep
 key_terms: [connector, api, rate-limit, cdc]
 check:
   type: mcq
   question_ids: [enterprise-connectors-1, enterprise-connectors-2, enterprise-connectors-3]
+flashcards:
+  - q: "What is a connector?"
+    a: "Code that moves data between a business system, such as SharePoint or Salesforce, and your AI system."
+  - q: "How do connectors usually authenticate?"
+    a: "With OAuth through an app registered by the client's IT team, scoped read-only to the agreed sites or objects."
+  - q: "Why save the paging cursor?"
+    a: "So a failed run can resume where it stopped instead of starting again from page 1."
+  - q: "How should a connector handle rate limits?"
+    a: "Respect Retry-After headers, back off on 429 responses, and spread large first loads over off-peak hours."
+  - q: "What is incremental sync?"
+    a: "After the first full copy, fetching only changes since the last run, using change tokens, modified-since filters or webhooks."
+  - q: "Why do deletions need special care?"
+    a: "If the sync does not report deletions, deleted documents stay searchable. Use a method that reports them or reconcile ids periodically."
+  - q: "What metadata should a connector keep?"
+    a: "Source id, URL, title, author, modified time, path or object type, owner, and access rights."
+  - q: "What should each sync run record?"
+    a: "Items read, added, changed, deleted and failed, and the time taken, with alerts when a connector stops or failures jump."
+exercise:
+  title: "Fix the connector"
+  setup: "A Pune manufacturer's maintenance assistant reads 60,000 manuals from a network file share and work orders from SAP. The current connector re-reads every file every night, takes nine hours, and sometimes runs into the morning shift. Retired manuals still appear in answers. Last week the job crashed at file 41,000 and restarted from the beginning. Nobody noticed when it failed for three days."
+  questions:
+    - q: "How do you shorten the nightly run?"
+      a: "Switch to incremental sync: compare modified times or a change journal and process only new and changed files."
+    - q: "Why do retired manuals still appear, and what fixes it?"
+      a: "Deletions and moves are not detected. Reconcile the list of file ids against the index and remove missing ones."
+    - q: "How do you avoid restarting from file 1?"
+      a: "Save progress, such as the last processed path or cursor, and resume from it after a failure."
+    - q: "How would the team have noticed the three-day failure?"
+      a: "Record per-run counts and alert when a run fails, does not start, or processes far fewer items than usual."
+ask:
+  - "How does Microsoft Graph delta sync work?"
+  - "Should I build connectors or use Airbyte?"
+  - "How do I sync permissions from SharePoint?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -28,6 +61,21 @@ A **connector** is the code that moves data between a business system and your A
 - **Messages**: email and chat, used carefully because of privacy.
 
 You can build connectors yourself, use an integration platform (Airbyte, Fivetran and others offer many ready-made ones), or use the connectors bundled with a search or AI platform. Either way you must understand what they do.
+
+```text
+  SharePoint --(Graph, OAuth, delta)--+
+  Salesforce --(API, modified since)--+--> [connector: page, back off, resume]
+  Jira, file shares, databases -------+            |
+                                                  v
+                               items + metadata + permissions + deletions
+                                                  |
+                                                  v
+                            [parse, chunk, embed]  -->  index for the assistant
+                                                  |
+                           run log: read 312, added 40, changed 266, deleted 6, failed 0
+```
+
+This lesson follows a sales assistant for a consumer-goods company in Gurugram, built on SharePoint and Salesforce.
 
 ## How it works
 
@@ -47,6 +95,17 @@ You can build connectors yourself, use an integration platform (Airbyte, Fivetra
 
 **Observability.** For each run record items read, added, changed, deleted, failed and time taken. Alert when a connector stops or failure counts jump.
 
+**Ways to detect changes:**
+
+| Method | How it works | Watch out for |
+| --- | --- | --- |
+| Change or delta tokens | The API returns changes since a saved token | Tokens can expire or break; keep a full re-scan fallback |
+| Modified-since filter | Query items with a modified time after the last run | Often misses deletions; clocks and time zones must match |
+| Webhooks | The system calls you when something changes | Calls can be lost; pair with a periodic check |
+| Full comparison | List all ids and compare with your index | Slow on large sets; good as a weekly safety net |
+
+**Build, buy or borrow.** Integration platforms such as Airbyte or Fivetran save weeks for common systems, and a search platform's bundled connectors may already read permissions. They still need checking: confirm they report deletions, read access rights, and expose run counts you can alert on. Write your own when the system is unusual, such as an in-house database or a vendor portal, or when the client's security team will not approve a third-party tool.
+
 ## A worked example
 
 A Gurugram consumer-goods company wants a sales assistant over SharePoint (product sheets, trade-scheme circulars) and Salesforce (accounts, opportunities).
@@ -57,6 +116,13 @@ Salesforce: a read-only integration user limited to Account, Opportunity and Pro
 
 In week three, the regional team renames a SharePoint site and the delta token becomes invalid. The connector's error rate alert fires; the job falls back to a full re-scan of that site overnight, and nothing is missed. Your runbook for the client's IT team explains exactly this case.
 
+| Measure | Before | After |
+| --- | --- | --- |
+| SharePoint sync | Full re-read nightly, about 6 hours, often throttled | Delta every 15 minutes, about 1 minute |
+| Salesforce sync | Daily export | Every 30 minutes |
+| Deleted documents still searchable | Dozens | None, checked weekly |
+| Time to notice a failed sync | Days | Minutes, through alerts |
+
 ## Common mistakes
 
 - **Full re-syncs every time.** Use change tokens or modified-since queries.
@@ -64,6 +130,7 @@ In week three, the regional team renames a SharePoint site and the delta token b
 - **Over-broad access.** Ask for read-only access to named sites and objects, not the whole tenant.
 - **No resume after failure.** A crash at page 9,000 should not restart from page 1.
 - **Silent connectors.** If nobody is alerted when a sync stops, the assistant quietly goes stale.
+- **No runbook for the client's IT team.** Write down what to do when tokens break, permissions change or a site is renamed.
 
 ## Practise
 

@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: langfuse-evaluation
 alternates: [eugeneyan-eval-process, hamel-evals]
-format: explainer
+format: deep
 key_terms: [online-evaluation, evals, llm-as-judge, drift]
 check:
   type: mcq
   question_ids: [online-evals-feedback-1, online-evals-feedback-2, online-evals-feedback-3]
+flashcards:
+  - q: "What is the difference between offline and online evals?"
+    a: "Offline evals test a fixed golden set before shipping; online evals score real traffic after shipping to find unknown problems."
+  - q: "What four kinds of online signal are there?"
+    a: "Automatic checks, model-graded scores on a sample, user feedback, and human review of a sample."
+  - q: "Why score asynchronously?"
+    a: "Running checks and judges from traces after the response is sent adds no latency for users."
+  - q: "How should online scoring be sampled?"
+    a: "Cheap rules on everything; a judge on a random 5 to 10% plus every trace with negative feedback or a guardrail trigger."
+  - q: "What makes feedback useful?"
+    a: "A thumbs down with a few quick reasons, plus implicit signals such as a rephrased question within a minute."
+  - q: "What is the weekly feedback loop?"
+    a: "Read the worst traces, group them by cause, fix the biggest group, and add representative cases to the golden set."
+  - q: "Why recheck the judge regularly?"
+    a: "Judge scores drift and have blind spots; a person grading about 50 samples every few weeks keeps them honest."
+  - q: "Why slice online scores?"
+    a: "A steady average can hide one topic, language or version getting much worse."
+exercise:
+  title: "Find the cause"
+  setup: "A Delhi edtech's tutor assistant scored 89% offline. A month after launch: negative feedback rose from 5% to 9%; the judge's faithfulness score is steady at 0.94; average answer length doubled after a prompt change two weeks ago; and the negative-feedback reason most chosen is 'too long'. Hindi conversations show twice the negative rate of English ones."
+  questions:
+    - q: "Why is the steady faithfulness score not reassuring?"
+      a: "Answers can be faithful to sources and still unhelpful; faithfulness does not measure length, clarity or fit to the question."
+    - q: "What is the most likely cause of the rise?"
+      a: "The prompt change that doubled answer length, matching the 'too long' feedback."
+    - q: "What does the Hindi gap suggest?"
+      a: "A language-specific problem worth slicing and reading: perhaps longer or poorer answers in Hindi, or missing Hindi cases offline."
+    - q: "What should the team add so this is caught before shipping next time?"
+      a: "A length check and Hindi cases in the golden set, plus an alert on sudden changes in answer length or negative feedback by language."
+ask:
+  - "How do I collect useful user feedback on AI answers?"
+  - "What is the difference between offline and online evaluation?"
+  - "How often should I review AI conversations?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -29,6 +62,24 @@ Online signals come in four kinds:
 - **Model-graded scores** on a sample: faithfulness to sources, relevance, tone, scored by a judge model you have checked against human grades.
 - **User feedback**: thumbs up or down, a reason, whether they copied the answer, asked again or escalated to a person.
 - **Human review**: an expert reads a weekly sample and labels what went wrong.
+
+```text
+   live request --> answer to user (no waiting)
+        |
+        v  trace stored
+   [rules on every trace]  format, citations, refusal, length, latency
+   [judge on 10% sample + all negative feedback]  faithfulness, relevance
+   [user feedback]  thumbs + reason, rephrased question, escalation
+   [weekly human review]  50 traces labelled by cause
+        |
+        v
+   dashboard by day, version, topic, language  --> alerts on sudden changes
+        |
+        v
+   fix the biggest cause  -->  add cases to the offline golden set
+```
+
+This lesson follows a telecom's customer assistant in Chennai whose negative feedback almost doubled six weeks after launch.
 
 ## How it works
 
@@ -44,6 +95,21 @@ Online signals come in four kinds:
 
 **Check the judge.** A judge model has its own errors. Every few weeks, have a person grade 50 judged samples and check agreement. If agreement falls, fix the judge prompt before trusting its numbers.
 
+**Signals and what they catch:**
+
+| Signal | Cost | Catches |
+| --- | --- | --- |
+| Rule checks on every trace | Almost free | Broken formats, missing citations, slow responses |
+| Refusal rate by topic | Free | Missing documents, over-strict prompts |
+| Judge on a sample | Model calls | Unfaithful or irrelevant answers |
+| Thumbs and reasons | Free | What users actually dislike |
+| Rephrase within a minute | Free | Answers that missed the question |
+| Weekly human review | Staff time | Causes no automatic signal names |
+
+**Running the weekly review.** Pull 50 traces: the 20 worst by judge score, 20 with negative feedback, and 10 at random. For each, write one cause label from a short list: retrieval miss, stale or missing document, prompt gap, out of scope, model error, or fine. Count the labels. The biggest group is next week's fix. Keep the counts week by week, so you and the client can see causes shrink as fixes land.
+
+**Telling the client.** Share the online dashboard and the weekly cause counts, not only the offline score. Clients trust a team that spots a problem, explains it and shows it fixed far more than a team that only reports a high launch number.
+
 ## A worked example
 
 A Chennai telecom's customer assistant passed its offline golden set at 91%. Six weeks after launch, negative feedback crept from 6% to 11%.
@@ -57,6 +123,12 @@ The online data showed:
 Reading 60 of those traces revealed the cause: a new prepaid plan had launched, customers asked about it in Tamil and English, and the plan documents had not been added to the index. The assistant correctly refused, and customers were unhappy.
 
 Fixes: the marketing team's plan launches now trigger an indexing job; an alert fires when the refusal rate for a topic jumps; 25 questions about new plans join the golden set. Negative feedback was back to 6% within a week. In the monthly review you showed the client the timeline, which did more for trust than the original 91%.
+
+| Week | Negative feedback | Refusal rate | Action |
+| --- | --- | --- | --- |
+| Launch | 6% | 8% | None |
+| Week 6 | 11% | 17% | Read 60 traces: new plan documents missing |
+| Week 7 | 6% | 8% | Plan launches trigger indexing; topic refusal alert; 25 golden cases added |
 
 ## Common mistakes
 

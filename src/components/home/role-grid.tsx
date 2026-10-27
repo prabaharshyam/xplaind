@@ -17,16 +17,19 @@ export type RoleCard = {
 export function RoleGrid({ roles }: { roles: RoleCard[] }) {
   return (
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {roles.map((r) => (
-        <li key={r.id}>
-          <Link
+      {roles.map((r, i) => (
+        <li key={r.id} className="lx-rise">
+          <Link data-tilt
             href={`/roadmap/${r.id}`}
             className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
           >
             <Cover theme={r.theme} seed={r.id} className="h-20 sm:h-28" iconSize={32} />
             <span className="flex flex-1 flex-col gap-2 p-4">
               <span className="flex items-center justify-between gap-2 text-lg font-semibold text-white">
-                {r.name}
+                <span className="flex items-baseline gap-2">
+                  <span aria-hidden="true" className="text-sm font-medium text-emerald-300">{i + 1}.</span>
+                  {r.name}
+                </span>
                 <span aria-hidden="true" className="text-white/40 transition group-hover:translate-x-0.5 group-hover:text-white">
                   →
                 </span>
@@ -50,8 +53,8 @@ export function TopicChips({ counts }: { counts: Record<string, number> }) {
   return (
     <ul className="flex flex-wrap gap-2">
       {THEMES.filter((t) => counts[t.id]).map((t) => (
-        <li key={t.id}>
-          <Link
+        <li key={t.id} className="lx-rise">
+          <Link data-tilt
             href={`/topics/${t.id}`}
             className="flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] py-2 pr-4 pl-2 text-sm text-zinc-100 hover:border-white/30 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-emerald-400"
           >

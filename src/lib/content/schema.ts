@@ -22,6 +22,10 @@ export const wordCount = (text: string): number => text.trim().split(/\s+/).filt
 export const EXPLAINER_SECTIONS = ["What it is", "How it works", "A worked example", "Common mistakes", "Practise"] as const;
 export const EXPLAINER_MIN_WORDS = 500;
 export const EXPLAINER_MAX_WORDS = 1500;
+/** A deep lesson has the same sections, written at roadmap.sh-pack depth, with a diagram and a table. */
+export const DEEP_MIN_WORDS = 1000;
+export const DEEP_MAX_WORDS = 3000;
+export const FLASHCARD_ANSWER_MAX_WORDS = 70;
 export const GLOSSARY_DEFINITION_MAX_WORDS = 45;
 
 const IsoDate = z.iso.date();
@@ -64,6 +68,8 @@ export const Resource = z
     affiliate_url: HttpsUrl.optional(), // RM-5: the tagged link /go uses; only when affiliate is true
     editor_score: z.number().min(0).max(5),
     why_picked: Text.max(280),
+    /** A warning shown right under the link, such as an age limit on the provider's site. */
+    notice: Text.max(240).optional(),
     last_verified: IsoDate,
     verified_by: Text,
     hosted_by: Text.optional(), // required when the link is a PDF (ED-8)
@@ -108,6 +114,15 @@ const McqCheck = z.strictObject({
 });
 const ProjectCheck = z.strictObject({ type: z.literal("project"), brief: Text });
 
+/** "Test your understanding": a question and a short answer, revealed on demand. */
+export const Flashcard = z.strictObject({ q: Text.max(200), a: Text });
+/** "Predict / try it": a short scenario, questions to answer first, then "Check your answers". */
+export const Exercise = z.strictObject({
+  title: Text.max(80),
+  setup: Text,
+  questions: z.array(z.strictObject({ q: Text, a: Text })).min(3).max(6),
+});
+
 /** Frontmatter of content/stops/<level>/<id>.mdx. The MDX body is the lesson text. */
 export const StopFrontmatter = z
   .strictObject({
@@ -130,13 +145,29 @@ export const StopFrontmatter = z
      * "explainer": our own lesson text with the EXPLAINER_SECTIONS. "brief": a short
      * task that leans on the linked course; release 1 lessons, to be rewritten.
      */
-    format: z.enum(["brief", "explainer"]).default("brief"),
+    format: z.enum(["brief", "explainer", "deep"]).default("brief"),
     /** Glossary ids this lesson teaches or relies on. */
     key_terms: z.array(Slug).default([]),
+    /** Deep lessons: 6 to 10 cards for "Test your understanding". */
+    flashcards: z.array(Flashcard).max(10).default([]),
+    /** Deep lessons: a "predict" or "try it" exercise with answers. */
+    exercise: Exercise.optional(),
+    /** Deep lessons: questions the AI tutor suggests for this lesson. */
+    ask: z.array(Text.max(90)).max(4).default([]),
     ...reviewShape,
   })
   .superRefine((s, ctx) => {
-    if (s.format === "explainer" && s.key_terms.length < 2) {
+    if (s.format === "deep") {
+      if (s.flashcards.length < 6) ctx.addIssue({ code: "custom", path: ["flashcards"], message: "a deep lesson has 6 to 10 flashcards" });
+      if (!s.exercise) ctx.addIssue({ code: "custom", path: ["exercise"], message: "a deep lesson has an exercise" });
+      if (s.ask.length < 3) ctx.addIssue({ code: "custom", path: ["ask"], message: "a deep lesson suggests 3 or 4 questions for the AI tutor" });
+    }
+    for (const [i, c] of s.flashcards.entries()) {
+      if (wordCount(c.a) > FLASHCARD_ANSWER_MAX_WORDS) {
+        ctx.addIssue({ code: "custom", path: ["flashcards", i, "a"], message: `a flashcard answer is ${FLASHCARD_ANSWER_MAX_WORDS} words or fewer` });
+      }
+    }
+    if (s.format !== "brief" && s.key_terms.length < 2) {
       ctx.addIssue({ code: "custom", path: ["key_terms"], message: "an explainer lesson lists at least 2 key terms" });
     }
     if (wordCount(s.why_it_matters) > WHY_IT_MATTERS_MAX_WORDS) {
@@ -200,10 +231,15 @@ export const RubricPoint = z.strictObject({
 });
 export type RubricPoint = z.infer<typeof RubricPoint>;
 
+/** IQ-8: what an interviewer is testing with the question. */
+export const INTERVIEW_KINDS = ["concept", "scenario", "use-case", "real-life"] as const;
+export type InterviewKind = (typeof INTERVIEW_KINDS)[number];
+
 export const InterviewQuestion = z
   .strictObject({
     id: Slug,
     question: Text,
+    kind: z.enum(INTERVIEW_KINDS).default("concept"),
     short_answer: Text,
     deeper_answer: Text,
     follow_ups: z.array(Text).min(2).max(3),
@@ -215,6 +251,8 @@ export const InterviewQuestion = z
     rubric: z.array(RubricPoint).min(3).max(6),
     /** How long a spoken answer should take at most, as in a real interview. */
     answer_seconds: z.number().int().min(60).max(180),
+    /** IQ-8: a concrete example to tell in the interview, in the candidate's own voice. Required for a Top 25 question. */
+    example: Text.max(1200).optional(),
     ...reviewShape,
   })
   .superRefine((q, ctx) => {
@@ -315,6 +353,41 @@ export const StageProject = z.strictObject({
 });
 export type StageProject = z.infer<typeof StageProject>;
 
+/**
+ * GP-1: a guided project, content/projects/<id>.yaml. Steps take the learner from an
+ * empty folder to the deliverables; the rubric is what a reviewer would check.
+ */
+export const ProjectStep = z.strictObject({
+  title: Text,
+  body: Text,
+  hint: Text.optional(),
+  /** How the learner knows the step is finished. */
+  done_when: Text,
+});
+export const RubricItem = z.strictObject({
+  criterion: Text,
+  /** What a strong submission does. */
+  strong: Text,
+  /** What a weak one does. */
+  weak: Text,
+});
+export const GuidedProject = z.strictObject({
+  id: Slug,
+  title: Text,
+  summary: Text.max(400),
+  difficulty: z.enum(["starter", "intermediate", "advanced"]),
+  hours: z.number().int().min(1).max(80),
+  /** Lessons the project puts to use, in the order they come up. */
+  lessons: z.array(Slug).min(2),
+  you_will_need: z.array(Text).min(1),
+  steps: z.array(ProjectStep).min(4, "GP-1: a guided project needs 4 to 8 steps").max(8, "GP-1: a guided project needs 4 to 8 steps"),
+  rubric: z.array(RubricItem).min(4, "GP-1: a rubric needs 4 to 6 criteria").max(6, "GP-1: a rubric needs 4 to 6 criteria"),
+  deliverables: z.array(Text).min(1),
+  stretch: z.array(Text).default([]),
+  ...reviewShape,
+});
+export type GuidedProject = z.infer<typeof GuidedProject>;
+
 /** A topic on a path that has no lesson yet. Shows on the map as "being written". */
 export const PlannedTopic = z.strictObject({ title: Text, summary: Text.max(140) });
 
@@ -329,6 +402,8 @@ export const PathStage = z.strictObject({
   lessons: z.array(Slug),
   planned: z.array(PlannedTopic).default([]),
   project: StageProject.optional(),
+  /** GP-4: the guided project for this stage, an id in content/projects. */
+  guide: Slug.optional(),
 });
 export type PathStage = z.infer<typeof PathStage>;
 
@@ -352,6 +427,8 @@ export const Goal = z.strictObject({
   placement: z.enum(["ladder", "none"]),
   months: z.number().positive(),
   stages: z.array(PathStage).min(1),
+  /** IQ-8: the role's Top 25 interview questions, in the order to study them. */
+  top_interview: z.array(Slug).default([]),
 });
 export type Goal = z.infer<typeof Goal>;
 

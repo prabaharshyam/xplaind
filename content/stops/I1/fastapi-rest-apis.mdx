@@ -9,14 +9,47 @@ hours: 5
 gap_tags: []
 primary_resource: fastapi-tutorial
 alternates: [mdn-http-overview]
-format: explainer
+format: deep
 key_terms: [rest-api, endpoint, http-method, http-status-code]
 check:
   type: mcq
   question_ids: [fastapi-rest-apis-1, fastapi-rest-apis-2, fastapi-rest-apis-3]
+flashcards:
+  - q: "What is an endpoint?"
+    a: "A URL plus an HTTP method, such as POST /tickets to create a ticket or GET /tickets/42 to read one."
+  - q: "What do GET, POST, PUT, PATCH and DELETE mean?"
+    a: "GET reads without changing anything, POST creates or triggers work, PUT replaces, PATCH updates part, DELETE removes."
+  - q: "What is the difference between 401 and 403?"
+    a: "401 means the caller is not signed in. 403 means they are signed in but not allowed to do this."
+  - q: "When does FastAPI return 422?"
+    a: "When the request body fails validation against the Pydantic model, with a list of exactly which fields failed."
+  - q: "When should your API return 503?"
+    a: "When a dependency, such as the model provider, is down, so callers know they can retry later."
+  - q: "What does response_model do?"
+    a: "Controls what goes back to the caller, so internal fields such as cost figures never leak by accident."
+  - q: "What is Depends used for?"
+    a: "Injecting shared things, such as a database session, the current user or a model client, into endpoints, and swapping them for fakes in tests."
+  - q: "Why put a maximum length on text inputs?"
+    a: "Without it, someone can send a huge document and your token bill jumps, or the request times out."
+exercise:
+  title: "Choose the status code"
+  setup: "Your FastAPI service for a Hyderabad hospital summarises discharge notes. Five calls arrive: (1) a request with no sign-in token; (2) a signed-in nurse asks for a summary of a patient outside her ward, which the rules forbid; (3) a body where 'notes' is 5 characters, below the 20-character minimum; (4) GET /summaries/99999, which does not exist; (5) a valid request while the model provider is down."
+  questions:
+    - q: "Which codes for (1) and (2)?"
+      a: "(1) 401, not signed in. (2) 403, signed in but not allowed."
+    - q: "Which code for (3), and who produces it?"
+      a: "422, produced automatically by FastAPI from the Pydantic model, naming the 'notes' field, before your function runs."
+    - q: "Which codes for (4) and (5)?"
+      a: "(4) 404, not found. (5) 503, a dependency is unavailable, so the caller can retry later."
+    - q: "Why not return 200 with 'error: true' for these?"
+      a: "Retry logic, monitoring and callers rely on status codes. A 200 tells them everything worked, so errors go unnoticed."
+ask:
+  - "What is the difference between a 400 and a 422 error?"
+  - "How do I test a FastAPI app?"
+  - "Should my FastAPI endpoints be async?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -24,6 +57,25 @@ reviewed_on: 2026-10-25
 A REST API lets other programs use your system over HTTP. Each **endpoint** is a URL plus a method: `POST /tickets` creates a ticket, `GET /tickets/42` reads one. The caller sends JSON and gets JSON back, with a **status code** that says what happened.
 
 FastAPI is a Python framework for building these APIs. You write ordinary functions with type hints and Pydantic models; FastAPI turns them into endpoints that validate input, convert output to JSON and publish interactive documentation at `/docs`. It also runs async code natively, which suits services that wait on model APIs.
+
+```text
+  Caller (another team's app)
+      |  POST /claims/triage   {"policy_no": "MOT1234567", "description": "..."}
+      v
+  [FastAPI]
+      |-- validate body with Pydantic --- fails? --> 422, list of bad fields
+      |-- inject model client (Depends)
+      v
+  [your function] --> model API --- down? --> 503 "try again shortly"
+      |
+      v
+  [response_model filters output]
+      |
+      v
+  200 {"category": "motor", "summary": "Rear bumper damage"}
+```
+
+This lesson follows an insurance broker in Kochi that wants other teams to call a claims-triage service.
 
 ## How it works
 
@@ -36,6 +88,22 @@ FastAPI is a Python framework for building these APIs. You write ordinary functi
 **Dependencies.** FastAPI's `Depends` injects shared things, such as the database session, the current user or a model client, into each endpoint. In tests you swap them for fakes.
 
 **Testing.** `TestClient` calls your app in memory, with no server, so endpoint tests run in milliseconds.
+
+**Status codes callers rely on:**
+
+| Code | Meaning | Caller's usual reaction |
+| --- | --- | --- |
+| 200, 201 | Success, or created | Use the result |
+| 400 | Malformed request | Fix the request; do not retry |
+| 401 | Not signed in | Sign in, then retry |
+| 403 | Not allowed | Stop; ask for access |
+| 404 | Not found | Check the id |
+| 422 | Body failed validation | Fix the named fields |
+| 429 | Too many requests | Wait, then retry |
+| 500 | Your code broke | Report it |
+| 503 | A dependency is down | Retry later with backoff |
+
+**Designing endpoints that age well.** Use nouns for resources (`/claims`, `/claims/{id}`) and methods for actions. Put a version in the path or a header (`/v1/claims`) so you can change the API later without breaking callers. Return the same error shape everywhere, for example `{"detail": "..."}`, so callers can handle errors in one place. And document every endpoint in the code with a summary and examples; FastAPI shows them at `/docs` automatically, which is often the only documentation other teams will read.
 
 ## A worked example
 
@@ -69,6 +137,8 @@ A request with policy number "abc123" never reaches the model: FastAPI returns 4
 The test fakes the model:
 
 ```python
+from fastapi.testclient import TestClient
+
 def test_triage_returns_category():
     app.dependency_overrides[get_llm] = lambda: FakeLLM("motor", "Rear bumper damage")
     r = TestClient(app).post("/claims/triage",
@@ -77,6 +147,8 @@ def test_triage_returns_category():
 ```
 
 Open `/docs` and the broker's other teams can try the endpoint in the browser, with the request schema already written for them.
+
+**What other teams noticed first.** The broker's mobile team integrated in a day, mostly because `/docs` showed every field, its rules and an example, and because bad requests came back with a 422 naming the exact field. When the model provider had a short outage, their app showed "Triage is busy, try again in a minute" for the 503 instead of crashing, because the status code told it what kind of failure it was.
 
 ## Common mistakes
 

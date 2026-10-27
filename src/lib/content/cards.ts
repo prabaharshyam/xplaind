@@ -2,6 +2,7 @@
 import type { ResourceCardData } from "@/components/resource-card";
 import { getResource, getStops } from "./index";
 import { getLinkStatus } from "./link-status";
+import { kindLabel, youtubeEmbed } from "./media";
 import { isHumanName } from "./review";
 
 export function resourceCard(id: string): ResourceCardData {
@@ -21,6 +22,9 @@ export function resourceCard(id: string): ResourceCardData {
     certificate: r.certificate,
     affiliate: r.affiliate,
     why_picked: r.why_picked,
+    kindLabel: kindLabel(r),
+    embed: youtubeEmbed(r.url),
+    ...(r.notice ? { notice: r.notice } : {}),
     // A draft written from memory is not a verification, so it shows no date.
     verifiedOn: isHumanName(r.verified_by) ? r.last_verified : null,
     linkCheckedOn: getLinkStatus()[r.id]?.checked_on ?? null,

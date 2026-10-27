@@ -10,7 +10,8 @@ export type RoadmapStop = {
 };
 
 /** RM-7 and RM-8. Mirrors the stop_progress table, so slice S5 can claim it as is. */
-export type DoneHow = "check" | "project" | "self_skipped";
+/** `self_marked` is a one-tap "Done" (RM-7 as amended); `self_skipped` is "I already know this" (RM-8). */
+export type DoneHow = "check" | "project" | "self_marked" | "self_skipped";
 export type StopStatus = "not_started" | "in_progress" | "done";
 
 export type StopProgress = {

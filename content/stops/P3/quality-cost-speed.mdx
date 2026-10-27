@@ -9,14 +9,47 @@ hours: 2
 gap_tags: [tradeoffs]
 primary_resource: huyen-llm-production
 alternates: [eugeneyan-llm-patterns]
-format: explainer
+format: deep
 key_terms: [latency, cost-per-request, model-tiering, evals]
 check:
   type: mcq
   question_ids: [quality-cost-speed-1, quality-cost-speed-2, quality-cost-speed-3]
+flashcards:
+  - q: "Which three things does every LLM app trade off?"
+    a: "Quality, cost and speed."
+  - q: "What should be measured for each option?"
+    a: "Quality by category from evals, cost per request, and latency at the median and 95th percentile plus time to first token."
+  - q: "Why put options in a table?"
+    a: "It turns trade-offs into a business conversation with the product owner, with numbers for each choice."
+  - q: "How should quality be judged?"
+    a: "By category and by the consequences of errors, not only overall accuracy."
+  - q: "Name three free wins."
+    a: "Streaming, prompt caching, and shorter prompts and outputs; also parallel steps and removing unnecessary ones."
+  - q: "What is routing by difficulty?"
+    a: "Sending simple requests to a fast, cheap model and hard ones to a strong model, while measuring router mistakes."
+  - q: "What budgets should be agreed?"
+    a: "A latency budget and a cost-per-request ceiling, then maximise quality within them."
+  - q: "Why revisit the decision?"
+    a: "Prices fall, models improve and usage grows, so the best trade-off changes every few months."
+exercise:
+  title: "Make the call"
+  setup: "A Delhi travel company's booking assistant compares options on 200 test questions. Small model: 79% accuracy, ₹0.05 per request, 1.4 s p95. Large model: 88%, ₹0.50, 4.2 s. Router: 86%, ₹0.18, 2.5 s. Wrong answers about refund rules cause costly disputes; general travel tips matter less. The agreed latency budget is first words within 1.5 s at p95."
+  questions:
+    - q: "Which option fits the cost and latency picture best overall?"
+      a: "The router: close to the large model's accuracy at about a third of the cost and much lower latency."
+    - q: "How should refund questions be handled?"
+      a: "Route them to the large model, and consider a reranker for that category, since errors there are costly."
+    - q: "How can the 1.5 s first-words budget be met?"
+      a: "Stream answers so the first words appear quickly, and keep prompts short."
+    - q: "When should the team revisit the choice?"
+      a: "Every few months, or when prices, models or traffic change significantly."
+ask:
+  - "How do I balance quality, cost and latency in an LLM app?"
+  - "What is model routing?"
+  - "How do I explain AI trade-offs to a product manager?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -29,6 +62,19 @@ Every LLM app trades three things against each other:
 
 Bigger models, more retrieved context, rerankers, reflection steps and agent loops usually raise quality and also raise cost and latency. Good engineering makes these trade-offs visible and decides them on purpose, with the people who own the product.
 
+```text
+   quality ^
+       89% |                         * large + reranker (₹0.64, 4.3 s)
+       86% |              * router (₹0.24, 2.8 s)
+       85% |                      * large (₹0.60, 3.9 s)
+       76% |  * small (₹0.08, 1.6 s)
+           +-------------------------------------------> cost and latency
+   chosen: router + reranker for exclusions and claims = 88%, ₹0.30, 3.1 s p95
+   + streaming: first words in under 1 s
+```
+
+This lesson follows a health-insurance company in Hyderabad whose call-centre agents use an assistant during live calls.
+
 ## How it works
 
 **Measure all three on the same test set.** For each option, record:
@@ -37,7 +83,7 @@ Bigger models, more retrieved context, rerankers, reflection steps and agent loo
 - cost per request (tokens times prices);
 - latency at the median and the 95th percentile, and time to first token.
 
-**Put the options in a table.** For example: small model, large model, large model plus reranker. Then the trade-off becomes a business conversation: "the reranker improves accuracy from 82% to 88% and adds 400 ms per request at p95; worth it?"
+**Put the options in a table.** For example: small model, large model, large model plus reranker. Then the trade-off becomes a business conversation: "the reranker improves accuracy from 85% to 89% and adds 400 ms per request at p95; worth it?"
 
 **Ask what quality matters.** For a casual chat, 85% may be fine; for medical or financial answers, quality and safety dominate. Weight errors by their consequences.
 
@@ -55,6 +101,24 @@ Bigger models, more retrieved context, rerankers, reflection steps and agent loo
 
 **Revisit.** Prices fall, models improve and usage grows; the best trade-off changes. Re-run the table every few months.
 
+**Levers and their effects:**
+
+| Lever | Quality | Cost | Speed |
+| --- | --- | --- | --- |
+| Larger model | Up | Up | Slower |
+| Reranker | Up | Slightly up | Slightly slower |
+| More retrieved context | Often up, then down | Up | Slower first token |
+| Router | Near the large model | Down | Faster on average |
+| Streaming | Same | Same | Feels much faster |
+| Prompt caching | Same | Down | Faster first token |
+| Shorter outputs | Same or better | Down | Faster |
+
+**Weighting by consequence.** Split the test set into categories and give each a weight from the business: how costly is a wrong answer here? For the insurer, exclusions and claims carried the most weight, general questions the least. A weighted score can rank options differently from plain accuracy, and it makes the reason for the choice clear to everyone.
+
+**Writing the recommendation.** One paragraph for the product owner: the options considered, the chosen one, its quality, cost and latency, what it gives up compared with the most accurate option, and when to revisit. For example: "We recommend the router with a reranker on exclusions and claims: 88% accuracy at about ₹0.30 per request and 3.1 s at p95. The large model with reranker everywhere is 1 point better but twice the cost and slower on live calls."
+
+**Measuring the router.** A router saves money only if it sends the right requests to the right model. Label a sample of test questions as easy or hard, run the router, and count two kinds of mistake: hard questions sent to the small model, which hurt quality, and easy ones sent to the large model, which waste money. The first kind matters more. If it is common in a high-risk category, route that whole category to the strong model, as the insurer did for exclusions and claims.
+
 ## A worked example
 
 A Hyderabad health-insurance company's assistant answers policy questions for its call-centre agents.
@@ -71,6 +135,12 @@ router (small, hard -> large)    86%        Rs 0.24        2.8 s
 
 The product owner's view: agents are on live calls, so latency matters a lot; wrong coverage answers cause complaints and refunds, so accuracy matters more. They choose the router plus the reranker for questions about exclusions and claims (the riskiest categories), reaching 88% overall at about ₹0.30 per request and 3.1 s at p95. Streaming makes the first words appear in under a second.
 
+| Decision factor | How it shaped the choice |
+| --- | --- |
+| Agents on live calls | Latency matters, so streaming and the router |
+| Wrong coverage answers cause complaints and refunds | Reranker for exclusions and claims |
+| Cost at call-centre volume | Router keeps most traffic on the small model |
+
 ## Common mistakes
 
 - **Optimising one dimension silently.** Show all three.
@@ -78,6 +148,7 @@ The product owner's view: agents are on live calls, so latency matters a lot; wr
 - **Ignoring tail latency.** Users remember slow requests.
 - **Missing free wins.** Streaming and caching first.
 - **Never revisiting the decision.**
+- **Choosing without the product owner.** The trade-off is a business decision; show the table and let them weigh it.
 
 ## Practise
 

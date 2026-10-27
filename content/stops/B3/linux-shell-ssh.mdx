@@ -9,45 +9,138 @@ hours: 4
 gap_tags: []
 primary_resource: missing-semester-command-line
 alternates: [missing-semester-shell]
-format: explainer
+format: deep
 key_terms: [ssh, environment-variable, secrets-management]
 check:
   type: mcq
   question_ids: [linux-shell-ssh-1, linux-shell-ssh-2, linux-shell-ssh-3]
+flashcards:
+  - q: "Why do AI engineers need the Linux shell?"
+    a: "Nearly every server an AI system runs on is Linux, reached through a text shell over SSH, with no desktop."
+  - q: "What do df -h and du -sh show?"
+    a: "df -h shows how full each disk is; du -sh shows how much space folders use. Full disks are a common cause of mystery outages."
+  - q: "How do you follow a log as it grows?"
+    a: "tail -f app.log for a file, journalctl -u service-name -f for systemd services, and docker logs -f for containers."
+  - q: "What does a pipe do in the shell?"
+    a: "Sends one command's output into the next, so small tools combine, such as grep ERROR app.log | sort | uniq -c."
+  - q: "What is an environment variable?"
+    a: "A named setting a program reads from its environment, such as DATABASE_URL or an API key, set with export NAME=value."
+  - q: "Why start scripts with set -euo pipefail?"
+    a: "So the script stops at the first error, an unset variable or a failed pipe step, instead of carrying on with half-done work."
+  - q: "How do SSH keys work?"
+    a: "ssh-keygen makes a key pair. The server gets your public key; the private key never leaves your machine and proves who you are."
+  - q: "What is a jump host or bastion?"
+    a: "A server you connect through to reach private servers, for example ssh -J bastion app-server."
+exercise:
+  title: "Read the outage"
+  setup: "At 11:40 a Hyderabad client's document-search API starts returning errors. You SSH in. systemctl status shows the service restarting every few seconds. journalctl shows 'MemoryError' just before each restart. free -h shows 7.8 GB of 8 GB memory used. ps aux sorted by memory shows a process called 'reindex.py' using 6.5 GB, started at 11:30 by a cron job. df -h shows the disk at 41%."
+  questions:
+    - q: "Is the disk the problem?"
+      a: "No. The disk is only 41% full. The errors are MemoryError, and memory is nearly full."
+    - q: "What is using the memory, and what started it?"
+      a: "reindex.py, using 6.5 GB, started at 11:30 by a cron job, ten minutes before the errors began."
+    - q: "What is the quickest safe fix to restore the service?"
+      a: "Stop or pause the reindex job, let the API service restart normally, and confirm it answers."
+    - q: "What two follow-ups would prevent a repeat?"
+      a: "Move the reindex to a quiet time or a separate machine, or limit its memory, and add an alert on memory use above about 85%."
+ask:
+  - "What Linux commands should every AI engineer know?"
+  - "How do I set up SSH keys?"
+  - "How do I find what is filling up a server's disk?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
-Nearly every server your AI system runs on is Linux, and you reach it through a text shell, usually Bash, over SSH. There is no desktop. You need a small, reliable set of skills:
+Your AI application works on your laptop. Then it goes to a server, and one evening the client calls: "The assistant stopped answering." Nearly every server your AI system runs on is **Linux**, and you reach it through a text **shell**, usually Bash, over **SSH**. There is no desktop, no mouse and no File Explorer.
 
-- moving around and reading files;
-- finding what is running and what is using the disk, memory or CPU;
-- reading logs as they arrive;
-- setting environment variables and running a script;
-- connecting securely with SSH keys.
+You do not need to be a Linux expert. You need a small, reliable set of skills:
+
+| Skill | Commands |
+| --- | --- |
+| Moving around and reading files | `pwd`, `ls -la`, `cd`, `cat`, `less`, `head`, `tail`, `grep` |
+| Seeing what is running and what it uses | `ps aux`, `top` or `htop`, `df -h`, `du -sh`, `free -h` |
+| Reading logs as they arrive | `tail -f`, `journalctl -u name -f`, `docker logs -f` |
+| Settings and scripts | `export`, `env`, `chmod +x`, `set -euo pipefail` |
+| Connecting securely | `ssh-keygen`, `ssh`, `~/.ssh/config`, `ssh -J` |
+
+```text
+   Your laptop                 Bastion (jump host)          App server
+ +--------------+   SSH key   +-------------------+   SSH   +------------------+
+ | private key  | ----------> | checks your       | ------> | ai-assistant     |
+ | stays here   |             | public key        |         | service, logs,   |
+ +--------------+             +-------------------+         | disk, memory     |
+                                                            +------------------+
+```
+
+This lesson follows you through a real outage for a logistics client in Pune: from connecting, to finding the cause, to fixing it and writing it up. By the end you will diagnose a full disk and connect with SSH keys confidently.
 
 ## How it works
 
-**Navigation and files.** `pwd`, `ls -la`, `cd`, `cat`, `less` for long files, `head` and `tail` for the start and end. `grep -i "timeout" app.log` finds lines; `grep -c` counts them. Pipes join small tools: `grep ERROR app.log | sort | uniq -c | sort -rn | head` lists the most common errors.
+### Navigation and files
 
-**Processes and resources.** `ps aux | grep uvicorn` finds your service. `top` or `htop` shows live CPU and memory. `df -h` shows disk space and `du -sh *` shows which folders are large; full disks are a top cause of mystery outages. `free -h` shows memory.
+`pwd` shows where you are. `ls -la` lists files, including hidden ones. `cd` moves. `cat` prints a short file; `less` lets you scroll a long one; `head` and `tail` show the start and end.
 
-**Logs.** `tail -f app.log` follows a log as it grows. Services run by systemd log to the journal: `journalctl -u ai-assistant --since "1 hour ago"`. Containers: `docker logs -f container-name`.
+`grep -i "timeout" app.log` finds matching lines, ignoring case; `grep -c` counts them.
 
-**Environment variables.** Programs read settings such as `DATABASE_URL` and API keys from the environment. `export NAME=value` sets one for the session; `env` lists them. Keep secrets in the environment or a secret manager, never in code or shell history.
+**Pipes** (`|`) join small tools into powerful ones:
 
-**Scripts.** A shell script is a file of commands. Start with `#!/usr/bin/env bash` and `set -euo pipefail` so it stops on the first error instead of carrying on with half-done work. Make it executable with `chmod +x`.
+```bash
+grep ERROR app.log | sort | uniq -c | sort -rn | head
+```
 
-**SSH.** `ssh-keygen -t ed25519` creates a key pair. You give the server your public key; the private key never leaves your machine. Then `ssh deploy@10.0.4.12` logs in without a password. A `~/.ssh/config` entry gives servers short names. Many companies route SSH through a jump host or bastion; `ssh -J bastion app-server` hops through it.
+This finds error lines, groups identical ones, counts each, sorts by count and shows the top ten: the most common errors in one line.
 
-**Permissions.** Files have owner, group and others, each with read, write and execute. `chmod 600` on a private key is required, or SSH refuses to use it. Use `sudo` only when needed, and think before pressing Enter after `rm -rf`.
+### Processes and resources
+
+| Question | Command |
+| --- | --- |
+| Is my service running? | `ps aux \| grep uvicorn` or `systemctl status ai-assistant` |
+| What is using CPU and memory right now? | `top` or `htop` |
+| How full are the disks? | `df -h` |
+| Which folders are large? | `du -sh *` or `sudo du -sh /var/* \| sort -h` |
+| How much memory is free? | `free -h` |
+
+A full disk is a common cause of mystery outages: logs, temporary files and model downloads quietly fill it until the service cannot write anything.
+
+### Logs
+
+- `tail -f app.log` follows a log file as it grows.
+- Services run by **systemd** log to the journal: `journalctl -u ai-assistant --since "1 hour ago"`.
+- Containers: `docker logs -f container-name`.
+
+### Environment variables
+
+Programs read settings such as `DATABASE_URL` and API keys from the **environment**. `export NAME=value` sets one for your session; `env` lists them. Keep secrets in the environment or a secret manager, never in code or in shell history.
+
+### Scripts
+
+A shell script is a file of commands. Start every script with:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+```
+
+`set -euo pipefail` makes the script stop at the first failed command, at any unset variable and at any failed step in a pipe, instead of carrying on with half-done work. Make it executable with `chmod +x script.sh`.
+
+### SSH and keys
+
+1. `ssh-keygen -t ed25519` creates a key pair on your machine.
+2. You give the server your **public** key. The **private** key never leaves your machine.
+3. `ssh deploy@10.0.4.12` logs you in without a password.
+
+A `~/.ssh/config` entry gives servers short names. Many companies route SSH through a **jump host** or **bastion**: `ssh -J bastion app-server` hops through it.
+
+### Permissions
+
+Each file has permissions for owner, group and others: read, write and execute. A private key needs `chmod 600`, or SSH refuses to use it. Use `sudo` only for single commands that need it, and think twice before pressing Enter after `rm -rf`.
 
 ## A worked example
 
-A Pune logistics client reports that the delivery-query assistant stopped answering at 19:05. You connect:
+A logistics client in Pune reports that their delivery-query assistant stopped answering at 19:05. You connect through their bastion:
 
 ```bash
 ssh -J bastion.client.in deploy@assistant-01
@@ -55,31 +148,41 @@ systemctl status ai-assistant        # active, but restarting every 30 seconds
 journalctl -u ai-assistant --since "19:00" | tail -50
 ```
 
-The log shows `OSError: [Errno 28] No space left on device`. You check:
+The log shows `OSError: [Errno 28] No space left on device`. You check the disk:
 
 ```bash
-df -h /                     # 100% used
+df -h /                                # 100% used
 sudo du -sh /var/* | sort -h | tail -3
 ```
 
-`/var/log/ai-assistant` holds 38 GB: debug logging was left on after a test, and the logs were never rotated. You compress and remove old logs, set the level back to INFO, add a logrotate rule and restart. The service is answering by 19:20.
+`/var/log/ai-assistant` holds 38 GB. Debug logging was left on after a test two weeks ago, and the logs were never rotated.
 
-In your incident note you write the cause, the fix and two follow-ups: a disk-space alert at 80% and a check in CI that the log level is not DEBUG in production.
+| Time | Step | Finding |
+| --- | --- | --- |
+| 19:08 | `systemctl status` | Service restarting every 30 seconds |
+| 19:09 | `journalctl` | "No space left on device" |
+| 19:10 | `df -h` | Disk 100% full |
+| 19:11 | `du -sh` | 38 GB of debug logs |
+| 19:15 | Compress and remove old logs, set level to INFO, add logrotate rule, restart | Disk at 34% |
+| 19:20 | Test a query | Assistant answering again |
+
+In your incident note you write the cause, the fix and two follow-ups: a disk-space alert at 80%, and a check in CI that the log level is not DEBUG in production.
 
 ## Common mistakes
 
 - **Working as root by habit.** Mistakes become disasters. Use a normal user and `sudo` for single commands.
-- **Pasting secrets into the command line.** They land in shell history. Use environment files with restricted permissions or the client's secret manager.
+- **Pasting secrets on the command line.** They land in shell history. Use environment files with restricted permissions or the client's secret manager.
 - **Editing production by hand and telling nobody.** The next deploy overwrites your fix. Put the change in code or config and write it down.
 - **Scripts without `set -euo pipefail`.** A failed step goes unnoticed and later steps damage data.
 - **Sharing private keys.** Each person and each machine gets its own key, so access can be removed cleanly.
+- **Deleting files you do not understand to free space.** Find what is large and why first.
 
 ## Practise
 
-Watch or read the Missing Semester lectures on the shell and the command-line environment.
+Watch or read the Missing Semester lectures on the shell and the command-line environment, linked below.
 
-1. On any Linux machine (a free cloud VM, WSL on Windows, or a Docker container), create a 500-line fake log with some ERROR lines, and list the top three error messages with one pipeline.
-2. Generate an SSH key, add it to a server or to GitHub, and connect without a password.
-3. Write a script with `set -euo pipefail` that checks disk usage and prints a warning above 80%.
+1. **Top errors.** On any Linux machine, such as a free cloud VM, WSL on Windows or a Docker container, create a 500-line fake log with some ERROR lines, and list the top three error messages with one pipeline.
+2. **Keys.** Generate an SSH key, add it to a server or to GitHub, and connect without a password.
+3. **A script.** Write a script with `set -euo pipefail` that checks disk usage and prints a warning above 80%.
 
 **You are done when you can** find which process or folder is filling a disk, and explain why the private key never leaves your machine.

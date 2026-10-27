@@ -9,14 +9,47 @@ hours: 5
 gap_tags: []
 primary_resource: pytorch-basics
 alternates: [fastai-course, d2l-book]
-format: explainer
+format: deep
 key_terms: [tensor, epoch, batch-size, backpropagation]
 check:
   type: mcq
   question_ids: [pytorch-basics-1, pytorch-basics-2, pytorch-basics-3]
+flashcards:
+  - q: "What is a tensor in PyTorch?"
+    a: "A multi-dimensional array, like a NumPy array, that can live on a CPU or GPU and track gradients."
+  - q: "What does autograd do?"
+    a: "Records operations on tensors and computes gradients automatically when you call loss.backward()."
+  - q: "What do Dataset and DataLoader do?"
+    a: "A Dataset returns one example and label by index; a DataLoader batches and shuffles them."
+  - q: "What are the five core lines of the training loop?"
+    a: "Move the batch to the device, opt.zero_grad(), compute the loss from model(x), loss.backward(), and opt.step()."
+  - q: "Why call opt.zero_grad() each batch?"
+    a: "PyTorch adds new gradients to old ones; without clearing, gradients accumulate across batches."
+  - q: "What do model.eval() and torch.no_grad() do?"
+    a: "eval() switches layers like dropout and batch norm to inference behaviour; no_grad() skips gradient tracking to save memory and time."
+  - q: "What is the most common beginner error with devices?"
+    a: "Having the model on the GPU and the data on the CPU, or the reverse. Both must be on the same device."
+  - q: "What should you save with a model?"
+    a: "The state_dict of the best checkpoint by validation score, plus the settings and preprocessing needed to rebuild and use it."
+exercise:
+  title: "Find the bugs"
+  setup: "Rohan in Indore trains a PyTorch model to classify bird calls. His loop calls loss.backward() and opt.step() but never opt.zero_grad(). Validation runs without model.eval(). He moves the model to 'cuda' but not the batches. At prediction time his script resizes audio spectrograms differently from training. He saves the model after the last epoch only."
+  questions:
+    - q: "Which bug crashes the program first?"
+      a: "The device mismatch: the model is on the GPU and the data on the CPU. Move each batch with .to(device)."
+    - q: "What does the missing zero_grad() cause?"
+      a: "Gradients accumulate across batches, so updates grow wrong and training becomes unstable."
+    - q: "Why are his validation numbers unreliable?"
+      a: "Without model.eval(), dropout and batch norm behave as in training, and without no_grad() memory is wasted."
+    - q: "What two fixes help prediction quality?"
+      a: "Use exactly the training preprocessing in one shared function, and save and load the best checkpoint by validation score."
+ask:
+  - "What is the difference between PyTorch and TensorFlow?"
+  - "How do I use a GPU with PyTorch?"
+  - "What does loss.backward() actually do?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -28,6 +61,27 @@ reviewed_on: 2026-10-25
 - **nn.Module**: the base class for models; layers and models are modules.
 - **Dataset** and **DataLoader**: load data and serve it in shuffled batches.
 - **Optimisers**: update weights from gradients (SGD, Adam).
+
+```text
+   CSV of images + labels
+          |
+          v
+   [Dataset]  __getitem__(i) -> (tensor 3x224x224, label 4)
+          |
+          v
+   [DataLoader]  batches of 64, shuffled  --> .to(device)
+          |
+          v
+   [nn.Module]  forward(x) -> scores for 6 classes
+          |
+          v
+   [loss_fn] --> loss.backward() --> opt.step()     repeat per batch
+          |
+          v
+   each epoch: model.eval() + no_grad() -> validation -> save best checkpoint
+```
+
+This lesson follows an engineer at a textile manufacturer in Pune building a fabric-defect classifier as a first PyTorch project.
 
 ## How it works
 
@@ -59,13 +113,49 @@ for epoch in range(epochs):
     save_if_best(model, val_loss)
 ```
 
-**Evaluation mode.** `model.eval()` changes layers such as dropout and batch normalisation to their inference behaviour; `torch.no_grad()` saves memory and time. Forgetting either gives wrong validation numbers.
+**Evaluation mode.** `model.eval()` changes layers such as dropout and batch normalisation to their inference behaviour; `torch.no_grad()` saves memory and time. Forgetting `eval()` gives wrong validation numbers; forgetting `no_grad()` wastes memory.
 
 **Saving.** Save the model's `state_dict` (its weights) along with the settings and preprocessing needed to rebuild it. Save the best checkpoint by validation score, not just the last.
 
 **Reproducibility.** Set random seeds, log settings and library versions.
 
 **Higher-level tools.** Libraries such as PyTorch Lightning or fastai wrap the loop with logging, checkpoints and multi-GPU support. Learn the plain loop first so you can debug the wrappers.
+
+**A minimal model and dataset:**
+
+```python
+import torch
+from torch import nn
+from torch.utils.data import Dataset, DataLoader
+
+class DefectData(Dataset):
+    def __init__(self, rows, label_map, transform):
+        self.rows, self.label_map, self.transform = rows, label_map, transform
+    def __len__(self):
+        return len(self.rows)
+    def __getitem__(self, i):
+        path, label = self.rows[i]
+        return self.transform(load_image(path)), self.label_map[label]
+
+class SmallNet(nn.Module):
+    def __init__(self, classes=6):
+        super().__init__()
+        self.body = nn.Sequential(
+            nn.Conv2d(3, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1),
+        )
+        self.head = nn.Linear(32, classes)
+    def forward(self, x):
+        return self.head(self.body(x).flatten(1))
+```
+
+The `label_map` is built once and passed to both the training and validation datasets, which is exactly the fix the worked example needed.
+
+**Checking shapes as you go.** Many PyTorch errors are shape errors. Pass one batch through the model and print the shape after each layer before training. A batch of 64 colour images at 224 pixels has shape `[64, 3, 224, 224]`, and the model's output should be `[64, 6]`. When an error mentions "mat1 and mat2 shapes cannot be multiplied", a layer expected a different number of inputs than it received.
+
+**Using a GPU.** Check `torch.cuda.is_available()` and set `device = "cuda" if torch.cuda.is_available() else "cpu"` once at the top of the script, then use `device` everywhere. Free GPUs on Google Colab or Kaggle notebooks are enough for the projects in this path. A GPU speeds up the large matrix multiplications in each layer, often ten times or more, but it does nothing for slow data loading. If the GPU sits idle while the loop runs, raise `num_workers` on the DataLoader so images are read and resized in parallel.
+
+**From a loop to a habit.** Write the loop once by hand and keep it as a template: seeds and device at the top, datasets and loaders, model, optimiser and loss, then the epoch loop with validation and checkpoint saving. Most new projects only change the dataset and the model.
 
 ## A worked example
 
@@ -79,6 +169,12 @@ A Pune textile manufacturer wants to classify fabric defect images into six type
 
 First run: validation accuracy stuck at 17%, about chance for six classes. The bug: labels were read as strings and mapped differently in the training and validation datasets. After fixing the mapping in one shared place, accuracy rises to 71% with the small model, before moving to transfer learning.
 
+| Run | Validation accuracy | Cause and fix |
+| --- | --- | --- |
+| 1 | 17% | Labels mapped differently in train and validation sets |
+| 2 | 71% | One shared label map; best checkpoint saved |
+| Next lesson | Much higher | Pre-trained CNN through transfer learning |
+
 ## Common mistakes
 
 - **Model and data on different devices.**
@@ -86,6 +182,7 @@ First run: validation accuracy stuck at 17%, about chance for six classes. The b
 - **Forgetting `model.eval()` and `torch.no_grad()` during validation.**
 - **Different preprocessing in training and prediction.**
 - **Saving only the last epoch.** Keep the best checkpoint by validation.
+- **Never printing shapes.** One batch through the model, with shapes printed, saves an hour of reading error messages.
 
 ## Practise
 

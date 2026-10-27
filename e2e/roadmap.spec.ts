@@ -23,15 +23,15 @@ test.describe("roadmap (RM-1)", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto("/roadmap/genai-engineer");
-    await expect(page.getByRole("heading", { level: 1, name: "GenAI Engineer" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Generative AI & LLM Engineer" })).toBeVisible();
     for (const id of ["B1", "B2", "B3", "I1", "I2", "I3", "P1", "P2", "P3"]) {
       await expect(page.getByRole("heading", { level: 2, name: new RegExp(`^${id} `) })).toBeVisible();
     }
     await expect(page.getByRole("main").getByRole("link", { name: "Find my level" })).toBeVisible();
-    // the complete outline shows, including topics with no lesson yet
-    await expect(page.getByText("Prompt injection defence")).toBeVisible();
-    await expect(page.getByText("Coming soon").first()).toBeVisible();
-    await expect(page.getByText("Level project:").first()).toBeVisible();
+    // the complete outline shows, including topics with no lesson yet, and each level's project
+    await expect(page.getByText("Coming soon").nth(1)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Level project.*Three checked prompts for a real work task/ })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Projects \(9\)/ })).toBeVisible();
     expect(await overflow(page)).toBe(false);
     expect((await wcag(page)).violations).toEqual([]);
     expect(errors).toEqual([]);
@@ -40,21 +40,21 @@ test.describe("roadmap (RM-1)", () => {
   test("marks the start level from the saved result and ticks a skipped stop", async ({ page }) => {
     await seedB1Result(page);
     await page.goto("/stop/what-is-ai");
-    await page.getByRole("button", { name: "I already know this" }).click();
+    await page.getByRole("group", { name: /^Track / }).getByRole("button", { name: "Skip", exact: true }).click();
     await expect(page.getByText("you said you already know this")).toBeVisible();
 
     await page.goto("/roadmap/genai-engineer");
     await expect(page.getByText("You start here")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "You start at B1" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /AI, machine learning and language models.*Done/ })).toBeVisible();
-    await expect(page.getByRole("progressbar", { name: "Roadmap covered" })).not.toHaveAttribute("aria-valuenow", "0");
+    await expect(page.getByText(/You start at B1: \d+% covered/)).toBeVisible();
+    await expect(page.getByRole("link", { name: /^What AI, machine learning and a language model are, Skipped/ })).toBeVisible();
+    await expect(page.getByRole("progressbar", { name: "Roadmap finished" })).not.toHaveAttribute("aria-valuenow", "0");
     expect((await wcag(page)).violations).toEqual([]);
   });
 
   test("the map works at desktop width too", async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 800 });
     await page.goto("/roadmap/genai-engineer");
-    await page.getByRole("navigation", { name: "Levels" }).getByRole("link", { name: /^I2 / }).click();
+    await page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: /^I2 / }).click();
     await expect(page.getByRole("heading", { level: 2, name: "I2 RAG builder" })).toBeInViewport();
     expect(await overflow(page)).toBe(false);
     expect((await wcag(page)).violations).toEqual([]);
@@ -80,10 +80,10 @@ test.describe("stop page (RM-2, RM-4, RM-7)", () => {
     for (const label of ["Cost", "Time", "Language", "Certificate", "Level", "Last verified", "Link checked"]) {
       await expect(card.getByText(label, { exact: true })).toBeVisible();
     }
-    // sample resources are drafts, so no verification date is claimed
-    await expect(card.getByText("Not yet verified")).toBeVisible();
+    // the owner verified every resource, so a date is shown, never "Not yet verified"
+    await expect(card.getByText("Not yet verified")).toHaveCount(0);
     await expect(card.getByRole("link", { name: "How we rank" })).toHaveAttribute("href", "/how-we-rank");
-    await expect(card.getByRole("link", { name: /^Watch the video|^Open the course/ })).toHaveAttribute(
+    await expect(card.getByRole("link", { name: /^Watch the video|^Open the course|^Open on YouTube|^Open it|^Read/ })).toHaveAttribute(
       "href",
       /^\/go\/[a-z0-9-]+\?stop=what-is-ai$/,
     );
@@ -93,7 +93,8 @@ test.describe("stop page (RM-2, RM-4, RM-7)", () => {
 
   test("passing the check marks the stop done; failing keeps it in progress", async ({ page }) => {
     await page.goto("/stop/what-is-ai");
-    const groups = page.locator("#check").getByRole("group"); // key terms are groups too (details)
+    // only the check's questions: the status buttons are a group too
+    const groups = page.locator("#check").getByRole("group").filter({ has: page.getByRole("radio") });
     const count = await groups.count();
     // answer every question with its first option, which is not always right
     for (let i = 0; i < count; i++) await groups.nth(i).getByRole("radio").first().check();

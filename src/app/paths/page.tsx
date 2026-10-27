@@ -10,7 +10,7 @@ import { YourPath } from "./your-path";
 
 export const metadata: Metadata = {
   title: "AI career roadmaps: choose your role",
-  description: "Nine AI career paths, from AI for beginners to forward deployed engineer, each with lessons, free courses and projects.",
+  description: "Nine AI career paths, from AI Engineer to MLOps Engineer, each with lessons, courses, projects and interview practice.",
 };
 
 export default function PathsPage() {
@@ -23,14 +23,14 @@ export default function PathsPage() {
         icon="map"
         eyebrow="Role roadmaps"
         title="Choose your AI role"
-        lead="Nine step-by-step roadmaps. Every topic has a plain-English lesson, the best free course and a check, and every stage ends in a project. Lessons are shared, so what you finish on one roadmap counts on every other."
+        lead="Nine step-by-step roadmaps. Every topic has a plain-English lesson, the best course and a check, and every stage ends in a project. Lessons are shared, so what you finish on one roadmap counts on every other."
       />
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <YourPath paths={paths.map((p) => ({ id: p.id, name: p.name }))} />
         <ul className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {paths.map((p) => (
-            <li key={p.id}>
-              <Link
+            <li key={p.id} className="lx-rise">
+              <Link data-tilt
                 href={roadmapHref(p.id)}
                 className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-zinc-800 dark:bg-zinc-900"
               >

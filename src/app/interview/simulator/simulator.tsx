@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useAiAccess } from "@/components/ai/ai-gate";
+import { AnswerReviewBlock, InterviewReviewPanel, useInterviewReview } from "@/components/ai/ai-interview-review";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { recordInterview } from "@/lib/browser/activity-store";
 import { XP } from "@/lib/game/xp";
@@ -9,6 +11,8 @@ import { todayInIST } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
 import {
   type AnswerResult,
+  BAND_LABEL,
+  type Band,
   PACE,
   type SimQuestion,
   analyseAnswer,
@@ -62,7 +66,7 @@ type Answer = { text: string; seconds: number };
  * the microphone on and off) or by typing; at the end they get a report on the key
  * points covered and on delivery. Everything stays in this browser tab.
  */
-export function Simulator({ questions, paths }: { questions: SimQuestion[]; paths: { id: string; name: string }[] }) {
+export function Simulator({ questions, paths, aiOn = false }: { questions: SimQuestion[]; paths: { id: string; name: string }[]; aiOn?: boolean }) {
   const search = useSearch();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const fixedQuestion = questions.find((q) => q.id === params.get("question")) ?? null;
@@ -116,6 +120,7 @@ export function Simulator({ questions, paths }: { questions: SimQuestion[]; path
         questions={session}
         answers={answers}
         onRetry={() => setStage({ kind: "setup" })}
+        aiOn={aiOn}
       />
     );
   }
@@ -472,12 +477,39 @@ const LENGTH_NOTE: Record<AnswerResult["delivery"]["length"], string> = {
   "ran-out": "Ran out of time",
 };
 
-function Report({ questions, answers, onRetry }: { questions: SimQuestion[]; answers: Answer[]; onRetry: () => void }) {
+const BAND_TONE: Record<Band, { bar: string; chip: string }> = {
+  strong: { bar: "bg-emerald-600", chip: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200" },
+  good: { bar: "bg-sky-600", chip: "bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200" },
+  partial: { bar: "bg-amber-500", chip: "bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-200" },
+  weak: { bar: "bg-rose-600", chip: "bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200" },
+  none: { bar: "bg-zinc-400", chip: "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200" },
+};
+
+const STRUCTURE_CHECKS: { key: keyof AnswerResult["structure"]; label: string; tip: string }[] = [
+  { key: "definition", label: "Opens with a clear definition", tip: "Start with one sentence that says what it is." },
+  { key: "example", label: "Gives an example", tip: "Add a short, concrete example from a real product or project." },
+  { key: "tradeoff", label: "Names a trade-off or limit", tip: "Say when it does not work, or what it costs." },
+  { key: "practice", label: "Connects to real use", tip: "Say how you would build, test or measure it." },
+];
+
+/** A labelled 0 to 100 bar. */
+function Meter({ value, band, label }: { value: number; band: Band; label: string }) {
+  return (
+    <div className="h-2.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value}>
+      <div className={`h-full ${BAND_TONE[band].bar}`} style={{ width: `${value}%` }} />
+    </div>
+  );
+}
+
+function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[]; answers: Answer[]; onRetry: () => void; aiOn: boolean }) {
   const results = useMemo(
     () => questions.map((q, i) => analyseAnswer(q, answers[i]?.text ?? "", answers[i]?.seconds ?? 0)),
     [questions, answers],
   );
   const report = useMemo(() => sessionReport(questions, results), [questions, results]);
+  const access = useAiAccess(aiOn);
+  const ai = useInterviewReview(questions.map((q, i) => ({ questionId: q.id, answer: answers[i]?.text ?? "" })));
+  const aiById = new Map(ai.review?.answers.map((a) => [a.questionId, a]) ?? []);
   const heading = useRef<HTMLHeadingElement>(null);
   const recorded = useRef(false);
   useEffect(() => heading.current?.focus(), []);
@@ -499,35 +531,86 @@ function Report({ questions, answers, onRetry }: { questions: SimQuestion[]; ans
 
   return (
     <div className="flex flex-col gap-8">
-      <section aria-labelledby="report-heading" className="flex flex-col gap-3">
+      <section aria-labelledby="report-heading" className="flex flex-col gap-4">
         <h2 id="report-heading" ref={heading} tabIndex={-1} className="text-2xl font-semibold">
           Your interview report
         </h2>
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            ["Score", `${report.averageScore} / 5`],
-            ["Key points", `${report.coveredPoints} of ${report.totalPoints}`],
-            ["Answered", `${report.answered} of ${questions.length}`],
-            ["Fillers", `${report.fillersPerMinute} a minute`],
-          ].map(([k, v]) => (
-            <div key={k} className={card}>
-              <dt className={`text-sm ${muted}`}>{k}</dt>
-              <dd className="mt-1 text-xl font-semibold">{v}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="leading-7">
-          <span className="font-medium">Pace:</span> {paceNote}.
-        </p>
+        <div className="rounded-2xl bg-zinc-100 p-4 md:p-5 dark:bg-zinc-900">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="font-semibold">How well you know these concepts</p>
+            <p>
+              <span className="text-3xl font-semibold">{report.understanding}%</span>{" "}
+              <span className={`ml-1 rounded-full px-2.5 py-0.5 text-sm font-medium ${BAND_TONE[report.band].chip}`}>{BAND_LABEL[report.band]}</span>
+            </p>
+          </div>
+          <div className="mt-3">
+            <Meter value={report.understanding} band={report.band} label="Overall understanding" />
+          </div>
+          <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              ["Score", `${report.averageScore} / 5`],
+              ["Key points", `${report.coveredPoints} of ${report.totalPoints}`],
+              ["Answered", `${report.answered} of ${questions.length}`],
+              ["Fillers", `${report.fillersPerMinute} a minute`],
+            ].map(([k, v]) => (
+              <div key={k} className="rounded-xl bg-white p-3 dark:bg-zinc-950">
+                <dt className={`text-sm ${muted}`}>{k}</dt>
+                <dd className="mt-1 text-xl font-semibold">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-sm leading-6">
+            <span className="font-medium">Pace:</span> {paceNote}.
+          </p>
+        </div>
         <p className="w-fit rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
           +{report.answered * XP.interviewAnswer + Math.round(report.averageScore * questions.length * XP.interviewScorePoint)} XP earned
         </p>
         <p className={`text-sm ${muted}`}>
-          The score counts the key points your answer mentioned, by matching words. It cannot tell whether your
-          explanation was right, so read the model answers too. Filler counts depend on the speech service, which often
-          leaves out “um” and “uh”.
+          Understanding combines the key points you covered, how close your answer is to the model answer, and how you built it
+          (definition, example, trade-off, real use). It matches words, so it cannot tell if a statement is wrong
+          {aiOn ? ": use the AI analysis for that." : "."} Filler counts depend on the speech service, which often leaves out “um” and “uh”.
         </p>
       </section>
+
+      <InterviewReviewPanel access={access} state={ai} answered={report.answered} />
+
+      {report.concepts.length > 0 && (
+        <section aria-labelledby="concepts-heading" className="flex flex-col gap-3">
+          <h3 id="concepts-heading" className="text-xl font-semibold">
+            Concept by concept
+          </h3>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {report.concepts.map((c) => (
+              <li key={c.topic} className={card}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="font-semibold">{interviewTopicLabel(c.topic)}</p>
+                  <p className="text-sm font-medium">{c.understanding}%</p>
+                </div>
+                <div className="mt-2">
+                  <Meter value={c.understanding} band={c.band} label={`Understanding of ${interviewTopicLabel(c.topic)}`} />
+                </div>
+                <p className={`mt-2 text-sm ${muted}`}>
+                  {BAND_LABEL[c.band]} · {c.questions} {c.questions === 1 ? "question" : "questions"}
+                </p>
+                {c.band !== "strong" && c.lessons.length > 0 && (
+                  <p className="mt-1 text-sm">
+                    Revise:{" "}
+                    {c.lessons.map((l, i) => (
+                      <span key={l.id}>
+                        {i > 0 && ", "}
+                        <Link href={`/stop/${l.id}`} className={textLink}>
+                          {l.title}
+                        </Link>
+                      </span>
+                    ))}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {report.fixes.length > 0 && (
         <section aria-labelledby="fix-heading">
@@ -548,39 +631,111 @@ function Report({ questions, answers, onRetry }: { questions: SimQuestion[]; ans
         </h3>
         {questions.map((q, i) => {
           const r = results[i];
+          const aiReview = aiById.get(q.id);
+          const said = answers[i]?.text ?? "";
+          const covered = r.points.filter((p) => p.covered);
+          const missed = r.points.filter((p) => !p.covered);
           return (
             <article key={q.id} className={card}>
               <h4 className="font-semibold leading-7">
                 {i + 1}. {q.question}
               </h4>
-              <p className={`mt-1 text-sm ${muted}`}>
-                {r.score} / 5 · {LENGTH_NOTE[r.delivery.length]} · {Math.round(r.delivery.secondsUsed)} s of{" "}
-                {q.answer_seconds} s · {r.delivery.words} words
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2.5 py-0.5 text-sm font-medium ${BAND_TONE[r.band].chip}`}>{BAND_LABEL[r.band]}</span>
+                <span className="text-sm font-medium">{r.understanding}%</span>
+                <span className={`text-sm ${muted}`}>· {r.score} / 5 key points</span>
+              </div>
+              <div className="mt-2">
+                <Meter value={r.understanding} band={r.band} label={`Understanding, question ${i + 1}`} />
+              </div>
+              <p className={`mt-2 text-sm ${muted}`}>
+                {LENGTH_NOTE[r.delivery.length]} · {Math.round(r.delivery.secondsUsed)} s of {q.answer_seconds} s · {r.delivery.words} words
                 {r.delivery.wordsPerMinute !== null ? ` · ${r.delivery.wordsPerMinute} words a minute` : ""}
-                {r.delivery.fillers.total > 0
-                  ? ` · fillers: ${r.delivery.fillers.top.map((f) => `“${f.word}” ${f.count}`).join(", ")}`
-                  : ""}
+                {r.delivery.fillers.total > 0 ? ` · fillers: ${r.delivery.fillers.top.map((f) => `“${f.word}” ${f.count}`).join(", ")}` : ""}
               </p>
-              <h5 className="mt-3 text-sm font-medium">Key points</h5>
-              <ul className="mt-1 flex flex-col gap-1 leading-7">
-                {r.points.map((p) => (
-                  <li key={p.point} className="flex gap-2">
-                    <span aria-hidden="true" className={p.covered ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"}>
-                      {p.covered ? "✓" : "✗"}
-                    </span>
-                    <span>
-                      <span className="sr-only">{p.covered ? "Covered: " : "Missed: "}</span>
-                      {p.point}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+
+              {r.band !== "none" && (
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/30">
+                    <h5 className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">What you covered</h5>
+                    {covered.length ? (
+                      <ul className="mt-1 flex flex-col gap-2 text-sm leading-6">
+                        {covered.map((p) => (
+                          <li key={p.point}>
+                            <span aria-hidden="true" className="text-emerald-700 dark:text-emerald-400">✓ </span>
+                            <span className="font-medium">{p.point}</span>
+                            {p.evidence && <span className={`block ${muted}`}>You said: “{p.evidence}”</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-sm">None of the key points yet.</p>
+                    )}
+                  </div>
+                  <div className="rounded-xl bg-rose-50 p-3 dark:bg-rose-950/30">
+                    <h5 className="text-sm font-semibold text-rose-900 dark:text-rose-200">What you missed</h5>
+                    {missed.length ? (
+                      <ul className="mt-1 flex flex-col gap-1 text-sm leading-6">
+                        {missed.map((p) => (
+                          <li key={p.point}>
+                            <span aria-hidden="true" className="text-rose-700 dark:text-rose-400">✗ </span>
+                            {p.point}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-sm">Nothing: every key point is there.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {r.band !== "none" && (
+                <div className="mt-3">
+                  <h5 className="text-sm font-semibold">Compared with the model answer: {Math.round(r.reference.score * 100)}% of its key terms</h5>
+                  <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
+                    {r.reference.matched.map((t) => (
+                      <span key={`m-${t}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+                        ✓ {t}
+                      </span>
+                    ))}
+                    {r.reference.missed.slice(0, 8).map((t) => (
+                      <span key={`x-${t}`} className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                        <span className="sr-only">not used: </span>
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                  <h5 className="mt-3 text-sm font-semibold">How you built the answer</h5>
+                  <ul className="mt-1 grid gap-1 text-sm leading-6 sm:grid-cols-2">
+                    {STRUCTURE_CHECKS.map((c) => (
+                      <li key={c.key}>
+                        <span aria-hidden="true" className={r.structure[c.key] ? "text-emerald-700 dark:text-emerald-400" : "text-zinc-500"}>
+                          {r.structure[c.key] ? "✓ " : "○ "}
+                        </span>
+                        {c.label}
+                        <span className="sr-only">{r.structure[c.key] ? ": yes" : ": not yet"}</span>
+                        {!r.structure[c.key] && <span className={`block text-xs ${muted}`}>{c.tip}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {aiReview && <AnswerReviewBlock r={aiReview} />}
+
               <details className="mt-3">
-                <summary className="min-h-8 cursor-pointer font-medium">Your answer and a model answer</summary>
-                <p className="mt-2 text-sm font-medium">You said</p>
-                <p className="mt-1 leading-7 whitespace-pre-wrap">{answers[i]?.text || "No answer."}</p>
-                <p className="mt-3 text-sm font-medium">A strong short answer</p>
-                <p className="mt-1 rounded-lg bg-zinc-100 p-3 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
+                <summary className="min-h-8 cursor-pointer font-medium">Your answer next to the model answer</summary>
+                <div className="mt-2 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-medium">You said</p>
+                    <p className="mt-1 rounded-lg border border-zinc-200 p-3 leading-7 whitespace-pre-wrap dark:border-zinc-800">{said || "No answer."}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">A strong short answer</p>
+                    <p className="mt-1 rounded-lg bg-zinc-100 p-3 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
+                  </div>
+                </div>
               </details>
               <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 <Link href={`/interview/${q.id}`} className={textLink}>

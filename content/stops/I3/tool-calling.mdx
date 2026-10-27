@@ -10,14 +10,47 @@ gap_tags: [tool-calling]
 primary_resource: claude-tool-use
 alternates: [hf-agents-course]
 more: [openai-cookbook, gemini-cookbook]
-format: explainer
+format: deep
 key_terms: [tool-calling, tool-schema, json-schema, agent]
 check:
   type: mcq
   question_ids: [tool-calling-1, tool-calling-2, tool-calling-3]
+flashcards:
+  - q: "What is tool calling?"
+    a: "Letting a model request that your code run a described function with specific arguments, then using the result to answer."
+  - q: "Does the model run the tool itself?"
+    a: "No. The model only asks; your code validates, runs the tool and sends back the result, so you stay in control."
+  - q: "What three parts describe a tool?"
+    a: "A name, a description and an input schema."
+  - q: "What does the model mainly use to decide when to call a tool?"
+    a: "Its name and description, so these must be clear and specific."
+  - q: "What are the steps of the tool round trip?"
+    a: "Send message and tools; model requests a call; your code validates and runs it; send the result back; model answers or calls again."
+  - q: "What should you send back when a tool fails?"
+    a: "A clear error message as the tool result, such as what was not found and what to ask the user, so the model can recover."
+  - q: "How do you keep tool calling safe?"
+    a: "Validate arguments, separate read-only and acting tools, require confirmation for risky actions, and treat results as data."
+  - q: "What are server-side tools?"
+    a: "Tools the model provider runs itself, such as web search. Tools for your own systems run on your side."
+exercise:
+  title: "Trace the round trip"
+  setup: "A Bhopal electricity distributor adds tools to its WhatsApp assistant: get_bill(consumer_no), get_outage_status(area), and register_complaint(consumer_no, issue). A consumer writes: 'Power has been off in Arera Colony since morning and my bill 4471283 looks too high.' Consumer numbers are 7 digits. The outage service is slow and sometimes times out."
+  questions:
+    - q: "Which tools should the model call, and with what arguments?"
+      a: "get_outage_status with area 'Arera Colony', and get_bill with consumer number 4471283."
+    - q: "What should the code do before running get_bill?"
+      a: "Validate the argument: 7 digits, and that this WhatsApp number is linked to that consumer."
+    - q: "What should get_outage_status return when it times out?"
+      a: "A clear message such as 'Outage status unavailable right now; you can register a complaint', not an empty result."
+    - q: "Should the model call register_complaint straight away?"
+      a: "Only after the consumer confirms, because it creates a record; the model should offer it and ask first."
+ask:
+  - "What is function calling in LLMs?"
+  - "How does a model decide which tool to call?"
+  - "How should a tool return errors to a model?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -25,6 +58,22 @@ reviewed_on: 2026-10-25
 **Tool calling** (also called function calling) lets a model use your code. You describe tools to the model: their names, what they do and the inputs they take. When a question needs a tool, the model replies with a request to call it with specific arguments. Your code runs the tool, sends back the result, and the model uses it to answer.
 
 The model never runs anything itself. Your code stays in control.
+
+```text
+   your app                                         model
+   +-------------------------------+                +---------------------------+
+   | 1. user message + tool list   | -------------> |                           |
+   |                               | <------------- | 2. tool_use: get_order_   |
+   |                               |                |    status {"order_id":...}|
+   | 3. validate args, run the     |                |                           |
+   |    real function              |                |                           |
+   | 4. tool_result: "Shipped 3    | -------------> |                           |
+   |    Nov, out for delivery"     | <------------- | 5. final answer, or       |
+   +-------------------------------+                |    another tool_use       |
+                                                    +---------------------------+
+```
+
+This lesson follows a fashion e-commerce site in Gurugram adding order tools to its support chat.
 
 ## How it works
 
@@ -59,6 +108,21 @@ The model decides when to call a tool mainly from its **name and description**, 
 
 **Server-side tools.** Some providers also offer tools they run themselves (such as web search). For your own systems, you run the tools on your side.
 
+**Good and weak tool definitions:**
+
+| Part | Weak | Strong |
+| --- | --- | --- |
+| Name | `order` | `get_order_status` |
+| Description | "Order API" | "Look up an order's status and delivery date by order id. Use when the customer asks where their order is." |
+| Parameter | `id: string` | `order_id`, described as "Like ORD-12345678" |
+| Error result | Empty | "No order found with id ...; ask the customer to check the id" |
+
+**Validating arguments.** Treat the model's arguments like input from a web form. Check types and formats against the schema, check that the user is allowed to act on that record, and reject anything else with a helpful error result. A model can produce a well-formed id that belongs to another customer, so ownership checks belong in your code, not in the prompt.
+
+**Several tool calls in one reply.** Models can request more than one tool at once when the calls do not depend on each other, such as an order status and the return policy. Run them, in parallel if you like, and send back one result for each request, each linked to its request id. When one call depends on another's result, the model asks for them in separate turns.
+
+**Choosing between tools.** When you add a second or third tool, test which one the model picks for a set of realistic questions. If it chooses wrongly, the fix is almost always in the descriptions: say plainly when each tool applies and when it does not.
+
 ## A worked example
 
 A Gurugram fashion e-commerce site adds order tools to its support chat: `get_order_status`, `get_return_policy` and `start_return` (which needs the customer to confirm).
@@ -71,6 +135,12 @@ A customer writes: "Where is my kurta order ORD-48213907? If it's late I want to
 4. It does not call `start_return`, because the order is not late; if the customer insists, it asks for confirmation first.
 
 When a customer types a wrong id, the tool returns a "not found" message and the model asks them to check their confirmation SMS.
+
+| Customer message | Tools called | Result |
+| --- | --- | --- |
+| "Where is ORD-48213907? Return if late" | get_order_status, get_return_policy | Arrives today; 15-day return window explained |
+| Insists on returning | None until confirmed | Asks for confirmation before start_return |
+| Wrong order id | get_order_status returns "not found" | Asks them to check their confirmation SMS |
 
 ## Common mistakes
 

@@ -9,14 +9,47 @@ hours: 5
 gap_tags: []
 primary_resource: langchain-academy-langgraph
 alternates: [dlai-agents-langgraph]
-format: explainer
+format: deep
 key_terms: [langgraph, checkpoint, agent-loop, human-in-the-loop]
 check:
   type: mcq
   question_ids: [langgraph-basics-1, langgraph-basics-2, langgraph-basics-3]
+flashcards:
+  - q: "What is LangGraph?"
+    a: "An open-source framework for building agents and multi-step AI workflows as graphs of state, nodes and edges."
+  - q: "What is the state in a LangGraph graph?"
+    a: "A typed object, such as messages, the current ticket and a draft reply, passed through the graph and updated by nodes."
+  - q: "What is a node?"
+    a: "A function that takes the state and returns updates; it may call a model, call a tool or run plain code."
+  - q: "What is a conditional edge?"
+    a: "An edge that chooses the next node from the state, such as going to the tool node if the model asked for a tool."
+  - q: "What does a checkpointer do?"
+    a: "Saves state after every step per thread id, so runs can pause, resume, be inspected or replayed."
+  - q: "What is an interrupt?"
+    a: "A pause before or inside a node that waits for outside input, the basis of human approval."
+  - q: "Why use a database checkpointer in production?"
+    a: "An in-memory checkpointer loses every paused run when the server restarts."
+  - q: "When is LangGraph unnecessary?"
+    a: "For a fixed short pipeline that plain functions handle; a framework adds weight without benefit."
+exercise:
+  title: "Draw the graph"
+  setup: "A Lucknow university wants an assistant for student requests. Requests are of three types: fee questions (needs the fee-records tool), exam schedule questions (needs the timetable tool), and requests for a fee extension, which a finance officer must approve before the extension is recorded. Students often continue the same conversation days later."
+  questions:
+    - q: "What nodes would the graph have?"
+      a: "classify, fee_agent, timetable_agent, propose_extension, approve_extension (interrupt), record_extension and reply."
+    - q: "Where do conditional edges go?"
+      a: "After classify, routing by request type, and inside each agent's tool loop, deciding whether to call a tool or finish."
+    - q: "How do students continue days later?"
+      a: "Each conversation uses a thread id, and a database-backed checkpointer reloads its state on the next message."
+    - q: "How would you test the routing without model calls?"
+      a: "Call the route function with hand-built states for each category and check the node it returns."
+ask:
+  - "What is the difference between LangChain and LangGraph?"
+  - "How does a LangGraph checkpointer work?"
+  - "How do I add human approval to a LangGraph agent?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -29,6 +62,22 @@ LangGraph is an open-source Python and JavaScript framework for building agents 
 - **Checkpointer**: saves the state after every step, so a run can pause, resume, be inspected or replayed.
 
 An agent loop is just a small graph: model node, tool node, and a conditional edge looping between them. A workflow is a graph with fixed edges. LangGraph lets you mix both in one system.
+
+```text
+   START
+     |
+     v
+  [classify] --category--+--> [billing_agent] --proposes credit?--> [approve_credit]  INTERRUPT
+                         |        (tool loop)          | no               |  supervisor decides
+                         |                             v                  v
+                         +--> [outage_agent] ------> [reply] <------ [apply_credit]
+                                  (tool loop)          |
+                                                       v
+                                                      END
+   checkpointer: state saved after every node, per thread_id
+```
+
+This lesson follows a broadband provider in Chennai building a support-ticket assistant with approval for credits.
 
 ## How it works
 
@@ -66,6 +115,24 @@ Each invocation passes a `thread_id`; the checkpointer stores state per thread, 
 
 **Interrupts** pause a run before or inside a node and wait for outside input, the basis of human approval. **Streaming** sends node-by-node updates to a UI. **Sub-graphs** let a node be a whole graph, useful for a specialist agent inside a larger flow.
 
+**LangGraph pieces and what they give you:**
+
+| Piece | What it is | What it gives you |
+| --- | --- | --- |
+| State | A typed dictionary | One place to see everything the run knows |
+| Node | A function returning updates | Small, testable steps |
+| Edge | Fixed next step | Predictable workflows |
+| Conditional edge | Function choosing the next node | Routing and tool loops |
+| Checkpointer | Saved state per thread | Memory, pause and resume, replay |
+| Interrupt | A pause for outside input | Human approval |
+| Sub-graph | A graph used as a node | Specialist agents inside a bigger flow |
+
+**How state updates work.** A node returns only the fields it changes, and LangGraph merges them into the state. For most fields the new value replaces the old one. For fields marked with a reducer, such as the message list with `add_messages`, new values are appended instead. This is why a tool node can return just the new tool message and the history stays intact. Forgetting the reducer is a classic bug: each node then overwrites the conversation with a single message.
+
+**Debugging with checkpoints.** Because every step is saved, you can list a thread's checkpoints, read the state at each one, and even resume from an earlier checkpoint with a changed state to see what would have happened. When a reply goes wrong, this shows which node produced which change, without adding print statements and rerunning.
+
+**Graphs and plain code together.** Not every step needs a model. Validation, database writes and formatting are ordinary nodes with no model call, which keeps them fast, cheap and easy to test.
+
 ## A worked example
 
 A Chennai broadband provider wants an assistant for support tickets. Requirements: classify each ticket, handle billing questions with account tools, handle outage questions with a status tool, and get a supervisor's approval before any credit is applied.
@@ -73,6 +140,13 @@ A Chennai broadband provider wants an assistant for support tickets. Requirement
 The graph: `classify` routes to `billing_agent` or `outage_agent`, each a small tool loop. If the billing agent proposes a credit, the graph routes to `approve_credit`, which interrupts. The supervisor sees the ticket, the proposed ₹300 credit and the agent's reason in their dashboard, approves or edits it, and the run resumes from the checkpoint to `apply_credit` and `reply`.
 
 Because state is checkpointed after every node, when the server restarts mid-ticket nothing is lost. When a customer complains about a reply, you load the thread's checkpoints and see exactly which node did what with which state. Tests call individual nodes with a hand-built state, so the routing logic is unit-tested without any model calls.
+
+| Situation | What the graph did |
+| --- | --- |
+| Billing question | classify, billing_agent, reply |
+| Proposed ₹300 credit | Interrupted at approve_credit; resumed after the supervisor approved |
+| Server restart mid-ticket | Resumed from the last checkpoint, nothing lost |
+| Customer complaint | Thread checkpoints showed which node wrote the reply and from what state |
 
 ## Common mistakes
 

@@ -4,11 +4,10 @@ import Link from "next/link";
 import { type MouseEvent, type ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
-import { useProgress, useToday } from "@/lib/browser/hooks";
-import { clearStop, setStop } from "@/lib/browser/progress-store";
 import type { DrawerCourse, TopicDetail } from "@/lib/content/drawer";
-import { todayInIST } from "@/lib/dates";
-import { markDone, statusOf } from "@/lib/roadmap/progress";
+import { ResourceNotice } from "@/components/resource-card";
+import { WatchButton } from "@/components/video-player";
+import { TopicStatus } from "./topic-status";
 import { themeOf } from "@/lib/themes";
 
 const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
@@ -40,6 +39,13 @@ export function TopicDrawerProvider({ details, children }: { details: Record<str
   useEffect(() => {
     if (id && !dialog.current?.open) dialog.current?.showModal();
   }, [id]);
+  // When the learner follows a link out of the drawer, the roadmap page may stay
+  // mounted but hidden (Cache Components). An open modal would then make the next
+  // page inert, so close it whenever this page's effects stop.
+  useEffect(() => {
+    const d = dialog.current;
+    return () => d?.close();
+  }, []);
   const close = () => dialog.current?.close();
   const detail = id ? details[id] : null;
 
@@ -77,28 +83,9 @@ export function useTopicLink(id: string) {
 }
 
 function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
-  const progress = useProgress();
-  const today = useToday();
-  const status = statusOf(progress.stops, d.id);
-  const day = () => today ?? todayInIST();
   const theme = themeOf(d.theme);
   const best = d.courses.filter((c) => c.pick === "best");
   const also = d.courses.filter((c) => c.pick === "also");
-
-  const statusButton = (label: string, active: boolean, onClick: () => void, icon: "book" | "check" | "play") => (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`flex min-h-10 items-center gap-1.5 rounded-full border px-3 text-sm font-medium ${
-        active
-          ? "border-emerald-700 bg-emerald-700 text-white"
-          : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-      }`}
-    >
-      <Icon name={icon} size={15} /> {label}
-    </button>
-  );
 
   return (
     <div className="flex min-h-full flex-col">
@@ -124,18 +111,12 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
           <p className="mt-2 text-lg leading-7">{d.outcome}</p>
         </div>
 
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Your status">
-          {statusButton("Learning", status === "in_progress", () => setStop(d.id, { status: "in_progress", updatedOn: day() }), "play")}
-          {statusButton("Done", status === "done", () => setStop(d.id, markDone("self_skipped", day())), "check")}
-          {status !== "not_started" && (
-            <button type="button" onClick={() => clearStop(d.id)} className="min-h-10 px-2 text-sm text-zinc-600 underline underline-offset-2 dark:text-zinc-400">
-              Reset
-            </button>
-          )}
+        <div>
+          <TopicStatus stopId={d.id} title={d.title} />
+          <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+            Done and Skip are your own call. Pass the lesson&apos;s check for full XP and level badges.
+          </p>
         </div>
-        <p className="-mt-3 text-xs text-zinc-600 dark:text-zinc-400">
-          Marking it done here counts as &ldquo;I already know this&rdquo;. Pass the lesson&apos;s check for full XP.
-        </p>
 
         <section aria-labelledby="why-h" className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-900">
           <h3 id="why-h" className="font-semibold">
@@ -160,8 +141,8 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
           <Icon name="book" size={18} /> Read the lesson and take the check
         </Link>
 
-        <CourseList title="Best free course" items={best} tone="text-emerald-800 dark:text-emerald-400" />
-        {also.length > 0 && <CourseList title="More free resources" items={also} tone="text-zinc-700 dark:text-zinc-300" />}
+        <CourseList title="Best course" items={best} tone="text-emerald-800 dark:text-emerald-400" />
+        {also.length > 0 && <CourseList title="More resources" items={also} tone="text-zinc-700 dark:text-zinc-300" />}
 
         {d.questions > 0 && (
           <Link href={`/stop/${d.id}#interview`} className="text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
@@ -181,7 +162,7 @@ function CourseList({ title, items, tone }: { title: string; items: DrawerCourse
       </h3>
       <ul className="mt-3 flex flex-col gap-3">
         {items.map((c) => {
-          const badge = TYPE_BADGE[c.type] ?? TYPE_BADGE.course;
+          const badge = { ...(TYPE_BADGE[c.type] ?? TYPE_BADGE.course), label: c.kindLabel };
           return (
             <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
@@ -192,6 +173,14 @@ function CourseList({ title, items, tone }: { title: string; items: DrawerCourse
               <span className="w-full text-sm text-zinc-600 dark:text-zinc-400">
                 {c.provider} · {c.cost} · about {c.hours} h{c.certificate ? " · certificate" : ""}
               </span>
+              {c.embed && (
+                <WatchButton
+                  embed={c.embed}
+                  title={c.title}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-rose-600 px-3 text-xs font-semibold text-white hover:bg-rose-700"
+                />
+              )}
+              {c.notice && <ResourceNotice text={c.notice} compact />}
             </li>
           );
         })}

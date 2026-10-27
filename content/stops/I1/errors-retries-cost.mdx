@@ -9,14 +9,47 @@ hours: 2
 gap_tags: [llm-cost-errors]
 primary_resource: claude-api-errors
 alternates: [claude-rate-limits]
-format: explainer
+format: deep
 key_terms: [rate-limit, retry-with-backoff, http-status-code, budget-limit]
 check:
   type: mcq
   question_ids: [errors-retries-cost-1, errors-retries-cost-2, errors-retries-cost-3]
+flashcards:
+  - q: "Which API errors are worth retrying?"
+    a: "429 rate limits, 500 and 503 server errors, provider overloaded errors, and network timeouts. They often succeed a moment later."
+  - q: "Which errors should not be retried unchanged?"
+    a: "400 bad request, 401 invalid key, 403 not permitted and 404 unknown model. Fix the cause instead."
+  - q: "What is exponential backoff with jitter?"
+    a: "Waiting longer after each failure, such as 1, 2, 4, 8 seconds, plus a little randomness so many clients do not retry at once, then stopping after a few attempts."
+  - q: "What does a retry-after header tell you?"
+    a: "How long the server wants you to wait before trying again. Respect it instead of your own backoff time."
+  - q: "Why check the SDK's retry settings first?"
+    a: "Many official SDKs already retry. Adding your own loop on top multiplies attempts and can flood the API."
+  - q: "How do you stay under rate limits?"
+    a: "Limit concurrency, spread batch jobs out, and use batch APIs for non-urgent work."
+  - q: "Name four cost guards."
+    a: "A monthly spending limit or alert, a max_tokens cap on every call, per-user daily limits, and logging tokens and cost per request."
+  - q: "What is a fallback?"
+    a: "What happens when calls keep failing: a cached answer, a simpler model, a friendly 'try again', or routing to a person."
+exercise:
+  title: "Fix the retry loop"
+  setup: "An app in Indore calls a model API for each of 2,000 product descriptions. Its code: while True: try the call; on any error, retry immediately. It runs 50 calls at once, has no timeout and no max_tokens. One night the bill is ₹45,000 instead of ₹4,000. Logs show many 429 errors, and one 400 error ('input too long') for a description pasted from a PDF, retried 3,000 times."
+  questions:
+    - q: "Why did the 400 error cost so much?"
+      a: "A 400 means the request itself is wrong, so it can never succeed. Retrying it forever sent the same long, costly input thousands of times."
+    - q: "How should the 429 errors be handled?"
+      a: "Retry with exponential backoff and jitter, respect retry-after, stop after a few attempts, and lower concurrency from 50."
+    - q: "What two limits on each call would cap cost?"
+      a: "Truncate or reject inputs above a length limit, and set max_tokens on the reply."
+    - q: "What account-level guard would have stopped the bill early?"
+      a: "A monthly spending limit in the provider console with an alert at, say, 50%, plus cost logging per run."
+ask:
+  - "Which API errors should I retry?"
+  - "How do I stop my AI app from running up a big bill?"
+  - "What is a rate limit and how do I handle it?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -26,6 +59,30 @@ Language model APIs fail sometimes, and they cost money on every call. A product
 - **Errors**: rate limits, overloaded servers, timeouts, bad requests, authentication problems.
 - **Retries**: trying again, the right way, for errors that are temporary.
 - **Cost caps**: limits that stop a bug or a heavy user from running up a large bill.
+
+```text
+  Call the model API
+        |
+        v
+   success? --yes--> use the result, log tokens and cost
+        |
+        no
+        v
+   retryable? (429, 500, 503, overloaded, timeout)
+        |                     |
+        no                    yes
+        v                     v
+   fail fast:           attempts left?
+   log, alert,            |        |
+   fix the cause         yes       no --> fallback: cache, smaller model,
+                          |              "try again", or a person
+                          v
+                wait: retry-after, or 2^n seconds + jitter
+                          |
+                          +--> call again
+```
+
+This lesson follows Fatima, whose nightly review-summarising job failed and tripled her bill.
 
 ## How it works
 
@@ -50,6 +107,20 @@ Language model APIs fail sometimes, and they cost money on every call. A product
 - Log tokens and cost per request so you can see where money goes.
 - Cap loops and retries; a bug that retries forever is a bug that spends forever.
 
+**Backoff in numbers.** With a base of 1 second, doubling and up to 1 second of jitter, five attempts wait roughly:
+
+| Attempt | Wait before it | Total time so far |
+| --- | --- | --- |
+| 1 | 0 s | 0 s |
+| 2 | about 1 to 2 s | about 1.5 s |
+| 3 | about 2 to 3 s | about 4 s |
+| 4 | about 4 to 5 s | about 8.5 s |
+| 5 | about 8 to 9 s | about 17 s |
+
+After that, stop and use the fallback. For interactive features, users will not wait 17 seconds, so use fewer attempts and a faster fallback. For overnight batch jobs, longer waits are fine.
+
+**Cost per request.** Every response tells you how many input and output tokens were used. Multiply by the provider's current prices and log the result with the request id, user and feature. A weekly look at cost per feature and per user shows quickly whether one feature, one user or one bug is driving the bill.
+
 ## A worked example
 
 Fatima's app summarises customer reviews for 300 small sellers each night. One morning she finds the job failed halfway and the bill was three times normal.
@@ -60,20 +131,33 @@ Her fixes:
 
 ```python
 import random, time
+import anthropic
 
-RETRYABLE = {429, 500, 503, 529}
+RETRYABLE = {429, 500, 503, 529}   # 529 is Anthropic's "overloaded"
 
+# Create the client with anthropic.Anthropic(max_retries=0),
+# so the SDK's own retries do not stack on top of these.
 def call_with_retry(send, max_attempts=5):
     for attempt in range(max_attempts):
         try:
             return send()
-        except APIError as e:
-            if e.status not in RETRYABLE or attempt == max_attempts - 1:
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            status = getattr(e, "status_code", None)   # None for timeouts and network errors
+            if (status is not None and status not in RETRYABLE) or attempt == max_attempts - 1:
                 raise
             time.sleep(min(30, 2 ** attempt) + random.random())
 ```
 
 She also truncates each review to 4,000 characters, sets `max_tokens=300` for summaries, runs at most five calls at a time, and sets a monthly spend limit with an alert at half. The next month's bill returns to normal and the nightly job completes.
+
+| Problem | Fix | Effect |
+| --- | --- | --- |
+| Immediate, endless retries on 429 | Backoff with jitter, five attempts | No more flooding at peak |
+| Retrying a 400 error 200 times | Fail fast on 400, 401, 403, 404 | One failure logged, not 200 |
+| A 40,000-character review | Truncate input to 4,000 characters | Request size capped |
+| Long summaries | `max_tokens=300` | Output size capped |
+| Too many calls at once | At most five at a time | Under the rate limit |
+| No spending guard | Monthly limit with an alert at 50% | A runaway bill is stopped early |
 
 ## Common mistakes
 

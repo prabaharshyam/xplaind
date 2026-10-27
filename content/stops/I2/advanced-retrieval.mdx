@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: weaviate-advanced-rag
 alternates: [hyde-paper]
-format: explainer
+format: deep
 key_terms: [query-rewriting, hyde, parent-child-chunking]
 check:
   type: mcq
   question_ids: [advanced-retrieval-1, advanced-retrieval-2, advanced-retrieval-3]
+flashcards:
+  - q: "What is query rewriting?"
+    a: "Using a model to turn the user's message into better search queries, such as resolving a follow-up with chat history or splitting a compound question."
+  - q: "What is multi-query retrieval?"
+    a: "Generating several phrasings of a question, searching with each and merging the results, to bridge jargon gaps."
+  - q: "What is HyDE?"
+    a: "Hypothetical document embeddings: a model writes a plausible answer, and you search with that answer's embedding instead of the question's."
+  - q: "Why does HyDE help short questions?"
+    a: "A short question and a formal answer passage can embed far apart. A fake answer looks like the real passage, so it lands near it."
+  - q: "When does HyDE hurt?"
+    a: "When the model's guess is confidently off-topic, pulling search the wrong way, and it always adds a model call before searching."
+  - q: "What are parent-child chunks?"
+    a: "Searching small child chunks for precise matches, then giving the model the larger parent section each came from, for context."
+  - q: "What is sentence-window retrieval?"
+    a: "A variant of parent-child: return a few sentences either side of the matched sentence."
+  - q: "When should you add one of these techniques?"
+    a: "Only when your golden set shows the specific failure it fixes, because each adds cost or latency."
+exercise:
+  title: "Match the fix to the failure"
+  setup: "A Bengaluru telecom's support assistant fails in four ways on its golden set: (1) 'What about prepaid?' after a question about international roaming returns general prepaid plans; (2) 'Roaming charges Dubai?' retrieves pages that mention Dubai only in passing; (3) the right 120-token chunk is found but the answer misses the exception for business plans in the next paragraph; (4) 'Compare the Gold and Platinum plan data limits' only returns the Gold plan page."
+  questions:
+    - q: "Which technique fixes (1)?"
+      a: "Query rewriting with chat history, turning it into 'international roaming charges for prepaid plans'."
+    - q: "Which technique is worth trying for (2)?"
+      a: "HyDE, because the query is short; route only short queries through it and measure recall before and after."
+    - q: "Which fixes (3)?"
+      a: "Parent-child chunks, so the model gets the whole sub-section, including the exception, not just the small matched chunk."
+    - q: "How should (4) be handled?"
+      a: "Split the compound question into two queries, one per plan, and merge the results."
+ask:
+  - "What is HyDE in RAG?"
+  - "How do I handle follow-up questions in a RAG chatbot?"
+  - "What chunk size should I use for parent-child retrieval?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -28,6 +61,23 @@ Even good hybrid search fails when the query and the document do not look alike.
 - **Parent-child chunks**: you search over small chunks for precision, then give the model the larger section each came from.
 
 Each costs something, usually an extra model call or more tokens, so you add one only when your golden set shows the problem it fixes.
+
+```text
+  user: "And for senior citizens?"
+          |
+  [query rewrite with chat history]  --> "FD interest rate for senior citizens"
+          |
+  [optional HyDE for short queries]  --> fake answer --> embed
+          |
+  [search small CHILD chunks]  --> c17, c18, c42
+          |
+  [fetch PARENT sections, de-duplicate] --> section 3.2, section 7.1
+          |
+          v
+  prompt to the model: question + parent sections
+```
+
+This lesson follows an internal assistant at a bank in Delhi, answering staff questions from 900 pages of circulars.
 
 ## How it works
 
@@ -43,6 +93,17 @@ A small, fast model does this well. Log the rewrites: when retrieval fails, the 
 
 **Parent-child chunks.** Small chunks (100 to 200 tokens) match precisely but often lack the surrounding context needed to answer: the exception two paragraphs later, the table header. Large chunks give context but match poorly. So index small "child" chunks, each storing the id of its "parent" (the section or page). Search children, then fetch and de-duplicate their parents for the prompt. A variant, sometimes called sentence-window retrieval, returns a few sentences either side of the match.
 
+**Cost and benefit of each technique:**
+
+| Technique | Fixes | Extra cost | Route it to |
+| --- | --- | --- | --- |
+| Query rewriting | Follow-ups, compound questions, jargon gaps | One small model call | Chat turns after the first; long or compound queries |
+| Multi-query | Jargon and phrasing gaps | One call plus several searches | Queries with low top scores |
+| HyDE | Short, vague queries | One model call | Queries under about eight words |
+| Parent-child | Missing context around a precise match | More prompt tokens | All queries, once chunks are built |
+
+Routing matters: running every technique on every query adds latency and cost for little gain on the queries that already work.
+
 ## A worked example
 
 A Delhi bank's internal assistant answers staff questions about 900 pages of circulars. The golden set shows three failure clusters.
@@ -52,6 +113,12 @@ A Delhi bank's internal assistant answers staff questions about 900 pages of cir
 *Short questions fail.* "KYC refresh period?" matches pages that mention KYC in passing. HyDE generates: "Customers classified as high risk must update KYC every two years, medium risk every eight years and low risk every ten years." Its embedding lands next to the actual periodic-update clause. Recall at 5 on short queries goes from 58% to 74%. On long, specific questions HyDE made no difference, so you route only queries under eight words through it.
 
 *Answers miss exceptions.* The right 150-token chunk is found, but the exception for priority-sector loans sits in the next paragraph, so answers are wrong. Switching to parent-child (children of 150 tokens, parents of one sub-section) fixes 9 of 11 such cases at the cost of about 40% more prompt tokens.
+
+| Failure cluster | Fix | Recall at 5 before | After |
+| --- | --- | --- | --- |
+| Follow-up questions | Rewrite with the last two turns | 41% | 83% |
+| Short questions | HyDE for queries under eight words | 58% | 74% |
+| Missed exceptions | Parent-child chunks | 11 of 11 failing | 2 of 11 failing |
 
 ## Common mistakes
 

@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: claude-batch-processing
 alternates: [routellm]
-format: explainer
+format: deep
 key_terms: [model-tiering, batch-api, cost-per-request, llm-gateway]
 check:
   type: mcq
   question_ids: [batching-model-tiering-1, batching-model-tiering-2, batching-model-tiering-3]
+flashcards:
+  - q: "What is model tiering?"
+    a: "Sending simple requests to small, cheap, fast models and only hard ones to large models."
+  - q: "What is a batch API?"
+    a: "A way to submit many non-urgent requests together; providers return results within hours at a large discount."
+  - q: "What are three tiering patterns?"
+    a: "Fixed by task, a cascade that escalates on failed checks, and a router that predicts difficulty up front."
+  - q: "What does a cascade need to work?"
+    a: "A reliable check on the small model's output, such as a validator, so failures escalate instead of passing on."
+  - q: "What is the real question when choosing a small model?"
+    a: "Whether it is good enough on the requests you actually send it, measured with evals per route."
+  - q: "How should batch jobs handle failures?"
+    a: "Expect some items to fail, match results by your own ids, resubmit failures, and keep work idempotent."
+  - q: "Why measure cost per successful task?"
+    a: "A cheap model that fails often and needs retries or humans can cost more overall."
+  - q: "Which other levers combine well with tiering?"
+    a: "Prompt caching, shorter prompts and outputs, fewer retrieved chunks, and caching identical answers."
+exercise:
+  title: "Cut the bill"
+  setup: "A Surat e-commerce marketplace runs three AI tasks on its largest model in real time: (A) categorising 2 million new product listings a month, uploaded in nightly seller batches; (B) answering buyer chat questions; (C) writing a weekly summary of seller complaints for managers. Monthly spend is ₹18 lakh."
+  questions:
+    - q: "How should task (A) change?"
+      a: "Move it to the batch API overnight and test a small model with a validator, escalating failures to the large one."
+    - q: "How should task (B) be tiered?"
+      a: "Route simple questions such as order status to a small model and keep complex ones on the large model, with evals per route."
+    - q: "How should task (C) change?"
+      a: "It can wait, so run it through the batch API; keep the large model if summary quality needs it."
+    - q: "What should the team report after the changes?"
+      a: "A table of cost and quality per task before and after, using cost per successful task."
+ask:
+  - "How do I choose between a small and a large model?"
+  - "When should I use a batch API?"
+  - "What is a model cascade?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -27,6 +60,25 @@ Two of the strongest cost levers for language-model systems:
 - **Batching**: work that does not need an answer in seconds, such as nightly document tagging, summarising yesterday's tickets or re-embedding a corpus, goes through a **batch API**. Providers process batches within hours at a large discount, often around half the normal price.
 
 Both depend on knowing your traffic: what share of requests is easy, and what share can wait.
+
+```text
+   incoming work
+        |
+        +-- can it wait hours? -- yes --> [batch API, discounted] --> results by id, rerun failures
+        |
+        no
+        |
+        v
+   [small model] --> validator passes? -- yes --> answer
+        |                   |
+        |                   no (about 2.5%)
+        |                   v
+        |            [large model] --> answer
+        |
+   fit summaries (hard task) --> [large model] directly
+```
+
+This lesson follows a resume-screening service at an HR-tech company in Pune processing 400,000 resumes a month.
 
 ## How it works
 
@@ -44,6 +96,19 @@ Every route needs its own eval. The real question is not "is the small model goo
 
 **Measure cost per successful task**, not just cost per call. A cheap model that fails half the time and needs a retry or a human may cost more overall.
 
+**Routes for the resume pipeline:**
+
+| Task | Route | Why | Evidence |
+| --- | --- | --- | --- |
+| Field extraction | Small model, escalate on validation failure | Small model nearly as accurate | 97% against 98% on 500 resumes |
+| Fit summary | Large model | Small model clearly worse | Recruiter ratings |
+| Bulk uploads | Batch API overnight | Needed by morning, not in seconds | Discounted price |
+| Daytime uploads | Real time | Recruiters wait for them | Latency needs |
+
+**Building a validator for a cascade.** The check decides what escalates, so it must catch bad outputs reliably. For extraction, validate against the JSON schema, check required fields are present and plausible (an email has an at sign, years of experience are between 0 and 50), and compare totals where possible. For free text, a cheap judge or a self-reported "unsure" can work, but test it: measure how many bad outputs it misses on a labelled set before trusting it.
+
+**Running a batch job.** Write one line per request with your own id, submit, and record the batch id. When results arrive, match them by id, write successes, and collect failures into a new batch. Make every write idempotent, so rerunning a batch after a crash does not create duplicates.
+
 ## A worked example
 
 A Pune HR-tech company screens resumes for its clients. Each resume gets structured extraction (name, skills, experience) and a fit summary against the job description. Volume: 400,000 resumes a month, mostly uploaded in bulk the evening before a hiring drive.
@@ -58,6 +123,12 @@ The redesign:
 4. The job description, identical for thousands of resumes, sits at the start of the prompt and is cached.
 
 Monthly spend falls to about ₹5 lakh. Recruiter ratings of the summaries are unchanged, and you report both numbers side by side in the monthly review.
+
+| Measure | Before | After |
+| --- | --- | --- |
+| Monthly model spend | About ₹14 lakh | About ₹5 lakh |
+| Extraction field accuracy | 98% | 97% plus escalation |
+| Recruiter rating of summaries | Baseline | Unchanged |
 
 ## Common mistakes
 

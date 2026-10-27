@@ -9,19 +9,72 @@ hours: 6
 gap_tags: [system-design]
 primary_resource: eugeneyan-llm-patterns
 alternates: [huyen-llm-production]
-format: explainer
+format: deep
 key_terms: [rag, guardrails, evals, monitoring, human-in-the-loop]
 check:
   type: project
   brief: "Write a two to four page design document for an AI product, covering users and success metrics, components, request flow, failure modes and guards, evaluation, and cost per user. Share a link to it."
+flashcards:
+  - q: "What is AI system design?"
+    a: "Planning an AI product on paper: users, success metric, components, request flow, failure modes, evaluation and operations."
+  - q: "How long should a design document be?"
+    a: "Two to four clear pages that a team and client will actually read."
+  - q: "What should the goal section contain?"
+    a: "Who uses it, for what task, and a success metric with a baseline, such as 6 minutes to under 2."
+  - q: "Which constraints shape an AI design?"
+    a: "Volume and peaks, latency budget, cost per request, languages, data residency, privacy rules and access rights."
+  - q: "Why describe the request flow step by step?"
+    a: "It shows what data passes where, which exposes privacy, latency and failure issues early."
+  - q: "What is a failure-mode table?"
+    a: "For each component, what can go wrong and the guard that catches it, such as a fallback model for outages."
+  - q: "What is a launch bar?"
+    a: "Agreed thresholds on the test set that must be met before launch, such as 85% correct with citations."
+  - q: "Why include open questions?"
+    a: "Recording undecided trade-offs and their options keeps the team honest and focuses client decisions."
+exercise:
+  title: "Sketch the design"
+  setup: "A Bhopal state health department wants an assistant for 5,000 field health workers to answer questions about vaccination schedules and scheme rules from 300 guideline PDFs in Hindi and English. Workers use basic Android phones on patchy mobile data. Guidelines change a few times a year. Data must stay in India."
+  questions:
+    - q: "What success metric and baseline would you propose?"
+      a: "For example, time to an answer, from calling a supervisor, about 20 minutes, to under 1 minute, at 90% correct with citations on a test set."
+    - q: "Which constraints most shape the design?"
+      a: "Patchy data and basic phones, so short streamed answers and a light interface; Hindi and English; Indian hosting; and guideline versions."
+    - q: "Name two failure modes and their guards."
+      a: "Superseded guidelines, handled by effective-date filters; and a provider outage, handled by a fallback model and a clear message to call the supervisor."
+    - q: "What would the evaluation plan include?"
+      a: "A test set of real workers' questions in both languages, including unanswerable ones, with recall and correctness metrics and a launch bar."
+ask:
+  - "What should an AI system design document include?"
+  - "How do I prepare for an AI system design interview?"
+  - "How do I list failure modes for an AI system?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
 **AI system design** is planning an AI product on paper before (or while) building it: who it serves, how success is measured, what components it has, how a request flows through them, where it can fail, how it is evaluated and how it is run in production. A short design document lets a team agree on decisions, spot risks early and explain the system to clients and reviewers.
+
+```text
+   user (underwriter)
+        |
+        v
+   [web app] --> [API service] --> [guardrails: input]
+                      |
+                      v
+              [hybrid search + department filter + effective date] --> [reranker] --> top 5
+                      |
+                      v
+              [model in the insurer's cloud region]  -- outage --> [fallback model]
+                      |
+                      v
+              [guardrails: output] --> answer with citation links
+                      |
+   tracing (masked) | evals in CI | dashboards: latency, cost, feedback, refusals
+```
+
+This lesson follows a design for an internal underwriting assistant at a general insurer in Mumbai.
 
 ## How it works
 
@@ -50,6 +103,22 @@ A practical design document, two to four pages, covers:
 
 **8. Open questions and trade-offs.** What you have not decided yet and the options.
 
+**A failure-mode table:**
+
+| Component | What can go wrong | Guard |
+| --- | --- | --- |
+| Parsing | Scanned tables garbled | Table extraction; flagged pages reviewed |
+| Retrieval | Superseded circulars ranked first | Effective-date filter |
+| Retrieval | Right passage missed | Hybrid search, reranker, recall tracked |
+| Generation | Unsupported claims | Citations required; refusal when sources are silent |
+| Documents | Injection in uploaded files | No write tools; content treated as data |
+| Provider | Outage or rate limits | Retries, fallback model, clear message |
+| Cost | Runaway usage | Per-user caps, daily budget alert |
+
+**Reviewing a design.** Walk through one request from the user's tap to the answer, and at each box ask three questions: what data is here, who may see it, and what happens if this part fails or is slow. Invite a security or compliance reviewer to the walk-through early. Questions such as "where is this data stored?" are cheap in week one and expensive in week ten.
+
+**Keeping it current.** Treat the document as living. When a decision changes, update the page and note the date and reason in a short decision log at the end. New team members and client reviewers then read one accurate page instead of reconstructing history from chat threads.
+
 ## A worked example
 
 Design summary for an internal assistant at a Mumbai general insurer, answering underwriters' questions from 2,000 policy wordings, circulars and underwriting guidelines:
@@ -62,6 +131,13 @@ Design summary for an internal assistant at a Mumbai general insurer, answering 
 - *Operations*: container service, dashboards for latency, cost, feedback and refusal rate, re-indexing nightly.
 
 The document took two days and prevented a month of rework when the compliance team asked about data residency in week one.
+
+| Design element | Decision |
+| --- | --- |
+| Goal | Lookup time from 6 minutes to 2 |
+| Launch bar | 85% correct with citations on 120 questions; 100% refusal on out-of-scope ones |
+| Constraints | 300 users, 40 requests a minute at peak, first token under 2 s, data in India |
+| Payoff | Compliance's week-one residency question answered from the document, avoiding a month of rework |
 
 ## Common mistakes
 

@@ -10,14 +10,47 @@ gap_tags: []
 primary_resource: bentoml-intro
 alternates: [fastapi-tutorial, rules-of-ml]
 more: [fsdl-course-2022]
-format: explainer
+format: deep
 key_terms: [batch-inference, inference, latency, model-registry]
 check:
   type: mcq
   question_ids: [serving-ml-models-1, serving-ml-models-2, serving-ml-models-3]
+flashcards:
+  - q: "What are the two main serving patterns?"
+    a: "Batch inference, scoring many records on a schedule, and real-time inference, an API that scores one request within milliseconds."
+  - q: "When should you choose batch inference?"
+    a: "Whenever the business can wait for scores. It is simpler, cheaper and easier to monitor."
+  - q: "Why package preprocessing with the model?"
+    a: "Features must be computed exactly as in training. Re-implementing them in the service causes silent prediction errors."
+  - q: "Why validate inputs in a real-time service?"
+    a: "Missing fields, wrong types, unit mismatches and out-of-range values otherwise produce silent wrong predictions."
+  - q: "What is shadow mode?"
+    a: "A new model scores live requests alongside the current one without affecting decisions, so outputs can be compared safely."
+  - q: "What is a canary release?"
+    a: "Sending a small share of traffic to the new model first, then increasing it if results hold up."
+  - q: "What is a fallback for a model service?"
+    a: "A planned decision when the model is unavailable, such as a simple rule or routing to manual review."
+  - q: "What should every prediction log record?"
+    a: "Inputs or their summaries, the output, the model version and a timestamp, with personal data masked."
+exercise:
+  title: "Choose and plan the serving"
+  setup: "A Surat diamond exporter has two models: (A) a demand forecast per product for the next month, used by planners each Monday; (B) a price check that flags unusual quotes while a salesperson types into the order system, which must respond within 200 milliseconds. A new version of (B) is ready, and a partner system sends weights in carats while the internal system uses cents."
+  questions:
+    - q: "Which serving pattern fits each model?"
+      a: "(A) batch, scored weekly and written to a table; (B) real-time, as an API with a latency budget."
+    - q: "How do you release the new version of (B) safely?"
+      a: "Run it in shadow mode, compare its flags with the current version, then canary a small share of traffic before full rollout."
+    - q: "How do you protect (B) from the carats versus cents problem?"
+      a: "Validate inputs against expected ranges and units with a schema, and reject or convert values from the partner channel."
+    - q: "What should happen if the price-check service is down?"
+      a: "A fallback: let the order continue with a 'not checked' marker, or apply a simple rule-based limit, rather than blocking sales."
+ask:
+  - "When should I use batch inference instead of an API?"
+  - "How do I deploy a new model version safely?"
+  - "What is a feature store?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -28,6 +61,22 @@ reviewed_on: 2026-10-25
 - **Real-time (online) inference**: an API that scores one request within milliseconds (fraud check at payment time, price suggestion as a seller types).
 
 Choose batch whenever the business can wait; it is simpler, cheaper and easier to monitor.
+
+```text
+  BATCH (nightly)                              REAL-TIME (per request)
+  scheduler                                    application form
+     |                                            |
+     v                                            v
+  load model v7 from registry                  [FastAPI service: model v7 loaded at start-up]
+  compute features as of today                 validate 42 fields  -> reject bad input
+  score all active loans                       compute features (same code as training)
+  write: loan_id, score, v7, timestamp         return score + version in under 80 ms
+     |                                            |
+     v                                            v
+  collections team's ranked list               decision, or manual review if service down
+```
+
+This lesson follows a non-banking finance company in Kolkata serving one default-risk model both ways.
 
 ## How it works
 
@@ -45,15 +94,35 @@ Choose batch whenever the business can wait; it is simpler, cheaper and easier t
 
 **Logging.** Log inputs (or their summaries), outputs and model version for monitoring and debugging, with personal data masked.
 
+**Batch or real-time:**
+
+| Question | Batch | Real-time |
+| --- | --- | --- |
+| When is the score needed? | Hours or days later is fine | Within the request |
+| Cost | Low: runs on a schedule | Higher: always-on service |
+| Monitoring | Counts and distributions per run | Latency, errors and drift per request |
+| Failure impact | A late report | A blocked customer journey, so a fallback is needed |
+| Typical examples | Churn lists, forecasts, risk reviews | Fraud checks, pricing, credit decisions |
+
+**The rollout path in words.** Shadow mode first: the new version scores every request but its output is only logged. After enough time to see real outcomes, compare how well each version's scores ranked what actually happened, segment by segment. Then a canary at a small share, watching error rates and business measures. Then full rollout, with the previous version still loaded or one deploy away. Each stage has a named owner and a written condition for moving on or rolling back, decided before the stage starts.
+
+**Keeping batch and real-time consistent.** When a model is served both ways, both paths must load the same registered version and call the same feature code. A useful test scores a sample of records through the batch job and through the API and checks that every score matches.
+
 ## A worked example
 
 A Kolkata NBFC (non-banking finance company) has a trained default-risk model.
 
 - **Batch**: every night, all active loans are scored for early-warning risk; the collections team sees a ranked list each morning. The job logs the number of loans scored and the share in each risk band; an alert fires if the counts change sharply.
 - **Real-time**: at loan application, a FastAPI service scores the applicant in under 80 milliseconds at p95. It validates 42 input fields with a Pydantic model and computes bank-statement features with the same code used in training. If the service is down, the application is routed to manual review rather than auto-decided.
-- **Rollout**: version 7 runs in shadow mode for two weeks beside version 6. Its scores rank later defaults better on that period's applications, so it moves to 20% of traffic, then 100%. The registry keeps version 6 ready for rollback.
+- **Rollout**: version 7 runs in shadow mode for two weeks beside version 6. Defaults take months to show, so two weeks of shadow scores cannot prove it ranks them better. Instead the team checks that its live scores are stable and sensible, and relies on a back-test on older loans with known outcomes, where it ranked defaults better. It then moves to 20% of traffic, then 100%. The registry keeps version 6 ready for rollback.
 
 One early bug: the service received income in lakhs from one partner channel and in rupees from another. Input range validation caught it on day one.
+
+| Stage for version 7 | Traffic | Outcome |
+| --- | --- | --- |
+| Shadow | 0% of decisions, 100% scored | Stable live scores; better than version 6 in the back-test |
+| Canary | 20% | No rise in errors or complaints |
+| Full rollout | 100% | Version 6 kept ready in the registry |
 
 ## Common mistakes
 

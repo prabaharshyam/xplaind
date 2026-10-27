@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { loadContent } from "./load";
 import { validateBundle } from "./validate";
+import { todayInIST } from "@/lib/dates";
 import { TODAY } from "./testing";
 
 const dirs: string[] = [];
@@ -129,7 +130,8 @@ describe("the real content/ folder", () => {
   it("loads and validates with no errors", () => {
     const { bundle, issues } = loadContent(path.resolve(__dirname, "../../../content"));
     expect(issues).toEqual([]);
-    const errors = validateBundle(bundle, { today: TODAY }).filter((i) => i.severity === "error");
+    // Real content is checked against today in India, as the build does.
+    const errors = validateBundle(bundle, { today: todayInIST() }).filter((i) => i.severity === "error");
     expect(errors).toEqual([]);
     expect(bundle.levels).toHaveLength(9);
   });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LAUNCH_MINIMUMS, coverage, validateBundle } from "./validate";
 import { isHumanName } from "./review";
-import { TODAY, book, check, explainerBody, goal, interview, placement, resource, stop, validBundle } from "./testing";
+import { TODAY, book, check, deepBody, deepExtras, explainerBody, goal, guidedProject, interview, placement, resource, stop, validBundle } from "./testing";
 import type { Bundle } from "./types";
 
 const run = (bundle: Bundle, launch = false) => validateBundle(bundle, { today: TODAY, launch });
@@ -52,6 +52,9 @@ describe("broken bundles fail", () => {
     ["an explainer misses a section", (b) => Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody().replace("## Common mistakes", "## Pitfalls") }), /missing Common mistakes/],
     ["an explainer has its sections out of order", (b) => Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody().replace("## What it is", "## Tmp").replace("## How it works", "## What it is").replace("## Tmp", "## How it works") }), /must come in the order/],
     ["an explainer is too short", (b) => Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody(100) }), /500 to 1500 words/],
+    ["a deep lesson is too short", (b) => Object.assign(b.stops[0].data, { format: "deep", ...deepExtras, body: deepBody(500) }), /1000 to 3000 words/],
+    ["a deep lesson has no diagram", (b) => Object.assign(b.stops[0].data, { format: "deep", ...deepExtras, body: deepBody().replace("```text", "```python") }), /diagram/],
+    ["a deep lesson has no table", (b) => Object.assign(b.stops[0].data, { format: "deep", ...deepExtras, body: deepBody().replace("| --- | --- |", "") }), /table/],
   ];
 
   it.each(cases)("%s", (_name, mutate, pattern) => {
@@ -117,6 +120,15 @@ describe("launch coverage (PL-1, RM-2, IQ-2)", () => {
     Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody(), key_terms: ["term-one", "term-two"] });
     expect(errorsOf(b)).toEqual([]);
     expect(run(b, true).some((i) => /still a brief/.test(i.message))).toBe(false);
+  });
+
+  it("accepts a complete deep lesson, and lists a short explainer as a launch gap", () => {
+    const b = validBundle();
+    Object.assign(b.stops[0].data, { format: "explainer", body: explainerBody(), key_terms: ["term-one", "term-two"] });
+    expect(run(b, true).some((i) => /rewrite it as a deep lesson/.test(i.message))).toBe(true);
+    Object.assign(b.stops[0].data, { format: "deep", body: deepBody(), ...deepExtras });
+    expect(errorsOf(b)).toEqual([]);
+    expect(run(b, true).some((i) => /deep lesson/.test(i.message))).toBe(false);
   });
 
   it("lists a core topic with no stop, but not an optional one (RM-2)", () => {
@@ -185,5 +197,30 @@ describe("a book and an interview question in the bundle", () => {
     b.books.push(entry("books/b2.yaml", book({ id: "book-2" })));
     b.interview.push(entry("questions/interview/iq-2.yaml", interview({ id: "iq-2" })));
     expect(errorsOf(b)).toEqual([]);
+  });
+});
+
+describe("guided projects (GP-1, GP-4)", () => {
+  const withGuide = (stageGuide: string | undefined, projects = [guidedProject()]) => {
+    const b = validBundle();
+    const g = b.goals[0].data;
+    b.goals[0] = { ...b.goals[0], data: { ...g, stages: g.stages.map((st) => (st.id === "B1" ? { ...st, guide: stageGuide } : st)) } };
+    b.projects = projects.map((data) => ({ file: `projects/${data.id}.yaml`, data }));
+    return b;
+  };
+
+  it("accepts a guide linked from a stage", () => {
+    expect(errorsOf(withGuide("project-one"))).toEqual([]);
+  });
+
+  it("rejects a missing guide, an unlinked guide and unknown lessons", () => {
+    expect(errorsOf(withGuide("nope", [])).map((e) => e.rule)).toContain("GP-4");
+    expect(errorsOf(withGuide(undefined)).map((e) => e.message)).toContain('guided project "project-one" is not linked from any path stage');
+    expect(errorsOf(withGuide("project-one", [guidedProject({ lessons: ["ghost"] })])).map((e) => e.message)).toContain('lesson "ghost" does not exist');
+  });
+
+  it("keeps raw links out of steps", () => {
+    const p = guidedProject({ steps: guidedProject().steps.map((st, i) => (i === 0 ? { ...st, body: "See https://example.com" } : st)) });
+    expect(errorsOf(withGuide("project-one", [p])).map((e) => e.rule)).toContain("GP-1");
   });
 });

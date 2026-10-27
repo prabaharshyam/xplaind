@@ -66,3 +66,40 @@ export function coverage(stops: readonly RoadmapStop[], startLevel: LevelId, pro
   const percent = totalHours === 0 ? 0 : Math.floor((doneHours * 100) / totalHours);
   return { doneHours, totalHours, percent, done, skipped, total: onPath.length };
 }
+
+/** What a topic shows on a roadmap: roadmap.sh-style to do, learning, done or skipped. */
+export type TopicState = "todo" | "learning" | "done" | "skipped";
+
+export function topicStateOf(progress: ProgressMap, stopId: string): TopicState {
+  const p = progress[stopId];
+  if (!p) return "todo";
+  if (p.status === "in_progress") return "learning";
+  return p.how === "self_skipped" ? "skipped" : "done";
+}
+
+/**
+ * The record to store when the learner picks a state on the map, or null to clear it.
+ * Picking "done" keeps a passed check or a project; otherwise it is self-marked (RM-7).
+ */
+export function recordFor(previous: StopProgress | undefined, state: TopicState, today: string): StopProgress | null {
+  switch (state) {
+    case "todo":
+      return null;
+    case "learning":
+      return { status: "in_progress", ...(previous?.score !== undefined ? { score: previous.score } : {}), updatedOn: today };
+    case "skipped":
+      return markDone("self_skipped", today);
+    case "done":
+      return previous?.status === "done" && (previous.how === "check" || previous.how === "project") ? previous : markDone("self_marked", today);
+  }
+}
+
+export type StateCounts = Record<TopicState, number> & { total: number; percent: number };
+
+/** Counts for a roadmap's progress bar. Done and skipped both count as finished (RM-8). */
+export function stateCounts(stopIds: readonly string[], progress: ProgressMap): StateCounts {
+  const c: StateCounts = { todo: 0, learning: 0, done: 0, skipped: 0, total: stopIds.length, percent: 0 };
+  for (const id of stopIds) c[topicStateOf(progress, id)] += 1;
+  c.percent = c.total === 0 ? 0 : Math.floor(((c.done + c.skipped) * 100) / c.total);
+  return c;
+}

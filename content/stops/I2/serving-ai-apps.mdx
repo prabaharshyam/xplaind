@@ -9,14 +9,47 @@ hours: 4
 gap_tags: []
 primary_resource: fastapi-deployment
 alternates: [fastapi-custom-response]
-format: explainer
+format: deep
 key_terms: [uvicorn, streaming, latency, async-await]
 check:
   type: mcq
   question_ids: [serving-ai-apps-1, serving-ai-apps-2, serving-ai-apps-3]
+flashcards:
+  - q: "What does serving an app involve?"
+    a: "Running it so users can rely on it: started automatically, restarted on crashes, handling many requests, and showing progress quickly."
+  - q: "Why run several Uvicorn workers?"
+    a: "CPU-heavy work blocks a single process for everyone. Several workers, often one or two per core, share the load."
+  - q: "How should timeouts be layered?"
+    a: "Set them on model calls, on the whole request and at the load balancer, with inner timeouts shorter than outer ones."
+  - q: "Why stream AI responses?"
+    a: "Time to first token drops from the full generation time to under a second, so users see progress instead of a spinner."
+  - q: "What is the difference between /health and /ready?"
+    a: "/health says the process is up; /ready says dependencies such as the database are reachable, so traffic is sent only to ready instances."
+  - q: "Why must health checks not call the model?"
+    a: "They cost money and fail when the provider is slow, taking healthy instances out of service."
+  - q: "What is graceful shutdown?"
+    a: "On deploy, stop accepting new requests and let in-flight ones, including long streams, finish within a grace period."
+  - q: "How should jobs taking minutes be handled?"
+    a: "Accept the job, return an id at once, process it on a background queue, and let the client poll or get a webhook."
+exercise:
+  title: "Fix the evening slowdown"
+  setup: "A Patna exam-prep app's AI answer service runs one Uvicorn process. At 9 pm, students wait 15 seconds before any text appears, some requests hang for minutes, PDF uploads for summarising freeze everyone, and the platform's health check calls the model, so instances get restarted whenever the provider is slow."
+  questions:
+    - q: "What fixes the 15-second wait for first text?"
+      a: "Stream the answer token by token, so first words appear in under a second."
+    - q: "What stops requests hanging for minutes?"
+      a: "Timeouts on the model call, the request and the load balancer, with a helpful message when one fires."
+    - q: "How should PDF summarising be handled?"
+      a: "Move it to a background queue: return a job id at once, show progress, and fetch the summary when ready."
+    - q: "What should the health check do instead?"
+      a: "A cheap /health for the process and a /ready that checks the database and queue, never the model."
+ask:
+  - "How many Uvicorn workers should I run?"
+  - "How do I stream responses from FastAPI?"
+  - "When should I use a background job queue?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -26,6 +59,20 @@ Serving means running your application so real users can rely on it: started aut
 For a Python AI service the usual stack is FastAPI for the app, **Uvicorn** as the server that runs it, several worker processes for parallelism, and something in front (a load balancer, an ingress or a platform such as Cloud Run) that handles HTTPS and spreads traffic.
 
 AI services have two special traits. Requests are slow, often 2 to 30 seconds, because they wait on model calls. And users tolerate that only if they see progress, which is why **streaming** matters.
+
+```text
+   users --HTTPS--> [load balancer: timeout 30 s, checks /ready]
+                          |                 |
+                    [container 1]     [container 2]
+                     4 workers          4 workers        (Uvicorn + FastAPI)
+                          |
+          +---------------+-----------------+
+          v                                 v
+   model API (timeout 25 s,           background queue
+   streamed tokens to user)           (OCR, indexing; job id + status)
+```
+
+This lesson follows a doubt-solving assistant at an edtech company in Lucknow that slowed to a crawl every evening.
 
 ## How it works
 
@@ -41,6 +88,27 @@ AI services have two special traits. Requests are slow, often 2 to 30 seconds, b
 
 **Background work.** Jobs that take minutes, such as indexing a 500-page PDF, do not belong in a request. Accept the job, return an id at once, process it on a worker queue and let the client poll or receive a webhook.
 
+**A streaming endpoint:**
+
+```python
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+
+app = FastAPI()
+
+# Question is your Pydantic request model; model_stream is your async model client.
+@app.post("/answer")
+async def answer(req: Request, body: Question):
+    async def tokens():
+        async for text in model_stream(body.text, timeout=25):
+            if await req.is_disconnected():
+                break                     # stop paying for unread tokens
+            yield f"data: {text}\n\n"
+    return StreamingResponse(tokens(), media_type="text/event-stream")
+```
+
+**Measuring before and after.** Record three numbers per request: time to first token, total time and whether it timed out. Look at the 95th percentile, not the average, because the slowest requests are the ones users complain about. Load-test with a tool such as Locust at the expected evening peak before launch, and again after each change.
+
 ## A worked example
 
 A Lucknow edtech's doubt-solving assistant ran as one Uvicorn process. During evening study hours, students waited 12 seconds for any text, a third of requests timed out at the load balancer's 30 seconds, and uploads of handwritten notes for OCR froze the server for everyone.
@@ -55,6 +123,13 @@ The changes:
 
 Timeouts fell from 33% to under 1% in the evening peak, and the number of students who gave up before seeing an answer fell by two thirds.
 
+| Measure at evening peak | Before | After |
+| --- | --- | --- |
+| Time to first text | About 12 s | About 0.7 s |
+| Requests timing out | 33% | Under 1% |
+| Server freezes from OCR uploads | Daily | None |
+| Students leaving before an answer | Baseline | Down by two thirds |
+
 ## Common mistakes
 
 - **One worker in production.** A single blocked request stalls everyone. Run several and measure.
@@ -62,6 +137,7 @@ Timeouts fell from 33% to under 1% in the evening peak, and the number of studen
 - **Waiting for the full answer.** Without streaming, users stare at a spinner and leave.
 - **Health checks that call the model.** They cost money and fail when the provider is slow, taking healthy instances out.
 - **Long jobs inside requests.** Use a queue for anything that can take more than a few seconds of CPU.
+- **No load test before launch.** The first evening peak should not be the first time the service sees real traffic.
 
 ## Practise
 

@@ -4,19 +4,52 @@ level: I1
 theme: ml
 title: "Trees and gradient boosting"
 outcome: "Use decision trees, random forests and gradient-boosted trees (XGBoost, LightGBM) for tabular data: how they work, how to tune them, and how to explain their predictions."
-why_it_matters: "For tabular business data (customers, transactions, claims, loans) gradient-boosted trees are usually the strongest practical choice, beating neural networks in most competitions and production systems. Most Indian fintech, e-commerce and insurance ML runs on them."
+why_it_matters: "For tabular business data (customers, transactions, claims, loans) gradient-boosted trees are usually the strongest practical choice and often beat neural networks on tabular problems. Many fintech, e-commerce and insurance teams in India rely on them."
 hours: 5
 gap_tags: []
 primary_resource: sklearn-ensembles
 alternates: [xgboost-intro, kaggle-intermediate-ml]
-format: explainer
+format: deep
 key_terms: [decision-tree, random-forest, gradient-boosting, overfitting]
 check:
   type: mcq
   question_ids: [trees-boosting-1, trees-boosting-2, trees-boosting-3]
+flashcards:
+  - q: "How does a decision tree predict?"
+    a: "By asking a sequence of questions about features, such as 'EMI-to-income above 0.45?', following branches to a prediction at a leaf."
+  - q: "What is a random forest?"
+    a: "Many trees, each trained on a random sample of rows and features, with their predictions averaged. Robust and hard to break."
+  - q: "What is gradient boosting?"
+    a: "Trees built one after another, each correcting the errors of the ensemble so far. XGBoost, LightGBM and CatBoost are popular libraries."
+  - q: "Why do trees suit business data?"
+    a: "They handle mixed feature types, need no scaling, capture non-linear effects and interactions, and cope with missing values."
+  - q: "What is early stopping?"
+    a: "Stopping adding trees when the validation error stops improving, which prevents boosting from overfitting."
+  - q: "What do SHAP values explain?"
+    a: "How much each feature pushed one individual prediction up or down, such as why this applicant's risk is high."
+  - q: "Why can feature importance mislead?"
+    a: "Correlated features share importance unpredictably, and a leaky feature can look like the most important one."
+  - q: "What can trees not do well?"
+    a: "Extrapolate beyond target values they saw, or learn directly from raw images, audio or text, where neural networks win."
+exercise:
+  title: "Diagnose the boosting run"
+  setup: "A Mumbai insurer trains LightGBM to predict claims. Run A: depth 15, learning rate 0.3, 2,000 trees, no early stopping: training AUC 0.99, validation AUC 0.70. Run B: depth 6, learning rate 0.03, early stopping after 50 rounds without improvement: stops at 640 trees, training AUC 0.84, validation AUC 0.80. The top feature in both runs is 'claim_settled_amount'."
+  questions:
+    - q: "What went wrong in run A?"
+      a: "Overfitting: deep trees, a high learning rate and too many trees fit the training data almost perfectly but generalise poorly."
+    - q: "Why is run B better even though its training AUC is lower?"
+      a: "Its validation AUC is higher, which is what matters for new data. The small gap between training and validation shows less overfitting."
+    - q: "What is suspicious about 'claim_settled_amount'?"
+      a: "It is only known after a claim is settled, so it leaks the outcome. It must be removed, and the validation score rechecked."
+    - q: "How would you explain one customer's high predicted risk?"
+      a: "With SHAP values for that prediction, translated into plain reasons, such as two claims in the last year and a high-risk vehicle category."
+ask:
+  - "What is the difference between random forest and gradient boosting?"
+  - "How do I tune XGBoost or LightGBM?"
+  - "What are SHAP values in simple words?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -27,6 +60,23 @@ Single trees overfit easily. Two ensemble methods fix this:
 
 - **Random forest**: many trees, each trained on a random sample of rows and features, with predictions averaged. Robust and hard to break.
 - **Gradient boosting**: trees built one after another, each new tree correcting the errors of the ensemble so far. XGBoost, LightGBM and CatBoost are popular implementations. Usually the most accurate on tabular data.
+
+```text
+             EMI / income > 0.45 ?
+               /            \
+             yes             no
+             /                 \
+   missed payment in      credit history < 2 yrs ?
+   last 12 months ?          /           \
+     /        \            yes            no
+   yes        no            |              |
+    |          |        risk 0.12      risk 0.03
+ risk 0.41  risk 0.18
+
+  Boosting: tree 1 + small correction from tree 2 + ... + tree 640
+```
+
+This lesson follows a digital lender in Gurugram predicting 90-day defaults on personal loans.
 
 ## How it works
 
@@ -45,6 +95,18 @@ Single trees overfit easily. Two ensemble methods fix this:
 
 **Limits.** Trees cannot extrapolate beyond the target values they saw, and they are not the right tool for raw images, audio or text, where neural networks win.
 
+**Tuning boosting, in order:**
+
+| Setting | Start with | Effect |
+| --- | --- | --- |
+| Learning rate | 0.03 to 0.1 | Lower is slower but usually generalises better |
+| Number of trees | Many, with early stopping | Early stopping picks the right number for you |
+| Max depth | 4 to 8 | Deeper trees capture more interactions and overfit more |
+| Row and column subsampling | 0.7 to 0.9 | Randomness reduces overfitting |
+| Minimum samples per leaf | 20 to 100 | Stops the model fitting tiny groups |
+
+Tune on a validation set split by time, then confirm once on a later test period. A gap between training and validation scores that keeps growing is the clearest sign of overfitting.
+
 ## A worked example
 
 A Gurugram digital lender predicts 90-day default on personal loans from 120 features: bureau data, bank-statement summaries, application details and app usage.
@@ -53,9 +115,18 @@ A Gurugram digital lender predicts 90-day default on personal loans from 120 fea
 - Random forest: 0.75.
 - LightGBM with early stopping, depth 6, learning rate 0.03, row and column subsampling: 0.79, tested on loans from a later quarter than training.
 
-Explanation: SHAP shows the top drivers are bounced EMIs in bank statements, the EMI-to-income ratio and credit history length. For each rejected applicant, the top three reasons are mapped to plain-language messages for the adverse-action notice.
+Explanation: SHAP shows the top drivers are bounced EMIs in bank statements, the EMI-to-income ratio and credit history length. For each rejected applicant, the top three reasons are mapped to plain-language messages for the rejection letter.
 
 A warning sign during development: a feature "number of collection calls" had very high importance. It was recorded after loans went bad, so it leaked the outcome. Removing it dropped validation AUC from 0.86 to the honest 0.79.
+
+| Model | Validation ROC AUC (later quarter) |
+| --- | --- |
+| Logistic regression baseline | 0.71 |
+| Random forest | 0.75 |
+| LightGBM, tuned, early stopping | 0.79 |
+| LightGBM with the leaky collection-calls feature | 0.86 (not real) |
+
+**From model to rejection letter.** In lending, a rejected applicant must be told the main reasons; RBI's fair practices rules ask lenders to give them in writing. For each rejection, the team takes the three features with the largest SHAP values pushing risk up, and maps each to a plain sentence agreed with the compliance team: "Several EMI payments bounced in the last six months", "Your existing EMIs are a high share of your income", "Your credit history is shorter than two years". Engineers never write these sentences on the fly; they come from a reviewed list, so the wording is consistent, accurate and fair. The same SHAP values also help analysts spot when the model leans on a feature it should not, such as a proxy for location.
 
 ## Common mistakes
 
@@ -64,6 +135,8 @@ A warning sign during development: a feature "number of collection calls" had ve
 - **Random splits on time-ordered data.** Validate on a later period.
 - **One-hot encoding hundreds of categories.** Use category-aware methods.
 - **Skipping explanations in regulated uses.** Lending and insurance decisions need reasons.
+
+- **Comparing models on different test sets.** Evaluate every candidate on the same later-period data, or the comparison means nothing.
 
 ## Practise
 

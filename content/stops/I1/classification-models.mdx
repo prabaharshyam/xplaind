@@ -9,14 +9,47 @@ hours: 4
 gap_tags: []
 primary_resource: google-mlcc-classification
 alternates: [kaggle-intro-ml]
-format: explainer
+format: deep
 key_terms: [classification-model, precision-recall, confusion-matrix, roc-auc]
 check:
   type: mcq
   question_ids: [classification-models-1, classification-models-2, classification-models-3]
+flashcards:
+  - q: "What does a classifier predict?"
+    a: "A category, such as fraud or genuine, usually by outputting a probability or score that a threshold turns into a decision."
+  - q: "What is logistic regression?"
+    a: "A linear model whose weighted sum is squeezed into a probability between 0 and 1. Its coefficients show which features push towards each class."
+  - q: "What four counts make up a confusion matrix?"
+    a: "True positives, false positives, false negatives and true negatives, for a chosen threshold."
+  - q: "What happens to precision and recall when you lower the threshold?"
+    a: "Recall rises because more positives are flagged, and precision usually falls because more false alarms are flagged too."
+  - q: "How do you choose a threshold?"
+    a: "From the rupee cost of each error and the team's capacity to review, not the default 0.5."
+  - q: "What are class weights?"
+    a: "Settings that make errors on the rare class count more in training, so the model does not ignore rare positives."
+  - q: "Why test on a later period for time-based data?"
+    a: "Because in real use the model predicts the future. Random splits leak future patterns into training and overstate performance."
+  - q: "Why use two thresholds for fraud?"
+    a: "A lower one sends cases for review, and a much higher one blocks automatically only when precision is very high."
+exercise:
+  title: "Choose the threshold"
+  setup: "A telecom company in Kolkata predicts which prepaid customers will leave next month. A retention call costs ₹40 and saves a leaving customer 25% of the time; a saved customer is worth ₹1,200. The call centre can make 2,000 calls a month. Threshold A flags 2,000 customers, of whom 900 would leave. Threshold B flags 5,000, of whom 1,600 would leave."
+  questions:
+    - q: "What is the precision of threshold A?"
+      a: "900 ÷ 2,000 = 45%."
+    - q: "What is the expected value of threshold A's calls?"
+      a: "Customers saved: 900 × 25% = 225, worth 225 × ₹1,200 = ₹2,70,000. Call cost: 2,000 × ₹40 = ₹80,000. Net about ₹1,90,000."
+    - q: "Why can't the company simply use threshold B?"
+      a: "It flags 5,000 customers but the call centre can only make 2,000 calls, so capacity limits the threshold."
+    - q: "What would you report to the business about threshold A?"
+      a: "The confusion matrix in plain words: 2,000 calls, 900 of them to customers about to leave, about 225 saved, net value about ₹1.9 lakh a month."
+ask:
+  - "How does logistic regression work?"
+  - "How do I handle imbalanced classes?"
+  - "What is a good threshold for a classifier?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -24,6 +57,21 @@ reviewed_on: 2026-10-25
 **Classification** predicts a category: fraud or genuine, will churn or will stay, which of five complaint types. Most classifiers output a **probability** or score; a **threshold** turns it into a decision ("flag as fraud if probability above 0.3").
 
 Common models: **logistic regression** (a linear model that outputs probabilities, easy to explain), decision trees, random forests, gradient boosting and neural networks.
+
+```text
+  features (amount, merchant, time, device)
+         |
+         v
+   [classifier] --> score 0.0 ........ 0.3 ......... 0.9 ..... 1.0
+                                       |              |
+                               review threshold   block threshold
+                                       |              |
+                          below: allow |  between:    | above: block,
+                                       |  analyst     | fast appeal
+                                       |  reviews     |
+```
+
+This lesson follows a payments company in Pune as it replaces fraud rules with a classifier.
 
 ## How it works
 
@@ -41,6 +89,20 @@ Common models: **logistic regression** (a linear model that outputs probabilitie
 
 **Multi-class.** For more than two categories, look at the confusion matrix to see which classes are confused with which.
 
+**Common classifiers compared:**
+
+| Model | Strengths | Weaknesses | Good first choice when |
+| --- | --- | --- | --- |
+| Logistic regression | Fast, explainable, calibrated-ish probabilities | Misses complex interactions | You need to explain decisions, such as credit |
+| Decision tree | Easy to draw and explain | Overfits, unstable | Teaching or simple rules |
+| Random forest | Robust, little tuning | Larger, slower | A strong baseline on tables |
+| Gradient boosting | Usually the most accurate on tables | Needs tuning, less explainable | Fraud, churn, risk on tabular data |
+| Neural network | Text, images, very large data | Needs lots of data, hard to explain | Unstructured inputs |
+
+**A sound workflow.** Start with a simple baseline, such as the current rules or logistic regression, so you know what "better" means. Split data by time. Train a stronger model with class weights. Compare on precision, recall and PR AUC, not accuracy. Choose a threshold from costs and capacity. Check calibration. Then report the result in rupees and in operational terms, such as alerts per day.
+
+**Reading a model's mistakes.** After choosing a threshold, read 50 false positives and 50 false negatives by hand. Patterns appear quickly: genuine festival-season spikes flagged as fraud, or a new fraud pattern the training data never saw. Each pattern suggests a fix: a feature such as "days to Diwali", more recent training data, or a rule for a specific case. Metrics tell you how often the model is wrong; reading cases tells you why.
+
 ## A worked example
 
 A Pune payments company has 2 million UPI merchant transactions a month, of which about 0.3% are later confirmed fraud.
@@ -53,6 +115,8 @@ A Pune payments company has 2 million UPI merchant transactions a month, of whic
 
 They set a second, higher threshold that blocks transactions automatically only when the score is extremely high and precision exceeds 98%, with a fast appeal route for merchants.
 
+**Explaining it to the risk committee.** The committee did not ask about gradient boosting. They asked three questions: will analysts be overloaded, will genuine merchants be hurt, and how much will it save? The team answered with the same number of alerts as today, a precision of about 68% instead of 40% so analysts waste far less time, an automatic block only above a score where precision exceeds 98% with appeals answered within four hours, and about ₹1.5 crore a month in fraud caught that the rules missed. They also showed the model's performance by merchant category and city, because a model that was good on average but bad for small kirana merchants would have been a fairness and business problem. It was slightly weaker for new merchants with little history, so new merchants were routed to review rather than automatic blocking for their first month.
+
 ## Common mistakes
 
 - **Reporting accuracy on imbalanced data.** Use precision, recall and PR curves.
@@ -60,6 +124,8 @@ They set a second, higher threshold that blocks transactions automatically only 
 - **Testing on random rows of time-based data.** Test on a later period, as in real use.
 - **Ignoring calibration.** Scores used for decisions should mean what they say.
 - **One threshold for all actions.** Review and automatic blocking need different precision.
+
+- **No baseline.** Without comparing to current rules or a simple model, you cannot show the new model is worth it.
 
 ## Practise
 

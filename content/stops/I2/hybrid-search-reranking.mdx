@@ -9,14 +9,47 @@ hours: 4
 gap_tags: []
 primary_resource: weaviate-hybrid-search
 alternates: [pinecone-rerankers, anthropic-contextual-retrieval]
-format: explainer
+format: deep
 key_terms: [hybrid-search, keyword-search, reranking, cross-encoder, reciprocal-rank-fusion, metadata-filter]
 check:
   type: mcq
   question_ids: [hybrid-search-reranking-1, hybrid-search-reranking-2, hybrid-search-reranking-3]
+flashcards:
+  - q: "What is hybrid search?"
+    a: "Running keyword search and vector search together and merging the results, so both exact terms and paraphrases are found."
+  - q: "Where does vector search fail and keyword search succeed?"
+    a: "On exact codes, clause numbers, error ids and rare names, such as 'clause 7.3(b)' or 'E-4012'."
+  - q: "What is BM25?"
+    a: "A keyword scoring formula that rewards passages containing the query's words, especially rare ones, without over-rewarding long passages."
+  - q: "Why not just add BM25 and cosine scores?"
+    a: "They are on different scales, so one silently dominates. Normalise them or use reciprocal rank fusion."
+  - q: "What is reciprocal rank fusion?"
+    a: "A merging method that ignores raw scores and rewards items ranked high in either list. It is simple and robust."
+  - q: "What is a cross-encoder reranker?"
+    a: "A model that reads the query and passage together and scores relevance directly; too slow for millions of passages, fine for 20 to 50."
+  - q: "How many candidates should go to the reranker?"
+    a: "Retrieve 20 to 50 and keep 3 to 8, because the reranker cannot rescue a passage that is not in the list."
+  - q: "Why filter inside the search, not after?"
+    a: "Filtering after taking the top 5 can leave nothing; filtering first means only in-scope documents compete."
+exercise:
+  title: "Diagnose the retrieval"
+  setup: "A Mumbai bank's assistant over 9,000 pages of circulars and product terms has these failures on its golden set: (1) 'What is the penalty under circular RBI/2025-26/41?' returns unrelated circulars; (2) 'How do I stop my card if it is lost?' misses the passage titled 'Hotlisting a card'; (3) questions about current savings rates often return the 2024 rate sheet; (4) the right passage is often found at rank 9 or 12 but only the top 5 go to the prompt."
+  questions:
+    - q: "Which failure needs keyword search, and why?"
+      a: "(1): the circular number is an exact code that embeddings handle poorly; BM25 matches it directly."
+    - q: "Which failure is vector search good at?"
+      a: "(2): 'stop my card if lost' and 'hotlisting a card' mean the same thing with different words."
+    - q: "How do you fix (3)?"
+      a: "Store an effective date and status with each chunk and filter to documents currently in force inside the search."
+    - q: "How do you fix (4)?"
+      a: "Retrieve about 40 candidates with hybrid search and rerank them with a cross-encoder before keeping the top 5."
+ask:
+  - "When do I need hybrid search instead of vector search?"
+  - "How does reciprocal rank fusion work?"
+  - "Which reranker should I use?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -28,9 +61,26 @@ Vector search finds passages with similar meaning. Keyword search finds passages
 
 **Hybrid search** runs both and merges the results. **Reranking** then takes the top 20 to 50 merged results and reorders them with a slower, more accurate model. **Metadata filters** restrict the search to the right slice first, such as one product, one state or documents in force after a date.
 
+```text
+                       query
+                  /            \
+       [BM25 keyword]        [vector search]       (both filtered: product, state, in force)
+         top 40                 top 40
+                  \            /
+              [fusion: reciprocal rank]
+                       |
+                    top 40
+                       |
+              [cross-encoder reranker]   reads query + passage together
+                       |
+                    top 5  -->  prompt
+```
+
+This lesson follows an insurance company in Chennai whose agents ask detailed questions about policy wordings.
+
 ## How it works
 
-**Keyword side.** Most systems use BM25, a formula that scores a passage higher when it contains the query's words, especially rare words, and does not over-reward long passages. PostgreSQL full-text search, Elasticsearch, OpenSearch and most vector databases offer it.
+**Keyword side.** Most systems use BM25, a formula that scores a passage higher when it contains the query's words, especially rare words, and does not over-reward long passages. Elasticsearch, OpenSearch and many vector databases offer it. PostgreSQL's built-in full-text search ranks with its own functions (`ts_rank`), not BM25; extensions add BM25.
 
 **Vector side.** Embed the query and find the nearest chunk embeddings.
 
@@ -39,6 +89,19 @@ Vector search finds passages with similar meaning. Keyword search finds passages
 **Reranking.** An embedding model encodes query and passage separately, which is fast but loses detail. A **cross-encoder** reads them together and scores relevance directly. It is too slow to run on a million passages, but fine on 40. Retrieve wide with hybrid search, rerank, keep the top 5 for the prompt.
 
 **Filters.** Store fields such as `doc_type`, `state`, `effective_from` and `access_group` with every chunk. Apply them in the query so irrelevant or out-of-date documents never compete. Filters are also where per-user permissions are enforced, which a later lesson covers.
+
+**Reciprocal rank fusion in one line.** Each passage gets a score of 1 divided by (60 plus its rank) from each list it appears in, and the scores are added. A passage ranked 1st by BM25 and 3rd by vectors scores about 1/61 + 1/63; one ranked 2nd by only one list scores 1/62. Passages that both methods like rise to the top, and nothing depends on raw score scales.
+
+**Choosing settings:**
+
+| Setting | Typical value | Raise it when |
+| --- | --- | --- |
+| Candidates from each search | 20 to 50 | The right passage is often just outside the list |
+| Candidates sent to the reranker | 20 to 50 | Recall at 50 is much higher than recall at 5 |
+| Passages kept for the prompt | 3 to 8 | Questions need several passages combined |
+| Weight in weighted fusion | 0.5 | Your golden set shows one side helping more |
+
+Tune these on the golden set, not by feel, and record latency alongside recall each time.
 
 ## A worked example
 
@@ -54,7 +117,17 @@ Your golden set has 60 questions with known source passages. You measure recall 
 
 Looking at failures shows why. Vector search missed questions naming endorsement codes like "END-17". BM25 missed paraphrases. The reranker fixed cases where the right passage was ranked eighth. The filter removed the superseded 2024 wording that had been outranking the current one.
 
-Reranking added about 180 milliseconds per query. The client accepted that for a 14-point gain in recall, and you wrote both numbers in the eval report.
+Reranking added about 180 milliseconds per query. The client accepted that for a 9-point gain in recall, and you wrote both numbers in the eval report.
+
+| Set-up | Recall at 5 | Added latency |
+| --- | --- | --- |
+| Vector only | 68% | Baseline |
+| BM25 only | 61% | Lower |
+| Hybrid with RRF | 79% | About 20 ms |
+| Hybrid plus reranker over 40 | 88% | About 180 ms |
+| Plus filters for product and effective date | 93% | No extra |
+
+Each step fixed a different kind of failure, which is why reading the failed questions mattered as much as the totals.
 
 ## Common mistakes
 

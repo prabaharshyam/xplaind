@@ -9,19 +9,68 @@ hours: 3
 gap_tags: [retrieval-eval]
 primary_resource: ragas-metrics
 alternates: [hamel-evals]
-format: explainer
+format: deep
 key_terms: [recall-at-k, golden-set, retrieval, faithfulness]
 check:
   type: mcq
   question_ids: [check-retrieval-1, check-retrieval-2, check-retrieval-3]
+flashcards:
+  - q: "Why check retrieval separately from answers?"
+    a: "Most wrong RAG answers start with retrieval: if the right passage never arrives, the model cannot use it, however good the prompt."
+  - q: "What goes in a retrieval test set?"
+    a: "30 to 100 realistic questions, each with the passage or passages that contain the answer, including easy, hard, vague and unanswerable ones."
+  - q: "What is recall at k?"
+    a: "The share of questions where at least one correct passage appears in the top k results."
+  - q: "What is context precision?"
+    a: "Of the passages retrieved, the share that are relevant. Low precision fills the prompt with noise."
+  - q: "What is MRR?"
+    a: "Mean reciprocal rank: it rewards putting the right passage near the top, scoring 1 for first place, 0.5 for second and so on."
+  - q: "What is faithfulness?"
+    a: "Whether the answer's claims are supported by the retrieved passages."
+  - q: "If the right passage was retrieved but the answer is wrong, what do you fix?"
+    a: "Generation: the prompt, grounding instructions or the model, not retrieval."
+  - q: "Why keep the test set fixed?"
+    a: "So you can compare changes fairly. A change can help some questions and hurt others; only a fixed set shows the net effect."
+exercise:
+  title: "Diagnose with the numbers"
+  setup: "An HR assistant at an IT company in Chennai is tested on 50 questions. Version A: recall at 5 is 92%, faithfulness 0.71, correctness 64%. Version B, after a prompt change: recall at 5 still 92%, faithfulness 0.94, correctness 85%. Version C, after switching to larger chunks: recall at 5 drops to 78%, correctness 74%."
+  questions:
+    - q: "In version A, is retrieval or generation the main problem?"
+      a: "Generation. Recall is high, so the right passages arrive, but faithfulness is low, so the model is not sticking to them."
+    - q: "What did the prompt change in B fix?"
+      a: "Grounding: the model now answers from the retrieved passages, so faithfulness and correctness rose while retrieval stayed the same."
+    - q: "Should the team keep version C's larger chunks?"
+      a: "No. Recall fell from 92% to 78% and correctness fell too, so the change hurt retrieval."
+    - q: "Why was it important to use the same 50 questions each time?"
+      a: "So the differences come from the changes, not from different questions."
+ask:
+  - "How do I measure RAG retrieval quality?"
+  - "What is a good recall at 5 for a RAG system?"
+  - "How do I build a test set for RAG?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
 Most wrong answers from a RAG system start with retrieval: the right passage was never found, so the model could not use it. **Checking retrieval** means measuring, with a fixed set of test questions, whether the right passages come back, separately from whether the final answer is good.
+
+```text
+  wrong answer
+       |
+       v
+  was the right passage in the top k?
+       |                      |
+      no                     yes
+       |                      |
+  RETRIEVAL problem      GENERATION problem
+  chunking, embeddings,  prompt, grounding rules,
+  hybrid search, query   citations, model choice
+  rewriting, filters
+```
+
+This lesson follows a bank in Kochi whose staff assistant gave too many wrong answers about its circulars.
 
 ## How it works
 
@@ -29,8 +78,8 @@ Most wrong answers from a RAG system start with retrieval: the right passage was
 
 **Retrieval metrics.**
 
-- **Recall at k**: for what share of questions does at least one correct passage appear in the top k results? Recall at 5 is a common headline number.
-- **Precision at k** or **context precision**: of the k passages retrieved, how many are actually relevant? Low precision fills prompts with noise.
+- **Recall at k**: for what share of questions does at least one correct passage appear in the top k results? Recall at 5 is a common headline number. Strictly, this "at least one" version is also called hit rate; when a question has several correct passages, some tools define recall at k as the share of them found.
+- **Precision at k** or **context precision**: of the k passages retrieved, how many are actually relevant? RAGAS's context precision also rewards ranking the relevant ones higher. Low precision fills prompts with noise.
 - **MRR** (mean reciprocal rank): rewards putting the right passage near the top.
 
 **Answer metrics**, measured separately:
@@ -47,6 +96,21 @@ Tools such as RAGAS compute these, often using a model as a judge; check a sampl
 
 **Run on every change.** Changing chunk size, the embedding model or top-k can help some questions and hurt others. The fixed set shows the net effect.
 
+**A tiny worked example of the metrics.** Four test questions, top 5 results each; the position of the first correct passage is shown:
+
+| Question | First correct passage at | In top 5? | Reciprocal rank |
+| --- | --- | --- | --- |
+| Q1 | 1 | yes | 1.0 |
+| Q2 | 3 | yes | 0.33 |
+| Q3 | not found | no | 0 |
+| Q4 | 2 | yes | 0.5 |
+
+Recall at 5 = 3 of 4 = 75%. MRR = (1.0 + 0.33 + 0 + 0.5) ÷ 4, about 0.46.
+
+**Building the test set fast.** Start from real questions in support tickets, search logs or chats. For each, a person who knows the documents finds the answering passage and records its document and section. Thirty questions can be done in an afternoon. Include questions the documents cannot answer, with "none" as the expected passage, so you can check the system says it does not know. Add a new question every time a user reports a wrong answer.
+
+**Using a model as a judge.** Tools such as RAGAS use a model to score faithfulness and relevance at scale. They are useful but not perfect. Score a sample of 20 by hand and compare; if the judge disagrees with people often, fix its instructions before trusting its numbers.
+
 ## A worked example
 
 A Kochi bank's internal assistant answers staff questions from 900 circulars. Staff complain that answers are often wrong.
@@ -61,6 +125,16 @@ Faithfulness is high, so the model mostly says what retrieved passages say. Reca
 
 Changes: hybrid search with keyword matching for circular numbers, and a filter excluding superseded circulars. Recall at 5 rises to 87% and correctness to 81%, measured on the same 60 questions.
 
+| Measure | Before | After hybrid search and the superseded filter |
+| --- | --- | --- |
+| Recall at 5 | 63% | 87% |
+| Faithfulness | 0.92 | 0.93 |
+| Correctness | 58% | 81% |
+
+The model was never the problem; it had been faithfully answering from the wrong circulars.
+
+**Reading the misses.** The team did not stop at the numbers. They read all 22 questions where the right passage was missing from the top five, and sorted them into causes: 9 involved circular numbers that the embedding search could not match exactly, 7 retrieved a superseded circular above the current one, 4 were vague questions, and 2 had the wrong expected passage in the test set itself. Each cause pointed to a different fix, and fixing the test set's own mistakes is a normal part of the work.
+
 ## Common mistakes
 
 - **Judging only final answers.** You cannot tell whether retrieval or generation failed.
@@ -68,6 +142,8 @@ Changes: hybrid search with keyword matching for circular numbers, and a filter 
 - **No unanswerable questions.** You need them to test refusals.
 - **Trusting automatic judges blindly.** Check a sample.
 - **Optimising recall while precision collapses.** Track both.
+- **Test sets made of easy questions.** Include vague, multi-part and unanswerable ones, as real users ask them.
+- **Changing several things before re-testing.** Change one setting, rerun the set, record the numbers, then change the next.
 
 ## Practise
 

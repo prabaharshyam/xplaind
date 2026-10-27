@@ -6,6 +6,7 @@ import type {
   Certification,
   Goal,
   GlossaryTerm,
+  GuidedProject,
   Book,
   CheckQuestion,
   InterviewQuestion,
@@ -58,6 +59,8 @@ export const stop = (o: Partial<Stop> = {}): Stop => ({
   more: [],
   check: { type: "mcq", question_ids: ["chk-1", "chk-2", "chk-3"] },
   format: "brief",
+  flashcards: [],
+  ask: [],
   key_terms: [],
   body: "Lesson text.",
   ...review,
@@ -103,6 +106,7 @@ export const interview = (o: Partial<InterviewQuestion> = {}): InterviewQuestion
     { point: "Evaluates retrieval", keywords: ["evaluate", "recall"] },
   ],
   answer_seconds: 90,
+  kind: "concept",
   ...review,
   ...o,
 });
@@ -165,6 +169,7 @@ export const goal = (o: Partial<Goal> = {}): Goal => ({
   placement: "ladder",
   months: 9,
   stages: LEVEL_IDS.map((id) => ({ id, lessons: id === "B1" ? ["stop-one"] : [], planned: [] })),
+  top_interview: [],
   ...o,
 });
 
@@ -182,6 +187,16 @@ export const term = (o: Partial<GlossaryTerm> = {}): GlossaryTerm => ({
 export const explainerBody = (words = 520): string => {
   const filler = Array.from({ length: Math.ceil(words / 20) }, () => "Plain words that teach.").join(" ");
   return ["What it is", "How it works", "A worked example", "Common mistakes", "Practise"].map((h) => `## ${h}\n\n${filler}`).join("\n\n");
+};
+
+/** A deep lesson's body: the five sections, a text diagram and a table. */
+export const deepBody = (words = 1050): string =>
+  explainerBody(words).replace("## How it works\n\n", "## How it works\n\n```text\n[a] --> [b]\n```\n\n```python\n# a comment, not a heading\n```\n\n| Part | Job |\n| --- | --- |\n| a | b |\n\n");
+
+export const deepExtras = {
+  flashcards: Array.from({ length: 6 }, (_, i) => ({ q: `Question ${i + 1}?`, a: "A short answer." })),
+  exercise: { title: "Predict it", setup: "A scenario.", questions: [1, 2, 3].map((n) => ({ q: `Q${n}?`, a: `A${n}.` })) },
+  ask: ["Why?", "How?", "What next?"],
 };
 
 /** Small and fully valid in development mode (not at launch size). */
@@ -214,5 +229,25 @@ export function validBundle(): Bundle {
     glossary: [{ ...f("glossary/term-one.yaml"), data: term() }, { ...f("glossary/term-two.yaml"), data: term({ id: "term-two", term: "Term two", related: ["term-one"] }) }],
     certifications: [{ ...f("certifications/cert-one.yaml"), data: certification() }],
     blog: [{ ...f("blog/post-one.mdx"), data: blogPost() }],
+    projects: [],
   };
 }
+
+/** A small valid guided project (GP-1). */
+export const guidedProject = (o: Partial<GuidedProject> = {}): GuidedProject => ({
+  id: "project-one",
+  title: "A small project",
+  summary: "Build a small thing.",
+  difficulty: "starter",
+  hours: 4,
+  lessons: ["stop-one"],
+  you_will_need: ["A laptop"],
+  steps: [1, 2, 3, 4].map((n) => ({ title: `Step ${n}`, body: "Do it.", done_when: "It works." })),
+  rubric: [1, 2, 3, 4].map((n) => ({ criterion: `Criterion ${n}`, strong: "Good.", weak: "Not good." })),
+  deliverables: ["A repository"],
+  stretch: [],
+  drafted_with_ai: true,
+  reviewed_by: "Priya Raman",
+  reviewed_on: TODAY,
+  ...o,
+});

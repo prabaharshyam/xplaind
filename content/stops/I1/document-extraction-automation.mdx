@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: n8n-ai
 alternates: [claude-structured-outputs, docling]
-format: explainer
+format: deep
 key_terms: [structured-output, document-parsing, ocr, human-in-the-loop]
 check:
   type: mcq
   question_ids: [document-extraction-automation-1, document-extraction-automation-2, document-extraction-automation-3]
+flashcards:
+  - q: "What is document extraction?"
+    a: "Turning an unstructured document, such as an invoice PDF, into structured fields like vendor, GSTIN, number, date, lines, tax and total."
+  - q: "What are the six steps of an extraction automation?"
+    a: "Receive, get the content, extract with a schema, validate with rules, route to automatic or human review, and record for audit."
+  - q: "Why extract with a schema?"
+    a: "So every result has the same fields with the right types, and missing fields come back as null instead of guesses."
+  - q: "Name three kinds of validation rule."
+    a: "Formats such as GSTIN pattern and dates, arithmetic such as lines adding up to the total, and business rules such as the vendor existing in the master list."
+  - q: "What is the straight-through rate?"
+    a: "The share of documents processed with no human touch. It is the main measure of an extraction automation."
+  - q: "What should happen when a check fails?"
+    a: "Send the document to a person with the image beside the fields and the failed check highlighted. Their correction becomes the final record."
+  - q: "Why keep the original document linked to the record?"
+    a: "For checking, audit and debugging: anyone can see exactly what the extraction was based on."
+  - q: "How do human corrections improve the system?"
+    a: "They become test cases and show which fields, suppliers or photo types fail most, guiding prompt and process fixes."
+exercise:
+  title: "Validate this invoice"
+  setup: "The AI extracts from a supplier invoice: GSTIN '24ABCDE1234F1Z' (14 characters), invoice number 'TX-4471', date '31/02/2026', two lines of ₹12,000 and ₹8,500, subtotal ₹20,500, CGST ₹1,845, SGST ₹1,845, total ₹24,190. The supplier master lists this supplier with a different GSTIN, and invoice TX-4471 from them was already recorded last week."
+  questions:
+    - q: "Which format checks fail?"
+      a: "The GSTIN has 14 characters instead of 15, and 31 February is not a valid date."
+    - q: "Does the arithmetic hold?"
+      a: "Lines: 12,000 + 8,500 = 20,500, which matches. But 20,500 + 1,845 + 1,845 = 24,190, which also matches. The arithmetic passes."
+    - q: "Which business-rule checks fail?"
+      a: "The GSTIN does not match the supplier master, and TX-4471 is a duplicate of an invoice already recorded."
+    - q: "What should the automation do with this invoice?"
+      a: "Not post it. Route it to the accounts assistant with the image and all four failed checks highlighted, especially the possible duplicate payment."
+ask:
+  - "How do I extract data from invoices with AI?"
+  - "What validation checks should I add to document extraction?"
+  - "How do I handle blurry or handwritten documents?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -24,6 +57,30 @@ reviewed_on: 2026-10-25
 **Document extraction** turns an unstructured document into structured fields: from an invoice PDF to vendor name, GSTIN, invoice number, date, line items, tax amounts and total. An automation does this for every document that arrives, then checks the result and passes it on to a sheet, an accounting system or an approval step.
 
 Modern AI models handle varied layouts far better than older template-based tools, which needed a template per supplier.
+
+```text
+  Email / WhatsApp / folder
+          |
+          v
+   [1 Receive, store original]
+          |
+          v
+   [2 Get content: text, or OCR, or image to a vision model]
+          |
+          v
+   [3 Extract with a schema]  -> { supplier, gstin, number, date, lines[], cgst, sgst, total }
+          |
+          v
+   [4 Validate: formats, arithmetic, business rules]
+          |
+     all pass? -- yes --> [5 Post to accounting]  --> [6 Record + audit trail]
+          |
+          no --> [5 Review screen: image beside fields, failed checks in red]
+                        |
+                 person corrects --> final record + new test case
+```
+
+This lesson follows a textile trader in Surat processing about 900 supplier invoices a month.
 
 ## How it works
 
@@ -45,6 +102,21 @@ Modern AI models handle varied layouts far better than older template-based tool
 
 **Measure.** Track straight-through rate (share with no human touch), field accuracy on a sample checked by people, and time saved.
 
+**Validation rules for Indian invoices:**
+
+| Field | Check | Catches |
+| --- | --- | --- |
+| GSTIN | 15 characters, valid pattern, state code matches address, in supplier master | Misreads, wrong supplier |
+| Invoice date | Valid date, not in the future, within the accounting period | 31 February, typos |
+| Line items | Quantity × rate = amount; lines add up to subtotal | Missed or merged lines |
+| Tax | CGST equals SGST for intra-state; IGST for inter-state; amounts match rates | Wrong tax type, misread amounts |
+| Total | Subtotal + taxes = total | Any arithmetic misread |
+| Invoice number | Not already recorded for this supplier | Duplicate payments |
+
+**Why rules matter more than model choice.** Even a very capable model misreads a blurry digit now and then. Arithmetic and format checks catch most of those errors at no cost, because a misread digit almost never keeps the totals consistent. The model reads; the rules decide whether to trust what it read.
+
+**Confidence and review queues.** Reviewers should not have to recheck every field. Show the fields that failed a rule first, then fields the model marked uncertain or left null, and let reviewers approve the rest with one action. Track how long reviews take; if a reviewer needs more than a minute per document, the screen needs work, not the reviewer.
+
 ## A worked example
 
 A Surat textile trader receives about 900 supplier invoices a month as PDFs and phone photos on WhatsApp and email.
@@ -58,6 +130,15 @@ The automation:
 
 First month: 71% straight through; most failures were blurry photos and handwritten corrections. After asking frequent suppliers to email PDFs and improving the photo prompt, straight-through reaches 84%. Accounts staff time on invoice entry drops from about 60 hours a month to 15, and the duplicate-invoice check catches four duplicate payments worth ₹2.3 lakh.
 
+| Measure | Month 1 | Month 3 |
+| --- | --- | --- |
+| Straight-through rate | 71% | 84% |
+| Main failure cause | Blurry photos, handwritten corrections | Handwritten corrections |
+| Staff time on invoice entry | about 60 hours a month | about 15 hours a month |
+| Duplicate payments caught | 4, worth ₹2.3 lakh | Ongoing |
+
+The biggest single improvement was not technical: asking the 30 most frequent suppliers to email PDFs instead of sending phone photos.
+
 ## Common mistakes
 
 - **Free-form output.** Use a schema so fields are always present and typed.
@@ -65,6 +146,8 @@ First month: 71% straight through; most failures were blurry photos and handwrit
 - **Letting the model guess missing fields.** Ask for null and route to a person.
 - **Losing the original document.** Keep it linked to the record for checking and audit.
 - **Measuring nothing.** Track straight-through rate and sample accuracy.
+
+- **Sending every page to the most expensive model.** Use text extraction for digital PDFs and keep vision models for scans and photos; it cuts cost a lot.
 
 ## Practise
 

@@ -15,7 +15,7 @@ export const QUIZ_VERSION = "v1";
 type ProgressRow = {
   stop_id: string;
   status: "in_progress" | "done";
-  done_how: "check" | "project" | "self_skipped" | null;
+  done_how: "check" | "project" | "self_marked" | "self_skipped" | null;
   check_score: number | null;
   project_url: string | null;
   updated_at: string;

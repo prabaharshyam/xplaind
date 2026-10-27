@@ -9,63 +9,160 @@ hours: 2
 gap_tags: []
 primary_resource: n8n-error-handling
 alternates: [n8n-course-level-two]
-format: explainer
+format: deep
 key_terms: [retry-with-backoff, idempotency, rate-limit, monitoring]
 check:
   type: mcq
   question_ids: [automation-error-handling-1, automation-error-handling-2, automation-error-handling-3]
+flashcards:
+  - q: "What five things does good error handling do?"
+    a: "Retry temporary errors, stop on permanent ones, alert a person with details, recover without duplicates, and record what happened."
+  - q: "Name three temporary errors."
+    a: "Network blips and timeouts, rate limits (HTTP 429), and server errors (HTTP 500 to 504). They usually succeed on retry."
+  - q: "Name three permanent errors."
+    a: "Wrong or expired credentials (401, 403), bad input (400) and a missing record (404). Retrying will not fix them."
+  - q: "What is retry with backoff?"
+    a: "Retrying a few times with growing waits, such as 5 seconds, 30 seconds, then 2 minutes, and respecting any Retry-After header."
+  - q: "How does idempotency prevent duplicates?"
+    a: "Before creating something, the workflow checks a unique key such as the order id. If it already exists, it does nothing, so reruns are safe."
+  - q: "What is a dead-letter queue?"
+    a: "A 'needs attention' list where records that failed permanently go, with the reason, so they can be fixed and reprocessed instead of lost."
+  - q: "What should a useful alert contain?"
+    a: "The workflow, the step, the record, the error message, a link to the run, and ideally what to do next."
+  - q: "Why monitor item counts as well as errors?"
+    a: "A workflow that quietly processes zero items shows no error. A 'too few items' check catches it."
+exercise:
+  title: "Classify the failures"
+  setup: "An automation in Coimbatore sends payment reminders from a billing system to WhatsApp, about 1,500 a day. Last week's run log shows: (1) 40 calls returned 429 Too Many Requests at 7 pm, (2) one day every call returned 401 Unauthorized, (3) 12 customers had phone numbers like '12345' and the API returned 400 Bad Request, (4) after a rerun, 300 customers got the same reminder twice, (5) on Sunday the run finished with no errors but sent 0 messages, because the billing export was empty."
+  questions:
+    - q: "Which failures should be retried, and how?"
+      a: "Only (1), the 429s. Retry with backoff and respect the Retry-After header, with a cap of a few attempts."
+    - q: "What should the workflow do on (2)?"
+      a: "Stop at once without retrying and alert the owner that the WhatsApp token has expired or been revoked, with where to renew it."
+    - q: "Where should the 12 records in (3) go?"
+      a: "To a 'needs attention' list with the reason 'invalid phone number', while the other reminders carry on."
+    - q: "What two checks would have caught (4) and (5)?"
+      a: "An idempotency check on a key like invoice id plus reminder date for (4), and a daily 'fewer than expected messages' alert for (5)."
+ask:
+  - "Which errors should an automation retry?"
+  - "How do I stop duplicate actions when a workflow reruns?"
+  - "How do I set up alerts in n8n?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
+Every automation fails eventually. An API is down, a token expires, a customer types their phone number wrongly, a provider limits how fast you can send. The question is not **whether** it fails but **how**. A well-built automation fails safely: nothing is lost, nothing is done twice, and the right person knows what to do.
+
 **Error handling** is everything an automation does when a step fails:
 
-- **Retry** errors that are likely temporary.
-- **Stop** and record errors that will not fix themselves.
-- **Alert** a person with enough detail to act.
-- **Recover** safely, without duplicating actions, once the cause is fixed.
-- **Record** what happened for later review.
+| Job | What it means |
+| --- | --- |
+| **Retry** | Try again errors that are likely temporary |
+| **Stop** | Record errors that will not fix themselves, and do not keep trying |
+| **Alert** | Tell a person, with enough detail to act |
+| **Recover** | Reprocess safely once the cause is fixed, without duplicating actions |
+| **Record** | Keep a history of what happened for later review |
+
+This lesson follows a logistics startup in Bengaluru whose delivery-update automation sent duplicate messages, hit rate limits and once did nothing for a whole day. By the end you will make your own automations fail safely.
 
 ## How it works
 
-**Know the kinds of error.**
+### Know the kinds of error
 
-- *Temporary*: network blips, timeouts, rate limits (HTTP 429), server errors (500 to 504). Usually succeed on retry.
-- *Permanent*: wrong credentials (401, 403), bad input (400), missing records (404), invalid data. Retrying wastes time; fix the cause.
-- *Logic*: the automation ran but did the wrong thing, such as a field mapped wrongly. Only checks and monitoring catch these.
+```text
+   An error happens
+        |
+        v
+   Is it likely temporary? (timeout, 429, 500-504)
+        |-- yes --> retry with backoff, then alert if still failing
+        |
+        no
+        v
+   Is it about one bad record? (400, 404, invalid data)
+        |-- yes --> put the record in "needs attention", continue the rest
+        |
+        no
+        v
+   Is it about the whole workflow? (401, 403, expired token)
+        |-- yes --> stop now, alert the owner with the fix
+```
 
-**Retry with backoff.** Retry temporary errors a few times with growing waits (for example 5 seconds, 30 seconds, 2 minutes). Respect "Retry-After" headers. Cap the number of retries.
+| Kind | Examples | What to do |
+| --- | --- | --- |
+| **Temporary** | Network blips, timeouts, rate limits (HTTP 429), server errors (500 to 504) | Retry with backoff |
+| **Permanent** | Wrong credentials (401, 403), bad input (400), missing record (404), invalid data | Stop, record, fix the cause |
+| **Logic** | The automation ran but did the wrong thing, such as a field mapped wrongly | Only checks and monitoring catch these |
 
-**Idempotency.** Before creating something (an invoice, a payment, a message), check if it already exists, using a unique key such as the order id. Then retries and reruns never duplicate it.
+### Retry with backoff
 
-**Alerts that help.** Send to a channel the owner watches (email, Slack, Teams, WhatsApp): which workflow, which step, which record, the error message, and a link to the run. Group repeated alerts so one outage does not send 500 messages.
+Retry temporary errors a few times, waiting longer each time, so you do not hammer a struggling service:
 
-**Dead-letter queue.** Put records that failed permanently into a "needs attention" list with the reason, so they can be fixed and reprocessed later instead of being lost.
+```text
+  attempt 1 --fails--> wait 5 s --> attempt 2 --fails--> wait 30 s
+     --> attempt 3 --fails--> wait 2 min --> attempt 4 --fails--> alert
+```
 
-**Partial failures.** When processing 300 items, one bad item should not stop the other 299. Process items independently and collect failures.
+Respect a **Retry-After** header if the service sends one: it tells you exactly how long to wait. Always cap the number of retries.
 
-**Monitoring.** Track runs, failures and items processed per day. A workflow that suddenly processes zero items is often broken, even with no error.
+### Idempotency: safe to run twice
 
-**Ownership and runbook.** Every automation has a named owner and a short note: what it does, common failures and fixes.
+Retries and manual reruns can repeat actions. Before creating something, such as an invoice, a payment or a message, check whether it already exists, using a unique key like the order id plus the status. If it exists, skip it. Then retries and reruns never create duplicates.
+
+### Alerts that help
+
+| Weak alert | Useful alert |
+| --- | --- |
+| "Workflow failed." | "Delivery SMS workflow, step 'Send SMS', order ORD-4471: 401 Unauthorized. The SMS provider token has expired. Renew it in Settings, Credentials, SMS provider. Run link: ..." |
+
+Send alerts to a channel the owner actually watches, such as email, Slack, Teams or WhatsApp. Group repeated alerts, so one outage sends one message, not 500.
+
+### Dead-letter queue
+
+Records that failed permanently go into a **"needs attention"** list, sometimes called a dead-letter queue, with the reason. Someone fixes them and reprocesses them later. Nothing is silently lost.
+
+### Partial failures
+
+When processing 300 items, one bad item should not stop the other 299. Process items independently, collect the failures, and report them at the end.
+
+### Monitoring
+
+Track runs, failures and items processed per day. A workflow that suddenly processes **zero** items is often broken, even with no error at all, for example because an export came back empty.
+
+### Ownership and a runbook
+
+Every automation has a named owner and a short runbook: what it does, the common failures and how to fix each.
 
 ## A worked example
 
-A Bengaluru logistics startup's automation sends delivery updates to customers by SMS and updates the order system, about 8,000 messages a day.
+A logistics startup in Bengaluru runs an automation that sends delivery updates to customers by SMS and updates the order system: about 8,000 messages a day.
 
-Problems in the first month: the SMS provider rate-limited the workflow during evening peaks, some customers got two messages, and one day the workflow quietly processed nothing because a token had expired.
+**The first month went badly:**
 
-Fixes:
+| Problem | Cause |
+| --- | --- |
+| Messages failed during evening peaks | The SMS provider rate-limited the workflow (HTTP 429) |
+| Some customers got two messages | A failed run was rerun by hand, and earlier messages were sent again |
+| One day, nothing was sent at all, with no error | A login token had expired; the step returned an empty result instead of failing loudly |
 
-- Retries with backoff on 429 and 5xx responses from the SMS provider, honouring its Retry-After header, at most four attempts.
-- A unique key per message (order id plus status) checked before sending, so reruns never send duplicates.
-- Expired or invalid credentials stop the run at once and alert the owner with "token expired for SMS provider, renew at..." instead of retrying.
-- Failed records go to a "needs attention" sheet with the reason; a button reprocesses them after fixing.
-- A daily check alerts if fewer than 1,000 messages were sent by 8 pm.
+**The fixes:**
 
-Duplicate messages disappear, and the next token expiry is fixed within 20 minutes because the alert said exactly what to do.
+1. **Retries with backoff** on 429 and 5xx responses from the SMS provider, honouring its Retry-After header, with at most four attempts.
+2. **A unique key** per message, order id plus status, checked before sending, so reruns never send duplicates.
+3. **Expired or invalid credentials stop the run** at once and alert the owner with "token expired for SMS provider, renew at Settings, Credentials" instead of retrying.
+4. **Failed records go to a "needs attention" sheet** with the reason; a button reprocesses them after fixing.
+5. **A daily check** alerts if fewer than 1,000 messages were sent by 8 pm.
+
+**The next month:**
+
+| Measure | Month 1 | Month 2 |
+| --- | --- | --- |
+| Duplicate messages | About 900 | 0 |
+| Messages lost to rate limits | About 1,200 | 0 (all retried) |
+| Time to fix the next token expiry | About 9 hours (noticed by a customer complaint) | 20 minutes (the alert said what to do) |
+| Records needing attention | Unknown | 35, all with a reason, all fixed within a day |
 
 ## Common mistakes
 
@@ -74,13 +171,14 @@ Duplicate messages disappear, and the next token expiry is fixed within 20 minut
 - **Alerts without details.** "Workflow failed" is not actionable.
 - **One bad item stops the whole batch.** Handle items independently.
 - **Watching only for errors.** A workflow doing nothing can look healthy.
+- **Retrying without a cap or waits.** You make an outage worse and may get blocked.
 
 ## Practise
 
-Read n8n's guide to error handling and revisit the error workflow part of the Level two course.
+Read n8n's guide to error handling, linked below, and revisit the error-handling part of the N8N102 course.
 
-1. Add retries with backoff to one API step in a workflow, and test with a deliberately failing endpoint.
-2. Add an idempotency check and a "needs attention" list for permanent failures.
-3. Create an alert that names the workflow, step, record and error, and a daily "too few items" check.
+1. **Retries.** Add retries with backoff to one API step in a workflow, and test with a deliberately failing endpoint.
+2. **Duplicates and dead letters.** Add an idempotency check and a "needs attention" list for permanent failures.
+3. **Alerts.** Create an alert that names the workflow, step, record and error, and a daily "too few items" check.
 
-**You are done when you can** break your workflow three ways (temporary error, permanent error, bad item) and show the right behaviour for each.
+**You are done when you can** break your workflow three ways, with a temporary error, a permanent error and a bad item, and show the right behaviour for each.

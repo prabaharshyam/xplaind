@@ -9,43 +9,142 @@ hours: 4
 gap_tags: []
 primary_resource: fastapi-python-types
 alternates: [pydantic-models, fastapi-async]
-format: explainer
+format: deep
 key_terms: [type-hint, pydantic, async-await]
 check:
   type: mcq
   question_ids: [python-for-production-1, python-for-production-2, python-for-production-3]
+flashcards:
+  - q: "What are type hints?"
+    a: "Annotations saying what a function takes and returns, such as def score(t: Ticket) -> float. Python ignores them at run time; tools use them to catch mistakes."
+  - q: "What checks type hints across a project?"
+    a: "Type checkers such as mypy or pyright, usually run in CI, and your editor as you type."
+  - q: "What is a dataclass?"
+    a: "A class marked with @dataclass that mainly holds data; Python writes its constructor, equality and printing for you."
+  - q: "How is a Pydantic model different from a dataclass?"
+    a: "It validates. It converts what it safely can, rejects what it cannot, and reports exactly which field failed."
+  - q: "Where should Pydantic validation happen?"
+    a: "At every boundary where data enters: API requests, config files, CSV rows and especially LLM output."
+  - q: "What does async and await help with?"
+    a: "Waiting on many slow network calls at once in one process, such as many model API calls. It does not speed up heavy computation."
+  - q: "What happens if you call requests.get or time.sleep inside async code?"
+    a: "It blocks the whole event loop, so nothing else runs. Use async libraries like httpx and asyncio.sleep."
+  - q: "Why cap concurrency with a semaphore?"
+    a: "Firing thousands of requests at once trips rate limits and can get you blocked. A semaphore limits how many are in flight."
+exercise:
+  title: "Validate the model's reply"
+  setup: "A Pydantic model Order has fields: order_id (str), qty (int, greater than 0), price_inr (float, greater than 0) and pin (str, exactly 6 characters). An LLM extracting orders from WhatsApp messages returns four replies: (1) order_id 'A12', qty '3', price_inr 499, pin '411001'; (2) order_id 'A13', qty 'two', price_inr 250, pin '560001'; (3) order_id 'A14', qty 1, price_inr 120, pin 41100; (4) order_id 'A15', qty 2, price_inr 80, no pin field."
+  questions:
+    - q: "Which reply passes, and what does Pydantic do to it?"
+      a: "Reply 1 passes. Pydantic converts the text '3' to the integer 3."
+    - q: "Why does reply 2 fail?"
+      a: "'two' cannot be converted to an integer, so qty fails validation with an error naming that field."
+    - q: "What two problems does reply 3 have?"
+      a: "The PIN is a number, not text, and has only 5 digits. Depending on settings it fails the type check, and it fails the 6-character rule either way."
+    - q: "What should the code do with failed replies?"
+      a: "Log the validation errors and retry with a firmer prompt, or send the message to a person, instead of storing bad data."
+ask:
+  - "What is Pydantic and why do AI apps use it?"
+  - "When should I use async in Python?"
+  - "Do type hints make Python faster?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
-Script Python and production Python look alike but behave differently under pressure. A script runs once, on your laptop, on data you have seen. Production code runs thousands of times a day on data you have never seen, and other people change it after you leave.
+Script Python and production Python look alike, but behave very differently under pressure. A script runs once, on your laptop, on data you have seen. Production code runs thousands of times a day, on data you have never seen, and other people change it after you leave.
 
 Four habits close most of the gap:
 
-- **Type hints** say what each function takes and returns, so editors and checkers catch mistakes before the code runs.
-- **Dataclasses** give plain records a clear shape without boilerplate.
-- **Pydantic models** check data that comes from outside (an API request, a file, a model's JSON reply) and refuse it with a clear error if it is wrong.
-- **async and await** let one process wait on many slow network calls at once, which matters when every request calls a model API.
+| Habit | What it does | Where it matters most |
+| --- | --- | --- |
+| **Type hints** | Say what each function takes and returns, so editors and checkers catch mistakes before the code runs | Every function you write |
+| **Dataclasses** | Give plain records a clear shape without boilerplate | Your own internal data |
+| **Pydantic models** | Check data from outside and refuse it with a clear error if it is wrong | API requests, files, LLM replies |
+| **async and await** | Let one process wait on many slow network calls at once | Services that call model APIs |
+
+```text
+   outside world                 your system
+ +----------------+   validate   +-------------------------------------+
+ | API requests   | --(Pydantic)--> typed, checked objects             |
+ | CSV rows       | --(Pydantic)--> dataclasses inside                 |
+ | LLM JSON reply | --(Pydantic)--> type hints on every function       |
+ +----------------+              +-------------------------------------+
+     messy, untrusted                  clean, predictable
+```
+
+This lesson follows a lending startup in Bengaluru that extracts fields from loan enquiry emails with an LLM, and then needs to process 200 of them quickly. By the end you will validate outside data properly and know when async helps.
 
 ## How it works
 
-**Type hints.** Python ignores them at run time. Their value comes from tools: your editor warns when you pass a string where a number belongs, and `mypy` or `pyright` checks a whole project in CI. Hints also document intent. `def score(ticket: Ticket) -> float` tells the next engineer more than a comment would.
+### Type hints
 
-**Dataclasses.** `@dataclass` writes the constructor, equality and printing for a class that mainly holds data. Use them for your own internal records.
+```python
+def emi(principal: float, annual_rate: float, months: int) -> float:
+    ...
+```
 
-**Pydantic.** A Pydantic model looks like a dataclass but validates. Give it a dictionary and it converts what it safely can ("42" to 42), rejects what it cannot and tells you which field failed. Use Pydantic at every boundary where data enters: request bodies, config files, CSV rows and especially LLM output, which is often almost right.
+Python ignores hints at run time; passing a string will not raise an error by itself. Their value comes from tools: your editor warns when you pass a string where a number belongs, and type checkers such as **mypy** or **pyright** check a whole project in CI. Hints are also documentation: `def score(ticket: Ticket) -> float` tells the next engineer more than a comment would.
 
-**async.** A normal function blocks: while it waits two seconds for a model reply, nothing else happens in that process. An `async def` function can `await` the reply and let the event loop run other work meanwhile. This only helps for waiting (network, disk), not for heavy computation, and every library in the chain must be async-aware, such as `httpx` instead of `requests`.
+### Dataclasses
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class LineItem:
+    sku: str
+    qty: int
+    price: float
+```
+
+`@dataclass` writes the constructor, equality and printing for a class that mainly holds data. Use them for your own internal records, where you control what goes in.
+
+### Pydantic: validation at the boundary
+
+A **Pydantic** model looks like a dataclass but **validates**. Give it a dictionary or JSON and it:
+
+- converts what it safely can, such as "42" to 42;
+- rejects what it cannot, such as "five lakh" for a number;
+- tells you exactly which field failed and why.
+
+| Input for `amount_inr: int` | Result |
+| --- | --- |
+| `500000` | Accepted |
+| `"500000"` | Converted to 500000 |
+| `"5,00,000"` | Rejected (commas), unless you add a cleaning step |
+| `"five lakh"` | Rejected with a clear error |
+| missing | Rejected, unless the field has a default |
+
+Use Pydantic at every boundary where data enters: request bodies, config files, CSV rows, and **especially LLM output**, which is often almost right. Validating at the edge means bad data never reaches the rest of your code, where it would cause confusing errors three functions later.
+
+### async and await
+
+A normal function **blocks**: while it waits two seconds for a model reply, nothing else happens in that process. An `async def` function can `await` the reply and let the **event loop** run other work in the meantime.
+
+```text
+  Sequential (blocking):  [call 1 ....2s....][call 2 ....2s....][call 3 ....2s....]  = 6 s
+
+  Concurrent (async):     [call 1 ....2s....]
+                          [call 2 ....2s....]
+                          [call 3 ....2s....]                                        = about 2 s
+```
+
+This only helps with **waiting**, on the network or the disk, not with heavy computation such as resizing images. And every library in the chain must be async-aware: `httpx` instead of `requests`, `asyncio.sleep` instead of `time.sleep`.
 
 ## A worked example
 
-A Bengaluru lending startup asks you to extract fields from loan enquiry emails with an LLM. The model returns JSON, usually correct, sometimes with a missing field or "five lakh" instead of a number.
+A lending startup in Bengaluru wants fields extracted from loan enquiry emails with an LLM. The model returns JSON. It is usually correct, but sometimes a field is missing, or the amount says "five lakh" instead of a number.
+
+**Validating the reply:**
 
 ```python
+import logging
 from pydantic import BaseModel, Field, ValidationError
+
+log = logging.getLogger(__name__)
 
 class Enquiry(BaseModel):
     name: str
@@ -61,24 +160,49 @@ def parse(reply: str) -> Enquiry | None:
         return None
 ```
 
-`parse('{"name": "Divya", "city": "Pune", "amount_inr": "500000"}')` returns a valid `Enquiry` with the amount converted to an integer. A reply with `"amount_inr": "five lakh"` fails with an error naming the field, so you can retry with a firmer prompt instead of storing junk.
+`parse('{"name": "Divya", "city": "Pune", "amount_inr": "500000"}')` returns a valid `Enquiry`, with the amount converted to an integer. A reply with `"amount_inr": "five lakh"` fails with an error naming the field, so the code can retry with a firmer prompt instead of storing junk.
 
-Now the same startup needs 200 emails processed. Calling the model one by one takes 200 times the latency. With `httpx.AsyncClient` and `asyncio.gather`, you send them concurrently, with a semaphore limiting how many are in flight so you stay under the provider's rate limit. The job drops from minutes to seconds.
+**Processing 200 emails.** Calling the model one at a time takes 200 times the latency: about 7 minutes at 2 seconds each. With `httpx.AsyncClient` and `asyncio.gather`, the emails are sent concurrently, and a **semaphore** limits how many are in flight at once, so the startup stays under the provider's rate limit:
+
+```python
+import asyncio
+import httpx
+
+sem = asyncio.Semaphore(10)
+
+async def extract(client, email):
+    async with sem:
+        reply = await call_model(client, email)   # your async model call
+        return parse(reply)
+
+async def main(emails):
+    async with httpx.AsyncClient(timeout=30) as client:
+        return await asyncio.gather(*(extract(client, e) for e in emails))
+
+results = asyncio.run(main(emails))
+```
+
+| Approach | Time for 200 emails | Rate-limit risk |
+| --- | --- | --- |
+| One at a time | about 7 minutes | None |
+| All 200 at once | seconds, then many 429 errors | High |
+| Async with a limit of 10 | about 40 seconds | Low |
 
 ## Common mistakes
 
 - **Treating hints as checks.** `amount: int` does not stop a string at run time. Validate outside data with Pydantic; use hints for your own code.
-- **Validating too late.** Bad data that slips past the boundary turns up three functions later as a confusing error. Validate on entry.
-- **Blocking inside async code.** Calling `requests.get` or `time.sleep` inside an `async def` freezes the whole event loop. Use async libraries and `asyncio.sleep`.
-- **Unlimited concurrency.** Firing 5,000 requests at once trips rate limits and gets you blocked. Cap it.
+- **Validating too late.** Bad data that slips past the boundary shows up three functions later as a confusing error. Validate on entry.
+- **Blocking inside async code.** Calling `requests.get` or `time.sleep` inside an `async def` freezes the whole event loop.
+- **Unlimited concurrency.** Firing 5,000 requests at once trips rate limits and can get you blocked. Cap it.
 - **Dictionaries everywhere.** Passing raw dicts between functions hides typos like `"ammount"`. Give your data a model.
+- **Using async for CPU-heavy work.** It will not make image processing or model training faster.
 
 ## Practise
 
-Read the FastAPI types intro, then the Pydantic models page.
+Read the FastAPI introduction to Python types, linked below, then the Pydantic models page.
 
-1. Write a Pydantic model for an invoice: number, date, vendor, GSTIN (15 characters), line items and total.
-2. Feed it five JSON strings, two of them broken, and print the errors.
-3. Write an async function that "processes" 50 invoices with `asyncio.sleep(1)` standing in for a model call, first one at a time, then with `asyncio.gather` and a limit of 10. Compare the times.
+1. **A model.** Write a Pydantic model for an invoice: number, date, vendor, GSTIN of 15 characters, line items and total.
+2. **Break it.** Feed it five JSON strings, two of them broken, and print the errors.
+3. **Async.** Write an async function that "processes" 50 invoices, with `asyncio.sleep(1)` standing in for a model call, first one at a time, then with `asyncio.gather` and a limit of 10. Compare the times.
 
-**You are done when you can** explain why Pydantic belongs at the edge of a system and why async helps a service that calls a model API but not one that resizes images.
+**You are done when you can** explain why Pydantic belongs at the edge of a system, and why async helps a service that calls a model API but not one that resizes images.

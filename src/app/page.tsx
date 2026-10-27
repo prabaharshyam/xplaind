@@ -2,21 +2,22 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
+import { HomeHeaderTone } from "@/components/home/header-tone";
 import { RoleGrid, TopicChips } from "@/components/home/role-grid";
 import { MiniCourses, MiniInterview, MiniLesson, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
 import { JsonLd } from "@/components/json-ld";
 import { Reveal } from "@/components/motion/reveal";
 import { SearchBox } from "@/components/search-box";
-import { getBlogPosts, getContent, getPaths, getStops } from "@/lib/content";
+import { getBlogPosts, getContent, getPaths, getProjects, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { pathView } from "@/lib/content/paths";
 import { CODING_LABEL } from "@/lib/paths";
 import type { IconName } from "@/lib/themes";
 
 export const metadata: Metadata = {
-  title: { absolute: "Xplaind: free AI roadmaps, lessons and interview practice" },
+  title: { absolute: "Xplaind: AI career roadmaps, lessons and interview practice" },
   description:
-    "Learn AI for the job you want, free. Step-by-step roadmaps for nine AI roles, a plain-English lesson for every topic, the best free course for each, and mock interviews you answer out loud.",
+    "Learn AI for the job you want. Step-by-step roadmaps for nine AI roles, from AI Engineer to MLOps Engineer, a plain-English lesson for every topic, the best course for each, and mock interviews you answer out loud.",
   alternates: { canonical: "/" },
 };
 
@@ -30,9 +31,9 @@ const PAINS: { pain: string; fix: string; href: string; cta: string; icon: IconN
   },
   {
     pain: "“There are a thousand courses. Which one is worth my time?”",
-    fix: "For every topic we pick the one free course that teaches it best, and tell you why. No paid placements, ever.",
+    fix: "For every topic we pick the one course that teaches it best, and tell you why. No paid placements, ever.",
     href: "/resources",
-    cta: "Browse free courses",
+    cta: "Browse courses",
     icon: "book",
   },
   {
@@ -53,16 +54,20 @@ const PAINS: { pain: string; fix: string; href: string; cta: string; icon: IconN
 
 const FAQ = [
   {
-    q: "Is Xplaind really free?",
-    a: "Yes. Every roadmap, lesson, interview question and the mock interview are free, with no sign-up needed. We link to free courses first; when a course costs money we show the price and the date we checked it. We never take money to rank a course.",
+    q: "Which AI role should I choose?",
+    a: "Start from your background. If you code, AI Engineer is the broadest start; Generative AI & LLM Engineer, Agentic AI Engineer, Machine Learning Engineer and MLOps Engineer go deeper in one area, and Forward Deployed Engineer adds client work. If you do not code, choose AI Product Manager, AI Automation Specialist or AI Governance & Compliance Specialist.",
+  },
+  {
+    q: "How do you choose the courses?",
+    a: "For every topic we pick the one course that teaches it best, and say why. When a course costs money we show the price and the date we checked it. We never take money to rank a course.",
   },
   {
     q: "I have never coded. Can I still learn AI here?",
-    a: "Yes. The AI for Beginners, AI Product Manager and AI Automation Specialist roadmaps need no programming. If you later want to build AI applications, the GenAI Engineer roadmap starts from Python basics.",
+    a: "Yes. The AI Product Manager, AI Automation Specialist and AI Governance & Compliance Specialist roadmaps need no programming. If you later want to build AI applications, the AI Engineer roadmap starts from Python basics.",
   },
   {
     q: "How long does it take?",
-    a: "Each roadmap shows an estimate, from about two months for AI for Beginners to six months for Forward Deployed Engineer at 10 to 20 hours a week. The level test skips topics you already know, so many learners finish faster.",
+    a: "Each roadmap shows an estimate, from about three months for AI Product Manager, AI Automation Specialist or AI Governance to about nine months for AI Engineer or Machine Learning Engineer. The level test skips topics you already know, so many learners finish faster.",
   },
   {
     q: "Do I need an account?",
@@ -81,8 +86,8 @@ export default function Home() {
     { value: String(paths.length), label: "role roadmaps" },
     { value: String(stops.length), label: "lessons" },
     { value: String(interview.length), label: "interview questions" },
-    { value: String(getContent().resources.length), label: "free courses picked" },
-    { value: "₹0", label: "to use all of it" },
+    { value: String(getContent().resources.length), label: "courses hand-picked" },
+    { value: String(getProjects().length), label: "guided projects" },
   ];
 
   return (
@@ -96,6 +101,7 @@ export default function Home() {
       />
 
       {/* Hero: what this is, and the first thing to do, above the fold. */}
+      <HomeHeaderTone />
       <section className="home-hero relative overflow-hidden bg-[#070a12] text-white" aria-labelledby="hero-heading">
         <div
           aria-hidden="true"
@@ -107,35 +113,20 @@ export default function Home() {
         />
         <div className="relative mx-auto max-w-6xl px-4 pt-14 pb-12 md:px-6 md:pt-20">
           <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-emerald-300">
-            <span className="size-1.5 rounded-full bg-emerald-400" /> 100% free · made for learners in India · no sign-up
+            <span className="size-1.5 rounded-full bg-emerald-400" /> 9 AI career roadmaps · made for learners in India
           </p>
           <h1 id="hero-heading" className="mt-5 max-w-4xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl">
             Learn AI for the job you want.{" "}
             <span className="bg-gradient-to-r from-emerald-300 via-teal-200 to-violet-300 bg-clip-text text-transparent">
-              Step by step, for free.
+              One clear roadmap per role.
             </span>
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-300">
-            Pick a role. Follow its roadmap, read a plain-English lesson for every topic, take the one free course worth
-            your time, then practise the interview out loud.
+            Pick one of nine AI roles. Follow its roadmap, read a plain-English lesson for every topic, take the one
+            course worth your time, build the projects, then practise the interview out loud.
           </p>
-          <div className="mt-8 max-w-2xl">
-            <SearchBox size="lg" />
-          </div>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/roadmap/ai-for-beginners" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-5 font-medium text-black hover:bg-zinc-200">
-              <Icon name="sparkles" size={18} /> I’m new to AI
-            </Link>
-            <Link href="/roadmap/genai-engineer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/25 px-5 font-medium hover:bg-white/10">
-              <Icon name="code" size={18} /> I can code
-            </Link>
-            <Link href="/interview/simulator" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/25 px-5 font-medium hover:bg-white/10">
-              <Icon name="mic" size={18} /> I have an interview soon
-            </Link>
-          </div>
-
-          <div className="mt-14 flex items-end justify-between gap-4">
-            <h2 className="text-xl font-semibold">Role roadmaps</h2>
+          <div className="mt-10 flex items-end justify-between gap-4">
+            <h2 className="text-2xl font-semibold">Choose your AI role</h2>
             <Link href="/paths" className="text-sm text-emerald-300 hover:underline">
               Compare all {paths.length} →
             </Link>
@@ -152,6 +143,21 @@ export default function Home() {
                 lessons: p.counts.lessons,
               }))}
             />
+          </div>
+
+          <div className="mt-10 max-w-2xl">
+            <SearchBox size="lg" />
+          </div>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Link href="/start" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-5 font-medium text-black hover:bg-zinc-200">
+              <Icon name="sparkles" size={18} /> Find my level
+            </Link>
+            <Link href="/paths" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/25 px-5 font-medium hover:bg-white/10">
+              <Icon name="compass" size={18} /> Compare the roles
+            </Link>
+            <Link href="/interview/simulator" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/25 px-5 font-medium hover:bg-white/10">
+              <Icon name="mic" size={18} /> I have an interview soon
+            </Link>
           </div>
 
           <div className="mt-12 flex items-end justify-between gap-4">
@@ -216,7 +222,7 @@ export default function Home() {
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <Feature
               title="Follow an interactive roadmap"
-              text="See the whole journey on one map. Tap any topic to read what it is, open the best free course and mark it done."
+              text="See the whole journey on one map. Tap any topic to read what it is, open the best course and mark it done."
               href="/roadmap/genai-engineer"
               cta="Open a roadmap"
               tone="from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950"
@@ -248,7 +254,7 @@ export default function Home() {
               </div>
             </Feature>
             <Feature
-              title="Find the best free courses and certificates"
+              title="Find the best courses and certificates"
               text="Courses from Google, Microsoft, AWS, NVIDIA, OpenAI, Anthropic, Hugging Face and more, each chosen for a lesson, plus the certifications worth sitting."
               href="/resources"
               cta="Browse courses"
@@ -270,8 +276,8 @@ export default function Home() {
           </h2>
           <ol className="mt-10 grid gap-6 md:grid-cols-3">
             {[
-              { icon: "compass" as const, title: "Choose your role", text: "Nine roadmaps, from AI for Beginners to Forward Deployed Engineer. Not sure? Take the 10-minute level test." },
-              { icon: "book" as const, title: "Learn, check, earn XP", text: "Read the lesson, take the best free course, pass the quick check. Your XP and streak grow as you go." },
+              { icon: "compass" as const, title: "Choose your role", text: "Nine roadmaps, from AI Engineer to MLOps Engineer. Not sure? Take the 10-minute level test." },
+              { icon: "book" as const, title: "Learn, check, earn XP", text: "Read the lesson, take the best course, pass the quick check. Your XP and streak grow as you go." },
               { icon: "trophy" as const, title: "Prove it", text: "Build the project at the end of each stage, then practise the interview until you are ready." },
             ].map((s, i) => (
               <li key={s.title} className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">

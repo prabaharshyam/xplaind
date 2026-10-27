@@ -9,21 +9,72 @@ hours: 2
 gap_tags: []
 primary_resource: mlflow-tracking
 alternates: [made-with-ml]
-format: explainer
+format: deep
 key_terms: [experiment-tracking, model-registry, data-versioning, regression-test]
 check:
   type: mcq
   question_ids: [experiment-tracking-1, experiment-tracking-2, experiment-tracking-3]
+flashcards:
+  - q: "What is experiment tracking?"
+    a: "Automatically logging each training run's code version, data version, parameters, metrics, artefacts and model."
+  - q: "What is a model registry?"
+    a: "A store of chosen model versions with metadata and a stage or alias, so production loads a known, approved model."
+  - q: "What must be logged to reproduce a model?"
+    a: "The code commit, data version or hash, parameters, environment and random seeds."
+  - q: "Why compare runs by segment?"
+    a: "A model can improve overall while getting worse for a region or customer group that matters."
+  - q: "What should a promotion rule check?"
+    a: "That the candidate beats production on agreed metrics, including key segments, passes checks on recent data, and has an owner's approval."
+  - q: "Why load models from a registry, not a file path?"
+    a: "The deployed version is then explicit and auditable, and rollback is switching an alias."
+  - q: "What is model lineage?"
+    a: "The chain from a production model version to its training run, code commit, data version and evaluation results."
+  - q: "Name two experiment tracking tools."
+    a: "MLflow, which is open source, and Weights and Biases; cloud ML platforms also include tracking."
+exercise:
+  title: "Set up tracking"
+  setup: "A Kolkata microfinance lender's data scientist trains loan-default models in notebooks. Results are pasted into a spreadsheet, the best model is saved as model_best_new.pkl and copied to the server. The regulator asks which data and code produced the model that rejected a specific applicant in March."
+  questions:
+    - q: "Can the team answer the regulator today?"
+      a: "No. Without the code commit and data version recorded for the deployed model, the lineage cannot be shown."
+    - q: "What should each training run log?"
+      a: "Parameters, metrics overall and by segment such as branch or loan type, the Git commit, the data snapshot id, library versions and the model file."
+    - q: "How should the model reach production?"
+      a: "Register the chosen run's model as a version with notes and approval, and have the server load the registry's production alias."
+    - q: "What promotion check suits a lending model?"
+      a: "Compare with the current model on recent applications and block promotion if any segment's error rates or approval rates shift beyond an agreed limit."
+ask:
+  - "How do I start using MLflow?"
+  - "What is the difference between experiment tracking and a model registry?"
+  - "How do I roll back a bad model?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
-**Experiment tracking** logs each training run automatically: the code version (Git commit), data version, parameters, metrics over time, artefacts such as plots, and the trained model. A **model registry** stores chosen model versions with their metadata and a stage (for example, staging or production), so deployment always uses a known, approved model.
+**Experiment tracking** logs each training run automatically: the code version (Git commit), data version, parameters, metrics over time, artefacts such as plots, and the trained model. A **model registry** stores chosen model versions with their metadata and a label such as an alias (for example, "production"), so deployment always uses a known, approved model.
 
-Tools include MLflow (open source), Weights & Biases, and cloud ML platforms' built-in tracking.
+Tools include MLflow (open source), Weights & Biases, and cloud ML platforms' built-in tracking. Recent MLflow versions use movable aliases for this; its older fixed stages (Staging, Production) are deprecated.
+
+```text
+   training run 412
+   +----------------------------------------------+
+   | params:  depth=6, lr=0.05, features=v3        |
+   | code:    git a1b2c3d     data: claims-2026-09 |
+   | metrics: PR AUC 0.46, per-region scores       |
+   | artefacts: model.pkl, confusion.png           |
+   +----------------------------------------------+
+                  | best run, approved
+                  v
+   model registry:  fraud-model  v13 (previous)   v14 --> alias "production"
+                  |
+                  v
+   production service loads "fraud-model@production"   (rollback = move the alias to v13)
+```
+
+This lesson follows the ML team at an insurer in Hyderabad that retrains its claim-fraud model every month.
 
 ## How it works
 
@@ -39,6 +90,20 @@ Tools include MLflow (open source), Weights & Biases, and cloud ML platforms' bu
 
 **Lineage.** For audits and debugging, the chain should be clear: production model version → training run → code commit → data version → evaluation results.
 
+**What to log, and why:**
+
+| Item | Example | Why it matters |
+| --- | --- | --- |
+| Parameters | `depth=6`, `learning_rate=0.05` | Explains differences between runs |
+| Metrics | PR AUC 0.46 overall, by region | Picks the winner fairly |
+| Code version | Git commit `a1b2c3d` | Reproduces the training logic |
+| Data version | `claims-2026-09`, with a hash | Reproduces the inputs |
+| Environment | Library versions, Python version | Avoids "works on my machine" |
+| Artefacts | Model file, plots, feature importance | Lets reviewers inspect results |
+| Seed | `random_state=42` | Controls randomness |
+
+**Adding it to a script.** With MLflow, tracking is a few lines: start a run, log parameters and metrics as you compute them, log the model at the end, and set tags for the commit and data version. The library records the run in a local folder or a tracking server the team shares. Turn on autologging for libraries such as scikit-learn and XGBoost to capture most parameters and metrics without extra code, then add the data version and segment metrics yourself, since no tool can guess those.
+
 ## A worked example
 
 A Hyderabad insurer's ML team retrains its claim-fraud model monthly. Before tracking, models were files named like `final_v3_really_final.pkl`, and nobody could say which data version production used when an auditor asked.
@@ -52,6 +117,15 @@ With MLflow:
 
 When the auditor returns six months later, the team shows the full lineage for the model that flagged a disputed claim in minutes.
 
+| Run | Change | PR AUC overall | Weakest region | Decision |
+| --- | --- | --- | --- | --- |
+| 398 | Last month's production model | 0.41 | 0.33 | Baseline |
+| 405 | Deeper trees | 0.42 | 0.31 | Rejected: weakest region fell |
+| 409 | New feature: claim within 30 days of start | 0.45 | 0.38 | Promising |
+| 412 | New feature, tuned learning rate | 0.46 | 0.39 | Registered as v14 after review |
+
+The comparison view made run 405's regional drop visible at a glance. In the spreadsheet era, it would have been promoted on its overall score.
+
 ## Common mistakes
 
 - **Tracking by hand in spreadsheets.** It is incomplete and goes stale.
@@ -59,6 +133,8 @@ When the auditor returns six months later, the team shows the full lineage for t
 - **Loading models from file paths in production.** Use the registry so the deployed version is explicit.
 - **Promoting on overall score only.** Check segments and recent data.
 - **No rollback plan.** Keep the previous version ready.
+- **Logging only the final run.** Failed experiments teach the team what does not work; keep them.
+- **Forgetting the seed.** Without it, two runs of the same code and data can give different models.
 
 ## Practise
 

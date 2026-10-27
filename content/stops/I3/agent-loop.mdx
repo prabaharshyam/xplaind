@@ -10,14 +10,47 @@ gap_tags: [agent-loop]
 primary_resource: anthropic-building-effective-agents
 alternates: [hf-agents-course]
 more: [ms-ai-agents-for-beginners, databricks-ai-agent-fundamentals, ms-develop-ai-agents-azure]
-format: explainer
+format: deep
 key_terms: [agent, agent-loop, workflow, tool-calling]
 check:
   type: mcq
   question_ids: [agent-loop-1, agent-loop-2, agent-loop-3]
+flashcards:
+  - q: "What is an agent?"
+    a: "A model running in a loop with tools: it decides the next step, calls a tool, reads the result and decides again until done or stopped."
+  - q: "What is the difference between a workflow and an agent?"
+    a: "In a workflow your code decides the steps; in an agent the model decides the steps and how many."
+  - q: "When should you use a workflow?"
+    a: "When the steps are known in advance. Workflows are more predictable and easier to test."
+  - q: "How does the agent loop end?"
+    a: "When the model answers without requesting a tool, or when the step limit is reached and the agent hands over cleanly."
+  - q: "Why is a step limit essential?"
+    a: "A confused agent can otherwise loop forever, burning money and repeating actions."
+  - q: "What should the system prompt tell an agent?"
+    a: "Its goal, what each tool is for, how to know it is finished, and what it must never do without confirmation."
+  - q: "Why do good tools matter more than clever prompts?"
+    a: "Clear, well-described tools with helpful errors let the model choose correctly and recover, instead of guessing or looping."
+  - q: "What is the first thing to try before building an agent?"
+    a: "A single model call with retrieval, or a short fixed workflow. Add a loop only when steps truly vary."
+exercise:
+  title: "Workflow or agent?"
+  setup: "A Pune insurance broker has three tasks: (A) every incoming email is classified, the policy is looked up, and a reply is drafted for staff; (B) a customer asks 'find me the cheapest health cover for my parents aged 64 and 67 with no waiting period for diabetes', which may need several searches and comparisons; (C) a nightly job checks every policy for renewal dates in the next 30 days and sends reminders."
+  questions:
+    - q: "Which tasks suit a fixed workflow?"
+      a: "(A) and (C). Their steps are known and the same every time."
+    - q: "Which task suits an agent, and why?"
+      a: "(B). The number and order of searches and comparisons depend on what each search returns."
+    - q: "What step limit and stop behaviour would you set for (B)?"
+      a: "Around 10 to 15 steps; when reached, show the best options found so far and offer a call with an advisor."
+    - q: "What tool improvement would most help (B)?"
+      a: "Search tools that return clear results and helpful messages, such as 'no plans without a diabetes waiting period; shortest is 1 year'."
+ask:
+  - "What is the difference between an AI agent and a workflow?"
+  - "How many steps should an agent be allowed?"
+  - "How do I write a system prompt for an agent?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -30,6 +63,22 @@ It helps to distinguish two designs, as Anthropic's "Building effective agents" 
 - An **agent**: the model decides the steps and how many, choosing tools as it goes. Flexible for open-ended tasks, harder to predict.
 
 Use a workflow when the steps are known; use an agent when they are not.
+
+```text
+          +--------------------------------------------+
+          |                                            |
+          v                                            |
+   [model: task + history + tool list]                 |
+          |                                            |
+     wants a tool?  -- no -->  final answer, stop      |
+          | yes                                        |
+          v                                            |
+   [your code runs the tool]  --> result appended -----+
+          |
+   step count > limit?  -- yes -->  stop cleanly, hand over to a person
+```
+
+This lesson follows a travel startup in Bengaluru building an assistant that plans weekend trips.
 
 ## How it works
 
@@ -44,7 +93,7 @@ for step in range(MAX_STEPS):
         return reply.text
     results = [run_tool(c.name, c.args) for c in reply.tool_calls]
     messages.append({"role": "user", "content": results})
-raise StopIteration("Step limit reached; hand over to a person")
+raise RuntimeError("Step limit reached; hand over to a person")
 ```
 
 Each round: the model sees the task, everything so far and the tool list; it either answers or asks for tools; your code runs them and appends the results.
@@ -56,6 +105,20 @@ Each round: the model sees the task, everything so far and the tool list; it eit
 **The system prompt** tells the agent its goal, its tools' purpose, how to decide it is finished, and what it must never do without confirmation.
 
 **Start simple.** Many tasks work with a single model call plus retrieval, or a short workflow. Add agent loops when the number and order of steps truly vary.
+
+**Workflow versus agent:**
+
+| Aspect | Workflow | Agent |
+| --- | --- | --- |
+| Who decides the steps | Your code | The model |
+| Predictability | High | Lower |
+| Testing | Test each step | Test outcomes across many runs |
+| Cost per task | Fixed, easy to estimate | Varies with the number of steps |
+| Best for | Known, repeatable processes | Open-ended tasks with varying steps |
+
+**Common workflow shapes.** Before reaching for an agent, check whether one of these fits. A **chain** runs fixed steps in order, such as extract, then check, then draft. A **router** classifies the request and sends it to one of several specialised prompts. **Parallel** calls split a task into independent parts and merge the results. An **evaluator loop** has one call draft and another check against criteria, repeating a fixed number of times. Many products that are described as agents are really one of these shapes, and they are easier to test.
+
+**What to watch in early runs.** Print each step's tool and arguments for twenty real tasks. Look for repeated calls with tiny changes, tools the model never uses, and steps where it misreads a result. Each pattern points to a fix in a tool's description, its error messages or the stop condition in the system prompt.
 
 ## A worked example
 
@@ -72,6 +135,12 @@ A run:
 
 Four model calls, three tool calls. With a cap of 10 steps, a run once looped on `search_stays` with slightly different budgets when nothing matched; it stopped at the cap and the app showed "We couldn't find stays in that budget; try other dates". The team then improved the tool to return "no stays under ₹X; cheapest is ₹Y", and the loop stopped looping.
 
+| Run | Steps | Outcome | Change made |
+| --- | --- | --- | --- |
+| Typical | 4 model calls, 3 tool calls | Plan at about ₹22,000 | None |
+| No stays in budget | Hit the 10-step cap | Clean message to the user | Tool now says "cheapest is ₹Y" |
+| Same case, after the change | 5 steps | Suggested other dates | Loop gone |
+
 ## Common mistakes
 
 - **Using an agent when a workflow would do.**
@@ -79,6 +148,8 @@ Four model calls, three tool calls. With a cap of 10 steps, a run once looped on
 - **Vague tools and errors.** The agent then guesses or loops.
 - **No stop condition in the instructions.**
 - **No logging of each step.** You cannot debug what you cannot see.
+
+- **Retrying a failed tool forever.** Return the error to the model with a clear message, and stop after two or three identical failures.
 
 ## Practise
 

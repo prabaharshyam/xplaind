@@ -9,14 +9,47 @@ hours: 3
 gap_tags: [security-privacy]
 primary_resource: owasp-llm-top-10
 alternates: []
-format: explainer
+format: deep
 key_terms: [secrets-management, pii, prompt-injection, least-privilege]
 check:
   type: mcq
   question_ids: [security-privacy-1, security-privacy-2, security-privacy-3]
+flashcards:
+  - q: "Where should a model API key live?"
+    a: "In server-side environment variables or a secret manager, never in browser code, mobile apps or Git."
+  - q: "Why never put secrets in system prompts?"
+    a: "Assume users can extract the system prompt."
+  - q: "What is data minimisation?"
+    a: "Sending the model only what the task needs, which reduces harm if anything leaks and follows the DPDP Act's principles."
+  - q: "Where must the user's identity come from?"
+    a: "From a verified session or token, never from an id sent by the browser."
+  - q: "Why treat model output as untrusted?"
+    a: "Inserted raw into HTML, SQL or shell commands, it can cause script injection or worse; escape or validate it."
+  - q: "What should happen to personal data in logs?"
+    a: "Mask it, set retention periods and restrict who can read logs."
+  - q: "What should you check in a model provider's terms?"
+    a: "How data is stored and used, retention, training use and which regions are available."
+  - q: "What checklist suits LLM app security reviews?"
+    a: "The OWASP Top 10 for LLM applications, with your defence noted for each item."
+exercise:
+  title: "Review the app"
+  setup: "A Pune fintech's loan-help chatbot: the React app calls the model directly with a key in the bundle; the system prompt includes the internal loan-approval rules and a database password; each request sends the customer's full profile including PAN and bank statements; the customer id comes from a hidden form field; replies are inserted with innerHTML; and logs keep full chats forever."
+  questions:
+    - q: "What is the fix for the key?"
+      a: "Move model calls to a backend with the key in a secret manager, and rotate the exposed key at once."
+    - q: "What should be removed from the system prompt?"
+      a: "The database password, which must be rotated, and anything internal the company would not want users to see."
+    - q: "How should customer data and identity be handled?"
+      a: "Send only the fields each question needs, and take the customer id from the verified session."
+    - q: "What about replies and logs?"
+      a: "Render replies as text or sanitised content, and mask PAN and other personal data in logs with a retention period."
+ask:
+  - "How do I keep my OpenAI or Claude API key safe?"
+  - "What is the OWASP Top 10 for LLM applications?"
+  - "What personal data should I send to an AI model?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -27,6 +60,18 @@ LLM apps bring together the usual web security concerns and some new ones. The O
 - **User data**: personal information sent to models, stored in logs or exposed in answers.
 - **Access**: who can use the app and what each user can see.
 - **Model-specific risks**: prompt injection, leaking the system prompt, excessive agency, insecure handling of model output.
+
+```text
+   BEFORE                                         AFTER
+   browser --(key in JS)--> model                 browser --> backend --(key from secrets)--> model
+   prompt: "admin password: ..."                  prompt: no secrets
+   whole customer record --> model                tool returns: order id, status, date only
+   customer id from the browser                   customer id from the verified session
+   reply inserted as raw HTML                     reply rendered as text
+   logs: full chats with phone numbers            logs: masked, kept 30 days
+```
+
+This lesson follows a security review of a support bot at a direct-to-consumer brand in Bengaluru.
 
 ## How it works
 
@@ -48,6 +93,23 @@ LLM apps bring together the usual web security concerns and some new ones. The O
 
 **Walk the checklist.** Go through the OWASP Top 10 for LLM applications for your app and note your defence for each item.
 
+**Checklist items for most LLM apps:**
+
+| Area | Question | Good answer |
+| --- | --- | --- |
+| Keys | Can the key be seen in the browser or Git history? | No; server-side, rotated if ever exposed |
+| Prompts | Does the system prompt contain anything secret? | No |
+| Data | What reaches the model for each feature? | Only the fields the task needs |
+| Identity | Where does the user id come from? | The verified session |
+| Output | How is model output displayed or used? | Escaped text; validated before any query or command |
+| Logs | What personal data is logged, and for how long? | Masked; fixed retention; restricted access |
+| Tools | What can the model trigger? | Least privilege; approval for risky actions |
+| Vendor | How does the provider use and keep data? | Terms checked; suitable region and settings |
+
+**Checking Git history for secrets.** Deleting a key from the code does not remove it from history. Run a secret scanner over the whole repository history, rotate anything it finds, and add the scanner to CI so new secrets are caught before they are pushed.
+
+**Testing access between users.** Create two test accounts and try, as the first, to read the second's orders by changing ids in requests and by asking the bot directly. Both must fail. Keep these as automated tests.
+
 ## A worked example
 
 A Bengaluru D2C brand builds a support bot. A security review of the first version finds:
@@ -58,6 +120,15 @@ A Bengaluru D2C brand builds a support bot. A security review of the first versi
 - The customer id came from a field in the browser request. Fixed: taken from the verified session instead.
 - Bot replies were inserted as raw HTML; a crafted message could inject a script. Fixed: replies are rendered as text.
 - Logs stored full conversations with phone numbers. Fixed: masking and a 30-day retention.
+
+| Finding | Fix |
+| --- | --- |
+| API key in the React front end | Calls moved to a backend; key rotated |
+| Admin password in the system prompt | Removed and rotated |
+| Whole customer record in the prompt | Tool returns only order id, status and date |
+| Customer id from the browser | Taken from the verified session |
+| Replies as raw HTML | Rendered as text |
+| Full chats with phone numbers in logs | Masked, 30-day retention |
 
 ## Common mistakes
 

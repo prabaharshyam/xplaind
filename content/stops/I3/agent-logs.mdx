@@ -9,14 +9,47 @@ hours: 3
 gap_tags: [agent-logging]
 primary_resource: dlai-evaluating-ai-agents
 alternates: [hf-agents-course]
-format: explainer
+format: deep
 key_terms: [tracing, agent, span, logging]
 check:
   type: project
   brief: "Push your agent with step-by-step logs, plus a short write-up of one failed run: what the logs showed and what you changed. Submit the repository link."
+flashcards:
+  - q: "What do agent logs, or traces, record?"
+    a: "Every model call and tool call in a run, with inputs, outputs, errors, times, tokens and cost, plus the outcome, user and versions."
+  - q: "Why log structured data instead of print statements?"
+    a: "Structured records can be searched, filtered and measured; loose prints cannot."
+  - q: "What fields make a simple step record?"
+    a: "Run id, step number, type, inputs, outputs, start and end time, tokens and cost."
+  - q: "Why pass the run id to other systems?"
+    a: "So one request can be followed through tool logs and application logs across every system."
+  - q: "How should you read a failed run?"
+    a: "Start at the wrong outcome and walk back: wrong tool result, misread result, wrong tool choice, or missing information."
+  - q: "What should happen to an interesting failure?"
+    a: "Save its input as a test case and rerun it after every change."
+  - q: "What privacy steps do agent logs need?"
+    a: "Mask personal data, restrict access and set retention periods."
+  - q: "What can you measure from logs?"
+    a: "Success rate, steps per task, cost per task, slowest steps and most common errors."
+exercise:
+  title: "Debug from the log"
+  setup: "A Chennai bank's card-services agent told a customer 'your card has been blocked'. The customer's card was used fraudulently an hour later. The log shows: step 1 model calls get_cards(customer 4471); step 2 tool returns two cards ending 1123 and 8890; step 3 model calls block_card('1123'); step 4 tool returns success; step 5 model replies 'your card has been blocked'. The customer had asked to block the card ending 8890."
+  questions:
+    - q: "At which step did it go wrong?"
+      a: "Step 3: the model picked the wrong card even though the tool result showed both and the customer named 8890."
+    - q: "What does the log rule out?"
+      a: "A tool failure: get_cards returned both cards and block_card worked. The error was the model's choice."
+    - q: "What fixes would you make?"
+      a: "Require the card's last four digits as confirmed by the customer, and have the final message name the card blocked."
+    - q: "What should the team do with this run?"
+      a: "Save it as a test case with two cards and a named one, and check the agent blocks the right card after the fix."
+ask:
+  - "What should I log for every agent step?"
+  - "Which tools are good for tracing agents?"
+  - "How do I turn agent failures into tests?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -26,6 +59,21 @@ When an agent does something wrong, you need to know why: which step went off co
 - each model call: the input messages, the reply, tokens, time;
 - each tool call: the tool, arguments, result or error, time;
 - the final outcome, the user and versions of the prompt and model.
+
+```text
+  run 9c1f   user=cust-2231   prompt=v6   model=chat-default
+  ┌───────┬────────┬──────────────────────────────┬──────────────────────────┬───────┐
+  │ step  │ type   │ input                        │ output                   │ time  │
+  ├───────┼────────┼──────────────────────────────┼──────────────────────────┼───────┤
+  │ 1     │ model  │ question + tools             │ call get_tracking        │ 1.1 s │
+  │ 2     │ tool   │ get_tracking(SHP-77812)      │ "Nagpur hub, 3 Nov"      │ 0.4 s │
+  │ 3     │ model  │ ... + tracking result        │ call get_eta             │ 0.9 s │
+  │ 4     │ tool   │ get_eta(SHP-77812)           │ ERROR timeout            │ 5.0 s │
+  │ 5     │ model  │ ... + error                  │ "arrives 5 November"  !! │ 0.8 s │
+  └───────┴────────┴──────────────────────────────┴──────────────────────────┴───────┘
+```
+
+This lesson follows a logistics company in Hyderabad whose shipment agent sometimes gave customers wrong delivery dates.
 
 ## How it works
 
@@ -42,6 +90,27 @@ When an agent does something wrong, you need to know why: which step went off co
 **Mind privacy.** Logs contain user messages and tool data. Mask personal data, restrict access and set retention periods.
 
 **Measure.** From logs you get success rates, steps per task, cost per task, slowest steps and the most common errors.
+
+**A step record as JSON lines:**
+
+```text
+{"run":"9c1f","step":4,"type":"tool","name":"get_eta","args":{"id":"SHP-77812"},
+ "error":"timeout after 5 s","start":"2026-11-03T21:52:10+05:30","ms":5004}
+```
+
+**Questions logs should answer quickly:**
+
+| Question | Fields needed |
+| --- | --- |
+| Why did this answer go wrong? | Every step's inputs and outputs, in order |
+| Which tool fails most? | Tool name and error per step |
+| What does a task cost? | Tokens and cost per model call, summed per run |
+| Did the new prompt help? | Prompt version on every run, plus outcome |
+| Which user hit the problem? | Pseudonymous user id and run id |
+
+**A regular review habit.** Once a week, read ten runs: five that failed or got poor feedback, and five chosen at random. Random runs matter, because they show problems nobody has complained about yet, such as an agent taking eight steps where three would do. Write one line per run on what went right or wrong. Over a month, these notes show which fix to make next better than any dashboard.
+
+**Keeping logs useful as volume grows.** Store every run with an error, a refusal or negative feedback, plus a sample of the rest. Keep them long enough to cover your release cycle, so you can compare before and after a change.
 
 ## A worked example
 
@@ -60,6 +129,15 @@ run 9c1f  user=cust-2231  prompt=v6  model=chat-default  5 steps  6.2 s  Rs 0.38
 
 The ETA tool timed out, and the model invented a date instead of saying it did not know. Fixes: the tool now returns a clear error message ("ETA unavailable right now"); the prompt says never to state a date unless `get_eta` returned one; and a check blocks dates in the final answer when no ETA result exists in the run. The trace becomes a test case.
 
+| Fix | Effect |
+| --- | --- |
+| ETA tool returns "ETA unavailable right now" | The model sees a clear error, not silence |
+| Prompt: never state a date unless get_eta returned one | Fewer invented dates |
+| Check blocks dates in answers when no ETA result exists | Invented dates caught before customers see them |
+| The run saved as a test case | The case is retested after every change |
+
+**Why the trace made this quick.** Without step logs, the team would have seen only the final message, "Your shipment will arrive on 5 November", and might have blamed the ETA service or the model at random. The trace showed both at once: the tool timed out, and the model filled the silence. Each fix targeted one of those two causes, and the saved test proves both stay fixed.
+
 ## Common mistakes
 
 - **Logging only final answers.**
@@ -67,6 +145,8 @@ The ETA tool timed out, and the model invented a date instead of saying it did n
 - **No run ids.** You cannot connect steps across systems.
 - **Logging personal data unmasked.**
 - **Reading logs only after complaints.** Review a sample regularly.
+
+- **No versions on runs.** Without prompt and model versions, you cannot tell whether a change made things better or worse.
 
 ## Practise
 

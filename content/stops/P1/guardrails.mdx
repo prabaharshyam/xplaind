@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: nemo-guardrails
 alternates: [owasp-llm-top-10]
-format: explainer
+format: deep
 key_terms: [guardrails, pii, prompt-injection, structured-output]
 check:
   type: mcq
   question_ids: [guardrails-1, guardrails-2, guardrails-3]
+flashcards:
+  - q: "What are guardrails?"
+    a: "Checks before and after the model, and before actions, that keep a system within its rules, catching what prompts and training miss."
+  - q: "What are input, output and action guardrails?"
+    a: "Input checks what comes in, output checks what the model produces, and action checks run before a tool call takes effect."
+  - q: "Name three kinds of check, cheapest first."
+    a: "Rules such as regular expressions and schema validation, small classifiers, and model checks."
+  - q: "What actions can a guardrail take?"
+    a: "Block with a polite message, mask, rewrite by asking the model to retry, or route to a person."
+  - q: "Why is 'never give medical advice' in a prompt not a guardrail?"
+    a: "It is a request the model may ignore. A control checks the output and acts when the rule is broken."
+  - q: "Which two error rates should guardrails report?"
+    a: "The catch rate on what should be blocked and the false-block rate on legitimate requests."
+  - q: "Why test guardrails in several languages?"
+    a: "Indian users mix languages, and checks tuned on English often miss or wrongly block Hindi, Tamil or Hinglish messages."
+  - q: "How do you keep guardrail latency low?"
+    a: "Run cheap rule checks first and checks in parallel where possible, and use model checks only where rules cannot decide."
+exercise:
+  title: "Choose the guardrails"
+  setup: "A Kochi bank's assistant answers customers' questions about accounts and loans. Rules from the risk team: never reveal another customer's data; never give investment advice on specific stocks; never ask for a full card number or PIN; only answer banking questions; and fund transfers above ₹10,000 need a one-time password. Customers write in English and Malayalam."
+  questions:
+    - q: "Which rules can a simple rule check enforce?"
+      a: "Masking card numbers and PINs, checking account numbers in replies match the signed-in customer, and the ₹10,000 OTP rule on transfers."
+    - q: "Which needs a classifier or model check?"
+      a: "Spotting stock-specific investment advice in replies and off-topic questions, which rules cannot judge reliably."
+    - q: "What should happen when the investment-advice check fires?"
+      a: "Regenerate once with a stricter instruction; if it still fails, send a safe template and offer a human advisor."
+    - q: "How would you test the guardrails?"
+      a: "A red-team set in English and Malayalam with messages that should block and similar ones that should pass, reporting both error rates."
+ask:
+  - "What are guardrails in AI applications?"
+  - "Should I use NeMo Guardrails or write my own?"
+  - "How do I measure false positives in guardrails?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -26,6 +59,27 @@ reviewed_on: 2026-10-25
 - **Input guardrails** run on what the user (or a document, or a tool) sends: off-topic requests, abuse, prompt injection attempts, personal data that should not reach the model.
 - **Output guardrails** run on what the model produces: wrong format, banned topics, personal data, unsupported claims, tone.
 - **Action guardrails** run before a tool call takes effect: amount limits, allowed recipients, required approvals.
+
+```text
+   user text / documents / tool results
+             |
+             v
+   INPUT:  [rule: mask Aadhaar, PAN, phone] -> [classifier: injection?] -> [model: on topic?]
+             |                                     | flagged -> fixed message
+             v
+          [model]
+             |
+             v
+   OUTPUT: [model: medical advice or claim promise?] -> regenerate once -> safe template + human
+           [rule: only the customer's own policy number]
+             |
+             v
+   ACTION: [limits, allowed recipients, approvals] --> tool runs
+             |
+   every trigger logged with its reason
+```
+
+This lesson follows a policy assistant at a health-insurance company in Chennai.
 
 ## How it works
 
@@ -41,6 +95,21 @@ Run cheap checks first and in parallel where possible, so guardrails add little 
 
 **Testing.** Build a red-team set: requests that should be blocked (in English, Hindi, Hinglish and Tamil if your users write them) and similar ones that should pass. Measure both catch rate and false-block rate, and rerun on every change.
 
+**Picking the right check:**
+
+| Rule to enforce | Best check | Why |
+| --- | --- | --- |
+| No Aadhaar or PAN in logs | Regular expression, plus the Aadhaar checksum | Exact and fast |
+| Output must be valid JSON | Schema validation | Exact |
+| No prompt injection | Small classifier | Fast, known error rate |
+| Only product questions | Model check with examples | Needs judgement |
+| No medical treatment advice | Model check | Needs judgement |
+| Refund under ₹5,000 only | Rule on the tool's arguments | Exact |
+
+**Designing the blocked message.** A block is part of the product. Say what the assistant can help with, in the user's language, and offer a next step, such as a human agent or the right page. Never say "your message was flagged" without a way forward. Log the trigger and the reason, and review a sample of blocks weekly, because false blocks are invisible unless someone looks.
+
+**Guardrails as code.** Keep each check in its own small function with its own tests, and its configuration, such as thresholds and word lists, in version control. Changes then go through review and the red-team set like any other code, and you can see exactly which version of each check was running when an incident happened.
+
 ## A worked example
 
 A Chennai health-insurance company deploys a policy assistant for customers. The risk team's requirements: no medical advice, no disclosure of other customers' data, no promises of claim approval, and only questions about the company's products.
@@ -54,6 +123,12 @@ Your guardrails:
 5. **Output, rule**: the reply contains no policy number other than the signed-in customer's.
 
 On a red-team set of 300 messages, the system blocks 96% of what it should and wrongly blocks 2.5% of legitimate questions, mostly Tamil messages about "maruthuvam" (medical treatment) that were really asking about hospital cover. You add Tamil examples to the topic check's prompt and the false-block rate falls to 1%. Guardrails add 220 milliseconds at the 95th percentile, which the client accepts.
+
+| Measure on 300 red-team messages | First version | After adding Tamil examples |
+| --- | --- | --- |
+| Should-block messages caught | 96% | 96% |
+| Legitimate messages wrongly blocked | 2.5% | 1% |
+| Added latency, 95th percentile | 220 ms | 220 ms |
 
 ## Common mistakes
 

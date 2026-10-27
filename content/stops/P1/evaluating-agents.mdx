@@ -9,14 +9,47 @@ hours: 4
 gap_tags: []
 primary_resource: anthropic-agent-evals
 alternates: [dlai-evaluating-ai-agents]
-format: explainer
+format: deep
 key_terms: [trajectory, evals, llm-as-judge, golden-set]
 check:
   type: mcq
   question_ids: [evaluating-agents-1, evaluating-agents-2, evaluating-agents-3]
+flashcards:
+  - q: "What two things are scored when evaluating an agent?"
+    a: "The outcome, whether the goal was achieved, and the trajectory, how it got there: tools, steps, safety and approvals."
+  - q: "Why measure consistency?"
+    a: "Agents are not deterministic. Running each task several times shows how reliably it succeeds."
+  - q: "What does an agent eval task need?"
+    a: "A realistic request, a defined starting state such as seeded sandbox data, and a clear success condition."
+  - q: "What are trajectory rules?"
+    a: "Checks on the steps taken, such as no refund without a prior quote, at most 12 steps, approval before any payment."
+  - q: "Why run agent evals in a sandbox?"
+    a: "Agents take real actions; a resettable sandbox with fake APIs or seeded data keeps production safe and runs repeatable."
+  - q: "What is the target for safety violations?"
+    a: "Zero. Any unapproved payment or forbidden action is a failure regardless of the outcome."
+  - q: "Which trap tasks should an agent suite include?"
+    a: "Tasks to refuse or escalate, failing tools, missing information that needs a question, and prompt injection attempts."
+  - q: "Why read failed transcripts?"
+    a: "Scores show that something changed; transcripts show why, which tells you what to fix."
+exercise:
+  title: "Design the agent eval"
+  setup: "A Bhubaneswar telecom's agent handles plan changes: it checks the customer's current plan, offers eligible plans, changes the plan after confirmation, and escalates disputes over bills above ₹2,000. Testing so far: the team tries five chats by hand and reads the final messages."
+  questions:
+    - q: "What task categories should the suite include?"
+      a: "Routine plan changes, ineligible requests to decline, bill disputes above ₹2,000 to escalate, a failing plan API, and injection attempts."
+    - q: "What code check proves a plan change succeeded?"
+      a: "The sandbox account shows the new plan with the right start date, and no other account changed."
+    - q: "Which trajectory rules matter here?"
+      a: "Eligibility checked before offering, explicit confirmation before change_plan, escalation for large disputes, and a step limit."
+    - q: "Why is reading final messages not enough?"
+      a: "The agent may have changed a plan without confirmation or touched the wrong account while the message looked fine."
+ask:
+  - "How do I evaluate an AI agent?"
+  - "What is pass at k for agents?"
+  - "How do I build a sandbox for agent testing?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -27,6 +60,23 @@ Evaluating an agent means running it on a set of tasks and scoring what happened
 - **The trajectory**: how did it get there? Which tools, how many steps, any unsafe or wasted actions, did it ask for approval where required?
 
 Because agents are not deterministic and take many steps, you also measure **consistency**: run each task several times and see how often it succeeds.
+
+```text
+   task: "refund my course, I joined 5 days ago"     seeded sandbox: student 812, payment ₹3,499
+                     |
+                     v
+   [agent run 1]  [agent run 2]  [agent run 3]        each starts from a fresh sandbox
+                     |
+                     v
+   OUTCOME  (code check)          refunds table has ₹3,499 for student 812?
+   TRAJECTORY (rules)             quote before refund? approval before payment? steps <= 10?
+   QUALITY  (model grader)        reply accurate and polite? (calibrated against humans)
+                     |
+                     v
+   metrics: success, success on all 3 runs, steps, cost, safety violations (must be 0)
+```
+
+This lesson follows a course-refund agent at an edtech company in Hyderabad.
 
 ## How it works
 
@@ -47,6 +97,20 @@ Because agents are not deterministic and take many steps, you also measure **con
 
 **Read transcripts.** Numbers show that something changed; reading ten failed trajectories shows why.
 
+**Metrics and what they tell you:**
+
+| Metric | Definition | Tells you |
+| --- | --- | --- |
+| Success rate | Share of runs that meet the success condition | Average capability |
+| All-runs success | Share of tasks that succeed on every run | Reliability users feel |
+| Steps, tokens, cost per task | Averages over runs | Efficiency |
+| Safety violations | Forbidden actions, missing approvals | Whether it can be trusted at all |
+| Escalation correctness | Escalated when and only when it should | Judgement on edge cases |
+
+**Building the sandbox.** Fake the tools at the boundary: a test database seeded with a few students and payments, a fake payment API that can be told to fail once, and an approval tool that answers from the test script. Reset everything before each run. Keep the seed data in the repository so anyone can reproduce a failure. The sandbox is also where you plant traps, such as an instruction hidden in a student's message, without risk to real systems.
+
+**Turning transcripts into fixes.** When a task fails, read its trajectory and name the failing step: wrong tool, wrong argument, skipped check, or bad final reply. Fix the tool, description or prompt that caused it, rerun that task several times, then rerun the whole suite to make sure nothing else broke.
+
 ## A worked example
 
 An ed-tech company in Hyderabad has an agent that handles course-refund requests: checks enrolment, applies the refund policy, issues refunds under ₹5,000 after approval, and escalates the rest.
@@ -62,6 +126,12 @@ The eval suite has 60 tasks in a sandbox with seeded students and payments:
 Graders: code checks on the refunds table; trajectory rules (quote before refund, approval before payment, at most 10 steps); a model grader for reply tone, calibrated on 40 human-graded replies (88% agreement).
 
 Each task runs three times. Baseline: 82% success, 71% success on all three runs, and one safety violation (a refund issued without approval when the approval tool timed out). The fix makes a timeout count as "not approved". After changes the suite shows 93% success, 88% on all three runs and zero violations. The same suite now runs in CI on every change.
+
+| Measure | Baseline | After fixes |
+| --- | --- | --- |
+| Success | 82% | 93% |
+| Success on all three runs | 71% | 88% |
+| Safety violations | 1: refund without approval after a timeout | 0: a timeout now counts as not approved |
 
 ## Common mistakes
 

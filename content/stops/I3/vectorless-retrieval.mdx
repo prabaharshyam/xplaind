@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: pageindex-intro
 alternates: [pageindex-docs]
-format: explainer
+format: deep
 key_terms: [vectorless-retrieval, parent-child-chunking, context-window]
 check:
   type: mcq
   question_ids: [vectorless-retrieval-1, vectorless-retrieval-2, vectorless-retrieval-3]
+flashcards:
+  - q: "What is vectorless retrieval?"
+    a: "Keeping a long document's structure as a tree of sections with summaries, and letting a model navigate down to the relevant pages."
+  - q: "When does chunk-and-embed RAG struggle?"
+    a: "On one long structured document where position matters, cross-references are far apart, and many passages look alike."
+  - q: "How is the tree built?"
+    a: "From the headings, with each node's title, page range and a short summary, often written by a model during indexing."
+  - q: "How does the model navigate per question?"
+    a: "It reads top-level titles and summaries, chooses nodes to open, repeats down to leaf sections, then answers from their full text."
+  - q: "What can tree navigation do that vectors cannot?"
+    a: "Follow references such as 'see note 14' by opening that node."
+  - q: "What does tree navigation cost?"
+    a: "Several sequential model calls per question, so it is slower and pricier than a vector lookup."
+  - q: "When does it suit, and when not?"
+    a: "It suits a few long, high-value documents needing precision; not large collections of short documents, where hybrid search wins."
+  - q: "How do production systems often combine the approaches?"
+    a: "Search to pick which documents matter, then tree navigation inside each long one."
+exercise:
+  title: "Pick the retrieval"
+  setup: "A Chennai legal team asks questions about a 450-page concession agreement for a port project, with definitions in Schedule A, many clauses saying 'subject to clause 18.3', and annexures for each year's tariffs. Separately, the firm's knowledge team wants search over 30,000 short internal notes. The first prototype uses vector RAG for both."
+  questions:
+    - q: "Why does vector RAG struggle with the concession agreement?"
+      a: "Answers depend on cross-references and definitions far away, and yearly tariff annexures look alike, so similarity cannot tell them apart."
+    - q: "How would tree navigation answer 'what is the tariff cap for year 5 and what conditions apply'?"
+      a: "Open the annexures, then year 5's tariff node, follow its reference to the conditions clause, and cite both with pages."
+    - q: "Which approach suits the 30,000 notes?"
+      a: "Hybrid search with reranking; tree navigation would be slow and costly with no gain on short notes."
+    - q: "What limit should the navigation loop have?"
+      a: "A cap on nodes opened per question, such as six, so cost and latency stay bounded."
+ask:
+  - "What is PageIndex and how does it work?"
+  - "When should I use tree search instead of vector search?"
+  - "How do I build a table-of-contents tree from a PDF?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -29,6 +62,23 @@ Standard RAG cuts documents into chunks, embeds them and retrieves by similarity
 
 **Vectorless retrieval** keeps the document's structure. You build a tree from the table of contents (chapters, sections, sub-sections, each with a short summary) and let a model reason its way down: read the top level, choose the likely section, open it, choose again, and finally read the relevant pages. Open-source projects such as PageIndex package this idea.
 
+```text
+   Annual report FY2026 (320 pages)
+   ├── Corporate overview                      summary: strategy, products
+   ├── Directors' report                       summary: performance, risks
+   ├── Standalone financial statements         summary: parent company only
+   └── Consolidated financial statements  <--- opened (analysts mean consolidated)
+        ├── Balance sheet
+        ├── Profit and loss
+        ├── Cash flow
+        └── Notes  <--- opened
+             ├── Note 38 Contingent liabilities   p.241  <--- opened; refers to Note 41
+             └── Note 41 Disputed tax matters     p.247  <--- opened
+   answer cites Note 38 (p.241) and Note 41 (p.247)
+```
+
+This lesson follows an equity research team in Mumbai asking precise questions about one company's annual report.
+
 ## How it works
 
 **Build the tree once.** Parse the document's headings into a hierarchy. For each node store the title, page range and a summary of a few lines, which a model can write during indexing. Scanned or badly formatted documents need cleaning first; the method is only as good as the structure it finds.
@@ -40,6 +90,21 @@ Standard RAG cuts documents into chunks, embeds them and retrieves by similarity
 **Costs.** Each question takes several model calls in sequence, so it is slower and pricier than one vector lookup. It suits a small number of long, high-value documents and questions where precision matters, such as an analyst asking about one company's filings. It does not suit searching 50,000 support articles; there, hybrid search wins.
 
 Many production systems combine the two: vector or keyword search to pick which documents matter, tree navigation inside each long one.
+
+**Vector RAG versus tree navigation:**
+
+| Factor | Vector RAG | Tree navigation |
+| --- | --- | --- |
+| Best documents | Many short ones | Few long, structured ones |
+| Cross-references | Missed | Followed |
+| Similar-looking passages | Often confused | Separated by position in the tree |
+| Calls per question | One search, one answer | Several in sequence |
+| Latency | Usually fast: one lookup | Slower: grows with each call |
+| Setup | Chunk and embed | Parse headings, write node summaries |
+
+**Checking the tree.** Before trusting the method, print the tree for each document and compare it with the real table of contents. Look for flat trees where headings were not detected, sections with page ranges that overlap, and summaries that are vague. Fixing the tree for a handful of important documents by hand is often worth it, since the same documents will be queried many times.
+
+**Writing node summaries.** Good summaries say what a section contains, not what it argues: "Contingent liabilities by type, both years, with references to tax notes" helps the model choose; "Discusses the company's risks" does not. Include key terms users ask about, such as the names of taxes, schemes or contract parties.
 
 ## A worked example
 
@@ -54,6 +119,11 @@ With tree navigation:
 3. The note has a table with both years and refers to Note 41 for the disputed tax details. The model opens Note 41 too.
 
 The answer cites Note 38 (page 241) and Note 41 (page 247) and gives both years from the same table. It took five model calls and about nine seconds, against under two seconds for vector RAG. The team is happy to wait for a correct answer they can check against the page.
+
+| Approach | Correct | Calls | Time |
+| --- | --- | --- | --- |
+| Vector RAG | No: mixed standalone and consolidated figures | 2 | Under 2 s |
+| Tree navigation | Yes, with both years and page citations | 5 | About 9 s |
 
 ## Common mistakes
 

@@ -10,14 +10,47 @@ gap_tags: []
 primary_resource: cs231n-cnns
 alternates: [fastai-course]
 more: [nvidia-fundamentals-dl]
-format: explainer
+format: deep
 key_terms: [cnn, transfer-learning, overfitting, fine-tuning]
 check:
   type: mcq
   question_ids: [cnns-images-1, cnns-images-2, cnns-images-3]
+flashcards:
+  - q: "What is a convolutional neural network?"
+    a: "A network that processes images with small learned filters sliding across the picture; early layers find edges and textures, later layers shapes and objects."
+  - q: "Why are CNNs efficient for images?"
+    a: "The same filter is used everywhere in the image, so the network learns a pattern once and recognises it wherever it appears."
+  - q: "What is transfer learning?"
+    a: "Starting from a model already trained on millions of general images and adapting it to your task, which needs far less data and time."
+  - q: "What are the steps of transfer learning?"
+    a: "Load a pre-trained model, replace the final layer with one for your classes, train it with earlier layers frozen, then optionally fine-tune more layers with a small learning rate."
+  - q: "What is data augmentation?"
+    a: "Creating varied training images with random flips, crops, rotations and brightness changes, to reduce overfitting."
+  - q: "How should augmentations be chosen?"
+    a: "To match reality: rotate leaf photos, but do not flip text documents or images where direction matters."
+  - q: "How should image models be evaluated?"
+    a: "On images from different days, devices or locations than training, with a confusion matrix and a look at misclassified images."
+  - q: "What is the difference between classification, detection and segmentation?"
+    a: "Classification says what is in the image, detection says where things are with boxes, and segmentation says which pixels belong to what."
+exercise:
+  title: "Plan an image classifier"
+  setup: "An agri-tech startup in Nashik wants to classify grape leaf diseases from farmers' phone photos into four classes. It has 2,000 photos, all taken by one agronomist in good daylight on the same phone. Farmers will take photos at different times of day, on cheap phones, often with soil and hands in the frame."
+  questions:
+    - q: "Should the team train a CNN from scratch?"
+      a: "No. With 2,000 images, transfer learning from a pre-trained model will be faster and more accurate."
+    - q: "What is the biggest data risk?"
+      a: "The training photos do not look like real farmers' photos. Collect photos from farmers' phones, in varied light and backgrounds."
+    - q: "Which augmentations make sense?"
+      a: "Rotations, flips, crops, brightness and colour changes, and some blur, because leaves can appear at any angle and lighting varies."
+    - q: "How should they test before launch?"
+      a: "On photos from farmers and phones not in training, read the misclassified ones, and send low-confidence predictions to an agronomist."
+ask:
+  - "How does a convolution work?"
+  - "How much data do I need for transfer learning?"
+  - "Should I use a CNN or a vision transformer?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -25,6 +58,18 @@ reviewed_on: 2026-10-25
 A **convolutional neural network (CNN)** processes images with small learned filters that slide across the picture. Early layers learn edges and textures; later layers combine them into shapes and objects. Because the same filter is used everywhere in the image, CNNs learn efficiently and recognise patterns wherever they appear.
 
 **Transfer learning** starts from a CNN (or vision transformer) already trained on millions of general images and adapts it to your task. It needs far less data and time than training from scratch and usually gives better results.
+
+```text
+  image  -->  [conv: edges]  -->  [conv: textures]  -->  [conv: parts]  -->  [classifier]
+  224x224     many small maps      smaller maps          small maps         "slub defect" 0.91
+              (3x3 filters)        (pooling shrinks)     (larger regions)
+
+  Transfer learning:
+  [pre-trained layers, frozen]  ------------------------->  [new final layer, trained]
+         then optionally unfreeze the last blocks with a small learning rate
+```
+
+This lesson follows a fabric-defect project at a textile factory in Pune.
 
 ## How it works
 
@@ -46,6 +91,18 @@ A **convolutional neural network (CNN)** processes images with small learned fil
 
 **Beyond classification.** Object detection (where things are), segmentation (which pixels belong to what) and OCR use related architectures, also usually fine-tuned from pre-trained models.
 
+**From scratch versus transfer learning:**
+
+| Approach | Data needed | Time | Typical result on small datasets |
+| --- | --- | --- | --- |
+| Train from scratch | Tens of thousands of images or more | Long | Weaker |
+| Transfer learning, frozen backbone | Hundreds to a few thousand | Short | Good |
+| Fine-tuning the last blocks | A few thousand | Medium | Often best |
+
+**What a filter computes.** A 3 × 3 filter holds nine learned weights. At each position it multiplies them with the nine pixels underneath and adds the results into one number. Sliding it across the image gives a map that is bright wherever the filter's pattern appears, such as a vertical edge. A layer with 64 filters produces 64 such maps, and the next layer combines them into more complex patterns.
+
+**Reading the confusion matrix.** Accuracy alone hides which classes are confused. A confusion matrix shows, for each true class, how often the model predicted each class. In the fabric project it showed that "slub" and "thick place" defects were swapped often, while "hole" was almost never missed. That told the team where to collect more examples and where an inspector's second look mattered most. Looking at twenty misclassified images by eye, sorted by confidence, usually teaches more than any single number.
+
 ## A worked example
 
 Continuing the Pune fabric-defect project: 4,800 labelled images across six defect types from two factory lines.
@@ -58,13 +115,24 @@ Validation used images from a different week than training. The confusion matrix
 
 Before deployment, the team tested on 300 images from the second factory line with different lighting: 88%. They added 400 images from that line to training, reaching 93% there too, and set a confidence threshold below which images go to a human inspector.
 
+| Step | Validation accuracy |
+| --- | --- |
+| Small CNN from scratch | 71% |
+| Pre-trained ResNet-50, frozen, new final layer | 86% |
+| Fine-tuned last two blocks with augmentation | 93% |
+| After fixing 14 mislabelled images | 94.5% |
+| Second factory line, before adding its images | 88% |
+| Second line, after adding 400 of its images | 93% |
+
+The labels and the second line's lighting mattered as much as the architecture.
+
 ## Common mistakes
 
 - **Training from scratch with little data.** Use transfer learning.
-- **Unrealistic augmentations.** Augment in ways real images vary.
+- **Unrealistic augmentations.** Augment in ways real images vary, such as lighting, angle and blur, not in ways they never do.
 - **Validating on near-duplicates of training images.** Split by day, device or location.
 - **Ignoring misclassified images.** They reveal label errors and missing conditions.
-- **No confidence threshold in production.** Route uncertain images to people.
+- **No confidence threshold in production.** Route uncertain images to an inspector instead of forcing a guess.
 
 ## Practise
 

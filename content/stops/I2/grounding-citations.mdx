@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: claude-citations
 alternates: [ragas-metrics]
-format: explainer
+format: deep
 key_terms: [grounding, citation, faithfulness, hallucination]
 check:
   type: mcq
   question_ids: [grounding-citations-1, grounding-citations-2, grounding-citations-3]
+flashcards:
+  - q: "What is grounding in RAG?"
+    a: "Techniques that keep the model's answer tied to the retrieved passages: precise instructions, citations, a refusal path and faithfulness checks."
+  - q: "Why give each passage an id and origin in the prompt?"
+    a: "Ids make citations possible, and the origin, such as document, section and page, lets users and engineers check them."
+  - q: "Why are API-provided citations more reliable than bracketed numbers?"
+    a: "The API returns the exact quoted span and its source, and guarantees the quote exists in the document."
+  - q: "Name three post-generation checks, from cheap to thorough."
+    a: "Cited ids exist among the passages sent; quoted spans appear in the source; a faithfulness score checking each claim against the passages."
+  - q: "What makes a refusal useful?"
+    a: "It says what the documents do and do not cover, and points to a next step such as a team, a person or a form."
+  - q: "What does a refusal rate near zero on a hard golden set suggest?"
+    a: "The model is guessing on questions the documents do not answer."
+  - q: "What share of a golden set should be unanswerable?"
+    a: "There is no fixed standard. A useful rule of thumb is at least a fifth, so guessing is measured."
+  - q: "What is faithfulness?"
+    a: "Whether every claim in the answer is supported by the passages provided, regardless of whether it is true in the world."
+exercise:
+  title: "Ground the answer"
+  setup: "A Delhi telecom's support assistant answers plan questions from tariff documents. Asked 'Does the ₹599 plan include international roaming?', it retrieves three passages about the ₹599 plan's data and calls, none about roaming, and answers: 'Yes, international roaming is included in select countries.' The answer cites 'Tariff Guide.pdf'."
+  questions:
+    - q: "What went wrong?"
+      a: "The model filled a gap from general knowledge. None of the passages support the claim, so the answer is unfaithful."
+    - q: "What is weak about the citation?"
+      a: "It names only the file. It should name the passage, with section and page, so the claim can be checked."
+    - q: "What should a good answer say here?"
+      a: "That the ₹599 plan documents cover data and calls but say nothing about roaming, and where to check, such as the roaming page or support."
+    - q: "Which automatic check would catch this?"
+      a: "A faithfulness check that finds the roaming claim has no supporting passage, or a rule rejecting sentences without a citation."
+ask:
+  - "How do I stop my RAG app from making things up?"
+  - "How do I measure faithfulness?"
+  - "How should a chatbot say it does not know?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -27,6 +60,25 @@ A RAG system retrieves passages and asks a model to answer from them. Nothing fo
 - **citations** that link each claim to the passage supporting it;
 - a clear **refusal** path when the passages do not contain the answer;
 - a check, automatic or human, that the answer is **faithful** to its sources.
+
+```text
+  question --> [retrieve passages] --> [1] Leave Policy v4, 3.2, p.6
+                                       [2] Leave Policy v4, 3.4, p.7
+                                       [3] Travel Policy v2, 1.1, p.2
+                                              |
+                                              v
+             prompt: use only these; cite ids; refuse with a next step
+                                              |
+                                              v
+          answer: "Earned leave carries forward up to 45 days [1].
+                   The policies do not cover sick leave carry-forward;
+                   ask hr-help."
+                                              |
+                                              v
+          checks: ids exist? quotes match? every claim supported?
+```
+
+This lesson follows an HR assistant pilot at an IT services firm in Bengaluru.
 
 ## How it works
 
@@ -44,6 +96,18 @@ A RAG system retrieves passages and asks a model to answer from them. Nothing fo
 
 **Design the refusal.** "I could not find this in the HR policies. For leave encashment questions, contact hr-help@..." is useful. "I don't know" alone is not. Track the refusal rate: too high means retrieval is failing; near zero on a hard golden set means the model is guessing.
 
+**Checks and what they catch:**
+
+| Check | Cost | Catches |
+| --- | --- | --- |
+| Cited ids exist | Free, code only | Made-up citation numbers |
+| Quotes appear in source | Free, string match | Invented or altered quotes |
+| Every sentence has a citation | Free, code only | Unsupported sentences |
+| Faithfulness score by a second model | One extra call | Claims a citation does not actually support |
+| Human review of a sample | Staff time | Subtle errors and tone problems |
+
+**Showing sources to users.** Put the citation next to the sentence it supports, and make it open the quoted passage with its section and page. Users then check answers that matter to them, such as leave rules before a long holiday, and they report mismatches, which feed back into the golden set.
+
 ## A worked example
 
 A Bengaluru IT services firm wants an HR assistant over its leave, travel and reimbursement policies. In the pilot, an employee asks: "Can I carry forward unused sick leave?"
@@ -55,6 +119,12 @@ You change three things. The prompt now requires a citation per sentence and inc
 The new answer: "The policies I have cover carry-forward of earned leave: up to 45 days [Leave Policy v4, 3.2]. They do not say whether sick leave can be carried forward. Please check with HR at hr-help." The employee can click the citation and read the clause.
 
 On the 80-question golden set, faithfulness rises from 0.81 to 0.96 and the share of unanswerable questions answered with a refusal goes from 30% to 85%. Correct answers to answerable questions barely change. You report all three numbers to the client.
+
+| Measure on 80 questions | Before | After |
+| --- | --- | --- |
+| Faithfulness | 0.81 | 0.96 |
+| Unanswerable questions refused | 30% | 85% |
+| Answerable questions answered correctly | 88% | 87% |
 
 ## Common mistakes
 

@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { AccountLink } from "@/components/account-link";
+import { XBot } from "@/components/bot/x-bot";
+import { MotionEffects, PageEnter } from "@/components/motion/motion-effects";
 import { SiteHeader } from "@/components/site-header";
+import { aiEnabled } from "@/lib/ai/settings";
 import { allowIndexing } from "@/lib/indexing";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
@@ -10,7 +14,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "Xplaind", template: "%s | Xplaind" },
   description:
-    "A free-first path to learn AI. A short test finds your level, then you get the next five steps with the best free or low-cost course for each.",
+    "Role-based AI learning paths for India. A short test finds your level, then you get the next five steps with the best course for each.",
   // Not listed in search results until launch (see src/lib/indexing.ts).
   ...(allowIndexing() ? {} : { robots: { index: false, follow: false } }),
 };
@@ -23,7 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <SiteHeader />
-        <div className="flex-1">{children}</div>
+        <div id="page" className="flex-1">
+          {children}
+        </div>
         <footer className="border-t border-zinc-200 px-4 py-6 text-sm dark:border-zinc-800">
           <nav aria-label="Footer" className="mx-auto flex max-w-2xl flex-wrap gap-x-6 gap-y-2">
             <Link href="/" className="underline-offset-2 hover:underline">
@@ -38,11 +44,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/resources" className="underline-offset-2 hover:underline">
               Courses
             </Link>
+            <Link href="/projects" className="underline-offset-2 hover:underline">
+              Projects
+            </Link>
             <Link href="/interview" className="underline-offset-2 hover:underline">
               Interview questions
             </Link>
             <Link href="/interview/simulator" className="underline-offset-2 hover:underline">
               Mock interview
+            </Link>
+            <Link href="/ai" className="underline-offset-2 hover:underline">
+              AI tools
             </Link>
             <Link href="/practice" className="underline-offset-2 hover:underline">
               Practice
@@ -65,6 +77,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <AccountLink className="underline-offset-2 hover:underline" />
           </nav>
         </footer>
+        <MotionEffects />
+        {/* These read the URL, so pages with dynamic URLs render them in the browser. */}
+        <Suspense fallback={null}>
+          <PageEnter />
+          <XBot aiOn={aiEnabled()} />
+        </Suspense>
       </body>
     </html>
   );

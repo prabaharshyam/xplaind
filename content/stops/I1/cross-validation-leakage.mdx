@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: sklearn-cross-validation
 alternates: [sklearn-pitfalls, kaggle-intermediate-ml]
-format: explainer
+format: deep
 key_terms: [cross-validation, data-leakage, overfitting, feature-engineering]
 check:
   type: mcq
   question_ids: [cross-validation-leakage-1, cross-validation-leakage-2, cross-validation-leakage-3]
+flashcards:
+  - q: "Why keep a test set untouched until the end?"
+    a: "So the final score is an honest estimate on data never used for training or choices. Checking it repeatedly turns it into a validation set."
+  - q: "What is k-fold cross-validation?"
+    a: "Split the data into k folds, train on k minus 1 and validate on the remaining one, repeat k times and average the scores."
+  - q: "What are stratified folds?"
+    a: "Folds that keep the same class proportions as the whole dataset, important when one class is rare."
+  - q: "When must you use a time-based split?"
+    a: "When data has time order, such as transactions or demand. Train on earlier periods and validate on later ones."
+  - q: "What is a grouped split?"
+    a: "Keeping all rows of the same customer, patient or store in one fold, so the model cannot memorise individuals."
+  - q: "What is data leakage?"
+    a: "Information from validation, test or the future reaching training, so results look better than they will be in use."
+  - q: "Why use scikit-learn pipelines in cross-validation?"
+    a: "They fit preprocessing like scaling and imputation on the training fold only, inside each split, preventing leakage."
+  - q: "Name three warning signs of leakage."
+    a: "Surprisingly high scores, one feature with overwhelming importance, and a big drop when scoring a truly new period."
+exercise:
+  title: "Find the leaks"
+  setup: "A Bengaluru lender predicts whether a loan will default within 12 months. The notebook: (1) splits 200,000 loans randomly into train and test; (2) many customers have several loans; (3) fills missing income with the mean of the whole dataset before splitting; (4) includes the feature 'number of collection calls', recorded after a payment is missed; (5) tries 40 model settings and picks the one with the best test score. Reported AUC: 0.94."
+  questions:
+    - q: "Which split should replace (1), and why?"
+      a: "A time-based split: train on older loans, test on newer ones, because in use the model predicts future loans."
+    - q: "What does (2) require?"
+      a: "Grouped splits by customer, so the same customer's loans are not in both training and testing."
+    - q: "Why are (3) and (4) leaks?"
+      a: "(3) uses statistics from test rows in training; fit imputation in a pipeline on training data only. (4) is a consequence of default, not known at prediction time."
+    - q: "What is wrong with (5), and how do you fix it?"
+      a: "Choosing by test score makes the test optimistic. Tune with cross-validation on training data, and report the test score once at the end."
+ask:
+  - "What is data leakage in machine learning?"
+  - "When should I use time-based cross-validation?"
+  - "Why did my model perform worse in production than in testing?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -26,6 +59,23 @@ To know how a model will perform on new data, you must test it on data it never 
 - **Train, validation, test**: train on one part, tune choices on a validation part, and report final performance once on a test part kept untouched until the end.
 - **Cross-validation**: repeat training and validation on several different splits (folds) and average, for a more stable estimate when data is limited.
 - **Data leakage**: any way information from the validation or test data, or from the future, reaches training, making results look better than they will be.
+
+```text
+  Random k-fold (fine for independent rows)
+  fold 1: [VAL][trn][trn][trn][trn]
+  fold 2: [trn][VAL][trn][trn][trn]   ... average the 5 scores
+
+  Time-based (rows ordered by time)
+  split 1: [train: Jan-Jun ][val: Jul]
+  split 2: [train: Jan-Jul    ][val: Aug]
+  split 3: [train: Jan-Aug       ][val: Sep]   ... never train on the future
+
+  Grouped (same patient = same fold)
+  patient A's 4 admissions -> all in fold 2
+  patient B's 2 admissions -> all in fold 5
+```
+
+This lesson follows a hospital network in Chennai whose readmission model looked brilliant until the leaks were found.
 
 ## How it works
 
@@ -47,6 +97,21 @@ To know how a model will perform on new data, you must test it on data it never 
 
 **Final check.** Before launch, score the model on the most recent period it never saw, ideally exactly as it will run in production.
 
+**Which split matches which problem:**
+
+| Data | Split to use | Why |
+| --- | --- | --- |
+| Independent rows, no time order | Stratified k-fold | Stable estimate, class balance kept |
+| Transactions, demand, churn | Time-based, rolling forward | The model always predicts the future |
+| Many rows per customer or patient | Grouped k-fold | New customers are what the model will see |
+| Both time order and groups | Time-based, with groups not crossing the boundary | Combines both risks |
+
+**The rule behind every split:** the validation data should look like the data the model will meet in real use, and training must use only information available at prediction time. If you can explain how your split mirrors production, you have probably chosen well.
+
+**A leakage checklist before you trust a score.** For every feature, ask "would I know this value at the moment the prediction is made?" Fit every preprocessing step inside a pipeline. Remove exact duplicates across splits. Look at feature importance and question anything that seems too good. And score the most recent untouched period last.
+
+**Leakage from feature engineering.** Many leaks enter through features built from event logs: "number of support calls", "last status", "days since last payment". Each must be computed only from events before the prediction moment. A safe habit is to fix a "prediction time" column for every row and filter every source table to events before it when building features.
+
 ## A worked example
 
 A Chennai hospital network predicts 30-day readmission from discharge records.
@@ -60,6 +125,17 @@ The first notebook reported AUC 0.91 with random 5-fold cross-validation. Concer
 
 The honest number, 0.77, is what the clinical team planned around. In the six-month pilot, live AUC was 0.76.
 
+| Fix | AUC after the fix |
+| --- | --- |
+| Random 5-fold (start) | 0.91 |
+| Grouped folds by patient | 0.83 |
+| Imputation inside a pipeline | 0.82 |
+| Removed the post-readmission feature | 0.78 |
+| Trained on 2023-2025, tested on early 2026 | 0.77 |
+| Live in the six-month pilot | 0.76 |
+
+The drop from 0.91 to 0.77 was not the model getting worse. It was the measurement getting honest, and it is why the pilot held no surprises.
+
 ## Common mistakes
 
 - **Random splits on time-ordered data.**
@@ -67,6 +143,9 @@ The honest number, 0.77, is what the clinical team planned around. In the six-mo
 - **Preprocessing before splitting.** Use pipelines.
 - **Repeatedly checking the test set.** Keep it for the final report.
 - **Ignoring suspiciously good scores.** Investigate before celebrating.
+
+- **Tuning with cross-validation, then reporting the cross-validation score as final.** After many tuning rounds, even the cross-validation score is optimistic. Keep a separate final test set.
+- **Assuming leakage is rare.** It is one of the most common reasons models fail after launch. Check for it every time, especially with features built from logs or event tables.
 
 ## Practise
 

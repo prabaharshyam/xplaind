@@ -9,14 +9,47 @@ hours: 5
 gap_tags: []
 primary_resource: kaggle-feature-engineering
 alternates: [rules-of-ml]
-format: explainer
+format: deep
 key_terms: [feature-engineering, feature, data-leakage, cross-validation]
 check:
   type: mcq
   question_ids: [ml-feature-engineering-1, ml-feature-engineering-2, ml-feature-engineering-3]
+flashcards:
+  - q: "What is feature engineering?"
+    a: "Creating model inputs from raw data, such as 'orders in the last 30 days' from a transactions table, capturing what a domain expert would look at."
+  - q: "Name three kinds of time-window feature."
+    a: "Aggregates over windows (counts, sums, averages over 7, 30, 90 days), trends (this month versus last), and recency (days since last event)."
+  - q: "Why do Indian calendar features matter?"
+    a: "Demand and payments follow festivals like Diwali, Onam, Eid and Pongal, and salary days at the start of the month."
+  - q: "What is target encoding, and its risk?"
+    a: "Replacing a category with the average outcome for it. Computed on all data, it leaks the target; compute it within training folds only."
+  - q: "What is the cardinal rule of features?"
+    a: "A feature may use only information available at the moment of prediction. Compute every aggregate as of the prediction time."
+  - q: "What is training-serving skew?"
+    a: "When features are computed differently in training and in production, such as a timezone mismatch, so the live model quietly performs worse."
+  - q: "How do you prevent training-serving skew?"
+    a: "Write feature code once and use it in both places, or use a feature store."
+  - q: "What should a too-good validation score make you do?"
+    a: "Investigate for leakage before celebrating, especially recently added features and joins."
+exercise:
+  title: "Build features as of a date"
+  setup: "A grocery app in Kochi predicts on 1 November 2026 whether each customer will order in the next 14 days. You have an orders table (customer, date, amount, delivered_late) and a support table (customer, ticket_date). Candidate features: (A) orders in October 2026, (B) days since the last order before 1 November, (C) number of support tickets between 1 and 14 November, (D) share of October orders delivered late, (E) total amount spent in November."
+  questions:
+    - q: "Which features are safe to use?"
+      a: "(A), (B) and (D). They use only information from before 1 November."
+    - q: "Why are (C) and (E) leaks?"
+      a: "They use data from after the prediction date, which the model would not have in real use."
+    - q: "Give one useful seasonal feature for this prediction."
+      a: "Whether the next 14 days include a festival such as Diwali, or a salary week at the start of the month."
+    - q: "How would you make sure production computes (D) exactly like training?"
+      a: "Use the same feature function in both, with the same 'as of' date logic and timezone, or a shared feature store."
+ask:
+  - "What makes a good feature for a machine learning model?"
+  - "What is training-serving skew?"
+  - "How do I encode categories with many values?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -24,6 +57,17 @@ reviewed_on: 2026-10-25
 **Feature engineering** creates model inputs from raw data. A transactions table does not directly tell a churn model much; features such as "orders in the last 30 days", "change in monthly spend versus the previous quarter" and "days since last order" do.
 
 Good features capture what a domain expert would look at.
+
+```text
+  prediction date: 1 Nov
+  ----------------------------------|----------------------------->
+       past (allowed)               |      future (never in features)
+  orders, sessions, tickets         |  next orders  <- this is the label
+  -> counts, trends, recency        |
+     "as of" 1 Nov                  |
+```
+
+This lesson follows a food-delivery company in Bengaluru predicting which customers will order again within 14 days.
 
 ## How it works
 
@@ -45,6 +89,19 @@ Good features capture what a domain expert would look at.
 
 **Selection.** More features are not always better. Remove useless or redundant ones; check importance and stability across time.
 
+**Feature ideas by data type:**
+
+| Raw data | Example features |
+| --- | --- |
+| Transactions | Orders in last 7, 30, 90 days; average value; change versus previous 30 days; days since last order |
+| Ratings and support | Last rating; tickets in last 30 days; share of late deliveries |
+| Dates | Day of week, hour, month, festival window, salary week |
+| Categories | One-hot for few values; frequency or fold-safe target encoding for many; rare values grouped as "other" |
+| Text | Length, keyword flags, embeddings |
+| Location | Distance to store or hub, city tier |
+
+**Start from experts.** The best features usually come from asking the people who know the business: "what would make you think a customer is about to leave?" Delivery managers suggested late-delivery share; finance suggested payday timing. Each became a feature that beat anything automatic.
+
 ## A worked example
 
 A Bengaluru food-delivery company predicts whether a customer will order again within 14 days.
@@ -64,6 +121,15 @@ Results: the baseline with only order counts reached AUC 0.72; with engineered f
 
 A leakage scare: "customer contacted support in the next 7 days" had appeared in an early draft through a misaligned join; it was found because the validation score jumped to 0.95, which was too good to be true.
 
+| Model | AUC |
+| --- | --- |
+| Baseline: order counts only | 0.72 |
+| With engineered features | 0.81 |
+| With the accidental leaky feature | 0.95 (too good to be true) |
+| After removing the leak | 0.81 |
+
+**Which features mattered, and why.** The delay share captured something the business already suspected: customers forgive one late delivery, but two in a month make them try a competitor. The change in order value caught customers drifting away gradually, ordering smaller baskets before stopping. Neither appears in raw order counts. Both came from conversations with the operations team, and both were cheap to compute from data the company already had. The team also learned what did not help: app session counts added almost nothing once order recency was included, so they dropped them and saved a costly daily data pipeline.
+
 ## Common mistakes
 
 - **Future information in features.** Compute everything as of prediction time.
@@ -71,6 +137,8 @@ A leakage scare: "customer contacted support in the next 7 days" had appeared in
 - **Target encoding on all data.** Compute it within training folds only.
 - **Ignoring Indian calendar effects.** Festivals and salary cycles matter.
 - **Too-good-to-be-true scores.** Investigate them for leakage.
+
+- **Building hundreds of features at once.** Add features in small groups and measure each group's gain, so you know which ones earn their place and their maintenance cost.
 
 ## Practise
 

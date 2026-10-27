@@ -10,14 +10,47 @@ gap_tags: [llm-api]
 primary_resource: claude-get-started
 alternates: [claude-messages-guide]
 more: [anthropic-claude-api-course, openai-cookbook, claude-cookbooks, gemini-cookbook, ms-genai-for-beginners]
-format: explainer
+format: deep
 key_terms: [api, prompt, token, environment-variable]
 check:
   type: project
   brief: "Push a small command-line or web app that calls an LLM API, keeps the API key out of the code, and prints the token usage of each call. Submit the repository link."
+flashcards:
+  - q: "What do you get back from an LLM API call?"
+    a: "The model's reply plus details such as how many input and output tokens were used and why it stopped."
+  - q: "Where should your API key live?"
+    a: "In an environment variable, often loaded from a .env file listed in .gitignore. Never in code. Rotate any key that was ever committed."
+  - q: "What is an SDK?"
+    a: "A software development kit: an official library that wraps the HTTP details of an API, such as the Anthropic Python SDK."
+  - q: "What does max_tokens do?"
+    a: "Caps how long the reply can be, which limits cost and time per call."
+  - q: "What is the system prompt?"
+    a: "Standing instructions for the whole conversation, such as the assistant's role, tone and rules."
+  - q: "Does the API remember earlier calls?"
+    a: "No. To continue a conversation, send the earlier user and assistant turns again with the new message."
+  - q: "How do you work out what a call cost?"
+    a: "Multiply input tokens and output tokens by the model's current prices per token and add them."
+  - q: "How should you choose a model at first?"
+    a: "Start with a mid-sized model, test on your real task, then try a smaller one for cost or a larger one for quality."
+exercise:
+  title: "Predict what the API does"
+  setup: "Meera in Chennai writes a chatbot. Call 1 sends messages: user 'My name is Meera.' The reply is 'Nice to meet you, Meera!'. Call 2 sends only: user 'What is my name?'. Call 3 sends: user 'My name is Meera.', assistant 'Nice to meet you, Meera!', user 'What is my name?'. Each call uses max_tokens=50. Call 3 reports 40 input and 12 output tokens. Assume ₹0.0002 per input token and ₹0.0008 per output token."
+  questions:
+    - q: "Will call 2 know her name? Why?"
+      a: "No. The API does not remember earlier calls; call 2 has no history."
+    - q: "Will call 3 know her name?"
+      a: "Yes, because the earlier turns were sent again in the messages list."
+    - q: "What did call 3 cost?"
+      a: "40 × 0.0002 + 12 × 0.0008 = 0.008 + 0.0096 = about ₹0.018."
+    - q: "If she asks for a 500-word essay with max_tokens=50, what happens?"
+      a: "The reply is cut off at about 50 tokens, and the stop reason shows the token limit was reached."
+ask:
+  - "How do I keep my API key safe?"
+  - "Why does the model forget what I said before?"
+  - "How much does an LLM API call cost?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -25,6 +58,22 @@ reviewed_on: 2026-10-25
 Calling a language model from code is like calling any web API: your program sends a request with your prompt, the provider runs the model, and you get back the reply plus details such as how many tokens were used. With that, your own programs can summarise, classify, extract and write.
 
 Every major provider offers an API and an official Python SDK (software development kit) that wraps the HTTP details.
+
+```text
+  your script                                    model provider
+ +----------------------------+   HTTPS POST    +------------------------+
+ | client = Anthropic()       | --------------> | runs the model on:     |
+ |   key from environment     |  model,         |   system prompt        |
+ | messages.create(...)       |  max_tokens,    |   + message history    |
+ |                            |  system,        |                        |
+ |                            |  messages[]     |                        |
+ |                            | <-------------- |                        |
+ | text blocks of .content    |  reply text,    |                        |
+ | reply.usage (tokens)       |  usage, stop    |                        |
+ +----------------------------+  reason         +------------------------+
+```
+
+This lesson follows Vikram, a backend developer in Gurugram, as he builds a tool that turns messy meeting notes into tidy summaries.
 
 ## How it works
 
@@ -48,15 +97,31 @@ reply = client.messages.create(
     messages=[{"role": "user", "content": "Write a two-line WhatsApp message announcing fresh plum cakes for Christmas."}],
 )
 
-print(reply.content[0].text)
+text = "".join(b.text for b in reply.content if b.type == "text")
+print(text)
 print("tokens in:", reply.usage.input_tokens, "out:", reply.usage.output_tokens)
 ```
+
+The reply's `content` is a list of blocks. Newer models can put a thinking block before the text, so pick out the blocks whose type is `text` rather than assuming the first block is the answer.
 
 **The message list.** A conversation is a list of messages with roles (user and assistant). To continue a chat, send the earlier turns again with the new message; the API does not remember previous calls by itself. The **system** prompt sets standing instructions.
 
 **Usage and cost.** Each reply reports input and output tokens. Multiply by the model's price per token to know what each call costs. Print usage while you build so costs never surprise you.
 
 **Choosing a model.** Providers offer larger, more capable models and smaller, faster, cheaper ones. Start with a mid-sized model and test before changing.
+
+**The parts of a request, and what they control:**
+
+| Part | Controls | Tip |
+| --- | --- | --- |
+| `model` | Capability, speed and price | Check the docs for current names |
+| `max_tokens` | Maximum reply length | Always set it |
+| `system` | Role, tone, rules for the whole chat | Keep it stable across calls |
+| `messages` | The conversation so far | Alternate user and assistant turns |
+| Reply `usage` | Tokens used | Log it from day one |
+| Reply stop reason | Why it stopped: finished, or hit the token limit | If it hit the limit, the answer is cut off |
+
+**Conversation history costs money.** Because you resend the whole history every turn, long chats get more expensive with each message: turn 20 pays for turns 1 to 19 again as input. Real apps trim or summarise old turns, and keep the system prompt stable so providers can cache it and charge less for the repeated part.
 
 ## A worked example
 
@@ -69,6 +134,15 @@ Vikram, a backend developer in Gurugram, builds a command-line tool that turns m
 
 He pushes the repository to GitHub without the key and with a README showing example output.
 
+| Run | Input | Input tokens | Output tokens | Cost |
+| --- | --- | --- | --- | --- |
+| Two-page notes | 1 file | about 1,800 | about 250 | Well under ₹1 |
+| A 60-page notes dump | blocked by the 20,000-character check | 0 | 0 | ₹0 |
+
+The length check took Vikram two lines and protects every future user from a surprise bill.
+
+**From script to habit.** Vikram's teammates started using the tool within a week. The most-used feature was not the summary but the action-item list in a fixed "owner: task: due date" format, because they could paste it straight into their tracker. That came entirely from the system prompt, which shows how much of an LLM app's value comes from clear instructions rather than clever code.
+
 ## Common mistakes
 
 - **Hard-coding the API key.** Use environment variables; rotate any key that was ever committed.
@@ -76,6 +150,8 @@ He pushes the repository to GitHub without the key and with a README showing exa
 - **Expecting the API to remember earlier calls.** Send the conversation history yourself.
 - **Using outdated model names.** Check the current list in the docs.
 - **Ignoring usage numbers.** Track tokens from your first call.
+
+- **Printing the whole response object into logs.** It can contain user text. Log ids, token counts and timings instead.
 
 ## Practise
 

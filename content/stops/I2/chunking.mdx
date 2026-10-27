@@ -4,24 +4,71 @@ level: I2
 theme: retrieval
 title: "Chunk documents for retrieval"
 outcome: "Split documents into chunks that retrieval can find, and choose a chunk size for a task."
-why_it_matters: "Bad chunking is the most common reason a RAG app gives wrong answers. The model can only use what retrieval hands it."
+why_it_matters: "Bad chunking is one of the most common reasons a RAG app gives wrong answers. The model can only use what retrieval hands it."
 hours: 2
 gap_tags: [chunking]
 primary_resource: pinecone-chunking
 alternates: []
-format: explainer
+format: deep
 key_terms: [chunking, chunk-overlap, embedding, retrieval]
 check:
   type: mcq
   question_ids: [chunking-1, chunking-2, chunking-3]
+flashcards:
+  - q: "What is chunking?"
+    a: "Splitting documents into passages small enough to embed, retrieve and fit into a prompt. It decides what retrieval can find."
+  - q: "What goes wrong with very large chunks?"
+    a: "The embedding blurs many topics so it matches no question well, and each retrieved chunk fills the prompt with irrelevant text."
+  - q: "What goes wrong with very small chunks?"
+    a: "They lose context: 'This limit is 45 days' is retrieved without saying which limit, so answers become vague or wrong."
+  - q: "What is a common starting chunk size for prose?"
+    a: "300 to 800 tokens, with smaller chunks for precise lookups like FAQs and larger ones for explanations."
+  - q: "What does chunk overlap do?"
+    a: "Repeats a little text between neighbouring chunks, often 10 to 20%, so an idea split at a boundary appears whole in one of them."
+  - q: "What is recursive splitting?"
+    a: "Splitting on headings first, then paragraphs, then sentences, so chunks follow the document's structure."
+  - q: "Why prepend the title and section heading?"
+    a: "So the chunk carries its context into the embedding, such as 'Leave Policy > Earned leave: This limit is 45 days'."
+  - q: "How should you choose a chunk size?"
+    a: "Test two or three sizes on real questions and measure whether the right passages are retrieved. Do not guess."
+exercise:
+  title: "Fix the chunks"
+  setup: "A Jaipur university's admissions assistant chunks its 60-page prospectus every 1,500 characters with no overlap. Problems: the fee table for different courses is split across two chunks; a chunk reads only 'The deadline for this is 15 June' with no course named; FAQ pages are split mid-answer; and answers about hostel fees also pull in scholarship rules."
+  questions:
+    - q: "How should the fee table be handled?"
+      a: "Keep tables whole as one chunk, with the section heading prepended, rather than cutting by characters."
+    - q: "How do you fix the 'deadline for this' chunk?"
+      a: "Split along headings and prepend the section path, so it reads like 'B.Tech admissions > Application: The deadline for this is 15 June'. Overlap also helps."
+    - q: "How should FAQ pages be chunked?"
+      a: "One question-and-answer pair per chunk."
+    - q: "Why do hostel answers pull in scholarship rules, and what helps?"
+      a: "The large character-based chunks mix topics. Smaller, heading-based chunks keep hostel fees and scholarships in separate chunks."
+ask:
+  - "What chunk size should I use for RAG?"
+  - "How much overlap should chunks have?"
+  - "How do I chunk tables and PDFs?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
 
 Before documents can be searched for RAG, they are split into **chunks**: passages small enough to embed, retrieve and fit into a prompt. Chunking decides what retrieval can find. If a chunk is too large, its embedding blurs many topics together; if too small, it loses the context needed to understand it.
+
+```text
+  Fixed-size chunks (every 2,000 characters)
+  |....Leave policy....Earned leave table ro|ws....Notice period....Probation...|
+                                            ^ table cut in half, topics mixed
+
+  Structure-aware chunks (headings, then paragraphs, ~400 tokens, overlap)
+  [Leave > Earned leave: ... full table ...]
+  [Leave > Sick leave: ...]
+  [Exit > Notice period: ...]   [Exit > Probation: ...]
+     ^ each chunk one topic, title path prepended
+```
+
+This lesson follows an HR assistant at a manufacturing company in Pune, answering questions from a 120-page employee handbook.
 
 ## How it works
 
@@ -44,6 +91,23 @@ Before documents can be searched for RAG, they are split into **chunks**: passag
 
 **Test it.** Chunking is a choice to evaluate, not to guess. Try two or three sizes on a set of real questions and measure whether the right passages are retrieved.
 
+**Chunking by document type:**
+
+| Document type | Strategy | Typical size |
+| --- | --- | --- |
+| Policies and manuals | Split by headings, then paragraphs; prepend the section path | 300 to 600 tokens |
+| FAQs | One question-and-answer pair per chunk | Whatever each pair needs |
+| Tables, price lists | Keep each table whole; add the heading | One table |
+| Contracts | Split by clause; keep clause numbers | One clause or sub-clause |
+| Chat transcripts, tickets | One ticket or conversation, or a window of turns | 200 to 500 tokens |
+| Code | By function or class | One function |
+
+**Chunk metadata.** Every chunk should carry: document id, title, section path, page, version or date, and any access group. This metadata makes citations possible ("Handbook, section 4.2, page 37"), allows filters ("only the current version", "only documents this user may see"), and lets you rebuild a single document's chunks when it changes instead of re-indexing everything.
+
+**Re-chunking is normal.** When a test shows a better strategy, re-chunk and re-embed. Keep the chunking code versioned and the settings recorded with the index, so you always know which strategy produced the current results.
+
+**Chunking PDFs and scanned documents.** Extracted PDF text often includes page headers, footers and page numbers on every page. Remove lines that repeat on most pages before chunking, or they pollute every chunk and its embedding. For scans, run OCR first and check a sample, because OCR errors in headings break structure-aware splitting. And keep the page number of the start of each chunk, so citations point to the right page even when a chunk crosses a page break.
+
 ## A worked example
 
 A Pune manufacturing company's HR assistant answers questions from a 120-page employee handbook.
@@ -54,6 +118,16 @@ Second attempt: split by headings, then paragraphs, up to about 400 tokens, with
 
 Third attempt, 200-token chunks: 82%, with more answers missing context. They keep the 400-token version.
 
+| Attempt | Strategy | Right passage in top 5 |
+| --- | --- | --- |
+| 1 | Fixed 2,000 characters, no overlap | 55% |
+| 2 | Headings then paragraphs, ~400 tokens, 60-token overlap, tables whole, title path prepended | 85% |
+| 3 | Same, but ~200 tokens | 82%, more answers missing context |
+
+The biggest single gain came from keeping the leave table whole: eight of the 18 failures in attempt 1 were questions about leave entitlements.
+
+**What the employees noticed.** After the change, the most common complaint, "it gives me half the answer", almost disappeared. Questions about leave, which made up a third of all questions, now retrieved the complete table, so the assistant could answer "how many earned leaves do I get in my third year?" correctly instead of quoting only the first rows.
+
 ## Common mistakes
 
 - **Fixed-size cuts through tables and sentences.**
@@ -61,6 +135,7 @@ Third attempt, 200-token chunks: 82%, with more answers missing context. They ke
 - **Huge chunks to "keep context".** Retrieval gets worse and prompts get costly.
 - **Losing headings and page numbers.**
 - **Never measuring.** Test sizes on real questions.
+- **Chunking once and never testing again.** When documents or questions change, recheck retrieval with your test set.
 
 ## Practise
 

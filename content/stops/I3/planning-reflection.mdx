@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: lilianweng-agents
 alternates: [hf-agents-react]
-format: explainer
+format: deep
 key_terms: [react, planning, reflection, agent-loop]
 check:
   type: mcq
   question_ids: [planning-reflection-1, planning-reflection-2, planning-reflection-3]
+flashcards:
+  - q: "What is ReAct?"
+    a: "Reason and act: the agent thinks briefly, calls a tool, reads the result and thinks again, one step at a time."
+  - q: "What is ReAct's main weakness?"
+    a: "Drift on long tasks: after many steps it can forget the goal, repeat itself or neglect parts of the task."
+  - q: "What is plan-then-execute?"
+    a: "The agent writes a full plan first, then carries out each step, re-planning only when something unexpected happens."
+  - q: "What are the benefits of a plan?"
+    a: "Long tasks become predictable, the plan can be shown to users, and cheaper models or code can run the steps."
+  - q: "What is reflection?"
+    a: "A pass that critiques a result against the goal or a checklist and fixes what falls short."
+  - q: "Which reflection checks are cheapest and most reliable?"
+    a: "Deterministic ones: tests pass, totals add up, JSON validates. Use model critique only where rules cannot judge."
+  - q: "Why cap reflection rounds?"
+    a: "Otherwise the agent can loop forever on a requirement it cannot meet. One or two rounds is typical."
+  - q: "When is planning a waste?"
+    a: "For trivial tasks such as a two-step lookup, where a plan only adds a call."
+exercise:
+  title: "Choose the pattern"
+  setup: "A Chandigarh consultancy wants three agents: (A) answer 'what is the GST rate on X?' from a rate table; (B) prepare a 10-section market-entry report on a city, using web search, government data and internal notes; (C) write SQL for analysts' questions and return results. Report drafts in tests often skip sections, and SQL sometimes fails to run or returns totals that do not match a known dashboard."
+  questions:
+    - q: "Which pattern suits (A)?"
+      a: "Plain ReAct or even a single call with a lookup tool. No plan or reflection is needed."
+    - q: "How should (B) be structured?"
+      a: "Plan-then-execute with one plan step per section and a per-step tool cap, so every section is covered."
+    - q: "What reflection suits (B)?"
+      a: "A checklist: every section filled, every claim sourced. Code checks the sections exist; a model checks for unsourced claims."
+    - q: "What reflection suits (C)?"
+      a: "Deterministic checks: run the query, and compare key totals with the dashboard, with one revision if they fail."
+ask:
+  - "What is the ReAct pattern for agents?"
+  - "When should an agent make a plan first?"
+  - "How does self-reflection improve agent results?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -29,6 +62,20 @@ An agent loop decides one step at a time. Three patterns shape how those decisio
 
 They combine: a plan, executed with ReAct-style steps, with a reflection pass before the final answer.
 
+```text
+  ReAct                         Plan-then-execute                  + Reflection
+  think -> act -> observe       [planner, strong model]            draft
+    ^                |            1. website  2. funding              |
+    +----------------+            3. founders 4. competitors          v
+  (adapts fast, drifts)           5. red flags 6. write            [checks]
+                                      |                             code: totals add up
+                                  each step: short ReAct loop       model: every claim sourced
+                                  (cap 5 tool calls, small model)       |
+                                                                    fail -> 1 revision -> final
+```
+
+This lesson follows a venture fund in Bengaluru building an agent that writes one-page startup briefs.
+
 ## How it works
 
 **ReAct.** Each turn the model writes a short thought ("I need the order status before I can answer"), then a tool call, then sees the observation. It adapts quickly to what it finds. Its weakness is drift on long tasks: after fifteen steps it can forget the original goal or repeat itself.
@@ -38,6 +85,18 @@ They combine: a plan, executed with ReAct-style steps, with a reflection pass be
 **Reflection.** A second pass asks: does this result meet the requirements? Are the numbers consistent? Did I answer every part? It can be the same model with a critique prompt, a different model, or deterministic checks (tests pass, totals add up, JSON validates). Deterministic checks are cheapest and most reliable; use a model critique only where rules cannot judge.
 
 **Cost and limits.** Each pattern adds calls. Reflection loops need a cap (say, two revision rounds) or they can loop forever on a requirement the model cannot meet.
+
+**Comparing the patterns:**
+
+| Pattern | Strengths | Weaknesses | Best for |
+| --- | --- | --- | --- |
+| ReAct | Simple, adapts to each result | Drifts on long tasks | Short tasks, a few tool calls |
+| Plan-then-execute | Covers every part, cheaper steps, plan visible | Rigid if not re-planned | Long tasks with known parts |
+| Reflection | Catches errors before users do | Extra calls; can loop | Outputs with checkable requirements |
+
+**When to re-plan.** Write the rule into the executor: if a step's result contradicts an assumption in the plan, stop and ask the planner for a revised plan from that point. For example, if step 2 finds the startup was acquired last year, the brief needs a different shape, and continuing the original plan would waste steps and produce a misleading document. Log every re-plan, because frequent re-plans suggest the planner's first plans are poor.
+
+**Making reflection useful.** A vague critique prompt such as "improve this" produces vague changes. Give the critic a specific checklist and ask for a pass or fail with a reason for each item. Send only the failed items back for revision. This keeps revisions focused and makes it easy to measure which checks fail most, which tells you what to improve in the main prompt.
 
 ## A worked example
 
@@ -59,6 +118,12 @@ A Bengaluru venture fund wants an agent that prepares a one-page brief on a star
 Each step runs a short ReAct loop with a cap of five tool calls. Every section is now covered and the average cost drops by a third, because steps use a smaller model.
 
 *Version 3, adding reflection.* Analysts find funding totals that do not match the rounds listed. A reflection step checks the draft against a checklist: totals equal the sum of rounds, every claim has a source link, every section is filled. Code checks the arithmetic; a model checks for unsourced claims. Failures go back for one revision. Unsourced claims fall from 11% to 2% of sentences.
+
+| Version | Sections covered | Unsourced claims | Relative cost |
+| --- | --- | --- | --- |
+| 1: ReAct only | Uneven; competitors often missing | 11% of sentences | 1.0 |
+| 2: Plan-then-execute | All six | About 11% | About 0.67 |
+| 3: Plus reflection, one revision | All six | 2% | About 0.75 |
 
 ## Common mistakes
 

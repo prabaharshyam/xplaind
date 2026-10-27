@@ -9,14 +9,47 @@ hours: 3
 gap_tags: []
 primary_resource: langchain-multi-agent
 alternates: [anthropic-multi-agent]
-format: explainer
+format: deep
 key_terms: [multi-agent-system, sub-agent, agent, tracing]
 check:
   type: mcq
   question_ids: [multi-agent-systems-1, multi-agent-systems-2, multi-agent-systems-3]
+flashcards:
+  - q: "What are the three main multi-agent patterns?"
+    a: "Supervisor and workers, hand-offs between specialists, and generator and reviewer."
+  - q: "How does the supervisor pattern work?"
+    a: "A lead agent plans and calls worker agents, often described as tools, possibly in parallel, then combines their results."
+  - q: "What is a hand-off?"
+    a: "A tool call that moves the conversation, with its context, from one agent to a specialist agent."
+  - q: "Why do hand-offs help with permissions?"
+    a: "Each agent owns a domain with narrow permissions, such as only the billing agent issuing refunds."
+  - q: "What risks do hand-offs carry?"
+    a: "Ping-pong between agents, context lost on transfer, and users repeating themselves."
+  - q: "How do you keep a generator-reviewer pair safe?"
+    a: "Cap revision rounds and test the reviewer on known bad drafts so it does not approve everything."
+  - q: "How should multi-agent runs be traced?"
+    a: "Every agent's steps under one request id, so one request shows the whole flow."
+  - q: "When should you avoid multiple agents?"
+    a: "When the task is sequential and tightly coupled; one agent with good tools usually wins on cost and reliability."
+exercise:
+  title: "Pick the pattern"
+  setup: "A Pune insurance company wants: (A) a customer assistant covering policy questions, claims status and premium payments, where only some staff-approved flows may take payments; (B) a weekly market report built from ten separate competitor websites; (C) customer letters about claim rejections that must follow regulatory wording and include specific reference numbers."
+  questions:
+    - q: "Which pattern suits (A), and why?"
+      a: "Hand-offs: a front-desk agent passing to policy, claims and payments specialists, so payment permissions stay with one narrow agent."
+    - q: "Which suits (B)?"
+      a: "Supervisor and workers: one worker per competitor in parallel, each returning a fixed-format summary, merged by the supervisor."
+    - q: "Which suits (C)?"
+      a: "Generator and reviewer: the reviewer checks wording, reference numbers and timelines against a checklist, with a capped number of rounds."
+    - q: "What safety rule would you add to (A)?"
+      a: "A limit on consecutive hand-offs, after which the conversation goes to a person, plus a summary passed on each transfer."
+ask:
+  - "What is the difference between a supervisor and hand-off multi-agent design?"
+  - "How do I stop agents passing a conversation back and forth?"
+  - "Is a multi-agent system better than a single agent?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -28,6 +61,17 @@ A **multi-agent system** splits a task across several agents, each with its own 
 - **Generator and reviewer**: one agent produces work; another checks it against criteria and sends it back with feedback.
 
 The earlier lesson on sub-agents explained why splitting helps: clean contexts, specialised tools, parallel work. This lesson is about choosing and running the patterns.
+
+```text
+   SUPERVISOR + WORKERS          HAND-OFFS                          GENERATOR + REVIEWER
+        [lead]                   [front desk] --billing?--> [billing]    [writer] --draft--> [reviewer]
+       /  |   \                       |  \                                   ^                  |
+   [w1] [w2] [w3]                     |   --cards?--> [cards]                +---- problems ----+
+    parallel, summaries           summary + last turns passed               max 2 rounds
+   back to the lead               max 2 hand-offs, then a person
+```
+
+This lesson follows a customer assistant at a bank in Bengaluru, rebuilt from one large agent into a set of specialists.
 
 ## How it works
 
@@ -41,22 +85,41 @@ The earlier lesson on sub-agents explained why splitting helps: clean contexts, 
 
 **When not to.** If the task is sequential and tightly coupled, one agent with good tools usually wins on cost and reliability. Measure a single-agent baseline first.
 
+**The patterns compared:**
+
+| Pattern | Strengths | Risks | Good for |
+| --- | --- | --- | --- |
+| Supervisor and workers | Parallel work, clean contexts | Vague delegation, high token use | Research, broad analysis |
+| Hand-offs | Small focused agents, narrow permissions | Ping-pong, lost context | Customer service with distinct domains |
+| Generator and reviewer | Catches errors one pass misses | Loops, lenient reviewers | Regulated or high-stakes writing |
+
+**Designing a hand-off.** A hand-off tool should carry a short summary written by the sending agent: who the customer is (after verification), what they asked, what has been done and what remains. Pass the last few turns too. Test with scripted conversations that cross domains, such as a balance question followed by a card block, and check that the customer never has to repeat their identity or request. Log every hand-off with its reason so you can spot agents passing work they should handle.
+
+**Writing role descriptions.** Each agent's description should say what it handles, what it must hand off, and what it must never do. Overlaps cause the worst failures: two agents that both think they handle refunds will either argue or both act. Read the descriptions side by side and remove every overlap before testing.
+
 ## A worked example
 
 A Bengaluru bank's customer assistant handles balances, card blocks, loan queries and complaints.
 
-Version one, a single agent with 22 tools, chose wrong tools 9% of the time and could not be given refund permissions safely.
+Version one, a single agent with 22 tools, chose wrong tools 9% of the time and could not safely be given card-block permissions.
 
 Version two uses hand-offs:
 
 - A **front-desk agent** with read-only tools for balances and FAQs and a hand-off tool to each specialist.
 - A **cards agent** that can block cards (after confirming identity) but not move money.
 - A **loans agent** with read access to loan accounts and the prepayment calculator.
-- A **complaints agent** that records complaints in the grievance system with the regulator-mandated reference number.
+- A **complaints agent** that records complaints in the grievance system and gives the customer a complaint reference number.
 
 Each hand-off passes a short summary plus the last few turns, so customers do not repeat themselves. A rule stops more than two hand-offs in a row and routes to a human instead. Wrong tool choices drop to 2%, and the security team approves because each agent's permissions are narrow. Token use rises 30%, mainly from the summaries, which the bank accepts.
 
 A generator-reviewer pair is added only for complaint responses, where a reviewer agent checks tone and that the reference number and timelines are correct; it catches issues in 6% of drafts.
+
+| Measure | One agent, 22 tools | Hand-offs to four specialists |
+| --- | --- | --- |
+| Wrong tool choices | 9% | 2% |
+| Card-block permissions | Could not be granted safely | Only the cards agent, after identity checks |
+| Token use | Baseline | About 30% higher, from summaries |
+| Security review | Not approved | Approved |
 
 ## Common mistakes
 

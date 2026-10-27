@@ -9,14 +9,47 @@ hours: 2
 gap_tags: []
 primary_resource: owasp-unbounded-consumption
 alternates: [anthropic-building-effective-agents]
-format: explainer
+format: deep
 key_terms: [budget-limit, kill-switch, rate-limit, cost-per-request]
 check:
   type: mcq
   question_ids: [agent-budgets-kill-switches-1, agent-budgets-kill-switches-2, agent-budgets-kill-switches-3]
+flashcards:
+  - q: "Why do agents need loop limits?"
+    a: "An agent can loop on failing tools, hand-offs or endless improvement, burning tokens, hammering systems and repeating actions."
+  - q: "How do you choose a step cap?"
+    a: "From real runs: if 95% of tasks finish in 12 steps, cap at around 25."
+  - q: "What should happen when an agent hits a limit?"
+    a: "Stop cleanly: save state, tell the user what was done and what remains, and log it as a failure to investigate."
+  - q: "What is a repetition check?"
+    a: "Stopping early when the same tool is called with the same arguments, or the same error recurs, several times in a row."
+  - q: "Why keep budgets in a shared store?"
+    a: "Counts held in each server's memory run separately, so the true total can far exceed the cap."
+  - q: "What is a kill switch?"
+    a: "A flag checked before every task or tool call that lets an operator disable a tool, the agent or the feature without a deploy."
+  - q: "What role do provider spend limits play?"
+    a: "A last line of defence behind your own caps, not the only control."
+  - q: "Why use idempotency keys for actions?"
+    a: "So a retried or looped action with the same key, such as a refund, happens only once."
+exercise:
+  title: "Set the limits"
+  setup: "An Indore logistics startup runs an agent that re-plans delivery routes and messages drivers. Typical tasks take 6 to 10 steps and about ₹2 of model spend. Last month a map tool returned errors for a new area, the agent retried for hours, sent 400 duplicate messages to drivers, and spent ₹60,000. Stopping it needed an emergency deploy. Budgets are counted in each server's memory."
+  questions:
+    - q: "What per-task limits would you set?"
+      a: "About 20 steps, a token cap and a time limit, plus ending the task after three identical tool errors."
+    - q: "How do you stop the duplicate messages?"
+      a: "Give each driver message an idempotency key per route and change, so repeats are sent only once."
+    - q: "What should replace the emergency deploy?"
+      a: "A kill switch per tool and for the whole agent, checked before each task, flipped from an admin screen."
+    - q: "How should budgets be counted?"
+      a: "In a shared database or cache, with a daily feature cap, an alert at about 80%, and a provider spend limit as a backstop."
+ask:
+  - "How do I stop an AI agent from looping?"
+  - "How should I set spending limits for an AI feature?"
+  - "What is a kill switch in an AI system?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED: drafted by Claude, a person must review"
-reviewed_on: 2026-10-25
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-10-27
 ---
 
 ## What it is
@@ -28,6 +61,21 @@ Three controls prevent this:
 - **Loop limits**: a maximum number of steps or tool calls per task.
 - **Budgets**: caps on tokens, time and money per task, per user and per day, for the whole feature.
 - **Kill switches**: a fast, reliable way for an operator to stop an agent, a tool or a whole feature without a deploy.
+
+```text
+   every task                          every tool call                every day
+   +----------------------+            +----------------------+       +----------------------+
+   | steps    <= 15       |            | kill switch on?      |       | user spend <= ₹15    |
+   | tokens   <= 60,000   |            | same call 3x? stop   |       | feature    <= ₹40,000|
+   | time     <= 90 s     |            | idempotency key set  |       | alert at   ₹30,000   |
+   +----------------------+            +----------------------+       +----------------------+
+              \                                   |                              /
+               +-------> shared store (database or cache) <---------------------+
+                                     |
+                          provider spend limit (backstop)
+```
+
+This lesson follows a homework-help agent at an edtech company in Bengaluru that spent ten times its weekly budget in one night.
 
 ## How it works
 
@@ -43,6 +91,21 @@ Three controls prevent this:
 
 **Idempotency for actions.** Give each action a unique key so a retried or looped "send refund" with the same key happens only once.
 
+**Layers of control:**
+
+| Layer | Example | Stops |
+| --- | --- | --- |
+| Per task | 15 steps, 60,000 tokens, 90 seconds | One runaway task |
+| Repetition | 3 identical errors ends the task | Retry loops |
+| Per user per day | ₹15 of model spend | One user, or one script, draining the budget |
+| Feature per day | ₹40,000, alert at ₹30,000 | A fault across many users |
+| Kill switch | Toggle per tool and per agent | Anything, in seconds |
+| Provider limit | Monthly hard cap on the API project | Everything else failing |
+
+**Running a kill-switch drill.** Once a month, in staging and then in production at a quiet hour, flip each switch and check three things: tasks stop within seconds, users see a clear message rather than an error, and the rest of the app keeps working. Time it, write down who did it, and turn it back on. Teams that never practise discover in a real incident that the switch was checked only at start-up, or that nobody on call knew where it was.
+
+**Choosing the user message.** A stopped task should never look like a crash. Say what happened in plain words and what the user can do instead, such as "I couldn't solve this one; your teacher can help", or "Homework help is resting; try again tomorrow." Log each stop with the reason, so the team can see whether limits are too tight.
+
 ## A worked example
 
 A Bengaluru edtech's homework-help agent ran fine for a month. Then, on a Sunday night, a change in a maths tool made it return an error for one type of question. The agent retried with small variations, and some students kept pressing "try again". By Monday morning one feature had spent ₹1.8 lakh, ten times a normal week.
@@ -56,6 +119,11 @@ The fixes:
 - Provider: a hard monthly spend limit on the API project as a backstop.
 
 Two weeks later a similar tool fault was stopped by the repetition check within minutes, costing ₹600, and the alert told the team before any student complained.
+
+| Incident | Cost | How it ended |
+| --- | --- | --- |
+| First tool fault, no limits | ₹1.8 lakh overnight | Noticed on Monday morning |
+| Similar fault, two weeks later | ₹600 | Repetition check stopped it in minutes; alert reached on-call |
 
 ## Common mistakes
 
