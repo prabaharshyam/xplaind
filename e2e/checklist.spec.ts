@@ -57,3 +57,24 @@ test("the download API checks details and says when saving is not switched on", 
   expect((await request.post("/api/roadmap-download", { data: { ...ok, pathId: "nope" } })).status()).toBe(400);
   expect((await request.post("/api/roadmap-download", { data: ok })).status()).toBe(503);
 });
+
+test("the form only blames the connection when the server cannot be reached", async ({ page }) => {
+  const fill = async () => {
+    const form = page.getByRole("region", { name: "Get the Generative AI & LLM Engineer checklist" });
+    await form.getByLabel("Name", { exact: true }).fill("Asha Rao");
+    await form.getByLabel("Email", { exact: true }).fill("asha@example.com");
+    await form.getByLabel("Professional experience").selectOption("student");
+    await form.getByRole("checkbox", { name: /Xplaind may keep my details/ }).check();
+    await form.getByRole("button", { name: "Save and download" }).click();
+    return form.getByRole("alert");
+  };
+  await page.goto("/roadmap/genai-engineer");
+  await page.getByRole("button", { name: "Download as a printable checklist (PDF)" }).click();
+
+  await page.route("**/api/roadmap-download", (r) => r.fulfill({ status: 500, body: "" }));
+  await expect(await fill()).toHaveText("We could not save your details just now. Please try again later.");
+
+  await page.unroute("**/api/roadmap-download");
+  await page.route("**/api/roadmap-download", (r) => r.abort());
+  await expect(await fill()).toHaveText("Could not reach Xplaind. Check your connection and try again.");
+});

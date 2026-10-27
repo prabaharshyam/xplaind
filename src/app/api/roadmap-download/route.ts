@@ -6,6 +6,16 @@ import { CONSENT_TEXT, DownloadDetails } from "@/lib/download/details";
 import { adminClient, currentUser, userClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
+  try {
+    return await save(request);
+  } catch (e) {
+    // A wrong Supabase setting can throw inside the client; answer in JSON so the form says so.
+    console.error("roadmap-download", e);
+    return problem(500, "We could not save your details just now. Please try again later.");
+  }
+}
+
+async function save(request: Request): Promise<Response> {
   const parsed = DownloadDetails.safeParse(await readJson(request, 4_000).catch(() => null));
   if (!parsed.success) return problem(400, parsed.error.issues[0]?.message ?? "Please check your details.");
   const d = parsed.data;
@@ -27,6 +37,9 @@ export async function POST(request: Request) {
     consent_text: CONSENT_TEXT,
     user_id: user?.id ?? null,
   });
-  if (error) return problem(500, "Could not save your details. Please try again.");
+  if (error) {
+    console.error("roadmap-download insert", error.message);
+    return problem(500, "Could not save your details. Please try again.");
+  }
   return json({ ok: true }, 201);
 }

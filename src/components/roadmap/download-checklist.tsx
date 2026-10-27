@@ -73,8 +73,9 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
     // 503: saving is not switched on for this deployment yet, so the download still goes ahead.
     if (!res || (!res.ok && res.status !== 503)) {
       setBusy(false);
-      const msg = res ? ((await res.json().catch(() => null)) as { error?: string } | null)?.error : null;
-      return setError(msg ?? "Could not save your details. Check your connection and try again.");
+      if (!res) return setError("Could not reach Xplaind. Check your connection and try again.");
+      const msg = ((await res.json().catch(() => null)) as { error?: string } | null)?.error;
+      return setError(msg ?? "We could not save your details just now. Please try again later.");
     }
     write(KEY, JSON.stringify({ name: parsed.data.name }));
     await make(parsed.data.name).finally(() => setBusy(false));
