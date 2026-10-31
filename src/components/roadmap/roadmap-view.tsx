@@ -16,7 +16,6 @@ import { type LessonSummary, startFor, testHref } from "@/lib/paths";
 import { type StateCounts, type TopicState, coverage, isProjectUrl, stateCounts, topicStateOf } from "@/lib/roadmap/progress";
 import type { ProgressMap } from "@/lib/roadmap/types";
 import { type RoadmapModel, type RoadmapSection, type RoadmapTopic, projectKey, roadmapStopIds } from "@/lib/roadmap/view";
-import { themeOf } from "@/lib/themes";
 import { DownloadChecklist } from "./download-checklist";
 
 // One roadmap design for every path (RM-1). A spine runs down the page; each section
@@ -25,13 +24,14 @@ import { DownloadChecklist } from "./download-checklist";
 // Phones get the spine on the left and one column of topics.
 
 /** Literal class names per section, so Tailwind keeps them. Text on chip colours passes AA. */
+/** MO-5: pastel milestones on the spine, one colour per stage, dark text for contrast. */
 const SECTION_COLOURS = [
-  { chip: "bg-emerald-700 text-white", rail: "bg-emerald-600" },
-  { chip: "bg-sky-700 text-white", rail: "bg-sky-600" },
-  { chip: "bg-violet-700 text-white", rail: "bg-violet-600" },
-  { chip: "bg-amber-700 text-white", rail: "bg-amber-600" },
-  { chip: "bg-rose-700 text-white", rail: "bg-rose-600" },
-  { chip: "bg-teal-700 text-white", rail: "bg-teal-600" },
+  { chip: "bg-violet-200 text-violet-950 ring-1 ring-violet-400", node: "bg-violet-100 ring-violet-400 dark:bg-violet-950 dark:ring-violet-700", badge: "bg-violet-700" },
+  { chip: "bg-sky-200 text-sky-950 ring-1 ring-sky-400", node: "bg-sky-100 ring-sky-400 dark:bg-sky-950 dark:ring-sky-700", badge: "bg-sky-700" },
+  { chip: "bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400", node: "bg-emerald-100 ring-emerald-400 dark:bg-emerald-950 dark:ring-emerald-700", badge: "bg-emerald-700" },
+  { chip: "bg-orange-200 text-orange-950 ring-1 ring-orange-400", node: "bg-orange-100 ring-orange-400 dark:bg-orange-950 dark:ring-orange-700", badge: "bg-orange-700" },
+  { chip: "bg-pink-200 text-pink-950 ring-1 ring-pink-400", node: "bg-pink-100 ring-pink-400 dark:bg-pink-950 dark:ring-pink-700", badge: "bg-pink-700" },
+  { chip: "bg-teal-200 text-teal-950 ring-1 ring-teal-400", node: "bg-teal-100 ring-teal-400 dark:bg-teal-950 dark:ring-teal-700", badge: "bg-teal-700" },
 ] as const;
 
 type Filter = "all" | TopicState;
@@ -170,7 +170,7 @@ export function RoadmapView({ model, lessons, known }: { model: RoadmapModel; le
                   <li key={s.id}>
                     <a
                       href={`#${sectionAnchor(s.id)}`}
-                      className={`flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${SECTION_COLOURS[i % SECTION_COLOURS.length].chip}`}
+                      className={`flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 ${SECTION_COLOURS[i % SECTION_COLOURS.length].chip}`}
                     >
                       {s.code}
                       <span className="sr-only"> {s.title}</span>
@@ -185,8 +185,8 @@ export function RoadmapView({ model, lessons, known }: { model: RoadmapModel; le
             </label>
           </div>
           <Legend />
-          <ol className="relative flex flex-col gap-10">
-            <span aria-hidden="true" className="absolute top-2 bottom-2 left-5 w-1 -translate-x-1/2 rounded-full bg-zinc-200 md:left-1/2 dark:bg-zinc-800" />
+          <ol className="relative flex flex-col gap-12">
+            <span aria-hidden="true" className="absolute top-2 bottom-2 left-4 w-0 -translate-x-1/2 border-l-2 border-dashed border-violet-300 md:left-1/2 dark:border-violet-800" />
             {model.sections.map((s, i) => (
               <Section key={s.id} section={s} index={i} progress={progress.stops} start={tested} visible={visible} onProject={() => {
                   setTab("projects");
@@ -294,60 +294,77 @@ function Section({
   }).length;
   const shown = section.topics.filter(visible);
   const headingId = `${sectionAnchor(section.id)}-h`;
+  // Like a hand-drawn roadmap: topics branch off the milestone in two clusters, left and right.
+  const half = Math.ceil(shown.length / 2);
+  const clusters = [shown.slice(0, half), shown.slice(half)].filter((c) => c.length > 0);
+  const tile = (t: RoadmapTopic) => (
+    <li key={t.key}>
+      <TopicCard topic={t} state={t.stopId ? topicStateOf(progress, t.stopId) : null} below={start !== null && t.level !== null && levelIndex(t.level) < levelIndex(start)} />
+    </li>
+  );
 
   return (
     <li id={sectionAnchor(section.id)} aria-labelledby={headingId} className="relative scroll-mt-20">
-      {/* the station on the spine */}
-      <div className="relative flex flex-col gap-2 pl-14 md:items-center md:pl-0 md:text-center">
-        <span aria-hidden="true" className={`absolute top-0 left-0 z-10 flex size-10 items-center justify-center rounded-full text-sm font-bold md:static ${colour.chip}`}>
-          {section.code}
-        </span>
-        <h2 id={headingId} className="text-xl font-semibold tracking-tight text-balance md:text-2xl">
-          {section.href ? (
-            <Link href={section.href} className="hover:underline">
-              {section.title}
-            </Link>
-          ) : (
-            section.title
-          )}
-        </h2>
-        <p className="max-w-2xl leading-7 text-zinc-700 dark:text-zinc-300">{section.summary}</p>
-        <p className={`text-sm ${muted}`}>
-          {start && section.code === start && (
-            <span className="mr-2 rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-950 dark:bg-amber-900 dark:text-amber-50">You start here</span>
-          )}
-          {finished} of {written.length} finished
-        </p>
-      </div>
+      <div className="grid gap-4 pl-12 md:grid-cols-[minmax(0,1fr)_minmax(13rem,16rem)_minmax(0,1fr)] md:items-center md:gap-0 md:pl-0">
+        {/* the milestone on the spine */}
+        <div className="relative md:col-start-2 md:row-start-1 md:px-6">
+          <span aria-hidden="true" className={`absolute top-3 -left-12 z-10 grid size-8 place-items-center rounded-full text-xs font-bold text-white ring-4 ring-white md:hidden dark:ring-zinc-950 ${colour.badge}`}>
+            {section.code}
+          </span>
+          <div className={`relative z-10 rounded-2xl px-4 py-3 text-center shadow-sm ring-2 ${colour.node}`}>
+            <p className="flex items-center justify-center gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              <span aria-hidden="true" className={`hidden size-6 place-items-center rounded-full text-[11px] font-bold text-white md:grid ${colour.badge}`}>
+                {section.code}
+              </span>
+              {finished} of {written.length} finished
+            </p>
+            <h2 id={headingId} className="mt-1 text-base leading-6 font-semibold text-balance text-zinc-950 dark:text-white">
+              {section.href ? (
+                <Link href={section.href} className="hover:underline">
+                  {section.title}
+                </Link>
+              ) : (
+                section.title
+              )}
+            </h2>
+            {start && section.code === start && (
+              <p className="mt-1.5">
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950 dark:bg-amber-900 dark:text-amber-50">You start here</span>
+              </p>
+            )}
+          </div>
+          <p className={`mt-2 text-center text-xs leading-5 ${muted}`}>{section.summary}</p>
+        </div>
 
-      {shown.length > 0 ? (
-        <ul className="mt-5 grid gap-3 pl-14 md:grid-cols-2 md:gap-x-16 md:pl-0">
-          {shown.map((t, i) => (
-            <li key={t.key} className="lx-rise relative">
-              {/* connector to the spine */}
+        {shown.length === 0 ? (
+          <p className={`text-sm md:col-span-3 md:text-center ${muted}`}>Nothing to show here with the current filter.</p>
+        ) : (
+          clusters.map((c, ci) => (
+            <div key={ci} className={`relative md:row-start-1 ${ci === 0 ? "md:col-start-1 md:pr-10" : "md:col-start-3 md:pl-10"}`}>
+              {/* dotted branch from the cluster to the milestone */}
               <span
                 aria-hidden="true"
-                className={`absolute top-7 h-0 w-9 border-t-2 border-dotted border-zinc-300 dark:border-zinc-700 ${i % 2 === 0 ? "-left-9 md:left-auto md:-right-8 md:w-8" : "-left-9 md:-left-8 md:w-8"}`}
+                className={`absolute top-1/2 hidden w-10 border-t-2 border-dotted border-violet-300 md:block dark:border-violet-800 ${ci === 0 ? "right-0" : "left-0"}`}
               />
-              <TopicCard topic={t} state={t.stopId ? topicStateOf(progress, t.stopId) : null} below={start !== null && t.level !== null && levelIndex(t.level) < levelIndex(start)} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className={`mt-4 pl-14 text-sm md:pl-0 md:text-center ${muted}`}>Nothing to show here with the current filter.</p>
-      )}
+              <ul className="grid grid-cols-1 gap-2 rounded-2xl bg-white/60 p-2 ring-1 ring-violet-100 backdrop-blur sm:grid-cols-2 md:grid-cols-1 dark:bg-white/[0.03] dark:ring-violet-950">
+                {c.map(tile)}
+              </ul>
+            </div>
+          ))
+        )}
+      </div>
 
       {section.project && (
-        <div className="mt-4 pl-14 md:mx-auto md:max-w-xl md:pl-0">
+        <div className="mt-4 pl-12 md:mx-auto md:max-w-sm md:pl-0">
           <button
             type="button"
             onClick={onProject}
-            className="flex w-full items-center gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 text-left hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:hover:bg-amber-950"
+            className="relative z-10 flex w-full items-center gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 text-left hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/60 dark:hover:bg-amber-950"
           >
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-400 text-amber-950">
-              <Icon name="trophy" size={20} />
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-400 text-amber-950">
+              <Icon name="trophy" size={18} />
             </span>
-            <span>
+            <span className="text-sm">
               <span className="block text-xs font-semibold text-amber-900 dark:text-amber-200">{/^\d+$/.test(section.code) ? "Stage project" : "Level project"}</span>
               <span className="font-medium">{section.project.title}</span>
             </span>
@@ -358,54 +375,50 @@ function Section({
   );
 }
 
+/** A topic tile: the title, clearly readable, and a small button to mark it. Details open in the drawer. */
 function TopicCard({ topic, state, below }: { topic: RoadmapTopic; state: TopicState | null; below: boolean }) {
   const [marking, setMarking] = useState(false);
   if (!topic.stopId || !state) {
     return (
-      <div className="flex h-full flex-col rounded-xl border-2 border-dashed border-zinc-300 p-3 dark:border-zinc-700">
-        <span className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-medium">{topic.title}</span>
-          {topic.optional && <span className={`text-xs font-medium uppercase ${muted}`}>Optional</span>}
-        </span>
-        <span className={`mt-1 text-sm leading-6 ${muted}`}>{topic.summary}</span>
-        <span className={`mt-2 text-xs font-medium ${muted}`}>Coming soon</span>
+      <div className="flex h-full min-h-12 flex-col justify-center rounded-xl border-2 border-dashed border-zinc-300 px-3 py-2 dark:border-zinc-700" title={topic.summary}>
+        <span className="text-sm leading-5 font-medium text-zinc-700 dark:text-zinc-300">{topic.title}</span>
+        <span className={`text-[11px] font-medium ${muted}`}>Coming soon{topic.optional ? " · optional" : ""}</span>
       </div>
     );
   }
   const style = STATE_STYLE[state];
-  const t = themeOf(topic.theme ?? "ai-basics");
   return (
-    <div className={`flex h-full flex-col rounded-xl border-2 p-3 transition ${style.card} ${below && state === "todo" ? "opacity-80" : ""}`}>
-      <div className="flex items-start gap-3">
-        <span className="relative grid size-10 shrink-0 place-items-center rounded-lg text-white" style={{ background: `linear-gradient(135deg, ${t.from}, ${t.to})` }}>
-          <Icon name={t.icon} size={18} />
-          <span aria-hidden="true" className={`absolute -right-1 -bottom-1 size-4 rounded-full border-2 ring-2 ring-white dark:ring-zinc-900 ${style.dot}`} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <TopicLink id={topic.stopId} label={`${topic.title}, ${style.label}`} className={`font-medium leading-6 underline-offset-2 hover:underline ${state === "skipped" ? "text-zinc-600 line-through dark:text-zinc-400" : ""}`}>
-            {topic.title}
-          </TopicLink>
-          <p className={`mt-0.5 line-clamp-2 text-sm leading-6 ${muted}`}>{topic.summary}</p>
-        </div>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className={muted}>
-          <span className="font-medium text-zinc-800 dark:text-zinc-200">{style.label}</span>
-          {topic.hours !== null && ` · about ${topic.hours} ${topic.hours === 1 ? "hour" : "hours"}`}
-          {below && " · below your level"}
-        </span>
+    <div className={`h-full rounded-xl border-2 transition hover:-translate-y-px hover:shadow-md ${style.card} ${below && state === "todo" ? "opacity-80" : ""}`}>
+      <div className="flex min-h-12 items-center gap-2 py-1.5 pr-1.5 pl-3">
+        <TopicLink
+          id={topic.stopId}
+          label={`${topic.title}, ${style.label}`}
+          className={`flex-1 text-sm leading-5 font-semibold text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-100 ${state === "skipped" ? "text-zinc-600 line-through dark:text-zinc-400" : ""}`}
+        >
+          {topic.title}
+          {topic.optional && <span className={`ml-1.5 text-[10px] font-medium uppercase ${muted}`}>Optional</span>}
+        </TopicLink>
         <button
           type="button"
           aria-expanded={marking}
+          aria-label={`${marking ? "Close" : "Mark"} ${topic.title}`}
+          title={`${style.label}${topic.hours !== null ? ` · about ${topic.hours} h` : ""}${below ? " · below your level" : ""}`}
           onClick={() => setMarking((m) => !m)}
-          className="min-h-9 rounded-full border border-zinc-300 bg-white px-3 font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+          className="grid size-9 shrink-0 place-items-center rounded-full hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-violet-700 dark:hover:bg-white/10"
         >
-          {marking ? "Close" : "Mark"}
-          <span className="sr-only"> {topic.title}</span>
+          {marking ? (
+            <Icon name="close" size={14} />
+          ) : state === "done" ? (
+            <span className="grid size-5 place-items-center rounded-full bg-emerald-600 text-white">
+              <Icon name="tick" size={12} />
+            </span>
+          ) : (
+            <span className={`size-5 rounded-full border-2 ${style.dot}`} />
+          )}
         </button>
       </div>
       {marking && (
-        <div className="mt-2 border-t border-zinc-200 pt-2 dark:border-zinc-800">
+        <div className="border-t border-zinc-200 px-2 py-2 dark:border-zinc-800">
           <TopicStatus stopId={topic.stopId} title={topic.title} size="sm" />
         </div>
       )}
