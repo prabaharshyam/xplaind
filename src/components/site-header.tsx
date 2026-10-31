@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AccountButton } from "./account-link";
 import { HeaderSearch, XpChip } from "./header-extras";
+import { MenuCloser } from "./menu-closer";
 
 const NAV = [
   { href: "/paths", label: "Roadmaps" },
@@ -31,7 +32,7 @@ export function SiteHeader() {
           <HeaderSearch />
           <XpChip />
           <AccountButton className="site-cta hidden sm:inline-flex h-9 items-center rounded-full bg-violet-700 px-4 text-[13px] font-medium text-white shadow-sm shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700" />
-          <details className="group relative md:hidden">
+          <details className="site-menu group relative md:hidden">
             <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 [&::-webkit-details-marker]:hidden">
               <span className="sr-only">Menu</span>
               <span aria-hidden="true" className="flex w-4 flex-col gap-1">
@@ -51,6 +52,7 @@ export function SiteHeader() {
               <AccountButton className="mt-1 rounded-xl bg-violet-700 px-3 py-3 text-center text-[15px] font-medium text-white" />
             </nav>
           </details>
+          <MenuCloser selector=".site-header details.site-menu" />
         </div>
       </div>
     </header>
