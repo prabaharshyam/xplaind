@@ -1,0 +1,129 @@
+---
+id: scaling-load-balancing
+level: I2
+theme: system-design
+title: "Scaling and load balancing"
+outcome: "Explain vertical and horizontal scaling, keep app servers stateless so they can scale out, and use load balancers and health checks to spread traffic and survive server failures."
+why_it_matters: "Traffic in India arrives in spikes: exam results, IPL finals, festive sales. Systems that scale out behind a load balancer stay up; systems tied to one big server fall over. This is also a core interview topic."
+hours: 2
+gap_tags: []
+primary_resource: yt-gaurav-sen-system-design-basics-horizontal-vs-vertical-scaling
+alternates: []
+videos: [yt-ibm-technology-what-is-a-load-balancer]
+format: deep
+key_terms: [horizontal-scaling, load-balancer, throughput]
+check:
+  type: project
+  brief: "Run two copies of a tiny FastAPI app on different ports that each return their own name, put nginx (or a simple Python round-robin proxy) in front, and show requests alternating between them. Then stop one copy and show the balancer sending all traffic to the healthy one. Share a link to your code, config and a screenshot of the results."
+flashcards:
+  - q: "What is vertical scaling?"
+    a: "Making one machine bigger, with more CPU, memory or disk. It is simple but has a ceiling and a single point of failure."
+  - q: "What is horizontal scaling?"
+    a: "Adding more machines that share the load. It needs a load balancer and stateless servers but can grow much further."
+  - q: "What does it mean for an app server to be stateless?"
+    a: "It keeps no user data between requests in its own memory, so any server can handle any request."
+  - q: "Where should session data go in a scaled-out system?"
+    a: "In a shared store such as Redis or a database, or in a signed token the client sends with each request."
+  - q: "What is a health check?"
+    a: "A regular request the load balancer sends to each server; servers that fail stop receiving traffic until they recover."
+  - q: "What is round robin?"
+    a: "A load-balancing rule that sends each new request to the next server in turn."
+  - q: "What is autoscaling?"
+    a: "Adding or removing servers automatically based on load, such as CPU use or requests per second."
+exercise:
+  title: "Scale it"
+  setup: "A results website for a state board serves 2 lakh students on a normal day. On result day 40 lakh students try in the first hour. One app server handles about 500 requests per second."
+  questions:
+    - q: "If each student makes 5 requests in that hour, what is the average load in requests per second?"
+      a: "40 lakh × 5 = 2 crore requests in 3,600 seconds: about 5,500 per second."
+    - q: "How many app servers are needed for that average, and why plan for more?"
+      a: "About 11. Plan for 2 to 3 times that, because the first minutes are far busier than the hour's average, and to survive a server failing."
+    - q: "The current app stores each student's login session in server memory. What breaks when you add servers?"
+      a: "A student's next request may go to a different server that does not know the session, so they are logged out. Move sessions to Redis or use tokens."
+    - q: "Results never change once published. What else cuts load?"
+      a: "Cache each result and serve the static pages from a CDN, so most requests never reach the app servers."
+ask:
+  - "When is vertical scaling the better choice?"
+  - "How do sticky sessions work and why avoid them?"
+  - "What is the difference between a layer 4 and layer 7 load balancer?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-10-31
+---
+
+## What it is
+
+**Scaling** is how a system handles more work. There are two ways.
+
+**Vertical scaling** (scaling up) makes one machine bigger: more CPU cores, more memory, faster disks. It needs no code changes, which is why it is often the first step. But there is a ceiling to how big one machine can get, the price rises steeply near the top, and if that one machine fails, everything stops.
+
+**Horizontal scaling** (scaling out) adds more machines that share the work. It can grow much further and survives the loss of any one machine. It needs two things: a **load balancer** in front to spread requests, and app servers that are **stateless**, so any server can handle any request.
+
+```text
+ VERTICAL                          HORIZONTAL
+ users ──► [ ONE BIG SERVER ]      users ──► [ LOAD BALANCER ]
+           more CPU, more RAM                 │    │    │    health checks
+           ceiling + single point             ▼    ▼    ▼
+           of failure                      [app1][app2][app3] ← stateless
+                                              └────┼────┘
+                                                   ▼
+                                    [ shared state: database, Redis ]
+```
+
+## How it works
+
+**Statelessness.** If app server 1 keeps a user's shopping cart in its own memory, the user's next request must go back to server 1. That ties users to servers and loses carts when a server restarts. Instead, keep shared state outside the app servers: carts and sessions in Redis or the database, files in object storage, and identity in a signed token such as a JWT that the client sends each time. Then servers become interchangeable.
+
+**Load balancers** accept all incoming traffic and forward each request to a healthy server. Common rules:
+
+| Rule | How it chooses | Good when |
+|---|---|---|
+| Round robin | next server in turn | servers are alike and requests similar |
+| Least connections | server with fewest open requests | some requests are slow, like file uploads |
+| Weighted | bigger servers get more traffic | servers differ in size |
+| Hash of user or IP | same user to same server | you need cache locality; avoid as a crutch for state |
+
+Load balancers send **health checks**, such as a request to `/health` every few seconds. A server that fails is taken out of rotation until it recovers, so one crash does not become an outage. A **layer 4** balancer routes by network address and port and is very fast; a **layer 7** balancer understands HTTP, so it can route `/api` and `/images` to different services and terminate HTTPS. In the cloud you usually use a managed balancer, such as AWS Application Load Balancer or Google Cloud Load Balancing; nginx and HAProxy are popular self-run options.
+
+**Autoscaling** adds servers when a metric, such as CPU above 60% or requests per second, stays high, and removes them when it falls. It saves money on quiet days and protects you on busy ones, but new servers take a minute or two to start, so for known spikes, such as a sale at midnight, scale up in advance.
+
+Remember that scaling app servers moves the pressure to whatever they share. Ten app servers hitting one database can overwhelm it; the next lessons cover caches, replicas and sharding for that.
+
+**In interviews**, scaling questions usually follow "what happens when traffic grows ten times?" A strong answer names the bottleneck first, then the fix: stateless app servers behind a load balancer, autoscaling with headroom, and then the shared tiers such as the database and cache. Mention health checks and what happens when a server dies; it shows you think about failure, not only growth.
+
+## A worked example
+
+Vikram runs engineering for a cricket fantasy app. On normal days traffic is steady, but in the last ten minutes before an IPL match locks, users rush to edit their teams, and traffic jumps about twenty times.
+
+The app started on one large server, scaled vertically each season. During one final it hit 100% CPU, requests queued, and many users could not save their teams. The bigger server option was double the cost and still not enough.
+
+His team moved to horizontal scaling in three steps:
+
+1. **Made the app stateless.** Sessions moved from server memory to Redis, and uploaded profile photos moved to object storage. Any server could now serve any user.
+2. **Put a managed layer 7 load balancer in front** with a `/health` endpoint that checks the app can reach Redis and the database. Servers that fail the check drop out automatically.
+3. **Set autoscaling** on requests per second, plus a scheduled rule that adds servers 30 minutes before each match lock, because new servers took about 90 seconds to be ready.
+
+During the next final, traffic rose from about 2,000 to 40,000 requests per second. The group grew from 4 to 60 servers and back down after the lock. When two servers crashed during the peak, health checks removed them within seconds and users never noticed.
+
+The new bottleneck was the database, which saw every team edit. That led Vikram's team to add a cache and read replicas, the subject of the next lessons.
+
+## Common mistakes
+
+**Keeping state on app servers.** In-memory sessions and local file uploads break as soon as you add a second server. Move state out first.
+
+**Relying on sticky sessions.** Pinning users to servers hides the state problem and spreads load unevenly. Use it only as a short-term patch.
+
+**No health checks, or shallow ones.** A check that only returns "OK" can pass while the server cannot reach its database. Check the dependencies that matter, but keep checks fast.
+
+**Autoscaling too late.** If servers take two minutes to start, a spike that peaks in one minute is over before help arrives. Pre-scale for known events.
+
+**Forgetting the load balancer can fail.** Use a managed, redundant balancer or run more than one.
+
+**Scaling the wrong tier.** Adding app servers does not help if the database is the bottleneck. Measure first.
+
+## Practise
+
+1. Watch the video lessons in the Watch & learn panel on horizontal versus vertical scaling and load balancers.
+2. Do the exercise above.
+3. Do the project check: two app copies behind a balancer, then stop one and watch traffic shift.
+4. Look at an app you use during a spike, such as results day, and sketch how you would scale it.

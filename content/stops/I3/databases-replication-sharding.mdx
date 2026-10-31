@@ -1,0 +1,123 @@
+---
+id: databases-replication-sharding
+level: I3
+theme: system-design
+title: "Databases: indexes, replication and sharding"
+outcome: "Choose between SQL and NoSQL for a workload, speed up queries with indexes, scale reads with replicas, and split data across shards with a sensible shard key."
+why_it_matters: "The database is usually the hardest part of a system to scale and the most painful to change later. Knowing indexes, replicas and sharding lets you plan for growth and answer the database questions in every design interview."
+hours: 3
+gap_tags: []
+primary_resource: yt-aced-formerly-expone-the-basics-of-database-sharding-and-partitioni
+alternates: []
+videos: [yt-aced-formerly-expone-database-replication-explained-in-5-minutes, yt-hayk-simonyan-database-replication-sharding-explained]
+format: deep
+key_terms: [database-index, replication, sharding]
+check:
+  type: project
+  brief: "Load 10 lakh fake orders into a local PostgreSQL or SQLite table. Time a query for one customer's orders before and after adding an index, and show the query plan each time. Then write a half-page note proposing a shard key for this table if it grew to 100 crore rows, with one risk of your choice. Share a link to your SQL, timings and note."
+flashcards:
+  - q: "What does a database index do?"
+    a: "Keeps a sorted structure of a column's values pointing to rows, so lookups by that column avoid scanning the whole table."
+  - q: "What is the cost of an index?"
+    a: "Extra storage and slower writes, because every insert or update must also update the index."
+  - q: "What is a read replica?"
+    a: "A copy of the database that receives changes from the primary and serves read queries, spreading read load."
+  - q: "What is replication lag?"
+    a: "The delay before a change on the primary appears on replicas. A user may not see their own update if they read from a lagging replica."
+  - q: "What is sharding?"
+    a: "Splitting one table across several databases by a shard key, so each holds part of the data and part of the load."
+  - q: "What makes a good shard key?"
+    a: "It spreads data and traffic evenly and keeps the data one request needs on one shard."
+  - q: "When is a relational (SQL) database a strong default?"
+    a: "When data has clear relationships and you need transactions and flexible queries, as with orders, payments and users."
+exercise:
+  title: "Plan the database"
+  setup: "A UPI payments app stores a row per transaction: transaction ID, sender ID, receiver ID, amount and time. It handles 2 crore transactions a day; users mostly view their own recent history."
+  questions:
+    - q: "Users load 'my last 20 transactions' constantly. What index helps?"
+      a: "A composite index on (sender_id, time), and similarly for receiver, so the database jumps to one user's rows already in time order."
+    - q: "Reads are ten times writes. What is a first step before sharding?"
+      a: "Add read replicas for history screens, keeping writes and balance checks on the primary."
+    - q: "A user pays and immediately opens history but the payment is missing. Why, and what is a fix?"
+      a: "Replication lag: history read from a replica not yet updated. Read the user's own recent writes from the primary for a short time after they write."
+    - q: "If sharding becomes necessary, is transaction date a good shard key?"
+      a: "No: all of today's writes would hit one shard. User ID spreads load and keeps one user's history together."
+ask:
+  - "How do I choose between SQL and NoSQL?"
+  - "What is the difference between partitioning and sharding?"
+  - "How do composite indexes work?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-10-31
+---
+
+## What it is
+
+Most systems keep their important data in a **database**. As a product grows, the database is usually the first part to strain, because every app server talks to it and its data must stay correct. Four ideas carry you a long way.
+
+- **Choosing the model.** Relational (SQL) databases such as PostgreSQL and MySQL store data in tables with relationships and support transactions. NoSQL databases such as DynamoDB, MongoDB and Cassandra trade some of that for easy horizontal scale or flexible documents.
+- **Indexes** make lookups fast by keeping a sorted structure of chosen columns.
+- **Replication** keeps copies of the data on several servers, to spread reads and survive failures.
+- **Sharding** splits the data itself across several databases when one is not enough.
+
+```text
+                        writes                     reads
+ app servers ──────────────► [ PRIMARY ] ───────────────► [ REPLICA 1 ]
+      │                           │  replication           [ REPLICA 2 ]
+      │                           ▼  (may lag)
+      │
+      └── when one primary is not enough: SHARD by key
+           user_id % 4 = 0 → [ shard A ]   = 1 → [ shard B ]
+                         = 2 → [ shard C ]   = 3 → [ shard D ]
+```
+
+## How it works
+
+**Pick the model by access pattern.** A relational database is a strong default for most products: orders, users and payments have clear relationships, need transactions, and benefit from flexible queries. NoSQL fits when you need massive write scale with simple key lookups, flexible document shapes, or time-series data. Many systems use both: PostgreSQL for core data and Redis or a key-value store for hot, simple data.
+
+**Indexes** work like the index at the back of a book. Without one, finding a customer's orders means scanning every row: O(n). With a B-tree index on `customer_id`, the database jumps straight to the right rows in about O(log n). A **composite index** on `(customer_id, created_at)` also returns them already sorted by time. Indexes cost storage and slow down writes, so add them for real query patterns, and check with `EXPLAIN` that queries use them.
+
+**Replication** copies every change from a **primary** to one or more **replicas**. Writes go to the primary; reads can go to replicas. This spreads read load and lets a replica take over if the primary fails. Most replication is asynchronous, so replicas can lag behind by milliseconds or seconds. That causes the classic bug where a user saves something and does not see it on the next screen; the fix is to read a user's own fresh writes from the primary.
+
+**Sharding** splits a big table across several independent databases by a **shard key**. Every row with the same key value lives on the same shard. A good key spreads both data and traffic evenly and keeps what one request needs on one shard. Sharding adds real complexity: queries across shards are slow, transactions across shards are hard, and moving data when you add shards takes care. Postpone it until indexes, caching and replicas are not enough.
+
+| Technique | Solves | Costs |
+|---|---|---|
+| Index | slow lookups and sorts | storage, slower writes |
+| Read replicas | too many reads; failover | replication lag, more servers |
+| Vertical scaling | everything, briefly | price, ceiling |
+| Sharding | too much data or too many writes for one server | complex queries, rebalancing, cross-shard transactions |
+| Caching (next lesson) | repeated reads of hot data | stale data, invalidation |
+
+## A worked example
+
+Fatima's team runs a ticketing platform for concerts and events across India. The `bookings` table had grown to 30 crore rows and pages were slowing down.
+
+**Step 1: indexes.** The "My bookings" screen ran `SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC LIMIT 20`. `EXPLAIN` showed a full table scan. A composite index on `(user_id, created_at)` cut it from 4 seconds to 3 milliseconds.
+
+**Step 2: read replicas.** Browsing events and viewing bookings were 90% of traffic. They added two replicas and routed those reads there, keeping seat holds and payments on the primary. Primary CPU dropped from 85% to 30%. Soon after, support tickets arrived: "I booked but my ticket is not showing." Replica lag during busy sales was up to two seconds. They changed the app so that for 30 seconds after a user books, their own bookings are read from the primary.
+
+**Step 3: sharding, later.** A year on, a single superstar's tour sale pushed writes past what one primary could take. They sharded bookings by `user_id`, which spread writes evenly and kept each user's history on one shard. They considered sharding by `event_id`, but a hit tour would have put all its bookings on one overloaded shard, a **hot shard**. Seat inventory for each event stayed in a separate, smaller table on its own database, because seat holds needed strong consistency within one event.
+
+The order mattered: each step was cheaper than the next, and they only took the next one when measurements showed they needed it.
+
+## Common mistakes
+
+**Indexing everything.** Each index slows every write. Index the columns your real queries filter and sort on.
+
+**Ignoring replication lag.** Reading from replicas right after a write shows stale data. Plan "read your own writes" from the primary.
+
+**Sharding too early.** It makes every later change harder. Exhaust indexes, query fixes, caching and replicas first.
+
+**A shard key that creates hot spots.** Dates, or one popular customer or event, can pile load onto one shard. Choose keys with many evenly used values.
+
+**Needing cross-shard joins on hot paths.** If common requests must read every shard, the key is wrong for your access pattern.
+
+**Choosing NoSQL because it sounds scalable.** If you need transactions and flexible queries, a well-indexed relational database will often serve you for years.
+
+## Practise
+
+1. Watch the video lessons in the Watch & learn panel on sharding and replication.
+2. Do the exercise above.
+3. Do the project check: time a query with and without an index and read the query plan.
+4. For an app you know, name the table most likely to need sharding and the key you would pick.

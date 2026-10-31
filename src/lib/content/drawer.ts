@@ -39,7 +39,7 @@ export function topicDetails(lessonIds: readonly string[]): Record<string, Topic
   for (const id of lessonIds) {
     const s = getStop(id);
     if (!s) continue;
-    const ids = [s.primary_resource, ...s.alternates, ...s.more];
+    const ids = [...s.videos, s.primary_resource, ...s.alternates, ...s.more];
     out[id] = {
       id,
       title: s.title,
@@ -50,7 +50,7 @@ export function topicDetails(lessonIds: readonly string[]): Record<string, Topic
       theme: s.theme,
       terms: s.key_terms.map((t) => glossary.get(t) ?? t).slice(0, 6),
       questions: questions.filter((q) => q.stop.id === id).length,
-      courses: ids.map((rid, i) => {
+      courses: ids.map((rid) => {
         const r = getResource(rid)!;
         const c = costLabel(r);
         return {
@@ -61,7 +61,7 @@ export function topicDetails(lessonIds: readonly string[]): Record<string, Topic
           cost: c.note ? `${c.label} (${c.note})` : c.label,
           hours: r.hours,
           certificate: r.certificate,
-          pick: i === 0 ? "best" : "also",
+          pick: rid === s.primary_resource ? "best" : "also",
           kindLabel: kindLabel(r),
           embed: youtubeEmbed(r.url),
           notice: r.notice ?? null,

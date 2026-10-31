@@ -141,12 +141,13 @@ test("on every roadmap, a lesson opened from the drawer still responds to clicks
   }
 });
 
-test("the top bar is light again after leaving the home page", async ({ page }) => {
+test("the top bar is the same light, frosted bar on the home page and after leaving it (MO-5)", async ({ page }) => {
   await page.goto("/");
   const header = page.locator(".site-header");
-  const dark = () => header.evaluate((h) => getComputedStyle(h).backgroundColor);
-  const onHome = await dark();
+  const tone = () => header.evaluate((h) => getComputedStyle(h).backgroundColor);
+  const onHome = await tone();
+  expect(onHome).toMatch(/255, 255, 255|oklab\(0\.99/); // white, however the browser writes it
   await page.locator('main a[href="/paths"]:visible').first().click();
   await expect(page).toHaveURL(/\/paths$/);
-  await expect.poll(dark).not.toBe(onHome);
+  await expect.poll(tone).toBe(onHome);
 });

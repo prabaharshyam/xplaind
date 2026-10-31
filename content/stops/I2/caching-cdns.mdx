@@ -1,0 +1,132 @@
+---
+id: caching-cdns
+level: I2
+theme: system-design
+title: "Caching and CDNs"
+outcome: "Decide what to cache and where, use cache-aside with sensible expiry, keep cached data fresh enough, and serve static files and media from a CDN close to users."
+why_it_matters: "Caching is the cheapest way to make a system faster and handle more traffic, and CDNs are why videos and images load quickly across India. Getting invalidation wrong shows users wrong prices or old results, so it is a favourite interview topic."
+hours: 2
+gap_tags: []
+primary_resource: yt-bytebytego-what-is-a-cdn-how-does-it
+alternates: []
+videos: [yt-hello-interview-caching-in-system-design-interviews-w-meta]
+format: deep
+key_terms: [caching, cdn, cache-invalidation]
+check:
+  type: project
+  brief: "Add a Redis (or an in-memory dict) cache in front of a slow function in a small Python API, such as one that sleeps 500 ms to mimic a database. Use cache-aside with a 60-second expiry, log hits and misses, and measure response times for 100 requests before and after. Share a link to your code and results."
+flashcards:
+  - q: "What is a cache hit and a cache miss?"
+    a: "A hit is when the data is already in the cache. A miss is when it is not, so it must be fetched from the slower source."
+  - q: "How does the cache-aside pattern work?"
+    a: "The app checks the cache; on a miss it reads the database, stores the result in the cache with an expiry, then returns it."
+  - q: "What does TTL mean?"
+    a: "Time to live: how long a cached item stays before it expires and is fetched again."
+  - q: "What does a CDN do?"
+    a: "Keeps copies of files on servers in many cities, so users download from a nearby server instead of your origin."
+  - q: "What is cache invalidation?"
+    a: "Removing or refreshing cached data when the original changes, so users do not see stale values."
+  - q: "What is a cache stampede?"
+    a: "When a popular item expires and many requests miss at once, all hitting the database together."
+  - q: "What should rarely be cached, or only briefly?"
+    a: "Data that must be exact right now, such as account balances, seat availability at checkout, or anything private shared across users."
+exercise:
+  title: "Cache or not?"
+  setup: "Decide for each item on a shopping app during a festive sale."
+  questions:
+    - q: "Product images and the app's JavaScript files."
+      a: "Cache on a CDN with long expiry; change the file name when the file changes."
+    - q: "The product page text and price for a popular phone."
+      a: "Cache with a short TTL, such as 30 to 60 seconds, and clear it when the price is updated."
+    - q: "How many units are left, shown at checkout."
+      a: "Read live from the source of truth at checkout; at most a very short cache on browse pages."
+    - q: "A user's own cart."
+      a: "Store it in a fast store keyed by user, but never in a shared page cache, so one user's cart is never shown to another."
+ask:
+  - "What is the difference between Redis and a CDN?"
+  - "How do I stop a cache stampede?"
+  - "When should I clear the cache instead of waiting for it to expire?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-10-31
+---
+
+## What it is
+
+A **cache** keeps a copy of data somewhere faster or closer than where it normally lives, so repeat requests are answered quickly without redoing the work. Reading from memory takes microseconds; a database query may take milliseconds; a request across the world takes hundreds of milliseconds.
+
+Caches exist at many layers:
+
+- the **browser** keeps images and scripts it has already downloaded;
+- a **CDN** (content delivery network) keeps files on servers in many cities;
+- an **application cache** such as Redis keeps results of expensive queries or API calls;
+- the **database** keeps hot pages in its own memory.
+
+```text
+ user in Patna
+     │ 1. image? ──────► [ CDN edge, Kolkata ] ── hit → served in ~20 ms
+     │                        │ miss
+     │                        ▼
+     │                   [ origin storage ]
+     │ 2. product API ─► [ app server ] ──► [ Redis cache ] ── hit → ~1 ms
+                                              │ miss
+                                              ▼
+                                         [ database ] → result stored in Redis with TTL
+```
+
+## How it works
+
+**Cache-aside** is the most common pattern for application caches. On each read, the app checks the cache first. On a hit it returns the cached value. On a miss it reads the database, stores the result in the cache with an expiry, and returns it. Writes go to the database, and the app then deletes or updates the cached copy.
+
+Every cached item needs a **TTL** (time to live). Short TTLs keep data fresher but cause more misses; long TTLs are faster but risk serving stale data. Choose per type of data, based on how often it changes and how much staleness costs.
+
+**Cache invalidation**, keeping cached data correct after the source changes, is the hard part. Options are: let items expire on their TTL; delete the key whenever the data is written; or version keys, such as `price:v42`, so new data uses a new key. For files on a CDN, the usual trick is to put a content hash in the file name, such as `app.3f9a1c.js`, so a changed file is a new URL and old copies never need clearing.
+
+When a very popular key expires, thousands of requests can miss at once and all hit the database: a **cache stampede**. Fixes include letting only one request refresh the key while others wait or get the old value, adding small random jitter to TTLs, and refreshing hot keys before they expire.
+
+**CDNs** such as Cloudflare, Akamai, Amazon CloudFront and Google Cloud CDN have servers across India and the world. They serve images, video, scripts and even whole cacheable pages from near the user, which cuts load time and offloads your origin servers. Video platforms rely on them completely.
+
+| What | Where to cache | Typical TTL | Watch out for |
+|---|---|---|---|
+| Images, video, JS and CSS | CDN and browser | days to a year, with hashed names | old files if names do not change |
+| Public pages, such as published results | CDN | minutes | clearing on updates |
+| Expensive query results | Redis | seconds to minutes | stale values, stampedes |
+| User sessions | Redis | hours | security; never share across users |
+| Balances, live inventory at checkout | do not cache, or very briefly | seconds at most | wrong numbers cost money |
+
+## A worked example
+
+Rohan works at an online test-prep company in Delhi. When the JEE answer key is released, lakhs of students open the same pages within minutes, and the site used to slow to a crawl.
+
+He measured first. The answer-key PDF and images made up most of the bytes; the "my score" API made most of the database queries.
+
+**Static files to a CDN.** He moved the PDF, images and front-end files to object storage behind a CDN, with content-hashed names and a one-year browser cache. Students in Guwahati and Kochi now downloaded from nearby edge servers. Origin bandwidth dropped by over 90%.
+
+**Hot queries to Redis.** The page listing all questions with correct options was the same for every student. He cached it in Redis with a 5-minute TTL using cache-aside. When the board corrected a disputed answer, an admin action deleted the key so the fix appeared at once rather than in 5 minutes.
+
+**Stampede protection.** At exactly 10 a.m. the cached list expired while 20,000 students refreshed, and the database spiked. Rohan added a lock so one request rebuilt the key while others received the previous value for a second or two, plus random jitter on TTLs.
+
+**What he did not cache.** Each student's calculated score was computed from their own responses and stored per user; it was never put in a shared page cache, so no student could ever see another's score.
+
+On the next release day, page loads stayed under a second at peak, and the database never went above half its capacity.
+
+## Common mistakes
+
+**Caching without a TTL.** Data then stays wrong forever after a change. Always set an expiry, even a long one.
+
+**Caching private data in a shared cache.** A page cached for one logged-in user can be served to another. Keep personal data out of shared caches, or key it by user.
+
+**Forgetting invalidation on writes.** Updating the database but not the cache shows the old value until expiry. Delete the key on write for data where freshness matters.
+
+**Caching data that must be exact.** Seat counts at checkout, balances and stock levels should come from the source of truth at the moment it matters.
+
+**Ignoring stampedes.** A hot key expiring under load can take down the database. Use locks, early refresh or jittered TTLs.
+
+**Caching before measuring.** Cache what is slow and often read. Caching rarely used data only adds complexity.
+
+## Practise
+
+1. Watch the video lessons in the Watch & learn panel on how CDNs work and how caching comes up in interviews.
+2. Do the exercise above.
+3. Do the project check: cache-aside in front of a slow function, with hit and miss logs and timings.
+4. Open your browser's developer tools on a big site and look for cached responses and CDN headers.

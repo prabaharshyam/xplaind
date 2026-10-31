@@ -57,6 +57,7 @@ export const stop = (o: Partial<Stop> = {}): Stop => ({
   primary_resource: "res-one",
   alternates: [],
   more: [],
+  videos: [],
   check: { type: "mcq", question_ids: ["chk-1", "chk-2", "chk-3"] },
   format: "brief",
   flashcards: [],
@@ -228,6 +229,7 @@ export function validBundle(): Bundle {
     books: [{ ...f("books/book-1.yaml"), data: book() }],
     glossary: [{ ...f("glossary/term-one.yaml"), data: term() }, { ...f("glossary/term-two.yaml"), data: term({ id: "term-two", term: "Term two", related: ["term-one"] }) }],
     certifications: [{ ...f("certifications/cert-one.yaml"), data: certification() }],
+    channels: [],
     blog: [{ ...f("blog/post-one.mdx"), data: blogPost() }],
     projects: [],
   };

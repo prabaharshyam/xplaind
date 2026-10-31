@@ -4,15 +4,15 @@ import { accountsEnabled } from "@/lib/supabase/config";
 import { SignInForm } from "./signin-form";
 
 export const metadata: Metadata = {
-  title: "Sign in",
-  description: "Sign in with an email link to keep your progress across devices.",
+  title: "Sign up or sign in",
+  description: "Sign up or sign in with an email link to save your journey and carry on from any device.",
   robots: { index: false },
 };
 
 export default function SignInPage() {
   return (
     <main className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight">Sign in</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Sign up or sign in</h1>
       {accountsEnabled() ? (
         <Suspense>
           <SignInForm />

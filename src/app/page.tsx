@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
-import { HomeHeaderTone } from "@/components/home/header-tone";
 import { RoleGrid, TopicChips } from "@/components/home/role-grid";
 import { MiniCourses, MiniInterview, MiniLesson, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
+import { ContinueCard } from "@/components/continue-card";
 import { JsonLd } from "@/components/json-ld";
 import { Reveal } from "@/components/motion/reveal";
 import { SearchBox } from "@/components/search-box";
+import { Scene3D } from "@/components/three/scene-3d";
 import { getBlogPosts, getContent, getPaths, getProjects, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { pathView } from "@/lib/content/paths";
@@ -86,7 +87,7 @@ export default function Home() {
     { value: String(paths.length), label: "role roadmaps" },
     { value: String(stops.length), label: "lessons" },
     { value: String(interview.length), label: "interview questions" },
-    { value: String(getContent().resources.length), label: "courses hand-picked" },
+    { value: String(getContent().resources.length), label: "courses and video lessons" },
     { value: String(getProjects().length), label: "guided projects" },
   ];
 
@@ -101,33 +102,32 @@ export default function Home() {
       />
 
       {/* Hero: what this is, and the first thing to do, above the fold. */}
-      <HomeHeaderTone />
-      <section className="home-hero relative overflow-hidden bg-[#070a12] text-white" aria-labelledby="hero-heading">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-70"
-          style={{
-            background:
-              "radial-gradient(600px 300px at 15% 10%, rgba(16,185,129,.25), transparent 70%), radial-gradient(700px 350px at 90% 0%, rgba(124,58,237,.28), transparent 70%)",
-          }}
+      <section className="home-hero relative overflow-hidden" aria-labelledby="hero-heading">
+        {/* MO-5: the signature moment: a large 3D network of ideas behind the headline, in the brand pastels. */}
+        <Scene3D
+          colors={["#c4b5fd", "#f9a8d4", "#99f6e4", "#bae6fd"]}
+          seed="xplaind-home"
+          className="pointer-events-none absolute top-6 right-[-3%] hidden h-[30rem] w-[44%] md:block"
         />
         <div className="relative mx-auto max-w-6xl px-4 pt-14 pb-12 md:px-6 md:pt-20">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-emerald-300">
-            <span className="size-1.5 rounded-full bg-emerald-400" /> 9 AI career roadmaps · made for learners in India
+          <p className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 backdrop-blur dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
+            <span className="size-1.5 rounded-full bg-violet-600" /> 9 AI career roadmaps · made for learners in India
           </p>
-          <h1 id="hero-heading" className="mt-5 max-w-4xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl">
+          <h1 id="hero-heading" className="mt-5 max-w-4xl md:max-w-[58%] text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl">
             Learn AI for the job you want.{" "}
-            <span className="bg-gradient-to-r from-emerald-300 via-teal-200 to-violet-300 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-violet-700 via-fuchsia-600 to-teal-600 bg-clip-text text-transparent dark:from-violet-300 dark:via-pink-300 dark:to-teal-300">
               One clear roadmap per role.
             </span>
           </h1>
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-300">
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-700 md:max-w-[55%] dark:text-zinc-300">
             Pick one of nine AI roles. Follow its roadmap, read a plain-English lesson for every topic, take the one
             course worth your time, build the projects, then practise the interview out loud.
           </p>
+          {/* On phones the scene gets its own band, so it never sits behind text. */}
+          <Scene3D colors={["#c4b5fd", "#f9a8d4", "#99f6e4", "#bae6fd"]} seed="xplaind-home" density="panel" className="pointer-events-none relative mt-6 h-52 w-full md:hidden" />
           <div className="mt-10 flex items-end justify-between gap-4">
             <h2 className="text-2xl font-semibold">Choose your AI role</h2>
-            <Link href="/paths" className="text-sm text-emerald-300 hover:underline">
+            <Link href="/paths" className="text-sm text-violet-800 hover:underline dark:text-violet-300">
               Compare all {paths.length} →
             </Link>
           </div>
@@ -149,32 +149,37 @@ export default function Home() {
             <SearchBox size="lg" />
           </div>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/start" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-5 font-medium text-black hover:bg-zinc-200">
+            <Link href="/start" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-violet-700 px-5 font-medium text-white shadow-md shadow-violet-700/25 hover:bg-violet-800">
               <Icon name="sparkles" size={18} /> Find my level
             </Link>
-            <Link href="/paths" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/25 px-5 font-medium hover:bg-white/10">
+            <Link href="/paths" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/80 px-5 font-medium text-violet-950 ring-1 ring-violet-200 backdrop-blur hover:bg-violet-50 dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
               <Icon name="compass" size={18} /> Compare the roles
             </Link>
-            <Link href="/interview/simulator" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/25 px-5 font-medium hover:bg-white/10">
+            <Link href="/interview/simulator" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/80 px-5 font-medium text-violet-950 ring-1 ring-violet-200 backdrop-blur hover:bg-violet-50 dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
               <Icon name="mic" size={18} /> I have an interview soon
             </Link>
           </div>
 
           <div className="mt-12 flex items-end justify-between gap-4">
             <h2 className="text-xl font-semibold">Topic roadmaps</h2>
-            <Link href="/topics" className="text-sm text-emerald-300 hover:underline">
+            <Link href="/topics" className="text-sm text-violet-800 hover:underline dark:text-violet-300">
               All topics →
             </Link>
           </div>
-          <p className="mt-1 text-sm text-zinc-400">Want one skill, not a whole role? Every lesson, grouped by subject.</p>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Want one skill, not a whole role? Every lesson, grouped by subject.</p>
           <div className="mt-4">
             <TopicChips counts={themeCounts} />
           </div>
         </div>
       </section>
 
+      {/* AC-6: a returning learner carries on from their last lesson. */}
+      <div className="mx-auto max-w-6xl px-4 empty:hidden md:px-6 [&>section]:my-8">
+        <ContinueCard titles={Object.fromEntries(stops.map((s) => [s.id, s.title]))} />
+      </div>
+
       {/* Numbers */}
-      <section aria-label="Xplaind in numbers" className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+      <section aria-label="Xplaind in numbers" className="border-y border-violet-100 bg-white/60 backdrop-blur dark:border-violet-950 dark:bg-white/[0.03]">
         <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 py-8 sm:grid-cols-3 md:grid-cols-5 md:px-6">
           {stats.map((s) => (
             <div key={s.label}>
@@ -186,7 +191,7 @@ export default function Home() {
       </section>
 
       {/* Pain points */}
-      <section aria-labelledby="pain-heading" className="bg-zinc-50 py-16 dark:bg-zinc-950 md:py-24">
+      <section aria-labelledby="pain-heading" className="py-16 md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <h2 id="pain-heading" className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
             Sound familiar?
@@ -196,7 +201,7 @@ export default function Home() {
           </p>
           <ul className="mt-10 grid gap-5 md:grid-cols-2">
             {PAINS.map((p, i) => (
-              <Reveal as="li" key={p.pain} delay={i * 60} className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <Reveal as="li" key={p.pain} delay={i * 60} className="flex gap-4 rounded-3xl bg-white/80 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-white/5 dark:ring-violet-900">
                 <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                   <Icon name={p.icon} size={24} />
                 </span>
@@ -214,7 +219,7 @@ export default function Home() {
       </section>
 
       {/* What you can do here */}
-      <section aria-labelledby="do-heading" className="bg-white py-16 dark:bg-zinc-900 md:py-24">
+      <section aria-labelledby="do-heading" className="bg-white/50 py-16 backdrop-blur dark:bg-white/[0.03] md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <h2 id="do-heading" className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
             Everything you need to get from zero to hired
@@ -269,7 +274,7 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section aria-labelledby="how-heading" className="bg-zinc-50 py-16 dark:bg-zinc-950 md:py-24">
+      <section aria-labelledby="how-heading" className="py-16 md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <h2 id="how-heading" className="text-3xl font-semibold tracking-tight md:text-4xl">
             How it works
@@ -280,9 +285,9 @@ export default function Home() {
               { icon: "book" as const, title: "Learn, check, earn XP", text: "Read the lesson, take the best course, pass the quick check. Your XP and streak grow as you go." },
               { icon: "trophy" as const, title: "Prove it", text: "Build the project at the end of each stage, then practise the interview until you are ready." },
             ].map((s, i) => (
-              <li key={s.title} className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <li key={s.title} className="rounded-3xl bg-white/80 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-white/5 dark:ring-violet-900">
                 <span className="flex items-center gap-3">
-                  <span className="grid size-10 place-items-center rounded-full bg-zinc-900 font-semibold text-white dark:bg-white dark:text-black">{i + 1}</span>
+                  <span className="grid size-10 place-items-center rounded-full bg-violet-700 font-semibold text-white">{i + 1}</span>
                   <Icon name={s.icon} size={24} className="text-emerald-700 dark:text-emerald-400" />
                 </span>
                 <h3 className="mt-4 text-xl font-semibold">{s.title}</h3>
@@ -302,7 +307,7 @@ export default function Home() {
 
       {/* Guides */}
       {posts.length > 0 && (
-        <section aria-labelledby="guides-heading" className="bg-white py-16 dark:bg-zinc-900 md:py-24">
+        <section aria-labelledby="guides-heading" className="bg-white/50 py-16 backdrop-blur dark:bg-white/[0.03] md:py-24">
           <div className="mx-auto max-w-6xl px-4 md:px-6">
             <div className="flex items-end justify-between gap-4">
               <h2 id="guides-heading" className="text-3xl font-semibold tracking-tight md:text-4xl">
@@ -330,12 +335,12 @@ export default function Home() {
       )}
 
       {/* FAQ and final call */}
-      <section aria-labelledby="faq-heading" className="bg-zinc-50 py-16 dark:bg-zinc-950 md:py-24">
+      <section aria-labelledby="faq-heading" className="py-16 md:py-24">
         <div className="mx-auto max-w-3xl px-4 md:px-6">
           <h2 id="faq-heading" className="text-3xl font-semibold tracking-tight md:text-4xl">
             Questions
           </h2>
-          <div className="mt-8 divide-y divide-zinc-200 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="mt-8 divide-y divide-zinc-200 rounded-3xl bg-white/80 ring-1 ring-violet-100 backdrop-blur dark:divide-zinc-800 dark:bg-white/5 dark:ring-violet-900">
             {FAQ.map((f) => (
               <details key={f.q} className="group p-5">
                 <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
@@ -351,17 +356,17 @@ export default function Home() {
         </div>
       </section>
 
-      <section aria-labelledby="final-heading" className="bg-[#070a12] py-16 text-center text-white md:py-24">
+      <section aria-labelledby="final-heading" className="relative overflow-hidden bg-gradient-to-br from-violet-200 via-pink-100 to-teal-100 py-16 text-center text-zinc-900 md:py-24 dark:from-violet-950 dark:via-fuchsia-950 dark:to-teal-950 dark:text-white">
         <div className="mx-auto max-w-3xl px-4">
           <h2 id="final-heading" className="text-3xl font-semibold tracking-tight text-balance md:text-5xl">
             Your AI career starts with one lesson.
           </h2>
-          <p className="mt-4 text-lg text-zinc-300">Pick a role and do the first topic today. It takes about 20 minutes.</p>
+          <p className="mt-4 text-lg text-zinc-700 dark:text-zinc-300">Pick a role and do the first topic today. It takes about 20 minutes.</p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/paths" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 font-medium text-black hover:bg-zinc-200">
+            <Link href="/paths" className="inline-flex min-h-12 items-center justify-center rounded-full bg-violet-700 px-6 font-medium text-white shadow-md hover:bg-violet-800">
               Choose a roadmap
             </Link>
-            <Link href="/start" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-6 font-medium hover:bg-white/10">
+            <Link href="/start" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white/80 px-6 font-medium text-violet-950 ring-1 ring-violet-300 hover:bg-white dark:bg-white/10 dark:text-violet-100">
               Find my level
             </Link>
           </div>

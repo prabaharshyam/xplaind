@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { getContent, getPaths } from "@/lib/content";
+import { ContinueCard } from "@/components/continue-card";
+import { getContent, getPaths, getStops } from "@/lib/content";
 import { lessonsByPath, pathRef } from "@/lib/content/paths";
 import { accountsEnabled } from "@/lib/supabase/config";
 import { currentUser, userClient } from "@/lib/supabase/server";
@@ -22,8 +23,11 @@ async function SignedIn() {
 export default function DashboardPage() {
   return (
     <main>
-      <PageHero theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="XP, streak and badges from everything you have done on this device." />
+      <PageHero theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your XP, streak and badges." />
       <div className="mx-auto max-w-3xl px-4 py-8">
+      <div className="mb-8 empty:hidden">
+        <ContinueCard titles={Object.fromEntries(getStops().map((s) => [s.id, s.title]))} />
+      </div>
       <ProgressOverview />
       <h2 className="mt-10 text-xl font-semibold">Your account</h2>
       {accountsEnabled() ? (

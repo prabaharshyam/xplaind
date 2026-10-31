@@ -1,4 +1,4 @@
-// AC-5: the weekly streak. Weeks run Monday to Sunday in India time. Pure.
+// AC-6: the weekly streak. Weeks run Monday to Sunday in India time. Pure.
 // Days come in as YYYY-MM-DD calendar dates in India (activity_days.day).
 
 const DAY_MS = 86_400_000;

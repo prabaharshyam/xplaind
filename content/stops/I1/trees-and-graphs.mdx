@@ -1,0 +1,162 @@
+---
+id: trees-and-graphs
+level: I1
+theme: dsa
+title: "Trees and graphs"
+outcome: "Represent trees and graphs in code, traverse them with breadth-first and depth-first search, and choose between them to find shortest paths, connected groups and cycles."
+why_it_matters: "Road maps, social networks, file systems, org charts and knowledge graphs for RAG are all trees or graphs. Graph traversal is one of the most common interview topics, and it is how routing and recommendation features work."
+hours: 3
+gap_tags: []
+primary_resource: yt-abdul-bari-5-1-graph-traversals-bfs-dfs-breadth
+alternates: []
+videos: [yt-cs-dojo-introduction-to-trees-data-structures-algorithms-9, yt-algomonster-dfs-vs-bfs-when-to-use-which]
+format: deep
+key_terms: [binary-tree, graph-data-structure, breadth-first-search, depth-first-search]
+check:
+  type: project
+  brief: "Model ten Delhi Metro stations and their connections as an adjacency list in Python. Write a BFS that returns the fewest-stops route between two stations, and a DFS that lists every station reachable from one station. Share a link to your code and the output for two pairs of stations."
+flashcards:
+  - q: "What is the difference between a tree and a graph?"
+    a: "A tree is a connected graph with no cycles and one path between any two nodes. A graph can have cycles and many paths."
+  - q: "What is an adjacency list?"
+    a: "A dict mapping each node to the list of nodes it connects to. It is the usual way to store a graph in code."
+  - q: "Which structure does BFS use, and what does it guarantee?"
+    a: "A queue. On an unweighted graph it finds the path with the fewest edges."
+  - q: "Which structure does DFS use?"
+    a: "A stack, or the call stack through recursion."
+  - q: "Why must graph search keep a visited set?"
+    a: "Graphs can have cycles. Without it the search loops forever or repeats work."
+  - q: "What property makes a binary search tree fast to search?"
+    a: "Smaller values go left and larger go right, so each step discards half the tree when it is balanced."
+  - q: "What is the time complexity of BFS or DFS on a graph?"
+    a: "O(V + E): every vertex and every edge is handled once."
+exercise:
+  title: "BFS or DFS?"
+  setup: "Choose a traversal for each task."
+  questions:
+    - q: "Fewest flight changes from Kochi to Srinagar, where every flight counts the same."
+      a: "BFS: it explores by number of hops, so the first time it reaches Srinagar is the fewest changes."
+    - q: "List every file inside a project folder and all its sub-folders."
+      a: "DFS, usually recursive: go deep into each folder before the next. BFS also works; order does not matter here."
+    - q: "Find which groups of users on a social app are connected to each other at all."
+      a: "Run DFS (or BFS) from each unvisited user; each run marks one connected group."
+    - q: "Find the cheapest train route when tickets have different prices."
+      a: "Neither plain BFS nor DFS: edges have weights, so use Dijkstra's algorithm, a BFS-like search with a priority queue."
+ask:
+  - "When should I use BFS instead of DFS?"
+  - "How do I store a graph in Python?"
+  - "How does Dijkstra's algorithm differ from BFS?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-10-31
+---
+
+## What it is
+
+A **graph** is a set of **nodes** joined by **edges**. Metro stations joined by tracks, people joined by friendships and web pages joined by links are all graphs. Edges can have a direction (a one-way street) and a weight (a distance or price).
+
+A **tree** is a special graph: connected, with no cycles, so there is exactly one path between any two nodes. It usually has a **root** at the top and **children** below. Folders on your laptop, a company org chart and the HTML of a web page are trees. A **binary tree** gives each node at most two children; a **binary search tree** keeps smaller values on the left and larger on the right.
+
+```text
+ TREE (no cycles)                  GRAPH (cycles allowed)
+          CEO                      Rajiv Chowk ──── Kashmere Gate
+         /    \                        │    \             │
+      CTO      CFO                 Mandi House  Central   Civil Lines
+     /   \       \                     │      Secretariat     │
+  Dev1  Dev2    Fin1               ITO ──────────┘       Vishwavidyalaya
+ one path between any two nodes     many paths; must track "visited"
+```
+
+Two ways to explore them come up again and again: **breadth-first search** (BFS) and **depth-first search** (DFS).
+
+## How it works
+
+In code, a graph is usually an **adjacency list**: a dict from each node to its neighbours.
+
+```python
+metro = {
+    "Rajiv Chowk": ["Kashmere Gate", "Mandi House", "Central Secretariat"],
+    "Kashmere Gate": ["Rajiv Chowk", "Civil Lines"],
+    "Mandi House": ["Rajiv Chowk", "ITO"],
+    "Central Secretariat": ["Rajiv Chowk", "ITO"],
+    "ITO": ["Mandi House", "Central Secretariat"],
+    "Civil Lines": ["Kashmere Gate", "Vishwavidyalaya"],
+    "Vishwavidyalaya": ["Civil Lines"],
+}
+```
+
+**BFS** explores in rings. It starts at a node, visits all its neighbours, then all their neighbours, and so on, using a **queue** so nodes are handled in the order they were found. Because it moves outward one edge at a time, the first time BFS reaches a node is by the fewest edges. That makes it the right tool for "fewest stops" or "degrees of separation".
+
+**DFS** goes as deep as it can along one path, then backs up and tries the next branch. It uses a **stack**, often the call stack through recursion. DFS is natural for exploring everything reachable, detecting cycles, and walking trees in a particular order.
+
+Both need a **visited** set on graphs, because cycles would otherwise send them round forever. Both take O(V + E) time, where V is the number of nodes and E the number of edges.
+
+| Question | Use | Why |
+|---|---|---|
+| Fewest hops between two nodes, unweighted | BFS | explores by distance in edges |
+| Everything reachable from a node | DFS or BFS | either visits all; DFS is shorter to write |
+| Detect a cycle, or order tasks with dependencies | DFS | its back-tracking reveals cycles; gives topological order |
+| Connected groups in a network | DFS or BFS from each unvisited node | each run marks one group |
+| Cheapest path with weighted edges | Dijkstra's algorithm | BFS ignores weights |
+| Find a value in a sorted tree | binary search tree walk | halves the search each step |
+
+## A worked example
+
+Kabir is building a route helper for commuters in Delhi. A user picks two stations and the app shows the route with the fewest stops. Every hop between adjacent stations counts the same, so BFS fits.
+
+```python
+from collections import deque
+
+def fewest_stops(graph, start, goal):
+    queue = deque([[start]])          # each item is a path so far
+    visited = {start}
+    while queue:
+        path = queue.popleft()
+        station = path[-1]
+        if station == goal:
+            return path
+        for nxt in graph[station]:
+            if nxt not in visited:
+                visited.add(nxt)
+                queue.append(path + [nxt])
+    return None
+```
+
+From "Mandi House" to "Civil Lines", BFS first finds Rajiv Chowk and ITO (one stop away), then Kashmere Gate and Central Secretariat (two away), then Civil Lines (three away). It returns `Mandi House → Rajiv Chowk → Kashmere Gate → Civil Lines`, and no shorter route exists, because BFS checked every two-stop route first.
+
+The app also needs to warn when a station is cut off during maintenance. Kabir removes the closed station from the graph and runs DFS from a major interchange to list every station still reachable:
+
+```python
+def reachable(graph, start, seen=None):
+    seen = seen if seen is not None else set()
+    seen.add(start)
+    for nxt in graph[start]:
+        if nxt not in seen:
+            reachable(graph, nxt, seen)
+    return seen
+```
+
+Any station not in the result is unreachable and gets a warning banner.
+
+When the team later adds fares, routes with the fewest stops are not always cheapest. That is a weighted graph, and Kabir switches to Dijkstra's algorithm, which is BFS with a priority queue ordered by total cost.
+
+## Common mistakes
+
+**No visited set.** On a graph with cycles, BFS and DFS loop forever. Mark nodes visited when you add them to the queue, not when you take them out, or you will add the same node many times.
+
+**Using DFS for shortest paths.** DFS finds a path, not the shortest one. For fewest edges, use BFS.
+
+**Using BFS on weighted graphs.** BFS counts edges, not cost. Use Dijkstra's algorithm when edges have different weights.
+
+**Deep recursion limits.** Recursive DFS on a long chain can exceed Python's recursion limit of about 1,000. Use an explicit stack for very deep graphs.
+
+**Assuming every tree is balanced.** A binary search tree built from already-sorted data becomes a long chain, and searches drop to O(n). Real systems use self-balancing trees.
+
+**Forgetting edge direction.** A follow on Instagram is one-way. Store directed edges only in the direction they go.
+
+## Practise
+
+1. Watch the video lessons in the Watch & learn panel; Abdul Bari's walkthrough of BFS and DFS on the same graph is especially clear.
+2. Do the exercise above.
+3. Do the project check with a slice of the Delhi Metro, or your own city's metro or bus routes.
+4. Stretch: change the BFS to return the number of stops between every pair of stations, and find the two stations that are furthest apart.

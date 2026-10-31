@@ -78,7 +78,7 @@ describe("merging device and server data (AC-2)", () => {
     expect(mergeRatings({ q: { rating: 2, updatedOn: T1 } }, { q: { rating: 0, updatedOn: T2 } })).toEqual({ q: { rating: 0, updatedOn: T2 } });
   });
 
-  it("counts done stops, checks taken and practice ratings as activity days (AC-5)", () => {
+  it("counts done stops, checks taken and practice ratings as activity days (AC-6)", () => {
     const days = activityDays(
       { a: done("2026-10-21"), b: inProgress("2026-10-22"), c: { ...inProgress("2026-10-23"), score: 33 } },
       { q: { rating: 1, updatedOn: "2026-10-24" } },

@@ -2,6 +2,7 @@ import type {
   BlogPost,
   Book,
   Certification,
+  Channel,
   CheckQuestion,
   Goal,
   GlossaryTerm,
@@ -37,6 +38,7 @@ export type Bundle = {
   books: Entry<Book>[];
   glossary: Entry<GlossaryTerm>[];
   certifications: Entry<Certification>[];
+  channels: Entry<Channel>[];
   blog: Entry<BlogPost>[];
   projects: Entry<GuidedProject>[];
 };
@@ -52,6 +54,7 @@ export const emptyBundle = (): Bundle => ({
   books: [],
   glossary: [],
   certifications: [],
+  channels: [],
   blog: [],
   projects: [],
 });

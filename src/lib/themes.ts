@@ -17,11 +17,27 @@ export const THEMES = [
   { id: "product", label: "Product", from: "#be185d", to: "#f9a8d4", icon: "target" },
   { id: "client", label: "Client delivery", from: "#9a3412", to: "#fca5a5", icon: "people" },
   { id: "career", label: "Career", from: "#15803d", to: "#86efac", icon: "star" },
+  { id: "dsa", label: "Data structures and algorithms", from: "#7e22ce", to: "#f9a8d4", icon: "tree" },
+  { id: "system-design", label: "System design", from: "#0f766e", to: "#a5b4fc", icon: "server" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];
 export type Theme = (typeof THEMES)[number];
-export type IconName = Theme["icon"] | "map" | "mic" | "book" | "trophy" | "fire" | "play" | "tick" | "skip" | "cert" | "lock" | "compass" | "close" | "send";
+export type IconName = Theme["icon"] | "map" | "mic" | "book" | "trophy" | "fire" | "play" | "tick" | "skip" | "cert" | "lock" | "compass" | "close" | "send" | "download";
 
 export const THEME_IDS = THEMES.map((t) => t.id) as [ThemeId, ...ThemeId[]];
 export const themeOf = (id: string): Theme => THEMES.find((t) => t.id === id) ?? THEMES[0];
+
+/** Mixes a hex colour with white; amount 0 keeps it, 1 is white. */
+export function tint(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c: number) => Math.round(c + (255 - c) * amount);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(mix);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
+
+/** MO-5: the pastel palette a theme's 3D scene and soft surfaces use. */
+export function pastelOf(id: ThemeId): [string, string, string, string] {
+  const t = themeOf(id);
+  return [tint(t.from, 0.45), tint(t.to, 0.25), tint("#f9a8d4", 0.1), tint("#a5f3fc", 0.1)];
+}

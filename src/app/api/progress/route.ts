@@ -1,5 +1,5 @@
 // AC-4: set one stop's status, check score or project link. Any change that
-// counts records an activity day (AC-5), and badges are rechecked (AC-6).
+// counts records an activity day (AC-6), and badges are rechecked (AC-6).
 import { z } from "zod";
 import { StopProgressInput } from "@/lib/account/claim";
 import { json, problem, rateLimit, readJson, requireSession } from "@/lib/account/http";

@@ -11,7 +11,7 @@ describe("weekStart", () => {
   });
 });
 
-describe("weeklyStreak (AC-5)", () => {
+describe("weeklyStreak (AC-6)", () => {
   const today = "2026-11-04"; // Wednesday of the week starting 2026-11-02
 
   it("counts consecutive active weeks up to this week", () => {

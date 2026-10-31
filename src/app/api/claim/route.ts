@@ -5,7 +5,7 @@ import { answersToRow, rowToAnswers, type AttemptAnswerRow } from "@/lib/account
 import { ClaimBody, InvalidClaimError, activityDays, mergeProgress, mergeRatings, rescoreAttempt } from "@/lib/account/claim";
 import { json, problem, rateLimit, readJson, requireSession } from "@/lib/account/http";
 import { QUIZ_VERSION, loadState, recordActivity, refreshBadges, saveProgress, saveRatings } from "@/lib/account/repo";
-import { getContent } from "@/lib/content";
+import { getContent, getStop } from "@/lib/content";
 
 export async function POST(request: Request) {
   const session = await requireSession();
@@ -76,6 +76,9 @@ export async function POST(request: Request) {
   if (latest) await admin.from("profiles").update({ start_level: latest.start_level }).eq("id", user.id);
 
   const after = await loadState(client, user.id);
+  // AC-6: read apart from loadState, so a database without the column still claims.
+  const { data: last } = await client.from("profiles").select("last_stop_id,last_stop_at").eq("id", user.id).maybeSingle();
+  const lastStop = last?.last_stop_id && last.last_stop_at && getStop(last.last_stop_id as string) ? { stopId: last.last_stop_id as string, at: last.last_stop_at as string } : null;
   const earned = await refreshBadges(admin, user.id, after);
 
   return json({
@@ -84,6 +87,7 @@ export async function POST(request: Request) {
     activityDays: after.activityDays,
     badges: [...new Set([...after.badges, ...earned])],
     weeklyHours: after.profile?.weekly_hours ?? null,
+    lastStop,
     attempt: latest
       ? {
           version: 1,

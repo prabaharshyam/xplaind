@@ -2,7 +2,7 @@
 // signed-out learner. Slice S5 copies this into stop_progress on sign-in, so the
 // record mirrors that table. Holds stop ids and choices only, no personal data.
 import type { ProgressMap, StopProgress } from "@/lib/roadmap/types";
-import { syncPath, syncStop } from "./account-sync";
+import { syncLastStop, syncPath, syncStop } from "./account-sync";
 import { read, write } from "./storage";
 
 export { serverSnapshot, subscribe } from "./storage";
@@ -19,8 +19,18 @@ export type ProjectProgress = {
   updatedOn: string;
 };
 
+/** AC-6: the lesson opened last, so the learner can carry on from it. `at` is an ISO time. */
+export type LastStop = { stopId: string; at: string };
+
 /** `path` is the id of the path the learner chose; absent until they choose one. */
-export type SavedProgress = { version: 1; stops: ProgressMap; freeOnly: boolean; path?: string; projects?: Record<string, ProjectProgress> };
+export type SavedProgress = {
+  version: 1;
+  stops: ProgressMap;
+  freeOnly: boolean;
+  path?: string;
+  projects?: Record<string, ProjectProgress>;
+  last?: LastStop;
+};
 
 const EMPTY: SavedProgress = { version: 1, stops: {}, freeOnly: false };
 
@@ -33,10 +43,25 @@ export function parseProgress(raw: string | null): SavedProgress {
     if (!v || v.version !== 1 || typeof v.stops !== "object" || v.stops === null) return EMPTY;
     const path = typeof v.path === "string" && /^[a-z0-9-]{1,64}$/.test(v.path) ? v.path : undefined;
     const projects = parseProjects(v.projects);
-    return { version: 1, stops: v.stops, freeOnly: v.freeOnly === true, ...(path ? { path } : {}), ...(projects ? { projects } : {}) };
+    const last = parseLast(v.last);
+    return {
+      version: 1,
+      stops: v.stops,
+      freeOnly: v.freeOnly === true,
+      ...(path ? { path } : {}),
+      ...(projects ? { projects } : {}),
+      ...(last ? { last } : {}),
+    };
   } catch {
     return EMPTY;
   }
+}
+
+export function parseLast(raw: unknown): LastStop | undefined {
+  const v = raw as Partial<LastStop> | null;
+  return v && typeof v.stopId === "string" && /^[a-z0-9-]{1,80}$/.test(v.stopId) && typeof v.at === "string" && !Number.isNaN(Date.parse(v.at))
+    ? { stopId: v.stopId, at: v.at }
+    : undefined;
 }
 
 function parseProjects(raw: unknown): Record<string, ProjectProgress> | undefined {
@@ -85,6 +110,18 @@ export const setFreeOnly = (freeOnly: boolean): void => update((p) => ({ ...p, f
 export function setPath(path: string): void {
   update((p) => ({ ...p, path }));
   syncPath(path);
+}
+
+/** AC-6: remembers the lesson just opened, here and (signed in) on the account. */
+export function setLastStop(stopId: string, at = new Date().toISOString()): void {
+  update((p) => ({ ...p, last: { stopId, at } }));
+  syncLastStop(stopId);
+}
+
+/** Keeps whichever of this device's and the account's last lesson is newer, without sending. */
+export function mergeLastStop(server: LastStop | null): void {
+  if (!server) return;
+  update((p) => (!p.last || Date.parse(server.at) > Date.parse(p.last.at) ? { ...p, last: server } : p));
 }
 
 /** Saves a stage project's state, or clears it with null. */

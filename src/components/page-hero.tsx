@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Cover } from "@/components/art/cover";
-import type { IconName, ThemeId } from "@/lib/themes";
+import { Scene3D } from "@/components/three/scene-3d";
+import { type IconName, type ThemeId, pastelOf } from "@/lib/themes";
 
 /** A page's banner: picture, title and one line on what the page is for. */
 export function PageHero({
@@ -24,7 +25,7 @@ export function PageHero({
   children?: ReactNode;
 }) {
   return (
-    <header className="border-b border-zinc-200 bg-gradient-to-b from-zinc-50 to-white dark:border-zinc-800 dark:from-zinc-950 dark:to-zinc-950">
+    <header className="relative overflow-hidden border-b border-violet-100 bg-gradient-to-br from-violet-100/80 via-white/40 to-pink-100/70 dark:border-violet-950 dark:from-violet-950/60 dark:via-transparent dark:to-fuchsia-950/40">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:flex-row md:items-center md:gap-10 md:px-6 md:py-12">
         <div className="min-w-0 flex-1">
           {crumbs.length > 0 && (
@@ -39,16 +40,20 @@ export function PageHero({
               ))}
             </nav>
           )}
-          {eyebrow && <p className="text-sm font-medium text-emerald-800 dark:text-emerald-400">{eyebrow}</p>}
+          {eyebrow && <p className="text-sm font-medium text-violet-800 dark:text-violet-300">{eyebrow}</p>}
           <h1 className="mt-1 text-3xl leading-tight font-semibold tracking-tight text-balance md:text-4xl">{title}</h1>
           {lead && <div className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">{lead}</div>}
           {children && <div className="mt-5">{children}</div>}
         </div>
-        {/* MO-2, MO-3: the picture floats, tilts toward the pointer and tips back as the page scrolls. */}
+        {/* MO-5: a live 3D scene in the theme's pastels; the drawn cover shows until it loads, or if WebGL is off. */}
         <div className="lx-hero-art shrink-0 [perspective:1000px]">
-          <div data-tilt="12" className="lx-bob">
-            <Cover theme={theme} seed={seed} icon={icon} className="h-36 w-full rounded-3xl shadow-xl md:h-48 md:w-80" iconSize={52} />
-          </div>
+          <Scene3D
+            colors={pastelOf(theme)}
+            seed={seed}
+            density="panel"
+            className="relative h-44 w-full md:h-56 md:w-96"
+            fallback={<Cover theme={theme} seed={seed} icon={icon} className="h-full w-full rounded-3xl shadow-xl" iconSize={52} />}
+          />
         </div>
       </div>
     </header>
