@@ -1,4 +1,5 @@
 import { Icon } from "@/components/art/icons";
+import { CourseThumb } from "@/components/course-thumb";
 import { ResourceNotice, resourceFacts, type ResourceCardData } from "@/components/resource-card";
 import { textLink } from "@/components/ui";
 import { WatchButton } from "@/components/video-player";
@@ -31,6 +32,7 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
       <ul className="mt-3 flex flex-col gap-3">
         {items.map((r, i) => (
           <li key={r.id} className="rounded-xl bg-white p-3 shadow-sm dark:bg-zinc-900">
+            {r.embed && <CourseThumb provider={r.provider} kindLabel={r.kindLabel} embed={r.embed} hours={r.hours} certificate={r.certificate} size="sm" className="mb-2 aspect-video rounded-lg" />}
             <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold tracking-wide uppercase">
               <span className={/video/i.test(r.kindLabel) ? "text-rose-700 dark:text-rose-300" : "text-emerald-800 dark:text-emerald-300"}>{r.kindLabel}</span>
               {i === 0 && <span className="rounded-full bg-zinc-900 px-1.5 py-px text-[10px] text-white dark:bg-white dark:text-zinc-900">Start here</span>}

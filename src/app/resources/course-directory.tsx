@@ -3,7 +3,8 @@
 import { ResourceNotice } from "@/components/resource-card";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Cover } from "@/components/art/cover";
+import { CourseThumb } from "@/components/course-thumb";
+import type { Embed } from "@/lib/content/media";
 import { Icon } from "@/components/art/icons";
 import { ALL, type DirectoryFilter, type DirectoryItem, EMPTY_FILTER, filterDirectory } from "@/lib/roadmap/directory";
 import { THEMES, type ThemeId, themeOf } from "@/lib/themes";
@@ -17,6 +18,8 @@ export type DirectoryRow = DirectoryItem & {
   kindLabel: string;
   /** A warning to show under the link, such as an age limit. */
   notice: string | null;
+  /** YouTube videos show their own thumbnail (media.ts). */
+  embed: Embed | null;
 };
 
 const BANDS = [
@@ -175,20 +178,16 @@ function CourseCard({ r }: { r: DirectoryRow }) {
   const theme = (r.themes[0] ?? "ai-basics") as ThemeId;
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="relative">
-        <Cover theme={theme} seed={r.id} className="h-32" iconSize={34} label={r.provider} />
-        <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur">
-          {r.kindLabel}
-        </span>
-        {r.certificate && (
-          <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-amber-300 px-2.5 py-0.5 text-xs font-semibold text-amber-950">
-            <Icon name="cert" size={12} /> Certificate
-          </span>
-        )}
-      </div>
+      <CourseThumb provider={r.provider} kindLabel={r.kindLabel} embed={r.embed} hours={r.hours} certificate={r.certificate} className="h-36" />
       <div className="flex flex-1 flex-col p-4">
-        <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
           {r.provider} · {themeOf(theme).label}
+          {/* The thumbnail is decorative, so the certificate is also stated here for everyone. */}
+          {r.certificate && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-950 dark:bg-amber-900 dark:text-amber-50">
+              <Icon name="cert" size={12} /> Certificate
+            </span>
+          )}
         </p>
         <h2 className="mt-1 text-lg leading-6 font-semibold">
           <a href={`/go/${r.id}`} target="_blank" rel="noopener" className="hover:underline">

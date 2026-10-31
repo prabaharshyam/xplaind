@@ -34,7 +34,7 @@ export function RoadmapPage({ path }: { path: Goal }) {
           <span className="font-medium">Who it is for:</span> {view.who_for}
         </p>
       </PageHero>
-      <div className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-8">
         <TopicDrawerProvider details={topicDetails(roadmapStopIds(model))}>
           <RoadmapView model={model} lessons={lessons} known={getPaths().map((p) => p.id)} />
         </TopicDrawerProvider>

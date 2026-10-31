@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
+  // RM-4: video thumbnails come through our image server, so browsers never call YouTube before play.
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "i.ytimg.com", pathname: "/vi/**" }],
+  },
   // API routes read content/ at run time (getContent uses process.cwd(), which file tracing
   // cannot follow), so ship those files with every route; pages are prerendered at build.
   outputFileTracingIncludes: {

@@ -1,7 +1,7 @@
 // RM-4 resource card. A plain component: rendered on the server for the static
 // page and by the stop's client island when "Free only" reorders the list.
 import Link from "next/link";
-import { Cover } from "@/components/art/cover";
+import { CourseThumb } from "@/components/course-thumb";
 import { WatchButton } from "@/components/video-player";
 import { type Embed, openLabel } from "@/lib/content/media";
 import { costLabel, formatDay } from "@/lib/roadmap/cost";
@@ -77,7 +77,7 @@ export function ResourceCard({
 
   return (
     <article className="lx-rise overflow-hidden rounded-2xl border border-zinc-200 sm:flex dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>
-      <Cover theme={r.theme ?? "ai-basics"} seed={r.id} className="h-24 shrink-0 sm:h-auto sm:w-36" iconSize={28} />
+      <CourseThumb provider={r.provider} kindLabel={r.kindLabel} embed={r.embed} hours={r.hours} certificate={r.certificate} className="aspect-video shrink-0 sm:aspect-auto sm:w-44" />
       <div className="min-w-0 flex-1 p-4">
       <p className="text-xs font-medium tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
         {role === "primary" ? "Start here" : role === "alternate" ? "Alternative" : r.level}
