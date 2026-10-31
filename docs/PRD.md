@@ -135,6 +135,9 @@ The structure is goal, then levels, then stops, then resources. A stop is one le
 | RM-7 | Completion. A stop is done when the learner passes its check (70% or more), submits a project link, or marks it done with one tap (recorded as self-marked). Release 1 trusts self-reports | Three states: not started, in progress, done. Self-marked stops are counted separately from checked ones and do not earn level badges |
 | RM-8 | "I already know this". The learner can skip a stop. It counts as done, is flagged as self-skipped, and the re-test can contradict it | Skipped stops are counted separately in analytics |
 | RM-9 | Preference toggle "Free only". When on, paid resources move below free alternates and are not the primary | The toggle persists for signed-in learners |
+| RM-10 | Library and tags. Lessons, video lessons and skills (glossary terms) sit in one list at /library, tagged by topic, level, skill and channel, and filtered by kind, topic, level, channel and a search box. Tags on every lesson open the Library filtered to that tag. Filters live in the address so a tag link opens the right view | Filters work at 360 px; a lesson's topic tag opens /library?topic=… with only that topic |
+| RM-11 | Video lessons. Each lesson may list up to three YouTube video lessons, shown first in its Watch & learn panel and playable on the page (RM-4 player). /videos features recommended teaching channels with their best videos. Videos are not repeated at the bottom of the lesson; the full RM-4 card remains for the best course | Every listed video exists and allows embedding when added; nothing loads from YouTube before play |
+| RM-12 | Topic tracks for interview foundations: Data structures and algorithms, and System design, each a set of deep lessons under /topics, linked from the coding roles' roadmaps (AI Engineer, GenAI & LLM Engineer, FDE, Agentic AI Engineer, ML Engineer, MLOps Engineer). They are not roles | Both tracks render under /topics; the six coding roadmaps link to them |
 
 **Seed resources and what is verified.** Verify each one again on the provider's page before it goes live, and record the date.
 
@@ -174,6 +177,13 @@ Added at the owner's request (2026-10-26): a friendly helper on every page, and 
 | MO-2 | Cards rise and tip into place as they scroll into view, page pictures tip back as they scroll away, and long reads show a reading-progress bar | Scroll-driven CSS only where the browser supports it; position and angle only, never opacity; no horizontal scroll at 360 px |
 | MO-3 | Cards and page pictures tilt a few degrees toward the pointer | Mouse and trackpad only, not touch |
 | MO-4 | Every animation stops under prefers-reduced-motion: reduce | Checked in the stylesheet: each effect sits behind a no-preference query |
+| MO-5 | Pastel brand and 3D. A soft pastel palette (lilac, peach, mint, sky) on every page; page headers, lesson headers and the home hero show a live WebGL scene (three.js) in the page's pastels. Scenes load only when on screen, pause off screen and in hidden tabs, draw one still frame under reduced motion, skip data-saver connections, and fall back to the drawn cover without WebGL. Card grids arrive in a staggered 3D scroll entrance (transforms only) | No horizontal scroll at 360 px; WCAG 2.1 AA unchanged; canvases are aria-hidden |
+
+## Community
+
+| ID | Requirement | Acceptance |
+|---|---|---|
+| CM-1 | /community explains the learner community, its rules and its 18+ age limit, and links to the Discord server or WhatsApp community set in content/community/community.yaml. With no link set it says the community is launching soon. Xplaind stores no community data | The page renders with and without links; the age note is visible |
 
 ## Ask me from my book
 
@@ -232,6 +242,7 @@ Keep gamification light. In a Belgian study of 6,592 adults, which the idea vali
 | AC-2 | Claim. On first sign-in, attach the device's saved test result and progress to the account | A learner who tested signed out sees the same result after signing in |
 | AC-3 | Dashboard: current level, next five steps, progress across the nine levels, weekly streak, weekly-hours goal, and a re-test link | Loads in under 2 seconds on a mid-range phone over 4G |
 | AC-4 | Progress rows per stop: status, check score, project link, timestamps. Any change records an activity day | Rows are readable and writable only by their owner |
+| AC-6 | Carry on where you left off. The lesson a learner opened last is kept on the device and, signed in, on their profile (last_stop_id), so the home page and dashboard offer "Continue where you left off" on any device. Signed out, the card invites sign-up. The header's main button reads "Sign up" when signed out and "My progress" when signed in | The column is writable only by its owner (RLS); the newer of device and account wins on sign-in |
 | AC-5 | Weekly streak. A week (Monday to Sunday, India time) counts when the learner marks a stop done, passes a check or finishes a practice set | The streak resets after one empty week, not before |
 | AC-6 | Badges in release 1: one per level passed. First-project and 4-week-streak badges come in release 2 | A badge appears only after the passing rule in PL-3 or RM-7 |
 | AC-7 | Level card: an image of 1200 by 630 pixels showing level, goal, weeks active and the site URL, with an optional first name. Sharing is opt-in and the link is unguessable | The card holds no email, photo or exact dates; the learner can delete it |

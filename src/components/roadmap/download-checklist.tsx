@@ -84,9 +84,28 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <button type="button" className={`${secondaryButton} self-start`} onClick={() => void (open ? setOpen(false) : start())} aria-expanded={open} aria-controls={ids.region} disabled={busy}>
-        <Icon name="check" size={18} /> {busy ? "Making your checklist…" : "Download as a printable checklist (PDF)"}
-      </button>
+      {/* RD-1: a banner, not a small link, so learners see the download straight away. */}
+      <div className="flex flex-col gap-4 rounded-3xl bg-gradient-to-br from-violet-200 via-pink-100 to-amber-100 p-5 shadow-sm ring-1 ring-violet-300/60 sm:flex-row sm:items-center sm:justify-between md:p-6 dark:from-violet-950 dark:via-fuchsia-950 dark:to-amber-950 dark:ring-violet-800">
+        <div className="flex items-start gap-4">
+          <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white text-violet-700 shadow-sm dark:bg-zinc-900 dark:text-violet-300">
+            <Icon name="download" size={26} />
+          </span>
+          <div>
+            <p className="text-lg font-semibold text-zinc-900 dark:text-white">Get this roadmap as a PDF</p>
+            <p className="mt-0.5 text-sm leading-6 text-zinc-700 dark:text-zinc-300">Every topic and project with a box to tick. Print it or keep it on your phone.</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-violet-700 px-6 text-base font-semibold text-white shadow-md transition hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 disabled:opacity-70"
+          onClick={() => void (open ? setOpen(false) : start())}
+          aria-expanded={open}
+          aria-controls={ids.region}
+          disabled={busy}
+        >
+          <Icon name="download" size={18} /> {busy ? "Making your checklist…" : "Download as a printable checklist (PDF)"}
+        </button>
+      </div>
 
       {open && (
         <section id={ids.region} aria-labelledby={`${ids.region}-h`} className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 md:p-5 dark:border-zinc-800 dark:bg-zinc-950">

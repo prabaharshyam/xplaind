@@ -25,6 +25,9 @@ test("an explainer lesson shows its sections, key terms and the course after the
   await main.locator("summary", { hasText: "Cosine similarity" }).click(); // key terms open in place
   await expect(main.getByRole("link", { name: "More in the glossary" }).first()).toHaveAttribute("href", "/glossary#cosine-similarity");
   await expect(main.getByRole("heading", { level: 2, name: "Go deeper: the best course" })).toBeVisible();
+  // the video lessons sit in the Watch & learn panel, not repeated after the text
+  await expect(main.locator("#learn-top")).toBeVisible();
+  await expect(main.locator("#courses").getByText("Video lesson")).toHaveCount(0);
   expect(await overflow(page)).toBe(false); // the code sample scrolls inside its box
   expect((await wcag(page)).violations).toEqual([]);
 });

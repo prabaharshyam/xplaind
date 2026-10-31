@@ -1,7 +1,14 @@
 import { Icon } from "@/components/art/icons";
-import { ResourceNotice, type ResourceCardData } from "@/components/resource-card";
+import { ResourceNotice, resourceFacts, type ResourceCardData } from "@/components/resource-card";
 import { textLink } from "@/components/ui";
 import { WatchButton } from "@/components/video-player";
+
+/** Videos are minutes long, courses hours. */
+export function duration(hours: number): string {
+  const mins = Math.round(hours * 60);
+  if (mins < 90) return `${mins} min`;
+  return `about ${Math.round(hours * 10) / 10} hours`;
+}
 
 /**
  * RM-4: every video lesson and course for the lesson, in the side panel so learners see
@@ -30,7 +37,7 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
             </p>
             <p className="mt-1 text-sm leading-5 font-medium">{r.title}</p>
             <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-              {r.provider} · about {r.hours} {r.hours === 1 ? "hour" : "hours"}
+              {r.provider} · {duration(r.hours)}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
               {r.embed && (
@@ -46,6 +53,22 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
               </a>
             </div>
             {r.notice && <ResourceNotice text={r.notice} compact />}
+            {/* RM-4: every resource's facts, one tap away. */}
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer text-zinc-700 underline-offset-2 hover:underline dark:text-zinc-300">
+                Details<span className="sr-only">: {r.title}</span>
+              </summary>
+              {r.affiliate && <p className="mt-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-950 dark:bg-amber-950 dark:text-amber-100">Affiliate link: we may earn a commission. It does not change our ranking.</p>}
+              <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+                {resourceFacts(r).map(([k, v]) => (
+                  <div key={k} className="contents">
+                    <dt className="text-zinc-600 dark:text-zinc-400">{k}</dt>
+                    <dd>{v}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-1 text-zinc-700 dark:text-zinc-300">{r.why_picked}</p>
+            </details>
           </li>
         ))}
       </ul>

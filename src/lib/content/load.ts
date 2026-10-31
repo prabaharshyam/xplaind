@@ -9,6 +9,7 @@ import {
   BlogFrontmatter,
   Book,
   Certification,
+  Channel,
   GlossaryTerm,
   GuidedProject,
   CheckQuestion,
@@ -191,6 +192,7 @@ export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   bundle.books = loadYamlDir(root, "books", Book, issues);
   bundle.glossary = loadYamlDir(root, "glossary", GlossaryTerm, issues);
   bundle.certifications = loadYamlDir(root, "certifications", Certification, issues);
+  bundle.channels = loadYamlDir(root, "channels", Channel, issues);
   bundle.blog = loadBlog(root, issues);
   bundle.projects = loadYamlDir(root, "projects", GuidedProject, issues);
   return { bundle, issues };

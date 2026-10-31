@@ -73,7 +73,7 @@ export function mergeRatings(device: Ratings, server: Ratings): Record<string, R
   return out;
 }
 
-/** AC-5: days that count towards the streak: a stop marked done, a check taken, a practice rating. */
+/** AC-6: days that count towards the streak: a stop marked done, a check taken, a practice rating. */
 export function activityDays(progress: ProgressMap, ratings: Ratings): string[] {
   const days = new Set<string>();
   for (const p of Object.values(progress)) if (p.status === "done" || p.score !== undefined) days.add(p.updatedOn);

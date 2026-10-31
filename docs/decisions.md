@@ -239,3 +239,14 @@ The owner asked for the AI features in the screenshot they shared (generate a co
   - everything else keeps its type, such as "Course" or "Article".
 - **Notices.** A resource can carry a `notice`, shown right under its link everywhere it appears. The Northwestern deepfake study uses one, because its site asks participants to be 18 or older.
 - **Sign-off.** The owner confirmed that the content is reviewed. The `reviewed_by` and `verified_by` fields now name the owner, dated 2026-10-27, so the draft labels disappear and launch-mode validation passes. Future edits on the live site should update those fields when a person changes a record.
+
+## 2026-10-31: Videos everywhere, Library, tracks, community and the pastel 3D look
+
+- **Video lessons (RM-11).** 161 of 163 lessons now list up to three YouTube video lessons, picked by hand from search results limited to vetted teaching channels, then checked by script to exist and allow embedding. They are marked `UNVERIFIED` until the owner opens them (ED-4), so launch validation lists them. The bottom-of-lesson list is gone; the full RM-4 card stays for the best course, and every panel item has a Details toggle with the RM-4 facts.
+- **Featured channels.** content/channels/ holds 14 channels (Krish Naik, Jeff Su, Tina Huang, CampusX, codebasics, 3Blue1Brown, StatQuest, Andrej Karpathy, IBM Technology, freeCodeCamp, Aishwarya Srinivasan, ByteByteGo, Dave Ebbelaar, Apna College) with five or six videos each, shown at /videos. No channel called "The data science girl" was found; the owner was asked which channel was meant.
+- **roadmap.sh.** The one roadmap.sh resource was removed; its two lessons now start with a video lesson.
+- **Library and tags (RM-10).** /library lists lessons, video lessons and skills, filtered by kind, topic, level, channel and search, with the filters in the address.
+- **Tracks (RM-12).** Data structures and algorithms and System design are topic tracks (six deep lessons each), not roles, linked from the six coding roles. Lessons are drafts awaiting the owner's review.
+- **Continue where you left off (AC-6).** Migration 20261031000000_last_lesson.sql adds profiles.last_stop_id; the claim reads it apart from the main state, so a database without the column still works.
+- **Community (CM-1).** The owner chose an external Discord or WhatsApp group. Links live in content/community/community.yaml; with none set, the page says it is launching soon.
+- **Pastel brand and 3D (MO-5).** The owner chose WebGL across the site. three.js 0.186.1 renders one network scene per header, loaded on view, paused off screen, still under reduced motion, skipped on data saver, with the drawn cover as fallback. Buttons and links moved from emerald to violet. Design guidance came from the taste-skill and Anthropic frontend-design skills, reviewed and vendored in .claude/skills.

@@ -45,6 +45,20 @@ const languageName = (code: string) => {
   }
 };
 
+/** RM-4 and RM-6: the facts every resource shows, shared by the full card and the side panel. */
+export function resourceFacts(r: ResourceCardData, today?: string): [string, string][] {
+  const cost = costLabel(r, today);
+  return [
+    ["Cost", cost.note ? `${cost.label} (${cost.note})` : cost.label],
+    ["Time", r.hours < 1.5 ? `${Math.max(1, Math.round(r.hours * 60))} minutes` : `about ${r.hours} hours`],
+    ["Language", languageName(r.language)],
+    ["Certificate", r.certificate ? "Yes" : "No"],
+    ["Level", r.level],
+    ["Last verified", r.verifiedOn ? formatDay(r.verifiedOn) : "Not yet verified"],
+    ["Link checked", r.linkCheckedOn ? formatDay(r.linkCheckedOn) : "Not checked yet"],
+  ];
+}
+
 export function ResourceCard({
   r,
   role,
@@ -59,16 +73,7 @@ export function ResourceCard({
   today?: string;
   onOpen?: () => void;
 }) {
-  const cost = costLabel(r, today);
-  const facts: [string, string][] = [
-    ["Cost", cost.note ? `${cost.label} (${cost.note})` : cost.label],
-    ["Time", `about ${r.hours} ${r.hours === 1 ? "hour" : "hours"}`],
-    ["Language", languageName(r.language)],
-    ["Certificate", r.certificate ? "Yes" : "No"],
-    ["Level", r.level],
-    ["Last verified", r.verifiedOn ? formatDay(r.verifiedOn) : "Not yet verified"],
-    ["Link checked", r.linkCheckedOn ? formatDay(r.linkCheckedOn) : "Not checked yet"],
-  ];
+  const facts = resourceFacts(r, today);
 
   return (
     <article className="lx-rise overflow-hidden rounded-2xl border border-zinc-200 sm:flex dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>

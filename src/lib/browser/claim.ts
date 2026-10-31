@@ -5,7 +5,7 @@ import type { RatingRecord } from "@/lib/practice/queue";
 import type { StopProgress } from "@/lib/roadmap/types";
 import { type SavedAttempt, parseAttempt, rawAttempt, saveAttempt } from "./attempt-store";
 import { parsePractice, rawPractice, replaceRatings } from "./practice-store";
-import { parseProgress, rawProgress, replaceStops } from "./progress-store";
+import { type LastStop, mergeLastStop, parseProgress, rawProgress, replaceStops } from "./progress-store";
 
 export type ClaimResult = {
   progress: Record<string, StopProgress>;
@@ -14,6 +14,7 @@ export type ClaimResult = {
   activityDays: string[];
   badges: string[];
   weeklyHours: number | null;
+  lastStop?: LastStop | null;
 };
 
 export async function claimDevice(): Promise<ClaimResult> {
@@ -39,6 +40,7 @@ export async function claimDevice(): Promise<ClaimResult> {
   const result = (await res.json()) as ClaimResult;
   replaceStops(result.progress);
   replaceRatings(result.ratings);
+  mergeLastStop(result.lastStop ?? null);
   // Keep the newest result on this device, so /result shows the same as the account.
   if (result.attempt && (!attempt || result.attempt.completedOn >= attempt.completedOn) && result.attempt.answers.length) {
     saveAttempt(result.attempt);

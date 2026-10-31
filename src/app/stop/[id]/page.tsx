@@ -8,15 +8,17 @@ import { GENAI_PATH_ID, getContent, getGlossary, getLevel, getStop, getStops, pa
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
 import { XP } from "@/lib/game/xp";
-import { type IconName, themeOf } from "@/lib/themes";
+import { Scene3D } from "@/components/three/scene-3d";
+import { type IconName, pastelOf, themeOf } from "@/lib/themes";
 import { LessonNav, type SectionLink } from "./lesson-nav";
 import { LearnPanel } from "./learn-panel";
+import { LessonVisit } from "@/components/continue-card";
+import { StopResources } from "./stop-resources";
 import { roadmapHref } from "@/lib/paths";
 import { resourceCard } from "@/lib/content/cards";
 import { getInterviewViews } from "@/lib/content/interview";
 import type { CheckQuestionView } from "./stop-progress";
 import { StopProgressPanel } from "./stop-progress";
-import { StopResources } from "./stop-resources";
 import { LessonTutor } from "./lesson-tutor";
 import { LessonExercise } from "./lesson-exercise";
 import { PathLessons } from "./path-lessons";
@@ -61,31 +63,6 @@ function splitSections(body: string): { title: string; body: string }[] {
     });
 }
 
-/** Free courses from other providers on the same topic: a short list, after the main picks. */
-function MoreCourses({ stopId, courses }: { stopId: string; courses: ReturnType<typeof resourceCard>[] }) {
-  if (courses.length === 0) return null;
-  return (
-    <section aria-labelledby="more-courses" className="mt-6">
-      <h3 id="more-courses" className="font-semibold">
-        More to learn on this topic
-      </h3>
-      <ul className="mt-2 flex flex-col gap-2">
-        {courses.map((c) => (
-          <li key={c.id} className="leading-7">
-            <a href={`/go/${c.id}?stop=${encodeURIComponent(stopId)}`} target="_blank" rel="noopener" className={textLink}>
-              {c.title}
-              <span className="sr-only"> (opens in a new tab)</span>
-            </a>{" "}
-            <span className={`text-sm ${muted}`}>
-              {c.kindLabel} · {c.provider} · {c.hours} h{c.certificate ? " · certificate" : ""}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 export function generateStaticParams() {
   return getStops().map((s) => ({ id: s.id }));
 }
@@ -107,6 +84,10 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   const interview = getInterviewViews().filter((q) => q.stop.id === stop.id);
   const cards = [stop.primary_resource, ...stop.alternates].map(resourceCard);
   const more = stop.more.map(resourceCard);
+  // RM-4: video lessons first, then the best course and the rest, all in the Watch & learn panel.
+  const learn = [...stop.videos.map(resourceCard), ...cards, ...more];
+  // RM-4: the full card for the best courses stays after the text; videos live only in the panel.
+  const courses = cards.filter((c) => !c.embed && !/video/i.test(c.kindLabel));
   const checks = new Map(getContent().checks.map(({ data: q }) => [q.id, q]));
   const check =
     stop.check.type === "project"
@@ -126,7 +107,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
     ...sections.map((sec) => ({ id: slug(sec.title), title: sec.title, icon: SECTION_ICON[sec.title] ?? ("book" as const) })),
     ...(stop.exercise ? [{ id: "try-it", title: stop.exercise.title, icon: "bolt" as const }] : []),
     ...(stop.flashcards.length ? [{ id: "flashcards", title: "Test your understanding", icon: "check" as const }] : []),
-    { id: "courses", title: "Best course", icon: "book" },
+    ...(courses.length ? [{ id: "courses", title: "Best course", icon: "book" as const }] : []),
     { id: "check", title: "Quick check", icon: "check" },
     { id: "tutor", title: "Ask the AI tutor", icon: "sparkles" },
   ];
@@ -141,6 +122,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
     <main>
       {/* MO-2: a reading-progress bar under the top bar. */}
       <div aria-hidden="true" className="lx-progress" />
+      <LessonVisit stopId={stop.id} />
       <header className="relative overflow-hidden text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}>
         <Cover theme={stop.theme} seed={stop.id} className="absolute inset-0 opacity-60 [&>div:last-child]:hidden" />
         <div className="relative mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 md:flex-row md:items-end md:justify-between md:px-6 md:py-12">
@@ -177,15 +159,24 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               <span className="rounded-full bg-amber-300 px-3 py-1 font-semibold text-amber-950">+{xpToEarn} XP</span>
             </p>
           </div>
-          <span className="hidden size-24 shrink-0 place-items-center rounded-3xl bg-white/20 ring-1 ring-white/40 backdrop-blur md:grid">
-            <Icon name={theme.icon} size={52} strokeWidth={1.5} />
-          </span>
+          {/* MO-5: the lesson's own 3D scene in its theme's pastels. */}
+          <Scene3D
+            colors={pastelOf(stop.theme)}
+            seed={stop.id}
+            density="panel"
+            className="relative hidden h-52 w-80 shrink-0 md:block"
+            fallback={
+              <span className="grid size-full place-items-center rounded-3xl bg-white/20 ring-1 ring-white/40 backdrop-blur">
+                <Icon name={theme.icon} size={52} strokeWidth={1.5} />
+              </span>
+            }
+          />
         </div>
       </header>
 
       <div className="mx-auto grid max-w-6xl gap-8 px-4 pb-16 md:px-6 lg:grid-cols-[1fr_260px]">
         <div className="min-w-0 lg:order-2">
-          <LessonNav sections={navSections} top={<LearnPanel stopId={stop.id} items={[...cards, ...more]} headingId="learn-side" />}>
+          <LessonNav sections={navSections} top={<LearnPanel stopId={stop.id} items={learn} headingId="learn-side" />}>
             {home && <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />}
           </LessonNav>
         </div>
@@ -204,6 +195,26 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </p>
           )}
 
+          {/* RM-10: tags open the Library filtered to the same topic, level or skill. */}
+          <p className="mt-3 flex flex-wrap items-center gap-1.5 text-sm" aria-label="Tags">
+            <Link href={`/library?topic=${stop.theme}`} className="rounded-full bg-violet-100 px-2.5 py-1 font-medium text-violet-900 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-200">
+              #{theme.label}
+            </Link>
+            <Link href={`/library?level=${stop.level}`} className="rounded-full bg-sky-100 px-2.5 py-1 font-medium text-sky-900 hover:bg-sky-200 dark:bg-sky-950 dark:text-sky-200">
+              #{stop.level} {level?.name}
+            </Link>
+            {stop.videos.length > 0 && (
+              <Link href={`/library?kind=video&topic=${stop.theme}`} className="rounded-full bg-rose-100 px-2.5 py-1 font-medium text-rose-900 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-200">
+                #Video lessons
+              </Link>
+            )}
+            {terms.map((t) => (
+              <Link key={t.id} href={`/library?q=${encodeURIComponent(t.term)}`} className="rounded-full bg-zinc-100 px-2.5 py-1 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200">
+                {t.term}
+              </Link>
+            ))}
+          </p>
+
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
             <span className="text-sm font-medium">Track this topic</span>
             <TopicStatus stopId={stop.id} title={stop.title} label={`Track ${stop.title}`} />
@@ -211,7 +222,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
           {/* On phones the side panel sits here, near the top, so the videos are seen first. */}
           <div className="mt-4 lg:hidden">
-            <LearnPanel stopId={stop.id} items={[...cards, ...more]} headingId="learn-top" />
+            <LearnPanel stopId={stop.id} items={learn} headingId="learn-top" />
           </div>
 
           <section id="why" aria-labelledby="why-h" className="mt-6 scroll-mt-24 rounded-2xl border-l-4 border-amber-400 bg-amber-50 p-5 dark:bg-amber-950/40">
@@ -297,13 +308,14 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </section>
           )}
 
-          <section id="courses" aria-labelledby="courses-h" className="mt-8 scroll-mt-24">
-            <h2 id="courses-h" className="text-xl font-semibold">
-              {explainer ? "Go deeper: the best course" : "Learn it"}
-            </h2>
-            <StopResources stopId={stop.id} cards={cards} />
-            <MoreCourses stopId={stop.id} courses={more} />
-          </section>
+{courses.length > 0 && (
+            <section id="courses" aria-labelledby="courses-h" className="mt-8 scroll-mt-24">
+              <h2 id="courses-h" className="text-xl font-semibold">
+                {explainer ? "Go deeper: the best course" : "Learn it"}
+              </h2>
+              <StopResources stopId={stop.id} cards={courses} />
+            </section>
+          )}
 
           <section id="check" aria-labelledby="check-h" className="mt-8 scroll-mt-24 rounded-2xl border-2 border-emerald-600 p-5 md:p-6">
             <h2 id="check-h" className="flex flex-wrap items-center gap-3 text-xl font-semibold">

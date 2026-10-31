@@ -1,0 +1,128 @@
+---
+id: design-url-shortener
+level: P1
+theme: system-design
+title: "Design walkthrough: a URL shortener"
+outcome: "Design a URL shortener end to end, from requirements and estimates to short-code generation, storage, caching for fast redirects and click analytics, using everything from the system design track."
+why_it_matters: "The URL shortener is the most common first system design interview question because it touches every building block in a small space. Working one design fully teaches the rhythm you will reuse for any system."
+hours: 3
+gap_tags: []
+primary_resource: yt-bytebytego-how-does-a-url-shortener-work
+alternates: []
+videos: [yt-hello-interview-beginner-system-design-interview-design-bitly-w, yt-neetcodeio-design-a-url-shortener-bitly-system-design]
+format: deep
+key_terms: [back-of-envelope-estimate, caching, sharding, message-queue]
+check:
+  type: project
+  brief: "Build a working mini URL shortener with FastAPI and SQLite: POST a long URL to get a 7-character code, GET the code to be redirected, with a Redis or in-memory cache for redirects and a background task that counts clicks. Add a one-page design note scaling it to 1 crore new links a day. Share a link to the code and the note."
+flashcards:
+  - q: "What are the core functional requirements of a URL shortener?"
+    a: "Create a short code for a long URL, redirect a short code to its long URL, and optionally track clicks and expiry."
+  - q: "Why is a URL shortener read-heavy?"
+    a: "Each link is created once but clicked many times, often 100 or more reads per write."
+  - q: "How many codes do 7 base62 characters allow?"
+    a: "62⁷, about 3.5 lakh crore, far more than needed for years."
+  - q: "What are two ways to generate short codes?"
+    a: "Encode a unique counter ID in base62, or hash the URL and take some characters, handling collisions."
+  - q: "Should redirects be 301 or 302?"
+    a: "302 if you need to count every click, because browsers may cache a 301 and skip your server."
+  - q: "Why put click counting on a queue?"
+    a: "So redirects stay fast; the click event is recorded in the background and aggregated later."
+  - q: "What is a natural shard key for the links table?"
+    a: "The short code, because every redirect looks up exactly one code."
+exercise:
+  title: "Size it"
+  setup: "Your shortener will create 1 crore new links a day and serve 100 redirects per link on average over its life, with each link row about 500 bytes. Links are kept for 5 years."
+  questions:
+    - q: "About how many new links per second on average?"
+      a: "1 crore ÷ about 1 lakh seconds ≈ 115 per second."
+    - q: "About how many redirects per second on average, and what does that suggest?"
+      a: "100 times the writes: about 11,500 per second. Reads dominate, so a cache in front of the database is essential."
+    - q: "How much storage for 5 years of links?"
+      a: "1 crore × 365 × 5 ≈ 1,825 crore links × 500 bytes ≈ 9 TB, before indexes and replicas."
+    - q: "Is 6 base62 characters enough for 5 years?"
+      a: "62⁶ is about 5,700 crore, enough for 1,825 crore links but with less headroom; 7 characters gives far more room for growth."
+ask:
+  - "Should I hash the URL or use a counter to create short codes?"
+  - "How would I stop people abusing a URL shortener for spam?"
+  - "How would this design change for 100 times the traffic?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-10-31
+---
+
+## What it is
+
+A **URL shortener**, like bit.ly or the short links in SMS from banks and delivery apps, turns a long address into a short one such as `xpl.in/aZ3k9Qb`. Visiting the short link redirects you to the original page, and the service usually counts clicks.
+
+It looks simple, which is why interviewers like it: a small problem that touches requirements, estimates, ID generation, database design, caching, sharding, background work and abuse prevention. This lesson walks through it with the five steps from the first lesson of the track.
+
+```text
+ CREATE                                   REDIRECT (hot path)
+ client ─POST long URL─► [ API ]          client ─GET /aZ3k9Qb─► [ LB ] ─► [ API ]
+                           │ new ID 125                                     │
+                           │ base62 → "aZ3k9Qb"           [ Redis cache ] ◄─┤ hit → 302
+                           ▼                                    │ miss      │
+                      [ links DB ] (sharded by code) ◄──────────┘           │
+                                                                            ▼
+                                         click event ─► [ QUEUE ] ─► analytics workers
+```
+
+## How it works
+
+**1. Requirements.** Functional: create a short code for a long URL; redirect a code to its URL; optionally custom codes, expiry dates and click stats. Non-functional: redirects must be very fast (well under 100 ms) and highly available, because a broken short link in a campaign SMS is very visible; codes must be unique and hard to guess in sequence; and the service must resist spam and phishing abuse.
+
+**2. Estimates.** Suppose 1 crore new links a day, about 115 writes per second, and on average 100 redirects per link, about 11,500 reads per second, with peaks several times higher. Over 5 years that is about 1,825 crore links; at roughly 500 bytes each, about 9 TB. This is a **read-heavy** system, so the redirect path matters most.
+
+**3. Short codes.** Two main approaches:
+
+| Approach | How it works | Pros | Cons |
+|---|---|---|---|
+| Counter + base62 | a unique number per link, written in digits 0-9, a-z, A-Z | no collisions, short codes | sequential codes are guessable; needs a distributed counter |
+| Hash of the URL | e.g. first 7 characters of a hash | same URL gives same code | collisions must be detected and retried |
+| Random code | 7 random base62 characters | not guessable | check for collisions on insert |
+
+A common choice is a counter from a service that hands out ranges of IDs to each app server (so servers do not coordinate on every request), with the number shuffled or mixed before base62 encoding so codes are not obviously sequential. Seven base62 characters allow about 3.5 lakh crore codes.
+
+**4. Storage, caching and scaling.** The core table is simple: `code` (primary key), `long_url`, `created_at`, `expires_at`, `owner_id`. Every redirect is a lookup by code, which suits a key-value store or a relational table with the code as primary key. Shard by code when one database is not enough; every request then touches exactly one shard.
+
+Because reads dominate and links rarely change, put a cache such as Redis in front: most redirects never touch the database. Popular links stay hot in the cache. For redirects, return **302** if you want to count every click; a 301 can be cached by browsers, which then skip your server.
+
+**5. Analytics and abuse.** Counting clicks synchronously would slow redirects. Instead the redirect handler publishes a small click event to a queue and returns at once; workers aggregate clicks per link per hour into an analytics store. For abuse, check new URLs against malware and phishing lists, rate-limit link creation per user and IP, and let reports disable a code quickly.
+
+## A worked example
+
+Karthik is asked this question in an interview at a Bengaluru product company. He spends the first four minutes on requirements and confirms with the interviewer: 1 crore links a day, redirects under 50 ms at p95, click counts per day are enough, custom codes are a stretch goal.
+
+He writes the estimates on the board, then states the key insight: "This is about a hundred reads per write, so the design is built around the redirect path."
+
+For codes, he proposes a counter. A small ID service gives each app server a block of 10,000 IDs at a time, so servers rarely need to talk to it. The ID is passed through a reversible shuffle and encoded in base62 to seven characters, so codes do not look sequential. When the interviewer asks what happens if the ID service is down, he points out that servers already hold blocks of IDs and can keep creating links for a while; the ID service itself runs with a standby.
+
+For the redirect path: load balancer, stateless API servers, Redis cache keyed by code with a TTL of a day for normal links, and the links database sharded by code with replicas. He estimates that with a 90% cache hit rate, the database sees only about 1,000 to 2,000 reads per second at peak.
+
+For analytics, each redirect pushes `{code, time, country}` to a queue. Workers roll these up into hourly counts. He notes the trade-off: click counts may lag by a minute, which matches the "per day is enough" requirement.
+
+When the interviewer asks about a link that goes viral in a cricket match ad, he explains that it will sit in the cache on every Redis node it maps to, and the CDN or load balancer can absorb further spikes. He closes with failure cases and abuse controls.
+
+The feedback afterwards was that he kept tying every decision to a number or a requirement, which is exactly the habit this track builds.
+
+## Common mistakes
+
+**Ignoring the read-to-write ratio.** Designing the write path in detail and treating redirects as an afterthought misses the point. Lead with the hot path.
+
+**Codes that are easy to guess.** Plain sequential codes let anyone walk through every link, including private ones. Shuffle IDs or use random codes.
+
+**No collision handling.** Hash or random codes can clash. Use a unique constraint and retry with a new code.
+
+**Counting clicks on the redirect path.** Writing to the analytics database on every click slows redirects and couples them to analytics. Queue click events.
+
+**Using 301 when you need counts.** Browsers cache permanent redirects and stop asking your server.
+
+**Forgetting abuse.** Shorteners are popular with spammers and phishers. Rate limits, URL scanning and quick takedown are part of the design.
+
+## Practise
+
+1. Watch the video lessons in the Watch & learn panel, including a full mock interview of this question.
+2. Do the sizing exercise above.
+3. Do the project check: build a mini shortener with a cache and background click counting, and write the scaling note.
+4. Run a 35-minute mock interview with a friend on this question, using the five steps, then swap roles.

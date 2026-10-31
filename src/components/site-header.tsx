@@ -1,20 +1,21 @@
 import Link from "next/link";
+import { AccountButton } from "./account-link";
 import { HeaderSearch, XpChip } from "./header-extras";
 
 const NAV = [
   { href: "/paths", label: "Roadmaps" },
-  { href: "/ai", label: "AI tools" },
-  { href: "/topics", label: "Topics" },
-  { href: "/resources", label: "Courses" },
+  { href: "/library", label: "Library" },
+  { href: "/videos", label: "Videos" },
   { href: "/practice", label: "Practice" },
   { href: "/interview/simulator", label: "Mock interview" },
-  { href: "/blog", label: "Blog" },
+  { href: "/ai", label: "AI tools" },
+  { href: "/community", label: "Community" },
 ];
 
 /** The site's top bar. A plain details element opens the phone menu, so it works without JavaScript. */
 export function SiteHeader() {
   return (
-    <header className="site-header sticky top-0 z-50 border-b border-black/5 bg-white/75 backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-black/65">
+    <header className="site-header sticky top-0 z-50 border-b border-violet-100/80 bg-white/70 backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#0e0b1c]/70">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 md:px-6">
         <Link href="/" className="text-[15px] font-semibold tracking-tight" aria-label="Xplaind home">
           Xplaind
@@ -29,12 +30,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <HeaderSearch />
           <XpChip />
-          <Link
-            href="/paths"
-            className="site-cta hidden sm:inline-flex h-9 items-center rounded-full bg-black px-4 text-[13px] font-medium text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-          >
-            Get started
-          </Link>
+          <AccountButton className="site-cta hidden sm:inline-flex h-9 items-center rounded-full bg-violet-700 px-4 text-[13px] font-medium text-white shadow-sm shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700" />
           <details className="group relative md:hidden">
             <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 [&::-webkit-details-marker]:hidden">
               <span className="sr-only">Menu</span>
@@ -52,6 +48,7 @@ export function SiteHeader() {
                   {n.label}
                 </Link>
               ))}
+              <AccountButton className="mt-1 rounded-xl bg-violet-700 px-3 py-3 text-center text-[15px] font-medium text-white" />
             </nav>
           </details>
         </div>

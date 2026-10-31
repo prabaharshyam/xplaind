@@ -7,7 +7,7 @@ import type { LevelId } from "@/lib/levels";
 import { loadContent } from "./load";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
-import type { BlogPost, Certification, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
+import type { BlogPost, Certification, Channel, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
 
 let cached: Bundle | undefined;
 
@@ -90,6 +90,9 @@ export const getCertifications = (): Certification[] =>
   getContent()
     .certifications.map((c) => c.data)
     .sort((a, b) => a.level.localeCompare(b.level) || a.provider.localeCompare(b.provider));
+
+/** Featured YouTube channels, in the order the editor set. */
+export const getChannels = (): Channel[] => getContent().channels.map((c) => c.data).sort((a, b) => a.rank - b.rank);
 
 /** Blog posts, newest first. */
 export const getBlogPosts = (): BlogPost[] =>

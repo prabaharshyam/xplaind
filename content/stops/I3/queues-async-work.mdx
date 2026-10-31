@@ -1,0 +1,125 @@
+---
+id: queues-async-work
+level: I3
+theme: system-design
+title: "Message queues and background work"
+outcome: "Move slow or unreliable work off the request path with message queues and workers, make consumers safe to retry, and choose between a simple queue and an event stream such as Kafka."
+why_it_matters: "Sending SMS, generating PDFs, calling LLMs and processing payments are too slow or unreliable to do while a user waits. Queues keep apps fast and absorb spikes, and they appear in nearly every real system design."
+hours: 2
+gap_tags: []
+primary_resource: yt-bytebytego-apache-kafka-fundamentals-you-should-know
+alternates: []
+videos: [yt-techworld-with-nana-kafka-tutorial-for-beginners-everything-you-nee]
+format: deep
+key_terms: [message-queue, idempotency, throughput]
+check:
+  type: project
+  brief: "Build a small FastAPI endpoint that accepts a 'generate certificate' request, puts a job on a queue (Redis with RQ or Celery, or Python's queue module with a worker thread), and returns at once with a job ID. A worker generates a PDF and marks the job done; a status endpoint reports progress. Make the worker safe to run twice for the same job. Share a link to your code."
+flashcards:
+  - q: "What is a message queue?"
+    a: "A service that holds messages from producers until consumers are ready to process them, decoupling the two."
+  - q: "Why move work off the request path?"
+    a: "So the user gets a fast response while slow or unreliable work, such as sending SMS or calling an LLM, happens in the background."
+  - q: "What does at-least-once delivery mean?"
+    a: "Every message is delivered, but some may be delivered more than once, so consumers must handle duplicates."
+  - q: "What makes a consumer idempotent?"
+    a: "Processing the same message twice has the same effect as once, for example by recording processed message IDs."
+  - q: "What is a dead-letter queue?"
+    a: "A separate queue for messages that keep failing after several retries, so they can be inspected without blocking others."
+  - q: "How does Kafka differ from a simple task queue?"
+    a: "Kafka keeps an ordered log that many consumer groups can read and replay; a task queue usually deletes each job once one worker handles it."
+  - q: "How do queues help with traffic spikes?"
+    a: "They buffer bursts, so workers process at a steady rate instead of the database being hit all at once."
+exercise:
+  title: "Design the background work"
+  setup: "When a learner finishes a course on an Indian ed-tech app, the app must save the completion, generate a PDF certificate, email it, send a WhatsApp message and update a leaderboard."
+  questions:
+    - q: "Which step must happen before the response, and which can be queued?"
+      a: "Save the completion in the database before responding. Queue the PDF, email, WhatsApp message and leaderboard update."
+    - q: "The WhatsApp provider times out and the job is retried, so some learners get two messages. What fix?"
+      a: "Make the consumer idempotent: store a sent flag keyed by completion ID and skip if already sent."
+    - q: "A bug makes PDF generation fail for one course every time. What stops it blocking the queue?"
+      a: "Retry a few times with backoff, then move the job to a dead-letter queue and alert someone."
+    - q: "Analytics, the leaderboard and a fraud check all want to know about completions. Queue or event stream?"
+      a: "An event stream such as Kafka: publish one 'course completed' event and let each consumer group read it independently."
+ask:
+  - "When should I use Kafka instead of RabbitMQ or SQS?"
+  - "How do I make a background job idempotent?"
+  - "How should I queue LLM calls that are slow or rate limited?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-10-31
+---
+
+## What it is
+
+Some work is too slow, too unreliable or too bursty to do while a user waits: sending emails and SMS, generating PDFs, resizing images, calling an LLM, syncing with a partner's API. A **message queue** lets one part of the system, the **producer**, drop a message saying "this needs doing", and another part, a **worker** or **consumer**, pick it up and do it later.
+
+The user gets a fast response, the slow work still happens, and if a downstream service is briefly down, the messages wait instead of being lost.
+
+```text
+ user ──► [ API ]  1. save order in DB
+             │      2. publish "order placed" ──► [ QUEUE ]  ──► worker: send SMS
+             │                                        │       ──► worker: update stock
+             ▼                                        │       ──► worker: email invoice
+       "Order placed!"  (fast)                        │  failures retry with backoff
+                                                      ▼
+                                              [ DEAD-LETTER QUEUE ] after N failures
+```
+
+Common tools are RabbitMQ, Amazon SQS, Google Pub/Sub, Redis-based job queues such as Celery and RQ, and Apache Kafka for high-volume event streams.
+
+## How it works
+
+**Producers and consumers are decoupled.** The API does not need to know how many workers exist or whether they are busy. You can add workers when the queue grows and remove them when it is empty. A spike of orders fills the queue; workers drain it at a steady pace, protecting the database and third-party APIs.
+
+**Delivery and retries.** Most queues offer **at-least-once delivery**: a message stays in the queue until a worker confirms it is done. If the worker crashes before confirming, the message is delivered again. That means the same message can be processed twice, so consumers must be **idempotent**: doing the work twice has the same effect as once. Typical ways are a unique job ID checked before acting, or an "upsert" instead of an insert.
+
+Failed jobs should be retried with **exponential backoff** (wait 1 second, then 2, 4, 8...), because many failures are temporary. After a few attempts, move the message to a **dead-letter queue** so one bad message does not block the rest, and alert someone.
+
+**Task queues versus event streams.** A task queue, such as SQS or RabbitMQ, hands each job to one worker and deletes it when done. An **event stream** such as Kafka keeps an ordered, durable log of events. Several independent **consumer groups**, for example analytics, notifications and fraud checks, each read the whole stream at their own pace, and can replay old events. Kafka handles very high throughput, at the cost of more operational complexity.
+
+| Need | Good fit | Why |
+|---|---|---|
+| Run background jobs (emails, PDFs, LLM calls) | Celery/RQ on Redis, SQS, RabbitMQ | simple, one worker per job, retries built in |
+| Many services react to the same event | Kafka, Pub/Sub | each consumer group reads independently |
+| Replay history to rebuild data | Kafka | events are kept for a set period |
+| Strict order per key | Kafka partitions by key, SQS FIFO | order kept within a key |
+| Very low volume, one server | Python queue + worker thread | no extra infrastructure |
+
+**In interviews**, reach for a queue when you hear "send a notification", "process an upload", "call a slow third-party API" or "handle a spike". Then say the three follow-ups interviewers wait for: what happens on failure (retries, backoff, dead-letter queue), what happens on duplicates (idempotent consumers), and how you would notice a backlog (queue length and job age alerts).
+
+## A worked example
+
+Isha builds an AI study-notes feature for a learning app in Pune. Students upload a chapter PDF and get AI-generated summary notes. Her first version called the LLM inside the upload request. It took 40 to 90 seconds, phones timed out, and when the LLM provider rate-limited them during exam season, uploads simply failed.
+
+She redesigned it around a queue:
+
+1. The upload endpoint stores the PDF in object storage, creates a `notes_job` row with status `queued`, publishes a message with the job ID, and returns within a second. The app shows "Your notes are being prepared".
+2. Workers take jobs from the queue, extract the text, call the LLM, save the notes and set the status to `done`. The app polls a status endpoint or receives a push notification.
+3. LLM calls that hit a rate limit are retried with exponential backoff and jitter. Worker concurrency is capped so the team never exceeds its provider quota.
+4. Workers are idempotent: before calling the LLM, a worker checks whether the job already has notes. A crash after saving but before confirming the message no longer causes a second, paid LLM call.
+5. Jobs that fail five times, such as scanned PDFs with no text, go to a dead-letter queue, and the student sees a clear message suggesting they upload a text-based PDF.
+
+During the next exam rush, uploads spiked to ten times normal. The queue grew to a few thousand jobs and drained over twenty minutes; no request timed out, and the monthly LLM bill stayed within budget because concurrency was capped.
+
+## Common mistakes
+
+**Doing slow work in the request.** Users wait, requests time out, and retries from impatient users double the load. Queue it and respond fast.
+
+**Assuming exactly-once processing.** Most queues deliver at least once. Without idempotent consumers you send duplicate SMS, emails or charges.
+
+**Retrying forever without backoff.** Immediate endless retries hammer a struggling service. Use exponential backoff, a retry limit and a dead-letter queue.
+
+**No visibility.** A queue that silently grows means users wait silently. Monitor queue length and job age, and alert on them.
+
+**Using Kafka for a handful of jobs.** It is powerful but heavy to run. A managed task queue is enough for most background work.
+
+**Losing work by acknowledging too early.** Confirm a message only after the work is safely done, or a crash loses it.
+
+## Practise
+
+1. Watch the video lessons in the Watch & learn panel on Kafka fundamentals and getting started.
+2. Do the exercise above.
+3. Do the project check: a queued certificate generator with a status endpoint and an idempotent worker.
+4. Find two features in apps you use that obviously run in the background, and sketch the queue behind them.

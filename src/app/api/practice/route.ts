@@ -1,4 +1,4 @@
-// IQ-4: save a practice rating for a signed-in learner. A rating counts as activity (AC-5).
+// IQ-4: save a practice rating for a signed-in learner. A rating counts as activity (AC-6).
 import { z } from "zod";
 import { RatingInput } from "@/lib/account/claim";
 import { json, problem, rateLimit, readJson, requireSession } from "@/lib/account/http";

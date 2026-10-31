@@ -105,6 +105,13 @@ describe("row-level security (SC-2, AC-4)", () => {
     await fails(asUser(db.client, A, () => q("update profiles set start_level = 'P3' where id = $1", [A])));
   });
 
+  it("a learner can set their own last lesson (AC-6), but not another learner's", async () => {
+    await asUser(db.client, A, async () => {
+      expect((await q("update profiles set last_stop_id = 'what-is-ai', last_stop_at = now() where id = $1", [A])).rowCount).toBe(1);
+      expect((await q("update profiles set last_stop_id = 'what-is-ai' where id = $1", [B])).rowCount).toBe(0);
+    });
+  });
+
   it("server-only tables are closed to learners", async () => {
     for (const table of ["email_subscriptions", "resource_clicks", "rate_limits", "roadmap_downloads"]) {
       const err = await fails(asUser(db.client, A, () => q(`select * from ${table}`)));

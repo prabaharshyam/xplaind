@@ -110,8 +110,12 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   // ---- stops --------------------------------------------------------------
   const referenced = new Set<string>();
   for (const { file, data: s } of bundle.stops) {
-    const refs = [s.primary_resource, ...s.alternates, ...s.more];
-    if (new Set(refs).size !== refs.length) error(file, "primary_resource, alternates and more must all be different");
+    const refs = [s.primary_resource, ...s.alternates, ...s.more, ...s.videos];
+    if (new Set(refs).size !== refs.length) error(file, "primary_resource, alternates, more and videos must all be different");
+    for (const id of s.videos) {
+      const r = resourceById.get(id);
+      if (r && (r.data.type !== "video" || !/youtu/.test(r.data.url))) error(file, `videos lists "${id}", which is not a YouTube video`, "RM-4");
+    }
     for (const id of refs) {
       referenced.add(id);
       if (!resourceById.has(id)) error(file, `resource "${id}" does not exist`, "RM-2");

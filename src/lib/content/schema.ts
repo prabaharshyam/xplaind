@@ -140,6 +140,8 @@ export const StopFrontmatter = z
     alternates: z.array(Slug).max(2),
     /** More free courses on the same topic, from other providers, shown under the main picks. */
     more: z.array(Slug).max(6).default([]),
+    /** YouTube video lessons on this topic, shown first in the Watch & learn panel. */
+    videos: z.array(Slug).max(3).default([]),
     check: z.discriminatedUnion("type", [McqCheck, ProjectCheck]),
     /**
      * "explainer": our own lesson text with the EXPLAINER_SECTIONS. "brief": a short
@@ -492,3 +494,40 @@ export const BlogFrontmatter = z.strictObject({
 });
 export type BlogFrontmatter = z.infer<typeof BlogFrontmatter>;
 export type BlogPost = BlogFrontmatter & { body: string };
+
+// --------------------------------------------------------------- channels ---
+
+/** A video on a featured channel's page: plays on Xplaind through the privacy-enhanced player. */
+const ChannelVideo = z.strictObject({
+  youtube_id: z.string().regex(/^[\w-]{11}$/, "a YouTube video id is 11 characters"),
+  title: Text,
+  minutes: z.number().int().positive(),
+});
+
+/** RM-4: a YouTube channel we recommend for learning AI, with its best videos. */
+export const Channel = z.strictObject({
+  id: Slug,
+  name: Text,
+  url: HttpsUrl.refine((u) => /^https:\/\/www\.youtube\.com\/@/.test(u), "use the channel's https://www.youtube.com/@handle link"),
+  /** One or two sentences: who teaches and what they are good for. */
+  about: Text.max(280),
+  /** Order on the page; lower comes first. */
+  rank: z.number().int().min(1),
+  language: z.string().default("en"),
+  topics: z.array(z.enum(THEME_IDS)).min(1),
+  videos: z.array(ChannelVideo).min(3).max(8),
+  last_verified: IsoDate,
+  verified_by: Text,
+});
+export type Channel = z.infer<typeof Channel>;
+
+// -------------------------------------------------------------- community ---
+
+/** CM-1: where learners meet. Empty links mean the community has not opened yet. */
+export const Community = z.strictObject({
+  discord_url: HttpsUrl.nullable().default(null),
+  whatsapp_url: HttpsUrl.nullable().default(null),
+  rules: z.array(Text.max(160)).min(3).max(10),
+  age_note: Text.max(240),
+});
+export type Community = z.infer<typeof Community>;

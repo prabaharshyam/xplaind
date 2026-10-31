@@ -23,3 +23,4 @@ function send(path: string, body: unknown): void {
 export const syncStop = (stopId: string, record: StopProgress | null): void => send("/api/progress", { stopId, record });
 export const syncRating = (questionId: string, record: RatingRecord): void => send("/api/practice", { questionId, record });
 export const syncPath = (pathId: string): void => send("/api/profile", { goalId: pathId });
+export const syncLastStop = (stopId: string): void => send("/api/profile", { lastStopId: stopId });

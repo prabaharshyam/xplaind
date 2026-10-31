@@ -30,13 +30,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div id="page" className="flex-1">
           {children}
         </div>
-        <footer className="border-t border-zinc-200 px-4 py-6 text-sm dark:border-zinc-800">
+        <footer className="border-t border-violet-100 bg-gradient-to-r from-violet-50/80 via-pink-50/60 to-teal-50/70 px-4 py-8 text-sm dark:border-violet-950 dark:from-violet-950/40 dark:via-transparent dark:to-teal-950/30">
           <nav aria-label="Footer" className="mx-auto flex max-w-2xl flex-wrap gap-x-6 gap-y-2">
             <Link href="/" className="underline-offset-2 hover:underline">
               Xplaind
             </Link>
             <Link href="/paths" className="underline-offset-2 hover:underline">
               Roadmaps
+            </Link>
+            <Link href="/library" className="underline-offset-2 hover:underline">
+              Library
             </Link>
             <Link href="/topics" className="underline-offset-2 hover:underline">
               Topics

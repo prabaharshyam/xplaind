@@ -28,6 +28,6 @@ export function resourceCard(id: string): ResourceCardData {
     // A draft written from memory is not a verification, so it shows no date.
     verifiedOn: isHumanName(r.verified_by) ? r.last_verified : null,
     linkCheckedOn: getLinkStatus()[r.id]?.checked_on ?? null,
-    theme: getStops().find((s) => s.primary_resource === id || s.alternates.includes(id) || s.more.includes(id))?.theme,
+    theme: getStops().find((s) => s.primary_resource === id || s.alternates.includes(id) || s.more.includes(id) || s.videos.includes(id))?.theme,
   };
 }
