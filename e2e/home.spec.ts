@@ -98,3 +98,15 @@ test("the course directory lists every course and filters them", async ({ page }
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });
+
+test("the logo, favicon and footer community invite are in place", async ({ page, request }) => {
+  await page.goto("/");
+  await expect(page.getByRole("banner").getByRole("link", { name: "Xplaind home" }).locator("img").first()).toHaveAttribute("alt", "Xplaind");
+  const footer = page.getByRole("contentinfo");
+  await expect(footer.getByRole("link", { name: "Join the community" })).toHaveAttribute("href", "/community");
+  for (const p of ["/favicon.ico", "/icon.png", "/apple-icon.png", "/brand/xplaind-logo.png", "/brand/xplaind-logo-dark.png"]) {
+    expect((await request.get(p)).status(), p).toBe(200);
+  }
+  await page.goto("/community");
+  await expect(page.getByRole("link", { name: /Join on WhatsApp/ })).toHaveAttribute("href", /^https:\/\/chat\.whatsapp\.com\//);
+});
