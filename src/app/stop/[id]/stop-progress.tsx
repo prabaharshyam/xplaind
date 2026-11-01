@@ -80,8 +80,9 @@ function McqCheck({ stopId, questions, onPassed }: { stopId: string; questions: 
       verdict={(p) => (passesCheck(p) ? "Step done. Well done." : `You need ${CHECK_PASS_PERCENT}% to finish. Review the answers and try again.`)}
       retryLabel="Try the check again"
       onScored={(p) => {
-        if (passesCheck(p)) onPassed(p);
-        setStop(stopId, afterCheck(progress.stops[stopId] as StopProgress | undefined, p, todayInIST()));
+        // SU-2: anyone can take the check; saving the score and the XP needs an account.
+        const saved = setStop(stopId, afterCheck(progress.stops[stopId] as StopProgress | undefined, p, todayInIST()));
+        if (saved && passesCheck(p)) onPassed(p);
       }}
     />
   );
@@ -102,8 +103,8 @@ function ProjectCheck({ stopId, brief, savedUrl, onDone }: { stopId: string; bri
           return;
         }
         setError(null);
+        if (!setStop(stopId, markDone("project", todayInIST(), url.trim()))) return; // SU-2: kept until they sign up
         onDone();
-        setStop(stopId, markDone("project", todayInIST(), url.trim()));
         setUrl("");
       }}
     >

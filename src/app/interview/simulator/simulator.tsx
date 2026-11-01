@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { needAccount } from "@/lib/browser/account-sync";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useAiAccess } from "@/components/ai/ai-gate";
 import { AnswerReviewBlock, InterviewReviewPanel, useInterviewReview } from "@/components/ai/ai-interview-review";
@@ -82,6 +83,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
   const [answers, setAnswers] = useState<Answer[]>([]);
 
   const start = (useVoice: boolean) => {
+    if (!needAccount("interview")) return; // SU-1: the mock interview needs a free account
     const picked = fixedQuestion
       ? [fixedQuestion]
       : pickQuestions(questions, { pathId: pathId || null, count, seed: Math.floor(Math.random() * 2 ** 31) });

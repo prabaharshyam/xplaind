@@ -5,11 +5,33 @@ import type { RatingRecord } from "@/lib/practice/queue";
 import type { StopProgress } from "@/lib/roadmap/types";
 
 let signedIn = false;
+let known = false;
 
 export const setSignedIn = (value: boolean): void => {
   signedIn = value;
+  known = true;
 };
 export const isSignedIn = (): boolean => signedIn;
+
+/** Accounts are on when the Supabase settings are built in. Off (local, CI), everything stays open. */
+export const accountsOn = (): boolean => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+/** SU-1: what needs an account. Shown on the sign-up prompt. */
+export type SignUpReason = "pdf" | "interview" | "progress" | "practice";
+export const SIGNUP_EVENT = "xp:signup";
+
+/** SU-2: may this device save progress? Always, while accounts are off; otherwise only when signed in. */
+export const canSave = (): boolean => !accountsOn() || signedIn;
+
+/**
+ * SU-2: gate an action that needs an account. Returns true when it may go ahead; otherwise opens
+ * the sign-up prompt (unless `quiet`, for saves the learner did not ask for) and returns false.
+ */
+export function needAccount(reason: SignUpReason, quiet = false): boolean {
+  if (canSave()) return true;
+  if (!quiet && known && typeof window !== "undefined") window.dispatchEvent(new CustomEvent(SIGNUP_EVENT, { detail: { reason } }));
+  return false;
+}
 
 function send(path: string, body: unknown): void {
   if (!signedIn) return;

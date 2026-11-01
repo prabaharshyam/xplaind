@@ -3,7 +3,7 @@
 Free-first AI learning path for India. Read docs/PRD.md before changing anything. Requirement IDs (PL-1, RM-2 and so on) are the spec.
 
 ## Stack
-Next.js App Router, TypeScript strict, Tailwind, Supabase (Postgres, email-link auth, row-level security), Zod, Vitest, Playwright, GitHub Actions.
+Next.js App Router, TypeScript strict, Tailwind, Supabase (Postgres, auth with Google, GitHub, email and password or an email link, row-level security), Zod, Vitest, Playwright, GitHub Actions.
 
 ## Rules
 - Editorial content is files under content/, validated by Zod with `npm run content:validate`. Never store editorial content in the database.

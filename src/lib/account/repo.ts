@@ -129,3 +129,9 @@ export async function refreshBadges(admin: SupabaseClient, userId: string, state
 export async function ensureProfile(admin: SupabaseClient, userId: string, adultConfirmedAt: string): Promise<void> {
   must(await admin.from("profiles").upsert({ id: userId, adult_confirmed_at: adultConfirmedAt }, { onConflict: "id", ignoreDuplicates: true }));
 }
+
+/** Whether a learner already has a profile, so a returning Google or GitHub user needs no new tick. */
+export async function profileExists(admin: SupabaseClient, userId: string): Promise<boolean> {
+  const { data } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
+  return Boolean(data);
+}

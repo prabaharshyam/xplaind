@@ -26,11 +26,13 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
     ],
   },
   {
-    title: "Courses",
+    title: "Courses and books",
     links: [
       { href: "/resources", label: "Courses" },
       { href: "/certifications", label: "Certifications" },
+      { href: "/books", label: "Books" },
       { href: "/how-we-rank", label: "How we rank" },
+      { href: "/disclosure", label: "Affiliate disclosure" },
     ],
   },
   {
@@ -96,7 +98,7 @@ export function SiteFooter() {
 
         <div className="mt-12 flex flex-col gap-3 border-t border-violet-100 pt-6 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:text-zinc-400">
           <p>© Xplaind. AI, explained simply.</p>
-          <p>No ads and no sponsored rankings. Prices show the date we checked them.</p>
+          <p>No ads and no sponsored rankings. Book links are affiliate links. Prices show the date we checked them.</p>
         </div>
       </div>
     </footer>

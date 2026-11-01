@@ -13,6 +13,8 @@ import { Scene3D } from "@/components/three/scene-3d";
 import { type IconName, pastelOf, themeOf } from "@/lib/themes";
 import { LessonNav, type SectionLink } from "./lesson-nav";
 import { LearnPanel } from "./learn-panel";
+import { BookCard } from "@/components/book-card";
+import { booksForTheme } from "@/lib/roadmap/books-order";
 import { LessonVisit } from "@/components/continue-card";
 import { JsonLd } from "@/components/json-ld";
 import { lessonGraph } from "@/lib/content/structured";
@@ -100,6 +102,8 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   const isVideo = (c: (typeof cards)[number]) => Boolean(c.embed) || /video/i.test(c.kindLabel);
   const learn = [...stop.videos.map(resourceCard), ...cards, ...more].filter(isVideo);
   const courses = [...cards, ...more].filter((c) => !isVideo(c));
+  // BK-4: up to two books for the lesson's topic, best first (ED-2: never by commission).
+  const books = booksForTheme(getContent().books.map((b) => b.data), stop.theme, 2);
   const checks = new Map(getContent().checks.map(({ data: q }) => [q.id, q]));
   const check =
     stop.check.type === "project"
@@ -120,6 +124,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
     ...(stop.exercise ? [{ id: "try-it", title: stop.exercise.title, icon: "bolt" as const }] : []),
     ...(stop.flashcards.length ? [{ id: "flashcards", title: "Test your understanding", icon: "check" as const }] : []),
     ...(courses.length ? [{ id: "courses", title: "Best course", icon: "book" as const }] : []),
+    ...(books.length ? [{ id: "books", title: "Books", icon: "book" as const }] : []),
     { id: "check", title: "Quick check", icon: "check" },
     { id: "tutor", title: "Ask the AI tutor", icon: "sparkles" },
   ];
@@ -336,6 +341,26 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
                 {explainer ? "Go deeper: the best course" : "Learn it"}
               </h2>
               <StopResources stopId={stop.id} cards={courses} />
+            </section>
+          )}
+
+          {books.length > 0 && (
+            <section id="books" aria-labelledby="books-h" className="mt-8 scroll-mt-24">
+              <h2 id="books-h" className="text-xl font-semibold">
+                Books on this topic
+              </h2>
+              <ul className="mt-3 flex flex-col gap-3">
+                {books.map((b) => (
+                  <li key={b.id}>
+                    <BookCard book={b} compact />
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-sm">
+                <Link href="/books" className={textLink}>
+                  All recommended books
+                </Link>
+              </p>
             </section>
           )}
 

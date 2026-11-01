@@ -14,7 +14,7 @@ export function StopResources({ stopId, cards }: { stopId: string; cards: Resour
 
   // Opening a resource starts the stop, unless the learner already has a status for it.
   const start = () => {
-    if (!progress.stops[stopId] && today) setStop(stopId, { status: "in_progress", updatedOn: today });
+    if (!progress.stops[stopId] && today) setStop(stopId, { status: "in_progress", updatedOn: today }, { quiet: true });
   };
 
   return (

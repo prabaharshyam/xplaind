@@ -281,14 +281,26 @@ export const Book = z
     id: Slug,
     title: Text,
     author: Text,
+    year: z.number().int().min(1950).max(2100),
     level: Level,
+    /** BK-4: the topics the book helps with; lesson and topic pages show matching books. */
+    themes: z.array(z.enum(THEME_IDS)).min(1),
+    /** ED-2: the editor's score from 0 to 5. Order comes from this, never from commission. */
+    score: z.number().min(0).max(5),
     why: Text.max(280),
-    amazon_in_url: HttpsUrl,
+    /** A plain Amazon India link with no tag; /go/book adds the affiliate tag (BK-2). */
+    amazon_in_url: HttpsUrl.refine((u) => new URL(u).hostname === "www.amazon.in", "BK-1: the buy link must be on www.amazon.in"),
     affiliate: z.literal(true),
     hosted_pdf_url: HttpsUrl.optional(),
     hosted_by: Text.optional(),
   })
   .superRefine((b, ctx) => {
+    if (b.why.split(/\s+/).length > 40) {
+      ctx.addIssue({ code: "custom", path: ["why"], message: "BK-1: the why line must be 40 words or fewer" });
+    }
+    if (new URL(b.amazon_in_url).searchParams.has("tag")) {
+      ctx.addIssue({ code: "custom", path: ["amazon_in_url"], message: "BK-2: keep the tag out of the file; /go/book adds it" });
+    }
     if (b.hosted_pdf_url && !b.hosted_by) {
       ctx.addIssue({
         code: "custom",
