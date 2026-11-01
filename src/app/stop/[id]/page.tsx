@@ -164,6 +164,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             colors={pastelOf(stop.theme)}
             seed={stop.id}
             density="panel"
+            glow
             className="relative hidden h-52 w-80 shrink-0 md:block"
             fallback={
               <span className="grid size-full place-items-center rounded-3xl bg-white/20 ring-1 ring-white/40 backdrop-blur">
