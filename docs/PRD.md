@@ -241,6 +241,7 @@ Interview prep is the entry point and the reason to share the site. Release 1 is
 | BK-1 | A books page with about 20 books by level: title, author, why it is worth reading, level, and a buy link on Amazon India | Each book has a why-it-helps line of 40 words or fewer |
 | BK-2 | Affiliate links carry a visible "we earn a commission" label and a sitewide disclosure page. Commission never changes order | The sort function does not read the affiliate field; a test enforces it |
 | BK-3 | Link to a free PDF only when the author or publisher hosts it | Validation requires a hosted\_by field for any PDF link |
+| BK-4 | Lesson pages show up to two books for the lesson's topic, and topic pages up to four, each with the same "we may earn a commission" label and a link to the books page. The pick uses the editor's score, never commission. Buy links go through /go/book/\[id\], which adds the Amazon Associates tag from the AMAZON\_IN\_TAG setting | The book-order function is in the ED-2 test; a book file holds a plain amazon.in link with no tag |
 
 The Amazon India commission rate is unconfirmed: a 2026 guide I found said about 4% and older sources said 10%, so treat books as a trust feature first and an income line second.
 

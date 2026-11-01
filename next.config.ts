@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   // cannot follow), so ship those files with every route; pages are prerendered at build.
   outputFileTracingIncludes: {
     "/api/**": ["./content/**/*", "./data/**/*"],
+    "/go/**": ["./content/**/*"],
     // Share images draw the logo from this file when they render on demand.
     "/**/opengraph-image*": ["./public/brand/xplaind-wordmark.png"],
   },

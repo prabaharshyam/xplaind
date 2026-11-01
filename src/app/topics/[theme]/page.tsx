@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { LessonCard } from "@/components/lesson-card";
 import { PageHero } from "@/components/page-hero";
 import { textLink } from "@/components/ui";
-import { getPaths, getStops } from "@/lib/content";
+import { BookCard } from "@/components/book-card";
+import { getContent, getPaths, getStops } from "@/lib/content";
+import { booksForTheme } from "@/lib/roadmap/books-order";
 import { getInterviewViews } from "@/lib/content/interview";
 import { LEVEL_IDS } from "@/lib/levels";
 import { THEMES, themeOf } from "@/lib/themes";
@@ -40,6 +42,8 @@ export default async function TopicPage({ params }: PageProps<"/topics/[theme]">
   const paths = getPaths().filter((p) => p.stages.some((st) => st.lessons.some((l) => ids.has(l))));
   const questions = getInterviewViews().filter((q) => ids.has(q.stop.id)).slice(0, 8);
   const hours = lessons.reduce((n, l) => n + l.hours, 0);
+  // BK-4: the best books for this topic (ED-2: by the editor's score, never by commission).
+  const books = booksForTheme(getContent().books.map((b) => b.data), id, 4);
 
   return (
     <main>
@@ -92,6 +96,26 @@ export default async function TopicPage({ params }: PageProps<"/topics/[theme]">
                 </li>
               ))}
             </ul>
+          </section>
+        )}
+
+        {books.length > 0 && (
+          <section aria-labelledby="books" className="mt-12">
+            <h2 id="books" className="text-2xl font-semibold">
+              Books on {t.label.toLowerCase()}
+            </h2>
+            <ul className="mt-4 flex flex-col gap-3">
+              {books.map((b) => (
+                <li key={b.id}>
+                  <BookCard book={b} compact />
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3">
+              <Link href="/books" className={textLink}>
+                All recommended books
+              </Link>
+            </p>
           </section>
         )}
       </div>

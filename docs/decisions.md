@@ -257,3 +257,8 @@ The owner asked for the AI features in the screenshot they shared (generate a co
 - **Research basis.** AI answer engines mostly cite pages that already rank, favour a complete answer near the top of the page, fresh dates, clear structure and named reviewers; ChatGPT search uses Bing's index, so the owner should also submit the sitemap to Bing Webmaster Tools. Vendor GEO figures were not relied on.
 - **Answer-first.** Each lesson gained a hand-written `answer` (175 in all) shown as Quick answer and used as the description, llms.txt and structured data.
 - **Writing audit.** Lessons scored a median Flesch reading ease of 65.5 (plain English, about grade 7) with only nine AI-sounding words, so they were edited, not rewritten: four filler words replaced and 43 of the longest sentences split in the hardest lessons. Interview answers scored 55 to 60, appropriate for spoken answers.
+
+## 2026-11-01: books with affiliate links (BK-1 to BK-4)
+
+The owner asked for highly rated books on AI, ML, DSA, system design and RAG, placed wherever they fit, to earn affiliate commission. We added 34 books, each checked to exist on Open Library, with an editor score from 0 to 5. They appear on /books, on topic pages (up to four) and on lesson pages (up to two). The order comes only from the editor score and level (ED-2); the ordering file is in the ED-2 test. Every buy link is labelled as an affiliate link and points to /disclosure. Buy links are Amazon India searches by title and author, so they always land on the Indian editions; /go/book adds the owner's Associates tag from AMAZON\_IN\_TAG. Amazon ratings could not be read automatically, so the scores are editorial and should be reviewed by the owner.
+

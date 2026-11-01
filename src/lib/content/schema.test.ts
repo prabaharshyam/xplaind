@@ -190,6 +190,9 @@ describe("Glossary term", () => {
 
 describe("Book (BK, ED-8)", () => {
   it("only allows affiliate links, which are always labelled", () => {
+    expect(Book.safeParse({ ...book(), amazon_in_url: "https://www.amazon.in/s?k=x&tag=me-21" }).success).toBe(false); // BK-2: tag lives in settings
+    expect(Book.safeParse({ ...book(), amazon_in_url: "https://example.com/x" }).success).toBe(false); // BK-1: Amazon India only
+    expect(Book.safeParse({ ...book(), why: Array(41).fill("word").join(" ") }).success).toBe(false); // BK-1: 40 words
     expect(Book.safeParse({ ...book(), affiliate: false }).success).toBe(false);
   });
   it("requires hosted_by for a hosted PDF", () => {
