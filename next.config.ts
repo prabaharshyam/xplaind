@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
   // cannot follow), so ship those files with every route; pages are prerendered at build.
   outputFileTracingIncludes: {
     "/api/**": ["./content/**/*", "./data/**/*"],
+    // Share images draw the logo from this file when they render on demand.
+    "/**/opengraph-image*": ["./public/brand/xplaind-wordmark.png"],
   },
   // The roles were reorganised on 2026-10-26: old links land on the closest new roadmap.
   async redirects() {

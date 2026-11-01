@@ -1,5 +1,12 @@
 // SE-6: the picture a shared Xplaind link shows on WhatsApp, LinkedIn and X.
+import fs from "node:fs";
+import path from "node:path";
 import { ImageResponse } from "next/og";
+
+// The official wordmark, read once at build time.
+const LOGO = `data:image/png;base64,${fs
+  .readFileSync(path.join(/* turbopackIgnore: true */ process.cwd(), "public", "brand", "xplaind-wordmark.png"))
+  .toString("base64")}`;
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
@@ -20,9 +27,10 @@ export function ogCard({ eyebrow, title, footer, from, to }: { eyebrow: string; 
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 16, background: `linear-gradient(135deg, ${from}, ${to})` }} />
-          <div style={{ fontSize: 30, fontWeight: 700, color: "#4c1d95" }}>Xplaind</div>
-          <div style={{ fontSize: 26, color: "#6d28d9", marginLeft: 12 }}>{eyebrow}</div>
+          {/* eslint-disable-next-line @next/next/no-img-element -- next/og draws plain img tags */}
+          <img src={LOGO} alt="" width={254} height={40} />
+          <div style={{ width: 3, height: 34, borderRadius: 2, background: `linear-gradient(180deg, ${from}, ${to})`, marginLeft: 6 }} />
+          <div style={{ fontSize: 26, color: "#1f66fe", fontWeight: 600 }}>{eyebrow}</div>
         </div>
         <div style={{ fontSize: title.length > 48 ? 64 : 78, fontWeight: 800, lineHeight: 1.08, letterSpacing: -1.5, maxWidth: 1000 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 28, color: "#3f3a56" }}>

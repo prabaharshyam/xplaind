@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AccountButton } from "./account-link";
+import { BrandLogo } from "./brand-logo";
 import { HeaderSearch, XpChip } from "./header-extras";
 import { MenuCloser } from "./menu-closer";
 
@@ -18,8 +19,8 @@ export function SiteHeader() {
   return (
     <header className="site-header sticky top-0 z-50 border-b border-violet-100/80 bg-white/70 backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#0e0b1c]/70">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 md:px-6">
-        <Link href="/" className="text-[15px] font-semibold tracking-tight" aria-label="Xplaind home">
-          Xplaind
+        <Link href="/" className="shrink-0" aria-label="Xplaind home">
+          <BrandLogo height={22} />
         </Link>
         <nav aria-label="Main" className="hidden items-center gap-6 text-[13px] text-zinc-700 md:flex dark:text-zinc-300">
           {NAV.map((n) => (
