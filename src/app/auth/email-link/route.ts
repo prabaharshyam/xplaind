@@ -10,14 +10,16 @@ const back = (request: NextRequest, params: Record<string, string>) =>
   NextResponse.redirect(new URL(`/signin?${new URLSearchParams(params)}`, request.url), 303);
 
 export async function POST(request: NextRequest) {
-  if (!accountsEnabled()) return back(request, { error: "off" });
-  const parsed = parseEmailLinkForm(await request.formData());
-  if (!parsed.ok) return back(request, { error: parsed.error });
+  const form = await request.formData();
+  const keep = { next: safeNext(typeof form.get("next") === "string" ? String(form.get("next")) : null) };
+  if (!accountsEnabled()) return back(request, { error: "off", ...keep });
+  const parsed = parseEmailLinkForm(form);
+  if (!parsed.ok) return back(request, { error: parsed.error, ...keep });
 
   const admin = adminClient();
   if (admin) {
     const limited = await rateLimit(admin, `email-link:${ipKey(request)}`, 600, 5);
-    if (limited) return back(request, { error: "busy" });
+    if (limited) return back(request, { error: "busy", ...keep });
   }
 
   const client = await userClient();
@@ -31,6 +33,6 @@ export async function POST(request: NextRequest) {
       data: { adult_confirmed_at: new Date().toISOString() },
     },
   });
-  if (error) return back(request, { error: "send" });
+  if (error) return back(request, { error: "send", ...keep });
   return back(request, { sent: "1" });
 }

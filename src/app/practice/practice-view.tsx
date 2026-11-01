@@ -82,7 +82,7 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
 
   function next(rating: Rating) {
     const id = queue![index];
-    rate(id, { rating, updatedOn: today ?? todayInIST() });
+    if (!rate(id, { rating, updatedOn: today ?? todayInIST() })) return; // SU-2: the sign-up prompt opens
     setIndex(index + 1);
     setStage(0);
     // Move focus to the new question for keyboard and screen-reader users.

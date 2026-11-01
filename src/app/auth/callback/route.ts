@@ -1,9 +1,9 @@
-// The sign-in link lands here. Exchange it for a session, create the profile
-// with the 18+ timestamp (AC-1), then go on, by default to the dashboard, where
+// Sign-in links, Google and GitHub land here. Exchange the code for a session, create the
+// profile with the 18+ timestamp (AC-1), then go on, by default to the dashboard, where
 // the device's result and progress are claimed (AC-2).
 import { type NextRequest, NextResponse } from "next/server";
 import { safeNext } from "@/lib/account/http";
-import { ensureProfile } from "@/lib/account/repo";
+import { finishSignIn } from "@/lib/account/finish";
 import { adminClient, userClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
@@ -20,14 +20,8 @@ export async function GET(request: NextRequest) {
     : tokenHash
       ? await client.auth.verifyOtp({ type: "email", token_hash: tokenHash })
       : { error: new Error("no code") };
-  if (error) return fail("link");
+  if (error) return fail(params.get("error") ? "provider" : "link");
 
-  const { data } = await client.auth.getUser();
-  const adultAt = data.user?.user_metadata?.adult_confirmed_at;
-  if (!data.user || typeof adultAt !== "string") {
-    await client.auth.signOut();
-    return fail("adult");
-  }
-  await ensureProfile(admin, data.user.id, adultAt);
+  if ((await finishSignIn(client, admin)) !== "ok") return fail("adult");
   return NextResponse.redirect(new URL(safeNext(params.get("next")), request.url), 303);
 }

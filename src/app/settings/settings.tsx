@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { WEEKLY_HOUR_CHOICES } from "@/lib/placement/estimate";
@@ -134,6 +134,8 @@ export function Settings({ email, weeklyHours }: { email: string | null; weeklyH
         )}
       </section>
 
+      <PasswordSection />
+
       <section aria-labelledby="data-heading" className="flex flex-col gap-3">
         <h2 id="data-heading" className="text-xl font-semibold">
           Your data
@@ -181,5 +183,46 @@ export function Settings({ email, weeklyHours }: { email: string | null; weeklyH
         </button>
       </form>
     </div>
+  );
+}
+
+const PASSWORD_STATUS: Record<string, string> = {
+  saved: "Password saved. You can now sign in with your email and this password.",
+  short: "Use a password of 8 to 72 characters.",
+  failed: "We could not save that password. Please try again.",
+};
+
+/** Set or change the password, for example after signing up with Google or an email link. */
+function PasswordSection() {
+  const status = useSearchParams().get("password");
+  return (
+    <section aria-labelledby="password-heading" className="flex flex-col gap-3">
+      <h2 id="password-heading" className="text-xl font-semibold">
+        Password
+      </h2>
+      <p className="leading-7">Signed up with Google, GitHub or an email link? Set a password to sign in with your email too.</p>
+      {status && PASSWORD_STATUS[status] && (
+        <p role="status" className="rounded-xl bg-zinc-100 p-3 text-sm dark:bg-zinc-900">
+          {PASSWORD_STATUS[status]}
+        </p>
+      )}
+      <form action="/auth/set-password" method="post" className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <label className="flex flex-1 flex-col gap-1">
+          <span className="font-medium">New password</span>
+          <input
+            type="password"
+            name="password"
+            required
+            minLength={8}
+            maxLength={72}
+            autoComplete="new-password"
+            className="min-h-12 rounded-xl border border-zinc-400 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+          />
+        </label>
+        <button type="submit" className={secondaryButton}>
+          Save password
+        </button>
+      </form>
+    </section>
   );
 }

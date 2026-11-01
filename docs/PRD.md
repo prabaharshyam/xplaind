@@ -215,7 +215,7 @@ Added at the owner's request (2026-10-26).
 | ID | Requirement | Acceptance criteria |
 | --- | --- | --- |
 | RD-1 | Every roadmap downloads as a printable PDF checklist: each section with a box per topic (hours, optional, coming soon), the section project with its deliverables, space for start and target dates and notes, and topics already done or skipped ticked | Made in the browser; works at 360 px |
-| RD-2 | Before the first download the learner gives name, email, professional experience and, optionally, a phone number, and agrees to the stated consent text. Details go to a server-only table with row-level security, are deleted with the account and included in the data export. A learner who says they are under 18 downloads without giving details and nothing is sent (PV-2). Details are asked once per device | RLS test; the API validates every field; the under-18 path sends no request |
+| RD-2 | Before the first download the learner gives name, email, professional experience and, optionally, a phone number, and agrees to the stated consent text. Details go to a server-only table with row-level security, are deleted with the account and included in the data export. A learner who says they are under 18 downloads without giving details and nothing is sent (PV-2); since SU-1 this applies only while accounts are off, because the PDF needs an account and accounts are 18+. Signed in, the form is pre-filled from the account. Details are asked once per device | RLS test; the API validates every field; the under-18 path sends no request |
 
 ## Interview Q&A, MCQs and books
 
@@ -251,7 +251,9 @@ Keep gamification light. In a Belgian study of 6,592 adults, which the idea vali
 
 | ID | Requirement | Acceptance criteria |
 | --- | --- | --- |
-| AC-1 | Sign-in by email link only, no passwords. Before sending the link, the learner ticks "I am 18 or older" | No link is sent without the tick; the tick is stored with a timestamp |
+| AC-1 | Sign-up and sign-in with Google, GitHub, email and password, or an email link (amended 2026-11-01 at the owner's request; was email link only). One form offers all four and works with JavaScript off. A new account needs the "I am 18 or older" tick; for Google and GitHub the tick travels to the callback in a short-lived cookie. Passwords are 8 to 72 characters; a learner can set one later in Settings | No account is created without the tick; the tick is stored with a timestamp; a new Google or GitHub account without it is signed out again |
+| SU-1 | What needs a free account (added 2026-11-01 at the owner's request): downloading a roadmap PDF, the mock interview simulator, and saving progress (lesson status, check scores and XP, project links, streaks, practice ratings). Everything else stays open without an account, so search engines and AI answers can read it: lessons, roadmaps, videos, glossary, blog, books, interview questions and the placement test with its result (PL-5) | With accounts on, a signed-out visitor who starts a gated action sees the sign-up prompt and nothing is saved; with accounts off (no Supabase settings) everything works as before |
+| SU-2 | One sign-up prompt for the whole site opens over the page, names what the learner was trying to do, offers every sign-up option and returns them to the same page. Anyone can still take a lesson check or practise a card; only saving needs an account. Saves the learner did not ask for (opening a course marks a lesson "learning") are skipped quietly | The prompt passes the accessibility scan at 360 px; a check score is not celebrated or counted unless it was saved |
 | AC-2 | Claim. On first sign-in, attach the device's saved test result and progress to the account | A learner who tested signed out sees the same result after signing in |
 | AC-3 | Dashboard: current level, next five steps, progress across the nine levels, weekly streak, weekly-hours goal, and a re-test link | Loads in under 2 seconds on a mid-range phone over 4G |
 | AC-4 | Progress rows per stop: status, check score, project link, timestamps. Any change records an activity day | Rows are readable and writable only by their owner |
@@ -426,7 +428,7 @@ Content reaches the site only through the build. User data reaches the database 
 | --- | --- | --- |
 | Framework | Next.js App Router, TypeScript strict, Tailwind CSS | Static generation for content pages |
 | Hosting | Vercel or Cloudflare Pages | Free tier to start; the idea validation doc estimates ₹2,000 to ₹10,000 a month for the whole stack, approximate |
-| Auth and database | Supabase: Postgres, email-link sign-in, row-level security | One service for both |
+| Auth and database | Supabase: Postgres, sign-in with Google, GitHub, email and password or an email link, row-level security | One service for both |
 | Content | YAML and MDX in the repo, validated with Zod | Review by pull request |
 | Search | Pagefind, a static search index built at deploy | No search server |
 | Email | A service with List-Unsubscribe support, such as Resend or Brevo | Pick after checking free limits and delivery to Indian inboxes; not verified |
@@ -472,7 +474,7 @@ Release 1 makes no language-model calls at run time, which keeps the first month
 | ID | Requirement | Acceptance criteria |
 | --- | --- | --- |
 | PV-1 | Collect only email, goal, weekly hours, level, progress, an optional first name for the level card, and, for a roadmap checklist download, name, email, professional experience and an optional phone number given with consent (RD-2, amended 2026-10-26 at the owner's request). No photo, government ID or precise location | The schema holds no other personal fields |
-| PV-2 | Under-18 path. No account and nothing stored on the server. Analytics for signed-out visitors uses no cookies and no user identifier | Choosing "under 18" never reaches the profiles or quiz\_attempts tables |
+| PV-2 | Under-18 path. No account and nothing stored on the server. Analytics for signed-out visitors uses no cookies and no user identifier. Since SU-1 (2026-11-01, the owner's choice), under-18s cannot use the features that need an account; everything open to signed-out visitors stays open to them | Choosing "under 18" never reaches the profiles or quiz\_attempts tables |
 | PV-3 | The privacy page names every processor (hosting, Supabase, email service, analytics), the purpose and retention of each data type, and how to delete data. Unconfirmed email signups are deleted after 7 days | Page exists before the first public signup; a scheduled job deletes stale rows |
 | SC-1 | Secrets live only in environment settings, never in the repository | A secret scan runs in CI |
 | SC-2 | Row-level security tests: a test signs in as user A and must fail to read or change user B's rows | The test runs in CI on every pull request |
@@ -532,7 +534,7 @@ How to use this PRD: export it as Markdown into the repository as docs/PRD.md, p
 Free-first AI learning path for India. Read docs/PRD.md before changing anything. Requirement IDs (PL-1, RM-2 and so on) are the spec.
 
 ## Stack
-Next.js App Router, TypeScript strict, Tailwind, Supabase (Postgres, email-link auth, row-level security), Zod, Vitest, Playwright, GitHub Actions.
+Next.js App Router, TypeScript strict, Tailwind, Supabase (Postgres, auth with Google, GitHub, email and password or an email link, row-level security), Zod, Vitest, Playwright, GitHub Actions.
 
 ## Rules
 - Editorial content is files under content/, validated by Zod with `npm run content:validate`. Never store editorial content in the database.

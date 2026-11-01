@@ -262,3 +262,12 @@ The owner asked for the AI features in the screenshot they shared (generate a co
 
 The owner asked for highly rated books on AI, ML, DSA, system design and RAG, placed wherever they fit, to earn affiliate commission. We added 34 books, each checked to exist on Open Library, with an editor score from 0 to 5. They appear on /books, on topic pages (up to four) and on lesson pages (up to two). The order comes only from the editor score and level (ED-2); the ordering file is in the ED-2 test. Every buy link is labelled as an affiliate link and points to /disclosure. Buy links are Amazon India searches by title and author, so they always land on the Indian editions; /go/book adds the owner's Associates tag from AMAZON\_IN\_TAG. Amazon ratings could not be read automatically, so the scores are editorial and should be reviewed by the owner.
 
+## 2026-11-01: sign-up gates the PDF, the mock interview and saved progress (AC-1, SU-1, SU-2)
+
+The owner asked that the site's real value need a sign-up, with quick options including Google and email and password. Decisions, confirmed by the owner:
+
+- **Sign-up options:** Google, GitHub, email and password, and the email link as a fallback. This amends AC-1, which was email link only.
+- **What needs an account:** the roadmap PDF, the mock interview, and saving progress and practice. Lessons, roadmaps, videos, glossary, blog, books, interview questions and the placement test stay open, so search engines and AI answers keep reading them (SE-1).
+- **Under-18s:** accounts stay 18+ only (PV-2). The owner chose not to keep a no-account path for gated features, so under-18s can no longer download the PDF or use the mock interview.
+- **Sites without accounts:** with accounts off (no Supabase settings, as in CI and local development), nothing is gated.
+

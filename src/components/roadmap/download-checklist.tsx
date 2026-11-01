@@ -1,5 +1,7 @@
 "use client";
 
+import { accountsOn, needAccount } from "@/lib/browser/account-sync";
+import { browserClient } from "@/lib/supabase/browser";
 import { useId, useState } from "react";
 import { Icon } from "@/components/art/icons";
 import { primaryButton, secondaryButton } from "@/components/ui";
@@ -44,11 +46,19 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
   };
 
   const start = async () => {
+    if (!needAccount("pdf")) return; // SU-1: the PDF needs a free account
     const known = remembered();
     if (known) {
       setBusy(true);
       await make(known.name).finally(() => setBusy(false));
       return;
+    }
+    // Signed in: fill in what the account already knows, so the form is quicker.
+    const user = accountsOn() ? (await browserClient()?.auth.getUser())?.data.user : null;
+    if (user) {
+      const meta = user.user_metadata as { full_name?: unknown; name?: unknown };
+      const name = typeof meta.full_name === "string" ? meta.full_name : typeof meta.name === "string" ? meta.name : "";
+      setForm((f) => ({ ...f, email: f.email || user.email || "", name: f.name || name }));
     }
     setOpen(true);
   };
@@ -118,9 +128,12 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
             </p>
           </div>
 
-          <label className="flex min-h-11 items-center gap-2">
-            <input type="checkbox" checked={minor} onChange={(e) => setMinor(e.target.checked)} className="size-5 accent-emerald-700" />I am under 18
-          </label>
+          {/* PV-2: with accounts on, the PDF needs an account and accounts are 18+, so this path is only for accounts-off sites. */}
+          {!accountsOn() && (
+            <label className="flex min-h-11 items-center gap-2">
+              <input type="checkbox" checked={minor} onChange={(e) => setMinor(e.target.checked)} className="size-5 accent-emerald-700" />I am under 18
+            </label>
+          )}
 
           {minor ? (
             <p className="rounded-xl bg-zinc-100 p-3 text-sm dark:bg-zinc-900">No details needed. Your checklist downloads straight away, and nothing is sent to us.</p>

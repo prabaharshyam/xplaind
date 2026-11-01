@@ -35,6 +35,39 @@ In Supabase, Authentication, then URL Configuration:
 
 Email sign-in is on by default. Supabase's built-in email sender allows only a few emails an hour, which is fine for testing. Before launch, connect a proper email service (slice S7).
 
-## 4. Check it works
+## 4. Switch on Google sign-in
 
-Open the site, use "Sign in" in the footer, tick "I am 18 or older", and open the emailed link in the same browser. You should land on the dashboard with your test result and progress from that device.
+1. Go to [Google Cloud Console](https://console.cloud.google.com/), then APIs & Services, then Credentials.
+2. Choose Create credentials, then OAuth client ID, then Web application. If Google asks, set up the consent screen first: External, app name "Xplaind", your support email.
+3. Under Authorised redirect URIs, add `https://blgqdjtbzhrtiohepmvn.supabase.co/auth/v1/callback`.
+4. Copy the Client ID and Client secret.
+5. In Supabase, go to Authentication, then Sign In / Providers, then Google. Switch it on, paste both values and save.
+
+## 5. Switch on GitHub sign-in
+
+1. On GitHub, go to Settings, then Developer settings, then OAuth Apps, then New OAuth App.
+2. Homepage URL: `https://xplaind.in`. Authorization callback URL: `https://blgqdjtbzhrtiohepmvn.supabase.co/auth/v1/callback`.
+3. Register it, then generate a client secret. Copy the Client ID and the secret.
+4. In Supabase, go to Authentication, then Sign In / Providers, then GitHub. Switch it on, paste both values and save.
+
+## 6. Email and password
+
+The Email provider (Authentication, then Sign In / Providers, then Email) handles both passwords and sign-in links, and it is on by default.
+
+"Confirm email" decides what happens after someone signs up with a password:
+
+- On: they must open a confirmation email before they can use their account.
+- Off: they are signed in straight away. This is quicker, but the email address is not checked.
+
+The site works either way.
+
+## 7. Check it works
+
+Open the site and press "Sign up". Tick "I am 18 or older", then try each way in:
+
+- Continue with Google
+- Continue with GitHub
+- Email and password
+- An emailed link
+
+Each one should land you on the dashboard with your test result and progress from that device. Then sign out and try Download the Roadmap or the mock interview: a "Sign up free" prompt should open.

@@ -2,7 +2,7 @@
 // signed-out learner. Slice S5 copies this into stop_progress on sign-in, so the
 // record mirrors that table. Holds stop ids and choices only, no personal data.
 import type { ProgressMap, StopProgress } from "@/lib/roadmap/types";
-import { syncLastStop, syncPath, syncStop } from "./account-sync";
+import { needAccount, syncLastStop, syncPath, syncStop } from "./account-sync";
 import { read, write } from "./storage";
 
 export { serverSnapshot, subscribe } from "./storage";
@@ -88,18 +88,23 @@ function update(change: (p: SavedProgress) => SavedProgress): void {
   write(PROGRESS_KEY, JSON.stringify(change(parseProgress(rawProgress()))));
 }
 
-export function setStop(stopId: string, record: StopProgress): void {
+/** SU-2: saving progress needs an account when accounts are on. Returns false when nothing was saved. */
+export function setStop(stopId: string, record: StopProgress, opts: { quiet?: boolean } = {}): boolean {
+  if (!needAccount("progress", opts.quiet)) return false;
   update((p) => ({ ...p, stops: { ...p.stops, [stopId]: record } }));
   syncStop(stopId, record);
+  return true;
 }
 
-export function clearStop(stopId: string): void {
+export function clearStop(stopId: string): boolean {
+  if (!needAccount("progress")) return false;
   update((p) => {
     const stops = { ...p.stops };
     delete stops[stopId];
     return { ...p, stops };
   });
   syncStop(stopId, null);
+  return true;
 }
 
 /** Replaces all stops with the merged copy from the server, without sending anything back. */
@@ -125,11 +130,13 @@ export function mergeLastStop(server: LastStop | null): void {
 }
 
 /** Saves a stage project's state, or clears it with null. */
-export function setProject(key: string, record: ProjectProgress | null): void {
+export function setProject(key: string, record: ProjectProgress | null): boolean {
+  if (!needAccount("progress")) return false;
   update((p) => {
     const projects = { ...p.projects };
     if (record) projects[key] = record;
     else delete projects[key];
     return { ...p, projects };
   });
+  return true;
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { SignUpDialog } from "@/components/account/signup-dialog";
 import { XBot } from "@/components/bot/x-bot";
 import { MotionEffects, PageEnter } from "@/components/motion/motion-effects";
 import { SiteFooter } from "@/components/site-footer";
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </div>
         <SiteFooter />
+        <SignUpDialog />
         <MotionEffects />
         {/* These read the URL, so pages with dynamic URLs render them in the browser. */}
         <Suspense fallback={null}>
