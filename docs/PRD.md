@@ -179,6 +179,18 @@ Added at the owner's request (2026-10-26): a friendly helper on every page, and 
 | MO-4 | Every animation stops under prefers-reduced-motion: reduce | Checked in the stylesheet: each effect sits behind a no-preference query |
 | MO-5 | Pastel brand and 3D. A soft pastel palette (lilac, peach, mint, sky) on every page; page headers, lesson headers and the home hero show a live WebGL scene (three.js) in the page's pastels. Scenes load only when on screen, pause off screen and in hidden tabs, draw one still frame under reduced motion, skip data-saver connections, and fall back to the drawn cover without WebGL. Card grids arrive in a staggered 3D scroll entrance (transforms only) | No horizontal scroll at 360 px; WCAG 2.1 AA unchanged; canvases are aria-hidden |
 
+## Search and AI answer visibility
+
+| ID | Requirement | Acceptance |
+|---|---|---|
+| SE-1 | The production site (VERCEL_ENV=production) is open to search engines and AI answer crawlers (OAI-SearchBot, PerplexityBot, ClaudeBot, Google-Extended and others); previews stay noindex. DISALLOW_INDEXING=1 closes production; private pages (dashboard, settings, sign-in, results, /go, /api) are never indexed | robots.txt allows / on production with the sitemap; previews disallow / |
+| SE-2 | The sitemap lists every public page with a last-modified date (a lesson's review date, otherwise the newest review date) | Dates are deterministic, not the build clock |
+| SE-3 | Every public page has a title of 60 characters or fewer, a description of at most 155 characters, a canonical address and Open Graph and Twitter tags | Audit of the built pages finds none missing on public routes |
+| SE-4 | Every lesson has an `answer`: one or two plain sentences (at most 200 characters) answering "what is this?" or "how do I do this?". It is shown first on the page as Quick answer and used as the search description | content:validate fails a lesson without one |
+| SE-5 | Lessons carry LearningResource, FAQPage (from their flashcards) and BreadcrumbList structured data; roadmaps carry Course structured data listing their lessons | JSON-LD parses on every lesson and roadmap |
+| SE-6 | Shared links show an image: a site card and a card per lesson with its title, topic and level | Each lesson has an opengraph-image |
+| SE-7 | /llms.txt maps the site for AI tools, listing every lesson with its answer by topic; /llms-full.txt holds each lesson's answer, why it matters and flashcards | Both are prerendered text files |
+
 ## Community
 
 | ID | Requirement | Acceptance |

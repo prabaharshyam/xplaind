@@ -7,14 +7,21 @@ import { MotionEffects, PageEnter } from "@/components/motion/motion-effects";
 import { SiteHeader } from "@/components/site-header";
 import { aiEnabled } from "@/lib/ai/settings";
 import { allowIndexing } from "@/lib/indexing";
+import { siteUrl } from "@/lib/site";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Xplaind", template: "%s | Xplaind" },
+  // SE-3: absolute links, the site's name and share previews for every page.
+  metadataBase: new URL(siteUrl()),
+  title: { default: "Xplaind: learn AI for the job you want", template: "%s | Xplaind" },
   description:
-    "Role-based AI learning paths for India. A short test finds your level, then you get the next five steps with the best course for each.",
+    "Step-by-step AI roadmaps for nine roles, plain-English lessons with video lessons, projects and interview practice, made for learners in India.",
+  applicationName: "Xplaind",
+  openGraph: { siteName: "Xplaind", locale: "en_IN", type: "website" },
+  twitter: { card: "summary_large_image" },
+  category: "education",
   // Not listed in search results until launch (see src/lib/indexing.ts).
   ...(allowIndexing() ? {} : { robots: { index: false, follow: false } }),
 };

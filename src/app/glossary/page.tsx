@@ -6,7 +6,8 @@ import { muted, textLink } from "@/components/ui";
 import { getGlossary, lessonsWithTerm } from "@/lib/content";
 
 export const metadata: Metadata = {
-  title: "AI glossary",
+  alternates: { canonical: "/glossary" },
+  title: "AI glossary: plain-English meanings of AI terms",
   description: "Plain-English meanings of the AI terms you will meet, from tokens to agents, each linked to the lesson that teaches it.",
 };
 

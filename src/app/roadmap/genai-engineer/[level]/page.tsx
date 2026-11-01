@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { muted, textLink } from "@/components/ui";
@@ -18,7 +19,9 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/roadmap/genai-engineer/[level]">): Promise<Metadata> {
   const id = fromSlug((await params).level);
   const level = id && roadmapData().levels.find((l) => l.id === id);
-  return level ? { title: `${level.id} ${level.name}`, description: `${level.can_do}.` } : {};
+  return level
+    ? pageMeta({ title: `${level.id} ${level.name}: GenAI engineer roadmap level`, description: `${level.can_do}.`, path: `/roadmap/genai-engineer/${level.id.toLowerCase()}` })
+    : {};
 }
 
 export default async function LevelPage({ params }: PageProps<"/roadmap/genai-engineer/[level]">) {

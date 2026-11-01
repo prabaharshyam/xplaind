@@ -250,3 +250,10 @@ The owner asked for the AI features in the screenshot they shared (generate a co
 - **Continue where you left off (AC-6).** Migration 20261031000000_last_lesson.sql adds profiles.last_stop_id; the claim reads it apart from the main state, so a database without the column still works.
 - **Community (CM-1).** The owner chose an external Discord or WhatsApp group. Links live in content/community/community.yaml; with none set, the page says it is launching soon.
 - **Pastel brand and 3D (MO-5).** The owner chose WebGL across the site. three.js 0.186.1 renders one network scene per header, loaded on view, paused off screen, still under reduced motion, skipped on data saver, with the drawn cover as fallback. Buttons and links moved from emerald to violet. Design guidance came from the taste-skill and Anthropic frontend-design skills, reviewed and vendored in .claude/skills.
+
+## 2026-11-01: Search and AI answer visibility (SE-1 to SE-7)
+
+- **The live site was hidden from every search engine** (`Disallow: /` and noindex) because ALLOW_INDEXING was never set. The owner asked for the site to be visible in search and AI answers, so indexing now follows VERCEL_ENV=production; previews stay hidden and DISALLOW_INDEXING=1 is the off switch.
+- **Research basis.** AI answer engines mostly cite pages that already rank, favour a complete answer near the top of the page, fresh dates, clear structure and named reviewers; ChatGPT search uses Bing's index, so the owner should also submit the sitemap to Bing Webmaster Tools. Vendor GEO figures were not relied on.
+- **Answer-first.** Each lesson gained a hand-written `answer` (175 in all) shown as Quick answer and used as the description, llms.txt and structured data.
+- **Writing audit.** Lessons scored a median Flesch reading ease of 65.5 (plain English, about grade 7) with only nine AI-sounding words, so they were edited, not rewritten: four filler words replaced and 43 of the longest sentences split in the hardest lessons. Interview answers scored 55 to 60, appropriate for spoken answers.

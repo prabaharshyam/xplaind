@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import { getPath, getPaths } from "@/lib/content";
 import { DEFAULT_PATH_ID } from "@/lib/paths";
@@ -13,7 +14,13 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/start/[path]">): Promise<Metadata> {
   const path = getPath((await params).path);
-  return path ? { title: `Find my level: ${path.name}`, description: `A short test finds where to start on the ${path.name} path.` } : {};
+  return path
+    ? pageMeta({
+        title: `${path.name} level test`,
+        description: `A 10-minute test that finds where to start on the ${path.name} roadmap, so you skip what you already know. No sign-up needed.`,
+        path: `/start/${path.id}`,
+      })
+    : {};
 }
 
 export default async function StartForPath({ params }: PageProps<"/start/[path]">) {

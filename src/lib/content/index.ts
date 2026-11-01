@@ -100,3 +100,6 @@ export const getBlogPosts = (): BlogPost[] =>
     .blog.map((b) => b.data)
     .sort((a, b) => b.published_on.localeCompare(a.published_on) || a.title.localeCompare(b.title));
 export const getBlogPost = (id: string): BlogPost | undefined => getBlogPosts().find((b) => b.id === id);
+
+/** SE-2: the newest review date across lessons: the site's "last updated", and its year. */
+export const contentUpdatedOn = (): string => getStops().reduce((m, s) => (s.reviewed_on > m ? s.reviewed_on : m), "2026-01-01");

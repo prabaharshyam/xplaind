@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getBlogPosts, getPaths, getProjects, getStops } from "@/lib/content";
+import { contentUpdatedOn, getBlogPosts, getPaths, getProjects, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { INTERVIEW_TOPIC_IDS } from "@/lib/interview-topics";
 import { LEVEL_IDS } from "@/lib/levels";
@@ -45,5 +45,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/glossary",
     "/how-we-rank",
   ];
-  return paths.map((p) => ({ url: `${base}${p}` }));
+  // SE-2: last-modified dates, so search and AI engines can tell fresh pages from stale ones.
+  // Lessons use their review date; everything else the date of this build.
+  const built = new Date(`${contentUpdatedOn()}T00:00:00+05:30`);
+  const lessonDate = new Map(getStops().map((s) => [`/stop/${s.id}`, new Date(`${s.reviewed_on}T00:00:00+05:30`)]));
+  const priority = (p: string) => (p === "/" ? 1 : p.startsWith("/roadmap/") || p === "/paths" ? 0.9 : p.startsWith("/stop/") ? 0.8 : 0.6);
+  return paths.map((p) => ({ url: `${base}${p}`, lastModified: lessonDate.get(p) ?? built, priority: priority(p) }));
 }

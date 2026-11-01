@@ -6,7 +6,7 @@ import { getCertifications, getContent, getPath, getResource } from "@/lib/conte
 import { formatDay } from "@/lib/roadmap/cost";
 
 export const metadata: Metadata = {
-  title: "AI certifications in 2026: fees, format and free prep",
+  title: "AI certifications: fees and free prep",
   description:
     "AI certifications from AWS, Microsoft, Google Cloud, NVIDIA and Databricks: who each suits, what it covers, the exam fee with the date we checked it, and the free courses that prepare you.",
   alternates: { canonical: "/certifications" },

@@ -4,6 +4,7 @@ level: P1
 theme: system-design
 title: "Design walkthrough: a URL shortener"
 outcome: "Design a URL shortener end to end, from requirements and estimates to short-code generation, storage, caching for fast redirects and click analytics, using everything from the system design track."
+answer: "A URL shortener maps short codes to long links. Generate unique codes, store them keyed by code, cache hot codes for fast redirects and count clicks in the background."
 why_it_matters: "The URL shortener is the most common first system design interview question because it touches every building block in a small space. Working one design fully teaches the rhythm you will reuse for any system."
 hours: 3
 gap_tags: []
@@ -70,7 +71,7 @@ It looks simple, which is why interviewers like it: a small problem that touches
 
 ## How it works
 
-**1. Requirements.** Functional: create a short code for a long URL; redirect a code to its URL; optionally custom codes, expiry dates and click stats. Non-functional: redirects must be very fast (well under 100 ms) and highly available, because a broken short link in a campaign SMS is very visible; codes must be unique and hard to guess in sequence; and the service must resist spam and phishing abuse.
+**1. Requirements.** Functional: create a short code for a long URL; redirect a code to its URL; optionally custom codes, expiry dates and click stats. Non-functional: redirects must be very fast (well under 100 ms) and highly available, because a broken short link in a campaign SMS is very visible. Codes must be unique and hard to guess in sequence. The service must also resist spam and phishing abuse.
 
 **2. Estimates.** Suppose 1 crore new links a day, about 115 writes per second, and on average 100 redirects per link, about 11,500 reads per second, with peaks several times higher. Over 5 years that is about 1,825 crore links; at roughly 500 bytes each, about 9 TB. This is a **read-heavy** system, so the redirect path matters most.
 
@@ -82,7 +83,7 @@ It looks simple, which is why interviewers like it: a small problem that touches
 | Hash of the URL | e.g. first 7 characters of a hash | same URL gives same code | collisions must be detected and retried |
 | Random code | 7 random base62 characters | not guessable | check for collisions on insert |
 
-A common choice is a counter from a service that hands out ranges of IDs to each app server (so servers do not coordinate on every request), with the number shuffled or mixed before base62 encoding so codes are not obviously sequential. Seven base62 characters allow about 3.5 lakh crore codes.
+A common choice is a counter service that hands out ranges of IDs to each app server, so servers do not coordinate on every request. The number is shuffled before base62 encoding, so codes are not obviously sequential. Seven base62 characters allow about 3.5 lakh crore codes.
 
 **4. Storage, caching and scaling.** The core table is simple: `code` (primary key), `long_url`, `created_at`, `expires_at`, `owner_id`. Every redirect is a lookup by code, which suits a key-value store or a relational table with the code as primary key. Shard by code when one database is not enough; every request then touches exactly one shard.
 
@@ -92,17 +93,17 @@ Because reads dominate and links rarely change, put a cache such as Redis in fro
 
 ## A worked example
 
-Karthik is asked this question in an interview at a Bengaluru product company. He spends the first four minutes on requirements and confirms with the interviewer: 1 crore links a day, redirects under 50 ms at p95, click counts per day are enough, custom codes are a stretch goal.
+Karthik is asked this question in an interview at a Bengaluru product company. He spends the first four minutes on requirements. He confirms with the interviewer: 1 crore links a day, redirects under 50 ms at p95, daily click counts are enough, and custom codes are a stretch goal.
 
 He writes the estimates on the board, then states the key insight: "This is about a hundred reads per write, so the design is built around the redirect path."
 
-For codes, he proposes a counter. A small ID service gives each app server a block of 10,000 IDs at a time, so servers rarely need to talk to it. The ID is passed through a reversible shuffle and encoded in base62 to seven characters, so codes do not look sequential. When the interviewer asks what happens if the ID service is down, he points out that servers already hold blocks of IDs and can keep creating links for a while; the ID service itself runs with a standby.
+For codes, he proposes a counter. A small ID service gives each app server a block of 10,000 IDs at a time, so servers rarely need to talk to it. The ID is passed through a reversible shuffle and encoded in base62 to seven characters, so codes do not look sequential. The interviewer asks what happens if the ID service is down. He points out that servers already hold blocks of IDs and can keep creating links for a while, and the ID service itself runs with a standby.
 
 For the redirect path: load balancer, stateless API servers, Redis cache keyed by code with a TTL of a day for normal links, and the links database sharded by code with replicas. He estimates that with a 90% cache hit rate, the database sees only about 1,000 to 2,000 reads per second at peak.
 
 For analytics, each redirect pushes `{code, time, country}` to a queue. Workers roll these up into hourly counts. He notes the trade-off: click counts may lag by a minute, which matches the "per day is enough" requirement.
 
-When the interviewer asks about a link that goes viral in a cricket match ad, he explains that it will sit in the cache on every Redis node it maps to, and the CDN or load balancer can absorb further spikes. He closes with failure cases and abuse controls.
+Then comes a link that goes viral in a cricket match ad. He explains that it will sit in the cache on the Redis node it maps to, and the CDN or load balancer can absorb further spikes. He closes with failure cases and abuse controls.
 
 The feedback afterwards was that he kept tying every decision to a number or a requirement, which is exactly the habit this track builds.
 

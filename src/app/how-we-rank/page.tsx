@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { muted } from "@/components/ui";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/how-we-rank" },
   title: "How we rank",
-  description: "How Xplaind picks courses, how links are checked, and how the site earns money.",
+  description: "How Xplaind picks the best course for each topic, checks every link and price, and keeps commissions out of the ranking.",
 };
 
 // ED-3. Draft wording for the owner to review before launch (slice S7 finishes the

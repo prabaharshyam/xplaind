@@ -6,8 +6,9 @@ import { getInterviewViews, quizPoolFor } from "@/lib/content/interview";
 import { PracticeView } from "./practice-view";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/practice" },
   title: "Practise AI interview questions",
-  description: "Practise GenAI interview questions one at a time, rate yourself, and take quick multiple-choice quizzes.",
+  description: "Practise AI interview questions as flashcards: answer out loud, compare with the model answer, rate yourself and take quick quizzes.",
 };
 
 export default function PracticePage() {
