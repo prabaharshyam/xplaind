@@ -103,7 +103,7 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
           aria-controls={ids.region}
           disabled={busy}
         >
-          <Icon name="download" size={18} /> {busy ? "Making your checklist…" : "Download as a printable checklist (PDF)"}
+          <Icon name="download" size={18} /> {busy ? "Making your roadmap…" : "Download the Roadmap"}
         </button>
       </div>
 
@@ -171,7 +171,7 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
           )}
           <div className="flex flex-wrap gap-2">
             <button type="button" className={primaryButton} onClick={() => void submit()} disabled={busy}>
-              {busy ? "Making your checklist…" : minor ? "Download my checklist" : "Save and download"}
+              {busy ? "Making your roadmap…" : "Download the Roadmap"}
             </button>
             <button type="button" className={secondaryButton} onClick={() => setOpen(false)}>
               Cancel
