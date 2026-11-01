@@ -12,8 +12,8 @@ export function duration(hours: number): string {
 }
 
 /**
- * RM-4: every video lesson and course for the lesson, in the side panel so learners see
- * at once that there is something to watch. YouTube plays here; the rest open in a new tab.
+ * RM-4: the lesson's videos, in the side panel so learners see at once that there is
+ * something to watch. YouTube plays here. Courses and articles sit after the lesson text.
  */
 export function LearnPanel({ stopId, items, headingId }: { stopId: string; items: ResourceCardData[]; headingId: string }) {
   if (items.length === 0) return null;
@@ -27,7 +27,7 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
         Watch &amp; learn
       </h2>
       <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-        {videos > 0 ? `${videos} video ${videos === 1 ? "lesson" : "lessons"} and more for this topic.` : "Hand-picked for this topic."}
+        {`${videos} video ${videos === 1 ? "lesson" : "lessons"} for this topic.`}
       </p>
       <ul className="mt-3 flex flex-col gap-3">
         {items.map((r, i) => (

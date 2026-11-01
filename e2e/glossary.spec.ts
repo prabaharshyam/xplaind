@@ -28,6 +28,8 @@ test("an explainer lesson shows its sections, key terms and the course after the
   // the video lessons sit in the Watch & learn panel, not repeated after the text
   await expect(main.locator("#learn-top")).toBeVisible();
   await expect(main.locator("#courses").getByText("Video lesson")).toHaveCount(0);
+  // and courses and articles sit after the text, not in the panel
+  await expect(main.locator("#learn-top").getByText(/^(Course|Article)$/)).toHaveCount(0);
   expect(await overflow(page)).toBe(false); // the code sample scrolls inside its box
   expect((await wcag(page)).violations).toEqual([]);
 });
