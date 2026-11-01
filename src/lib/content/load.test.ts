@@ -46,6 +46,7 @@ level: B1
 theme: ai-basics
 title: One
 outcome: Do it.
+answer: It is a simple idea, explained in one sentence.
 why_it_matters: Because.
 hours: 2
 gap_tags: [ai-basics]

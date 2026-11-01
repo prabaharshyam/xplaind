@@ -25,7 +25,7 @@ test.describe("interview questions (IQ-1, IQ-3)", () => {
   });
 
   test("every question page has its parts, fits a phone and passes the accessibility scan", async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(questions.length * 4_000); // each page is loaded and scanned
     for (const q of questions) {
       await page.goto(`/interview/${q.id}`);
       await expect(page.getByRole("heading", { level: 1 }), q.id).toHaveText(q.question);

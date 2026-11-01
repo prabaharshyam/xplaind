@@ -62,8 +62,8 @@ test("an unknown stop shows the not-found page and asks search engines to skip i
 });
 
 test("every stop page fits a 360px phone and passes the accessibility scan", async ({ page }) => {
-  test.setTimeout(420_000); // 163 pages, each scanned
   const { bundle } = loadContent(path.resolve(__dirname, "../content"));
+  test.setTimeout(bundle.stops.length * 5_000); // each page is loaded and scanned
   for (const { data: stop } of bundle.stops) {
     await page.goto(`/stop/${stop.id}`);
     await expect(page.getByRole("heading", { level: 1 }), stop.id).toHaveText(stop.title);

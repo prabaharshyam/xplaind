@@ -133,6 +133,11 @@ export const StopFrontmatter = z
     theme: z.enum(THEME_IDS),
     title: Text,
     outcome: Text,
+    /**
+     * SE-4: the plain answer to "what is this?", in one or two sentences. Shown first on the
+     * page and used as the search description, so search and AI results can quote it.
+     */
+    answer: Text.max(200),
     why_it_matters: Text.max(360),
     hours: z.number().min(1).max(6),
     gap_tags: z.array(Slug),

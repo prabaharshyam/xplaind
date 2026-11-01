@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DraftNote } from "@/components/draft-note";
@@ -15,7 +16,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/projects/[id]">): Promise<Metadata> {
   const p = getProject((await params).id);
-  return p ? { title: `${p.title}: a guided AI project`, description: p.summary, alternates: { canonical: `/projects/${p.id}` } } : {};
+  return p ? pageMeta({ title: `${p.title}: a guided AI project`, description: p.summary, path: `/projects/${p.id}`, type: "article" }) : {};
 }
 
 /** GP-2: one guided project, from brief to submission. */

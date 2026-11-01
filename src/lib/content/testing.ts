@@ -51,6 +51,7 @@ export const stop = (o: Partial<Stop> = {}): Stop => ({
   theme: "ai-basics",
   title: "Stop one",
   outcome: "Do the thing.",
+  answer: "The thing is a simple idea, explained in one sentence.",
   why_it_matters: "Because it is the base for what comes next.",
   hours: 2,
   gap_tags: ["tag-one"],

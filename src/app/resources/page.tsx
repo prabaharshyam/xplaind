@@ -8,7 +8,7 @@ import { CourseDirectory, type DirectoryRow } from "./course-directory";
 import { kindLabel, youtubeEmbed } from "@/lib/content/media";
 
 export const metadata: Metadata = {
-  title: "AI courses and certificates, filtered by path and level",
+  title: "AI courses and certificates, hand-picked",
   description:
     "Every AI course we recommend, from Google, Microsoft, AWS, NVIDIA, OpenAI, Anthropic, Hugging Face, DeepLearning.AI and more. Filter by path, level and certificate.",
   alternates: { canonical: "/resources" },

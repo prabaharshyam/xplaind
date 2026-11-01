@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Icon } from "@/components/art/icons";
+import { JsonLd } from "@/components/json-ld";
 import { PageHero } from "@/components/page-hero";
+import { roadmapGraph } from "@/lib/content/structured";
 import { RoadmapView } from "@/components/roadmap/roadmap-view";
 import { TopicDrawerProvider } from "@/components/roadmap/topic-drawer";
 import { getPaths, getStops } from "@/lib/content";
@@ -22,6 +24,7 @@ export function RoadmapPage({ path }: { path: Goal }) {
   const sections = model.sections.length;
   return (
     <main>
+      <JsonLd data={roadmapGraph(path.id, lessons.map((l) => ({ id: l.id, title: l.title })))} />
       <PageHero theme={path.theme ?? "llm"} seed={path.id} eyebrow="Role roadmap" title={view.name} lead={view.description} crumbs={[{ href: "/paths", label: "Roadmaps" }]}>
         <p className="flex flex-wrap gap-2 text-sm">
           {[CODING_LABEL[view.coding], `${sections} ${path.layout === "levels" ? "levels" : "stages"}`, `${view.counts.lessons} lessons`, `about ${view.months} months`].map((c) => (

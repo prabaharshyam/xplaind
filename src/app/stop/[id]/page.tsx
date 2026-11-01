@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
@@ -13,6 +14,8 @@ import { type IconName, pastelOf, themeOf } from "@/lib/themes";
 import { LessonNav, type SectionLink } from "./lesson-nav";
 import { LearnPanel } from "./learn-panel";
 import { LessonVisit } from "@/components/continue-card";
+import { JsonLd } from "@/components/json-ld";
+import { lessonGraph } from "@/lib/content/structured";
 import { StopResources } from "./stop-resources";
 import { roadmapHref } from "@/lib/paths";
 import { resourceCard } from "@/lib/content/cards";
@@ -69,7 +72,16 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/stop/[id]">): Promise<Metadata> {
   const stop = getStop((await params).id);
-  return stop ? { title: stop.title, description: stop.outcome } : {};
+  if (!stop) return {};
+  // SE-3: answer-first: the plain answer is what search and AI results quote.
+  return pageMeta({
+    // Add the search phrase only while the whole title still fits in a result.
+    title: stop.title.length <= 32 ? `${stop.title}: explained simply` : stop.title,
+    description: stop.answer,
+    path: `/stop/${stop.id}`,
+    type: "article",
+    modifiedTime: stop.reviewed_on,
+  });
 }
 
 export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
@@ -123,6 +135,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
       {/* MO-2: a reading-progress bar under the top bar. */}
       <div aria-hidden="true" className="lx-progress" />
       <LessonVisit stopId={stop.id} />
+      <JsonLd data={lessonGraph(stop, paths)} />
       <header className="relative overflow-hidden text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}>
         <Cover theme={stop.theme} seed={stop.id} className="absolute inset-0 opacity-60 [&>div:last-child]:hidden" />
         <div className="relative mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 md:flex-row md:items-end md:justify-between md:px-6 md:py-12">
@@ -225,6 +238,14 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
           <div className="mt-4 lg:hidden">
             <LearnPanel stopId={stop.id} items={learn} headingId="learn-top" />
           </div>
+
+          {/* SE-4: the answer first, in plain words, for readers in a hurry and for search and AI results. */}
+          <section aria-labelledby="answer-h" className="mt-6 rounded-2xl bg-violet-50 p-5 ring-1 ring-violet-200 dark:bg-violet-950/40 dark:ring-violet-900">
+            <h2 id="answer-h" className="text-sm font-semibold tracking-wide text-violet-800 uppercase dark:text-violet-300">
+              Quick answer
+            </h2>
+            <p className="mt-1 text-lg leading-8 text-zinc-900 dark:text-zinc-100">{stop.answer}</p>
+          </section>
 
           <section id="why" aria-labelledby="why-h" className="mt-6 scroll-mt-24 rounded-2xl border-l-4 border-amber-400 bg-amber-50 p-5 dark:bg-amber-950/40">
             <h2 id="why-h" className="flex items-center gap-2 text-lg font-semibold">

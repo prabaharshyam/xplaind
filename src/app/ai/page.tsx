@@ -6,7 +6,7 @@ import { aiEnabled } from "@/lib/ai/settings";
 import type { IconName } from "@/lib/themes";
 
 export const metadata: Metadata = {
-  title: "AI tools to learn AI faster: roadmap generator, course generator, coach and tutor",
+  title: "AI tools to learn AI faster",
   description:
     "AI tools for learners: generate a personal AI roadmap, a course on any topic, get coaching, ask a tutor inside every lesson, and get AI feedback on interview answers.",
   alternates: { canonical: "/ai" },

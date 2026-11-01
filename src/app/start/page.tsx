@@ -4,6 +4,7 @@ import { getPath } from "@/lib/content";
 import { TestPage } from "./test-page";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/start" },
   title: "Find my level",
   description: "A short test finds your level, so your roadmap skips what you already know. No sign-up needed.",
 };

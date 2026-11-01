@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import { getInterviewViews, quizPoolFor } from "@/lib/content/interview";
 import { INTERVIEW_TOPIC_IDS, type InterviewTopicId, interviewTopicLabel } from "@/lib/interview-topics";
@@ -13,7 +14,13 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/practice/[topic]">): Promise<Metadata> {
   const topic = asTopic((await params).topic);
-  return topic ? { title: `Practise ${interviewTopicLabel(topic)} interview questions` } : {};
+  return topic
+    ? pageMeta({
+        title: `Practise ${interviewTopicLabel(topic)} interview questions`,
+        description: `Flashcards for ${interviewTopicLabel(topic)} interview questions: answer out loud, check the model answer and rate yourself. Missed questions come back first.`,
+        path: `/practice/${topic}`,
+      })
+    : {};
 }
 
 export default async function TopicPracticePage({ params }: PageProps<"/practice/[topic]">) {

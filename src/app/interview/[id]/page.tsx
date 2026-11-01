@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DraftNote } from "@/components/draft-note";
@@ -12,7 +13,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/interview/[id]">): Promise<Metadata> {
   const q = getInterviewView((await params).id);
-  return q ? { title: q.question, description: q.short_answer } : {};
+  return q ? pageMeta({ title: q.question, description: q.short_answer, path: `/interview/${q.id}`, type: "article" }) : {};
 }
 
 export default async function InterviewQuestionPage({ params }: PageProps<"/interview/[id]">) {
