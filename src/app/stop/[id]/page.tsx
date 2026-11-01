@@ -96,10 +96,10 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   const interview = getInterviewViews().filter((q) => q.stop.id === stop.id);
   const cards = [stop.primary_resource, ...stop.alternates].map(resourceCard);
   const more = stop.more.map(resourceCard);
-  // RM-4: video lessons first, then the best course and the rest, all in the Watch & learn panel.
-  const learn = [...stop.videos.map(resourceCard), ...cards, ...more];
-  // RM-4: the full card for the best courses stays after the text; videos live only in the panel.
-  const courses = cards.filter((c) => !c.embed && !/video/i.test(c.kindLabel));
+  // RM-4: the Watch & learn panel holds only videos; courses and articles get full cards after the text.
+  const isVideo = (c: (typeof cards)[number]) => Boolean(c.embed) || /video/i.test(c.kindLabel);
+  const learn = [...stop.videos.map(resourceCard), ...cards, ...more].filter(isVideo);
+  const courses = [...cards, ...more].filter((c) => !isVideo(c));
   const checks = new Map(getContent().checks.map(({ data: q }) => [q.id, q]));
   const check =
     stop.check.type === "project"
