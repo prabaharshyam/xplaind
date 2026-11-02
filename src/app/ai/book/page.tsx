@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AccountWall } from "@/components/account/account-wall";
 import { PageHero } from "@/components/page-hero";
 import { aiEnabled } from "@/lib/ai/settings";
 import { BookStudio } from "./book-studio";
@@ -24,7 +25,9 @@ export default function BookPage() {
         crumbs={[{ href: "/practice", label: "Practice" }]}
       />
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <BookStudio aiOn={aiEnabled()} />
+        <AccountWall reason="tools" next="/ai/book">
+          <BookStudio aiOn={aiEnabled()} />
+        </AccountWall>
       </div>
     </main>
   );

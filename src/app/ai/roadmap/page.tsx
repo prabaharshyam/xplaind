@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AccountWall } from "@/components/account/account-wall";
 import { PageHero } from "@/components/page-hero";
 import { aiEnabled } from "@/lib/ai/settings";
 import { RoadmapStudio } from "./roadmap-studio";
@@ -23,7 +24,9 @@ export default function AiRoadmapPage() {
         crumbs={[{ href: "/ai", label: "AI tools" }]}
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
-        <RoadmapStudio enabled={aiEnabled()} />
+        <AccountWall reason="tools" next="/ai/roadmap">
+          <RoadmapStudio enabled={aiEnabled()} />
+        </AccountWall>
       </div>
     </main>
   );

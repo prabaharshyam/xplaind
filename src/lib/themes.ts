@@ -19,6 +19,8 @@ export const THEMES = [
   { id: "career", label: "Career", from: "#15803d", to: "#86efac", icon: "star" },
   { id: "dsa", label: "Data structures and algorithms", from: "#7e22ce", to: "#f9a8d4", icon: "tree" },
   { id: "system-design", label: "System design", from: "#0f766e", to: "#a5b4fc", icon: "server" },
+  { id: "rust", label: "Rust", from: "#b7410e", to: "#fdba74", icon: "code" },
+  { id: "ai-tools", label: "AI tools", from: "#db2777", to: "#a78bfa", icon: "sparkles" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];

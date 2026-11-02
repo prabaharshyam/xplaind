@@ -34,6 +34,9 @@ export default function InterviewPage() {
         <Link href="/practice" className={secondaryButton}>
           Practise with flashcards
         </Link>
+        <Link href="/interview/answers" className={secondaryButton}>
+          All answers by role
+        </Link>
       </div>
       <nav aria-labelledby="by-role" className="mt-8">
         <h2 id="by-role" className="text-lg font-semibold">
