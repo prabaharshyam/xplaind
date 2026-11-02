@@ -548,3 +548,26 @@ export const Community = z.strictObject({
   age_note: Text.max(240),
 });
 export type Community = z.infer<typeof Community>;
+
+// ---------------------------------------------------------------- library ---
+
+/**
+ * LB-1: a research paper or a free book. We never host the file: the link goes to the copy the
+ * authors or publisher share (arXiv, their own site), and `hosted_by` says who that is (BK-3).
+ */
+export const LibraryItem = z.strictObject({
+  id: Slug,
+  kind: z.enum(["paper", "book"]),
+  title: Text,
+  authors: Text,
+  year: z.number().int().min(1950).max(2100),
+  theme: z.enum(THEME_IDS),
+  level: Level,
+  why: Text.max(280).refine((w) => w.split(/\s+/).length <= 40, "LB-1: the why line must be 40 words or fewer"),
+  url: z.url().refine((u) => /^https?:\/\//.test(u), "must be a web link"),
+  hosted_by: Text,
+});
+export type LibraryItem = z.infer<typeof LibraryItem>;
+export const Library = z
+  .strictObject({ items: z.array(LibraryItem).min(1) })
+  .refine((l) => new Set(l.items.map((i) => i.id)).size === l.items.length, "LB-1: every item needs its own id");

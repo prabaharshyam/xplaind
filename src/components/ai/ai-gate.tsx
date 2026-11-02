@@ -33,13 +33,13 @@ export function AiGate({ access, next, children }: { access: AiAccess; next: str
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900 dark:bg-emerald-950/40">
         <p className="flex items-center gap-2 font-semibold">
-          <Icon name="lock" size={18} /> Sign in to use AI features
+          <Icon name="lock" size={18} /> Sign up free to use AI features
         </p>
         <p className="mt-1 text-zinc-700 dark:text-zinc-300">
           AI features are for signed-in learners aged 18 or over, with a daily allowance so everyone gets a turn.
         </p>
-        <Link href={`/signin?next=${encodeURIComponent(next)}`} className={`${primaryButton} mt-4`}>
-          Sign in with email
+        <Link href={`/signin?reason=tools&next=${encodeURIComponent(next)}`} className={`${primaryButton} mt-4`}>
+          Create a free account
         </Link>
       </div>
     );

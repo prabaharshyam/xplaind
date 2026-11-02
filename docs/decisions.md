@@ -271,3 +271,17 @@ The owner asked that the site's real value need a sign-up, with quick options in
 - **Under-18s:** accounts stay 18+ only (PV-2). The owner chose not to keep a no-account path for gated features, so under-18s can no longer download the PDF or use the mock interview.
 - **Sites without accounts:** with accounts off (no Supabase settings, as in CI and local development), nothing is gated.
 
+## 2026-11-02: more behind sign-up, a papers library, Rust and AI-tool guides, a new 3D hero (SU-3, IQ-9, LB-1, LB-2, MO-5)
+
+The owner asked for these seven things:
+
+- **AI tools page order:** "Ask me from my book" now comes first.
+- **AI tools behind sign-up:** every AI tool needs a free account (SU-3).
+- **Interview answers by role (IQ-9):** one page with all questions and answers for a role. It sits behind sign-up; single question pages stay public for search.
+- **Papers library (LB-1, LB-2):** research papers and free AI books, with downloads behind sign-up. We link only to copies the authors or publishers host, never our own copies (BK-3). Paper details were checked against arXiv.
+- **Rust:** a Rust topic of seven deep lessons, and a blog post whose quotes link to their sources: Musk's X posts, Google's Android security blog, The Register on Microsoft, and the kernel mailing list.
+- **AI-tool guides:** six deep guides on Claude Code, n8n, Vapi, Claude animation, Veo and Flow, and Gemini and Midjourney images. Videos were chosen by YouTube view count and checked to embed.
+- **3D hero (MO-5):** the particle "mind" is replaced by an iridescent liquid orb with an orbiting ring of light.
+
+All new lessons, terms and video picks are marked for owner review.
+

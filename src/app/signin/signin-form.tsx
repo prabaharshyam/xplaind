@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { SignInForm as Form } from "@/components/account/signin-form";
 import type { SignUpReason } from "@/lib/browser/account-sync";
 
-const REASON_IDS = ["pdf", "interview", "progress", "practice"] as const;
+const REASON_IDS = ["pdf", "interview", "progress", "practice", "tools", "library"] as const;
 
 /** The sign-in page's form, driven by the address: ?next, ?reason, ?error, ?sent and ?mode. */
 export function SignInForm() {

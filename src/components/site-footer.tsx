@@ -31,6 +31,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/resources", label: "Courses" },
       { href: "/certifications", label: "Certifications" },
       { href: "/books", label: "Books" },
+      { href: "/papers", label: "Research papers" },
       { href: "/how-we-rank", label: "How we rank" },
       { href: "/disclosure", label: "Affiliate disclosure" },
     ],

@@ -3,11 +3,12 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 /**
- * MO-5: "the living mind". Thousands of glowing particles keep reassembling: a cloud of ideas
- * becomes a double helix, then a folded brain, then an endless knot, and back. They swirl and
- * twinkle, part around the pointer, and scrolling speeds the change. Decorative (aria-hidden).
- * Three.js loads only when the scene is on screen, the loop pauses off screen and in hidden
- * tabs, reduced motion gets one still frame, and without WebGL the fallback stays.
+ * MO-5: "the thinking orb". A liquid, iridescent orb in the brand pastels breathes and ripples
+ * like a thought taking shape, its colours sliding across the surface like light on a soap
+ * bubble, while a ring of fine light orbits it like ideas in motion. It leans and swells toward
+ * the pointer, and scrolling stirs it. Decorative (aria-hidden). Three.js loads only when the
+ * scene is on screen, the loop pauses off screen and in hidden tabs, reduced motion gets one
+ * still frame, and without WebGL the fallback stays.
  */
 export function Scene3D({
   colors,
@@ -88,127 +89,185 @@ function rng(seedText: string) {
   };
 }
 
-/** The four forms the particles move between, each centred and about 6 units across. */
-function shapes(n: number, rand: () => number): Float32Array[] {
-  const out = [0, 1, 2, 3].map(() => new Float32Array(n * 3));
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < n; i++) {
-    const k = i * 3;
-    // 1. A cloud of ideas: a Fibonacci sphere with a soft, thick shell.
-    const y = 1 - (i / (n - 1)) * 2;
-    const ring = Math.sqrt(1 - y * y);
-    const th = golden * i;
-    const r1 = 2.4 + (rand() - 0.5) * 0.5;
-    out[0].set([Math.cos(th) * ring * r1, y * r1, Math.sin(th) * ring * r1], k);
-
-    // 2. A double helix with rungs: the structure that learning builds.
-    const t = (i / n) * Math.PI * 6;
-    const h = (i / n) * 6 - 3;
-    if (i % 9 === 0) {
-      const f = rand();
-      const a = t;
-      out[1].set([Math.cos(a) * 1.1 * (2 * f - 1), h, Math.sin(a) * 1.1 * (2 * f - 1)], k);
-    } else {
-      const strand = i % 2 ? Math.PI : 0;
-      const jitter = 0.12;
-      out[1].set([Math.cos(t + strand) * 1.1 + (rand() - 0.5) * jitter, h + (rand() - 0.5) * jitter, Math.sin(t + strand) * 1.1 + (rand() - 0.5) * jitter], k);
-    }
-
-    // 3. A brain: two folded hemispheres.
-    const u = rand() * Math.PI * 2;
-    const v = Math.acos(2 * rand() - 1);
-    const folds = 1 + 0.09 * Math.sin(9 * u) * Math.sin(7 * v) + 0.05 * Math.sin(17 * v);
-    const side = i % 2 ? 1 : -1;
-    const sx = Math.sin(v) * Math.cos(u) * 1.25 * folds;
-    out[2].set([side * (Math.abs(sx) + 0.12), Math.cos(v) * 1.45 * folds * 0.85, Math.sin(v) * Math.sin(u) * 1.8 * folds], k);
-
-    // 4. An endless (3, 2) torus knot, the tube filled with light.
-    const s = (i / n) * Math.PI * 2;
-    const p = 2;
-    const q = 3;
-    const rr = Math.cos(q * s) + 2;
-    const cx = rr * Math.cos(p * s) * 0.95;
-    const cy = -Math.sin(q * s) * 0.95;
-    const cz = rr * Math.sin(p * s) * 0.95;
-    const tube = 0.32 * Math.sqrt(rand());
-    const ang = rand() * Math.PI * 2;
-    out[3].set([cx + Math.cos(ang) * tube, cy + Math.sin(ang) * tube, cz + Math.cos(ang + 1.3) * tube], k);
-  }
-  return out;
-}
-
-const VERTEX = /* glsl */ `
-  attribute vec3 aShape0;
-  attribute vec3 aShape1;
-  attribute vec3 aShape2;
-  attribute vec3 aShape3;
-  attribute vec4 aRand;
-  uniform float uTime;
-  uniform float uMorph;
-  uniform float uSize;
-  uniform vec3 uPointer;
-  uniform float uPixel;
-  uniform float uDark;
-  varying float vMix;
-  varying float vTwinkle;
-  varying float vDepth;
-
-  // Weight of shape k when the morph value sits at m on a loop of four.
-  float w(float m, float k) {
-    float d = abs(mod(m - k + 2.0, 4.0) - 2.0);
-    return smoothstep(1.0, 0.0, d);
-  }
-
-  void main() {
-    // Each particle leaves a little earlier or later, so the change ripples through the cloud.
-    float m = uMorph + (aRand.x - 0.5) * 0.35;
-    float w0 = w(m, 0.0), w1 = w(m, 1.0), w2 = w(m, 2.0), w3 = w(m, 3.0);
-    vec3 p = (aShape0 * w0 + aShape1 * w1 + aShape2 * w2 + aShape3 * w3) / max(w0 + w1 + w2 + w3, 0.0001);
-
-    // In mid-change the particles swirl outward like smoke, then settle into the next form.
-    float between = 1.0 - max(max(w0, w1), max(w2, w3));
-    float a = uTime * (0.4 + aRand.y * 0.6) + aRand.z * 6.2831;
-    p += vec3(sin(a), cos(a * 1.3), sin(a * 0.7)) * (0.05 + between * 0.9 * aRand.w);
-
-    vec4 world = modelMatrix * vec4(p, 1.0);
-    // Particles part around the pointer.
-    vec3 away = world.xyz - uPointer;
-    float dist = length(away.xy);
-    world.xy += normalize(away.xy + 0.0001) * smoothstep(1.6, 0.0, dist) * 0.9;
-
-    vec4 mv = viewMatrix * world;
-    gl_Position = projectionMatrix * mv;
-    vTwinkle = 0.55 + 0.45 * sin(uTime * (1.5 + aRand.y * 3.0) + aRand.x * 40.0);
-    // A few particles are bright stars; the rest are fine dust. Nearer particles are larger.
-    float star = step(0.965, aRand.w) * mix(0.9, 2.2, uDark);
-    gl_PointSize = uSize * uPixel * (0.55 + aRand.w * 0.7 + star) * (0.8 + vTwinkle * 0.4) / -mv.z;
-    vMix = aRand.y;
-    vDepth = clamp((p.z + 3.0) / 6.0, 0.0, 1.0);
+// Ashima Arts 3D simplex noise (MIT), the standard compact GLSL version.
+const NOISE = /* glsl */ `
+  vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec4 permute(vec4 x) { return mod289(((x * 34.0) + 10.0) * x); }
+  vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+  float snoise(vec3 v) {
+    const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+    vec3 i = floor(v + dot(v, C.yyy));
+    vec3 x0 = v - i + dot(i, C.xxx);
+    vec3 g = step(x0.yzx, x0.xyz);
+    vec3 l = 1.0 - g;
+    vec3 i1 = min(g.xyz, l.zxy);
+    vec3 i2 = max(g.xyz, l.zxy);
+    vec3 x1 = x0 - i1 + C.xxx;
+    vec3 x2 = x0 - i2 + C.yyy;
+    vec3 x3 = x0 - D.yyy;
+    i = mod289(i);
+    vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+    float n_ = 0.142857142857;
+    vec3 ns = n_ * D.wyz - D.xzx;
+    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+    vec4 x_ = floor(j * ns.z);
+    vec4 y_ = floor(j - 7.0 * x_);
+    vec4 x = x_ * ns.x + ns.yyyy;
+    vec4 y = y_ * ns.x + ns.yyyy;
+    vec4 h = 1.0 - abs(x) - abs(y);
+    vec4 b0 = vec4(x.xy, y.xy);
+    vec4 b1 = vec4(x.zw, y.zw);
+    vec4 s0 = floor(b0) * 2.0 + 1.0;
+    vec4 s1 = floor(b1) * 2.0 + 1.0;
+    vec4 sh = -step(h, vec4(0.0));
+    vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+    vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+    vec3 p0 = vec3(a0.xy, h.x);
+    vec3 p1 = vec3(a0.zw, h.y);
+    vec3 p2 = vec3(a1.xy, h.z);
+    vec3 p3 = vec3(a1.zw, h.w);
+    vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+    p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+    vec4 m = max(0.5 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
+    m = m * m;
+    return 105.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
   }
 `;
 
-const FRAGMENT = /* glsl */ `
+const ORB_VERTEX = /* glsl */ `
+  uniform float uTime;
+  uniform float uAmp;
+  uniform float uFreq;
+  uniform vec3 uPointer;
+  uniform float uPull;
+  varying vec3 vNormalW;
+  varying vec3 vPosW;
+  varying float vRipple;
+  ${NOISE}
+
+  // How far the surface moves out along its normal at point p: a slow, large breath plus
+  // finer ripples, and a swell toward the pointer.
+  float displace(vec3 p) {
+    float t = uTime;
+    float big = snoise(p * uFreq + vec3(t * 0.16, t * 0.12, -t * 0.1));
+    float fine = snoise(p * uFreq * 2.1 - vec3(t * 0.22)) * 0.18;
+    vec3 w = (modelMatrix * vec4(p, 1.0)).xyz;
+    float near = smoothstep(2.4, 0.0, length(w.xy - uPointer.xy)) * uPull;
+    return (big * 0.3 + fine * 0.06) * uAmp + near * 0.22;
+  }
+
+  void main() {
+    vec3 n = normalize(normal);
+    vec3 helper = abs(n.y) < 0.95 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tA = normalize(cross(n, helper));
+    vec3 tB = cross(n, tA);
+    float e = 0.012;
+    float d = displace(position);
+    vec3 p0 = position + n * d;
+    vec3 pA = position + tA * e;
+    vec3 pB = position + tB * e;
+    pA += normalize(pA) * displace(pA);
+    pB += normalize(pB) * displace(pB);
+    vec3 bent = normalize(cross(pA - p0, pB - p0));
+    if (dot(bent, n) < 0.0) bent = -bent;
+    vRipple = d;
+    vec4 world = modelMatrix * vec4(p0, 1.0);
+    vPosW = world.xyz;
+    vNormalW = normalize(mat3(modelMatrix) * bent);
+    gl_Position = projectionMatrix * viewMatrix * world;
+  }
+`;
+
+const ORB_FRAGMENT = /* glsl */ `
+  uniform vec3 uColorA;
+  uniform vec3 uColorB;
+  uniform vec3 uColorC;
+  uniform float uTime;
+  uniform float uDark;
+  varying vec3 vNormalW;
+  varying vec3 vPosW;
+  varying float vRipple;
+
+  // Three brand colours around a loop, so the gradient never has a hard edge.
+  vec3 brand(float t) {
+    t = fract(t) * 3.0;
+    if (t < 1.0) return mix(uColorA, uColorB, smoothstep(0.0, 1.0, t));
+    if (t < 2.0) return mix(uColorB, uColorC, smoothstep(0.0, 1.0, t - 1.0));
+    return mix(uColorC, uColorA, smoothstep(0.0, 1.0, t - 2.0));
+  }
+
+  void main() {
+    vec3 n = normalize(vNormalW);
+    vec3 v = normalize(cameraPosition - vPosW);
+    float facing = max(dot(n, v), 0.0);
+    float fresnel = pow(1.0 - facing, 2.2);
+
+    // Thin-film colour: depends on viewing angle, surface height and a slow drift, like a soap bubble.
+    float film = fresnel * 0.9 + vRipple * 0.9 + dot(n, vec3(0.35, 0.6, 0.25)) * 0.35 + uTime * 0.025;
+    vec3 base = brand(film);
+    vec3 sheen = 0.5 + 0.5 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + film * 1.4));
+    vec3 col = mix(base, base * 0.75 + sheen * 0.35, 0.35);
+
+    // A soft key light and a cool fill, plus two sharp highlights that make it read as glass.
+    vec3 key = normalize(vec3(-0.6, 0.9, 0.7));
+    vec3 fill = normalize(vec3(0.8, -0.3, 0.6));
+    float diffuse = 0.62 + 0.38 * max(dot(n, key), 0.0) + 0.18 * max(dot(n, fill), 0.0);
+    col *= diffuse;
+    float spec = pow(max(dot(n, normalize(key + v)), 0.0), 90.0);
+    float spec2 = pow(max(dot(n, normalize(fill + v)), 0.0), 40.0) * 0.35;
+    col += vec3(1.0) * (spec * 0.9 + spec2);
+
+    // The rim: pale and luminous on a light page, a bright halo on a dark one.
+    vec3 rim = mix(vec3(1.0), brand(film + 0.33) * 1.6, uDark);
+    col = mix(col, rim, fresnel * mix(0.55, 0.85, uDark));
+    col = mix(col, col * 1.15 + 0.05, uDark);
+
+    gl_FragColor = vec4(col, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`;
+
+const RING_VERTEX = /* glsl */ `
+  attribute vec4 aOrbit;   // radius, start angle, speed, height
+  attribute float aSeed;
+  uniform float uTime;
+  uniform float uSize;
+  uniform float uPixel;
+  uniform float uStir;
+  varying float vSeed;
+  varying float vTwinkle;
+  void main() {
+    float a = aOrbit.y + uTime * aOrbit.z * (1.0 + uStir * 2.5);
+    float r = aOrbit.x + sin(uTime * 0.6 + aSeed * 20.0) * 0.05;
+    vec3 p = vec3(cos(a) * r, aOrbit.w + sin(a * 2.0 + aSeed * 6.0) * 0.06, sin(a) * r);
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    gl_Position = projectionMatrix * mv;
+    vTwinkle = 0.55 + 0.45 * sin(uTime * (1.2 + aSeed * 2.5) + aSeed * 40.0);
+    float star = step(0.97, aSeed) * 2.0;
+    gl_PointSize = uSize * uPixel * (0.5 + aSeed * 0.6 + star) / -mv.z;
+    vSeed = aSeed;
+  }
+`;
+
+const RING_FRAGMENT = /* glsl */ `
   uniform vec3 uColorA;
   uniform vec3 uColorB;
   uniform vec3 uColorC;
   uniform float uDark;
-  varying float vMix;
+  varying float vSeed;
   varying float vTwinkle;
-  varying float vDepth;
   void main() {
     float d = length(gl_PointCoord - 0.5);
-    float core = smoothstep(0.5, 0.0, d);
-    float glow = pow(core, 2.6);
-    float hot = smoothstep(0.12, 0.0, d);
-    vec3 col = vMix < 0.5 ? mix(uColorA, uColorB, vMix * 2.0) : mix(uColorB, uColorC, (vMix - 0.5) * 2.0);
-    // Light page: richer, deeper colour so the form reads. Dark page: glowing, with a white-hot centre.
-    vec3 deep = mix(col, vec3(0.30, 0.18, 0.62), 0.38);
-    col = mix(deep, col + hot * 0.8, uDark);
-    float depth = 0.45 + vDepth * 0.55;
-    float crisp = smoothstep(0.5, 0.32, d);
-    float alpha = (uDark > 0.5 ? glow * 1.1 : crisp * 0.8) * vTwinkle * depth;
+    float glow = pow(smoothstep(0.5, 0.0, d), 2.2);
+    vec3 col = vSeed < 0.5 ? mix(uColorA, uColorB, vSeed * 2.0) : mix(uColorB, uColorC, (vSeed - 0.5) * 2.0);
+    col = mix(mix(col, vec3(0.36, 0.22, 0.7), 0.55), col + 0.25, uDark);
+    float alpha = glow * vTwinkle * mix(0.95, 1.0, uDark);
     if (alpha < 0.02) discard;
     gl_FragColor = vec4(col, alpha);
+    #include <colorspace_fragment>
   }
 `;
 
@@ -218,9 +277,10 @@ async function mount(el: HTMLElement, colors: string[], seed: string, density: "
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const dark = glow || window.matchMedia("(prefers-color-scheme: dark)").matches;
   const small = el.clientWidth < 420 || window.innerWidth < 640;
-  const count = density === "hero" ? (small ? 4500 : 11000) : small ? 2500 : 6000;
+  const detail = density === "hero" ? (small ? 40 : 72) : small ? 28 : 48;
+  const ringCount = density === "hero" ? (small ? 900 : 2200) : small ? 600 : 1300;
 
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, powerPreference: "high-performance" });
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
   const pixel = Math.min(window.devicePixelRatio, 1.75);
   renderer.setPixelRatio(pixel);
   renderer.domElement.style.width = "100%";
@@ -228,84 +288,111 @@ async function mount(el: HTMLElement, colors: string[], seed: string, density: "
   el.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-  camera.position.set(0, 0, 9);
-
-  const forms = shapes(count, rand);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(forms[0].slice(), 3));
-  forms.forEach((f, i) => geometry.setAttribute(`aShape${i}`, new THREE.BufferAttribute(f, 3)));
-  const randoms = new Float32Array(count * 4);
-  for (let i = 0; i < randoms.length; i++) randoms[i] = rand();
-  geometry.setAttribute("aRand", new THREE.BufferAttribute(randoms, 4));
+  const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+  camera.position.set(0, 0, 10);
 
   const colour = (i: number) => new THREE.Color(colors[i % colors.length]);
-  const uniforms = {
+  const shared = {
     uTime: { value: 0 },
-    uMorph: { value: 0 },
-    uSize: { value: (density === "hero" ? 44 : 36) * (dark ? 1 : 0.62) },
-    uPixel: { value: pixel },
-    uPointer: { value: new THREE.Vector3(99, 99, 0) },
     uColorA: { value: colour(0) },
     uColorB: { value: colour(1) },
     uColorC: { value: colour(2) },
     uDark: { value: dark ? 1 : 0 },
   };
-  const material = new THREE.ShaderMaterial({
-    vertexShader: VERTEX,
-    fragmentShader: FRAGMENT,
-    uniforms,
+
+  // The orb: a finely divided sphere the vertex shader bends.
+  const orbUniforms = {
+    ...shared,
+    uAmp: { value: 1 },
+    uFreq: { value: 0.42 + rand() * 0.16 },
+    uPointer: { value: new THREE.Vector3(99, 99, 0) },
+    uPull: { value: 0 },
+  };
+  const orbGeometry = new THREE.IcosahedronGeometry(1.55, detail);
+  const orbMaterial = new THREE.ShaderMaterial({ vertexShader: ORB_VERTEX, fragmentShader: ORB_FRAGMENT, uniforms: orbUniforms });
+  const orb = new THREE.Mesh(orbGeometry, orbMaterial);
+  orb.rotation.set(rand() * 6, rand() * 6, 0);
+
+  // The ring of light around it, tilted like a planet's.
+  const ringGeometry = new THREE.BufferGeometry();
+  const orbit = new Float32Array(ringCount * 4);
+  const seeds = new Float32Array(ringCount);
+  for (let i = 0; i < ringCount; i++) {
+    const band = rand();
+    orbit.set([2.15 + band * band * 0.95, rand() * Math.PI * 2, (0.08 + rand() * 0.12) * (rand() < 0.12 ? -1 : 1), (rand() - 0.5) * 0.22 * (1 + band)], i * 4);
+    seeds[i] = rand();
+  }
+  ringGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(ringCount * 3), 3));
+  ringGeometry.setAttribute("aOrbit", new THREE.BufferAttribute(orbit, 4));
+  ringGeometry.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
+  const ringUniforms = { ...shared, uSize: { value: (density === "hero" ? 34 : 28) * (dark ? 1.1 : 1.05) }, uPixel: { value: pixel }, uStir: { value: 0 } };
+  const ringMaterial = new THREE.ShaderMaterial({
+    vertexShader: RING_VERTEX,
+    fragmentShader: RING_FRAGMENT,
+    uniforms: ringUniforms,
     transparent: true,
     depthWrite: false,
     blending: dark ? THREE.AdditiveBlending : THREE.NormalBlending,
   });
-  const points = new THREE.Points(geometry, material);
-  points.frustumCulled = false;
-  scene.add(points);
+  const ring = new THREE.Points(ringGeometry, ringMaterial);
+  ring.frustumCulled = false;
+  ring.rotation.set(1.18 + rand() * 0.2, 0, -0.32 + rand() * 0.2);
+
+  const group = new THREE.Group();
+  group.add(orb, ring);
+  scene.add(group);
 
   const resize = () => {
     const w = Math.max(1, el.clientWidth);
     const h = Math.max(1, el.clientHeight);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    // Fit the camera so the tallest form (about 7 units with its swirl) and the widest
-    // (about 6.5) always fit the box, whatever its shape.
+    // Fit the ring (about 6.4 wide) and the swelling orb (about 4.4 tall) in the box, whatever its shape.
     const view = 2 * Math.tan((camera.fov * Math.PI) / 360);
-    camera.position.z = Math.max(7.4 / view, 6.8 / (view * camera.aspect));
+    camera.position.z = Math.max(5.2 / view, 6.9 / (view * camera.aspect));
     camera.updateProjectionMatrix();
   };
   resize();
   const ro = new ResizeObserver(resize);
   ro.observe(el);
 
-  // The pointer, projected onto the plane the cloud sits in.
+  // The pointer, projected onto the plane through the orb's centre.
   const ndc = new THREE.Vector2();
   const ray = new THREE.Raycaster();
   const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   const hit = new THREE.Vector3();
+  const lean = new THREE.Vector2();
+  let pointerIn = false;
   const onPointer = (e: PointerEvent) => {
     const r = el.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    if (ray.ray.intersectPlane(plane, hit)) uniforms.uPointer.value.copy(hit);
+    if (ray.ray.intersectPlane(plane, hit)) orbUniforms.uPointer.value.copy(hit);
+    pointerIn = Math.abs(ndc.x) < 1.4 && Math.abs(ndc.y) < 1.4;
   };
-  const onLeave = () => uniforms.uPointer.value.set(99, 99, 0);
+  const onLeave = () => (pointerIn = false);
   window.addEventListener("pointermove", onPointer, { passive: true });
   document.addEventListener("pointerleave", onLeave);
 
-  // Each form holds for a moment, then flows into the next; scrolling adds to the flow.
-  let morph = rand() * 4;
   let lastScroll = window.scrollY;
+  let stir = 0;
   const update = (t: number, dt: number) => {
     const scrolled = Math.abs(window.scrollY - lastScroll);
     lastScroll = window.scrollY;
-    const phase = (t % 6) / 6; // six seconds per form
-    const speed = phase < 0.55 ? 0.02 : 0.5; // hold, then flow
-    morph = (morph + dt * speed + Math.min(scrolled, 200) * 0.003) % 4;
-    uniforms.uMorph.value = morph;
-    uniforms.uTime.value = t;
-    points.rotation.y = t * 0.12;
-    points.rotation.x = Math.sin(t * 0.17) * 0.18;
+    // Scrolling stirs the orb and spins the ring, then both settle.
+    stir = Math.min(1, stir * Math.exp(-dt * 2.2) + scrolled * 0.004);
+    shared.uTime.value = t;
+    orbUniforms.uAmp.value = 1 + stir * 0.9 + Math.sin(t * 0.5) * 0.12;
+    orbUniforms.uPull.value += ((pointerIn ? 1 : 0) - orbUniforms.uPull.value) * Math.min(1, dt * 3);
+    ringUniforms.uStir.value = stir;
+    // The orb leans gently toward the pointer.
+    lean.x += ((pointerIn ? ndc.x : 0) * 0.35 - lean.x) * Math.min(1, dt * 2.5);
+    lean.y += ((pointerIn ? ndc.y : 0) * 0.25 - lean.y) * Math.min(1, dt * 2.5);
+    group.rotation.y = lean.x;
+    group.rotation.x = -lean.y;
+    orb.rotation.y += dt * (0.12 + stir * 0.8);
+    orb.rotation.x = Math.sin(t * 0.21) * 0.3;
+    group.position.y = Math.sin(t * 0.7) * 0.08;
     renderer.render(scene, camera);
   };
 
@@ -328,9 +415,8 @@ async function mount(el: HTMLElement, colors: string[], seed: string, density: "
     running = false;
     cancelAnimationFrame(frame);
   };
-  // Reduced motion: one still frame, settled on the brain.
-  morph = reduced ? 2 : morph;
-  update(0, 0);
+  // Reduced motion: one still frame.
+  update(reduced ? 4 : 0, 0);
   const io = new IntersectionObserver(([entry]) => (entry.isIntersecting ? play() : pause()));
   io.observe(el);
   const onVisibility = () => (document.hidden ? pause() : play());
@@ -343,8 +429,10 @@ async function mount(el: HTMLElement, colors: string[], seed: string, density: "
     window.removeEventListener("pointermove", onPointer);
     document.removeEventListener("pointerleave", onLeave);
     document.removeEventListener("visibilitychange", onVisibility);
-    geometry.dispose();
-    material.dispose();
+    orbGeometry.dispose();
+    orbMaterial.dispose();
+    ringGeometry.dispose();
+    ringMaterial.dispose();
     renderer.dispose();
     renderer.domElement.remove();
   };

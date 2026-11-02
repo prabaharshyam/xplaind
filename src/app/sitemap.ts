@@ -38,6 +38,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/videos",
     "/community",
     "/books",
+    "/interview/answers",
+    "/papers",
     "/disclosure",
     ...getProjects().map((p) => `/projects/${p.id}`),
     "/resources",
