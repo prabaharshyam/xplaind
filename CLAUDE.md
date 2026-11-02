@@ -26,3 +26,16 @@ This repo uses Next.js 16 with Cache Components on. Its APIs differ from older v
 ## Commands
 - `npm run dev` runs the site. `npm run check` runs lint, typecheck and unit tests. `npm run test:e2e` runs the Playwright flow (set `PW_CHROMIUM_PATH` if a browser is pre-installed).
 - Fonts are self-hosted with the `geist` package, because `next/font/google` needs network access at build time.
+
+<!-- web-skills:start -->
+## Frontend, 3D & motion skills (in this repo's .claude/skills)
+
+When building or changing UI in this project, use these skills:
+
+- **Visual direction:** `design-taste-frontend` (Taste v2) for the premium, agency-grade look; `ui-ux-pro-max` to pick palette, type and style; `frontend-design` as the baseline. Use at most two taste skills at once — if they disagree, `design-taste-frontend` wins. `impeccable` for audit/polish passes.
+- **3D:** `threejs-*` skills (vanilla Three.js), `r3f-best-practices` / `r3f-fundamentals` (React Three Fiber), `webgpu-threejs-tsl` for WebGPU/TSL, `web-shaders` for GLSL/WGSL.
+- **Motion & scroll:** `gsap-*` skills (timelines, ScrollTrigger, useGSAP); Lenis as the ONLY smooth-scroll engine; `emil-design-eng` for micro-interactions, `review-animations` to audit them; `vercel-react-view-transitions` for page transitions.
+- **Award-style pages:** `build-awwwards-quality-sites` for heroes and scroll storytelling; `scroll-cinematic` for Apple-style frame-sequence scroll.
+- **Components:** `shadcn` / `shadcn-ui` for UI primitives.
+- **Before shipping:** run `web-design-guidelines` and `vercel-react-best-practices`; respect `prefers-reduced-motion`; lazy-load 3D so Core Web Vitals stay green.
+<!-- web-skills:end -->
