@@ -39,7 +39,7 @@ export function ParticleScene({ shape, colors, icon, className = "" }: { shape: 
   }, [shape, key]);
 
   return (
-    <div aria-hidden="true" className={`particle-panel relative overflow-hidden rounded-3xl shadow-xl ring-1 ring-white/50 dark:ring-white/10 ${className}`}>
+    <div aria-hidden="true" className={`relative ${className}`}>
       {/* The poster: the page's icon, until the particles take over (or for good without WebGL). */}
       <span className={`absolute inset-0 grid place-items-center transition-opacity duration-700 ${live ? "opacity-0" : "opacity-100"}`} style={{ color: colors[0] }}>
         <Icon name={icon} size={72} strokeWidth={1.4} />
@@ -155,14 +155,16 @@ const FRAGMENT = /* glsl */ `
 
   void main() {
     float d = length(gl_PointCoord - 0.5);
-    float g = smoothstep(0.5, 0.0, d);
-    g = mix(g * g, g, uDark);
+    // A crisp dot with a faint halo: clear shapes in the light, a soft glow in the dark.
+    float core = smoothstep(0.5, 0.3, d);
+    float halo = smoothstep(0.5, 0.0, d);
+    float g = mix(core, max(core * 0.85, halo), uDark * 0.6);
     vec3 col = mix(uA, uB, clamp(vY * 0.5 + 0.5, 0.0, 1.0));
-    col = mix(col, uC, step(0.86, vSeed));
+    col = mix(col, uC, step(0.93, vSeed));
     col = mix(col, vec3(1.0), vShine * mix(0.35, 0.45, uDark));
-    col = mix(col * 0.9, col * 1.1, uDark);
+    col = mix(col * 0.88, col * 1.1, uDark);
     // Additive glow in the dark: keep each particle faint so the page's colours survive.
-    float a = g * vAlpha * mix(0.95, 0.42, uDark);
+    float a = g * vAlpha * mix(1.0, 0.5, uDark);
     if (a < 0.02) discard;
     gl_FragColor = vec4(col, a);
     #include <colorspace_fragment>
@@ -185,7 +187,7 @@ async function mount(el: HTMLElement, shape: ParticleShape, palette: [string, st
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 50);
-  camera.position.set(0, 0, 3.4);
+  camera.position.set(0, 0, 3.0);
 
   const target = shape.startsWith("icon:") ? extrude(iconPoints(shape.slice(5) as IconName), count) : sculpture(shape as Exclude<ParticleShape, `icon:${string}`>, count);
   const seeds = new Float32Array(count);
@@ -201,7 +203,7 @@ async function mount(el: HTMLElement, shape: ParticleShape, palette: [string, st
     uScatter: { value: 0 },
     uBurst: { value: 0 },
     uPixel: { value: pixel },
-    uSize: { value: small ? 20 : 17 },
+    uSize: { value: small ? 15 : 13 },
     uMouse: { value: new THREE.Vector3(9, 9, 0) },
     uMouseOn: { value: 0 },
     uDark: { value: darkQuery.matches ? 1 : 0 },
@@ -227,7 +229,7 @@ async function mount(el: HTMLElement, shape: ParticleShape, palette: [string, st
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     // Keep the whole shape in view in narrow and wide panels alike.
-    camera.position.z = w / h < 1.2 ? 4.2 : 3.4;
+    camera.position.z = w / h < 1.2 ? 3.7 : 3.0;
     camera.updateProjectionMatrix();
   };
   resize();

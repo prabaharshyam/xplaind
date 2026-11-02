@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { AccountWall } from "@/components/account/account-wall";
 import { PageHero } from "@/components/page-hero";
 import { aiEnabled } from "@/lib/ai/settings";
 import { getPaths, getStops } from "@/lib/content";
@@ -25,9 +24,8 @@ export default function CoachPage() {
         crumbs={[{ href: "/ai", label: "AI tools" }]}
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
-        <AccountWall reason="tools" next="/ai/coach">
-          <Coach enabled={aiEnabled()} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} titles={titles} />
-        </AccountWall>
+        {/* SU-5: AI tools work without an account. */}
+        <Coach enabled={aiEnabled()} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} titles={titles} />
       </div>
     </main>
   );

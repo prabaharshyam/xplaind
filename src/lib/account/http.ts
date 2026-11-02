@@ -39,7 +39,12 @@ export async function rateLimit(admin: SupabaseClient, key: string, windowSecond
  * never stored, and the hash changes daily, so it cannot track anyone over time.
  */
 export function ipKey(request: Request): string {
-  const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  return visitorKey(request.headers);
+}
+
+/** The same daily-rotating hash, from the request's headers (for code that has no Request). */
+export function visitorKey(headers: Pick<Headers, "get">): string {
+  const ip = (headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
   const day = new Date().toISOString().slice(0, 10);
   return createHash("sha256").update(`${day}:${ip}:${process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""}`).digest("hex").slice(0, 24);
 }

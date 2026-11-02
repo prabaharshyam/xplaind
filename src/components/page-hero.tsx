@@ -50,7 +50,7 @@ export function PageHero({
         </div>
         {/* MO-8: the page's own particle sculpture, in its theme's colours. */}
         <div className="lx-hero-art shrink-0 [perspective:1000px]">
-          <ParticleScene shape={shape ?? THEME_SHAPE[theme]} colors={particleColorsOf(theme)} icon={icon ?? themeOf(theme).icon} className="h-44 w-full md:h-56 md:w-96" />
+          <ParticleScene shape={shape ?? THEME_SHAPE[theme]} colors={particleColorsOf(theme)} icon={icon ?? themeOf(theme).icon} className="h-56 w-full md:h-72 md:w-[26rem]" />
         </div>
       </div>
     </header>

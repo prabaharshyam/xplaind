@@ -5,16 +5,19 @@ import { z } from "zod";
 const rpc = vi.fn();
 const create = vi.fn();
 let profile: { id: string } | null = { id: "u1" };
+let user: { id: string; email: null } | null = { id: "u1", email: null };
 
 vi.mock("@/lib/account/http", () => ({
   problem: (status: number, message: string) => Response.json({ error: message }, { status }),
   rateLimit: async () => null,
-  requireSession: async () => ({
-    user: { id: "u1", email: null },
-    client: {},
-    admin: { rpc, from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: profile }) }) }) }) },
-  }),
+  visitorKey: () => "visitor-hash",
 }));
+vi.mock("@/lib/supabase/server", () => ({
+  serviceClient: () => ({ rpc, from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: profile }) }) }) }) }),
+  userClient: async () => ({}),
+  currentUser: async () => user,
+}));
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 
 vi.mock("@anthropic-ai/sdk", () => {
   class APIError extends Error {}
@@ -49,6 +52,7 @@ beforeEach(() => {
   vi.stubEnv("AI_MODEL", "");
   vi.stubEnv("AI_MONTHLY_CAP_USD", "");
   profile = { id: "u1" };
+  user = { id: "u1", email: null };
   rpc.mockReset();
   create.mockReset();
 });
@@ -74,9 +78,31 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("never calls the model without an 18+ profile", async () => {
+  it("treats a visitor without an account as a guest with their own allowance (SU-5)", async () => {
+    user = null;
+    rpc.mockResolvedValueOnce({ data: "ok", error: null }).mockResolvedValueOnce({ data: null, error: null });
+    create.mockResolvedValue(reply('{"answer":"42"}'));
+    expect(await runAi(req)).toEqual({ data: { answer: "42" } });
+    expect(rpc.mock.calls[0]).toEqual(["ai_reserve_guest", expect.objectContaining({ p_visitor: "visitor-hash", p_kind: "tutor", p_month_cap_usd: 20 })]);
+    expect(rpc.mock.calls[0][1]).not.toHaveProperty("p_user");
+    expect(rpc.mock.calls[1]).toEqual(["ai_record_guest", expect.objectContaining({ p_visitor: "visitor-hash", p_tokens_in: 1000 })]);
+  });
+
+  it("counts a signed-in learner without an 18+ profile, and everyone during the sign-up hold, as a guest", async () => {
     profile = null;
-    expect(((await runAi(req)) as Response).status).toBe(403);
+    rpc.mockResolvedValue({ data: "day", error: null });
+    expect(((await runAi(req)) as Response).status).toBe(429);
+    expect(rpc.mock.calls[0][0]).toBe("ai_reserve_guest");
+    vi.stubEnv("NEXT_PUBLIC_SIGNUPS_OPEN", "");
+    profile = { id: "u1" };
+    await runAi(req);
+    expect(rpc.mock.calls[1][0]).toBe("ai_reserve_guest");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("is off without the database for the spend guard, even with a key", async () => {
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+    expect(((await runAi(req)) as Response).status).toBe(503);
     expect(create).not.toHaveBeenCalled();
   });
 

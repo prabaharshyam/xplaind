@@ -197,6 +197,48 @@ describe("AI spend guard (CO-1)", () => {
   });
 });
 
+describe("AI for guests without an account (SU-5)", () => {
+  const guest = async (visitor: string, kind: string, day: string, dailyMax: number, cap: number) =>
+    (await q("select public.ai_reserve_guest($1, $2, $3, '2026-11-01', $4, $5) as r", [visitor, kind, day, dailyMax, cap])).rows[0].r;
+  const learner = async (user: string, cap: number) =>
+    (await q("select public.ai_reserve($1, 'tutor', '2026-11-03', '2026-11-01', 99, $2) as r", [user, cap])).rows[0].r;
+
+  it("counts each visitor's calls per kind and day", async () => {
+    const got: string[] = [];
+    for (let i = 0; i < 3; i++) got.push(await guest("hash-1", "coach", "2026-11-02", 2, 20));
+    expect(got).toEqual(["ok", "ok", "day"]);
+    expect(await guest("hash-2", "coach", "2026-11-02", 2, 20)).toBe("ok");
+    expect(await guest("hash-1", "coach", "2026-11-03", 2, 20)).toBe("ok");
+  });
+
+  it("puts guest spend and learner spend under the one monthly cap", async () => {
+    await q("select public.ai_record_guest('hash-1', 'coach', '2026-11-02', 500, 900, 4)");
+    const row = (await q("select tokens_in, tokens_out, cost_usd::float as cost from ai_guest_usage where visitor = 'hash-1' and kind = 'coach' and day = '2026-11-02'")).rows[0];
+    expect(row).toEqual({ tokens_in: 500, tokens_out: 900, cost: 4 });
+    expect(await learner(A, 4)).toBe("month");
+    expect(await learner(A, 10)).toBe("ok");
+    await q("select public.ai_record($1, 'tutor', '2026-11-03', 10, 10, 6)", [A]);
+    expect(await guest("hash-3", "coach", "2026-11-03", 5, 10)).toBe("month");
+  });
+
+  it("visitors and learners cannot read or write guest usage, or call the guard", async () => {
+    for (const who of [A, null]) {
+      const rows = await asUser(db.client, who, () => q("select * from ai_guest_usage").then((r) => r.rows, () => []));
+      expect(rows).toEqual([]);
+      for (const sql of [
+        "insert into ai_guest_usage (visitor, day, kind) values ('x', '2026-11-05', 'x')",
+        "update ai_guest_usage set cost_usd = 0",
+        "select public.ai_reserve_guest('x', 'x', '2026-11-05', '2026-11-01', 99, 999)",
+        "select public.ai_record_guest('x', 'x', '2026-11-05', 0, 0, -100)",
+        "select public.ai_month_spend('2026-11-01')",
+      ]) {
+        const err = await fails(asUser(db.client, who, () => q(sql)));
+        expect(err.code, sql).toBe(PERMISSION_DENIED);
+      }
+    }
+  });
+});
+
 describe("account deletion (AC-11)", () => {
   it("removes every row of the learner and only theirs", async () => {
     await q("delete from auth.users where id = $1", [B]);
