@@ -126,7 +126,7 @@ export default function Home() {
           <Scene3D colors={["#c4b5fd", "#f9a8d4", "#99f6e4", "#bae6fd"]} seed="xplaind-home" density="panel" className="pointer-events-none relative mt-6 h-52 w-full md:hidden" />
           <div className="mt-10 flex items-end justify-between gap-4">
             <h2 className="text-2xl font-semibold">Choose your AI role</h2>
-            <Link href="/paths" className="text-sm text-violet-800 hover:underline dark:text-violet-300">
+            <Link href="/paths" className="shrink-0 text-sm whitespace-nowrap text-violet-800 hover:underline dark:text-violet-300">
               Compare all roles →
             </Link>
           </div>
