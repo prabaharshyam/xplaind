@@ -65,6 +65,9 @@ export function PageEnter() {
     }
     const el = document.getElementById("page");
     if (!el) return;
+    // The home page runs its own intro, and a transform on the page container would trap the
+    // road's fixed layer (MO-6) inside it, so it skips this one.
+    if (el.querySelector(".journey-sky")) return;
     el.classList.remove("lx-enter");
     void el.offsetWidth; // restart the animation
     el.classList.add("lx-enter");

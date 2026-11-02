@@ -302,6 +302,11 @@ async function mount(el: HTMLElement): Promise<() => void> {
   };
   resize();
   window.addEventListener("resize", resize);
+  // Re-measure whenever the layer's box changes, not only when the window does. After an in-site
+  // navigation the page container is briefly transformed, which stretches this fixed layer to the
+  // whole page for a moment; measuring only once left the road zoomed in until a refresh.
+  const ro = new ResizeObserver(resize);
+  ro.observe(el);
 
   // Scroll sets where we are on the road; the camera eases towards it so the flight feels smooth.
   const progress = () => {
@@ -376,6 +381,7 @@ async function mount(el: HTMLElement): Promise<() => void> {
   return () => {
     pause();
     window.removeEventListener("resize", resize);
+    ro.disconnect();
     window.removeEventListener("pointermove", onPointer);
     darkQuery.removeEventListener("change", onScheme);
     document.removeEventListener("visibilitychange", onVisibility);
