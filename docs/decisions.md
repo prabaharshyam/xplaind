@@ -285,3 +285,7 @@ The owner asked for these seven things:
 
 All new lessons, terms and video picks are marked for owner review.
 
+
+## 2026-11-02: the home page becomes a road flight (MO-6)
+
+The owner disliked both the particle mind and the orb on the home page and asked for a full revamp with 3D scroll effects. Of three concepts they chose the roadmap flight: the road is the product's own metaphor (a roadmap per role), so the motion tells the story instead of decorating it. Home page only for now; other pages keep the orb headers until the owner decides. GSAP and Lenis were added (exact versions) because scroll-linked reveals need ScrollTrigger and the brief asked for smooth scrolling; Lenis is the only smooth-scroll engine and is skipped entirely under reduced motion. Copy sits on solid, slightly translucent cards and a reading-side veil so contrast does not depend on the frame of the scene.
