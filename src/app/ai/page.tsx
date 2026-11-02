@@ -1,4 +1,3 @@
-import { signupsOnHold } from "@/lib/signups";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "@/components/art/icons";
@@ -41,12 +40,12 @@ export default function AiToolsPage() {
         icon="sparkles"
         eyebrow="AI tools"
         title="Learn faster with AI that knows our lessons"
-        lead="AI helpers built on Claude, an AI model from Anthropic, plus study tools for interviews and research papers. All free with an account, for learners aged 18 or over."
+        lead="AI helpers built on Claude, an AI model from Anthropic, plus study tools for interviews and research papers. Free, and no account needed."
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         {!on && (
           <p className="mb-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            {signupsOnHold() ? "The AI helpers come back when sign-ups reopen, shortly. The research papers library and interview practice are open to everyone in the meantime." : "AI tools are switched off right now. Roadmaps, lessons, the course directory and interview practice all work without them."}
+            AI tools are switched off right now. Roadmaps, lessons, the course directory and interview practice all work without them.
           </p>
         )}
         <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

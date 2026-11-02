@@ -131,7 +131,6 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
       from: "bot",
       text: "Hmm, I couldn’t find that on Xplaind yet. Try fewer or different words, like “embeddings” or “interview”, or look it up in the glossary.",
       links: [{ t: "Open the glossary", h: "/glossary", k: "guide" }],
-      signIn: access === "signed-out",
     };
   };
 

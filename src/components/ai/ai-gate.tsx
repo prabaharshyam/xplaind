@@ -1,48 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Icon } from "@/components/art/icons";
-import { primaryButton } from "@/components/ui";
-import { browserClient } from "@/lib/supabase/browser";
 
-export type AiAccess = "loading" | "off" | "signed-out" | "on";
+export type AiAccess = "off" | "on";
 
-/** Whether this visitor can use AI: switched on for the site, and signed in. */
+/**
+ * Whether this visitor can use AI. SU-5: no account is needed, so it is simply whether AI is
+ * switched on for the site; the server still applies the daily allowance and the monthly cap.
+ */
 export function useAiAccess(enabled: boolean): AiAccess {
-  const [state, setState] = useState<AiAccess>(enabled ? "loading" : "off");
-  useEffect(() => {
-    if (!enabled) return;
-    const client = browserClient();
-    if (!client) {
-      queueMicrotask(() => setState("off"));
-      return;
-    }
-    void client.auth.getSession().then(({ data }) => setState(data.session ? "on" : "signed-out"));
-    const { data } = client.auth.onAuthStateChange((_e, session) => setState(session ? "on" : "signed-out"));
-    return () => data.subscription.unsubscribe();
-  }, [enabled]);
-  return state;
+  return enabled ? "on" : "off";
 }
 
-/** Shows children only to signed-in learners when AI is on; otherwise explains why not. */
-export function AiGate({ access, next, children }: { access: AiAccess; next: string; children: ReactNode }) {
+/** Shows children when AI is on; otherwise explains that it is not switched on yet. */
+export function AiGate({ access, children }: { access: AiAccess; next?: string; children: ReactNode }) {
   if (access === "on") return <>{children}</>;
-  if (access === "loading") return <p className="text-zinc-600 dark:text-zinc-400">Checking your account…</p>;
-  if (access === "signed-out")
-    return (
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900 dark:bg-emerald-950/40">
-        <p className="flex items-center gap-2 font-semibold">
-          <Icon name="lock" size={18} /> Sign up free to use AI features
-        </p>
-        <p className="mt-1 text-zinc-700 dark:text-zinc-300">
-          AI features are for signed-in learners aged 18 or over, with a daily allowance so everyone gets a turn.
-        </p>
-        <Link href={`/signin?reason=tools&next=${encodeURIComponent(next)}`} className={`${primaryButton} mt-4`}>
-          Create a free account
-        </Link>
-      </div>
-    );
   return (
     <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900">
       <p className="flex items-center gap-2 font-semibold">

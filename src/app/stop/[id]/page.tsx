@@ -11,7 +11,7 @@ import { Icon } from "@/components/art/icons";
 import { XP } from "@/lib/game/xp";
 import { ParticleScene } from "@/components/three/particle-scene";
 import { THEME_SHAPE } from "@/components/three/particle-shapes";
-import { type IconName, particleColorsOf, themeOf } from "@/lib/themes";
+import { type IconName, themeOf } from "@/lib/themes";
 import { LessonNav, type SectionLink } from "./lesson-nav";
 import { LearnPanel } from "./learn-panel";
 import { BookCard } from "@/components/book-card";
@@ -179,7 +179,8 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </p>
           </div>
           {/* MO-8: the lesson's topic as a particle sculpture. */}
-          <ParticleScene shape={THEME_SHAPE[stop.theme]} colors={particleColorsOf(stop.theme)} icon={theme.icon} className="hidden h-52 w-80 shrink-0 md:block" />
+          {/* White particles: the lesson header is already in the topic's colours. */}
+          <ParticleScene shape={THEME_SHAPE[stop.theme]} colors={["#ffffff", "#fdf2f8", "#fef9c3"]} icon={theme.icon} className="hidden h-64 w-96 shrink-0 md:block" />
         </div>
       </header>
 

@@ -1,11 +1,15 @@
-// Every AI call goes through runAi. Node only. In order: the feature is on, the
-// learner is signed in with a confirmed 18+ profile (PV-2), a burst limit, the
-// daily and monthly caps (CO-1), the call itself with the output checked against
-// a Zod schema (SC-5), then the tokens and cost are written to ai_usage.
+// Every AI call goes through runAi. Node only. In order: the feature is on, who is
+// asking (a signed-in learner with a confirmed 18+ profile, or since SU-5 a visitor
+// without an account, counted by a daily-rotating hash), a burst limit, the daily
+// and monthly caps (CO-1), the call itself with the output checked against a Zod
+// schema (SC-5), then the tokens and cost are written to the usage table.
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
-import { problem, rateLimit, requireSession } from "@/lib/account/http";
+import { headers } from "next/headers";
+import { problem, rateLimit, visitorKey } from "@/lib/account/http";
+import { accountsEnabled } from "@/lib/supabase/config";
+import { currentUser, serviceClient, userClient } from "@/lib/supabase/server";
 import { todayInIST } from "@/lib/dates";
 import { type AiKind, costUsd, DAILY_LIMIT, LIMIT_MESSAGE, monthStart, tokenUses } from "./limits";
 import { aiSettings } from "./settings";
@@ -24,20 +28,16 @@ export async function runAi<S extends z.ZodType>(req: AiRequest<S>): Promise<{ d
   const settings = aiSettings();
   if (!settings) return problem(503, LIMIT_MESSAGE.off);
 
-  const session = await requireSession();
-  if (session instanceof Response) return session;
-  const { user, admin } = session;
+  const admin = serviceClient();
+  if (!admin) return problem(503, LIMIT_MESSAGE.off);
+  const who = await caller(admin);
 
-  // PV-2: only learners who confirmed they are 18 or over have a profile.
-  const { data: profile } = await admin.from("profiles").select("id").eq("id", user.id).maybeSingle();
-  if (!profile) return problem(403, "Finish setting up your account first. AI features are for learners aged 18 or over.");
-
-  const burst = await rateLimit(admin, `ai:${user.id}`, 60, 6);
+  const burst = await rateLimit(admin, `ai:${who.id}`, 60, 6);
   if (burst) return burst;
 
   const day = todayInIST();
-  const { data: verdict, error } = await admin.rpc("ai_reserve", {
-    p_user: user.id,
+  const { data: verdict, error } = await admin.rpc(who.guest ? "ai_reserve_guest" : "ai_reserve", {
+    ...(who.guest ? { p_visitor: who.id } : { p_user: who.id }),
     p_kind: req.kind,
     p_day: day,
     p_month_start: monthStart(day),
@@ -71,8 +71,8 @@ export async function runAi<S extends z.ZodType>(req: AiRequest<S>): Promise<{ d
   }
 
   const uses = tokenUses(response.usage, settings.model);
-  await admin.rpc("ai_record", {
-    p_user: user.id,
+  await admin.rpc(who.guest ? "ai_record_guest" : "ai_record", {
+    ...(who.guest ? { p_visitor: who.id } : { p_user: who.id }),
     p_kind: req.kind,
     p_day: day,
     p_tokens_in: uses.reduce((n, u) => n + u.input, 0),
@@ -85,6 +85,23 @@ export async function runAi<S extends z.ZodType>(req: AiRequest<S>): Promise<{ d
   const checked = req.schema.safeParse(safeJson(text));
   if (!checked?.success) return problem(502, "The answer came back incomplete. Please try again.");
   return { data: checked.data };
+}
+
+/**
+ * Who is asking. A signed-in learner with an 18+ profile (PV-2) uses their own allowance;
+ * anyone else, including everyone while sign-ups are on hold, is a guest (SU-5) counted by a
+ * hash of their address that changes daily, so no one can be tracked over time.
+ */
+async function caller(admin: NonNullable<ReturnType<typeof serviceClient>>): Promise<{ guest: boolean; id: string }> {
+  if (accountsEnabled()) {
+    const client = await userClient();
+    const user = client ? await currentUser(client) : null;
+    if (user) {
+      const { data: profile } = await admin.from("profiles").select("id").eq("id", user.id).maybeSingle();
+      if (profile) return { guest: false, id: user.id };
+    }
+  }
+  return { guest: true, id: visitorKey(await headers()) };
 }
 
 function safeJson(text: string): unknown {

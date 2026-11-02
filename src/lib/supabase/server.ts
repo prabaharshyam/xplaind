@@ -31,6 +31,17 @@ export function adminClient(): SupabaseClient | null {
   return createClient(config.url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
+/**
+ * SU-5: the service client for the AI guard. Unlike adminClient it ignores the sign-up hold
+ * (SU-4): AI usage and caps are recorded even while accounts are off.
+ */
+export function serviceClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = supabaseServiceKey();
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
 /** The signed-in user's id, checked with the auth server (not just read from the cookie). */
 export async function currentUser(client: SupabaseClient): Promise<{ id: string; email: string | null } | null> {
   const { data, error } = await client.auth.getUser();

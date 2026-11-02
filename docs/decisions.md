@@ -301,3 +301,11 @@ The owner did not want the same road on every page and asked for particles inste
 ## 2026-11-02: sign-ups on hold until sign-in is set up (SU-4)
 
 Google sign-in and the other providers are not configured yet, so sign-up does not work and the owner could not reach the gated features. Rather than remove the gates, one switch puts the whole site into the accounts-off mode CI already tests: everything open, progress on the device, no prompts. It is on by default and lifted with NEXT_PUBLIC_SIGNUPS_OPEN=true in Vercel. The AI helpers stay off during the hold: they need a signed-in, confirmed 18+ learner for PV-2 and for the per-learner daily limits and monthly spend cap (CO-1). Opening them to anonymous visitors would change PV-2 and the cost guard, so that is left to the owner.
+
+## 2026-11-02: AI tools work without an account (SU-5)
+
+The owner asked for the AI tools to work without sign-up or sign-in. This relaxes the earlier rule that AI is for signed-in learners aged 18 or over (PV-2 as applied to AI in SU-3): the owner's decision. Spend stays bounded: visitors without an account are counted by a short hash of their address that rotates daily (the address is never stored, and nothing about the request itself is kept), with the same per-kind daily limits and burst limit as learners, and their spend counts toward the one monthly cap. The AI guard now uses the service key directly, so it keeps working while sign-ups are on hold (SU-4). Needs the 20261102000000_ai_guests migration applied to the production database; until it is, guest AI calls fail closed with "AI is not available right now" and no money is spent.
+
+## 2026-11-02: particle sculptures without the card (MO-8)
+
+The owner asked to drop the rectangle around the sculptures, make them fill the space and make the particles clearer. The card is gone, the scene is larger (up to 26 by 18 rem), the camera sits closer, and each particle is a smaller, crisp dot with only a faint halo in dark mode. Lesson headers, which are already in the topic's colours, use white particles.
