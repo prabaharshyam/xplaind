@@ -20,8 +20,8 @@ export default function SignInPage() {
         </Suspense>
       ) : (
         <p className="mt-4 leading-7">
-          Accounts are coming soon. Everything on the site works without one: your test result, progress and practice
-          are saved on this device.
+          Sign-ups are paused for a short while. Everything on the site is open without an account in the meantime: your
+          test result, progress and practice are saved on this device.
         </p>
       )}
     </main>

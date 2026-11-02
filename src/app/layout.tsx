@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { SignUpDialog } from "@/components/account/signup-dialog";
 import { XBot } from "@/components/bot/x-bot";
 import { MotionEffects, PageEnter } from "@/components/motion/motion-effects";
+import { SiteMotion } from "@/components/motion/site-motion";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { aiEnabled } from "@/lib/ai/settings";
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* These read the URL, so pages with dynamic URLs render them in the browser. */}
         <Suspense fallback={null}>
           <PageEnter />
+          <SiteMotion />
           <XBot aiOn={aiEnabled()} />
         </Suspense>
       </body>

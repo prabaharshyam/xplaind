@@ -16,7 +16,7 @@ export default function TopicsPage() {
   const topics = THEMES.map((t) => ({ ...t, lessons: stops.filter((s) => s.theme === t.id) })).filter((t) => t.lessons.length > 0);
   return (
     <main>
-      <PageHero theme="ai-basics" seed="topics" icon="compass" eyebrow="Topic roadmaps" title="Learn one AI skill at a time" lead="Want RAG, agents or Python without following a whole role? Every lesson, grouped by subject. Each one takes about 20 minutes to read." />
+      <PageHero shape="atom" theme="ai-basics" seed="topics" icon="compass" eyebrow="Topic roadmaps" title="Learn one AI skill at a time" lead="Want RAG, agents or Python without following a whole role? Every lesson, grouped by subject. Each one takes about 20 minutes to read." />
       <ul className="mx-auto grid max-w-6xl gap-5 px-4 py-10 sm:grid-cols-2 lg:grid-cols-3 md:px-6">
         {topics.map((t) => (
           <li key={t.id} className="lx-rise">

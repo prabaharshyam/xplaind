@@ -20,7 +20,7 @@ export default function GlossaryPage() {
 
   return (
     <main>
-      <PageHero theme="ai-basics" seed="glossary" icon="book" eyebrow="Glossary" title="AI glossary" lead={`${terms.length} AI terms in plain words. Each links to the lessons that teach it.`} />
+      <PageHero shape="bulb" theme="ai-basics" seed="glossary" icon="book" eyebrow="Glossary" title="AI glossary" lead={`${terms.length} AI terms in plain words. Each links to the lessons that teach it.`} />
       <div className="mx-auto max-w-3xl px-4 py-8">
       <div>
         <DraftNote />

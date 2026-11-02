@@ -29,7 +29,7 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[id]"
 
   return (
     <main>
-      <PageHero theme={theme} seed={p.id} icon="trophy" eyebrow="Guided project" title={p.title} lead={p.summary} crumbs={[{ href: "/projects", label: "Projects" }]}>
+      <PageHero shape="rocket" theme={theme} seed={p.id} icon="trophy" eyebrow="Guided project" title={p.title} lead={p.summary} crumbs={[{ href: "/projects", label: "Projects" }]}>
         <p className="flex flex-wrap gap-2 text-sm">
           {[DIFFICULTY_LABEL[p.difficulty], `about ${p.hours} hours`, `${p.steps.length} steps`].map((c) => (
             <span key={c} className="rounded-full bg-zinc-200/70 px-3 py-1 dark:bg-zinc-800">

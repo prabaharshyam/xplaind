@@ -3,13 +3,13 @@
 // All reads and writes of learner data go through the server routes.
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { publicSupabase } from "@/lib/signups";
 
 let client: SupabaseClient | null | undefined;
 
 export function browserClient(): SupabaseClient | null {
   if (client !== undefined) return client;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  client = url && key ? createBrowserClient(url, key) : null;
+  const config = publicSupabase(); // null while sign-ups are on hold (SU-4)
+  client = config ? createBrowserClient(config.url, config.anonKey) : null;
   return client;
 }

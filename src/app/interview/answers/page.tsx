@@ -29,7 +29,7 @@ export default function InterviewAnswersPage() {
   }));
   return (
     <main>
-      <PageHero
+      <PageHero shape="target"
         theme="career"
         seed="interview-answers"
         icon="target"

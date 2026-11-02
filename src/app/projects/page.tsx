@@ -29,7 +29,7 @@ export default function ProjectsPage() {
   });
   return (
     <main>
-      <PageHero
+      <PageHero shape="rocket"
         theme="career"
         seed="projects"
         icon="trophy"

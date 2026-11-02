@@ -30,7 +30,7 @@ export default function SimulatorPage() {
   return (
     <main>
       <div className="print:hidden">
-        <PageHero
+        <PageHero shape="microphone"
           theme="client"
           seed="simulator"
           icon="mic"

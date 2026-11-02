@@ -48,7 +48,7 @@ export default async function PathInterviewPage({ params }: PageProps<"/intervie
           })),
         }}
       />
-      <PageHero
+      <PageHero shape="microphone"
         theme={path.theme}
         seed={`interview-${path.id}`}
         icon="mic"

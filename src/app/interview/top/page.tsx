@@ -15,7 +15,7 @@ export default function TopIndexPage() {
   const paths = getPaths().filter((p) => p.top_interview.length);
   return (
     <main>
-      <PageHero
+      <PageHero shape="trophy"
         theme="career"
         seed="top-25"
         icon="trophy"

@@ -5,10 +5,10 @@ import { Icon } from "@/components/art/icons";
 import { RoleGrid, TopicChips } from "@/components/home/role-grid";
 import { MiniCourses, MiniInterview, MiniLesson, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
 import { ContinueCard } from "@/components/continue-card";
+import { Words } from "@/components/motion/words";
+import { RoadScene } from "@/components/three/road-scene";
 import { JsonLd } from "@/components/json-ld";
-import { Reveal } from "@/components/motion/reveal";
 import { SearchBox } from "@/components/search-box";
-import { Scene3D } from "@/components/three/scene-3d";
 import { getBlogPosts, getContent, getPaths, getProjects, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { pathView } from "@/lib/content/paths";
@@ -72,7 +72,7 @@ const FAQ = [
   },
   {
     q: "Do I need an account?",
-    a: "No. Your progress, XP and streak are saved in your browser. You can sign in later to keep them across devices.",
+    a: "Not to learn. Every roadmap, lesson and interview question is open to read. A free account, with Google, GitHub or email, saves your progress and unlocks roadmap downloads, the mock interview, the papers library and the AI tools.",
   },
 ];
 
@@ -91,7 +91,8 @@ export default function Home() {
   ];
 
   return (
-    <main>
+    <main className="relative isolate">
+      <RoadScene />
       <JsonLd
         data={{
           "@context": "https://schema.org",
@@ -100,37 +101,62 @@ export default function Home() {
         }}
       />
 
-      {/* Hero: what this is, and the first thing to do, above the fold. */}
-      <section className="home-hero relative overflow-hidden" aria-labelledby="hero-heading">
-        {/* MO-5: the signature moment: a large 3D network of ideas behind the headline, in the brand pastels. */}
-        <Scene3D
-          colors={["#c4b5fd", "#f9a8d4", "#99f6e4", "#bae6fd"]}
-          seed="xplaind-home"
-          className="pointer-events-none absolute top-6 right-[-3%] hidden h-[30rem] w-[44%] md:block"
-        />
-        <div className="relative mx-auto max-w-6xl px-4 pt-14 pb-12 md:px-6 md:pt-20">
-          <p className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 backdrop-blur dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
+      {/* Hero: the start of the road. The message and actions work before any animation runs. */}
+      <section data-hero className="home-hero relative flex min-h-[calc(100svh-3.5rem)] items-center" aria-labelledby="hero-heading">
+        <div className="mx-auto w-full max-w-6xl px-4 py-16 md:px-6">
+          <p data-hero-fade className="inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 backdrop-blur dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
             <span className="size-1.5 rounded-full bg-violet-600" /> AI career roadmaps · Helping India learn AI faster
           </p>
-          <h1 id="hero-heading" className="mt-5 max-w-4xl md:max-w-[58%] text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl">
-            Learn AI for the job you want.{" "}
-            <span className="bg-gradient-to-r from-violet-700 via-fuchsia-600 to-teal-600 bg-clip-text text-transparent dark:from-violet-300 dark:via-pink-300 dark:to-teal-300">
-              One clear roadmap per role.
+          <h1 id="hero-heading" className="mt-6 max-w-3xl text-5xl leading-[1.02] font-semibold tracking-tight sm:text-6xl md:text-7xl">
+            <Words text="Learn AI for the job you want." />{" "}
+            <span data-hero-fade className="block bg-gradient-to-r from-violet-700 via-fuchsia-600 to-teal-600 bg-clip-text pb-1 text-transparent dark:from-violet-300 dark:via-pink-300 dark:to-teal-300">
+              One clear road per role.
             </span>
           </h1>
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-700 md:max-w-[55%] dark:text-zinc-300">
-            Pick an AI role. Follow its roadmap, read a plain-English lesson for every topic, take the one
-            course worth your time, build the projects, then practise the interview out loud.
+          <p data-hero-fade className="mt-6 max-w-xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">
+            Pick an AI role and follow its roadmap: a plain-English lesson for every topic, the one course worth your time, real projects, then
+            interview practice out loud.
           </p>
-          {/* On phones the scene gets its own band, so it never sits behind text. */}
-          <Scene3D colors={["#c4b5fd", "#f9a8d4", "#99f6e4", "#bae6fd"]} seed="xplaind-home" density="panel" className="pointer-events-none relative mt-6 h-52 w-full md:hidden" />
-          <div className="mt-10 flex items-end justify-between gap-4">
-            <h2 className="text-2xl font-semibold">Choose your AI role</h2>
-            <Link href="/paths" className="shrink-0 text-sm whitespace-nowrap text-violet-800 hover:underline dark:text-violet-300">
+          <div data-hero-fade className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <a data-magnetic href="#roles" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-violet-700 px-6 font-medium text-white shadow-lg shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700">
+              <Icon name="compass" size={18} /> Choose your role
+            </a>
+            <Link data-magnetic href="/start" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/85 px-6 font-medium text-violet-950 ring-1 ring-violet-200 backdrop-blur hover:bg-white dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
+              <Icon name="sparkles" size={18} /> Find my level in 10 minutes
+            </Link>
+          </div>
+          <p data-hero-fade className="mt-4 text-sm">
+            <Link href="/interview/simulator" className="inline-flex min-h-11 items-center gap-2 font-medium text-violet-900 underline-offset-4 hover:underline dark:text-violet-200">
+              <Icon name="mic" size={18} /> I have an interview soon
+            </Link>
+          </p>
+          <p data-hero-fade className="mt-14 hidden items-center gap-3 text-sm font-medium text-zinc-700 md:flex dark:text-zinc-300">
+            <span className="relative flex h-9 w-5 justify-center rounded-full ring-1 ring-zinc-400 dark:ring-zinc-500">
+              <span className="journey-cue mt-1.5 size-1.5 rounded-full bg-violet-600" />
+            </span>
+            Scroll to start the journey
+          </p>
+        </div>
+      </section>
+
+      {/* AC-6: a returning learner carries on from their last lesson. */}
+      <div className="mx-auto max-w-6xl px-4 empty:hidden md:px-6 [&>section]:my-8">
+        <ContinueCard titles={Object.fromEntries(stops.map((s) => [s.id, s.title]))} />
+      </div>
+
+      {/* Milestone 1: choose a role. */}
+      <section id="roles" aria-labelledby="roles-heading" className="scroll-mt-20 py-20 md:py-28">
+        <div className="mx-auto max-w-6xl px-4 md:px-6">
+          <Gate n={1} label="Start here" />
+          <div className="mt-4 flex items-end justify-between gap-4">
+            <h2 id="roles-heading" data-words className="max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
+              <Words text="Choose your AI role" />
+            </h2>
+            <Link href="/paths" className="shrink-0 text-sm font-medium whitespace-nowrap text-violet-800 hover:underline dark:text-violet-300">
               Compare all roles →
             </Link>
           </div>
-          <div className="mt-4">
+          <div className="mt-8" data-rise-group>
             <RoleGrid
               roles={paths.map((p) => ({
                 id: p.id,
@@ -143,87 +169,43 @@ export default function Home() {
               }))}
             />
           </div>
-
-          <div className="mt-10 max-w-2xl">
-            <SearchBox size="lg" />
-          </div>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/start" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-violet-700 px-5 font-medium text-white shadow-md shadow-violet-700/25 hover:bg-violet-800">
-              <Icon name="sparkles" size={18} /> Find my level
-            </Link>
-            <Link href="/paths" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/80 px-5 font-medium text-violet-950 ring-1 ring-violet-200 backdrop-blur hover:bg-violet-50 dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
-              <Icon name="compass" size={18} /> Compare the roles
-            </Link>
-            <Link href="/interview/simulator" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/80 px-5 font-medium text-violet-950 ring-1 ring-violet-200 backdrop-blur hover:bg-violet-50 dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
-              <Icon name="mic" size={18} /> I have an interview soon
-            </Link>
-          </div>
-
-          <div className="mt-12 flex items-end justify-between gap-4">
-            <h2 className="text-xl font-semibold">Topic roadmaps</h2>
-            <Link href="/topics" className="text-sm text-violet-800 hover:underline dark:text-violet-300">
-              All topics →
-            </Link>
-          </div>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Want one skill, not a whole role? Every lesson, grouped by subject.</p>
-          <div className="mt-4">
-            <TopicChips counts={themeCounts} />
+          <div className="mt-10 grid grid-cols-1 gap-6 rounded-[2rem] [&>div]:min-w-0 bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur md:grid-cols-[1.2fr_1fr] md:p-8 dark:bg-zinc-950/70 dark:ring-violet-900">
+            <div>
+              <h3 className="text-lg font-semibold">Search every lesson, question and course</h3>
+              <div className="mt-3">
+                <SearchBox size="lg" />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Or follow one topic</h3>
+              <div className="mt-3">
+                <TopicChips counts={themeCounts} />
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* AC-6: a returning learner carries on from their last lesson. */}
-      <div className="mx-auto max-w-6xl px-4 empty:hidden md:px-6 [&>section]:my-8">
-        <ContinueCard titles={Object.fromEntries(stops.map((s) => [s.id, s.title]))} />
-      </div>
-
       {/* Numbers */}
-      <section aria-label="Xplaind in numbers" className="border-y border-violet-100 bg-white/60 backdrop-blur dark:border-violet-950 dark:bg-white/[0.03]">
-        <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 py-8 sm:grid-cols-3 md:grid-cols-5 md:px-6">
+      <section aria-label="Xplaind in numbers" className="py-6">
+        <dl data-rise-group className="mx-auto grid max-w-6xl grid-cols-2 gap-4 px-4 md:grid-cols-4 md:px-6">
           {stats.map((s) => (
-            <div key={s.label}>
-              <dd className="text-3xl font-semibold tracking-tight">{s.value}</dd>
-              <dt className="text-sm text-zinc-600 dark:text-zinc-400">{s.label}</dt>
+            <div key={s.label} data-rise className="rounded-3xl bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
+              <dd data-count className="text-4xl font-semibold tracking-tight md:text-5xl">{s.value}</dd>
+              <dt className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{s.label}</dt>
             </div>
           ))}
         </dl>
       </section>
 
-      {/* Pain points */}
-      <section aria-labelledby="pain-heading" className="py-16 md:py-24">
+      {/* Milestone 2: learn. */}
+      <section aria-labelledby="do-heading" className="py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <h2 id="pain-heading" className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
-            Sound familiar?
+          <Gate n={2} label="Learn" />
+          <h2 id="do-heading" data-words className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
+            <Words text="Everything you need to get from zero to hired" />
           </h2>
-          <p className="mt-3 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
-            Learning AI on your own is confusing. Here is what we fixed.
-          </p>
-          <ul className="mt-10 grid gap-5 md:grid-cols-2">
-            {PAINS.map((p, i) => (
-              <Reveal as="li" key={p.pain} delay={i * 60} className="flex gap-4 rounded-3xl bg-white/80 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-white/5 dark:ring-violet-900">
-                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  <Icon name={p.icon} size={24} />
-                </span>
-                <div>
-                  <p className="text-lg font-semibold leading-7">{p.pain}</p>
-                  <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{p.fix}</p>
-                  <Link href={p.href} className="mt-3 inline-block font-medium text-emerald-800 hover:underline dark:text-emerald-400">
-                    {p.cta} →
-                  </Link>
-                </div>
-              </Reveal>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* What you can do here */}
-      <section aria-labelledby="do-heading" className="bg-white/50 py-16 backdrop-blur dark:bg-white/[0.03] md:py-24">
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <h2 id="do-heading" className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
-            Everything you need to get from zero to hired
-          </h2>
-          <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <div className="mt-10 grid gap-6 md:grid-cols-2" data-rise-group>
             <Feature
               title="Follow an interactive roadmap"
               text="See the whole journey on one map. Tap any topic to read what it is, open the best course and mark it done."
@@ -247,17 +229,6 @@ export default function Home() {
               </div>
             </Feature>
             <Feature
-              title="Practise interviews out loud"
-              text={`${interview.length} real questions across every role. Answer against the clock with your voice, then see which key points you covered.`}
-              href="/interview/simulator"
-              cta="Start a mock interview"
-              tone="from-rose-50 to-orange-50 dark:from-rose-950 dark:to-orange-950"
-            >
-              <div className="mx-auto max-w-[300px]">
-                <MiniInterview />
-              </div>
-            </Feature>
-            <Feature
               title="Find the best courses and certificates"
               text="Courses from Google, Microsoft, AWS, NVIDIA, OpenAI, Anthropic, Hugging Face and more, each chosen for a lesson, plus the certifications worth sitting."
               href="/resources"
@@ -268,23 +239,54 @@ export default function Home() {
                 <MiniCourses />
               </div>
             </Feature>
+            <Feature
+              title="Read the papers that built AI"
+              text="From Attention Is All You Need to today's reasoning models, with one plain line on why each matters, plus free books by their authors."
+              href="/papers"
+              cta="Open the library"
+              tone="from-amber-50 to-rose-50 dark:from-amber-950 dark:to-rose-950"
+            >
+              <div className="mx-auto max-w-[300px]">
+                <MiniLesson />
+              </div>
+            </Feature>
           </div>
+          <h3 id="pains-heading" data-words className="mt-16 text-2xl font-semibold tracking-tight md:text-3xl">
+            <Words text="Sound familiar?" />
+          </h3>
+          <ul aria-labelledby="pains-heading" className="mt-6 grid gap-5 md:grid-cols-2" data-rise-group>
+            {PAINS.map((p) => (
+              <li key={p.pain} data-rise className="flex gap-4 rounded-3xl bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
+                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  <Icon name={p.icon} size={24} />
+                </span>
+                <div>
+                  <p className="text-lg font-semibold leading-7">{p.pain}</p>
+                  <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{p.fix}</p>
+                  <Link href={p.href} className="mt-3 inline-block font-medium text-emerald-800 hover:underline dark:text-emerald-400">
+                    {p.cta} →
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
-      {/* How it works */}
-      <section aria-labelledby="how-heading" className="py-16 md:py-24">
+      {/* Milestone 3: practise and prove it. */}
+      <section aria-labelledby="how-heading" className="py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <h2 id="how-heading" className="text-3xl font-semibold tracking-tight md:text-4xl">
-            How it works
+          <Gate n={3} label="Practise and prove it" />
+          <h2 id="how-heading" data-words className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
+            <Words text="Build it, then say it out loud" />
           </h2>
-          <ol className="mt-10 grid gap-6 md:grid-cols-3">
+          <ol className="mt-10 grid gap-6 md:grid-cols-3" data-rise-group>
             {[
-              { icon: "compass" as const, title: "Choose your role", text: "Nine roadmaps, from AI Engineer to MLOps Engineer. Not sure? Take the 10-minute level test." },
+              { icon: "compass" as const, title: "Choose your role", text: "A roadmap for each AI role, from AI Engineer to MLOps Engineer. Not sure? Take the 10-minute level test." },
               { icon: "book" as const, title: "Learn, check, earn XP", text: "Read the lesson, take the best course, pass the quick check. Your XP and streak grow as you go." },
               { icon: "trophy" as const, title: "Prove it", text: "Build the project at the end of each stage, then practise the interview until you are ready." },
             ].map((s, i) => (
-              <li key={s.title} className="rounded-3xl bg-white/80 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-white/5 dark:ring-violet-900">
+              <li key={s.title} data-rise className="rounded-3xl bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
                 <span className="flex items-center gap-3">
                   <span className="grid size-10 place-items-center rounded-full bg-violet-700 font-semibold text-white">{i + 1}</span>
                   <Icon name={s.icon} size={24} className="text-emerald-700 dark:text-emerald-400" />
@@ -294,36 +296,72 @@ export default function Home() {
               </li>
             ))}
           </ol>
-          <div className="mt-10 flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-amber-50 to-emerald-50 p-6 md:flex-row md:items-center md:justify-between dark:from-amber-950 dark:to-emerald-950">
-            <div>
-              <h3 className="text-xl font-semibold">Keep going with XP, streaks and badges</h3>
-              <p className="mt-1 text-zinc-700 dark:text-zinc-300">Every lesson, check and mock interview counts. Saved in your browser, no account needed.</p>
+          <div className="mt-6 grid gap-6 md:grid-cols-2" data-rise-group>
+            <Feature
+              title="Practise interviews out loud"
+              text={`${interview.length} real questions across every role. Answer against the clock with your voice, then see which key points you covered.`}
+              href="/interview/simulator"
+              cta="Start a mock interview"
+              tone="from-rose-50 to-orange-50 dark:from-rose-950 dark:to-orange-950"
+            >
+              <div className="mx-auto max-w-[300px]">
+                <MiniInterview />
+              </div>
+            </Feature>
+            <div data-rise className="flex flex-col justify-between gap-4 rounded-3xl bg-gradient-to-br from-amber-50 to-emerald-50 p-6 ring-1 ring-amber-100 md:p-8 dark:from-amber-950 dark:to-emerald-950 dark:ring-amber-900">
+              <div>
+                <h3 className="text-xl font-semibold">Keep going with XP, streaks and badges</h3>
+                <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
+                  Every lesson, check and mock interview counts. A free account keeps your progress on every device.
+                </p>
+              </div>
+              <MiniProgress />
             </div>
-            <MiniProgress />
+          </div>
+        </div>
+      </section>
+
+      {/* Milestone 4: the finish line. */}
+      <section aria-labelledby="final-heading" className="py-24 text-center md:py-36">
+        <div className="mx-auto max-w-3xl px-4">
+          <div className="flex justify-center">
+            <Gate n={4} label="Your AI career" />
+          </div>
+          <h2 id="final-heading" data-words className="mt-5 text-4xl font-semibold tracking-tight text-balance md:text-6xl">
+            <Words text="Your AI career starts with one lesson." />
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-lg text-zinc-800 dark:text-zinc-200">Pick a role and do the first topic today. It takes about 20 minutes.</p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link data-magnetic href="/paths" className="inline-flex min-h-12 items-center justify-center rounded-full bg-violet-700 px-6 font-medium text-white shadow-lg shadow-violet-700/30 hover:bg-violet-800">
+              Choose a roadmap
+            </Link>
+            <Link href="/start" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white/85 px-6 font-medium text-violet-950 ring-1 ring-violet-300 backdrop-blur hover:bg-white dark:bg-white/10 dark:text-violet-100">
+              Find my level
+            </Link>
           </div>
         </div>
       </section>
 
       {/* Guides */}
       {posts.length > 0 && (
-        <section aria-labelledby="guides-heading" className="bg-white/50 py-16 backdrop-blur dark:bg-white/[0.03] md:py-24">
+        <section aria-labelledby="guides-heading" className="py-16 md:py-20">
           <div className="mx-auto max-w-6xl px-4 md:px-6">
             <div className="flex items-end justify-between gap-4">
-              <h2 id="guides-heading" className="text-3xl font-semibold tracking-tight md:text-4xl">
-                Guides
+              <h2 id="guides-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
+                <Words text="Guides" />
               </h2>
               <Link href="/blog" className="font-medium text-emerald-800 hover:underline dark:text-emerald-400">
                 All guides →
               </Link>
             </div>
-            <ul className="mt-8 grid gap-6 md:grid-cols-3">
+            <ul className="mt-8 grid gap-6 md:grid-cols-3" data-rise-group>
               {posts.map((p, i) => (
-                <li key={p.id}>
-                  <Link href={`/blog/${p.id}`} className="group block overflow-hidden rounded-2xl border border-zinc-200 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600">
+                <li key={p.id} data-rise>
+                  <Link href={`/blog/${p.id}`} className="group block overflow-hidden rounded-3xl bg-white/90 ring-1 ring-violet-100 backdrop-blur hover:ring-violet-300 dark:bg-zinc-950/80 dark:ring-violet-900">
                     <Cover theme={(["career", "ai-basics", "using-ai"] as const)[i % 3]} seed={p.id} icon="book" className="h-36" iconSize={40} />
                     <span className="block p-5">
                       <span className="block text-lg font-semibold leading-7 group-hover:underline">{p.title}</span>
-                      <span className="mt-2 block text-sm leading-6 text-zinc-600 dark:text-zinc-400">{p.description}</span>
+                      <span className="mt-2 block text-sm leading-6 text-zinc-700 dark:text-zinc-300">{p.description}</span>
                     </span>
                   </Link>
                 </li>
@@ -333,13 +371,13 @@ export default function Home() {
         </section>
       )}
 
-      {/* FAQ and final call */}
-      <section aria-labelledby="faq-heading" className="py-16 md:py-24">
+      {/* FAQ */}
+      <section aria-labelledby="faq-heading" className="pt-8 pb-24 md:pb-32">
         <div className="mx-auto max-w-3xl px-4 md:px-6">
-          <h2 id="faq-heading" className="text-3xl font-semibold tracking-tight md:text-4xl">
-            Questions
+          <h2 id="faq-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
+            <Words text="Questions" />
           </h2>
-          <div className="mt-8 divide-y divide-zinc-200 rounded-3xl bg-white/80 ring-1 ring-violet-100 backdrop-blur dark:divide-zinc-800 dark:bg-white/5 dark:ring-violet-900">
+          <div className="mt-8 divide-y divide-zinc-200 rounded-3xl bg-white/90 ring-1 ring-violet-100 backdrop-blur dark:divide-zinc-800 dark:bg-zinc-950/80 dark:ring-violet-900">
             {FAQ.map((f) => (
               <details key={f.q} className="group p-5">
                 <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
@@ -354,24 +392,17 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <section aria-labelledby="final-heading" className="relative overflow-hidden bg-gradient-to-br from-violet-200 via-pink-100 to-teal-100 py-16 text-center text-zinc-900 md:py-24 dark:from-violet-950 dark:via-fuchsia-950 dark:to-teal-950 dark:text-white">
-        <div className="mx-auto max-w-3xl px-4">
-          <h2 id="final-heading" className="text-3xl font-semibold tracking-tight text-balance md:text-5xl">
-            Your AI career starts with one lesson.
-          </h2>
-          <p className="mt-4 text-lg text-zinc-700 dark:text-zinc-300">Pick a role and do the first topic today. It takes about 20 minutes.</p>
-          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/paths" className="inline-flex min-h-12 items-center justify-center rounded-full bg-violet-700 px-6 font-medium text-white shadow-md hover:bg-violet-800">
-              Choose a roadmap
-            </Link>
-            <Link href="/start" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white/80 px-6 font-medium text-violet-950 ring-1 ring-violet-300 hover:bg-white dark:bg-white/10 dark:text-violet-100">
-              Find my level
-            </Link>
-          </div>
-        </div>
-      </section>
     </main>
+  );
+}
+
+/** A milestone marker: the gate the reader has just reached on the road. */
+function Gate({ n, label }: { n: number; label: string }) {
+  return (
+    <p data-gate className="inline-flex items-center gap-2 rounded-full bg-white/85 py-1 pr-3 pl-1 text-sm font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 backdrop-blur dark:bg-zinc-950/70 dark:text-violet-100 dark:ring-violet-800">
+      <span className="grid size-6 place-items-center rounded-full bg-violet-700 text-xs font-semibold text-white">{n}</span>
+      Milestone {n} · {label}
+    </p>
   );
 }
 
@@ -391,7 +422,7 @@ function Feature({
   children: React.ReactNode;
 }) {
   return (
-    <Reveal className="flex flex-col overflow-hidden rounded-3xl border border-zinc-200 dark:border-zinc-800">
+    <div data-rise className="flex flex-col overflow-hidden rounded-3xl bg-white/90 ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/80 dark:ring-violet-900">
       <div className={`bg-gradient-to-br ${tone} p-6 md:p-8`}>{children}</div>
       <div className="flex flex-1 flex-col p-6">
         <h3 className="text-xl font-semibold">{title}</h3>
@@ -400,6 +431,6 @@ function Feature({
           {cta} →
         </Link>
       </div>
-    </Reveal>
+    </div>
   );
 }

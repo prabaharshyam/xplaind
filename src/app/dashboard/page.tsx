@@ -23,7 +23,7 @@ async function SignedIn() {
 export default function DashboardPage() {
   return (
     <main>
-      <PageHero theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your XP, streak and badges." />
+      <PageHero shape="barChart" theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your XP, streak and badges." />
       <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-8 empty:hidden">
         <ContinueCard titles={Object.fromEntries(getStops().map((s) => [s.id, s.title]))} />
@@ -35,7 +35,7 @@ export default function DashboardPage() {
           <SignedIn />
         </Suspense>
       ) : (
-        <p className="mt-2 leading-7">Accounts are coming soon. Your progress is saved on this device.</p>
+        <p className="mt-2 leading-7">Sign-ups are paused for a short while. Your progress is saved on this device.</p>
       )}
       </div>
     </main>

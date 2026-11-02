@@ -15,7 +15,7 @@ export default function CoachPage() {
   const titles = Object.fromEntries(getStops().map((s) => [s.id, s.title]));
   return (
     <main>
-      <PageHero
+      <PageHero shape="robot"
         theme="career"
         seed="ai-coach"
         icon="people"

@@ -46,7 +46,7 @@ export default function ResourcesPage() {
 
   return (
     <main>
-      <PageHero
+      <PageHero shape="gradCap"
         theme="using-ai"
         seed="courses"
         icon="book"

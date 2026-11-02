@@ -1,13 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-// CI builds without Supabase settings, so accounts are switched off. The site
-// must work exactly as before, and account routes must refuse cleanly.
+// CI builds without Supabase settings (and sign-ups are on hold, SU-4), so accounts are
+// switched off. The site must work exactly as before, and account routes must refuse cleanly.
 test.describe("accounts switched off", () => {
-  test("sign-in, dashboard and settings say accounts are coming soon", async ({ page }) => {
+  test("sign-in, dashboard and settings say sign-ups are paused", async ({ page }) => {
     for (const path of ["/signin", "/dashboard", "/settings"]) {
       await page.goto(path);
-      await expect(page.getByText(/Accounts are coming soon/), path).toBeVisible();
+      await expect(page.getByText(/Sign-ups are paused/), path).toBeVisible();
     }
     expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations).toEqual([]);
   });

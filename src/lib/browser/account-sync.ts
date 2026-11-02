@@ -1,6 +1,7 @@
 // When a learner is signed in, changes saved on the device are also sent to the
 // server (AC-4, IQ-4). Signed out, nothing leaves the device. Sends are best
 // effort: the device copy stays the source of truth until the next claim merges.
+import { publicSupabase } from "@/lib/signups";
 import type { RatingRecord } from "@/lib/practice/queue";
 import type { StopProgress } from "@/lib/roadmap/types";
 
@@ -14,7 +15,7 @@ export const setSignedIn = (value: boolean): void => {
 export const isSignedIn = (): boolean => signedIn;
 
 /** Accounts are on when the Supabase settings are built in. Off (local, CI), everything stays open. */
-export const accountsOn = (): boolean => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+export const accountsOn = (): boolean => publicSupabase() !== null;
 
 /** SU-1: what needs an account. Shown on the sign-up prompt. */
 export type SignUpReason = "pdf" | "interview" | "progress" | "practice" | "tools" | "library";

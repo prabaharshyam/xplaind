@@ -18,7 +18,7 @@ export default function InterviewPage() {
   const paths = getPaths();
   return (
     <main>
-      <PageHero
+      <PageHero shape="speech"
         theme="career"
         seed="interview"
         icon="mic"

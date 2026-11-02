@@ -18,7 +18,7 @@ export default function PathsPage() {
   const paths = getPaths().map(pathView);
   return (
     <main>
-      <PageHero
+      <PageHero shape="compass"
         theme="career"
         seed="paths"
         icon="map"

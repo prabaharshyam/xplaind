@@ -2,12 +2,13 @@
 // cannot write cookies). Static content pages are not matched, so they stay static.
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { publicSupabase } from "@/lib/signups";
 
 export async function proxy(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   let response = NextResponse.next({ request });
-  if (!url || !key) return response;
+  const config = publicSupabase(); // null while sign-ups are on hold (SU-4)
+  if (!config) return response;
+  const { url, anonKey: key } = config;
 
   const supabase = createServerClient(url, key, {
     cookies: {

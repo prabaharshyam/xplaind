@@ -43,6 +43,7 @@ beforeEach(() => {
   vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://localhost");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
+  vi.stubEnv("NEXT_PUBLIC_SIGNUPS_OPEN", "true");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service");
   vi.stubEnv("AI_KILL_SWITCH", "");
   vi.stubEnv("AI_MODEL", "");

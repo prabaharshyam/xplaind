@@ -19,7 +19,7 @@ export default function BlogIndex() {
   const posts = getBlogPosts();
   return (
     <main>
-      <PageHero theme="using-ai" seed="blog" icon="book" eyebrow="Guides" title="Blog" lead="Guides on learning AI, choosing a role and getting hired. No sponsored posts." />
+      <PageHero shape="quill" theme="using-ai" seed="blog" icon="book" eyebrow="Guides" title="Blog" lead="Guides on learning AI, choosing a role and getting hired. No sponsored posts." />
       <ul className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:grid-cols-2 lg:grid-cols-3 md:px-6">
         {posts.map((p, i) => (
           <li key={p.id} className="lx-rise">
