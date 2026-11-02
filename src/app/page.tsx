@@ -5,8 +5,8 @@ import { Icon } from "@/components/art/icons";
 import { RoleGrid, TopicChips } from "@/components/home/role-grid";
 import { MiniCourses, MiniInterview, MiniLesson, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
 import { ContinueCard } from "@/components/continue-card";
-import { HomeMotion, Words } from "@/components/home/home-motion";
-import { JourneyScene } from "@/components/home/journey-scene";
+import { Words } from "@/components/motion/words";
+import { RoadScene } from "@/components/three/road-scene";
 import { JsonLd } from "@/components/json-ld";
 import { SearchBox } from "@/components/search-box";
 import { getBlogPosts, getContent, getPaths, getProjects, getStops } from "@/lib/content";
@@ -92,8 +92,7 @@ export default function Home() {
 
   return (
     <main className="relative isolate">
-      <JourneyScene />
-      <HomeMotion />
+      <RoadScene variant="flight" />
       <JsonLd
         data={{
           "@context": "https://schema.org",
@@ -119,10 +118,10 @@ export default function Home() {
             interview practice out loud.
           </p>
           <div data-hero-fade className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a href="#roles" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-violet-700 px-6 font-medium text-white shadow-lg shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700">
+            <a data-magnetic href="#roles" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-violet-700 px-6 font-medium text-white shadow-lg shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700">
               <Icon name="compass" size={18} /> Choose your role
             </a>
-            <Link href="/start" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/85 px-6 font-medium text-violet-950 ring-1 ring-violet-200 backdrop-blur hover:bg-white dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
+            <Link data-magnetic href="/start" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/85 px-6 font-medium text-violet-950 ring-1 ring-violet-200 backdrop-blur hover:bg-white dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
               <Icon name="sparkles" size={18} /> Find my level in 10 minutes
             </Link>
           </div>
@@ -192,7 +191,7 @@ export default function Home() {
         <dl data-rise-group className="mx-auto grid max-w-6xl grid-cols-2 gap-4 px-4 md:grid-cols-4 md:px-6">
           {stats.map((s) => (
             <div key={s.label} data-rise className="rounded-3xl bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
-              <dd className="text-4xl font-semibold tracking-tight md:text-5xl">{s.value}</dd>
+              <dd data-count className="text-4xl font-semibold tracking-tight md:text-5xl">{s.value}</dd>
               <dt className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{s.label}</dt>
             </div>
           ))}
@@ -333,7 +332,7 @@ export default function Home() {
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-lg text-zinc-800 dark:text-zinc-200">Pick a role and do the first topic today. It takes about 20 minutes.</p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/paths" className="inline-flex min-h-12 items-center justify-center rounded-full bg-violet-700 px-6 font-medium text-white shadow-lg shadow-violet-700/30 hover:bg-violet-800">
+            <Link data-magnetic href="/paths" className="inline-flex min-h-12 items-center justify-center rounded-full bg-violet-700 px-6 font-medium text-white shadow-lg shadow-violet-700/30 hover:bg-violet-800">
               Choose a roadmap
             </Link>
             <Link href="/start" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white/85 px-6 font-medium text-violet-950 ring-1 ring-violet-300 backdrop-blur hover:bg-white dark:bg-white/10 dark:text-violet-100">

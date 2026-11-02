@@ -9,8 +9,8 @@ import { GENAI_PATH_ID, getContent, getGlossary, getLevel, getStop, getStops, pa
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
 import { XP } from "@/lib/game/xp";
-import { Scene3D } from "@/components/three/scene-3d";
-import { type IconName, pastelOf, themeOf } from "@/lib/themes";
+import { RoadScene } from "@/components/three/road-scene";
+import { type IconName, roadColorsOf, themeOf } from "@/lib/themes";
 import { LessonNav, type SectionLink } from "./lesson-nav";
 import { LearnPanel } from "./learn-panel";
 import { BookCard } from "@/components/book-card";
@@ -177,19 +177,8 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               <span className="rounded-full bg-amber-300 px-3 py-1 font-semibold text-amber-950">+{xpToEarn} XP</span>
             </p>
           </div>
-          {/* MO-5: the lesson's own 3D scene in its theme's pastels. */}
-          <Scene3D
-            colors={pastelOf(stop.theme)}
-            seed={stop.id}
-            density="panel"
-            glow
-            className="relative hidden h-52 w-80 shrink-0 md:block"
-            fallback={
-              <span className="grid size-full place-items-center rounded-3xl bg-white/20 ring-1 ring-white/40 backdrop-blur">
-                <Icon name={theme.icon} size={52} strokeWidth={1.5} />
-              </span>
-            }
-          />
+          {/* MO-6: the lesson's stretch of road, in its theme's colours. */}
+          <RoadScene variant="panel" colors={roadColorsOf(stop.theme)} className="hidden h-52 w-80 shrink-0 md:block" />
         </div>
       </header>
 

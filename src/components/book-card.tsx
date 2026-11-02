@@ -26,7 +26,7 @@ function Spine({ book }: { book: Book }) {
 export function BookCard({ book, compact = false }: { book: Book; compact?: boolean }) {
   const level = getLevel(book.level);
   return (
-    <article className="flex gap-4 rounded-2xl border border-zinc-200 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/60">
+    <article data-tilt="4" className="flex gap-4 rounded-2xl border border-zinc-200 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/60">
       <Spine book={book} />
       <div className="min-w-0 flex-1">
         <h3 className={`${compact ? "text-base" : "text-lg"} leading-snug font-semibold`}>{book.title}</h3>

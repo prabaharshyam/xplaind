@@ -4,7 +4,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 /**
- * MO-3: tilts any element marked data-tilt a few degrees toward the pointer. One listener
+ * MO-3: tilts any element marked data-tilt a few degrees toward the pointer, and (MO-7) moves a
+ * soft light across it. One listener
  * for the whole site, so server components only add the attribute. Off for touch screens
  * and reduced motion (the CSS ignores the angles there too).
  */
@@ -16,6 +17,8 @@ export function MotionEffects() {
     const reset = (el: HTMLElement) => {
       el.style.removeProperty("--tilt-x");
       el.style.removeProperty("--tilt-y");
+      el.style.removeProperty("--spot-x");
+      el.style.removeProperty("--spot-y");
       el.removeAttribute("data-tilting");
     };
     const onMove = (e: PointerEvent) => {
@@ -31,6 +34,8 @@ export function MotionEffects() {
         const y = (e.clientY - r.top) / r.height - 0.5;
         el.style.setProperty("--tilt-x", `${(-y * max).toFixed(2)}deg`);
         el.style.setProperty("--tilt-y", `${(x * max).toFixed(2)}deg`);
+        el.style.setProperty("--spot-x", `${((x + 0.5) * 100).toFixed(1)}%`);
+        el.style.setProperty("--spot-y", `${((y + 0.5) * 100).toFixed(1)}%`);
         el.setAttribute("data-tilting", "");
       });
     };

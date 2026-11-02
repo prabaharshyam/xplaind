@@ -76,7 +76,7 @@ export function ResourceCard({
   const facts = resourceFacts(r, today);
 
   return (
-    <article className="lx-rise overflow-hidden rounded-2xl border border-zinc-200 sm:flex dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>
+    <article data-tilt="4" className="lx-rise overflow-hidden rounded-2xl border border-zinc-200 sm:flex dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>
       <CourseThumb provider={r.provider} kindLabel={r.kindLabel} embed={r.embed} hours={r.hours} certificate={r.certificate} className="aspect-video shrink-0 sm:aspect-auto sm:w-44" />
       <div className="min-w-0 flex-1 p-4">
       <p className="text-xs font-medium tracking-wide text-zinc-600 uppercase dark:text-zinc-400">

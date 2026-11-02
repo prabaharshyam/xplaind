@@ -1,14 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Cover } from "@/components/art/cover";
-import { Scene3D } from "@/components/three/scene-3d";
-import { type IconName, type ThemeId, pastelOf } from "@/lib/themes";
+import { RoadScene } from "@/components/three/road-scene";
+import { type IconName, type ThemeId, roadColorsOf } from "@/lib/themes";
 
 /** A page's banner: picture, title and one line on what the page is for. */
 export function PageHero({
   theme,
-  seed,
-  icon,
   eyebrow,
   title,
   lead,
@@ -16,7 +13,8 @@ export function PageHero({
   children,
 }: {
   theme: ThemeId;
-  seed: string;
+  /** Kept for callers; the road panel needs only the theme. */
+  seed?: string;
   icon?: IconName;
   eyebrow?: string;
   title: string;
@@ -41,19 +39,13 @@ export function PageHero({
             </nav>
           )}
           {eyebrow && <p className="text-sm font-medium text-violet-800 dark:text-violet-300">{eyebrow}</p>}
-          <h1 className="mt-1 text-3xl leading-tight font-semibold tracking-tight text-balance md:text-4xl">{title}</h1>
+          <h1 data-hero-title className="mt-1 text-3xl leading-tight font-semibold tracking-tight text-balance md:text-4xl">{title}</h1>
           {lead && <div className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">{lead}</div>}
           {children && <div className="mt-5">{children}</div>}
         </div>
-        {/* MO-5: a live 3D scene in the theme's pastels; the drawn cover shows until it loads, or if WebGL is off. */}
+        {/* MO-6: the page's own stretch of road, in its theme's colours. */}
         <div className="lx-hero-art shrink-0 [perspective:1000px]">
-          <Scene3D
-            colors={pastelOf(theme)}
-            seed={seed}
-            density="panel"
-            className="relative h-44 w-full md:h-56 md:w-96"
-            fallback={<Cover theme={theme} seed={seed} icon={icon} className="h-full w-full rounded-3xl shadow-xl" iconSize={52} />}
-          />
+          <RoadScene variant="panel" colors={roadColorsOf(theme)} className="h-44 w-full md:h-56 md:w-96" />
         </div>
       </div>
     </header>
