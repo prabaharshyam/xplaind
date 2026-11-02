@@ -35,7 +35,6 @@ test("the home page says what to do and leads to roadmaps, topics, courses and i
   await expect(main.getByRole("link", { name: "I have an interview soon" })).toHaveAttribute("href", "/interview/simulator");
   // the nine role roadmaps are right there, as cards
   await expect(main.getByRole("link", { name: /Forward Deployed Engineer/ }).first()).toHaveAttribute("href", "/roadmap/forward-deployed-engineer");
-  await expect(main.getByRole("link", { name: /^Retrieval and RAG/ })).toHaveAttribute("href", "/topics/retrieval");
   await expect(main.getByRole("heading", { name: "Sound familiar?" })).toBeVisible();
   await expect(main.getByRole("link", { name: "Find my level" }).first()).toHaveAttribute("href", "/start");
   // the removed sections stay removed
@@ -50,6 +49,8 @@ test("the home page says what to do and leads to roadmaps, topics, courses and i
 
 test("search finds lessons and opens them", async ({ page }) => {
   await page.goto("/");
+  // Search lives in the header on every page (the home page's own search block was removed).
+  await page.getByRole("banner").getByRole("button", { name: "Search" }).click();
   const box = page.getByRole("combobox", { name: /Search lessons/ });
   await box.fill("build a rag");
   await expect(page.getByRole("option").first()).toContainText("Build a RAG app");

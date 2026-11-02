@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
-import { RoleGrid, TopicChips } from "@/components/home/role-grid";
+import { RoleGrid } from "@/components/home/role-grid";
 import { MiniCourses, MiniInterview, MiniLesson, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
 import { ContinueCard } from "@/components/continue-card";
 import { Words } from "@/components/motion/words";
 import { RoadScene } from "@/components/three/road-scene";
 import { JsonLd } from "@/components/json-ld";
-import { SearchBox } from "@/components/search-box";
 import { getBlogPosts, getContent, getPaths, getProjects, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { pathView } from "@/lib/content/paths";
@@ -81,8 +80,6 @@ export default function Home() {
   const stops = getStops();
   const interview = getInterviewViews();
   const posts = getBlogPosts().slice(0, 3);
-  const themeCounts: Record<string, number> = {};
-  for (const s of stops) themeCounts[s.theme] = (themeCounts[s.theme] ?? 0) + 1;
   const stats = [
     { value: String(stops.length), label: "lessons" },
     { value: String(interview.length), label: "interview questions" },
@@ -168,20 +165,6 @@ export default function Home() {
                 lessons: p.counts.lessons,
               }))}
             />
-          </div>
-          <div className="mt-10 grid grid-cols-1 gap-6 rounded-[2rem] [&>div]:min-w-0 bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur md:grid-cols-[1.2fr_1fr] md:p-8 dark:bg-zinc-950/70 dark:ring-violet-900">
-            <div>
-              <h3 className="text-lg font-semibold">Search every lesson, question and course</h3>
-              <div className="mt-3">
-                <SearchBox size="lg" />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold">Or follow one topic</h3>
-              <div className="mt-3">
-                <TopicChips counts={themeCounts} />
-              </div>
-            </div>
           </div>
         </div>
       </section>

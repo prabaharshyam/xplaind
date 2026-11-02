@@ -222,7 +222,7 @@ const SCULPTURES: Record<ShapeName, Weighted[]> = {
   brain: (() => {
     // A constellation of ideas: nodes on a rounded, two-lobed cloud, each linked to its neighbours.
     const r0 = seeded(42);
-    const nodes: Vec[] = Array.from({ length: 46 }, () => {
+    const nodes: Vec[] = Array.from({ length: 26 }, () => {
       const [x, y, z] = sphere(1)(r0);
       const k = 0.55 + r0() * 0.45;
       return [x * 1.25 * k + (x > 0 ? 0.1 : -0.1), y * 0.85 * k, z * 0.9 * k] as Vec;
@@ -237,10 +237,10 @@ const SCULPTURES: Record<ShapeName, Weighted[]> = {
         .forEach(([j]) => links.push([a, nodes[j]])),
     );
     return [
-      [4, (r) => sphere(0.05 + r() * 0.05, nodes[Math.floor(r() * nodes.length)])(r)],
+      [3, (r) => sphere(0.045, nodes[Math.floor(r() * nodes.length)])(r)],
       [4, (r) => {
         const [a, b] = links[Math.floor(r() * links.length)];
-        return seg(a, b, 0.012)(r);
+        return seg(a, b, 0.004)(r);
       }],
     ] as Weighted[];
   })(),
@@ -426,11 +426,24 @@ const SCULPTURES: Record<ShapeName, Weighted[]> = {
     }],
   ],
   cardFan: [
-    // Practice cards fanned in a hand, the top one showing a tick.
-    [6, (r) => {
-      const k = Math.floor(r() * 5);
-      const p = r() < 0.55 ? rect(0.75, 1.1, true)(r) : rect(0.75, 1.1)(r).map((v) => v * 0.4) as Vec;
-      return rotate(() => p, 0, 0, (k - 2) * 0.28)(r).map((v, i) => v + [(k - 2) * 0.28, -Math.abs(k - 2) * 0.06, k * 0.06][i]) as Vec;
+    // Practice cards: a neat stack of flash cards, the front one asking a question.
+    [5, (r) => {
+      const k = Math.floor(r() * 3);
+      const p = rect(1.15, 1.5, true)(r);
+      return [p[0] + k * 0.16, p[1] + k * 0.16, -k * 0.22];
+    }],
+    [5, (r) => {
+      // A large question mark on the front card: the hook, the stem and the dot.
+      const t = r();
+      if (t < 0.62) {
+        const a = Math.PI * 1.05 - (t / 0.62) * Math.PI * 1.55;
+        return [Math.cos(a) * 0.27 + jit(r, 0.035), 0.3 + Math.sin(a) * 0.27 + jit(r, 0.035), 0.05];
+      }
+      if (t < 0.85) {
+        const u = (t - 0.62) / 0.23;
+        return [jit(r, 0.05), 0.03 - u * 0.25, 0.05];
+      }
+      return sphere(0.065, [0, -0.43, 0.05])(r);
     }],
   ],
   bulb: [

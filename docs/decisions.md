@@ -313,3 +313,7 @@ The owner asked to drop the rectangle around the sculptures, make them fill the 
 ## 2026-11-02: the home road stays sharp after in-site navigation (MO-6 fix)
 
 Coming back to the home page through a link drew the road zoomed in until a refresh. The page-enter animation (MO-1) transforms the page container for a moment, and a transform on an ancestor makes a fixed layer size itself to that ancestor, so the road measured itself as the whole page (about 7,800 px tall) and kept that size. The road now re-measures whenever its box changes (ResizeObserver), and the page-enter animation skips the home page, which has its own intro. An e2e test navigates to the home page in-site and checks the road's drawing buffer keeps the screen's shape; it fails without the fix.
+
+## 2026-11-02: sharper particles on phones, a clearer Practice shape, a lighter home page (MO-8, MO-6)
+
+On phones the sculptures looked blurry: the scene drew at most 1.75x while phone screens are 3x, so it was upscaled, and in dark mode additive glow merged dense shapes into white blobs. The scene now draws at the screen's real resolution (up to 3x on small screens, 2x on large), every particle is a hard-edged dot with normal blending in both themes, phones get fewer and smaller particles, and the AI tools network has fewer nodes and thinner links. The Practice page's fanned cards were not recognisable, so it is now a stack of flash cards with a large question mark. The home page's search and topic-chip block is gone: search is in the header on every page and the Library has every filter.
