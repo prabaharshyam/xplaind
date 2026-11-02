@@ -155,16 +155,13 @@ const FRAGMENT = /* glsl */ `
 
   void main() {
     float d = length(gl_PointCoord - 0.5);
-    // A crisp dot with a faint halo: clear shapes in the light, a soft glow in the dark.
-    float core = smoothstep(0.5, 0.3, d);
-    float halo = smoothstep(0.5, 0.0, d);
-    float g = mix(core, max(core * 0.85, halo), uDark * 0.6);
+    // A crisp, hard-edged dot (a soft edge reads as blur, above all on phone screens).
+    float g = smoothstep(0.5, 0.4, d);
     vec3 col = mix(uA, uB, clamp(vY * 0.5 + 0.5, 0.0, 1.0));
     col = mix(col, uC, step(0.93, vSeed));
     col = mix(col, vec3(1.0), vShine * mix(0.35, 0.45, uDark));
-    col = mix(col * 0.88, col * 1.1, uDark);
-    // Additive glow in the dark: keep each particle faint so the page's colours survive.
-    float a = g * vAlpha * mix(1.0, 0.5, uDark);
+    col = mix(col * 0.88, min(col * 1.2 + 0.08, vec3(1.0)), uDark);
+    float a = g * vAlpha;
     if (a < 0.02) discard;
     gl_FragColor = vec4(col, a);
     #include <colorspace_fragment>
@@ -176,10 +173,12 @@ async function mount(el: HTMLElement, shape: ParticleShape, palette: [string, st
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
   const small = window.innerWidth < 640;
-  const count = small ? 4500 : 7500;
+  // Fewer particles on phones, so the dots stay distinct instead of merging into blobs.
+  const count = small ? 3200 : 6500;
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, powerPreference: "high-performance" });
-  const pixel = Math.min(window.devicePixelRatio, 1.75);
+  // Draw at the screen's real resolution (phones are often 3x); the panel is small, so this is cheap.
+  const pixel = Math.min(window.devicePixelRatio, small ? 3 : 2);
   renderer.setPixelRatio(pixel);
   renderer.domElement.style.width = "100%";
   renderer.domElement.style.height = "100%";
@@ -203,7 +202,7 @@ async function mount(el: HTMLElement, shape: ParticleShape, palette: [string, st
     uScatter: { value: 0 },
     uBurst: { value: 0 },
     uPixel: { value: pixel },
-    uSize: { value: small ? 15 : 13 },
+    uSize: { value: small ? 8.5 : 11 },
     uMouse: { value: new THREE.Vector3(9, 9, 0) },
     uMouseOn: { value: 0 },
     uDark: { value: darkQuery.matches ? 1 : 0 },
@@ -217,7 +216,7 @@ async function mount(el: HTMLElement, shape: ParticleShape, palette: [string, st
     uniforms,
     transparent: true,
     depthWrite: false,
-    blending: darkQuery.matches ? THREE.AdditiveBlending : THREE.NormalBlending,
+    blending: THREE.NormalBlending,
   });
   const points = new THREE.Points(geometry, material);
   points.frustumCulled = false;
@@ -258,8 +257,6 @@ async function mount(el: HTMLElement, shape: ParticleShape, palette: [string, st
   el.addEventListener("pointerdown", onDown);
   const onScheme = () => {
     uniforms.uDark.value = darkQuery.matches ? 1 : 0;
-    material.blending = darkQuery.matches ? THREE.AdditiveBlending : THREE.NormalBlending;
-    material.needsUpdate = true;
   };
   darkQuery.addEventListener("change", onScheme);
 
