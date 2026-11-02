@@ -97,9 +97,9 @@ export const SITE_GUIDE: BotEntry[] = [
   {
     k: "guide",
     t: "Use the AI tools",
-    a: "Signed-in learners aged 18 or over can generate a roadmap or a course on any topic, chat with a learning coach, and get AI feedback on interview answers, within a small daily allowance.",
+    a: "Anyone can generate a personal roadmap, ask the AI tutor (on its own page or inside every lesson), and get AI feedback on interview answers, within a small daily allowance. No account needed.",
     h: "/ai",
-    w: "ai tools generate course roadmap coach personal custom",
+    w: "ai tools generate roadmap tutor coach personal custom plan",
   },
   {
     k: "guide",

@@ -11,7 +11,6 @@ test.use({ viewport: { width: 360, height: 740 } });
 // A roadmap as the generator saves it, so the viewer and editor can be tested without calling the model.
 const saved = {
   version: 1,
-  courses: [],
   roadmaps: [
     {
       id: "r1",
@@ -44,8 +43,8 @@ const saved = {
 test("the AI tools page lists every tool and says when AI is off", async ({ page }) => {
   await page.goto("/ai");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  for (const name of ["AI roadmap generator", "Generate a course on anything", "Personal AI coach", "AI tutor in every lesson", "AI interview feedback", "Change your roadmap with AI"]) {
-    await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible();
+  for (const name of ["AI roadmap generator", "AI tutor", "Resume review", "Code playground", "AI interview feedback"]) {
+    await expect(page.getByRole("main").getByRole("link").filter({ has: page.getByText(name, { exact: true }) })).toBeVisible();
   }
   await expect(page.getByText(/AI tools are switched off right now/)).toBeVisible();
   expect(await overflow(page)).toBe(false);
@@ -84,11 +83,11 @@ test("a saved roadmap opens, can be ticked off and edited by hand", async ({ pag
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Topic name" }).last()).toHaveValue("Git and GitHub");
 
-  // the edit survives a reload, and the AI editor asks for AI to be switched on
+  // the edit survives a reload; editing with AI was removed, so a roadmap is changed by hand only
   await page.reload();
   await page.getByRole("button", { name: /From zero to RAG engineer/ }).click();
   await expect(page.getByText("Git and GitHub")).toBeVisible();
-  await expect(page.getByText("AI features are not switched on yet")).toBeVisible();
+  await expect(page.getByText("Change it with AI")).toHaveCount(0);
 });
 
 test("every lesson ends with the AI tutor section", async ({ page }) => {
@@ -98,12 +97,11 @@ test("every lesson ends with the AI tutor section", async ({ page }) => {
   await expect(tutor.getByText("AI features are not switched on yet")).toBeVisible();
 });
 
-test("the course generator and coach pages work without AI", async ({ page }) => {
-  for (const path of ["/ai/course", "/ai/coach"]) {
-    await page.goto(path);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByText("AI features are not switched on yet")).toBeVisible();
-    expect(await overflow(page)).toBe(false);
-  }
-  await expect(page.getByText("What your coach sees")).toBeVisible();
+test("the AI tutor page works without AI, and the old coach link lands on it", async ({ page }) => {
+  await page.goto("/ai/coach");
+  await expect(page).toHaveURL(/\/ai\/tutor$/);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByText("AI features are not switched on yet")).toBeVisible();
+  await expect(page.getByText("What your tutor sees")).toBeVisible();
+  expect(await overflow(page)).toBe(false);
 });

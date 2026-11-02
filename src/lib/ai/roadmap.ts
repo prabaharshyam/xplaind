@@ -71,8 +71,6 @@ export const RoadmapShape: z.ZodType<Roadmap> = z.strictObject({
   tips: z.array(text(400)).max(8),
 });
 
-export const RefineRequest = z.strictObject({ roadmap: RoadmapShape, instruction: z.string().trim().min(3).max(400) });
-
 const LIMITS = { stages: 8, topics: 10, subtopics: 8, tips: 6 };
 const clip = (s: string, n: number) => s.trim().replace(/\s+/g, " ").slice(0, n);
 const round = (n: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number.isFinite(n) ? n : min)));
@@ -108,22 +106,6 @@ export function cleanRoadmap(raw: ModelRoadmap, knownLessons: ReadonlySet<string
     stages,
     project: { title: clip(raw.project.title, 120), description: clip(raw.project.description, 800) },
     tips: raw.tips.map((t) => clip(t, 300)).filter(Boolean).slice(0, LIMITS.tips),
-  };
-}
-
-/** Converts a roadmap the learner edited back into the model's shape, for a refine request. */
-export function toModelShape(r: Roadmap): ModelRoadmap {
-  return {
-    title: r.title,
-    summary: r.summary,
-    stages: r.stages.map((s) => ({
-      title: s.title,
-      weeks: s.weeks,
-      goal: s.goal,
-      topics: s.topics.map((t) => ({ title: t.title, why: t.why, subtopics: t.subtopics, hours: t.hours, lesson_id: t.lessonId })),
-    })),
-    project: r.project,
-    tips: r.tips,
   };
 }
 

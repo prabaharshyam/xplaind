@@ -3,6 +3,7 @@ import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import { RunnableCode } from "@/components/playground/runnable-code";
 import remarkGfm from "remark-gfm";
 import { muted, textLink } from "@/components/ui";
 import { GENAI_PATH_ID, getContent, getGlossary, getLevel, getStop, getStops, pathLessons, pathsWithLesson } from "@/lib/content";
@@ -37,8 +38,22 @@ const PROSE =
   "mt-2 leading-7 [&_h2]:mt-10 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:font-semibold [&_li]:mt-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mt-3 [&_ul]:list-disc [&_ul]:pl-6 [&_strong]:font-semibold [&_blockquote]:mt-3 [&_blockquote]:border-l-4 [&_blockquote]:border-zinc-300 [&_blockquote]:pl-4 [&_blockquote]:text-zinc-700 dark:[&_blockquote]:border-zinc-700 dark:[&_blockquote]:text-zinc-300 [&_pre]:mt-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-zinc-100 [&_pre]:p-3 [&_pre]:text-sm dark:[&_pre]:bg-zinc-900 [&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-zinc-100 [&_:not(pre)>code]:px-1 dark:[&_:not(pre)>code]:bg-zinc-900 [&_table]:mt-3 [&_table]:block [&_table]:overflow-x-auto [&_td]:border [&_td]:border-zinc-300 [&_td]:p-2 [&_th]:border [&_th]:border-zinc-300 [&_th]:p-2 [&_th]:text-left dark:[&_td]:border-zinc-700 dark:[&_th]:border-zinc-700 [&_table]:w-full [&_table]:border-collapse [&_th]:bg-zinc-100 dark:[&_th]:bg-zinc-900 [&_pre:has(>code.language-text)]:bg-zinc-950 [&_pre:has(>code.language-text)]:p-4 [&_pre:has(>code.language-text)]:leading-6 [&_pre:has(>code.language-text)]:text-emerald-100 dark:[&_pre:has(>code.language-text)]:bg-black";
 
 /** Code blocks and tables scroll sideways on phones, so keyboard users must be able to focus them (WCAG 2.1.1). */
+/** PG-4: Python examples in lessons get a "Run this code" button; other code stays as it is. */
+function LessonPre(props: React.ComponentProps<"pre">) {
+  const child = props.children as React.ReactElement<{ className?: string; children?: unknown }> | undefined;
+  const lang = child?.props?.className ?? "";
+  const text = typeof child?.props?.children === "string" ? child.props.children : null;
+  const pre = <pre tabIndex={0} {...props} />;
+  if (!text || !/\blanguage-(python|py)\b/.test(lang)) return pre;
+  return (
+    <RunnableCode code={text.replace(/\n$/, "")} aiOn={aiEnabled()}>
+      {pre}
+    </RunnableCode>
+  );
+}
+
 const MDX_COMPONENTS = {
-  pre: (props: React.ComponentProps<"pre">) => <pre tabIndex={0} {...props} />,
+  pre: LessonPre,
   table: (props: React.ComponentProps<"table">) => <table tabIndex={0} {...props} />,
 };
 const MDX_OPTIONS = { mdxOptions: { remarkPlugins: [remarkGfm] } };

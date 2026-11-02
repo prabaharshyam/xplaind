@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AccountLink } from "./account-link";
 import { Icon } from "./art/icons";
 import { BrandLogo } from "./brand-logo";
+import { getCommunity } from "@/lib/content/community";
 
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -20,6 +21,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
     links: [
       { href: "/projects", label: "Projects" },
       { href: "/practice", label: "Practice cards" },
+      { href: "/playground", label: "Code playground" },
       { href: "/interview", label: "Interview questions" },
       { href: "/interview/simulator", label: "Mock interview" },
       { href: "/ai", label: "AI tools" },
@@ -40,7 +42,8 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
     title: "You",
     links: [
       { href: "/dashboard", label: "Your progress" },
-      { href: "/community", label: "Community" },
+      { href: "/plan", label: "Weekly plan" },
+      { href: "/jobs", label: "Jobs and salaries" },
     ],
   },
 ];
@@ -49,6 +52,7 @@ const link = "rounded text-zinc-600 underline-offset-4 hover:text-zinc-950 hover
 
 /** The site footer: the logo and promise, the community invite, then the site map in four short columns. */
 export function SiteFooter() {
+  const whatsapp = getCommunity().whatsapp_url;
   return (
     <footer className="site-footer relative mt-16 overflow-hidden border-t border-violet-100 bg-gradient-to-b from-white via-violet-50/50 to-blue-50/60 text-sm dark:border-white/10 dark:from-[#0e0b1c] dark:via-[#110d24] dark:to-[#0b1230]">
       <div className="mx-auto max-w-6xl px-4 pt-12 pb-8 md:px-6">
@@ -65,12 +69,16 @@ export function SiteFooter() {
               <p className="mt-1 text-zinc-600 dark:text-zinc-400">
                 Ask questions, share what you are building and find study partners in our WhatsApp group.
               </p>
-              <Link
-                href="/community"
+              {/* CM-2: straight to the WhatsApp group; there is no separate Community page. */}
+              <a
+                href={whatsapp || "/community"}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-3 inline-flex h-10 items-center gap-2 rounded-full bg-emerald-700 px-4 font-medium text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
               >
                 <Icon name="chat" size={16} /> Join the community
-              </Link>
+                <span className="sr-only"> on WhatsApp (opens in a new tab)</span>
+              </a>
             </div>
           </div>
 

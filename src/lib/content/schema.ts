@@ -571,3 +571,31 @@ export type LibraryItem = z.infer<typeof LibraryItem>;
 export const Library = z
   .strictObject({ items: z.array(LibraryItem).min(1) })
   .refine((l) => new Set(l.items.map((i) => i.id)).size === l.items.length, "LB-1: every item needs its own id");
+
+// ------------------------------------------------------------------ jobs ---
+
+/** JB-1: one salary band, in lakh rupees a year (LPA). */
+const SalaryBand = z
+  .strictObject({ years: Text, min: z.number().positive(), max: z.number().positive() })
+  .refine((b) => b.min <= b.max, "JB-1: a band's min must not be above its max");
+
+/** JB-1: AI jobs and salaries in India, one entry per role roadmap, with the date they were checked. */
+export const JobsFile = z
+  .strictObject({
+    checked: z.preprocess((v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v), IsoDate),
+    sources: z.array(z.strictObject({ name: Text, url: HttpsUrl })).min(1),
+    roles: z
+      .array(
+        z.strictObject({
+          path: Slug,
+          /** The words to search for on job sites. */
+          search: Text,
+          bands: z.array(SalaryBand).min(2),
+          skills: z.array(Text).min(4).max(10),
+        }),
+      )
+      .min(1),
+  })
+  .refine((j) => new Set(j.roles.map((r) => r.path)).size === j.roles.length, "JB-1: one entry per role");
+export type JobsFile = z.infer<typeof JobsFile>;
+export type JobRole = JobsFile["roles"][number];

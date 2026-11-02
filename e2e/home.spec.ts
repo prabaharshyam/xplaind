@@ -42,7 +42,7 @@ test("the home page says what to do and leads to roadmaps, topics, courses and i
   await expect(page.getByText("Where this is going")).toHaveCount(0);
   const nav = page.getByRole("banner");
   await nav.locator("summary").click(); // phone width: the links sit in the menu
-  for (const [name, href] of [["Library", "/library"], ["Videos", "/videos"], ["Practice", "/practice"], ["Mock interview", "/interview/simulator"], ["Community", "/community"], ["Roadmaps", "/paths"]]) {
+  for (const [name, href] of [["Library", "/library"], ["Videos", "/videos"], ["Practice", "/practice"], ["Mock interview", "/interview/simulator"], ["Jobs", "/jobs"], ["Roadmaps", "/paths"]]) {
     await expect(nav.getByRole("link", { name, exact: true }).first()).toHaveAttribute("href", href);
   }
 });
@@ -104,12 +104,15 @@ test("the logo, favicon and footer community invite are in place", async ({ page
   await page.goto("/");
   await expect(page.getByRole("banner").getByRole("link", { name: "Xplaind home" }).locator("img").first()).toHaveAttribute("alt", "Xplaind");
   const footer = page.getByRole("contentinfo");
-  await expect(footer.getByRole("link", { name: "Join the community" })).toHaveAttribute("href", "/community");
+  // CM-2: the invite goes straight to the WhatsApp group.
+  await expect(footer.getByRole("link", { name: /Join the community/ })).toHaveAttribute("href", /^https:\/\/chat\.whatsapp\.com\//);
   for (const p of ["/favicon.ico", "/icon.png", "/apple-icon.png", "/brand/xplaind-logo.png", "/brand/xplaind-logo-dark.png"]) {
     expect((await request.get(p)).status(), p).toBe(200);
   }
-  await page.goto("/community");
-  await expect(page.getByRole("link", { name: /Join on WhatsApp/ })).toHaveAttribute("href", /^https:\/\/chat\.whatsapp\.com\//);
+  // Old /community links land on the group too.
+  const old = await request.get("/community", { maxRedirects: 0 });
+  expect(old.status()).toBe(307);
+  expect(old.headers().location).toMatch(/^https:\/\/chat\.whatsapp\.com\//);
 });
 
 test("the road keeps the screen's size after navigating back home (MO-6)", async ({ page }) => {

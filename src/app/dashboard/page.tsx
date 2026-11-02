@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -23,7 +24,12 @@ async function SignedIn() {
 export default function DashboardPage() {
   return (
     <main>
-      <PageHero shape="barChart" theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your XP, streak and badges." />
+      <PageHero shape="barChart" theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your XP, streak and badges.">
+        {/* WP-1: this week's plan, one tap from progress. */}
+        <Link href="/plan" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-violet-700 px-5 font-medium text-white hover:bg-violet-800">
+          See this week&apos;s study plan →
+        </Link>
+      </PageHero>
       <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-8 empty:hidden">
         <ContinueCard titles={Object.fromEntries(getStops().map((s) => [s.id, s.title]))} />

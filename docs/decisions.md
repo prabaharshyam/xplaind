@@ -317,3 +317,13 @@ Coming back to the home page through a link drew the road zoomed in until a refr
 ## 2026-11-02: sharper particles on phones, a clearer Practice shape, a lighter home page (MO-8, MO-6)
 
 On phones the sculptures looked blurry: the scene drew at most 1.75x while phone screens are 3x, so it was upscaled, and in dark mode additive glow merged dense shapes into white blobs. The scene now draws at the screen's real resolution (up to 3x on small screens, 2x on large), every particle is a hard-edged dot with normal blending in both themes, phones get fewer and smaller particles, and the AI tools network has fewer nodes and thinner links. The Practice page's fanned cards were not recognisable, so it is now a stack of flash cards with a large question mark. The home page's search and topic-chip block is gone: search is in the header on every page and the Library has every filter.
+
+## 2026-11-02: new learner tools, and fewer AI tools (PG, JB, WP, RV, AI-1, CM-2, PR-9)
+
+The owner chose what to build next from an analysis of gaps: a code playground, jobs and salaries, a weekly study plan and a resume review; not certificates, shareable profiles or AI project review for now.
+
+- Code playground: Pyodide in a Web Worker, loaded from jsDelivr at a pinned version, so code runs on the learner's device with no server cost; only an explicit "Explain this error" sends code and error to the AI tutor.
+- Jobs and salaries: salary sources disagree widely, so each role shows middle-of-the-road bands by experience with the checked date and the sources, the same honesty as RM-6 for prices. Live openings are search links to Naukri and LinkedIn (as the owner asked), so they never go stale.
+- Weekly plan: built on the device from the roadmap and the hours chosen. Email or WhatsApp nudges need sign-ups and a paid sending service, so the reminder is a calendar event (Google Calendar link or .ics) that works today without an account.
+- Resume review: the file is read in the browser with the same PDF reader as Ask me from my book; only the text goes to the model for one review. Word files are saved as PDF first rather than adding a parser.
+- The owner removed "Generate a course on anything" and "Change your roadmap with AI", merged the personal coach into the AI tutor (one assistant: in every lesson and on its own page; its daily limit rose from 30 to 40 to cover the coach's use), removed the Community page in favour of direct WhatsApp links, and asked for the glossary to be visible from Practice.

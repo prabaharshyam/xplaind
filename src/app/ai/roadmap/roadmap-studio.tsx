@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { aiPost } from "@/components/ai/ai-client";
-import { type AiAccess, AiGate, useAiAccess } from "@/components/ai/ai-gate";
+import { AiGate, useAiAccess } from "@/components/ai/ai-gate";
 import { AiError, AiWorking } from "@/components/ai/ai-working";
 import { Icon } from "@/components/art/icons";
 import { primaryButton, secondaryButton } from "@/components/ui";
@@ -41,7 +41,7 @@ export function RoadmapStudio({ enabled }: { enabled: boolean }) {
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="min-w-0">
         {open ? (
-          <RoadmapView key={open.id} saved={open} access={access} onClose={() => setOpenId(null)} />
+          <RoadmapView key={open.id} saved={open} onClose={() => setOpenId(null)} />
         ) : (
           <section aria-labelledby="new-roadmap">
             <h2 id="new-roadmap" className="text-2xl font-semibold tracking-tight">
@@ -179,14 +179,9 @@ function RoadmapForm({ onMade }: { onMade: (id: string) => void }) {
   );
 }
 
-const REFINE_IDEAS = ["Make it shorter", "Add more hands-on projects", "Focus on interview preparation", "I can only study on weekends", "Explain it for a complete beginner"];
-
-function RoadmapView({ saved, access, onClose }: { saved: SavedRoadmap; access: AiAccess; onClose: () => void }) {
+function RoadmapView({ saved, onClose }: { saved: SavedRoadmap; onClose: () => void }) {
   const r = saved.roadmap;
   const [editing, setEditing] = useState(false);
-  const [instruction, setInstruction] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const done = new Set(saved.done);
   const topics = r.stages.flatMap((s) => s.topics);
   const pct = topics.length ? Math.round((topics.filter((t) => done.has(t.id)).length / topics.length) * 100) : 0;
@@ -198,24 +193,7 @@ function RoadmapView({ saved, access, onClose }: { saved: SavedRoadmap; access: 
     });
   const toggle = (id: string) => updateRoadmap(saved.id, (s) => ({ ...s, done: s.done.includes(id) ? s.done.filter((x) => x !== id) : [...s.done, id] }));
 
-  const refine = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (instruction.trim().length < 3) return setError("Say what you would like to change.");
-    setBusy(true);
-    setError(null);
-    const res = await aiPost<{ roadmap: Roadmap }>("/api/ai/roadmap", { mode: "refine", roadmap: r, instruction });
-    setBusy(false);
-    if (!res.ok) return setError(res.message);
-    // Keep ticks on topics that survived the edit, matched by title.
-    const doneTitles = new Set(topics.filter((t) => done.has(t.id)).map((t) => t.title.toLowerCase()));
-    const next = res.data.roadmap;
-    updateRoadmap(saved.id, (s) => ({
-      ...s,
-      roadmap: next,
-      done: next.stages.flatMap((st) => st.topics).filter((t) => doneTitles.has(t.title.toLowerCase())).map((t) => t.id),
-    }));
-    setInstruction("");
-  };
+
 
   return (
     <article aria-labelledby="roadmap-title">
@@ -357,37 +335,6 @@ function RoadmapView({ saved, access, onClose }: { saved: SavedRoadmap; access: 
         </section>
       )}
 
-      <section className="mt-10 rounded-2xl border border-violet-200 bg-violet-50/60 p-5 print:hidden dark:border-violet-900 dark:bg-violet-950/20" aria-labelledby="ai-editor">
-        <h3 id="ai-editor" className="flex items-center gap-2 text-lg font-semibold">
-          <Icon name="sparkles" size={20} /> Change it with AI
-        </h3>
-        <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">Say what to change in plain words. The AI rewrites the roadmap and keeps your ticks on topics that stay.</p>
-        <div className="mt-3">
-          <AiGate access={access} next="/ai/roadmap">
-            {busy ? (
-              <AiWorking steps={["Reading your change", "Rewriting the stages", "Checking the hours"]} />
-            ) : (
-              <form onSubmit={refine} className="space-y-3">
-                <label className="block">
-                  <span className="sr-only">What should change?</span>
-                  <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} maxLength={400} rows={2} className={field} placeholder="For example: add a stage on interview practice and drop the maths" />
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {REFINE_IDEAS.map((x) => (
-                    <button key={x} type="button" onClick={() => setInstruction(x)} className="rounded-full border border-violet-300 bg-white px-3 py-1.5 text-sm hover:bg-violet-100 dark:border-violet-800 dark:bg-zinc-900 dark:hover:bg-violet-950">
-                      {x}
-                    </button>
-                  ))}
-                </div>
-                {error && <AiError message={error} />}
-                <button type="submit" className={primaryButton}>
-                  Update roadmap
-                </button>
-              </form>
-            )}
-          </AiGate>
-        </div>
-      </section>
       <p className="mt-6 text-xs text-zinc-600 dark:text-zinc-400">
         Made with AI on {saved.createdOn} for: “{saved.goal}”. AI can be wrong, so check anything important.
       </p>

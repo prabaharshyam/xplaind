@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cleanGrade, cleanCourseLesson, chatMessages, knownIds } from "./features";
-import { addTopic, cleanRoadmap, type ModelRoadmap, moveTopic, removeTopic, renameTopic, RoadmapShape, toModelShape, totalHours } from "./roadmap";
+import { cleanGrade, chatMessages, knownIds } from "./features";
+import { addTopic, cleanRoadmap, type ModelRoadmap, moveTopic, removeTopic, renameTopic, RoadmapShape, totalHours } from "./roadmap";
 
 const topic = (title: string, lesson_id: string | null = null) => ({ title, why: "because", subtopics: ["a", "b"], hours: 3, lesson_id });
 const raw: ModelRoadmap = {
@@ -43,9 +43,6 @@ describe("cleanRoadmap", () => {
     expect(c.stages[0].topics).toHaveLength(10);
   });
 
-  it("round-trips to the model's shape for a refine request", () => {
-    expect(toModelShape(r).stages[0].topics[0].lesson_id).toBe("python-basics");
-  });
 });
 
 describe("roadmap editing", () => {
@@ -76,24 +73,6 @@ describe("other AI clean-up", () => {
     expect(g.score).toBe(5);
     expect(g.covered).toEqual(["a"]);
     expect(cleanGrade({ ...g, score: Number.NaN }, []).score).toBe(0);
-  });
-
-  it("drops quiz questions whose answer is not one of the options", () => {
-    const l = cleanCourseLesson({
-      title: "t",
-      intro: "i",
-      sections: [{ heading: "h", body: "b" }],
-      diagram: "\n[a] --> [b]\n",
-      example: { title: "e", body: "b" },
-      key_points: ["k"],
-      quiz: [
-        { question: "q1", options: ["a", "b"], answer_index: 1, explanation: "x" },
-        { question: "q2", options: ["a", "b"], answer_index: 4, explanation: "x" },
-      ],
-      flashcards: [{ q: "q", a: "a" }],
-    });
-    expect(l.quiz.map((q) => q.question)).toEqual(["q1"]);
-    expect(l.diagram).toBe("[a] --> [b]");
   });
 
   it("starts a chat on a learner turn and wraps learner turns as data", () => {
