@@ -65,7 +65,7 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     const out = await runAi(req);
     expect(out).toEqual({ data: { answer: "42" } });
     expect(rpc.mock.calls[0][0]).toBe("ai_reserve");
-    expect(rpc.mock.calls[0][1]).toMatchObject({ p_kind: "tutor", p_daily_max: 30, p_month_cap_usd: 20 });
+    expect(rpc.mock.calls[0][1]).toMatchObject({ p_kind: "tutor", p_daily_max: 40, p_month_cap_usd: 20 });
     expect(rpc.mock.calls[1]).toEqual(["ai_record", expect.objectContaining({ p_tokens_in: 1000, p_tokens_out: 100, p_cost_usd: 0.006 })]);
     expect(create.mock.calls[0][0]).toMatchObject({ model: "claude-opus-5-5", fallbacks: "default", output_config: { effort: "low" } });
   });

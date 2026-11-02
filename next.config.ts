@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/**": ["./content/**/*", "./data/**/*"],
     "/go/**": ["./content/**/*"],
+    "/community": ["./content/community/**/*"],
     // Share images draw the logo from this file when they render on demand.
     "/**/opengraph-image*": ["./public/brand/xplaind-wordmark.png"],
   },
@@ -22,11 +23,13 @@ const nextConfig: NextConfig = {
       ["rag-expert", "genai-engineer"],
       ["ai-for-beginners", "ai-engineer"],
     ];
-    return moved.flatMap(([from, to]) => [
+    // 2026-11-02: the AI coach was merged into the AI tutor.
+    const merged = [{ source: "/ai/coach", destination: "/ai/tutor", permanent: true }];
+    return [...merged, ...moved.flatMap(([from, to]) => [
       { source: `/roadmap/${from}`, destination: `/roadmap/${to}`, permanent: true },
       { source: `/interview/for/${from}`, destination: `/interview/for/${to}`, permanent: true },
       { source: `/interview/top/${from}`, destination: `/interview/top/${to}`, permanent: true },
-    ]);
+    ])];
   },
   partialPrefetching: true,
   turbopack: {

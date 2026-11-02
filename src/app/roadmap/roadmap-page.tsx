@@ -36,6 +36,13 @@ export function RoadmapPage({ path }: { path: Goal }) {
         <p className="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
           <span className="font-medium">Who it is for:</span> {view.who_for}
         </p>
+        {/* JB-3: what the role pays and live openings, one tap away. */}
+        <Link href={`/jobs#${path.id}`} className="mt-3 inline-flex min-h-10 items-center gap-1 text-sm font-medium text-violet-800 underline-offset-2 hover:underline dark:text-violet-300">
+          Salaries and live jobs for this role →
+        </Link>
+        <Link href="/plan" className="mt-3 ml-4 inline-flex min-h-10 items-center gap-1 text-sm font-medium text-violet-800 underline-offset-2 hover:underline dark:text-violet-300">
+          Plan my week →
+        </Link>
       </PageHero>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <TopicDrawerProvider details={topicDetails(roadmapStopIds(model))}>

@@ -2,7 +2,7 @@
 // database, no UI. Every learner-typed string goes through asData (SC-5).
 import { z } from "zod";
 import { asData, DATA_RULE, HOUSE_STYLE } from "./prompt";
-import { ModelRoadmap, type RoadmapRequest, type Roadmap, toModelShape } from "./roadmap";
+import { ModelRoadmap, type RoadmapRequest } from "./roadmap";
 
 export type CatalogLesson = { id: string; title: string; level: string };
 
@@ -39,92 +39,6 @@ export function roadmapPrompt(req: RoadmapRequest, catalog: CatalogLesson[]) {
   return { system, messages: [{ role: "user" as const, content: user }], schema: ModelRoadmap };
 }
 
-export function refinePrompt(roadmap: Roadmap, instruction: string, catalog: CatalogLesson[]) {
-  const system = `${roadmapSystem(catalog)}\n\nYou are now editing an existing roadmap. Apply the learner's change and keep everything else the same unless the change requires otherwise. Return the whole updated roadmap.`;
-  const user = [
-    "Here is the current roadmap as JSON.",
-    asData("current_roadmap", JSON.stringify(toModelShape(roadmap)), 20_000),
-    "Apply this change:",
-    asData("change", instruction, 400),
-  ].join("\n\n");
-  return { system, messages: [{ role: "user" as const, content: user }], schema: ModelRoadmap };
-}
-
-// ----------------------------------------------------------------- course --
-
-export const CourseRequest = z.strictObject({
-  topic: z.string().trim().min(2).max(200),
-  level: z.enum(["new", "some", "experienced"]),
-  goal: z.string().trim().max(300).default(""),
-});
-export type CourseRequest = z.infer<typeof CourseRequest>;
-
-export const CourseOutline = z.object({
-  title: z.string(),
-  summary: z.string(),
-  audience: z.string(),
-  modules: z.array(z.object({ title: z.string(), summary: z.string(), lessons: z.array(z.object({ title: z.string(), summary: z.string() })) })),
-});
-export type CourseOutline = z.infer<typeof CourseOutline>;
-
-export function coursePrompt(req: CourseRequest) {
-  const system = [
-    "You design short self-study courses for Xplaind, an AI learning site. Courses can be on any learnable topic, with a bias toward AI and technology.",
-    HOUSE_STYLE,
-    DATA_RULE,
-    "A course has 3 to 6 modules in a sensible order; each module has 2 to 5 lessons. Each lesson summary says in one sentence what the learner will be able to do after it.",
-    "Pitch everything at the learner's level. If the topic is harmful or not something to learn, return a course on the nearest safe, useful topic and say so in the summary.",
-  ].join("\n\n");
-  const user = [
-    "Design a course.",
-    asData("topic", req.topic, 200),
-    req.goal ? asData("goal", req.goal, 300) : "",
-    `The learner is ${LEVEL_WORDS[req.level]}.`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-  return { system, messages: [{ role: "user" as const, content: user }], schema: CourseOutline };
-}
-
-export const CourseLessonRequest = z.strictObject({
-  course: z.string().trim().min(2).max(160),
-  module: z.string().trim().min(2).max(160),
-  lesson: z.string().trim().min(2).max(160),
-  level: z.enum(["new", "some", "experienced"]),
-});
-
-export const CourseLesson = z.object({
-  title: z.string(),
-  intro: z.string(),
-  sections: z.array(z.object({ heading: z.string(), body: z.string() })),
-  diagram: z.string(),
-  example: z.object({ title: z.string(), body: z.string() }),
-  key_points: z.array(z.string()),
-  quiz: z.array(z.object({ question: z.string(), options: z.array(z.string()), answer_index: z.number(), explanation: z.string() })),
-  flashcards: z.array(z.object({ q: z.string(), a: z.string() })),
-});
-export type CourseLesson = z.infer<typeof CourseLesson>;
-
-export function courseLessonPrompt(req: z.infer<typeof CourseLessonRequest>) {
-  const system = [
-    "You write one lesson of a self-study course for Xplaind, an AI learning site.",
-    HOUSE_STYLE,
-    DATA_RULE,
-    "Teach clearly and in depth, like a good textbook chapter: 3 to 5 sections of 2 to 4 short paragraphs each, separated by blank lines. You may use '- ' bullet lines and **bold** for key terms. For code, use fenced code blocks.",
-    "diagram: a plain-text diagram (boxes and arrows drawn with characters, at most 60 characters wide and 16 lines) that shows how the idea works, or an empty string if a diagram would not help.",
-    "example: one worked example with a realistic Indian setting.",
-    "key_points: 3 to 5 one-sentence takeaways. quiz: 3 multiple-choice questions with 4 options each, answer_index from 0 to 3, and a one-sentence explanation. flashcards: 4 question and answer pairs.",
-  ].join("\n\n");
-  const user = [
-    "Write this lesson.",
-    asData("course", req.course, 160),
-    asData("module", req.module, 160),
-    asData("lesson", req.lesson, 160),
-    `The learner is ${LEVEL_WORDS[req.level]}.`,
-  ].join("\n\n");
-  return { system, messages: [{ role: "user" as const, content: user }], schema: CourseLesson };
-}
-
 // ------------------------------------------------------------ coach, tutor --
 
 export const ChatTurn = z.strictObject({ role: z.enum(["user", "assistant"]), text: z.string().max(4000) });
@@ -146,18 +60,33 @@ const CHAT_FORMAT =
   "reply: your answer in plain text, under 220 words, with blank lines between paragraphs; '- ' bullets, **bold** and fenced code are allowed. " +
   "lesson_ids: up to 3 exact ids from the catalog that would help next (or none). follow_ups: 2 or 3 short questions the learner might ask next.";
 
-export const CoachRequest = z.strictObject({
+/**
+ * The AI tutor (one assistant since 2026-11-02; the coach was merged into it). Inside a lesson it
+ * is grounded in that lesson; on its own page it sees a short summary of the learner's progress
+ * and also plans study and answers career questions.
+ */
+export const TutorRequest = z.strictObject({
+  lessonId: z.string().max(80).optional(),
   turns: z.array(ChatTurn).min(1).max(30),
   context: z.string().max(1500).default(""),
 });
 
-export function coachPrompt(req: z.infer<typeof CoachRequest>, catalog: CatalogLesson[]) {
+export function tutorPrompt(
+  lesson: { title: string; outcome: string; body: string } | null,
+  req: { turns: z.infer<typeof ChatTurn>[]; context?: string },
+  catalog: CatalogLesson[],
+) {
+  const role = lesson
+    ? `You are the Xplaind AI tutor, helping a learner with the lesson "${lesson.title}". They are reading it now. Its goal: ${lesson.outcome}`
+    : "You are the Xplaind AI tutor: a friendly, honest mentor who explains AI topics, helps one learner plan their study week, keeps them going and answers career questions about getting into AI work in India.";
   const system = [
-    "You are the Xplaind learning coach: a friendly, honest mentor who helps one learner plan, stay motivated and choose what to learn next on their way into AI work.",
+    role,
     HOUSE_STYLE,
     DATA_RULE,
-    "Give concrete next actions sized to the learner's time. Prefer Xplaind's own lessons from the catalog. Be honest about job markets and timelines; never promise jobs or salaries.",
+    "Explain, give fresh examples and analogies, and check understanding with a quick question when useful. If asked to just do an exercise for them, coach them through it instead.",
+    "When asked to plan, give concrete next actions sized to the learner's time, preferring Xplaind's own lessons from the catalog. Be honest about job markets and timelines; never promise jobs or salaries.",
     CHAT_FORMAT,
+    ...(lesson ? ["Stay grounded in the lesson text below; if you go beyond it, say so.", "The lesson text:", lesson.body.slice(0, 30_000)] : []),
     "Lesson catalog (id | title | level):",
     catalogText(catalog),
   ].join("\n\n");
@@ -166,23 +95,6 @@ export function coachPrompt(req: z.infer<typeof CoachRequest>, catalog: CatalogL
     messages[0] = { role: "user", content: `${asData("learner_progress", req.context, 1500)}\n\n${messages[0].content}` };
   }
   return { system, messages, schema: ChatReply };
-}
-
-export const TutorRequest = z.strictObject({ lessonId: z.string().max(80), turns: z.array(ChatTurn).min(1).max(30) });
-
-export function tutorPrompt(lesson: { title: string; outcome: string; body: string }, turns: z.infer<typeof ChatTurn>[], catalog: CatalogLesson[]) {
-  const system = [
-    `You are the Xplaind learning companion for the lesson "${lesson.title}". The learner is reading it now. Its goal: ${lesson.outcome}`,
-    HOUSE_STYLE,
-    DATA_RULE,
-    "Explain, give fresh examples and analogies, and check understanding with a quick question when useful. Stay grounded in the lesson text below; if you go beyond it, say so. If asked to just do an exercise for them, coach them through it instead.",
-    CHAT_FORMAT,
-    "The lesson text:",
-    lesson.body.slice(0, 30_000),
-    "Lesson catalog (id | title | level):",
-    catalogText(catalog),
-  ].join("\n\n");
-  return { system, messages: chatMessages(turns), schema: ChatReply };
 }
 
 // ------------------------------------------------------------------ x bot --
@@ -261,50 +173,6 @@ export const knownIds = (ids: string[], known: ReadonlySet<string>) => [...new S
 
 const clip = (s: string, n: number) => s.trim().slice(0, n);
 const line = (s: string, n: number) => clip(s.replace(/\s+/g, " "), n);
-
-export function cleanOutline(o: CourseOutline): CourseOutline {
-  return {
-    title: line(o.title, 120) || "Your course",
-    summary: line(o.summary, 600),
-    audience: line(o.audience, 300),
-    modules: o.modules
-      .slice(0, 6)
-      .map((m) => ({
-        title: line(m.title, 120),
-        summary: line(m.summary, 400),
-        lessons: m.lessons
-          .slice(0, 5)
-          .map((l) => ({ title: line(l.title, 120), summary: line(l.summary, 300) }))
-          .filter((l) => l.title),
-      }))
-      .filter((m) => m.title && m.lessons.length),
-  };
-}
-
-export function cleanCourseLesson(l: CourseLesson): CourseLesson {
-  return {
-    title: line(l.title, 120),
-    intro: clip(l.intro, 1500),
-    sections: l.sections
-      .slice(0, 6)
-      .map((s) => ({ heading: line(s.heading, 120), body: clip(s.body, 5000) }))
-      .filter((s) => s.body),
-    diagram: l.diagram
-      .split("\n")
-      .slice(0, 20)
-      .map((r) => r.slice(0, 72))
-      .join("\n")
-      .replace(/^\s*\n|\n\s*$/g, ""),
-    example: { title: line(l.example.title, 120), body: clip(l.example.body, 3000) },
-    key_points: l.key_points.map((p) => line(p, 300)).filter(Boolean).slice(0, 6),
-    quiz: l.quiz
-      .filter((q) => q.options.length >= 2 && Number.isInteger(q.answer_index) && q.answer_index >= 0 && q.answer_index < q.options.length)
-      .slice(0, 5)
-      .map((q) => ({ question: line(q.question, 300), options: q.options.slice(0, 5).map((o) => line(o, 200)), answer_index: q.answer_index, explanation: line(q.explanation, 400) }))
-      .filter((q) => q.answer_index < q.options.length),
-    flashcards: l.flashcards.map((c) => ({ q: line(c.q, 300), a: line(c.a, 600) })).filter((c) => c.q && c.a).slice(0, 8),
-  };
-}
 
 export function cleanChat(r: ChatReply, known: ReadonlySet<string>): ChatReply {
   return {
@@ -499,4 +367,71 @@ export function cleanBookQuestions(out: BookOutput, excerpts: BookExcerpt[], cou
     .sort((a, b) => a.order - b.order)
     .slice(0, count)
     .map((q, i) => ({ id: `q${i + 1}`, question: q.question, options: q.options, answer: q.answer, explanation: q.explanation, quote: q.quote, page: q.page, section: q.section }));
+}
+
+// ----------------------------------------------------------------- resume --
+
+/** RV-1: a resume (text read in the browser) and, optionally, the role and a job post to aim at. */
+export const ResumeRequest = z.strictObject({
+  resume: z.string().trim().min(200, "That resume looks too short to review.").max(15_000),
+  role: z.string().trim().max(80).default(""),
+  job: z.string().trim().max(6_000).default(""),
+});
+
+export const ResumeReview = z.object({
+  score: z.number(),
+  verdict: z.string(),
+  strengths: z.array(z.string()),
+  fixes: z.array(
+    z.object({
+      priority: z.enum(["high", "medium", "low"]),
+      area: z.string(),
+      issue: z.string(),
+      suggestion: z.string(),
+      example: z.string(),
+    }),
+  ),
+  missing_keywords: z.array(z.string()),
+});
+export type ResumeReview = z.infer<typeof ResumeReview>;
+
+/** RV-2: a recruiter's and an applicant tracking system's eye on the resume, with fixes in order. */
+export function resumePrompt(req: z.infer<typeof ResumeRequest>) {
+  const system = [
+    "You review resumes for people applying to AI and tech jobs in India, the way a busy recruiter and an applicant tracking system (ATS) would read them. Your goal: a list of concrete changes that make this resume more likely to be shortlisted.",
+    HOUSE_STYLE,
+    DATA_RULE,
+    "Base every point on what the resume actually says, quoting or naming the line you mean. Never invent experience, employers, numbers or skills the person does not have; where a number would help, tell them to add their real figure.",
+    "Check: a clear headline and summary for the target role; experience bullets that start with action verbs and show results with numbers; skills and keywords that match the role or job post; projects with links (GitHub, demos) and the stack used; education placed sensibly for their experience; ATS-safe format (no tables, columns, photos, headers or footers holding key details; standard section names; one or two pages); spelling, tense and consistency.",
+    "score: 0 to 100, how ready it is to be shortlisted for the target role. verdict: two or three sentences, honest and kind.",
+    "strengths: 2 to 4 things that already work. fixes: 5 to 12 changes, most important first, each with priority (high, medium or low), area (for example Summary, Experience, Skills, Projects, Format, Keywords), issue, suggestion, and example: a rewritten line they could adapt, or an empty string if a rewrite does not apply.",
+    "missing_keywords: up to 12 skills or terms the role or job post expects that the resume lacks, only ones a reasonable candidate for this role would have.",
+  ].join("\n\n");
+  const user = [
+    "Review this resume.",
+    req.role ? asData("target_role", req.role, 80) : "",
+    req.job ? asData("job_post", req.job, 6_000) : "",
+    asData("resume", req.resume, 15_000),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  return { system, messages: [{ role: "user" as const, content: user }], schema: ResumeReview };
+}
+
+const RANK = { high: 0, medium: 1, low: 2 } as const;
+
+/** Bounds the model's review: a whole-number score, trimmed text, high-priority fixes first. */
+export function cleanResumeReview(r: ResumeReview): ResumeReview {
+  const t = (s: string, n: number) => s.trim().replace(/\s+\n/g, "\n").slice(0, n);
+  return {
+    score: Math.min(100, Math.max(0, Math.round(Number.isFinite(r.score) ? r.score : 0))),
+    verdict: t(r.verdict, 600),
+    strengths: r.strengths.map((s) => t(s, 300)).filter(Boolean).slice(0, 4),
+    fixes: r.fixes
+      .map((f) => ({ priority: f.priority, area: t(f.area, 40), issue: t(f.issue, 400), suggestion: t(f.suggestion, 500), example: t(f.example, 400) }))
+      .filter((f) => f.issue && f.suggestion)
+      .sort((a, b) => RANK[a.priority] - RANK[b.priority])
+      .slice(0, 12),
+    missing_keywords: [...new Set(r.missing_keywords.map((k) => t(k, 40)).filter(Boolean))].slice(0, 12),
+  };
 }

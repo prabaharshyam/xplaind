@@ -10,17 +10,16 @@ import type { IconName } from "@/lib/themes";
 export const metadata: Metadata = {
   title: "AI tools to learn AI faster",
   description:
-    "AI tools for learners: generate a personal AI roadmap, a course on any topic, get coaching, ask a tutor inside every lesson, and get AI feedback on interview answers.",
+    "AI tools for learners: a personal AI roadmap, an AI tutor in every lesson, a resume review, a Python code playground and AI feedback on interview answers.",
   alternates: { canonical: "/ai" },
 };
 
 const TOOLS: { href: string; title: string; text: string; icon: IconName; tone: string; tag: string }[] = [
   { href: "/ai/book", title: "Ask me from my book", text: "Upload your textbook or notes and get a timed MCQ test written from it. The report shows each answer on its page and what to reread.", icon: "book", tone: "from-teal-600 to-violet-600", tag: "Most popular" },
   { href: "/ai/roadmap", title: "AI roadmap generator", text: "Your goal, level and hours in; a stage-by-stage plan linked to our lessons out. Tick topics off as you go.", icon: "map", tone: "from-violet-600 to-fuchsia-500", tag: "Plan" },
-  { href: "/ai/roadmap", title: "Change your roadmap with AI", text: "“Make it shorter”, “add interview prep”, “weekends only”. Say it in plain words and the roadmap is rewritten. Or edit it by hand.", icon: "flow", tone: "from-fuchsia-600 to-orange-500", tag: "Editor" },
-  { href: "/ai/course", title: "Generate a course on anything", text: "Any topic at your level: modules, then lessons with examples, a diagram, a quiz and flashcards, written when you open them.", icon: "book", tone: "from-sky-600 to-indigo-600", tag: "New" },
-  { href: "/ai/coach", title: "Personal AI coach", text: "Plans your week, keeps you going and answers career questions, knowing what you have already done.", icon: "people", tone: "from-emerald-600 to-teal-500", tag: "Coach" },
-  { href: "/topics", title: "AI tutor in every lesson", text: "Stuck on a lesson? Ask the tutor at the bottom of the page. It has read the lesson and explains it another way.", icon: "chat", tone: "from-amber-500 to-rose-500", tag: "In lessons" },
+  { href: "/ai/tutor", title: "AI tutor", text: "Explains any AI topic, plans your week and answers career questions, knowing what you have done. The same tutor sits inside every lesson.", icon: "chat", tone: "from-emerald-600 to-teal-500", tag: "Tutor" },
+  { href: "/ai/resume", title: "Resume review", text: "Upload your resume and the role you want. Get fixes in order of importance, rewritten lines and the keywords recruiters look for.", icon: "star", tone: "from-indigo-600 to-violet-600", tag: "Get hired" },
+  { href: "/playground", title: "Code playground", text: "Write and run Python in your browser, with NumPy and pandas. If your code breaks, the AI tutor explains the error.", icon: "code", tone: "from-sky-600 to-cyan-500", tag: "Practise" },
   { href: "/interview/answers", title: "Interview Q&A by role", text: "Pick a role and read every interview question with its short and deeper answer on one page. Search, filter and print.", icon: "target", tone: "from-indigo-600 to-sky-500", tag: "New" },
   { href: "/papers", title: "Research papers and free books", text: "The papers that built modern AI, from Attention Is All You Need onwards, and free books shared by their authors.", icon: "book", tone: "from-zinc-700 to-violet-700", tag: "Library" },
   { href: "/interview/simulator", title: "AI interview feedback", text: "After a mock interview, get each answer graded against the key points, with a stronger version to learn from.", icon: "mic", tone: "from-rose-600 to-pink-500", tag: "Interview prep" },

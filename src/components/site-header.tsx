@@ -11,7 +11,7 @@ const NAV = [
   { href: "/practice", label: "Practice" },
   { href: "/interview/simulator", label: "Mock interview" },
   { href: "/ai", label: "AI tools" },
-  { href: "/community", label: "Community" },
+  { href: "/jobs", label: "Jobs" },
 ];
 
 /** The site's top bar. A plain details element opens the phone menu, so it works without JavaScript. */

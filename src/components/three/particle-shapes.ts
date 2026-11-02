@@ -40,7 +40,10 @@ export type ShapeName =
   | "tree"
   | "serverRack"
   | "mapRoute"
-  | "sparkle";
+  | "sparkle"
+  | "briefcase"
+  | "resume"
+  | "calendar";
 
 /** A page's shape: a 3D sculpture, or one of the site's line icons given depth. */
 export type ParticleShape = ShapeName | `icon:${IconName}`;
@@ -585,6 +588,34 @@ const SCULPTURES: Record<ShapeName, Weighted[]> = {
     }],
     [2, (r) => sphere(0.12, [0.7, 0.55, 0.3])(r)],
     [1, seg([0.7, 0.43, 0.3], [0.7, 0.2, 0.3], 0.02)],
+  ],
+  calendar: [
+    // A wall calendar: the page, the binding rings and a grid of days with this week lit up.
+    [3, rect(1.8, 1.6, true)],
+    [1, seg([-0.9, 0.5, 0], [0.9, 0.5, 0], 0.02)],
+    [2, (r) => move(ring(0.08, 0.025), [-0.55 + Math.floor(r() * 4) * 0.37, 0.82, 0.03])(r)],
+    [4, (r) => {
+      const col = Math.floor(r() * 7);
+      const row = Math.floor(r() * 4);
+      const c: Vec = [-0.72 + col * 0.24, 0.3 - row * 0.3, 0.02];
+      return row === 1 ? sphere(0.06, c)(r) : [c[0] + jit(r, 0.1), c[1] + jit(r, 0.1), c[2]];
+    }],
+  ],
+  resume: [
+    // A one-page resume: the page, a photo, the name, lines of experience and a tick of approval.
+    [4, rect(1.3, 1.75, true)],
+    [2, move(ring(0.17, 0.03), [-0.38, 0.6, 0.02])],
+    [1, seg([-0.12, 0.66, 0.02], [0.45, 0.66, 0.02], 0.03)],
+    [1, seg([-0.12, 0.54, 0.02], [0.3, 0.54, 0.02], 0.02)],
+    [4, move(linesOnPage(1.0, 1.0, 9), [0, -0.25, 0.02])],
+    [2, (r) => (r() < 0.4 ? seg([0.35, -0.75, 0.2], [0.5, -0.9, 0.2], 0.04)(r) : seg([0.5, -0.9, 0.2], [0.8, -0.55, 0.2], 0.04)(r))],
+  ],
+  briefcase: [
+    // A work briefcase: the case, its handle, the clasp and the seam across the middle.
+    [6, box([1.9, 1.25, 0.55], [0, -0.15, 0], true)],
+    [2, move(ring(0.32, 0.04, 0, Math.PI), [0, 0.5, 0])],
+    [1, seg([-0.95, 0.05, 0.28], [0.95, 0.05, 0.28], 0.02)],
+    [1, box([0.3, 0.2, 0.05], [0, 0.05, 0.3])],
   ],
   sparkle: [
     // A four-point star with smaller sparks around it.
