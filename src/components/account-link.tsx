@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { setSignedIn } from "@/lib/browser/account-sync";
+import { publicSupabase } from "@/lib/signups";
 import { browserClient } from "@/lib/supabase/browser";
 
 /** "off" until accounts are switched on for this deployment. */
@@ -11,9 +12,7 @@ export type AccountState = "off" | "unknown" | "in" | "out";
 /** Whether the learner is signed in. Also tells the sync layer whether to send changes. */
 export function useAccountState(): AccountState {
   // The Supabase settings are built into the page, so server and browser agree on "off".
-  const [state, setState] = useState<AccountState>(() =>
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "unknown" : "off",
-  );
+  const [state, setState] = useState<AccountState>(() => (publicSupabase() ? "unknown" : "off"));
   useEffect(() => {
     const client = browserClient();
     if (!client) return;

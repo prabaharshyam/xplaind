@@ -24,7 +24,7 @@ export default function SettingsPage() {
           <SignedIn />
         </Suspense>
       ) : (
-        <p className="mt-4 leading-7">Accounts are coming soon.</p>
+        <p className="mt-4 leading-7">Sign-ups are paused for a short while. Everything on the site works without an account.</p>
       )}
     </main>
   );

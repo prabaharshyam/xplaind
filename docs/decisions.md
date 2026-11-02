@@ -297,3 +297,7 @@ The owner liked the home page road and asked for it on the other pages, with smo
 ## 2026-11-02: page headers get particle sculptures, not the road (MO-8)
 
 The owner did not want the same road on every page and asked for particles instead, a different shape per page that stands for it, and more interesting than the first particle scene. The home page keeps the road. Every other header gets a particle sculpture: 30 hand-built 3D shapes (compass, microphone, bookshelf, trophy, globe and so on) plus a few of the site's line icons given depth, chosen per page or, for lessons, topic pages and role roadmaps, per topic. The shapes are pure functions with unit tests. The scene stays in its card beside the title, never behind text. In dark mode the particles glow additively but each stays faint so the theme colours survive.
+
+## 2026-11-02: sign-ups on hold until sign-in is set up (SU-4)
+
+Google sign-in and the other providers are not configured yet, so sign-up does not work and the owner could not reach the gated features. Rather than remove the gates, one switch puts the whole site into the accounts-off mode CI already tests: everything open, progress on the device, no prompts. It is on by default and lifted with NEXT_PUBLIC_SIGNUPS_OPEN=true in Vercel. The AI helpers stay off during the hold: they need a signed-in, confirmed 18+ learner for PV-2 and for the per-learner daily limits and monthly spend cap (CO-1). Opening them to anonymous visitors would change PV-2 and the cost guard, so that is left to the owner.

@@ -35,7 +35,7 @@ export default function DashboardPage() {
           <SignedIn />
         </Suspense>
       ) : (
-        <p className="mt-2 leading-7">Accounts are coming soon. Your progress is saved on this device.</p>
+        <p className="mt-2 leading-7">Sign-ups are paused for a short while. Your progress is saved on this device.</p>
       )}
       </div>
     </main>

@@ -1,10 +1,11 @@
+import { publicSupabase } from "@/lib/signups";
+
 // Accounts switch on only when the Supabase settings exist in the environment
 // (SC-1: values live in the host's settings, never in the repository). Until then
 // the site works signed out, exactly as before, and account routes answer 503.
+// SU-4: while sign-ups are on hold, accounts count as off too.
 export function supabasePublicConfig(): { url: string; anonKey: string } | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  return url && anonKey ? { url, anonKey } : null;
+  return publicSupabase();
 }
 
 export const accountsEnabled = (): boolean => supabasePublicConfig() !== null;

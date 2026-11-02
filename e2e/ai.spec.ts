@@ -47,7 +47,8 @@ test("the AI tools page lists every tool and says when AI is off", async ({ page
   for (const name of ["AI roadmap generator", "Generate a course on anything", "Personal AI coach", "AI tutor in every lesson", "AI interview feedback", "Change your roadmap with AI"]) {
     await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible();
   }
-  await expect(page.getByText(/AI tools are switched off right now/)).toBeVisible();
+  // SU-4: while sign-ups are on hold, the page says the AI helpers return when they reopen.
+  await expect(page.getByText(/The AI helpers come back when sign-ups reopen/)).toBeVisible();
   expect(await overflow(page)).toBe(false);
 });
 
