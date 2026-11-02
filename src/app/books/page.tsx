@@ -10,7 +10,7 @@ import { THEMES } from "@/lib/themes";
 export const metadata = pageMeta({
   title: "Best books on AI, ML, DSA and system design",
   description:
-    "Hand-picked books on AI, machine learning, LLMs and RAG, data structures and algorithms, and system design, sorted by topic and level for learners in India.",
+    "Hand-picked books on AI, machine learning, LLMs and RAG, data structures and algorithms, and system design, sorted by topic and level to help India learn AI faster.",
   path: "/books",
 });
 

@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: { default: "Xplaind: learn AI for the job you want", template: "%s | Xplaind" },
   description:
-    "Step-by-step AI roadmaps for nine roles, plain-English lessons with video lessons, projects and interview practice, made for learners in India.",
+    "Step-by-step AI career roadmaps, plain-English lessons with video lessons, projects and interview practice, built to help India learn AI faster.",
   applicationName: "Xplaind",
   openGraph: { siteName: "Xplaind", locale: "en_IN", type: "website" },
   twitter: { card: "summary_large_image" },

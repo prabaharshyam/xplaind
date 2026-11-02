@@ -18,7 +18,7 @@ import type { IconName } from "@/lib/themes";
 export const metadata: Metadata = {
   title: { absolute: "Xplaind: AI career roadmaps, lessons and interview practice" },
   description:
-    "Learn AI for the job you want. Step-by-step roadmaps for nine AI roles, from AI Engineer to MLOps Engineer, a plain-English lesson for every topic, the best course for each, and mock interviews you answer out loud.",
+    "Learn AI for the job you want. Step-by-step roadmaps for AI roles from AI Engineer to MLOps Engineer, a plain-English lesson for every topic, the best course for each, and mock interviews you answer out loud.",
   alternates: { canonical: "/" },
 };
 
@@ -84,7 +84,6 @@ export default function Home() {
   const themeCounts: Record<string, number> = {};
   for (const s of stops) themeCounts[s.theme] = (themeCounts[s.theme] ?? 0) + 1;
   const stats = [
-    { value: String(paths.length), label: "role roadmaps" },
     { value: String(stops.length), label: "lessons" },
     { value: String(interview.length), label: "interview questions" },
     { value: String(getContent().resources.length), label: "courses and video lessons" },
@@ -111,7 +110,7 @@ export default function Home() {
         />
         <div className="relative mx-auto max-w-6xl px-4 pt-14 pb-12 md:px-6 md:pt-20">
           <p className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 backdrop-blur dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
-            <span className="size-1.5 rounded-full bg-violet-600" /> 9 AI career roadmaps · made for learners in India
+            <span className="size-1.5 rounded-full bg-violet-600" /> AI career roadmaps · Helping India learn AI faster
           </p>
           <h1 id="hero-heading" className="mt-5 max-w-4xl md:max-w-[58%] text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl">
             Learn AI for the job you want.{" "}
@@ -120,7 +119,7 @@ export default function Home() {
             </span>
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-700 md:max-w-[55%] dark:text-zinc-300">
-            Pick one of nine AI roles. Follow its roadmap, read a plain-English lesson for every topic, take the one
+            Pick an AI role. Follow its roadmap, read a plain-English lesson for every topic, take the one
             course worth your time, build the projects, then practise the interview out loud.
           </p>
           {/* On phones the scene gets its own band, so it never sits behind text. */}
@@ -128,7 +127,7 @@ export default function Home() {
           <div className="mt-10 flex items-end justify-between gap-4">
             <h2 className="text-2xl font-semibold">Choose your AI role</h2>
             <Link href="/paths" className="text-sm text-violet-800 hover:underline dark:text-violet-300">
-              Compare all {paths.length} →
+              Compare all roles →
             </Link>
           </div>
           <div className="mt-4">
@@ -249,7 +248,7 @@ export default function Home() {
             </Feature>
             <Feature
               title="Practise interviews out loud"
-              text={`${interview.length} real questions for nine roles. Answer against the clock with your voice, then see which key points you covered.`}
+              text={`${interview.length} real questions across every role. Answer against the clock with your voice, then see which key points you covered.`}
               href="/interview/simulator"
               cta="Start a mock interview"
               tone="from-rose-50 to-orange-50 dark:from-rose-950 dark:to-orange-950"

@@ -13,7 +13,7 @@ export type RoleCard = {
   lessons: number;
 };
 
-/** The nine role roadmaps as picture cards: the first thing a visitor can act on. */
+/** The role roadmaps as picture cards: the first thing a visitor can act on. */
 export function RoleGrid({ roles }: { roles: RoleCard[] }) {
   return (
     <ul className="lx-deal grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

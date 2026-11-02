@@ -9,7 +9,7 @@ import { InterviewList } from "./interview-list";
 export const metadata: Metadata = {
   title: "AI interview questions with answers",
   description:
-    "AI interview questions for nine roles, from GenAI engineer and forward deployed engineer to AI product manager and ML engineer, each with a short answer, a deeper answer, follow-ups and common mistakes.",
+    "AI interview questions for every AI role, from GenAI engineer and forward deployed engineer to AI product manager and ML engineer, each with a short answer, a deeper answer, follow-ups and common mistakes.",
   alternates: { canonical: "/interview" },
 };
 
