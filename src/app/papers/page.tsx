@@ -22,7 +22,7 @@ export default function PapersPage() {
 
   return (
     <main>
-      <PageHero
+      <PageHero shape="paperStack"
         theme="llm"
         seed="papers"
         icon="book"

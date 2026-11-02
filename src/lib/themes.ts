@@ -39,10 +39,10 @@ export function tint(hex: string, amount: number): string {
 }
 
 /** MO-5: the pastel palette a theme's 3D scene and soft surfaces use. */
-/** The road scene's three colours for a theme: its own two, then the brand pink. */
-export function roadColorsOf(id: ThemeId): [string, string, string] {
+/** A particle sculpture's three colours for a theme: its own two, then the brand pink. */
+export function particleColorsOf(id: ThemeId): [string, string, string] {
   const t = themeOf(id);
-  return [t.to, t.from, "#f472b6"];
+  return [t.from, t.to, "#f472b6"];
 }
 
 export function pastelOf(id: ThemeId): [string, string, string, string] {

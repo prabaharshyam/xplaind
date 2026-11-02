@@ -21,7 +21,7 @@ export default function BooksPage() {
   const groups = THEMES.map((t) => ({ theme: t, books: books.filter((b) => b.themes[0] === t.id) })).filter((g) => g.books.length);
   return (
     <main>
-      <PageHero
+      <PageHero shape="bookshelf"
         theme="ai-basics"
         seed="books"
         icon="book"

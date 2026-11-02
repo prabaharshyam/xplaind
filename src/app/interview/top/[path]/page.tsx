@@ -45,7 +45,7 @@ export default async function TopInterviewPage({ params }: PageProps<"/interview
           mainEntity: questions.map((q) => ({ "@type": "Question", name: q.question, acceptedAnswer: { "@type": "Answer", text: q.short_answer } })),
         }}
       />
-      <PageHero
+      <PageHero shape="trophy"
         theme={path.theme}
         seed={`top-${path.id}`}
         icon="trophy"

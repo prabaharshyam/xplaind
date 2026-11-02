@@ -19,7 +19,7 @@ export default function CommunityPage() {
   const open = Boolean(c.discord_url || c.whatsapp_url);
   return (
     <main>
-      <PageHero
+      <PageHero shape="globe"
         theme="career"
         seed="community"
         icon="people"

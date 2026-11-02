@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function BookPage() {
   return (
     <main>
-      <PageHero
+      <PageHero shape="openBook"
         theme="retrieval"
         seed="ask-my-book"
         icon="book"

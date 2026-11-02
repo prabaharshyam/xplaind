@@ -25,7 +25,7 @@ export default function CertificationsPage() {
 
   return (
     <main>
-      <PageHero
+      <PageHero shape="medal"
         theme="career"
         seed="certifications"
         icon="cert"

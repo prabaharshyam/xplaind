@@ -20,7 +20,7 @@ export default function VideosPage() {
   const total = libraryItems().filter((i) => i.kind === "video").length;
   return (
     <main>
-      <PageHero
+      <PageHero shape="screenPlay"
         theme="using-ai"
         seed="videos"
         icon="play"

@@ -1,11 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { RoadScene } from "@/components/three/road-scene";
-import { type IconName, type ThemeId, roadColorsOf } from "@/lib/themes";
+import { ParticleScene } from "@/components/three/particle-scene";
+import { type ParticleShape, THEME_SHAPE } from "@/components/three/particle-shapes";
+import { type IconName, type ThemeId, particleColorsOf, themeOf } from "@/lib/themes";
 
 /** A page's banner: picture, title and one line on what the page is for. */
 export function PageHero({
   theme,
+  icon,
+  shape,
   eyebrow,
   title,
   lead,
@@ -16,6 +19,8 @@ export function PageHero({
   /** Kept for callers; the road panel needs only the theme. */
   seed?: string;
   icon?: IconName;
+  /** The particle sculpture that stands for this page; defaults to the theme's. */
+  shape?: ParticleShape;
   eyebrow?: string;
   title: string;
   lead?: ReactNode;
@@ -43,9 +48,9 @@ export function PageHero({
           {lead && <div className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">{lead}</div>}
           {children && <div className="mt-5">{children}</div>}
         </div>
-        {/* MO-6: the page's own stretch of road, in its theme's colours. */}
+        {/* MO-8: the page's own particle sculpture, in its theme's colours. */}
         <div className="lx-hero-art shrink-0 [perspective:1000px]">
-          <RoadScene variant="panel" colors={roadColorsOf(theme)} className="h-44 w-full md:h-56 md:w-96" />
+          <ParticleScene shape={shape ?? THEME_SHAPE[theme]} colors={particleColorsOf(theme)} icon={icon ?? themeOf(theme).icon} className="h-44 w-full md:h-56 md:w-96" />
         </div>
       </div>
     </header>

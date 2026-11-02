@@ -17,7 +17,7 @@ export default function LibraryPage() {
   const topics = THEMES.map((t) => ({ id: t.id, label: TOPIC_LABEL[t.id] })).filter((t) => items.some((i) => i.topics.includes(t.id)));
   return (
     <main>
-      <PageHero
+      <PageHero shape="magnifier"
         theme="ai-basics"
         seed="library"
         icon="search"

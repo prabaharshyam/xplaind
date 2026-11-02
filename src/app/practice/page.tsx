@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function PracticePage() {
   return (
     <main>
-      <PageHero
+      <PageHero shape="cardFan"
         theme="evals"
         seed="practice"
         icon="check"

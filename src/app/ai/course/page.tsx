@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function AiCoursePage() {
   return (
     <main>
-      <PageHero
+      <PageHero shape="gears"
         theme="code"
         seed="ai-course"
         icon="book"

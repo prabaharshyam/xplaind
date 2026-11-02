@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function AiRoadmapPage() {
   return (
     <main>
-      <PageHero
+      <PageHero shape="mapRoute"
         theme="ai-basics"
         seed="ai-roadmap"
         icon="map"

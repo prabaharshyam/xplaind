@@ -34,7 +34,7 @@ export default function AiToolsPage() {
     .map((s) => ({ id: s.id, title: s.title, outcome: s.outcome, hours: s.hours, level: s.level, theme: s.theme }));
   return (
     <main>
-      <PageHero
+      <PageHero shape="brain"
         theme="ai-basics"
         seed="ai-tools"
         icon="sparkles"

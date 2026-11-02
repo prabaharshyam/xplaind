@@ -92,7 +92,7 @@ export default function Home() {
 
   return (
     <main className="relative isolate">
-      <RoadScene variant="flight" />
+      <RoadScene />
       <JsonLd
         data={{
           "@context": "https://schema.org",

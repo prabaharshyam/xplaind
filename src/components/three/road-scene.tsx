@@ -3,30 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * MO-6: the road. A luminous road winds to a glowing horizon with milestone gates along it.
+ * MO-6: the home page journey. A luminous road winds from the viewer to a glowing horizon, with
+ * four milestone gates along it. As the learner scrolls the page, the camera flies along the road
+ * and passes each gate as the matching section arrives. Decorative (aria-hidden).
  *
- * - "flight" (home page): fixed behind the page; scrolling flies the camera along the road.
- * - "panel" (page and lesson headers): a looping road in a card, tinted with the page's theme;
- *   it cruises on by itself, leans with the pointer and drifts on as the header scrolls away.
- *
- * Decorative (aria-hidden). Three.js loads only in the browser, the loop runs only while the
- * scene is on screen and the tab is visible, pixel ratio is capped, reduced motion gets one still
- * frame, and without WebGL the CSS sky behind the canvas stays as the poster.
+ * One responsibility: the flight. Three.js loads only in the browser, the loop pauses in hidden
+ * tabs, pixel ratio is capped, reduced motion gets one still frame, and without WebGL the CSS sky
+ * behind the canvas stays as the poster.
  */
-export type RoadColors = [string, string, string];
-const BRAND: RoadColors = ["#a78bfa", "#f472b6", "#2dd4bf"];
-
-export function RoadScene({ variant, colors = BRAND, className = "" }: { variant: "flight" | "panel"; colors?: RoadColors; className?: string }) {
+export function RoadScene() {
   const host = useRef<HTMLDivElement>(null);
   const [live, setLive] = useState(false);
-  const key = colors.join();
 
   useEffect(() => {
     const el = host.current;
     if (!el || !webgl() || saveData()) return;
     let dispose: (() => void) | null = null;
     let cancelled = false;
-    void mount(el, variant, key.split(",") as RoadColors).then((d) => {
+    void mount(el).then((d) => {
       if (cancelled) d();
       else {
         dispose = d;
@@ -37,22 +31,13 @@ export function RoadScene({ variant, colors = BRAND, className = "" }: { variant
       cancelled = true;
       dispose?.();
     };
-  }, [variant, key]);
+  }, []);
 
-  const canvas = <div ref={host} className={`absolute inset-0 transition-opacity duration-1000 ${live ? "opacity-100" : "opacity-0"}`} />;
-  if (variant === "flight") {
-    return (
-      <div aria-hidden="true" className={`journey-sky pointer-events-none fixed inset-0 -z-10 ${className}`}>
-        {canvas}
-        {/* A soft veil on the reading side keeps text crisp over the scene. */}
-        <div className="journey-veil absolute inset-0" />
-      </div>
-    );
-  }
   return (
-    <div aria-hidden="true" className={`journey-sky relative overflow-hidden rounded-3xl shadow-xl ring-1 ring-white/50 dark:ring-white/10 ${className}`}>
-      {canvas}
-      <div className="road-panel-sheen pointer-events-none absolute inset-0" />
+    <div aria-hidden="true" className="journey-sky pointer-events-none fixed inset-0 -z-10">
+      <div ref={host} className={`absolute inset-0 transition-opacity duration-1000 ${live ? "opacity-100" : "opacity-0"}`} />
+      {/* A soft veil on the reading side keeps text crisp over the scene. */}
+      <div className="journey-veil absolute inset-0" />
     </div>
   );
 }
@@ -177,12 +162,11 @@ const GATE_FRAGMENT = /* glsl */ `
   }
 `;
 
-async function mount(el: HTMLElement, variant: "flight" | "panel", palette: RoadColors): Promise<() => void> {
-  const panel = variant === "panel";
+async function mount(el: HTMLElement): Promise<() => void> {
   const THREE = await import("three");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-  const small = panel || window.innerWidth < 640;
+  const small = window.innerWidth < 640;
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
   const pixel = Math.min(window.devicePixelRatio, small ? 1.5 : 1.75);
@@ -197,21 +181,13 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
 
   // The road: a long curve that winds and gently rises and falls into the distance.
   const points: InstanceType<typeof THREE.Vector3>[] = [];
-  if (panel) {
-    // A long, gently winding loop: from inside it reads as a road into the distance.
-    for (let i = 0; i < 40; i++) {
-      const a = (i / 40) * Math.PI * 2;
-      points.push(new THREE.Vector3(Math.cos(a) * 60 + Math.sin(a * 5) * 6, Math.sin(a * 3) * 1.4, Math.sin(a) * 90 + Math.cos(a * 4) * 6));
-    }
-  } else {
-    for (let i = 0; i <= 24; i++) {
-      const z = -i * 12;
-      points.push(new THREE.Vector3(Math.sin(i * 0.55) * 7 + Math.sin(i * 0.21) * 4, Math.sin(i * 0.37) * 1.6, z));
-    }
+  for (let i = 0; i <= 24; i++) {
+    const z = -i * 12;
+    points.push(new THREE.Vector3(Math.sin(i * 0.55) * 7 + Math.sin(i * 0.21) * 4, Math.sin(i * 0.37) * 1.6, z));
   }
-  const curve = new THREE.CatmullRomCurve3(points, panel, "catmullrom", 0.5);
+  const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.5);
 
-  const segments = panel ? 900 : small ? 600 : 1200;
+  const segments = small ? 600 : 1200;
   const width = 2.6;
   const pos = new Float32Array((segments + 1) * 2 * 3);
   const uvs = new Float32Array((segments + 1) * 2 * 2);
@@ -240,9 +216,9 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
   roadGeometry.setIndex(index);
 
   const colors = {
-    uA: { value: new THREE.Color(palette[0]) },
-    uB: { value: new THREE.Color(palette[1]) },
-    uC: { value: new THREE.Color(palette[2]) },
+    uA: { value: new THREE.Color("#a78bfa") },
+    uB: { value: new THREE.Color("#f472b6") },
+    uC: { value: new THREE.Color("#2dd4bf") },
   };
   const shared = { uTime: { value: 0 }, uDark: { value: darkQuery.matches ? 1 : 0 }, uFar: { value: FAR } };
   const roadMaterial = new THREE.ShaderMaterial({
@@ -256,8 +232,8 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
   scene.add(new THREE.Mesh(roadGeometry, roadMaterial));
 
   // Lights along both edges, and a field of drifting motes around the road.
-  const lampsPerSide = panel ? 260 : small ? 160 : 300;
-  const motes = panel ? 700 : small ? 900 : 2200;
+  const lampsPerSide = small ? 160 : 300;
+  const motes = small ? 900 : 2200;
   const glowPos = new Float32Array((lampsPerSide * 2 + motes) * 3);
   const glowSeed = new Float32Array(lampsPerSide * 2 + motes);
   let k = 0;
@@ -295,8 +271,7 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
 
   // Milestone gates: rings standing across the road.
   const gateGeometry = new THREE.TorusGeometry(2.4, 0.07, 16, 160);
-  const gateAt = panel ? [0.09, 0.34, 0.59, 0.84] : GATES;
-  const gates = gateAt.map((t, i) => {
+  const gates = GATES.map((t, i) => {
     const material = new THREE.ShaderMaterial({
       vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
       fragmentShader: GATE_FRAGMENT,
@@ -304,8 +279,8 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
         uTime: shared.uTime,
         uDark: shared.uDark,
         uNear: { value: 0 },
-        uA: { value: new THREE.Color(panel ? palette[i % 2] : ["#8b5cf6", "#ec4899", "#14b8a6", "#f59e0b"][i]) },
-        uB: { value: new THREE.Color(panel ? palette[2] : ["#f0abfc", "#a5b4fc", "#a7f3d0", "#fbcfe8"][i]) },
+        uA: { value: new THREE.Color(["#8b5cf6", "#ec4899", "#14b8a6", "#f59e0b"][i]) },
+        uB: { value: new THREE.Color(["#f0abfc", "#a5b4fc", "#a7f3d0", "#fbcfe8"][i]) },
       },
       transparent: true,
     });
@@ -322,23 +297,18 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
     const h = Math.max(1, el.clientHeight);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    camera.fov = panel ? 64 : w < 640 ? 70 : 58;
+    camera.fov = w < 640 ? 70 : 58;
     camera.updateProjectionMatrix();
   };
   resize();
   window.addEventListener("resize", resize);
-  const ro = new ResizeObserver(resize);
-  ro.observe(el);
 
   // Scroll sets where we are on the road; the camera eases towards it so the flight feels smooth.
   const progress = () => {
     const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     return Math.min(1, Math.max(0, window.scrollY / max));
   };
-  // Panel: cruise on a loop, nudged on as the header scrolls away.
-  const cruise = () => 0.02 + window.scrollY * 0.00004;
-  let at = panel ? cruise() : reduced ? 0.02 : progress() * 0.9 + 0.02;
-  let travelled = 0;
+  let at = reduced ? 0.02 : progress() * 0.9 + 0.02;
   const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
   const onPointer = (e: PointerEvent) => {
     pointer.tx = (e.clientX / window.innerWidth) * 2 - 1;
@@ -355,27 +325,19 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
   const eye = new THREE.Vector3();
   const look = new THREE.Vector3();
   const update = (time: number, dt: number) => {
-    if (panel) {
-      travelled += dt * 0.006;
-      const target = cruise() + travelled;
-      at += (target - at) * Math.min(1, dt * 3.2);
-    } else {
-      const target = Math.min(0.94, progress() * 0.92 + 0.02);
-      at += (target - at) * Math.min(1, dt * 3.2);
-    }
+    const target = Math.min(0.94, progress() * 0.92 + 0.02);
+    at += (target - at) * Math.min(1, dt * 3.2);
     pointer.x += (pointer.tx - pointer.x) * Math.min(1, dt * 2);
     pointer.y += (pointer.ty - pointer.y) * Math.min(1, dt * 2);
-    const u = panel ? ((at % 1) + 1) % 1 : at;
-    const p = curve.getPointAt(u);
-    const ahead = curve.getPointAt(panel ? (u + 0.03) % 1 : Math.min(1, u + 0.035));
-    const lift = panel ? 2.3 : 1.5;
-    eye.copy(p).add(new THREE.Vector3(pointer.x * 0.6, lift - pointer.y * 0.3 + Math.sin(time * 0.8) * 0.05, 0));
+    const p = curve.getPointAt(at);
+    const ahead = curve.getPointAt(Math.min(1, at + 0.035));
+    eye.copy(p).add(new THREE.Vector3(pointer.x * 0.6, 1.5 - pointer.y * 0.3 + Math.sin(time * 0.8) * 0.05, 0));
     look.copy(ahead).add(new THREE.Vector3(pointer.x * 1.2, 1.1, 0));
     camera.position.copy(eye);
     camera.lookAt(look);
     shared.uTime.value = time;
     for (const g of gates) {
-      const near = 1 - Math.min(1, Math.abs(g.t - u) / 0.08);
+      const near = 1 - Math.min(1, Math.abs(g.t - at) / 0.08);
       g.material.uniforms.uNear.value = near;
       g.ring.rotation.z = time * 0.15;
     }
@@ -391,9 +353,8 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
     previous = now;
     frame = requestAnimationFrame(loop);
   };
-  let onScreen = true;
   const play = () => {
-    if (running || reduced || document.hidden || !onScreen) return;
+    if (running || reduced || document.hidden) return;
     running = true;
     previous = performance.now();
     frame = requestAnimationFrame(loop);
@@ -405,13 +366,6 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
   update(0, 0);
   play();
   const onVisibility = () => (document.hidden ? pause() : play());
-  // Only draw while the scene is on screen (a header panel scrolls away).
-  const io = new IntersectionObserver(([entry]) => {
-    onScreen = entry.isIntersecting;
-    if (onScreen) play();
-    else pause();
-  });
-  if (panel) io.observe(el);
   document.addEventListener("visibilitychange", onVisibility);
   const onLost = (e: Event) => {
     e.preventDefault();
@@ -421,8 +375,6 @@ async function mount(el: HTMLElement, variant: "flight" | "panel", palette: Road
 
   return () => {
     pause();
-    io.disconnect();
-    ro.disconnect();
     window.removeEventListener("resize", resize);
     window.removeEventListener("pointermove", onPointer);
     darkQuery.removeEventListener("change", onScheme);

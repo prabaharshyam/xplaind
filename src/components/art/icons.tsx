@@ -2,9 +2,9 @@
 // label is given, so screen readers skip them by default.
 import type { IconName } from "@/lib/themes";
 
-type Shape = { d?: string; circles?: [number, number, number][]; rects?: [number, number, number, number, number][] };
+export type IconShape = { d?: string; circles?: [number, number, number][]; rects?: [number, number, number, number, number][] };
 
-const SHAPES: Record<IconName, Shape> = {
+export const ICON_SHAPES: Record<IconName, IconShape> = {
   sparkles: { d: "M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" },
   chat: { d: "M4 5h16v10H9l-5 4z M8 9h8 M8 12h5" },
   code: { d: "M8 7l-5 5 5 5 M16 7l5 5-5 5 M14 4l-4 16" },
@@ -53,7 +53,7 @@ export function Icon({
   /** Give a label only when the icon carries meaning on its own. */
   label?: string;
 }) {
-  const s = SHAPES[name];
+  const s = ICON_SHAPES[name];
   return (
     <svg
       width={size}
