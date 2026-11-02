@@ -110,3 +110,23 @@ test("the logo, favicon and footer community invite are in place", async ({ page
   await page.goto("/community");
   await expect(page.getByRole("link", { name: /Join on WhatsApp/ })).toHaveAttribute("href", /^https:\/\/chat\.whatsapp\.com\//);
 });
+
+test("the road keeps the screen's size after navigating back home (MO-6)", async ({ page }) => {
+  await page.goto("/paths", { waitUntil: "networkidle" });
+  // A marker on window survives only an in-site navigation, which is where the bug was.
+  await page.evaluate(() => Object.assign(window, { stayedOnPage: true }));
+  await page.getByRole("link", { name: "Xplaind home" }).first().click();
+  await expect(page).toHaveURL(/\/$/);
+  expect(await page.evaluate(() => (window as unknown as { stayedOnPage?: boolean }).stayedOnPage)).toBe(true);
+  const canvas = page.locator(".journey-sky canvas");
+  const webgl = await page.evaluate(() => Boolean(document.createElement("canvas").getContext("webgl2") ?? document.createElement("canvas").getContext("webgl")));
+  test.skip(!webgl, "no WebGL in this browser: the road is not drawn, so there is nothing to size");
+  await expect(canvas).toHaveCount(1, { timeout: 10_000 });
+  // The layer fills the screen, and its drawing buffer has the screen's shape, not the shape of
+  // the whole page it was briefly stretched to (which drew the road zoomed in until a refresh).
+  await expect
+    .poll(() =>
+      canvas.evaluate((c: HTMLCanvasElement) => c.clientHeight === window.innerHeight && Math.abs(c.width / c.height - c.clientWidth / c.clientHeight) < 0.02),
+    )
+    .toBe(true);
+});

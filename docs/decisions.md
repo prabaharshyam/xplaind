@@ -309,3 +309,7 @@ The owner asked for the AI tools to work without sign-up or sign-in. This relaxe
 ## 2026-11-02: particle sculptures without the card (MO-8)
 
 The owner asked to drop the rectangle around the sculptures, make them fill the space and make the particles clearer. The card is gone, the scene is larger (up to 26 by 18 rem), the camera sits closer, and each particle is a smaller, crisp dot with only a faint halo in dark mode. Lesson headers, which are already in the topic's colours, use white particles.
+
+## 2026-11-02: the home road stays sharp after in-site navigation (MO-6 fix)
+
+Coming back to the home page through a link drew the road zoomed in until a refresh. The page-enter animation (MO-1) transforms the page container for a moment, and a transform on an ancestor makes a fixed layer size itself to that ancestor, so the road measured itself as the whole page (about 7,800 px tall) and kept that size. The road now re-measures whenever its box changes (ResizeObserver), and the page-enter animation skips the home page, which has its own intro. An e2e test navigates to the home page in-site and checks the road's drawing buffer keeps the screen's shape; it fails without the fix.
