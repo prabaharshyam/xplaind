@@ -11,7 +11,7 @@ import { YourPath } from "./your-path";
 export const metadata: Metadata = {
   alternates: { canonical: "/paths" },
   title: "AI career roadmaps: choose your role",
-  description: "Nine AI career paths, from AI Engineer to MLOps Engineer, each with lessons, courses, projects and interview practice.",
+  description: "AI career paths, from AI Engineer to MLOps Engineer, each with lessons, courses, projects and interview practice.",
 };
 
 export default function PathsPage() {

@@ -57,7 +57,7 @@ export function SiteFooter() {
               <BrandLogo height={52} tagline />
             </Link>
             <p className="mt-4 leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Step-by-step AI roadmaps for nine roles, with plain-English lessons, projects and interview practice. Made for learners in India.
+              Step-by-step AI career roadmaps with plain-English lessons, projects and interview practice. Our mission: help India learn AI faster.
             </p>
             <div className="mt-5 rounded-2xl border border-emerald-200/80 bg-white/80 p-4 shadow-sm dark:border-emerald-900/60 dark:bg-white/5">
               <p className="font-medium text-zinc-900 dark:text-zinc-100">Learn with others</p>
