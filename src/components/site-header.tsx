@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AccountButton } from "./account-link";
+import { AccountButton, SignInLink } from "./account-link";
 import { BrandLogo } from "./brand-logo";
 import { HeaderSearch, XpChip } from "./header-extras";
 import { MenuCloser } from "./menu-closer";
@@ -19,6 +19,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <HeaderSearch />
           <XpChip />
+          <SignInLink className="hidden h-10 items-center rounded-full px-3 text-sm font-medium text-zinc-800 hover:bg-violet-50 hover:text-violet-950 sm:inline-flex dark:text-zinc-200 dark:hover:bg-white/10" />
           <AccountButton className="site-cta hidden sm:inline-flex h-10 items-center rounded-full bg-violet-700 px-4 text-sm font-medium text-white shadow-sm shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700" />
           <details className="site-menu group relative md:hidden">
             <summary className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 [&::-webkit-details-marker]:hidden">
@@ -34,6 +35,10 @@ export function SiteHeader() {
               className="fixed inset-x-0 top-14 bottom-0 z-50 flex flex-col gap-6 overflow-y-auto overscroll-contain border-t border-zinc-200 bg-white px-3 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] dark:border-zinc-800 dark:bg-zinc-950"
             >
               <AccountButton className="flex min-h-12 items-center justify-center rounded-full bg-violet-700 px-6 text-base font-medium text-white hover:bg-violet-800" />
+              <SignInLink
+                label="Sign in or create an account"
+                className="-mt-3 flex min-h-12 items-center justify-center rounded-full border border-violet-200 bg-white px-6 text-base font-medium text-violet-950 hover:bg-violet-50 dark:border-violet-800 dark:bg-zinc-900 dark:text-violet-100"
+              />
               <PhoneNavLinks />
             </nav>
           </details>

@@ -78,3 +78,18 @@ export function AccountButton({ className }: { className: string }) {
     </Link>
   );
 }
+
+/**
+ * AC-6: a "Sign in" link that a signed-out visitor can always find, even when the main button says
+ * "Continue learning". Hidden while accounts are off or the account check is still running.
+ */
+export function SignInLink({ className, label = "Sign in" }: { className: string; label?: string }) {
+  const state = useAccountState();
+  if (state !== "out") return null;
+  return (
+    <Link href="/signin" className={className}>
+      {label}
+    </Link>
+  );
+}
+
