@@ -34,10 +34,13 @@ export function AiChat({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followUps, setFollowUps] = useState<string[]>(starters);
-  const end = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
 
+  // Keep the newest message in view by scrolling the chat's own list, never the page: a lesson
+  // that opened with the page pulled down to its tutor (NV-4).
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
+    const el = log.current;
+    if (el && (turns.length > 0 || busy)) el.scrollTop = el.scrollHeight;
   }, [turns, busy]);
 
   const send = async (text: string) => {
@@ -62,7 +65,7 @@ export function AiChat({
 
   return (
     <div className="flex flex-col">
-      <div className={`space-y-4 overflow-y-auto ${compact ? "max-h-[26rem]" : "max-h-[36rem]"} pr-1`} aria-live="polite">
+      <div ref={log} className={`space-y-4 overflow-y-auto ${compact ? "max-h-[26rem]" : "max-h-[36rem]"} pr-1`} aria-live="polite">
         <Bubble role="assistant" text={greeting} />
         {turns.map((t, i) => (
           <Bubble key={i} role={t.role} text={t.text} lessons={t.lessons} />
@@ -75,7 +78,6 @@ export function AiChat({
             Thinking…
           </p>
         )}
-        <div ref={end} />
       </div>
       {error && (
         <p role="alert" className="mt-3 rounded-2xl bg-rose-50 p-3 text-sm text-rose-900 dark:bg-rose-950/40 dark:text-rose-200">

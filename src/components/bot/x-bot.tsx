@@ -49,7 +49,7 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
   const root = useRef<HTMLDivElement>(null);
   const launcher = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
-  const end = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const panelId = useId();
 
@@ -101,9 +101,11 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
     };
   }, []);
 
+  // Scroll the conversation itself, never the page behind it (NV-4).
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
-  }, [msgs, busy]);
+    const el = log.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [msgs, busy, open]);
 
   const ensureIndex = () => loadIndex().then((e) => (setEntries(e), e));
 
@@ -205,7 +207,7 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
             </button>
           </header>
 
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
+          <div ref={log} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
             <BotBubble msg={{ from: "bot", text: GREETING }} onLink={onLink} />
             {msgs.map((m, i) => (m.from === "me" ? <MeBubble key={i} text={m.text} /> : <BotBubble key={i} msg={m} onLink={onLink} next={pathname} />))}
             {busy && (
@@ -230,7 +232,6 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
                 ))}
               </div>
             )}
-            <div ref={end} />
           </div>
 
           <form
