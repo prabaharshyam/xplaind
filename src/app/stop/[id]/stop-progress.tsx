@@ -131,10 +131,10 @@ function ProjectCheck({ stopId, brief, savedUrl, onDone }: { stopId: string; bri
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `project-${stopId}-error` : undefined}
         placeholder="https://"
-        className="min-h-12 rounded-lg border border-zinc-400 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+        className="min-h-12 rounded-2xl border border-zinc-400 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
       />
       {error && (
-        <p id={`project-${stopId}-error`} className="text-sm text-red-800 dark:text-red-400">
+        <p id={`project-${stopId}-error`} className="text-sm text-rose-800 dark:text-rose-400">
           {error}
         </p>
       )}

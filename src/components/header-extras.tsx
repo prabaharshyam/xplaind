@@ -24,7 +24,7 @@ export function HeaderSearch() {
       <button
         type="button"
         onClick={() => dialog.current?.showModal()}
-        className="flex h-9 items-center gap-2 rounded-full border border-black/10 px-3 text-[13px] text-zinc-600 hover:bg-black/5 dark:border-white/15 dark:text-zinc-300 dark:hover:bg-white/10"
+        className="flex size-10 items-center justify-center gap-2 rounded-full border border-black/10 text-sm lg:w-auto lg:px-3 text-zinc-600 hover:bg-black/5 dark:border-white/15 dark:text-zinc-300 dark:hover:bg-white/10"
       >
         <Icon name="search" size={16} />
         <span className="hidden lg:inline">Search</span>
@@ -51,7 +51,7 @@ export function XpChip() {
   return (
     <Link
       href="/dashboard"
-      className="flex h-9 items-center gap-2 rounded-full bg-amber-100 px-3 text-[13px] font-medium text-amber-900 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-200"
+      className="flex h-10 items-center gap-2 rounded-full bg-amber-100 px-3 text-sm font-medium text-amber-900 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-200"
     >
       {game.streak > 0 && (
         <span className="flex items-center gap-1">

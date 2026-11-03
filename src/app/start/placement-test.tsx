@@ -18,11 +18,11 @@ import { DEFAULT_WEEKLY_HOURS, WEEKLY_HOUR_CHOICES } from "@/lib/placement/estim
 import { currentQuestion, startTest, submitAnswer, TEST_LENGTH } from "@/lib/placement/select";
 import type { PublicQuestion } from "@/lib/placement/types";
 import { splitStem } from "@/lib/text";
+import { primaryButton } from "@/components/ui";
 
 const IDK = "__idk__";
 
-const button =
-  "inline-flex min-h-12 items-center justify-center rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:cursor-not-allowed disabled:opacity-50";
+const button = primaryButton;
 
 export function PlacementTest({ goal, bank }: { goal: { id: string; name: string }; bank: PublicQuestion[] }) {
   const router = useRouter();
@@ -79,10 +79,10 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
           </p>
         </div>
 
-        <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+        <div className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">Your path</p>
           <p className="font-medium">{goal.name}</p>
-          <Link href="/paths" className="text-sm text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
+          <Link href="/paths" className="text-sm text-violet-800 underline underline-offset-2 dark:text-violet-300">
             Choose a different path
           </Link>
         </div>
@@ -93,7 +93,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
             {WEEKLY_HOUR_CHOICES.map((h) => (
               <label
                 key={h}
-                className="flex min-h-12 min-w-16 cursor-pointer items-center justify-center rounded-lg border border-zinc-300 px-4 py-2 has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-700 dark:border-zinc-700 dark:has-[:checked]:bg-emerald-950"
+                className="flex min-h-12 min-w-16 cursor-pointer items-center justify-center rounded-2xl border border-zinc-300 px-4 py-2 has-[:checked]:border-violet-700 has-[:checked]:bg-violet-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-violet-700 dark:border-zinc-700 dark:has-[:checked]:bg-violet-950"
               >
                 <input
                   type="radio"
@@ -138,7 +138,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         aria-valuemax={TEST_LENGTH}
         aria-valuenow={answered}
       >
-        <div className="h-full bg-emerald-700" style={{ width: `${(answered / TEST_LENGTH) * 100}%` }} />
+        <div className="h-full bg-violet-700" style={{ width: `${(answered / TEST_LENGTH) * 100}%` }} />
       </div>
 
       <fieldset className="flex min-w-0 flex-col gap-3" key={question.id}>
@@ -151,7 +151,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
           <pre
             tabIndex={0}
             aria-label="Code"
-            className="overflow-x-auto rounded-lg bg-zinc-100 p-3 font-mono text-sm leading-6 dark:bg-zinc-900"
+            className="overflow-x-auto rounded-2xl bg-zinc-100 p-3 font-mono text-sm leading-6 dark:bg-zinc-900"
           >
             <code>{code}</code>
           </pre>
@@ -159,12 +159,12 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         {options.map((o) => (
           <label
             key={o.id}
-            className="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-zinc-300 p-3 has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-700 dark:border-zinc-700 dark:has-[:checked]:bg-emerald-950"
+            className="flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border border-zinc-300 p-3 has-[:checked]:border-violet-700 has-[:checked]:bg-violet-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-violet-700 dark:border-zinc-700 dark:has-[:checked]:bg-violet-950"
           >
             <input
               type="radio"
               name="answer"
-              className="mt-1.5 size-4 accent-emerald-700"
+              className="mt-1.5 size-4 accent-violet-700"
               checked={selected === o.id}
               onChange={() => setSelected(o.id)}
             />

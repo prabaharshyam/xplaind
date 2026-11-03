@@ -93,10 +93,10 @@ export default async function TopInterviewPage({ params }: PageProps<"/interview
                 </h2>
                 {!q.reviewed && <DraftNote />}
 
-                <h3 className="mt-4 text-sm font-semibold tracking-wide text-emerald-800 uppercase dark:text-emerald-400">Short answer</h3>
+                <h3 className="mt-4 text-sm font-semibold text-emerald-800 dark:text-emerald-400">Short answer</h3>
                 <p className="mt-1 leading-7">{q.short_answer}</p>
 
-                <h3 className="mt-4 text-sm font-semibold tracking-wide text-zinc-700 uppercase dark:text-zinc-300">The explanation</h3>
+                <h3 className="mt-4 text-sm font-semibold text-zinc-700 dark:text-zinc-300">The explanation</h3>
                 {q.deeper_answer.split(/\n\n+/).map((p, k) => (
                   <p key={k} className="mt-1 leading-7 text-zinc-800 dark:text-zinc-200">
                     {p}
@@ -104,7 +104,7 @@ export default async function TopInterviewPage({ params }: PageProps<"/interview
                 ))}
 
                 {q.example && (
-                  <figure className="mt-4 rounded-xl border-l-4 border-violet-600 bg-violet-50 p-4 dark:bg-violet-950/30">
+                  <figure className="mt-4 rounded-2xl border-l-4 border-violet-600 bg-violet-50 p-4 dark:bg-violet-950/30">
                     <figcaption className="text-sm font-semibold text-violet-900 dark:text-violet-200">An example you can use in the interview</figcaption>
                     {q.example.split(/\n\n+/).map((p, k) => (
                       <p key={k} className="mt-1 leading-7">

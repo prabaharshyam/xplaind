@@ -8,7 +8,7 @@ import { Icon } from "@/components/art/icons";
 import { primaryButton, secondaryButton } from "@/components/ui";
 import type { ResumeReview } from "@/lib/ai/features";
 
-const field = "w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950";
+const field = "w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950";
 const TONE = {
   high: "bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200",
   medium: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
@@ -164,7 +164,7 @@ function Review({ review, onAgain }: { review: ResumeReview; onAgain: () => void
               <p className="mt-2 font-medium">{f.issue}</p>
               <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">{f.suggestion}</p>
               {f.example && (
-                <p className="mt-2 rounded-xl bg-zinc-100 p-3 text-sm leading-6 dark:bg-zinc-800">
+                <p className="mt-2 rounded-2xl bg-zinc-100 p-3 text-sm leading-6 dark:bg-zinc-800">
                   <span className="font-semibold">Try: </span>
                   {f.example}
                 </p>

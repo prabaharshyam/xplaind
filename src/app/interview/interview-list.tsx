@@ -10,7 +10,7 @@ import { LEVEL_IDS } from "@/lib/levels";
 import { RATINGS } from "@/lib/practice/queue";
 
 const select =
-  "min-h-12 rounded-lg border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950";
+  "min-h-12 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950";
 
 /** IQ-3: browse and filter by topic and level. */
 export function InterviewList({
@@ -83,7 +83,7 @@ export function InterviewList({
             <li key={q.id}>
               <Link
                 href={`/interview/${q.id}`}
-                className="block rounded-lg border border-zinc-200 p-3 hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-zinc-800 dark:hover:border-zinc-600"
+                className="block rounded-2xl border border-zinc-200 p-3 hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:hover:border-zinc-600"
               >
                 <span className="block font-medium">{q.question}</span>
                 <span className={`mt-1 block text-sm ${muted}`}>

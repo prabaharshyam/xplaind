@@ -54,7 +54,7 @@ export function LessonNav({ sections, top, children }: { sections: SectionLink[]
                   <a
                     href={`#${s.id}`}
                     aria-current={current === s.id ? "location" : undefined}
-                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-900 ${current === s.id ? "bg-zinc-100 font-medium dark:bg-zinc-900" : ""}`}
+                    className={`flex items-center gap-2 rounded-2xl px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-900 ${current === s.id ? "bg-zinc-100 font-medium dark:bg-zinc-900" : ""}`}
                   >
                     <span
                       className={`grid size-5 shrink-0 place-items-center rounded-full ${seen.has(s.id) ? "bg-emerald-600 text-white" : "border border-zinc-300 text-zinc-500 dark:border-zinc-600"}`}

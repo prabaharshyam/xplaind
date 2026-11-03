@@ -15,7 +15,7 @@ export function LessonExercise({ setup, questions }: { setup: string; questions:
         ))}
       </ol>
       {shown ? (
-        <div className="mt-5 rounded-xl bg-white p-4 dark:bg-zinc-950" role="region" aria-label="Answers">
+        <div className="mt-5 rounded-2xl bg-white p-4 dark:bg-zinc-950" role="region" aria-label="Answers">
           <p className="font-semibold">Check your answers</p>
           <ol className="mt-2 list-decimal space-y-2 pl-6 leading-7">
             {questions.map((x) => (

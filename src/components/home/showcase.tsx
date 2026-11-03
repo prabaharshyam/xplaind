@@ -46,7 +46,7 @@ export function MiniRoadmap() {
 
 export function MiniLesson() {
   return (
-    <div aria-hidden="true" className="rounded-xl bg-white p-4 text-zinc-900 shadow-lg dark:bg-zinc-900 dark:text-zinc-100">
+    <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 shadow-lg dark:bg-zinc-900 dark:text-zinc-100">
       <div className="flex items-center justify-between text-xs">
         <span className="rounded-full bg-teal-100 px-2 py-0.5 font-medium text-teal-900">Retrieval · 20 min</span>
         <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900">+50 XP</span>
@@ -63,26 +63,26 @@ export function MiniLesson() {
           </li>
         ))}
       </ul>
-      <p className="mt-3 rounded-lg bg-zinc-100 p-2 text-xs dark:bg-zinc-800">Quick check: which step comes first? ◉ Retrieve ○ Generate</p>
+      <p className="mt-3 rounded-2xl bg-zinc-100 p-2 text-xs dark:bg-zinc-800">Quick check: which step comes first? ◉ Retrieve ○ Generate</p>
     </div>
   );
 }
 
 export function MiniInterview() {
   return (
-    <div aria-hidden="true" className="rounded-xl bg-white p-4 text-zinc-900 shadow-lg dark:bg-zinc-900 dark:text-zinc-100">
+    <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 shadow-lg dark:bg-zinc-900 dark:text-zinc-100">
       <p className="text-xs text-zinc-500">Question 2 of 5 · RAG</p>
       <p className="mt-1 font-semibold">How do you evaluate a RAG system?</p>
       <div className="mt-3 flex items-center justify-between">
         <span className="font-mono text-2xl tabular-nums">1:12</span>
-        <span className="flex items-center gap-2 rounded-full bg-red-600 px-3 py-1.5 text-sm text-white">
+        <span className="flex items-center gap-2 rounded-full bg-rose-600 px-3 py-1.5 text-sm text-white">
           <span className="size-2 animate-pulse rounded-full bg-white" /> Listening
         </span>
       </div>
       <ul className="mt-3 space-y-1 text-sm">
         <li className="text-emerald-700 dark:text-emerald-400">✓ Retrieval and generation separately</li>
         <li className="text-emerald-700 dark:text-emerald-400">✓ Recall at k</li>
-        <li className="text-red-700 dark:text-red-400">✗ Faithfulness to the context</li>
+        <li className="text-rose-700 dark:text-rose-400">✗ Faithfulness to the context</li>
       </ul>
     </div>
   );
@@ -97,7 +97,7 @@ export function MiniCourses() {
   return (
     <div aria-hidden="true" className="grid grid-cols-3 gap-2">
       {items.map((c) => (
-        <div key={c.title} className="overflow-hidden rounded-lg bg-white text-zinc-900 shadow dark:bg-zinc-900 dark:text-zinc-100">
+        <div key={c.title} className="overflow-hidden rounded-2xl bg-white text-zinc-900 shadow dark:bg-zinc-900 dark:text-zinc-100">
           <Cover theme={c.theme} seed={c.title} className="h-14" iconSize={18} />
           <p className="p-2 text-[11px] leading-tight font-medium">{c.title}</p>
           <p className="px-2 pb-2 text-[10px] text-zinc-500">{c.by}</p>

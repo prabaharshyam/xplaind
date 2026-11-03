@@ -3,6 +3,7 @@ import { bookHref } from "@/lib/books";
 import type { Book } from "@/lib/content/schema";
 import { getLevel } from "@/lib/content";
 import { textLink } from "./ui";
+import { levelText } from "@/lib/levels";
 
 /** A cover made from the title, so no publisher artwork is copied. */
 function Spine({ book }: { book: Book }) {
@@ -26,12 +27,12 @@ function Spine({ book }: { book: Book }) {
 export function BookCard({ book, compact = false }: { book: Book; compact?: boolean }) {
   const level = getLevel(book.level);
   return (
-    <article data-tilt="4" className="flex gap-4 rounded-2xl border border-zinc-200 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/60">
+    <article data-tilt="4" className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950/60">
       <Spine book={book} />
       <div className="min-w-0 flex-1">
         <h3 className={`${compact ? "text-base" : "text-lg"} leading-snug font-semibold`}>{book.title}</h3>
         <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
-          {book.author} · {book.year} · {book.level} {level?.name}
+          {book.author} · {book.year} · {levelText(book.level)} {level?.name}
         </p>
         <p className={`mt-2 ${compact ? "text-sm leading-6" : "leading-7"}`}>{book.why}</p>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">

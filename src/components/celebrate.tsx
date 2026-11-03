@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 const BITS = Array.from({ length: 18 }, (_, i) => i);
-const COLORS = ["#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#0ea5e9"];
+const COLORS = ["#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#14b8a6"];
 
 /** A short burst of confetti and an XP toast. Respects reduced motion; the toast is announced. */
 export function Celebrate({ xp, message, onDone }: { xp: number; message: string; onDone: () => void }) {

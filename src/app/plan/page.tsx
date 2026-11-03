@@ -16,6 +16,7 @@ export default function PlanPage() {
   return (
     <main>
       <PageHero
+        size="full"
         shape="calendar"
         theme="career"
         seed="plan"

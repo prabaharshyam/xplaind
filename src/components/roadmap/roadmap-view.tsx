@@ -29,8 +29,8 @@ const SECTION_COLOURS = [
   { chip: "bg-violet-200 text-violet-950 ring-1 ring-violet-400", node: "bg-violet-100 ring-violet-400 dark:bg-violet-950 dark:ring-violet-700", badge: "bg-violet-700" },
   { chip: "bg-sky-200 text-sky-950 ring-1 ring-sky-400", node: "bg-sky-100 ring-sky-400 dark:bg-sky-950 dark:ring-sky-700", badge: "bg-sky-700" },
   { chip: "bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400", node: "bg-emerald-100 ring-emerald-400 dark:bg-emerald-950 dark:ring-emerald-700", badge: "bg-emerald-700" },
-  { chip: "bg-orange-200 text-orange-950 ring-1 ring-orange-400", node: "bg-orange-100 ring-orange-400 dark:bg-orange-950 dark:ring-orange-700", badge: "bg-orange-700" },
-  { chip: "bg-pink-200 text-pink-950 ring-1 ring-pink-400", node: "bg-pink-100 ring-pink-400 dark:bg-pink-950 dark:ring-pink-700", badge: "bg-pink-700" },
+  { chip: "bg-amber-200 text-amber-950 ring-1 ring-amber-400", node: "bg-amber-100 ring-amber-400 dark:bg-amber-950 dark:ring-amber-700", badge: "bg-amber-700" },
+  { chip: "bg-rose-200 text-rose-950 ring-1 ring-rose-400", node: "bg-rose-100 ring-rose-400 dark:bg-rose-950 dark:ring-rose-700", badge: "bg-rose-700" },
   { chip: "bg-teal-200 text-teal-950 ring-1 ring-teal-400", node: "bg-teal-100 ring-teal-400 dark:bg-teal-950 dark:ring-teal-700", badge: "bg-teal-700" },
 ] as const;
 
@@ -180,7 +180,7 @@ export function RoadmapView({ model, lessons, known }: { model: RoadmapModel; le
               </ol>
             </nav>
             <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
-              <input type="checkbox" className="size-5 accent-emerald-700" checked={hideFinished} onChange={(e) => setHideFinished(e.target.checked)} />
+              <input type="checkbox" className="size-5 accent-violet-700" checked={hideFinished} onChange={(e) => setHideFinished(e.target.checked)} />
               Hide done and skipped
             </label>
           </div>
@@ -239,7 +239,7 @@ function ProgressSummary({ counts, filter, onFilter }: { counts: StateCounts; fi
               type="button"
               aria-pressed={active}
               onClick={() => onFilter(f.id)}
-              className={`flex min-h-10 items-center gap-2 rounded-full border px-3 text-sm font-medium ${
+              className={`flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm font-medium ${
                 active ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900" : "border-zinc-300 bg-white hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:bg-zinc-900"
               }`}
             >
@@ -346,7 +346,7 @@ function Section({
                 aria-hidden="true"
                 className={`absolute top-1/2 hidden w-10 border-t-2 border-dotted border-violet-300 md:block dark:border-violet-800 ${ci === 0 ? "right-0" : "left-0"}`}
               />
-              <ul className="grid grid-cols-1 gap-2 rounded-2xl bg-white/60 p-2 ring-1 ring-violet-100 backdrop-blur sm:grid-cols-2 md:grid-cols-1 dark:bg-white/[0.03] dark:ring-violet-950">
+              <ul className="grid grid-cols-1 gap-2 rounded-2xl bg-white p-2 ring-1 ring-violet-100 sm:grid-cols-2 md:grid-cols-1 dark:bg-white/[0.03] dark:ring-violet-950">
                 {c.map(tile)}
               </ul>
             </div>
@@ -361,7 +361,7 @@ function Section({
             onClick={onProject}
             className="relative z-10 flex w-full items-center gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 text-left hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/60 dark:hover:bg-amber-950"
           >
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-400 text-amber-950">
+            <span className="grid size-9 shrink-0 place-items-center rounded-2xl bg-amber-400 text-amber-950">
               <Icon name="trophy" size={18} />
             </span>
             <span className="text-sm">
@@ -380,7 +380,7 @@ function TopicCard({ topic, state, below }: { topic: RoadmapTopic; state: TopicS
   const [marking, setMarking] = useState(false);
   if (!topic.stopId || !state) {
     return (
-      <div className="flex h-full min-h-12 flex-col justify-center rounded-xl border-2 border-dashed border-zinc-300 px-3 py-2 dark:border-zinc-700" title={topic.summary}>
+      <div className="flex h-full min-h-12 flex-col justify-center rounded-2xl border-2 border-dashed border-zinc-300 px-3 py-2 dark:border-zinc-700" title={topic.summary}>
         <span className="text-sm leading-5 font-medium text-zinc-700 dark:text-zinc-300">{topic.title}</span>
         <span className={`text-[11px] font-medium ${muted}`}>Coming soon{topic.optional ? " · optional" : ""}</span>
       </div>
@@ -388,7 +388,7 @@ function TopicCard({ topic, state, below }: { topic: RoadmapTopic; state: TopicS
   }
   const style = STATE_STYLE[state];
   return (
-    <div className={`h-full rounded-xl border-2 transition hover:-translate-y-px hover:shadow-md ${style.card} ${below && state === "todo" ? "opacity-80" : ""}`}>
+    <div className={`h-full rounded-2xl border-2 transition hover:-translate-y-px hover:shadow-md ${style.card} ${below && state === "todo" ? "opacity-80" : ""}`}>
       <div className="flex min-h-12 items-center gap-2 py-1.5 pr-1.5 pl-3">
         <TopicLink
           id={topic.stopId}
@@ -396,7 +396,7 @@ function TopicCard({ topic, state, below }: { topic: RoadmapTopic; state: TopicS
           className={`flex-1 text-sm leading-5 font-semibold text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-100 ${state === "skipped" ? "text-zinc-600 line-through dark:text-zinc-400" : ""}`}
         >
           {topic.title}
-          {topic.optional && <span className={`ml-1.5 text-[10px] font-medium uppercase ${muted}`}>Optional</span>}
+          {topic.optional && <span className={`ml-1.5 text-[10px] font-medium ${muted}`}>Optional</span>}
         </TopicLink>
         <button
           type="button"
@@ -496,7 +496,7 @@ function ProjectCard({
   return (
     <li aria-labelledby={headingId} className="lx-rise flex flex-col gap-3 rounded-2xl border border-zinc-200 p-4 md:p-5 dark:border-zinc-800">
       <div className="flex items-start gap-3">
-        <span className={`grid size-11 shrink-0 place-items-center rounded-xl ${state === "done" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"}`}>
+        <span className={`grid size-11 shrink-0 place-items-center rounded-2xl ${state === "done" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"}`}>
           <Icon name={state === "done" ? "tick" : "trophy"} size={22} />
         </span>
         <div className="min-w-0">
@@ -551,7 +551,7 @@ function ProjectCard({
           </button>
         )}
         {state !== "todo" && (
-          <button type="button" className="min-h-10 px-2 text-sm underline underline-offset-2" onClick={() => setProject(key, null)}>
+          <button type="button" className="min-h-11 px-2 text-sm underline underline-offset-2" onClick={() => setProject(key, null)}>
             Reset
           </button>
         )}
@@ -578,7 +578,7 @@ function ProjectCard({
               onChange={(e) => setUrl(e.target.value)}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? `${headingId}-error` : undefined}
-              className="min-h-11 rounded-lg border border-zinc-300 bg-white px-3 font-normal dark:border-zinc-700 dark:bg-zinc-950"
+              className="min-h-11 rounded-2xl border border-zinc-300 bg-white px-3 font-normal dark:border-zinc-700 dark:bg-zinc-950"
               placeholder="https://github.com/you/project"
             />
           </label>
@@ -588,7 +588,7 @@ function ProjectCard({
         </form>
       )}
       {error && (
-        <p id={`${headingId}-error`} role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p id={`${headingId}-error`} role="alert" className="text-sm text-rose-700 dark:text-rose-400">
           {error}
         </p>
       )}

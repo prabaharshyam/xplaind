@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { secondaryButtonSm, primaryButton } from "@/components/ui";
 import { type MouseEvent, type ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
@@ -9,6 +10,7 @@ import { ResourceNotice } from "@/components/resource-card";
 import { WatchButton } from "@/components/video-player";
 import { TopicStatus } from "./topic-status";
 import { themeOf } from "@/lib/themes";
+import { levelText } from "@/lib/levels";
 
 const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   course: { label: "Course", cls: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200" },
@@ -103,7 +105,7 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
       <div className="flex flex-1 flex-col gap-5 p-5 md:p-6">
         <div>
           <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-            {theme.label} · {d.level} · about {d.hours} {d.hours === 1 ? "hour" : "hours"}
+            {theme.label} · {levelText(d.level)} · about {d.hours} {d.hours === 1 ? "hour" : "hours"}
           </p>
           <h2 id="drawer-title" className="mt-1 text-2xl font-semibold tracking-tight">
             {d.title}
@@ -136,16 +138,16 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
 
         <Link
           href={`/stop/${d.id}`}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 font-medium text-white hover:bg-emerald-800"
+          className={primaryButton}
         >
           <Icon name="book" size={18} /> Read the lesson and take the check
         </Link>
 
-        <CourseList title="Best course" items={best} tone="text-emerald-800 dark:text-emerald-400" />
+        <CourseList title="Best course" items={best} tone="text-violet-800 dark:text-violet-300" />
         {also.length > 0 && <CourseList title="More resources" items={also} tone="text-zinc-700 dark:text-zinc-300" />}
 
         {d.questions > 0 && (
-          <Link href={`/stop/${d.id}#interview`} className="text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
+          <Link href={`/stop/${d.id}#interview`} className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
             {d.questions} interview {d.questions === 1 ? "question" : "questions"} on this topic
           </Link>
         )}
@@ -177,7 +179,7 @@ function CourseList({ title, items, tone }: { title: string; items: DrawerCourse
                 <WatchButton
                   embed={c.embed}
                   title={c.title}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-rose-600 px-3 text-xs font-semibold text-white hover:bg-rose-700"
+                  className={secondaryButtonSm}
                 />
               )}
               {c.notice && <ResourceNotice text={c.notice} compact />}

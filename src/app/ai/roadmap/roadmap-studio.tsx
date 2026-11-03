@@ -13,7 +13,7 @@ import { useAi } from "@/lib/browser/hooks";
 import { todayInIST } from "@/lib/dates";
 
 const field =
-  "w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700";
+  "w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
 
 const GOAL_IDEAS = [
   "Get my first job as a generative AI engineer",
@@ -72,8 +72,8 @@ export function RoadmapStudio({ enabled }: { enabled: boolean }) {
                     type="button"
                     onClick={() => setOpenId(r.id)}
                     aria-current={r.id === openId ? "true" : undefined}
-                    className={`w-full rounded-xl border p-3 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 ${
-                      r.id === openId ? "border-emerald-600" : "border-zinc-200 dark:border-zinc-800"
+                    className={`w-full rounded-2xl border p-3 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 ${
+                      r.id === openId ? "border-violet-600" : "border-zinc-200 dark:border-zinc-800"
                     }`}
                   >
                     <span className="line-clamp-2 font-medium">{r.roadmap.title}</span>
@@ -151,8 +151,8 @@ function RoadmapForm({ onMade }: { onMade: (id: string) => void }) {
         <legend className="font-medium">Where you are starting</legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           {LEVELS.map((l) => (
-            <label key={l.id} className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 ${level === l.id ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
-              <input type="radio" name="level" value={l.id} checked={level === l.id} onChange={() => setLevel(l.id)} className="size-4 accent-emerald-700" />
+            <label key={l.id} className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-2xl border px-3 ${level === l.id ? "border-violet-600 bg-violet-50 dark:bg-violet-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
+              <input type="radio" name="level" value={l.id} checked={level === l.id} onChange={() => setLevel(l.id)} className="size-4 accent-violet-700" />
               <span className="text-sm">{l.label}</span>
             </label>
           ))}
@@ -161,11 +161,11 @@ function RoadmapForm({ onMade }: { onMade: (id: string) => void }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="font-medium">Hours a week: {hoursPerWeek}</span>
-          <input type="range" min={1} max={40} value={hoursPerWeek} onChange={(e) => setHours(Number(e.target.value))} className="mt-3 w-full accent-emerald-700" />
+          <input type="range" min={1} max={40} value={hoursPerWeek} onChange={(e) => setHours(Number(e.target.value))} className="mt-3 w-full accent-violet-700" />
         </label>
         <label className="block">
           <span className="font-medium">Weeks: {weeks}</span>
-          <input type="range" min={2} max={52} value={weeks} onChange={(e) => setWeeks(Number(e.target.value))} className="mt-3 w-full accent-emerald-700" />
+          <input type="range" min={2} max={52} value={weeks} onChange={(e) => setWeeks(Number(e.target.value))} className="mt-3 w-full accent-violet-700" />
         </label>
       </div>
       {error && <AiError message={error} />}
@@ -197,7 +197,7 @@ function RoadmapView({ saved, onClose }: { saved: SavedRoadmap; onClose: () => v
 
   return (
     <article aria-labelledby="roadmap-title">
-      <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-orange-500 p-6 text-white shadow-lg dark:border-zinc-800">
+      <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-gradient-to-br from-violet-700 to-teal-700 p-6 text-white shadow-lg dark:border-zinc-800">
         <p className="flex items-center gap-2 text-sm font-medium text-white/90">
           <Icon name="sparkles" size={16} /> AI roadmap
         </p>
@@ -211,7 +211,7 @@ function RoadmapView({ saved, onClose }: { saved: SavedRoadmap; onClose: () => v
             ["hours", totalHours(r)],
             ["topics", topics.length],
           ].map(([label, n]) => (
-            <div key={label} className="rounded-xl bg-white/15 px-2 py-2 backdrop-blur">
+            <div key={label} className="rounded-2xl bg-white/15 px-2 py-2 backdrop-blur">
               <dt className="text-xs text-white/85">{label}</dt>
               <dd className="text-xl font-semibold">{n}</dd>
             </div>
@@ -263,7 +263,7 @@ function RoadmapView({ saved, onClose }: { saved: SavedRoadmap; onClose: () => v
               {s.topics.map((t, j) => (
                 <li key={t.id} className={`rounded-2xl border p-4 transition ${done.has(t.id) ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30" : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"}`}>
                   <div className="flex items-start gap-3">
-                    <input type="checkbox" checked={done.has(t.id)} onChange={() => toggle(t.id)} aria-label={`Mark "${t.title}" done`} className="mt-1 size-5 shrink-0 accent-emerald-700" />
+                    <input type="checkbox" checked={done.has(t.id)} onChange={() => toggle(t.id)} aria-label={`Mark "${t.title}" done`} className="mt-1 size-5 shrink-0 accent-violet-700" />
                     <div className="min-w-0 flex-1">
                       {editing ? (
                         <label className="block">
@@ -286,20 +286,20 @@ function RoadmapView({ saved, onClose }: { saved: SavedRoadmap; onClose: () => v
                       <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                         <span className="text-zinc-600 dark:text-zinc-400">about {t.hours} h</span>
                         {t.lessonId && (
-                          <Link href={`/stop/${t.lessonId}`} className="font-medium text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
+                          <Link href={`/stop/${t.lessonId}`} className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
                             Read our lesson
                           </Link>
                         )}
                       </p>
                       {editing && (
                         <div className="mt-3 flex gap-2">
-                          <button type="button" onClick={() => change(moveTopic(r, t.id, -1))} aria-label={`Move up: ${t.title}`} disabled={j === 0} className="min-h-10 rounded-lg border border-zinc-300 px-3 text-sm disabled:opacity-40 dark:border-zinc-700">
+                          <button type="button" onClick={() => change(moveTopic(r, t.id, -1))} aria-label={`Move up: ${t.title}`} disabled={j === 0} className="min-h-11 rounded-2xl border border-zinc-300 px-3 text-sm disabled:opacity-40 dark:border-zinc-700">
                             Move up
                           </button>
-                          <button type="button" onClick={() => change(moveTopic(r, t.id, 1))} aria-label={`Move down: ${t.title}`} disabled={j === s.topics.length - 1} className="min-h-10 rounded-lg border border-zinc-300 px-3 text-sm disabled:opacity-40 dark:border-zinc-700">
+                          <button type="button" onClick={() => change(moveTopic(r, t.id, 1))} aria-label={`Move down: ${t.title}`} disabled={j === s.topics.length - 1} className="min-h-11 rounded-2xl border border-zinc-300 px-3 text-sm disabled:opacity-40 dark:border-zinc-700">
                             Move down
                           </button>
-                          <button type="button" onClick={() => change(removeTopic(r, t.id))} aria-label={`Remove: ${t.title}`} className="min-h-10 rounded-lg border border-rose-300 px-3 text-sm text-rose-800 dark:border-rose-800 dark:text-rose-300">
+                          <button type="button" onClick={() => change(removeTopic(r, t.id))} aria-label={`Remove: ${t.title}`} className="min-h-11 rounded-2xl border border-rose-300 px-3 text-sm text-rose-800 dark:border-rose-800 dark:text-rose-300">
                             Remove
                           </button>
                         </div>

@@ -13,6 +13,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const paths = [
     "/",
     "/start",
+    "/about",
+    "/privacy",
+    "/terms",
     "/paths",
     "/topics",
     ...THEMES.map((t) => `/topics/${t.id}`),

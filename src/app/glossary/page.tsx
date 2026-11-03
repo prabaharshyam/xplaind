@@ -32,7 +32,7 @@ export default function GlossaryPage() {
             <li key={l}>
               <a
                 href={`#letter-${l}`}
-                className="flex size-11 items-center justify-center rounded-lg border border-zinc-300 font-semibold hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-emerald-700 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                className="flex size-11 items-center justify-center rounded-2xl border border-zinc-300 font-semibold hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-violet-700 dark:border-zinc-700 dark:hover:bg-zinc-900"
               >
                 {l}
               </a>

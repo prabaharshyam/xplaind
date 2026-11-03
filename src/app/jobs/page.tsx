@@ -42,7 +42,7 @@ export default function JobsPage() {
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <nav aria-label="Roles" className="flex flex-wrap gap-2">
           {roles.map(({ path }) => (
-            <a key={path.id} href={`#${path.id}`} className="inline-flex min-h-10 items-center rounded-full border border-zinc-300 bg-white px-3 text-sm font-medium hover:border-violet-400 dark:border-zinc-700 dark:bg-zinc-900">
+            <a key={path.id} href={`#${path.id}`} className="inline-flex min-h-11 items-center rounded-full border border-zinc-300 bg-white px-3 text-sm font-medium hover:border-violet-400 dark:border-zinc-700 dark:bg-zinc-900">
               {path.name}
             </a>
           ))}
@@ -62,7 +62,7 @@ export default function JobsPage() {
                 <h2 className="text-xl font-semibold">{path.name}</h2>
                 <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{path.tagline}</p>
 
-                <h3 className="mt-5 text-sm font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">Typical salary</h3>
+                <h3 className="mt-5 text-sm font-semibold text-zinc-600 dark:text-zinc-400">Typical salary</h3>
                 <table className="mt-2 w-full text-sm">
                   <caption className="sr-only">
                     {path.name} salary in lakh rupees a year by experience, checked {checked}
@@ -89,7 +89,7 @@ export default function JobsPage() {
                   </tbody>
                 </table>
 
-                <h3 className="mt-5 text-sm font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">Skills job posts ask for</h3>
+                <h3 className="mt-5 text-sm font-semibold text-zinc-600 dark:text-zinc-400">Skills job posts ask for</h3>
                 <ul className="mt-2 flex flex-wrap gap-2">
                   {role.skills.map((s) => (
                     <li key={s} className="rounded-full bg-violet-50 px-3 py-1 text-sm text-violet-950 ring-1 ring-violet-200 dark:bg-violet-950/40 dark:text-violet-100 dark:ring-violet-900">

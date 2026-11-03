@@ -40,7 +40,7 @@ export default async function InterviewQuestionPage({ params }: PageProps<"/inte
       )}
 
       <h2 className="mt-8 text-xl font-semibold">Short answer</h2>
-      <p className="mt-2 rounded-lg bg-zinc-100 p-4 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
+      <p className="mt-2 rounded-2xl bg-zinc-100 p-4 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
 
       <h2 className="mt-8 text-xl font-semibold">Deeper answer</h2>
       {q.deeper_answer.split(/\n\s*\n/).map((para, i) => (

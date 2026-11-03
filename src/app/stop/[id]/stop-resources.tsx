@@ -23,7 +23,7 @@ export function StopResources({ stopId, cards }: { stopId: string; cards: Resour
         <label className="flex min-h-12 cursor-pointer items-center gap-3">
           <input
             type="checkbox"
-            className="size-5 accent-emerald-700"
+            className="size-5 accent-violet-700"
             checked={progress.freeOnly}
             onChange={(e) => setFreeOnly(e.target.checked)}
           />

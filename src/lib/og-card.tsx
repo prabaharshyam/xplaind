@@ -30,7 +30,7 @@ export function ogCard({ eyebrow, title, footer, from, to }: { eyebrow: string; 
           {/* eslint-disable-next-line @next/next/no-img-element -- next/og draws plain img tags */}
           <img src={LOGO} alt="" width={254} height={40} />
           <div style={{ width: 3, height: 34, borderRadius: 2, background: `linear-gradient(180deg, ${from}, ${to})`, marginLeft: 6 }} />
-          <div style={{ fontSize: 26, color: "#1f66fe", fontWeight: 600 }}>{eyebrow}</div>
+          <div style={{ fontSize: 26, color: "#6d28d9", fontWeight: 600 }}>{eyebrow}</div>
         </div>
         <div style={{ fontSize: title.length > 48 ? 64 : 78, fontWeight: 800, lineHeight: 1.08, letterSpacing: -1.5, maxWidth: 1000 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 28, color: "#3f3a56" }}>

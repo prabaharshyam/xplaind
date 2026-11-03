@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useProgress } from "@/lib/browser/hooks";
-import type { LevelId } from "@/lib/levels";
+import { type LevelId, levelText } from "@/lib/levels";
 import { DEFAULT_PATH_ID, roadmapHref } from "@/lib/paths";
 import { nextSteps } from "@/lib/roadmap/next-steps";
 import { completedIds } from "@/lib/roadmap/progress";
@@ -55,7 +55,7 @@ export function NextStepsCard({
               <li key={s.id}>
                 <Link
                   href={`/stop/${s.id}`}
-                  className="flex min-h-12 gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-emerald-700 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                  className="flex min-h-12 gap-3 rounded-2xl border border-zinc-200 p-3 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:hover:bg-zinc-900"
                 >
                   <span aria-hidden="true" className="font-semibold text-emerald-800 dark:text-emerald-400">
                     {n + 1}
@@ -63,7 +63,7 @@ export function NextStepsCard({
                   <span className="flex flex-col">
                     <span className="font-medium">{s.title}</span>
                     <span className={`text-sm ${muted}`}>
-                      {step.reason === "review" ? `Review for ${tagLabel(step.gapTag)} · ` : pathId === DEFAULT_PATH_ID ? `${s.level} · ` : ""}
+                      {step.reason === "review" ? `Review for ${tagLabel(step.gapTag)} · ` : pathId === DEFAULT_PATH_ID ? `${levelText(s.level)} · ` : ""}
                       about {s.hours} {s.hours === 1 ? "hour" : "hours"}
                     </span>
                   </span>

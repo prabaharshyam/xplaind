@@ -24,7 +24,7 @@ const remembered = (): { name: string | null } | null => {
   }
 };
 
-const field = "min-h-12 w-full rounded-xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900";
+const field = "min-h-12 w-full rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900";
 
 /**
  * RD-1, RD-2: download the roadmap as a printable checklist. The first time, the learner
@@ -95,9 +95,9 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
   return (
     <div className="flex flex-col gap-3">
       {/* RD-1: a banner, not a small link, so learners see the download straight away. */}
-      <div className="flex flex-col gap-4 rounded-3xl bg-gradient-to-br from-violet-200 via-pink-100 to-amber-100 p-5 shadow-sm ring-1 ring-violet-300/60 sm:flex-row sm:items-center sm:justify-between md:p-6 dark:from-violet-950 dark:via-fuchsia-950 dark:to-amber-950 dark:ring-violet-800">
+      <div className="flex flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-start gap-4">
-          <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white text-violet-700 shadow-sm dark:bg-zinc-900 dark:text-violet-300">
+          <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
             <Icon name="download" size={26} />
           </span>
           <div>
@@ -107,13 +107,13 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
         </div>
         <button
           type="button"
-          className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-violet-700 px-6 text-base font-semibold text-white shadow-md transition hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 disabled:opacity-70"
+          className={`${secondaryButton} shrink-0`}
           onClick={() => void (open ? setOpen(false) : start())}
           aria-expanded={open}
           aria-controls={ids.region}
           disabled={busy}
         >
-          <Icon name="download" size={18} /> {busy ? "Making your roadmap…" : "Download the Roadmap"}
+          <Icon name="download" size={18} /> {busy ? "Making your roadmap…" : "Download the PDF"}
         </button>
       </div>
 
@@ -131,12 +131,12 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
           {/* PV-2: with accounts on, the PDF needs an account and accounts are 18+, so this path is only for accounts-off sites. */}
           {!accountsOn() && (
             <label className="flex min-h-11 items-center gap-2">
-              <input type="checkbox" checked={minor} onChange={(e) => setMinor(e.target.checked)} className="size-5 accent-emerald-700" />I am under 18
+              <input type="checkbox" checked={minor} onChange={(e) => setMinor(e.target.checked)} className="size-5 accent-violet-700" />I am under 18
             </label>
           )}
 
           {minor ? (
-            <p className="rounded-xl bg-zinc-100 p-3 text-sm dark:bg-zinc-900">No details needed. Your checklist downloads straight away, and nothing is sent to us.</p>
+            <p className="rounded-2xl bg-zinc-100 p-3 text-sm dark:bg-zinc-900">No details needed. Your checklist downloads straight away, and nothing is sent to us.</p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1">
@@ -171,7 +171,7 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
                 </select>
               </div>
               <label className="flex items-start gap-2 text-sm leading-6 sm:col-span-2">
-                <input type="checkbox" checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} className="mt-1 size-5 shrink-0 accent-emerald-700" />
+                <input type="checkbox" checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} className="mt-1 size-5 shrink-0 accent-violet-700" />
                 {CONSENT_TEXT}
               </label>
             </div>
@@ -184,7 +184,7 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
           )}
           <div className="flex flex-wrap gap-2">
             <button type="button" className={primaryButton} onClick={() => void submit()} disabled={busy}>
-              {busy ? "Making your roadmap…" : "Download the Roadmap"}
+              {busy ? "Making your roadmap…" : "Download the PDF"}
             </button>
             <button type="button" className={secondaryButton} onClick={() => setOpen(false)}>
               Cancel

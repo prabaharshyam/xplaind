@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { setSignedIn } from "@/lib/browser/account-sync";
+import { useProgress } from "@/lib/browser/hooks";
 import { publicSupabase } from "@/lib/signups";
 import { browserClient } from "@/lib/supabase/browser";
 
@@ -42,9 +43,14 @@ export function AccountLink({ className }: { className?: string }) {
   );
 }
 
-/** AC-6: the header's main button. Signed out it invites sign-up, so progress follows the learner. */
+/**
+ * AC-6: the header's main button. It says exactly what happens next: signed in it opens your
+ * progress, a returning learner carries on from their last lesson, and a new visitor starts
+ * learning (or signs up, once sign-ups are open).
+ */
 export function AccountButton({ className }: { className: string }) {
   const state = useAccountState();
+  const progress = useProgress();
   if (state === "in") {
     return (
       <Link href="/dashboard" className={className}>
@@ -52,16 +58,23 @@ export function AccountButton({ className }: { className: string }) {
       </Link>
     );
   }
+  if (progress.last) {
+    return (
+      <Link href={`/stop/${progress.last.stopId}`} className={className}>
+        Continue learning
+      </Link>
+    );
+  }
   if (state === "out") {
     return (
       <Link href="/signin" className={className}>
-        Sign up
+        Sign up free
       </Link>
     );
   }
   return (
     <Link href="/paths" className={className}>
-      Get started
+      Start learning
     </Link>
   );
 }

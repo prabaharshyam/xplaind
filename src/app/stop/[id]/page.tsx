@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { RunnableCode } from "@/components/playground/runnable-code";
@@ -32,10 +33,11 @@ import { PathLessons } from "./path-lessons";
 import { Flashcards } from "@/components/flashcards";
 import { TopicStatus } from "@/components/roadmap/topic-status";
 import { aiEnabled } from "@/lib/ai/settings";
+import { levelWords } from "@/lib/levels";
 
 /** Lesson text: headings, lists, code and tables styled without a typography plugin. Code scrolls inside its box at 360px. */
 const PROSE =
-  "mt-2 leading-7 [&_h2]:mt-10 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:font-semibold [&_li]:mt-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mt-3 [&_ul]:list-disc [&_ul]:pl-6 [&_strong]:font-semibold [&_blockquote]:mt-3 [&_blockquote]:border-l-4 [&_blockquote]:border-zinc-300 [&_blockquote]:pl-4 [&_blockquote]:text-zinc-700 dark:[&_blockquote]:border-zinc-700 dark:[&_blockquote]:text-zinc-300 [&_pre]:mt-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-zinc-100 [&_pre]:p-3 [&_pre]:text-sm dark:[&_pre]:bg-zinc-900 [&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-zinc-100 [&_:not(pre)>code]:px-1 dark:[&_:not(pre)>code]:bg-zinc-900 [&_table]:mt-3 [&_table]:block [&_table]:overflow-x-auto [&_td]:border [&_td]:border-zinc-300 [&_td]:p-2 [&_th]:border [&_th]:border-zinc-300 [&_th]:p-2 [&_th]:text-left dark:[&_td]:border-zinc-700 dark:[&_th]:border-zinc-700 [&_table]:w-full [&_table]:border-collapse [&_th]:bg-zinc-100 dark:[&_th]:bg-zinc-900 [&_pre:has(>code.language-text)]:bg-zinc-950 [&_pre:has(>code.language-text)]:p-4 [&_pre:has(>code.language-text)]:leading-6 [&_pre:has(>code.language-text)]:text-emerald-100 dark:[&_pre:has(>code.language-text)]:bg-black";
+  "mt-2 leading-7 [&_h2]:mt-10 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:font-semibold [&_li]:mt-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mt-3 [&_ul]:list-disc [&_ul]:pl-6 [&_strong]:font-semibold [&_blockquote]:mt-3 [&_blockquote]:border-l-4 [&_blockquote]:border-zinc-300 [&_blockquote]:pl-4 [&_blockquote]:text-zinc-700 dark:[&_blockquote]:border-zinc-700 dark:[&_blockquote]:text-zinc-300 [&_pre]:mt-3 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:bg-zinc-100 [&_pre]:p-3 [&_pre]:text-sm dark:[&_pre]:bg-zinc-900 [&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-zinc-100 [&_:not(pre)>code]:px-1 dark:[&_:not(pre)>code]:bg-zinc-900 [&_table]:mt-3 [&_table]:block [&_table]:overflow-x-auto [&_td]:border [&_td]:border-zinc-300 [&_td]:p-2 [&_th]:border [&_th]:border-zinc-300 [&_th]:p-2 [&_th]:text-left dark:[&_td]:border-zinc-700 dark:[&_th]:border-zinc-700 [&_table]:w-full [&_table]:border-collapse [&_th]:bg-zinc-100 dark:[&_th]:bg-zinc-900 [&_pre:has(>code.language-text)]:bg-zinc-950 [&_pre:has(>code.language-text)]:p-4 [&_pre:has(>code.language-text)]:leading-6 [&_pre:has(>code.language-text)]:text-emerald-100 dark:[&_pre:has(>code.language-text)]:bg-black";
 
 /** Code blocks and tables scroll sideways on phones, so keyboard users must be able to focus them (WCAG 2.1.1). */
 /** PG-4: Python examples in lessons get a "Run this code" button; other code stays as it is. */
@@ -159,7 +161,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
       <JsonLd data={lessonGraph(stop, paths)} />
       <header className="relative overflow-hidden text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}>
         <Cover theme={stop.theme} seed={stop.id} className="absolute inset-0 opacity-60 [&>div:last-child]:hidden" />
-        <div className="relative mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 md:flex-row md:items-end md:justify-between md:px-6 md:py-12">
+        <div className="relative mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row md:items-end md:justify-between md:px-6 md:py-12">
           <div className="max-w-3xl">
             <nav aria-label="Breadcrumb" className="text-sm text-white/90">
               {onGenai ? (
@@ -169,7 +171,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
                   </Link>
                   <span> / </span>
                   <Link href={`/roadmap/genai-engineer/${stop.level.toLowerCase()}`} className="underline underline-offset-2">
-                    {stop.level} {level?.name}
+                    {levelWords(stop.level)}: {level?.name}
                   </Link>
                 </>
               ) : (
@@ -183,10 +185,10 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               </Link>
             </nav>
             <h1 className="mt-3 text-3xl leading-tight font-semibold tracking-tight text-balance drop-shadow-sm md:text-5xl">{stop.title}</h1>
-            <p className="mt-3 text-lg leading-8 text-white/95">{stop.outcome}</p>
+            <p className="mt-3 text-base leading-7 text-white md:text-lg md:leading-8">{stop.outcome}</p>
             <p className="mt-4 flex flex-wrap gap-2 text-sm">
-              {[`${stop.level} · ${level?.name ?? ""}`, `about ${stop.hours} ${stop.hours === 1 ? "hour" : "hours"}`, `${sections.length || 1} sections`].map((c) => (
-                <span key={c} className="rounded-full bg-black/25 px-3 py-1 backdrop-blur">
+              {[`${levelWords(stop.level)} · ${level?.name ?? ""}`, `about ${stop.hours} ${stop.hours === 1 ? "hour" : "hours"}`, `${sections.length || 1} sections`].map((c) => (
+                <span key={c} className="rounded-full bg-black/35 px-3 py-1">
                   {c}
                 </span>
               ))}
@@ -206,53 +208,15 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
           </LessonNav>
         </div>
         <div className="min-w-0 pt-6 lg:order-1 lg:pt-10">
-          {paths.length > 0 && (
-            <p className={`text-sm ${muted}`}>
-              On {paths.length === 1 ? "the path" : "these paths"}:{" "}
-              {paths.map((p, i) => (
-                <span key={p.id}>
-                  {i > 0 && ", "}
-                  <Link href={roadmapHref(p.id)} className={textLink}>
-                    {p.name}
-                  </Link>
-                </span>
-              ))}
-            </p>
-          )}
-
-          {/* RM-10: tags open the Library filtered to the same topic, level or skill. */}
-          <p className="mt-3 flex flex-wrap items-center gap-1.5 text-sm" aria-label="Tags">
-            <Link href={`/library?topic=${stop.theme}`} className="rounded-full bg-violet-100 px-2.5 py-1 font-medium text-violet-900 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-200">
-              #{theme.label}
-            </Link>
-            <Link href={`/library?level=${stop.level}`} className="rounded-full bg-sky-100 px-2.5 py-1 font-medium text-sky-900 hover:bg-sky-200 dark:bg-sky-950 dark:text-sky-200">
-              #{stop.level} {level?.name}
-            </Link>
-            {stop.videos.length > 0 && (
-              <Link href={`/library?kind=video&topic=${stop.theme}`} className="rounded-full bg-rose-100 px-2.5 py-1 font-medium text-rose-900 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-200">
-                #Video lessons
-              </Link>
-            )}
-            {terms.map((t) => (
-              <Link key={t.id} href={`/library?q=${encodeURIComponent(t.term)}`} className="rounded-full bg-zinc-100 px-2.5 py-1 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200">
-                {t.term}
-              </Link>
-            ))}
-          </p>
-
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
+          {/* RM-7: on a big screen the Learning / Done / Skip buttons sit at the top; phones get the bar at the bottom. */}
+          <div className="mb-6 hidden flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3 lg:flex dark:border-zinc-800 dark:bg-zinc-900">
             <span className="text-sm font-medium">Track this topic</span>
             <TopicStatus stopId={stop.id} title={stop.title} label={`Track ${stop.title}`} />
           </div>
 
-          {/* On phones the side panel sits here, near the top, so the videos are seen first. */}
-          <div className="mt-4 lg:hidden">
-            <LearnPanel stopId={stop.id} items={learn} headingId="learn-top" />
-          </div>
-
           {/* SE-4: the answer first, in plain words, for readers in a hurry and for search and AI results. */}
-          <section aria-labelledby="answer-h" className="mt-6 rounded-2xl bg-violet-50 p-5 ring-1 ring-violet-200 dark:bg-violet-950/40 dark:ring-violet-900">
-            <h2 id="answer-h" className="text-sm font-semibold tracking-wide text-violet-800 uppercase dark:text-violet-300">
+          <section aria-labelledby="answer-h" className="rounded-2xl bg-violet-50 p-5 ring-1 ring-violet-200 dark:bg-violet-950/40 dark:ring-violet-900">
+            <h2 id="answer-h" className="text-sm font-semibold text-violet-800 dark:text-violet-300">
               Quick answer
             </h2>
             <p className="mt-1 text-lg leading-8 text-zinc-900 dark:text-zinc-100">{stop.answer}</p>
@@ -267,14 +231,14 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
           {explainer ? (
             sections.map((sec, i) => (
+              <Fragment key={sec.title}>
               <section
-                key={sec.title}
                 id={slug(sec.title)}
                 aria-labelledby={`${slug(sec.title)}-h`}
                 className={`mt-6 scroll-mt-24 rounded-2xl border p-5 md:p-6 ${SECTION_TONE[sec.title] ?? "border-zinc-200 dark:border-zinc-800"}`}
               >
                 <h2 id={`${slug(sec.title)}-h`} className="flex items-center gap-3 text-xl font-semibold">
-                  <span className="grid size-9 place-items-center rounded-xl text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}>
+                  <span className="grid size-9 place-items-center rounded-2xl text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}>
                     <Icon name={SECTION_ICON[sec.title] ?? "book"} size={18} />
                   </span>
                   <span>
@@ -288,6 +252,13 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
                   <MDXRemote source={sec.body} components={MDX_COMPONENTS} options={MDX_OPTIONS} />
                 </div>
               </section>
+              {/* On phones the videos come once the learner has the idea, after the first part. */}
+              {i === 0 && (
+                <div className="mt-6 lg:hidden">
+                  <LearnPanel stopId={stop.id} items={learn} headingId="learn-top" />
+                </div>
+              )}
+              </Fragment>
             ))
           ) : (
             <section className="mt-6">
@@ -297,11 +268,16 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               </div>
             </section>
           )}
+          {!explainer && (
+            <div className="mt-6 lg:hidden">
+              <LearnPanel stopId={stop.id} items={learn} headingId="learn-top" />
+            </div>
+          )}
 
           {stop.exercise && (
             <section id="try-it" aria-labelledby="try-it-h" className="mt-6 scroll-mt-24 rounded-2xl border-2 border-dashed border-amber-400 bg-amber-50/60 p-5 md:p-6 dark:border-amber-700 dark:bg-amber-950/20">
               <h2 id="try-it-h" className="flex items-center gap-3 text-xl font-semibold">
-                <span className="grid size-9 place-items-center rounded-xl bg-amber-400 text-amber-950">
+                <span className="grid size-9 place-items-center rounded-2xl bg-amber-400 text-amber-950">
                   <Icon name="bolt" size={18} />
                 </span>
                 {stop.exercise.title}
@@ -324,8 +300,8 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               <p className={`mt-1 text-sm ${muted}`}>Tap a term to see what it means.</p>
               <div className="mt-3 flex flex-col gap-2">
                 {terms.map((t) => (
-                  <details key={t.id} className="group rounded-xl bg-white px-4 py-3 dark:bg-zinc-950">
-                    <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-3 font-medium [&::-webkit-details-marker]:hidden">
+                  <details key={t.id} className="group rounded-2xl bg-white px-4 py-3 dark:bg-zinc-950">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 font-medium [&::-webkit-details-marker]:hidden">
                       {t.term}
                       <span aria-hidden="true" className="transition group-open:rotate-45">
                         +
@@ -380,7 +356,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             <StopProgressPanel stopId={stop.id} title={stop.title} check={check} />
           </section>
 
-          <section id="tutor" aria-labelledby="tutor-h" className="mt-8 scroll-mt-24 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5 md:p-6 dark:border-violet-900 dark:from-violet-950/30 dark:to-fuchsia-950/20">
+          <section id="tutor" aria-labelledby="tutor-h" className="mt-8 scroll-mt-24 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-teal-50 p-5 md:p-6 dark:border-violet-900 dark:from-violet-950/30 dark:to-teal-950/20">
             <h2 id="tutor-h" className="flex items-center gap-2 text-xl font-semibold">
               <Icon name="sparkles" size={22} className="text-violet-700 dark:text-violet-300" /> Stuck? Ask the AI tutor
             </h2>
@@ -434,6 +410,52 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               )}
             </nav>
           )}
+
+          {/* RM-10: where this lesson sits, and tags that open the Library filtered the same way. */}
+          <section aria-labelledby="related-h" className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+            <h2 id="related-h" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              Related
+            </h2>
+            {paths.length > 0 && (
+              <p className={`mt-2 text-sm ${muted}`}>
+                On {paths.length === 1 ? "the roadmap" : "these roadmaps"}:{" "}
+                {paths.map((p, i) => (
+                  <span key={p.id}>
+                    {i > 0 && ", "}
+                    <Link href={roadmapHref(p.id)} className={textLink}>
+                      {p.name}
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            )}
+            <p className="mt-3 flex flex-wrap items-center gap-2 text-sm" aria-label="Tags">
+              <Link href={`/library?topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-violet-50 px-3 font-medium text-violet-900 ring-1 ring-violet-200 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200 dark:ring-violet-900">
+                {theme.label}
+              </Link>
+              <Link href={`/library?level=${stop.level}`} className="inline-flex min-h-11 items-center rounded-full bg-violet-50 px-3 font-medium text-violet-900 ring-1 ring-violet-200 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200 dark:ring-violet-900">
+                {levelWords(stop.level)}: {level?.name}
+              </Link>
+              {stop.videos.length > 0 && (
+                <Link href={`/library?kind=video&topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-violet-50 px-3 font-medium text-violet-900 ring-1 ring-violet-200 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200 dark:ring-violet-900">
+                  Video lessons
+                </Link>
+              )}
+              {terms.map((t) => (
+                <Link key={t.id} href={`/library?q=${encodeURIComponent(t.term)}`} className="inline-flex min-h-11 items-center rounded-full bg-zinc-100 px-3 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200">
+                  {t.term}
+                </Link>
+              ))}
+            </p>
+          </section>
+        </div>
+      </div>
+
+      {/* RM-7: phones keep Learning / Done / Skip one tap away in a slim bar at the bottom. */}
+      <div className="lx-trackbar fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/95 print:hidden">
+        <div className="mx-auto flex max-w-3xl items-center gap-2">
+          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Track</span>
+          <TopicStatus stopId={stop.id} title={stop.title} size="sm" label={`Track ${stop.title}`} />
         </div>
       </div>
     </main>

@@ -62,7 +62,7 @@ test.describe("roadmap (RM-1)", () => {
 
   test("a level page lists its steps, and an unknown level is not found", async ({ page }) => {
     await page.goto("/roadmap/genai-engineer/b2");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("B2 Python starter");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Beginner 2: Python starter");
     await expect(page.getByRole("link", { name: /Variables, loops and functions in Python/ })).toBeVisible();
     expect((await wcag(page)).violations).toEqual([]);
     await page.goto("/roadmap/genai-engineer/p2");

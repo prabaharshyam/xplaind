@@ -61,7 +61,7 @@ export function useTopicState(stopId: string): [TopicState, (next: TopicState) =
  */
 export function TopicStatus({ stopId, title, size = "md", label }: { stopId: string; title: string; size?: "sm" | "md"; label?: string }) {
   const [state, set] = useTopicState(stopId);
-  const pad = size === "sm" ? "min-h-9 px-2.5 text-xs" : "min-h-10 px-3 text-sm";
+  const pad = size === "sm" ? "min-h-11 px-3 text-xs" : "min-h-11 px-3.5 text-sm";
   return (
     <div role="group" aria-label={label ?? `Your status for ${title}`} className="flex flex-wrap gap-1.5">
       {CHOICES.map((c) => {

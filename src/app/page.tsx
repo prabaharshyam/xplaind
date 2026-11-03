@@ -14,6 +14,7 @@ import { getJobs } from "@/lib/content/jobs";
 import { pathView } from "@/lib/content/paths";
 import { CODING_LABEL } from "@/lib/paths";
 import type { IconName } from "@/lib/themes";
+import { primaryButtonLg, secondaryButtonLg } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: { absolute: "Xplaind: AI career roadmaps, lessons and interview practice" },
@@ -141,12 +142,12 @@ export default function Home() {
       {/* Hero: the promise first (one place, the right order), then the market as proof. Works before any animation runs. */}
       <section data-hero className="home-hero relative flex min-h-[calc(100svh-3.5rem)] items-center" aria-labelledby="hero-heading">
         <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6">
-          <p data-hero-fade className="inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 backdrop-blur dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
+          <p data-hero-fade className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-100 dark:ring-violet-800">
             <span className="size-1.5 rounded-full bg-violet-600" /> AI career roadmaps · Helping India learn AI faster
           </p>
           <h1 id="hero-heading" className="mt-6 max-w-5xl text-[2.6rem] leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-[4.25rem]">
             <Words text="Everything you need to learn AI," />{" "}
-            <span data-hero-fade className="block bg-gradient-to-r from-violet-700 via-fuchsia-600 to-teal-600 bg-clip-text pb-1 text-transparent dark:from-violet-300 dark:via-pink-300 dark:to-teal-300">
+            <span data-hero-fade className="block bg-gradient-to-r from-violet-700 via-violet-600 to-teal-700 bg-clip-text pb-1 text-transparent dark:from-violet-300 dark:via-violet-300 dark:to-teal-300">
               in one place, in the right order.
             </span>
           </h1>
@@ -155,10 +156,10 @@ export default function Home() {
             and mock interviews built in.
           </p>
           <div data-hero-fade className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a data-magnetic href="#roles" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-violet-700 px-6 font-medium text-white shadow-lg shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700">
+            <a data-magnetic href="#roles" className={primaryButtonLg}>
               <Icon name="compass" size={18} /> Choose your role
             </a>
-            <Link data-magnetic href="/start" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/85 px-6 font-medium text-violet-950 ring-1 ring-violet-200 backdrop-blur hover:bg-white dark:bg-white/10 dark:text-violet-100 dark:ring-violet-800">
+            <Link data-magnetic href="/start" className={secondaryButtonLg}>
               <Icon name="sparkles" size={18} /> Find my level in 10 minutes
             </Link>
           </div>
@@ -177,10 +178,10 @@ export default function Home() {
 
           {/* JB-4: the market behind the promise, each figure sourced and dated. */}
           <div data-hero-fade className="mt-10 max-w-4xl">
-            <p className="text-sm font-semibold tracking-wide text-zinc-700 uppercase dark:text-zinc-300">Why now: India&apos;s AI job market</p>
+            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Why now: India&apos;s AI job market</p>
             <dl className="mt-3 grid gap-3 sm:grid-cols-3">
               {market.stats.map((m) => (
-                <div key={m.label} className="flex flex-col-reverse justify-end rounded-2xl bg-white/85 p-4 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
+                <div key={m.label} className="flex flex-col-reverse justify-end rounded-2xl bg-white p-4 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-900 dark:ring-violet-900">
                   <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
                   <dd className="text-3xl font-semibold tracking-tight text-violet-800 md:text-4xl dark:text-violet-300">{m.value}</dd>
                 </div>
@@ -208,14 +209,14 @@ export default function Home() {
           </p>
           <ul aria-labelledby="pains-heading" className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3" data-rise-group>
             {PAINS.map((p) => (
-              <li key={p.pain} data-rise className="flex gap-4 rounded-3xl bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
-                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+              <li key={p.pain} data-rise className="flex gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-900 dark:ring-violet-900">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                   <Icon name={p.icon} size={24} />
                 </span>
                 <div>
                   <p className="text-lg leading-7 font-semibold">{p.pain}</p>
                   <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{p.fix}</p>
-                  <Link href={p.href} className="mt-3 inline-block font-medium text-emerald-800 hover:underline dark:text-emerald-400">
+                  <Link href={p.href} className="mt-3 inline-block font-medium text-violet-800 hover:underline dark:text-violet-300">
                     {p.cta} →
                   </Link>
                 </div>
@@ -239,7 +240,7 @@ export default function Home() {
           <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">Three steps. You always know where you are and what comes next.</p>
           <ol className="mt-8 grid gap-6 md:grid-cols-3" data-rise-group>
             {STEPS.map((s, i) => (
-              <li key={s.title} data-rise className="rounded-3xl bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
+              <li key={s.title} data-rise className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-900 dark:ring-violet-900">
                 <span className="flex items-center gap-3">
                   <span className="grid size-10 place-items-center rounded-full bg-violet-700 font-semibold text-white">{i + 1}</span>
                   <Icon name={s.icon} size={24} className="text-emerald-700 dark:text-emerald-400" />
@@ -316,7 +317,7 @@ export default function Home() {
               text="Our own plain-English explainer, a worked example from Indian work life, the common mistakes and a quick check that earns XP."
               href="/topics"
               cta="Browse lessons"
-              tone="from-violet-50 to-fuchsia-50 dark:from-violet-950 dark:to-fuchsia-950"
+              tone="from-violet-50 to-violet-100/60 dark:from-violet-950 dark:to-violet-900/40"
             >
               <div className="mx-auto max-w-[300px]">
                 <MiniLesson />
@@ -327,7 +328,7 @@ export default function Home() {
               text="From Google, Microsoft, AWS, NVIDIA, OpenAI, Anthropic, Hugging Face and more: one chosen for each lesson, plus the certifications worth sitting."
               href="/resources"
               cta="Browse courses"
-              tone="from-sky-50 to-indigo-50 dark:from-sky-950 dark:to-indigo-950"
+              tone="from-sky-50 to-teal-50 dark:from-sky-950 dark:to-teal-950"
             >
               <div className="mx-auto max-w-[320px]">
                 <MiniCourses />
@@ -340,7 +341,7 @@ export default function Home() {
               cta="Open the playground"
               tone="from-zinc-100 to-violet-100 dark:from-zinc-900 dark:to-violet-950"
             >
-              <pre aria-hidden="true" className="mx-auto max-w-[300px] overflow-hidden rounded-xl bg-zinc-950 p-4 font-mono text-xs leading-5 text-emerald-200 shadow-lg">
+              <pre aria-hidden="true" className="mx-auto max-w-[300px] overflow-hidden rounded-2xl bg-zinc-950 p-4 font-mono text-xs leading-5 text-emerald-200 shadow-lg">
                 {`>>> tokens = "Learn AI".split()\n>>> len(tokens)\n2\n>>> print("You can do this")\nYou can do this`}
               </pre>
             </Feature>
@@ -362,7 +363,7 @@ export default function Home() {
               text={`${interview.length} real questions across every role. Answer against the clock with your voice, then see which key points you covered.`}
               href="/interview/simulator"
               cta="Start a mock interview"
-              tone="from-rose-50 to-orange-50 dark:from-rose-950 dark:to-orange-950"
+              tone="from-amber-50 to-rose-50 dark:from-amber-950 dark:to-rose-950"
             >
               <div className="mx-auto max-w-[300px]">
                 <MiniInterview />
@@ -374,7 +375,7 @@ export default function Home() {
                 <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
                   A study plan sized to your hours, a Monday reminder, and XP, streaks and badges for every lesson and practice session.
                 </p>
-                <Link href="/plan" className="mt-3 inline-block font-medium text-emerald-800 hover:underline dark:text-emerald-400">
+                <Link href="/plan" className="mt-3 inline-block font-medium text-violet-800 hover:underline dark:text-violet-300">
                   Plan my week →
                 </Link>
               </div>
@@ -386,14 +387,14 @@ export default function Home() {
               { href: "/ai/resume", icon: "star" as const, title: "Get your resume shortlisted", text: "Upload it and get fixes in order of importance, rewritten lines and the keywords recruiters look for.", cta: "Review my resume" },
               { href: "/jobs", icon: "target" as const, title: "Know what the job pays", text: "Typical salaries for every AI role in India, the skills job posts ask for, and live openings on Naukri and LinkedIn.", cta: "See jobs and salaries" },
             ].map((c) => (
-              <li key={c.href} data-rise className="flex gap-4 rounded-3xl bg-white/90 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/80 dark:ring-violet-900">
-                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
+              <li key={c.href} data-rise className="flex gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-950/80 dark:ring-violet-900">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
                   <Icon name={c.icon} size={24} />
                 </span>
                 <div>
                   <h3 className="text-xl font-semibold">{c.title}</h3>
                   <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{c.text}</p>
-                  <Link href={c.href} className="mt-3 inline-block font-medium text-emerald-800 hover:underline dark:text-emerald-400">
+                  <Link href={c.href} className="mt-3 inline-block font-medium text-violet-800 hover:underline dark:text-violet-300">
                     {c.cta} →
                   </Link>
                 </div>
@@ -414,7 +415,7 @@ export default function Home() {
           </p>
           <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" data-rise-group>
             {TRUST.map((t) => (
-              <li key={t.title} data-rise className="rounded-3xl bg-white/90 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/80 dark:ring-violet-900">
+              <li key={t.title} data-rise className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-950/80 dark:ring-violet-900">
                 <Icon name={t.icon} size={28} className="text-violet-700 dark:text-violet-300" />
                 <h3 className="mt-3 text-lg font-semibold">{t.title}</h3>
                 <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">{t.text}</p>
@@ -424,7 +425,7 @@ export default function Home() {
           <h3 className="mt-14 text-xl font-semibold">What is inside, today</h3>
           <dl data-rise-group className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
             {stats.map((s) => (
-              <div key={s.label} data-rise className="flex flex-col-reverse justify-end rounded-3xl bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
+              <div key={s.label} data-rise className="flex flex-col-reverse justify-end rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-900 dark:ring-violet-900">
                 <dt className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{s.label}</dt>
                 <dd data-count className="text-4xl font-semibold tracking-tight md:text-5xl">
                   {s.value}
@@ -449,10 +450,10 @@ export default function Home() {
             Pick a role, open the first topic, and you will know exactly what comes next. No sign-up, no payment, nothing to install.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row md:justify-center">
-            <Link data-magnetic href="/paths" className="inline-flex min-h-12 items-center justify-center rounded-full bg-violet-700 px-6 font-medium text-white shadow-lg shadow-violet-700/30 hover:bg-violet-800">
+            <Link data-magnetic href="/paths" className={primaryButtonLg}>
               Start my roadmap
             </Link>
-            <Link href="/start" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white/85 px-6 font-medium text-violet-950 ring-1 ring-violet-300 backdrop-blur hover:bg-white dark:bg-white/10 dark:text-violet-100">
+            <Link href="/start" className={secondaryButtonLg}>
               Find my level first
             </Link>
           </div>
@@ -467,14 +468,14 @@ export default function Home() {
               <h2 id="guides-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
                 <Words text="Guides" />
               </h2>
-              <Link href="/blog" className="font-medium text-emerald-800 hover:underline dark:text-emerald-400">
+              <Link href="/blog" className="font-medium text-violet-800 hover:underline dark:text-violet-300">
                 All guides →
               </Link>
             </div>
             <ul className="mt-8 grid gap-6 md:grid-cols-3" data-rise-group>
               {posts.map((p, i) => (
                 <li key={p.id} data-rise>
-                  <Link href={`/blog/${p.id}`} className="group block overflow-hidden rounded-3xl bg-white/90 ring-1 ring-violet-100 backdrop-blur hover:ring-violet-300 dark:bg-zinc-950/80 dark:ring-violet-900">
+                  <Link href={`/blog/${p.id}`} className="group block overflow-hidden rounded-3xl bg-white ring-1 ring-violet-100 hover:ring-violet-300 dark:bg-zinc-950/80 dark:ring-violet-900">
                     <Cover theme={(["career", "ai-basics", "using-ai"] as const)[i % 3]} seed={p.id} icon="book" className="h-36" iconSize={40} />
                     <span className="block p-5">
                       <span className="block text-lg leading-7 font-semibold group-hover:underline">{p.title}</span>
@@ -494,10 +495,10 @@ export default function Home() {
           <h2 id="faq-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
             <Words text="Questions you might have" />
           </h2>
-          <div className="mt-8 divide-y divide-zinc-200 rounded-3xl bg-white/90 ring-1 ring-violet-100 backdrop-blur dark:divide-zinc-800 dark:bg-zinc-950/80 dark:ring-violet-900">
+          <div className="mt-8 divide-y divide-zinc-200 rounded-3xl bg-white ring-1 ring-violet-100 dark:divide-zinc-800 dark:bg-zinc-950/80 dark:ring-violet-900">
             {FAQ.map((f) => (
               <details key={f.q} className="group p-5">
-                <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
                   {f.q}
                   <span aria-hidden="true" className="text-xl transition group-open:rotate-45">
                     +
@@ -536,7 +537,7 @@ export default function Home() {
 /** A milestone marker: the gate the reader has just reached on the road. */
 function Gate({ n, label }: { n: number; label: string }) {
   return (
-    <p data-gate className="inline-flex items-center gap-2 rounded-full bg-white/85 py-1 pr-3 pl-1 text-sm font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 backdrop-blur dark:bg-zinc-950/70 dark:text-violet-100 dark:ring-violet-800">
+    <p data-gate className="inline-flex items-center gap-2 rounded-full bg-white py-1 pr-3 pl-1 text-sm font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-100 dark:ring-violet-800">
       <span className="grid size-6 place-items-center rounded-full bg-violet-700 text-xs font-semibold text-white">{n}</span>
       Milestone {n} · {label}
     </p>
@@ -559,12 +560,12 @@ function Feature({
   children: React.ReactNode;
 }) {
   return (
-    <div data-rise className="flex flex-col overflow-hidden rounded-3xl bg-white/90 ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/80 dark:ring-violet-900">
+    <div data-rise className="flex flex-col overflow-hidden rounded-3xl bg-white ring-1 ring-violet-100 dark:bg-zinc-950/80 dark:ring-violet-900">
       <div className={`bg-gradient-to-br ${tone} p-6 md:p-8`}>{children}</div>
       <div className="flex flex-1 flex-col p-6">
         <h3 className="text-xl font-semibold">{title}</h3>
         <p className="mt-2 flex-1 leading-7 text-zinc-700 dark:text-zinc-300">{text}</p>
-        <Link href={href} className="mt-4 font-medium text-emerald-800 hover:underline dark:text-emerald-400">
+        <Link href={href} className="mt-4 font-medium text-violet-800 hover:underline dark:text-violet-300">
           {cta} →
         </Link>
       </div>

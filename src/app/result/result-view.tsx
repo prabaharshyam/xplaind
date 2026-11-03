@@ -11,12 +11,10 @@ import { scoreAnswers } from "@/lib/placement/score";
 import { reviewStopFor } from "@/lib/roadmap/next-steps";
 import type { PublicQuestion } from "@/lib/placement/types";
 import { splitStem, tagLabel } from "@/lib/text";
+import { primaryButton, secondaryButton } from "@/components/ui";
 
 type LevelInfo = { id: LevelId; name: string; can_do: string; draft_hours: number; exit_check: string };
 type StopInfo = { id: string; title: string; level: LevelId; hours: number; gap_tags: string[] };
-
-const linkButton =
-  "inline-flex min-h-12 items-center justify-center rounded-lg px-5 py-3 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700";
 
 export function ResultView({
   levels,
@@ -42,7 +40,7 @@ export function ResultView({
         <p className="leading-7 text-zinc-700 dark:text-zinc-300">
           There is no saved result on this device yet. The test takes five to ten minutes.
         </p>
-        <Link href="/start" className={`${linkButton} bg-emerald-700 text-white hover:bg-emerald-800`}>
+        <Link href="/start" className={primaryButton}>
           Find my level
         </Link>
       </div>
@@ -53,7 +51,7 @@ export function ResultView({
       <div className="flex flex-col gap-4">
         <h1 className="text-3xl font-semibold tracking-tight">Your level</h1>
         <p className="leading-7">We could not read the saved result. Please take the test again.</p>
-        <Link href="/start" className={`${linkButton} bg-emerald-700 text-white hover:bg-emerald-800`}>
+        <Link href="/start" className={primaryButton}>
           Find my level
         </Link>
       </div>
@@ -99,7 +97,7 @@ export function ResultView({
             : `That puts your first step at ${result.startLevel}.`}
         </p>
         {start && (
-          <p className="rounded-lg bg-zinc-100 p-4 leading-7 dark:bg-zinc-900">
+          <p className="rounded-2xl bg-zinc-100 p-4 leading-7 dark:bg-zinc-900">
             <span className="font-medium">At {start.id} you work towards:</span> {start.can_do}.
           </p>
         )}
@@ -130,12 +128,12 @@ export function ResultView({
             {result.gaps.map((tag) => {
               const stop = stopFor(tag);
               return (
-                <li key={tag} className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                <li key={tag} className="rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
                   <p className="font-medium">{tagLabel(tag)}</p>
                   {stop ? (
                     <Link
                       href={`/stop/${stop.id}`}
-                      className="text-emerald-800 underline underline-offset-2 dark:text-emerald-400"
+                      className="text-violet-800 underline underline-offset-2 dark:text-violet-300"
                     >
                       Review: {stop.title}
                     </Link>
@@ -161,8 +159,8 @@ export function ResultView({
             const { text } = splitStem(q.stem);
             const right = q.options.find((o) => o.id === q.correct);
             return (
-              <details key={a.questionId} className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                <summary className="min-h-8 cursor-pointer font-medium">{text}</summary>
+              <details key={a.questionId} className="rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
+                <summary className="min-h-11 cursor-pointer font-medium">{text}</summary>
                 <p className="mt-2">
                   <span className="font-medium">Answer:</span> {right?.text}
                 </p>
@@ -177,7 +175,7 @@ export function ResultView({
         <Link
           href="/start"
           onClick={() => clearAttempt()}
-          className={`${linkButton} border border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900`}
+          className={secondaryButton}
         >
           Take the test again
         </Link>

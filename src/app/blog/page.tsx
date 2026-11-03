@@ -25,7 +25,7 @@ export default function BlogIndex() {
           <li key={p.id} className="lx-rise">
             <Link data-tilt
               href={`/blog/${p.id}`}
-              className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-zinc-800 dark:bg-zinc-900"
+              className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900"
             >
               <Cover theme={BLOG_THEMES[i % BLOG_THEMES.length]} seed={p.id} icon="book" className="h-36" iconSize={40} />
               <span className="flex flex-1 flex-col p-5">

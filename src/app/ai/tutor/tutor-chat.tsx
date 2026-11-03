@@ -45,7 +45,7 @@ export function TutorChat({ enabled, paths, titles }: { enabled: boolean; paths:
       </section>
       <aside className="text-sm lg:sticky lg:top-20 lg:self-start">
         <h2 className="font-semibold">What your tutor sees</h2>
-        <p className="mt-2 rounded-xl bg-zinc-100 p-3 leading-6 dark:bg-zinc-800">{context}</p>
+        <p className="mt-2 rounded-2xl bg-zinc-100 p-3 leading-6 dark:bg-zinc-800">{context}</p>
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">This summary of your progress on this device is sent with each message so the advice fits you. Nothing else is shared, and the chat is not saved. The same tutor is built into every lesson, where it has read the lesson with you.</p>
       </aside>
     </div>

@@ -44,9 +44,9 @@ export function PracticeView({
                 <Link
                   href={t.id ? `/practice/${t.id}` : "/practice"}
                   aria-current={active ? "page" : undefined}
-                  className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${
+                  className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 ${
                     active
-                      ? "border-emerald-700 bg-emerald-700 text-white"
+                      ? "border-violet-700 bg-violet-700 text-white"
                       : "border-zinc-300 hover:border-zinc-500 dark:border-zinc-700"
                   }`}
                 >
@@ -114,7 +114,7 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
         (() => {
           const q = byId.get(queue[index])!;
           return (
-            <article className="flex flex-col gap-4 rounded-xl border border-zinc-300 p-4 dark:border-zinc-700" aria-labelledby="card-question">
+            <article className="flex flex-col gap-4 rounded-2xl border border-zinc-300 p-4 dark:border-zinc-700" aria-labelledby="card-question">
               <p className={`text-sm ${muted}`}>
                 Question {index + 1} of {queue.length} · level {q.level}
               </p>
@@ -133,7 +133,7 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
               {stage >= 1 && (
                 <div className="flex flex-col gap-3">
                   <h4 className="font-semibold">Short answer</h4>
-                  <p className="rounded-lg bg-zinc-100 p-3 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
+                  <p className="rounded-2xl bg-zinc-100 p-3 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
                   {stage === 1 ? (
                     <button type="button" className={secondaryButton} onClick={() => setStage(2)}>
                       Show the deeper answer

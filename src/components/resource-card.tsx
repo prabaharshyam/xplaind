@@ -7,6 +7,7 @@ import { type Embed, openLabel } from "@/lib/content/media";
 import { costLabel, formatDay } from "@/lib/roadmap/cost";
 import type { ThemeId } from "@/lib/themes";
 import { muted, textLink } from "./ui";
+import { primaryButton } from "@/components/ui";
 
 export type ResourceCardData = {
   id: string;
@@ -79,7 +80,7 @@ export function ResourceCard({
     <article data-tilt="4" className="lx-rise overflow-hidden rounded-2xl border border-zinc-200 sm:flex dark:border-zinc-800" aria-labelledby={`res-${r.id}`}>
       <CourseThumb provider={r.provider} kindLabel={r.kindLabel} embed={r.embed} hours={r.hours} certificate={r.certificate} className="aspect-video shrink-0 sm:aspect-auto sm:w-44" />
       <div className="min-w-0 flex-1 p-4">
-      <p className="text-xs font-medium tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
+      <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
         {role === "primary" ? "Start here" : role === "alternate" ? "Alternative" : r.level}
       </p>
       <h3 id={`res-${r.id}`} className="mt-1 text-lg leading-7 font-semibold">
@@ -114,7 +115,7 @@ export function ResourceCard({
           className={
             r.embed
               ? `text-sm ${textLink}`
-              : "inline-flex min-h-12 items-center rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              : primaryButton
           }
         >
           {r.embed ? "Open on YouTube" : openLabel(r.kindLabel)}
@@ -133,7 +134,7 @@ export function ResourceCard({
 /** A warning shown right under a resource's link, such as an age limit on the provider's site. */
 export function ResourceNotice({ text, compact = false }: { text: string; compact?: boolean }) {
   return (
-    <p role="note" className={`flex gap-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 ${compact ? "mt-1.5 px-2 py-1.5 text-xs" : "mt-3 px-3 py-2 text-sm"}`}>
+    <p role="note" className={`flex gap-2 rounded-2xl border border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100 ${compact ? "mt-1.5 px-2 py-1.5 text-xs" : "mt-3 px-3 py-2 text-sm"}`}>
       <span aria-hidden="true" className="font-bold">!</span>
       <span>
         <span className="font-semibold">Please note: </span>

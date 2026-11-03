@@ -23,11 +23,11 @@ export function PlaygroundStudio({ aiOn, lessonTitles }: { aiOn: boolean; lesson
   return (
     <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <nav aria-label="Starter programs" className="lg:sticky lg:top-20 lg:self-start">
-        <h2 className="text-sm font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">Try a starter</h2>
+        <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Try a starter</h2>
         <ul className="mt-3 flex flex-wrap gap-2 lg:flex-col">
           {shared && (
             <li>
-              <button type="button" aria-pressed className="min-h-10 rounded-xl border-2 border-violet-600 lg:w-full bg-violet-50 px-3 py-2 text-left text-sm font-medium dark:bg-violet-950">
+              <button type="button" aria-pressed className="min-h-11 rounded-2xl border-2 border-violet-600 lg:w-full bg-violet-50 px-3 py-2 text-left text-sm font-medium dark:bg-violet-950">
                 Code from the lesson
               </button>
             </li>
@@ -44,7 +44,7 @@ export function PlaygroundStudio({ aiOn, lessonTitles }: { aiOn: boolean; lesson
                     setPick(e.id);
                     history.replaceState(null, "", window.location.pathname);
                   }}
-                  className={`min-h-10 rounded-xl border px-3 py-2 lg:w-full text-left text-sm font-medium ${on ? "border-2 border-violet-600 bg-violet-50 dark:bg-violet-950" : "border-zinc-200 bg-white hover:border-violet-300 dark:border-zinc-800 dark:bg-zinc-900"}`}
+                  className={`min-h-11 rounded-2xl border px-3 py-2 lg:w-full text-left text-sm font-medium ${on ? "border-2 border-violet-600 bg-violet-50 dark:bg-violet-950" : "border-zinc-200 bg-white hover:border-violet-300 dark:border-zinc-800 dark:bg-zinc-900"}`}
                 >
                   {e.title}
                 </button>
