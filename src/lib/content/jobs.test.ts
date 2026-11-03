@@ -19,6 +19,11 @@ describe("AI jobs and salaries (JB-1, JB-2)", () => {
     }
   });
 
+  it("dates and sources every market figure (JB-4)", () => {
+    expect(jobs.market.checked <= todayInIST()).toBe(true);
+    for (const m of jobs.market.stats) expect(m.url.startsWith("https://"), m.label).toBe(true);
+  });
+
   it("links to live openings on Naukri and LinkedIn, searched across India", () => {
     const l = jobLinks("AI Product Manager");
     expect(l.naukri).toBe("https://www.naukri.com/ai-product-manager-jobs");
