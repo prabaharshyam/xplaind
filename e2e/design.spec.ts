@@ -59,3 +59,16 @@ test("the About, Privacy and Terms pages are linked from the footer and accessib
     expect((await wcag(page)).violations).toEqual([]);
   }
 });
+
+test("the About page tells the founder's story with his photo and LinkedIn (TR-2)", async ({ page }) => {
+  await page.goto("/about#founder");
+  const founder = page.locator("#founder");
+  await expect(founder.getByRole("heading", { name: "Meet the founder" })).toBeVisible();
+  await expect(founder.getByRole("img", { name: /Shyam Prabahar/ })).toBeVisible();
+  await expect(founder.getByText(/Tamil medium/)).toBeVisible();
+  await expect(founder.getByRole("link", { name: /Connect on LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/shyam-prabahar/");
+  await expect(page.getByRole("contentinfo").getByRole("link", { name: "Meet the founder" })).toHaveAttribute("href", "/about#founder");
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+});
+

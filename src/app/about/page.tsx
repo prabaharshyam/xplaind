@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { Icon } from "@/components/art/icons";
+import { JsonLd } from "@/components/json-ld";
 import { PageHero } from "@/components/page-hero";
-import { primaryButton, secondaryButton } from "@/components/ui";
+import { primaryButton, secondaryButton, secondaryButtonSm } from "@/components/ui";
 import { getPaths, getStops } from "@/lib/content";
 import { pageMeta } from "@/lib/seo";
+import { siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = pageMeta({
   title: "About Xplaind",
-  description: "Why Xplaind exists, what it believes, and how its free AI roadmaps, lessons and course picks are made.",
+  description: "Why Xplaind exists, the story of its founder Shyam Prabahar, what it believes, and how its free AI roadmaps, lessons and course picks are made.",
   path: "/about",
 });
 
@@ -35,12 +38,43 @@ const BELIEFS = [
   },
 ] as const;
 
+/** The founder's story up to AI (TR-2). The ending, with its emphasis, is written out in the page. */
+const STORY = [
+  "Hi, I’m Shyam Prabahar.",
+  "I grew up in Sivakasi, a small town in south Tamil Nadu. I studied in Tamil medium and was always among the toppers in my class. I had one dream: to study in English one day.",
+  "That dream came true when I joined Karunya University for engineering. On my first days I sat among students from CBSE and ICSE schools, all speaking English as if it were nothing. I understood the lessons, but I couldn’t say a single sentence out loud. When a professor called my name, my heart raced, and more than once I walked out of the class rather than answer.",
+  "The topper from Sivakasi suddenly felt like the slowest person in the room. Within a few months I had decided to quit, go home and join a local arts and science college, where nobody would ask me to speak English.",
+  "But I couldn’t let go of that dream. I gathered whatever courage I had left and went back.",
+  "There was no coach and no course, and nobody to show me the way. Just me, a few books, and practice every single day. Slowly, by God’s grace, the words started coming.",
+  "In my third year I started freelancing, using a laptop the government gave me free in 12th grade and an internet dongle a friend got me: ₹3,000 for 10 GB a month. I designed hundreds of logos and websites, mostly for clients abroad. Every call with them was an English class I was getting paid for. By my final year, I was paying part of my own college fees.",
+  "That boy who walked out of class went on to manage marketing budgets worth millions, work at Cognizant, build his own startup, lead a team of 20+ at Amazon, and today drive enterprise AI adoption at one of the world’s top automotive companies.",
+  "When ChatGPT arrived in early 2023, I knew AI would change every job, so I went all in. I learnt it the way I had learnt everything else: on my own, for free or nearly free, never spending lakhs on a course. I’ve been championing AI ever since, with my teams, my friends and on social media.",
+];
+
 /** TR-1: who we are and how the site is made, so a visitor can decide whether to trust it with their time. */
 export default function AboutPage() {
   const roles = getPaths().length;
   const lessons = getStops().length;
   return (
     <main>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "AboutPage",
+          url: `${siteUrl()}/about`,
+          mainEntity: {
+            "@type": "Organization",
+            name: "Xplaind",
+            url: siteUrl(),
+            founder: {
+              "@type": "Person",
+              name: "Shyam Prabahar",
+              image: `${siteUrl()}/founder/shyam-prabahar.webp`,
+              sameAs: ["https://www.linkedin.com/in/shyam-prabahar/"],
+            },
+          },
+        }}
+      />
       <PageHero
         theme="ai-basics"
         shape="compass"
@@ -65,6 +99,48 @@ export default function AboutPage() {
               learn, in what order, which free course or video teaches it best, what to build, and how to explain it in an interview.
               Today that is {lessons} lessons, each written to be read in one sitting.
             </p>
+          </div>
+        </section>
+
+        {/* TR-2: the founder's story, in his own words, so visitors know who is behind the site. */}
+        <section id="founder" aria-labelledby="founder-h" className="mt-14 scroll-mt-24">
+          <h2 id="founder-h" className="text-2xl font-semibold tracking-tight md:text-3xl">
+            Meet the founder
+          </h2>
+          <div className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-end">
+            <Image
+              src="/founder/shyam-prabahar.webp"
+              alt="Shyam Prabahar, smiling, at a talk"
+              width={640}
+              height={800}
+              sizes="(min-width: 640px) 13rem, 11rem"
+              className="w-44 rounded-3xl object-cover shadow-lg ring-1 ring-zinc-200 sm:w-52 dark:ring-zinc-800"
+            />
+            <div>
+              <p className="text-xl font-semibold">Shyam Prabahar</p>
+              <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">Founder of Xplaind. Leads enterprise AI adoption at one of the world&apos;s top automotive companies.</p>
+              <a href="https://www.linkedin.com/in/shyam-prabahar/" target="_blank" rel="noopener noreferrer" className={`${secondaryButtonSm} mt-3`}>
+                Connect on LinkedIn <span aria-hidden="true">↗</span>
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </div>
+          </div>
+          <div className="mt-8 space-y-5 text-lg leading-8 text-zinc-800 dark:text-zinc-200">
+            {STORY.map((p) => (
+              <p key={p.slice(0, 24)}>{p}</p>
+            ))}
+            <p>
+              Soon friends started asking me: <em>Where do I start? What should I learn? Which course is worth it?</em> I knew that feeling of
+              being lost with no one to show you the way. So I guided each of them, one by one.
+            </p>
+            <p>Then I thought: why not build one place that does this for everyone?</p>
+            <p>
+              That&apos;s Xplaind: a clear path, in the right order, in plain English. Every course and video on it is free to learn, and only a
+              handful charge if you want the certificate.
+            </p>
+            <p>You don&apos;t need an expensive school, perfect English or lakhs of rupees. I didn&apos;t.</p>
+            <p className="text-xl font-semibold text-violet-800 dark:text-violet-300">Let&apos;s learn AI together.</p>
+            <p className="text-base text-zinc-600 italic dark:text-zinc-400">— Shyam Prabahar, founder</p>
           </div>
         </section>
 

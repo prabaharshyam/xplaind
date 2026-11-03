@@ -349,3 +349,7 @@ After a design review, the owner asked for every high-priority fix, aiming for a
 - The home road ran behind the hero text on wide screens; the camera's view is now offset so the road runs on the right, with a stronger veil behind the text.
 - Trust: /about, /privacy and /terms are new and linked from the footer. The privacy page lists only what the code actually stores and who processes it; there are no analytics scripts today, so it says so. It needs a lawyer's review before sign-ups reopen (PRD, Privacy section), and the owner should set NEXT_PUBLIC_CONTACT_EMAIL so privacy requests have an address. The About page has no founder story yet because none was given.
 
+## 2026-11-03: the founder's story on the About page (TR-2)
+
+The owner wrote his story with Claude over several drafts and approved the final text. It sits on the About page rather than a page of its own, with a "Meet the founder" link in the footer, because the About page is where visitors look for who is behind a site. His current employer is described as "one of the world's top automotive companies" at his request; Amazon is named with his permission. The claim that every course and video is free to learn was checked against the content (574 free, 6 free with a paid certificate); books cost money, so the story speaks only of courses and videos. The photo is his own, cropped to a 4:5 portrait.
+
