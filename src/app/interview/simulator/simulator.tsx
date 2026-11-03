@@ -141,7 +141,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
             <select
               value={pathId}
               onChange={(e) => setPathChoice(e.target.value)}
-              className="min-h-12 rounded-lg border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+              className="min-h-12 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
             >
               <option value="">Any AI role</option>
               {paths.map((p) => (
@@ -157,7 +157,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
               {COUNTS.map((n) => (
                 <label
                   key={n}
-                  className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-400 has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50 dark:border-zinc-600 dark:has-[:checked]:bg-emerald-950"
+                  className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-400 has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50 dark:border-zinc-600 dark:has-[:checked]:bg-emerald-950"
                 >
                   <input
                     type="radio"
@@ -165,7 +165,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
                     value={n}
                     checked={count === n}
                     onChange={() => setCount(n)}
-                    className="accent-emerald-700"
+                    className="accent-violet-700"
                   />
                   {n}
                 </label>
@@ -384,7 +384,7 @@ function QuestionScreen({
 
       <div className="flex items-center gap-3" aria-live="off">
         <span
-          className={`font-mono text-3xl tabular-nums ${lowTime ? "text-red-700 dark:text-red-400" : ""}`}
+          className={`font-mono text-3xl tabular-nums ${lowTime ? "text-rose-700 dark:text-rose-400" : ""}`}
           aria-hidden="true"
         >
           {clock(startedAt === null ? q.answer_seconds : left)}
@@ -399,7 +399,7 @@ function QuestionScreen({
       </div>
       <div className="h-2 w-full overflow-hidden rounded bg-zinc-200 dark:bg-zinc-800" aria-hidden="true">
         <div
-          className={`h-full ${lowTime ? "bg-red-600" : "bg-emerald-600"}`}
+          className={`h-full ${lowTime ? "bg-rose-600" : "bg-emerald-600"}`}
           style={{ width: `${startedAt === null ? 100 : (left / q.answer_seconds) * 100}%` }}
         />
       </div>
@@ -421,11 +421,11 @@ function QuestionScreen({
             }
           }}
           aria-pressed={listening}
-          className={`${listening ? "bg-red-700 text-white hover:bg-red-800" : "bg-emerald-700 text-white hover:bg-emerald-800"} inline-flex min-h-14 items-center justify-center gap-3 rounded-full px-6 py-3 text-lg font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700`}
+          className={`${listening ? "bg-rose-700 text-white hover:bg-rose-800" : "bg-violet-700 text-white hover:bg-violet-800"} inline-flex min-h-14 items-center justify-center gap-3 rounded-full px-6 py-3 text-lg font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700`}
         >
           <span
             aria-hidden="true"
-            className={`inline-block size-3 rounded-full ${listening ? "animate-pulse bg-white" : "bg-white/70"}`}
+            className={`inline-block size-3 rounded-full ${listening ? "animate-pulse bg-white" : "bg-white"}`}
           />
           {listening ? "Stop the microphone" : text ? "Speak more" : "Start speaking"}
           <span className="text-sm font-normal opacity-80">(Space)</span>
@@ -433,7 +433,7 @@ function QuestionScreen({
       )}
 
       {notice && (
-        <p role="alert" className="rounded-lg bg-amber-50 p-3 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        <p role="alert" className="rounded-2xl bg-amber-50 p-3 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
           {notice}
         </p>
       )}
@@ -449,7 +449,7 @@ function QuestionScreen({
           }}
           rows={7}
           placeholder={voice ? "Press Space and start talking…" : "Type your answer as you would say it…"}
-          className="rounded-lg border border-zinc-400 bg-white p-3 leading-7 dark:border-zinc-600 dark:bg-zinc-950"
+          className="rounded-2xl border border-zinc-400 bg-white p-3 leading-7 dark:border-zinc-600 dark:bg-zinc-950"
         />
         <span className={`text-xs ${muted}`}>Enter submits; Shift and Enter starts a new line.</span>
       </label>
@@ -555,7 +555,7 @@ function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[
               ["Answered", `${report.answered} of ${questions.length}`],
               ["Fillers", `${report.fillersPerMinute} a minute`],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-xl bg-white p-3 dark:bg-zinc-950">
+              <div key={k} className="rounded-2xl bg-white p-3 dark:bg-zinc-950">
                 <dt className={`text-sm ${muted}`}>{k}</dt>
                 <dd className="mt-1 text-xl font-semibold">{v}</dd>
               </div>
@@ -658,7 +658,7 @@ function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[
 
               {r.band !== "none" && (
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/30">
+                  <div className="rounded-2xl bg-emerald-50 p-3 dark:bg-emerald-950/30">
                     <h5 className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">What you covered</h5>
                     {covered.length ? (
                       <ul className="mt-1 flex flex-col gap-2 text-sm leading-6">
@@ -674,7 +674,7 @@ function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[
                       <p className="mt-1 text-sm">None of the key points yet.</p>
                     )}
                   </div>
-                  <div className="rounded-xl bg-rose-50 p-3 dark:bg-rose-950/30">
+                  <div className="rounded-2xl bg-rose-50 p-3 dark:bg-rose-950/30">
                     <h5 className="text-sm font-semibold text-rose-900 dark:text-rose-200">What you missed</h5>
                     {missed.length ? (
                       <ul className="mt-1 flex flex-col gap-1 text-sm leading-6">
@@ -727,15 +727,15 @@ function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[
               {aiReview && <AnswerReviewBlock r={aiReview} />}
 
               <details className="mt-3">
-                <summary className="min-h-8 cursor-pointer font-medium">Your answer next to the model answer</summary>
+                <summary className="min-h-11 cursor-pointer font-medium">Your answer next to the model answer</summary>
                 <div className="mt-2 grid gap-3 md:grid-cols-2">
                   <div>
                     <p className="text-sm font-medium">You said</p>
-                    <p className="mt-1 rounded-lg border border-zinc-200 p-3 leading-7 whitespace-pre-wrap dark:border-zinc-800">{said || "No answer."}</p>
+                    <p className="mt-1 rounded-2xl border border-zinc-200 p-3 leading-7 whitespace-pre-wrap dark:border-zinc-800">{said || "No answer."}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">A strong short answer</p>
-                    <p className="mt-1 rounded-lg bg-zinc-100 p-3 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
+                    <p className="mt-1 rounded-2xl bg-zinc-100 p-3 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
                   </div>
                 </div>
               </details>

@@ -56,7 +56,7 @@ export function McqQuiz({
               {n + 1}. {text}
             </legend>
             {code && (
-              <pre tabIndex={0} aria-label="Code" className="overflow-x-auto rounded-lg bg-zinc-100 p-3 font-mono text-sm leading-6 dark:bg-zinc-900">
+              <pre tabIndex={0} aria-label="Code" className="overflow-x-auto rounded-2xl bg-zinc-100 p-3 font-mono text-sm leading-6 dark:bg-zinc-900">
                 <code>{code}</code>
               </pre>
             )}
@@ -66,12 +66,12 @@ export function McqQuiz({
               return (
                 <label
                   key={o.id}
-                  className="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-zinc-300 p-3 has-[:checked]:border-emerald-700 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-700 dark:border-zinc-700"
+                  className="flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border border-zinc-300 p-3 has-[:checked]:border-emerald-700 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-violet-700 dark:border-zinc-700"
                 >
                   <input
                     type="radio"
                     name={`check-${q.id}`}
-                    className="mt-1.5 size-4 accent-emerald-700"
+                    className="mt-1.5 size-4 accent-violet-700"
                     checked={chosen[q.id] === o.id}
                     disabled={result !== null}
                     onChange={() => setChosen((c) => ({ ...c, [q.id]: o.id }))}
@@ -79,7 +79,7 @@ export function McqQuiz({
                   <span>
                     {o.text}
                     {shownRight && <span className="font-medium text-emerald-800 dark:text-emerald-400"> (right answer)</span>}
-                    {shownWrong && <span className="font-medium text-red-800 dark:text-red-400"> (your answer)</span>}
+                    {shownWrong && <span className="font-medium text-rose-800 dark:text-rose-400"> (your answer)</span>}
                   </span>
                 </label>
               );

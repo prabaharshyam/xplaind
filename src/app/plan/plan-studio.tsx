@@ -116,7 +116,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
           <label className="mt-3 block text-sm font-medium" htmlFor="plan-path">
             Role
           </label>
-          <select id="plan-path" value={pathId} onChange={(e) => setPath(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950">
+          <select id="plan-path" value={pathId} onChange={(e) => setPath(e.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950">
             {paths.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -130,7 +130,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
             id="plan-hours"
             value={hours}
             onChange={(e) => savePlan({ week: week.start, pathId, hours: Number(e.target.value), lessonIds: [] })}
-            className="mt-1 min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950"
+            className="mt-1 min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950"
           >
             {HOUR_CHOICES.map((h) => (
               <option key={h} value={h}>

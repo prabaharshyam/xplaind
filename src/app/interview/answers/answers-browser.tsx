@@ -35,12 +35,12 @@ export function AnswersBrowser({ roles, questions }: { roles: { id: string; name
 
   return (
     <div>
-      <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white/80 p-4 sm:flex-row sm:items-end print:hidden dark:border-zinc-800 dark:bg-zinc-950/60">
+      <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 sm:flex-row sm:items-end print:hidden dark:border-zinc-800 dark:bg-zinc-950/60">
         <div className="flex flex-1 flex-col gap-1">
           <label htmlFor={ids.role} className="font-medium">
             Role
           </label>
-          <select id={ids.role} value={role} onChange={(e) => setRole(e.target.value)} className="min-h-12 rounded-xl border border-zinc-400 bg-white px-3 dark:border-zinc-600 dark:bg-zinc-950">
+          <select id={ids.role} value={role} onChange={(e) => setRole(e.target.value)} className="min-h-12 rounded-2xl border border-zinc-400 bg-white px-3 dark:border-zinc-600 dark:bg-zinc-950">
             {roles.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -59,7 +59,7 @@ export function AnswersBrowser({ roles, questions }: { roles: { id: string; name
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="RAG, embeddings, metrics…"
-            className="min-h-12 rounded-xl border border-zinc-400 bg-white px-3 dark:border-zinc-600 dark:bg-zinc-950"
+            className="min-h-12 rounded-2xl border border-zinc-400 bg-white px-3 dark:border-zinc-600 dark:bg-zinc-950"
           />
         </div>
         <div className="flex gap-2">
@@ -79,13 +79,13 @@ export function AnswersBrowser({ roles, questions }: { roles: { id: string; name
       <ol className="mt-3 flex flex-col gap-4">
         {shown.map((q, i) => (
           <li key={q.id} className="break-inside-avoid rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
-            <p className="text-xs font-semibold tracking-wide text-violet-800 uppercase dark:text-violet-300">
+            <p className="text-xs font-semibold text-violet-800 dark:text-violet-300">
               {q.topic} · {q.level}
             </p>
             <h2 className="mt-1 text-lg leading-snug font-semibold">
               {i + 1}. {q.question}
             </h2>
-            <p className="mt-3 rounded-xl bg-violet-50 p-3 leading-7 dark:bg-violet-950/40">
+            <p className="mt-3 rounded-2xl bg-violet-50 p-3 leading-7 dark:bg-violet-950/40">
               <span className="font-semibold">Short answer: </span>
               {q.short}
             </p>

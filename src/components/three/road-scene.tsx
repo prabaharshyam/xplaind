@@ -217,7 +217,7 @@ async function mount(el: HTMLElement): Promise<() => void> {
 
   const colors = {
     uA: { value: new THREE.Color("#a78bfa") },
-    uB: { value: new THREE.Color("#f472b6") },
+    uB: { value: new THREE.Color("#8b5cf6") },
     uC: { value: new THREE.Color("#2dd4bf") },
   };
   const shared = { uTime: { value: 0 }, uDark: { value: darkQuery.matches ? 1 : 0 }, uFar: { value: FAR } };
@@ -279,8 +279,8 @@ async function mount(el: HTMLElement): Promise<() => void> {
         uTime: shared.uTime,
         uDark: shared.uDark,
         uNear: { value: 0 },
-        uA: { value: new THREE.Color(["#8b5cf6", "#ec4899", "#14b8a6", "#f59e0b"][i]) },
-        uB: { value: new THREE.Color(["#f0abfc", "#a5b4fc", "#a7f3d0", "#fbcfe8"][i]) },
+        uA: { value: new THREE.Color(["#8b5cf6", "#0ea5e9", "#14b8a6", "#f59e0b"][i]) },
+        uB: { value: new THREE.Color(["#c4b5fd", "#bae6fd", "#a7f3d0", "#fde68a"][i]) },
       },
       transparent: true,
     });
@@ -298,6 +298,9 @@ async function mount(el: HTMLElement): Promise<() => void> {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.fov = w < 640 ? 70 : 58;
+    // On wide screens the road runs down the right side, clear of the headline and buttons on the left.
+    if (w >= 1024) camera.setViewOffset(w, h, -Math.round(w * 0.2), 0, w, h);
+    else camera.clearViewOffset();
     camera.updateProjectionMatrix();
   };
   resize();

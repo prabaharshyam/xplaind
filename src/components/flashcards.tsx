@@ -58,7 +58,7 @@ export function Flashcards({ cards, storageKey, title = "Test your understanding
             ["Skipped", "skipped", "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"],
           ] as const
         ).map(([label, m, cls]) => (
-          <div key={m} className={`rounded-xl px-2 py-2 ${cls}`}>
+          <div key={m} className={`rounded-2xl px-2 py-2 ${cls}`}>
             <dt>{label}</dt>
             <dd className="text-lg font-semibold">{count(m)}</dd>
           </div>
@@ -81,7 +81,7 @@ export function Flashcards({ cards, storageKey, title = "Test your understanding
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Question {i + 1}</p>
             <p className="mt-2 text-lg leading-7 font-medium">{card.q}</p>
             {revealed ? (
-              <p className="mt-4 rounded-xl bg-zinc-50 p-4 text-left leading-7 dark:bg-zinc-950">{card.a}</p>
+              <p className="mt-4 rounded-2xl bg-zinc-50 p-4 text-left leading-7 dark:bg-zinc-950">{card.a}</p>
             ) : (
               <button type="button" onClick={() => setRevealed(true)} className="mx-auto mt-4 min-h-11 rounded-full bg-zinc-900 px-5 font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-black dark:hover:bg-zinc-200">
                 Reveal the answer
@@ -89,13 +89,13 @@ export function Flashcards({ cards, storageKey, title = "Test your understanding
             )}
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <button type="button" onClick={() => save([...marks, "knew"])} className="min-h-11 rounded-xl border border-emerald-300 px-3 text-sm font-medium hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950">
+            <button type="button" onClick={() => save([...marks, "knew"])} className="min-h-11 rounded-2xl border border-emerald-300 px-3 text-sm font-medium hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950">
               Already knew that
             </button>
-            <button type="button" onClick={() => save([...marks, "learnt"])} className="min-h-11 rounded-xl border border-sky-300 px-3 text-sm font-medium hover:bg-sky-50 dark:border-sky-800 dark:hover:bg-sky-950">
+            <button type="button" onClick={() => save([...marks, "learnt"])} className="min-h-11 rounded-2xl border border-sky-300 px-3 text-sm font-medium hover:bg-sky-50 dark:border-sky-800 dark:hover:bg-sky-950">
               Didn&apos;t know that
             </button>
-            <button type="button" onClick={() => save([...marks, "skipped"])} className="min-h-11 rounded-xl border border-zinc-300 px-3 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800">
+            <button type="button" onClick={() => save([...marks, "skipped"])} className="min-h-11 rounded-2xl border border-zinc-300 px-3 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800">
               Skip question
             </button>
           </div>

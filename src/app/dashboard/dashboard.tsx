@@ -62,7 +62,7 @@ export function Dashboard({
     <div className="mt-6 flex flex-col gap-8">
       <p className={`text-sm ${muted}`}>Signed in as {email}</p>
 
-      <section aria-labelledby="level-heading" className="rounded-xl bg-zinc-100 p-4 dark:bg-zinc-900">
+      <section aria-labelledby="level-heading" className="rounded-2xl bg-zinc-100 p-4 dark:bg-zinc-900">
         <h2 id="level-heading" className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
           Your level
         </h2>

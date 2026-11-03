@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/art/icons";
+import { secondaryButton } from "@/components/ui";
 import { type Embed, embedSrc } from "@/lib/content/media";
 
 /**
@@ -33,7 +34,7 @@ export function WatchButton({ embed, title, className = "", onWatch }: { embed: 
         onClick={show}
         className={
           className ||
-          "inline-flex min-h-12 items-center gap-2 rounded-lg bg-rose-600 px-5 py-3 font-medium text-white hover:bg-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
+          secondaryButton
         }
       >
         <Icon name="play" size={16} /> Watch here<span className="sr-only">: {title}</span>

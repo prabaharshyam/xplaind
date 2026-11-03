@@ -28,7 +28,7 @@ export function ProjectList({ projects, paths }: { projects: ProjectCardView[]; 
   const [level, setLevel] = useState<"" | Difficulty>("");
   const progress = useProgress();
   const shown = projects.filter((p) => (!path || p.paths.includes(path)) && (!level || p.difficulty === level));
-  const select = "min-h-11 rounded-lg border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950";
+  const select = "min-h-11 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950";
 
   return (
     <div className="flex flex-col gap-6">
@@ -66,7 +66,7 @@ export function ProjectList({ projects, paths }: { projects: ProjectCardView[]; 
             <li key={p.id} className="lx-rise">
               <Link data-tilt
                 href={`/projects/${p.id}`}
-                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 dark:border-zinc-800 dark:bg-zinc-900"
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <Cover theme={p.theme} seed={p.id} className="h-28" iconSize={32} />
                 <span className="flex flex-1 flex-col gap-2 p-4">

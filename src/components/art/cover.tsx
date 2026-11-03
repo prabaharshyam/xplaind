@@ -68,7 +68,7 @@ export function Cover({
         </span>
       </div>
       {label && (
-        <span className="absolute bottom-2 left-2 max-w-[85%] truncate rounded-md bg-black/55 px-2 py-0.5 text-xs font-semibold text-white">{label}</span>
+        <span className="absolute bottom-2 left-2 max-w-[85%] truncate rounded-2xl bg-black/55 px-2 py-0.5 text-xs font-semibold text-white">{label}</span>
       )}
     </div>
   );

@@ -70,4 +70,4 @@ Open the site and press "Sign up". Tick "I am 18 or older", then try each way in
 - Email and password
 - An emailed link
 
-Each one should land you on the dashboard with your test result and progress from that device. Then sign out and try Download the Roadmap or the mock interview: a "Sign up free" prompt should open.
+Each one should land you on the dashboard with your test result and progress from that device. Then sign out and try Download the PDF on a roadmap or the mock interview: a "Sign up free" prompt should open.

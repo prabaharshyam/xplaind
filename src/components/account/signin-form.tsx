@@ -49,7 +49,7 @@ function GitHubMark() {
 
 const provider =
   "flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white px-4 font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
-const field = "min-h-12 rounded-xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950";
+const field = "min-h-12 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950";
 
 /**
  * AC-1 (amended 2026-11-01): one form, four ways in. Google and GitHub, email and password, or an
@@ -98,14 +98,14 @@ export function SignInForm({
         </ul>
       )}
       {error && ERRORS[error] && (
-        <p id={ids.err} role="alert" className="rounded-xl bg-red-50 p-3 text-red-900 dark:bg-red-950 dark:text-red-100">
+        <p id={ids.err} role="alert" className="rounded-2xl bg-rose-50 p-3 text-rose-900 dark:bg-rose-950 dark:text-rose-100">
           {ERRORS[error]}
         </p>
       )}
       <input type="hidden" name="next" value={next} />
       <input type="hidden" name="mode" value={mode} />
 
-      <label htmlFor={ids.adult} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl bg-violet-50 px-3 py-2 dark:bg-violet-950/40">
+      <label htmlFor={ids.adult} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl bg-violet-50 px-3 py-2 dark:bg-violet-950/40">
         <input id={ids.adult} type="checkbox" name="adult" value="yes" defaultChecked={false} className="size-5 shrink-0 accent-violet-700" />
         <span>I am 18 or older</span>
       </label>

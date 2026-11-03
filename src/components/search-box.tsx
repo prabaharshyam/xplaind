@@ -58,7 +58,7 @@ export function SearchBox({
   return (
     <div className="relative w-full">
       <div
-        className={`flex items-center gap-3 rounded-2xl border border-zinc-300 bg-white text-zinc-900 shadow-sm focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/30 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 ${big ? "h-14 px-5" : "h-12 px-4"}`}
+        className={`flex items-center gap-3 rounded-2xl border border-zinc-300 bg-white text-zinc-900 shadow-sm focus-within:border-violet-600 focus-within:ring-2 focus-within:ring-violet-600/30 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 ${big ? "h-14 px-5" : "h-12 px-4"}`}
       >
         <Icon name="search" size={big ? 22 : 18} className="shrink-0 text-zinc-500" />
         <input
@@ -123,7 +123,7 @@ export function SearchBox({
                 go(r);
               }}
               onMouseEnter={() => setActive(i)}
-              className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2.5 ${i === active ? "bg-emerald-50 dark:bg-emerald-950" : ""}`}
+              className={`flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-3 py-2.5 ${i === active ? "bg-emerald-50 dark:bg-emerald-950" : ""}`}
             >
               <span className="min-w-0">
                 <span className="block truncate font-medium">{r.t}</span>

@@ -21,7 +21,7 @@ export function AiText({ text, className = "" }: { text: string; className?: str
   parts.forEach((part, i) => {
     if (i % 2 === 1) {
       blocks.push(
-        <pre key={`c${i}`} className="overflow-x-auto rounded-xl bg-zinc-950 p-4 text-sm leading-6 text-zinc-100">
+        <pre key={`c${i}`} className="overflow-x-auto rounded-2xl bg-zinc-950 p-4 text-sm leading-6 text-zinc-100">
           <code>{part.replace(/\n$/, "")}</code>
         </pre>,
       );

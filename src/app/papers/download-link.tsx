@@ -1,6 +1,7 @@
 "use client";
 
 import { needAccount } from "@/lib/browser/account-sync";
+import {  } from "@/components/ui";
 
 /** LB-2: opens the authors' copy for signed-in learners; signed out, it opens the sign-up prompt instead. */
 export function DownloadLink({ url, title, kind }: { url: string; title: string; kind: "paper" | "book" }) {

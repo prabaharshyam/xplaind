@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { aiPost } from "@/components/ai/ai-client";
 import { AiText } from "@/components/ai/ai-text";
 import { Icon } from "@/components/art/icons";
-import { primaryButton, secondaryButton } from "@/components/ui";
+import { primaryButtonSm, secondaryButtonSm } from "@/components/ui";
 import { encodeCode } from "@/lib/playground/examples";
 import { runPython } from "@/lib/playground/python";
 
@@ -127,25 +127,25 @@ export function CodeRunner({
       />
       <div className="flex flex-wrap gap-2 border-t border-white/10 bg-zinc-900 px-3 py-2">
         {running ? (
-          <button type="button" onClick={() => stop.current?.()} className={`${secondaryButton} min-h-10`}>
+          <button type="button" onClick={() => stop.current?.()} className={secondaryButtonSm}>
             Stop
           </button>
         ) : (
-          <button type="button" onClick={run} className={`${primaryButton} min-h-10`}>
+          <button type="button" onClick={run} className={primaryButtonSm}>
             <Icon name="play" size={16} /> Run
           </button>
         )}
-        <button type="button" onClick={() => edit(initialCode)} disabled={running || code === initialCode} className={`${secondaryButton} min-h-10 disabled:opacity-50`}>
+        <button type="button" onClick={() => edit(initialCode)} disabled={running || code === initialCode} className={secondaryButtonSm}>
           Reset
         </button>
         {compact && (
-          <Link href={`/playground#code=${encodeCode(code)}`} className={`${secondaryButton} min-h-10`}>
+          <Link href={`/playground#code=${encodeCode(code)}`} className={secondaryButtonSm}>
             Open in playground
           </Link>
         )}
       </div>
       <div id={`${id}-out`} className="border-t border-white/10 bg-black/60 px-4 py-3">
-        <p className="text-xs font-medium tracking-wide text-zinc-400 uppercase">Output</p>
+        <p className="text-xs font-medium text-zinc-400">Output</p>
         <pre role="log" aria-live="polite" className="mt-1 max-h-80 overflow-auto font-mono text-sm leading-6 whitespace-pre-wrap">
           {lines.map((l, i) => (
             <span key={i} className={l.kind === "err" ? "text-rose-300" : "text-emerald-200"}>
@@ -160,14 +160,14 @@ export function CodeRunner({
         {error && aiOn && (
           <div className="mt-3">
             {!explain.text && (
-              <button type="button" onClick={askAi} disabled={explain.busy} className={`${secondaryButton} min-h-10 disabled:opacity-60`}>
+              <button type="button" onClick={askAi} disabled={explain.busy} className={secondaryButtonSm}>
                 <Icon name="sparkles" size={16} /> {explain.busy ? "Asking the AI tutor…" : "Explain this error with AI"}
               </button>
             )}
             {explain.fail && <p className="mt-2 text-sm text-rose-300">{explain.fail}</p>}
             {explain.text && (
-              <div className="mt-2 rounded-xl bg-white p-4 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
-                <p className="text-xs font-semibold tracking-wide text-violet-800 uppercase dark:text-violet-300">AI tutor</p>
+              <div className="mt-2 rounded-2xl bg-white p-4 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+                <p className="text-xs font-semibold text-violet-800 dark:text-violet-300">AI tutor</p>
                 <AiText text={explain.text} className="mt-1" />
               </div>
             )}

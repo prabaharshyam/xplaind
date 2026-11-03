@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "@/components/art/icons";
 import { PageHero } from "@/components/page-hero";
-import { primaryButton, textLink } from "@/components/ui";
+import { primaryButton, textLink, secondaryButtonSm } from "@/components/ui";
 import { WatchButton } from "@/components/video-player";
 import { getChannels } from "@/lib/content";
 import { libraryItems, TOPIC_LABEL } from "@/lib/content/library";
@@ -52,7 +52,7 @@ export default function VideosPage() {
                 <p className="flex flex-wrap items-center gap-2 text-sm">
                   {c.topics.map((t) => (
                     <Link key={t} href={`/library?kind=video&topic=${t}`} className="rounded-full bg-violet-50 px-2.5 py-1 text-violet-900 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200">
-                      #{TOPIC_LABEL[t]}
+                      {TOPIC_LABEL[t]}
                     </Link>
                   ))}
                   <a href={c.url} target="_blank" rel="noopener" className={textLink}>
@@ -70,7 +70,7 @@ export default function VideosPage() {
                     <WatchButton
                       embed={{ kind: "video", id: v.youtube_id }}
                       title={v.title}
-                      className="mt-auto inline-flex min-h-10 items-center gap-1.5 self-start rounded-full bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
+                      className={`mt-auto self-start ${secondaryButtonSm}`}
                     />
                   </li>
                 ))}

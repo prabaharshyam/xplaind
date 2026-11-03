@@ -11,7 +11,7 @@ export function YourPath({ paths }: { paths: { id: string; name: string }[] }) {
   const chosen = paths.find((p) => p.id === path);
   if (!chosen) return null;
   return (
-    <p className="mt-4 rounded-lg bg-zinc-100 p-4 leading-7 dark:bg-zinc-900">
+    <p className="mt-4 rounded-2xl bg-zinc-100 p-4 leading-7 dark:bg-zinc-900">
       Your path is{" "}
       <Link href={roadmapHref(chosen.id)} className={textLink}>
         {chosen.name}

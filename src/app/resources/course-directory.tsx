@@ -42,7 +42,7 @@ const TYPE_LABEL: Record<string, string> = {
 const PAGE = 24;
 
 const field =
-  "min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700";
+  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
 
 /** RM-2: every course as a picture card, filterable. Rendered on the server, so search engines see the list. */
 export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: { id: string; name: string }[] }) {
@@ -80,7 +80,7 @@ export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: 
                   type="button"
                   aria-pressed={on}
                   onClick={() => set({ theme: t.id })}
-                  className={`flex min-h-10 items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 text-sm ${
+                  className={`flex min-h-11 items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 text-sm ${
                     on ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-black" : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
                   }`}
                 >
@@ -127,12 +127,12 @@ export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: 
               ))}
             </select>
           </label>
-          <label className="flex min-h-11 items-center gap-3 self-end rounded-xl border border-zinc-300 px-3 dark:border-zinc-700">
+          <label className="flex min-h-11 items-center gap-3 self-end rounded-2xl border border-zinc-300 px-3 dark:border-zinc-700">
             <input
               type="checkbox"
               checked={filter.certificateOnly}
               onChange={(e) => set({ certificateOnly: e.target.checked })}
-              className="size-5 accent-emerald-700"
+              className="size-5 accent-violet-700"
             />
             <span className="text-sm">Only courses with a certificate or badge</span>
           </label>
@@ -165,7 +165,7 @@ export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: 
       {shown.length === 0 && (
         <p className="mt-4">
           Nothing matches.{" "}
-          <button type="button" onClick={() => set(EMPTY_FILTER)} className="text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
+          <button type="button" onClick={() => set(EMPTY_FILTER)} className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
             Clear the filters
           </button>
         </p>

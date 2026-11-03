@@ -26,3 +26,15 @@ export function levelUp(level: LevelId): LevelId {
 export function levelDown(level: LevelId): LevelId {
   return LEVEL_IDS[Math.max(levelIndex(level) - 1, 0)];
 }
+
+const BAND = { B: "Beginner", I: "Intermediate", P: "Pro" } as const;
+
+/** A level in words, for people: "Beginner 1" for B1, up to "Pro 3" for P3. The code stays for search and links. */
+export function levelWords(level: LevelId): string {
+  return `${BAND[level[0] as keyof typeof BAND]} ${level[1]}`;
+}
+
+/** Like levelWords, for a value that may not be a level id; anything else comes back as it is. */
+export function levelText(value: string): string {
+  return isLevelId(value) ? levelWords(value) : value;
+}

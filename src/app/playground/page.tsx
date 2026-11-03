@@ -18,6 +18,7 @@ export default function PlaygroundPage() {
   return (
     <main>
       <PageHero
+        size="full"
         shape="icon:code"
         theme="code"
         seed="playground"

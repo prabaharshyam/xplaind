@@ -11,9 +11,9 @@ export function XBotMascot({ size = 56, mood = "happy", className = "" }: { size
     <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true" focusable="false" className={`xbot ${className}`} data-mood={mood}>
       <defs>
         <linearGradient id={`${id}b`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#34d399" />
-          <stop offset="0.55" stopColor="#14b8a6" />
-          <stop offset="1" stopColor="#8b5cf6" />
+          <stop offset="0" stopColor="#a78bfa" />
+          <stop offset="0.55" stopColor="#8b5cf6" />
+          <stop offset="1" stopColor="#6d28d9" />
         </linearGradient>
         <radialGradient id={`${id}s`} cx="0.3" cy="0.2" r="0.7">
           <stop offset="0" stopColor="#fff" stopOpacity="0.55" />
@@ -21,9 +21,9 @@ export function XBotMascot({ size = 56, mood = "happy", className = "" }: { size
         </radialGradient>
       </defs>
       {/* Antenna with its X spark. */}
-      <path d="M32 15V8" stroke="#0f766e" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M32 15V8" stroke="#5b21b6" strokeWidth="2.5" strokeLinecap="round" />
       <g className="xbot-spark" style={{ transformOrigin: "32px 6px" }}>
-        <path d="M28.6 2.6 35.4 9.4M35.4 2.6 28.6 9.4" stroke="#f59e0b" strokeWidth="3.2" strokeLinecap="round" />
+        <path d="M28.6 2.6 35.4 9.4M35.4 2.6 28.6 9.4" stroke="#14b8a6" strokeWidth="3.2" strokeLinecap="round" />
       </g>
       {/* Ears. */}
       <rect x="5" y="27" width="6" height="12" rx="3" fill="#0d9488" />
@@ -45,8 +45,8 @@ export function XBotMascot({ size = 56, mood = "happy", className = "" }: { size
       </g>
       <path className="xbot-mouth" d="M28.5 38.2q3.5 3 7 0" stroke="#5eead4" strokeWidth="2" strokeLinecap="round" fill="none" />
       {/* Cheeks. */}
-      <circle cx="19.5" cy="40" r="2.2" fill="#f472b6" opacity="0.55" />
-      <circle cx="44.5" cy="40" r="2.2" fill="#f472b6" opacity="0.55" />
+      <circle cx="19.5" cy="40" r="2.2" fill="#c4b5fd" opacity="0.6" />
+      <circle cx="44.5" cy="40" r="2.2" fill="#c4b5fd" opacity="0.6" />
     </svg>
   );
 }

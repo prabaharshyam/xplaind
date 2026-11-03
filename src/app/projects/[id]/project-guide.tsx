@@ -80,7 +80,7 @@ export function ProjectGuide({ id, steps, rubric }: { id: string; steps: Step[];
                       </details>
                     )}
                     <label className="mt-3 flex min-h-11 w-fit cursor-pointer items-center gap-2 font-medium">
-                      <input type="checkbox" className="size-5 accent-emerald-700" checked={done} onChange={() => save({ steps: toggle(record?.steps, i) })} />
+                      <input type="checkbox" className="size-5 accent-violet-700" checked={done} onChange={() => save({ steps: toggle(record?.steps, i) })} />
                       I have done this step
                     </label>
                   </div>
@@ -101,17 +101,17 @@ export function ProjectGuide({ id, steps, rubric }: { id: string; steps: Step[];
             <li key={r.criterion} className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
               <h3 className="font-semibold">{r.criterion}</h3>
               <div className="mt-2 grid gap-2 text-sm leading-6 sm:grid-cols-2">
-                <p className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/40">
+                <p className="rounded-2xl bg-emerald-50 p-3 dark:bg-emerald-950/40">
                   <span className="font-semibold text-emerald-900 dark:text-emerald-200">Strong: </span>
                   {r.strong}
                 </p>
-                <p className="rounded-xl bg-zinc-100 p-3 dark:bg-zinc-900">
+                <p className="rounded-2xl bg-zinc-100 p-3 dark:bg-zinc-900">
                   <span className="font-semibold">Weak: </span>
                   {r.weak}
                 </p>
               </div>
               <label className="mt-2 flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm font-medium">
-                <input type="checkbox" className="size-5 accent-emerald-700" checked={met.has(i)} onChange={() => save({ rubric: toggle(record?.rubric, i) })} />
+                <input type="checkbox" className="size-5 accent-violet-700" checked={met.has(i)} onChange={() => save({ rubric: toggle(record?.rubric, i) })} />
                 My project meets this
               </label>
             </li>
@@ -170,7 +170,7 @@ function Submit({ record, onSubmit, onReopen }: { record: ProjectProgress | unde
               onChange={(e) => setUrl(e.target.value)}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? "submit-error" : undefined}
-              className="min-h-11 rounded-lg border border-zinc-300 bg-white px-3 font-normal dark:border-zinc-700 dark:bg-zinc-950"
+              className="min-h-11 rounded-2xl border border-zinc-300 bg-white px-3 font-normal dark:border-zinc-700 dark:bg-zinc-950"
               placeholder="https://github.com/you/project"
             />
           </label>
@@ -180,7 +180,7 @@ function Submit({ record, onSubmit, onReopen }: { record: ProjectProgress | unde
         </form>
       )}
       {error && (
-        <p id="submit-error" role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p id="submit-error" role="alert" className="text-sm text-rose-700 dark:text-rose-400">
           {error}
         </p>
       )}

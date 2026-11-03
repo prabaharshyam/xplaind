@@ -55,7 +55,7 @@ export function InterviewReviewPanel({ access, state, answered }: { access: AiAc
               ] as const
             ).map(([title, items, tone]) =>
               items.length ? (
-                <div key={title} className="rounded-xl bg-white p-3 dark:bg-zinc-900">
+                <div key={title} className="rounded-2xl bg-white p-3 dark:bg-zinc-900">
                   <p className={`text-sm font-semibold ${tone}`}>{title}</p>
                   <ul className="mt-1 list-disc pl-5 text-sm leading-6">
                     {items.map((x) => (
@@ -77,7 +77,7 @@ export function InterviewReviewPanel({ access, state, answered }: { access: AiAc
             type="button"
             onClick={run}
             disabled={busy}
-            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-violet-700 px-4 font-medium text-white hover:bg-violet-800 disabled:opacity-60"
+            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-violet-700 px-4 font-medium text-white hover:bg-violet-800 disabled:opacity-60"
           >
             <Icon name="sparkles" size={16} /> {busy ? "Analysing your answers…" : `Analyse all ${answered} answers with AI`}
           </button>
@@ -98,7 +98,7 @@ export function InterviewReviewPanel({ access, state, answered }: { access: AiAc
 /** The AI's review of one answer, inside that question's card. */
 export function AnswerReviewBlock({ r }: { r: AnswerReview }) {
   return (
-    <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900 dark:bg-violet-950/20">
+    <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900 dark:bg-violet-950/20">
       <p className="flex flex-wrap items-center gap-2 font-semibold">
         <Icon name="sparkles" size={16} /> AI: {r.score} / 5 · {UNDERSTANDING_LABEL[r.understanding]}
       </p>
@@ -126,7 +126,7 @@ export function AnswerReviewBlock({ r }: { r: AnswerReview }) {
       {r.missing.length > 0 && <p className="mt-3 text-sm">Missing: {r.missing.join("; ")}</p>}
       <p className="mt-3 leading-7">{r.feedback}</p>
       <p className="mt-3 text-sm font-medium">A stronger version of your answer</p>
-      <p className="mt-1 rounded-lg bg-white p-3 leading-7 dark:bg-zinc-900">{r.stronger_answer}</p>
+      <p className="mt-1 rounded-2xl bg-white p-3 leading-7 dark:bg-zinc-900">{r.stronger_answer}</p>
     </div>
   );
 }

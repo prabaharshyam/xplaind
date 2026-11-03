@@ -3,6 +3,7 @@ import { Icon } from "@/components/art/icons";
 import { JsonLd } from "@/components/json-ld";
 import { PageHero } from "@/components/page-hero";
 import { roadmapGraph } from "@/lib/content/structured";
+import { RoadmapStart } from "@/components/roadmap/roadmap-start";
 import { RoadmapView } from "@/components/roadmap/roadmap-view";
 import { TopicDrawerProvider } from "@/components/roadmap/topic-drawer";
 import { getPaths, getStops } from "@/lib/content";
@@ -28,7 +29,7 @@ export function RoadmapPage({ path }: { path: Goal }) {
       <PageHero theme={path.theme ?? "llm"} seed={path.id} eyebrow="Role roadmap" title={view.name} lead={view.description} crumbs={[{ href: "/paths", label: "Roadmaps" }]}>
         <p className="flex flex-wrap gap-2 text-sm">
           {[CODING_LABEL[view.coding], `${sections} ${path.layout === "levels" ? "levels" : "stages"}`, `${view.counts.lessons} lessons`, `about ${view.months} months`].map((c) => (
-            <span key={c} className="rounded-full bg-zinc-200/70 px-3 py-1 dark:bg-zinc-800">
+            <span key={c} className="rounded-full bg-white px-3 py-1 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
               {c}
             </span>
           ))}
@@ -36,15 +37,21 @@ export function RoadmapPage({ path }: { path: Goal }) {
         <p className="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
           <span className="font-medium">Who it is for:</span> {view.who_for}
         </p>
+        {/* RM-1: one main action, the first lesson (or the next one for a returning learner). */}
+        <div className="mt-5">
+          <RoadmapStart lessons={lessons.map((l) => ({ id: l.id, title: l.title }))} />
+        </div>
         {/* JB-3: what the role pays and live openings, one tap away. */}
-        <Link href={`/jobs#${path.id}`} className="mt-3 inline-flex min-h-10 items-center gap-1 text-sm font-medium text-violet-800 underline-offset-2 hover:underline dark:text-violet-300">
-          Salaries and live jobs for this role →
-        </Link>
-        <Link href="/plan" className="mt-3 ml-4 inline-flex min-h-10 items-center gap-1 text-sm font-medium text-violet-800 underline-offset-2 hover:underline dark:text-violet-300">
-          Plan my week →
-        </Link>
+        <p className="mt-3 flex flex-wrap gap-x-5 text-sm">
+          <Link href={`/jobs#${path.id}`} className="inline-flex min-h-11 items-center gap-1 font-medium text-violet-800 underline-offset-4 hover:underline dark:text-violet-300">
+            Salaries and live jobs for this role →
+          </Link>
+          <Link href="/plan" className="inline-flex min-h-11 items-center gap-1 font-medium text-violet-800 underline-offset-4 hover:underline dark:text-violet-300">
+            Plan my week →
+          </Link>
+        </p>
       </PageHero>
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <TopicDrawerProvider details={topicDetails(roadmapStopIds(model))}>
           <RoadmapView model={model} lessons={lessons} known={getPaths().map((p) => p.id)} />
         </TopicDrawerProvider>
@@ -62,7 +69,7 @@ function InterviewTracks() {
     { theme: "system-design", icon: "server" as const, title: "System design", lead: "Scaling, databases, caching, queues and a full URL shortener design." },
   ];
   return (
-    <section aria-labelledby="interview-tracks-h" className="mt-10 rounded-3xl bg-gradient-to-br from-fuchsia-50 via-violet-50 to-teal-50 p-5 ring-1 ring-violet-200 md:p-6 dark:from-fuchsia-950/30 dark:via-violet-950/30 dark:to-teal-950/30 dark:ring-violet-900">
+    <section aria-labelledby="interview-tracks-h" className="mt-10 rounded-3xl bg-gradient-to-br from-violet-50 to-teal-50 p-5 ring-1 ring-violet-200 md:p-6 dark:from-teal-950/30 dark:via-violet-950/30 dark:to-teal-950/30 dark:ring-violet-900">
       <h2 id="interview-tracks-h" className="text-lg font-semibold">
         Interview foundations for this role
       </h2>
@@ -70,7 +77,7 @@ function InterviewTracks() {
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {tracks.map((t) => (
           <Link key={t.theme} href={`/topics/${t.theme}`} className="lx-rise flex items-start gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200 hover:ring-violet-400 dark:bg-zinc-900 dark:ring-zinc-800">
-            <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+            <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
               <Icon name={t.icon} size={22} />
             </span>
             <span>

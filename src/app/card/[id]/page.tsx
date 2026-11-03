@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { primaryButton } from "@/components/ui";
 import { getPublicCard } from "@/lib/account/cards";
+import { levelText } from "@/lib/levels";
 
 export const metadata: Metadata = { title: "Level card", robots: { index: false } };
 
@@ -19,7 +20,7 @@ async function Card({ params }: { params: Promise<{ id: string }> }) {
         <div>
           {card.name && <p className="text-lg">{card.name} is at</p>}
           <p className="text-4xl font-bold">
-            {card.level} {card.levelName}
+            {levelText(card.level)}: {card.levelName}
           </p>
         </div>
         <p className="text-sm opacity-90">

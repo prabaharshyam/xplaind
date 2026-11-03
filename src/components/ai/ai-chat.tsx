@@ -78,7 +78,7 @@ export function AiChat({
         <div ref={end} />
       </div>
       {error && (
-        <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+        <p role="alert" className="mt-3 rounded-2xl bg-rose-50 p-3 text-sm text-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
           {error}
         </p>
       )}
@@ -112,10 +112,10 @@ export function AiChat({
             rows={2}
             maxLength={1500}
             placeholder={placeholder}
-            className="w-full resize-none rounded-xl border border-zinc-300 bg-white px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+            className="w-full resize-none rounded-2xl border border-zinc-300 bg-white px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
           />
         </label>
-        <button type="submit" disabled={busy || !draft.trim()} className="min-h-12 self-end rounded-xl bg-violet-700 px-4 font-medium text-white hover:bg-violet-800 disabled:opacity-50">
+        <button type="submit" disabled={busy || !draft.trim()} className="min-h-12 self-end rounded-2xl bg-violet-700 px-4 font-medium text-white hover:bg-violet-800 disabled:opacity-50">
           Send
         </button>
       </form>
@@ -129,7 +129,7 @@ function Bubble({ role, text, lessons }: Turn) {
   return (
     <div className={`flex gap-2 ${mine ? "justify-end" : ""}`}>
       {!mine && (
-        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white" aria-hidden="true">
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-600 to-teal-500 text-white" aria-hidden="true">
           <Icon name="sparkles" size={15} />
         </span>
       )}
@@ -140,7 +140,7 @@ function Bubble({ role, text, lessons }: Turn) {
           <ul className="mt-3 space-y-1 border-t border-zinc-300 pt-2 text-sm dark:border-zinc-700">
             {lessons.map((l) => (
               <li key={l.id}>
-                <Link href={`/stop/${l.id}`} className="font-medium text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
+                <Link href={`/stop/${l.id}`} className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
                   Lesson: {l.title}
                 </Link>
               </li>

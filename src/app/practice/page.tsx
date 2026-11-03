@@ -22,7 +22,8 @@ export default function PracticePage() {
   const starters = STARTER_TERMS.filter((id) => ids.has(id)).map((id) => glossary.find((g) => g.id === id)!);
   return (
     <main>
-      <PageHero shape="cardFan"
+      <PageHero
+        size="full" shape="cardFan"
         theme="evals"
         seed="practice"
         icon="check"
@@ -66,7 +67,7 @@ export default function PracticePage() {
             <ul className="mt-4 flex flex-wrap gap-2" aria-label="Popular terms">
               {starters.map((t) => (
                 <li key={t.id}>
-                  <Link href={`/glossary#${t.id}`} className="inline-flex min-h-10 items-center rounded-full border border-violet-300 bg-white px-3 text-sm font-medium text-violet-900 hover:bg-violet-100 dark:border-violet-800 dark:bg-zinc-900 dark:text-violet-200 dark:hover:bg-violet-950">
+                  <Link href={`/glossary#${t.id}`} className="inline-flex min-h-11 items-center rounded-full border border-violet-300 bg-white px-3 text-sm font-medium text-violet-900 hover:bg-violet-100 dark:border-violet-800 dark:bg-zinc-900 dark:text-violet-200 dark:hover:bg-violet-950">
                     {t.term}
                   </Link>
                 </li>

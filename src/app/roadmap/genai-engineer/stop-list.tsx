@@ -26,7 +26,7 @@ export function StopList({ stops, showOutcome = false }: { stops: StopSummary[];
           <li key={s.id}>
             <Link
               href={`/stop/${s.id}`}
-              className="flex min-h-12 items-start gap-3 rounded-lg p-2 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-emerald-700 dark:hover:bg-zinc-900"
+              className="flex min-h-12 items-start gap-3 rounded-2xl p-2 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-violet-700 dark:hover:bg-zinc-900"
             >
               <span
                 aria-hidden="true"

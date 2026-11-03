@@ -3,7 +3,7 @@ import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { muted, textLink } from "@/components/ui";
-import { LEVEL_IDS, type LevelId, isLevelId } from "@/lib/levels";
+import { LEVEL_IDS, type LevelId, isLevelId, levelWords } from "@/lib/levels";
 import { levelSlug, roadmapData } from "../data";
 import { StopList } from "../stop-list";
 
@@ -46,7 +46,7 @@ export default async function LevelPage({ params }: PageProps<"/roadmap/genai-en
         Level {at + 1} of {LEVEL_IDS.length}
       </p>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight text-balance">
-        {level.id} {level.name}
+        {levelWords(level.id)}: {level.name}
       </h1>
       <p className="mt-4 leading-7">
         <span className="font-medium">At the end you can:</span> {level.can_do}.

@@ -85,11 +85,20 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
     };
   }, []);
 
-  // Say hello once, a few seconds into the first visit.
+  // Say hello once ever, a few seconds into the first visit, and tuck the bubble away after a
+  // few seconds so it never sits on top of the page's own buttons.
   useEffect(() => {
     if (read(KEY)) return;
-    const t = setTimeout(() => setHint(true), 4000);
-    return () => clearTimeout(t);
+    let hideHint = 0;
+    const t = setTimeout(() => {
+      setHint(true);
+      write(KEY, "1");
+      hideHint = window.setTimeout(() => setHint(false), 7000);
+    }, 5000);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(hideHint);
+    };
   }, []);
 
   useEffect(() => {
@@ -169,7 +178,7 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
   };
 
   return (
-    <div ref={root} className="xbot-root fixed right-3 bottom-3 z-40 print:hidden sm:right-5 sm:bottom-5" data-open={open || undefined}>
+    <div ref={root} className="xbot-root fixed right-2 bottom-[calc(0.5rem+var(--xbot-lift,0px))] z-40 print:hidden sm:right-5 sm:bottom-[calc(1.25rem+var(--xbot-lift,0px))]" data-open={open || undefined}>
       {open && (
         <section
           id={panelId}
@@ -260,7 +269,7 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
       )}
 
       {hint && !open && (
-        <button type="button" onClick={show} className="xbot-hint absolute right-1 bottom-[4.5rem] w-max max-w-[14rem] rounded-2xl rounded-br-sm bg-zinc-900 px-3 py-2 text-left text-sm text-white shadow-lg dark:bg-white dark:text-zinc-900">
+        <button type="button" onClick={show} className="xbot-hint absolute right-1 bottom-[3.75rem] w-max max-w-[12rem] rounded-2xl rounded-br-sm bg-zinc-900 px-3 py-2 text-left text-sm text-white shadow-lg sm:bottom-[4.5rem] dark:bg-white dark:text-zinc-900">
           Stuck? Ask me anything!
         </button>
       )}
@@ -272,10 +281,10 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-label={open ? "Close X Bot" : "Ask X Bot for help"}
-        className={`xbot-launcher relative grid size-16 place-items-center rounded-full focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${open ? "max-sm:hidden" : ""}`}
+        className={`xbot-launcher relative grid size-12 place-items-center rounded-full focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-violet-700 sm:size-16 ${open ? "max-sm:hidden" : ""}`}
       >
         <span className="xbot-float block">
-          <XBotMascot size={60} mood={open ? "wave" : "happy"} />
+          <XBotMascot size={60} mood={open ? "wave" : "happy"} className="max-sm:size-11" />
         </span>
         <span aria-hidden="true" className="xbot-shadow absolute -bottom-0.5 left-1/2 h-2 w-9 -translate-x-1/2 rounded-full bg-black/20 blur-[2px] dark:bg-black/60" />
       </button>
@@ -304,12 +313,12 @@ function BotBubble({ msg, onLink, next = "/" }: { msg: Extract<Msg, { from: "bot
         <p className="sr-only">X Bot said:</p>
         {msg.ai ? <AiText text={msg.text} /> : <p>{msg.text}</p>}
         {msg.lead && (
-          <div className="mt-2 rounded-xl bg-white p-3 dark:bg-zinc-900">
+          <div className="mt-2 rounded-2xl bg-white p-3 dark:bg-zinc-900">
             <p className="text-xs font-medium text-teal-800 dark:text-teal-300">{BOT_KIND_LABEL[msg.lead.k]}</p>
             <p className="font-semibold">{msg.lead.t}</p>
             <p className="mt-1 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{msg.lead.a}</p>
             {msg.lead.h !== next && (
-              <Link href={msg.lead.h} onClick={onLink} className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
+              <Link href={msg.lead.h} onClick={onLink} className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
                 Open it <Icon name="send" size={14} />
               </Link>
             )}
@@ -319,7 +328,7 @@ function BotBubble({ msg, onLink, next = "/" }: { msg: Extract<Msg, { from: "bot
           <ul className="mt-2 space-y-1.5 text-sm">
             {msg.links.map((l) => (
               <li key={l.h}>
-                <Link href={l.h} onClick={onLink} className="font-medium text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
+                <Link href={l.h} onClick={onLink} className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
                   {l.k ? `${BOT_KIND_LABEL[l.k]}: ` : ""}
                   {l.t}
                 </Link>

@@ -22,7 +22,7 @@ export function SiteHeader() {
         <Link href="/" className="shrink-0" aria-label="Xplaind home">
           <BrandLogo height={22} />
         </Link>
-        <nav aria-label="Main" className="hidden items-center gap-6 text-[13px] text-zinc-700 md:flex dark:text-zinc-300">
+        <nav aria-label="Main" className="hidden items-center gap-5 text-sm text-zinc-700 md:flex lg:gap-6 dark:text-zinc-300">
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} className="hover:text-black dark:hover:text-white">
               {n.label}
@@ -32,7 +32,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <HeaderSearch />
           <XpChip />
-          <AccountButton className="site-cta hidden sm:inline-flex h-9 items-center rounded-full bg-violet-700 px-4 text-[13px] font-medium text-white shadow-sm shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700" />
+          <AccountButton className="site-cta hidden sm:inline-flex h-10 items-center rounded-full bg-violet-700 px-4 text-sm font-medium text-white shadow-sm shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700" />
           <details className="site-menu group relative md:hidden">
             <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 [&::-webkit-details-marker]:hidden">
               <span className="sr-only">Menu</span>
@@ -46,11 +46,11 @@ export function SiteHeader() {
               className="absolute right-0 mt-2 flex w-56 flex-col rounded-2xl border border-black/5 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-zinc-900"
             >
               {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className="rounded-xl px-3 py-3 text-[15px] hover:bg-black/5 dark:hover:bg-white/10">
+                <Link key={n.href} href={n.href} className="rounded-2xl px-3 py-3 text-[15px] hover:bg-black/5 dark:hover:bg-white/10">
                   {n.label}
                 </Link>
               ))}
-              <AccountButton className="mt-1 rounded-xl bg-violet-700 px-3 py-3 text-center text-[15px] font-medium text-white" />
+              <AccountButton className="mt-1 rounded-2xl bg-violet-700 px-3 py-3 text-center text-[15px] font-medium text-white" />
             </nav>
           </details>
           <MenuCloser selector=".site-header details.site-menu" />

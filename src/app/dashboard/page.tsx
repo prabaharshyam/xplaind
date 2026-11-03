@@ -10,6 +10,7 @@ import { currentUser, userClient } from "@/lib/supabase/server";
 import { PageHero } from "@/components/page-hero";
 import { Dashboard } from "./dashboard";
 import { ProgressOverview } from "./progress-overview";
+import { primaryButtonSm } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Your dashboard", robots: { index: false } };
 
@@ -24,9 +25,10 @@ async function SignedIn() {
 export default function DashboardPage() {
   return (
     <main>
-      <PageHero shape="barChart" theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your XP, streak and badges.">
+      <PageHero
+        size="full" shape="barChart" theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your XP, streak and badges.">
         {/* WP-1: this week's plan, one tap from progress. */}
-        <Link href="/plan" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-violet-700 px-5 font-medium text-white hover:bg-violet-800">
+        <Link href="/plan" className={primaryButtonSm}>
           See this week&apos;s study plan →
         </Link>
       </PageHero>

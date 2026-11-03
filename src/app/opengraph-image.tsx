@@ -10,6 +10,6 @@ export default function Image() {
     title: "Learn AI for the job you want. One clear roadmap per role.",
     footer: "Plain-English lessons, video lessons, projects and interview practice",
     from: "#7c3aed",
-    to: "#f472b6",
+    to: "#14b8a6",
   });
 }

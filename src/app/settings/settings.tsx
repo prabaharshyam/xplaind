@@ -53,7 +53,7 @@ export function Settings({ email, weeklyHours }: { email: string | null; weeklyH
             <select
               value={hours}
               onChange={(e) => setHours(Number(e.target.value))}
-              className="min-h-12 rounded-lg border border-zinc-400 bg-white px-3 dark:border-zinc-600 dark:bg-zinc-950"
+              className="min-h-12 rounded-2xl border border-zinc-400 bg-white px-3 dark:border-zinc-600 dark:bg-zinc-950"
             >
               {WEEKLY_HOUR_CHOICES.map((h) => (
                 <option key={h} value={h}>
@@ -98,11 +98,11 @@ export function Settings({ email, weeklyHours }: { email: string | null; weeklyH
               onChange={(e) => setName(e.target.value)}
               maxLength={40}
               autoComplete="given-name"
-              className="min-h-12 rounded-lg border border-zinc-400 px-3 dark:border-zinc-600 dark:bg-zinc-950"
+              className="min-h-12 rounded-2xl border border-zinc-400 px-3 dark:border-zinc-600 dark:bg-zinc-950"
             />
           </label>
           {cardError && (
-            <p role="alert" className="text-sm text-red-800 dark:text-red-400">
+            <p role="alert" className="text-sm text-rose-800 dark:text-rose-400">
               {cardError}
             </p>
           )}
@@ -113,14 +113,14 @@ export function Settings({ email, weeklyHours }: { email: string | null; weeklyH
         {cards && cards.length > 0 && (
           <ul className="flex flex-col gap-2">
             {cards.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+              <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
                 <Link href={`/card/${c.id}`} className={textLink}>
                   {c.level}
                   {c.display_name ? ` · ${c.display_name}` : ""} · {c.weeks_active} weeks
                 </Link>
                 <button
                   type="button"
-                  className="text-sm text-red-800 underline dark:text-red-400"
+                  className="text-sm text-rose-800 underline dark:text-rose-400"
                   onClick={async () => {
                     await call("/api/card", "DELETE", { id: c.id });
                     await loadCards();
@@ -148,16 +148,16 @@ export function Settings({ email, weeklyHours }: { email: string | null; weeklyH
             Delete my account
           </button>
         ) : (
-          <div className="flex flex-col gap-3 rounded-lg border border-red-300 p-4 dark:border-red-800" role="alert">
+          <div className="flex flex-col gap-3 rounded-2xl border border-rose-300 p-4 dark:border-rose-800" role="alert">
             <p className="leading-7">
               This deletes your account and everything saved with it: results, progress, ratings, badges and cards. It
               cannot be undone. Progress saved on this device stays here until you clear it.
             </p>
-            {deleteError && <p className="text-sm text-red-800 dark:text-red-400">{deleteError}</p>}
+            {deleteError && <p className="text-sm text-rose-800 dark:text-rose-400">{deleteError}</p>}
             <div className="flex gap-3">
               <button
                 type="button"
-                className="inline-flex min-h-12 items-center justify-center rounded-lg bg-red-700 px-5 font-medium text-white hover:bg-red-800"
+                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-rose-700 px-5 font-medium text-white hover:bg-rose-800"
                 onClick={async () => {
                   const { ok, data } = await call("/api/account", "DELETE");
                   if (ok) {
@@ -202,7 +202,7 @@ function PasswordSection() {
       </h2>
       <p className="leading-7">Signed up with Google, GitHub or an email link? Set a password to sign in with your email too.</p>
       {status && PASSWORD_STATUS[status] && (
-        <p role="status" className="rounded-xl bg-zinc-100 p-3 text-sm dark:bg-zinc-900">
+        <p role="status" className="rounded-2xl bg-zinc-100 p-3 text-sm dark:bg-zinc-900">
           {PASSWORD_STATUS[status]}
         </p>
       )}
@@ -216,7 +216,7 @@ function PasswordSection() {
             minLength={8}
             maxLength={72}
             autoComplete="new-password"
-            className="min-h-12 rounded-xl border border-zinc-400 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+            className="min-h-12 rounded-2xl border border-zinc-400 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
           />
         </label>
         <button type="submit" className={secondaryButton}>

@@ -130,7 +130,7 @@ function Home({ tests, onBook, onOpen }: { tests: BookTest[]; onBook: (b: Book) 
                   <button type="button" className={secondaryButton} onClick={() => onOpen(t)} aria-label={`${r ? "See the report" : "Take the test"}: ${t.book}, ${t.createdOn}`}>
                     {r ? "See the report" : "Take the test"}
                   </button>
-                  <button type="button" className="min-h-11 rounded-lg px-3 text-sm text-zinc-600 underline underline-offset-2 dark:text-zinc-400" onClick={() => deleteBookTest(t.id)} aria-label={`Delete the test on ${t.book}, ${t.createdOn}`}>
+                  <button type="button" className="min-h-11 rounded-2xl px-3 text-sm text-zinc-600 underline underline-offset-2 dark:text-zinc-400" onClick={() => deleteBookTest(t.id)} aria-label={`Delete the test on ${t.book}, ${t.createdOn}`}>
                     Delete
                   </button>
                 </li>
@@ -190,10 +190,10 @@ function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnTy
           </button>
           <span className="text-zinc-600 dark:text-zinc-400">{chosen.length} chosen</span>
         </div>
-        <ul className="grid max-h-72 gap-1 overflow-y-auto rounded-xl border border-zinc-200 p-2 sm:grid-cols-2 dark:border-zinc-800">
+        <ul className="grid max-h-72 gap-1 overflow-y-auto rounded-2xl border border-zinc-200 p-2 sm:grid-cols-2 dark:border-zinc-800">
           {book.sections.map((s) => (
             <li key={s}>
-              <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 hover:bg-zinc-100 dark:hover:bg-zinc-900">
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-2xl px-2 hover:bg-zinc-100 dark:hover:bg-zinc-900">
                 <input type="checkbox" checked={chosen.includes(s)} onChange={() => toggle(s)} className="size-5 accent-teal-700" />
                 <span className="min-w-0 truncate">{s}</span>
               </label>
@@ -206,7 +206,7 @@ function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnTy
         <legend className="text-lg font-semibold">How hard?</legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           {(Object.keys(DIFFICULTY_LABEL) as Difficulty[]).map((d) => (
-            <label key={d} className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 ${difficulty === d ? "border-teal-600 bg-teal-50 dark:bg-teal-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
+            <label key={d} className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-2xl border px-3 ${difficulty === d ? "border-teal-600 bg-teal-50 dark:bg-teal-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
               <input type="radio" name="difficulty" value={d} checked={difficulty === d} onChange={() => setDifficulty(d)} className="size-5 accent-teal-700" />
               {DIFFICULTY_LABEL[d]}
             </label>
@@ -217,7 +217,7 @@ function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnTy
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
           <span className="text-lg font-semibold">Number of questions</span>
-          <select value={count} onChange={(e) => setCount(Number(e.target.value))} className="min-h-12 rounded-xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900">
+          <select value={count} onChange={(e) => setCount(Number(e.target.value))} className="min-h-12 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900">
             {COUNTS.map((n) => (
               <option key={n} value={n}>
                 {n} questions
@@ -227,7 +227,7 @@ function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnTy
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-lg font-semibold">Time allowed</span>
-          <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="min-h-12 rounded-xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900">
+          <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="min-h-12 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900">
             {MINUTES.map((n) => (
               <option key={n} value={n}>
                 {n} minutes
@@ -290,7 +290,7 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-zinc-200 bg-white/90 px-4 py-2 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
+      <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-950/90">
         <p className="text-sm font-medium">
           Question {i + 1} of {test.questions.length}
         </p>
@@ -310,7 +310,7 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
           {q.question}
         </legend>
         {q.options.map((o, k) => (
-          <label key={k} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-xl border p-3 ${answers[i] === k ? "border-teal-600 bg-teal-50 dark:bg-teal-950/40" : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}>
+          <label key={k} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 ${answers[i] === k ? "border-teal-600 bg-teal-50 dark:bg-teal-950/40" : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}>
             <input type="radio" name={`q-${q.id}`} checked={answers[i] === k} onChange={() => setAnswers((a) => a.map((x, j) => (j === i ? k : x)))} className="mt-0.5 size-5 shrink-0 accent-teal-700" />
             <span>{o}</span>
           </label>
@@ -340,7 +340,7 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
             onClick={() => setI(k)}
             aria-label={`Question ${k + 1}, ${answers[k] === null ? "not answered" : "answered"}`}
             aria-current={k === i ? "step" : undefined}
-            className={`grid size-10 place-items-center rounded-lg border text-sm font-medium ${k === i ? "border-zinc-900 dark:border-white" : "border-zinc-300 dark:border-zinc-700"} ${answers[k] !== null ? "bg-teal-700 text-white" : ""}`}
+            className={`grid size-10 place-items-center rounded-2xl border text-sm font-medium ${k === i ? "border-zinc-900 dark:border-white" : "border-zinc-300 dark:border-zinc-700"} ${answers[k] !== null ? "bg-teal-700 text-white" : ""}`}
           >
             {k + 1}
           </button>
@@ -349,7 +349,7 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
 
       <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
         {confirm ? (
-          <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/40">
+          <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/40">
             <p>
               {unanswered} {unanswered === 1 ? "question is" : "questions are"} not answered yet. Finish anyway?
             </p>
@@ -500,7 +500,7 @@ function Report({ test, onRetake, onHome }: { test: BookTest; onRetake: () => vo
                   <span className="font-semibold">Correct answer:</span> {q.options[q.answer]}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{q.explanation}</p>
-                <figure className="mt-3 rounded-xl border-l-4 border-teal-600 bg-teal-50 p-3 dark:bg-teal-950/30">
+                <figure className="mt-3 rounded-2xl border-l-4 border-teal-600 bg-teal-50 p-3 dark:bg-teal-950/30">
                   <blockquote className="text-sm leading-6 italic">“{q.quote}”</blockquote>
                   <figcaption className="mt-1 text-xs font-medium text-teal-900 dark:text-teal-200">
                     From your book: {q.section}, page {q.page}

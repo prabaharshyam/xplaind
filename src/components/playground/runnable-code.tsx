@@ -14,7 +14,7 @@ export function RunnableCode({ code, aiOn, children }: { code: string; aiOn: boo
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="not-prose -mt-2 inline-flex min-h-10 items-center gap-2 rounded-full bg-violet-700 px-4 text-sm font-medium text-white hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+        className="not-prose -mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-violet-700 px-4 text-sm font-medium text-white hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
       >
         <Icon name="play" size={14} /> Run this code
       </button>

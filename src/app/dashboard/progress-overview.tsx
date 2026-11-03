@@ -48,7 +48,7 @@ export function ProgressOverview() {
             {game.rank.next ? `${game.rank.next.min - game.xp} XP to ${game.rank.next.name}` : "You reached the top rank."}
           </p>
         </div>
-        <div className="flex flex-col justify-between rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 p-5 text-amber-950">
+        <div className="flex flex-col justify-between rounded-2xl bg-gradient-to-br from-amber-300 to-amber-400 p-5 text-amber-950">
           <p className="text-sm">Streak</p>
           <p className="flex items-center gap-2 text-4xl font-semibold">
             <Icon name="fire" size={34} /> {game.streak}
@@ -109,7 +109,7 @@ export function ProgressOverview() {
           answered mock interview question: 10, plus points for the key points you cover. Ranks: {RANKS.map((r) => r.name).join(", ")}.
         </p>
         <p className="mt-2">Saved in this browser. Clearing your browser data clears it.</p>
-        <Link href="/paths" className="mt-3 inline-block font-medium text-emerald-800 underline underline-offset-2 dark:text-emerald-400">
+        <Link href="/paths" className="mt-3 inline-block font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
           Continue learning
         </Link>
       </section>
