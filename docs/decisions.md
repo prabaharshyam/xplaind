@@ -375,3 +375,10 @@ After the owner reopened sign-ups, /dashboard showed "This page couldn't load" f
 
 With the content files shipped, the signed-in dashboard still crashed on Vercel, now with "ENOENT: public/brand/xplaind-wordmark.png". The root share image belongs to every page's metadata, and its helper read the logo when the module loaded, so every dynamic page needed a file only the share-image routes shipped. The logo is now read only when a share image is drawn, a missing logo draws the card without it instead of failing, and the logo ships with every route. A new CI step, `npm run check:traces`, fails when any route's bundle lacks content/, data/ or the logo; on the old configuration it reports 83 of 86 routes.
 
+## 2026-11-03: two intermittent e2e failures, root-caused
+
+CI on the dashboard fix failed two tests that had failed now and then before.
+
+- Mock interview report: the simulator seeds its question pick from Math.random, and the test types one fixed answer. When that answer matched no key point of the questions drawn, no "You said" quote appeared. The test now fixes Math.random, so the same questions come up every run (8 of 8 under parallel load, was failing at random).
+- Roadmap section links at desktop width: two real races, fixed in the site. The CSS smooth scroll (html scroll-behavior) could still be running when Lenis started and froze it half-way, and the roadmap's sections move by hundreds of pixels while it hydrates, so a glide aimed at the old position stopped short. CSS smooth scrolling is gone; Lenis now glides in-page links and lands exactly on the target when the glide ends (and checks again 500 ms later), and a link clicked before Lenis loads is landed again once it does. What remained was headless Chromium drawing the header's particle scene in software, which starved the smooth scroll for seconds under four parallel workers; that layout test now runs with reduced motion, so it checks the layout and the link, not the animation (252 of 252 under load).
+

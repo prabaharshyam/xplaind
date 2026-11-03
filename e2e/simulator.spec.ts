@@ -7,6 +7,12 @@ const wcag = (page: import("@playwright/test").Page) =>
 test.use({ viewport: { width: 360, height: 740 } });
 
 test("a typed mock interview ends with a report on key points", async ({ page }) => {
+  // The simulator seeds its question pick from Math.random. Fix it so the same three questions come up
+  // every run: with random questions the canned answer sometimes matched no key point, so no
+  // "You said" quote appeared and the test failed at random.
+  await page.addInitScript(() => {
+    Math.random = () => 0.42;
+  });
   await page.goto("/interview/simulator?path=genai-engineer");
   await expect(page.getByRole("heading", { level: 1, name: "Mock interview" })).toBeVisible();
   await expect(page.getByLabel("Role")).toHaveValue("genai-engineer");
