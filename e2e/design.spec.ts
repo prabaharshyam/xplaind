@@ -120,8 +120,10 @@ test("a link clicked while the page is still scrolling opens the next page at th
       return seen?.getAttribute("href") ?? null;
     });
     if (!href) continue;
-    await page.mouse.wheel(0, 600); // still gliding when the click lands
-    await page.locator(`main a[href='${href}']`).first().click({ force: true });
+    await page.mouse.wheel(0, 600);
+    // Click while the page is still gliding. A pointer click could miss the moving link, so the
+    // link is clicked directly; it still runs the site's own navigation.
+    await page.locator(`main a[href='${href}']`).first().evaluate((a: HTMLAnchorElement) => a.click());
     await expect(page).toHaveURL(new RegExp(`${href}$`));
     await page.waitForTimeout(1500);
     expect(await page.evaluate(() => window.scrollY), `${from} -> ${href}`).toBeLessThan(5);
