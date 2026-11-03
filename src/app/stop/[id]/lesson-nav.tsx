@@ -57,7 +57,7 @@ export function LessonNav({ sections, top, children }: { sections: SectionLink[]
                     className={`flex items-center gap-2 rounded-2xl px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-900 ${current === s.id ? "bg-zinc-100 font-medium dark:bg-zinc-900" : ""}`}
                   >
                     <span
-                      className={`grid size-5 shrink-0 place-items-center rounded-full ${seen.has(s.id) ? "bg-emerald-600 text-white" : "border border-zinc-300 text-zinc-500 dark:border-zinc-600"}`}
+                      className={`grid size-5 shrink-0 place-items-center rounded-full ${seen.has(s.id) ? "bg-emerald-600 text-white" : "border border-zinc-300 text-zinc-600 dark:text-zinc-400 dark:border-zinc-600"}`}
                     >
                       {seen.has(s.id) ? <Icon name="check" size={11} strokeWidth={2.5} /> : <Icon name={s.icon} size={11} />}
                     </span>

@@ -72,3 +72,34 @@ test("the About page tells the founder's story with his photo and LinkedIn (TR-2
   expect((await wcag(page)).violations).toEqual([]);
 });
 
+
+test("key pages pass the accessibility check in dark mode too (A11Y-3)", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, colorScheme: "dark", reducedMotion: "reduce" });
+  const page = await ctx.newPage();
+  for (const url of ["/", "/paths", "/roadmap/ai-engineer", "/stop/rag-app", "/library", "/jobs", "/practice", "/about"]) {
+    await page.goto(url);
+    expect((await wcag(page)).violations, url).toEqual([]);
+  }
+  await ctx.close();
+});
+
+test("the menu is grouped and marks the section you are in (NV-1 to NV-3)", async ({ page }) => {
+  await page.goto("/jobs");
+  const menu = page.locator(".site-header details.site-menu");
+  await menu.locator("summary").click();
+  const panel = menu.getByRole("navigation", { name: "Main" });
+  await expect(panel).toBeVisible();
+  // Full height: the panel reaches the bottom of the screen.
+  const box = (await panel.boundingBox())!;
+  expect(box.y + box.height).toBeGreaterThan(730);
+  await expect(panel.getByRole("link", { name: "Jobs and salaries" })).toHaveAttribute("aria-current", "page");
+  await expect(panel.getByText("Learn", { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/roadmap/ai-engineer");
+  const desktop = page.locator(".site-header nav[aria-label='Main']").first();
+  await expect(desktop.locator("summary", { hasText: "Learn" })).toContainText("current section");
+  await desktop.locator("summary", { hasText: "Practise" }).click();
+  await desktop.getByRole("link", { name: /Mock interview/ }).click();
+  await expect(page).toHaveURL(/\/interview\/simulator$/);
+});

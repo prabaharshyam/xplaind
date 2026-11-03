@@ -39,14 +39,14 @@ export default function VideosPage() {
             <section key={c.id} id={c.id} aria-labelledby={`${c.id}-h`} className="scroll-mt-24">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <span aria-hidden="true" className="grid size-14 shrink-0 place-items-center rounded-2xl text-xl font-bold text-white shadow-md" style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}>
+                  <span aria-hidden="true" className="grid size-14 shrink-0 place-items-center rounded-2xl text-xl font-bold text-white shadow-md" style={{ background: `linear-gradient(135deg, ${theme.from}, color-mix(in srgb, ${theme.to} 35%, ${theme.from}))` }}>
                     {c.name.replace(/[^A-Za-z0-9 ]/g, "").split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase()}
                   </span>
                   <div>
                     <h2 id={`${c.id}-h`} className="text-xl font-semibold">
                       {c.name}
                     </h2>
-                    <p className="text-sm text-zinc-700 dark:text-zinc-300">{c.about}</p>
+                    <p className="text-card text-zinc-700 dark:text-zinc-300">{c.about}</p>
                   </div>
                 </div>
                 <p className="flex flex-wrap items-center gap-2 text-sm">

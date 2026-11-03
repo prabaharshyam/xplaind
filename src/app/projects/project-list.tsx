@@ -81,7 +81,7 @@ export function ProjectList({ projects, paths }: { projects: ProjectCardView[]; 
                     )}
                   </span>
                   <span className="text-lg font-semibold leading-snug group-hover:underline">{p.title}</span>
-                  <span className={`line-clamp-3 text-sm leading-6 ${muted}`}>{p.summary}</span>
+                  <span className={`line-clamp-3 text-card ${muted}`}>{p.summary}</span>
                   <span className="mt-auto text-xs text-zinc-600 dark:text-zinc-400">{p.where.join(" · ")}</span>
                 </span>
               </Link>

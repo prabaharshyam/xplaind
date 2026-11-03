@@ -382,7 +382,7 @@ function TopicCard({ topic, state, below }: { topic: RoadmapTopic; state: TopicS
     return (
       <div className="flex h-full min-h-12 flex-col justify-center rounded-2xl border-2 border-dashed border-zinc-300 px-3 py-2 dark:border-zinc-700" title={topic.summary}>
         <span className="text-sm leading-5 font-medium text-zinc-700 dark:text-zinc-300">{topic.title}</span>
-        <span className={`text-[11px] font-medium ${muted}`}>Coming soon{topic.optional ? " · optional" : ""}</span>
+        <span className={`text-xs font-medium ${muted}`}>Coming soon{topic.optional ? " · optional" : ""}</span>
       </div>
     );
   }
@@ -396,7 +396,7 @@ function TopicCard({ topic, state, below }: { topic: RoadmapTopic; state: TopicS
           className={`flex-1 text-sm leading-5 font-semibold text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-100 ${state === "skipped" ? "text-zinc-600 line-through dark:text-zinc-400" : ""}`}
         >
           {topic.title}
-          {topic.optional && <span className={`ml-1.5 text-[10px] font-medium ${muted}`}>Optional</span>}
+          {topic.optional && <span className={`ml-1.5 text-xs font-medium ${muted}`}>Optional</span>}
         </TopicLink>
         <button
           type="button"

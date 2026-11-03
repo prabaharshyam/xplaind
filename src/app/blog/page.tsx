@@ -30,7 +30,7 @@ export default function BlogIndex() {
               <Cover theme={BLOG_THEMES[i % BLOG_THEMES.length]} seed={p.id} icon="book" className="h-36" iconSize={40} />
               <span className="flex flex-1 flex-col p-5">
                 <h2 className="text-lg leading-7 font-semibold group-hover:underline">{p.title}</h2>
-                <span className={`mt-1 text-sm ${muted}`}>
+                <span className={`mt-1 text-card ${muted}`}>
                   <time dateTime={p.updated_on}>Updated {formatDay(p.updated_on)}</time>
                 </span>
                 <span className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{p.description}</span>

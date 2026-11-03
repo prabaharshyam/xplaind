@@ -11,6 +11,7 @@ import { type LevelId, levelIndex } from "@/lib/levels";
 import { DEFAULT_PATH_ID, type PathRef, roadmapHref, startFor, testHref } from "@/lib/paths";
 import { coverage } from "@/lib/roadmap/progress";
 import type { RoadmapStop } from "@/lib/roadmap/types";
+import { Skeleton } from "@/components/skeleton";
 
 type Level = { id: LevelId; name: string; draft_hours: number };
 type Stop = RoadmapStop & { title: string };
@@ -52,7 +53,7 @@ export function Dashboard({
       </p>
     );
   }
-  if (!claim || !today) return <p className="mt-6">Loading your progress…</p>;
+  if (!claim || !today) return <Skeleton label="Loading your progress…" className="mt-6" />;
 
   const start = result?.startLevel ?? null;
   const streak = weeklyStreak(claim.activityDays, today);

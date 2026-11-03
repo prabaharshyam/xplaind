@@ -71,7 +71,7 @@ export function MiniLesson() {
 export function MiniInterview() {
   return (
     <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 shadow-lg dark:bg-zinc-900 dark:text-zinc-100">
-      <p className="text-xs text-zinc-500">Question 2 of 5 · RAG</p>
+      <p className="text-xs text-zinc-600 dark:text-zinc-400">Question 2 of 5 · RAG</p>
       <p className="mt-1 font-semibold">How do you evaluate a RAG system?</p>
       <div className="mt-3 flex items-center justify-between">
         <span className="font-mono text-2xl tabular-nums">1:12</span>
@@ -100,7 +100,7 @@ export function MiniCourses() {
         <div key={c.title} className="overflow-hidden rounded-2xl bg-white text-zinc-900 shadow dark:bg-zinc-900 dark:text-zinc-100">
           <Cover theme={c.theme} seed={c.title} className="h-14" iconSize={18} />
           <p className="p-2 text-[11px] leading-tight font-medium">{c.title}</p>
-          <p className="px-2 pb-2 text-[10px] text-zinc-500">{c.by}</p>
+          <p className="px-2 pb-2 text-[10px] text-zinc-600 dark:text-zinc-400">{c.by}</p>
         </div>
       ))}
     </div>

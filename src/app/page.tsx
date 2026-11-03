@@ -308,7 +308,7 @@ export default function Home() {
               cta="Open a roadmap"
               tone="from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950"
             >
-              <div className="mx-auto max-w-[280px] text-zinc-500">
+              <div className="mx-auto max-w-[280px] text-zinc-600 dark:text-zinc-400">
                 <MiniRoadmap />
               </div>
             </Feature>
