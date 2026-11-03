@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AccountLink } from "./account-link";
+import { AccountLink, SignedInLinks } from "./account-link";
 import { Icon } from "./art/icons";
 import { BrandLogo } from "./brand-logo";
 import { getCommunity } from "@/lib/content/community";
@@ -97,9 +97,14 @@ export function SiteFooter() {
                     </li>
                   ))}
                   {col.title === "You" && (
-                    <li>
-                      <AccountLink className={`${link} inline-block py-1`} />
-                    </li>
+                    <>
+                      <li>
+                        <AccountLink className={`${link} inline-block py-2 sm:py-1`} />
+                      </li>
+                      <li className="flex flex-col items-start">
+                        <SignedInLinks linkClass={`${link} inline-block py-2 sm:py-1`} buttonClass={`${link} inline-block cursor-pointer py-2 text-left sm:py-1`} />
+                      </li>
+                    </>
                   )}
                 </ul>
               </div>
