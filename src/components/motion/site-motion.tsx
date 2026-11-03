@@ -32,6 +32,15 @@ export function SiteMotion() {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let cancelled = false;
     let destroy = () => {};
+    // A section link clicked before Lenis has loaded jumps natively, while the page may still be
+    // settling. Remember it, so Lenis can land on the section where it ends up (see settleAnchor).
+    let pending: { target: HTMLElement; at: number } | null = null;
+    const remember = (ev: MouseEvent) => {
+      const link = (ev.target as Element | null)?.closest?.("a[href^='#']") as HTMLAnchorElement | null;
+      const target = link ? document.getElementById(decodeURIComponent(link.hash.slice(1))) : null;
+      if (target) pending = { target, at: performance.now() };
+    };
+    document.addEventListener("click", remember, true);
     void (async () => {
       const [{ gsap }, { ScrollTrigger }, { default: Lenis }] = await Promise.all([import("gsap"), import("gsap/ScrollTrigger"), import("lenis")]);
       if (cancelled) return;
@@ -52,12 +61,46 @@ export function SiteMotion() {
       const refresh = () => ScrollTrigger.refresh();
       window.addEventListener("load", refresh);
       void document.fonts?.ready.then(refresh);
+      // In-page links (#section) glide there with Lenis. The page can still be settling while the
+      // glide runs (a roadmap's sections move by hundreds of pixels as it hydrates), so when it ends
+      // we land exactly on the target where it is now, and check once more a moment later.
+      const onAnchorClick = (ev: MouseEvent) => {
+        if (ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+        const link = (ev.target as Element | null)?.closest?.("a[href^='#']") as HTMLAnchorElement | null;
+        const id = link ? decodeURIComponent(link.hash.slice(1)) : "";
+        const target = id ? document.getElementById(id) : null;
+        if (!target) return;
+        ev.preventDefault();
+        pending = null; // Lenis handles this one; its onComplete re-aims.
+        history.pushState(null, "", `#${id}`);
+        const margin = () => parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
+        const land = () => {
+          target.scrollIntoView({ block: "start" });
+          lenis.scrollTo(window.scrollY, { immediate: true, force: true });
+        };
+        const off = () => Math.abs(target.getBoundingClientRect().top - margin()) > 4;
+        lenis.scrollTo(target.getBoundingClientRect().top + window.scrollY - margin(), {
+          onComplete: () => {
+            if (off()) land();
+            window.setTimeout(() => off() && land(), 500);
+          },
+        });
+      };
+      document.addEventListener("click", onAnchorClick);
+      const settleAnchor = () => {
+        if (!pending || performance.now() - pending.at > 6000) return;
+        pending.target.scrollIntoView({ block: "start" });
+        lenis.scrollTo(window.scrollY, { immediate: true, force: true });
+      };
+      const settleTimers = [300, 900, 1800].map((ms) => window.setTimeout(settleAnchor, ms));
       engine.current = { gsap, ScrollTrigger, lenis };
       setReady(true);
       destroy = () => {
         clearTimeout(timer);
         ro.disconnect();
         window.removeEventListener("load", refresh);
+        document.removeEventListener("click", onAnchorClick);
+        settleTimers.forEach(clearTimeout);
         gsap.ticker.remove(tick);
         lenis.destroy();
         engine.current = null;
@@ -65,6 +108,7 @@ export function SiteMotion() {
     })();
     return () => {
       cancelled = true;
+      document.removeEventListener("click", remember, true);
       destroy();
     };
   }, []);

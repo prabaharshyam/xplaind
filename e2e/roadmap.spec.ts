@@ -52,6 +52,10 @@ test.describe("roadmap (RM-1)", () => {
   });
 
   test("the map works at desktop width too", async ({ page }) => {
+    // This checks the desktop layout and the section links, not the motion. With motion on, the
+    // header's particle scene runs in software in headless Chromium and can starve the smooth
+    // scroll for seconds under parallel load; reduced motion makes the jump immediate.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({ width: 1100, height: 800 });
     await page.goto("/roadmap/genai-engineer");
     await page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: /^I2 / }).click();
