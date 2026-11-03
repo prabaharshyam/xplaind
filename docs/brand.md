@@ -12,6 +12,7 @@ One page that every new screen follows, so the site looks like one product. The 
 
 - The wordmark is `public/brand/xplaind-wordmark.png` (with `-dark` for dark pages); the version with the tagline "AI, explained simply." is `xplaind-logo.png`.
 - "XPL" and "ND" are ink (#111111 on light, #FAFAFA on dark). "AI" is brand violet: #7C3AED on light, #A78BFA on dark.
+- Square (1:1) versions for profile pictures, app stores and sign-in screens: `xplaind-logo-square.png` (1024 px, white), `-dark` (1024 px, near-black), `-transparent`, and `xplaind-icon-512.png`, the X mark with its violet bar (also the favicon).
 - Keep clear space of at least the height of the "X" around it. Never recolour, stretch, outline or put it on a busy picture.
 
 ## Colour
