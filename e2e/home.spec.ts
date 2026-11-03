@@ -26,7 +26,10 @@ const wcag = (page: import("@playwright/test").Page) =>
 test("the home page says what to do and leads to roadmaps, topics, courses and interviews", async ({ page }) => {
   await page.goto("/");
   const main = page.getByRole("main");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Learn AI for the job you want");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Everything you need to learn AI, in one place, in the right order.");
+  // JB-4: the market figures are sourced on the page.
+  await expect(main.getByRole("link", { name: "Sources" })).toHaveAttribute("href", "#market-sources");
+  await expect(page.locator("#market-sources a").first()).toHaveAttribute("href", /^https:\/\//);
   await expect(main.getByRole("link", { name: "Find my level" }).first()).toHaveAttribute("href", "/start");
   await expect(main.getByRole("heading", { level: 2, name: "Choose your AI role" })).toBeVisible();
   await expect(main.getByRole("link", { name: /^AI Engineer/ })).toHaveAttribute("href", "/roadmap/ai-engineer");

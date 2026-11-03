@@ -595,6 +595,11 @@ export const JobsFile = z
         }),
       )
       .min(1),
+    /** JB-4: India's AI job market in a few dated, sourced figures. */
+    market: z.strictObject({
+      checked: z.preprocess((v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v), IsoDate),
+      stats: z.array(z.strictObject({ value: Text.max(12), label: Text.max(80), source: Text, url: HttpsUrl })).min(2).max(4),
+    }),
   })
   .refine((j) => new Set(j.roles.map((r) => r.path)).size === j.roles.length, "JB-1: one entry per role");
 export type JobsFile = z.infer<typeof JobsFile>;

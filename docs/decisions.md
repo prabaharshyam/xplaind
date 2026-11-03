@@ -327,3 +327,11 @@ The owner chose what to build next from an analysis of gaps: a code playground, 
 - Weekly plan: built on the device from the roadmap and the hours chosen. Email or WhatsApp nudges need sign-ups and a paid sending service, so the reminder is a calendar event (Google Calendar link or .ics) that works today without an account.
 - Resume review: the file is read in the browser with the same PDF reader as Ask me from my book; only the text goes to the model for one review. Word files are saved as PDF first rather than adding a parser.
 - The owner removed "Generate a course on anything" and "Change your roadmap with AI", merged the personal coach into the AI tutor (one assistant: in every lesson and on its own page; its daily limit rose from 30 to 40 to cover the coach's use), removed the Community page in favour of direct WhatsApp links, and asked for the glossary to be visible from Practice.
+
+## 2026-11-03: "Sound familiar?" comes right after the home hero (MO-6)
+
+The owner moved the problems learners recognise to directly under the hero, so a visitor sees their own situation first and then the solutions (roles, features, practice). The section keeps each problem's fix and link, with one line introducing it.
+
+## 2026-11-03: the home page rewritten around how visitors decide (MO-6, JB-4)
+
+The owner chose the hero "Everything you need to learn AI, in one place, in the right order." and asked for the whole page to connect, convince and feel safe. The page now follows the visitor's decision: the promise; the market as proof (three sourced, dated figures: 23 lakh AI openings by 2027, +32% AI hiring in 2026, 16% of IT professionals with AI skills); their problems in their own words, including "not from a tech background" and "only a few hours a week"; how it works in three steps; the four milestones (roles, learning, getting hired with the resume review, jobs and weekly plan); a trust section of promises a visitor can check (no paid rankings, dated prices, plain English, no sign-up to start, honest market figures) with what is inside counted; a low-commitment final step; and an FAQ that answers "is it free", "how is this different from YouTube" and, honestly, "will this get me a job". No testimonials or superlatives are used, because none can be backed yet. The word "free" stays out of the hero (an earlier decision); the FAQ answers it.
