@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type Engine = {
   gsap: typeof import("gsap").gsap;
@@ -112,6 +112,29 @@ export function SiteMotion() {
       destroy();
     };
   }, []);
+
+  // NV-4: every new page opens at the top. A link clicked while Lenis is still gliding from a
+  // scroll would otherwise finish that glide on the new page and land it halfway down. Back and
+  // forward keep the position the browser restores, and an address with #section keeps its target.
+  const popped = useRef(false);
+  const firstPath = useRef(true);
+  useEffect(() => {
+    const onPop = () => {
+      popped.current = true;
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  useLayoutEffect(() => {
+    if (firstPath.current) {
+      firstPath.current = false;
+      return;
+    }
+    const back = popped.current;
+    popped.current = false;
+    if (!back && !location.hash) window.scrollTo(0, 0);
+    engine.current?.lenis.scrollTo(window.scrollY, { immediate: true, force: true });
+  }, [pathname]);
 
   // The choreography: again for every page.
   useEffect(() => {

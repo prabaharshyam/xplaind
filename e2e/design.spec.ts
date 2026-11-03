@@ -103,3 +103,28 @@ test("the menu is grouped and marks the section you are in (NV-1 to NV-3)", asyn
   await desktop.getByRole("link", { name: /Mock interview/ }).click();
   await expect(page).toHaveURL(/\/interview\/simulator$/);
 });
+
+test("a link clicked while the page is still scrolling opens the next page at the top (NV-4)", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  for (const from of ["/library", "/roadmap/ai-engineer", "/stop/evals-test-sets"]) {
+    await page.goto(from);
+    await page.waitForTimeout(1500); // the smooth scroller loads
+    await page.mouse.wheel(0, 1200);
+    await page.waitForTimeout(600);
+    const href = await page.locator("main a[href^='/stop/']").evaluateAll((as) => {
+      const seen = as.find((a) => {
+        const r = a.getBoundingClientRect();
+        return r.width > 0 && r.top > 120 && r.bottom < innerHeight - 60 && a.getAttribute("href") !== location.pathname;
+      });
+      return seen?.getAttribute("href") ?? null;
+    });
+    if (!href) continue;
+    await page.mouse.wheel(0, 600); // still gliding when the click lands
+    await page.locator(`main a[href='${href}']`).first().click({ force: true });
+    await expect(page).toHaveURL(new RegExp(`${href}$`));
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => window.scrollY), `${from} -> ${href}`).toBeLessThan(5);
+  }
+  await ctx.close();
+});
