@@ -33,9 +33,9 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
         {items.map((r, i) => (
           <li key={r.id} className="rounded-2xl border border-zinc-100 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-950">
             {r.embed && <CourseThumb provider={r.provider} kindLabel={r.kindLabel} embed={r.embed} hours={r.hours} certificate={r.certificate} size="sm" className="mb-2 aspect-video rounded-2xl" />}
-            <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+            <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
               <span className={/video/i.test(r.kindLabel) ? "text-violet-800 dark:text-violet-300" : "text-teal-800 dark:text-teal-300"}>{r.kindLabel}</span>
-              {i === 0 && <span className="rounded-full bg-zinc-900 px-1.5 py-px text-[10px] text-white dark:bg-white dark:text-zinc-900">Start here</span>}
+              {i === 0 && <span className="rounded-full bg-zinc-900 px-1.5 py-px text-xs text-white dark:bg-white dark:text-zinc-900">Start here</span>}
             </p>
             <p className="mt-1 text-sm leading-5 font-medium">{r.title}</p>
             <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">

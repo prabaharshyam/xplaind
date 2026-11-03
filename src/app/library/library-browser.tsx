@@ -167,7 +167,7 @@ export function LibraryBrowser({ items, topics, channels }: { items: LibraryItem
             <Link href={i.href} className="text-base leading-6 font-semibold hover:underline">
               {i.title}
             </Link>
-            <p className="line-clamp-2 text-sm text-zinc-700 dark:text-zinc-300">{i.channel && i.kind === "video" ? `${i.channel} · ${i.summary}` : i.summary}</p>
+            <p className="line-clamp-2 text-card text-zinc-700 dark:text-zinc-300">{i.channel && i.kind === "video" ? `${i.channel} · ${i.summary}` : i.summary}</p>
             <p className="mt-auto flex flex-wrap gap-1.5 pt-1">
               {i.topics.map((t) => (
                 <button key={t} type="button" onClick={() => set("topic", t)} className="rounded-full bg-violet-50 px-2 py-1 text-xs text-violet-900 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200">

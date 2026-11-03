@@ -20,7 +20,7 @@ export function LessonCard({ l }: { l: LessonCardData }) {
           {themeOf(l.theme).label} · {levelText(l.level)} · about {l.hours} h
         </span>
         <span className="mt-1 font-semibold leading-6 group-hover:underline">{l.title}</span>
-        <span className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{l.outcome}</span>
+        <span className="mt-1 text-card text-zinc-600 dark:text-zinc-400">{l.outcome}</span>
       </span>
     </Link>
   );

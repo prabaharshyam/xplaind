@@ -262,7 +262,7 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
               <Icon name="send" size={18} />
             </button>
           </form>
-          <p className="px-3 pb-2 text-[11px] text-zinc-600 dark:text-zinc-400">
+          <p className="px-3 pb-2 text-xs text-zinc-600 dark:text-zinc-400">
             {access === "on" ? "AI can be wrong. Chats are not saved; your message goes to Anthropic only to write the answer." : "Not saved. Answers come from Xplaind’s own pages."}
           </p>
         </section>

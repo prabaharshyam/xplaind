@@ -24,7 +24,7 @@ export default function TopicsPage() {
               <Cover theme={t.id} seed={`topic-${t.id}`} className="h-28" iconSize={36} />
               <span className="p-4">
                 <span className="block text-lg font-semibold group-hover:underline">{t.label}</span>
-                <span className="mt-1 block text-sm text-zinc-600 dark:text-zinc-400">
+                <span className="mt-1 block text-card text-zinc-600 dark:text-zinc-400">
                   {t.lessons.length} lessons · {t.lessons.slice(0, 3).map((l) => l.title).join(", ")}
                 </span>
               </span>

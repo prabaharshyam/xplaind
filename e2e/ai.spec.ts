@@ -46,7 +46,10 @@ test("the AI tools page lists every tool and says when AI is off", async ({ page
   for (const name of ["AI roadmap generator", "AI tutor", "Resume review", "Code playground", "AI interview feedback"]) {
     await expect(page.getByRole("main").getByRole("link").filter({ has: page.getByText(name, { exact: true }) })).toBeVisible();
   }
-  await expect(page.getByText(/AI tools are switched off right now/)).toBeVisible();
+  await expect(page.getByText(/AI-powered tools are paused right now/)).toBeVisible();
+  // Each AI-powered tool says it is paused; the others say they need no AI.
+  await expect(page.getByText("Paused", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("No AI needed", { exact: true }).first()).toBeVisible();
   expect(await overflow(page)).toBe(false);
 });
 

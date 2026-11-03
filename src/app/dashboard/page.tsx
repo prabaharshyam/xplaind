@@ -11,6 +11,7 @@ import { PageHero } from "@/components/page-hero";
 import { Dashboard } from "./dashboard";
 import { ProgressOverview } from "./progress-overview";
 import { primaryButtonSm } from "@/components/ui";
+import { Skeleton } from "@/components/skeleton";
 
 export const metadata: Metadata = { title: "Your dashboard", robots: { index: false } };
 
@@ -39,7 +40,7 @@ export default function DashboardPage() {
       <ProgressOverview />
       <h2 className="mt-10 text-xl font-semibold">Your account</h2>
       {accountsEnabled() ? (
-        <Suspense fallback={<p className="mt-6">Loading your progress…</p>}>
+        <Suspense fallback={<Skeleton label="Loading your progress…" className="mt-6" />}>
           <SignedIn />
         </Suspense>
       ) : (

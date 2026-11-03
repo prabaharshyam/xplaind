@@ -34,7 +34,7 @@ export function RoleGrid({ roles }: { roles: RoleCard[] }) {
                   →
                 </span>
               </span>
-              <span className="text-sm leading-6 text-zinc-700 dark:text-zinc-300">{r.tagline}</span>
+              <span className="text-card text-zinc-700 dark:text-zinc-300">{r.tagline}</span>
               <span className="mt-auto flex flex-wrap gap-2 pt-2 text-xs text-violet-950 dark:text-violet-100">
                 <span className="rounded-full bg-violet-100/80 px-2 py-0.5 dark:bg-violet-900/50">{r.coding}</span>
                 <span className="rounded-full bg-violet-100/80 px-2 py-0.5 dark:bg-violet-900/50">about {r.months} {r.months === 1 ? "month" : "months"}</span>

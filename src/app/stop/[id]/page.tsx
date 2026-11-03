@@ -159,8 +159,11 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
       <div aria-hidden="true" className="lx-progress" />
       <LessonVisit stopId={stop.id} />
       <JsonLd data={lessonGraph(stop, paths)} />
-      <header className="relative overflow-hidden text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}>
+      {/* A11Y-1: the light end of a topic's colours is blended in only a third of the way, and a dark layer sits
+          over the art, so white text keeps at least 4.5:1 contrast on every topic. */}
+      <header className="relative overflow-hidden text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, color-mix(in srgb, ${theme.to} 35%, ${theme.from}))` }}>
         <Cover theme={stop.theme} seed={stop.id} className="absolute inset-0 opacity-60 [&>div:last-child]:hidden" />
+        <div aria-hidden="true" className="absolute inset-0 bg-black/[0.22]" />
         <div className="relative mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row md:items-end md:justify-between md:px-6 md:py-12">
           <div className="max-w-3xl">
             <nav aria-label="Breadcrumb" className="text-sm text-white/90">

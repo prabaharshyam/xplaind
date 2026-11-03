@@ -9,6 +9,7 @@ import { parsePlan, rawPlan, savePlan } from "@/lib/browser/plan-store";
 import { setPath } from "@/lib/browser/progress-store";
 import { serverSnapshot, subscribe } from "@/lib/browser/storage";
 import { currentPlan, googleCalendarLink, HOUR_CHOICES, nextMonday, type PlanLesson, planWeek, reminderIcs, weekOf } from "@/lib/plan/weekly";
+import { Skeleton } from "@/components/skeleton";
 
 const DEFAULT_HOURS = 6;
 const fmt = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
@@ -37,7 +38,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
     if (plan && plan !== saved) savePlan(plan);
   }, [plan, saved]);
 
-  if (!week || !plan) return <p className="text-zinc-600 dark:text-zinc-400">Making your plan…</p>;
+  if (!week || !plan) return <Skeleton label="Making your plan…" rows={4} />;
 
   const items = plan.lessonIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
   const done = items.filter((l) => progress.stops[l.id]?.status === "done").length;

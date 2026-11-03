@@ -61,7 +61,7 @@ export function CourseThumb({
             <Icon name="play" size={size === "sm" ? 12 : 18} />
           </span>
         </span>
-        <span className="absolute right-1.5 bottom-1.5 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-semibold text-white">{length(hours)}</span>
+        <span className="absolute right-1.5 bottom-1.5 rounded bg-black/75 px-1.5 py-0.5 text-xs font-semibold text-white">{length(hours)}</span>
       </div>
     );
   }
@@ -71,9 +71,9 @@ export function CourseThumb({
       {/* the ticket's torn edge */}
       <span className={`w-2 shrink-0 ${t.edge}`} />
       <span className={`flex min-w-0 flex-1 flex-col justify-between p-3 ${t.ink}`}>
-        <span className="text-[11px] font-semibold opacity-80">{kindLabel}</span>
+        <span className="text-xs font-semibold opacity-80">{kindLabel}</span>
         <span className={`leading-tight font-semibold text-balance ${size === "sm" ? "text-sm" : "text-lg"}`}>{provider}</span>
-        <span className="flex items-center gap-2 text-[11px] font-medium opacity-90">
+        <span className="flex items-center gap-2 text-xs font-medium opacity-90">
           {length(hours)}
           {certificate && (
             <span className="inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 dark:bg-black/30">

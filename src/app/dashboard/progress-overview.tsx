@@ -86,7 +86,7 @@ export function ProgressOverview() {
               key={b.id}
               className={`flex items-center gap-3 rounded-2xl border p-3 ${b.earned ? "border-violet-300 bg-violet-50 dark:border-violet-800 dark:bg-violet-950/40" : "border-dashed border-zinc-300 dark:border-zinc-700"}`}
             >
-              <span className={`grid size-11 shrink-0 place-items-center rounded-full ${b.earned ? "bg-violet-600 text-white" : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800"}`}>
+              <span className={`grid size-11 shrink-0 place-items-center rounded-full ${b.earned ? "bg-violet-600 text-white" : "bg-zinc-200 text-zinc-600 dark:text-zinc-400 dark:bg-zinc-800"}`}>
                 <Icon name={b.earned ? (BADGE_ICON[b.id] ?? "star") : "lock"} size={20} />
               </span>
               <span>

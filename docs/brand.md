@@ -35,9 +35,9 @@ Seven colour families in all. Anything else is a bug.
 
 ## Type
 
-- Geist Sans for everything, Geist Mono for code.
-- Body text is 16 px or more (lessons 18 px). Nothing a person must read is under 14 px, and the top menu is 14 px.
-- Headings are semibold with tight tracking. Small labels are sentence case ("Why it matters"), not capitals.
+- Headings (h1 to h3) use **Bricolage Grotesque**, a friendly grotesque with optical sizing: big titles get tight, confident letterforms and small headings stay open. It is self-hosted from `@fontsource-variable/bricolage-grotesque`, so builds need no network. Body text and interface use Geist Sans; code uses Geist Mono.
+- One scale: display 42 to 68 px (home hero), h1 30 to 44 px, h2 24 to 30 px, h3 18 to 20 px, body 16 px (lessons 18 px), card text 15 px (`text-card`), small 14 px, caption 12 px for dates and sources only.
+- Headings are semibold with slightly tight tracking and balanced line breaks. Small labels are sentence case, never capitals.
 
 ## Shape
 
@@ -55,6 +55,10 @@ Seven colour families in all. Anything else is a bug.
 - GSAP for choreography, Lenis as the only smooth-scroll engine, CSS for hover and focus.
 - Motion moves position and angle, never the opacity of text. Everything has a still version under `prefers-reduced-motion`.
 - The 3D road (home) and particle sculptures (page headers) are the signature; they never sit behind body text and are hidden on phones when they would push content down.
+
+## Navigation
+
+- The top menu has four entries: Learn, Practise and Career open short menus with a one-line note under each link, and AI tools is a direct link. The section you are in is underlined and announced to screen readers. On phones the same groups fill the screen below the top bar, with the main action first.
 
 ## Mascot
 

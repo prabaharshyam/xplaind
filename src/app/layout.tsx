@@ -11,7 +11,17 @@ import { allowIndexing } from "@/lib/indexing";
 import { siteUrl } from "@/lib/site";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import localFont from "next/font/local";
 import "./globals.css";
+
+// BR-1: Bricolage Grotesque for headings (self-hosted from the package, so builds need no network);
+// Geist stays for body text. One variable file covers every weight and optical size.
+const display = localFont({
+  src: "../../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-opsz-normal.woff2",
+  variable: "--font-bricolage",
+  weight: "200 800",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   // SE-3: absolute links, the site's name and share previews for every page.
@@ -31,7 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <SiteHeader />
