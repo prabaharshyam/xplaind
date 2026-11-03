@@ -363,3 +363,11 @@ The owner wrote his story with Claude over several drafts and approved the final
 
 The owner found the AI tools cards, a big coloured banner with one icon each, read like folders. Product launchers (app stores, Raycast, Notion and Linear integration directories, the Google Workspace app grid) show a tool as an app icon, its name, a status, one line on what it does and an Open button, so the page now does the same. Each card also says what you give the tool and what you get back, tools are grouped by the job (Study, Practise, Get hired, Go deeper), and AI-powered tools say "Uses AI" and show "Paused" while AI is off, while the others say "No AI needed". The "Most popular" and "New" badges were dropped because no usage data backs them. "Ask me from my book" stays first (SU-1). The page uses the compact header so the tools start on the first phone screen.
 
+## 2026-11-03: a Sign in link that is always there (AC-6)
+
+After sign-ups reopened, the owner could not find a way to sign in. The header's one button said "Continue learning" for anyone who had opened a lesson, which hid sign-in for exactly the returning visitors most likely to want an account. Signed-out visitors now always see a "Sign in" link next to the main button on larger screens, and a "Sign in or create an account" button under the main action in the phone menu. Signed-in learners and sites with accounts off see neither.
+
+## 2026-11-03: the dashboard crashed on Vercel once accounts were on (fix)
+
+After the owner reopened sign-ups, /dashboard showed "This page couldn't load" for everyone, signed in or not. With accounts on, the dashboard is partly dynamic, so on each request Vercel re-renders it, and that render reads the lesson files in content/ (for the "Continue" card and the signed-in panel). Those files were only shipped with API routes, so on Vercel the read failed; locally the folder is always there, and CI runs with accounts off, so no test reached this path. content/ and data/ (about 9 MB) now ship with every route. The traced files for /dashboard went from 195 to all 1,844.
+
