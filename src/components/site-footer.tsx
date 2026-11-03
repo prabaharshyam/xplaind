@@ -45,6 +45,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/plan", label: "Weekly plan" },
       { href: "/jobs", label: "Jobs and salaries" },
       { href: "/about", label: "About Xplaind" },
+      { href: "/about#founder", label: "Meet the founder" },
     ],
   },
 ];
