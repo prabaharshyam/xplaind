@@ -130,3 +130,11 @@ test("a link clicked while the page is still scrolling opens the next page at th
   }
   await ctx.close();
 });
+
+test("a lesson opens at its top, not at a widget further down (NV-4)", async ({ page }) => {
+  for (const url of ["/stop/agent-failures", "/stop/evals-test-sets", "/stop/python-basics"]) {
+    await page.goto(url);
+    await page.waitForTimeout(2000); // widgets, the tutor and the smooth scroller have loaded
+    expect(await page.evaluate(() => window.scrollY), url).toBeLessThan(5);
+  }
+});
