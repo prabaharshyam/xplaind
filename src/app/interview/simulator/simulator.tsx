@@ -35,8 +35,24 @@ type Recognition = {
   onresult: ((e: RecognitionEvent) => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   onend: (() => void) | null;
+  onaudiostart?: (() => void) | null;
 };
 type RecognitionCtor = new () => Recognition;
+
+/**
+ * VS-1: one recogniser for the whole interview. iPhone browsers all use Safari's speech engine, which
+ * runs one recognition at a time and silently gives a new one no audio while the last is still
+ * shutting down, so a fresh recogniser per question went deaf from question 2 on. `active` is true
+ * from start() until the browser reports the end.
+ */
+let shared: { r: Recognition; active: boolean } | null = null;
+function sharedRecognizer(Ctor: RecognitionCtor) {
+  if (!shared) shared = { r: new Ctor(), active: false };
+  return shared;
+}
+
+/** How long to wait for sound after the microphone starts before telling the learner it is not working. */
+const HEAR_TIMEOUT_MS = 5000;
 
 const recognitionCtor = (): RecognitionCtor | null => {
   if (typeof window === "undefined") return null;
@@ -247,10 +263,10 @@ function QuestionScreen({
   const [now, setNow] = useState<number>(0);
   const [shownAt] = useState(() => Date.now());
   const [notice, setNotice] = useState<string | null>(null);
-  const recognition = useRef<Recognition | null>(null);
   const wantListening = useRef(false);
   const submitted = useRef(false);
   const micButton = useRef<HTMLButtonElement>(null);
+  const heardTimer = useRef<number | null>(null);
 
   const elapsed = startedAt === null ? 0 : Math.max(0, (now - startedAt) / 1000);
   const left = Math.max(0, q.answer_seconds - elapsed);
@@ -258,7 +274,9 @@ function QuestionScreen({
 
   const stopListening = useCallback(() => {
     wantListening.current = false;
-    recognition.current?.stop();
+    if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
+    heardTimer.current = null;
+    shared?.r.stop();
     setListening(false);
     setInterim("");
   }, []);
@@ -268,6 +286,7 @@ function QuestionScreen({
       if (submitted.current) return;
       submitted.current = true;
       stopListening();
+      shared?.r.abort();
       const seconds = startedAt === null ? 0 : Math.min(q.answer_seconds, (Date.now() - startedAt) / 1000);
       onSubmit({ text: (override ?? joinText(text, interim)).trim(), seconds });
     },
@@ -280,12 +299,31 @@ function QuestionScreen({
     const Ctor = recognitionCtor();
     if (!Ctor) return;
     beginClock();
-    recognition.current?.abort();
-    const r = new Ctor();
+    const s = sharedRecognizer(Ctor);
+    const r = s.r;
+    const clearHeardTimer = () => {
+      if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
+      heardTimer.current = null;
+    };
+    // If no sound reaches us soon after a start, say so plainly instead of showing "Listening…" forever.
+    const expectSound = (message: string) => {
+      clearHeardTimer();
+      heardTimer.current = window.setTimeout(() => {
+        heardTimer.current = null;
+        wantListening.current = false;
+        r.abort();
+        setListening(false);
+        setInterim("");
+        setNotice(message);
+      }, HEAR_TIMEOUT_MS);
+    };
+    const heard = () => clearHeardTimer();
     r.lang = "en-IN";
     r.continuous = true;
     r.interimResults = true;
+    r.onaudiostart = heard;
     r.onresult = (e) => {
+      heard();
       let finalText = "";
       let interimText = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -298,6 +336,7 @@ function QuestionScreen({
     };
     r.onerror = (e) => {
       if (e.error === "no-speech" || e.error === "aborted") return;
+      clearHeardTimer();
       wantListening.current = false;
       setListening(false);
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
@@ -307,25 +346,45 @@ function QuestionScreen({
         setNotice("Speech-to-text stopped working. Type the rest of your answer, or press the microphone again.");
       }
     };
-    // Browsers end recognition after a pause; carry on while the learner still wants it.
+    // Browsers end recognition after a pause; carry on while the learner still wants it. Phones may
+    // refuse a restart that no tap started, so the sound check turns the microphone off if it stays quiet.
     r.onend = () => {
-      if (recognition.current !== r) return; // a replaced recogniser ends quietly
-      if (wantListening.current) {
-        try {
-          r.start();
-        } catch {
-          setListening(false);
-        }
-      } else setListening(false);
+      s.active = false;
+      if (!wantListening.current) {
+        clearHeardTimer();
+        setListening(false);
+        return;
+      }
+      try {
+        r.start();
+        s.active = true;
+        expectSound("The microphone paused. Tap “Speak more” to carry on, or type the rest of your answer.");
+      } catch {
+        setListening(false);
+      }
     };
-    recognition.current = r;
     wantListening.current = true;
-    try {
+    const begin = () => {
       r.start();
+      s.active = true;
       setListening(true);
       setNotice(null);
+      expectSound("The microphone isn't picking up any sound. Tap “Start speaking” to try again, or type your answer.");
+    };
+    try {
+      if (s.active) r.abort(); // a recognition from the last question is still closing
+      begin();
     } catch {
-      // Already started: nothing to do.
+      // Still closing: start as soon as the browser says it has ended.
+      r.onend = () => {
+        s.active = false;
+        try {
+          begin();
+        } catch {
+          setListening(false);
+          setNotice("The microphone couldn't start. Tap “Start speaking” again, or type your answer.");
+        }
+      };
     }
   }, [beginClock, onVoiceFailed]);
 
@@ -369,7 +428,8 @@ function QuestionScreen({
     micButton.current?.focus();
     return () => {
       wantListening.current = false;
-      recognition.current?.abort();
+      if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
+      shared?.r.abort();
     };
   }, []);
 

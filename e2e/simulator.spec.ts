@@ -110,3 +110,73 @@ test("Space turns a (fake) microphone on and off and the words land in the answe
   await expect(page.getByRole("heading", { name: "Your interview report" })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "Retrieves relevant text from your documents" }).filter({ hasText: "You said:" })).toBeVisible();
 });
+
+// VS-1: iPhone browsers all use Safari's speech engine, which runs one recognition at a time and gives
+// a second recogniser no audio. This stand-in does the same: only the first one ever created hears.
+const iphoneLikeSpeech = (deaf = false) => {
+  class PhoneRecognition {
+    static made = 0;
+    lang = "";
+    continuous = false;
+    interimResults = false;
+    onresult: ((e: unknown) => void) | null = null;
+    onerror: ((e: unknown) => void) | null = null;
+    onend: (() => void) | null = null;
+    onaudiostart: (() => void) | null = null;
+    private live = false;
+    private hears: boolean;
+    constructor() {
+      PhoneRecognition.made++;
+      this.hears = !deaf && PhoneRecognition.made === 1;
+    }
+    start() {
+      this.live = true;
+      if (!this.hears) return; // starts without error, but never hears anything
+      setTimeout(() => {
+        if (!this.live) return;
+        this.onaudiostart?.();
+        const result = Object.assign([{ transcript: "We retrieve relevant chunks and cite the source" }], { isFinal: true });
+        this.onresult?.({ resultIndex: 0, results: [result] });
+      }, 100);
+    }
+    stop() {
+      this.live = false;
+      setTimeout(() => this.onend?.(), 10);
+    }
+    abort() {
+      this.stop();
+    }
+  }
+  for (const name of ["SpeechRecognition", "webkitSpeechRecognition"]) {
+    Object.defineProperty(window, name, { value: PhoneRecognition, configurable: true, writable: true });
+  }
+};
+
+test("on a phone-like speech engine, every question of a voice interview still hears the answer (VS-1)", async ({ page }) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0.42;
+  });
+  await page.addInitScript(iphoneLikeSpeech, false);
+  await page.goto("/interview/simulator?path=genai-engineer");
+  await page.getByRole("radio", { name: "3" }).check();
+  await page.getByRole("button", { name: "Allow the microphone and start" }).click();
+  for (let i = 1; i <= 3; i++) {
+    await expect(page.getByText(`Question ${i} of 3`)).toBeVisible();
+    await page.getByRole("button", { name: /Start speaking/ }).click();
+    await expect(page.getByLabel(/Your answer/)).toHaveValue(/retrieve relevant chunks/);
+    await page.getByRole("button", { name: /Stop the microphone/ }).click();
+    await page.getByLabel(/Your answer/).press("Enter");
+  }
+  await expect(page.getByRole("heading", { name: "Your interview report" })).toBeVisible();
+  await expect(page.getByText("Answered", { exact: true }).locator("..")).toContainText("3 of 3");
+});
+
+test("when the microphone hears nothing, the learner is told and the microphone turns off (VS-1)", async ({ page }) => {
+  await page.addInitScript(iphoneLikeSpeech, true);
+  await page.goto("/interview/simulator?question=what-is-rag");
+  await page.getByRole("button", { name: "Allow the microphone and start" }).click();
+  await page.getByRole("button", { name: /Start speaking/ }).click();
+  await expect(page.getByRole("button", { name: /Stop the microphone/ })).toBeVisible();
+  await expect(page.getByText(/isn't picking up any sound/)).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole("button", { name: /Start speaking/ })).toHaveAttribute("aria-pressed", "false");
+});
