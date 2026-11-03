@@ -327,3 +327,7 @@ The owner chose what to build next from an analysis of gaps: a code playground, 
 - Weekly plan: built on the device from the roadmap and the hours chosen. Email or WhatsApp nudges need sign-ups and a paid sending service, so the reminder is a calendar event (Google Calendar link or .ics) that works today without an account.
 - Resume review: the file is read in the browser with the same PDF reader as Ask me from my book; only the text goes to the model for one review. Word files are saved as PDF first rather than adding a parser.
 - The owner removed "Generate a course on anything" and "Change your roadmap with AI", merged the personal coach into the AI tutor (one assistant: in every lesson and on its own page; its daily limit rose from 30 to 40 to cover the coach's use), removed the Community page in favour of direct WhatsApp links, and asked for the glossary to be visible from Practice.
+
+## 2026-11-03: "Sound familiar?" comes right after the home hero (MO-6)
+
+The owner moved the problems learners recognise to directly under the hero, so a visitor sees their own situation first and then the solutions (roles, features, practice). The section keeps each problem's fix and link, with one line introducing it.

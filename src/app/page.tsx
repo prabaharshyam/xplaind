@@ -136,6 +136,34 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Right after the hero: the problems visitors recognise, each with how the site solves it. */}
+      <section aria-labelledby="pains-heading" className="py-16 md:py-24">
+        <div className="mx-auto max-w-6xl px-4 md:px-6">
+          <h2 id="pains-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
+            <Words text="Sound familiar?" />
+          </h2>
+          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">
+            Most people learning AI get stuck in the same places. Here is how Xplaind gets you past each one.
+          </p>
+          <ul aria-labelledby="pains-heading" className="mt-8 grid gap-5 md:grid-cols-2" data-rise-group>
+            {PAINS.map((p) => (
+              <li key={p.pain} data-rise className="flex gap-4 rounded-3xl bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
+                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  <Icon name={p.icon} size={24} />
+                </span>
+                <div>
+                  <p className="text-lg font-semibold leading-7">{p.pain}</p>
+                  <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{p.fix}</p>
+                  <Link href={p.href} className="mt-3 inline-block font-medium text-emerald-800 hover:underline dark:text-emerald-400">
+                    {p.cta} →
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
       {/* AC-6: a returning learner carries on from their last lesson. */}
       <div className="mx-auto max-w-6xl px-4 empty:hidden md:px-6 [&>section]:my-8">
         <ContinueCard titles={Object.fromEntries(stops.map((s) => [s.id, s.title]))} />
@@ -234,25 +262,6 @@ export default function Home() {
               </div>
             </Feature>
           </div>
-          <h3 id="pains-heading" data-words className="mt-16 text-2xl font-semibold tracking-tight md:text-3xl">
-            <Words text="Sound familiar?" />
-          </h3>
-          <ul aria-labelledby="pains-heading" className="mt-6 grid gap-5 md:grid-cols-2" data-rise-group>
-            {PAINS.map((p) => (
-              <li key={p.pain} data-rise className="flex gap-4 rounded-3xl bg-white/85 p-6 shadow-sm ring-1 ring-violet-100 backdrop-blur dark:bg-zinc-950/70 dark:ring-violet-900">
-                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  <Icon name={p.icon} size={24} />
-                </span>
-                <div>
-                  <p className="text-lg font-semibold leading-7">{p.pain}</p>
-                  <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{p.fix}</p>
-                  <Link href={p.href} className="mt-3 inline-block font-medium text-emerald-800 hover:underline dark:text-emerald-400">
-                    {p.cta} →
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
         </div>
       </section>
 
