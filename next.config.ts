@@ -7,12 +7,12 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [{ protocol: "https", hostname: "i.ytimg.com", pathname: "/vi/**" }],
   },
-  // API routes read content/ at run time (getContent uses process.cwd(), which file tracing
-  // cannot follow), so ship those files with every route; pages are prerendered at build.
+  // getContent reads content/ with process.cwd(), which file tracing cannot follow, so ship the
+  // content with every route. Not only API routes read it at run time: a partly dynamic page such as
+  // /dashboard re-renders on each request once accounts are on, and an unknown lesson or post renders
+  // its not-found page on demand. Without the files those pages crashed on Vercel (2026-11-03).
   outputFileTracingIncludes: {
-    "/api/**": ["./content/**/*", "./data/**/*"],
-    "/go/**": ["./content/**/*"],
-    "/community": ["./content/community/**/*"],
+    "/**": ["./content/**/*", "./data/**/*"],
     // Share images draw the logo from this file when they render on demand.
     "/**/opengraph-image*": ["./public/brand/xplaind-wordmark.png"],
   },
