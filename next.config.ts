@@ -12,9 +12,8 @@ const nextConfig: NextConfig = {
   // /dashboard re-renders on each request once accounts are on, and an unknown lesson or post renders
   // its not-found page on demand. Without the files those pages crashed on Vercel (2026-11-03).
   outputFileTracingIncludes: {
-    "/**": ["./content/**/*", "./data/**/*"],
-    // Share images draw the logo from this file when they render on demand.
-    "/**/opengraph-image*": ["./public/brand/xplaind-wordmark.png"],
+    // Share images draw the logo from this file; the root share image belongs to every page.
+    "/**": ["./content/**/*", "./data/**/*", "./public/brand/xplaind-wordmark.png"],
   },
   // The roles were reorganised on 2026-10-26: old links land on the closest new roadmap.
   async redirects() {

@@ -3,14 +3,27 @@ import fs from "node:fs";
 import path from "node:path";
 import { ImageResponse } from "next/og";
 
-// The official wordmark, read once at build time.
-const LOGO = `data:image/png;base64,${fs
-  .readFileSync(path.join(/* turbopackIgnore: true */ process.cwd(), "public", "brand", "xplaind-wordmark.png"))
-  .toString("base64")}`;
+// The official wordmark, read the first time a share image is drawn, never when the module loads.
+// The root share image is part of every page's metadata, so a read at load time ran on every
+// dynamic page (such as /dashboard) and crashed it on Vercel when the file was not shipped there.
+// If the file is ever missing, the card is drawn without the logo instead of failing.
+let logo: string | null | undefined;
+function wordmark(): string | null {
+  if (logo === undefined) {
+    try {
+      const file = path.join(/* turbopackIgnore: true */ process.cwd(), "public", "brand", "xplaind-wordmark.png");
+      logo = `data:image/png;base64,${fs.readFileSync(file).toString("base64")}`;
+    } catch {
+      logo = null;
+    }
+  }
+  return logo;
+}
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
 export function ogCard({ eyebrow, title, footer, from, to }: { eyebrow: string; title: string; footer: string; from: string; to: string }) {
+  const LOGO = wordmark();
   return new ImageResponse(
     (
       <div
@@ -28,7 +41,7 @@ export function ogCard({ eyebrow, title, footer, from, to }: { eyebrow: string; 
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- next/og draws plain img tags */}
-          <img src={LOGO} alt="" width={254} height={40} />
+          {LOGO ? <img src={LOGO} alt="" width={254} height={40} /> : <div style={{ fontSize: 34, fontWeight: 800 }}>XPLAIND</div>}
           <div style={{ width: 3, height: 34, borderRadius: 2, background: `linear-gradient(180deg, ${from}, ${to})`, marginLeft: 6 }} />
           <div style={{ fontSize: 26, color: "#6d28d9", fontWeight: 600 }}>{eyebrow}</div>
         </div>

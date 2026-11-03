@@ -371,3 +371,7 @@ After sign-ups reopened, the owner could not find a way to sign in. The header's
 
 After the owner reopened sign-ups, /dashboard showed "This page couldn't load" for everyone, signed in or not. With accounts on, the dashboard is partly dynamic, so on each request Vercel re-renders it, and that render reads the lesson files in content/ (for the "Continue" card and the signed-in panel). Those files were only shipped with API routes, so on Vercel the read failed; locally the folder is always there, and CI runs with accounts off, so no test reached this path. content/ and data/ (about 9 MB) now ship with every route. The traced files for /dashboard went from 195 to all 1,844.
 
+## 2026-11-03: the dashboard's second crash, the share-image logo (fix)
+
+With the content files shipped, the signed-in dashboard still crashed on Vercel, now with "ENOENT: public/brand/xplaind-wordmark.png". The root share image belongs to every page's metadata, and its helper read the logo when the module loaded, so every dynamic page needed a file only the share-image routes shipped. The logo is now read only when a share image is drawn, a missing logo draws the card without it instead of failing, and the logo ships with every route. A new CI step, `npm run check:traces`, fails when any route's bundle lacks content/, data/ or the logo; on the old configuration it reports 83 of 86 routes.
+
