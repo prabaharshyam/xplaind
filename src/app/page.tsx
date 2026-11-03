@@ -314,16 +314,17 @@ export default function Home() {
       </section>
 
       {/* Milestone 4: the finish line. */}
-      <section aria-labelledby="final-heading" className="py-24 text-center md:py-36">
+      <section aria-labelledby="final-heading" className="py-24 text-left md:py-36 md:text-center">
         <div className="mx-auto max-w-3xl px-4">
-          <div className="flex justify-center">
+          {/* Left-aligned on phones like the other milestones; centred as a closing call on larger screens. */}
+          <div className="flex justify-start md:justify-center">
             <Gate n={4} label="Your AI career" />
           </div>
           <h2 id="final-heading" data-words className="mt-5 text-4xl font-semibold tracking-tight text-balance md:text-6xl">
             <Words text="Your AI career starts with one lesson." />
           </h2>
-          <p className="mx-auto mt-5 max-w-xl text-lg text-zinc-800 dark:text-zinc-200">Pick a role and do the first topic today. It takes about 20 minutes.</p>
-          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+          <p className="mt-5 max-w-xl text-lg text-zinc-800 md:mx-auto dark:text-zinc-200">Pick a role and do the first topic today. It takes about 20 minutes.</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row md:justify-center">
             <Link data-magnetic href="/paths" className="inline-flex min-h-12 items-center justify-center rounded-full bg-violet-700 px-6 font-medium text-white shadow-lg shadow-violet-700/30 hover:bg-violet-800">
               Choose a roadmap
             </Link>
