@@ -22,8 +22,8 @@ export type DrawerCourse = {
 export type TopicDetail = {
   id: string;
   title: string;
-  outcome: string;
-  why: string;
+  /** RM-13: the lesson's plain one-line answer, shown as "What it is". */
+  what: string;
   hours: number;
   level: string;
   theme: ThemeId;
@@ -43,8 +43,7 @@ export function topicDetails(lessonIds: readonly string[]): Record<string, Topic
     out[id] = {
       id,
       title: s.title,
-      outcome: s.outcome,
-      why: s.why_it_matters,
+      what: s.answer,
       hours: s.hours,
       level: s.level,
       theme: s.theme,

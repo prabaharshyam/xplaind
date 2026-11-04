@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Cover } from "@/components/art/cover";
+import { GuideCover } from "@/components/guide-cover";
 import { PageHero } from "@/components/page-hero";
 import { muted } from "@/components/ui";
 import { getBlogPosts } from "@/lib/content";
@@ -27,7 +27,7 @@ export default function BlogIndex() {
               href={`/blog/${p.id}`}
               className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900"
             >
-              <Cover theme={BLOG_THEMES[i % BLOG_THEMES.length]} seed={p.id} icon="book" className="h-36" iconSize={40} />
+              <GuideCover cover={p.cover} theme={BLOG_THEMES[i % BLOG_THEMES.length]} seed={p.id} />
               <span className="flex flex-1 flex-col p-5">
                 <h2 className="text-lg leading-7 font-semibold group-hover:underline">{p.title}</h2>
                 <span className={`mt-1 text-card ${muted}`}>

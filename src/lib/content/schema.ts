@@ -507,6 +507,10 @@ export const BlogFrontmatter = z.strictObject({
   related_lessons: z.array(Slug).default([]),
   /** Short questions and answers shown at the end and given to search engines. */
   faq: z.array(z.strictObject({ q: Text, a: Text.max(600) })).default([]),
+  /** BL-1: the guide's cover picture in public/blog/covers, with alt text. */
+  cover: z
+    .strictObject({ src: z.string().regex(/^\/blog\/covers\/[a-z0-9-]+\.webp$/, "a cover lives at /blog/covers/<name>.webp"), alt: Text.max(160) })
+    .optional(),
   ...reviewShape,
 });
 export type BlogFrontmatter = z.infer<typeof BlogFrontmatter>;
