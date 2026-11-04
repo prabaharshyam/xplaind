@@ -26,42 +26,42 @@ export const metadata: Metadata = {
 const PAINS: { pain: string; fix: string; href: string; cta: string; icon: IconName }[] = [
   {
     pain: "“I want to learn AI, but I don’t know where to start.”",
-    fix: "Pick the job you want. Its roadmap lays out every topic in order, and a 10-minute test skips what you already know.",
+    fix: "Pick the job you want. Its roadmap puts every topic in order.",
     href: "/paths",
     cta: "See the roadmaps",
     icon: "compass",
   },
   {
     pain: "“There are a thousand courses. Which one is worth my time?”",
-    fix: "For every topic we pick the one course that teaches it best, and tell you why. Nobody pays us to be on the list.",
+    fix: "We pick the one best course for each topic. Nobody pays to be listed.",
     href: "/resources",
     cta: "Browse courses",
     icon: "book",
   },
   {
     pain: "“I watched tutorials, but I still can’t build anything.”",
-    fix: "Every lesson ends with a quick check, code examples run right here in your browser, and every stage ends with a project you can show an employer.",
+    fix: "Quick checks, code you run in the browser, and a project at every stage.",
     href: "/playground",
     cta: "Try the code playground",
     icon: "code",
   },
   {
     pain: "“I’m not from a tech background.”",
-    fix: "Three roadmaps need no coding at all: AI Product Manager, AI Automation Specialist and AI Governance. Every lesson is in plain English.",
+    fix: "Three roadmaps need no coding: AI Product Manager, AI Automation and AI Governance.",
     href: "/paths",
     cta: "See roles without coding",
     icon: "people",
   },
   {
     pain: "“I only have a few hours a week.”",
-    fix: "Lessons take about 20 minutes. Tell us your hours and we plan your week, with a reminder every Monday.",
+    fix: "Lessons take about 20 minutes, and we plan your week around your hours.",
     href: "/plan",
     cta: "Plan my week",
     icon: "map",
   },
   {
     pain: "“I freeze in interviews.”",
-    fix: "Answer real AI interview questions out loud, against the clock, and see exactly what you covered and missed.",
+    fix: "Answer real AI interview questions out loud and see what you missed.",
     href: "/interview/simulator",
     cta: "Try a mock interview",
     icon: "mic",
@@ -69,48 +69,48 @@ const PAINS: { pain: string; fix: string; href: string; cta: string; icon: IconN
 ];
 
 const STEPS: { icon: IconName; title: string; text: string }[] = [
-  { icon: "compass", title: "Choose the job you want", text: "Pick one of the AI roles, or take the 10-minute level test and let it suggest where to begin." },
-  { icon: "map", title: "Follow the roadmap, one topic at a time", text: "Each topic is a 20-minute lesson, the one course worth your time and a quick check. You always know what comes next." },
-  { icon: "trophy", title: "Prove it and get hired", text: "Build a project at the end of every stage, practise interviews out loud, polish your resume and see live openings." },
+  { icon: "compass", title: "Choose the job you want", text: "Pick an AI role, or let the 10-minute level test suggest one." },
+  { icon: "map", title: "Follow the roadmap, one topic at a time", text: "Each topic is a 20-minute lesson, the best course and a quick check." },
+  { icon: "trophy", title: "Prove it and get hired", text: "Build projects, practise interviews out loud and see live openings." },
 ];
 
 const TRUST: { icon: IconName; title: string; text: string }[] = [
-  { icon: "scale", title: "No paid rankings, ever", text: "We pick courses on how well they teach. No one can pay to be listed or to rank higher." },
-  { icon: "tick", title: "Prices with dates", text: "When a course costs money, we show the price and the date we checked it, so nothing surprises you." },
-  { icon: "chat", title: "Plain English, Indian examples", text: "Lessons explain AI the way a good senior colleague would, with worked examples from Indian work life." },
-  { icon: "lock", title: "Start without signing up", text: "Read every lesson, practise every question and use the AI tools without an account. Your progress stays on your device." },
-  { icon: "target", title: "Built around real jobs", text: "Each roadmap follows what the role does at work, and the interview questions cover what AI interviews test." },
-  { icon: "shield", title: "Honest about the market", text: "Salaries and job figures come with their source and the date we checked them. No hype, no promised packages." },
+  { icon: "scale", title: "No paid rankings, ever", text: "No one can pay to be listed or to rank higher." },
+  { icon: "tick", title: "Prices with dates", text: "Every price shows the date we checked it." },
+  { icon: "chat", title: "Plain English, Indian examples", text: "Explained the way a good senior colleague would." },
+  { icon: "lock", title: "Start without signing up", text: "Learn and practise without an account. Progress stays on your device." },
+  { icon: "target", title: "Built around real jobs", text: "Each roadmap follows what the role does at work." },
+  { icon: "shield", title: "Honest about the market", text: "Salaries and job figures show their source and date. No promised packages." },
 ];
 
 const FAQ = [
   {
     q: "Is Xplaind free?",
-    a: "Yes. Every roadmap, lesson, interview question and AI tool on Xplaind is free. Some of the courses we recommend are paid; we always show the price and the date we checked it, and we never take money to rank a course.",
+    a: "Yes. Every roadmap, lesson, interview question and AI tool here is free. Some courses we recommend are paid; we show the price and the date we checked it.",
   },
   {
     q: "How is this different from YouTube and online courses?",
-    a: "YouTube and course sites give you thousands of options and no order. Xplaind gives you one path: what to learn, in what order, the one resource worth your time for each topic, a check that you understood it, a project to prove it, and interview practice at the end.",
+    a: "They give you thousands of options and no order. Xplaind gives you one path: what to learn next, the best resource for it, a check, a project and interview practice.",
   },
   {
     q: "Which AI role should I choose?",
-    a: "Start from your background. If you code, AI Engineer is the broadest start; Generative AI & LLM Engineer, Agentic AI Engineer, Machine Learning Engineer and MLOps Engineer go deeper in one area, and Forward Deployed Engineer adds client work. If you do not code, choose AI Product Manager, AI Automation Specialist or AI Governance & Compliance Specialist. Not sure? The 10-minute level test suggests one.",
+    a: "If you code, start with AI Engineer; the other engineering roles go deeper in one area. If you don't, choose AI Product Manager, AI Automation Specialist or AI Governance & Compliance Specialist. Not sure? The 10-minute level test suggests one.",
   },
   {
     q: "I have never coded. Can I still learn AI here?",
-    a: "Yes. The AI Product Manager, AI Automation Specialist and AI Governance & Compliance Specialist roadmaps need no programming. If you later want to build AI applications, the AI Engineer roadmap starts from Python basics, and you can run code right in your browser.",
+    a: "Yes. AI Product Manager, AI Automation Specialist and AI Governance & Compliance Specialist need no programming. AI Engineer starts from Python basics if you want to build later.",
   },
   {
     q: "How long does it take?",
-    a: "Each roadmap shows an estimate, from about three months for AI Product Manager, AI Automation Specialist or AI Governance to about nine months for AI Engineer or Machine Learning Engineer. The level test skips topics you already know, so many learners finish faster.",
+    a: "About three months for the no-coding roles and up to nine for AI Engineer or Machine Learning Engineer. The level test skips what you already know.",
   },
   {
     q: "Will this get me a job?",
-    a: "No website can promise a job, and we won't. What we promise is a clear path: the skills each role needs, projects you can show, interview practice and an honest view of salaries and openings. The work is yours; the direction is ours.",
+    a: "No website can promise a job, and we won't. We give you the skills, projects, interview practice and an honest view of salaries. The work is yours.",
   },
   {
     q: "Do I need an account?",
-    a: "No. You can learn, practise and use the AI tools without one. Your progress is saved in your browser. An account only keeps it in sync across your devices.",
+    a: "No. Your progress is saved in your browser. An account only syncs it across your devices.",
   },
 ];
 
@@ -152,8 +152,7 @@ export default function Home() {
             </span>
           </h1>
           <p data-hero-fade className="mt-6 max-w-2xl text-lg leading-8 text-zinc-800 md:text-xl md:leading-9 dark:text-zinc-200">
-            No more jumping between random videos and courses. One roadmap per role takes you from the basics to job-ready, with lessons, projects
-            and mock interviews built in.
+            No more jumping between random videos. One roadmap per role takes you from the basics to job-ready.
           </p>
           <div data-hero-fade className="mt-8 flex flex-col gap-3 sm:flex-row">
             <a data-magnetic href="#roles" className={primaryButtonLg}>
@@ -204,8 +203,7 @@ export default function Home() {
             <Words text="Sound familiar?" />
           </h2>
           <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">
-            You are not the problem. The missing path is. Most people learning AI get stuck in the same places, and here is how Xplaind gets you past
-            each one.
+            You are not the problem. The missing path is.
           </p>
           <ul aria-labelledby="pains-heading" className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3" data-rise-group>
             {PAINS.map((p) => (
@@ -237,7 +235,6 @@ export default function Home() {
           <h2 id="how-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
             <Words text="How Xplaind works" />
           </h2>
-          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">Three steps. You always know where you are and what comes next.</p>
           <ol className="mt-8 grid gap-6 md:grid-cols-3" data-rise-group>
             {STEPS.map((s, i) => (
               <li key={s.title} data-rise className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-900 dark:ring-violet-900">
@@ -266,15 +263,11 @@ export default function Home() {
             </Link>
           </div>
           <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">
-            Each card is a full roadmap for one job, with how long it takes and whether it needs coding. Not sure?{" "}
+            One roadmap per job. Not sure?{" "}
             <Link href="/start" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
               Find my level
             </Link>{" "}
-            in 10 minutes, or{" "}
-            <Link href="/jobs" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
-              compare salaries
-            </Link>
-            .
+            in 10 minutes.
           </p>
           <div className="mt-8" data-rise-group>
             <RoleGrid
@@ -299,11 +292,11 @@ export default function Home() {
           <h2 id="do-heading" data-words className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
             <Words text="Learn it properly, without the overwhelm" />
           </h2>
-          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">Everything a topic needs is on one page, so you never have to hunt for the next step.</p>
+          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">Everything a topic needs, on one page.</p>
           <div className="mt-10 grid gap-6 md:grid-cols-2" data-rise-group>
             <Feature
               title="See the whole journey on one map"
-              text="Every topic for your role, in order. Tap one to see what it is, open the best course and mark it done."
+              text="Every topic for your role, in order. Tap one to see what it is."
               href="/roadmap/genai-engineer"
               cta="Open a roadmap"
               tone="from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950"
@@ -314,7 +307,7 @@ export default function Home() {
             </Feature>
             <Feature
               title="Understand each topic in 20 minutes"
-              text="Our own plain-English explainer, a worked example from Indian work life, the common mistakes and a quick check that earns XP."
+              text="A plain-English explainer, an example from Indian work life and a quick check."
               href="/topics"
               cta="Browse lessons"
               tone="from-violet-50 to-violet-100/60 dark:from-violet-950 dark:to-violet-900/40"
@@ -325,7 +318,7 @@ export default function Home() {
             </Feature>
             <Feature
               title="Only the courses worth your time"
-              text="From Google, Microsoft, AWS, NVIDIA, OpenAI, Anthropic, Hugging Face and more: one chosen for each lesson, plus the certifications worth sitting."
+              text="One picked for each lesson, from Google, AWS, OpenAI, Anthropic and more."
               href="/resources"
               cta="Browse courses"
               tone="from-sky-50 to-teal-50 dark:from-sky-950 dark:to-teal-950"
@@ -336,7 +329,7 @@ export default function Home() {
             </Feature>
             <Feature
               title="Write and run code in your browser"
-              text="Python with NumPy and pandas, nothing to install. Every code example in a lesson has a Run button, and the AI tutor explains your errors."
+              text="Python with nothing to install. The AI tutor explains your errors."
               href="/playground"
               cta="Open the playground"
               tone="from-zinc-100 to-violet-100 dark:from-zinc-900 dark:to-violet-950"
@@ -356,11 +349,11 @@ export default function Home() {
           <h2 id="hired-heading" data-words className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
             <Words text="Build it, say it out loud, get hired" />
           </h2>
-          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">Learning is half the job. These tools get you ready for the other half.</p>
+          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">Learning is half the job. These tools cover the other half.</p>
           <div className="mt-10 grid gap-6 md:grid-cols-2" data-rise-group>
             <Feature
               title="Practise interviews out loud"
-              text={`${interview.length} real questions across every role. Answer against the clock with your voice, then see which key points you covered.`}
+              text={`${interview.length} real questions. Answer out loud, against the clock, and see what you covered.`}
               href="/interview/simulator"
               cta="Start a mock interview"
               tone="from-amber-50 to-rose-50 dark:from-amber-950 dark:to-rose-950"
@@ -373,7 +366,7 @@ export default function Home() {
               <div>
                 <h3 className="text-xl font-semibold">Stay on track, week after week</h3>
                 <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
-                  A study plan sized to your hours, a Monday reminder, and XP, streaks and badges for every lesson and practice session.
+                  A weekly plan sized to your hours, plus XP, streaks and badges.
                 </p>
                 <Link href="/plan" className="mt-3 inline-block font-medium text-violet-800 hover:underline dark:text-violet-300">
                   Plan my week →
@@ -384,8 +377,8 @@ export default function Home() {
           </div>
           <ul className="mt-6 grid gap-6 md:grid-cols-2" data-rise-group>
             {[
-              { href: "/ai/resume", icon: "star" as const, title: "Get your resume shortlisted", text: "Upload it and get fixes in order of importance, rewritten lines and the keywords recruiters look for.", cta: "Review my resume" },
-              { href: "/jobs", icon: "target" as const, title: "Know what the job pays", text: "Typical salaries for every AI role in India, the skills job posts ask for, and live openings on Naukri and LinkedIn.", cta: "See jobs and salaries" },
+              { href: "/ai/resume", icon: "star" as const, title: "Get your resume shortlisted", text: "Get fixes in order of importance and the keywords recruiters look for.", cta: "Review my resume" },
+              { href: "/jobs", icon: "target" as const, title: "Know what the job pays", text: "Salaries for every AI role in India, and live openings.", cta: "See jobs and salaries" },
             ].map((c) => (
               <li key={c.href} data-rise className="flex gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-950/80 dark:ring-violet-900">
                 <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
@@ -410,9 +403,6 @@ export default function Home() {
           <h2 id="trust-heading" data-words className="max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
             <Words text="A place you can trust with your time" />
           </h2>
-          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">
-            Learning AI takes months. You should know exactly what you are getting into, so here is how we work.
-          </p>
           <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" data-rise-group>
             {TRUST.map((t) => (
               <li key={t.title} data-rise className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-950/80 dark:ring-violet-900">
@@ -447,7 +437,7 @@ export default function Home() {
             <Words text="Your AI career starts with one 20-minute lesson." />
           </h2>
           <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-800 md:mx-auto dark:text-zinc-200">
-            Pick a role, open the first topic, and you will know exactly what comes next. No sign-up, no payment, nothing to install.
+            Pick a role and open the first topic. No sign-up, nothing to install.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row md:justify-center">
             <Link data-magnetic href="/paths" className={primaryButtonLg}>
@@ -479,7 +469,6 @@ export default function Home() {
                     <Cover theme={(["career", "ai-basics", "using-ai"] as const)[i % 3]} seed={p.id} icon="book" className="h-36" iconSize={40} />
                     <span className="block p-5">
                       <span className="block text-lg leading-7 font-semibold group-hover:underline">{p.title}</span>
-                      <span className="mt-2 block text-sm leading-6 text-zinc-700 dark:text-zinc-300">{p.description}</span>
                     </span>
                   </Link>
                 </li>
