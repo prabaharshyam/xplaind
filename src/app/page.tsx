@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Cover } from "@/components/art/cover";
+import { GuideCover } from "@/components/guide-cover";
 import { Icon } from "@/components/art/icons";
 import { RoleGrid } from "@/components/home/role-grid";
 import { MiniCourses, MiniInterview, MiniLesson, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
@@ -33,7 +33,7 @@ const PAINS: { pain: string; fix: string; href: string; cta: string; icon: IconN
   },
   {
     pain: "“There are a thousand courses. Which one is worth my time?”",
-    fix: "We pick the one best course for each topic. Nobody pays to be listed.",
+    fix: "For each topic we pick the one course that teaches it best.",
     href: "/resources",
     cta: "Browse courses",
     icon: "book",
@@ -76,9 +76,9 @@ const STEPS: { icon: IconName; title: string; text: string }[] = [
 
 const TRUST: { icon: IconName; title: string; text: string }[] = [
   { icon: "scale", title: "No paid rankings, ever", text: "No one can pay to be listed or to rank higher." },
-  { icon: "tick", title: "Prices with dates", text: "Every price shows the date we checked it." },
+  { icon: "trophy", title: "Projects you can show", text: "Every stage ends with a guided project for your portfolio." },
   { icon: "chat", title: "Plain English, Indian examples", text: "Explained the way a good senior colleague would." },
-  { icon: "lock", title: "Start without signing up", text: "Learn and practise without an account. Progress stays on your device." },
+  { icon: "map", title: "Always the next step", text: "Your roadmap shows what to learn next, so no hour is wasted." },
   { icon: "target", title: "Built around real jobs", text: "Each roadmap follows what the role does at work." },
   { icon: "shield", title: "Honest about the market", text: "Salaries and job figures show their source and date. No promised packages." },
 ];
@@ -86,31 +86,31 @@ const TRUST: { icon: IconName; title: string; text: string }[] = [
 const FAQ = [
   {
     q: "Is Xplaind free?",
-    a: "Yes. Every roadmap, lesson, interview question and AI tool here is free. Some courses we recommend are paid; we show the price and the date we checked it.",
+    a: "Yes. Every roadmap, lesson, practice question, project guide and mock interview on Xplaind costs nothing. The AI tools are free too, with a daily limit so they stay free for everyone. Some of the outside courses we recommend charge for a certificate or the course itself; we always show the price and the date we checked it.",
   },
   {
     q: "How is this different from YouTube and online courses?",
-    a: "They give you thousands of options and no order. Xplaind gives you one path: what to learn next, the best resource for it, a check, a project and interview practice.",
+    a: "YouTube and course sites are great at teaching single topics, but they leave you to decide what to learn, in what order, and when you are ready for a job. Xplaind does that part. Each roadmap puts every topic a role needs in order, explains each one in a short plain-English lesson, points you to the one course or video that teaches it best, checks that you understood it, gives you a project to build at each stage and ends with interview practice. You still learn from the best courses out there; we tell you which one to take next.",
   },
   {
     q: "Which AI role should I choose?",
-    a: "If you code, start with AI Engineer; the other engineering roles go deeper in one area. If you don't, choose AI Product Manager, AI Automation Specialist or AI Governance & Compliance Specialist. Not sure? The 10-minute level test suggests one.",
+    a: "Start from what you do today and what you enjoy. If you can code, or want to, AI Engineer is the broadest start. Generative AI & LLM Engineer, Agentic AI Engineer, Machine Learning Engineer and MLOps Engineer go deeper into one area, and Forward Deployed Engineer adds working directly with clients. If you would rather not code, AI Product Manager, AI Automation Specialist and AI Governance & Compliance Specialist fit people from business, operations, law or policy. Still unsure? The 10-minute level test suggests a role and where to begin.",
   },
   {
     q: "I have never coded. Can I still learn AI here?",
-    a: "Yes. AI Product Manager, AI Automation Specialist and AI Governance & Compliance Specialist need no programming. AI Engineer starts from Python basics if you want to build later.",
+    a: "Yes. AI Product Manager and AI Governance & Compliance Specialist need no programming at all, and AI Automation Specialist needs only a little, using low-code tools. Every lesson is written in plain English with examples from Indian work life. If you later want to build AI apps yourself, the AI Engineer roadmap starts from Python basics, and you can write and run code in your browser with nothing to install.",
   },
   {
     q: "How long does it take?",
-    a: "About three months for the no-coding roles and up to nine for AI Engineer or Machine Learning Engineer. The level test skips what you already know.",
+    a: "Each roadmap shows its own estimate at a few hours a week: about 3 months for AI Product Manager, AI Automation Specialist and AI Governance & Compliance Specialist, 4 months for Agentic AI Engineer, 6 months for Forward Deployed Engineer and MLOps Engineer, and about 9 months for AI Engineer, Generative AI & LLM Engineer and Machine Learning Engineer. The level test skips the topics you already know, and the weekly plan fits the lessons around the hours you have.",
   },
   {
     q: "Will this get me a job?",
-    a: "No website can promise a job, and we won't. We give you the skills, projects, interview practice and an honest view of salaries. The work is yours.",
+    a: "No website can promise you a job, and we won't. What Xplaind gives you is what hiring managers look for: the skills each role needs in the right order, projects you can show, practice answering real interview questions out loud, a resume review, and an honest view of salaries and live openings. The learning and the applying are yours; we make sure you spend your time on the right things.",
   },
   {
     q: "Do I need an account?",
-    a: "No. Your progress is saved in your browser. An account only syncs it across your devices.",
+    a: "Not to start. You can read every lesson, follow any roadmap and practise with the cards and interview questions without signing up, and your progress is saved in your browser. A free account keeps your progress in sync across your phone and laptop, and unlocks the mock interview, the PDF roadmaps and the library of research papers and books. Accounts are for learners aged 18 and over.",
   },
 ];
 
@@ -121,6 +121,7 @@ export default function Home() {
   const posts = getBlogPosts().slice(0, 3);
   const market = getJobs().market;
   const checked = new Date(`${market.checked}T00:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+  const checkedMonth = new Date(`${market.checked}T00:00:00+05:30`).toLocaleDateString("en-IN", { month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
   const stats = [
     { value: String(stops.length), label: "plain-English lessons" },
     { value: String(interview.length), label: "interview questions with answers" },
@@ -466,7 +467,7 @@ export default function Home() {
               {posts.map((p, i) => (
                 <li key={p.id} data-rise>
                   <Link href={`/blog/${p.id}`} className="group block overflow-hidden rounded-3xl bg-white ring-1 ring-violet-100 hover:ring-violet-300 dark:bg-zinc-950/80 dark:ring-violet-900">
-                    <Cover theme={(["career", "ai-basics", "using-ai"] as const)[i % 3]} seed={p.id} icon="book" className="h-36" iconSize={40} />
+                    <GuideCover cover={p.cover} theme={(["career", "ai-basics", "using-ai"] as const)[i % 3]} seed={p.id} />
                     <span className="block p-5">
                       <span className="block text-lg leading-7 font-semibold group-hover:underline">{p.title}</span>
                     </span>
@@ -516,7 +517,7 @@ export default function Home() {
               </li>
             ))}
           </ul>
-          <p className="mt-2">Checked {checked}. Forecasts are the publishers&apos; estimates, not promises of jobs.</p>
+          <p className="mt-2">Checked on {checkedMonth}. Forecasts are the publishers&apos; estimates, not promises of jobs.</p>
         </div>
       </section>
     </main>

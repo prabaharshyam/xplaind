@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -27,7 +28,14 @@ export async function generateMetadata({ params }: PageProps<"/blog/[slug]">): P
     title: post.title,
     description: post.description,
     alternates: { canonical: `/blog/${post.id}` },
-    openGraph: { type: "article", title: post.title, description: post.description, publishedTime: post.published_on, modifiedTime: post.updated_on },
+    openGraph: {
+      type: "article",
+      title: post.title,
+      description: post.description,
+      publishedTime: post.published_on,
+      modifiedTime: post.updated_on,
+      ...(post.cover && { images: [{ url: post.cover.src, width: 1200, height: 600, alt: post.cover.alt }] }),
+    },
   };
 }
 
@@ -54,6 +62,7 @@ export default async function BlogPostPage({ params }: PageProps<"/blog/[slug]">
           author: { "@type": "Organization", name: post.author, url: base },
           publisher: { "@type": "Organization", name: "Xplaind", url: base },
           mainEntityOfPage: `${base}/blog/${post.id}`,
+          ...(post.cover && { image: `${base}${post.cover.src}` }),
         }}
       />
       {post.faq.length > 0 && (
@@ -75,6 +84,17 @@ export default async function BlogPostPage({ params }: PageProps<"/blog/[slug]">
         <p className={`mt-3 text-sm ${muted}`}>
           By {post.author} · <time dateTime={post.updated_on}>updated {formatDay(post.updated_on)}</time>
         </p>
+        {post.cover && (
+          <Image
+            src={post.cover.src}
+            alt={post.cover.alt}
+            width={1200}
+            height={600}
+            priority
+            sizes="(min-width: 672px) 42rem, 100vw"
+            className="mt-6 w-full rounded-3xl object-cover"
+          />
+        )}
         {!isHumanName(post.reviewed_by) && (
           <div className="mt-4">
             <DraftNote />
