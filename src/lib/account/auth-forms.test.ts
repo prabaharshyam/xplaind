@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adultConfirmedAt, parseGoogleIdForm, parseNewPassword, parseOAuthForm, parsePasswordForm } from "./auth-forms";
+import { adultConfirmedAt, parseGoogleIdForm, signUpHitExistingAccount, parseNewPassword, parseOAuthForm, parsePasswordForm } from "./auth-forms";
 
 const form = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null });
 
@@ -49,5 +49,16 @@ describe("parseGoogleIdForm (AC-1a)", () => {
     expect(parseGoogleIdForm(form({ credential: "not a jwt", nonce, adult: "yes" }))).toEqual({ ok: false, error: "provider" });
     expect(parseGoogleIdForm(form({ credential: jwt, nonce: "short", adult: "yes" }))).toEqual({ ok: false, error: "provider" });
     expect(parseGoogleIdForm(form({ nonce, adult: "yes" }))).toEqual({ ok: false, error: "provider" });
+  });
+});
+
+describe("signUpHitExistingAccount (AC-1)", () => {
+  it("spots Supabase's quiet answer for an email that already has an account", () => {
+    expect(signUpHitExistingAccount({ identities: [] })).toBe(true);
+  });
+  it("treats a real new sign-up, or no user, as not existing", () => {
+    expect(signUpHitExistingAccount({ identities: [{ provider: "email" }] })).toBe(false);
+    expect(signUpHitExistingAccount({})).toBe(false);
+    expect(signUpHitExistingAccount(null)).toBe(false);
   });
 });

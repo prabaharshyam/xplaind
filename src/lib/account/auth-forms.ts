@@ -79,3 +79,12 @@ export function adultConfirmedAt(metadata: unknown, cookie: string | undefined):
 }
 
 export const ADULT_COOKIE = "xp_adult";
+
+/**
+ * AC-1: Supabase answers a sign-up for an email that already has an account with no error, no
+ * session and a user with no identities, and sends no email (so emails cannot be probed). Spot
+ * that case so the learner is told to sign in instead of waiting for an email that never comes.
+ */
+export function signUpHitExistingAccount(user: { identities?: unknown[] | null } | null | undefined): boolean {
+  return Boolean(user) && Array.isArray(user!.identities) && user!.identities.length === 0;
+}
