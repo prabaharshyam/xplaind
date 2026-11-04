@@ -17,6 +17,10 @@ test("a roadmap topic opens a drawer where it can be marked done, without leavin
   await expect(drawer).toBeVisible();
   await expect(page).toHaveURL(/\/roadmap\/forward-deployed-engineer$/);
   await expect(drawer.getByText("Best course", { exact: true })).toBeVisible();
+  // RM-13: the title, then what the topic is in one line; no outcome or "Why it matters".
+  await expect(drawer.getByRole("heading", { name: "What it is" })).toBeVisible();
+  await expect(drawer.getByText("Why it matters")).toHaveCount(0);
+  await expect(drawer.getByRole("link", { name: "Read the full chapter" })).toHaveAttribute("href", "/stop/rag-app");
   expect((await wcag(page)).violations).toEqual([]);
   await drawer.getByRole("button", { name: "Done", exact: true }).click();
   await expect(drawer.getByRole("button", { name: "Done", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -31,7 +35,7 @@ test("the GenAI roadmap's topics open the drawer too", async ({ page }) => {
   await page.goto("/roadmap/genai-engineer");
   await page.getByRole("tabpanel").getByRole("link", { name: /^What AI, machine learning and a language model are/ }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("dialog").getByRole("link", { name: /Read the lesson/ })).toHaveAttribute("href", "/stop/what-is-ai");
+  await expect(page.getByRole("dialog").getByRole("link", { name: "Read the full chapter" })).toHaveAttribute("href", "/stop/what-is-ai");
 });
 
 test("topic pages list lessons as cards", async ({ page }) => {
@@ -119,7 +123,7 @@ test("on every roadmap, a lesson opened from the drawer still responds to clicks
     await page.getByRole("tabpanel").getByRole("link", { name: /, (To do|Learning|Done|Skipped)$/ }).nth(1).click();
     const drawer = page.getByRole("dialog");
     await expect(drawer, p.id).toBeVisible();
-    await drawer.getByRole("link", { name: /Read the lesson/ }).click();
+    await drawer.getByRole("link", { name: "Read the full chapter" }).click();
     await expect(page, p.id).toHaveURL(/\/stop\//);
     await expect(page.locator("dialog[open]"), p.id).toHaveCount(0);
     // a plain HTML control and a React button on the lesson both respond

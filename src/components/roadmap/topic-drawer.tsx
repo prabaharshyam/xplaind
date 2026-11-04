@@ -110,7 +110,6 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
           <h2 id="drawer-title" className="mt-1 text-2xl font-semibold tracking-tight">
             {d.title}
           </h2>
-          <p className="mt-2 text-lg leading-7">{d.outcome}</p>
         </div>
 
         <div>
@@ -120,11 +119,11 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
           </p>
         </div>
 
-        <section aria-labelledby="why-h" className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-900">
-          <h3 id="why-h" className="font-semibold">
-            Why it matters
+        <section aria-labelledby="what-h" className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-900">
+          <h3 id="what-h" className="font-semibold">
+            What it is
           </h3>
-          <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">{d.why}</p>
+          <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">{d.what}</p>
           {d.terms.length > 0 && (
             <p className="mt-3 flex flex-wrap gap-1.5">
               {d.terms.map((t) => (
@@ -140,7 +139,7 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
           href={`/stop/${d.id}`}
           className={primaryButton}
         >
-          <Icon name="book" size={18} /> Read the lesson and take the check
+          <Icon name="book" size={18} /> Read the full chapter
         </Link>
 
         <CourseList title="Best course" items={best} tone="text-violet-800 dark:text-violet-300" />
