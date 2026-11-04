@@ -47,7 +47,7 @@ test.describe("interview questions (IQ-1, IQ-3)", () => {
 test.describe("practice (IQ-4, IQ-5)", () => {
   test("a rating is saved and missed questions come back first", async ({ page }) => {
     await page.goto("/practice/rag");
-    await page.getByRole("button", { name: "Start practising" }).click();
+    await page.getByRole("button", { name: "Start practicing" }).click();
     const first = (await page.locator("#card-question").textContent())!.trim();
     await page.getByRole("button", { name: "Show the short answer" }).click();
     await page.getByRole("button", { name: "Show the deeper answer" }).click();
@@ -55,7 +55,7 @@ test.describe("practice (IQ-4, IQ-5)", () => {
     expect((await wcag(page)).violations).toEqual([]);
     await page.getByRole("button", { name: "Missed" }).click();
     await expect(page.getByText("Question 2 of")).toBeVisible();
-    await expect(page.getByText(/^1 of \d+ practised: 0 got it, 0 partly, 1 missed/)).toBeVisible();
+    await expect(page.getByText(/^1 of \d+ practiced: 0 got it, 0 partly, 1 missed/)).toBeVisible();
 
     // the rating survives a reload, and the list shows it
     await page.goto("/interview");
@@ -63,7 +63,7 @@ test.describe("practice (IQ-4, IQ-5)", () => {
 
     // next round: unrated questions first, the missed one after them
     await page.goto("/practice/rag");
-    await page.getByRole("button", { name: "Continue practising" }).click();
+    await page.getByRole("button", { name: "Continue practicing" }).click();
     await expect(page.locator("#card-question")).not.toHaveText(first);
   });
 

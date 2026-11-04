@@ -71,7 +71,7 @@ const PAINS: { pain: string; fix: string; href: string; cta: string; icon: IconN
 const STEPS: { icon: IconName; title: string; text: string }[] = [
   { icon: "compass", title: "Choose the job you want", text: "Pick an AI role, or let the 10-minute level test suggest one." },
   { icon: "map", title: "Follow the roadmap, one topic at a time", text: "Each topic is a 20-minute lesson, the best course and a quick check." },
-  { icon: "trophy", title: "Prove it and get hired", text: "Build projects, practise interviews out loud and see live openings." },
+  { icon: "trophy", title: "Prove it and get hired", text: "Build projects, practice interviews out loud and see live openings." },
 ];
 
 const TRUST: { icon: IconName; title: string; text: string }[] = [
@@ -110,7 +110,7 @@ const FAQ = [
   },
   {
     q: "Do I need an account?",
-    a: "Not to start. You can read every lesson, follow any roadmap and practise with the cards and interview questions without signing up, and your progress is saved in your browser. A free account keeps your progress in sync across your phone and laptop, and unlocks the mock interview, the PDF roadmaps and the library of research papers and books. Accounts are for learners aged 18 and over.",
+    a: "Not to start. You can read every lesson, follow any roadmap and practice with the cards and interview questions without signing up, and your progress is saved in your browser. A free account keeps your progress in sync across your phone and laptop, and unlocks the mock interview, the PDF roadmaps and the library of research papers and books. Accounts are for learners aged 18 and over.",
   },
 ];
 
@@ -343,17 +343,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Milestone 3: practise, prove it and get hired. */}
+      {/* Milestone 3: practice, prove it and get hired. */}
       <section aria-labelledby="hired-heading" className="py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <Gate n={3} label="Practise and get hired" />
+          <Gate n={3} label="Practice and get hired" />
           <h2 id="hired-heading" data-words className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
             <Words text="Build it, say it out loud, get hired" />
           </h2>
           <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">Learning is half the job. These tools cover the other half.</p>
           <div className="mt-10 grid gap-6 md:grid-cols-2" data-rise-group>
             <Feature
-              title="Practise interviews out loud"
+              title="Practice interviews out loud"
               text={`${interview.length} real questions. Answer out loud, against the clock, and see what you covered.`}
               href="/interview/simulator"
               cta="Start a mock interview"

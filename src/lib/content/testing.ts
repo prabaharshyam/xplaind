@@ -191,7 +191,7 @@ export const term = (o: Partial<GlossaryTerm> = {}): GlossaryTerm => ({
 /** An explainer body with every section, long enough to pass. */
 export const explainerBody = (words = 520): string => {
   const filler = Array.from({ length: Math.ceil(words / 20) }, () => "Plain words that teach.").join(" ");
-  return ["What it is", "How it works", "A worked example", "Common mistakes", "Practise"].map((h) => `## ${h}\n\n${filler}`).join("\n\n");
+  return ["What it is", "How it works", "A worked example", "Common mistakes", "Practice"].map((h) => `## ${h}\n\n${filler}`).join("\n\n");
 };
 
 /** A deep lesson's body: the five sections, a text diagram and a table. */

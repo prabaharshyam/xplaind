@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: PageProps<"/interview/top/[pa
   };
 }
 
-/** IQ-8: one role's Top 25 interview questions on one page, to read, print and practise. */
+/** IQ-8: one role's Top 25 interview questions on one page, to read, print and practice. */
 export default async function TopInterviewPage({ params }: PageProps<"/interview/top/[path]">) {
   const path = getPath((await params).path);
   if (!path) notFound();
@@ -59,7 +59,7 @@ export default async function TopInterviewPage({ params }: PageProps<"/interview
       >
         <div className="flex flex-wrap gap-3 print:hidden">
           <Link href={`/interview/simulator?path=${path.id}`} className={primaryButton}>
-            Practise out loud
+            Practice out loud
           </Link>
           <PrintButton />
         </div>
@@ -136,7 +136,7 @@ export default async function TopInterviewPage({ params }: PageProps<"/interview
                 </div>
                 <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm print:hidden">
                   <Link href={`/interview/${q.id}`} className={textLink}>
-                    Practise this one
+                    Practice this one
                   </Link>
                   <Link href={`/stop/${q.stop.id}`} className={textLink}>
                     Lesson: {q.stop.title}

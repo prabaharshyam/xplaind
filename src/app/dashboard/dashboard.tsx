@@ -85,7 +85,7 @@ export function Dashboard({
             <dd className="text-lg font-semibold">
               {streak.current} {streak.current === 1 ? "week" : "weeks"}
             </dd>
-            <dd className={`text-xs ${muted}`}>{streak.activeThisWeek ? "This week counts already." : "Finish a step or practise this week to keep it."}</dd>
+            <dd className={`text-xs ${muted}`}>{streak.activeThisWeek ? "This week counts already." : "Finish a step or practice this week to keep it."}</dd>
           </div>
           <div>
             <dt className={muted}>Weekly goal</dt>

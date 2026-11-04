@@ -95,13 +95,13 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
         Interview questions
       </h2>
       <p className={`text-sm ${muted}`}>
-        {summary.rated} of {summary.total} practised: {summary.gotIt} got it, {summary.partly} partly, {summary.missed}{" "}
+        {summary.rated} of {summary.total} practiced: {summary.gotIt} got it, {summary.partly} partly, {summary.missed}{" "}
         missed. Ratings are saved on this device.
       </p>
 
       {queue === null ? (
         <button type="button" className={primaryButton} onClick={start}>
-          {summary.rated > 0 ? "Continue practising" : "Start practising"}
+          {summary.rated > 0 ? "Continue practicing" : "Start practicing"}
         </button>
       ) : index >= queue.length ? (
         <div className="flex flex-col gap-3" role="status">

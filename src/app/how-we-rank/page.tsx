@@ -24,7 +24,7 @@ export default function HowWeRankPage() {
         <li>Fit: does it teach exactly this step, at this level?</li>
         <li>Quality: is it clear, correct and well made?</li>
         <li>Currency: is it up to date?</li>
-        <li>Hands-on: do you build or practise something?</li>
+        <li>Hands-on: do you build or practice something?</li>
         <li>Cost: free first. A paid pick must earn its place, and we aim for about ₹400.</li>
       </ul>
       <p>

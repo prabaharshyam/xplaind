@@ -32,8 +32,8 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     ],
   },
   {
-    id: "practise",
-    title: "Practise",
+    id: "practice",
+    title: "Practice",
     lead: "Write real code and answer out loud before the real thing.",
     tools: [
       { href: "/playground", title: "Code playground", text: "Write and run Python in your browser, with NumPy and pandas. If it breaks, the AI tutor explains the error.", icon: "code", tone: "from-zinc-700 to-zinc-900", ai: false, give: "Python code", get: "Output in seconds, nothing to install" },

@@ -54,7 +54,7 @@ test("the weekly plan lists this week's lessons, follows the hours and offers a 
   const at6 = await lessons.count();
   await page.getByLabel("Hours a week").selectOption("15");
   await expect.poll(() => lessons.count()).toBeGreaterThan(at6);
-  await expect(page.getByRole("link", { name: "Practise interview flashcards" })).toHaveAttribute("href", "/practice");
+  await expect(page.getByRole("link", { name: "Practice interview flashcards" })).toHaveAttribute("href", "/practice");
   await expect(page.getByRole("link", { name: "Add to Google Calendar" })).toHaveAttribute("href", /calendar\.google\.com.*ctz=Asia%2FKolkata.*BYDAY%3DMO/);
   const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /Add to iPhone or Outlook/ }).click()]);
   expect(file.suggestedFilename()).toBe("xplaind-weekly-plan.ics");

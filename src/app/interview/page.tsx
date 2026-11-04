@@ -33,7 +33,7 @@ export default function InterviewPage() {
           Try the mock interview
         </Link>
         <Link href="/practice" className={secondaryButton}>
-          Practise with flashcards
+          Practice with flashcards
         </Link>
         <Link href="/interview/answers" className={secondaryButton}>
           All answers by role

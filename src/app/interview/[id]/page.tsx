@@ -85,7 +85,7 @@ export default async function InterviewQuestionPage({ params }: PageProps<"/inte
 
       <div className="mt-8 flex flex-col gap-2">
         <Link href={`/practice/${q.topic}`} className={textLink}>
-          Practise {interviewTopicLabel(q.topic)} questions
+          Practice {interviewTopicLabel(q.topic)} questions
         </Link>
         {sameTopic.length > 0 && (
           <>

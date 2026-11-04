@@ -36,7 +36,7 @@ export default function SimulatorPage() {
           icon="mic"
           eyebrow="Interview prep"
           title="Mock interview"
-          lead="Practise the way it happens: one question at a time, a clock running, and you answering out loud. Then see what you covered and missed. No sign-in."
+          lead="Practice the way it happens: one question at a time, a clock running, and you answering out loud. Then see what you covered and missed. No sign-in."
           crumbs={[{ href: "/interview", label: "Interview questions" }]}
         />
       </div>

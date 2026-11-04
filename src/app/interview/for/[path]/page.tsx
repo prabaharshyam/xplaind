@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PageProps<"/interview/for/[pa
   const n = getInterviewViews().filter((q) => q.paths.includes(path.id)).length;
   return {
     title: `${path.name} interview questions and answers`,
-    description: `${n} ${path.name} interview questions with short answers you can say out loud, deeper answers, follow-ups and common mistakes. Then practise them in a timed mock interview.`,
+    description: `${n} ${path.name} interview questions with short answers you can say out loud, deeper answers, follow-ups and common mistakes. Then practice them in a timed mock interview.`,
     alternates: { canonical: `/interview/for/${path.id}` },
   };
 }
@@ -54,7 +54,7 @@ export default async function PathInterviewPage({ params }: PageProps<"/intervie
         icon="mic"
         eyebrow="Interview prep"
         title={`${path.name} interview questions`}
-        lead={`${questions.length} questions a ${path.name} interview is likely to ask, with short answers you can say out loud. Then practise them in a timed mock interview.`}
+        lead={`${questions.length} questions a ${path.name} interview is likely to ask, with short answers you can say out loud. Then practice them in a timed mock interview.`}
         crumbs={[{ href: "/interview", label: "Interview questions" }]}
       >
         <div className="flex flex-wrap gap-3">

@@ -19,7 +19,7 @@ export const WHY_IT_MATTERS_MAX_WORDS = 60;
 export const wordCount = (text: string): number => text.trim().split(/\s+/).filter(Boolean).length;
 
 /** The sections an explainer lesson's body has, as level-2 headings, in this order. */
-export const EXPLAINER_SECTIONS = ["What it is", "How it works", "A worked example", "Common mistakes", "Practise"] as const;
+export const EXPLAINER_SECTIONS = ["What it is", "How it works", "A worked example", "Common mistakes", "Practice"] as const;
 export const EXPLAINER_MIN_WORDS = 500;
 export const EXPLAINER_MAX_WORDS = 1500;
 /** A deep lesson has the same sections, written at roadmap.sh-pack depth, with a diagram and a table. */

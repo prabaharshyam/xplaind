@@ -19,8 +19,8 @@ export const NAV_GROUPS: Group[] = [
     ],
   },
   {
-    id: "practise",
-    label: "Practise",
+    id: "practice",
+    label: "Practice",
     items: [
       { href: "/practice", label: "Practice cards", note: "Flashcards for interview questions" },
       { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report" },
@@ -47,7 +47,7 @@ export function activeGroup(path: string): string | null {
   if (under(path, "/ai/resume")) return "career";
   if (under(path, "/ai")) return "ai";
   if (under(path, "/roadmap") || under(path, "/stop") || under(path, "/start") || under(path, "/resources")) return "learn";
-  if (under(path, "/interview")) return "practise";
+  if (under(path, "/interview")) return "practice";
   for (const g of NAV_GROUPS) if (g.items.some((i) => under(path, i.href))) return g.id;
   return null;
 }

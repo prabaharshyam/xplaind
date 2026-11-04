@@ -59,7 +59,7 @@ Seven colour families in all. Anything else is a bug.
 
 ## Navigation
 
-- The top menu has four entries: Learn, Practise and Career open short menus with a one-line note under each link, and AI tools is a direct link. The section you are in is underlined and announced to screen readers. On phones the same groups fill the screen below the top bar, with the main action first.
+- The top menu has four entries: Learn, Practice and Career open short menus with a one-line note under each link, and AI tools is a direct link. The section you are in is underlined and announced to screen readers. On phones the same groups fill the screen below the top bar, with the main action first.
 
 ## Mascot
 

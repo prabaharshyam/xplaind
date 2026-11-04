@@ -65,12 +65,12 @@ const SECTION_ICON: Record<string, IconName> = {
   "How it works": "flow",
   "A worked example": "play",
   "Common mistakes": "shield",
-  Practise: "target",
+  Practice: "target",
 };
 const SECTION_TONE: Record<string, string> = {
   "A worked example": "border-sky-200 bg-sky-50/50 dark:border-sky-900 dark:bg-sky-950/30",
   "Common mistakes": "border-rose-200 bg-rose-50/50 dark:border-rose-900 dark:bg-rose-950/30",
-  Practise: "border-violet-200 bg-violet-50/50 dark:border-violet-900 dark:bg-violet-950/30",
+  Practice: "border-violet-200 bg-violet-50/50 dark:border-violet-900 dark:bg-violet-950/30",
 };
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

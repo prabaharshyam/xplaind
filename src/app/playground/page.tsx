@@ -23,7 +23,7 @@ export default function PlaygroundPage() {
         theme="code"
         seed="playground"
         icon="code"
-        eyebrow="Practise · Code playground"
+        eyebrow="Practice · Code playground"
         title="Write and run Python, right here"
         lead="Nothing to install: Python runs inside your browser, with NumPy and pandas ready. Pick a warm-up, an AI idea or a challenge, or paste your own code. If it breaks, the AI tutor explains the error."
       />
