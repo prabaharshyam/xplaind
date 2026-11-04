@@ -19,7 +19,7 @@ test("the glossary lists terms A to Z and links each to its lessons", async ({ p
 test("an explainer lesson shows its sections, key terms and the course after the text", async ({ page }) => {
   await page.goto("/stop/embeddings");
   const main = page.getByRole("main");
-  for (const h of ["What it is", "How it works", "A worked example", "Common mistakes", "Practise", "Key terms"]) {
+  for (const h of ["What it is", "How it works", "A worked example", "Common mistakes", "Practice", "Key terms"]) {
     await expect(main.getByRole("heading", { level: 2, name: h })).toBeVisible();
   }
   await main.locator("summary", { hasText: "Cosine similarity" }).click(); // key terms open in place

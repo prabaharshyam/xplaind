@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useId, useMemo, useState } from "react";
-import { secondaryButton, textLink } from "@/components/ui";
+import { Icon } from "@/components/art/icons";
+import { primaryButton, textLink } from "@/components/ui";
 
 type Q = {
   id: string;
@@ -62,14 +63,10 @@ export function AnswersBrowser({ roles, questions }: { roles: { id: string; name
             className="min-h-12 rounded-2xl border border-zinc-400 bg-white px-3 dark:border-zinc-600 dark:bg-zinc-950"
           />
         </div>
-        <div className="flex gap-2">
-          <button type="button" className={secondaryButton} onClick={() => setDeep(!deep)} aria-pressed={!deep}>
-            {deep ? "Short answers only" : "Show deeper answers"}
-          </button>
-          <button type="button" className={secondaryButton} onClick={() => window.print()}>
-            Print
-          </button>
-        </div>
+        <button type="button" className={`${primaryButton} shrink-0 whitespace-nowrap`} onClick={() => setDeep(!deep)}>
+          <Icon name="book" size={18} />
+          {deep ? "Short answers only" : "Show deeper answers"}
+        </button>
       </div>
 
       <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400" role="status">

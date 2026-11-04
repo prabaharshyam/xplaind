@@ -40,7 +40,7 @@
 | pytorch-basics.mdx | Stray blank line in Common mistakes | One list | Formatting |
 | rag-app.mdx | Worked example said "42 correct" out of 42 answerable questions, then said two failures were fixed. Those two statements cannot both be true | "40 of the 42 answerable questions correct". The table still shows 42 of 42 after the OCR fix | Internal arithmetic |
 | rag-app.mdx | "RAG is the most common GenAI feature" (twice) and "This one check halves the time spent guessing" are unverifiable | "one of the most common", "saves a lot of guessing" | Softened |
-| rag-app.mdx | The README content asked for in Practise did not match the project brief (the brief asks for the source of each answer) | Practise now matches the brief. The fixed failure is presented as optional | Internal consistency |
+| rag-app.mdx | The README content asked for in Practice did not match the project brief (the brief asks for the source of each answer) | Practice now matches the brief. The fixed failure is presented as optional | Internal consistency |
 | serving-ai-apps.mdx | Streaming snippet used `Question` and `model_stream` with no hint they are placeholders | Adds a comment saying both are your own request model and model client | Code clarity |
 | serving-ai-apps.mdx | Stray blank line in Common mistakes | One list | Formatting |
 | serving-ml-models.mdx | Two weeks of shadow mode was said to show that v7 "ranked later defaults better". Loan defaults take months to appear, so this is not possible | Shadow checks stability. The claim of better ranking now comes from a back-test on older loans with known outcomes. Table updated | Domain logic |

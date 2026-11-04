@@ -11,7 +11,7 @@ Xplaind (xplaind.ai) is a free-first AI learning path for India. A short test pl
 The owner widened the product from one path to nine; read `docs/product-plan.md`. Where the build stands now:
 
 - Nine paths in `content/goals/`, each an ordered route through one shared lesson library: GenAI Engineer, Forward Deployed Engineer, AI for Beginners, Agentic AI Expert, RAG Expert, AI Automation Specialist, LLMOps / AI Platform Engineer, AI Product Manager and ML Engineer. Every topic on every path has a lesson; nothing is left "being written".
-- 163 lessons, all in the explainer format (What it is, How it works, A worked example, Common mistakes, Practise), each with key terms, a free primary course and a check. 239 resources (links opened by Claude on 2026-10-25), 450 check questions, 261 glossary terms at `/glossary`.
+- 163 lessons, all in the explainer format (What it is, How it works, A worked example, Common mistakes, Practice), each with key terms, a free primary course and a check. 239 resources (links opened by Claude on 2026-10-25), 450 check questions, 261 glossary terms at `/glossary`.
 - Pages: `/paths` (chooser), `/roadmap/<path>` (staged map), `/start/<path>` (level test for ladder paths), home page rebuilt for nine paths.
 - Everything is still a draft for human review; launch mode lists about 1,200 sign-off gaps.
 - Not built yet, from the owner's final-stage list (phases in the product plan): bookmarks, guided projects with rubrics, curated AI news, newsletter and reminders, Tamil, adaptive tutoring and mock interviews (need model calls), portfolios, premium interview prep, college and company programmes, community contributions. Interview questions still cover the GenAI topics only.

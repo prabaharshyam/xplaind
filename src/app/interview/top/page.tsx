@@ -21,7 +21,7 @@ export default function TopIndexPage() {
         icon="trophy"
         eyebrow="Interview prep"
         title="Top 25 interview questions, by role"
-        lead="For each role, the 25 questions most worth preparing, most of them the scenario and real-life questions interviewers use to see how you think. Read them, print them, then practise out loud."
+        lead="For each role, the 25 questions most worth preparing, most of them the scenario and real-life questions interviewers use to see how you think. Read them, print them, then practice out loud."
         crumbs={[{ href: "/interview", label: "Interview questions" }]}
       />
       <ul className="mx-auto grid max-w-6xl gap-5 px-4 py-10 sm:grid-cols-2 lg:grid-cols-3 md:px-6">

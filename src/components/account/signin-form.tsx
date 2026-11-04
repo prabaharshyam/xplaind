@@ -26,7 +26,7 @@ export const REASONS: Record<SignUpReason, string> = {
   library: "Create a free account to download research papers and free AI books.",
 };
 
-const PERKS = ["Download roadmap PDFs and research papers", "Practise mock interviews and use the AI tools", "Save progress, XP and streaks on every device"];
+const PERKS = ["Download roadmap PDFs and research papers", "Practice mock interviews and use the AI tools", "Save progress, XP and streaks on every device"];
 
 function GoogleMark() {
   return (

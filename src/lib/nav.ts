@@ -15,16 +15,18 @@ export const NAV_GROUPS: Group[] = [
       { href: "/videos", label: "Videos", note: "Hand-picked AI channels" },
       { href: "/projects", label: "Projects", note: "Guided builds for your portfolio" },
       { href: "/glossary", label: "Glossary", note: "AI words in plain English" },
+      { href: "/papers", label: "Papers and free books", note: "Landmark research and free AI books" },
     ],
   },
   {
-    id: "practise",
-    label: "Practise",
+    id: "practice",
+    label: "Practice",
     items: [
       { href: "/practice", label: "Practice cards", note: "Flashcards for interview questions" },
       { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report" },
       { href: "/interview/answers", label: "Interview Q&A", note: "Every question and answer, by role" },
       { href: "/playground", label: "Code playground", note: "Run Python in your browser" },
+      { href: "/plan", label: "Weekly plan", note: "This week's lessons for your hours" },
     ],
   },
   {
@@ -33,7 +35,6 @@ export const NAV_GROUPS: Group[] = [
     items: [
       { href: "/jobs", label: "Jobs and salaries", note: "Pay by role, skills and live openings" },
       { href: "/ai/resume", label: "Resume review", note: "Fixes that get you shortlisted" },
-      { href: "/plan", label: "Weekly plan", note: "This week's lessons for your hours" },
     ],
   },
 ];
@@ -46,7 +47,7 @@ export function activeGroup(path: string): string | null {
   if (under(path, "/ai/resume")) return "career";
   if (under(path, "/ai")) return "ai";
   if (under(path, "/roadmap") || under(path, "/stop") || under(path, "/start") || under(path, "/resources")) return "learn";
-  if (under(path, "/interview")) return "practise";
+  if (under(path, "/interview")) return "practice";
   for (const g of NAV_GROUPS) if (g.items.some((i) => under(path, i.href))) return g.id;
   return null;
 }

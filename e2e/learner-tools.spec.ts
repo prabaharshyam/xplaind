@@ -8,12 +8,16 @@ const overflow = (page: import("@playwright/test").Page) =>
 
 test.use({ viewport: { width: 360, height: 740 } });
 
-test("the code playground offers starters and an editor, and lessons get Run buttons (PG-1, PG-2, PG-4)", async ({ page }) => {
+test("the code playground offers starters and an editor, and lessons get Run buttons (PG-1, PG-2, PG-4, PG-5)", async ({ page }) => {
   await page.goto("/playground");
   await expect(page.getByRole("heading", { level: 1, name: /Write and run Python/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Fix the bug" }).click();
   await expect(page.getByLabel("Fix the bug")).toHaveValue(/range\(len\(prices\) \+ 1\)/);
+  // PG-5: starters in three groups, each with one thing to try.
+  for (const name of ["Warm-ups", "AI ideas", "Challenges"]) await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
+  await page.getByRole("button", { name: /Temperature/ }).click();
+  await expect(page.locator("p", { hasText: "Try this:" })).toContainText("temperature");
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 
@@ -50,7 +54,7 @@ test("the weekly plan lists this week's lessons, follows the hours and offers a 
   const at6 = await lessons.count();
   await page.getByLabel("Hours a week").selectOption("15");
   await expect.poll(() => lessons.count()).toBeGreaterThan(at6);
-  await expect(page.getByRole("link", { name: "Practise interview flashcards" })).toHaveAttribute("href", "/practice");
+  await expect(page.getByRole("link", { name: "Practice interview flashcards" })).toHaveAttribute("href", "/practice");
   await expect(page.getByRole("link", { name: "Add to Google Calendar" })).toHaveAttribute("href", /calendar\.google\.com.*ctz=Asia%2FKolkata.*BYDAY%3DMO/);
   const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /Add to iPhone or Outlook/ }).click()]);
   expect(file.suggestedFilename()).toBe("xplaind-weekly-plan.ics");

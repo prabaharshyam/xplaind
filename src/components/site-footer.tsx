@@ -17,7 +17,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
     ],
   },
   {
-    title: "Practise",
+    title: "Practice",
     links: [
       { href: "/projects", label: "Projects" },
       { href: "/practice", label: "Practice cards" },

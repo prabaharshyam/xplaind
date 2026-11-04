@@ -99,7 +99,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
             </span>
             <div className="min-w-0 flex-1">
               <Link href="/practice" className="font-medium hover:underline">
-                Practise interview flashcards
+                Practice interview flashcards
               </Link>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">30 minutes, any day this week</p>
             </div>

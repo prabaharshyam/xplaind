@@ -9,8 +9,8 @@ import { PracticeView } from "./practice-view";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/practice" },
-  title: "Practise AI interview questions",
-  description: "Practise AI interview questions as flashcards: answer out loud, compare with the model answer, rate yourself and take quick quizzes.",
+  title: "Practice AI interview questions",
+  description: "Practice AI interview questions as flashcards: answer out loud, compare with the model answer, rate yourself and take quick quizzes.",
 };
 
 /** Terms learners meet first, shown as a taste of the glossary (only those that exist are shown). */

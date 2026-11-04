@@ -23,10 +23,9 @@ export default function PlaygroundPage() {
         theme="code"
         seed="playground"
         icon="code"
-        eyebrow="AI tools · Code playground"
+        eyebrow="Practice · Code playground"
         title="Write and run Python, right here"
-        lead="Nothing to install: Python runs inside your browser, with NumPy and pandas ready. Pick a starter or paste your own code. If it breaks, the AI tutor explains the error."
-        crumbs={[{ href: "/ai", label: "AI tools" }]}
+        lead="Nothing to install: Python runs inside your browser, with NumPy and pandas ready. Pick a warm-up, an AI idea or a challenge, or paste your own code. If it breaks, the AI tutor explains the error."
       />
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <PlaygroundStudio aiOn={aiEnabled()} lessonTitles={lessonTitles} />

@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: PageProps<"/practice/[topic]"
   const topic = asTopic((await params).topic);
   return topic
     ? pageMeta({
-        title: `Practise ${interviewTopicLabel(topic)} interview questions`,
+        title: `Practice ${interviewTopicLabel(topic)} interview questions`,
         description: `Flashcards for ${interviewTopicLabel(topic)} interview questions: answer out loud, check the model answer and rate yourself. Missed questions come back first.`,
         path: `/practice/${topic}`,
       })

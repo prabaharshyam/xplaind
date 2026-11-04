@@ -33,7 +33,7 @@ export const SITE_GUIDE: BotEntry[] = [
   },
   {
     k: "guide",
-    t: "Practise a mock interview out loud",
+    t: "Practice a mock interview out loud",
     a: "The mock interview asks real AI interview questions against the clock. Answer out loud or type, then get a report on what you covered, what you missed and how well you know each concept.",
     h: "/interview/simulator",
     w: "interview mock practice speak voice prepare job simulator",

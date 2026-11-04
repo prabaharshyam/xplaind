@@ -122,7 +122,7 @@ The six sample resources, three stops and six check questions exist to exercise 
 
 ## Explainer lessons and the glossary
 
-- **Explainer format.** A lesson with `format: explainer` carries our own teaching text with five sections in order: What it is, How it works, A worked example, Common mistakes, Practise. It is 500 to 1,500 words and lists at least two `key_terms` from the glossary. The page shows the text first, then the key terms, then the free course under "Go deeper", then the check. Release 1 lessons stay `format: brief` until rewritten, and each brief is a launch gap.
+- **Explainer format.** A lesson with `format: explainer` carries our own teaching text with five sections in order: What it is, How it works, A worked example, Common mistakes, Practice. It is 500 to 1,500 words and lists at least two `key_terms` from the glossary. The page shows the text first, then the key terms, then the free course under "Go deeper", then the check. Release 1 lessons stay `format: brief` until rewritten, and each brief is a launch gap.
 - **Examples are Indian and original.** Worked examples use Indian settings (UPI payments, Chennai support teams, Hinglish queries) and are written for Xplaind, not adapted from a course.
 - **Glossary.** One YAML file per term under `content/glossary/`, with a definition of 45 words or fewer, an optional fuller explanation, other names and related terms. `/glossary` lists terms A to Z; each term links to the lessons that list it as a key term. Terms are drafts until a person reviews them.
 - **MDX limits.** Lessons avoid tables and curly braces outside code blocks (no GFM plugin; MDX reads braces as code). Code blocks scroll inside their box at 360 px and can take keyboard focus.
@@ -361,7 +361,7 @@ The owner wrote his story with Claude over several drafts and approved the final
 
 ## 2026-11-03: AI tools shown as apps, not folders (AI-1)
 
-The owner found the AI tools cards, a big coloured banner with one icon each, read like folders. Product launchers (app stores, Raycast, Notion and Linear integration directories, the Google Workspace app grid) show a tool as an app icon, its name, a status, one line on what it does and an Open button, so the page now does the same. Each card also says what you give the tool and what you get back, tools are grouped by the job (Study, Practise, Get hired, Go deeper), and AI-powered tools say "Uses AI" and show "Paused" while AI is off, while the others say "No AI needed". The "Most popular" and "New" badges were dropped because no usage data backs them. "Ask me from my book" stays first (SU-1). The page uses the compact header so the tools start on the first phone screen.
+The owner found the AI tools cards, a big coloured banner with one icon each, read like folders. Product launchers (app stores, Raycast, Notion and Linear integration directories, the Google Workspace app grid) show a tool as an app icon, its name, a status, one line on what it does and an Open button, so the page now does the same. Each card also says what you give the tool and what you get back, tools are grouped by the job (Study, Practice, Get hired, Go deeper), and AI-powered tools say "Uses AI" and show "Paused" while AI is off, while the others say "No AI needed". The "Most popular" and "New" badges were dropped because no usage data backs them. "Ask me from my book" stays first (SU-1). The page uses the compact header so the tools start on the first phone screen.
 
 ## 2026-11-03: a Sign in link that is always there (AC-6)
 

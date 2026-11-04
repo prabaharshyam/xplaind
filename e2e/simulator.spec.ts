@@ -48,7 +48,7 @@ test("a typed mock interview ends with a report on key points", async ({ page })
   expect((await wcag(page)).violations).toEqual([]);
 });
 
-test("a single question can be practised from its page", async ({ page }) => {
+test("a single question can be practiced from its page", async ({ page }) => {
   await page.goto("/interview/what-is-rag");
   await expect(page.getByRole("heading", { name: "What a strong answer covers" })).toBeVisible();
   await page.getByRole("link", { name: "Answer it out loud in the mock interview" }).click();

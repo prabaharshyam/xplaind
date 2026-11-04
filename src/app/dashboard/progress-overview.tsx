@@ -65,7 +65,7 @@ export function ProgressOverview() {
           {[
             ["Lessons done", done],
             ["In progress", started],
-            ["Questions practised", Object.keys(practice.ratings).length],
+            ["Questions practiced", Object.keys(practice.ratings).length],
             ["Mock interviews", activity.interviews.length],
           ].map(([k, v]) => (
             <div key={k} className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">

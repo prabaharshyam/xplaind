@@ -93,7 +93,7 @@ export function ResultView({
             ? `You passed ${passed.id} (${passed.name}). `
             : "You did not pass a level yet, which is a fine place to start. "}
           {result.topOfLadder
-            ? "There is no level above P3, so use this path to sharpen what you know and practise for interviews."
+            ? "There is no level above P3, so use this path to sharpen what you know and practice for interviews."
             : `That puts your first step at ${result.startLevel}.`}
         </p>
         {start && (
