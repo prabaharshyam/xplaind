@@ -8,12 +8,16 @@ const overflow = (page: import("@playwright/test").Page) =>
 
 test.use({ viewport: { width: 360, height: 740 } });
 
-test("the code playground offers starters and an editor, and lessons get Run buttons (PG-1, PG-2, PG-4)", async ({ page }) => {
+test("the code playground offers starters and an editor, and lessons get Run buttons (PG-1, PG-2, PG-4, PG-5)", async ({ page }) => {
   await page.goto("/playground");
   await expect(page.getByRole("heading", { level: 1, name: /Write and run Python/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Fix the bug" }).click();
   await expect(page.getByLabel("Fix the bug")).toHaveValue(/range\(len\(prices\) \+ 1\)/);
+  // PG-5: starters in three groups, each with one thing to try.
+  for (const name of ["Warm-ups", "AI ideas", "Challenges"]) await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
+  await page.getByRole("button", { name: /Temperature/ }).click();
+  await expect(page.locator("p", { hasText: "Try this:" })).toContainText("temperature");
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 

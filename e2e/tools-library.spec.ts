@@ -13,7 +13,7 @@ test("the AI tools page puts Ask me from my book first and lists the new tools a
   const cards = page.locator("main ul").first().getByRole("link");
   await expect(cards.first()).toContainText("Ask me from my book");
   await expect(page.getByRole("link", { name: /Interview Q&A by role/ })).toHaveAttribute("href", "/interview/answers");
-  await expect(page.getByRole("link", { name: /Research papers and free books/ })).toHaveAttribute("href", "/papers");
+  await expect(page.getByRole("main").getByRole("link", { name: /Research papers and free books/ })).toHaveCount(0); // moved to the Learn menu (NV-1)
   await expect(page.getByRole("heading", { name: "Complete guides to the AI tools people use at work" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Vibe coding with Claude Code/ })).toBeVisible();
   expect(await overflow(page)).toBe(false);

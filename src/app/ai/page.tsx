@@ -46,15 +46,7 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     lead: "Get past the recruiter and into the interview.",
     tools: [
       { href: "/ai/resume", title: "Resume review", text: "Fixes in order of importance, rewritten lines and the keywords recruiters search for.", icon: "star", tone: "from-amber-400 to-amber-600", ai: true, give: "Your resume and target role", get: "A ranked list of fixes" },
-      { href: "/interview/answers", title: "Interview Q&A by role", text: "Every interview question for your role with a short and a deeper answer, on one page you can print.", icon: "target", tone: "from-violet-600 to-teal-600", ai: false, give: "The role you want", get: "Every question with answers" },
-    ],
-  },
-  {
-    id: "research",
-    title: "Go deeper",
-    lead: "Read the work that built modern AI.",
-    tools: [
-      { href: "/papers", title: "Research papers and free books", text: "The landmark papers, from Attention Is All You Need onwards, and free books shared by their authors.", icon: "book", tone: "from-sky-600 to-sky-800", ai: false, give: "A topic", get: "The papers and books that matter" },
+      { href: "/interview/answers", title: "Interview Q&A by role", text: "Every interview question for your role with a short and a deeper answer, on one page.", icon: "target", tone: "from-violet-600 to-teal-600", ai: false, give: "The role you want", get: "Every question with answers" },
     ],
   },
 ];

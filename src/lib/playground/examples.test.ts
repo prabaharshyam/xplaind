@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { decodeCode, encodeCode, EXAMPLES } from "./examples";
+import { decodeCode, encodeCode, EXAMPLE_GROUPS, EXAMPLES } from "./examples";
 
 describe("playground examples (PG-2)", () => {
   it("have unique ids, code, and link only to lessons that exist", () => {
@@ -12,6 +12,14 @@ describe("playground examples (PG-2)", () => {
     for (const e of EXAMPLES) {
       expect(e.code.trim().length).toBeGreaterThan(10);
       if (e.lesson) expect(lessons.has(e.lesson), e.lesson).toBe(true);
+    }
+  });
+
+  it("sit in the three groups, each with starters and a tip (PG-5)", () => {
+    for (const g of EXAMPLE_GROUPS) expect(EXAMPLES.filter((e) => e.group === g.id).length, g.id).toBeGreaterThanOrEqual(4);
+    for (const e of EXAMPLES) {
+      expect(e.tip.length, e.id).toBeGreaterThan(10);
+      expect(e.code, e.id).not.toMatch(/\binput\(/); // the playground has no keyboard input yet
     }
   });
 

@@ -14,6 +14,8 @@ describe("activeGroup (NV-2)", () => {
     expect(activeGroup("/ai/resume")).toBe("career");
     expect(activeGroup("/ai")).toBe("ai");
     expect(activeGroup("/ai/tutor")).toBe("ai");
+    expect(activeGroup("/papers")).toBe("learn");
+    expect(activeGroup("/plan")).toBe("practise");
   });
 
   it("marks nothing on pages outside the menu, and does not match on a shared prefix", () => {
