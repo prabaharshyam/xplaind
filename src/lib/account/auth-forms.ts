@@ -22,6 +22,26 @@ export function parseOAuthForm(form: FormLike): { ok: true; provider: OAuthProvi
   return { ok: true, provider: provider.data, next: str(form, "next")?.slice(0, 200) };
 }
 
+/**
+ * AC-1a: Google's own button on xplaind.in hands back a signed ID token (a JWT) and we send it,
+ * with the raw nonce it was issued for, to Supabase. The 18+ tick is required as for any
+ * Google sign-in.
+ */
+export function parseGoogleIdForm(form: FormLike): { ok: true; credential: string; nonce: string; next?: string } | { ok: false; error: FormError } {
+  const credential = z
+    .string()
+    .max(4096)
+    .regex(/^[\w-]+\.[\w-]+\.[\w-]+$/)
+    .safeParse(str(form, "credential"));
+  const nonce = z
+    .string()
+    .regex(/^[\w-]{16,128}$/)
+    .safeParse(str(form, "nonce"));
+  if (!credential.success || !nonce.success) return { ok: false, error: "provider" };
+  if (str(form, "adult") !== "yes") return { ok: false, error: "adult" };
+  return { ok: true, credential: credential.data, nonce: nonce.data, next: str(form, "next")?.slice(0, 200) };
+}
+
 const Email = z.email().max(254);
 const Password = z.string().min(PASSWORD_MIN).max(72); // 72: the bcrypt limit Supabase uses
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useState } from "react";
 import type { SignUpReason } from "@/lib/browser/account-sync";
+import { GoogleButton } from "./google-button";
 
 const ERRORS: Record<string, string> = {
   adult: "Please tick “I am 18 or older” to make an account.",
@@ -111,9 +112,11 @@ export function SignInForm({
       </label>
 
       <div className="grid gap-2">
-        <button type="submit" formAction="/auth/oauth" formNoValidate name="provider" value="google" className={provider}>
-          <GoogleMark /> Continue with Google
-        </button>
+        <GoogleButton next={next} adultId={ids.adult}>
+          <button type="submit" formAction="/auth/oauth" formNoValidate name="provider" value="google" className={provider}>
+            <GoogleMark /> Continue with Google
+          </button>
+        </GoogleButton>
         <button type="submit" formAction="/auth/oauth" formNoValidate name="provider" value="github" className={provider}>
           <GitHubMark /> Continue with GitHub
         </button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adultConfirmedAt, parseNewPassword, parseOAuthForm, parsePasswordForm } from "./auth-forms";
+import { adultConfirmedAt, parseGoogleIdForm, parseNewPassword, parseOAuthForm, parsePasswordForm } from "./auth-forms";
 
 const form = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null });
 
@@ -32,5 +32,22 @@ describe("sign-in forms (AC-1, PV-2)", () => {
     expect(adultConfirmedAt({}, "2026-11-01T10:00:00Z")).toBe("2026-11-01T10:00:00.000Z");
     expect(adultConfirmedAt(null, "garbage")).toBeNull();
     expect(adultConfirmedAt({ adult_confirmed_at: 5 }, undefined)).toBeNull();
+  });
+});
+
+describe("parseGoogleIdForm (AC-1a)", () => {
+  const jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl";
+  const nonce = "a".repeat(64);
+
+  it("accepts a token, its nonce and the 18+ tick", () => {
+    expect(parseGoogleIdForm(form({ credential: jwt, nonce, adult: "yes", next: "/dashboard" }))).toEqual({ ok: true, credential: jwt, nonce, next: "/dashboard" });
+  });
+  it("needs the 18+ tick, like every Google sign-in", () => {
+    expect(parseGoogleIdForm(form({ credential: jwt, nonce, adult: "" }))).toEqual({ ok: false, error: "adult" });
+  });
+  it("refuses anything that is not a token with a nonce", () => {
+    expect(parseGoogleIdForm(form({ credential: "not a jwt", nonce, adult: "yes" }))).toEqual({ ok: false, error: "provider" });
+    expect(parseGoogleIdForm(form({ credential: jwt, nonce: "short", adult: "yes" }))).toEqual({ ok: false, error: "provider" });
+    expect(parseGoogleIdForm(form({ nonce, adult: "yes" }))).toEqual({ ok: false, error: "provider" });
   });
 });
