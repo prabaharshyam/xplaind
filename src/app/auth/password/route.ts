@@ -1,6 +1,6 @@
 // AC-1: sign up or sign in with email and password. A plain form POST, so it works with JavaScript off.
 import { type NextRequest, NextResponse } from "next/server";
-import { parsePasswordForm } from "@/lib/account/auth-forms";
+import { parsePasswordForm, signUpHitExistingAccount } from "@/lib/account/auth-forms";
 import { finishSignIn } from "@/lib/account/finish";
 import { ipKey, rateLimit, safeNext } from "@/lib/account/http";
 import { accountsEnabled } from "@/lib/supabase/config";
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       },
     });
     if (error) return back({ error: /registered|exists/i.test(error.message) ? "taken" : "send", mode });
+    if (signUpHitExistingAccount(data.user)) return back({ error: "taken", mode: "signin" });
     // With "Confirm email" on in Supabase, there is no session until the learner opens the email.
     if (!data.session) return back({ sent: "confirm" });
   }
