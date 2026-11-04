@@ -5,11 +5,12 @@ import { cookies } from "next/headers";
 import { ADULT_COOKIE, adultConfirmedAt } from "./auth-forms";
 import { ensureProfile, profileExists } from "./repo";
 
-export async function finishSignIn(client: SupabaseClient, admin: SupabaseClient): Promise<"ok" | "adult"> {
+/** `tickedAt` is the 18+ tick sent with this sign-in, when it arrives with the request itself. */
+export async function finishSignIn(client: SupabaseClient, admin: SupabaseClient, tickedAt?: string): Promise<"ok" | "adult"> {
   const { data } = await client.auth.getUser();
   if (!data.user) return "adult";
   const store = await cookies();
-  const adultAt = adultConfirmedAt(data.user.user_metadata, store.get(ADULT_COOKIE)?.value);
+  const adultAt = adultConfirmedAt(data.user.user_metadata, tickedAt ?? store.get(ADULT_COOKIE)?.value);
   store.delete({ name: ADULT_COOKIE, path: "/auth" });
   if (adultAt) {
     await ensureProfile(admin, data.user.id, adultAt);
