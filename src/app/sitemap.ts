@@ -1,10 +1,13 @@
 import type { MetadataRoute } from "next";
-import { contentUpdatedOn, getBlogPosts, getPaths, getProjects, getStops } from "@/lib/content";
+import { contentUpdatedOn, getBlogPosts, getContent, getPaths, getProjects, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { INTERVIEW_TOPIC_IDS } from "@/lib/interview-topics";
 import { LEVEL_IDS } from "@/lib/levels";
 import { siteUrl } from "@/lib/site";
 import { THEMES } from "@/lib/themes";
+
+/** The last day the site's own pages (home, menus, tools) changed. Bump it with page changes. */
+export const PAGES_UPDATED_ON = "2026-11-04";
 
 // IQ-3: every public page, including each interview question. /result and /go are
 // left out: one is personal, the other only redirects.
@@ -27,6 +30,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...getStops().map((s) => `/stop/${s.id}`),
     "/interview",
     "/interview/simulator",
+    "/interview/top",
+    ...getPaths()
+      .filter((p) => p.top_interview.length)
+      .map((p) => `/interview/top/${p.id}`),
     "/ai",
     "/ai/tutor",
     "/jobs",
@@ -55,9 +62,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/how-we-rank",
   ];
   // SE-2: last-modified dates, so search and AI engines can tell fresh pages from stale ones.
-  // Lessons use their review date; everything else the date of this build.
-  const built = new Date(`${contentUpdatedOn()}T00:00:00+05:30`);
-  const lessonDate = new Map(getStops().map((s) => [`/stop/${s.id}`, new Date(`${s.reviewed_on}T00:00:00+05:30`)]));
+  // Lessons, interview questions and projects use their review date and guides their update date.
+  // Every other page uses the newest of those and PAGES_UPDATED_ON.
+  const day = (d: string) => new Date(`${d}T00:00:00+05:30`);
+  const dated = new Map<string, string>([
+    ...getStops().map((s) => [`/stop/${s.id}`, s.reviewed_on] as const),
+    ...getContent().interview.map(({ data: q }) => [`/interview/${q.id}`, q.reviewed_on] as const),
+    ...getProjects().map((p) => [`/projects/${p.id}`, p.reviewed_on] as const),
+    ...getBlogPosts().map((b) => [`/blog/${b.id}`, b.updated_on] as const),
+  ]);
+  const newest = [PAGES_UPDATED_ON, contentUpdatedOn(), ...dated.values()].reduce((m, d) => (d > m ? d : m));
   const priority = (p: string) => (p === "/" ? 1 : p.startsWith("/roadmap/") || p === "/paths" ? 0.9 : p.startsWith("/stop/") ? 0.8 : 0.6);
-  return paths.map((p) => ({ url: `${base}${p}`, lastModified: lessonDate.get(p) ?? built, priority: priority(p) }));
+  return [...new Set(paths)].map((p) => ({ url: `${base}${p}`, lastModified: day(dated.get(p) ?? newest), priority: priority(p) }));
 }
