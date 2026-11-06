@@ -34,10 +34,11 @@ import { TopicStatus } from "@/components/roadmap/topic-status";
 import { aiEnabled } from "@/lib/ai/settings";
 import { levelWords } from "@/lib/levels";
 import { CopyCode } from "@/components/copy-code";
+import { FlowDiagram } from "@/components/flow-diagram";
 
 /** Lesson text: headings, lists, code and tables styled without a typography plugin. Code scrolls inside its box at 360px. */
 const PROSE =
-  "mt-2 leading-7 [&_h2]:mt-10 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:font-semibold [&_li]:mt-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mt-3 [&_ul]:list-disc [&_ul]:pl-6 [&_strong]:font-semibold [&_blockquote]:mt-3 [&_blockquote]:border-l-4 [&_blockquote]:border-zinc-300 [&_blockquote]:pl-4 [&_blockquote]:text-zinc-700 dark:[&_blockquote]:border-zinc-700 dark:[&_blockquote]:text-zinc-300 [&_pre]:mt-3 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:bg-zinc-100 [&_pre]:p-3 [&_pre]:text-sm dark:[&_pre]:bg-zinc-900 [&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-zinc-100 [&_:not(pre)>code]:px-1 dark:[&_:not(pre)>code]:bg-zinc-900 [&_table]:mt-3 [&_table]:block [&_table]:overflow-x-auto [&_td]:border [&_td]:border-zinc-300 [&_td]:p-2 [&_th]:border [&_th]:border-zinc-300 [&_th]:p-2 [&_th]:text-left dark:[&_td]:border-zinc-700 dark:[&_th]:border-zinc-700 [&_table]:w-full [&_table]:border-collapse [&_th]:bg-zinc-100 dark:[&_th]:bg-zinc-900 [&_pre:has(>code.language-text)]:bg-zinc-950 [&_pre:has(>code.language-text)]:p-4 [&_pre:has(>code.language-text)]:leading-6 [&_pre:has(>code.language-text)]:text-emerald-100 dark:[&_pre:has(>code.language-text)]:bg-black";
+  "mt-2 leading-7 [&_h2]:mt-10 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:font-semibold [&_li]:mt-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mt-3 [&_ul]:list-disc [&_ul]:pl-6 [&_strong]:font-semibold [&_blockquote]:mt-3 [&_blockquote]:border-l-4 [&_blockquote]:border-zinc-300 [&_blockquote]:pl-4 [&_blockquote]:text-zinc-700 dark:[&_blockquote]:border-zinc-700 dark:[&_blockquote]:text-zinc-300 [&_pre]:mt-3 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:bg-zinc-100 [&_pre]:p-3 [&_pre]:text-sm dark:[&_pre]:bg-zinc-900 [&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-zinc-100 [&_:not(pre)>code]:px-1 dark:[&_:not(pre)>code]:bg-zinc-900 [&_table]:mt-3 [&_table]:block [&_table]:overflow-x-auto [&_td]:border [&_td]:border-zinc-300 [&_td]:p-2 [&_th]:border [&_th]:border-zinc-300 [&_th]:p-2 [&_th]:text-left dark:[&_td]:border-zinc-700 dark:[&_th]:border-zinc-700 [&_table]:w-full [&_table]:border-collapse [&_th]:bg-zinc-100 dark:[&_th]:bg-zinc-900 [&_pre:has(>code.language-text)]:border [&_pre:has(>code.language-text)]:border-zinc-200 [&_pre:has(>code.language-text)]:bg-zinc-50 [&_pre:has(>code.language-text)]:p-4 [&_pre:has(>code.language-text)]:leading-6 [&_pre:has(>code.language-text)]:text-zinc-800 dark:[&_pre:has(>code.language-text)]:border-zinc-800 dark:[&_pre:has(>code.language-text)]:bg-zinc-950 dark:[&_pre:has(>code.language-text)]:text-zinc-200";
 
 /** Code blocks and tables scroll sideways on phones, so keyboard users must be able to focus them (WCAG 2.1.1). */
 /** PG-4: Python examples in lessons get a "Run this code" button; other code stays as it is. */
@@ -45,7 +46,9 @@ function LessonPre(props: React.ComponentProps<"pre">) {
   const child = props.children as React.ReactElement<{ className?: string; children?: unknown }> | undefined;
   const lang = child?.props?.className ?? "";
   const text = typeof child?.props?.children === "string" ? child.props.children : null;
-  // Text diagrams (language-text) are drawings, not code: no Copy button on those.
+  // RM-14: a ```flow block is a diagram, drawn as SVG.
+  if (/\blanguage-flow\b/.test(lang) && text) return <FlowDiagram source={text} />;
+  // Text blocks (language-text) are program output and logs: no Copy button on those.
   const pre = /\blanguage-text\b/.test(lang) ? <pre tabIndex={0} {...props} /> : <CopyCode><pre tabIndex={0} {...props} className={`${props.className ?? ""} pr-16`} /></CopyCode>;
   if (!text || !/\blanguage-(python|py)\b/.test(lang)) return pre;
   return (
@@ -215,7 +218,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
           {/* SE-4: the answer first, in plain words, for readers in a hurry and for search and AI results. */}
           <section aria-labelledby="answer-h" className={CARD}>
-            <h2 id="answer-h" className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+            <h2 id="answer-h" className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
               Quick answer
             </h2>
             <p className="mt-1 text-lg leading-8 text-zinc-900 dark:text-zinc-100">{stop.answer}</p>
@@ -241,7 +244,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
                     <Icon name={SECTION_ICON[sec.title] ?? "book"} size={18} />
                   </span>
                   <span>
-                    <span className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                    <span className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
                       Part {i + 1} of {sections.length}
                     </span>
                     {sec.title}

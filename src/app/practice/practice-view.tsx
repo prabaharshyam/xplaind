@@ -134,7 +134,7 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
                   className="card-flip relative flex min-h-72 flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-lg shadow-zinc-950/5 md:p-8 dark:border-zinc-800 dark:bg-zinc-900"
                   aria-labelledby="card-question"
                 >
-                  <p className="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
+                  <p className="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
                     <span>{stage === 0 ? "Question" : "Answer"}</span>
                     <span>Level {q.level}</span>
                   </p>

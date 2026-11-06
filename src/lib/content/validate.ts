@@ -4,6 +4,7 @@ import { daysBetween } from "@/lib/dates";
 import { INTERVIEW_TOPICS } from "@/lib/interview-topics";
 import { PRICE_STALE_DAYS } from "@/lib/roadmap/cost";
 import { LEVEL_IDS, type LevelId, levelIndex } from "@/lib/levels";
+import { parseFlow } from "@/lib/diagram/flow";
 import { isHumanName } from "./review";
 import { DEEP_MAX_WORDS, DEEP_MIN_WORDS, EXPLAINER_MAX_WORDS, EXPLAINER_MIN_WORDS, EXPLAINER_SECTIONS, wordCount } from "./schema";
 import type { Bundle, Entry, Issue } from "./types";
@@ -148,6 +149,14 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   // ---- lesson format and glossary -----------------------------------------
   const termIds = new Set(bundle.glossary.map((g) => g.data.id));
   for (const { file, data: s } of bundle.stops) {
+    // RM-14: every ```flow diagram must parse, so a broken one never reaches a lesson.
+    for (const m of s.body.matchAll(/^```flow\n([\s\S]*?)^```/gm)) {
+      try {
+        parseFlow(m[1]);
+      } catch (e) {
+        error(file, `diagram: ${e instanceof Error ? e.message : String(e)}`, "RM-14");
+      }
+    }
     for (const t of s.key_terms) if (!termIds.has(t)) error(file, `key term "${t}" is not in the glossary`);
     if (s.format === "brief") {
       gap(file, `lesson "${s.id}" is still a brief; write it as an explainer`, "RM-2");
@@ -171,7 +180,7 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     if (words < DEEP_MIN_WORDS || words > DEEP_MAX_WORDS) {
       error(file, `a deep lesson is ${DEEP_MIN_WORDS} to ${DEEP_MAX_WORDS} words; this one is ${words}`);
     }
-    if (!/^```text\n/m.test(s.body)) error(file, "a deep lesson has at least one diagram in a ```text block");
+    if (!/^```(text|flow)\n/m.test(s.body)) error(file, "a deep lesson has at least one diagram, in a ```flow block (RM-14)");
     if (!/^\|.+\|\s*\n\|[\s:|-]+\|/m.test(s.body)) error(file, "a deep lesson has at least one table");
     if (/^# /m.test(s.body.replace(/^```[\s\S]*?^```/gm, ""))) error(file, "lesson text starts its headings at ##");
   }

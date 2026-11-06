@@ -688,7 +688,7 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
               aria-label={`Card ${i + 1}`}
               className="card-flip relative flex min-h-72 flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-lg shadow-zinc-950/5 outline-none md:p-8 dark:border-zinc-800 dark:bg-zinc-900"
             >
-              <p className="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
+              <p className="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
                 <span>{flipped ? "Answer" : "Question"}</span>
                 <span className="min-w-0 truncate normal-case">
                   {card.section}, page {card.page}
@@ -700,7 +700,7 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
                   <p className="text-lg leading-8">{card.back}</p>
                   <figure className="mt-auto border-l-2 border-zinc-300 pl-3 dark:border-zinc-700">
                     <blockquote className="text-sm leading-6 text-zinc-600 italic dark:text-zinc-400">&ldquo;{card.quote}&rdquo;</blockquote>
-                    <figcaption className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">From your file: {card.section}, page {card.page}</figcaption>
+                    <figcaption className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">From your file: {card.section}, page {card.page}</figcaption>
                   </figure>
                 </>
               ) : (

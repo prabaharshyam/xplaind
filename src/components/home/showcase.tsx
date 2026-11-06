@@ -133,10 +133,10 @@ export function MiniNotes() {
       <div className="relative pb-2">
         <span className="absolute inset-x-4 bottom-0 h-full rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
         <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-lg shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-[11px] font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">Flashcard 3 of 15</p>
+          <p className="text-[11px] font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">Flashcard 3 of 15</p>
           <p className="mt-2 font-semibold text-zinc-900 dark:text-zinc-100">Where do plants turn light into chemical energy?</p>
           <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">In the chloroplast, during photosynthesis.</p>
-          <p className="mt-3 border-l-2 border-zinc-300 pl-2 text-xs text-zinc-500 italic dark:border-zinc-700 dark:text-zinc-400">From your notes: Chapter 6, page 41</p>
+          <p className="mt-3 border-l-2 border-zinc-300 pl-2 text-xs text-zinc-600 italic dark:border-zinc-700 dark:text-zinc-400">From your notes: Chapter 6, page 41</p>
         </div>
       </div>
     </div>

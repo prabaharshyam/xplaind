@@ -13,12 +13,12 @@ test("a stop page renders its lesson from MDX at 360px", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toContainText("What AI, machine learning");
   await expect(page.getByRole("heading", { name: "Go deeper: the best course" })).toBeVisible();
   await expect(page.locator("#courses").getByText("Start here")).toBeVisible();
-  // from the MDX body: section headings, sub-headings, a list, a table and a text diagram
+  // from the MDX body: section headings, sub-headings, a list, a table and a diagram (RM-14)
   await expect(page.getByRole("heading", { level: 2, name: "How it works" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "Rules versus learning" })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "is the broad goal" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Rule-based software" })).toBeVisible();
-  await expect(page.locator("pre code.language-text").first()).toContainText("Machine learning (ML)");
+  await expect(page.locator("figure:has(svg)").first()).toContainText("Machine learning (ML)");
   expect(await noHorizontalScroll(page)).toBe(false);
   expect(errors).toEqual([]);
 });
@@ -112,4 +112,20 @@ test("the lesson widgets still work when the browser blocks storage", async ({ p
   });
   await page.goto("/stop/kpi-that-matters");
   await exerciseWidgets(page, "kpi-that-matters");
+});
+
+test("lesson diagrams are drawn as clean SVG with a text description, and no black boxes remain (RM-14)", async ({ page }) => {
+  await page.goto("/stop/errors-retries-cost");
+  const figure = page.locator("figure:has(svg)").first();
+  await expect(figure).toBeVisible();
+  await expect(figure.locator("ol li").filter({ hasText: "Success? → yes → Use the result" })).toHaveCount(1);
+  const darkText = await page.evaluate(() =>
+    [...document.querySelectorAll("pre")].filter((p) => {
+      const [r, g, b] = getComputedStyle(p).backgroundColor.match(/\d+/g)!.map(Number);
+      return r + g + b < 120;
+    }).length,
+  );
+  expect(darkText).toBe(0);
+  expect(await noHorizontalScroll(page)).toBe(false);
+  expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations).toEqual([]);
 });
