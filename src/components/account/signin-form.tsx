@@ -21,13 +21,13 @@ const ERRORS: Record<string, string> = {
 export const REASONS: Record<SignUpReason, string> = {
   pdf: "Create a free account to download your roadmap.",
   interview: "Create a free account to take the mock interview.",
-  progress: "Create a free account to save your progress, XP and streak.",
+  progress: "Create a free account to save your progress and streak.",
   practice: "Create a free account to save your practice and see missed questions again.",
   tools: "Create a free account to use the AI tools.",
   library: "Create a free account to download research papers and free AI books.",
 };
 
-const PERKS = ["Download roadmap PDFs and research papers", "Practice mock interviews and use the AI tools", "Save progress, XP and streaks on every device"];
+const PERKS = ["Download roadmap PDFs and research papers", "Practice mock interviews and use the AI tools", "Save your progress and streak on every device"];
 
 function GoogleMark() {
   return (

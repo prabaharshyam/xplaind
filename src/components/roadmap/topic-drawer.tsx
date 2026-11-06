@@ -118,7 +118,7 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
         <div>
           <TopicStatus stopId={d.id} title={d.title} />
           <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-            Done and Skip are your own call. Pass the lesson&apos;s check for full XP and level badges.
+            Done and Skip are your own call. The lesson&apos;s check tells you if you have it.
           </p>
         </div>
 

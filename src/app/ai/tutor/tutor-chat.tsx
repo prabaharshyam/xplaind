@@ -23,7 +23,7 @@ export function TutorChat({ enabled, paths, titles }: { enabled: boolean; paths:
       `Path: ${pathName}.`,
       result ? `Placement test level: ${result.startLevel}.` : "Has not taken the placement test.",
       `Lessons done: ${done.length}${recent.length ? ` (latest: ${recent.join("; ")})` : ""}.`,
-      `XP: ${game.xp} (${game.rank.name}). Weekly streak: ${game.streak}.`,
+      `Day streak: ${game.streak}.`,
     ].join(" ");
   }, [progress.stops, result, game, pathName, titles]);
 

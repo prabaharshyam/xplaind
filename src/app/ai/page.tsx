@@ -26,7 +26,7 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     title: "Study",
     lead: "Understand topics faster and know what to learn next.",
     tools: [
-      { href: "/ai/book", title: "Ask me from my book", text: "Turns your textbook or notes into a timed multiple-choice test, and shows what to reread.", icon: "book", tone: "from-teal-500 to-teal-700", ai: true, give: "A PDF of your book or notes", get: "A test and a page-by-page report" },
+      { href: "/ai/book", title: "Study from my notes & books", text: "Turns your textbook or notes into a timed test or flashcards, and shows what to reread.", icon: "book", tone: "from-teal-500 to-teal-700", ai: true, give: "A PDF of your book or notes", get: "A test and a page-by-page report" },
       { href: "/ai/tutor", title: "AI tutor", text: "Explains any AI topic in plain English, with examples, and knows which lessons you have done.", icon: "chat", tone: "from-violet-500 to-violet-700", ai: true, give: "Your question", get: "A clear answer and lessons to read" },
       { href: "/ai/roadmap", title: "AI roadmap generator", text: "Builds a stage-by-stage plan for your goal, level and hours, linked to our lessons.", icon: "map", tone: "from-sky-500 to-violet-600", ai: true, give: "Your goal and weekly hours", get: "A personal roadmap to tick off" },
     ],

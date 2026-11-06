@@ -10,7 +10,6 @@ import { muted, textLink } from "@/components/ui";
 import { GENAI_PATH_ID, getContent, getGlossary, getLevel, getStop, getStops, pathLessons, pathsWithLesson } from "@/lib/content";
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
-import { XP } from "@/lib/game/xp";
 import { ParticleScene } from "@/components/three/particle-scene";
 import { THEME_SHAPE } from "@/components/three/particle-shapes";
 import { type IconName, themeOf } from "@/lib/themes";
@@ -69,11 +68,8 @@ const SECTION_ICON: Record<string, IconName> = {
   "Common mistakes": "shield",
   Practice: "target",
 };
-const SECTION_TONE: Record<string, string> = {
-  "A worked example": "border-sky-200 bg-sky-50/50 dark:border-sky-900 dark:bg-sky-950/30",
-  "Common mistakes": "border-rose-200 bg-rose-50/50 dark:border-rose-900 dark:bg-rose-950/30",
-  Practice: "border-violet-200 bg-violet-50/50 dark:border-violet-900 dark:bg-violet-950/30",
-};
+/** 2026-11-06, owner request: every lesson section is the same plain white card with a soft shadow. */
+const CARD = "rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] md:p-6 dark:border-zinc-800 dark:bg-zinc-900";
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
@@ -153,7 +149,6 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   const at = order.findIndex((l) => l.id === stop.id);
   const prev = at > 0 ? order[at - 1] : null;
   const next = at >= 0 && at < order.length - 1 ? order[at + 1] : null;
-  const xpToEarn = stop.check.type === "project" ? XP.lessonProject : XP.lessonCheck;
 
   return (
     <main>
@@ -197,7 +192,6 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
                   {c}
                 </span>
               ))}
-              <span className="rounded-full bg-amber-300 px-3 py-1 font-semibold text-amber-950">+{xpToEarn} XP</span>
             </p>
           </div>
           {/* MO-8: the lesson's topic as a particle sculpture. */}
@@ -220,16 +214,16 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
           </div>
 
           {/* SE-4: the answer first, in plain words, for readers in a hurry and for search and AI results. */}
-          <section aria-labelledby="answer-h" className="rounded-2xl bg-violet-50 p-5 ring-1 ring-violet-200 dark:bg-violet-950/40 dark:ring-violet-900">
-            <h2 id="answer-h" className="text-sm font-semibold text-violet-800 dark:text-violet-300">
+          <section aria-labelledby="answer-h" className={CARD}>
+            <h2 id="answer-h" className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
               Quick answer
             </h2>
             <p className="mt-1 text-lg leading-8 text-zinc-900 dark:text-zinc-100">{stop.answer}</p>
           </section>
 
-          <section id="why" aria-labelledby="why-h" className="mt-6 scroll-mt-24 rounded-2xl border-l-4 border-amber-400 bg-amber-50 p-5 dark:bg-amber-950/40">
+          <section id="why" aria-labelledby="why-h" className={`mt-6 scroll-mt-24 ${CARD}`}>
             <h2 id="why-h" className="flex items-center gap-2 text-lg font-semibold">
-              <Icon name="star" size={20} className="text-amber-600" /> Why it matters
+              Why it matters
             </h2>
             <p className="mt-2 leading-7">{stop.why_it_matters}</p>
           </section>
@@ -240,10 +234,10 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               <section
                 id={slug(sec.title)}
                 aria-labelledby={`${slug(sec.title)}-h`}
-                className={`mt-6 scroll-mt-24 rounded-2xl border p-5 md:p-6 ${SECTION_TONE[sec.title] ?? "border-zinc-200 dark:border-zinc-800"}`}
+                className={`mt-6 scroll-mt-24 ${CARD}`}
               >
                 <h2 id={`${slug(sec.title)}-h`} className="flex items-center gap-3 text-xl font-semibold">
-                  <span className="grid size-9 place-items-center rounded-2xl text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}>
+                  <span className="grid size-9 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
                     <Icon name={SECTION_ICON[sec.title] ?? "book"} size={18} />
                   </span>
                   <span>
@@ -280,9 +274,9 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
           )}
 
           {stop.exercise && (
-            <section id="try-it" aria-labelledby="try-it-h" className="mt-6 scroll-mt-24 rounded-2xl border-2 border-dashed border-amber-400 bg-amber-50/60 p-5 md:p-6 dark:border-amber-700 dark:bg-amber-950/20">
+            <section id="try-it" aria-labelledby="try-it-h" className={`mt-6 scroll-mt-24 ${CARD}`}>
               <h2 id="try-it-h" className="flex items-center gap-3 text-xl font-semibold">
-                <span className="grid size-9 place-items-center rounded-2xl bg-amber-400 text-amber-950">
+                <span className="grid size-9 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
                   <Icon name="bolt" size={18} />
                 </span>
                 {stop.exercise.title}
@@ -298,14 +292,14 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
           )}
 
           {terms.length > 0 && (
-            <section aria-labelledby="terms-heading" className="mt-6 rounded-2xl bg-zinc-100 p-5 dark:bg-zinc-900">
+            <section aria-labelledby="terms-heading" className={`mt-6 ${CARD}`}>
               <h2 id="terms-heading" className="text-xl font-semibold">
                 Key terms
               </h2>
               <p className={`mt-1 text-sm ${muted}`}>Tap a term to see what it means.</p>
               <div className="mt-3 flex flex-col gap-2">
                 {terms.map((t) => (
-                  <details key={t.id} className="group rounded-2xl bg-white px-4 py-3 dark:bg-zinc-950">
+                  <details key={t.id} className="group rounded-2xl border border-zinc-200 px-4 py-3 dark:border-zinc-800">
                     <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 font-medium [&::-webkit-details-marker]:hidden">
                       {t.term}
                       <span aria-hidden="true" className="transition group-open:rotate-45">
@@ -351,17 +345,14 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </section>
           )}
 
-          <section id="check" aria-labelledby="check-h" className="mt-8 scroll-mt-24 rounded-2xl border-2 border-emerald-600 p-5 md:p-6">
+          <section id="check" aria-labelledby="check-h" className={`mt-8 scroll-mt-24 ${CARD}`}>
             <h2 id="check-h" className="flex flex-wrap items-center gap-3 text-xl font-semibold">
               <Icon name="check" size={22} className="text-emerald-700 dark:text-emerald-400" /> Check
-              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                +{xpToEarn} XP
-              </span>
             </h2>
             <StopProgressPanel stopId={stop.id} title={stop.title} check={check} />
           </section>
 
-          <section id="tutor" aria-labelledby="tutor-h" className="mt-8 scroll-mt-24 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-teal-50 p-5 md:p-6 dark:border-violet-900 dark:from-violet-950/30 dark:to-teal-950/20">
+          <section id="tutor" aria-labelledby="tutor-h" className={`mt-8 scroll-mt-24 ${CARD}`}>
             <h2 id="tutor-h" className="flex items-center gap-2 text-xl font-semibold">
               <Icon name="sparkles" size={22} className="text-violet-700 dark:text-violet-300" /> Stuck? Ask the AI tutor
             </h2>

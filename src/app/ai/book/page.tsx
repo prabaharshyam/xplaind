@@ -4,13 +4,13 @@ import { aiEnabled } from "@/lib/ai/settings";
 import { BookStudio } from "./book-studio";
 
 export const metadata: Metadata = {
-  title: "Ask me from my book: MCQ tests from your own PDF",
+  title: "Study from my notes & books: tests and flashcards from your own PDF",
   description:
-    "Upload your textbook or notes, pick chapters, difficulty, number of questions and time, and take a timed MCQ test written from your book. The report quotes the page for every answer and shows what to reread.",
+    "Upload your textbook or notes as a PDF or Word file. Take a timed MCQ test written from it, or make flashcards from it. Every answer quotes its page, and the report shows what to reread.",
   alternates: { canonical: "/ai/book" },
 };
 
-/** MB-1 to MB-4: "Ask me from my book". The book is read in the browser and never stored. */
+/** MB-1 to MB-5: "Study from my notes & books" (renamed from "Ask me from my book" on 2026-11-06). The book is read in the browser and never stored. */
 export default function BookPage() {
   return (
     <main>
@@ -19,8 +19,8 @@ export default function BookPage() {
         seed="ask-my-book"
         icon="book"
         eyebrow="Practice · AI tool"
-        title="Ask me from my book"
-        lead="Upload your book or notes. Choose the chapters, how hard, how many questions and how long. Take a timed test written from your book, then get a report that shows each answer on its page and tells you what to reread."
+        title="Study from my notes & books"
+        lead="Upload your book or notes as a PDF or Word file. Get a timed test or a deck of flashcards written from it. Every answer shows the page it came from, and the report tells you what to reread."
         crumbs={[{ href: "/practice", label: "Practice" }]}
       />
       <div className="mx-auto max-w-3xl px-4 py-8">

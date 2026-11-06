@@ -43,7 +43,7 @@ export async function downloadReportPdf(test: BookTest, report: BookReport): Pro
     y += gap;
   };
 
-  write("Ask me from my book: test report", { size: 18, bold: true, color: [4, 120, 87] });
+  write("Study from my notes & books: test report", { size: 18, bold: true, color: [4, 120, 87] });
   write(test.book, { size: 13, bold: true });
   write(`${DIFFICULTY_LABEL[test.difficulty]} · ${test.questions.length} questions · ${test.minutes} minutes allowed · taken ${test.result?.finishedOn ?? test.createdOn}`.replace(/·/g, "-"), { size: 10, color: [82, 82, 91], gap: 12 });
 

@@ -113,57 +113,83 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
       ) : (
         (() => {
           const q = byId.get(queue[index])!;
+          const done = Math.round((index / queue.length) * 100);
           return (
-            <article className="flex flex-col gap-4 rounded-2xl border border-zinc-300 p-4 dark:border-zinc-700" aria-labelledby="card-question">
-              <p className={`text-sm ${muted}`}>
-                Question {index + 1} of {queue.length} · level {q.level}
-              </p>
-              <h3 id="card-question" tabIndex={-1} className="text-xl leading-8 font-semibold outline-none">
-                {q.question}
-              </h3>
-              {!q.reviewed && <DraftNote />}
-              {stage === 0 && (
-                <>
-                  <p className={muted}>Say your answer out loud first, then check it.</p>
-                  <button type="button" className={primaryButton} onClick={() => setStage(1)}>
-                    Show the short answer
-                  </button>
-                </>
-              )}
-              {stage >= 1 && (
-                <div className="flex flex-col gap-3">
-                  <h4 className="font-semibold">Short answer</h4>
-                  <p className="rounded-2xl bg-zinc-100 p-3 leading-7 dark:bg-zinc-900">{q.short_answer}</p>
-                  {stage === 1 ? (
-                    <button type="button" className={secondaryButton} onClick={() => setStage(2)}>
-                      Show the deeper answer
-                    </button>
-                  ) : (
-                    <>
-                      <h4 className="font-semibold">Deeper answer</h4>
-                      {q.deeper_answer.split(/\n\s*\n/).map((para, i) => (
-                        <p key={i} className="leading-7">
-                          {para}
-                        </p>
-                      ))}
-                    </>
-                  )}
-                  <fieldset className="mt-2 flex min-w-0 flex-col gap-2">
-                    <legend className="mb-2 font-medium">How did you do?</legend>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[...RATINGS].reverse().map((r) => (
-                        <button key={r.value} type="button" className={secondaryButton} onClick={() => next(r.value)}>
-                          {r.label}
-                        </button>
-                      ))}
+            <div className="flex flex-col gap-4">
+              {/* Progress through the deck. */}
+              <div className="flex items-center gap-3 text-sm">
+                <span className={muted}>
+                  Card {index + 1} of {queue.length}
+                </span>
+                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden="true">
+                  <span className="block h-full rounded-full bg-violet-700 transition-[width] duration-300" style={{ width: `${done}%` }} />
+                </span>
+              </div>
+              {/* A deck: the card on top, with two cards peeking out behind it. */}
+              <div className="relative pb-3">
+                <span aria-hidden="true" className="absolute inset-x-6 bottom-0 h-full rounded-3xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
+                <span aria-hidden="true" className="absolute inset-x-3 bottom-1.5 h-full rounded-3xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
+                <article
+                  key={`${q.id}-${stage > 0 ? "back" : "front"}`}
+                  className="card-flip relative flex min-h-72 flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-lg shadow-zinc-950/5 md:p-8 dark:border-zinc-800 dark:bg-zinc-900"
+                  aria-labelledby="card-question"
+                >
+                  <p className="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
+                    <span>{stage === 0 ? "Question" : "Answer"}</span>
+                    <span>Level {q.level}</span>
+                  </p>
+                  <h3
+                    id="card-question"
+                    tabIndex={-1}
+                    className={`leading-snug font-semibold outline-none ${stage === 0 ? "my-auto py-6 text-center text-2xl" : "text-lg text-zinc-600 dark:text-zinc-300"}`}
+                  >
+                    {q.question}
+                  </h3>
+                  {!q.reviewed && <DraftNote />}
+                  {stage === 0 ? (
+                    <div className="mt-auto flex flex-col items-center gap-3">
+                      <p className={`text-sm ${muted}`}>Say your answer out loud first, then flip the card.</p>
+                      <button type="button" className={primaryButton} onClick={() => setStage(1)}>
+                        Show the short answer
+                      </button>
                     </div>
-                  </fieldset>
-                  <Link href={`/interview/${q.id}`} className={`text-sm ${textLink}`}>
-                    Full answer, follow-ups and common mistakes
-                  </Link>
-                </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      <p className="text-lg leading-8">{q.short_answer}</p>
+                      {stage === 1 ? (
+                        <button type="button" className={`${secondaryButton} self-start`} onClick={() => setStage(2)}>
+                          Show the deeper answer
+                        </button>
+                      ) : (
+                        <div className="flex flex-col gap-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                          <h4 className="font-semibold">Deeper answer</h4>
+                          {q.deeper_answer.split(/\n\s*\n/).map((para, i) => (
+                            <p key={i} className="leading-7">
+                              {para}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      <Link href={`/interview/${q.id}`} className={`text-sm ${textLink}`}>
+                        Full answer, follow-ups and common mistakes
+                      </Link>
+                    </div>
+                  )}
+                </article>
+              </div>
+              {stage >= 1 && (
+                <fieldset className="flex min-w-0 flex-col gap-2">
+                  <legend className="mb-2 font-medium">How did you do?</legend>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[...RATINGS].reverse().map((r) => (
+                      <button key={r.value} type="button" className={secondaryButton} onClick={() => next(r.value)}>
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
               )}
-            </article>
+            </div>
           );
         })()
       )}

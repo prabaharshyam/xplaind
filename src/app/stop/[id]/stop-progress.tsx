@@ -5,7 +5,6 @@ import { useState } from "react";
 import { Celebrate } from "@/components/celebrate";
 import { McqQuiz, type McqQuestion } from "@/components/mcq-quiz";
 import { TopicStatus } from "@/components/roadmap/topic-status";
-import { XP } from "@/lib/game/xp";
 import { muted, primaryButton, textLink } from "@/components/ui";
 import { useProgress } from "@/lib/browser/hooks";
 import { setStop } from "@/lib/browser/progress-store";
@@ -32,14 +31,14 @@ export function StopProgressPanel({ stopId, title, check }: { stopId: string; ti
   const progress = useProgress();
   const record = progress.stops[stopId] as StopProgress | undefined;
   const status = statusOf(progress.stops, stopId);
-  const [party, setParty] = useState<{ xp: number; message: string } | null>(null);
-  const celebrate = (xp: number, message: string) => {
-    if (status !== "done") setParty({ xp, message });
+  const [party, setParty] = useState<string | null>(null);
+  const celebrate = (message: string) => {
+    if (status !== "done") setParty(message);
   };
 
   return (
     <div className="mt-3 flex flex-col gap-4">
-      {party && <Celebrate xp={party.xp} message={party.message} onDone={() => setParty(null)} />}
+      {party && <Celebrate message={party} onDone={() => setParty(null)} />}
       <p aria-live="polite">
         <span className={muted}>Your status: </span>
         <span className="font-medium">{STATUS_TEXT[status]}</span>
@@ -51,10 +50,10 @@ export function StopProgressPanel({ stopId, title, check }: { stopId: string; ti
         <McqCheck
           stopId={stopId}
           questions={check.questions}
-          onPassed={(p) => celebrate(XP.lessonCheck + (p === 100 ? XP.perfectCheck : 0), p === 100 ? "Perfect score. Lesson done!" : "Lesson done!")}
+          onPassed={(p) => celebrate(p === 100 ? "Perfect score. Lesson done!" : "Lesson done!")}
         />
       ) : (
-        <ProjectCheck stopId={stopId} brief={check.brief} savedUrl={record?.projectUrl} onDone={() => celebrate(XP.lessonProject, "Your project is in. Lesson done!")} />
+        <ProjectCheck stopId={stopId} brief={check.brief} savedUrl={record?.projectUrl} onDone={() => celebrate("Your project is in. Lesson done!")} />
       )}
 
       <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
@@ -80,7 +79,7 @@ function McqCheck({ stopId, questions, onPassed }: { stopId: string; questions: 
       verdict={(p) => (passesCheck(p) ? "Step done. Well done." : `You need ${CHECK_PASS_PERCENT}% to finish. Review the answers and try again.`)}
       retryLabel="Try the check again"
       onScored={(p) => {
-        // SU-2: anyone can take the check; saving the score and the XP needs an account.
+        // SU-2: anyone can take the check; saving the score needs an account.
         const saved = setStop(stopId, afterCheck(progress.stops[stopId] as StopProgress | undefined, p, todayInIST()));
         if (saved && passesCheck(p)) onPassed(p);
       }}

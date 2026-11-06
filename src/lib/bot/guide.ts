@@ -26,8 +26,8 @@ export const SITE_GUIDE: BotEntry[] = [
   },
   {
     k: "guide",
-    t: "Where do I see my progress, XP and streak?",
-    a: "Your dashboard shows your XP, streak, badges and what you have finished. It is saved in this browser; sign in to keep it across devices.",
+    t: "Where do I see my progress and streak?",
+    a: "Your dashboard shows your streak and what you have finished. It is saved in this browser; sign in to keep it across devices.",
     h: "/dashboard",
     w: "progress xp streak badge points dashboard score",
   },
@@ -48,7 +48,7 @@ export const SITE_GUIDE: BotEntry[] = [
   {
     k: "guide",
     t: "Revise with interview flashcards",
-    a: "Practice turns interview questions into flashcards. Questions you miss come back first, and every rating earns XP.",
+    a: "Practice turns interview questions into flashcards. Questions you miss come back first.",
     h: "/practice",
     w: "flashcards revise revision practice spaced repetition remember",
   },
@@ -90,7 +90,7 @@ export const SITE_GUIDE: BotEntry[] = [
   {
     k: "guide",
     t: "Test yourself on your own book",
-    a: "Ask me from my book turns your PDF or notes into a timed MCQ test. Choose chapters, difficulty, number of questions and time; the report quotes the page for each answer and says what to reread.",
+    a: "Study from my notes & books turns your PDF, Word file or notes into a timed MCQ test or a deck of flashcards. Choose chapters, difficulty, number of questions and time; the report quotes the page for each answer and says what to reread.",
     h: "/ai/book",
     w: "book pdf textbook notes upload mcq quiz test exam chapter study",
   },

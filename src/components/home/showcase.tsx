@@ -49,7 +49,6 @@ export function MiniLesson() {
     <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 shadow-lg dark:bg-zinc-900 dark:text-zinc-100">
       <div className="flex items-center justify-between text-xs">
         <span className="rounded-full bg-teal-100 px-2 py-0.5 font-medium text-teal-900">Retrieval · 20 min</span>
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900">+50 XP</span>
       </div>
       <p className="mt-3 font-semibold">Build a RAG app</p>
       <div className="mt-2 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700">
@@ -114,15 +113,32 @@ export function MiniProgress() {
         <Icon name="fire" size={22} /> <span className="text-2xl font-semibold">7</span> day streak
       </span>
       <span className="rounded-2xl bg-emerald-100 px-4 py-3 text-emerald-900">
-        <span className="text-2xl font-semibold">640</span> XP · Builder
+        <span className="text-2xl font-semibold">12</span> lessons done
       </span>
-      <span className="flex gap-1">
-        {(["trophy", "star", "mic", "check"] as const).map((n) => (
-          <span key={n} className="grid size-11 place-items-center rounded-full bg-violet-100 text-violet-900">
-            <Icon name={n} size={20} />
-          </span>
-        ))}
-      </span>
+    </div>
+  );
+}
+
+/** The "Study from my notes & books" spotlight: a file becomes a flashcard that quotes its page. */
+export function MiniNotes() {
+  return (
+    <div aria-hidden="true" className="relative mx-auto flex w-full max-w-[340px] flex-col gap-3">
+      <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <span className="grid size-10 place-items-center rounded-xl bg-rose-100 text-xs font-bold text-rose-900">PDF</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">Class 12 Biology notes.pdf</span>
+          <span className="block text-xs text-zinc-600 dark:text-zinc-400">212 pages · read on your device</span>
+        </span>
+      </div>
+      <div className="relative pb-2">
+        <span className="absolute inset-x-4 bottom-0 h-full rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
+        <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-lg shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-[11px] font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">Flashcard 3 of 15</p>
+          <p className="mt-2 font-semibold text-zinc-900 dark:text-zinc-100">Where do plants turn light into chemical energy?</p>
+          <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">In the chloroplast, during photosynthesis.</p>
+          <p className="mt-3 border-l-2 border-zinc-300 pl-2 text-xs text-zinc-500 italic dark:border-zinc-700 dark:text-zinc-400">From your notes: Chapter 6, page 41</p>
+        </div>
+      </div>
     </div>
   );
 }

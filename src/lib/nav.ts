@@ -37,9 +37,18 @@ export const NAV_GROUPS: Group[] = [
       { href: "/ai/resume", label: "Resume review", note: "Fixes that get you shortlisted" },
     ],
   },
+  {
+    // 2026-11-06, owner request: each AI tool in a dropdown, straight to its own page.
+    id: "ai",
+    label: "AI tools",
+    items: [
+      { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards" },
+      { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English" },
+      { href: "/ai/roadmap", label: "AI roadmap generator", note: "A plan for your goal and hours" },
+      { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work" },
+    ],
+  },
 ];
-export const AI_TOOLS = { href: "/ai", label: "AI tools" };
-
 export const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 
 /** Which group the current page belongs to, so the menu can say "you are here". Pure, for tests. */

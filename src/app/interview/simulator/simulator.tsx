@@ -7,7 +7,6 @@ import { useAiAccess } from "@/components/ai/ai-gate";
 import { AnswerReviewBlock, InterviewReviewPanel, useInterviewReview } from "@/components/ai/ai-interview-review";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { recordInterview } from "@/lib/browser/activity-store";
-import { XP } from "@/lib/game/xp";
 import { todayInIST } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
 import {
@@ -575,7 +574,7 @@ function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[
   const heading = useRef<HTMLHeadingElement>(null);
   const recorded = useRef(false);
   useEffect(() => heading.current?.focus(), []);
-  // Count the session for XP and streaks: dates and scores only, never the answers.
+  // Count the session for the streak: dates and scores only, never the answers.
   useEffect(() => {
     if (recorded.current) return;
     recorded.current = true;
@@ -625,9 +624,6 @@ function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[
             <span className="font-medium">Pace:</span> {paceNote}.
           </p>
         </div>
-        <p className="w-fit rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          +{report.answered * XP.interviewAnswer + Math.round(report.averageScore * questions.length * XP.interviewScorePoint)} XP earned
-        </p>
         <p className={`text-sm ${muted}`}>
           Understanding combines the key points you covered, how close your answer is to the model answer, and how you built it
           (definition, example, trade-off, real use). It matches words, so it cannot tell if a statement is wrong

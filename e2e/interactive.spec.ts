@@ -27,8 +27,9 @@ test("a roadmap topic opens a drawer where it can be marked done, without leavin
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
   await expect(page.getByRole("link", { name: /^Build a RAG app, Done/ }).first()).toBeVisible();
-  // the header now shows XP
-  await expect(page.getByRole("banner").getByRole("link", { name: /\d+ XP/ })).toBeVisible();
+  // XP was removed (2026-11-06); the header shows the day streak instead.
+  await expect(page.getByRole("banner").getByRole("link", { name: /-day streak/ })).toBeVisible();
+  await expect(page.getByRole("banner").getByText(/\d+ XP/)).toHaveCount(0);
 });
 
 test("the GenAI roadmap's topics open the drawer too", async ({ page }) => {
@@ -47,15 +48,15 @@ test("topic pages list lessons as cards", async ({ page }) => {
   expect((await wcag(page)).violations).toEqual([]);
 });
 
-test("a lesson shows its parts, a reading guide and XP for the check", async ({ page }) => {
+test("a lesson shows its parts and a reading guide, and no XP", async ({ page }) => {
   await page.goto("/stop/what-is-ai");
   await expect(page.getByText("Part 1 of 5")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Check/ })).toContainText("+50 XP");
+  await expect(page.getByText(/\bXP\b/)).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: /Lessons on the/ }).getByText("Next →")).toBeVisible();
   expect(await overflow(page)).toBe(false);
 });
 
-test("the progress page shows XP, streak and badges without an account", async ({ page }) => {
+test("the progress page shows the streak and counts without an account, and no XP or badges", async ({ page }) => {
   await page.addInitScript(() => {
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
     localStorage.setItem(
@@ -64,9 +65,9 @@ test("the progress page shows XP, streak and badges without an account", async (
     );
   });
   await page.goto("/dashboard");
-  await expect(page.getByRole("region", { name: "XP and streak" }).getByText("70 XP", { exact: true })).toBeVisible();
-  await expect(page.getByText("Earned: Finish your first lesson")).toBeVisible();
-  await expect(page.getByText("Earned: Score 100% on a lesson check")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Streak" }).getByText("1 day", { exact: true })).toBeVisible();
+  await expect(page.getByText(/\bXP\b/)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Badges" })).toHaveCount(0);
   expect((await wcag(page)).violations).toEqual([]);
 });
 

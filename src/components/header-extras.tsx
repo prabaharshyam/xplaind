@@ -44,22 +44,17 @@ export function HeaderSearch() {
   );
 }
 
-/** XP and streak, once the learner has any. Links to their progress page. */
+/** The day streak, once the learner has one. Links to their progress page. XP was removed on 2026-11-06. */
 export function XpChip() {
   const game = useGame();
-  if (game.xp === 0 && game.streak === 0) return null;
+  if (game.streak === 0) return null;
   return (
     <Link
       href="/dashboard"
       className="flex h-10 items-center gap-2 rounded-full bg-amber-100 px-3 text-sm font-medium text-amber-900 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-200"
     >
-      {game.streak > 0 && (
-        <span className="flex items-center gap-1">
-          <Icon name="fire" size={15} /> {game.streak}
-          <span className="sr-only">-day streak,</span>
-        </span>
-      )}
-      <span>{game.xp} XP</span>
+      <Icon name="fire" size={15} /> {game.streak}
+      <span className="sr-only">-day streak</span>
     </Link>
   );
 }

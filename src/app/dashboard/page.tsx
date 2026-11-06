@@ -27,7 +27,7 @@ export default function DashboardPage() {
   return (
     <main>
       <PageHero
-        size="full" shape="barChart" theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your XP, streak and badges.">
+        size="full" shape="barChart" theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your streak and what you have finished.">
         {/* WP-1: this week's plan, one tap from progress. */}
         <Link href="/plan" className={primaryButtonSm}>
           See this week&apos;s study plan →

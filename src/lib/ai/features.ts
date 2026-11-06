@@ -274,7 +274,7 @@ export function cleanInterviewReview(r: InterviewReview, asked: ReviewQuestion[]
   };
 }
 
-// ---------------------------------------------------- ask me from my book --
+// ------------------------------------------- study from my notes & books --
 
 export const BookExcerpt = z.strictObject({
   id: z.string().regex(/^c\d{1,6}$/),
@@ -367,6 +367,54 @@ export function cleanBookQuestions(out: BookOutput, excerpts: BookExcerpt[], cou
     .sort((a, b) => a.order - b.order)
     .slice(0, count)
     .map((q, i) => ({ id: `q${i + 1}`, question: q.question, options: q.options, answer: q.answer, explanation: q.explanation, quote: q.quote, page: q.page, section: q.section }));
+}
+
+/** MB-5: flashcards from the learner's own notes or book, from the same kind of excerpts as a test. */
+export const BookCardsRequest = z.strictObject({
+  book: z.string().max(160),
+  count: z.number().int().min(5).max(30),
+  excerpts: z.array(BookExcerpt).min(1).max(30),
+});
+
+export const BookCardsOutput = z.object({
+  cards: z.array(z.object({ excerpt_id: z.string(), front: z.string(), back: z.string(), quote: z.string() })),
+});
+export type BookCardsOutput = z.infer<typeof BookCardsOutput>;
+
+export function bookCardsPrompt(req: z.infer<typeof BookCardsRequest>) {
+  const system = [
+    "You write study flashcards from a book or notes a learner is studying. You get numbered excerpts from it.",
+    HOUSE_STYLE,
+    DATA_RULE,
+    "Each card tests one idea from one excerpt alone; never use outside knowledge, and never ask about page numbers, the author or the layout. Spread the cards over the excerpts, skipping any that has nothing worth learning (references, a copyright notice, a table of contents).",
+    "front: a short question or prompt, at most 25 words, that makes the learner recall the idea (a definition, a cause, a step, a difference, a number that matters). back: the answer in one to three short sentences, in your own words.",
+    "quote: copy 8 to 40 words exactly, character for character, from the excerpt that supports the back of the card. Do not change, join or shorten words inside the quote. excerpt_id: the id of that excerpt.",
+  ].join("\n\n");
+  const user = [
+    `Write ${req.count} flashcards.`,
+    asData("book_title", req.book, 160),
+    ...req.excerpts.map((e) => asData(`excerpt_${e.id}`, `[${e.id}] ${e.section}, page ${e.page}\n${e.text}`, 2000)),
+  ].join("\n\n");
+  return { system, messages: [{ role: "user" as const, content: user }], schema: BookCardsOutput };
+}
+
+/** MB-5: keeps only cards whose quote is found in the excerpt they cite, one per front, in book order. */
+export function cleanBookCards(out: BookCardsOutput, excerpts: BookExcerpt[], count: number) {
+  const byId = new Map(excerpts.map((e) => [e.id, e]));
+  const seen = new Set<string>();
+  const kept = out.cards.flatMap((c) => {
+    const e = byId.get(c.excerpt_id);
+    const front = line(c.front, 300);
+    const back = clip(c.back, 600);
+    const key = front.toLowerCase();
+    if (!e || !front || !back || seen.has(key) || !quoteIn(c.quote, e.text)) return [];
+    seen.add(key);
+    return [{ front, back, quote: clip(c.quote, 400), page: e.page, section: e.section, order: excerpts.indexOf(e) }];
+  });
+  return kept
+    .sort((a, b) => a.order - b.order)
+    .slice(0, count)
+    .map((c, i) => ({ id: `c${i + 1}`, front: c.front, back: c.back, quote: c.quote, page: c.page, section: c.section }));
 }
 
 // ----------------------------------------------------------------- resume --

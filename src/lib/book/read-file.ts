@@ -14,7 +14,15 @@ export async function readBookFile(file: File, onProgress?: (done: number, total
     const { pages, outline } = pagesFromText(await file.text());
     return { title: titleFromName(file.name), pages, outline };
   }
-  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") throw new Error("Please choose a PDF, or a .txt or .md file.");
+  if (/\.docx$/i.test(file.name) || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    // A Word file: mammoth turns it into HTML in the browser; headings become chapters.
+    const mammoth = await import("mammoth");
+    const { value } = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
+    const { pages, outline } = pagesFromText(docxHtmlToText(value));
+    return { title: titleFromName(file.name), pages, outline };
+  }
+  if (/\.doc$/i.test(file.name)) throw new Error("Old .doc files cannot be read. Save it as .docx or PDF in Word, then try again.");
+  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") throw new Error("Please choose a PDF, a Word (.docx) file, or a .txt or .md file.");
 
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
@@ -57,4 +65,25 @@ export async function readBookFile(file: File, onProgress?: (done: number, total
   } finally {
     void task.destroy();
   }
+}
+
+/** Word HTML from mammoth to plain text, with headings as "# " lines so they become chapters. Pure, for tests. */
+export function docxHtmlToText(html: string): string {
+  const decode = (t: string) =>
+    t
+      .replace(/&nbsp;/g, " ")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, "&");
+  return decode(
+    html
+      .replace(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi, (_, t: string) => `\n# ${t.replace(/<[^>]+>/g, "").trim()}\n`)
+      .replace(/<\/(p|li|h[4-6]|tr)>/gi, "\n")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, ""),
+  )
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
