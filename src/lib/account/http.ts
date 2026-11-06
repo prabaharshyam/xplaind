@@ -50,7 +50,7 @@ export function visitorKey(headers: Pick<Headers, "get">): string {
 }
 
 /** Only same-site paths, so a sign-in link cannot redirect anywhere else. */
-export function safeNext(value: string | null | undefined, fallback = "/dashboard"): string {
+export function safeNext(value: string | null | undefined, fallback = "/"): string {
   return value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") ? value : fallback;
 }
 

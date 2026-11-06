@@ -13,6 +13,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import localFont from "next/font/local";
 import "./globals.css";
+import { THEME_SCRIPT } from "@/lib/browser/theme";
 
 // BR-1: Bricolage Grotesque for headings (self-hosted from the package, so builds need no network);
 // Geist stays for body text. One variable file covers every weight and optical size.
@@ -42,7 +43,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} h-full antialiased`}
+      // BR-6: the theme script sets data-theme before React loads.
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <SiteHeader />
         <div id="page" className="flex-1">

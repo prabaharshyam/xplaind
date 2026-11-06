@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { darkScheme } from "@/lib/browser/theme";
 
 /**
  * MO-6: the home page journey. A luminous road winds from the viewer to a glowing horizon, with
@@ -165,7 +166,7 @@ const GATE_FRAGMENT = /* glsl */ `
 async function mount(el: HTMLElement): Promise<() => void> {
   const THREE = await import("three");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const darkQuery = darkScheme();
   const small = window.innerWidth < 640;
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });

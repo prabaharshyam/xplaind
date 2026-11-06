@@ -34,6 +34,7 @@ import { Flashcards } from "@/components/flashcards";
 import { TopicStatus } from "@/components/roadmap/topic-status";
 import { aiEnabled } from "@/lib/ai/settings";
 import { levelWords } from "@/lib/levels";
+import { CopyCode } from "@/components/copy-code";
 
 /** Lesson text: headings, lists, code and tables styled without a typography plugin. Code scrolls inside its box at 360px. */
 const PROSE =
@@ -45,7 +46,8 @@ function LessonPre(props: React.ComponentProps<"pre">) {
   const child = props.children as React.ReactElement<{ className?: string; children?: unknown }> | undefined;
   const lang = child?.props?.className ?? "";
   const text = typeof child?.props?.children === "string" ? child.props.children : null;
-  const pre = <pre tabIndex={0} {...props} />;
+  // Text diagrams (language-text) are drawings, not code: no Copy button on those.
+  const pre = /\blanguage-text\b/.test(lang) ? <pre tabIndex={0} {...props} /> : <CopyCode><pre tabIndex={0} {...props} className={`${props.className ?? ""} pr-16`} /></CopyCode>;
   if (!text || !/\blanguage-(python|py)\b/.test(lang)) return pre;
   return (
     <RunnableCode code={text.replace(/\n$/, "")} aiOn={aiEnabled()}>

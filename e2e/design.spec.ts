@@ -138,3 +138,31 @@ test("a lesson opens at its top, not at a widget further down (NV-4)", async ({ 
     expect(await page.evaluate(() => window.scrollY), url).toBeLessThan(5);
   }
 });
+
+test("the header switch turns the site dark and remembers it (BR-6)", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: "light" });
+  const page = await ctx.newPage();
+  await page.goto("/paths");
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const light = await bg();
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  expect(await bg()).not.toBe(light);
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByRole("button", { name: "Switch to light mode" })).toBeVisible();
+  await ctx.close();
+});
+
+test("lesson code blocks have a Copy button (BR-7)", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ["clipboard-read", "clipboard-write"] });
+  const page = await ctx.newPage();
+  await page.goto("/stop/docker-basics");
+  // The name changes to "Copied code" after a click, so match both to keep the same button.
+  const copy = page.getByRole("button", { name: /^Cop(y|ied) code$/ }).first();
+  await expect(async () => {
+    await copy.click();
+    await expect(copy).toContainText("Copied", { timeout: 1000 });
+  }).toPass();
+  await ctx.close();
+});

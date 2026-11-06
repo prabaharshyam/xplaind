@@ -12,7 +12,7 @@ import { SignInForm } from "./signin-form";
 export function SignUpDialog() {
   const ref = useRef<HTMLDialogElement>(null);
   const [reason, setReason] = useState<SignUpReason | null>(null);
-  const [next, setNext] = useState("/dashboard");
+  const [next, setNext] = useState("/");
 
   useEffect(() => {
     const open = (e: Event) => {

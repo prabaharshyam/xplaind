@@ -16,7 +16,7 @@ test("a roadmap topic opens a drawer where it can be marked done, without leavin
   const drawer = page.getByRole("dialog", { name: "Build a RAG app" });
   await expect(drawer).toBeVisible();
   await expect(page).toHaveURL(/\/roadmap\/forward-deployed-engineer$/);
-  await expect(drawer.getByText("Best course", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("Free resources", { exact: false }).first()).toBeVisible();
   // RM-13: the title, then what the topic is in one line; no outcome or "Why it matters".
   await expect(drawer.getByRole("heading", { name: "What it is" })).toBeVisible();
   await expect(drawer.getByText("Why it matters")).toHaveCount(0);
@@ -171,21 +171,22 @@ test("the phone menu closes after a page is chosen", async ({ page }) => {
   await expect(menu).not.toHaveAttribute("open");
 });
 
-test("closing a video inside a roadmap topic keeps the topic panel and its content (RM-13)", async ({ browser }) => {
-  // A phone in dark mode, where the bug showed as a black screen: closing the video also emptied
-  // the topic panel, which stayed open as a blank full-height window over the page.
+test("a roadmap topic's panel keeps videos for the lesson and folds resources into a dropdown (RM-13)", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark", reducedMotion: "reduce" });
   const page = await ctx.newPage();
   await page.goto("/roadmap/forward-deployed-engineer");
   await page.locator("main a[href='/stop/docker-basics']").last().click();
   const drawer = page.getByRole("dialog", { name: "Docker and Compose" });
   await expect(drawer).toBeVisible();
-  await drawer.getByRole("button", { name: /Watch here/ }).first().click();
-  await page.getByRole("button", { name: "Close the video" }).first().click();
-  // The panel is still there with its title and button, not an empty window.
-  await expect(drawer.getByRole("heading", { name: "Docker and Compose" })).toBeVisible();
-  await expect(drawer.getByRole("link", { name: "Read the full chapter" })).toBeVisible();
-  // Closing the panel then leaves no window open over the roadmap.
+  // No video players in the panel; the lesson page has them.
+  await expect(drawer.getByRole("button", { name: /Watch here/ })).toHaveCount(0);
+  // Resources start folded and open on a tap.
+  const free = drawer.locator("details", { hasText: "Free resources" });
+  await expect(free).not.toHaveAttribute("open");
+  await free.locator("summary").click();
+  await expect(free.getByRole("link").first()).toBeVisible();
+  await expect(free.getByText("Best pick")).toBeVisible();
+  // Closing the panel leaves no window open over the roadmap.
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
   expect(await page.evaluate(() => document.querySelectorAll("dialog[open]").length)).toBe(0);

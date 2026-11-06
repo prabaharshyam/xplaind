@@ -22,7 +22,7 @@ declare global {
  * Until Google's script has loaded, or when no client id is set, the plain redirect button
  * (children) stays, so sign-in always works, with JavaScript off too.
  */
-export function GoogleButton({ next, adultId, children }: { next: string; adultId: string; children: ReactNode }) {
+export function GoogleButton({ next, children }: { next: string; children: ReactNode }) {
   const slot = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
   const [ready, setReady] = useState(false);
@@ -41,7 +41,8 @@ export function GoogleButton({ next, adultId, children }: { next: string; adultI
         auto_select: false,
         context: "signin",
         callback: ({ credential }: { credential?: string }) => {
-          if (credential) post({ credential, nonce: raw, next, adult: (document.getElementById(adultId) as HTMLInputElement | null)?.checked ? "yes" : "" });
+          // PV-2: continuing is the 18+ confirmation, as the line under the buttons says.
+          if (credential) post({ credential, nonce: raw, next, adult: "yes" });
         },
       });
       gis.renderButton(el, {
@@ -58,7 +59,7 @@ export function GoogleButton({ next, adultId, children }: { next: string; adultI
     return () => {
       live = false;
     };
-  }, [loaded, next, adultId]);
+  }, [loaded, next]);
 
   if (!CLIENT_ID) return <>{children}</>;
   return (

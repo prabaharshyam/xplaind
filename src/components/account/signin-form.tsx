@@ -6,7 +6,7 @@ import type { SignUpReason } from "@/lib/browser/account-sync";
 import { GoogleButton } from "./google-button";
 
 const ERRORS: Record<string, string> = {
-  adult: "Please tick “I am 18 or older” to make an account.",
+  adult: "Accounts are for people aged 18 or over.",
   email: "Please enter a valid email address.",
   password: "Use a password of at least 8 characters.",
   wrong: "That email and password do not match. Try again, or email yourself a sign-in link.",
@@ -70,7 +70,7 @@ export function SignInForm({
   initialMode?: "signup" | "signin";
 }) {
   const [mode, setMode] = useState<"signup" | "signin">(initialMode);
-  const ids = { adult: useId(), email: useId(), password: useId(), err: useId() };
+  const ids = { email: useId(), password: useId(), err: useId() };
 
   if (sent) {
     return (
@@ -106,13 +106,12 @@ export function SignInForm({
       <input type="hidden" name="next" value={next} />
       <input type="hidden" name="mode" value={mode} />
 
-      <label htmlFor={ids.adult} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl bg-violet-50 px-3 py-2 dark:bg-violet-950/40">
-        <input id={ids.adult} type="checkbox" name="adult" value="yes" defaultChecked={false} className="size-5 shrink-0 accent-violet-700" />
-        <span>I am 18 or older</span>
-      </label>
+      {/* PV-2 (amended 2026-11-06): continuing is the 18+ confirmation; the line below says so. */}
+      <input type="hidden" name="adult" value="yes" />
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">By continuing, you confirm you are 18 or older.</p>
 
       <div className="grid gap-2">
-        <GoogleButton next={next} adultId={ids.adult}>
+        <GoogleButton next={next}>
           <button type="submit" formAction="/auth/oauth" formNoValidate name="provider" value="google" className={provider}>
             <GoogleMark /> Continue with Google
           </button>

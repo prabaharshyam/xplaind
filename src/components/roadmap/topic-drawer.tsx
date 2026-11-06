@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { secondaryButtonSm, primaryButton } from "@/components/ui";
+import { primaryButton } from "@/components/ui";
 import { type MouseEvent, type ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Cover } from "@/components/art/cover";
 import { Icon } from "@/components/art/icons";
 import type { DrawerCourse, TopicDetail } from "@/lib/content/drawer";
 import { ResourceNotice } from "@/components/resource-card";
-import { WatchButton } from "@/components/video-player";
 import { TopicStatus } from "./topic-status";
 import { themeOf } from "@/lib/themes";
 import { levelText } from "@/lib/levels";
@@ -88,8 +87,10 @@ export function useTopicLink(id: string) {
 
 function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
   const theme = themeOf(d.theme);
-  const best = d.courses.filter((c) => c.pick === "best");
-  const also = d.courses.filter((c) => c.pick === "also");
+  // RM-13: the best pick first, then the rest; free ones and paid ones in their own dropdowns.
+  const ordered = [...d.courses].sort((a, b) => (a.pick === b.pick ? 0 : a.pick === "best" ? -1 : 1));
+  const free = ordered.filter((c) => c.free);
+  const paid = ordered.filter((c) => !c.free);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -144,8 +145,8 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
           <Icon name="book" size={18} /> Read the full chapter
         </Link>
 
-        <CourseList title="Best course" items={best} tone="text-violet-800 dark:text-violet-300" />
-        {also.length > 0 && <CourseList title="More resources" items={also} tone="text-zinc-700 dark:text-zinc-300" />}
+        {free.length > 0 && <CourseList title="Free resources" items={free} />}
+        {paid.length > 0 && <CourseList title="Paid courses" items={paid} />}
 
         {d.questions > 0 && (
           <Link href={`/stop/${d.id}#interview`} className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
@@ -157,18 +158,25 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
   );
 }
 
-function CourseList({ title, items, tone }: { title: string; items: DrawerCourse[]; tone: string }) {
+/** RM-13: a dropdown of resources, closed until the learner opens it, so the panel stays short. */
+function CourseList({ title, items }: { title: string; items: DrawerCourse[] }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
-      <h3 className={`flex items-center gap-2 font-semibold ${tone}`}>
-        <Icon name="star" size={16} /> {title}
-      </h3>
-      <ul className="mt-3 flex flex-col gap-3">
+    <details className="group rounded-2xl border border-zinc-200 dark:border-zinc-800">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 font-semibold [&::-webkit-details-marker]:hidden">
+        <span>
+          {title} <span className="font-normal text-zinc-600 dark:text-zinc-400">({items.length})</span>
+        </span>
+        <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 transition group-open:rotate-180">
+          <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </summary>
+      <ul className="flex flex-col gap-3 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
         {items.map((c) => {
           const badge = { ...(TYPE_BADGE[c.type] ?? TYPE_BADGE.course), label: c.kindLabel };
           return (
             <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+              {c.pick === "best" && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900 dark:bg-violet-950 dark:text-violet-200">Best pick</span>}
               <a href={`/go/${c.id}`} target="_blank" rel="noopener" className="font-medium underline underline-offset-2">
                 {c.title}
                 <span className="sr-only"> (opens in a new tab)</span>
@@ -176,18 +184,11 @@ function CourseList({ title, items, tone }: { title: string; items: DrawerCourse
               <span className="w-full text-sm text-zinc-600 dark:text-zinc-400">
                 {c.provider} · {c.cost} · about {c.hours} h{c.certificate ? " · certificate" : ""}
               </span>
-              {c.embed && (
-                <WatchButton
-                  embed={c.embed}
-                  title={c.title}
-                  className={secondaryButtonSm}
-                />
-              )}
               {c.notice && <ResourceNotice text={c.notice} compact />}
             </li>
           );
         })}
       </ul>
-    </section>
+    </details>
   );
 }

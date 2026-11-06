@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { AccountButton, AccountMenu, SignInLink, SignedInLinks } from "./account-link";
+import { AccountButton, AccountMenu, ClaimOnSignIn, SignInLink, SignedInLinks } from "./account-link";
 import { BrandLogo } from "./brand-logo";
 import { HeaderSearch, XpChip } from "./header-extras";
 import { MenuCloser } from "./menu-closer";
+import { ThemeToggle } from "./theme-toggle";
 import { DesktopNav, PhoneNavLinks } from "./site-nav";
 
 /** The site's top bar. A plain details element opens the phone menu, so it works without JavaScript. */
@@ -22,6 +23,9 @@ export function SiteHeader() {
           <SignInLink className="hidden h-10 items-center rounded-full px-3 text-sm font-medium text-zinc-800 hover:bg-violet-50 hover:text-violet-950 sm:inline-flex dark:text-zinc-200 dark:hover:bg-white/10" />
           <AccountButton className="site-cta hidden sm:inline-flex h-10 items-center rounded-full bg-violet-700 px-4 text-sm font-medium text-white shadow-sm shadow-violet-700/30 hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700" />
           <AccountMenu />
+          <ClaimOnSignIn />
+          {/* BR-6: top right on larger screens; on phones it is a row in the menu, so the bar fits 360 px. */}
+          <ThemeToggle className="hidden sm:grid" />
           <details className="site-menu group relative md:hidden">
             <summary className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 [&::-webkit-details-marker]:hidden">
               <span className="sr-only">Menu</span>
@@ -41,6 +45,7 @@ export function SiteHeader() {
                 className="-mt-3 flex min-h-12 items-center justify-center rounded-full border border-violet-200 bg-white px-6 text-base font-medium text-violet-950 hover:bg-violet-50 dark:border-violet-800 dark:bg-zinc-900 dark:text-violet-100"
               />
               <PhoneNavLinks />
+              <ThemeToggle labelled />
               <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 empty:hidden dark:border-zinc-800">
                 <SignedInLinks
                   linkClass="flex min-h-12 items-center rounded-2xl px-3 text-base font-medium text-zinc-900 hover:bg-violet-50 dark:text-zinc-100 dark:hover:bg-white/5"
