@@ -124,7 +124,7 @@ export function MiniNotes() {
   return (
     <div aria-hidden="true" className="relative mx-auto flex w-full max-w-[340px] flex-col gap-3">
       <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <span className="grid size-10 place-items-center rounded-xl bg-rose-100 text-xs font-bold text-rose-900">PDF</span>
+        <span className="grid size-10 place-items-center rounded-2xl bg-rose-100 text-xs font-bold text-rose-900">PDF</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">Class 12 Biology notes.pdf</span>
           <span className="block text-xs text-zinc-600 dark:text-zinc-400">212 pages · read on your device</span>
