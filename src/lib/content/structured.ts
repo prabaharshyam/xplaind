@@ -68,7 +68,6 @@ export function roadmapGraph(pathId: string, lessons: { id: string; title: strin
     provider: ORG,
     inLanguage: "en-IN",
     educationalLevel: "Beginner to professional",
-    timeRequired: `P${p.months}M`,
     audience: { "@type": "EducationalAudience", educationalRole: "student", audienceType: p.who_for },
     hasPart: lessons.map((l, i) => ({ "@type": "LearningResource", position: i + 1, name: l.title, url: `${siteUrl()}/stop/${l.id}` })),
   };

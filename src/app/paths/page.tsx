@@ -43,7 +43,6 @@ export default function PathsPage() {
                   <span className={`mt-auto flex flex-wrap gap-1.5 pt-2 text-xs ${muted}`}>
                     {[
                       CODING_LABEL[p.coding],
-                      `about ${p.months} ${p.months === 1 ? "month" : "months"}`,
                       `${p.stages.length} stages`,
                       `${p.counts.lessons} lessons`,
                     ].map((c) => (

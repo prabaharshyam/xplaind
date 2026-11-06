@@ -42,8 +42,8 @@ test("a deep lesson has an exercise with answers, flashcards that remember, and 
   await page.getByRole("region", { name: /Test your understanding/ }).getByRole("button", { name: "Reset" }).click();
   await expect(page.getByRole("region", { name: /Test your understanding/ }).getByText("0 of 8")).toBeVisible();
 
-  // on a phone, the path's lesson list sits at the end of the lesson
-  await page.getByText(/^Lessons on /).last().click();
+  // RM-15: on a phone, the course outline folds into a dropdown above the lesson
+  await page.locator("summary").filter({ hasText: "lessons done" }).click();
   await expect(page.getByRole("link", { name: "What AI, machine learning and a language model are" }).last()).toHaveAttribute("aria-current", "page");
 });
 

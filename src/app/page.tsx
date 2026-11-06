@@ -102,7 +102,7 @@ const FAQ = [
   },
   {
     q: "How long does it take?",
-    a: "Each roadmap shows its own estimate at a few hours a week: about 3 months for AI Product Manager, AI Automation Specialist and AI Governance & Compliance Specialist, 4 months for Agentic AI Engineer, 6 months for Forward Deployed Engineer and MLOps Engineer, and about 9 months for AI Engineer, Generative AI & LLM Engineer and Machine Learning Engineer. The level test skips the topics you already know, and the weekly plan fits the lessons around the hours you have.",
+    a: "At your own pace. There are no deadlines: learn a topic when you have time, and pick up where you left off. The level test skips the topics you already know, and the weekly plan fits lessons around the hours you have.",
   },
   {
     q: "Will this get me a job?",

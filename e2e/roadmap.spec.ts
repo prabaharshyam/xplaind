@@ -87,10 +87,11 @@ test.describe("stop page (RM-2, RM-4, RM-7)", () => {
     // the owner verified every resource, so a date is shown, never "Not yet verified"
     await expect(card.getByText("Not yet verified")).toHaveCount(0);
     await expect(card.getByRole("link", { name: "How we rank" })).toHaveAttribute("href", "/how-we-rank");
-    await expect(card.getByRole("link", { name: /^Watch the video|^Open the course|^Open on YouTube|^Open it|^Read/ })).toHaveAttribute(
-      "href",
-      /^\/go\/[a-z0-9-]+\?stop=what-is-ai$/,
-    );
+    // A video plays on the page (no "Open on YouTube"); anything else opens through /go.
+    const open = card.getByRole("link", { name: /^Watch the video|^Open the course|^Open it|^Read/ });
+    if (await open.count()) await expect(open).toHaveAttribute("href", /^\/go\/[a-z0-9-]+\?stop=what-is-ai$/);
+    else await expect(card.getByRole("button", { name: /Watch here/ })).toBeVisible();
+    await expect(page.getByText("Open on YouTube")).toHaveCount(0);
     expect(await overflow(page)).toBe(false);
     expect((await wcag(page)).violations).toEqual([]);
   });
