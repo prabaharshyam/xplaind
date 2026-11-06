@@ -3,7 +3,7 @@ import { costLabel } from "@/lib/roadmap/cost";
 import type { ThemeId } from "@/lib/themes";
 import { getGlossary, getResource, getStop } from "./index";
 import { getInterviewViews } from "./interview";
-import { type Embed, kindLabel, youtubeEmbed } from "./media";
+import { kindLabel } from "./media";
 
 export type DrawerCourse = {
   id: string;
@@ -14,8 +14,9 @@ export type DrawerCourse = {
   hours: number;
   certificate: boolean;
   pick: "best" | "also";
+  /** RM-13: free to learn (free, or free with a paid certificate). Paid ones are listed apart. */
+  free: boolean;
   kindLabel: string;
-  embed: Embed | null;
   notice: string | null;
 };
 
@@ -39,7 +40,8 @@ export function topicDetails(lessonIds: readonly string[]): Record<string, Topic
   for (const id of lessonIds) {
     const s = getStop(id);
     if (!s) continue;
-    const ids = [...s.videos, s.primary_resource, ...s.alternates, ...s.more];
+    // RM-13 (2026-11-06): videos are kept for the lesson page; the panel lists courses and reading.
+    const ids = [s.primary_resource, ...s.alternates, ...s.more].filter((rid) => getResource(rid)?.type !== "video");
     out[id] = {
       id,
       title: s.title,
@@ -61,8 +63,8 @@ export function topicDetails(lessonIds: readonly string[]): Record<string, Topic
           hours: r.hours,
           certificate: r.certificate,
           pick: rid === s.primary_resource ? "best" : "also",
+          free: r.cost !== "paid",
           kindLabel: kindLabel(r),
-          embed: youtubeEmbed(r.url),
           notice: r.notice ?? null,
         };
       }),

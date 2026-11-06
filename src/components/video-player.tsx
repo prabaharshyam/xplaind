@@ -42,7 +42,12 @@ export function WatchButton({ embed, title, className = "", onWatch }: { embed: 
       <dialog
         ref={dialog}
         aria-labelledby={titleId}
-        onClose={() => setOpen(false)}
+        onClose={(e) => {
+          // React passes "close" up through parent components; a video inside the roadmap's topic
+          // panel would otherwise close the panel's content too and leave an empty, black window.
+          e.stopPropagation();
+          setOpen(false);
+        }}
         onClick={(e) => {
           if (e.target === dialog.current) dialog.current?.close();
         }}

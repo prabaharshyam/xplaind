@@ -36,7 +36,7 @@ export function Dashboard({
   const pathId = useCurrentPathId(paths.map((p) => p.id));
   const path = paths.find((p) => p.id === pathId)!;
   const pathStops = stopsByPath[pathId] ?? [];
-  // Level progress and badges are measured on the nine-level GenAI ladder.
+  // Level progress is measured on the nine-level GenAI ladder.
   const stops = stopsByPath[DEFAULT_PATH_ID] ?? [];
 
   useEffect(() => {
@@ -149,7 +149,7 @@ export function Dashboard({
                   <div className="h-full bg-emerald-700" style={{ width: `${cov.percent}%` }} />
                 </div>
                 <span className={`w-28 text-right text-xs ${muted}`}>
-                  {earned ? "Badge earned" : below ? "Below your level" : `${cov.done} of ${cov.total} steps`}
+                  {earned ? "Level done" : below ? "Below your level" : `${cov.done} of ${cov.total} steps`}
                 </span>
               </li>
             );
@@ -157,22 +157,6 @@ export function Dashboard({
         </ul>
       </section>
 
-      <section aria-labelledby="badges-heading" className="flex flex-col gap-2">
-        <h2 id="badges-heading" className="text-xl font-semibold">
-          Badges
-        </h2>
-        {claim.badges.length === 0 ? (
-          <p className={muted}>Pass a level in the test, or finish every step of a level with its check or project, to earn its badge.</p>
-        ) : (
-          <ul className="flex flex-wrap gap-2">
-            {claim.badges.map((b) => (
-              <li key={b} className="rounded-full bg-emerald-700 px-3 py-1 text-sm font-medium text-white">
-                {b.replace("level-", "")} passed
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <Link href={testHref(path.placement === "ladder" ? path.id : DEFAULT_PATH_ID)} className={secondaryButton}>

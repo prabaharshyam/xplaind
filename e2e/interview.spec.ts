@@ -54,7 +54,7 @@ test.describe("practice (IQ-4, IQ-5)", () => {
     await expect(page.getByRole("heading", { name: "Deeper answer" })).toBeVisible();
     expect((await wcag(page)).violations).toEqual([]);
     await page.getByRole("button", { name: "Missed" }).click();
-    await expect(page.getByText("Question 2 of")).toBeVisible();
+    await expect(page.getByText("Card 2 of")).toBeVisible();
     await expect(page.getByText(/^1 of \d+ practiced: 0 got it, 0 partly, 1 missed/)).toBeVisible();
 
     // the rating survives a reload, and the list shows it

@@ -14,7 +14,7 @@ export const DAILY_LIMIT: Record<AiKind, number> = {
   interview: 3,
   /** X Bot, the site helper that floats on every page (XB-3). */
   bot: 30,
-  /** "Ask me from my book": one call writes a whole test (MB-2). */
+  /** "Study from my notes & books": one call writes a whole test or deck of cards (MB-2, MB-5). */
   book: 5,
   /** RV-1: one review of a resume. */
   resume: 5,

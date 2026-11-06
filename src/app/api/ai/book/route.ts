@@ -1,4 +1,4 @@
-// "Ask me from my book": writes a test from excerpts of the learner's own book (MB-2).
+// "Study from my notes & books": writes a test from excerpts of the learner's own book (MB-2).
 // Signed-in learners only, CO-1 caps apply. The excerpts are not stored.
 import { json, problem } from "@/lib/account/http";
 import { BookRequest, bookPrompt, cleanBookQuestions } from "@/lib/ai/features";

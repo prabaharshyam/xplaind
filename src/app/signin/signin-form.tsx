@@ -13,7 +13,7 @@ export function SignInForm() {
   return (
     <div className="mt-6">
       <Form
-        next={params.get("next") ?? "/dashboard"}
+        next={params.get("next") ?? "/"}
         reason={(REASON_IDS as readonly string[]).includes(reason ?? "") ? (reason as SignUpReason) : undefined}
         error={params.get("error")}
         sent={params.get("sent")}

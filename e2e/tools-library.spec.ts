@@ -8,10 +8,10 @@ const overflow = (page: import("@playwright/test").Page) =>
 
 test.use({ viewport: { width: 360, height: 740 } });
 
-test("the AI tools page puts Ask me from my book first and lists the new tools and guides (SU-1)", async ({ page }) => {
+test("the AI tools page puts Study from my notes & books first and lists the new tools and guides (SU-1)", async ({ page }) => {
   await page.goto("/ai");
   const cards = page.locator("main ul").first().getByRole("link");
-  await expect(cards.first()).toContainText("Ask me from my book");
+  await expect(cards.first()).toContainText("Study from my notes & books");
   await expect(page.getByRole("link", { name: /Interview Q&A by role/ })).toHaveAttribute("href", "/interview/answers");
   await expect(page.getByRole("main").getByRole("link", { name: /Research papers and free books/ })).toHaveCount(0); // moved to the Learn menu (NV-1)
   await expect(page.getByRole("heading", { name: "Complete guides to the AI tools people use at work" })).toBeVisible();

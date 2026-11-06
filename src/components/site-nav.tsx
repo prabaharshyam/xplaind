@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
 
-import { AI_TOOLS, NAV_GROUPS, activeGroup, under } from "@/lib/nav";
+import { NAV_GROUPS, activeGroup, under } from "@/lib/nav";
 
 const current = (path: string, href: string) => (under(path, href) ? ("page" as const) : undefined);
 
@@ -106,10 +106,6 @@ function DesktopMenus({ path }: { path: string }) {
           </div>
         </details>
       ))}
-      <Link href={AI_TOOLS.href} aria-current={active === "ai" ? "page" : undefined} className={tab(active === "ai")}>
-        {AI_TOOLS.label}
-        {active === "ai" && dot}
-      </Link>
     </div>
   );
 }
@@ -138,13 +134,6 @@ function PhoneMenu({ path }: { path: string }) {
           </ul>
         </section>
       ))}
-      <Link
-        href={AI_TOOLS.href}
-        aria-current={active === "ai" ? "page" : undefined}
-        className="flex min-h-12 items-center rounded-2xl px-3 text-base font-medium text-zinc-900 hover:bg-violet-50 aria-[current=page]:bg-violet-50 dark:text-zinc-100 dark:hover:bg-white/5"
-      >
-        {AI_TOOLS.label}
-      </Link>
     </div>
   );
 }

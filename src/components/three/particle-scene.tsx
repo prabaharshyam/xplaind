@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ICON_SHAPES, Icon } from "@/components/art/icons";
 import type { IconName } from "@/lib/themes";
 import { type ParticleShape, extrude, galaxy, sculpture } from "./particle-shapes";
+import { darkScheme } from "@/lib/browser/theme";
 
 /**
  * MO-8: a page's particle sculpture. Thousands of points swirl in from a spiral galaxy and settle
@@ -171,7 +172,7 @@ const FRAGMENT = /* glsl */ `
 async function mount(el: HTMLElement, shape: ParticleShape, palette: [string, string, string]): Promise<() => void> {
   const THREE = await import("three");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const darkQuery = darkScheme();
   const small = window.innerWidth < 640;
   // Fewer particles on phones, so the dots stay distinct instead of merging into blobs.
   const count = small ? 3200 : 6500;

@@ -67,14 +67,13 @@ Four habits close most of the gap:
 | **Pydantic models** | Check data from outside and refuse it with a clear error if it is wrong | API requests, files, LLM replies |
 | **async and await** | Let one process wait on many slow network calls at once | Services that call model APIs |
 
-```text
-   outside world                 your system
- +----------------+   validate   +-------------------------------------+
- | API requests   | --(Pydantic)--> typed, checked objects             |
- | CSV rows       | --(Pydantic)--> dataclasses inside                 |
- | LLM JSON reply | --(Pydantic)--> type hints on every function       |
- +----------------+              +-------------------------------------+
-     messy, untrusted                  clean, predictable
+```flow
+dir: LR
+title: Messy, untrusted input outside; clean, predictable code inside
+API requests -[validate with Pydantic]-> Typed, checked objects
+CSV rows -[validate with Pydantic]-> Typed, checked objects
+LLM JSON reply -[validate with Pydantic]-> Typed, checked objects
+Typed, checked objects -> Your system | dataclasses inside, type hints on every function
 ```
 
 This lesson follows a lending startup in Bengaluru that extracts fields from loan enquiry emails with an LLM, and then needs to process 200 of them quickly. By the end you will validate outside data properly and know when async helps.
@@ -126,12 +125,21 @@ Use Pydantic at every boundary where data enters: request bodies, config files, 
 
 A normal function **blocks**: while it waits two seconds for a model reply, nothing else happens in that process. An `async def` function can `await` the reply and let the **event loop** run other work in the meantime.
 
-```text
-  Sequential (blocking):  [call 1 ....2s....][call 2 ....2s....][call 3 ....2s....]  = 6 s
+```flow
+dir: LR
+title: Sequential, blocking: about 6 s
+Call 1, 2 s -> Call 2, 2 s -> Call 3, 2 s -> Done after 6 s
+```
 
-  Concurrent (async):     [call 1 ....2s....]
-                          [call 2 ....2s....]
-                          [call 3 ....2s....]                                        = about 2 s
+```flow
+dir: LR
+title: Concurrent with async: about 2 s
+Start -> Call 1, 2 s
+Start -> Call 2, 2 s
+Start -> Call 3, 2 s
+Call 1, 2 s -> Done after about 2 s
+Call 2, 2 s -> Done after about 2 s
+Call 3, 2 s -> Done after about 2 s
 ```
 
 This only helps with **waiting**, on the network or the disk, not with heavy computation such as resizing images. And every library in the chain must be async-aware: `httpx` instead of `requests`, `asyncio.sleep` instead of `time.sleep`.

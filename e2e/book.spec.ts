@@ -46,7 +46,7 @@ const saved = {
 
 test("a PDF is read in the browser and its chapters can be chosen before any AI call (MB-1)", async ({ page }) => {
   await page.goto("/ai/book");
-  await expect(page.getByRole("heading", { level: 1, name: "Ask me from my book" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Study from my notes & books" })).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
   await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/3 pages · 3 sections/)).toBeVisible();
@@ -102,4 +102,54 @@ test("the book API refuses when AI is off and checks what it is sent", async ({ 
   const ok = { book: "Bio", difficulty: "easy", count: 5, excerpts: [{ id: "c1", page: 1, section: "One", text: "Some text." }] };
   expect((await request.post("/api/ai/book", { data: ok })).status()).toBe(503);
   expect((await request.post("/api/ai/book", { data: { ...ok, count: 500 } })).status()).toBe(400);
+});
+
+test("flashcards made from a file flip, remember 'Again' and download as CSV (MB-5)", async ({ page }) => {
+  await page.addInitScript(() => {
+    const deck = {
+      id: "d1",
+      createdOn: "2026-11-06",
+      book: "Biology for Class 11",
+      marks: {},
+      cards: [
+        { id: "c1", front: "Where does photosynthesis happen?", back: "In the chloroplast.", quote: "Photosynthesis takes place in the chloroplast", page: 12, section: "Photosynthesis" },
+        { id: "c2", front: "What does respiration release?", back: "Energy stored in glucose.", quote: "Respiration releases the energy stored in glucose", page: 20, section: "Respiration" },
+      ],
+    };
+    localStorage.setItem("xplaind.bookcards.v1", JSON.stringify({ version: 1, decks: [deck] }));
+  });
+  await page.goto("/ai/book");
+  await page.getByRole("button", { name: /^Study the flashcards: Biology for Class 11/ }).click();
+  await expect(page.getByText("Where does photosynthesis happen?")).toBeVisible();
+  await page.getByRole("button", { name: "Flip the card" }).click();
+  await expect(page.getByText("In the chloroplast.")).toBeVisible();
+  await expect(page.getByText("From your file: Photosynthesis, page 12")).toBeVisible();
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Again" }).click();
+  await page.getByRole("button", { name: "Flip the card" }).click();
+  await page.getByRole("button", { name: "I knew it" }).click();
+  await expect(page.getByText("You knew 1 of 2")).toBeVisible();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download the cards (CSV)" }).click();
+  expect((await download).suggestedFilename()).toMatch(/flashcards\.csv$/);
+  expect(await overflow(page)).toBe(false);
+  // "Again" is saved, so that card comes first next time.
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("xplaind.bookcards.v1")!).decks[0].marks);
+  expect(saved).toEqual({ c1: "again", c2: "knew" });
+});
+
+test("after reading a file, the learner can choose flashcards instead of a test (MB-5)", async ({ page }) => {
+  await page.goto("/ai/book");
+  await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
+  await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("radio", { name: /Flashcards/ }).check();
+  await expect(page.getByLabel("Number of cards")).toBeVisible();
+  await expect(page.getByLabel("Time allowed")).toHaveCount(0);
+  expect((await wcag(page)).violations).toEqual([]);
+});
+
+test("the home page has its own section for Study from my notes & books (MB-6)", async ({ page }) => {
+  await page.goto("/");
+  const section = page.getByRole("region", { name: "Turn your own notes into a test and flashcards" });
+  await expect(section.getByRole("link", { name: "Try it with your notes" })).toHaveAttribute("href", "/ai/book");
 });

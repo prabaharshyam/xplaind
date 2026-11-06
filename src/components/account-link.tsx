@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { setSignedIn } from "@/lib/browser/account-sync";
-import { useProgress } from "@/lib/browser/hooks";
 import { publicSupabase } from "@/lib/signups";
 import { browserClient } from "@/lib/supabase/browser";
 
@@ -28,6 +27,25 @@ export function useAccountState(): AccountState {
   return state;
 }
 
+/**
+ * AC-2: sign-in now lands on the page the learner came from (or home), not the dashboard, so the
+ * device's progress is copied into the account once per browser session wherever they land.
+ */
+export function ClaimOnSignIn() {
+  const state = useAccountState();
+  useEffect(() => {
+    if (state !== "in") return;
+    try {
+      if (sessionStorage.getItem("xp_claimed")) return;
+      sessionStorage.setItem("xp_claimed", "1");
+    } catch {
+      return;
+    }
+    void import("@/lib/browser/claim").then(({ claimDevice }) => claimDevice()).catch(() => {});
+  }, [state]);
+  return null;
+}
+
 /** Footer link: "Sign in" or "Your dashboard". Hidden until accounts are switched on. */
 export function AccountLink({ className }: { className?: string }) {
   const state = useAccountState();
@@ -44,24 +62,16 @@ export function AccountLink({ className }: { className?: string }) {
 }
 
 /**
- * AC-6: the header's main button. It says exactly what happens next: signed in it opens your
- * progress, a returning learner carries on from their last lesson, and a new visitor starts
- * learning (or signs up, once sign-ups are open).
+ * AC-6: the header's main button. Signed in it opens your progress; everyone else gets one
+ * plain next step (sign up free, or start learning). "Continue learning" was taken out of the
+ * header on 2026-11-06: it confused first-time visitors.
  */
 export function AccountButton({ className }: { className: string }) {
   const state = useAccountState();
-  const progress = useProgress();
   if (state === "in") {
     return (
       <Link href="/dashboard" className={className}>
         My progress
-      </Link>
-    );
-  }
-  if (progress.last) {
-    return (
-      <Link href={`/stop/${progress.last.stopId}`} className={className}>
-        Continue learning
       </Link>
     );
   }
@@ -109,7 +119,16 @@ function useAccountEmail(state: AccountState): string | null {
 /** AC-7: signs the learner out on the server (the cookie is cleared there), then lands on the home page. */
 export function SignOutButton({ className, label = "Sign out" }: { className: string; label?: string }) {
   return (
-    <form action="/auth/signout" method="post" className="contents">
+    <form
+      action="/auth/signout"
+      method="post"
+      className="contents"
+      onSubmit={() => {
+        try {
+          sessionStorage.removeItem("xp_claimed");
+        } catch {}
+      }}
+    >
       <button type="submit" className={className}>
         {label}
       </button>

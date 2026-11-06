@@ -10,17 +10,20 @@ import { type Book, buildBook, pickExcerpts } from "@/lib/book/chunk";
 import { MAX_FILE_MB, readBookFile } from "@/lib/book/read-file";
 import { type BookQuestion, type BookTest, bookReport, DIFFICULTY_LABEL, type Difficulty, formatSeconds, pageList } from "@/lib/book/report";
 import { addBookTest, deleteBookTest, finishBookTest, retakeBookTest, useBookTests } from "@/lib/browser/book-store";
+import { type BookCard, type BookDeck, addDeck, deckCsv, deleteDeck, markCard, studyOrder, useDecks } from "@/lib/browser/book-cards-store";
 import { todayInIST } from "@/lib/dates";
 
 const COUNTS = [5, 10, 15, 20, 25];
 const MINUTES = [5, 10, 15, 20, 30, 45, 60];
+const CARD_COUNTS = [10, 15, 20, 30];
 
-type View = { kind: "home" } | { kind: "setup"; book: Book } | { kind: "test"; id: string } | { kind: "report"; id: string };
+type View = { kind: "home" } | { kind: "setup"; book: Book } | { kind: "test"; id: string } | { kind: "report"; id: string } | { kind: "deck"; id: string };
 
-/** MB-1 to MB-4: upload a book, get a timed MCQ test written from it, and a grounded report. */
+/** MB-1 to MB-5: upload a book or notes, get a timed MCQ test or flashcards written from it, with a grounded report. */
 export function BookStudio({ aiOn }: { aiOn: boolean }) {
   const access = useAiAccess(aiOn);
   const tests = useBookTests();
+  const decks = useDecks();
   const [view, setView] = useState<View>({ kind: "home" });
   const top = useRef<HTMLDivElement>(null);
 
@@ -29,11 +32,21 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
     requestAnimationFrame(() => top.current?.scrollIntoView({ block: "start" }));
   };
   const current = view.kind === "test" || view.kind === "report" ? tests.find((t) => t.id === view.id) : undefined;
+  const deck = view.kind === "deck" ? decks.find((d) => d.id === view.id) : undefined;
 
   return (
     <div ref={top} className="scroll-mt-20">
-      {view.kind === "home" && <Home tests={tests} onBook={(book) => go({ kind: "setup", book })} onOpen={(t) => go(t.result ? { kind: "report", id: t.id } : { kind: "test", id: t.id })} />}
-      {view.kind === "setup" && <Setup book={view.book} access={access} onBack={() => go({ kind: "home" })} onReady={(id) => go({ kind: "test", id })} />}
+      {view.kind === "home" && (
+        <Home
+          tests={tests}
+          decks={decks}
+          onBook={(book) => go({ kind: "setup", book })}
+          onOpen={(t) => go(t.result ? { kind: "report", id: t.id } : { kind: "test", id: t.id })}
+          onDeck={(d) => go({ kind: "deck", id: d.id })}
+        />
+      )}
+      {view.kind === "setup" && <Setup book={view.book} access={access} onBack={() => go({ kind: "home" })} onReady={(id) => go({ kind: "test", id })} onDeck={(id) => go({ kind: "deck", id })} />}
+      {view.kind === "deck" && deck && <StudyDeck key={deck.id} deck={deck} onHome={() => go({ kind: "home" })} />}
       {view.kind === "test" && current && <TakeTest key={current.id} test={current} onDone={() => go({ kind: "report", id: current.id })} />}
       {view.kind === "report" && current?.result && (
         <Report
@@ -51,7 +64,7 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
 
 // ------------------------------------------------------------------ home --
 
-function Home({ tests, onBook, onOpen }: { tests: BookTest[]; onBook: (b: Book) => void; onOpen: (t: BookTest) => void }) {
+function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; decks: BookDeck[]; onBook: (b: Book) => void; onOpen: (t: BookTest) => void; onDeck: (d: BookDeck) => void }) {
   const inputId = useId();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,15 +87,15 @@ function Home({ tests, onBook, onOpen }: { tests: BookTest[]; onBook: (b: Book) 
 
   return (
     <div className="flex flex-col gap-8">
-      <section aria-labelledby="upload-h" className="rounded-3xl border-2 border-dashed border-teal-300 bg-teal-50/60 p-6 text-center dark:border-teal-800 dark:bg-teal-950/20">
+      <section aria-labelledby="upload-h" className="rounded-3xl border-2 border-dashed border-zinc-300 bg-white p-6 text-center dark:border-zinc-700 dark:bg-zinc-900">
         <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-teal-500 to-violet-500 text-white">
           <Icon name="book" size={28} />
         </span>
         <h2 id="upload-h" className="mt-3 text-xl font-semibold">
-          Choose your book
+          Choose your notes or book
         </h2>
         <p className="mx-auto mt-1 max-w-md leading-7 text-zinc-700 dark:text-zinc-300">
-          A PDF with selectable text, or a .txt or .md file, up to {MAX_FILE_MB} MB. It is read in your browser and never uploaded.
+          A PDF with selectable text, a Word (.docx) file, or a .txt or .md file, up to {MAX_FILE_MB} MB. It is read in your browser and never uploaded.
         </p>
         <label htmlFor={inputId} className={`${primaryButton} mt-4 cursor-pointer`}>
           <Icon name="book" size={18} /> {busy ? "Reading…" : "Choose a file"}
@@ -90,7 +103,7 @@ function Home({ tests, onBook, onOpen }: { tests: BookTest[]; onBook: (b: Book) 
         <input
           id={inputId}
           type="file"
-          accept=".pdf,application/pdf,.txt,.md,text/plain,text/markdown"
+          accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.doc,.txt,.md,text/plain,text/markdown"
           className="sr-only"
           disabled={busy !== null}
           onChange={(e) => {
@@ -109,6 +122,35 @@ function Home({ tests, onBook, onOpen }: { tests: BookTest[]; onBook: (b: Book) 
           </p>
         )}
       </section>
+
+      {decks.length > 0 && (
+        <section aria-labelledby="decks-h">
+          <h2 id="decks-h" className="text-xl font-semibold">
+            Your flashcards on this device
+          </h2>
+          <ul className="mt-3 flex flex-col gap-3">
+            {decks.map((d) => {
+              const knew = d.cards.filter((c) => d.marks[c.id] === "knew").length;
+              return (
+                <li key={d.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{d.book}</p>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {d.cards.length} cards · {d.createdOn} · you knew {knew}
+                    </p>
+                  </div>
+                  <button type="button" className={secondaryButton} onClick={() => onDeck(d)} aria-label={`Study the flashcards: ${d.book}, ${d.createdOn}`}>
+                    Study
+                  </button>
+                  <button type="button" className="min-h-11 rounded-2xl px-3 text-sm text-zinc-600 underline underline-offset-2 dark:text-zinc-400" onClick={() => deleteDeck(d.id)} aria-label={`Delete the flashcards on ${d.book}, ${d.createdOn}`}>
+                    Delete
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {tests.length > 0 && (
         <section aria-labelledby="tests-h">
@@ -145,7 +187,9 @@ function Home({ tests, onBook, onOpen }: { tests: BookTest[]; onBook: (b: Book) 
 
 // ----------------------------------------------------------------- setup --
 
-function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnType<typeof useAiAccess>; onBack: () => void; onReady: (id: string) => void }) {
+function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: ReturnType<typeof useAiAccess>; onBack: () => void; onReady: (id: string) => void; onDeck: (id: string) => void }) {
+  const [mode, setMode] = useState<"test" | "cards">("test");
+  const [cardCount, setCardCount] = useState(15);
   const [chosen, setChosen] = useState<string[]>(book.sections);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [count, setCount] = useState(10);
@@ -153,6 +197,17 @@ function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnTy
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const toggle = (s: string) => setChosen((c) => (c.includes(s) ? c.filter((x) => x !== s) : book.sections.filter((x) => x === s || c.includes(x))));
+
+  const makeCards = async () => {
+    const excerpts = pickExcerpts(book, chosen, cardCount);
+    if (excerpts.length === 0) return setError("Choose at least one chapter.");
+    setBusy(true);
+    setError(null);
+    const res = await aiPost<{ cards: BookCard[] }>("/api/ai/book-cards", { book: book.title.slice(0, 160), count: cardCount, excerpts: excerpts.map((e) => ({ ...e, text: e.text.slice(0, 2000) })) });
+    setBusy(false);
+    if (!res.ok) return setError(res.message);
+    onDeck(addDeck({ createdOn: todayInIST(), book: book.title, cards: res.data.cards }));
+  };
 
   const generate = async () => {
     const excerpts = pickExcerpts(book, chosen, count);
@@ -170,7 +225,7 @@ function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnTy
       <button type="button" onClick={onBack} className="self-start text-sm underline underline-offset-2">
         ← Choose another book
       </button>
-      <section aria-labelledby="book-h" className="rounded-2xl bg-zinc-100 p-5 dark:bg-zinc-900">
+      <section aria-labelledby="book-h" className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <h2 id="book-h" className="text-xl font-semibold">
           {book.title}
         </h2>
@@ -178,6 +233,26 @@ function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnTy
           {book.pages} pages · {book.sections.length} {book.sections.length === 1 ? "section" : "sections"} · {book.chunks.length} passages with enough text to ask about
         </p>
       </section>
+
+      <fieldset>
+        <legend className="text-lg font-semibold">What do you want?</legend>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {(
+            [
+              ["test", "A timed test", "Multiple-choice questions and a report on what to reread"],
+              ["cards", "Flashcards", "Cards to flip and learn, saved on this device"],
+            ] as const
+          ).map(([m, label, note]) => (
+            <label key={m} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 ${mode === m ? "border-violet-600 bg-violet-50 dark:bg-violet-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
+              <input type="radio" name="mode" value={m} checked={mode === m} onChange={() => setMode(m)} className="mt-0.5 size-5 accent-violet-700" />
+              <span>
+                <span className="block font-medium">{label}</span>
+                <span className="block text-sm text-zinc-600 dark:text-zinc-400">{note}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       <fieldset className="flex flex-col gap-2">
         <legend className="text-lg font-semibold">Which chapters?</legend>
@@ -202,6 +277,19 @@ function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnTy
         </ul>
       </fieldset>
 
+      {mode === "cards" ? (
+        <label className="flex flex-col gap-1 sm:max-w-xs">
+          <span className="text-lg font-semibold">Number of cards</span>
+          <select value={cardCount} onChange={(e) => setCardCount(Number(e.target.value))} className="min-h-12 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900">
+            {CARD_COUNTS.map((n) => (
+              <option key={n} value={n}>
+                {n} cards
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+      <>
       <fieldset>
         <legend className="text-lg font-semibold">How hard?</legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -236,17 +324,29 @@ function Setup({ book, access, onBack, onReady }: { book: Book; access: ReturnTy
           </select>
         </label>
       </div>
+      </>
+      )}
 
       <AiGate access={access} next="/ai/book">
         {busy ? (
-          <AiWorking steps={["Reading the passages you chose", `Writing ${count} questions`, "Checking every answer against your book"]} />
+          <AiWorking
+            steps={
+              mode === "cards"
+                ? ["Reading the passages you chose", `Writing ${cardCount} flashcards`, "Checking every card against your file"]
+                : ["Reading the passages you chose", `Writing ${count} questions`, "Checking every answer against your book"]
+            }
+          />
+        ) : mode === "cards" ? (
+          <button type="button" onClick={() => void makeCards()} disabled={chosen.length === 0} className={`${primaryButton} self-start disabled:opacity-50`}>
+            <Icon name="sparkles" size={18} /> Make my flashcards
+          </button>
         ) : (
           <button type="button" onClick={() => void generate()} disabled={chosen.length === 0} className={`${primaryButton} self-start disabled:opacity-50`}>
             <Icon name="sparkles" size={18} /> Write my test
           </button>
         )}
         <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-          Only short passages from the chapters you chose are sent to Claude, Anthropic&apos;s AI model, to write the questions. We keep no copy of your book. 5 tests a day.
+          Only short passages from the chapters you chose are sent to Claude, Anthropic&apos;s AI model, to write the questions or cards. We keep no copy of your file. 5 tests or decks a day.
         </p>
         {error && (
           <p role="alert" className="mt-2 text-sm text-rose-800 dark:text-rose-300">
@@ -511,6 +611,122 @@ function Report({ test, onRetake, onHome }: { test: BookTest; onRetake: () => vo
           })}
         </ol>
       </section>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------- flashcards --
+
+/** MB-5: study a deck card by card: flip, then say whether you knew it. "Again" cards come first next time. */
+function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
+  const [order] = useState(() => studyOrder(deck));
+  const [i, setI] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [knew, setKnew] = useState(0);
+  const card = order[i];
+
+  const mark = (m: "knew" | "again") => {
+    markCard(deck.id, card.id, m);
+    if (m === "knew") setKnew((k) => k + 1);
+    setFlipped(false);
+    setI(i + 1);
+    requestAnimationFrame(() => document.getElementById("deck-card")?.focus());
+  };
+
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([deckCsv(deck)], { type: "text/csv;charset=utf-8" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: `${deck.book.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "flashcards"}-flashcards.csv` });
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" onClick={onHome} className="text-sm underline underline-offset-2">
+          ← All my tests and cards
+        </button>
+        <button type="button" onClick={download} className={secondaryButton}>
+          Download the cards (CSV)
+        </button>
+      </div>
+      <h2 className="text-xl font-semibold">{deck.book}</h2>
+      {i >= order.length ? (
+        <div role="status" className="rounded-3xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-2xl font-semibold">
+            You knew {knew} of {order.length}
+          </p>
+          <p className="mt-1 text-zinc-600 dark:text-zinc-400">The cards you marked &ldquo;Again&rdquo; come first next time.</p>
+          <button
+            type="button"
+            className={`${primaryButton} mt-4`}
+            onClick={() => {
+              setI(0);
+              setKnew(0);
+            }}
+          >
+            Go through them again
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-zinc-600 dark:text-zinc-400">
+              Card {i + 1} of {order.length}
+            </span>
+            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden="true">
+              <span className="block h-full rounded-full bg-violet-700 transition-[width] duration-300" style={{ width: `${Math.round((i / order.length) * 100)}%` }} />
+            </span>
+          </div>
+          <div className="relative pb-3">
+            <span aria-hidden="true" className="absolute inset-x-6 bottom-0 h-full rounded-3xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
+            <span aria-hidden="true" className="absolute inset-x-3 bottom-1.5 h-full rounded-3xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
+            <article
+              key={`${card.id}-${flipped ? "back" : "front"}`}
+              id="deck-card"
+              tabIndex={-1}
+              aria-label={`Card ${i + 1}`}
+              className="card-flip relative flex min-h-72 flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-lg shadow-zinc-950/5 outline-none md:p-8 dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              <p className="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
+                <span>{flipped ? "Answer" : "Question"}</span>
+                <span className="min-w-0 truncate normal-case">
+                  {card.section}, page {card.page}
+                </span>
+              </p>
+              <p className={`leading-snug font-semibold ${flipped ? "text-lg text-zinc-600 dark:text-zinc-300" : "my-auto py-6 text-center text-2xl"}`}>{card.front}</p>
+              {flipped ? (
+                <>
+                  <p className="text-lg leading-8">{card.back}</p>
+                  <figure className="mt-auto border-l-2 border-zinc-300 pl-3 dark:border-zinc-700">
+                    <blockquote className="text-sm leading-6 text-zinc-600 italic dark:text-zinc-400">&ldquo;{card.quote}&rdquo;</blockquote>
+                    <figcaption className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">From your file: {card.section}, page {card.page}</figcaption>
+                  </figure>
+                </>
+              ) : (
+                <div className="mt-auto flex justify-center">
+                  <button type="button" className={primaryButton} onClick={() => setFlipped(true)}>
+                    Flip the card
+                  </button>
+                </div>
+              )}
+            </article>
+          </div>
+          {flipped && (
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 font-medium">Did you know it?</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" className={secondaryButton} onClick={() => mark("again")}>
+                  Again
+                </button>
+                <button type="button" className={primaryButton} onClick={() => mark("knew")}>
+                  I knew it
+                </button>
+              </div>
+            </fieldset>
+          )}
+        </>
+      )}
     </div>
   );
 }

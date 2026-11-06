@@ -3,7 +3,7 @@ import Link from "next/link";
 import { GuideCover } from "@/components/guide-cover";
 import { Icon } from "@/components/art/icons";
 import { RoleGrid } from "@/components/home/role-grid";
-import { MiniCourses, MiniInterview, MiniLesson, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
+import { MiniCourses, MiniInterview, MiniLesson, MiniNotes, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
 import { ContinueCard } from "@/components/continue-card";
 import { Words } from "@/components/motion/words";
 import { RoadScene } from "@/components/three/road-scene";
@@ -343,6 +343,41 @@ export default function Home() {
         </div>
       </section>
 
+      {/* MB-5, owner request 2026-11-06: "Study from my notes & books" is a product on its own, so it gets its own spotlight. */}
+      <section aria-labelledby="notes-heading" className="py-16 md:py-24">
+        <div className="mx-auto max-w-6xl px-4 md:px-6">
+          <div className="grid items-center gap-10 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm shadow-zinc-950/[0.03] md:grid-cols-2 md:p-12 dark:border-zinc-800 dark:bg-zinc-900">
+            <div>
+              <p className="text-sm font-semibold text-violet-800 dark:text-violet-300">Study from my notes &amp; books</p>
+              <h2 id="notes-heading" data-words className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">
+                <Words text="Turn your own notes into a test and flashcards" />
+              </h2>
+              <p className="mt-3 text-lg leading-8 text-zinc-700 dark:text-zinc-300">
+                Upload a textbook, class notes or a work document. Get questions written only from it, so you study what your exam or job needs.
+              </p>
+              <ul className="mt-5 flex flex-col gap-3">
+                {[
+                  "A PDF or Word file, read on your device and never stored",
+                  "A timed test with a report, or a deck of flashcards",
+                  "Every answer shows the page it came from",
+                ].map((t) => (
+                  <li key={t} className="flex items-start gap-3">
+                    <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
+                      <Icon name="check" size={14} />
+                    </span>
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/ai/book" className={`${primaryButtonLg} mt-7`}>
+                Try it with your notes
+              </Link>
+            </div>
+            <MiniNotes />
+          </div>
+        </div>
+      </section>
+
       {/* Milestone 3: practice, prove it and get hired. */}
       <section aria-labelledby="hired-heading" className="py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
@@ -367,7 +402,7 @@ export default function Home() {
               <div>
                 <h3 className="text-xl font-semibold">Stay on track, week after week</h3>
                 <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
-                  A weekly plan sized to your hours, plus XP, streaks and badges.
+                  A weekly plan sized to your hours, and a streak that shows the days you learnt.
                 </p>
                 <Link href="/plan" className="mt-3 inline-block font-medium text-violet-800 hover:underline dark:text-violet-300">
                   Plan my week →

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import { CopyCode } from "@/components/copy-code";
 import remarkGfm from "remark-gfm";
 import { DraftNote } from "@/components/draft-note";
 import { JsonLd } from "@/components/json-ld";
@@ -101,7 +102,17 @@ export default async function BlogPostPage({ params }: PageProps<"/blog/[slug]">
           </div>
         )}
         <div className={PROSE}>
-          <MDXRemote source={post.body} options={{ mdxOptions: { remarkPlugins: [remarkGfm] } }} />
+          <MDXRemote
+            source={post.body}
+            options={{ mdxOptions: { remarkPlugins: [remarkGfm] } }}
+            components={{
+              pre: (props: React.ComponentProps<"pre">) => (
+                <CopyCode>
+                  <pre tabIndex={0} {...props} className={`${props.className ?? ""} pr-16`} />
+                </CopyCode>
+              ),
+            }}
+          />
         </div>
 
         {post.faq.length > 0 && (

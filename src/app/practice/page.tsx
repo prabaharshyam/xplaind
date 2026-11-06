@@ -29,7 +29,7 @@ export default function PracticePage() {
         icon="check"
         eyebrow="Interview prep"
         title="Practice"
-        lead="Flashcards for interview questions: answer out loud, check yourself and rate it. Questions you miss come back first. Every rating earns XP."
+        lead="Flashcards for interview questions: answer out loud, check yourself and rate it. Questions you miss come back first."
       >
         {/* The question bank lost its place in the top bar, so it is one tap from here. */}
         <div className="flex flex-wrap gap-2">
@@ -40,7 +40,7 @@ export default function PracticePage() {
             Take a mock interview
           </Link>
           <Link href="/ai/book" className={secondaryButton}>
-            Ask me from my book
+            Study from my notes & books
           </Link>
           <Link href="/glossary" className={secondaryButton}>
             AI glossary
@@ -48,8 +48,9 @@ export default function PracticePage() {
         </div>
       </PageHero>
       <div className="mx-auto max-w-3xl px-4 py-8">
-        {/* The glossary was only in the footer; practice is where learners need words explained. */}
-        <section aria-labelledby="glossary-heading" className="mb-8 rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50 to-sky-50 p-5 md:p-6 dark:border-violet-900 dark:from-violet-950/40 dark:to-sky-950/30">
+        <PracticeView topic={null} questions={getInterviewViews()} quizPool={quizPoolFor(null)} />
+        {/* The glossary sits below the cards, so the cards are the first thing on the page (owner, 2026-11-06). */}
+        <section aria-labelledby="glossary-heading" className="mt-12 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-start gap-4">
             <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-violet-700 text-white">
               <Icon name="book" size={24} />
@@ -78,7 +79,6 @@ export default function PracticePage() {
             Open the AI glossary →
           </Link>
         </section>
-        <PracticeView topic={null} questions={getInterviewViews()} quizPool={quizPoolFor(null)} />
       </div>
     </main>
   );

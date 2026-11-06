@@ -1,4 +1,4 @@
-// MB-3: scores an "Ask me from my book" test and says where the learner is strong and
+// MB-3: scores a "Study from my notes & books" test and says where the learner is strong and
 // what to reread. Pure, so it runs in the browser and in tests.
 
 export type Difficulty = "easy" | "medium" | "hard";

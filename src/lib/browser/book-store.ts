@@ -1,4 +1,4 @@
-// "Ask me from my book" tests, kept on this device only (MB-4). The book itself is never
+// "Study from my notes & books" tests, kept on this device only (MB-4). The book itself is never
 // saved: only the questions, their short quotes and the learner's answers.
 import { useMemo, useSyncExternalStore } from "react";
 import { z } from "zod";
