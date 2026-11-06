@@ -170,3 +170,24 @@ test("the phone menu closes after a page is chosen", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(menu).not.toHaveAttribute("open");
 });
+
+test("closing a video inside a roadmap topic keeps the topic panel and its content (RM-13)", async ({ browser }) => {
+  // A phone in dark mode, where the bug showed as a black screen: closing the video also emptied
+  // the topic panel, which stayed open as a blank full-height window over the page.
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark", reducedMotion: "reduce" });
+  const page = await ctx.newPage();
+  await page.goto("/roadmap/forward-deployed-engineer");
+  await page.locator("main a[href='/stop/docker-basics']").last().click();
+  const drawer = page.getByRole("dialog", { name: "Docker and Compose" });
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole("button", { name: /Watch here/ }).first().click();
+  await page.getByRole("button", { name: "Close the video" }).first().click();
+  // The panel is still there with its title and button, not an empty window.
+  await expect(drawer.getByRole("heading", { name: "Docker and Compose" })).toBeVisible();
+  await expect(drawer.getByRole("link", { name: "Read the full chapter" })).toBeVisible();
+  // Closing the panel then leaves no window open over the roadmap.
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  expect(await page.evaluate(() => document.querySelectorAll("dialog[open]").length)).toBe(0);
+  await ctx.close();
+});

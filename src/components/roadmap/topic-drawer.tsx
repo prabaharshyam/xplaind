@@ -57,7 +57,9 @@ export function TopicDrawerProvider({ details, children }: { details: Record<str
       <dialog
         ref={dialog}
         aria-labelledby="drawer-title"
-        onClose={() => {
+        onClose={(e) => {
+          // Only this panel closing, never a window inside it (such as a video), empties it.
+          if (e.target !== e.currentTarget) return;
           setId(null);
           opener.current?.focus();
         }}
