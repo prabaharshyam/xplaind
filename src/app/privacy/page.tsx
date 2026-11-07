@@ -25,7 +25,7 @@ const STORED: [string, string, string][] = [
   ],
   [
     "Your account (18 and over only)",
-    "Email address, the role you chose, weekly hours, level, lesson progress, test attempts, practice ratings and badges. If you sign in with Google or GitHub, we receive your email and name from them.",
+    "Email address, the role you chose, weekly hours, level, lesson progress, test attempts, practice ratings, and, if you opt in to “Commit to 90 days”, that choice with your email so we can send one email a week for 13 weeks (stop any time with the link in each email). If you sign in with Google or GitHub, we receive your email and name from them.",
     "Until you delete your account in Settings, which removes all of it at once.",
   ],
   [

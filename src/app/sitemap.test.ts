@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import sitemap, { PAGES_UPDATED_ON } from "./sitemap";
 
 // SE-2 and IQ-3: the sitemap lists every public page once, with a real date.
-const PRIVATE = ["/card/[id]", "/dashboard", "/result", "/settings", "/signin"];
+const PRIVATE = ["/card/[id]", "/commit/stopped", "/dashboard", "/result", "/settings", "/signin"];
 
 function routes(dir: string, prefix = ""): string[] {
   return readdirSync(dir).flatMap((name) => {
