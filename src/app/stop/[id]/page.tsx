@@ -203,13 +203,12 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 pb-16 md:px-6 lg:grid-cols-[1fr_260px]">
-        <div className="min-w-0 lg:order-2">
-          <LessonNav sections={navSections} top={<LearnPanel stopId={stop.id} items={learn} headingId="learn-side" />}>
-            {home && <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />}
-          </LessonNav>
+      {/* RM-15: "On this page" on the left, the lesson in the middle, videos and the path's lessons on the right. */}
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-16 md:px-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_260px]">
+        <div className="min-w-0">
+          <LessonNav sections={navSections} />
         </div>
-        <div className="min-w-0 pt-6 lg:order-1 lg:pt-10">
+        <div className="min-w-0 pt-6 lg:pt-10 xl:order-2">
           {/* RM-7: on a big screen the Learning / Done / Skip buttons sit at the top; phones get the bar at the bottom. */}
           <div className="mb-6 hidden flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3 lg:flex dark:border-zinc-800 dark:bg-zinc-900">
             <span className="text-sm font-medium">Track this topic</span>
@@ -256,7 +255,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               </section>
               {/* On phones the videos come once the learner has the idea, after the first part. */}
               {i === 0 && (
-                <div className="mt-6 lg:hidden">
+                <div className="mt-6 xl:hidden">
                   <LearnPanel stopId={stop.id} items={learn} headingId="learn-top" />
                 </div>
               )}
@@ -271,7 +270,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </section>
           )}
           {!explainer && (
-            <div className="mt-6 lg:hidden">
+            <div className="mt-6 xl:hidden">
               <LearnPanel stopId={stop.id} items={learn} headingId="learn-top" />
             </div>
           )}
@@ -386,7 +385,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
           )}
 
           {home && (
-            <div className="lg:hidden">
+            <div className="xl:hidden">
               <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />
             </div>
           )}
@@ -448,6 +447,12 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </p>
           </section>
         </div>
+        <aside className="hidden min-w-0 xl:order-3 xl:block xl:pt-10">
+          <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col gap-4 overflow-y-auto pb-4">
+            <LearnPanel stopId={stop.id} items={learn} headingId="learn-side" />
+            {home && <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />}
+          </div>
+        </aside>
       </div>
 
       {/* RM-7: phones keep Learning / Done / Skip one tap away in a slim bar at the bottom. */}

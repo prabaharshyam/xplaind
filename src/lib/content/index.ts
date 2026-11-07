@@ -7,7 +7,7 @@ import type { LevelId } from "@/lib/levels";
 import { loadContent } from "./load";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
-import type { BlogPost, Certification, Channel, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
+import type { BlogPost, Certification, Cheatsheet, Testimonial, Channel, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
 
 let cached: Bundle | undefined;
 
@@ -103,3 +103,13 @@ export const getBlogPost = (id: string): BlogPost | undefined => getBlogPosts().
 
 /** SE-2: the newest review date across lessons: the site's "last updated", and its year. */
 export const contentUpdatedOn = (): string => getStops().reduce((m, s) => (s.reviewed_on > m ? s.reviewed_on : m), "2026-01-01");
+
+/** CS-1: cheatsheets, by title. */
+export const getCheatsheets = (): Cheatsheet[] =>
+  getContent()
+    .cheatsheets.map((c) => c.data)
+    .sort((a, b) => a.title.localeCompare(b.title, "en"));
+export const getCheatsheet = (id: string): Cheatsheet | undefined => getCheatsheets().find((c) => c.id === id);
+
+/** SO-1: what real users said, in file order. */
+export const getTestimonials = (): Testimonial[] => getContent().testimonials.map((t) => t.data);

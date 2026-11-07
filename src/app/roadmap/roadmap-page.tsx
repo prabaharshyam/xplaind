@@ -28,7 +28,7 @@ export function RoadmapPage({ path }: { path: Goal }) {
       <JsonLd data={roadmapGraph(path.id, lessons.map((l) => ({ id: l.id, title: l.title })))} />
       <PageHero theme={path.theme ?? "llm"} seed={path.id} eyebrow="Role roadmap" title={view.name} lead={view.description} crumbs={[{ href: "/paths", label: "Roadmaps" }]}>
         <p className="flex flex-wrap gap-2 text-sm">
-          {[CODING_LABEL[view.coding], `${sections} ${path.layout === "levels" ? "levels" : "stages"}`, `${view.counts.lessons} lessons`, `about ${view.months} months`].map((c) => (
+          {[CODING_LABEL[view.coding], `${sections} ${path.layout === "levels" ? "levels" : "stages"}`, `${view.counts.lessons} lessons`].map((c) => (
             <span key={c} className="rounded-full bg-white px-3 py-1 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
               {c}
             </span>

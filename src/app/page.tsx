@@ -3,12 +3,13 @@ import Link from "next/link";
 import { GuideCover } from "@/components/guide-cover";
 import { Icon } from "@/components/art/icons";
 import { RoleGrid } from "@/components/home/role-grid";
+import { Testimonials } from "@/components/home/testimonials";
 import { MiniCourses, MiniInterview, MiniLesson, MiniNotes, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
 import { ContinueCard } from "@/components/continue-card";
 import { Words } from "@/components/motion/words";
 import { RoadScene } from "@/components/three/road-scene";
 import { JsonLd } from "@/components/json-ld";
-import { getBlogPosts, getContent, getPaths, getProjects, getStops } from "@/lib/content";
+import { getBlogPosts, getContent, getPaths, getProjects, getStops, getTestimonials } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { getJobs } from "@/lib/content/jobs";
 import { pathView } from "@/lib/content/paths";
@@ -102,7 +103,7 @@ const FAQ = [
   },
   {
     q: "How long does it take?",
-    a: "Each roadmap shows its own estimate at a few hours a week: about 3 months for AI Product Manager, AI Automation Specialist and AI Governance & Compliance Specialist, 4 months for Agentic AI Engineer, 6 months for Forward Deployed Engineer and MLOps Engineer, and about 9 months for AI Engineer, Generative AI & LLM Engineer and Machine Learning Engineer. The level test skips the topics you already know, and the weekly plan fits the lessons around the hours you have.",
+    a: "At your own pace. There are no deadlines: learn a topic when you have time, and pick up where you left off. The level test skips the topics you already know, and the weekly plan fits lessons around the hours you have.",
   },
   {
     q: "Will this get me a job?",
@@ -115,6 +116,7 @@ const FAQ = [
 ];
 
 export default function Home() {
+  const testimonials = getTestimonials();
   const paths = getPaths().map(pathView);
   const stops = getStops();
   const interview = getInterviewViews();
@@ -432,6 +434,19 @@ export default function Home() {
           </ul>
         </div>
       </section>
+
+      {/* SO-1: early users, in their own words (real, shared with permission). */}
+      {testimonials.length > 0 && (
+        <section aria-labelledby="voices-heading" className="py-16 md:py-24">
+          <div className="mx-auto max-w-6xl px-4 md:px-6">
+            <h2 id="voices-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
+              <Words text="What early learners say" />
+            </h2>
+            <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">Freshers, founders and working professionals who tried Xplaind first.</p>
+            <Testimonials items={testimonials} />
+          </div>
+        </section>
+      )}
 
       {/* Trust: promises a visitor can check, then what is inside, counted. */}
       <section aria-labelledby="trust-heading" className="py-20 md:py-28">

@@ -184,6 +184,14 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     if (!/^\|.+\|\s*\n\|[\s:|-]+\|/m.test(s.body)) error(file, "a deep lesson has at least one table");
     if (/^# /m.test(s.body.replace(/^```[\s\S]*?^```/gm, ""))) error(file, "lesson text starts its headings at ##");
   }
+  // CS-1: a cheatsheet points only at lessons that exist, and each id is used once.
+  const stopIds = new Set(bundle.stops.map((x) => x.data.id));
+  const sheetIds = new Set<string>();
+  for (const { file, data: c } of bundle.cheatsheets) {
+    if (sheetIds.has(c.id)) error(file, `cheatsheet id "${c.id}" is used twice`, "CS-1");
+    sheetIds.add(c.id);
+    for (const l of c.lessons) if (!stopIds.has(l)) error(file, `lesson "${l}" does not exist`, "CS-1");
+  }
   for (const { file, data: g } of bundle.glossary) {
     for (const r of g.related) {
       if (r === g.id) error(file, "a term cannot be related to itself");

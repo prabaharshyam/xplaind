@@ -107,20 +107,13 @@ export function ResourceCard({
       </dl>
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         {r.embed && <WatchButton embed={r.embed} title={r.title} onWatch={onOpen} />}
-        <a
-          href={stopId ? `/go/${r.id}?stop=${encodeURIComponent(stopId)}` : `/go/${r.id}`}
-          target="_blank"
-          rel="noopener"
-          onClick={onOpen}
-          className={
-            r.embed
-              ? `text-sm ${textLink}`
-              : primaryButton
-          }
-        >
-          {r.embed ? "Open on YouTube" : openLabel(r.kindLabel)}
-          <span className="sr-only"> {r.title} (opens in a new tab)</span>
-        </a>
+        {/* 2026-11-06, owner request: no "Open on YouTube" link; the player has its own YouTube button. */}
+        {!r.embed && (
+          <a href={stopId ? `/go/${r.id}?stop=${encodeURIComponent(stopId)}` : `/go/${r.id}`} target="_blank" rel="noopener" onClick={onOpen} className={primaryButton}>
+            {openLabel(r.kindLabel)}
+            <span className="sr-only"> {r.title} (opens in a new tab)</span>
+          </a>
+        )}
         <Link href="/how-we-rank" className={`text-sm ${textLink}`}>
           How we rank
         </Link>

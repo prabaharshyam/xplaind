@@ -49,10 +49,12 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
                   className={secondaryButtonSm}
                 />
               )}
-              <a href={`/go/${r.id}?stop=${encodeURIComponent(stopId)}`} target="_blank" rel="noopener" className={`inline-flex min-h-11 items-center text-sm ${textLink}`}>
-                {r.embed ? "Open on YouTube" : /video/i.test(r.kindLabel) ? "Watch it" : "Open it"}
-                <span className="sr-only">: {r.title} (opens in a new tab)</span>
-              </a>
+              {!r.embed && (
+                <a href={`/go/${r.id}?stop=${encodeURIComponent(stopId)}`} target="_blank" rel="noopener" className={`inline-flex min-h-11 items-center text-sm ${textLink}`}>
+                  {/video/i.test(r.kindLabel) ? "Watch it" : "Open it"}
+                  <span className="sr-only">: {r.title} (opens in a new tab)</span>
+                </a>
+              )}
             </div>
             {r.notice && <ResourceNotice text={r.notice} compact />}
             {/* RM-4: every resource's facts, one tap away. */}
