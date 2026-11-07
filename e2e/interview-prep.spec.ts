@@ -37,3 +37,21 @@ test("the software engineering and Git track lists its lessons (SE-1)", async ({
     await expect(page.getByRole("link", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first()).toBeVisible();
   }
 });
+
+test("the three book-informed lessons render with their sections, a diagram and code (LQ-1)", async ({ page }) => {
+  const lessons: [string, RegExp, string][] = [
+    ["how-models-pick-words", /How a model picks its next word/, "From the playground to production"],
+    ["how-fine-tuning-works", /How fine-tuning works/, "When fine-tuning is the wrong tool"],
+    ["lora-and-memory-maths", /LoRA, QLoRA and the GPU memory maths/, "When not to use LoRA or QLoRA"],
+  ];
+  for (const [id, title, extra] of lessons) {
+    await page.goto(`/stop/${id}`);
+    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: extra })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Common mistakes" })).toBeVisible();
+    await expect(page.locator("figure:has(svg)").first()).toBeVisible();
+    await expect(page.locator("pre").first()).toBeVisible();
+    expect(await overflow(page)).toBe(false);
+    expect((await wcag(page)).violations).toEqual([]);
+  }
+});

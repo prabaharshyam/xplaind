@@ -1,0 +1,188 @@
+---
+id: how-fine-tuning-works
+level: P1
+theme: llm
+title: "How fine-tuning works: data, training and what can go wrong"
+outcome: "Explain what fine-tuning changes inside a model, prepare a clean training set, judge a fine-tuned model fairly against a good prompt, and name its main risks."
+answer: "Fine-tuning keeps training a model on your examples, shifting its weights toward your task. Most of the work is data and testing, and the model can get worse at other tasks."
+why_it_matters: "Teams reach for fine-tuning too early or too late. Knowing how it works, what data it needs and how it fails lets you give a clear yes or no, which interviewers and clients both want to hear."
+hours: 3
+gap_tags: []
+primary_resource: hf-llm-course
+alternates: [hf-peft-docs]
+videos: [yt-ibm-technology-rag-vs-fine-tuning-vs-prompt-engineering]
+more: []
+format: deep
+key_terms: [fine-tuning, catastrophic-forgetting, overfitting, training]
+check:
+  type: mcq
+  question_ids: [how-fine-tuning-works-1, how-fine-tuning-works-2, how-fine-tuning-works-3]
+flashcards:
+  - q: "What does fine-tuning change in a model?"
+    a: "Its weights. The model is trained a little more on your examples, so its default behaviour shifts toward your task."
+  - q: "What are the three common kinds of further training?"
+    a: "Continued pre-training on raw text, supervised fine-tuning (SFT) on prompt and ideal-answer pairs, and preference tuning on pairs where one answer is better."
+  - q: "What does an SFT example look like?"
+    a: "A prompt and the exact answer you want, often written as a short chat: a user message and an assistant reply."
+  - q: "Why does the quality of examples matter more than the number?"
+    a: "The model copies what it sees, including mistakes and inconsistency. A few hundred excellent, consistent examples often beat thousands of sloppy ones."
+  - q: "Why keep a test set the model never trains on?"
+    a: "To measure real performance. If test examples leak into training, the score looks great and means nothing."
+  - q: "What is catastrophic forgetting?"
+    a: "A model that gets better at your task and worse at things it could do before, such as following other instructions or answering general questions."
+  - q: "What baseline must a fine-tuned model beat?"
+    a: "A well-written prompt with a few good examples on the same test set. If it does not clearly win, fine-tuning is not worth its upkeep."
+  - q: "Why is personal data in training examples risky?"
+    a: "The model can memorise and repeat it, and removing it later means retraining. Mask or remove personal data first."
+exercise:
+  title: "Should this team fine-tune?"
+  setup: "An insurer in Pune receives claim emails and wants each sorted into one of 12 categories. A prompt with six examples scores 78% on 300 labelled emails. They have 40,000 old emails already labelled by agents, though a spot check finds about 1 in 10 labels is wrong. Volume is 200,000 emails a month, and the current model costs too much per call."
+  questions:
+    - q: "What should they do about the labels before training?"
+      a: "Clean them first. About 10% wrong labels teaches the model those mistakes. Re-check a sample, fix the rules agents disagreed on, and write down the labelling guide."
+    - q: "How should they judge the fine-tuned model?"
+      a: "On the 300 untouched emails, against the best prompt they can write (78% now, and likely higher after an afternoon of improving it). Also check cost and speed, since the goal is a cheaper model that stays accurate."
+    - q: "The fine-tuned model scores 91% but replies oddly to a customer's general question. What is that?"
+      a: "Catastrophic forgetting. It was trained narrowly. Keep it for classification only and test other uses separately."
+    - q: "A year later the provider retires the base model. What happens to their work?"
+      a: "They must retrain on a new base model. Keep the data, the labelling guide and the test set versioned so that is a routine job, not a rebuild."
+ask:
+  - "How many examples do I need to fine-tune a model?"
+  - "What is the difference between SFT and RLHF?"
+  - "Can fine-tuning teach a model new facts?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-07
+---
+
+## What it is
+
+A language model starts life as a **base model**, trained on a huge amount of text to predict the next token. Companies then train it further so that it follows instructions and behaves like a helpful assistant. **Fine-tuning** is you doing a small version of that: you take an existing model and keep training it on your own examples, so its **weights** (the numbers inside the model) shift toward your task.
+
+Three kinds of further training are common:
+
+- **Continued pre-training** feeds the model more raw text from a field, such as legal or medical documents. It is expensive and rare for application teams.
+- **Supervised fine-tuning (SFT)** shows the model a prompt and the exact answer you want, thousands of times. This is the usual choice.
+- **Preference tuning** (RLHF, or a simpler method called DPO) shows the model two answers to a prompt and which one people preferred. It shapes tone and judgement.
+
+This is why a chat model behaves differently from a base model: it went through all three. Most application teams only ever do SFT, and sometimes preference tuning.
+
+Fine-tuning is best at teaching a model **how to respond**: a format, a tone, a strict routine, a narrow classification. It is a poor way to teach **facts**, because facts change and the model may still misremember them. For facts, use retrieval. The lesson on prompting, RAG or fine-tuning helps you decide between them. This lesson is about what happens once you have decided to fine-tune.
+
+```flow
+title: The fine-tuning loop
+Define the task and a test | what counts as good?
+Define the task and a test -> Collect and clean examples | quality first
+Collect and clean examples -> Split train, validation and test | test stays locked
+Split train, validation and test -> Train a few passes | watch validation loss
+Train a few passes -> Better than the prompt baseline?
+Better than the prompt baseline? -[no]-> Fix the data or stop | often the data is the problem
+Fix the data or stop -> Collect and clean examples
+Better than the prompt baseline? -[yes]-> Check old abilities | forgetting
+Check old abilities -> Deploy and monitor | retrain when things change
+```
+
+This lesson follows an insurer in Pune that wants to sort claim emails into 12 categories.
+
+## How it works
+
+1. **Write the test before the training set.** Decide what "good" means for this task, and build a small test set of real examples with correct answers. Without it you cannot tell whether fine-tuning helped.
+2. **Collect examples.** Each one is an input and the ideal output. Use real past work where you can, checked by a person. How many you need depends on the task: a few hundred excellent examples can teach a format, and a harder task may need thousands.
+3. **Clean them.** Remove duplicates, fix wrong labels, make the format identical across examples, and take out personal data. The model copies whatever it sees, mistakes included.
+4. **Split the data.** Most goes to **training**. A smaller part is **validation**, used during training to check progress. A third part is the **test set**, which you do not touch until the end.
+5. **Train.** The model reads the examples a few times (each full pass is an epoch) and its weights shift to make the ideal answers more likely. You watch the **loss**, a number that measures how wrong the model is. Training loss should fall. If validation loss starts rising while training loss keeps falling, the model is memorising the examples, which is **overfitting**. Stop there.
+6. **Test against a strong baseline.** The fair comparison is not the base model with a lazy prompt. It is the base model with a well-written prompt and a few good examples. Fine-tuning must clearly beat that to be worth keeping.
+7. **Check what it forgot.** Try prompts unrelated to your task. A narrow fine-tune can make a model worse at general instructions, called **catastrophic forgetting**.
+8. **Deploy and keep the pieces.** Version the data, the labelling guide, the settings and the test set, because you will retrain when the base model or your rules change.
+
+An SFT example is usually stored as one line of JSON, written like a short chat:
+
+```json
+{"messages": [
+  {"role": "user", "content": "Classify this claim email.\n\nSubject: Hospital bill for my father\nBody: He was admitted on 3 March for 4 days at a Pune hospital. Please process the cashless request."},
+  {"role": "assistant", "content": "health_cashless"}
+]}
+```
+
+A small script splits the data and keeps the test set safe:
+
+```python
+import json, random
+
+random.seed(7)                       # same split every time
+rows = [json.loads(line) for line in open("claims_clean.jsonl")]
+random.shuffle(rows)
+
+n = len(rows)
+test = rows[: int(n * 0.05)]         # locked away until the end
+valid = rows[int(n * 0.05): int(n * 0.15)]
+train = rows[int(n * 0.15):]
+
+for name, part in [("train", train), ("valid", valid), ("test", test)]:
+    with open(f"{name}.jsonl", "w") as f:
+        for r in part:
+            f.write(json.dumps(r) + "\n")
+print(len(train), len(valid), len(test))
+```
+
+Duplicates matter here. If the same email appears in both training and test, the test score is flattered. Remove exact and near duplicates before you split.
+
+**Hosted or open weights?** Some providers let you fine-tune their models through an API and host the result for you, which is simple but ties you to them. With open-weight models you train and serve the model yourself, which gives control but needs GPUs and skills. Availability and prices change, so check the provider's current documentation. The next lesson covers how to train open models without a huge GPU.
+
+## A worked example
+
+The Pune insurer sorts 200,000 claim emails a month into 12 categories. A prompt with six examples on a large model scores 78% on 300 labelled emails, and the cost per call is too high for this volume.
+
+They have 40,000 emails already labelled by agents. Before training, they check a sample of 400 and find about 1 in 10 labels is wrong, mostly because two agents used "health reimbursement" and "health cashless" differently. They write a one-page labelling guide, have two senior agents relabel the confusing categories, and remove 3,000 duplicate emails. They mask names, phone numbers and policy numbers, which is personal data under India's data protection law.
+
+They fine-tune a small open-weight model on 30,000 cleaned examples, keeping 2,000 for validation and the 300 original test emails untouched. Validation loss stops improving after the second pass, so they stop there.
+
+| Option | Accuracy on 300 test emails | Relative cost per email | Notes |
+| --- | --- | --- | --- |
+| Large model with a six-example prompt | 78% | 1x (baseline) | Easy to change, costly at this volume |
+| Same prompt, improved after error review | 84% | 1x | An afternoon of work |
+| Fine-tuned small model | 91% | about 0.1x | Needs data upkeep and retraining |
+
+The numbers in this table are for illustration, to show how to compare. The point is the method: the fine-tune is judged against the *improved* prompt (84%), not the first one (78%).
+
+The fine-tuned model clearly wins on cost and accuracy for this narrow task. But when someone typed a general question into it, the answer was odd, which is forgetting. Since it is used only to classify, that does not matter. They add a rule that it never talks to customers.
+
+## Common mistakes
+
+- **Starting with the training set instead of the test.** Without a test you cannot tell whether you improved anything.
+- **Training on messy labels.** The model learns the mistakes and the disagreements.
+- **Comparing against a weak prompt.** Improve the prompt first, then see whether fine-tuning still wins.
+- **Letting test examples leak into training.** Duplicates across splits give a score that looks great and means nothing.
+- **Using fine-tuning to add facts.** Policies and prices change, and a fine-tune is slow to update. Use retrieval.
+- **Ignoring forgetting.** Test the model on tasks you did not train it for, or restrict where it is used.
+- **Putting personal data in training examples.** The model can repeat it, and the only fix is retraining.
+
+## When fine-tuning is the wrong tool
+
+- The problem is missing or changing knowledge. Use retrieval or tools.
+- A better prompt has not been tried. It costs minutes, not weeks.
+- You have no test set, or fewer than a few hundred good examples.
+- The task changes every month. You would retrain constantly.
+- You need to show where an answer came from. A fine-tuned model cannot cite sources, while retrieval can.
+- Volume is low. The upkeep will cost more than the savings.
+
+## From demo to production
+
+- **Version everything.** Keep the data, the cleaning script, the labelling guide, the settings and the test set under version control, and note which model each result came from.
+- **Plan for retraining.** Base models are retired and replaced, and your rules change. If retraining is painful, the project will rot.
+- **Watch it after launch.** Sample real inputs and outputs every week, and compare with your test set. If the kind of email changes, accuracy falls quietly.
+- **Keep a fallback.** If the fine-tuned model is down or confused, route to the prompt-based version.
+- **Document the data.** Where did it come from, who labelled it, what was removed. Clients and auditors ask.
+
+## Practice
+
+Do a paper exercise, then a small real one.
+
+1. Pick a task from your own work. Write what "good" means and ten test examples with correct answers.
+2. Write the best prompt you can, with three examples, and score it on the ten.
+3. Write down how many cleaned examples you could realistically collect, and who would check them.
+4. Decide: fine-tune, improve the prompt, or use retrieval. Write three lines to justify it.
+
+For more depth, chapter 7 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers when to fine-tune and the costs involved.
+
+**You are done when you can** explain why test data must stay unseen, why you compare with the best prompt, and name one way fine-tuning can make a model worse.
