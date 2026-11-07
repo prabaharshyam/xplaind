@@ -219,6 +219,15 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     sheetIds.add(c.id);
     for (const l of c.lessons) if (!stopIds.has(l)) error(file, `lesson "${l}" does not exist`, "CS-1");
   }
+  // SO-1: a testimonial's short version is only the person's own words: every piece between
+  // the "…" marks must appear in the full quote.
+  const squash = (t: string) => t.replace(/\s+/g, " ").trim();
+  for (const { file, data: t } of bundle.testimonials) {
+    if (!t.excerpt) continue;
+    for (const piece of t.excerpt.split("…").map(squash).filter(Boolean)) {
+      if (!squash(t.quote).includes(piece)) error(file, `testimonial "${t.name}": the excerpt "${piece.slice(0, 40)}…" is not word for word in the quote`, "SO-1");
+    }
+  }
   for (const { file, data: g } of bundle.glossary) {
     for (const r of g.related) {
       if (r === g.id) error(file, "a term cannot be related to itself");

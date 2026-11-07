@@ -627,7 +627,14 @@ export const Cheatsheet = z.strictObject({
   /** Lessons that teach what the sheet sums up. */
   lessons: z.array(Slug).default([]),
   sections: z
-    .array(z.strictObject({ title: Text.max(60), items: z.array(CheatItem).min(2).max(10) }))
+    .array(
+      z.strictObject({
+        title: Text.max(60),
+        /** "steps" draws the items as a numbered timeline, for a sequence; "tiles" (the default) as a grid. */
+        layout: z.enum(["tiles", "steps"]).default("tiles"),
+        items: z.array(CheatItem).min(2).max(10),
+      }),
+    )
     .min(2)
     .max(8),
   reviewed_by: Text,
@@ -639,7 +646,9 @@ export type Cheatsheet = z.infer<typeof Cheatsheet>;
 
 /** SO-1: real words from real users, shared with their permission. Never invented. */
 export const TestimonialsFile = z.strictObject({
-  testimonials: z.array(z.strictObject({ name: Text.max(60), role: Text.max(60), quote: Text.max(600) })).max(30),
+  testimonials: z
+    .array(z.strictObject({ name: Text.max(60), role: Text.max(60), quote: Text.max(600), excerpt: Text.max(300).optional() }))
+    .max(30),
 });
 export type Testimonial = z.infer<typeof TestimonialsFile>["testimonials"][number];
 

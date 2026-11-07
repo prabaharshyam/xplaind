@@ -8,6 +8,14 @@ const run = (bundle: Bundle, launch = false) => validateBundle(bundle, { today: 
 const errorsOf = (bundle: Bundle, launch = false) => run(bundle, launch).filter((i) => i.severity === "error");
 const entry = <T>(file: string, data: T) => ({ file, data });
 
+describe("testimonial excerpts (SO-1)", () => {
+  it("accept a short version made of the person's own words with an ellipsis", () => {
+    const b = validBundle();
+    b.testimonials = [entry("testimonials/testimonials.yaml", { name: "A", role: "B", quote: "I love this platform. It helps a lot.", excerpt: "I love this platform … It helps a lot." })];
+    expect(errorsOf(b)).toEqual([]);
+  });
+});
+
 describe("a valid bundle", () => {
   it("has no errors in development mode", () => {
     expect(errorsOf(validBundle())).toEqual([]);
@@ -26,6 +34,7 @@ describe("broken bundles fail", () => {
     ["a path lists a lesson that does not exist", (b) => b.goals[0].data.stages[0].lessons.push("ghost"), /lesson "ghost" does not exist/],
     ["a path lists a lesson twice", (b) => b.goals[0].data.stages[1].lessons.push("stop-one"), /listed twice/],
     ["a level-laid path lists a lesson at the wrong level (RM-1)", (b) => (b.goals[0].data.stages = b.goals[0].data.stages.map((st) => ({ ...st, lessons: st.id === "B2" ? ["stop-one"] : [] }))), /B1 lesson, listed at B2/],
+    ["a testimonial excerpt is not word for word (SO-1)", (b) => (b.testimonials = [entry("testimonials/testimonials.yaml", { name: "A", role: "B", quote: "I love this platform. It helps a lot.", excerpt: "I really love this platform … It helps a lot." })]), /not word for word/],
     ["a stop's more list repeats its primary resource", (b) => (b.stops[0].data.more = ["res-one"]), /must all be different/],
     ["a certification's prep resource does not exist", (b) => (b.certifications[0].data.prep = ["nope"]), /prep resource "nope" does not exist/],
     ["a certification names a path that does not exist", (b) => (b.certifications[0].data.paths = ["nope"]), /path "nope" does not exist/],
