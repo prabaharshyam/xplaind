@@ -1,0 +1,221 @@
+---
+id: how-models-pick-words
+level: I1
+theme: llm
+title: "How a model picks its next word: temperature, top-p and top-k"
+outcome: "Explain how a language model chooses each next token, predict what temperature, top-p and top-k do, and set them sensibly for a task."
+answer: "A model scores every possible next word, turns the scores into chances and picks one. Temperature, top-p and top-k change how adventurous that pick is, so the same prompt can give different answers."
+why_it_matters: "These settings are the main dial you control on every LLM call. Setting them wrongly gives rambling facts or robotic copy, and interviewers often ask why the same prompt gives different answers."
+hours: 2
+gap_tags: []
+primary_resource: huyenchip-sampling
+alternates: [hf-generation-strategies]
+videos: [yt-bhavesh-bhatt-llm-basics-top-p-vs-top-k-sampling-explained]
+more: [hf-llm-course]
+format: deep
+key_terms: [sampling, temperature, top-p, top-k, logits]
+check:
+  type: mcq
+  question_ids: [how-models-pick-words-1, how-models-pick-words-2, how-models-pick-words-3]
+flashcards:
+  - q: "How does a language model produce a sentence?"
+    a: "One token at a time. At each step it scores every possible next token, one is picked, and the pick is added to the text before the next step."
+  - q: "What are logits?"
+    a: "The raw scores the model gives each possible next token. Higher means more likely. They are turned into chances with softmax."
+  - q: "What does temperature do?"
+    a: "It divides the logits before they become chances. Low makes the top choice dominate and answers steady. High flattens the chances and answers vary more."
+  - q: "What does temperature 0 mean in practice?"
+    a: "Always take the top-scoring token (greedy). It is the steadiest setting, but not a promise of identical outputs or of correct ones."
+  - q: "How is top-k different from top-p?"
+    a: "Top-k keeps a fixed number of options. Top-p keeps however many options it takes to reach a total chance of p, so the group shrinks when the model is sure."
+  - q: "Should you change temperature and top-p together?"
+    a: "Usually not. They both reshape the same choice, so changing both makes results hard to predict. Several providers advise adjusting one."
+  - q: "Does a low temperature stop hallucinations?"
+    a: "No. A model can confidently pick a wrong answer every time. Fix facts with retrieval, citations and checks, not with temperature."
+  - q: "Name one job for low temperature and one for high."
+    a: "Low: extraction, classification, answers from documents, code. High: brainstorming names, slogans, story ideas."
+exercise:
+  title: "Set the dials for three features"
+  setup: "A Bengaluru fintech is adding three LLM features: (1) pull the amount, date and merchant from a bank SMS into JSON, (2) answer customer questions using only the help-centre articles, (3) suggest ten playful names for a new savings account. A developer plans to use temperature 1.0 everywhere because it is the default."
+  questions:
+    - q: "Which settings suit feature 1, and why?"
+      a: "Temperature near 0 and the default top-p. Extraction has one right answer, so you want steady output. Pair it with structured output so the JSON is always valid."
+    - q: "Feature 2 sometimes invents a refund rule. Will lowering temperature fix it?"
+      a: "Not on its own. The model may be confidently wrong at any temperature. Ground answers in retrieved articles, require citations and add a check."
+    - q: "What would you use for feature 3?"
+      a: "A higher temperature, around 0.8 to 1.0, because variety is the goal. Generate more names than you need, then let a person choose."
+    - q: "A tester says feature 1 gave two different outputs at temperature 0. Is that a bug?"
+      a: "Not necessarily. Outputs at temperature 0 can still differ slightly between runs. Log the settings and test several runs, and do not assume exact repeatability."
+ask:
+  - "What is the difference between top-p and top-k?"
+  - "Why does the same prompt give different answers?"
+  - "What temperature should I use for a RAG chatbot?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-07
+---
+
+## What it is
+
+A language model does not write a whole answer in one go. It writes one **token** at a time (a token is a word or a piece of a word). To choose each one, it gives every token it knows a score, the application turns the scores into chances, and one token is picked. The pick is added to the text, and the whole thing repeats for the next token until the answer ends.
+
+That picking step is called **sampling**. You do not need to change the model to change it. A few settings on the API call decide how adventurous the pick is: **temperature**, **top-p** and **top-k**. These are the settings you will touch on almost every LLM call you make.
+
+This is also why the same prompt can give two different answers. The model is not looking up one stored reply. At each step it has several reasonable next tokens, and sampling picks among them.
+
+```flow
+dir: LR
+title: One step of writing a reply
+Prompt and text so far -> Model scores every token | the logits
+Model scores every token -> Temperature reshapes the scores
+Temperature reshapes the scores -> Chances add up to 100 percent | softmax
+Chances add up to 100 percent -> Top-k and top-p drop unlikely tokens
+Top-k and top-p drop unlikely tokens -> Pick one at random by chance
+Pick one at random by chance -> Add it to the text
+Add it to the text -> Prompt and text so far
+```
+
+This lesson follows a Bengaluru fintech team that is adding three LLM features and has to choose settings for each.
+
+## How it works
+
+1. **The model scores every possible next token.** These raw scores are called **logits**. A bigger number means the model thinks that token fits better here. A vocabulary has tens of thousands of tokens, so there are tens of thousands of scores at every step.
+2. **Softmax turns the scores into chances.** Every score becomes a number between 0 and 1, and all the numbers add up to 1. The token with the highest score gets the highest chance, but not all of it.
+3. **Temperature reshapes the scores first.** Before softmax, each logit is divided by the temperature. A **low** temperature (say 0.2) widens the gaps, so the top token takes almost all the chance. A **high** temperature (say 1.5) shrinks the gaps, so rare tokens get a real chance. At exactly 1 nothing changes. At 0 the model always takes the top token, which is called **greedy** decoding.
+4. **Top-k and top-p cut the list.** **Top-k** keeps only the k best tokens, for example 40. **Top-p** (also called nucleus sampling) keeps the smallest group of tokens whose chances add up to p, for example 0.9. The chances of the survivors are scaled up to add to 1 again.
+5. **One token is picked at random, weighted by its chance.** A token with 60% is picked about six times in ten. Then the loop starts again.
+6. **It stops** when the model writes an end token, hits the maximum length, or produces a **stop sequence** you chose.
+
+**What each setting does:**
+
+| Setting | What it controls | Lower value | Higher value |
+| --- | --- | --- | --- |
+| Temperature | How flat the chances are | Steadier, repeats the safest wording | More varied, more surprising, more risk of nonsense |
+| Top-p | How much of the likely mass to keep | Fewer options, safer | More options, more variety |
+| Top-k | How many tokens to keep | Fewer options, safer | More options, more variety |
+| Max tokens | The longest reply allowed | Cheaper, may cut off | Longer, costs more |
+| Stop sequences | Text that ends the reply | None needed | Stops runaway output and saves cost |
+
+Top-k and top-p behave differently when the model is very sure. If one token has 95% of the chance, top-p 0.9 may keep only that one token, while top-k 40 still keeps 40. That is why top-p adapts to how sure the model is and top-k does not.
+
+Defaults vary by provider and model, and some newer models fix or ignore some of these settings. Check the provider's documentation for the model you use.
+
+## A worked example
+
+Take the prompt "My favourite Indian city to visit is" and suppose the model gives these scores to five next tokens. The numbers are made up to keep the maths easy to follow.
+
+| Token | Score (logit) |
+| --- | --- |
+| Mumbai | 3.0 |
+| Delhi | 2.5 |
+| Chennai | 1.5 |
+| Jaipur | 0.5 |
+| Pune | -0.5 |
+
+Here are the chances at four temperatures:
+
+| Temperature | Mumbai | Delhi | Chennai | Jaipur | Pune |
+| --- | --- | --- | --- | --- | --- |
+| 0.2 | 92.4% | 7.6% | 0.1% | 0.0% | 0.0% |
+| 0.5 | 70.2% | 25.8% | 3.5% | 0.5% | 0.1% |
+| 1.0 | 51.5% | 31.2% | 11.5% | 4.2% | 1.6% |
+| 2.0 | 36.9% | 28.7% | 17.4% | 10.6% | 6.4% |
+
+At 0.2 the model says "Mumbai" almost every time. At 2.0 it names Pune about once in sixteen tries.
+
+Now cut the list at temperature 1.0. Adding the chances from the top: Mumbai 51.5%, then Delhi 82.7%, then Chennai 94.2%. With **top-p 0.9**, the smallest group reaching 90% is those three. With **top-k 3**, the group is also those three. Their chances are scaled up to add to 100%: Mumbai 54.7%, Delhi 33.1%, Chennai 12.2%. Jaipur and Pune can no longer be picked.
+
+You can check the maths in a few lines of Python:
+
+```python
+import numpy as np
+
+tokens = ["Mumbai", "Delhi", "Chennai", "Jaipur", "Pune"]
+logits = np.array([3.0, 2.5, 1.5, 0.5, -0.5])
+
+def chances(logits, temperature=1.0):
+    scaled = logits / temperature
+    e = np.exp(scaled - scaled.max())      # subtract the max for numeric safety
+    return e / e.sum()
+
+for t in (0.2, 0.5, 1.0, 2.0):
+    print(t, np.round(chances(logits, t) * 100, 1))
+
+def top_p(probs, p=0.9):
+    order = np.argsort(-probs)
+    keep, total = [], 0.0
+    for i in order:
+        keep.append(i)
+        total += probs[i]
+        if total >= p:
+            break
+    out = np.zeros_like(probs)
+    out[keep] = probs[keep]
+    return out / out.sum()
+
+print(np.round(top_p(chances(logits)) * 100, 1))   # [54.7 33.1 12.2  0.   0. ]
+rng = np.random.default_rng(0)
+print(tokens[rng.choice(5, p=top_p(chances(logits)))])
+```
+
+In a real call you set the same dials by name. The exact names depend on the provider, but they look like this:
+
+```python
+reply = client.messages.create(
+    model=MODEL_NAME,            # whichever model you use
+    max_tokens=200,
+    temperature=0.2,             # steady
+    messages=[{"role": "user", "content": "Pull the amount and merchant from this SMS: ..."}],
+)
+```
+
+**What the team chose.** For the SMS extractor they used temperature 0 plus structured output, so the JSON was always valid and the fields did not wander. For the help-centre answers they used a low temperature of 0.2 and retrieval with citations. For the account names they used 0.9, generated twenty names and let the product manager choose.
+
+## Starting points for common jobs
+
+These are starting points, not rules. Test them on your own examples.
+
+| Job | Temperature to try | Why |
+| --- | --- | --- |
+| Extraction, classification, routing | 0 to 0.2 | One right answer, so steady is best |
+| Answers from documents (RAG) | 0 to 0.3 | Stay close to the sources |
+| Writing or fixing code | 0 to 0.3 | Small changes can break code |
+| Summaries and emails | 0.3 to 0.7 | Some natural wording, little drift |
+| Brainstorming, names, slogans | 0.7 to 1.0 | You want variety |
+
+## When these settings are the wrong lever
+
+- **To stop hallucinations.** A low temperature makes the model pick its top choice every time, but the top choice can be wrong. Give the model the facts (retrieval), ask for sources, and check the answer. See the lesson on grounding and citations.
+- **To get valid JSON.** Do not hope a low temperature produces clean JSON. Use structured output, which restricts the model to your format. See the lesson on structured output.
+- **To make results exactly repeatable.** Even at temperature 0, outputs can differ slightly between runs because of how servers batch requests and do arithmetic. If you need an audit trail, log the input, settings and output.
+- **To fix an unclear prompt.** If the answers vary because the instruction is vague, tightening the prompt helps more than any setting.
+
+## From the playground to production
+
+- **Keep the settings in one place.** Store temperature and the other settings in config for each task, not scattered through the code, and log them with every call so you can reproduce a bad answer.
+- **Test more than once.** Run each test question three to five times. If the scores swing a lot between runs, the feature is not steady enough, whatever one run shows.
+- **Sampling several answers is a tool, not a default.** You can generate several answers and pick the one most of them agree on, or the one a judge prefers. This often improves hard reasoning questions, but costs several times as much and adds delay. Use it where the stakes justify it.
+- **Cap the cost.** Set max tokens, and add a stop sequence if the reply has a clear end, so one odd reply cannot run on and cost you money.
+- **Retrying only helps if there is randomness.** At temperature 0, running the same call again usually gives you the same wrong answer.
+
+## Common mistakes
+
+- **Using the default temperature everywhere.** Extraction and brainstorming need very different settings.
+- **Changing temperature and top-p together.** Both reshape the same choice. Change one, test, then decide whether to touch the other.
+- **Believing temperature 0 means correct.** It means steady, and a steady wrong answer is still wrong.
+- **Setting a high temperature to get "more creative" answers for factual tasks.** You get more variety and also more mistakes.
+- **Judging a setting from one run.** One lucky or unlucky sample tells you little. Run it several times.
+- **Forgetting a stop sequence or max tokens.** A reply that never ends costs money.
+
+## Practice
+
+Open the playground or API you use and run this experiment.
+
+1. Pick one factual question and one creative request, such as "Suggest five names for a chai stall".
+2. Run each five times at temperature 0, 0.7 and 1.2. Write down how many different answers you got.
+3. Add a top-p of 0.5 at temperature 1.0 and compare.
+4. Write two lines on which setting you would use for each task and why.
+
+For a deeper read on this topic, chapter 2 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers sampling and test-time compute.
+
+**You are done when you can** explain to a friend why the same prompt gives different answers, and say which setting you would change first for an extraction task and for a naming task.
