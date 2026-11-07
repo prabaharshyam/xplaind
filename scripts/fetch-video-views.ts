@@ -1,4 +1,5 @@
-// npm run videos:views
+// npm run videos:views            reads every video
+// npm run videos:views -- --missing  reads only videos with no count yet
 // VD-1: reads each video's public view count from its YouTube page and writes
 // content/video-views.yaml with today's date. Run it whenever you want fresh numbers.
 // A video that cannot be read keeps its last count. Nothing here is used for ranking
@@ -22,7 +23,8 @@ for (const r of bundle.resources) {
 for (const c of bundle.channels) for (const v of c.data.videos) ids.add(v.youtube_id);
 
 const old: Record<string, number> = fs.existsSync(file) ? (parse(fs.readFileSync(file, "utf8")).views ?? {}) : {};
-const views: Record<string, number> = {};
+// Videos we skip this time keep the count they already have.
+const views: Record<string, number> = process.argv.includes("--missing") ? Object.fromEntries(Object.entries(old).filter(([id]) => ids.has(id))) : {};
 
 async function read(id: string): Promise<number | null> {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -43,7 +45,8 @@ async function read(id: string): Promise<number | null> {
 }
 
 async function main() {
-  const queue = [...ids];
+  const onlyMissing = process.argv.includes("--missing");
+  const queue = [...ids].filter((id) => !onlyMissing || old[id] === undefined);
   let failed = 0;
   let done = 0;
   async function worker() {
@@ -55,10 +58,10 @@ async function main() {
       } else views[id] = n;
     done++;
     if (done % 50 === 0) console.log(`${done} of ${ids.size}`);
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 600));
     }
   }
-  await Promise.all(Array.from({ length: 5 }, worker));
+  await Promise.all(Array.from({ length: 3 }, worker));
 
   const sorted = Object.fromEntries(Object.entries(views).sort(([a], [b]) => a.localeCompare(b)));
   const header = "# VD-1: public YouTube view counts, written by `npm run videos:views`. Do not edit by hand.\n";
