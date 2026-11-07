@@ -6,6 +6,8 @@ const overflow = (page: import("@playwright/test").Page) =>
   page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
 
 test("cheatsheets are listed from Practice and each one quizzes, filters and downloads (CS-1, CS-2)", async ({ page }) => {
+  // Sections fade in as they scroll into view; scan the finished page, as reduced-motion users see it.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/practice");
   await page.getByRole("link", { name: "Cheatsheets" }).first().click();
   await expect(page.getByRole("heading", { level: 1, name: "Cheatsheets" })).toBeVisible();

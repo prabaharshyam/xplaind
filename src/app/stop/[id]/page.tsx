@@ -28,7 +28,7 @@ import type { CheckQuestionView } from "./stop-progress";
 import { StopProgressPanel } from "./stop-progress";
 import { LessonTutor } from "./lesson-tutor";
 import { LessonExercise } from "./lesson-exercise";
-import { CourseOutline } from "./course-outline";
+import { PathLessons } from "./path-lessons";
 import { Flashcards } from "@/components/flashcards";
 import { TopicStatus } from "@/components/roadmap/topic-status";
 import { aiEnabled } from "@/lib/ai/settings";
@@ -148,18 +148,6 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
     { id: "tutor", title: "Ask the AI tutor", icon: "sparkles" },
   ];
   const home = paths[0];
-  const outline = home
-    ? {
-        name: home.name,
-        stages: home.stages
-          .filter((st) => st.lessons.length > 0)
-          .map((st) => ({
-            id: st.id,
-            title: st.title ?? (getLevel(st.id as never) ? `${st.id} · ${getLevel(st.id as never)!.name}` : st.id),
-            lessons: st.lessons.map((id) => ({ id, title: getStop(id)?.title ?? id })),
-          })),
-      }
-    : null;
   const order = home ? pathLessons(home.id) : [];
   const at = order.findIndex((l) => l.id === stop.id);
   const prev = at > 0 ? order[at - 1] : null;
@@ -215,24 +203,12 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
         </div>
       </header>
 
-      {/* RM-15: the course outline on the left, the lesson in the middle, videos and "On this page" on the right. */}
-      <div className={`mx-auto grid max-w-7xl gap-8 px-4 pb-16 md:px-6 ${outline ? "lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_260px]" : "xl:grid-cols-[minmax(0,1fr)_260px]"}`}>
-        {outline && (
-          <aside className="hidden lg:block lg:pt-10">
-            <div className="sticky top-20">
-              <CourseOutline pathName={outline.name} stages={outline.stages} current={stop.id} variant="side" />
-            </div>
-          </aside>
-        )}
-        <div className="min-w-0 lg:hidden xl:order-3 xl:block">
-          <LessonNav sections={navSections} top={<LearnPanel stopId={stop.id} items={learn} headingId="learn-side" />} />
+      {/* RM-15: "On this page" on the left, the lesson in the middle, videos and the path's lessons on the right. */}
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-16 md:px-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_260px]">
+        <div className="min-w-0">
+          <LessonNav sections={navSections} />
         </div>
-        <div className="min-w-0 pt-6 xl:order-2 xl:pt-10 lg:pt-10">
-          {outline && (
-            <div className="mb-6 lg:hidden">
-              <CourseOutline pathName={outline.name} stages={outline.stages} current={stop.id} variant="inline" />
-            </div>
-          )}
+        <div className="min-w-0 pt-6 lg:pt-10 xl:order-2">
           {/* RM-7: on a big screen the Learning / Done / Skip buttons sit at the top; phones get the bar at the bottom. */}
           <div className="mb-6 hidden flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3 lg:flex dark:border-zinc-800 dark:bg-zinc-900">
             <span className="text-sm font-medium">Track this topic</span>
@@ -408,6 +384,12 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </section>
           )}
 
+          {home && (
+            <div className="xl:hidden">
+              <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />
+            </div>
+          )}
+
           {(prev || next) && home && (
             <nav aria-label={`Lessons on the ${home.name} path`} className="mt-12 grid gap-3 sm:grid-cols-2">
               {prev ? (
@@ -465,6 +447,12 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </p>
           </section>
         </div>
+        <aside className="hidden min-w-0 xl:order-3 xl:block xl:pt-10">
+          <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col gap-4 overflow-y-auto pb-4">
+            <LearnPanel stopId={stop.id} items={learn} headingId="learn-side" />
+            {home && <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />}
+          </div>
+        </aside>
       </div>
 
       {/* RM-7: phones keep Learning / Done / Skip one tap away in a slim bar at the bottom. */}

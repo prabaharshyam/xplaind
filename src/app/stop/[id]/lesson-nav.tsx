@@ -1,16 +1,17 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/art/icons";
 import type { IconName } from "@/lib/themes";
 
 export type SectionLink = { id: string; title: string; icon: IconName };
 
 /**
- * "On this page", with a tick for each section the learner has scrolled through
- * and a reading bar. Desktop: a sticky side panel. Phone: a slim bar under the header.
+ * RM-15: "On this page", sticky in the LEFT column on big screens (owner request, 7 Nov 2026), so a
+ * learner jumps straight to a section instead of scrolling. Each section the learner has scrolled
+ * through gets a tick. Phone: a slim reading bar under the header.
  */
-export function LessonNav({ sections, top, children }: { sections: SectionLink[]; top?: ReactNode; children?: ReactNode }) {
+export function LessonNav({ sections }: { sections: SectionLink[] }) {
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [current, setCurrent] = useState<string | null>(null);
 
@@ -34,13 +35,12 @@ export function LessonNav({ sections, top, children }: { sections: SectionLink[]
 
   return (
     <>
-      <div className="sticky top-14 z-30 -mx-4 h-1 bg-zinc-200 xl:hidden dark:bg-zinc-800" aria-hidden="true">
+      <div className="sticky top-14 z-30 -mx-4 h-1 bg-zinc-200 lg:hidden dark:bg-zinc-800" aria-hidden="true">
         <div className="h-full bg-emerald-600 transition-[width] duration-500" style={{ width: `${percent}%` }} />
       </div>
-      <div className="hidden xl:block xl:h-full xl:pt-10">
+      <div className="hidden lg:block lg:h-full lg:pt-10">
         <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col gap-4 overflow-y-auto pb-4">
-          {top}
-          <nav aria-label="On this page" className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
+          <nav aria-label="On this page" className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <p className="text-sm font-semibold">On this page</p>
             <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
               {seen.size} of {sections.length} sections read
@@ -68,7 +68,6 @@ export function LessonNav({ sections, top, children }: { sections: SectionLink[]
               ))}
             </ol>
           </nav>
-          {children}
         </div>
       </div>
     </>
