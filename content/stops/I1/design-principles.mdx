@@ -1,0 +1,136 @@
+---
+id: design-principles
+level: I1
+theme: software-engineering
+title: "Design principles: modules, SOLID and dependency injection"
+outcome: "Split code into modules with one job each, keep parts loosely coupled, apply the SOLID principles in plain terms, and pass dependencies in so code is easy to test and change."
+answer: "Good design splits code into parts that each do one job and depend on each other as little as possible, so you can change, test or replace one part without touching the rest."
+why_it_matters: "AI systems change constantly: new models, new vector stores, new tools. Code designed in loosely coupled parts lets you swap one in an afternoon. Design questions also come up in take-homes and in low-level design interviews."
+hours: 2
+gap_tags: []
+primary_resource: yt-arjancodes-solid-principles-in-python
+alternates: []
+videos: []
+format: deep
+key_terms: [solid-principles, dependency-injection, refactoring]
+check:
+  type: project
+  brief: "Take a small app that calls one model provider directly, for example a summariser. Refactor it so the model client is passed in behind a small interface, add a second implementation (another provider or a fake), and write tests that use the fake. Share the repository and three sentences on what is now easier to change."
+flashcards:
+  - q: "What is coupling?"
+    a: "How much one part of the code depends on the details of another. Loose coupling means you can change one part without changing the others."
+  - q: "What is cohesion?"
+    a: "How closely the things inside one module belong together. High cohesion means a module does one job and everything in it serves that job."
+  - q: "Single responsibility principle, in one line?"
+    a: "A module or class should have one reason to change. Reading files and calculating tax are two reasons, so two modules."
+  - q: "Dependency inversion, in one line?"
+    a: "High-level logic should depend on a small interface, such as \"a model client\", not on a specific provider's library."
+  - q: "What is dependency injection?"
+    a: "Passing a part a function needs, such as a client or database, in from outside instead of creating it inside, so it can be swapped or faked."
+  - q: "What is the risk of overusing design principles?"
+    a: "Too many layers and interfaces for a small problem. Add abstraction when you have a real second case or need to test, not before."
+exercise:
+  title: "Where would you split it?"
+  setup: "A single file summarise.py reads a PDF, calls OpenAI directly inside the summarise() function, formats the result as Markdown and emails it."
+  questions:
+    - q: "How many reasons to change does this file have?"
+      a: "At least four: PDF reading, the model provider, the output format and the delivery channel. Each could be its own module."
+    - q: "How would you make it easy to switch to another model provider?"
+      a: "Define a small interface, such as complete(prompt) -> str, write one class per provider, and pass the chosen one into summarise()."
+    - q: "How would you test summarise() without a real API call?"
+      a: "Pass in a fake client that returns a fixed summary, and check the formatted output."
+ask:
+  - "Do I need classes, or are functions enough?"
+  - "What is the difference between low-level and system design interviews?"
+  - "When is an abstraction too much?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-07
+---
+
+## What it is
+
+**Software design** is deciding how to split a program into parts and how those parts talk to each other. Two ideas sit underneath most good designs:
+
+- **Cohesion**: each part does one job, and everything inside it belongs to that job.
+- **Coupling**: how much parts depend on each other's details. Loose coupling means you can change one part without touching the others.
+
+Good design is high cohesion and loose coupling. A badly designed program is one where changing the email template somehow requires editing the code that calls the model.
+
+The **SOLID principles** are five well-known guidelines for getting there. They come from object-oriented programming, but the ideas apply to plain Python functions and modules too. You do not need to recite them; you need to recognise the problems they prevent.
+
+## How it works
+
+The five principles, in plain words:
+
+| Principle | In plain words | A sign you are breaking it |
+| --- | --- | --- |
+| **S**ingle responsibility | One module or class, one reason to change | A file that reads data, calls a model and sends email |
+| **O**pen for extension | Add new behaviour by adding code, not editing working code | Every new provider means another `elif` in a long chain |
+| **L**iskov substitution | Any implementation of an interface works wherever the interface is expected | A "provider" that raises "not supported" on half its methods |
+| **I**nterface segregation | Small, focused interfaces | One giant `Storage` class that every part depends on |
+| **D**ependency inversion | Depend on an interface, not a specific library | `openai.chat...` called deep inside business logic |
+
+**Dependency injection** is the practical tool behind most of these. Instead of a function creating what it needs, it receives it:
+
+```python
+from typing import Protocol
+
+class ModelClient(Protocol):
+    def complete(self, prompt: str) -> str: ...
+
+def summarise(text: str, client: ModelClient) -> str:
+    return client.complete(f"Summarise in 3 bullet points:\n{text}")
+```
+
+Now `summarise` does not care which provider it uses. Production passes a real client; tests pass a fake; switching providers means writing one new class, not editing `summarise`.
+
+```flow
+title: Business logic depends on a small interface, not on a provider
+summarise() -> ModelClient interface | complete(prompt) -> str
+ModelClient interface -> Provider A client
+ModelClient interface -> Provider B client
+ModelClient interface -> Fake client for tests
+```
+
+A common way to organise an AI application uses the same idea across the whole codebase:
+
+- **Core logic** (what the product does: classify a ticket, build a prompt, score an answer) depends on nothing external.
+- **Adapters** (the model client, the vector store, the database, email) implement small interfaces.
+- **Wiring** at the edge (the API startup, the CLI) creates the real adapters and passes them in.
+
+**Functions or classes?** You do not need classes everywhere. Plain functions with clear inputs and outputs are often the cleanest design in Python. Reach for a class when something holds state or settings that several functions share, such as a client with an API key and a timeout, or when you want several interchangeable implementations of the same interface.
+
+**In interviews.** Low-level design rounds ask you to design the classes and interfaces for something small, such as a rate limiter or a parking lot. System design rounds ask how services fit together. The same idea runs through both: name the parts, give each one job, and show how you would change or test one without touching the rest.
+
+## A worked example
+
+Rohit's team at a legal-tech startup in Delhi built a contract summariser in a week. Everything lived in one 300-line file: it read the PDF, called one model provider directly, formatted Markdown and emailed the result.
+
+Two months later, three requests arrive at once: a client wants their data processed by a model hosted in their own cloud, the sales team wants summaries as Word documents, and tests take minutes because every one makes real API calls.
+
+Rohit refactors in steps, with tests around today's behaviour first:
+
+1. **Single responsibility.** He splits the file into `reader.py` (PDF to text), `summariser.py` (prompt and parsing), `formatters.py` (Markdown, and now Word) and `delivery.py` (email).
+2. **An interface for the model.** `summariser.py` now takes a `ModelClient`. He writes `ProviderAClient` and `SelfHostedClient`, each a small class with `complete()`.
+3. **Injection at the edge.** The API startup reads the customer's settings and passes in the right client and formatter.
+4. **Fast tests.** Unit tests pass a `FakeClient` that returns a fixed summary. The test suite drops from four minutes to three seconds.
+
+The self-hosted client is a new class with its own tests; `summarise()` did not change at all. Word output is a new formatter; nothing else changed. Each request took a day instead of a rewrite.
+
+He also resists going further: he does not add interfaces for the PDF reader, because there is only one reader and no plan for another. Abstraction is added when there is a real second case or a testing need.
+
+## Common mistakes
+
+- **Calling external services deep inside logic.** It makes code impossible to test without the network and hard to switch providers.
+- **Too much abstraction too early.** Interfaces, factories and layers for a 100-line script make it harder to read, not easier.
+- **Giant "utils" or "manager" modules.** If a module's name does not say what it does, it probably does several things.
+- **Changing an interface to suit one implementation.** Then every other implementation and caller has to change too.
+- **Treating SOLID as rules to recite.** Interviewers care whether you can spot the problem in real code and fix it.
+
+## Practice
+
+1. Take any script that calls an API directly and pass the client in instead. Write one test with a fake.
+2. List the reasons to change for your largest file. If there are more than two, sketch how you would split it.
+3. Add a second implementation behind an interface you created, without editing the code that uses it.
+4. Practise explaining, in two minutes, how you would structure an AI app so the model provider can be swapped.

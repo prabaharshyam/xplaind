@@ -1,0 +1,132 @@
+---
+id: debugging-systematically
+level: B3
+theme: software-engineering
+title: "Debugging systematically"
+outcome: "Find the cause of a bug step by step: reproduce it, read the traceback, narrow it down, inspect state with a debugger, fix it and prove the fix with a test."
+answer: "Debugging is finding why code misbehaves. Reproduce the bug, read the error, narrow down where it starts, inspect the values there, fix the cause and add a test."
+why_it_matters: "Most of a developer's time goes into understanding why something does not work. A method beats guessing, and interviewers often ask you to talk through how you would track down a bug."
+hours: 1
+gap_tags: []
+primary_resource: yt-neuralnine-debugging-python-code
+alternates: []
+videos: [yt-patrick-loeber-python-debugger-and-breakpoint]
+format: deep
+key_terms: [debugger, breakpoint, unit-test]
+check:
+  type: project
+  brief: "Take a small script with a bug (or plant one in your own code). Write a short debugging log: how you reproduced it, what the traceback said, how you narrowed it down, what you saw at a breakpoint, the fix, and the test you added. Share the repository and the log."
+flashcards:
+  - q: "What is the first step in debugging?"
+    a: "Reproduce the bug reliably, with the smallest input that triggers it. If you cannot make it happen on demand, you cannot know you fixed it."
+  - q: "How do you read a Python traceback?"
+    a: "From the bottom up. The last line names the error and message; the lines above show the call path, with your own code's line usually near the bottom."
+  - q: "What does breakpoint() do in Python?"
+    a: "It pauses the program at that line and opens the debugger, where you can print variables, step to the next line and continue."
+  - q: "What are the main pdb commands?"
+    a: "p name prints a value, n runs the next line, s steps into a function, c continues, q quits."
+  - q: "What is binary search debugging?"
+    a: "Halving the search space: check the middle of the steps, or the middle commit with git bisect, to see which half holds the bug, and repeat."
+  - q: "Why add a test after fixing a bug?"
+    a: "So the same bug cannot quietly come back later. The test fails if anyone reintroduces it."
+exercise:
+  title: "Read the clue"
+  setup: "A script that totals orders crashes with: TypeError: unsupported operand type(s) for +: 'int' and 'str', on the line total = total + row['amount']."
+  questions:
+    - q: "What does the error tell you?"
+      a: "total is a number but row['amount'] is a string. Some rows store the amount as text, probably straight from a CSV."
+    - q: "How would you confirm which row?"
+      a: "Put breakpoint() before that line, or print repr(row) when the type is not a number, and run it on the same file."
+    - q: "What is a good fix, and what test would you add?"
+      a: "Convert with Decimal(row['amount']) and handle bad values clearly. Add a test with an amount given as text and one with an invalid value."
+ask:
+  - "How do I debug code that only fails in production?"
+  - "What is git bisect and when should I use it?"
+  - "How do I debug an LLM app that gives wrong answers?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-07
+---
+
+## What it is
+
+**Debugging** is finding out why a program does something other than what you expect, and fixing the cause. The bug might crash the program, give a wrong number, or work on your laptop and fail on the server.
+
+Beginners often debug by guessing: change a line, run again, change another. That works for small bugs and wastes hours on real ones. Experienced engineers use a method. It is not faster on easy bugs, but it always finishes, and it is what interviewers want to hear when they ask how you would track something down.
+
+## How it works
+
+```flow
+title: The debugging loop
+Reproduce it | smallest input that fails, every time -> Read the error | traceback from the bottom up
+Read the error -> Form a guess | what must be true for this to happen?
+Form a guess -> Narrow it down | print, breakpoint, halve the search
+Narrow it down -[guess wrong]-> Form a guess
+Narrow it down -[cause found]-> Fix the cause, not the symptom
+Fix the cause, not the symptom -> Add a test that fails without the fix
+```
+
+**Reproduce.** Find the smallest input that triggers the bug every time. "It sometimes fails" becomes "it fails when the CSV has an empty amount". A reliable reproduction is half the work.
+
+**Read the error.** A Python traceback reads from the bottom up:
+
+```text
+Traceback (most recent call last):
+  File "report.py", line 31, in <module>
+    print(monthly_total(rows))
+  File "report.py", line 12, in monthly_total
+    total = total + row["amount"]
+TypeError: unsupported operand type(s) for +: 'int' and 'str'
+```
+
+The last line is the error: you tried to add a number and a string. The line above it is where it happened. The lines above that show how the program got there.
+
+**Narrow it down.** Ask what must be true for this error to happen, then check it. Three tools, from quick to thorough:
+
+| Tool | How | Good for |
+| --- | --- | --- |
+| `print(repr(x))` | Print values at key points | Quick checks; `repr` shows quotes and types |
+| `breakpoint()` | Pause and inspect in the debugger | Seeing all variables at the moment it goes wrong |
+| Editor debugger | Click to set breakpoints, step, watch values | Longer investigations |
+| Logging | `logging.debug(...)` with context | Bugs that only show on a server |
+| `git bisect` | Binary search through commits | "It worked last week" |
+
+**The debugger.** Put `breakpoint()` on a line and run the program. It pauses there, and you can type `p row` to print a variable, `n` to run the next line, `s` to step into a function, and `c` to continue. You see the real state at the moment it matters, instead of guessing.
+
+**Halve the search.** If a 200-line pipeline produces a wrong total, check the value halfway through. Right there? The bug is in the second half. Wrong? The first half. A handful of checks finds the line. `git bisect` does the same across commits: mark a good commit and a bad one, and Git walks you to the change that broke it.
+
+**Fix the cause.** Wrapping the failing line in `try/except` hides a symptom; the bad data is still there. Fix where the wrong value comes from.
+
+**Prove it.** Write a test that fails without your fix and passes with it.
+
+**Bugs in AI apps.** When an LLM feature gives a wrong answer, the same method applies, with a trace in place of a traceback. Open the trace for that request and check each step in order: was the question rewritten correctly, did retrieval find the right passage, did the prompt include it, and did the model use it? The first step that looks wrong is where to dig.
+
+## A worked example
+
+Imran's monthly sales report for a chain of pharmacies in Pune shows ₹0 for one store, while the dashboard shows ₹4.2 lakh.
+
+**Reproduce.** He runs the report for October on his laptop with the same export file. Same result: ₹0 for the Kothrud store. Reproducible.
+
+**Read.** There is no error at all, which is itself a clue: the code runs but skips or zeroes the data.
+
+**Guess and narrow.** What must be true for the total to be zero? Either no rows match the store, or every amount is zero. He puts `breakpoint()` inside the loop and prints `row["store"]` for the first few rows: `'Kothrud '`, with a trailing space. His filter compares against `'Kothrud'`. No rows match.
+
+**Fix the cause.** He could add the space to his filter, but the real problem is untidy data from the export. He strips whitespace from store names where the file is read, so every later step gets clean values.
+
+**Prove it.** He adds a test with a store name that has a trailing space and checks it is counted. He also adds a check that warns when a store in the master list has no rows, so a similar mismatch would be loud next time instead of silently showing ₹0.
+
+## Common mistakes
+
+- **Changing code before you can reproduce the bug.** You cannot know your fix worked.
+- **Reading the traceback from the top.** The error and the line that failed are at the bottom.
+- **Fixing the symptom.** A `try/except` that swallows the error makes the next bug harder to find.
+- **Changing several things at once.** If it starts working, you will not know which change mattered.
+- **Leaving debug prints and breakpoints in.** Search for `breakpoint(` and stray prints before you commit.
+- **Not adding a test.** Without one, the bug can return the next time someone touches that code.
+
+## Practice
+
+1. Plant a bug in a small script (a string amount, an off-by-one in a range) and find it with `breakpoint()`.
+2. Read three tracebacks from your own past errors and say, from the last line, what went wrong.
+3. In a practice repository, break something in one of ten commits and find it with `git bisect`.
+4. Explain your debugging method out loud in one minute, as you would in an interview.

@@ -1,0 +1,173 @@
+---
+id: writing-tests
+level: B3
+theme: software-engineering
+title: "Writing tests with pytest"
+outcome: "Write unit tests with pytest, use fixtures and parametrised tests, fake slow or external parts, and know what to test first."
+answer: "A test is code that runs your code with a known input and checks the output. pytest finds functions named test_ and reports which pass, so you can change code knowing you have not broken it."
+why_it_matters: "Tests let you change code without fear, catch bugs before users do, and show reviewers that your change works. Interviewers ask how you test, and AI teams test both their code and their prompts."
+hours: 2
+gap_tags: []
+primary_resource: yt-tech-with-tim-pytest-tutorial
+alternates: [yt-freecodecamp-org-pytest-tutorial-how-to-test-python-code]
+videos: []
+format: deep
+key_terms: [unit-test, pytest, test-fixture, mocking]
+check:
+  type: project
+  brief: "Take a small Python module you wrote (or the GST helper from this lesson) and add at least eight pytest tests: normal cases, edge cases, one parametrised test, one fixture, one test that expects an error, and one test that fakes an external call. Share the repository link and a screenshot of pytest passing."
+flashcards:
+  - q: "How does pytest find tests?"
+    a: "It looks in files named test_*.py for functions whose names start with test_, runs each, and reports passes and failures."
+  - q: "What makes a good unit test?"
+    a: "Fast, independent of other tests, tests one behaviour, has a clear name, and fails with a message that shows what went wrong."
+  - q: "What is the arrange, act, assert pattern?"
+    a: "Set up the inputs, call the code once, then check the result. It keeps each test short and readable."
+  - q: "What is a fixture in pytest?"
+    a: "A function marked @pytest.fixture that prepares something tests share, such as sample data. A test gets it by naming it as a parameter."
+  - q: "What does @pytest.mark.parametrize do?"
+    a: "Runs the same test with several sets of inputs and expected outputs, each reported as its own test."
+  - q: "How do you test that code raises an error?"
+    a: "with pytest.raises(ValueError): call_the_code(). The test passes only if that error is raised."
+  - q: "Why fake an API or model call in a unit test?"
+    a: "Real calls are slow, cost money and give different answers each time, so tests become flaky. A fake returns a fixed answer."
+exercise:
+  title: "Which test is missing?"
+  setup: "This function computes GST: def gst(amount: float, rate: float = 0.18) -> float. It should round to 2 decimals and refuse negative amounts."
+  questions:
+    - q: "You have one test: gst(100) == 18.0. What important case is not covered?"
+      a: "A negative amount should raise an error, and rounding (for example gst(10.555) to two decimals) is not checked."
+    - q: "How would you test 5%, 12%, 18% and 28% without four near-identical functions?"
+      a: "One test with @pytest.mark.parametrize listing (amount, rate, expected) for each rate."
+    - q: "The invoice module calls a currency API. How do you test it offline?"
+      a: "Pass in, or patch, a fake client that returns a fixed exchange rate, so the test is fast and the same every run."
+ask:
+  - "What should I test first in an existing project with no tests?"
+  - "How do I test code that calls an LLM?"
+  - "What is test coverage and is 100% worth it?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-07
+---
+
+## What it is
+
+A **test** is a small piece of code that runs your code with an input you choose and checks the result is what you expect. A **unit test** checks one small part, usually one function, on its own. When the result is wrong, the test fails and tells you where.
+
+Tests matter less for the code you are writing today than for every change after it. Six months from now, you or a teammate will change a function. Without tests, the only way to know nothing broke is to click through the app and hope. With tests, you run one command and find out in seconds.
+
+**pytest** is the standard testing tool for Python. You write plain functions whose names start with `test_`, use plain `assert` statements, and pytest finds and runs them, showing exactly which values differed when one fails.
+
+## How it works
+
+A test follows three steps, often called **arrange, act, assert**: prepare the inputs, call the code once, check the result.
+
+```python
+# gst.py
+def gst(amount: float, rate: float = 0.18) -> float:
+    if amount < 0:
+        raise ValueError("amount must not be negative")
+    return round(amount * rate, 2)
+```
+
+```python
+# test_gst.py
+import pytest
+from gst import gst
+
+def test_default_rate_is_18_percent():
+    assert gst(100) == 18.0
+
+def test_rounds_to_two_decimals():
+    assert gst(10.555) == 1.9
+
+def test_negative_amount_is_refused():
+    with pytest.raises(ValueError):
+        gst(-1)
+```
+
+Run `pytest` in the project folder and it reports something like `3 passed in 0.02s`.
+
+The loop you work in:
+
+```flow
+dir: LR
+Write or change code -> Run pytest
+Run pytest -[a test fails]-> Read the failure | which values differed
+Read the failure -> Write or change code
+Run pytest -[all pass]-> Commit
+```
+
+Three tools cover most real tests:
+
+| Tool | What it does | Example use |
+| --- | --- | --- |
+| `@pytest.mark.parametrize` | Runs one test over many inputs | Every GST rate: 5%, 12%, 18%, 28% |
+| `@pytest.fixture` | Shared setup a test asks for by name | A sample invoice, a temporary folder |
+| Fakes and mocks | Replace slow or external parts | A model client that returns a fixed reply |
+| `pytest.raises` | Checks that an error is raised | Negative amounts are refused |
+| `tmp_path` | A fresh temporary folder per test | Code that writes files |
+
+**Parametrise** instead of copying tests:
+
+```python
+@pytest.mark.parametrize("amount, rate, expected", [
+    (100, 0.05, 5.0),
+    (100, 0.12, 12.0),
+    (100, 0.28, 28.0),
+])
+def test_rates(amount, rate, expected):
+    assert gst(amount, rate) == expected
+```
+
+**Fixtures** hold shared setup:
+
+```python
+@pytest.fixture
+def invoice():
+    return {"items": [("Charger", 999.0), ("Cable", 299.0)], "rate": 0.18}
+
+def test_invoice_total(invoice):
+    assert invoice_total(invoice) == 1531.64
+```
+
+**Fakes** keep tests fast and repeatable. If a function takes the model client as a parameter (this is called **dependency injection**), a test can pass a fake one:
+
+```python
+class FakeClient:
+    def complete(self, prompt):
+        return '{"category": "refund"}'
+
+def test_classify_reads_category():
+    assert classify("Money not returned", client=FakeClient()) == "refund"
+```
+
+**What to test first.** In a project with no tests, start where a bug would cost the most: money calculations, data that other systems read, and code you are about to change. Then add a test for every bug you fix. In AI projects, keep two kinds apart: fast unit tests for your own parsing, validation and scoring logic, which run on every commit, and slower evaluation runs against the real model on a golden set, which run on a schedule. Mixing them makes everyday tests slow and flaky.
+
+## A worked example
+
+Sneha maintains an invoice-extraction service at a logistics company in Chennai. A customer reports that an invoice with a ₹0.50 rounding difference was rejected. She wants to fix it without breaking anything else.
+
+**First, a failing test.** Before touching the code, she writes a test that reproduces the bug: an invoice whose lines add up to ₹1,180.00 but whose printed total is ₹1,180.50. The test expects it to be accepted, because the business allows up to ₹1 of rounding. She runs pytest: the new test fails, which proves it captures the bug.
+
+**Then the fix.** In `validate_total`, the check was `lines_total == printed_total`. She changes it to `abs(lines_total - printed_total) <= 1.0`. The new test passes.
+
+**Then the edges.** A ₹1 tolerance raises new questions, so she parametrises: a difference of exactly ₹1 is accepted, ₹1.01 is rejected, a negative difference is treated the same as a positive one. One case fails: her check accepted a ₹1.01 difference because of floating-point error. She switches the amounts to `Decimal`, and all cases pass.
+
+**Finally, the whole suite.** She runs all 214 tests. One unrelated test fails: it had relied on the old exact-match behaviour to reject a forged invoice. She talks to the team, they agree the forgery check should use a separate rule, and she updates both. Without tests, that forgery check would have silently stopped working in production.
+
+## Common mistakes
+
+- **Testing only the happy path.** Bugs live at the edges: zero, empty lists, negatives, very large values, missing fields.
+- **One test that checks ten things.** When it fails, you cannot tell which. One behaviour per test, with a name that says what.
+- **Tests that depend on each other or on order.** Each test should set up what it needs and pass alone.
+- **Real network or model calls in unit tests.** They are slow, cost money and make tests flaky. Fake them; test the real service separately and less often.
+- **Writing tests after a bug is fixed.** Write the failing test first, so you know it really catches the bug.
+- **Chasing 100% coverage.** Coverage shows what ran, not whether it was checked. Test behaviour that matters.
+
+## Practice
+
+1. Copy the `gst` function, write the three tests above and run pytest. Then break the function on purpose and watch the failures.
+2. Add a parametrised test for every GST slab and one for rounding.
+3. Write a function that calls a fake model client, and test it with a fixture.
+4. In an interview, explain in one minute how you would add tests to a project that has none.

@@ -1,0 +1,140 @@
+---
+id: git-undo-and-history
+level: B3
+theme: software-engineering
+title: "Undoing things in Git: restore, reset, revert and reflog"
+outcome: "Undo a change at any stage, from an unsaved edit to a pushed commit, choose between reset and revert, and recover work with the reflog."
+answer: "Use restore for uncommitted edits, reset for your own unpushed commits, revert for pushed commits, and the reflog to find work you thought was lost."
+why_it_matters: "Everyone commits the wrong thing sooner or later. Knowing the safe undo for each situation is what lets you fix it in a minute instead of breaking main or losing a day's work."
+hours: 1
+gap_tags: []
+primary_resource: yt-philomatics-undo-a-git-commit
+alternates: [missing-semester-git]
+videos: [yt-boot-dev-git-revert-vs-git-reset]
+format: deep
+key_terms: [git-reset, git-revert, commit]
+check:
+  type: project
+  brief: "In a practice repository, show each undo: discard an unsaved edit with git restore, unstage a file, undo your last unpushed commit with git reset --soft, undo a pushed commit with git revert, and recover a commit you removed with git reset --hard by finding it in git reflog. Share the repository and a short note of the commands you ran for each."
+flashcards:
+  - q: "How do you throw away an edit you have not staged?"
+    a: "git restore file.py. The file goes back to its last committed version. The edit is gone for good."
+  - q: "How do you unstage a file but keep your edits?"
+    a: "git restore --staged file.py."
+  - q: "What do reset --soft, --mixed and --hard do to your changes?"
+    a: "All move the branch back. Soft keeps the changes staged, mixed (the default) keeps them unstaged, hard deletes them."
+  - q: "Why use revert instead of reset on main?"
+    a: "Revert adds a new commit that undoes the old one, so history only grows and teammates' copies still match. Reset rewrites history."
+  - q: "How do you fix the message or forget a file in your last, unpushed commit?"
+    a: "Stage the fix and run git commit --amend. It replaces the last commit. Never amend a commit you have already pushed to a shared branch."
+  - q: "What is the reflog?"
+    a: "A local log of everywhere your branch tip has been. It lets you find and restore commits after a reset or a rebase that went wrong."
+exercise:
+  title: "Pick the right undo"
+  setup: "For each situation, name the command you would use and say why it is safe."
+  questions:
+    - q: "You edited utils.py, have not staged it, and want the original back."
+      a: "git restore utils.py. Nothing was committed, so nothing else is affected."
+    - q: "Your last commit, not pushed, included a .env file with a secret."
+      a: "git reset --soft HEAD~1, remove .env, add it to .gitignore, commit again. Since it was never pushed, rewriting is safe. Rotate the secret anyway if in doubt."
+    - q: "A commit merged into main yesterday broke checkout. Others have pulled it."
+      a: "git revert <commit>, then push. It undoes the change with a new commit, without rewriting shared history."
+    - q: "You ran git reset --hard HEAD~3 and lost three commits you needed."
+      a: "git reflog to find the commit id from before the reset, then git reset --hard <that id> or git branch rescue <that id>."
+ask:
+  - "I pushed a secret to GitHub. Is reverting enough?"
+  - "How do I undo a merge commit?"
+  - "What is the difference between restore and checkout?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-07
+---
+
+## What it is
+
+Git keeps your work in three places, and each has its own undo:
+
+- **Working folder**: the files you are editing right now.
+- **Staging area**: what you have marked with `git add` to go into the next commit.
+- **History**: the commits themselves, first only on your laptop, then on the shared server once you push.
+
+The right undo depends on where the mistake is and, most of all, on whether anyone else has it yet. The rule that decides almost everything: **you may rewrite history nobody else has; you must not rewrite history others already pulled.**
+
+## How it works
+
+```flow
+title: Where is the mistake?
+Mistake -> Where is it?
+Where is it? -[edited, not staged]-> git restore file | discard the edit
+Where is it? -[staged, not committed]-> git restore --staged file | keep the edit, unstage it
+Where is it? -[committed, not pushed]-> git reset or git commit --amend | rewrite your own history
+Where is it? -[pushed to a shared branch]-> git revert commit | add a commit that undoes it
+git reset or git commit --amend -[went wrong]-> git reflog | find the old commit and go back
+```
+
+**Restore** works on files. `git restore app.py` throws away unstaged edits and brings back the last committed version. `git restore --staged app.py` takes a file out of the staging area but keeps your edits.
+
+**Reset** moves your branch label back to an earlier commit. What happens to the changes in the commits you step over depends on the mode:
+
+| Command | Branch moves back | Changes from those commits | Use it when |
+| --- | --- | --- | --- |
+| `git reset --soft HEAD~1` | Yes | Kept, and staged | You want to redo the last commit differently |
+| `git reset HEAD~1` (mixed) | Yes | Kept, unstaged | You want to split or re-pick what to commit |
+| `git reset --hard HEAD~1` | Yes | Deleted from your files | You want the work gone (be sure) |
+| `git revert <id>` | No | A new commit undoes them | The commit is already shared |
+
+`HEAD~1` means "one commit before where I am". `HEAD~3` means three.
+
+**Amend** is a small reset for the last commit: stage a fix and run `git commit --amend` to replace the last commit with a corrected one. It is perfect for a typo in the message or a forgotten file, before you push.
+
+**Revert** never rewrites anything. `git revert a1b2c3d` looks at what that commit changed and creates a new commit that changes it back. History grows; everyone's copy still lines up. On main, this is the undo you want.
+
+**Stash** sets work aside without committing it. `git stash` saves your unfinished edits and gives you a clean folder, for example to fix an urgent bug on another branch; `git stash pop` brings the edits back. It is the safe move before any command that would throw away uncommitted changes, because once edits are stashed, they can be recovered even if the next step goes wrong.
+
+**Reflog** is your safety net. Every time your branch tip moves, by a commit, a reset, a rebase or a checkout, Git notes it in the reflog for about 90 days. `git reflog` lists those positions, and you can jump back to any of them.
+
+## A worked example
+
+Rahul is working on a recommendation API for an e-commerce company in Hyderabad. It is Friday evening.
+
+**Mistake one: a debug print.** He has `print(user)` scattered in `ranker.py` and has not staged it. `git restore ranker.py` cleans it up instantly.
+
+**Mistake two: a secret in a commit.** His last commit, not yet pushed, includes `.env` with an API key. He runs:
+
+```bash
+git reset --soft HEAD~1
+git restore --staged .env
+echo ".env" >> .gitignore
+git add .gitignore ranker.py
+git commit -m "Add category boost to ranker"
+```
+
+The commit is rebuilt without the secret. Because it was never pushed, rewriting it is safe. He still rotates the key, because the cautious assumption is that a secret on disk in history may have leaked.
+
+**Mistake three: a bad change on main.** On Monday, a teammate's merged commit makes the ranker return empty lists for new users. It has been on main for a day and everyone has pulled it. Resetting main would break every copy. Instead:
+
+```bash
+git switch main
+git pull
+git revert 7f3e9c1
+git push
+```
+
+A new commit "Revert 'Boost recent items'" goes out through the normal pull request and pipeline. The bug is gone, history is intact, and the team fixes the original change properly later.
+
+**Mistake four: the lost afternoon.** While cleaning up his branch, Rahul runs `git reset --hard HEAD~3` and realises one of those three commits was a test he needed. He runs `git reflog`, sees `e41d2aa HEAD@{1}: commit: Add tests for cold-start users`, and brings it back with `git cherry-pick e41d2aa`. Nothing is truly lost if it was ever committed.
+
+## Common mistakes
+
+- **Resetting a shared branch.** `git reset` plus a force push on main rewrites everyone's history. Use `git revert` on anything shared.
+- **Thinking revert removes a secret.** A revert leaves the secret in history. Rotate the key; removing it from history needs special tools and a coordinated rewrite.
+- **Using --hard without checking.** `git status` and `git stash` first. Uncommitted edits deleted by `--hard` are not in the reflog.
+- **Amending a pushed commit.** It replaces the commit with a new one, so teammates who pulled the old one end up diverged.
+- **Forgetting the reflog exists.** Most "I lost my work" panics end with `git reflog`.
+
+## Practice
+
+1. In a practice repository, make three commits. Use each reset mode in turn and watch `git status` after each.
+2. Revert a commit and read the new commit's diff with `git show`.
+3. Run `git reset --hard HEAD~2`, then recover the lost commits with `git reflog`.
+4. Write a one-line rule for your future self: which undo for unshared work, and which for shared work.
