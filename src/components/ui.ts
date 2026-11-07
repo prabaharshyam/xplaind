@@ -11,7 +11,7 @@ const md = "min-h-12 px-6 py-3";
 /** Large (56 px): the one main action of a hero or a page. */
 const lg = "min-h-14 px-8 text-lg";
 
-const primary = "bg-violet-700 text-white shadow-md shadow-violet-700/20 hover:bg-violet-800";
+const primary = "bg-violet-700 text-white hover:bg-violet-800";
 const secondary =
   "border border-violet-200 bg-white text-violet-950 hover:border-violet-300 hover:bg-violet-50 dark:border-violet-800 dark:bg-zinc-900 dark:text-violet-100 dark:hover:bg-violet-950";
 const quiet = "text-violet-800 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-violet-950/60";

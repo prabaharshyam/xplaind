@@ -10,9 +10,9 @@ export type LessonCardData = { id: string; title: string; outcome: string; hours
 export function LessonCard({ l }: { l: LessonCardData }) {
   return (
     <Link
-      data-tilt
+     
       href={`/stop/${l.id}`}
-      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900"
     >
       <Cover theme={l.theme} seed={l.id} className="h-24" iconSize={30} />
       <span className="flex flex-1 flex-col p-4">

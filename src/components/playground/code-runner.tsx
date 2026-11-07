@@ -106,7 +106,7 @@ export function CodeRunner({
   const rows = Math.min(compact ? 16 : 24, Math.max(compact ? 4 : 10, code.split("\n").length + 1));
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-300 bg-zinc-950 text-zinc-100 shadow-sm dark:border-zinc-700">
+    <div className="overflow-hidden rounded-2xl border border-zinc-300 bg-zinc-950 text-zinc-100 dark:border-zinc-700">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2 text-xs text-zinc-300">
         <label htmlFor={`${id}-code`} className="font-medium">
           {label}

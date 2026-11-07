@@ -30,7 +30,7 @@ export default function DesignsPage() {
             <li key={d.id}>
               <Link
                 href={`/interview/design/${d.id}`}
-                className="flex h-full flex-col gap-2 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm shadow-zinc-950/[0.03] transition hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-zinc-800 dark:bg-zinc-900"
+                className="flex h-full flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-6 transition hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <span className="text-lg font-semibold">{d.title}</span>
                 <span className="text-sm leading-6 text-zinc-600 italic dark:text-zinc-400">&ldquo;{d.prompt}&rdquo;</span>

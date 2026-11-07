@@ -197,7 +197,7 @@ function RoadmapView({ saved, onClose }: { saved: SavedRoadmap; onClose: () => v
 
   return (
     <article aria-labelledby="roadmap-title">
-      <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-gradient-to-br from-violet-700 to-teal-700 p-6 text-white shadow-lg dark:border-zinc-800">
+      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-gradient-to-br from-violet-700 to-teal-700 p-6 text-white dark:border-zinc-800">
         <p className="flex items-center gap-2 text-sm font-medium text-white/90">
           <Icon name="sparkles" size={16} /> AI roadmap
         </p>

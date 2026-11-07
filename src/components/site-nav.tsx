@@ -88,7 +88,7 @@ function DesktopMenus({ path }: { path: string }) {
             {active === g.id && dot}
             {active === g.id && <span className="sr-only"> (current section)</span>}
           </summary>
-          <div className="absolute top-full left-0 z-50 mt-3 w-80 rounded-3xl border border-zinc-200 bg-white p-2 shadow-xl shadow-violet-950/10 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="absolute top-full left-0 z-50 mt-3 w-80 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-violet-950/10 dark:border-zinc-800 dark:bg-zinc-900">
             <ul>
               {g.items.map((i) => (
                 <li key={i.href}>

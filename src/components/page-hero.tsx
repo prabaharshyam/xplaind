@@ -36,7 +36,7 @@ export function PageHero({
 }) {
   const full = size === "full";
   return (
-    <header className="relative overflow-hidden border-b border-violet-100 bg-gradient-to-br from-violet-100/80 via-white/40 to-teal-50/70 dark:border-violet-950 dark:from-violet-950/60 dark:via-transparent dark:to-teal-950/40">
+    <header className="relative overflow-hidden border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950">
       <div className={`mx-auto flex max-w-6xl flex-col px-4 md:flex-row md:items-center md:gap-10 md:px-6 ${full ? "gap-4 py-8 md:py-12" : "gap-4 py-6 md:py-8"}`}>
         <div className="min-w-0 flex-1">
           {crumbs.length > 0 && (

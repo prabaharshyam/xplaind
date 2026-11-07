@@ -24,50 +24,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-const PAINS: { pain: string; fix: string; href: string; cta: string; icon: IconName }[] = [
-  {
-    pain: "“I want to learn AI, but I don’t know where to start.”",
-    fix: "Pick the job you want. Its roadmap puts every topic in order.",
-    href: "/paths",
-    cta: "See the roadmaps",
-    icon: "compass",
-  },
-  {
-    pain: "“There are a thousand courses. Which one is worth my time?”",
-    fix: "For each topic we pick the one course that teaches it best.",
-    href: "/resources",
-    cta: "Browse courses",
-    icon: "book",
-  },
-  {
-    pain: "“I watched tutorials, but I still can’t build anything.”",
-    fix: "Quick checks, code you run in the browser, and a project at every stage.",
-    href: "/playground",
-    cta: "Try the code playground",
-    icon: "code",
-  },
-  {
-    pain: "“I’m not from a tech background.”",
-    fix: "Three roadmaps need no coding: AI Product Manager, AI Automation and AI Governance.",
-    href: "/paths",
-    cta: "See roles without coding",
-    icon: "people",
-  },
-  {
-    pain: "“I only have a few hours a week.”",
-    fix: "Lessons take about 20 minutes, and we plan your week around your hours.",
-    href: "/plan",
-    cta: "Plan my week",
-    icon: "map",
-  },
-  {
-    pain: "“I freeze in interviews.”",
-    fix: "Answer real AI interview questions out loud and see what you missed.",
-    href: "/interview/simulator",
-    cta: "Try a mock interview",
-    icon: "mic",
-  },
-];
 
 const STEPS: { icon: IconName; title: string; text: string }[] = [
   { icon: "compass", title: "Choose the job you want", text: "Pick an AI role, or let the 10-minute level test suggest one." },
@@ -75,14 +31,6 @@ const STEPS: { icon: IconName; title: string; text: string }[] = [
   { icon: "trophy", title: "Prove it and get hired", text: "Build projects, practice interviews out loud and see live openings." },
 ];
 
-const TRUST: { icon: IconName; title: string; text: string }[] = [
-  { icon: "scale", title: "No paid rankings, ever", text: "No one can pay to be listed or to rank higher." },
-  { icon: "trophy", title: "Projects you can show", text: "Every stage ends with a guided project for your portfolio." },
-  { icon: "chat", title: "Plain English, Indian examples", text: "Explained the way a good senior colleague would." },
-  { icon: "map", title: "Always the next step", text: "Your roadmap shows what to learn next, so no hour is wasted." },
-  { icon: "target", title: "Built around real jobs", text: "Each roadmap follows what the role does at work." },
-  { icon: "shield", title: "Honest about the market", text: "Salaries and job figures show their source and date. No promised packages." },
-];
 
 const FAQ = [
   {
@@ -145,7 +93,7 @@ export default function Home() {
       {/* Hero: the promise first (one place, the right order), then the market as proof. Works before any animation runs. */}
       <section data-hero className="home-hero relative flex min-h-[calc(100svh-3.5rem)] items-center" aria-labelledby="hero-heading">
         <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6">
-          <p data-hero-fade className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-100 dark:ring-violet-800">
+          <p data-hero-fade className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-violet-900 ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-100 dark:ring-violet-800">
             <span className="size-1.5 rounded-full bg-violet-600" /> AI career roadmaps · Helping India learn AI faster
           </p>
           <h1 id="hero-heading" className="mt-6 max-w-5xl text-[2.6rem] leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-[4.25rem]">
@@ -183,7 +131,7 @@ export default function Home() {
             <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Why now: India&apos;s AI job market</p>
             <dl className="mt-3 grid gap-3 sm:grid-cols-3">
               {market.stats.map((m) => (
-                <div key={m.label} className="flex flex-col-reverse justify-end rounded-2xl bg-white p-4 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-900 dark:ring-violet-900">
+                <div key={m.label} className="flex flex-col-reverse justify-end rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
                   <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
                   <dd className="text-3xl font-semibold tracking-tight text-violet-800 md:text-4xl dark:text-violet-300">{m.value}</dd>
                 </div>
@@ -196,34 +144,6 @@ export default function Home() {
               , checked {checked}
             </p>
           </div>
-        </div>
-      </section>
-
-      {/* Problem, in the visitor's own words, each answered: they feel understood before we explain anything. */}
-      <section aria-labelledby="pains-heading" className="py-16 md:py-24">
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <h2 id="pains-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
-            <Words text="Sound familiar?" />
-          </h2>
-          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">
-            You are not the problem. The missing path is.
-          </p>
-          <ul aria-labelledby="pains-heading" className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3" data-rise-group>
-            {PAINS.map((p) => (
-              <li key={p.pain} data-rise className="flex gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-900 dark:ring-violet-900">
-                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  <Icon name={p.icon} size={24} />
-                </span>
-                <div>
-                  <p className="text-lg leading-7 font-semibold">{p.pain}</p>
-                  <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{p.fix}</p>
-                  <Link href={p.href} className="mt-3 inline-block font-medium text-violet-800 hover:underline dark:text-violet-300">
-                    {p.cta} →
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
         </div>
       </section>
 
@@ -240,7 +160,7 @@ export default function Home() {
           </h2>
           <ol className="mt-8 grid gap-6 md:grid-cols-3" data-rise-group>
             {STEPS.map((s, i) => (
-              <li key={s.title} data-rise className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-900 dark:ring-violet-900">
+              <li key={s.title} data-rise className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <span className="flex items-center gap-3">
                   <span className="grid size-10 place-items-center rounded-full bg-violet-700 font-semibold text-white">{i + 1}</span>
                   <Icon name={s.icon} size={24} className="text-emerald-700 dark:text-emerald-400" />
@@ -302,7 +222,6 @@ export default function Home() {
               text="Every topic for your role, in order. Tap one to see what it is."
               href="/roadmap/genai-engineer"
               cta="Open a roadmap"
-              tone="from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950"
             >
               <div className="mx-auto max-w-[280px] text-zinc-600 dark:text-zinc-400">
                 <MiniRoadmap />
@@ -313,7 +232,6 @@ export default function Home() {
               text="A plain-English explainer, an example from Indian work life and a quick check."
               href="/topics"
               cta="Browse lessons"
-              tone="from-violet-50 to-violet-100/60 dark:from-violet-950 dark:to-violet-900/40"
             >
               <div className="mx-auto max-w-[300px]">
                 <MiniLesson />
@@ -324,7 +242,6 @@ export default function Home() {
               text="One picked for each lesson, from Google, AWS, OpenAI, Anthropic and more."
               href="/resources"
               cta="Browse courses"
-              tone="from-sky-50 to-teal-50 dark:from-sky-950 dark:to-teal-950"
             >
               <div className="mx-auto max-w-[320px]">
                 <MiniCourses />
@@ -335,9 +252,8 @@ export default function Home() {
               text="Python with nothing to install. The AI tutor explains your errors."
               href="/playground"
               cta="Open the playground"
-              tone="from-zinc-100 to-violet-100 dark:from-zinc-900 dark:to-violet-950"
             >
-              <pre aria-hidden="true" className="mx-auto max-w-[300px] overflow-hidden rounded-2xl bg-zinc-950 p-4 font-mono text-xs leading-5 text-emerald-200 shadow-lg">
+              <pre aria-hidden="true" className="mx-auto max-w-[300px] overflow-hidden rounded-2xl bg-zinc-950 p-4 font-mono text-xs leading-5 text-emerald-200">
                 {`>>> tokens = "Learn AI".split()\n>>> len(tokens)\n2\n>>> print("You can do this")\nYou can do this`}
               </pre>
             </Feature>
@@ -348,7 +264,7 @@ export default function Home() {
       {/* MB-5, owner request 2026-11-06: "Study from my notes & books" is a product on its own, so it gets its own spotlight. */}
       <section aria-labelledby="notes-heading" className="py-16 md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <div className="grid items-center gap-10 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm shadow-zinc-950/[0.03] md:grid-cols-2 md:p-12 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="grid items-center gap-10 rounded-2xl border border-zinc-200 bg-white p-6 md:grid-cols-2 md:p-12 dark:border-zinc-800 dark:bg-zinc-900">
             <div>
               <p className="text-sm font-semibold text-violet-800 dark:text-violet-300">Study from my notes &amp; books</p>
               <h2 id="notes-heading" data-words className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">
@@ -394,13 +310,12 @@ export default function Home() {
               text={`${interview.length} real questions. Answer out loud, against the clock, and see what you covered.`}
               href="/interview/simulator"
               cta="Start a mock interview"
-              tone="from-amber-50 to-rose-50 dark:from-amber-950 dark:to-rose-950"
             >
               <div className="mx-auto max-w-[300px]">
                 <MiniInterview />
               </div>
             </Feature>
-            <div data-rise className="flex flex-col justify-between gap-4 rounded-3xl bg-gradient-to-br from-amber-50 to-emerald-50 p-6 ring-1 ring-amber-100 md:p-8 dark:from-amber-950 dark:to-emerald-950 dark:ring-amber-900">
+            <div data-rise className="flex flex-col justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-6 md:p-8 dark:border-zinc-800 dark:bg-zinc-900">
               <div>
                 <h3 className="text-xl font-semibold">Stay on track, week after week</h3>
                 <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
@@ -418,7 +333,7 @@ export default function Home() {
               { href: "/ai/resume", icon: "star" as const, title: "Get your resume shortlisted", text: "Get fixes in order of importance and the keywords recruiters look for.", cta: "Review my resume" },
               { href: "/jobs", icon: "target" as const, title: "Know what the job pays", text: "Salaries for every AI role in India, and live openings.", cta: "See jobs and salaries" },
             ].map((c) => (
-              <li key={c.href} data-rise className="flex gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-950/80 dark:ring-violet-900">
+              <li key={c.href} data-rise className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
                   <Icon name={c.icon} size={24} />
                 </span>
@@ -448,25 +363,16 @@ export default function Home() {
         </section>
       )}
 
-      {/* Trust: promises a visitor can check, then what is inside, counted. */}
+      {/* Trust: what is inside, counted. */}
       <section aria-labelledby="trust-heading" className="py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <h2 id="trust-heading" data-words className="max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
-            <Words text="A place you can trust with your time" />
+          <h2 id="trust-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
+            <Words text="What is inside, today" />
           </h2>
-          <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" data-rise-group>
-            {TRUST.map((t) => (
-              <li key={t.title} data-rise className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-950/80 dark:ring-violet-900">
-                <Icon name={t.icon} size={28} className="text-violet-700 dark:text-violet-300" />
-                <h3 className="mt-3 text-lg font-semibold">{t.title}</h3>
-                <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">{t.text}</p>
-              </li>
-            ))}
-          </ul>
-          <h3 className="mt-14 text-xl font-semibold">What is inside, today</h3>
+          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">No paid rankings, no ads. Every course is picked on merit.</p>
           <dl data-rise-group className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
             {stats.map((s) => (
-              <div key={s.label} data-rise className="flex flex-col-reverse justify-end rounded-3xl bg-white p-6 shadow-sm ring-1 ring-violet-100 dark:bg-zinc-900 dark:ring-violet-900">
+              <div key={s.label} data-rise className="flex flex-col-reverse justify-end rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <dt className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{s.label}</dt>
                 <dd data-count className="text-4xl font-semibold tracking-tight md:text-5xl">
                   {s.value}
@@ -516,7 +422,7 @@ export default function Home() {
             <ul className="mt-8 grid gap-6 md:grid-cols-3" data-rise-group>
               {posts.map((p, i) => (
                 <li key={p.id} data-rise>
-                  <Link href={`/blog/${p.id}`} className="group block overflow-hidden rounded-3xl bg-white ring-1 ring-violet-100 hover:ring-violet-300 dark:bg-zinc-950/80 dark:ring-violet-900">
+                  <Link href={`/blog/${p.id}`} className="group block overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900">
                     <GuideCover cover={p.cover} theme={(["career", "ai-basics", "using-ai"] as const)[i % 3]} seed={p.id} />
                     <span className="block p-5">
                       <span className="block text-lg leading-7 font-semibold group-hover:underline">{p.title}</span>
@@ -535,7 +441,7 @@ export default function Home() {
           <h2 id="faq-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
             <Words text="Questions you might have" />
           </h2>
-          <div className="mt-8 divide-y divide-zinc-200 rounded-3xl bg-white ring-1 ring-violet-100 dark:divide-zinc-800 dark:bg-zinc-950/80 dark:ring-violet-900">
+          <div className="mt-8 divide-y divide-zinc-200 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
             {FAQ.map((f) => (
               <details key={f.q} className="group p-5">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
@@ -577,7 +483,7 @@ export default function Home() {
 /** A milestone marker: the gate the reader has just reached on the road. */
 function Gate({ n, label }: { n: number; label: string }) {
   return (
-    <p data-gate className="inline-flex items-center gap-2 rounded-full bg-white py-1 pr-3 pl-1 text-sm font-medium text-violet-900 shadow-sm ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-100 dark:ring-violet-800">
+    <p data-gate className="inline-flex items-center gap-2 rounded-full bg-white py-1 pr-3 pl-1 text-sm font-medium text-violet-900 ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-100 dark:ring-violet-800">
       <span className="grid size-6 place-items-center rounded-full bg-violet-700 text-xs font-semibold text-white">{n}</span>
       Milestone {n} · {label}
     </p>
@@ -589,19 +495,17 @@ function Feature({
   text,
   href,
   cta,
-  tone,
   children,
 }: {
   title: string;
   text: string;
   href: string;
   cta: string;
-  tone: string;
   children: React.ReactNode;
 }) {
   return (
-    <div data-rise className="flex flex-col overflow-hidden rounded-3xl bg-white ring-1 ring-violet-100 dark:bg-zinc-950/80 dark:ring-violet-900">
-      <div className={`bg-gradient-to-br ${tone} p-6 md:p-8`}>{children}</div>
+    <div data-rise className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="border-b border-zinc-200 bg-zinc-50 p-6 md:p-8 dark:border-zinc-800 dark:bg-zinc-950">{children}</div>
       <div className="flex flex-1 flex-col p-6">
         <h3 className="text-xl font-semibold">{title}</h3>
         <p className="mt-2 flex-1 leading-7 text-zinc-700 dark:text-zinc-300">{text}</p>

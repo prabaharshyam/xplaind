@@ -35,7 +35,7 @@ export default function CheatsheetsPage() {
               <li key={s.id}>
                 <Link
                   href={`/cheatsheets/${s.id}`}
-                  className="group flex h-full flex-col gap-3 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] transition hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-zinc-800 dark:bg-zinc-900"
+                  className="group flex h-full flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 transition hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-zinc-800 dark:bg-zinc-900"
                 >
                   <span className="grid size-11 place-items-center rounded-2xl text-white" style={{ background: `linear-gradient(135deg, ${t.from}, ${t.to})` }}>
                     <Icon name={t.icon} size={22} />

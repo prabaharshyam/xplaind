@@ -26,8 +26,8 @@ export default function TopIndexPage() {
       />
       <ul className="mx-auto grid max-w-6xl gap-5 px-4 py-10 sm:grid-cols-2 lg:grid-cols-3 md:px-6">
         {paths.map((p) => (
-          <li key={p.id} className="lx-rise">
-            <Link data-tilt href={`/interview/top/${p.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
+          <li key={p.id} className="">
+            <Link href={`/interview/top/${p.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
               <Cover theme={p.theme} seed={`top-${p.id}`} icon="trophy" className="h-24" iconSize={30} />
               <span className="p-4">
                 <span className="block font-semibold group-hover:underline">Top 25 {p.name} questions</span>

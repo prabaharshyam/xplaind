@@ -74,7 +74,7 @@ export function LibraryBrowser({ items, topics, channels }: { items: LibraryItem
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
         <label className="flex flex-col gap-1">
           <span className="text-sm font-semibold">Search</span>
           <input
@@ -156,9 +156,9 @@ export function LibraryBrowser({ items, topics, channels }: { items: LibraryItem
         {results.length} {results.length === 1 ? "result" : "results"}
       </p>
 
-      <ul className="lx-deal grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {results.slice(0, shown).map((i) => (
-          <li key={i.key} className="flex flex-col gap-2 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
+          <li key={i.key} className="flex flex-col gap-2 rounded-2xl bg-white p-4 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
             <p className="flex flex-wrap items-center gap-2 text-xs font-semibold">
               <span className={`rounded-full px-2 py-0.5 ${KIND_STYLE[i.kind]}`}>{KIND_LABEL[i.kind]}</span>
               {i.level && <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">{levelText(i.level)}</span>}

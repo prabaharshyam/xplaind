@@ -1,7 +1,6 @@
 "use client";
 
 import { ResourceNotice } from "@/components/resource-card";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CourseThumb } from "@/components/course-thumb";
 import type { Embed } from "@/lib/content/media";
@@ -177,17 +176,11 @@ export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: 
 function CourseCard({ r }: { r: DirectoryRow }) {
   const theme = (r.themes[0] ?? "ai-basics") as ThemeId;
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
+    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900">
       <CourseThumb provider={r.provider} kindLabel={r.kindLabel} embed={r.embed} hours={r.hours} certificate={r.certificate} className="h-36" />
       <div className="flex flex-1 flex-col p-4">
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+        <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
           {r.provider} · {themeOf(theme).label}
-          {/* The thumbnail is decorative, so the certificate is also stated here for everyone. */}
-          {r.certificate && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-950 dark:bg-amber-900 dark:text-amber-50">
-              <Icon name="cert" size={12} /> Certificate
-            </span>
-          )}
         </p>
         <h2 className="mt-1 text-lg leading-6 font-semibold">
           <a href={`/go/${r.id}`} target="_blank" rel="noopener" className="hover:underline">
@@ -196,25 +189,17 @@ function CourseCard({ r }: { r: DirectoryRow }) {
           </a>
         </h2>
         {r.notice && <ResourceNotice text={r.notice} compact />}
-        <p className="mt-2 line-clamp-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{r.whyPicked}</p>
-        <p className="mt-3 flex flex-wrap gap-1.5 text-xs">
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">{r.costLabel}</span>
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">{r.level}</span>
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">about {r.hours} h</span>
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{r.whyPicked}</p>
+        {/* 2026-11-07, owner request (minimal): one plain line of facts instead of badges. */}
+        <p className="mt-auto pt-3 text-sm text-zinc-600 dark:text-zinc-400">
+          {r.costLabel} · {r.level} · about {r.hours} h
+          {r.certificate && (
+            <>
+              {" · "}
+              <span className="font-medium text-zinc-800 dark:text-zinc-200">Certificate</span>
+            </>
+          )}
         </p>
-        {r.lessons.length > 0 && (
-          <p className="mt-auto pt-3 text-xs text-zinc-600 dark:text-zinc-400">
-            Used in:{" "}
-            {r.lessons.map((l, i) => (
-              <span key={l.id}>
-                {i > 0 && ", "}
-                <Link href={`/stop/${l.id}`} className="underline underline-offset-2">
-                  {l.title}
-                </Link>
-              </span>
-            ))}
-          </p>
-        )}
       </div>
     </article>
   );

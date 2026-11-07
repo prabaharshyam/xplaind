@@ -7,7 +7,7 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
     <ul className="mt-10 columns-1 gap-5 md:columns-2 lg:columns-3" data-rise-group>
       {items.map((t) => (
         <li key={t.name} data-rise className="mb-5 break-inside-avoid">
-          <figure className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm shadow-zinc-950/[0.03] dark:border-zinc-800 dark:bg-zinc-900">
+          <figure className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="size-7 text-violet-300 dark:text-violet-700" fill="currentColor">
               <path d="M9.5 5C6 6.4 4 9.2 4 13v6h6v-6H7c0-2.5 1.2-4.3 3.4-5.3L9.5 5Zm10 0C16 6.4 14 9.2 14 13v6h6v-6h-3c0-2.5 1.2-4.3 3.4-5.3L19.5 5Z" />
             </svg>

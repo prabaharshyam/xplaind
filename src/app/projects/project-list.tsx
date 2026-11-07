@@ -63,10 +63,10 @@ export function ProjectList({ projects, paths }: { projects: ProjectCardView[]; 
         {shown.map((p) => {
           const record = progress.projects?.[guideKey(p.id)];
           return (
-            <li key={p.id} className="lx-rise">
-              <Link data-tilt
+            <li key={p.id} className="">
+              <Link
                 href={`/projects/${p.id}`}
-                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900"
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <Cover theme={p.theme} seed={p.id} className="h-28" iconSize={32} />
                 <span className="flex flex-1 flex-col gap-2 p-4">

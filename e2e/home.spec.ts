@@ -38,7 +38,9 @@ test("the home page says what to do and leads to roadmaps, topics, courses and i
   await expect(main.getByRole("link", { name: "I have an interview soon" })).toHaveAttribute("href", "/interview/simulator");
   // the nine role roadmaps are right there, as cards
   await expect(main.getByRole("link", { name: /Forward Deployed Engineer/ }).first()).toHaveAttribute("href", "/roadmap/forward-deployed-engineer");
-  await expect(main.getByRole("heading", { name: "Sound familiar?" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Choose your AI role" })).toBeVisible();
+  // 2026-11-07, owner request (minimal, less text): the pain-point cards are gone
+  await expect(page.getByText("Sound familiar?")).toHaveCount(0);
   await expect(main.getByRole("link", { name: "Find my level" }).first()).toHaveAttribute("href", "/start");
   // the removed sections stay removed
   await expect(page.getByText("Honest by design")).toHaveCount(0);
@@ -78,8 +80,8 @@ test("with reduced motion, everything is visible and accessible at once", async 
   const context = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 360, height: 740 } });
   const page = await context.newPage();
   await page.goto("/");
-  await page.getByRole("heading", { name: "Sound familiar?" }).scrollIntoViewIfNeeded();
-  await expect(page.getByText("I freeze in interviews", { exact: false })).toBeVisible();
+  await page.getByRole("heading", { name: "How Xplaind works" }).scrollIntoViewIfNeeded();
+  await expect(page.getByText("Choose the job you want", { exact: false })).toBeVisible();
   expect((await wcag(page)).violations).toEqual([]);
   await context.close();
 });

@@ -29,42 +29,18 @@ export function Cover({
   label?: string;
 }) {
   const t = themeOf(theme);
-  const h = hash(seed);
-  const pick = (shift: number, max: number) => ((h >>> shift) % 1000) / 1000 * max;
-  const id = `g${h.toString(36)}`;
-  const angle = Math.round(pick(0, 360));
-  const circles = [
-    { cx: 20 + pick(3, 120), cy: 10 + pick(7, 70), r: 40 + pick(11, 50) },
-    { cx: 180 + pick(13, 130), cy: 90 + pick(17, 80), r: 30 + pick(19, 60) },
-    { cx: 80 + pick(23, 160), cy: 130 + pick(29, 50), r: 12 + pick(5, 24) },
-  ];
+  // 2026-11-07, owner request (DataCamp-style, minimal): a flat tint of the theme colour with
+  // its icon, no gradients or shapes. `seed` stays in the API so callers need not change.
+  void seed;
   return (
-    <div className={`relative overflow-hidden ${className}`} aria-hidden="true">
-      <svg
-        viewBox="0 0 320 180"
-        preserveAspectRatio="xMidYMid slice"
-        className="absolute inset-0 size-full"
-        style={{ filter: `hue-rotate(${Math.round(pick(21, 36)) - 18}deg)` }}
-      >
-        <defs>
-          <linearGradient id={id} gradientTransform={`rotate(${angle} .5 .5)`}>
-            <stop offset="0" stopColor={t.from} />
-            <stop offset="1" stopColor={t.to} />
-          </linearGradient>
-          <pattern id={`${id}d`} width="16" height="16" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.2" fill="white" opacity=".18" />
-          </pattern>
-        </defs>
-        <rect width="320" height="180" fill={`url(#${id})`} />
-        <rect width="320" height="180" fill={`url(#${id}d)`} />
-        {circles.map((c, i) => (
-          <circle key={i} cx={c.cx} cy={c.cy} r={c.r} fill="white" opacity={0.08 + i * 0.04} />
-        ))}
-        <path d={`M0 ${140 + pick(2, 30)} Q 160 ${100 + pick(9, 60)} 320 ${130 + pick(15, 40)} V180 H0Z`} fill="black" opacity=".12" />
-      </svg>
+    <div
+      className={`relative overflow-hidden bg-[color-mix(in_srgb,var(--cover)_9%,white)] dark:bg-[color-mix(in_srgb,var(--cover)_18%,#18181b)] ${className}`}
+      style={{ "--cover": t.from } as React.CSSProperties}
+      aria-hidden="true"
+    >
       <div className="absolute inset-0 grid place-items-center">
-        <span className="grid place-items-center rounded-2xl bg-white/20 p-3 text-white shadow-lg ring-1 ring-white/40 backdrop-blur-sm">
-          <Icon name={icon ?? t.icon} size={iconSize} strokeWidth={1.6} />
+        <span className="grid place-items-center rounded-2xl bg-white p-3 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-700" style={{ color: t.from }}>
+          <Icon name={icon ?? t.icon} size={Math.round(iconSize * 0.7)} strokeWidth={1.8} />
         </span>
       </div>
       {label && (

@@ -30,7 +30,7 @@ export function SignUpDialog() {
       aria-labelledby="signup-title"
       onClose={(e) => e.target === e.currentTarget && setReason(null)}
       onClick={(e) => e.target === ref.current && ref.current?.close()}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-3xl border border-violet-100 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 backdrop:backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-100"
+      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-violet-100 bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/50 backdrop:backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-100"
     >
       {reason && (
         <div className="max-h-[90vh] overflow-y-auto p-5 sm:p-6">

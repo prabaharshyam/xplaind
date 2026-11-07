@@ -177,7 +177,7 @@ export function AccountMenu() {
       >
         <span aria-hidden="true">{initial}</span>
       </summary>
-      <div className="absolute top-full right-0 z-50 mt-3 w-64 rounded-3xl border border-zinc-200 bg-white p-2 shadow-xl shadow-violet-950/10 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="absolute top-full right-0 z-50 mt-3 w-64 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-violet-950/10 dark:border-zinc-800 dark:bg-zinc-900">
         {email && (
           <p className="truncate px-3 pt-2 pb-1 text-sm text-zinc-600 dark:text-zinc-400">
             Signed in as <span className="font-medium text-zinc-900 dark:text-zinc-100">{email}</span>

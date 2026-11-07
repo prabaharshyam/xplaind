@@ -111,7 +111,7 @@ export function CheatsheetView({ sheet }: { sheet: Cheatsheet }) {
             data-cs-section
             aria-labelledby={`cs-${si}`}
             style={{ transitionDelay: `${(si % 3) * 80}ms` }}
-            className="cs-section mb-5 break-inside-avoid rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] dark:border-zinc-800 dark:bg-zinc-900"
+            className="cs-section mb-5 break-inside-avoid rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
           >
             <h2 id={`cs-${si}`} className="flex items-center gap-2 text-base font-semibold">
               <span className="grid size-6 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-800 dark:bg-violet-950 dark:text-violet-200">{si + 1}</span>

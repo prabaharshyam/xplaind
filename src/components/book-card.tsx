@@ -11,7 +11,7 @@ function Spine({ book }: { book: Book }) {
   return (
     <div
       aria-hidden="true"
-      className="flex h-28 w-20 shrink-0 flex-col justify-between rounded-r-md rounded-l-sm p-2 text-white shadow-md ring-1 ring-black/10"
+      className="flex h-28 w-20 shrink-0 flex-col justify-between rounded-r-md rounded-l-sm p-2 text-white ring-1 ring-black/10"
       style={{ background: `linear-gradient(160deg, hsl(${hue} 55% 38%), hsl(${(hue + 40) % 360} 60% 24%))` }}
     >
       <span className="line-clamp-4 text-[10px] leading-tight font-semibold">{book.title}</span>
@@ -27,7 +27,7 @@ function Spine({ book }: { book: Book }) {
 export function BookCard({ book, compact = false }: { book: Book; compact?: boolean }) {
   const level = getLevel(book.level);
   return (
-    <article data-tilt="4" className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950/60">
+    <article className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950/60">
       <Spine book={book} />
       <div className="min-w-0 flex-1">
         <h3 className={`${compact ? "text-base" : "text-lg"} leading-snug font-semibold`}>{book.title}</h3>

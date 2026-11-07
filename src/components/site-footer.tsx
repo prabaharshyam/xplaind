@@ -56,7 +56,7 @@ const link = "rounded text-zinc-600 underline-offset-4 hover:text-zinc-950 hover
 export function SiteFooter() {
   const whatsapp = getCommunity().whatsapp_url;
   return (
-    <footer className="site-footer relative mt-16 overflow-hidden border-t border-violet-100 bg-gradient-to-b from-white via-violet-50/50 to-teal-50/40 text-sm dark:border-white/10 dark:from-[#0e0b1c] dark:via-[#110d24] dark:to-[#0b1230]">
+    <footer className="site-footer relative mt-16 overflow-hidden border-t border-zinc-200 bg-white text-sm dark:border-white/10 dark:bg-[#0e0b1c]">
       <div className="mx-auto max-w-6xl px-4 pt-12 pb-8 md:px-6">
         <div className="grid gap-10 lg:grid-cols-[1.1fr_2fr]">
           <div className="max-w-sm">
