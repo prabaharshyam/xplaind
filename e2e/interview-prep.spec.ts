@@ -29,3 +29,11 @@ test("a system design answer walks through the 35-minute shape (IP-2)", async ({
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });
+
+test("the software engineering and Git track lists its lessons (SE-1)", async ({ page }) => {
+  await page.goto("/topics/software-engineering");
+  await expect(page.getByRole("heading", { level: 1, name: "Software engineering" })).toBeVisible();
+  for (const name of ["Git branches, merging and rebasing", "Writing tests with pytest", "Debugging systematically", "Code review: giving and getting good reviews"]) {
+    await expect(page.getByRole("link", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first()).toBeVisible();
+  }
+});

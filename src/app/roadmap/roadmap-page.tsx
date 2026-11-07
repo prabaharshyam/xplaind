@@ -67,14 +67,15 @@ function InterviewTracks() {
   const tracks = [
     { theme: "dsa", icon: "tree" as const, title: "Data structures and algorithms", lead: "Big-O, hash maps, trees and graphs, binary search, dynamic programming." },
     { theme: "system-design", icon: "server" as const, title: "System design", lead: "Scaling, databases, caching, queues and a full URL shortener design." },
+    { theme: "software-engineering", icon: "code" as const, title: "Software engineering and Git", lead: "Git branches and undo, tests, debugging, clean code, code review and design principles." },
   ];
   return (
     <section aria-labelledby="interview-tracks-h" className="mt-10 rounded-3xl bg-gradient-to-br from-violet-50 to-teal-50 p-5 ring-1 ring-violet-200 md:p-6 dark:from-teal-950/30 dark:via-violet-950/30 dark:to-teal-950/30 dark:ring-violet-900">
       <h2 id="interview-tracks-h" className="text-lg font-semibold">
         Interview foundations for this role
       </h2>
-      <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">Coding interviews for this role usually include a DSA round and a system design round. Add these tracks alongside your roadmap.</p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">Coding interviews for this role usually include a DSA round and a system design round, and the job expects solid engineering habits. Add these tracks alongside your roadmap.</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tracks.map((t) => (
           <Link key={t.theme} href={`/topics/${t.theme}`} className="lx-rise flex items-start gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200 hover:ring-violet-400 dark:bg-zinc-900 dark:ring-zinc-800">
             <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">

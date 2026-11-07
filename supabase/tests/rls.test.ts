@@ -31,6 +31,9 @@ beforeAll(async () => {
   await q("insert into email_subscriptions (email, user_id, source, consent_text, consent_at) values ('a@example.com', $1, 'landing', 'Yes, email me', now())", [A]);
   await q("insert into resource_clicks (resource_id, stop_id, level) values ('cs50p', 'python-basics', 'B2')");
   await q("insert into roadmap_downloads (path_id, name, email, experience, consent_text, user_id) values ('genai-engineer', 'Asha', 'a@example.com', 'fresher', 'Yes', $1)", [A]);
+  for (const [id, email] of [[A, "a@example.com"], [B, "b@example.com"]]) {
+    await q("insert into commitments (user_id, path_id, email, consent_text) values ($1, 'ai-engineer', $2, 'Yes, email me weekly')", [id, email]);
+  }
 }, 60_000);
 
 afterAll(async () => {
@@ -248,5 +251,30 @@ describe("account deletion (AC-11)", () => {
       const kept = (await q(`select count(*)::int as n from ${table} where ${ownerColumn(table)} = $1`, [A])).rows[0].n;
       expect(kept, table).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("90-day commitment emails (CM-90)", () => {
+  it("a learner reads only their own commitment, and not its unsubscribe token or email", async () => {
+    const rows = await asUser(db.client, A, async () => (await q("select user_id, path_id, last_sent_week from commitments")).rows);
+    expect(rows).toEqual([{ user_id: A, path_id: "ai-engineer", last_sent_week: 0 }]);
+    await fails(asUser(db.client, A, () => q("select unsubscribe_token from commitments")));
+    await fails(asUser(db.client, A, () => q("select email from commitments")));
+  });
+
+  it("only the server writes commitments", async () => {
+    await fails(asUser(db.client, A, () => q("insert into commitments (user_id, path_id, email, consent_text) values ($1, 'x', 'a@example.com', 'y')", [A])));
+    const updated = await asUser(db.client, A, () => q("update commitments set last_sent_week = 13 where user_id = $1", [A]).then((r) => r.rowCount, () => -1));
+    expect(updated === 0 || updated === -1).toBe(true);
+    expect((await q("select last_sent_week from commitments where user_id = $1", [A])).rows[0].last_sent_week).toBe(0);
+    const err = await fails(asUser(db.client, null, () => q("select * from commitments")));
+    expect(err.code).toBe(PERMISSION_DENIED);
+  });
+
+  it("is removed with the account", async () => {
+    await q("insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000cc', 'c@example.com')");
+    await q("insert into commitments (user_id, path_id, email, consent_text) values ('00000000-0000-4000-8000-0000000000cc', 'p', 'c@example.com', 'Yes')");
+    await q("delete from auth.users where id = '00000000-0000-4000-8000-0000000000cc'");
+    expect((await q("select count(*)::int as n from commitments where email = 'c@example.com'")).rows[0].n).toBe(0);
   });
 });

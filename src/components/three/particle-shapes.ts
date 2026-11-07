@@ -67,6 +67,7 @@ export const THEME_SHAPE: Record<ThemeId, ParticleShape> = {
   client: "icon:people",
   career: "trophy",
   dsa: "tree",
+  "software-engineering": "layers",
   "system-design": "serverRack",
   rust: "cog",
   "ai-tools": "icon:bolt",
