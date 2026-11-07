@@ -20,7 +20,6 @@ const HUB: { href: string; title: string; text: string; icon: IconName }[] = [
   { href: "/interview/design", title: "System design answers", text: "Worked LLM designs in the 35-minute shape interviewers expect.", icon: "target" },
   { href: "/interview/simulator", title: "Mock interview", text: "Answer out loud and get a report on the key points you covered.", icon: "mic" },
   { href: "/interview/answers", title: "Q&A by role", text: "Every question for your role with a short and a deeper answer.", icon: "chat" },
-  { href: "/cheatsheets", title: "Cheatsheets", text: "One page per topic to revise the night before.", icon: "book" },
   { href: "/practice", title: "Practice cards", text: "Flashcards that bring back the questions you missed.", icon: "check" },
 ];
 

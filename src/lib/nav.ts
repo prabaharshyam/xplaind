@@ -23,7 +23,6 @@ export const NAV_GROUPS: Group[] = [
     label: "Practice",
     items: [
       { href: "/practice", label: "Practice cards", note: "Flashcards for interview questions" },
-      { href: "/cheatsheets", label: "Cheatsheets", note: "One page per topic, quiz or download" },
       { href: "/playground", label: "Code playground", note: "Run Python in your browser" },
       { href: "/plan", label: "Weekly plan", note: "This week's lessons for your hours" },
     ],
