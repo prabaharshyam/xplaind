@@ -24,7 +24,12 @@ const nextConfig: NextConfig = {
     ];
     // 2026-11-02: the AI coach was merged into the AI tutor.
     const merged = [{ source: "/ai/coach", destination: "/ai/tutor", permanent: true }];
-    return [...merged, ...moved.flatMap(([from, to]) => [
+    // 2026-11-08: cheatsheets are paused for now; old links land on Practice. Temporary, since they come back.
+    const paused = [
+      { source: "/cheatsheets", destination: "/practice", permanent: false },
+      { source: "/cheatsheets/:id", destination: "/practice", permanent: false },
+    ];
+    return [...merged, ...paused, ...moved.flatMap(([from, to]) => [
       { source: `/roadmap/${from}`, destination: `/roadmap/${to}`, permanent: true },
       { source: `/interview/for/${from}`, destination: `/interview/for/${to}`, permanent: true },
       { source: `/interview/top/${from}`, destination: `/interview/top/${to}`, permanent: true },
