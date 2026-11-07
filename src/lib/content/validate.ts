@@ -184,6 +184,33 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     if (!/^\|.+\|\s*\n\|[\s:|-]+\|/m.test(s.body)) error(file, "a deep lesson has at least one table");
     if (/^# /m.test(s.body.replace(/^```[\s\S]*?^```/gm, ""))) error(file, "lesson text starts its headings at ##");
   }
+  // IP-1, IP-2: patterns and designs link only to things that exist, and their diagrams parse.
+  {
+    const qIds = new Set(bundle.interview.map((x) => x.data.id));
+    const lessonIds = new Set(bundle.stops.map((x) => x.data.id));
+    const patternIds = new Set(bundle.patterns.map((x) => x.data.id));
+    const check = (file: string, kind: string, ids: string[], known: Set<string>) => {
+      for (const id of ids) if (!known.has(id)) error(file, `${kind} "${id}" does not exist`, "IP-1");
+    };
+    const flow = (file: string, src: string) => {
+      try {
+        parseFlow(src);
+      } catch (e) {
+        error(file, `diagram: ${e instanceof Error ? e.message : String(e)}`, "IP-1");
+      }
+    };
+    for (const { file, data: p } of bundle.patterns) {
+      check(file, "question", p.questions, qIds);
+      check(file, "lesson", p.lessons, lessonIds);
+      flow(file, p.flow);
+    }
+    for (const { file, data: d } of bundle.designs) {
+      check(file, "question", d.questions, qIds);
+      check(file, "lesson", d.lessons, lessonIds);
+      check(file, "pattern", d.patterns, patternIds);
+      flow(file, d.architecture);
+    }
+  }
   // CS-1: a cheatsheet points only at lessons that exist, and each id is used once.
   const stopIds = new Set(bundle.stops.map((x) => x.data.id));
   const sheetIds = new Set<string>();

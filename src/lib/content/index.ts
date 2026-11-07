@@ -7,7 +7,7 @@ import type { LevelId } from "@/lib/levels";
 import { loadContent } from "./load";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
-import type { BlogPost, Certification, Cheatsheet, Testimonial, Channel, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
+import type { BlogPost, Certification, Cheatsheet, InterviewPattern, SystemDesign, Testimonial, Channel, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
 
 let cached: Bundle | undefined;
 
@@ -113,3 +113,10 @@ export const getCheatsheet = (id: string): Cheatsheet | undefined => getCheatshe
 
 /** SO-1: what real users said, in file order. */
 export const getTestimonials = (): Testimonial[] => getContent().testimonials.map((t) => t.data);
+
+/** IP-1: interview patterns, in file order within each category. */
+export const getPatterns = (): InterviewPattern[] => getContent().patterns.map((p) => p.data);
+export const getPattern = (id: string): InterviewPattern | undefined => getPatterns().find((p) => p.id === id);
+/** IP-2: worked system design answers. */
+export const getDesigns = (): SystemDesign[] => getContent().designs.map((d) => d.data);
+export const getDesign = (id: string): SystemDesign | undefined => getDesigns().find((d) => d.id === id);

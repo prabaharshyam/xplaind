@@ -99,7 +99,7 @@ test("the menu is grouped and marks the section you are in (NV-1 to NV-3)", asyn
   await page.goto("/roadmap/ai-engineer");
   const desktop = page.locator(".site-header nav[aria-label='Main']").first();
   await expect(desktop.locator("summary", { hasText: "Learn" })).toContainText("current section");
-  await desktop.locator("summary", { hasText: "Practice" }).click();
+  await desktop.locator("summary", { hasText: "Interview" }).click();
   await desktop.getByRole("link", { name: /Mock interview/ }).click();
   await expect(page).toHaveURL(/\/interview\/simulator$/);
 });

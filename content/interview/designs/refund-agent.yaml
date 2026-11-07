@@ -1,0 +1,84 @@
+id: refund-agent
+title: A refund agent for an online store
+prompt: 'Design an agent that handles refund requests end to end: checks the order, decides, and issues the refund.'
+summary: A tool-using agent with task-shaped tools, rules for what it may do alone, human approval above a limit, and full audit.
+clarify:
+- What refund policy applies, and which cases are judgement calls?
+- Up to what amount may it refund without a person?
+- 'Which systems: orders, payments, courier tracking?'
+- How many requests a day?
+requirements:
+  functional:
+  - Read the order and delivery status
+  - Apply the refund policy and explain the decision
+  - Issue refunds within limits; ask a person above them
+  - Tell the customer the outcome
+  non_functional:
+  - No refund issued twice for the same order
+  - Every step logged with its reason
+  - A person can stop the agent at once
+estimates:
+- label: Volume
+  value: 8,000 refund requests a day
+- label: Steps per run
+  value: 4-8 tool calls, under 30 s
+- label: Approval share
+  value: About 10% need a person
+architecture: 'Customer request -> Agent loop
+
+  Agent loop -> get_order | read
+
+  Agent loop -> get_delivery_status | read
+
+  Agent loop -> refund_quote | read
+
+  refund_quote -> Within the auto limit?
+
+  Within the auto limit? -[yes]-> issue_refund | idempotency key = order id
+
+  Within the auto limit? -[no]-> Human approval card
+
+  Human approval card -[approved]-> issue_refund
+
+  issue_refund -> Tell the customer -> Audit log'
+deep_dives:
+- title: Tools
+  body: Three read tools and one action tool, each with a strict schema. issue_refund takes a quote id, not an amount, so the model cannot invent a figure, and uses the order id as an idempotency key.
+- title: Approval
+  body: 'Rules decide what is automatic: under ₹2,000, delivered and within policy. Everything else pauses with a checkpoint and an approval card showing the evidence; no reply in 4 hours escalates.'
+failures:
+- risk: Double refund
+  mitigation: Idempotency key on the order; the payment API rejects repeats
+- risk: Agent loops
+  mitigation: Step cap of 10 and repeated-call detection
+- risk: Injected instructions in the message
+  mitigation: The refund amount comes from the quote tool, never from text
+- risk: Runaway cost
+  mitigation: Token budget per task and a kill switch
+evals:
+- 'Sandbox runs with seeded orders: right refund state, approval before large refunds, zero safety violations'
+- Success on all of 3 runs per task
+- Human review of a weekly sample of decisions
+trade_offs:
+- An agent over a fixed workflow only because cases vary; simple cases could be a workflow
+- A lower auto limit means more approvals but less risk
+follow_ups:
+- How do you stop it from being talked into a refund?
+- How would you test it before launch?
+patterns:
+- agent-loop
+- tool-design
+- human-approval
+- budgets-kill-switch
+- trajectory-evals
+questions:
+- design-refund-agent
+- human-approval
+- agent-failure-modes
+lessons:
+- agent-loop
+- agent-tool-design
+- human-approval
+- evaluating-agents
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-07'
