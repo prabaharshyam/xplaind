@@ -8,6 +8,8 @@ import type {
   GlossaryTerm,
   Cheatsheet,
   Testimonial,
+  InterviewPattern,
+  SystemDesign,
   GuidedProject,
   InterviewQuestion,
   LevelDefinition,
@@ -45,6 +47,8 @@ export type Bundle = {
   projects: Entry<GuidedProject>[];
   cheatsheets: Entry<Cheatsheet>[];
   testimonials: Entry<Testimonial>[];
+  patterns: Entry<InterviewPattern>[];
+  designs: Entry<SystemDesign>[];
 };
 
 export const emptyBundle = (): Bundle => ({
@@ -63,4 +67,6 @@ export const emptyBundle = (): Bundle => ({
   projects: [],
   cheatsheets: [],
   testimonials: [],
+  patterns: [],
+  designs: [],
 });

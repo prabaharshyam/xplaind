@@ -642,3 +642,51 @@ export const TestimonialsFile = z.strictObject({
   testimonials: z.array(z.strictObject({ name: Text.max(60), role: Text.max(60), quote: Text.max(600) })).max(30),
 });
 export type Testimonial = z.infer<typeof TestimonialsFile>["testimonials"][number];
+
+// --------------------------------------------------------------- interview ---
+
+export const PATTERN_CATEGORIES = ["retrieval", "agents", "evals", "serving", "safety"] as const;
+
+/** IP-1: a named AI interview pattern: when to use it, how it works, its trade-offs and how to say it. */
+export const InterviewPattern = z.strictObject({
+  id: Slug,
+  name: Text.max(60),
+  category: z.enum(PATTERN_CATEGORIES),
+  summary: Text.max(220),
+  when_to_use: z.array(Text.max(200)).min(2).max(6),
+  /** A ```flow diagram source (RM-14) of how the pattern works. */
+  flow: Text,
+  trade_offs: z.array(Text.max(240)).min(2).max(6),
+  pitfalls: z.array(Text.max(240)).min(2).max(6),
+  /** How to name and explain it in an interview, in two or three sentences. */
+  say_it: Text.max(600),
+  questions: z.array(Slug).default([]),
+  lessons: z.array(Slug).min(1),
+  reviewed_by: Text,
+  reviewed_on: IsoDate,
+});
+export type InterviewPattern = z.infer<typeof InterviewPattern>;
+
+/** IP-2: a worked LLM system design answer, in the shape of a 35-minute interview. */
+export const SystemDesign = z.strictObject({
+  id: Slug,
+  title: Text.max(90),
+  prompt: Text.max(240),
+  summary: Text.max(240),
+  clarify: z.array(Text.max(200)).min(3).max(8),
+  requirements: z.strictObject({ functional: z.array(Text.max(200)).min(2).max(8), non_functional: z.array(Text.max(200)).min(2).max(8) }),
+  estimates: z.array(z.strictObject({ label: Text.max(80), value: Text.max(160) })).min(2).max(8),
+  /** A ```flow diagram source (RM-14) of the high-level design. */
+  architecture: Text,
+  deep_dives: z.array(z.strictObject({ title: Text.max(80), body: Text.max(1200) })).min(2).max(5),
+  failures: z.array(z.strictObject({ risk: Text.max(160), mitigation: Text.max(280) })).min(3).max(8),
+  evals: z.array(Text.max(240)).min(2).max(6),
+  trade_offs: z.array(Text.max(260)).min(2).max(6),
+  follow_ups: z.array(Text.max(200)).min(2).max(6),
+  patterns: z.array(Slug).min(1),
+  questions: z.array(Slug).default([]),
+  lessons: z.array(Slug).min(1),
+  reviewed_by: Text,
+  reviewed_on: IsoDate,
+});
+export type SystemDesign = z.infer<typeof SystemDesign>;

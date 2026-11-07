@@ -13,6 +13,8 @@ import {
   GlossaryTerm,
   Cheatsheet,
   TestimonialsFile,
+  InterviewPattern,
+  SystemDesign,
   GuidedProject,
   CheckQuestion,
   Goal,
@@ -213,5 +215,7 @@ export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   bundle.projects = loadYamlDir(root, "projects", GuidedProject, issues);
   bundle.cheatsheets = loadYamlDir(root, "cheatsheets", Cheatsheet, issues);
   bundle.testimonials = loadTestimonials(root, issues);
+  bundle.patterns = loadYamlDir(root, "interview/patterns", InterviewPattern, issues);
+  bundle.designs = loadYamlDir(root, "interview/designs", SystemDesign, issues);
   return { bundle, issues };
 }

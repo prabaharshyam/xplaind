@@ -1,0 +1,89 @@
+id: support-rag-assistant
+title: A customer support assistant for an Indian bank
+prompt: Design an AI assistant that answers customer questions for a bank, in English and Hindi, on the website and WhatsApp.
+summary: RAG over approved policy documents, read-only account tools behind login, strict guardrails, and a clean hand-off to people.
+clarify:
+- Which questions may it answer, and which must always go to a person (fraud, disputes, complaints)?
+- Which languages and channels, and how many conversations a day?
+- May it see account data, and how is the customer verified?
+- 'What does success mean: resolution rate, correct hand-offs, satisfaction, cost?'
+requirements:
+  functional:
+  - Answer product, fee and process questions from current policy, with links
+  - Show balance and recent transactions after verification
+  - Hand over to an agent with a summary
+  - Work in English and Hindi on web and WhatsApp
+  non_functional:
+  - First words in under 2 s; full answer under 8 s
+  - No investment advice; no data from another customer, ever
+  - Every answer and action logged for audit
+  - Data stays in an Indian region
+estimates:
+- label: Volume
+  value: 50,000 conversations a day, peak 15 requests a second
+- label: Tokens per turn
+  value: About 3,000 in (prompt, history, 5 passages) and 300 out
+- label: Corpus
+  value: About 2,000 policy pages, updated weekly
+architecture: 'Customer -> Web chat or WhatsApp -> API
+
+  API -> Input guardrails
+
+  Input guardrails -> Router
+
+  Router -[policy question]-> Hybrid search + rerank -> Policy index
+
+  Router -[account question, verified]-> Read-only account tools
+
+  Router -[fraud, dispute, unsure]-> Hand-off to an agent
+
+  Hybrid search + rerank -> Model via gateway
+
+  Read-only account tools -> Model via gateway
+
+  Model via gateway -> Output guardrails -> Answer with citations'
+deep_dives:
+- title: Retrieval
+  body: Chunk policies by heading with the title path, keep version and effective date as metadata, filter out superseded versions, and use hybrid search (codes like "NEFT" need keywords) with a reranker. Measure recall at 5 on 300 real questions in both languages.
+- title: Account tools and safety
+  body: Account tools are read-only and take the customer id from the verified session, never from the model. Permission checks live in code. Output checks block advice and any account number that is not the customer's own.
+- title: Languages
+  body: Keep one English index and translate the question for search, answering in the customer's language; build a separate eval set per language because quality differs.
+failures:
+- risk: Hallucinated policy
+  mitigation: Answer only from cited passages; refuse with a link to a person when nothing matches
+- risk: Prompt injection in a message
+  mitigation: Tools are read-only and scoped to the session; untrusted text in marked sections
+- risk: Model provider outage
+  mitigation: Gateway fallback to a second region, then a scripted "we will call you back" flow
+- risk: Stale policy
+  mitigation: Weekly re-index with effective dates; old versions filtered out
+evals:
+- Golden set of 300 questions per language with required facts and correct hand-off
+- Recall at 5 for retrieval, faithfulness by a calibrated judge
+- 'Online: hand-off rate, thumbs-down reasons, 50 traces reviewed a week'
+trade_offs:
+- 'RAG over fine-tuning: policies change weekly and answers need citations'
+- More refusals early in exchange for zero invented policy
+- A small model for routing and a large one for answers, to control cost
+follow_ups:
+- How would you handle a question in Tamil?
+- What would you never let the bot do, and how is that enforced?
+- What do you watch in the first week after launch?
+patterns:
+- rag-pipeline
+- hybrid-search-rerank
+- metadata-permission-filters
+- guardrail-layers
+- llm-gateway
+- grounded-citations
+questions:
+- design-support-bot
+- whatsapp-bot-handoff
+lessons:
+- ai-system-design
+- rag-app
+- guardrails
+- chat-assistants-whatsapp
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-07'

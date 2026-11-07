@@ -1,0 +1,75 @@
+id: enterprise-search-permissions
+title: Enterprise search with permissions
+prompt: Design an AI search assistant over a company's SharePoint, Jira and Google Drive, where each employee sees only what they are allowed to.
+summary: Connectors that sync content and permissions, permission-aware retrieval inside the search, and grounded answers with citations.
+clarify:
+- Which sources, how many documents, how often do they change?
+- How are permissions defined, and how fast must a revoked permission take effect?
+- Do we answer questions or only find documents?
+- Single sign-on provider?
+requirements:
+  functional:
+  - Search and answer across sources with citations
+  - Respect each source's access rights
+  - Show freshness and the source of every answer
+  non_functional:
+  - A revoked permission applies within 10 minutes
+  - p95 answer under 6 s
+  - Audit log of who asked what and what was retrieved
+estimates:
+- label: Corpus
+  value: 2 million documents, about 40 million chunks
+- label: Users
+  value: 20,000 employees, peak 50 queries a second
+- label: Change rate
+  value: About 30,000 documents changed a day
+architecture: 'SharePoint -[delta sync]-> Connectors
+
+  Jira -[modified since]-> Connectors
+
+  Google Drive -[changes API]-> Connectors
+
+  Connectors -> Parse, chunk, embed -> Index with allowed groups
+
+  Employee -[SSO]-> API -> Verified groups
+
+  Verified groups -> Hybrid search filtered by groups -> Index with allowed groups
+
+  Hybrid search filtered by groups -> Rerank -> Model -> Answer with citations'
+deep_dives:
+- title: Permissions
+  body: Store allowed users and groups on every chunk; filter inside the search before ranking; a chunk with missing permissions is visible to nobody. Re-sync permissions every 10 minutes and on webhook events, separate from content sync.
+- title: Connectors
+  body: Incremental sync with delta tokens, page through results, back off on 429s, resume after failure, and handle deletions. Every run logs read, added, changed, deleted and failed counts.
+failures:
+- risk: A leak through stale permissions
+  mitigation: Fast permission sync, deny by default, and an alert when sync lags
+- risk: Connector falls behind
+  mitigation: Lag metric per source and a backfill job
+- risk: Answers mix old and new versions
+  mitigation: Version metadata and filters for the latest
+evals:
+- 'Access tests: users from different groups must never see each other''s restricted chunks'
+- Golden set of 200 questions with the expected source documents
+- 'Freshness: time from edit to searchable'
+trade_offs:
+- Filtering inside the search costs some speed but prevents leaks
+- 'Answering vs only finding: answers are useful but need grounding and evals'
+follow_ups:
+- What happens when someone leaves a group?
+- How would you search scanned PDFs?
+patterns:
+- metadata-permission-filters
+- hybrid-search-rerank
+- grounded-citations
+- rag-pipeline
+questions:
+- permission-aware-retrieval
+- connect-enterprise-data
+- sso-for-enterprise-copilot
+lessons:
+- permission-aware-rag
+- enterprise-connectors
+- single-sign-on
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-07'

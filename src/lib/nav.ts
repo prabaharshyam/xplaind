@@ -24,10 +24,20 @@ export const NAV_GROUPS: Group[] = [
     items: [
       { href: "/practice", label: "Practice cards", note: "Flashcards for interview questions" },
       { href: "/cheatsheets", label: "Cheatsheets", note: "One page per topic, quiz or download" },
-      { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report" },
-      { href: "/interview/answers", label: "Interview Q&A", note: "Every question and answer, by role" },
       { href: "/playground", label: "Code playground", note: "Run Python in your browser" },
       { href: "/plan", label: "Weekly plan", note: "This week's lessons for your hours" },
+    ],
+  },
+  {
+    // IP-3, 7 Nov 2026: interview prep gets its own menu, the AlgoMaster-style spine of the site.
+    id: "interview",
+    label: "Interview",
+    items: [
+      { href: "/interview/patterns", label: "Interview patterns", note: "The ideas AI interviews are built on" },
+      { href: "/interview/design", label: "System design answers", note: "Worked LLM designs, step by step" },
+      { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report" },
+      { href: "/interview/answers", label: "Interview Q&A", note: "Every question and answer, by role" },
+      { href: "/interview", label: "Question bank", note: "Every question, by topic and role" },
     ],
   },
   {
@@ -57,7 +67,7 @@ export function activeGroup(path: string): string | null {
   if (under(path, "/ai/resume")) return "career";
   if (under(path, "/ai")) return "ai";
   if (under(path, "/roadmap") || under(path, "/stop") || under(path, "/start") || under(path, "/resources")) return "learn";
-  if (under(path, "/interview")) return "practice";
+  if (under(path, "/interview")) return "interview";
   for (const g of NAV_GROUPS) if (g.items.some((i) => under(path, i.href))) return g.id;
   return null;
 }

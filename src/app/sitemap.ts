@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { contentUpdatedOn, getBlogPosts, getCheatsheets, getContent, getPaths, getProjects, getStops } from "@/lib/content";
+import { contentUpdatedOn, getBlogPosts, getCheatsheets, getDesigns, getPatterns, getContent, getPaths, getProjects, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { INTERVIEW_TOPIC_IDS } from "@/lib/interview-topics";
 import { LEVEL_IDS } from "@/lib/levels";
@@ -48,6 +48,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...INTERVIEW_TOPIC_IDS.map((t) => `/practice/${t}`),
     "/projects",
     "/cheatsheets",
+    "/interview/patterns",
+    ...getPatterns().map((p) => `/interview/patterns/${p.id}`),
+    "/interview/design",
+    ...getDesigns().map((d) => `/interview/design/${d.id}`),
     ...getCheatsheets().map((c) => `/cheatsheets/${c.id}`),
     "/library",
     "/videos",
@@ -72,6 +76,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...getContent().interview.map(({ data: q }) => [`/interview/${q.id}`, q.reviewed_on] as const),
     ...getProjects().map((p) => [`/projects/${p.id}`, p.reviewed_on] as const),
     ...getCheatsheets().map((c) => [`/cheatsheets/${c.id}`, c.reviewed_on] as const),
+    ...getPatterns().map((p) => [`/interview/patterns/${p.id}`, p.reviewed_on] as const),
+    ...getDesigns().map((d) => [`/interview/design/${d.id}`, d.reviewed_on] as const),
     ...getBlogPosts().map((b) => [`/blog/${b.id}`, b.updated_on] as const),
   ]);
   const newest = [PAGES_UPDATED_ON, contentUpdatedOn(), ...dated.values()].reduce((m, d) => (d > m ? d : m));

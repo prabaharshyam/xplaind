@@ -7,8 +7,9 @@ describe("activeGroup (NV-2)", () => {
     expect(activeGroup("/roadmap/ai-engineer")).toBe("learn");
     expect(activeGroup("/stop/rag-app")).toBe("learn");
     expect(activeGroup("/library")).toBe("learn");
-    expect(activeGroup("/interview/simulator")).toBe("practice");
-    expect(activeGroup("/interview/rag-basics")).toBe("practice");
+    expect(activeGroup("/interview/simulator")).toBe("interview");
+    expect(activeGroup("/interview/rag-basics")).toBe("interview");
+    expect(activeGroup("/interview/patterns/rag-pipeline")).toBe("interview");
     expect(activeGroup("/practice/rag")).toBe("practice");
     expect(activeGroup("/jobs")).toBe("career");
     expect(activeGroup("/ai/resume")).toBe("career");
