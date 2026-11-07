@@ -29,10 +29,10 @@ test("the videos page filters by topic, level, length and search, and shows view
   expect(chipCount).toBeLessThan(all);
 
   // level and length narrow it further
-  await page.getByLabel("Level").selectOption("B");
+  await page.getByRole("combobox", { name: /^Level/ }).selectOption("B");
   const beginner = await count(page);
   expect(beginner).toBeLessThanOrEqual(chipCount);
-  await page.getByLabel("Length").selectOption("short");
+  await page.getByRole("combobox", { name: /^Length/ }).selectOption("short");
   expect(await count(page)).toBeLessThanOrEqual(beginner);
 
   // search, with a way back
@@ -51,7 +51,7 @@ test("sorting puts the most viewed first and the shortest first", async ({ page 
   };
   const top = await views();
   expect(top).toBeGreaterThan(100_000);
-  await page.getByLabel("Sort by").selectOption("short");
+  await page.getByRole("combobox", { name: /^Sort by/ }).selectOption("short");
   const first = (await page.locator("article").first().textContent()) ?? "";
   expect(first).toMatch(/\b[1-5] min\b/);
 });
