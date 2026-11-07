@@ -36,7 +36,7 @@ test("cheatsheets are listed from Practice and each one quizzes, filters and dow
 test("the home page shows what early users said (SO-1)", async ({ page }) => {
   await page.goto("/");
   const section = page.getByRole("region", { name: "What early learners say" });
-  await expect(section.getByText("Rajakumar")).toBeVisible();
+  await expect(section.getByText("Rajakumar", { exact: true })).toBeVisible();
   await expect(section.getByText("Program Manager at MNC")).toBeVisible();
   await expect(section.locator("figure")).toHaveCount(5);
 });

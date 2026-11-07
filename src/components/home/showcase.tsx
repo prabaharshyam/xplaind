@@ -133,7 +133,7 @@ export function MiniPlan() {
           <span
             key={i}
             className={`grid size-8 place-items-center rounded-full text-xs font-semibold ${
-              x.done ? "bg-emerald-500 text-white" : x.today ? "border-2 border-violet-600 text-violet-800 dark:text-violet-300" : "border border-zinc-300 text-zinc-500 dark:border-zinc-700"
+              x.done ? "bg-emerald-500 text-white" : x.today ? "border-2 border-violet-600 text-violet-800 dark:text-violet-300" : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400"
             }`}
           >
             {x.done ? "✓" : x.d}
@@ -144,7 +144,7 @@ export function MiniPlan() {
         {plan.map((p) => (
           <li key={p.title} className={`flex items-center gap-2 rounded-2xl px-3 py-1.5 ${p.today ? "bg-violet-50 dark:bg-violet-950/50" : "bg-zinc-50 dark:bg-zinc-950"}`}>
             <span className={`grid size-4 shrink-0 place-items-center rounded-full text-[10px] ${p.done ? "bg-emerald-500 text-white" : "border border-zinc-300 dark:border-zinc-600"}`}>{p.done ? "✓" : ""}</span>
-            <span className={`min-w-0 flex-1 truncate ${p.done ? "text-zinc-500 line-through" : "font-medium"}`}>{p.title}</span>
+            <span className={`min-w-0 flex-1 truncate ${p.done ? "text-zinc-600 line-through dark:text-zinc-400" : "font-medium"}`}>{p.title}</span>
             <span className="text-xs text-zinc-600 dark:text-zinc-400">{p.min} min</span>
           </li>
         ))}

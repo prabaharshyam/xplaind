@@ -49,7 +49,7 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
         ref={row}
         tabIndex={0}
         aria-label="Testimonials, scroll sideways"
-        className="-mx-4 flex snap-x snap-mandatory items-start gap-5 overflow-x-auto scroll-smooth px-4 pb-4 [scrollbar-width:thin] md:-mx-6 md:px-6 motion-reduce:scroll-auto"
+        className="relative -mx-4 flex snap-x snap-mandatory items-start gap-5 overflow-x-auto scroll-smooth px-4 pb-4 [scrollbar-width:thin] md:-mx-6 md:px-6 motion-reduce:scroll-auto"
       >
         {items.map((t) => {
           const full = open.has(t.name);
