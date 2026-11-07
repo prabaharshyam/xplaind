@@ -8,6 +8,7 @@ import type {
   GlossaryTerm,
   Cheatsheet,
   Testimonial,
+  VideoViews,
   InterviewPattern,
   SystemDesign,
   GuidedProject,
@@ -47,6 +48,8 @@ export type Bundle = {
   projects: Entry<GuidedProject>[];
   cheatsheets: Entry<Cheatsheet>[];
   testimonials: Entry<Testimonial>[];
+  /** VD-1: view counts for video lessons, or null when the file is missing. */
+  videoViews: VideoViews | null;
   patterns: Entry<InterviewPattern>[];
   designs: Entry<SystemDesign>[];
 };
@@ -67,6 +70,7 @@ export const emptyBundle = (): Bundle => ({
   projects: [],
   cheatsheets: [],
   testimonials: [],
+  videoViews: null,
   patterns: [],
   designs: [],
 });

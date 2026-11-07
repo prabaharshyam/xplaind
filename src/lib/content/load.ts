@@ -13,6 +13,7 @@ import {
   GlossaryTerm,
   Cheatsheet,
   TestimonialsFile,
+  VideoViewsFile,
   InterviewPattern,
   SystemDesign,
   GuidedProject,
@@ -193,6 +194,20 @@ function loadTestimonials(root: string, issues: Issue[]): Bundle["testimonials"]
   return parsed.data.testimonials.map((data) => ({ file, data }));
 }
 
+function loadVideoViews(root: string, issues: Issue[]): Bundle["videoViews"] {
+  const file = "video-views.yaml";
+  const abs = path.join(root, file);
+  if (!fs.existsSync(abs)) return null;
+  const raw = readYaml(abs, file, issues);
+  if (raw === undefined) return null;
+  const parsed = VideoViewsFile.safeParse(raw);
+  if (!parsed.success) {
+    issues.push(...zodToIssues(file, parsed.error));
+    return null;
+  }
+  return parsed.data;
+}
+
 export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   const issues: Issue[] = [];
   const bundle = emptyBundle();
@@ -215,6 +230,7 @@ export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   bundle.projects = loadYamlDir(root, "projects", GuidedProject, issues);
   bundle.cheatsheets = loadYamlDir(root, "cheatsheets", Cheatsheet, issues);
   bundle.testimonials = loadTestimonials(root, issues);
+  bundle.videoViews = loadVideoViews(root, issues);
   bundle.patterns = loadYamlDir(root, "interview/patterns", InterviewPattern, issues);
   bundle.designs = loadYamlDir(root, "interview/designs", SystemDesign, issues);
   return { bundle, issues };

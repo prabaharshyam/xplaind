@@ -12,7 +12,7 @@ export const NAV_GROUPS: Group[] = [
       { href: "/paths", label: "Roadmaps", note: "A step-by-step path for each AI role" },
       { href: "/library", label: "Library", note: "Every lesson, video and skill" },
       { href: "/topics", label: "Topics", note: "Lessons grouped by subject" },
-      { href: "/videos", label: "Videos", note: "Hand-picked AI channels" },
+      { href: "/videos", label: "Videos", note: "Filter by topic" },
       { href: "/projects", label: "Projects", note: "Guided builds for your portfolio" },
       { href: "/glossary", label: "Glossary", note: "AI words in plain English" },
       { href: "/papers", label: "Papers and free books", note: "Landmark research and free AI books" },

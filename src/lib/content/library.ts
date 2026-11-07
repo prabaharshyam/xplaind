@@ -84,7 +84,7 @@ export function libraryItems(): LibraryItem[] {
         kind: "video",
         key: `video:${v.youtube_id}`,
         title: v.title,
-        href: `/videos#${c.id}`,
+        href: "/videos",
         summary: `From ${c.name}`,
         topics: c.topics,
         level: null,

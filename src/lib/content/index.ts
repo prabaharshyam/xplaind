@@ -114,6 +114,12 @@ export const getCheatsheet = (id: string): Cheatsheet | undefined => getCheatshe
 /** SO-1: what real users said, in file order. */
 export const getTestimonials = (): Testimonial[] => getContent().testimonials.map((t) => t.data);
 
+/** VD-1: public view counts by YouTube video id, with the day they were read. */
+export const getVideoViews = (): { checkedOn: string; views: Record<string, number> } | null => {
+  const v = getContent().videoViews;
+  return v ? { checkedOn: v.checked_on, views: v.views } : null;
+};
+
 /** IP-1: interview patterns, in file order within each category. */
 export const getPatterns = (): InterviewPattern[] => getContent().patterns.map((p) => p.data);
 export const getPattern = (id: string): InterviewPattern | undefined => getPatterns().find((p) => p.id === id);

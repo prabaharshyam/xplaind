@@ -690,3 +690,12 @@ export const SystemDesign = z.strictObject({
   reviewed_on: IsoDate,
 });
 export type SystemDesign = z.infer<typeof SystemDesign>;
+
+// ------------------------------------------------------------ video views ---
+// VD-1: public YouTube view counts by video id, and the day they were read.
+
+export const VideoViewsFile = z.strictObject({
+  checked_on: IsoDate,
+  views: z.record(z.string().regex(/^[\w-]{6,64}$/), z.number().int().nonnegative()),
+});
+export type VideoViews = z.infer<typeof VideoViewsFile>;
