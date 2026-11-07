@@ -236,6 +236,8 @@ export function validBundle(): Bundle {
     channels: [],
     blog: [{ ...f("blog/post-one.mdx"), data: blogPost() }],
     projects: [],
+    cheatsheets: [],
+    testimonials: [],
   };
 }
 

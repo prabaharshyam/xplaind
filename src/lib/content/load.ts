@@ -11,6 +11,8 @@ import {
   Certification,
   Channel,
   GlossaryTerm,
+  Cheatsheet,
+  TestimonialsFile,
   GuidedProject,
   CheckQuestion,
   Goal,
@@ -175,6 +177,20 @@ function loadLevels(root: string, issues: Issue[]): Bundle["levels"] {
   return parsed.data.levels.map((data) => ({ file, data }));
 }
 
+function loadTestimonials(root: string, issues: Issue[]): Bundle["testimonials"] {
+  const file = "testimonials/testimonials.yaml";
+  const abs = path.join(root, file);
+  if (!fs.existsSync(abs)) return [];
+  const raw = readYaml(abs, file, issues);
+  if (raw === undefined) return [];
+  const parsed = TestimonialsFile.safeParse(raw);
+  if (!parsed.success) {
+    issues.push(...zodToIssues(file, parsed.error));
+    return [];
+  }
+  return parsed.data.testimonials.map((data) => ({ file, data }));
+}
+
 export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   const issues: Issue[] = [];
   const bundle = emptyBundle();
@@ -195,5 +211,7 @@ export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   bundle.channels = loadYamlDir(root, "channels", Channel, issues);
   bundle.blog = loadBlog(root, issues);
   bundle.projects = loadYamlDir(root, "projects", GuidedProject, issues);
+  bundle.cheatsheets = loadYamlDir(root, "cheatsheets", Cheatsheet, issues);
+  bundle.testimonials = loadTestimonials(root, issues);
   return { bundle, issues };
 }

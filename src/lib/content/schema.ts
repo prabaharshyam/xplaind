@@ -608,3 +608,37 @@ export const JobsFile = z
   .refine((j) => new Set(j.roles.map((r) => r.path)).size === j.roles.length, "JB-1: one entry per role");
 export type JobsFile = z.infer<typeof JobsFile>;
 export type JobRole = JobsFile["roles"][number];
+
+// ------------------------------------------------------------- cheatsheets ---
+
+/** CS-1: one line of a cheatsheet: a term, what it means, and an optional snippet or formula. */
+const CheatItem = z.strictObject({
+  term: Text.max(80),
+  detail: Text.max(260),
+  code: z.string().max(400).optional(),
+});
+
+/** CS-1: a one-page cheatsheet for a topic, grouped into short sections. */
+export const Cheatsheet = z.strictObject({
+  id: Slug,
+  title: Text.max(80),
+  theme: z.enum(THEME_IDS),
+  summary: Text.max(200),
+  /** Lessons that teach what the sheet sums up. */
+  lessons: z.array(Slug).default([]),
+  sections: z
+    .array(z.strictObject({ title: Text.max(60), items: z.array(CheatItem).min(2).max(10) }))
+    .min(2)
+    .max(8),
+  reviewed_by: Text,
+  reviewed_on: IsoDate,
+});
+export type Cheatsheet = z.infer<typeof Cheatsheet>;
+
+// ------------------------------------------------------------ testimonials ---
+
+/** SO-1: real words from real users, shared with their permission. Never invented. */
+export const TestimonialsFile = z.strictObject({
+  testimonials: z.array(z.strictObject({ name: Text.max(60), role: Text.max(60), quote: Text.max(600) })).max(30),
+});
+export type Testimonial = z.infer<typeof TestimonialsFile>["testimonials"][number];

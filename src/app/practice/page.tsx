@@ -42,6 +42,9 @@ export default function PracticePage() {
           <Link href="/ai/book" className={secondaryButton}>
             Study from my notes & books
           </Link>
+          <Link href="/cheatsheets" className={secondaryButton}>
+            Cheatsheets
+          </Link>
           <Link href="/glossary" className={secondaryButton}>
             AI glossary
           </Link>

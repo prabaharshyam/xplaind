@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { contentUpdatedOn, getBlogPosts, getContent, getPaths, getProjects, getStops } from "@/lib/content";
+import { contentUpdatedOn, getBlogPosts, getCheatsheets, getContent, getPaths, getProjects, getStops } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { INTERVIEW_TOPIC_IDS } from "@/lib/interview-topics";
 import { LEVEL_IDS } from "@/lib/levels";
@@ -47,6 +47,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/practice",
     ...INTERVIEW_TOPIC_IDS.map((t) => `/practice/${t}`),
     "/projects",
+    "/cheatsheets",
+    ...getCheatsheets().map((c) => `/cheatsheets/${c.id}`),
     "/library",
     "/videos",
     "/books",
@@ -69,6 +71,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...getStops().map((s) => [`/stop/${s.id}`, s.reviewed_on] as const),
     ...getContent().interview.map(({ data: q }) => [`/interview/${q.id}`, q.reviewed_on] as const),
     ...getProjects().map((p) => [`/projects/${p.id}`, p.reviewed_on] as const),
+    ...getCheatsheets().map((c) => [`/cheatsheets/${c.id}`, c.reviewed_on] as const),
     ...getBlogPosts().map((b) => [`/blog/${b.id}`, b.updated_on] as const),
   ]);
   const newest = [PAGES_UPDATED_ON, contentUpdatedOn(), ...dated.values()].reduce((m, d) => (d > m ? d : m));

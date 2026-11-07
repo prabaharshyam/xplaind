@@ -6,6 +6,8 @@ import type {
   CheckQuestion,
   Goal,
   GlossaryTerm,
+  Cheatsheet,
+  Testimonial,
   GuidedProject,
   InterviewQuestion,
   LevelDefinition,
@@ -41,6 +43,8 @@ export type Bundle = {
   channels: Entry<Channel>[];
   blog: Entry<BlogPost>[];
   projects: Entry<GuidedProject>[];
+  cheatsheets: Entry<Cheatsheet>[];
+  testimonials: Entry<Testimonial>[];
 };
 
 export const emptyBundle = (): Bundle => ({
@@ -57,4 +61,6 @@ export const emptyBundle = (): Bundle => ({
   channels: [],
   blog: [],
   projects: [],
+  cheatsheets: [],
+  testimonials: [],
 });
