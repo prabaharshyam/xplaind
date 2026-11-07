@@ -238,6 +238,7 @@ export function validBundle(): Bundle {
     projects: [],
     cheatsheets: [],
     testimonials: [],
+    videoViews: null,
     patterns: [],
     designs: [],
   };

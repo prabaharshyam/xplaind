@@ -32,7 +32,7 @@ export function GET(): Response {
     "",
     "## Find and watch",
     `- [Library](${base}/library): every lesson, video lesson and skill, filterable by topic and level`,
-    `- [Video lessons](${base}/videos): hand-picked YouTube teachers such as Krish Naik, Jeff Su and Tina Huang, playable on the site`,
+    `- [Video lessons](${base}/videos): hand-picked YouTube lessons you can filter by topic, level and length, with view counts, playable on the site`,
     `- [Topic tracks](${base}/topics): one subject at a time, including data structures and algorithms and system design`,
     "",
     "## Interview preparation",
