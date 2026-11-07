@@ -14,7 +14,6 @@ type Engine = {
  *
  * - Lenis is the only smooth-scroll engine and drives GSAP's ScrollTrigger.
  * - Headings arrive as you reach them: [data-words] word by word, every other h2 with a wipe.
- * - Card grids rise in with a slight 3D tilt, staggered; [data-rise-group] marks one explicitly.
  * - [data-count] numbers count up, [data-magnetic] buttons lean toward the pointer, the home hero
  *   ([data-hero]) and page titles ([data-hero-title]) run a short intro.
  *
@@ -160,7 +159,7 @@ export function SiteMotion() {
 const below = (el: Element) => el.getBoundingClientRect().top > window.innerHeight * 0.95;
 const inside = (el: Element, sel: string) => el.parentElement?.closest(sel) != null;
 
-function choreograph({ gsap, ScrollTrigger }: Engine): () => void {
+function choreograph({ gsap }: Engine): () => void {
   const root = document.getElementById("page") ?? document.body;
   const cleanups: (() => void)[] = [];
 
@@ -205,37 +204,7 @@ function choreograph({ gsap, ScrollTrigger }: Engine): () => void {
     );
   }
 
-  // Groups marked for it: their [data-rise] children lift in with a 3D tilt.
-  for (const group of root.querySelectorAll<HTMLElement>("[data-rise-group]")) {
-    gsap.from(group.querySelectorAll("[data-rise]"), {
-      y: 70,
-      rotateX: 14,
-      opacity: 0,
-      transformPerspective: 900,
-      transformOrigin: "50% 100%",
-      duration: 1.1,
-      ease: "expo.out",
-      stagger: 0.08,
-      scrollTrigger: { trigger: group, start: "top 85%", once: true },
-    });
-  }
-
-  // Any other grid of cards below the fold rises in, a few at a time.
-  const cards: HTMLElement[] = [];
-  for (const grid of root.querySelectorAll<HTMLElement>(":is(ul,ol,div,section).grid")) {
-    if (grid.matches("[data-rise-group]") || inside(grid, "[data-rise-group],[data-rise],dialog,[data-no-motion],.grid") || grid.querySelector(".")) continue;
-    const kids = [...grid.children].filter((c): c is HTMLElement => c instanceof HTMLElement);
-    if (kids.length < 2) continue;
-    cards.push(...kids.filter(below));
-  }
-  if (cards.length) {
-    gsap.set(cards, { y: 56, rotateX: 10, transformPerspective: 900, transformOrigin: "50% 100%" });
-    ScrollTrigger.batch(cards, {
-      start: "top 94%",
-      once: true,
-      onEnter: (batch) => gsap.to(batch, { y: 0, rotateX: 0, duration: 1, ease: "expo.out", stagger: 0.06, overwrite: true, clearProps: "transform" }),
-    });
-  }
+  // BR-3 (2026-11-07): cards no longer rise or tilt in as they scroll into view; they are simply there.
 
   // Milestone markers slide in.
   for (const gate of root.querySelectorAll<HTMLElement>("[data-gate]")) {
