@@ -106,15 +106,57 @@ export function MiniCourses() {
   );
 }
 
-export function MiniProgress() {
+/** The weekly plan and streak, as a small example. Decorative: the tile says in words what it does. */
+export function MiniPlan() {
+  const days = [
+    { d: "M", done: true },
+    { d: "T", done: true },
+    { d: "W", done: true },
+    { d: "T", today: true },
+    { d: "F" },
+    { d: "S" },
+    { d: "S" },
+  ];
+  const plan = [
+    { title: "Tokens and context", min: 25, done: true },
+    { title: "Embeddings", min: 30, today: true },
+    { title: "Build a RAG app", min: 45 },
+  ];
   return (
-    <div aria-hidden="true" className="flex flex-wrap items-center gap-3">
-      <span className="flex items-center gap-2 rounded-2xl bg-amber-100 px-4 py-3 text-amber-900">
-        <Icon name="fire" size={22} /> <span className="text-2xl font-semibold">7</span> day streak
-      </span>
-      <span className="rounded-2xl bg-emerald-100 px-4 py-3 text-emerald-900">
-        <span className="text-2xl font-semibold">12</span> lessons done
-      </span>
+    <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+      <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
+        <span>Your week · 5 hours</span>
+        <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">Example</span>
+      </div>
+      <div className="mt-3 flex justify-between">
+        {days.map((x, i) => (
+          <span
+            key={i}
+            className={`grid size-8 place-items-center rounded-full text-xs font-semibold ${
+              x.done ? "bg-emerald-500 text-white" : x.today ? "border-2 border-violet-600 text-violet-800 dark:text-violet-300" : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400"
+            }`}
+          >
+            {x.done ? "✓" : x.d}
+          </span>
+        ))}
+      </div>
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {plan.map((p) => (
+          <li key={p.title} className={`flex items-center gap-2 rounded-2xl px-3 py-1.5 ${p.today ? "bg-violet-50 dark:bg-violet-950/50" : "bg-zinc-50 dark:bg-zinc-950"}`}>
+            <span className={`grid size-4 shrink-0 place-items-center rounded-full text-[10px] ${p.done ? "bg-emerald-500 text-white" : "border border-zinc-300 dark:border-zinc-600"}`}>{p.done ? "✓" : ""}</span>
+            <span className={`min-w-0 flex-1 truncate ${p.done ? "text-zinc-600 line-through dark:text-zinc-400" : "font-medium"}`}>{p.title}</span>
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">{p.min} min</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex items-center gap-2 text-xs">
+        <span className="flex items-center gap-1.5 rounded-2xl bg-amber-100 px-3 py-1.5 whitespace-nowrap text-amber-900">
+          <Icon name="fire" size={16} /> <span className="text-base font-semibold">7</span> day streak
+        </span>
+        <span className="rounded-2xl bg-emerald-100 px-3 py-1.5 whitespace-nowrap text-emerald-900">
+          <span className="text-base font-semibold">12</span> lessons done
+        </span>
+      </div>
     </div>
   );
 }

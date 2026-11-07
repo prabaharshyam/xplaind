@@ -4,7 +4,7 @@ import { GuideCover } from "@/components/guide-cover";
 import { Icon } from "@/components/art/icons";
 import { RoleGrid } from "@/components/home/role-grid";
 import { Testimonials } from "@/components/home/testimonials";
-import { MiniCourses, MiniInterview, MiniLesson, MiniNotes, MiniProgress, MiniRoadmap } from "@/components/home/showcase";
+import { MiniCourses, MiniInterview, MiniLesson, MiniNotes, MiniPlan, MiniRoadmap } from "@/components/home/showcase";
 import { ContinueCard } from "@/components/continue-card";
 import { Words } from "@/components/motion/words";
 import { RoadScene } from "@/components/three/road-scene";
@@ -315,18 +315,16 @@ export default function Home() {
                 <MiniInterview />
               </div>
             </Feature>
-            <div data-rise className="flex flex-col justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-6 md:p-8 dark:border-zinc-800 dark:bg-zinc-900">
-              <div>
-                <h3 className="text-xl font-semibold">Stay on track, week after week</h3>
-                <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
-                  A weekly plan sized to your hours, and a streak that shows the days you learnt.
-                </p>
-                <Link href="/plan" className="mt-3 inline-block font-medium text-violet-800 hover:underline dark:text-violet-300">
-                  Plan my week →
-                </Link>
+            <Feature
+              title="Stay on track, week after week"
+              text="A weekly plan sized to your hours, and a streak that shows the days you learnt."
+              href="/plan"
+              cta="Plan my week"
+            >
+              <div className="mx-auto max-w-[300px]">
+                <MiniPlan />
               </div>
-              <MiniProgress />
-            </div>
+            </Feature>
           </div>
           <ul className="mt-6 grid gap-6 md:grid-cols-2" data-rise-group>
             {[
@@ -505,7 +503,9 @@ function Feature({
 }) {
   return (
     <div data-rise className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="border-b border-zinc-200 bg-zinc-50 p-6 md:p-8 dark:border-zinc-800 dark:bg-zinc-950">{children}</div>
+      <div className="flex items-center justify-center border-b border-zinc-200 bg-zinc-50 p-6 md:min-h-[21rem] md:p-8 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="w-full">{children}</div>
+      </div>
       <div className="flex flex-1 flex-col p-6">
         <h3 className="text-xl font-semibold">{title}</h3>
         <p className="mt-2 flex-1 leading-7 text-zinc-700 dark:text-zinc-300">{text}</p>
