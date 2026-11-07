@@ -114,7 +114,7 @@ export default function AboutPage() {
               width={640}
               height={800}
               sizes="(min-width: 640px) 13rem, 11rem"
-              className="w-44 rounded-3xl object-cover shadow-lg ring-1 ring-zinc-200 sm:w-52 dark:ring-zinc-800"
+              className="w-44 rounded-2xl object-cover ring-1 ring-zinc-200 sm:w-52 dark:ring-zinc-800"
             />
             <div>
               <p className="text-xl font-semibold">Shyam Prabahar</p>
@@ -182,7 +182,7 @@ export default function AboutPage() {
           </ul>
         </section>
 
-        <section aria-labelledby="next-h" className="mt-14 rounded-3xl bg-violet-50 p-6 md:p-8 dark:bg-violet-950/40">
+        <section aria-labelledby="next-h" className="mt-14 rounded-2xl bg-violet-50 p-6 md:p-8 dark:bg-violet-950/40">
           <h2 id="next-h" className="text-2xl font-semibold tracking-tight">
             Start with one lesson
           </h2>

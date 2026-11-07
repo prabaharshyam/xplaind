@@ -311,7 +311,7 @@ function Section({
           <span aria-hidden="true" className={`absolute top-3 -left-12 z-10 grid size-8 place-items-center rounded-full text-xs font-bold text-white ring-4 ring-white md:hidden dark:ring-zinc-950 ${colour.badge}`}>
             {section.code}
           </span>
-          <div className={`relative z-10 rounded-2xl px-4 py-3 text-center shadow-sm ring-2 ${colour.node}`}>
+          <div className={`relative z-10 rounded-2xl px-4 py-3 text-center ring-2 ${colour.node}`}>
             <p className="flex items-center justify-center gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
               <span aria-hidden="true" className={`hidden size-6 place-items-center rounded-full text-[11px] font-bold text-white md:grid ${colour.badge}`}>
                 {section.code}
@@ -346,7 +346,7 @@ function Section({
                 aria-hidden="true"
                 className={`absolute top-1/2 hidden w-10 border-t-2 border-dotted border-violet-300 md:block dark:border-violet-800 ${ci === 0 ? "right-0" : "left-0"}`}
               />
-              <ul className="grid grid-cols-1 gap-2 rounded-2xl bg-white p-2 ring-1 ring-violet-100 sm:grid-cols-2 md:grid-cols-1 dark:bg-white/[0.03] dark:ring-violet-950">
+              <ul className="grid grid-cols-1 gap-2 rounded-2xl border border-zinc-200 bg-white p-2 sm:grid-cols-2 md:grid-cols-1 dark:border-zinc-800 dark:bg-white/[0.03]">
                 {c.map(tile)}
               </ul>
             </div>
@@ -388,7 +388,7 @@ function TopicCard({ topic, state, below }: { topic: RoadmapTopic; state: TopicS
   }
   const style = STATE_STYLE[state];
   return (
-    <div className={`h-full rounded-2xl border-2 transition hover:-translate-y-px hover:shadow-md ${style.card} ${below && state === "todo" ? "opacity-80" : ""}`}>
+    <div className={`h-full rounded-2xl border-2 transition hover:-translate-y-px ${style.card} ${below && state ==="todo" ? "opacity-80" : ""}`}>
       <div className="flex min-h-12 items-center gap-2 py-1.5 pr-1.5 pl-3">
         <TopicLink
           id={topic.stopId}
@@ -494,7 +494,7 @@ function ProjectCard({
   const headingId = `project-${section.id}`;
 
   return (
-    <li aria-labelledby={headingId} className="lx-rise flex flex-col gap-3 rounded-2xl border border-zinc-200 p-4 md:p-5 dark:border-zinc-800">
+    <li aria-labelledby={headingId} className="flex flex-col gap-3 rounded-2xl border border-zinc-200 p-4 md:p-5 dark:border-zinc-800">
       <div className="flex items-start gap-3">
         <span className={`grid size-11 shrink-0 place-items-center rounded-2xl ${state === "done" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"}`}>
           <Icon name={state === "done" ? "tick" : "trophy"} size={22} />

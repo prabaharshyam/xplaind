@@ -126,7 +126,7 @@ function Review({ review, onAgain }: { review: ResumeReview; onAgain: () => void
   const tone = review.score >= 75 ? "text-emerald-700 dark:text-emerald-400" : review.score >= 50 ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400";
   return (
     <section id="resume-review" tabIndex={-1} aria-labelledby="review-heading" className="space-y-6 outline-none">
-      <div className="flex flex-wrap items-center gap-6 rounded-3xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex flex-wrap items-center gap-6 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="text-center">
           <p className={`text-5xl font-semibold tabular-nums ${tone}`}>{review.score}</p>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">out of 100</p>

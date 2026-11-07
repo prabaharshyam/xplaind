@@ -11,7 +11,7 @@ export function AiWorking({ steps }: { steps: string[] }) {
     return () => clearInterval(t);
   }, [steps.length]);
   return (
-    <div role="status" className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-teal-50 p-5 dark:border-violet-900 dark:from-violet-950/40 dark:to-teal-950/30">
+    <div role="status" className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900">
       <p className="flex items-center gap-2 font-medium">
         <span className="grid size-8 animate-pulse place-items-center rounded-full bg-violet-600 text-white">
           <Icon name="sparkles" size={16} />

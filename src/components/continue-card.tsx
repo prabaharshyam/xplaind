@@ -24,7 +24,7 @@ export function ContinueCard({ titles }: { titles: Record<string, string> }) {
   const last = progress.last && titles[progress.last.stopId] ? progress.last : null;
   if (!last) return null;
   return (
-    <section aria-labelledby="continue-h" className="rounded-3xl bg-gradient-to-br from-violet-100 to-teal-50 p-5 ring-1 ring-violet-200 md:p-6 dark:from-sky-950 dark:via-violet-950 dark:to-teal-950 dark:ring-violet-900">
+    <section aria-labelledby="continue-h" className="rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
       <h2 id="continue-h" className="text-sm font-semibold text-violet-800 dark:text-violet-300">
         Continue where you left off
       </h2>

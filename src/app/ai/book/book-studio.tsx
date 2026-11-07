@@ -87,7 +87,7 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
 
   return (
     <div className="flex flex-col gap-8">
-      <section aria-labelledby="upload-h" className="rounded-3xl border-2 border-dashed border-zinc-300 bg-white p-6 text-center dark:border-zinc-700 dark:bg-zinc-900">
+      <section aria-labelledby="upload-h" className="rounded-2xl border-2 border-dashed border-zinc-300 bg-white p-6 text-center dark:border-zinc-700 dark:bg-zinc-900">
         <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-teal-500 to-violet-500 text-white">
           <Icon name="book" size={28} />
         </span>
@@ -493,7 +493,7 @@ function Report({ test, onRetake, onHome }: { test: BookTest; onRetake: () => vo
 
   return (
     <div className="flex flex-col gap-8">
-      <section aria-labelledby="score-h" className="rounded-3xl bg-zinc-100 p-5 md:p-6 dark:bg-zinc-900">
+      <section aria-labelledby="score-h" className="rounded-2xl bg-zinc-100 p-5 md:p-6 dark:bg-zinc-900">
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           {test.book} · {DIFFICULTY_LABEL[test.difficulty]}
         </p>
@@ -652,7 +652,7 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
       </div>
       <h2 className="text-xl font-semibold">{deck.book}</h2>
       {i >= order.length ? (
-        <div role="status" className="rounded-3xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-800 dark:bg-zinc-900">
+        <div role="status" className="rounded-2xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-2xl font-semibold">
             You knew {knew} of {order.length}
           </p>
@@ -679,14 +679,14 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
             </span>
           </div>
           <div className="relative pb-3">
-            <span aria-hidden="true" className="absolute inset-x-6 bottom-0 h-full rounded-3xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
-            <span aria-hidden="true" className="absolute inset-x-3 bottom-1.5 h-full rounded-3xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
+            <span aria-hidden="true" className="absolute inset-x-6 bottom-0 h-full rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
+            <span aria-hidden="true" className="absolute inset-x-3 bottom-1.5 h-full rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
             <article
               key={`${card.id}-${flipped ? "back" : "front"}`}
               id="deck-card"
               tabIndex={-1}
               aria-label={`Card ${i + 1}`}
-              className="card-flip relative flex min-h-72 flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-6 shadow-lg shadow-zinc-950/5 outline-none md:p-8 dark:border-zinc-800 dark:bg-zinc-900"
+              className="card-flip relative flex min-h-72 flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-6 outline-none md:p-8 dark:border-zinc-800 dark:bg-zinc-900"
             >
               <p className="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
                 <span>{flipped ? "Answer" : "Question"}</span>

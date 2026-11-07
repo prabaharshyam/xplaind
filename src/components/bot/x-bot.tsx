@@ -190,7 +190,7 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
           onKeyDown={(e) => {
             if (e.key === "Escape") hide();
           }}
-          className="xbot-panel fixed inset-x-2 bottom-2 flex h-[min(82dvh,640px)] flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white text-zinc-900 shadow-2xl sm:inset-x-auto sm:right-5 sm:bottom-24 sm:w-[390px] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
+          className="xbot-panel fixed inset-x-2 bottom-2 flex h-[min(82dvh,640px)] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white text-zinc-900 shadow-2xl sm:inset-x-auto sm:right-5 sm:bottom-24 sm:w-[390px] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
         >
           <header className="flex items-center gap-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-violet-500 px-4 py-3 text-white">
             <span className="grid size-11 place-items-center rounded-2xl bg-white/20">

@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: PageProps<"/interview/design/
   return d ? pageMeta({ title: `System design: ${d.title}`, description: d.summary, path: `/interview/design/${d.id}`, type: "article" }) : {};
 }
 
-const card = "scroll-mt-24 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] md:p-6 dark:border-zinc-800 dark:bg-zinc-900";
+const card = "scroll-mt-24 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] md:p-6 dark:border-zinc-800 dark:bg-zinc-900";
 
 const STEPS = [
   { id: "clarify", title: "Clarify", time: "0-5 min" },
@@ -80,7 +80,7 @@ export default async function DesignPage({ params }: PageProps<"/interview/desig
         </nav>
         <div className="flex min-w-0 flex-col gap-6">
           {d.reviewed_by === "UNREVIEWED" && <DraftNote />}
-          <blockquote className="rounded-3xl border border-violet-200 bg-violet-50/60 p-5 text-lg leading-8 dark:border-violet-900 dark:bg-violet-950/30">
+          <blockquote className="rounded-2xl border border-violet-200 bg-violet-50/60 p-5 text-lg leading-8 dark:border-violet-900 dark:bg-violet-950/30">
             <span className="block text-sm font-semibold text-violet-900 dark:text-violet-200">The question</span>
             &ldquo;{d.prompt}&rdquo;
           </blockquote>
@@ -164,7 +164,7 @@ export default async function DesignPage({ params }: PageProps<"/interview/desig
           </p>
         </div>
         <aside className="flex min-w-0 flex-col gap-4 lg:col-start-2 xl:col-start-auto xl:sticky xl:top-20 xl:self-start">
-          <section className="rounded-3xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900" aria-labelledby="pat-h">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900" aria-labelledby="pat-h">
             <h2 id="pat-h" className="font-semibold">
               Patterns used
             </h2>
@@ -179,7 +179,7 @@ export default async function DesignPage({ params }: PageProps<"/interview/desig
             </ul>
           </section>
           {qs.length > 0 && (
-            <section className="rounded-3xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900" aria-labelledby="dq-h">
+            <section className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900" aria-labelledby="dq-h">
               <h2 id="dq-h" className="font-semibold">
                 Related questions
               </h2>
@@ -194,7 +194,7 @@ export default async function DesignPage({ params }: PageProps<"/interview/desig
               </ul>
             </section>
           )}
-          <section className="rounded-3xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900" aria-labelledby="dl-h">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900" aria-labelledby="dl-h">
             <h2 id="dl-h" className="font-semibold">
               Lessons behind it
             </h2>

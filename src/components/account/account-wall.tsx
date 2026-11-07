@@ -15,7 +15,7 @@ export function AccountWall({ reason, next, children }: { reason: SignUpReason; 
   if (state === "off" || state === "in") return <>{children}</>;
   if (state === "unknown") return <Skeleton label="Checking your account…" rows={2} />;
   return (
-    <div className="mx-auto max-w-md rounded-3xl border border-violet-100 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-zinc-950">
+    <div className="mx-auto max-w-md rounded-2xl border border-violet-100 bg-white p-5 sm:p-6 dark:border-white/10 dark:bg-zinc-950">
       <h2 className="mb-3 text-xl font-semibold tracking-tight">Sign up free to continue</h2>
       <SignInForm next={next} reason={reason} />
     </div>

@@ -45,7 +45,7 @@ export default function PatternsPage() {
                   <li key={p.id}>
                     <Link
                       href={`/interview/patterns/${p.id}`}
-                      className="flex h-full flex-col gap-2 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] transition hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-zinc-800 dark:bg-zinc-900"
+                      className="flex h-full flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-5 transition hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-zinc-800 dark:bg-zinc-900"
                     >
                       <span className="text-lg font-semibold">{p.name}</span>
                       <span className="text-sm leading-6 text-zinc-700 dark:text-zinc-300">{p.summary}</span>

@@ -46,7 +46,7 @@ export function MiniRoadmap() {
 
 export function MiniLesson() {
   return (
-    <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 shadow-lg dark:bg-zinc-900 dark:text-zinc-100">
+    <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
       <div className="flex items-center justify-between text-xs">
         <span className="rounded-full bg-teal-100 px-2 py-0.5 font-medium text-teal-900">Retrieval · 20 min</span>
       </div>
@@ -69,7 +69,7 @@ export function MiniLesson() {
 
 export function MiniInterview() {
   return (
-    <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 shadow-lg dark:bg-zinc-900 dark:text-zinc-100">
+    <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
       <p className="text-xs text-zinc-600 dark:text-zinc-400">Question 2 of 5 · RAG</p>
       <p className="mt-1 font-semibold">How do you evaluate a RAG system?</p>
       <div className="mt-3 flex items-center justify-between">
@@ -96,7 +96,7 @@ export function MiniCourses() {
   return (
     <div aria-hidden="true" className="grid grid-cols-3 gap-2">
       {items.map((c) => (
-        <div key={c.title} className="overflow-hidden rounded-2xl bg-white text-zinc-900 shadow dark:bg-zinc-900 dark:text-zinc-100">
+        <div key={c.title} className="overflow-hidden rounded-2xl bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
           <Cover theme={c.theme} seed={c.title} className="h-14" iconSize={18} />
           <p className="p-2 text-[11px] leading-tight font-medium">{c.title}</p>
           <p className="px-2 pb-2 text-[10px] text-zinc-600 dark:text-zinc-400">{c.by}</p>
@@ -123,7 +123,7 @@ export function MiniProgress() {
 export function MiniNotes() {
   return (
     <div aria-hidden="true" className="relative mx-auto flex w-full max-w-[340px] flex-col gap-3">
-      <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
         <span className="grid size-10 place-items-center rounded-2xl bg-rose-100 text-xs font-bold text-rose-900">PDF</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">Class 12 Biology notes.pdf</span>
@@ -132,7 +132,7 @@ export function MiniNotes() {
       </div>
       <div className="relative pb-2">
         <span className="absolute inset-x-4 bottom-0 h-full rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
-        <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-lg shadow-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-[11px] font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">Flashcard 3 of 15</p>
           <p className="mt-2 font-semibold text-zinc-900 dark:text-zinc-100">Where do plants turn light into chemical energy?</p>
           <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">In the chloroplast, during photosynthesis.</p>

@@ -149,7 +149,7 @@ export function SignInForm({
 
       <button
         type="submit"
-        className="min-h-12 rounded-full bg-violet-700 px-4 font-semibold text-white shadow-md hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+        className="min-h-12 rounded-full bg-violet-700 px-4 font-semibold text-white hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
       >
         {mode === "signup" ? "Create free account" : "Sign in"}
       </button>

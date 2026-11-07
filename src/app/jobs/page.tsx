@@ -58,7 +58,7 @@ export default function JobsPage() {
           {roles.map(({ path, role }) => {
             const links = jobLinks(role.search);
             return (
-              <li key={path.id} id={path.id} className="scroll-mt-24 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <li key={path.id} id={path.id} className="scroll-mt-24 rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <h2 className="text-xl font-semibold">{path.name}</h2>
                 <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{path.tagline}</p>
 

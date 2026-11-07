@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 /**
- * MO-3: tilts any element marked data-tilt a few degrees toward the pointer, and (MO-7) moves a
+ * MO-3: tilts any element marked a few degrees toward the pointer, and (MO-7) moves a
  * soft light across it. One listener
  * for the whole site, so server components only add the attribute. Off for touch screens
  * and reduced motion (the CSS ignores the angles there too).

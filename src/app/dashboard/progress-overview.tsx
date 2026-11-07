@@ -16,7 +16,7 @@ export function ProgressOverview() {
 
   return (
     <div className="flex flex-col gap-6">
-      <section aria-label="Streak" className="flex items-center gap-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] dark:border-zinc-800 dark:bg-zinc-900">
+      <section aria-label="Streak" className="flex items-center gap-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
           <Icon name="fire" size={28} />
         </span>

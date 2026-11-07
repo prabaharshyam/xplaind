@@ -223,7 +223,7 @@ function choreograph({ gsap, ScrollTrigger }: Engine): () => void {
   // Any other grid of cards below the fold rises in, a few at a time.
   const cards: HTMLElement[] = [];
   for (const grid of root.querySelectorAll<HTMLElement>(":is(ul,ol,div,section).grid")) {
-    if (grid.matches("[data-rise-group]") || inside(grid, "[data-rise-group],[data-rise],dialog,[data-no-motion],.grid") || grid.querySelector(".lx-rise")) continue;
+    if (grid.matches("[data-rise-group]") || inside(grid, "[data-rise-group],[data-rise],dialog,[data-no-motion],.grid") || grid.querySelector(".")) continue;
     const kids = [...grid.children].filter((c): c is HTMLElement => c instanceof HTMLElement);
     if (kids.length < 2) continue;
     cards.push(...kids.filter(below));

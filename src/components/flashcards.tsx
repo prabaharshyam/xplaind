@@ -38,7 +38,7 @@ export function Flashcards({ cards, storageKey, title = "Test your understanding
   const card = cards[Math.min(i, cards.length - 1)];
 
   return (
-    <section aria-labelledby="flashcards-h" className="rounded-3xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+    <section aria-labelledby="flashcards-h" className="rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="flashcards-h" className="flex items-center gap-2 text-xl font-semibold">
           <Icon name="check" size={20} /> {title}

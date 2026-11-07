@@ -93,7 +93,7 @@ export default async function BlogPostPage({ params }: PageProps<"/blog/[slug]">
             height={600}
             priority
             sizes="(min-width: 672px) 42rem, 100vw"
-            className="mt-6 w-full rounded-3xl object-cover"
+            className="mt-6 w-full rounded-2xl object-cover"
           />
         )}
         {!isHumanName(post.reviewed_by) && (

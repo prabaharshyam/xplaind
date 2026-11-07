@@ -43,7 +43,7 @@ export function CommitCard({ paths, defaultPath }: { paths: { id: string; name: 
   const pathName = (id: string) => paths.find((p) => p.id === id)?.name ?? id;
 
   return (
-    <section aria-labelledby="commit-h" className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+    <section aria-labelledby="commit-h" className="rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
       <h2 id="commit-h" className="flex items-center gap-2 text-lg font-semibold">
         <span className="grid size-9 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
           <Icon name="fire" size={18} />

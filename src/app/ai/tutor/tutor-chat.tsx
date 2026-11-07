@@ -29,7 +29,7 @@ export function TutorChat({ enabled, paths, titles }: { enabled: boolean; paths:
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
-      <section aria-labelledby="tutor-chat" className="min-w-0 rounded-3xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+      <section aria-labelledby="tutor-chat" className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
         <h2 id="tutor-chat" className="sr-only">
           Chat with your AI tutor
         </h2>

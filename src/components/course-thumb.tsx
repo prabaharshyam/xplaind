@@ -2,22 +2,6 @@ import Image from "next/image";
 import { Icon } from "@/components/art/icons";
 import type { Embed } from "@/lib/content/media";
 
-/** Pastel pairs a provider's ticket can take; the provider's name picks one, so it is stable. */
-const TICKETS = [
-  { bg: "bg-violet-100 dark:bg-violet-950", ink: "text-violet-950 dark:text-violet-100", edge: "bg-violet-300 dark:bg-violet-700" },
-  { bg: "bg-sky-100 dark:bg-sky-950", ink: "text-sky-950 dark:text-sky-100", edge: "bg-sky-300 dark:bg-sky-700" },
-  { bg: "bg-emerald-100 dark:bg-emerald-950", ink: "text-emerald-950 dark:text-emerald-100", edge: "bg-emerald-300 dark:bg-emerald-700" },
-  { bg: "bg-amber-100 dark:bg-amber-950", ink: "text-amber-950 dark:text-amber-100", edge: "bg-amber-300 dark:bg-amber-700" },
-  { bg: "bg-rose-100 dark:bg-rose-950", ink: "text-rose-950 dark:text-rose-100", edge: "bg-rose-300 dark:bg-rose-700" },
-  { bg: "bg-teal-100 dark:bg-teal-950", ink: "text-teal-950 dark:text-teal-100", edge: "bg-teal-300 dark:bg-teal-700" },
-] as const;
-
-const pick = (text: string) => {
-  let h = 0;
-  for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return TICKETS[h % TICKETS.length];
-};
-
 const length = (hours: number) => {
   const mins = Math.round(hours * 60);
   return mins < 90 ? `${Math.max(1, mins)} min` : `${Math.round(hours * 10) / 10} h`;
@@ -57,7 +41,7 @@ export function CourseThumb({
           className="object-cover"
         />
         <span className="absolute inset-0 grid place-items-center">
-          <span className={`grid place-items-center rounded-full bg-violet-700/95 text-white shadow-lg ${size === "sm" ? "size-8" : "size-11"}`}>
+          <span className={`grid place-items-center rounded-full bg-violet-700/95 text-white ${size ==="sm" ? "size-8" : "size-11"}`}>
             <Icon name="play" size={size === "sm" ? 12 : 18} />
           </span>
         </span>
@@ -65,22 +49,14 @@ export function CourseThumb({
       </div>
     );
   }
-  const t = pick(provider);
+  // 2026-11-07, owner request (DataCamp-style, minimal): a plain grey tile with the provider's name.
   return (
-    <div aria-hidden="true" className={`relative flex overflow-hidden ${t.bg} ${className}`}>
-      {/* the ticket's torn edge */}
-      <span className={`w-2 shrink-0 ${t.edge}`} />
-      <span className={`flex min-w-0 flex-1 flex-col justify-between p-3 ${t.ink}`}>
-        <span className="text-xs font-semibold opacity-80">{kindLabel}</span>
-        <span className={`leading-tight font-semibold text-balance ${size === "sm" ? "text-sm" : "text-lg"}`}>{provider}</span>
-        <span className="flex items-center gap-2 text-xs font-medium opacity-90">
-          {length(hours)}
-          {certificate && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 dark:bg-black/30">
-              <Icon name="cert" size={11} /> With certificate
-            </span>
-          )}
-        </span>
+    <div aria-hidden="true" className={`flex flex-col justify-between overflow-hidden border-b border-zinc-200 bg-zinc-50 p-3 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 ${className}`}>
+      <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{kindLabel}</span>
+      <span className={`leading-tight font-semibold text-balance ${size === "sm" ? "text-sm" : "text-lg"}`}>{provider}</span>
+      <span className="text-xs text-zinc-600 dark:text-zinc-400">
+        {length(hours)}
+        {certificate && " · With certificate"}
       </span>
     </div>
   );
