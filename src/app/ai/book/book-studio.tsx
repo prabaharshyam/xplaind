@@ -327,7 +327,7 @@ function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: 
       </>
       )}
 
-      <AiGate access={access} next="/ai/book">
+      <AiGate access={access} next="/ai/book" kind="book" label="tests or card decks">
         {busy ? (
           <AiWorking
             steps={

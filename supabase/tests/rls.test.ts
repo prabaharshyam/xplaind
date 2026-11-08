@@ -278,3 +278,61 @@ describe("90-day commitment emails (CM-90)", () => {
     expect((await q("select count(*)::int as n from commitments where email = 'c@example.com'")).rows[0].n).toBe(0);
   });
 });
+
+describe("Pro passes (PAY-2)", () => {
+  const C = "00000000-0000-4000-8000-0000000000c1";
+  const D = "00000000-0000-4000-8000-0000000000d1";
+  const order = (id: string, user: string, plan = "pass_month", paise = 24900) =>
+    q("insert into payments (order_id, user_id, plan_id, amount_paise, environment) values ($1, $2, $3, $4, 'sandbox')", [id, user, plan, paise]);
+
+  beforeAll(async () => {
+    await q("insert into auth.users (id, email) values ($1, 'c@example.com'), ($2, 'd@example.com')", [C, D]);
+    await order("xp_c_000001", C);
+    await order("xp_d_000001", D, "pass_year", 199900);
+  });
+
+  it("a learner reads only their own payments and pass, and a visitor reads neither", async () => {
+    await q("select public.grant_pass('xp_d_000001', 'cf1', '2026-11-08T10:00:00+05:30')");
+    const pays = await asUser(db.client, C, async () => (await q("select order_id from payments")).rows);
+    expect(pays).toEqual([{ order_id: "xp_c_000001" }]);
+    const passes = await asUser(db.client, C, async () => (await q("select user_id from entitlements")).rows);
+    expect(passes).toEqual([]);
+    for (const table of ["payments", "entitlements"]) {
+      const err = await fails(asUser(db.client, null, () => q(`select * from ${table}`)));
+      expect(err.code, table).toBe(PERMISSION_DENIED);
+    }
+  });
+
+  it("only the server writes payments and passes, or grants a pass", async () => {
+    for (const sql of [
+      `insert into payments (order_id, user_id, plan_id, amount_paise, environment) values ('xp_c_hack01', '${C}', 'pass_year', 1, 'sandbox')`,
+      `insert into entitlements (user_id, plan_id, valid_until) values ('${C}', 'pass_year', '2099-01-01')`,
+      "select public.grant_pass('xp_c_000001', 'x', now())",
+    ]) {
+      const err = await fails(asUser(db.client, C, () => q(sql)));
+      expect(err.code, sql).toBe(PERMISSION_DENIED);
+    }
+    const updated = await asUser(db.client, C, () => q("update payments set status = 'paid'").then((r) => r.rowCount, () => -1));
+    expect(updated === 0 || updated === -1).toBe(true);
+    expect((await q("select status from payments where order_id = 'xp_c_000001'")).rows[0].status).toBe("created");
+  });
+
+  it("grants a pass once per order, and a second pass starts when the first ends", async () => {
+    const grant = async (id: string) => (await q("select public.grant_pass($1, 'cf', '2026-11-08T10:00:00+05:30') as r", [id])).rows[0].r;
+    expect(await grant("xp_c_000001")).toBe("granted");
+    expect(await grant("xp_c_000001")).toBe("already");
+    expect(await grant("xp_nope_0001")).toBe("missing");
+    const until = async () => (await q("select valid_until from entitlements where user_id = $1", [C])).rows[0].valid_until as Date;
+    expect((await until()).toISOString()).toBe("2026-12-08T04:30:00.000Z");
+    await order("xp_c_000002", C, "pass_6month", 119900);
+    expect(await grant("xp_c_000002")).toBe("granted");
+    expect((await until()).toISOString()).toBe("2027-06-08T04:30:00.000Z");
+    expect((await q("select status, paid_at is not null as paid from payments where order_id = 'xp_c_000002'")).rows[0]).toEqual({ status: "paid", paid: true });
+  });
+
+  it("keeps the payment record but not the pass when the account is deleted", async () => {
+    await q("delete from auth.users where id = $1", [D]);
+    expect((await q("select count(*)::int as n from entitlements where user_id = $1", [D])).rows[0].n).toBe(0);
+    expect((await q("select user_id, status from payments where order_id = 'xp_d_000001'")).rows[0]).toEqual({ user_id: null, status: "paid" });
+  });
+});

@@ -48,7 +48,7 @@ export function RoadmapStudio({ enabled }: { enabled: boolean }) {
               Describe where you want to go
             </h2>
             <div className="mt-4">
-              <AiGate access={access} next="/ai/roadmap">
+              <AiGate access={access} next="/ai/roadmap" kind="roadmap" label="AI roadmaps">
                 <RoadmapForm onMade={setOpenId} />
               </AiGate>
             </div>

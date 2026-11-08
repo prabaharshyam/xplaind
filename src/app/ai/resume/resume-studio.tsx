@@ -62,7 +62,7 @@ export function ResumeStudio({ enabled, roles }: { enabled: boolean; roles: stri
   if (review) return <Review review={review} onAgain={() => setReview(null)} />;
 
   return (
-    <AiGate access={access} next="/ai/resume">
+    <AiGate access={access} next="/ai/resume" kind="resume" label="resume reviews">
       {busy ? (
         <AiWorking steps={["Reading your resume", "Checking it like a recruiter", "Checking it like an ATS", "Writing your fixes"]} />
       ) : (

@@ -136,6 +136,16 @@ export function Settings({ email, weeklyHours }: { email: string | null; weeklyH
 
       <PasswordSection />
 
+      <section aria-labelledby="billing-heading" className="flex flex-col gap-3">
+        <h2 id="billing-heading" className="text-xl font-semibold">
+          Billing
+        </h2>
+        <p className={muted}>Your plan, when a Pro pass ends, and receipts for your payments.</p>
+        <Link href="/settings/billing" className={secondaryButton}>
+          Open billing
+        </Link>
+      </section>
+
       <section aria-labelledby="data-heading" className="flex flex-col gap-3">
         <h2 id="data-heading" className="text-xl font-semibold">
           Your data

@@ -19,6 +19,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/about",
     "/privacy",
     "/terms",
+    "/refunds",
+    "/pricing",
     "/paths",
     "/topics",
     ...THEMES.map((t) => `/topics/${t.id}`),

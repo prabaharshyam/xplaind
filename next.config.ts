@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // PAY-5: the menu shows Pricing only when Pro passes are switched on. Only this yes/no reaches the browser.
+  env: { NEXT_PUBLIC_PRO_OPEN: ["sandbox", "production"].includes((process.env.PAYMENTS_MODE ?? "").trim().toLowerCase()) ? "1" : "" },
   /* config options here */
   cacheComponents: true,
   // RM-4: video thumbnails come through our image server, so browsers never call YouTube before play.

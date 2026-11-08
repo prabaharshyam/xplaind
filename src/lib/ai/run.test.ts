@@ -9,6 +9,7 @@ let user: { id: string; email: null } | null = { id: "u1", email: null };
 
 vi.mock("@/lib/account/http", () => ({
   problem: (status: number, message: string) => Response.json({ error: message }, { status }),
+  json: (body: unknown, status = 200) => Response.json(body, { status }),
   rateLimit: async () => null,
   visitorKey: () => "visitor-hash",
 }));
@@ -66,8 +67,30 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     expect(out).toEqual({ data: { answer: "42" } });
     expect(rpc.mock.calls[0][0]).toBe("ai_reserve");
     expect(rpc.mock.calls[0][1]).toMatchObject({ p_kind: "tutor", p_daily_max: 40, p_month_cap_usd: 20 });
-    expect(rpc.mock.calls[1]).toEqual(["ai_record", expect.objectContaining({ p_tokens_in: 1000, p_tokens_out: 100, p_cost_usd: 0.006 })]);
-    expect(create.mock.calls[0][0]).toMatchObject({ model: "claude-opus-5-5", fallbacks: "default", output_config: { effort: "low" } });
+    // PAY-1: the tutor runs on the fast model, which has no server-side fallback.
+    expect(rpc.mock.calls[1]).toEqual(["ai_record", expect.objectContaining({ p_tokens_in: 1000, p_tokens_out: 100, p_cost_usd: 0.00015 })]);
+    expect(create.mock.calls[0][0]).toMatchObject({ model: "claude-haiku-5-5", output_config: { effort: "low" } });
+    expect(create.mock.calls[0][0]).not.toHaveProperty("fallbacks");
+  });
+
+  it("keeps the main model, with its fallback, for grading (PAY-1)", async () => {
+    rpc.mockResolvedValueOnce({ data: "ok", error: null }).mockResolvedValueOnce({ data: null, error: null });
+    create.mockResolvedValue(reply('{"answer":"42"}'));
+    await runAi({ ...req, kind: "grade" });
+    expect(rpc.mock.calls[1]).toEqual(["ai_record", expect.objectContaining({ p_cost_usd: 0.006 })]);
+    expect(create.mock.calls[0][0]).toMatchObject({ model: "claude-opus-5-5", fallbacks: "default" });
+  });
+
+  it("uses the free learner's lower limit once Pro is open, and offers a pass at the limit (PAY-1, PAY-4)", async () => {
+    vi.stubEnv("PAYMENTS_MODE", "sandbox");
+    vi.stubEnv("CASHFREE_APP_ID", "app");
+    vi.stubEnv("CASHFREE_SECRET_KEY", "secret");
+    rpc.mockResolvedValueOnce({ data: "day", error: null });
+    const res = (await runAi(req)) as Response;
+    expect(rpc.mock.calls[0][1]).toMatchObject({ p_kind: "tutor", p_daily_max: 10 });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ upgrade: "/pricing" });
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("never calls the model when the kill switch is on", async () => {
