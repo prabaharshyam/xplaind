@@ -34,6 +34,10 @@ flashcards:
     a: "So the chunk carries its context into the embedding, such as 'Leave Policy > Earned leave: This limit is 45 days'."
   - q: "How should you choose a chunk size?"
     a: "Test two or three sizes on real questions and measure whether the right passages are retrieved. Do not guess."
+  - q: "What is small-to-big retrieval?"
+    a: "Search over small, precise chunks, but give the model the larger parent section each match came from, so it gets both accuracy and context."
+  - q: "Why strip repeated headers and footers before chunking?"
+    a: "Lines like 'Company Confidential — Page 12' appear in every chunk, pulling all their embeddings towards each other and wasting tokens."
 exercise:
   title: "Fix the chunks"
   setup: "A Jaipur university's admissions assistant chunks its 60-page prospectus every 1,500 characters with no overlap. Problems: the fee table for different courses is split across two chunks; a chunk reads only 'The deadline for this is 15 June' with no course named; FAQ pages are split mid-answer; and answers about hostel fees also pull in scholarship rules."
@@ -51,8 +55,8 @@ ask:
   - "How much overlap should chunks have?"
   - "How do I chunk tables and PDFs?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -115,6 +119,58 @@ This lesson follows an HR assistant at a manufacturing company in Pune, answerin
 
 **Chunking PDFs and scanned documents.** Extracted PDF text often includes page headers, footers and page numbers on every page. Remove lines that repeat on most pages before chunking, or they pollute every chunk and its embedding. For scans, run OCR first and check a sample, because OCR errors in headings break structure-aware splitting. And keep the page number of the start of each chunk, so citations point to the right page even when a chunk crosses a page break.
 
+**A structure-aware splitter in code.** This one works on Markdown or text with headings, keeps the section path, and adds overlap. Sizes are in words for simplicity; switch to the embedding model's tokenizer for exact limits:
+
+```python
+import re
+
+def split_by_headings(text, max_words=350, overlap_words=50, title=""):
+    chunks, path, buf = [], [], []
+
+    def flush():
+        words = " ".join(buf).split()
+        start = 0
+        while start < len(words):
+            piece = words[start:start + max_words]
+            header = " > ".join([title] + path)
+            chunks.append({"section": header, "text": f"{header}: " + " ".join(piece)})
+            if start + max_words >= len(words):
+                break
+            start += max_words - overlap_words
+        buf.clear()
+
+    for line in text.splitlines():
+        m = re.match(r"^(#{1,4})\s+(.*)", line)
+        if m:
+            flush()
+            level = len(m.group(1))
+            path[:] = path[:level - 1] + [m.group(2).strip()]
+        elif line.strip():
+            buf.append(line.strip())
+    flush()
+    return chunks
+```
+
+Each chunk starts with its section path, such as "Leave Policy > Earned leave: ...", so a short sentence still says what it is about.
+
+**Strip repeated lines from PDFs.** Before chunking extracted PDF text, drop lines that appear on most pages:
+
+```python
+from collections import Counter
+
+def strip_repeats(pages, share=0.6):
+    """pages: list of page texts."""
+    counts = Counter(l.strip() for p in pages for l in set(p.splitlines()) if l.strip())
+    repeated = {l for l, n in counts.items() if n >= share * len(pages)}
+    return ["\n".join(l for l in p.splitlines() if l.strip() not in repeated) for p in pages]
+```
+
+**Small to big.** Precise retrieval wants small chunks; good answers want context. Do both: index small chunks (one or two paragraphs), store which section each came from, and when a small chunk matches, give the model the whole parent section (or the chunk plus its neighbours). This often beats any single chunk size.
+
+**Context written by a model.** For documents where headings are weak, a cheap model can write one sentence per chunk describing where it sits ("From the 2026 leave policy, section on carrying forward earned leave"). Prepend it before embedding. It costs one call per chunk at ingestion time, once, and helps retrieval on vague chunks. Prompt caching the full document makes this much cheaper.
+
+**Measure, then choose.** Keep the 20-question test from the practice, and record recall at 5 for each strategy and size in a small table. Pick by the numbers, and keep the table with the index settings.
+
 ## A worked example
 
 A Pune manufacturing company's HR assistant answers questions from a 120-page employee handbook.
@@ -143,6 +199,23 @@ The biggest single gain came from keeping the leave table whole: eight of the 18
 - **Losing headings and page numbers.**
 - **Never measuring.** Test sizes on real questions.
 - **Chunking once and never testing again.** When documents or questions change, recheck retrieval with your test set.
+- **Repeated page headers and footers left in every chunk.**
+- **Choosing one chunk size for every document type.** Policies, FAQs, tables and tickets need different strategies.
+- **Changing chunking without re-running the retrieval test.**
+
+## When chunking hardly matters
+
+- **Short documents**, such as one-page notices, that fit whole in a chunk.
+- **Already structured items**, such as one FAQ pair, one product or one ticket per record.
+- **Small collections that fit in the context**, where you can skip retrieval altogether.
+
+## From demo to production
+
+- **Version the chunking code and settings**, and record them with the index.
+- **Re-chunk one document at a time** on change, using document ids in chunk ids.
+- **Keep the retrieval test** and rerun it on every chunking change.
+- **Check a sample of chunks by eye** after each ingestion: broken tables and stray headers show up quickly.
+- **Track chunk counts and sizes** per document to catch parsing failures, such as a 200-page manual producing three chunks.
 
 ## Practice
 
@@ -151,5 +224,8 @@ Read Pinecone's guide to chunking strategies linked below.
 1. Chunk one long document three ways: fixed size, recursive by structure, and by structure with overlap and headings.
 2. Write 20 questions with the passage that answers each.
 3. Measure how often the right passage is in the top five for each method.
+4. Add small-to-big retrieval to your best method and measure whether answer quality changes on the same 20 questions.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers chunking strategies, chunk size and overlap, and adding context to chunks.
 
 **You are done when you can** explain what goes wrong with very large and very small chunks, and show which method won on your test.

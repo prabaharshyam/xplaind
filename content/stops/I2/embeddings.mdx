@@ -34,6 +34,10 @@ flashcards:
     a: "On exact terms such as order numbers, product codes and rare names. Pair them with keyword search for those."
   - q: "When do you need a vector database?"
     a: "When you have millions of vectors. For a few thousand, a NumPy array and a dot product are enough."
+  - q: "How much memory do a million 768-dimension embeddings need?"
+    a: "About 3 GB as 32-bit floats (1,000,000 × 768 × 4 bytes), half that at 16-bit, and a quarter at 8-bit."
+  - q: "Why do some embedding models need 'query:' and 'passage:' prefixes?"
+    a: "They were trained with those markers to tell questions from documents. Leaving them out quietly lowers search quality."
 exercise:
   title: "Choose the embedding setup"
   setup: "A Jaipur travel company wants semantic search over 15,000 FAQ answers and 40,000 customer reviews, in English and Hindi. Queries include 'refund kab milega', 'cancel my Goa trip' and booking ids like 'TRV-88213'. An engineer suggests embedding each review as one vector, using a top English-only leaderboard model, and showing results above a score of 0.7."
@@ -51,8 +55,8 @@ ask:
   - "Which embedding model should I use for Indian languages?"
   - "What is the difference between cosine similarity and dot product?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -94,6 +98,49 @@ Two practical points. First, embed the query and the documents with the same mod
 
 **Testing before you choose.** Collect twenty real queries with the ticket or passage that should come first for each. Embed everything with two or three candidate models and count how often the right item lands in the top three. This takes an afternoon and beats any public leaderboard, because it uses your users' words, spellings and languages. Repeat the test whenever you consider switching models, since a switch means re-embedding the whole collection.
 
+**Embeddings in code.** With the `sentence-transformers` library:
+
+```python
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+docs = ["Dhoni hit the winning six in 2011", "Add the soaked rice to the biryani masala",
+        "Kohli scored a century in Perth", "Fry onions until golden brown"]
+vecs = model.encode(docs, normalize_embeddings=True)            # shape (4, 384)
+
+query = model.encode(["how to cook biryani"], normalize_embeddings=True)[0]
+scores = vecs @ query                                            # cosine, because vectors are normalised
+for score, text in sorted(zip(scores, docs), reverse=True)[:2]:
+    print(f"{score:.2f}  {text}")
+```
+
+**Multilingual models and their prefixes.** For Hindi, Tamil, Hinglish and other Indian-language text, use a multilingual model. Some, such as the E5 family, expect inputs marked as queries or passages:
+
+```python
+m = SentenceTransformer("intfloat/multilingual-e5-base")
+passages = m.encode(["passage: बिरयानी बनाने के लिए चावल भिगो दें", "passage: Kohli scored a century"],
+                    normalize_embeddings=True)
+q = m.encode(["query: biryani kaise banate hain"], normalize_embeddings=True)[0]
+print(passages @ q)
+```
+
+Read each model's card for its prefixes, input limit and languages. Missing prefixes do not cause errors, only worse results, which is why they are easy to miss.
+
+**Size and storage.** Each vector has a fixed number of dimensions (384, 768, 1,024 or more). Storage is vectors × dimensions × bytes: a million 768-dimension vectors take about 3 GB as 32-bit floats. Storing at 16-bit halves that with almost no loss; 8-bit or binary quantisation shrinks it further at some cost in quality. Some newer models are trained so you can keep only the first part of each vector (for example 256 of 1,024 dimensions) and still search well. Test any shrinking on your own golden queries.
+
+**Benchmarks are a starting point.** Public leaderboards such as MTEB compare embedding models on many tasks and languages, which helps shortlist. Your own test, with your users' queries and spellings, decides.
+
+```python
+def top3_hit_rate(model, queries, corpus, correct_ids):
+    """queries[i] should find corpus item correct_ids[i] in its top 3."""
+    c = model.encode(corpus, normalize_embeddings=True)
+    q = model.encode(queries, normalize_embeddings=True)
+    top3 = (-(q @ c.T)).argsort(axis=1)[:, :3]
+    return sum(correct_ids[i] in top3[i] for i in range(len(queries))) / len(queries)
+```
+
+**Switching models means re-embedding.** Vectors from different models live in different spaces and cannot be mixed. Store the model name and version with each vector, and plan a full re-embed (and a test) for any switch.
+
 ## A worked example
 
 Say an edtech support team in Chennai has 2,000 past tickets and wants to show agents similar solved tickets.
@@ -130,6 +177,23 @@ Now try "certificate name spelling mistake". It should match the certificate tic
 - **Trusting the score as a probability.** A score of 0.62 is not "62% relevant". Scores are only useful for ranking, and good thresholds differ by model, so set any cut-off from your own data.
 - **Ignoring exact terms.** Embeddings are weak on order numbers, product codes and rare names. Pair them with keyword search when those matter.
 - **Not testing on your own text.** A model that tops a public leaderboard may do worse on Indian names, Hinglish or your domain's jargon. Check on twenty real queries before you choose.
+- **Forgetting a model's query and passage prefixes.** Nothing errors; results just get worse.
+- **Mixing vectors from two models** in one index.
+- **Choosing from a leaderboard alone.** Test on your own queries.
+
+## When embeddings are not the best tool
+
+- **Exact identifiers**: order numbers, PAN, part codes and names are better found with keyword search or a database lookup.
+- **Very small collections**, such as 30 FAQs: keyword matching or putting them all in the prompt is simpler.
+- **Structured filters**, such as "orders over ₹5,000 last week": a SQL query beats similarity.
+
+## From demo to production
+
+- **Store model name, version and dimensions** with every vector.
+- **Keep a golden query set** and rerun the hit rate on every model or setting change.
+- **Batch embedding jobs** and track their cost and time.
+- **Plan re-embeds** for model switches, with the old index kept until the new one passes tests.
+- **Watch storage**: choose precision and dimensions from your own tests, not defaults.
 
 ## Practice
 
@@ -138,5 +202,8 @@ Work through the Hugging Face notebook linked below. Then do this:
 1. Embed twenty sentences: ten about cricket and ten about cooking.
 2. For three queries of your own, print the top three sentences and their scores.
 3. Add one query in Hinglish, such as "biryani kaise banate hain", and see whether it still finds the cooking sentences.
+4. Run top3_hit_rate for an English-only model and a multilingual one on ten Hinglish queries, and compare.
+
+For more depth, chapter 3 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers embeddings and how they are compared, and chapter 6 covers embedding-based retrieval.
 
 **You are done when you can** explain to a friend why "car" and "automobile" end up close together, and name one kind of query where embeddings alone would fail.

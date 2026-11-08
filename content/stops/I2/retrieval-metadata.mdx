@@ -33,6 +33,10 @@ flashcards:
     a: "A wrong filter hides the right answer completely. Prefer user context and ask when unsure."
   - q: "What is generated metadata, and what is its cost?"
     a: "Summaries, keywords or likely questions written by a model per chunk; it costs a model call per chunk at ingestion, so measure the gain."
+  - q: "Why infer query filters conservatively?"
+    a: "A wrong filter, such as the wrong state or year, silently hides the right answer. When unsure, search without the filter."
+  - q: "What should happen to a chunk with invalid metadata at ingestion?"
+    a: "Quarantine it and report it, rather than indexing it with bad values that make it disappear from filtered searches."
 exercise:
   title: "Design the metadata"
   setup: "A Bhopal state-government department builds an assistant over 6,000 government orders and circulars, in Hindi and English, issued since 2015. Many orders amend or cancel earlier ones. Some files are marked for internal use only. Officers ask questions like 'current TA rates for district officers' and 'what did the 2019 order on transfers say?'"
@@ -50,8 +54,8 @@ ask:
   - "How do I handle document versions in RAG?"
   - "Should I generate questions for each chunk?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -109,6 +113,81 @@ This lesson follows an HR assistant at an IT company in Bengaluru serving employ
 
 **Validating metadata.** Treat metadata like any other data. At ingestion, check that required fields exist, that values come from the fixed lists, and that effective dates make sense, such as an end date after a start date. Reject or quarantine chunks that fail, and report counts per run. A single document tagged "Karnatka" instead of "KA" silently disappears from every Karnataka employee's search.
 
+**Validate metadata in code.** Fixed vocabularies and date rules, checked before anything is indexed:
+
+```python
+from datetime import date
+from typing import Literal
+from pydantic import BaseModel, field_validator, model_validator
+
+State = Literal["KA", "TN", "MH", "DL", "ALL"]
+DocType = Literal["policy", "circular", "faq", "contract"]
+
+class ChunkMeta(BaseModel):
+    doc_id: str
+    title: str
+    section_path: str
+    page: int
+    doc_type: DocType
+    state: State
+    language: Literal["en", "hi", "ta", "kn", "mr"]
+    effective_from: date
+    effective_to: date | None = None
+    superseded_by: str | None = None
+    access_groups: list[str]
+
+    @field_validator("access_groups")
+    @classmethod
+    def not_empty(cls, v):
+        if not v:
+            raise ValueError("every chunk needs at least one access group")
+        return v
+
+    @model_validator(mode="after")
+    def dates_in_order(self):
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValueError("effective_to is before effective_from")
+        return self
+```
+
+Run every chunk through `ChunkMeta.model_validate`, index the ones that pass, and write the failures to a quarantine table with the error. "Karnatka" now fails loudly instead of vanishing.
+
+**Infer filters from the question, safely.** Ask a small model for filters as structured output with a confidence, and only apply them when the question clearly states them:
+
+```python
+class Filters(BaseModel):
+    state: State | None = None
+    year_from: int | None = None
+    doc_type: DocType | None = None
+    explicit: bool        # true only if the user named these in the question
+
+def apply_filters(f: Filters, user_state):
+    filters = {"state": [user_state, "ALL"], "current": True}    # from the profile, always safe
+    if f.explicit:
+        if f.state:
+            filters["state"] = [f.state, "ALL"]
+        if f.year_from:
+            filters["effective_from_gte"] = date(f.year_from, 1, 1)
+        if f.doc_type:
+            filters["doc_type"] = f.doc_type
+    return filters
+```
+
+If a filtered search returns nothing, retry once without the inferred filters and say so in the logs.
+
+**Superseding a document.** When a new version arrives, mark the old one in the same transaction:
+
+```sql
+BEGIN;
+UPDATE chunks SET superseded_by = 'HR-LP-2026', effective_to = '2025-12-31' WHERE doc_id = 'HR-LP-2025';
+INSERT INTO chunks (...) VALUES (...);   -- the new version's chunks
+COMMIT;
+```
+
+Default searches filter `superseded_by IS NULL`; history questions ("what was the rule in 2024?") drop that filter and use the dates.
+
+**Check the payoff.** Measure recall at 5 with and without each piece of metadata (contextual text, generated questions, inferred filters) on your golden set, and keep only what helps.
+
 ## A worked example
 
 A Bengaluru IT company's HR assistant serves employees in five states. Leave and holiday rules differ by state, and policies are revised each year.
@@ -135,6 +214,24 @@ On the 100-question golden set, correct answers rise from 71% to 90%. Citations 
 - **No effective dates.** Old versions keep winning.
 - **Aggressive inferred filters.** A wrongly inferred filter hides the right answer; prefer user context and ask when unsure.
 - **Generating metadata without measuring.** It costs money at ingestion; prove it helps.
+- **Free-text metadata values.** Use fixed lists and validate them.
+- **Inferred filters applied without a fallback.** Retry without them when results are empty.
+
+## When little metadata is needed
+
+- **A small, single-topic collection** with one version of each document.
+- **Everyone may see everything**, and nothing goes out of date.
+- **A prototype** testing whether retrieval helps at all.
+
+Rich metadata pays off once there are many document types, versions, regions or permission groups.
+
+## From demo to production
+
+- **Validate every chunk's metadata** at ingestion and report quarantine counts per run.
+- **Supersede in transactions**, and filter superseded documents by default.
+- **Log the filters applied** to each search, including inferred ones.
+- **Review vocabularies** (states, document types, departments) with the content owners.
+- **Measure the value** of each metadata feature on the golden set.
 
 ## Practice
 
@@ -143,5 +240,8 @@ Read LlamaIndex's page on metadata extraction and Microsoft's security filter pa
 1. Re-ingest your RAG documents with title, section path, type, dates and language on every chunk.
 2. Prepend title and section path to the embedded text and compare recall at 5 before and after.
 3. Add a "superseded" flag to one document's old version and show that filtering removes it from answers.
+4. Feed five chunks with deliberately bad metadata through ChunkMeta and confirm each lands in quarantine with a clear error.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers metadata filtering and adding context to chunks.
 
 **You are done when you can** show an answer with a precise citation and a question where a metadata filter fixed a wrong answer.

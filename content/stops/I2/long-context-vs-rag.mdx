@@ -34,6 +34,10 @@ flashcards:
     a: "Retrieve at the document level to find the right few documents, then put those whole documents in context."
   - q: "Where should the question go in a long prompt?"
     a: "After the long material, together with the instructions."
+  - q: "What is document-level retrieval?"
+    a: "Search to pick the right few whole documents, then put those documents in the context, so you get RAG's scale and long context's completeness."
+  - q: "How do you test position effects on your own documents?"
+    a: "Plant one known fact at the start, middle and end of a realistic long document, ask about it each time, and compare accuracy by position."
 exercise:
   title: "Pick the approach"
   setup: "Three requests reach an AI team at a Pune engineering firm: (A) a manager wants to ask 20 questions about one 120-page tender document this afternoon, including 'Which clauses conflict with our standard terms?'; (B) 3,000 field engineers want quick answers from 18,000 equipment manuals that change weekly; (C) a lawyer wants to compare the indemnity terms across the five contracts with one client, out of 4,000 contracts in the system."
@@ -51,8 +55,8 @@ ask:
   - "How does prompt caching work?"
   - "What is context rot?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -112,6 +116,64 @@ This lesson follows a law firm in Chennai building a contract-review assistant w
 
 **Testing on your own documents.** Published studies give warnings, not answers. Write questions where the answer sits early, in the middle and late in the document, and questions that need two distant sections. Run them both ways and read the failures.
 
+**A position test in code.** Plant a fact at different depths of a real document and check whether answers stay right:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+FACT = "The penalty for late GST filing under clause 14.3 is ₹750 per day."
+QUESTION = "What is the penalty per day for late GST filing under clause 14.3?"
+
+def plant(doc, depth):
+    cut = int(len(doc) * depth)
+    return doc[:cut] + "\n\n" + FACT + "\n\n" + doc[cut:]
+
+def position_test(doc, depths=(0.05, 0.5, 0.95), runs=3):
+    for d in depths:
+        correct = 0
+        for _ in range(runs):
+            r = client.messages.create(
+                model="claude-sonnet-5-5", max_tokens=100,       # check the docs for current names
+                messages=[{"role": "user", "content": plant(doc, d) + "\n\n" + QUESTION}])
+            text = "".join(b.text for b in r.content if b.type == "text")
+            correct += "750" in text
+        print(f"fact at {d:.0%} depth: {correct}/{runs} correct")
+```
+
+Run it with your real documents and lengths. Then test questions that need two distant sections, which is where long context often beats RAG.
+
+**A cost comparison you can adjust.** Plug in current prices, with the date you checked them:
+
+```python
+def cost_inr(input_tokens, output_tokens, price_in, price_out, cached_tokens=0, cache_read_ratio=0.1,
+             usd_to_inr=84):
+    """Prices in USD per million tokens. cache_read_ratio: cached input price as a share of normal."""
+    uncached = input_tokens - cached_tokens
+    usd = (uncached * price_in + cached_tokens * price_in * cache_read_ratio + output_tokens * price_out) / 1e6
+    return usd * usd_to_inr
+
+questions, doc, out = 12, 40_000, 300
+long_ctx = sum(cost_inr(doc + 100, out, 3, 15, cached_tokens=doc if i else 0) for i in range(questions))
+rag = questions * cost_inr(3_000, out, 3, 15)
+print(f"long context with caching ₹{long_ctx:.1f}, RAG ₹{rag:.1f}")
+```
+
+The first call pays for the full document (and usually a little extra to write the cache); later calls read it cheaply if they come within the cache lifetime. Change the numbers to your own document sizes and traffic.
+
+**The middle path in code.** Retrieve whole documents, not chunks, then let long context do the reading:
+
+```python
+def doc_level_answer(question, search_docs, load_doc, max_docs=2):
+    docs = search_docs(question, k=max_docs)          # search over document summaries or titles
+    context = "\n\n".join(f"<document title='{d['title']}'>\n{load_doc(d['id'])}\n</document>" for d in docs)
+    return context + f"\n\nAnswer using the documents above, citing titles and sections.\nQuestion: {question}"
+```
+
+This suits contracts, policies and reports where questions need the whole document but you have hundreds of them.
+
+**Decide by measuring three things.** Accuracy on your question types, cost per answer at your traffic, and time to first token. Write the numbers in a small table for each option and choose with the client, not by habit.
+
 ## A worked example
 
 A Chennai law firm wants an assistant for contract review. Two use cases:
@@ -134,6 +196,22 @@ The firm gets both, each where it fits.
 - **Forgetting caching.** For repeated use of the same document it changes the economics.
 - **Putting the question first.** Place instructions and the question after the long material.
 - **"RAG is dead" thinking.** Large collections still need retrieval.
+- **Comparing costs without caching** when the same document serves many questions.
+- **Assuming a big window means the model uses all of it well.** Test positions and cross-references.
+
+## When the choice is obvious
+
+- **One short document**: just put it in the prompt.
+- **Millions of documents**: you need retrieval of some kind, at least to choose documents.
+- **Answers from structured data**, such as records or tables: use a database query or a tool, not either of these.
+
+## From demo to production
+
+- **Record accuracy, cost and latency** for the chosen approach on your golden set, and recheck on model changes.
+- **Use prompt caching** for long documents reused within minutes.
+- **Log input tokens per request** and alert on unexpected growth.
+- **Re-run the position test** when you change models or document lengths grow.
+- **Keep the middle path in mind**: document-level retrieval often wins once collections grow.
 
 ## Practice
 
@@ -142,5 +220,8 @@ Read the Lost in the Middle abstract, Chroma's context rot report and your provi
 1. Pick one long document (an annual report or policy) and write 15 questions, some needing the whole document.
 2. Answer them with long context and with your RAG pipeline. Record accuracy, latency and cost for each.
 3. Repeat the long-context run with prompt caching and compare.
+4. Run position_test on your long document at five depths and plot accuracy against depth.
+
+For more depth, chapter 5 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers context length and how well models use long inputs, and chapter 6 covers when to retrieve.
 
 **You are done when you can** recommend long context or RAG for a stated use case with your own numbers.
