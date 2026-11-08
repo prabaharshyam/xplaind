@@ -109,3 +109,21 @@ test("the fourth batch of book-informed lessons render with their sections, a di
     expect((await wcag(page)).violations).toEqual([]);
   }
 });
+
+test("the fifth batch of book-informed lessons render with their sections, a diagram and code (LQ-5)", async ({ page }) => {
+  const lessons: [string, RegExp, string][] = [
+    ["ai-in-indian-languages", /AI in Indian languages/, "When English is fine"],
+    ["model-size-and-scaling", /Model size and scaling laws/, "When bigger is not better"],
+    ["perplexity-and-cross-entropy", /Perplexity and cross-entropy/, "When you do not need these metrics"],
+  ];
+  for (const [id, title, extra] of lessons) {
+    await page.goto(`/stop/${id}`);
+    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: extra })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Common mistakes" })).toBeVisible();
+    await expect(page.locator("figure:has(svg)").first()).toBeVisible();
+    await expect(page.locator("pre").first()).toBeVisible();
+    expect(await overflow(page)).toBe(false);
+    expect((await wcag(page)).violations).toEqual([]);
+  }
+});

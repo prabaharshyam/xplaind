@@ -1,0 +1,176 @@
+---
+id: ai-in-indian-languages
+level: I2
+theme: llm
+title: "AI in Indian languages: tokens, quality gaps and what to use"
+outcome: "Explain why language models do worse and cost more in most Indian languages, measure the gap for your own users, and choose between a general model, translation and Indian-language models."
+answer: "Indian languages are rare in training data, so models are weaker in them, and tokenizers often split them into many more tokens, raising cost and delay. Test each language first."
+why_it_matters: "Most Indians are more comfortable in a language other than English, and many products succeed or fail on that. Knowing where models are weak, why replies in Hindi or Tamil cost more, and what Indian-language tools exist is a practical edge for any AI builder in India."
+hours: 2.5
+gap_tags: []
+primary_resource: artfish-languages-not-tokenized-equally
+alternates: [ai4bharat]
+videos: [yt-sarvam-sarvam-2b-an-indic-llm, yt-ai4bharat-llm-arena-demo]
+more: [indictrans2-hf, bhashini]
+format: deep
+key_terms: [low-resource-language, token-fertility, tokenizer, token]
+check:
+  type: mcq
+  question_ids: [ai-in-indian-languages-1, ai-in-indian-languages-2, ai-in-indian-languages-3]
+flashcards:
+  - q: "Why are models weaker in most Indian languages?"
+    a: "Those languages make up a tiny share of the web text models learn from. Punjabi, Kannada, Telugu and Marathi each make up only around 0.01% to 0.02% of a common training dataset."
+  - q: "What is token fertility?"
+    a: "How many tokens a tokenizer needs per word. Many tokenizers need several times more tokens for Hindi or Tamil than for English, for the same meaning."
+  - q: "Why does token fertility matter for a product?"
+    a: "APIs charge per token and generate one token at a time, so more tokens means a higher bill, slower replies and less room in the context window."
+  - q: "What is code-mixing?"
+    a: "Mixing languages in one message, like Hinglish ('mera order kab aayega?'), often in Roman script. Users do it constantly, so test sets must include it."
+  - q: "What is the translate-pivot approach?"
+    a: "Translate the user's message to English, answer in English, then translate back. It can help weak languages but loses nuance such as aap versus tum."
+  - q: "Name two Indian-language AI resources."
+    a: "AI4Bharat (IIT Madras) for open translation, speech and evaluation models, and Bhashini, the government's free language platform. Several Indian startups also build Indian-language models."
+  - q: "What should an Indian-language test set include?"
+    a: "Real questions in each language and script users write in, including code-mixed and Romanised text, scored by native speakers."
+  - q: "What is the first thing to measure when adding a language?"
+    a: "Quality and token count on real user questions in that language, compared with English, using the models you might deploy."
+exercise:
+  title: "A farmer helpline in Marathi and Hindi"
+  setup: "A Pune agritech company wants a voice-and-chat helpline answering farmers' questions about crops, weather and government schemes. Most users speak Marathi or Hindi, many type in Roman script, and volume will reach 50,000 questions a month. A general model answers well in English but its Marathi answers sound stiff and occasionally mix up scheme names."
+  questions:
+    - q: "What should they build before choosing a model?"
+      a: "A test set of real farmer questions in Marathi and Hindi, in Devanagari and Roman script, including code-mixed ones, with answers checked by native-speaking agronomists."
+    - q: "Why might the Marathi version cost more than the English one?"
+      a: "The tokenizer may split Marathi into many more tokens for the same meaning, and the bill and reply time scale with tokens."
+    - q: "What options should they compare?"
+      a: "The general model answering directly, translate to English and back with an Indian-language translation model, and a model built for Indian languages, all scored on the same test set with cost per answer."
+    - q: "How should they handle scheme names the model gets wrong?"
+      a: "Retrieve official scheme details in each language at question time, and keep a glossary of exact scheme names, instead of relying on the model's memory."
+ask:
+  - "Why does ChatGPT cost more in Hindi than in English?"
+  - "Which models are best for Indian languages?"
+  - "Should I translate to English before calling the model?"
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-08
+---
+
+## What it is
+
+Language models learn from text on the web, and the web is mostly English. In one widely used training dataset, English is about 46% of the text. Indian languages are tiny by comparison:
+
+| Language | Speakers (millions) | Share of the dataset | Under-represented by about |
+| --- | --- | --- | --- |
+| Punjabi | 113 | 0.006% | 230 times |
+| Kannada | 64 | 0.012% | 66 times |
+| Telugu | 95 | 0.018% | 65 times |
+| Gujarati | 62 | 0.013% | 62 times |
+| Marathi | 99 | 0.021% | 58 times |
+| Bengali | 272 | 0.093% | 37 times |
+| English (for comparison) | 1,452 | 45.9% | over-represented |
+
+The last column compares each language's share of the world's population with its share of the dataset. The figures are from a 2023 study of the Common Crawl web dataset, cited in Chip Huyen's *AI Engineering*. Languages like these, with little training text compared with how many people speak them, are called **low-resource languages**.
+
+This causes three practical problems:
+
+1. **Lower quality.** On a well-known test of general knowledge, a leading model scored worst in Telugu, Marathi and Punjabi, the most under-represented languages tested.
+2. **Higher cost and delay.** A **tokenizer** splits text into tokens, and many tokenizers were designed mainly for English. They can need several times more tokens for the same sentence in Hindi or Tamil. This is called high **token fertility**. Since you pay per token and models write one token at a time, the same answer costs more and arrives more slowly.
+3. **Real usage is messy.** Indians mix languages ("mera order kab aayega?"), switch scripts, and type Indian languages in Roman letters. Test sets made only of clean, formal text miss all this.
+
+The picture is improving: newer tokenizers handle Indian scripts far better, and Indian groups build models and data for Indian languages. But you still need to measure, language by language, for your users.
+
+```flow
+title: Choosing an approach for an Indian language
+Real user questions in each language -> Score general models | quality, tokens, cost
+Score general models -> Good enough?
+Good enough? -[yes]-> Ship with monitoring per language
+Good enough? -[no]-> Try translate to English and back | Indian translation model
+Try translate to English and back -> Try an Indian-language model
+Try an Indian-language model -> Pick the best on quality and cost
+Pick the best on quality and cost -> Ship with monitoring per language
+```
+
+## How it works
+
+**Measure token fertility yourself.** Count tokens for the same message in English and your users' languages, with the tokenizer of each model you are considering. Write the same meaning, not a word-for-word translation.
+
+```python
+# pip install tiktoken
+import tiktoken
+
+texts = {
+    "English": "When will my order arrive? I paid yesterday.",
+    "Hindi": "मेरा ऑर्डर कब आएगा? मैंने कल भुगतान किया था।",
+    "Hinglish": "Mera order kab aayega? Maine kal payment kiya tha.",
+    "Tamil": "என் ஆர்டர் எப்போது வரும்? நான் நேற்று பணம் செலுத்தினேன்.",
+}
+for name in ["cl100k_base", "o200k_base"]:          # an older and a newer tokenizer
+    enc = tiktoken.get_encoding(name)
+    counts = {lang: len(enc.encode(t)) for lang, t in texts.items()}
+    base = counts["English"]
+    print(name, {lang: f"{n} ({n / base:.1f}x)" for lang, n in counts.items()})
+```
+
+Run it and you will usually see the newer tokenizer cut the Hindi and Tamil counts sharply, while Romanised Hinglish stays close to English. Other providers use different tokenizers, so check each one you consider.
+
+**Three ways to serve a language.**
+
+- **A general model, directly.** Simplest. Strong recent models are often good in Hindi, and weaker in lower-resource languages. Test before you assume.
+- **Translate, answer, translate back.** Translate the question to English with a strong Indian-language translation model (such as AI4Bharat's open IndicTrans2), answer in English, translate back. It can lift quality for weak languages, but adds steps, delay and errors, and loses nuance: respect markers like *aap* and *tum* collapse into "you", and local terms may be mistranslated.
+- **A model built for Indian languages.** Indian startups and research groups train models and tokenizers on far more Indian-language text. The government's Bhashini platform offers translation and speech services. These can be stronger and cheaper for Indian languages, but compare them on your own test set, as you would any model.
+
+**Speech matters too.** Many users would rather speak than type, especially outside cities. Speech recognition quality varies by language, accent and background noise, so test it with real recordings from your users.
+
+| Approach | Quality in weaker languages | Cost and speed | Main risk |
+| --- | --- | --- | --- |
+| General model, directly | Varies; check per language | Can be high where tokenizers are inefficient | Stiff language, wrong local terms |
+| Translate to English and back | Often better for weak languages | Extra steps and delay | Lost nuance, mistranslated names |
+| Indian-language model | Often strong in Indian languages | Often efficient tokenizers | Narrower general knowledge; check |
+| Retrieval of local facts, with any of the above | Better on schemes, prices, names | Small extra cost | Must keep sources current in each language |
+
+## A worked example
+
+An agritech company in Pune is building a helpline for farmers in Marathi and Hindi, by chat and voice, at about 50,000 questions a month. Many farmers type Marathi in Roman script.
+
+They build a test set of 300 real questions: Marathi and Hindi, Devanagari and Roman script, about crops, weather and schemes, checked by native-speaking agronomists. Then they compare three options.
+
+| Option | Correct and natural (Marathi) | Correct and natural (Hindi) | Average tokens per answer | Cost per 1,000 answers |
+| --- | --- | --- | --- | --- |
+| General model, direct | 68% | 82% | 410 | ₹310 |
+| Translate to English, answer, translate back | 76% | 81% | 190 (English) plus translation | ₹260 |
+| Indian-language model with retrieval | 84% | 86% | 230 | ₹150 |
+
+The numbers are for illustration, to show how to compare. Scheme names were the biggest source of errors in every option, so the team adds retrieval of official scheme pages in Marathi and Hindi and a glossary of exact names. They keep monitoring quality per language, because a model update can improve Hindi and quietly hurt Marathi.
+
+## Common mistakes
+
+- **Testing only in English**, then launching in five languages.
+- **Testing only formal, Devanagari text.** Real users mix languages and type in Roman script.
+- **Ignoring token counts.** A feature that is cheap in English can cost several times more in Tamil.
+- **Translating everything word for word.** Names, schemes and polite forms often break.
+- **Treating "Indian languages" as one.** Quality in Hindi says little about Odia or Assamese.
+- **Skipping native speakers** in evaluation. Fluent-looking text can still be wrong or unnatural.
+
+## When English is fine
+
+- **Professional users who work in English**, such as developers or analysts, may prefer it.
+- **Highly technical content**, where English terms are standard, can stay in English with local-language explanations.
+- **Early prototypes** can start in one language, as long as you plan and budget for the others.
+
+## From demo to production
+
+- **Report every metric per language and script**, not only overall.
+- **Budget per language**, using measured tokens per answer.
+- **Keep glossaries** of product names, schemes and terms in each language, and retrieve them.
+- **Let users choose the language**, and reply in the one they wrote in.
+- **Re-test after every model change**, since gains and losses differ by language.
+
+## Practice
+
+1. Run the token-count script with a sentence your users might send, in two Indian languages and in Hinglish. How large is the gap?
+2. Ask any chat assistant the same question in English, Hindi and one more Indian language. Rate each answer for correctness and naturalness.
+3. Write ten test questions the way real users in your target language would type them, including code-mixing.
+
+For more depth, chapter 2 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers multilingual models and why tokenization differs across languages.
+
+**You are done when you can** explain why models are weaker and costlier in most Indian languages, measure token counts for a language, and name three ways to serve users in their own language.
