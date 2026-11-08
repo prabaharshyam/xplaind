@@ -34,6 +34,10 @@ flashcards:
     a: "Small labels, tags and handwriting disappear at low resolution, and the model cannot answer about them."
   - q: "What must the golden set include for multimodal work?"
     a: "Questions that need the visual content, so you can tell whether the multimodal route helped."
+  - q: "How do you send a page image to a vision model?"
+    a: "Render the page to an image, encode it, and include it as an image block in the message, alongside the question and an instruction to cite the page."
+  - q: "What does a multimodal embedding model let you do?"
+    a: "Put images and text into the same vector space, so a text question can retrieve the page image or photo that matches it."
 exercise:
   title: "Choose the route"
   setup: "A Bengaluru real-estate investment firm wants an assistant over 2,000 documents: quarterly investor decks with charts, scanned lease agreements, site inspection photos, and Excel-generated PDF tables of rents. Analysts ask questions like 'what was occupancy in the Q2 chart for the Whitefield park?' and 'what is the lock-in period in the lease for unit 4B?'"
@@ -51,8 +55,8 @@ ask:
   - "What is a vision-language model?"
   - "Should I OCR documents or use image embeddings?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -121,6 +125,54 @@ Pros: keeps layout, charts and visual details; no OCR errors. Cons: larger index
 
 **Showing the evidence.** With visual content, a citation is more useful as a thumbnail of the page or slide. Engineers and analysts can glance at the image and confirm the answer, which also catches the model's occasional misreadings of small numbers.
 
+**Render pages and describe visuals in code.** PyMuPDF turns PDF pages into images; a vision model describes them with a focused prompt:
+
+```python
+import base64
+import fitz                                      # PyMuPDF
+import anthropic
+
+client = anthropic.Anthropic()
+CHART_PROMPT = ("Describe this page for search. For each chart: title, axes and units, every labelled value, "
+                "and the main trend. For tables: headers and every row. Quote numbers exactly as shown.")
+
+def page_images(pdf_path, dpi=150):
+    doc = fitz.open(pdf_path)
+    for i, page in enumerate(doc, start=1):
+        yield i, page.get_pixmap(dpi=dpi).tobytes("png")
+
+def describe(png_bytes):
+    r = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=800,           # check the docs for current names
+        messages=[{"role": "user", "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                         "data": base64.b64encode(png_bytes).decode()}},
+            {"type": "text", "text": CHART_PROMPT}]}])
+    return "".join(b.text for b in r.content if b.type == "text")
+
+# Text route: store describe(png) with the page number, and index it like any other chunk.
+```
+
+At answer time, the same image block format lets you send the top retrieved page images with the question for the image route.
+
+**Retrieve images with text queries.** A multimodal embedding model places images and text in one space:
+
+```python
+from PIL import Image
+from sentence_transformers import SentenceTransformer
+
+clip = SentenceTransformer("clip-ViT-B-32")
+img_vecs = clip.encode([Image.open(p) for p in photo_paths], normalize_embeddings=True)
+q = clip.encode(["rust on a flange joint"], normalize_embeddings=True)[0]
+best = (img_vecs @ q).argsort()[::-1][:5]
+```
+
+General models like this work for photos. For document pages full of text and charts, models trained for page retrieval (the ColPali family is a well-known example) do much better; test both on your golden set.
+
+**Image tokens cost money.** A page image sent to a vision model is billed as many tokens, roughly in proportion to its size. Send the top two or three pages, not ten, crop to the relevant region when you can, and choose a resolution where small numbers are still readable. Measure cost per question for each route.
+
+**Check numbers read from images.** Vision models sometimes misread small digits in charts and scans. Where the underlying data exists (the spreadsheet behind a chart), link to it and compare; otherwise show the page thumbnail with the answer so users can check.
+
 ## A worked example
 
 A Vadodara chemicals manufacturer wants its plant engineers to query 15 years of maintenance reports: scanned forms, photos of equipment, piping diagrams and slide decks from root-cause reviews.
@@ -145,6 +197,23 @@ You ship a hybrid: scanned forms go through OCR (their text fields are what engi
 - **Low-resolution images.** Details vanish; keep enough resolution for the questions asked.
 - **No visual questions in the golden set.** Then you cannot tell whether multimodal work helped.
 - **Image route for everything.** Text-heavy documents are cheaper and often better as text.
+- **Generic captions** for charts and diagrams. Ask for the values and labels users will need.
+- **Sending many full-resolution pages** per question, which is slow and expensive.
+- **Using a photo model for document pages.** Test a page-retrieval model too.
+
+## When text-only RAG is enough
+
+- **The visuals repeat what the text says**, as in many reports where charts illustrate stated numbers.
+- **Tables can be extracted cleanly** to text by the PDF parser.
+- **Few questions need the visuals**, so describing a handful of key pages by hand is cheaper.
+
+## From demo to production
+
+- **Keep page numbers and thumbnails** with every description and retrieved image.
+- **Track cost per query** by route, including image tokens.
+- **Re-describe pages** when the description prompt improves, and version the descriptions.
+- **Keep a visual golden set** and rerun it when models change.
+- **Let users flag misread numbers**, and add them to the test set.
 
 ## Practice
 
@@ -153,5 +222,8 @@ Work through the Hugging Face multimodal RAG notebook, and use Docling or a simi
 1. Collect 20 pages with charts, tables or photos, and write 15 questions that need the visual content.
 2. Build the convert-to-text route and the image-retrieval route.
 3. Compare accuracy, latency and cost per query, and decide which content type should use which route.
+4. Describe five chart pages with the focused prompt and with a plain 'describe this image' prompt, and count how many of your chart questions each version can answer.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers RAG beyond text, including multimodal and tabular data.
 
 **You are done when you can** show a question that only the image route answered correctly and explain why.

@@ -34,6 +34,10 @@ flashcards:
     a: "For entity-rich collections such as contracts, investigations and supplier networks, where multi-hop or global questions are frequent and valuable."
   - q: "What are lighter alternatives?"
     a: "Entity metadata for filtering, a small table of key relationships, or summaries of document groups."
+  - q: "What is entity resolution in Graph RAG?"
+    a: "Deciding that differently written names, such as 'ABC Infra Ltd' and 'ABC Infrastructure', are the same entity, so their relationships join up in the graph."
+  - q: "How does local graph search gather context?"
+    a: "Find the entities named in the question, collect their neighbours within one or two hops and the source chunks of those relationships, and answer from that."
 exercise:
   title: "Graph or not?"
   setup: "Three assistants at a Delhi conglomerate: (A) HR policy questions over 200 policy documents; (B) an investigations team linking 8,000 vendor invoices, emails and audit reports to find related parties; (C) a strategy team asking 'what themes recur in two years of customer feedback?' over 50,000 comments."
@@ -51,8 +55,8 @@ ask:
   - "When should I use a knowledge graph for RAG?"
   - "What is the difference between local and global search in GraphRAG?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -117,6 +121,62 @@ This lesson follows an infrastructure finance company in Mumbai whose analysts a
 
 **Keeping citations.** Every entity, relationship and community summary should keep links to the chunks it came from. Answers can then cite real documents, and analysts can check whether an extracted relationship is actually stated or was invented during extraction.
 
+**A small graph in code.** Extract triples with a model (as structured output), load them into NetworkX, and answer local questions from neighbourhoods:
+
+```python
+import networkx as nx
+from pydantic import BaseModel
+
+class Triple(BaseModel):
+    subject: str
+    relation: str
+    object: str
+
+class Extraction(BaseModel):
+    triples: list[Triple]
+
+def normalise(name):
+    n = name.lower().replace("limited", "ltd").replace("infrastructure", "infra")
+    return " ".join(w for w in n.replace(".", "").split() if w not in {"ltd", "pvt", "private"})
+
+def build_graph(chunks, extract):
+    """extract(text) -> Extraction, via structured output from a model."""
+    g = nx.MultiDiGraph()
+    for c in chunks:
+        for t in extract(c["text"]).triples:
+            s, o = normalise(t.subject), normalise(t.object)
+            g.add_node(s, label=t.subject); g.add_node(o, label=t.object)
+            g.add_edge(s, o, relation=t.relation, source=c["id"])
+    return g
+
+def local_context(g, entities, hops=2, limit=40):
+    nodes = set()
+    for e in map(normalise, entities):
+        if e in g:
+            nodes |= set(nx.ego_graph(g.to_undirected(as_view=True), e, radius=hops))
+    facts = [f'{g.nodes[u]["label"]} —{d["relation"]}→ {g.nodes[v]["label"]} [{d["source"]}]'
+             for u, v, d in g.subgraph(nodes).edges(data=True)]
+    return facts[:limit]
+```
+
+The facts carry their source chunk ids, so the answer can cite real documents. The `normalise` rules are a crude start at entity resolution; check merges by hand for the important entities, and keep a list of names that must never be merged.
+
+**Communities for global questions.** Group closely linked entities and summarise each group once:
+
+```python
+from networkx.algorithms.community import louvain_communities
+
+def communities(g, seed=7):
+    groups = louvain_communities(g.to_undirected(), seed=seed)
+    return sorted(groups, key=len, reverse=True)
+```
+
+A model writes a summary per community (with the chunk ids it drew on). For "What are the recurring delay causes across all packages?", ask the question of each community summary, then combine the partial answers.
+
+**Check the extraction before trusting the graph.** Sample 50 extracted triples and mark each as stated in the source, implied, or wrong. If more than a few percent are wrong, improve the extraction prompt (give the allowed entity types and relations) before building anything on top.
+
+**Estimate the indexing bill first.** Count chunks × (extraction prompt + chunk + output tokens), plus one summary call per community. Run it on 5% of the collection, measure, and multiply before committing to the whole thing.
+
 ## A worked example
 
 A Mumbai infrastructure finance company reviews thousands of project reports, contractor agreements and site inspection notes. Analysts ask questions like "Which contractors appear in projects with cost overruns above 20%, and where else do they work?"
@@ -141,6 +201,23 @@ On a 40-question test set of multi-hop and global questions, the graph approach 
 - **Forgetting updates.** A graph built once goes stale.
 - **No comparison.** Measure against hybrid RAG on the questions that matter.
 - **Losing citations.** Keep links from entities and summaries back to source chunks.
+- **Trusting extracted relationships without sampling them** against the source text.
+- **Free-form relation names.** Give the extractor a fixed list, or the graph fills with near-duplicates.
+- **Skipping a cost estimate** before indexing the whole collection.
+
+## When Graph RAG is not worth it
+
+- **Questions are mostly about one document or one fact**: hybrid RAG answers them more cheaply.
+- **Documents change constantly**, making re-extraction expensive.
+- **Few entities and relationships matter**: a small table of key facts, maintained by people, may be enough.
+
+## From demo to production
+
+- **Keep source chunk ids** on every entity, relationship and summary.
+- **Measure extraction accuracy** on a sample after every prompt or model change.
+- **Update incrementally**: re-extract changed documents and re-run community summaries on a schedule.
+- **Route questions** between graph and hybrid search, and log the route.
+- **Track indexing and query cost** separately from ordinary RAG.
 
 ## Practice
 
@@ -149,5 +226,6 @@ Read Microsoft Research's GraphRAG post and skim the GraphRAG docs on local and 
 1. Take 30 to 50 related documents (news articles about one industry work well) and extract entities and relationships with a model into a simple table.
 2. Write five multi-hop or global questions and answer them with your hybrid RAG and with a small graph-based approach.
 3. Record the indexing cost and the answer quality for both.
+4. Sample 30 triples from your graph and mark each stated, implied or wrong; report the share of each.
 
 **You are done when you can** say for which questions a graph helped, by how much, and whether it was worth the indexing cost.

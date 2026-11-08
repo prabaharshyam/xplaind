@@ -33,6 +33,10 @@ flashcards:
     a: "It suits a few long, high-value documents needing precision; not large collections of short documents, where hybrid search wins."
   - q: "How do production systems often combine the approaches?"
     a: "Search to pick which documents matter, then tree navigation inside each long one."
+  - q: "Where can a document's tree come from without parsing headings?"
+    a: "Many PDFs carry a built-in table of contents (bookmarks), which libraries such as PyMuPDF read as levels, titles and page numbers."
+  - q: "Why cap the number of node openings per question?"
+    a: "Each opening is a model call in sequence. A cap keeps latency and cost bounded and forces a clean 'not found' instead of wandering."
 exercise:
   title: "Pick the retrieval"
   setup: "A Chennai legal team asks questions about a 450-page concession agreement for a port project, with definitions in Schedule A, many clauses saying 'subject to clause 18.3', and annexures for each year's tariffs. Separately, the firm's knowledge team wants search over 30,000 short internal notes. The first prototype uses vector RAG for both."
@@ -50,8 +54,8 @@ ask:
   - "When should I use tree search instead of vector search?"
   - "How do I build a table-of-contents tree from a PDF?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -106,6 +110,76 @@ Many production systems combine the two: vector or keyword search to pick which 
 
 **Writing node summaries.** Good summaries say what a section contains, not what it argues: "Contingent liabilities by type, both years, with references to tax notes" helps the model choose; "Discusses the company's risks" does not. Include key terms users ask about, such as the names of taxes, schemes or contract parties.
 
+**Build the tree from a PDF's bookmarks.** Many long PDFs ship with a table of contents that PyMuPDF can read:
+
+```python
+import fitz
+
+def build_tree(pdf_path):
+    doc = fitz.open(pdf_path)
+    toc = doc.get_toc()                         # [[level, title, page], ...]
+    nodes = []
+    for i, (level, title, page) in enumerate(toc):
+        end = next((p - 1 for l, _, p in toc[i + 1:] if l <= level), doc.page_count)
+        nodes.append({"id": f"n{i}", "level": level, "title": title.strip(),
+                      "pages": (page, max(page, end)), "summary": None})
+    return doc, nodes
+
+def text_of(doc, node):
+    a, b = node["pages"]
+    return "\n".join(doc[p - 1].get_text() for p in range(a, b + 1))
+```
+
+If `get_toc()` is empty, fall back to detecting headings by font size, or write the top two levels by hand for important documents. A model fills each node's `summary` once, at indexing time.
+
+**The navigation loop.** Show titles and summaries, let the model pick nodes, open them, and stop at a cap:
+
+```python
+import json
+
+def children(nodes, parent):
+    if parent is None:
+        return [n for n in nodes if n["level"] == 1]
+    i = nodes.index(parent)
+    out = []
+    for n in nodes[i + 1:]:
+        if n["level"] <= parent["level"]:
+            break
+        if n["level"] == parent["level"] + 1:
+            out.append(n)
+    return out
+
+def navigate(question, doc, nodes, choose, answer, max_open=6):
+    """choose(question, options) -> {"open": [ids], "done": bool}, as structured output."""
+    frontier, gathered, opened = children(nodes, None), [], 0
+    while frontier and opened < max_open:
+        menu = [{"id": n["id"], "title": n["title"], "pages": n["pages"], "summary": n["summary"]} for n in frontier]
+        pick = choose(question, json.dumps(menu, ensure_ascii=False))
+        chosen = [n for n in frontier if n["id"] in pick["open"]][: max_open - opened]
+        if not chosen:
+            break
+        next_frontier = []
+        for n in chosen:
+            opened += 1
+            kids = children(nodes, n)
+            if kids:
+                next_frontier += kids
+            else:
+                gathered.append((n["title"], n["pages"], text_of(doc, n)))
+        if pick.get("done"):
+            break
+        frontier = next_frontier
+    if not gathered:
+        return "I could not find a section that answers this.", []
+    return answer(question, gathered), [(t, p) for t, p, _ in gathered]
+```
+
+Log every menu shown and every choice made. When an answer is wrong, the log shows exactly where the model turned the wrong way.
+
+**Following references.** When the gathered text contains "see Note 14", add the matching node to the next menu even if it is not a child. A simple regex over the gathered text for "Note \d+", "Section \d+(\.\d+)*" or "Schedule [IVX]+" covers most annual reports and circulars.
+
+**Mix with search.** For a library of long documents, use keyword or vector search over document titles and node summaries to pick the document and a starting node, then navigate inside it.
+
 ## A worked example
 
 An equity research team in Mumbai asks: "What was the contingent liability for disputed GST demands at the end of FY2026, and has it grown?"
@@ -132,6 +206,22 @@ The answer cites Note 38 (page 241) and Note 41 (page 247) and gives both years 
 - **Letting the model wander.** Cap the number of nodes it may open per question, or cost and latency grow without limit.
 - **Skipping evaluation.** Compare with your hybrid RAG on the same golden set; do not adopt a method because it sounds smarter.
 - **Losing page numbers.** Citations to page and section are the main benefit; keep them through every step.
+- **No cap on node openings**, so hard questions wander and run up cost.
+- **Trusting a tree you have not printed and checked** against the real table of contents.
+
+## When to use vectors instead
+
+- **Many short documents**, such as FAQs or support articles: hybrid search is faster and cheaper.
+- **Documents with no real structure**, such as chat logs or emails.
+- **Tight latency budgets**, where several sequential calls are too slow.
+
+## From demo to production
+
+- **Check each document's tree** after ingestion and fix important ones by hand.
+- **Cap openings and time** per question, with a clear "not found" answer.
+- **Log menus and choices** for every question.
+- **Cache answers** for repeated questions on the same document version.
+- **Re-build trees and summaries** when a new version of a document arrives.
 
 ## Practice
 
@@ -140,5 +230,6 @@ Read the PageIndex introduction and skim its docs for how the tree is built.
 1. Take one long public document, such as a listed company's annual report or a regulator's master circular. Build a tree of headings with page ranges, by hand for the top two levels if needed.
 2. Write ten questions that need the right section, including two that need a cross-reference.
 3. Answer them with your hybrid RAG and with a simple navigate-the-tree loop (at most six node openings). Compare correctness, latency and cost.
+4. Print the tree for your document, compare it with the printed table of contents, and fix the first three differences you find.
 
 **You are done when you can** say for which kind of question and document tree navigation won in your test, and what it cost.
