@@ -3,7 +3,7 @@
 import type { LevelId } from "@/lib/levels";
 import { THEMES, type ThemeId } from "@/lib/themes";
 import { getChannels, getGlossary, getResource, getStops, lessonsWithTerm } from "./index";
-import { type Embed, youtubeEmbed } from "./media";
+import { type Embed, resourceEmbed } from "./media";
 
 export type LibraryKind = "lesson" | "video" | "skill";
 
@@ -56,7 +56,7 @@ export function libraryItems(): LibraryItem[] {
   for (const s of stops) {
     for (const id of s.videos) {
       const r = getResource(id);
-      const embed = r ? youtubeEmbed(r.url) : null;
+      const embed = r ? resourceEmbed(r) : null;
       if (!r || !embed || seen.has(embed.id)) continue;
       seen.add(embed.id);
       items.push({

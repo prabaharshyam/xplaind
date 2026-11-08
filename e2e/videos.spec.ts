@@ -67,3 +67,32 @@ test("the videos page fits a 360px phone and passes the accessibility scan", asy
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });
+
+test("the video courses tab lists DeepLearning.AI and Andrew Ng courses and filters to Andrew Ng (VD-2)", async ({ page }) => {
+  await page.goto("/videos#courses");
+  await expect(page.getByRole("tab", { name: /^Video courses/ })).toHaveAttribute("aria-selected", "true");
+  const all = await count(page);
+  expect(all).toBeGreaterThan(130);
+  const ng = page.getByRole("button", { name: /^Taught by Andrew Ng/ });
+  const ngCount = Number(((await ng.textContent()) ?? "").match(/(\d+)$/)![1]);
+  await ng.click();
+  expect(await count(page)).toBe(ngCount);
+  expect(ngCount).toBeGreaterThan(15);
+  await expect(page.locator("article").first()).toContainText("Andrew Ng");
+  await page.getByLabel("Search by title, teacher or lesson").fill("CS230");
+  await page.getByRole("button", { name: /^Watch/ }).first().click();
+  await expect(page.locator("dialog[open] iframe")).toHaveAttribute("src", /videoseries\?list=/);
+  await page.keyboard.press("Escape");
+  await page.getByLabel("Search by title, teacher or lesson").fill("CS229");
+  await expect(page.getByRole("link", { name: /Watch the course\s*: Stanford CS229/ })).toHaveAttribute("href", /^\/go\//);
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+});
+
+test("a lesson's Watch & learn panel lists its video courses after its videos (VD-2)", async ({ page }) => {
+  await page.goto("/stop/agent-loop");
+  const panel = page.locator("section", { has: page.getByRole("heading", { name: "Watch & learn" }) }).first();
+  await expect(panel).toContainText(/video lessons? and \d video courses? for this topic/);
+  await expect(panel.getByText("Agentic AI", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("link", { name: /Watch the course\s*: Agentic AI/ })).toHaveAttribute("href", /^\/go\/dlai-agentic-ai/);
+});

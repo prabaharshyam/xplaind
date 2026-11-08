@@ -30,6 +30,11 @@ export function youtubeEmbed(url: string): Embed | null {
   return embedded ? { kind: "video", id: embedded[1] } : null;
 }
 
+/** A resource's player, or null when it cannot play here (not YouTube, or embedding turned off by the owner). */
+export function resourceEmbed(r: { url: string; embeddable?: boolean }): Embed | null {
+  return r.embeddable === false ? null : youtubeEmbed(r.url);
+}
+
 /**
  * The privacy-enhanced player address. It loads only after the learner presses play,
  * so YouTube receives nothing from a visitor who never watches.
@@ -54,7 +59,9 @@ const TYPE_LABEL: Record<string, string> = {
  * Google Skills paths are "Google's video lessons" (their badges are not certifications), and
  * other videos without a certificate are a "Short video lesson".
  */
-export function kindLabel(r: { url: string; type: string; provider: string; certificate: boolean }): string {
+export function kindLabel(r: { url: string; type: string; provider: string; certificate: boolean; tags?: string[] }): string {
+  // VD-2: a whole course taught on video, such as a DeepLearning.AI short course or a lecture series.
+  if (r.tags?.includes("video-course")) return "Video course";
   if (isYouTube(r.url)) return "Video lesson";
   if (r.provider === "Google Skills") return "Google's video lessons";
   if (r.type === "video" && !r.certificate) return "Short video lesson";
@@ -65,6 +72,7 @@ export function kindLabel(r: { url: string; type: string; provider: string; cert
 export function openLabel(label: string): string {
   if (/video lesson/i.test(label)) return "Watch the video lesson";
   if (label === "Course") return "Open the course";
+  if (label === "Video course") return "Watch the course";
   if (label === "Article") return "Read the article";
   if (label === "Documentation") return "Read the docs";
   if (label === "Book") return "Open the book";
