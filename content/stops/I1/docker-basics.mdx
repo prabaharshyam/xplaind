@@ -33,6 +33,10 @@ flashcards:
     a: "You cannot tell what is running or roll back. Tag images with versions or commit hashes."
   - q: "Why run containers as a non-root user?"
     a: "It limits damage if the container is compromised, and many client security reviews require it."
+  - q: "What does a multi-stage build do?"
+    a: "Builds or compiles in one stage with all the tools, then copies only the results into a small final image, which is faster to ship and has less to attack."
+  - q: "Why add a .dockerignore file?"
+    a: "It keeps .env files, Git history, data folders and caches out of the build, so secrets are not copied into images and builds stay fast."
 exercise:
   title: "Review this Dockerfile"
   setup: "A teammate's Dockerfile for an AI API: FROM python:3.12 (the full image); COPY . . as the first step; RUN pip install -r requirements.txt; ENV ANTHROPIC_API_KEY=sk-ant-...; CMD python main.py. They deploy it as myapi:latest. The PostgreSQL container in compose.yaml has no volume."
@@ -50,8 +54,8 @@ ask:
   - "How do I make my Docker image smaller?"
   - "How do containers talk to each other in Docker Compose?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -118,6 +122,71 @@ Docker caches layers. Copying the dependency files before the code means a code 
 
 **Images for AI apps.** AI images get large fast: machine learning libraries, model files and system packages add up. Keep model weights out of the image where you can and download them to a volume at start-up, or call a hosted model instead. Use multi-stage builds when you need compilers only to install packages: build in one stage, copy the results into a slim final stage. Smaller images pull faster, start faster and give security scanners less to complain about.
 
+**A production-shaped Dockerfile.** Two stages, a health check and no secrets in the image:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS build
+WORKDIR /app
+RUN pip install --no-cache-dir uv
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+COPY src ./src
+
+FROM python:3.12-slim
+WORKDIR /app
+COPY --from=build /app/.venv ./.venv
+COPY --from=build /app/src ./src
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+RUN useradd --uid 1000 --create-home app
+USER app
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
+CMD ["uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+And a `.dockerignore` next to it:
+
+```text
+.env
+.git
+__pycache__/
+data/
+models/
+*.ipynb
+```
+
+**Compose that waits for the database.** `depends_on` alone only waits for the container to start, not for Postgres to accept connections:
+
+```yaml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+  db:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_PASSWORD: devonly, POSTGRES_DB: app}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:
+```
+
+The `devonly` password is for a local machine only; real environments take credentials from a secret store.
+
+**GPUs in containers.** With NVIDIA's container toolkit installed on the host, `docker run --gpus all ...` gives a container the GPUs. In Compose, request them under `deploy.resources.reservations.devices`. Use a CUDA base image that matches the host driver, and keep model weights in a mounted volume so the image stays small.
+
+**Scan and pin.** Scan images for known vulnerabilities in CI with a tool such as Trivy or Docker Scout, and fail on serious findings. Pin base images to a version (or a digest) so a rebuild next month does not silently change Python or system libraries.
+
+**Size matters for AI apps.** Check `docker images` after each change. A Python app with a hosted model should be a few hundred megabytes; one with PyTorch and CUDA can be several gigabytes, which slows every deploy and autoscale. Split heavy model serving into its own image so the API image stays small.
+
 ## A worked example
 
 You are handing a document-search API to a Jaipur bank's IT team, who run everything on their own servers. They want one command to try it.
@@ -159,6 +228,25 @@ Their security team scans the image and flags that it runs as root. The `USER 10
 - **Copying the whole folder first.** Every code change then reinstalls all packages. Copy dependency files, install, then copy code. Add a `.dockerignore` for `.git`, `.env` and data folders.
 
 - **One giant container for everything.** Keep the API, database and cache as separate services so each can be restarted, scaled and upgraded on its own.
+- **No .dockerignore**, so .env files and data folders end up inside images.
+- **Model weights baked into the image**, making it gigabytes and slow to deploy.
+- **depends_on without a health condition**, so the app starts before the database is ready.
+
+## When you may not need Docker
+
+- **Serverless platforms** that build from your code directly, such as Vercel for a Next.js app.
+- **Notebooks and one-off scripts** you run yourself.
+- **Managed AI platforms** where you only supply configuration and prompts.
+
+Containers become valuable once several people or servers must run the same thing the same way.
+
+## From demo to production
+
+- **Tag images with the commit hash**, never only `latest`.
+- **Scan images in CI** and fail on serious vulnerabilities.
+- **Run as a non-root user**, with a health check.
+- **Keep secrets out of images**; inject them at run time.
+- **Watch image size**, and split heavy model serving into its own image.
 
 ## Practice
 
@@ -167,5 +255,6 @@ Do Docker's Get started guide and the Compose quickstart.
 1. Write a Dockerfile for the FastAPI app from the REST API lesson, using a slim base image and a non-root user. Check the image size with `docker images`.
 2. Add a `compose.yaml` with your API and PostgreSQL with a volume. Restart everything and confirm the data survived.
 3. Change one line of code, rebuild, and confirm the dependency layer came from cache.
+4. Add the multi-stage build and .dockerignore to your image, and compare its size before and after.
 
 **You are done when you can** explain the difference between an image and a container, and start your API and its database with one command on a fresh machine.
