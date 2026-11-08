@@ -33,6 +33,10 @@ flashcards:
     a: "How data is stored and used, retention, training use and which regions are available."
   - q: "What checklist suits LLM app security reviews?"
     a: "The OWASP Top 10 for LLM applications, with your defence noted for each item."
+  - q: "What does masking with a reverse map do?"
+    a: "Replaces personal data with placeholders such as [PHONE_1] before the model call, then puts the real values back into the reply on your server."
+  - q: "Why must retrieval filter by user permissions?"
+    a: "Otherwise a search over shared documents can put another user's or department's data into the prompt, and the model may repeat it."
 exercise:
   title: "Review the app"
   setup: "A Pune fintech's loan-help chatbot: the React app calls the model directly with a key in the bundle; the system prompt includes the internal loan-approval rules and a database password; each request sends the customer's full profile including PAN and bank statements; the customer id comes from a hidden form field; replies are inserted with innerHTML; and logs keep full chats forever."
@@ -50,8 +54,8 @@ ask:
   - "What is the OWASP Top 10 for LLM applications?"
   - "What personal data should I send to an AI model?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -114,6 +118,66 @@ This lesson follows a security review of a support bot at a direct-to-consumer b
 | Tools | What can the model trigger? | Least privilege; approval for risky actions |
 | Vendor | How does the provider use and keep data? | Terms checked; suitable region and settings |
 
+**Guardrails on the way in and out.** An **input guardrail** checks what is about to leave for the model: personal data, company secrets, signs of an attack. An **output guardrail** checks what comes back before anyone sees it or code acts on it: personal data, unsafe content, malformed output, a tool call that should not happen. When a guardrail fires, you can block, mask, retry or hand over to a person. Two trade-offs: every check adds delay, and output checks are harder with streaming, because words reach the user before the full reply can be checked. For streamed chat, check in chunks, and keep the strictest checks for actions rather than words.
+
+**Leaks usually start with good intentions.** In 2023, Samsung engineers pasted internal source code into a public chatbot to get help with it. The same thing happens in apps: a developer pastes internal policy into the system prompt, or a tool pulls a whole database row into the context. Ask, for every feature, "what leaves our servers, and does it need to?"
+
+**Mask, call, unmask.** For many tasks the model does not need real identifiers. Replace them with placeholders before the call, keep a map on your server, and put the real values back afterwards:
+
+```python
+import re
+
+PATTERNS = {
+    "PAN": r"\b[A-Z]{5}[0-9]{4}[A-Z]\b",
+    "AADHAAR": r"\b[2-9][0-9]{3}\s?[0-9]{4}\s?[0-9]{4}\b",
+    "PHONE": r"(?<!\d)(?:\+91[\s-]?)?[6-9][0-9]{9}(?!\d)",
+    "EMAIL": r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b",
+    "UPI": r"\b[\w.-]+@(?:ok\w+|ybl|paytm|upi|ibl|axl)\b",
+}
+
+def mask(text):
+    mapping, count = {}, {}
+    for label in ["UPI", "EMAIL", "PAN", "AADHAAR", "PHONE"]:     # UPI first: UPI ids look like emails
+        def swap(m, label=label):
+            count[label] = count.get(label, 0) + 1
+            key = f"[{label}_{count[label]}]"
+            mapping[key] = m.group(0)
+            return key
+        text = re.sub(PATTERNS[label], swap, text)
+    return text, mapping
+
+def unmask(text, mapping):
+    for key, value in mapping.items():
+        text = text.replace(key, value)
+    return text
+
+safe, keys = mask("My PAN is ABCDE1234F and mobile 9876543210, UPI ravi@okaxis.")
+print(safe)    # My PAN is [PAN_1] and mobile [PHONE_1], UPI [UPI_1].
+```
+
+Patterns like these miss some forms and catch some innocent numbers, so test them on real (masked) samples, and use a dedicated detection tool such as Microsoft Presidio when the stakes are high. Masking also has limits: a model cannot check a PAN it never sees, so for those tasks the check belongs in your own code.
+
+**Retrieval must respect permissions.** In a RAG app, the search index often holds documents from many users or departments. Filter results by what the signed-in user may read **before** anything goes into the prompt; the model cannot keep a secret it has been shown.
+
+**Control the bill too.** Unlimited requests let one user, a script or an attacker run up costs or slow the app for everyone. Set per-user rate limits, a cap on input length and a daily budget alert.
+
+**The OWASP Top 10 for LLM applications (2025), with one defence each:**
+
+| Risk | One defence |
+| --- | --- |
+| Prompt injection | Treat retrieved and user text as data; limit what tools can do |
+| Sensitive information disclosure | Data minimisation, masking, output checks |
+| Supply chain | Pin and scan packages; use models and datasets from trusted sources |
+| Data and model poisoning | Review and track training and retrieval data sources |
+| Improper output handling | Escape output; validate before SQL, shell or HTML |
+| Excessive agency | Least-privilege tools; approval for actions |
+| System prompt leakage | No secrets or access rules in prompts; enforce them in code |
+| Vector and embedding weaknesses | Permission filters on retrieval; separate indexes per tenant |
+| Misinformation | Grounding, citations, and saying "I don't know" |
+| Unbounded consumption | Rate limits, input caps, budgets |
+
+**Indian law in brief.** The Digital Personal Data Protection Act, 2023, and its Rules, which come into force in phases, apply to digital personal data of people in India. In practice: a clear notice and consent for what you collect, use only for the stated purpose, keep it only as long as needed, protect it with reasonable security, let people access and erase their data, and report breaches. Children's data needs verifiable parental consent. This is a summary, not legal advice; check the current rules for your case.
+
 **Checking Git history for secrets.** Deleting a key from the code does not remove it from history. Run a secret scanner over the whole repository history, rotate anything it finds, and add the scanner to CI so new secrets are caught before they are pushed.
 
 **Testing access between users.** Create two test accounts and try, as the first, to read the second's orders by changing ids in requests and by asking the bot directly. Both must fail. Keep these as automated tests.
@@ -145,6 +209,26 @@ A Bengaluru D2C brand builds a support bot. A security review of the first versi
 - **Sending whole customer records to the model.**
 - **Trusting user ids from the browser.**
 - **Rendering model output as raw HTML.**
+- **Retrieval without permission filters.** The model will happily quote a document the user should never see.
+- **Access rules written only in the prompt.** "Never show other customers' orders" in a prompt is a hope; a check in code is a control.
+- **No limits on use.** One script can run up a bill or slow the app for everyone.
+
+## When the risk is lower
+
+- **A personal tool on your own laptop** with your own data still needs the key out of Git, but not masking or audit logs.
+- **Public data only**, such as a bot over published government circulars: focus on output handling, injection and cost limits.
+- **Read-only internal tools** for a small trusted team: keep the key safe and limit what the tools can reach, but full guardrail stacks can wait.
+
+The risk goes up fast with personal data, money, write actions, many users or regulated sectors such as banking, insurance and health.
+
+## From demo to production
+
+- **Write a data map**: for each feature, what personal data is used, where it goes, how long it is kept.
+- **Sign a data processing agreement** with your model provider, and choose retention and region settings to match.
+- **Automate the checks**: a secret scanner in CI, two-account access tests, injection tests and output-escaping tests.
+- **Rotate keys on a schedule** and at once when anyone with access leaves.
+- **Plan for incidents**: who decides, how to revoke keys, how to tell affected users and the regulator, and how fast.
+- **Review access** every few months: who can read logs, the index and the admin tools.
 
 ## Practice
 
@@ -153,5 +237,8 @@ Work through the OWASP Top 10 for LLM applications linked below.
 1. Check where your app's API key lives and confirm it never reaches the browser or Git history.
 2. List the data sent to the model for one feature, and remove anything the task does not need.
 3. Write your defence for each OWASP item that applies to your app.
+4. Run the mask function on ten realistic support messages, note what it missed or wrongly caught, and improve one pattern.
+
+For more depth, chapter 5 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers attacks and defences, and chapter 10 covers input and output guardrails and masking.
 
 **You are done when you can** explain where the key lives, what data reaches the model and why, and how a user is prevented from seeing another user's data.

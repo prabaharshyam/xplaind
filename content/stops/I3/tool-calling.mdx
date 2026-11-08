@@ -34,6 +34,10 @@ flashcards:
     a: "Validate arguments, separate read-only and acting tools, require confirmation for risky actions, and treat results as data."
   - q: "What are server-side tools?"
     a: "Tools the model provider runs itself, such as web search. Tools for your own systems run on your side."
+  - q: "What does tool_choice control?"
+    a: "Whether the model may decide (auto), must use some tool (any), must use one named tool, or must not use tools (none)."
+  - q: "Why not give a model every tool you have?"
+    a: "More tools mean longer prompts and more wrong choices. Keep the tools that measurably help, and merge ones always used together."
 exercise:
   title: "Trace the round trip"
   setup: "A Bhopal electricity distributor adds tools to its WhatsApp assistant: get_bill(consumer_no), get_outage_status(area), and register_complaint(consumer_no, issue). A consumer writes: 'Power has been off in Arera Colony since morning and my bill 4471283 looks too high.' Consumer numbers are 7 digits. The outage service is slow and sometimes times out."
@@ -51,8 +55,8 @@ ask:
   - "How does a model decide which tool to call?"
   - "How should a tool return errors to a model?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -119,6 +123,85 @@ The model decides when to call a tool mainly from its **name and description**, 
 
 **Choosing between tools.** When you add a second or third tool, test which one the model picks for a set of realistic questions. If it chooses wrongly, the fix is almost always in the descriptions: say plainly when each tool applies and when it does not.
 
+**Three kinds of tools, three levels of risk.**
+
+| Kind | Examples | Risk | Rule |
+| --- | --- | --- | --- |
+| Read: fetch knowledge | Order status, product search, policy lookup | Low to medium: can expose data | Check the user may see it; return only needed fields |
+| Compute: extend ability | Calculator, date maths, running code in a sandbox | Low, if sandboxed | Prefer tools to model arithmetic for money and dates |
+| Write: change the world | Start a return, send an email, update a record, make a payment | High | Confirmation, limits, an audit log; never from untrusted text alone |
+
+**Steering tool use.** By default the model decides whether to call a tool (`auto`). You can also require some tool (`any`), require one named tool (useful for structured output), or turn tools off for a turn (`none`). Forcing tools is handy in fixed workflows; in open chat, `auto` with clear descriptions usually works best.
+
+**The full round trip in code.** This uses Anthropic's Python SDK; other providers follow the same pattern. Arguments are validated with Pydantic, ownership is checked in code, and the write tool needs the customer's confirmation:
+
+```python
+import anthropic
+from pydantic import BaseModel, Field, ValidationError
+
+client = anthropic.Anthropic()
+MODEL = "claude-sonnet-5-5"            # check the docs for current model names
+
+class OrderArgs(BaseModel):
+    order_id: str = Field(pattern=r"^ORD-\d{8}$")
+
+ORDERS = {"ORD-48213907": {"customer": "c_101", "status": "Out for delivery today"}}
+
+def get_order_status(customer_id, order_id):
+    order = ORDERS.get(order_id)
+    if not order or order["customer"] != customer_id:          # ownership check in code
+        return f"No order {order_id} on this account; ask the customer to check the id."
+    return order["status"]
+
+def start_return(customer_id, order_id, confirmed=False):
+    if not confirmed:
+        return "Not started: ask the customer to confirm the return first."
+    return f"Return started for {order_id}; pickup in 2 days."
+
+TOOLS = [
+    {"name": "get_order_status", "description": "Look up an order's status by order id. Use when the customer asks where an order is.",
+     "input_schema": OrderArgs.model_json_schema()},
+    {"name": "start_return", "description": "Start a return. Only after the customer has clearly confirmed in this chat.",
+     "input_schema": OrderArgs.model_json_schema()},
+]
+HANDLERS = {"get_order_status": get_order_status, "start_return": start_return}
+
+def chat_turn(customer_id, messages, confirmed=False):
+    while True:
+        reply = client.messages.create(model=MODEL, max_tokens=600, tools=TOOLS, messages=messages)
+        messages.append({"role": "assistant", "content": reply.content})
+        calls = [b for b in reply.content if b.type == "tool_use"]
+        if not calls:
+            return "".join(b.text for b in reply.content if b.type == "text")
+        results = []
+        for call in calls:                                   # one result per request, matched by id
+            try:
+                args = OrderArgs.model_validate(call.input)
+                fn = HANDLERS[call.name]
+                extra = {"confirmed": confirmed} if call.name == "start_return" else {}
+                out, err = fn(customer_id, args.order_id, **extra), False
+            except ValidationError:
+                out, err = "Order ids look like ORD-12345678. Ask the customer for theirs.", True
+            results.append({"type": "tool_result", "tool_use_id": call.id, "content": out, "is_error": err})
+        messages.append({"role": "user", "content": results})
+
+msgs = [{"role": "user", "content": "Where is ORD-48213907?"}]
+print(chat_turn("c_101", msgs))
+```
+
+Three things to notice. The customer id comes from your session, never from the model. The confirmation flag is set by your own interface (a "Yes, start the return" button), not by the model saying the customer agreed. And a wrong or foreign order id produces the same polite message, so the bot never confirms that someone else's order exists. In a real app, cap the `while` loop with a step limit, as the agent-loop lesson shows.
+
+**Choosing the tool set.** More tools give more abilities but make choosing harder and fill the context with descriptions. A few habits:
+
+- **Start with few tools** and add one only when a test question needs it.
+- **Remove tools that do not help**: if success does not drop without a tool, drop it.
+- **Watch the usage**: count calls per tool. A tool never called may be badly described; a tool often called wrongly may need a simpler design.
+- **Merge tools that always run together**, such as "find customer" then "get orders", into one.
+
+**Sharing tools with MCP.** The Model Context Protocol is an open standard for exposing tools and data to AI apps. Write a tool once as an MCP server, and any app or agent that supports MCP can use it. The same rules apply: validate inputs, check permissions, and be careful with write actions.
+
+**Testing tool use.** Keep a list of realistic questions with the tool and arguments you expect, including questions that need no tool. Run it after every change to tools, descriptions or the model, and count wrong tool, wrong arguments and missed calls. Public benchmarks such as the Berkeley Function Calling Leaderboard compare models on this, but your own questions matter more.
+
 ## A worked example
 
 A Gurugram fashion e-commerce site adds order tools to its support chat: `get_order_status`, `get_return_policy` and `start_return` (which needs the customer to confirm).
@@ -145,6 +228,23 @@ When a customer types a wrong id, the tool returns a "not found" message and the
 - **Swallowing errors.** Return them as clear tool results.
 - **Risky actions without confirmation.**
 - **Forgetting to send the tool result back.** The model cannot answer without it.
+- **Trusting identity or consent from the model.** The user id and "the customer agreed" must come from your app, not from tool arguments.
+- **Returning huge results.** Return the few fields the model needs; big results cost tokens and confuse it.
+- **Doing sums in the model.** Let a tool calculate totals, discounts and dates.
+
+## When you do not need tools
+
+- **The answer is in the prompt** or in retrieved documents already.
+- **A fixed step always runs**: just call the function in your code and put its result in the prompt.
+- **You only need a JSON shape**: structured output may be simpler, though a forced single tool is one way to get it.
+
+## From demo to production
+
+- **Version tool definitions** with the prompt, and test tool choice on every change.
+- **Log every call**: tool, arguments, result size, time, errors and the user it ran for.
+- **Set timeouts** on every tool and return a clear message when one is slow.
+- **Separate read and write tools** in code and permissions, with an audit log for writes.
+- **Rate-limit write actions** per user and per day.
 
 ## Practice
 
@@ -153,5 +253,7 @@ Read the tool-use overview linked below.
 1. Give a model one read-only tool (for example, a weather lookup or a small product table) and complete the full round trip in code.
 2. Make the tool return an error for unknown inputs and show the model handling it.
 3. Add a second tool and test which one the model chooses for five different questions.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers tool types, write actions, function calling and choosing a tool set.
 
 **You are done when you can** explain who runs the tool, what the model uses to decide when to call it, and what to send back when it fails.

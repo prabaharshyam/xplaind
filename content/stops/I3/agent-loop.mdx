@@ -34,6 +34,10 @@ flashcards:
     a: "Clear, well-described tools with helpful errors let the model choose correctly and recover, instead of guessing or looping."
   - q: "What is the first thing to try before building an agent?"
     a: "A single model call with retrieval, or a short fixed workflow. Add a loop only when steps truly vary."
+  - q: "Why do long agent runs fail more often?"
+    a: "Errors compound. At 95% per step, ten steps all go right only about 60% of the time, so keep plans short and check progress."
+  - q: "What is reflection in an agent?"
+    a: "Checking its own work: whether the request is possible, the plan makes sense, a step worked, and the task is really finished."
 exercise:
   title: "Workflow or agent?"
   setup: "A Pune insurance broker has three tasks: (A) every incoming email is classified, the policy is looked up, and a reply is drafted for staff; (B) a customer asks 'find me the cheapest health cover for my parents aged 64 and 67 with no waiting period for diabetes', which may need several searches and comparisons; (C) a nightly job checks every policy for renewal dates in the next 30 days and sends reminders."
@@ -51,8 +55,8 @@ ask:
   - "How many steps should an agent be allowed?"
   - "How do I write a system prompt for an agent?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -112,6 +116,75 @@ Each round: the model sees the task, everything so far and the tool list; it eit
 | Cost per task | Fixed, easy to estimate | Varies with the number of steps |
 | Best for | Known, repeatable processes | Open-ended tasks with varying steps |
 
+**Why reliability is hard.** Errors compound. If each step goes right 95% of the time, all ten steps of a ten-step task go right only about 60% of the time (0.95 to the power of 10). That is why short plans, good tools and checks along the way matter so much, and why a workflow with three fixed steps often beats a free agent.
+
+**Planning.** Two common styles:
+
+- **Think and act in turns** (the ReAct pattern): at each step the model reasons briefly, takes one action, reads the result and decides again. This is what the loop above does, and most agents use it.
+- **Plan first, then execute**: the model writes the whole plan, your code checks it (are the tools real, are the arguments sensible, is it within budget), and only then runs it. Checking a plan before acting is cheaper than undoing actions, and a person can approve the plan for high-stakes tasks.
+
+**Reflection.** An agent does better when it checks its own work at the right moments: is the request possible at all, does the plan make sense, did this step work, and is the task really finished? The check can be a prompt to the same model, a separate model acting as a reviewer, or plain code such as running the tests on generated code. Reflection costs extra tokens and time, so add it where mistakes are expensive.
+
+**A runnable loop.** This version uses Anthropic's Python SDK, returns tool errors to the model instead of crashing, stops on a step limit, a budget or repeated identical calls, and logs every step:
+
+```python
+import json
+import anthropic
+
+client = anthropic.Anthropic()
+MODEL = "claude-sonnet-5-5"          # check the docs for current model names
+MAX_STEPS, MAX_TOKENS_TOTAL = 10, 60_000
+
+def run_agent(task, tools, handlers, system):
+    messages = [{"role": "user", "content": task}]
+    seen, used = {}, 0
+    for step in range(1, MAX_STEPS + 1):
+        reply = client.messages.create(model=MODEL, max_tokens=1000, system=system,
+                                       tools=tools, messages=messages)
+        used += reply.usage.input_tokens + reply.usage.output_tokens
+        messages.append({"role": "assistant", "content": reply.content})
+        calls = [b for b in reply.content if b.type == "tool_use"]
+        if not calls:
+            return "".join(b.text for b in reply.content if b.type == "text"), step
+        results = []
+        for call in calls:
+            key = call.name + json.dumps(call.input, sort_keys=True)
+            seen[key] = seen.get(key, 0) + 1
+            try:
+                if seen[key] > 2:
+                    raise RuntimeError("Same call made twice already; try something different or stop.")
+                if call.name not in handlers:
+                    raise RuntimeError(f"No tool named {call.name}; use one of {sorted(handlers)}.")
+                output, is_error = handlers[call.name](**call.input), False
+            except Exception as err:                        # unknown tool, bad arguments, tool failure
+                output, is_error = f"Error: {err}", True
+            print(f"step {step}: {call.name}({call.input}) -> {str(output)[:80]}")
+            results.append({"type": "tool_result", "tool_use_id": call.id,
+                            "content": str(output), "is_error": is_error})
+        messages.append({"role": "user", "content": results})
+        if used > MAX_TOKENS_TOTAL:
+            break
+    return None, step                                       # hand over to a person
+```
+
+`handlers` maps each tool name to a Python function. An unknown tool name, bad arguments or a failing tool all go back to the model as a clear error rather than crashing the run, so it can correct itself. The tool-calling lesson shows how to define the tools themselves.
+
+**How agents fail, and how to measure it.** Agents have their own failure modes on top of ordinary wrong answers. Name them, then count how often each happens over a set of test tasks:
+
+| Failure | Example | How to spot it |
+| --- | --- | --- |
+| Invalid tool | Calls `book_hotel`, which does not exist | Count unknown tool names in the logs |
+| Invalid arguments | Leaves out the required `dates` | Validation errors per tool |
+| Wrong argument values | Searches Coorg for the wrong weekend | Compare with expected values in test tasks |
+| Goal failure | A plan that costs ₹31,000 on a ₹25,000 budget | Check constraints in code after the run |
+| False "done" | Says all 12 guests are booked when only 9 are | Check the final state, not the agent's claim |
+| Tool failure | The stays API returns stale prices | Test each tool on its own |
+| Inefficiency | 14 steps where 5 would do | Steps, tokens, time and cost per task |
+
+Keep 20 to 50 realistic test tasks with what success means for each, run them after every prompt, tool or model change, and track the success rate, the average steps and the cost per task.
+
+**Context grows with every step.** Each tool result stays in the conversation, so long runs get slower and more expensive, and the model can lose track. Return short, relevant tool results (the top five stays, not five hundred), and summarise or drop old results in long runs.
+
 **Common workflow shapes.** Before reaching for an agent, check whether one of these fits. A **chain** runs fixed steps in order, such as extract, then check, then draft. A **router** classifies the request and sends it to one of several specialised prompts. **Parallel** calls split a task into independent parts and merge the results. An **evaluator loop** has one call draft and another check against criteria, repeating a fixed number of times. Many products that are described as agents are really one of these shapes, and they are easier to test.
 
 **What to watch in early runs.** Print each step's tool and arguments for twenty real tasks. Look for repeated calls with tiny changes, tools the model never uses, and steps where it misreads a result. Each pattern points to a fix in a tool's description, its error messages or the stop condition in the system prompt.
@@ -146,6 +219,24 @@ Four model calls, three tool calls. With a cap of 10 steps, a run once looped on
 - **No logging of each step.** You cannot debug what you cannot see.
 
 - **Retrying a failed tool forever.** Return the error to the model with a clear message, and stop after two or three identical failures.
+- **Trusting the agent's "done".** Check the result in code wherever you can.
+- **Giving the agent every tool you have.** More tools mean more wrong choices and longer prompts.
+- **Testing on two happy-path tasks.** Agents need a set of varied tasks, run more than once, because results change from run to run.
+
+## When not to build an agent
+
+- **The steps are known**: a fixed workflow is cheaper, faster and easier to test.
+- **Mistakes are costly and hard to undo**, such as payments or messages to customers, unless a person approves each action.
+- **Latency matters**: a reply needed in under two seconds rarely has room for several model calls.
+- **One good call with retrieval already works**: measure that baseline first.
+
+## From demo to production
+
+- **Set limits in code**: steps, tokens, time and money per task, with a clean handover when any is hit.
+- **Trace every run**: each step's tool, arguments, result, tokens and time.
+- **Keep a test set of tasks** and track success rate, steps and cost per task over time.
+- **Gate write actions**: read-only tools run freely; anything that changes data or contacts people needs approval or tight rules.
+- **Ship narrow first**: one task type, a few tools, a clear stop rule, then widen as the numbers allow.
 
 ## Practice
 
@@ -154,5 +245,8 @@ Read Anthropic's "Building effective agents" linked below.
 1. Write the agent loop above with two simple tools and a step limit.
 2. Run five different tasks and print each step (tool and arguments) to see how the agent decides.
 3. Rewrite one task as a fixed workflow and compare reliability and cost.
+4. Write ten test tasks with what success means for each, run them three times with the runnable loop, and count each failure type from the table.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers agents, planning, reflection, tool selection and agent failure modes.
 
 **You are done when you can** explain the agent loop, the difference between a workflow and an agent, and why the step limit matters.

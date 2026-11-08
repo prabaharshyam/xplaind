@@ -177,3 +177,19 @@ test("the second batch of deepened lessons have code and the new sections (LQ-7)
     expect((await wcag(page)).violations).toEqual([]);
   }
 });
+
+test("the third batch of deepened lessons have code and the new sections (LQ-7)", async ({ page }) => {
+  const lessons: [string, string][] = [
+    ["security-privacy", "When the risk is lower"],
+    ["agent-loop", "When not to build an agent"],
+    ["tool-calling", "When you do not need tools"],
+  ];
+  for (const [id, extra] of lessons) {
+    await page.goto(`/stop/${id}`);
+    await expect(page.getByRole("heading", { level: 2, name: extra })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "From demo to production" })).toBeVisible();
+    await expect(page.locator("pre").first()).toBeVisible();
+    expect(await overflow(page)).toBe(false);
+    expect((await wcag(page)).violations).toEqual([]);
+  }
+});
