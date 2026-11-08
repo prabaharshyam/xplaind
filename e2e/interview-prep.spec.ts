@@ -127,3 +127,21 @@ test("the fifth batch of book-informed lessons render with their sections, a dia
     expect((await wcag(page)).violations).toEqual([]);
   }
 });
+
+test("the sixth batch of book-informed lessons render with their sections, a diagram and code (LQ-6)", async ({ page }) => {
+  const lessons: [string, RegExp, string][] = [
+    ["fine-tuning-in-practice", /Fine-tuning in practice/, "When to stop tuning settings"],
+    ["model-merging", /Model merging/, "When not to merge"],
+    ["running-models-on-many-gpus", /Running models on many GPUs/, "When you do not need any of this"],
+  ];
+  for (const [id, title, extra] of lessons) {
+    await page.goto(`/stop/${id}`);
+    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: extra })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Common mistakes" })).toBeVisible();
+    await expect(page.locator("figure:has(svg)").first()).toBeVisible();
+    await expect(page.locator("pre").first()).toBeVisible();
+    expect(await overflow(page)).toBe(false);
+    expect((await wcag(page)).violations).toEqual([]);
+  }
+});
