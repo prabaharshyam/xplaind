@@ -33,6 +33,10 @@ flashcards:
     a: "Write feature code once and use it in both places, or use a feature store."
   - q: "What should a too-good validation score make you do?"
     a: "Investigate for leakage before celebrating, especially recently added features and joins."
+  - q: "What does 'as of' mean for a feature?"
+    a: "The value computed using only events before the prediction time, such as orders in the 30 days before the scoring date, never after."
+  - q: "Why put feature code in a ColumnTransformer or shared module?"
+    a: "So training and serving run exactly the same transformations, avoiding training-serving mismatches that silently hurt accuracy."
 exercise:
   title: "Build features as of a date"
   setup: "A grocery app in Kochi predicts on 1 November 2026 whether each customer will order in the next 14 days. You have an orders table (customer, date, amount, delivered_late) and a support table (customer, ticket_date). Candidate features: (A) orders in October 2026, (B) days since the last order before 1 November, (C) number of support tickets between 1 and 14 November, (D) share of October orders delivered late, (E) total amount spent in November."
@@ -50,8 +54,8 @@ ask:
   - "What is training-serving skew?"
   - "How do I encode categories with many values?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -102,6 +106,75 @@ This lesson follows a food-delivery company in Bengaluru predicting which custom
 
 **Start from experts.** The best features usually come from asking the people who know the business: "what would make you think a customer is about to leave?" Delivery managers suggested late-delivery share; finance suggested payday timing. Each became a feature that beat anything automatic.
 
+**Point-in-time features in pandas.** Compute everything "as of" a cutoff date, from events strictly before it:
+
+```python
+import numpy as np, pandas as pd
+
+rng = np.random.default_rng(2)
+events = pd.DataFrame({
+    "customer": rng.integers(1, 301, 6000),
+    "ts": pd.Timestamp("2026-01-01") + pd.to_timedelta(rng.integers(0, 300, 6000), unit="D"),
+    "amount": rng.gamma(2, 400, 6000).round(),
+    "late": rng.random(6000) < 0.1,
+})
+
+def features_as_of(events, cutoff):
+    past = events[events.ts < cutoff]
+    out = {}
+    for days in (7, 30, 90):
+        w = past[past.ts >= cutoff - pd.Timedelta(days=days)]
+        g = w.groupby("customer")
+        out[f"orders_{days}d"] = g.size()
+        out[f"spend_{days}d"] = g.amount.sum()
+    g = past.groupby("customer")
+    out["days_since_last"] = (cutoff - g.ts.max()).dt.days
+    out["late_share"] = g.late.mean()
+    f = pd.DataFrame(out).fillna(0)
+    f["spend_trend"] = f.spend_30d / (f.spend_90d / 3 + 1)          # last month vs monthly average
+    return f
+
+cut = pd.Timestamp("2026-09-01")
+X = features_as_of(events, cut)
+print(X.describe().T[["mean", "max"]].round(1).head(8))
+```
+
+For training, build features at several cutoffs (one per month), each paired with labels from after its cutoff. That gives more examples and tests stability over time.
+
+**Festival and salary-cycle features.**
+
+```python
+FESTIVALS = pd.to_datetime(["2026-03-04", "2026-08-28", "2026-10-20", "2026-11-08"])   # check the year's dates
+
+def calendar_features(dates):
+    d = pd.Series(pd.to_datetime(dates))
+    days_to_fest = d.apply(lambda x: min(((f - x).days for f in FESTIVALS if f >= x), default=365))
+    return pd.DataFrame({"dow": d.dt.dayofweek, "month": d.dt.month,
+                         "salary_week": (d.dt.day <= 7).astype(int),
+                         "days_to_festival": days_to_fest.clip(upper=60)})
+```
+
+Festival dates move every year and differ by region, so keep them in a dated table, not in code.
+
+**Encoding inside a pipeline.** Keep categorical handling with the model, so serving matches training:
+
+```python
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, TargetEncoder
+from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import HistGradientBoostingClassifier
+
+prep = ColumnTransformer([
+    ("few", OneHotEncoder(handle_unknown="infrequent_if_exist", min_frequency=20), ["city_tier", "channel"]),
+    ("many", TargetEncoder(), ["pin_code"]),           # fitted with internal cross-fitting to limit leakage
+], remainder="passthrough")
+model = make_pipeline(prep, HistGradientBoostingClassifier())
+```
+
+`TargetEncoder` in scikit-learn uses cross-fitting during `fit_transform`, which reduces the leakage that naive target encoding causes.
+
+**Measure each feature group's value.** Train with and without each group (recency, spend, delivery, calendar) on the same time split and keep the groups that clearly help. Features that only help on one cutoff month are probably noise.
+
 ## A worked example
 
 A Bengaluru food-delivery company predicts whether a customer will order again within 14 days.
@@ -139,6 +212,23 @@ A leakage scare: "customer contacted support in the next 7 days" had appeared in
 - **Too-good-to-be-true scores.** Investigate them for leakage.
 
 - **Building hundreds of features at once.** Add features in small groups and measure each group's gain, so you know which ones earn their place and their maintenance cost.
+- **Aggregates that include the prediction day or later.**
+- **Festival dates hard-coded once** and wrong the next year.
+- **Feature code copied between training and serving** instead of shared.
+
+## When heavy feature engineering is not needed
+
+- **Unstructured data** such as images, audio or long text, where neural networks learn their own features.
+- **A strong pretrained model or embeddings** already capture what you need.
+- **Very small data**, where a few expert features and a simple model beat a hundred engineered ones.
+
+## From demo to production
+
+- **Compute features as of the prediction time**, with tests that fail on future data.
+- **Share feature code** between training and serving, or use a feature store.
+- **Keep calendars in data tables** with dates per year and region.
+- **Track feature distributions** for drift, and missing rates per source.
+- **Measure value by feature group** at each retrain, and drop what stops helping.
 
 ## Practice
 
@@ -147,5 +237,6 @@ Complete Kaggle's Feature Engineering course and read the feature engineering se
 1. From a transactions dataset, build ten time-windowed features computed as of a chosen date, with no future data.
 2. Measure the model's improvement from your features over a simple baseline.
 3. Deliberately add a leaky feature, see the score jump, and write a test that would catch it.
+4. Build features at three monthly cutoffs, train on the first two and test on the third, and compare with a model using only days_since_last.
 
 **You are done when you can** explain how each feature is computed as of prediction time, and how training and serving compute it identically.

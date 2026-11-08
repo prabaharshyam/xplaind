@@ -34,6 +34,10 @@ flashcards:
     a: "Attention compares every token with every other, so cost grows quickly with sequence length."
   - q: "Why do Indian languages often cost more tokens?"
     a: "Tokenisers trained mostly on English split words in Indian scripts into more tokens, which affects limits and cost."
+  - q: "Why divide attention scores by the square root of the key size?"
+    a: "Dot products grow with vector size; dividing keeps scores in a range where softmax is not too sharp, so training stays stable."
+  - q: "How does the causal mask work?"
+    a: "Scores for future positions are set to minus infinity before softmax, so each token can only attend to itself and earlier tokens."
 exercise:
   title: "Match the model to the job"
   setup: "A Bengaluru healthtech has four tasks: (1) tag 50,000 patient feedback messages by topic, with 8,000 labelled examples; (2) find past cases similar to a new case note; (3) translate discharge instructions from English to Kannada; (4) draft replies to patients' questions using clinic policies. An engineer proposes using the largest chat model for all four."
@@ -51,8 +55,8 @@ ask:
   - "What is the difference between GPT-style and BERT-style models?"
   - "Why do language models have context limits?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -111,6 +115,62 @@ This lesson follows a legal-tech startup in Chennai using three kinds of transfo
 
 **What pre-training teaches.** By predicting the next or missing token across enormous amounts of text, a model learns grammar, facts, styles and patterns of reasoning, because all of them help prediction. Instruction tuning and preference training then shape that raw ability into a helpful assistant that follows requests.
 
+**Attention in a few lines of NumPy.** One head, a causal mask, and the weights printed so you can see who attends to whom:
+
+```python
+import numpy as np
+
+def softmax(z, axis=-1):
+    z = z - z.max(axis=axis, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=axis, keepdims=True)
+
+def attention(Q, K, V, causal=True):
+    d = Q.shape[-1]
+    scores = Q @ K.T / np.sqrt(d)                       # how relevant each token is to each other
+    if causal:
+        scores = np.where(np.triu(np.ones_like(scores), k=1) == 1, -np.inf, scores)
+    weights = softmax(scores)                           # each row sums to 1
+    return weights @ V, weights
+
+rng = np.random.default_rng(0)
+tokens = ["Priya", "paid", "the", "bill", "she"]
+x = rng.normal(size=(len(tokens), 16))                  # token embeddings plus position
+Wq, Wk, Wv = (rng.normal(0, 0.3, (16, 8)) for _ in range(3))
+out, w = attention(x @ Wq, x @ Wk, x @ Wv)
+print(np.round(w, 2))                                   # upper triangle is 0: no peeking ahead
+```
+
+In a trained model, the row for "she" would put high weight on "Priya". Here the weights are random, but the shapes and the mask are exactly what real models compute, for every head in every layer.
+
+**Multi-head shapes.** With a model width of 768 and 12 heads, each head works on 64 dimensions; their outputs are joined back to 768 and mixed by one more matrix. The same idea in PyTorch:
+
+```python
+import torch
+mha = torch.nn.MultiheadAttention(embed_dim=768, num_heads=12, batch_first=True)
+seq = torch.randn(2, 10, 768)                           # batch of 2, 10 tokens each
+mask = torch.triu(torch.ones(10, 10, dtype=torch.bool), diagonal=1)
+out, weights = mha(seq, seq, seq, attn_mask=mask)
+print(out.shape, weights.shape)                         # (2, 10, 768) and (2, 10, 10)
+```
+
+**Where the parameters are.** In each layer, attention has four matrices of width × width (queries, keys, values, output); the feed-forward block usually expands to about four times the width and back, which is about twice as many weights again:
+
+```python
+def layer_params(width, ff_mult=4):
+    attn = 4 * width * width
+    ff = 2 * width * (ff_mult * width)
+    return attn + ff
+
+w, layers, vocab = 4096, 32, 128_000
+total = layers * layer_params(w) + vocab * w
+print(f"about {total / 1e9:.1f} billion parameters")    # about 7 billion: the 7B to 8B range
+```
+
+Real models differ in details (grouped key-value heads, gated feed-forward layers), but the estimate lands in the right range.
+
+**Why long inputs cost more.** Attention compares every token with every earlier one, so the work grows with the square of the length: 8,000 tokens take about 64 times the attention work of 1,000. Generation also keeps a cache of keys and values for every earlier token, which is why long contexts need lots of GPU memory.
+
 ## A worked example
 
 A Chennai legal-tech startup classifies Indian court judgments by area of law (property, family, criminal, tax, labour) and also wants semantic search over them.
@@ -135,6 +195,24 @@ When judgments exceed the encoder's 512-token limit, they classify the first and
 - **Fine-tuning a huge model when a small encoder would do.** Match model size to task.
 - **Assuming attention weights are explanations.** They are not reliable explanations of decisions.
 - **Forgetting tokenisation.** Indian languages often use more tokens per word, affecting limits and cost.
+- **Thinking attention "understands" by itself**: it is weighted averaging; meaning comes from training.
+- **Ignoring the quadratic cost** of long inputs when designing prompts and context.
+
+## When you do not need transformer internals
+
+- **Using models through an API**: prompts, retrieval and evals matter more day to day.
+- **Tabular prediction**, where boosted trees are usually the better tool.
+- **Simple text tasks** that a keyword rule or a small classifier already handles well.
+
+Knowing the internals pays off when choosing models, sizing hardware, debugging long-context behaviour or fine-tuning.
+
+## From demo to production
+
+- **Estimate memory and cost from the architecture** (layers, width, heads, context) before choosing hardware.
+- **Keep prompts and contexts no longer than needed**, given the quadratic attention cost.
+- **Use the model's own tokenizer and chat template** exactly as documented.
+- **Benchmark long-context accuracy** on your own documents, not only the advertised window.
+- **Record model architecture and version** with every deployment.
 
 ## Practice
 
@@ -143,5 +221,8 @@ Read Jay Alammar's Illustrated Transformer and watch 3Blue1Brown's chapters on a
 1. Draw the flow of one sentence through a transformer layer: tokens, embeddings, attention, feed-forward.
 2. Use a small open encoder model to embed ten sentences and find the most similar pairs.
 3. Fine-tune a small encoder classifier on a public text dataset and compare it with a keyword-based baseline.
+4. Run the NumPy attention with causal=False and compare the weight matrix with the masked one; explain the difference in one sentence.
+
+For more depth, chapter 2 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers the transformer architecture, attention and model size.
 
 **You are done when you can** explain attention with queries, keys and values, and why longer contexts cost more.

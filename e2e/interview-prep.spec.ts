@@ -279,3 +279,13 @@ test("every lesson from the full deepening pass has code and a production sectio
     expect(await overflow(page), id).toBe(false);
   }
 });
+
+test("the classic ML lessons have code and a production section (LQ-7)", async ({ page }) => {
+  test.setTimeout(120_000);
+  for (const id of ["choosing-a-metric", "classification-models", "cross-validation-leakage", "ml-feature-engineering", "regression-models", "trees-boosting", "unsupervised-learning", "cnns-images", "neural-networks", "pytorch-basics", "transformers-explained"]) {
+    await page.goto(`/stop/${id}`);
+    await expect(page.getByRole("heading", { level: 2, name: "From demo to production" }), id).toBeVisible();
+    await expect(page.locator("pre").first(), id).toBeVisible();
+    expect(await overflow(page), id).toBe(false);
+  }
+});

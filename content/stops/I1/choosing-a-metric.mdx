@@ -34,6 +34,10 @@ flashcards:
     a: "Putting money on outcomes, such as the cost of a false alarm and a miss, then choosing the model and threshold that maximise expected value."
   - q: "Why report metrics by segment?"
     a: "A model can be good on average and poor for some groups, such as rural customers or one language."
+  - q: "What does the Brier score measure?"
+    a: "The average squared gap between predicted probabilities and what happened. Lower is better, and it rewards scores that are both sharp and calibrated."
+  - q: "Why put a confidence interval on a metric?"
+    a: "On a few hundred cases, a metric can move several points by chance. A bootstrap interval shows whether two models really differ."
 exercise:
   title: "Read the confusion matrix"
   setup: "A loan default model at a Chennai NBFC is tested on 10,000 past loans, of which 500 defaulted. At the chosen threshold it flags 800 loans; 350 of the flagged loans actually defaulted. A missed defaulter costs about ₹60,000; reviewing a flagged loan costs about ₹500 of analyst time."
@@ -51,8 +55,8 @@ ask:
   - "Which metric should I use for fraud detection?"
   - "When should I use MAE instead of RMSE?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -119,6 +123,82 @@ This lesson follows three teams at a bank in Mumbai, each choosing a different m
 
 **Calibration.** If a model says 0.8, does that mean an 80% chance? Often it does not. A calibrated model's scores match real frequencies: of all cases scored around 0.8, about 80% are positive. Calibration matters when people act on the probability itself, such as pricing insurance or showing a risk level to a doctor. Check it with a reliability plot, and fix it with methods such as Platt scaling or isotonic regression.
 
+**Metrics on a rare-event problem, in code.** A synthetic fraud-like dataset with 2% positives shows how differently the numbers behave:
+
+```python
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (accuracy_score, roc_auc_score, average_precision_score,
+                             precision_score, recall_score, brier_score_loss)
+
+X, y = make_classification(n_samples=20_000, n_features=12, weights=[0.98], class_sep=0.9, random_state=7)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3, stratify=y, random_state=7)
+p = LogisticRegression(max_iter=1000).fit(X_tr, y_tr).predict_proba(X_te)[:, 1]
+
+print("accuracy, always 'no':", round(accuracy_score(y_te, np.zeros_like(y_te)), 3))
+print("ROC AUC:", round(roc_auc_score(y_te, p), 3), " PR AUC:", round(average_precision_score(y_te, p), 3))
+print("precision, recall at 0.5:", round(precision_score(y_te, p > 0.5), 3), round(recall_score(y_te, p > 0.5), 3))
+print("Brier:", round(brier_score_loss(y_te, p), 4))
+```
+
+Predicting "never fraud" scores about 98% accuracy, the ROC AUC looks reassuring, and the PR AUC tells the honest story about the rare class.
+
+**Choose the threshold from costs.** Sweep thresholds and keep the one with the lowest total cost:
+
+```python
+def best_threshold(y_true, scores, cost_fp=200, cost_fn=15_000):
+    best = None
+    for t in np.linspace(0.01, 0.99, 99):
+        pred = scores >= t
+        fp = int(((pred == 1) & (y_true == 0)).sum())
+        fn = int(((pred == 0) & (y_true == 1)).sum())
+        cost = fp * cost_fp + fn * cost_fn
+        if best is None or cost < best[1]:
+            best = (round(float(t), 2), cost, fp, fn)
+    return {"threshold": best[0], "cost_inr": best[1], "false_alarms": best[2], "missed": best[3]}
+
+print(best_threshold(y_te, p))
+```
+
+With a missed fraud 75 times as costly as a false alarm, the best threshold sits far below 0.5.
+
+**Is the difference real?** Bootstrap the test set to get an interval:
+
+```python
+def bootstrap_ci(y_true, scores, metric=average_precision_score, n=1000, seed=0):
+    rng = np.random.default_rng(seed)
+    vals = []
+    for _ in range(n):
+        idx = rng.integers(0, len(y_true), len(y_true))
+        if y_true[idx].sum() == 0:
+            continue
+        vals.append(metric(y_true[idx], scores[idx]))
+    return np.percentile(vals, [2.5, 97.5]).round(3)
+
+print("PR AUC 95% interval:", bootstrap_ci(y_te, p))
+```
+
+If two models' intervals overlap a lot, do not claim one is better on this test set alone.
+
+**Predicting a range.** For delivery promises, train for the 90th percentile and score with pinball loss:
+
+```python
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.metrics import mean_pinball_loss
+
+rng = np.random.default_rng(1)
+km = rng.uniform(1, 12, 3000).reshape(-1, 1)
+minutes = 10 + 3 * km[:, 0] + rng.gamma(2, 4, 3000)          # skewed delays
+q90 = GradientBoostingRegressor(loss="quantile", alpha=0.9).fit(km[:2000], minutes[:2000])
+pred = q90.predict(km[2000:])
+print("share delivered within the promise:", round(float((minutes[2000:] <= pred).mean()), 2))
+print("pinball loss:", round(mean_pinball_loss(minutes[2000:], pred, alpha=0.9), 2))
+```
+
+About 90% of deliveries should land within the promised time; check that share on real data by area.
+
 ## A worked example
 
 Three teams at a Mumbai bank:
@@ -147,6 +227,23 @@ Each team reports its metric by customer segment. The recommendation model turns
 
 - **Choosing the threshold by habit.** 0.5 is rarely the best threshold. Choose it from costs and review capacity.
 - **Treating scores as probabilities without checking calibration.**
+- **Picking a metric after seeing the results.** Agree it before the experiment.
+- **No interval on small test sets**, so noise is reported as progress.
+- **Default threshold of 0.5** when error costs are lopsided.
+
+## When a simple metric is enough
+
+- **Balanced classes and similar error costs**: accuracy is fine and easy to explain.
+- **Early exploration**, where one sensible metric helps you compare ideas quickly.
+- **A quick sanity check** against a baseline before a fuller evaluation.
+
+## From demo to production
+
+- **Write the metric, threshold and costs down** before training, with the business owner.
+- **Report intervals** and segment-level metrics, not just one overall number.
+- **Recheck the threshold** when costs, volumes or the model change.
+- **Track the business KPI alongside the offline metric** after launch.
+- **Monitor calibration** if anyone acts on the probabilities.
 
 ## Practice
 
@@ -155,5 +252,6 @@ Read scikit-learn's metrics guide and Google's classification module on precisio
 1. For three problems you know (one rare-event classification, one forecast, one ranking), choose a primary metric and justify it in one sentence each.
 2. On an imbalanced dataset, compare ROC AUC and PR AUC for two models, and note where they disagree.
 3. Build a cost-weighted evaluation with your own cost assumptions and pick a threshold from it.
+4. Run best_threshold with your own costs on an imbalanced dataset, then halve the cost of a missed case and see how far the threshold moves.
 
 **You are done when you can** defend your metric choice to a business owner in rupees and to an engineer in terms of model behaviour.
