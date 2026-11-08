@@ -117,9 +117,9 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   const interview = getInterviewViews().filter((q) => q.stop.id === stop.id);
   const cards = [stop.primary_resource, ...stop.alternates].map(resourceCard);
   const more = stop.more.map(resourceCard);
-  // RM-4: the Watch & learn panel holds only videos; courses and articles get full cards after the text.
+  // RM-4: the Watch & learn panel holds only videos and, after them, video courses (VD-2); other courses and articles get full cards after the text.
   const isVideo = (c: (typeof cards)[number]) => Boolean(c.embed) || /video/i.test(c.kindLabel);
-  const learn = [...stop.videos.map(resourceCard), ...cards, ...more].filter(isVideo);
+  const learn = [...stop.videos.map(resourceCard), ...cards, ...more].filter(isVideo).sort((a, b) => Number(a.kindLabel === "Video course") - Number(b.kindLabel === "Video course"));
   const courses = [...cards, ...more].filter((c) => !isVideo(c));
   // BK-4: up to two books for the lesson's topic, best first (ED-2: never by commission).
   const books = booksForTheme(getContent().books.map((b) => b.data), stop.theme, 2);

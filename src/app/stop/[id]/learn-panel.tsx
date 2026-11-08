@@ -17,7 +17,10 @@ export function duration(hours: number): string {
  */
 export function LearnPanel({ stopId, items, headingId }: { stopId: string; items: ResourceCardData[]; headingId: string }) {
   if (items.length === 0) return null;
-  const videos = items.filter((r) => /video/i.test(r.kindLabel)).length;
+  const courses = items.filter((r) => r.kindLabel === "Video course").length;
+  const videos = items.filter((r) => /video/i.test(r.kindLabel)).length - courses;
+  const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const summary = [videos > 0 && count(videos, "video lesson", "video lessons"), courses > 0 && count(courses, "video course", "video courses")].filter(Boolean).join(" and ");
   return (
     <section aria-labelledby={headingId} className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
       <h2 id={headingId} className="flex items-center gap-2 text-sm font-semibold">
@@ -27,7 +30,7 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
         Watch &amp; learn
       </h2>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-        {`${videos} video ${videos === 1 ? "lesson" : "lessons"} for this topic.`}
+        {`${summary} for this topic.`}
       </p>
       <ul className="mt-3 flex flex-col gap-3">
         {items.map((r, i) => (
@@ -51,7 +54,7 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
               )}
               {!r.embed && (
                 <a href={`/go/${r.id}?stop=${encodeURIComponent(stopId)}`} target="_blank" rel="noopener" className={`inline-flex min-h-11 items-center text-sm ${textLink}`}>
-                  {/video/i.test(r.kindLabel) ? "Watch it" : "Open it"}
+                  {r.kindLabel === "Video course" ? "Watch the course" : /video/i.test(r.kindLabel) ? "Watch it" : "Open it"}
                   <span className="sr-only">: {r.title} (opens in a new tab)</span>
                 </a>
               )}

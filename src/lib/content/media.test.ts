@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { embedSrc, kindLabel, openLabel, youtubeEmbed } from "./media";
+import { embedSrc, kindLabel, openLabel, resourceEmbed, youtubeEmbed } from "./media";
 
 describe("resource media and labels (RM-4)", () => {
   it("finds YouTube videos and playlists that can play on the page", () => {
@@ -29,5 +29,20 @@ describe("resource media and labels (RM-4)", () => {
     expect(kindLabel(base)).toBe("Course");
     expect(openLabel("Video lesson")).toBe("Watch the video lesson");
     expect(openLabel("Course")).toBe("Open the course");
+  });
+});
+
+describe("video courses (VD-2)", () => {
+  it("labels a resource tagged video-course as a Video course, even on YouTube", () => {
+    const base = { type: "course", provider: "DeepLearning.AI", certificate: true };
+    expect(kindLabel({ ...base, url: "https://www.deeplearning.ai/courses/agentic-ai", tags: ["video-course"] })).toBe("Video course");
+    expect(kindLabel({ ...base, url: "https://www.youtube.com/playlist?list=PLabc123", tags: ["video-course"] })).toBe("Video course");
+    expect(openLabel("Video course")).toBe("Watch the course");
+  });
+
+  it("does not play a video whose owner turned off embedding", () => {
+    const url = "https://www.youtube.com/playlist?list=PLabc123";
+    expect(resourceEmbed({ url })).toEqual({ kind: "playlist", id: "PLabc123" });
+    expect(resourceEmbed({ url, embeddable: false })).toBeNull();
   });
 });

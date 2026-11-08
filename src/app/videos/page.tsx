@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
-import { getVideoViews } from "@/lib/content";
+import { getContent, getStops, getVideoViews } from "@/lib/content";
 import { libraryItems } from "@/lib/content/library";
+import { resourceEmbed } from "@/lib/content/media";
+import { VIDEO_COURSE_TAG } from "@/lib/content/schema";
+import { costLabel } from "@/lib/roadmap/cost";
 import { THEMES } from "@/lib/themes";
 import { type VideoRow, topicCounts } from "@/lib/videos/browse";
+import type { CourseRow } from "@/lib/videos/courses";
+import { CourseBrowser } from "./course-browser";
 import { type TopicChip, VideoBrowser } from "./video-browser";
+import { VideoTabs } from "./video-tabs";
 
 export const metadata: Metadata = {
-  title: "AI video lessons by topic: hand-picked from the best teachers on YouTube",
-  description: "Filter hand-picked AI video lessons by topic, level and length, see how many people watched each, and play them right here on Xplaind.",
+  title: "AI video lessons and courses by topic, including every Andrew Ng and DeepLearning.AI course",
+  description: "Filter hand-picked AI video lessons and free video courses, from DeepLearning.AI and Andrew Ng to the best teachers on YouTube, by topic, level and length.",
   alternates: { canonical: "/videos" },
 };
 
@@ -30,10 +36,36 @@ export default function VideosPage() {
       lesson: i.href.startsWith("/stop/") && i.tags[0] ? { id: i.href.slice("/stop/".length), title: i.tags[0] } : null,
     }));
   const teachers = new Set(rows.map((r) => r.channel).filter(Boolean)).size;
-  const topics: TopicChip[] = topicCounts(rows).flatMap(({ topic, count }) => {
-    const t = THEMES.find((x) => x.id === topic);
-    return t ? [{ id: t.id, label: t.label, count, from: t.from, to: t.to, icon: t.icon }] : [];
-  });
+  const chipsFor = (list: { topics: string[] }[]): TopicChip[] =>
+    topicCounts(list as VideoRow[]).flatMap(({ topic, count }) => {
+      const t = THEMES.find((x) => x.id === topic);
+      return t ? [{ id: t.id, label: t.label, count, from: t.from, to: t.to, icon: t.icon }] : [];
+    });
+  const topics = chipsFor(rows);
+
+  // VD-2: every video course, with the first lesson that lists it.
+  const stops = getStops();
+  const courses: CourseRow[] = getContent()
+    .resources.map((r) => r.data)
+    .filter((r) => r.tags.includes(VIDEO_COURSE_TAG))
+    .map((r) => {
+      const lesson = stops.find((s) => s.primary_resource === r.id || s.alternates.includes(r.id) || s.more.includes(r.id));
+      const cost = costLabel(r);
+      return {
+        id: r.id,
+        title: r.title,
+        provider: r.provider,
+        instructors: r.instructors ?? [],
+        topics: r.topics ?? (lesson ? [lesson.theme] : []),
+        level: r.level,
+        hours: r.hours,
+        published: r.published_on ?? null,
+        cost: cost.note ? `${cost.label} (${cost.note})` : cost.label,
+        embed: resourceEmbed(r),
+        notice: r.notice ?? null,
+        lesson: lesson ? { id: lesson.id, title: lesson.title } : null,
+      };
+    });
 
   return (
     <main>
@@ -44,10 +76,15 @@ export default function VideosPage() {
         icon="play"
         eyebrow="Video lessons"
         title="AI video lessons, by topic"
-        lead={`${rows.length} hand-picked videos from ${teachers} teachers. Choose a topic, level and length, and press Watch to play one on this page, so you never lose your place.`}
+        lead={`${rows.length} hand-picked videos from ${teachers} teachers, and ${courses.length} free video courses, including every DeepLearning.AI course and Andrew Ng's Stanford lectures. Choose a topic, level and length.`}
       />
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
-        <VideoBrowser rows={rows} topics={topics} checkedOn={stats ? fmt(stats.checkedOn) : null} />
+        <VideoTabs
+          tabs={[
+            { id: "videos", label: "Videos", count: rows.length, panel: <VideoBrowser rows={rows} topics={topics} checkedOn={stats ? fmt(stats.checkedOn) : null} /> },
+            { id: "courses", label: "Video courses", count: courses.length, panel: <CourseBrowser rows={courses} topics={chipsFor(courses)} /> },
+          ]}
+        />
       </div>
     </main>
   );

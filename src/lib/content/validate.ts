@@ -6,7 +6,7 @@ import { PRICE_STALE_DAYS } from "@/lib/roadmap/cost";
 import { LEVEL_IDS, type LevelId, levelIndex } from "@/lib/levels";
 import { parseFlow } from "@/lib/diagram/flow";
 import { isHumanName } from "./review";
-import { DEEP_MAX_WORDS, DEEP_MIN_WORDS, EXPLAINER_MAX_WORDS, EXPLAINER_MIN_WORDS, EXPLAINER_SECTIONS, wordCount } from "./schema";
+import { DEEP_MAX_WORDS, DEEP_MIN_WORDS, EXPLAINER_MAX_WORDS, EXPLAINER_MIN_WORDS, EXPLAINER_SECTIONS, VIDEO_COURSE_TAG, wordCount } from "./schema";
 import type { Bundle, Entry, Issue } from "./types";
 
 /** Launch minimums from the PRD. They fail the build only in launch mode. */
@@ -237,7 +237,8 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   }
 
   for (const { file, data: r } of bundle.resources) {
-    if (!referenced.has(r.id)) add("warning", file, `resource "${r.id}" is not used by any stop`);
+    // VD-2: a video course is listed on /videos even when no lesson links it.
+    if (!referenced.has(r.id) && !r.tags.includes(VIDEO_COURSE_TAG)) add("warning", file, `resource "${r.id}" is not used by any stop`);
   }
 
   // ---- paths --------------------------------------------------------------

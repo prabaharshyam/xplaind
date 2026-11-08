@@ -49,6 +49,9 @@ const reviewShape = {
 
 // -------------------------------------------------------------- resources ---
 
+/** VD-2: the tag that marks a resource as a video course: on the lesson's Watch & learn panel and the Video courses tab of /videos. */
+export const VIDEO_COURSE_TAG = "video-course";
+
 export const Resource = z
   .strictObject({
     id: Slug,
@@ -74,11 +77,22 @@ export const Resource = z
     verified_by: Text,
     hosted_by: Text.optional(), // required when the link is a PDF (ED-8)
     tags: z.array(z.string()),
+    /** VD-2: who teaches a video course, shown on its card and searchable on /videos. */
+    instructors: z.array(Text).optional(),
+    /** VD-2: a video course's topics on /videos, for courses that no lesson lists. */
+    topics: z.array(z.enum(THEME_IDS)).optional(),
+    /** VD-2: when the provider published the course, for "Newest first". */
+    published_on: IsoDate.optional(),
+    /** False when the owner turned off playing a YouTube video on other sites, so we link out instead. */
+    embeddable: z.boolean().optional(),
   })
   .superRefine((r, ctx) => {
     const issue = (path: string, message: string) =>
       ctx.addIssue({ code: "custom", path: [path], message });
 
+    if (r.tags.includes(VIDEO_COURSE_TAG) && (!r.topics?.length || !r.instructors?.length)) {
+      issue("topics", "VD-2: a video course needs topics and instructors, so /videos can file and credit it");
+    }
     if (r.affiliate && !r.affiliate_url) {
       issue("affiliate_url", "RM-5: an affiliate resource needs affiliate_url, the tagged link /go redirects to");
     }
