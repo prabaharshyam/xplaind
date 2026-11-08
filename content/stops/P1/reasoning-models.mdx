@@ -1,0 +1,170 @@
+---
+id: reasoning-models
+level: P1
+theme: llm
+title: "Reasoning models and test-time compute: when to let the model think longer"
+outcome: "Explain chain of thought, best-of-N and reasoning models, pick the cheapest way to get a hard answer right, and keep the extra cost and wait under control."
+answer: "Test-time compute means spending more at answer time for a better answer: reasoning step by step, sampling several answers and keeping the best, or using a model trained to think first."
+why_it_matters: "Reasoning models and 'think step by step' can turn a wrong answer into a right one, but they can also multiply cost and waiting time. Knowing when extra thinking pays, and when it does not, is now a core design decision and a common interview topic."
+hours: 2.5
+gap_tags: []
+primary_resource: hf-scaling-test-time-compute
+alternates: [arxiv-chain-of-thought]
+videos: [yt-ibm-technology-why-ai-models-pause-to-think-test-time-compute, yt-codeemporium-chain-of-thought-prompting-explained]
+more: [dlai-reasoning-with-o1]
+format: deep
+key_terms: [test-time-compute, chain-of-thought, reasoning-model, best-of-n, verifier]
+check:
+  type: mcq
+  question_ids: [reasoning-models-1, reasoning-models-2, reasoning-models-3]
+flashcards:
+  - q: "What is test-time compute?"
+    a: "Spending more computing when answering, not when training: longer reasoning, or several answers with the best one kept."
+  - q: "What is chain-of-thought prompting?"
+    a: "Asking the model to work through the problem step by step before giving the answer. It helps most on maths, logic and multi-step questions."
+  - q: "What is best-of-N?"
+    a: "Generating N answers and keeping the best one, chosen by a checker, a scoring model or a majority vote. It costs roughly N times as much."
+  - q: "What is a verifier?"
+    a: "Something that checks or scores an answer: tests for code, a SQL run, a rule check, or a reward model. Good verifiers make best-of-N worthwhile."
+  - q: "When does a majority vote (self-consistency) work well?"
+    a: "When answers are exact and easy to compare, such as a number, a class label or a multiple-choice letter."
+  - q: "What is a reasoning model?"
+    a: "A model trained to think at length before answering, often with hidden thinking tokens and a setting for how much effort to spend."
+  - q: "Why can reasoning hurt the user experience?"
+    a: "The thinking happens before the reply, so the user waits longer for the first visible word and pays for the extra tokens."
+  - q: "What is the cheapest first step on a hard task?"
+    a: "Measure the plain answer on a test set, then try step-by-step prompting. Move to sampling or a reasoning model only if the numbers say so."
+exercise:
+  title: "Grading JEE-style maths answers"
+  setup: "A Kota coaching company wants AI to check students' final answers to 300 JEE-style maths problems a day and explain mistakes. A plain prompt on a mid-size model gets 71% of the checks right on 200 problems with known answers. Each problem has one numeric answer. A reasoning model scores 90% but costs 6 times as much per problem and takes 20 seconds."
+  questions:
+    - q: "What should they try before the reasoning model?"
+      a: "Step-by-step prompting on the same model, then a majority vote over 5 samples. Each answer is a number, so a vote is easy to count."
+    - q: "Why is a majority vote a good fit here?"
+      a: "The answer is exact. If 4 of 5 samples give 12.5, that agreement is strong evidence, and disagreement flags problems to check more carefully."
+    - q: "How could they keep the reasoning model but control cost?"
+      a: "Route only the problems where the cheaper samples disagree to the reasoning model. Most easy problems never reach it."
+    - q: "Students wait 20 seconds for a check. What helps?"
+      a: "Show progress while it thinks, run checks in the background and notify when done, or show the fast answer first and update it if the careful check differs."
+ask:
+  - "When should I use a reasoning model instead of a normal one?"
+  - "What is the difference between chain of thought and best-of-N?"
+  - "How do I stop reasoning from making my app slow and expensive?"
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-08
+---
+
+## What it is
+
+Most of the money in AI is spent before you ever see a model: training it. **Test-time compute** is the other side. It means spending more computing at the moment of answering, so the answer is more likely to be right. "Test time" is the research word for inference, the time when the model is used.
+
+There are three common ways to do it.
+
+1. **Ask it to think step by step.** This is **chain-of-thought** (CoT) prompting: the model writes out its reasoning before the answer. A close cousin is **self-critique**, where the model checks its own draft before finishing.
+2. **Generate several answers and keep the best.** This is **best-of-N**. You pick the winner with a **verifier** (a test, a rule check or a scoring model), or by a majority vote when answers are exact.
+3. **Use a reasoning model.** These models are trained to think at length before they answer. Most let you set how much effort to spend, and some hide the thinking and only show the result.
+
+All three trade money and waiting time for accuracy. The skill is knowing when the trade is worth it.
+
+```flow
+title: Choosing how much thinking a question needs
+New question -> Hard for the plain model? | check your test set
+Hard for the plain model? -[no]-> Plain answer | fast and cheap
+Hard for the plain model? -[yes]-> Step-by-step prompt | try this first
+Step-by-step prompt -> Good enough?
+Good enough? -[yes]-> Ship it
+Good enough? -[no]-> Can answers be checked? | tests, rules, exact values
+Can answers be checked? -[yes]-> Sample N and verify | best-of-N or vote
+Can answers be checked? -[no]-> Reasoning model | set an effort budget
+```
+
+## How it works
+
+**Chain of thought.** The simplest version adds one line: "Think step by step before you answer," or "Explain your reasoning, then give the final answer on the last line." You can also list the steps you want, or show one worked example. The 2022 paper that named the method showed big gains on maths word problems, and later work found it can reduce made-up facts. The catch is length: a reasoned answer has many more tokens, and they all cost money and time.
+
+**Best-of-N.** Ask for several answers, ideally with a little variety (a higher temperature or slightly different prompts), then choose one.
+
+- **With a verifier.** Run generated code against tests, run generated SQL and check it returns rows, or check that an extracted date is a real date. OpenAI found that a small model with a good verifier for maths matched a model about 30 times larger without one.
+- **By majority vote**, also called self-consistency. Ask the same maths question five times and take the most common final number. It works when answers are exact: a number, a label, a choice.
+- **By a scoring model.** A reward model or an LLM judge rates each answer. This works for open-ended text but is only as good as the judge.
+
+Sampling N answers costs roughly N times as much, so N is usually small: 3 to 8 in real products. Research runs with hundreds or thousands of samples show gains keep coming, but no product can pay for that per request.
+
+**Reasoning models.** These are trained, often with reinforcement learning on problems that have checkable answers, to produce a long internal chain of thought before replying. You usually control this with an effort or budget setting. They shine on maths, code, planning and multi-step analysis. On simple questions they mostly add cost and delay.
+
+A small helper for majority voting:
+
+```python
+from collections import Counter
+
+def majority_answer(ask, question, n=5):
+    """ask(question) returns the model's final answer as a short string."""
+    answers = [ask(question).strip().lower() for _ in range(n)]
+    best, votes = Counter(answers).most_common(1)[0]
+    agreement = votes / n
+    # Low agreement is a signal: send it to a stronger model or a person.
+    return best, agreement
+
+# answer, agreement = majority_answer(ask, "If 3x + 7 = 25, what is x?")
+# if agreement < 0.6: escalate(question)
+```
+
+| Method | Extra cost | Extra wait | Works best when | Watch out for |
+| --- | --- | --- | --- | --- |
+| Step-by-step prompt | 2 to 5 times the output tokens | Seconds | Multi-step problems | Long answers users must scroll past |
+| Majority vote of 5 | About 5 times | Little, if run in parallel | Exact answers: numbers, labels | Useless for free-form text |
+| Best-of-N with a verifier | About N times plus checks | Little, if parallel | Code, SQL, formats you can test | A weak verifier picks bad answers |
+| Reasoning model | Often 3 to 10 times | Seconds to minutes | Hard maths, code, planning | Paying for thinking on easy questions |
+
+These multipliers are rough patterns to compare options, not prices. Measure on your own questions.
+
+## A worked example
+
+A coaching company in Kota wants AI to check students' answers to JEE-style maths problems and explain mistakes, about 300 problems a day. They build a test set of 200 problems with known answers and compare options.
+
+| Option | Correct checks | Cost per 100 problems | Typical wait |
+| --- | --- | --- | --- |
+| Mid-size model, plain prompt | 71% | ₹20 | 3 s |
+| Same model, step-by-step prompt | 81% | ₹55 | 8 s |
+| Step-by-step, majority of 5 | 88% | ₹275 | 9 s (parallel) |
+| Reasoning model, medium effort | 90% | ₹120 | 20 s |
+| Route: majority of 5, reasoning model only when votes disagree | 91% | ₹140 | 9 s for most, 25 s for some |
+
+The numbers are for illustration, to show how to compare. Two things stand out. The step-by-step prompt was a big, cheap win. And routing beat every single option: when four or five of five samples agree, the answer is almost always right, so only the disputed problems (about one in six) go to the reasoning model.
+
+They show "Checking your working…" with a progress bar, because students accept a short wait when they can see something is happening.
+
+## Common mistakes
+
+- **Using a reasoning model for everything.** Simple lookups, greetings and formatting do not need it. You pay for thinking that adds nothing.
+- **Skipping the cheap step.** A step-by-step prompt often closes much of the gap at a fraction of the cost.
+- **Voting on free-form text.** Two good paragraphs are never identical, so a vote finds nothing. Use a verifier or a judge instead.
+- **Trusting a weak verifier.** If the checker is easy to fool, best-of-N picks the answer that fools it best.
+- **Showing raw reasoning to users.** It is long, can be confusing, and can contain wrong turns. Show the answer and a short explanation.
+- **Forgetting the wait.** The user sees nothing until the thinking ends. Measure "time to the first word the user sees", not the model's first token.
+
+## When more thinking is the wrong tool
+
+- **The model lacks facts.** Thinking longer does not add knowledge. Use retrieval.
+- **The task is simple or creative.** Short replies, summaries and tone changes rarely improve.
+- **Latency matters more than a small gain.** A voice agent or autocomplete cannot wait ten seconds.
+- **You cannot measure the gain.** Without a test set you will pay more and not know whether it helped.
+
+## From demo to production
+
+- **Route by difficulty.** Send easy questions to a fast model and escalate only when a check fails or samples disagree.
+- **Cap the budget.** Set effort or thinking limits and a maximum output length, and track cost per request.
+- **Run samples in parallel.** Five answers at once take about as long as one.
+- **Show progress.** A visible step or progress message makes waits feel shorter.
+- **Log disagreements.** Questions where samples disagree are your best test cases and training examples.
+
+## Practice
+
+1. Take ten maths or logic questions with known answers. Score a plain prompt, then a step-by-step prompt, on any chat model.
+2. For the questions it got wrong, sample five answers each and take the majority. How many did the vote fix?
+3. Write down the cost and wait for each method, and decide which you would ship for a student app.
+
+For more depth, chapters 2 and 5 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) cover test-time compute and chain-of-thought prompting.
+
+**You are done when you can** explain the three ways to spend test-time compute, say when a majority vote works, and name two ways to keep reasoning costs under control.
