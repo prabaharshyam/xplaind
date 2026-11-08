@@ -32,6 +32,10 @@ flashcards:
     a: "So the actor is verified, not a name the user typed, which makes the record trustworthy."
   - q: "How does the DPDP Act affect audit logs?"
     a: "Personal data must not be kept longer than needed, so define retention and store personal details separately with shorter retention where possible."
+  - q: "What is a hash chain in an audit log?"
+    a: "Each event stores a hash of the previous event. Editing or deleting any past event breaks every hash after it, so tampering is detectable."
+  - q: "How can Postgres make an audit table insert-only?"
+    a: "Grant the app only INSERT and SELECT, and add a trigger that raises an error on UPDATE or DELETE, so even mistakes cannot change history."
 exercise:
   title: "Write the audit events"
   setup: "A hospital in Lucknow uses an AI assistant to draft insurance pre-authorisation letters. Dr Rao (user id doc-118) asks for a draft for patient P-5521 at 10:15 IST; the assistant retrieves the patient's admission note and the insurer's policy document; it drafts a letter; at 10:40 the billing manager (user id bil-007) edits the amount and approves sending it."
@@ -49,8 +53,8 @@ ask:
   - "What should an AI system record in its audit log?"
   - "How long should audit logs be kept?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -105,6 +109,76 @@ This lesson follows a cooperative bank in Kochi that must explain to its ombudsm
 
 **Retention and access in practice.** Agree retention with the client's compliance team before launch. For example, keep audit events for eight years to match financial record rules, full question and answer text for 180 days in a restricted store, and application logs for 30 days. Give read access to the audit log to a small named group, such as compliance and security, not to the whole engineering team, and review that list every quarter.
 
+**An insert-only table in Postgres.** Permissions plus a trigger, so neither the app nor a careless admin script can rewrite history:
+
+```sql
+CREATE TABLE audit_events (
+  id bigserial PRIMARY KEY,
+  at timestamptz NOT NULL DEFAULT now(),
+  actor text NOT NULL, action text NOT NULL, target text,
+  outcome text NOT NULL, request_id text, versions jsonb,
+  detail jsonb, prev_hash text, hash text NOT NULL
+);
+
+CREATE FUNCTION audit_no_change() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'audit_events is append-only';
+END $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER audit_lock BEFORE UPDATE OR DELETE ON audit_events
+  FOR EACH ROW EXECUTE FUNCTION audit_no_change();
+
+GRANT INSERT, SELECT ON audit_events TO app;
+GRANT USAGE ON SEQUENCE audit_events_id_seq TO app;
+```
+
+**A hash chain in code.** Each event includes the hash of the one before, so a changed or missing row shows up when you verify:
+
+```python
+import hashlib, json
+
+def event_hash(event, prev_hash):
+    body = json.dumps({k: event[k] for k in sorted(event) if k not in ("hash", "prev_hash")},
+                      sort_keys=True, default=str, ensure_ascii=False)
+    return hashlib.sha256((prev_hash or "").encode() + body.encode()).hexdigest()
+
+def append(db, event):
+    with db.transaction():
+        last = db.fetchone("SELECT hash FROM audit_events ORDER BY id DESC LIMIT 1 FOR UPDATE")
+        prev = last[0] if last else None
+        event["prev_hash"], event["hash"] = prev, event_hash(event, prev)
+        db.insert("audit_events", event)
+
+def verify(rows):
+    prev = None
+    for r in rows:                                 # ordered by id
+        if r["prev_hash"] != prev or event_hash(r, prev) != r["hash"]:
+            return f"chain broken at event {r['id']}"
+        prev = r["hash"]
+    return "ok"
+```
+
+Run `verify` nightly and copy the latest hash somewhere the application cannot write, such as a separate account or a daily email to compliance. Then even someone with database access cannot quietly rewrite the chain.
+
+**Write-once storage for exports.** Cloud object stores can lock objects against deletion for a retention period (for example S3 Object Lock in compliance mode). Export audit events there daily as compressed files. This also keeps the main database small.
+
+**Queries investigators need, ready in advance.**
+
+```sql
+-- Everything that touched one customer in a date range, in IST:
+SELECT at AT TIME ZONE 'Asia/Kolkata', actor, action, outcome, request_id
+FROM audit_events WHERE target = 'customer=CUST-4471'
+  AND at >= '2026-03-01 00:00+05:30' AND at < '2026-04-01 00:00+05:30' ORDER BY at;
+
+-- Agent proposals approved by one manager:
+SELECT a.at, a.target, a.detail->>'amount_inr' AS amount
+FROM audit_events a WHERE a.action = 'approve' AND a.actor = 'emp-1180' ORDER BY a.at;
+```
+
+Save these as named queries or dashboard views for the compliance team.
+
+**Log access to the log.** Reading audit events is itself an event worth recording: who searched for which customer, and when.
+
 ## A worked example
 
 A Kochi cooperative bank uses an AI agent to help staff draft responses to loan-restructuring requests. Six months later a borrower complains that their request was rejected unfairly, and the bank's ombudsman office asks for the full history.
@@ -132,6 +206,25 @@ The history shows that the policy version used had since been revised, and that 
 - **No version information.** Without prompt and model versions you cannot explain why the system behaved as it did then.
 - **Logging the agent as the actor.** Always record on whose behalf it acted, and who approved.
 - **Auditing only failures.** Disputes are usually about decisions that "worked". Record successful actions and approvals too.
+- **Audit rows the application can update or delete.** Lock them with permissions and a trigger.
+- **No way to detect tampering.** Use a hash chain and keep the latest hash elsewhere.
+- **Building investigation queries during the incident.** Write and test them in advance.
+
+## When ordinary logs are enough
+
+- **Prototypes and personal tools** with no other users.
+- **Read-only assistants on public information**, where nobody's records change.
+- **Short-lived internal experiments** that never touch customer data.
+
+Formal audit logs are needed once the system acts on records, handles personal or financial data, or a client's compliance team will ask "who did what, when?".
+
+## From demo to production
+
+- **Use a fixed event schema** with verified identities, IST timestamps and versions.
+- **Make audit storage append-only**, with a nightly hash-chain check.
+- **Export daily to write-once storage** with the agreed retention.
+- **Restrict and log read access** to a named group, reviewed quarterly.
+- **Keep investigation queries saved and tested.**
 
 ## Practice
 
@@ -140,5 +233,6 @@ Read the OWASP Logging Cheat Sheet, especially the sections on what to log and w
 1. Define an audit event schema for your AI app with the fields above, and emit events for ask, retrieve, tool action, approval and configuration change.
 2. Write them to an append-only store (for example a cloud bucket with object lock, or a separate database table with insert-only permissions).
 3. Write two queries an investigator would need: all events for one customer id in a date range, and every agent action approved by a given manager.
+4. Insert ten events with the hash chain, disable the trigger as an admin and change one row, and show that verify reports the break.
 
 **You are done when you can** reconstruct one request's full story from your audit log alone, without reading application logs.

@@ -34,6 +34,10 @@ flashcards:
     a: "Indian users mix languages, and checks tuned on English often miss or wrongly block Hindi, Tamil or Hinglish messages."
   - q: "How do you keep guardrail latency low?"
     a: "Run cheap rule checks first and checks in parallel where possible, and use model checks only where rules cannot decide."
+  - q: "How can a rule tell a real Aadhaar number from any 12 digits?"
+    a: "Aadhaar numbers end in a Verhoeff check digit. Checking it rejects most random 12-digit numbers, such as order ids, cutting false matches."
+  - q: "Why are output guardrails harder with streaming?"
+    a: "Words reach the user before the whole reply exists to check. Check in chunks as text streams, and keep strict checks for actions, which do not stream."
 exercise:
   title: "Choose the guardrails"
   setup: "A Kochi bank's assistant answers customers' questions about accounts and loans. Rules from the risk team: never reveal another customer's data; never give investment advice on specific stocks; never ask for a full card number or PIN; only answer banking questions; and fund transfers above ₹10,000 need a one-time password. Customers write in English and Malayalam."
@@ -51,8 +55,8 @@ ask:
   - "Should I use NeMo Guardrails or write my own?"
   - "How do I measure false positives in guardrails?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -105,6 +109,78 @@ Run cheap checks first and in parallel where possible, so guardrails add little 
 
 **Guardrails as code.** Keep each check in its own small function with its own tests, and its configuration, such as thresholds and word lists, in version control. Changes then go through review and the red-team set like any other code, and you can see exactly which version of each check was running when an incident happened.
 
+**A guard pipeline in code.** Cheap rules first, checks in parallel, one decision at the end:
+
+```python
+import asyncio, re
+from dataclasses import dataclass
+
+@dataclass
+class Verdict:
+    action: str          # "allow", "mask", "block" or "human"
+    reason: str = ""
+    text: str = ""
+
+D = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],
+     [4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],
+     [8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]]
+P = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],
+     [9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]]
+
+def verhoeff_ok(digits):
+    c = 0
+    for i, ch in enumerate(reversed(digits)):
+        c = D[c][P[i % 8][int(ch)]]
+    return c == 0
+
+def mask_aadhaar(text):
+    def swap(m):
+        digits = re.sub(r"\D", "", m.group(0))
+        return "[AADHAAR]" if verhoeff_ok(digits) else m.group(0)
+    return re.sub(r"\b[2-9]\d{3}\s?\d{4}\s?\d{4}\b", swap, text)
+
+async def injection_score(text):      # a small classifier you host or call; returns 0 to 1
+    ...
+
+async def off_topic(text):            # a model check with examples; returns True or False
+    ...
+
+async def check_input(text):
+    text = mask_aadhaar(text)
+    score, wander = await asyncio.gather(injection_score(text), off_topic(text))
+    if score is not None and score > 0.9:
+        return Verdict("block", "likely prompt injection")
+    if wander:
+        return Verdict("block", "off topic", "I can help with orders, returns and delivery. What do you need?")
+    return Verdict("allow", text=text)
+```
+
+The rule runs first and costs nothing; the classifier and model check run at the same time, so the slowest one sets the delay, not their sum.
+
+**Measure catch rate and false blocks together.** A red-team set labelled "should block" or "should pass":
+
+```python
+def guard_report(cases, guard):
+    """cases: list of (text, should_block, language)."""
+    from collections import defaultdict
+    stats = defaultdict(lambda: {"caught": 0, "bad": 0, "false_block": 0, "good": 0})
+    for text, should_block, lang in cases:
+        blocked = guard(text).action in {"block", "human"}
+        s = stats[lang]
+        if should_block:
+            s["bad"] += 1; s["caught"] += blocked
+        else:
+            s["good"] += 1; s["false_block"] += blocked
+    for lang, s in stats.items():
+        print(f"{lang}: catch {s['caught']}/{s['bad']}, false blocks {s['false_block']}/{s['good']}")
+```
+
+Report by language: a guard tuned on English often misses Hinglish attacks and over-blocks Tamil text.
+
+**Streaming and output checks.** If you stream replies, run output checks on each sentence or every few hundred characters as they arrive, and stop the stream with a short message if one fails. For actions (tool calls), there is no streaming problem: check the full arguments before running anything.
+
+**Retries and fallbacks.** For quality failures such as an empty or malformed reply, one retry often fixes it. For safety failures, do not retry the same request hoping for a different answer; block or hand over.
+
 ## A worked example
 
 A Chennai health-insurance company deploys a policy assistant for customers. The risk team's requirements: no medical advice, no disclosure of other customers' data, no promises of claim approval, and only questions about the company's products.
@@ -132,6 +208,25 @@ On a red-team set of 300 messages, the system blocks 96% of what it should and w
 - **Measuring only catches.** False blocks frustrate real users. Track both.
 - **English-only testing.** Indian users mix languages; your red-team set must too.
 - **Silent blocking.** Tell the user what you can help with, and log why you blocked.
+- **Matching every 12-digit number as Aadhaar.** Use the check digit to cut false matches.
+- **Retrying after a safety block** until the model produces something that passes.
+- **Running every check in sequence**, adding their delays together.
+
+## When fewer guardrails are fine
+
+- **Internal tools for trusted staff** on non-sensitive data: schema checks and logging may be enough.
+- **No free-text input**, such as buttons and forms only: validate the fields instead.
+- **The provider's built-in safety** already covers general harmful content, and your domain adds no special risks.
+
+Add more as the stakes rise: personal data, money, health, children, public users or actions in the real world.
+
+## From demo to production
+
+- **Keep each check as tested code** with its configuration in version control.
+- **Log every trigger** with check, version and reason, and review a sample of blocks weekly.
+- **Track catch and false-block rates** by language on every change.
+- **Budget guardrail latency** and run checks in parallel.
+- **Write the blocked messages** with the product team, in each language you support.
 
 ## Practice
 
@@ -140,5 +235,8 @@ Read the NeMo Guardrails overview and the OWASP Top 10 for LLM applications.
 1. Write ten rules your assistant must follow, and decide for each whether a rule, a classifier or a model check enforces it.
 2. Implement personal-data masking with rules and one model-based output check.
 3. Build a red-team set of 40 messages (20 should block, 20 similar ones should pass), in at least two languages, and report catch and false-block rates.
+4. Run guard_report on your 40 messages split by language, and fix the language with the worst false-block rate first.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers input and output guardrails, their trade-offs with latency and streaming, and fallbacks.
 
 **You are done when you can** show your guardrail list, the action each takes, and both error rates on your red-team set.

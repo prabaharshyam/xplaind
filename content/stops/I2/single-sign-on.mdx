@@ -33,6 +33,10 @@ flashcards:
     a: "Exchanging the user's token for one scoped to a downstream system, so that system applies the user's own permissions."
   - q: "Why request app registration early?"
     a: "Identity teams at large companies have queues and approvals; registration can take days or weeks."
+  - q: "What is the groups overage problem in Microsoft Entra ID?"
+    a: "When a user is in too many groups, the token carries a pointer instead of the group list, and your app must fetch groups from Microsoft Graph."
+  - q: "What does SCIM add to single sign-on?"
+    a: "Automatic creation, updates and removal of user accounts from the identity provider, so leavers lose access in your app without waiting for a session to expire."
 exercise:
   title: "Plan the sign-in"
   setup: "You are deploying a contracts assistant for a Mumbai conglomerate that uses Okta. It must be used by the legal team and some finance staff, must read contracts from Box with each user's own permissions, and the client's security team has said the app must not store any passwords. Your first build uses a shared Box service account and email-and-password login."
@@ -50,8 +54,8 @@ ask:
   - "How does the OIDC code flow with PKCE work?"
   - "Should I use SAML or OIDC?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -105,6 +109,75 @@ This lesson follows a quality-documents assistant rolled out to plant staff at a
 
 **Sessions after sign-in.** Once tokens are verified, keep a server-side session with a sensible lifetime, such as eight hours for plant shifts, and re-check group membership when the session renews. When IT disables an account, the next renewal fails and access ends.
 
+**OIDC sign-in with FastAPI and Authlib.** The library handles redirects, PKCE, code exchange and token checks:
+
+```python
+import os
+from authlib.integrations.starlette_client import OAuth
+from fastapi import FastAPI, Request, HTTPException, Depends
+from starlette.middleware.sessions import SessionMiddleware
+
+app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key=os.environ["SESSION_SECRET"], https_only=True,
+                   max_age=8 * 3600)
+
+oauth = OAuth()
+oauth.register(
+    name="corp",
+    server_metadata_url=os.environ["OIDC_DISCOVERY_URL"],   # e.g. .../v2.0/.well-known/openid-configuration
+    client_id=os.environ["OIDC_CLIENT_ID"],
+    client_secret=os.environ["OIDC_CLIENT_SECRET"],
+    client_kwargs={"scope": "openid email profile", "code_challenge_method": "S256"},
+)
+
+@app.get("/login")
+async def login(request: Request):
+    return await oauth.corp.authorize_redirect(request, request.url_for("callback"))
+
+@app.get("/auth/callback")
+async def callback(request: Request):
+    token = await oauth.corp.authorize_access_token(request)    # verifies the ID token
+    claims = token["userinfo"]
+    request.session["user"] = {"id": claims["sub"], "email": claims.get("email"),
+                               "groups": claims.get("groups", [])}
+    return {"signed_in": claims.get("email")}
+
+def require_group(group):
+    def check(request: Request):
+        user = request.session.get("user")
+        if not user or group not in user["groups"]:
+            raise HTTPException(status_code=403)
+        return user
+    return check
+
+@app.get("/admin/reports")
+def reports(user=Depends(require_group("claims-officers-south"))):
+    return {"ok": True, "for": user["email"]}
+```
+
+The session stores the verified subject id and groups, never anything the browser sent. Use the `sub` claim (or the provider's object id) as the user's key, not the email, which can change.
+
+**Verifying tokens sent to an API.** If a front end sends bearer tokens to your API, check them on every request:
+
+```python
+import jwt
+
+jwks = jwt.PyJWKClient(os.environ["OIDC_JWKS_URL"])
+
+def verify(bearer):
+    key = jwks.get_signing_key_from_jwt(bearer)
+    return jwt.decode(bearer, key.key, algorithms=["RS256"],
+                      audience=os.environ["API_AUDIENCE"], issuer=os.environ["OIDC_ISSUER"])
+```
+
+Signature, audience, issuer and expiry are all checked by `jwt.decode`; never skip any of them.
+
+**Large group lists.** Some providers stop listing groups in the token once a user has too many (Microsoft Entra ID switches to an "overage" pointer). Either ask the identity team to send only the app's groups (app roles are a clean way), or fetch groups from the provider's API at sign-in.
+
+**Leavers and SCIM.** Disabling a user at the identity provider stops new sign-ins, but an open session may last hours. Keep sessions short, re-check at renewal, and where the client supports it, accept SCIM provisioning so that removing a user in their directory deactivates them in your app immediately.
+
+**SAML without writing SAML.** If the client only offers SAML, put a gateway or identity broker in front (many managed auth services translate SAML to OIDC), so your app still speaks one standard.
+
 ## A worked example
 
 A Chennai automobile-parts manufacturer on Microsoft Entra ID wants your quality-documents assistant available to 1,200 plant staff.
@@ -128,6 +201,25 @@ At go-live, contractors complain they cannot sign in. The provider's sign-in err
 - **Using OAuth access tokens as proof of identity.** Use the OIDC ID token for who the user is.
 - **One service account for all downstream calls.** Users can then see what their own permissions forbid.
 - **Asking for app registration late.** Identity teams have queues and approvals. Ask on day one.
+- **Keying users by email.** Emails change; use the stable subject or object id.
+- **Long sessions with no renewal check**, so leavers keep access.
+- **Skipping audience or issuer checks** on bearer tokens.
+
+## When you do not need single sign-on
+
+- **Consumer apps**, where Google, GitHub or email sign-in is what users expect.
+- **A prototype for one team**, where a managed auth service's email login is enough until the pilot is approved.
+- **Machine-to-machine calls** with no user, which use client credentials or API keys instead.
+
+Enterprise clients almost always require SSO before production; plan for it from the first week.
+
+## From demo to production
+
+- **Send the registration request in week one**, with redirect URLs for every environment.
+- **Use maintained libraries** for OIDC and token checks.
+- **Keep sessions short** and re-check groups on renewal.
+- **Support SCIM or a deprovisioning hook** where the client offers it.
+- **Log sign-ins, failures and group changes** to the audit log.
 
 ## Practice
 
@@ -136,5 +228,6 @@ Read Okta's illustrated guide to OAuth and OIDC, then Auth0's pages on OIDC and 
 1. Create a free developer account with an identity provider and register an app with a redirect URL.
 2. Add OIDC sign-in to your FastAPI app with a maintained library; print the verified claims after sign-in.
 3. Add a group claim and show one endpoint that only members of a chosen group can call.
+4. Sign in as a test user, remove them from the group at the provider, and measure how long until the protected endpoint returns 403.
 
 **You are done when you can** explain each step of the OIDC code flow and show your app rejecting a user outside the allowed group.

@@ -33,6 +33,10 @@ flashcards:
     a: "A review of timeline, impact, causes and actions that focuses on the system, so people report mistakes openly."
   - q: "What should follow every AI incident?"
     a: "The triggering cases added to the eval suite and monitoring, and actions with owners and dates."
+  - q: "How do you count who was affected by a bad document?"
+    a: "Query the traces for every answer that retrieved or cited that document in the incident window, and list the distinct users and conversations."
+  - q: "What reporting duty can apply to a cyber incident in India?"
+    a: "CERT-In's 2022 directions require certain cyber security incidents to be reported within 6 hours, alongside any DPDP breach duties. Check the current rules."
 exercise:
   title: "Run the response"
   setup: "Tuesday 3 pm: a Bengaluru bank's assistant starts telling customers their personal loan EMI will be lower than it is. Complaints arrive through the call centre. Traces show answers using a new rate card uploaded at 1 pm, which had a typo in the interest rate. The team has a kill switch for the loans topic and a way to remove documents from the index."
@@ -50,8 +54,8 @@ ask:
   - "How do I write a blameless postmortem?"
   - "What should an AI incident runbook contain?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -106,6 +110,48 @@ This lesson follows a Saturday incident at an e-commerce company in Chennai, whe
 
 **Writing to the client during an incident.** Send short, factual updates at agreed intervals: what is happening, what users may have seen, what has been done, and when the next update will come. Do not guess at causes in early updates. Saying "we have stopped the wrong answers and are confirming how many customers were affected" builds more trust than a confident explanation that turns out wrong.
 
+**Detect drift from normal, not just hard limits.** Many AI incidents are a rate quietly changing. Compare the last hour with the same hour over recent days:
+
+```python
+from statistics import mean, pstdev
+
+def anomalous(current, history, min_sigma=3.0, min_abs=0.02):
+    """current: rate this hour; history: same-hour rates from the last 14 days."""
+    mu, sd = mean(history), pstdev(history) or 0.005
+    return (current - mu) / sd > min_sigma and current - mu > min_abs
+
+# e.g. refusal rate, guardrail triggers, thumbs-down rate, judge failure rate
+if anomalous(0.11, [0.03, 0.04, 0.03, 0.05, 0.04, 0.03, 0.04]):
+    page_on_call("Refusal rate 11% vs about 4% normal for this hour")
+```
+
+**Contain a bad document in one step.** The fastest fix for "the assistant is quoting a wrong price" is often removing one source:
+
+```python
+def quarantine_document(doc_id, index, cache, audit, reason, who):
+    index.set_flag(doc_id, quarantined=True)        # every search filters quarantined docs
+    purged = cache.delete_where(source_doc=doc_id)  # cached answers built from it
+    audit.write(actor=who, action="quarantine", target=doc_id, detail={"reason": reason, "cache_purged": purged})
+```
+
+Make it an admin button, test it before launch, and include it in the runbook.
+
+**Measure the impact from traces.** Customers and regulators ask "how many people saw it?". If traces record retrieved document ids, the answer is one query:
+
+```sql
+SELECT count(DISTINCT user_id) AS users, count(*) AS answers,
+       min(created_at) AS first_seen, max(created_at) AS last_seen
+FROM traces
+WHERE 'pricing-2026-11' = ANY(retrieved_doc_ids)
+  AND created_at BETWEEN '2026-11-06 09:00+05:30' AND '2026-11-07 14:30+05:30';
+```
+
+Without trace data this becomes days of guesswork, which is a good argument for logging retrieved ids from day one.
+
+**Reporting duties in India.** A personal data breach can trigger notice duties to the Data Protection Board and the affected people under the DPDP Act and its Rules. Separately, CERT-In's 2022 directions require many kinds of cyber security incidents to be reported within 6 hours. Agree in advance who decides whether an incident is reportable (usually the client's legal or privacy lead) and keep their contact in the runbook.
+
+**Practise.** Run a tabletop exercise every quarter with a different scenario: a leaked document, a jailbreak screenshot on social media, a provider outage, a model update that breaks formatting. Time detection and containment, and fix whatever slowed you down.
+
 ## A worked example
 
 Saturday, 11:40 am. A Chennai e-commerce company's support assistant begins telling customers that orders above ₹5,000 qualify for free returns within 60 days. The policy says 15 days.
@@ -133,6 +179,24 @@ Monday's blameless review finds three causes: no review of marketing pages befor
 - **No severity levels.** Every incident becomes either a panic or ignored.
 - **Silence towards the client.** Bad news travels anyway; tell them early and honestly.
 - **Blame-focused reviews.** People hide mistakes, and the system does not improve.
+- **No retrieved ids in traces**, so impact cannot be measured.
+- **Containment tools that exist only on paper.** Test every switch and quarantine before launch.
+- **Waiting for a root cause before telling the client.** Send facts as you have them.
+
+## When a lighter process is enough
+
+- **Internal prototypes** with a handful of users: a named owner, a kill switch and a chat channel may do.
+- **Read-only tools on public data**, where the worst case is a wrong answer people can check.
+
+Full severity levels, on-call rotas, runbooks and drills are needed once customers, personal data, money or regulated decisions are involved.
+
+## From demo to production
+
+- **Alert on rate changes** for refusals, guardrail triggers, feedback and judge failures, not only errors.
+- **Keep containment one click away**: kill switches, rollback and document quarantine, all tested.
+- **Log retrieved ids, versions and users** so impact can be measured fast.
+- **Name the reporting decision-maker** for DPDP and CERT-In duties in the runbook.
+- **Drill quarterly** and fix the slowest step each time.
 
 ## Practice
 
@@ -141,5 +205,8 @@ Read the Google SRE chapter on managing incidents and its workbook chapter on po
 1. Define severity levels and roles for an AI system you have built, and list the containment actions available for each type of incident.
 2. Run a tabletop exercise: "the assistant is quoting a wrong price", and walk through detection, containment, communication and investigation.
 3. Write a blameless review of that exercise with at least three actions.
+4. Write the impact query for your own traces and run it for one document over the last week.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers monitoring for fast detection and response, and chapter 5 covers the attacks behind many incidents.
 
 **You are done when you can** show your containment options working (a rollback and a kill switch) and a review template your team would actually use.
