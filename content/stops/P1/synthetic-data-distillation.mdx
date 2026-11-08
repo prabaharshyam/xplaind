@@ -1,0 +1,182 @@
+---
+id: synthetic-data-distillation
+level: P1
+theme: llm
+title: "Synthetic data and distillation: training with model-made data"
+outcome: "Decide when model-made data is worth using, generate and filter it safely, and distil a large model's skill on one task into a small, cheap model."
+answer: "Synthetic data is training or test data made by a model instead of people. Distillation uses a big model's answers to train a small one. Both save money but need checking and real data mixed in."
+why_it_matters: "Good labelled data is the slowest, costliest part of most AI projects, especially in Indian languages. Knowing how to make, check and use model-made data, and where it fails, can cut a project from months to weeks."
+hours: 3
+gap_tags: []
+primary_resource: hf-synthetic-data-save-costs
+alternates: [hf-cosmopedia]
+videos: [yt-julia-turc-knowledge-distillation-how-llms-train-each-other, yt-ibm-technology-what-is-synthetic-data]
+more: []
+format: deep
+key_terms: [synthetic-data, distillation, model-collapse, fine-tuning]
+check:
+  type: mcq
+  question_ids: [synthetic-data-distillation-1, synthetic-data-distillation-2, synthetic-data-distillation-3]
+flashcards:
+  - q: "What is synthetic data?"
+    a: "Training or test examples made by a model or a program instead of collected from real people."
+  - q: "Name four reasons to use synthetic data."
+    a: "More examples, better coverage of rare cases, sometimes better quality, and privacy when real data cannot be used. It also makes distillation possible."
+  - q: "What is distillation?"
+    a: "Training a small student model on a large teacher model's answers, to get similar quality on a task at lower cost and higher speed."
+  - q: "What is back-translation?"
+    a: "Translating text, then translating it back with another model and comparing with the original. A big difference suggests a bad translation."
+  - q: "Name three simple filters for generated examples."
+    a: "Remove duplicates and near-duplicates, remove examples that are too short or too long, and remove ones where the output just repeats the input."
+  - q: "What is model collapse?"
+    a: "When models are trained again and again on model-made data, rare cases fade and errors pile up. Mixing in real data helps prevent it."
+  - q: "Why can a distilled model be weaker than it looks?"
+    a: "It can copy the teacher's style without its skill, giving answers that look right but are wrong, especially outside the training topics."
+  - q: "What must you check before training on another provider's outputs?"
+    a: "Its terms of use. Many providers do not allow their outputs to be used to train competing models."
+exercise:
+  title: "A cheaper intent classifier for a Hinglish support inbox"
+  setup: "A Gurugram travel company gets 50,000 support messages a month in English, Hindi and Hinglish. A large model sorts them into 20 intents at 94% accuracy on 500 hand-labelled messages, but costs ₹1.2 lakh a month. Three intents, such as visa refund, have fewer than 30 real examples each."
+  questions:
+    - q: "How could they build training data for a small classifier?"
+      a: "Have the large model label about 20,000 real past messages, with personal data masked first. Spot-check a sample by hand to measure label quality."
+    - q: "How can they fill the gap in the three rare intents?"
+      a: "Generate paraphrases of the real rare examples in English, Hindi and Hinglish, then filter duplicates and have a person check a sample."
+    - q: "How should they judge the small model?"
+      a: "On the same 500 hand-labelled messages, which were never used for training, against the large model's 94%, and per intent, not just overall."
+    - q: "What is the risk if the large model has a habit of putting baggage complaints under the wrong intent?"
+      a: "The student copies the mistake. Hand-checked samples and per-intent scores catch it, and corrected labels should go back into the training data."
+ask:
+  - "When should I use synthetic data to train a model?"
+  - "What is the difference between distillation and fine-tuning?"
+  - "What is model collapse?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
+---
+
+## What it is
+
+**Synthetic data** is data made by a model or a program instead of collected from real people. You might ask a large model to write 5,000 customer questions, translate English examples into Marathi, label a pile of support tickets, or write test cases for an evaluation.
+
+**Distillation** is one important use of it. A small **student** model is trained to copy a large **teacher** model on a task, using the teacher's answers as training data. The goal is a model that is much cheaper and faster, with quality close to the teacher on that task. A well-known early example, DistilBERT, kept about 97% of its teacher's language-understanding ability while being 40% smaller and 60% faster.
+
+Teams use synthetic data for five main reasons:
+
+- **Quantity.** Real labelled data is slow and costly to collect. A model can produce thousands of examples in an hour.
+- **Coverage.** You can create examples of rare cases on purpose: unusual complaints, very long inputs, tricky edge cases or attacks for testing.
+- **Quality.** Sometimes a strong model writes more consistent labels or harder questions than a rushed human team.
+- **Privacy.** When real records cannot be used, such as patient files or insurance claims, realistic made-up records can stand in.
+- **Distillation.** A cheap model can learn a task from an expensive one.
+
+```flow
+title: Making and using synthetic data
+Real seed examples | a few hundred, checked
+Real seed examples -> Generate with a strong model | paraphrase, translate, label, create
+Generate with a strong model -> Filter and verify | duplicates, length, judges, tests
+Filter and verify -> Good enough sample?
+Good enough sample? -[no]-> Fix the prompt or seeds
+Fix the prompt or seeds -> Generate with a strong model
+Good enough sample? -[yes]-> Mix with real data | never all synthetic
+Mix with real data -> Train the student model
+Train the student model -> Test on real, unseen data | the final judge
+```
+
+## How it works
+
+**Ways to generate.** The common methods, from simplest to most involved:
+
+1. **Templates and rules.** Fill a template such as "I booked [service] on [date] and want a refund" with lists of values. Cheap and predictable, but repetitive.
+2. **Paraphrasing.** Give a model a real example and ask for several rewordings. "How do I cancel my ticket?" becomes "I want to cancel my booking" and "Ticket cancel kaise karu?". This is a good way to grow rare classes.
+3. **Translation.** Translate examples from a language with plenty of data, such as English, into one with little, such as Kannada. Check quality with **back-translation**: translate the result back to English with a different model and compare with the original. If they differ a lot, drop the example.
+4. **Labelling.** Ask a strong model to label real, unlabelled data. This is often the best value, because the inputs stay real and only the labels are made by a model.
+5. **Simulation.** Have one model play a customer and another play the support agent, producing whole conversations for training or testing.
+6. **Instruction generation.** Start from a small set of hand-written tasks and ask a model to invent new tasks and answers in the same style. This is how several early open instruction datasets were built.
+
+**Verify before you train.** Model-made data contains errors, so filtering is not optional.
+
+- **Run it if you can.** Code can be executed against tests, and SQL can be run against a sample database. Data you can check by running it is the safest to generate, which is why code is one of the most common kinds of synthetic data.
+- **Use a judge.** An LLM judge can score each example against written quality rules, or flag ones that are off-topic or contain made-up facts.
+- **Apply simple filters.** Remove exact and near duplicates, examples that are too short or too long, ones where the output repeats the input, and ones with the same question but conflicting answers.
+- **Read a sample yourself.** Thirty minutes reading 100 random examples catches problems no filter will.
+
+A small filter script covers the basics:
+
+```python
+import json
+from difflib import SequenceMatcher
+
+def keep(ex, seen):
+    q, a = ex["input"].strip(), ex["output"].strip()
+    if not (5 <= len(q.split()) <= 120):        # too short or too long
+        return False
+    if a.lower() == q.lower() or q.lower() in a.lower():  # output repeats the input
+        return False
+    for s in seen[-500:]:                        # near-duplicate of a recent example
+        if SequenceMatcher(None, q.lower(), s).ratio() > 0.9:
+            return False
+    seen.append(q.lower())
+    return True
+
+seen, kept = [], []
+for line in open("generated.jsonl"):
+    ex = json.loads(line)
+    if keep(ex, seen):
+        kept.append(ex)
+print(f"kept {len(kept)} examples")
+```
+
+**Distil a task.** Run the teacher on a large set of real inputs from your task, keep its answers (after filtering), and fine-tune a small model on those pairs. Test the student on real, hand-labelled data it has never seen, and compare with the teacher on the same test.
+
+| Method | Good for | Main risk |
+| --- | --- | --- |
+| Templates and rules | Simple formats, quick test cases | Repetitive, unrealistic text |
+| Paraphrasing | Growing rare classes, varied wording | Drifts away from how users really write |
+| Translation with back-translation | Indian-language data from English | Stiff, formal language users do not speak |
+| Model labelling of real inputs | Classification and extraction | The teacher's mistakes become the student's |
+| Simulation | Multi-turn conversations, agent testing | Both sides sound like a model |
+| Distillation | Cheaper, faster model for one task | Copies style without skill |
+
+## A worked example
+
+A Gurugram travel company sorts 50,000 support messages a month into 20 intents, such as refund, date change and baggage. A large model does it at 94% accuracy on 500 hand-labelled messages, but costs ₹1.2 lakh a month.
+
+They take 20,000 real past messages, mask names, phone numbers and booking IDs, and have the large model label them. A support lead checks 300 of the labels and finds 93% correct, with most errors in two intents that the guide described poorly. They fix the guide, re-label those two intents and check again.
+
+Three intents, including visa refund, have fewer than 30 real examples each. For these, they ask the large model to paraphrase each real example five ways in English, Hindi and Hinglish, filter out duplicates, and have a person check a sample. Synthetic examples make up about 10% of the final 21,500.
+
+They fine-tune a small open-weight model on the labelled set and test it on the original 500 messages, which were never used for training.
+
+| Option | Accuracy on 500 real messages | Weakest intent | Monthly cost |
+| --- | --- | --- | --- |
+| Large model, prompted | 94% | 85% (visa refund) | ₹1.2 lakh |
+| Small model, real labels only | 90% | 52% (visa refund) | ₹9,000 |
+| Small model, real labels plus synthetic rare intents | 93% | 81% (visa refund) | ₹9,000 |
+
+The numbers are for illustration, to show how to compare. The synthetic examples mainly helped the rare intents. The team keeps the large model as a fallback for messages where the small model is unsure, and adds a fresh sample of real, hand-checked messages to the training set each month.
+
+## Common mistakes
+
+- **Training on unchecked output.** Garbage in, garbage out. Filter, verify and read a sample.
+- **Testing on synthetic data.** The final test must be real data that was never used in training. Otherwise you measure how well the student copies the teacher, not how well it serves users.
+- **Going all synthetic.** Training models repeatedly on model-made data can lead to **model collapse**: rare cases fade and errors pile up. Keep real data in the mix.
+- **Expecting the student to beat the teacher.** A distilled model rarely exceeds its teacher on the task. If the teacher is weak, fix that first.
+- **Ignoring terms of use.** Many providers do not allow their outputs to be used to train competing models. Read the terms, and record which model made which data.
+- **Losing track of where data came from.** If the teacher was trained on a benchmark, your student's score on it may be contaminated.
+
+## The limits of model-made data
+
+- **Style without skill.** Research on models trained to imitate stronger ones found they copied the style well but stayed weaker on facts and new tasks. A student trained on solutions it cannot work out may learn to produce confident, wrong answers.
+- **Bias amplification.** If the teacher favours certain answers, the student learns that bias, sometimes more strongly.
+- **Unknown lineage.** Model-made data hides where the knowledge came from, including possible copyright problems in the teacher's training data.
+- **Unrealistic language.** Generated Hindi is often more formal than how people actually write on WhatsApp. Real seed examples keep it grounded.
+
+## Practice
+
+1. Pick a classification task you know. Write 20 real examples, then ask a chat model for 5 paraphrases of each. Read them: which ones would a real user never write?
+2. Run the filter script above on your generated set and note how many examples it removes and why.
+3. Write a short plan for distilling the task: teacher, number of inputs, how you will check labels, and the real test set you will use.
+
+For more depth, chapter 8 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers data synthesis, verification and distillation.
+
+**You are done when you can** give three reasons to use synthetic data, explain how to verify it, and say why a distilled model must be tested on real, unseen data.

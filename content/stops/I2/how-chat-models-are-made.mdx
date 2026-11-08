@@ -1,0 +1,166 @@
+---
+id: how-chat-models-are-made
+level: I2
+theme: llm
+title: "How a chat model is made: pre-training, SFT and preference tuning"
+outcome: "Explain the three training stages behind a chat model, say what each one adds and costs, and tell a base model from an instruct model when you pick one."
+answer: "A chat model is a base model, pre-trained on huge text to predict words, then taught to follow instructions with example answers (SFT), then tuned toward answers people prefer (RLHF or DPO)."
+why_it_matters: "Knowing the stages explains a lot of everyday behaviour: why base models ramble, why chat models are polite but sometimes refuse, and why fine-tuning your own model is a small version of the same process. It is also a common interview question."
+hours: 2
+gap_tags: []
+primary_resource: hf-illustrating-rlhf
+alternates: [intro-to-llms-karpathy]
+videos: [yt-ibm-technology-reinforcement-learning-from-human-feedback-rlhf-explained, yt-ai-coffee-break-with-letitia-direct-preference-optimization-dpo-explained]
+more: []
+format: deep
+key_terms: [pre-training, base-model, supervised-fine-tuning, rlhf, dpo, reward-model]
+check:
+  type: mcq
+  question_ids: [how-chat-models-are-made-1, how-chat-models-are-made-2, how-chat-models-are-made-3]
+flashcards:
+  - q: "What are the three stages that make a chat model?"
+    a: "Pre-training on huge text, supervised fine-tuning (SFT) on prompt and ideal-answer pairs, then preference tuning with RLHF or DPO."
+  - q: "What does a base model do with a question?"
+    a: "It continues the text in the most likely way. It may answer, but it may also add more questions or ramble, because it was only trained to predict the next token."
+  - q: "Which stage uses most of the compute?"
+    a: "Pre-training, by a wide margin. The later stages use a small share of the compute but change behaviour a lot."
+  - q: "What does an SFT example contain?"
+    a: "A prompt and the ideal answer, usually written by trained people, so the model learns the shape of a good reply."
+  - q: "What does a preference example contain?"
+    a: "A prompt, a preferred answer and a rejected answer. It is easier for people to compare two answers than to write a perfect one."
+  - q: "What does a reward model do in RLHF?"
+    a: "It learns from the comparisons to give any answer a score for how much people would like it. The chat model is then trained to earn high scores."
+  - q: "How is DPO different from RLHF?"
+    a: "DPO learns from the same preference pairs but trains the model on them directly, with no separate reward model. It is simpler and more stable to run."
+  - q: "Why might a chat model refuse a harmless request?"
+    a: "Preference tuning rewards safe answers. If the rewards lean too far toward caution, the model learns to refuse things it should help with."
+exercise:
+  title: "Base or instruct for a Hindi support bot?"
+  setup: "A Jaipur e-commerce startup wants a bot that answers delivery and refund questions in Hindi and English. An open-weight model family offers two downloads: a base model and an instruct (chat) version of the same size. The team has 600 good past replies from their support agents and 2,000 pairs where a senior agent picked the better of two draft replies."
+  questions:
+    - q: "Which download should they start with, and why?"
+      a: "The instruct version. It already follows instructions and holds a conversation. A base model would need its own SFT before it behaves like an assistant."
+    - q: "What can the 600 good replies be used for?"
+      a: "SFT data, if they want the model to match their tone and policies more closely than a prompt can. They should also keep some aside as a test set."
+    - q: "What kind of training could the 2,000 picked pairs feed?"
+      a: "Preference tuning, such as DPO. Each pair is a prompt, a better reply and a worse reply, which is exactly the format DPO needs."
+    - q: "What should they try before any training?"
+      a: "A good prompt on the instruct model with a few example replies, scored on a test set. Training is only worth it if it clearly beats that."
+ask:
+  - "Why does a base model ramble instead of answering?"
+  - "What is the difference between RLHF and DPO?"
+  - "Why do chat models sometimes refuse harmless requests?"
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
+---
+
+## What it is
+
+The chat assistants you use every day were not trained in one go. They are built in stages, and each stage adds something different.
+
+1. **Pre-training.** The model reads a huge amount of text (web pages, books, code) and learns to predict the next token. This takes most of the money and compute. The result is a **base model**. It knows a lot about language and the world, but it only continues text.
+2. **Supervised fine-tuning (SFT).** The base model is trained on examples of a prompt and the ideal answer, written or checked by people. It learns to follow instructions and to reply like an assistant. This is also called instruction tuning.
+3. **Preference tuning.** People compare two answers to the same prompt and pick the better one. The model is then tuned so that preferred answers become more likely. The two common methods are **RLHF** (reinforcement learning from human feedback) and **DPO** (direct preference optimisation).
+
+Stages 2 and 3 together are often called **post-training**. They use a small part of the total compute but change the model's behaviour a great deal. When a provider releases both a "base" and an "instruct" or "chat" version of a model, the difference is post-training.
+
+```flow
+title: From raw text to a chat model
+dir: LR
+Huge text collection | web, books, code
+Huge text collection -> Pre-training | predict the next token
+Pre-training -> Base model | continues text
+Base model -> Supervised fine-tuning | prompt and ideal answer
+Supervised fine-tuning -> Instruct model | follows instructions
+Instruct model -> Preference tuning | RLHF or DPO
+Preference tuning -> Chat model | helpful, polite, safer
+```
+
+A useful picture: pre-training gives the model knowledge, SFT teaches it the format of being helpful, and preference tuning shapes its judgement about which of many possible answers people actually want.
+
+## How it works
+
+**Stage 1: pre-training.** The training text is cut into tokens. For each position, the model guesses the next token, compares its guess with the real one, and adjusts its weights a tiny amount. Repeated over trillions of tokens, this teaches grammar, facts, reasoning patterns and code. What the model learns depends heavily on what it reads. If a language, such as Odia or Assamese, is rare in the training text, the model will be weaker in it.
+
+Give a base model the prompt "How do I reset my UPI PIN?" and it may answer, or it may produce a list of more questions, because pages full of questions are common on the web. It is not being unhelpful on purpose. It is predicting likely text.
+
+**Stage 2: supervised fine-tuning.** Trained people write thousands of prompts with high-quality answers: explanations, summaries, code, polite refusals. OpenAI's InstructGPT work, an early public example, used about 13,000 such demonstration examples. Writing them is slow and costly, because a good answer to a hard question can take a skilled person a long time. After SFT the model answers questions instead of continuing them.
+
+An SFT example looks like a short chat:
+
+```json
+{"messages": [
+  {"role": "user", "content": "How do I reset my UPI PIN?"},
+  {"role": "assistant", "content": "Open your UPI app, go to the bank account, choose Reset UPI PIN, and verify with your debit card details and the OTP sent to your phone."}
+]}
+```
+
+**Stage 3: preference tuning.** For any prompt there are many acceptable answers, and some are better than others. Writing the single best answer is hard, but comparing two answers is easy. So people are shown a prompt and two answers from the model and asked which is better. Each judgement becomes a **preference pair**:
+
+```json
+{"prompt": "My order is late. What can I do?",
+ "chosen": "Sorry about the delay. You can track it under My Orders. If it is more than 3 days late, you can ask for a refund there.",
+ "rejected": "Orders are sometimes late. Please wait."}
+```
+
+There are two main ways to learn from these pairs.
+
+- **RLHF.** First train a separate **reward model** on the pairs, so it can give any answer a score for how much people would like it. Then train the chat model with reinforcement learning to produce answers that earn high scores, while staying close to the SFT model so it does not drift into odd text that happens to score well.
+- **DPO.** Skip the reward model. Train the chat model directly on the pairs, making the chosen answer more likely and the rejected one less likely, relative to where it started. It uses ordinary training code, is cheaper and is more stable to run. Several open model families have moved to DPO or similar methods.
+
+A third variant, **RLAIF**, uses a strong model instead of people to judge which answer is better. It is cheaper but inherits the judge model's blind spots.
+
+| Stage | Training data | What it adds | Rough cost |
+| --- | --- | --- | --- |
+| Pre-training | Trillions of tokens of raw text | Knowledge of language, facts and code | Most of the compute; only large labs do it |
+| Supervised fine-tuning | Thousands to tens of thousands of prompt and ideal-answer pairs | Follows instructions, replies like an assistant | Small compute; expensive expert writing |
+| Preference tuning (RLHF or DPO) | Tens of thousands of chosen and rejected pairs | Better judgement, tone and safety | Small compute; cheaper human comparisons |
+
+These figures are broad patterns, not exact numbers. Each lab's recipe differs and changes over time.
+
+## A worked example
+
+A team in Hyderabad is building a bot that explains bank statements to small-shop owners in Telugu and English. They compare three versions of the same open-weight model family on one prompt, "Explain this ₹2,350 debit marked NACH", to see what each stage adds.
+
+| Version | What it did with the prompt | Why |
+| --- | --- | --- |
+| Base model | Wrote three more lines that looked like a forum post, then a different question | It only continues text; forum posts are common |
+| After SFT | Explained that NACH is an automatic debit, usually a loan EMI or a subscription, in a long, formal paragraph | It learned the format of a helpful answer |
+| After preference tuning | Gave the same explanation in three short lines, suggested checking the mandate list in the bank app, and offered to explain another entry | People had preferred short, practical answers with a next step |
+
+The team picks the chat version as their starting point. They then notice its Telugu replies are stiff and sometimes switch to English. That gap comes from pre-training, where Telugu text was rarer. No amount of prompting fully fixes a gap in pre-training, so they test two options on 200 real questions: a careful prompt with Telugu examples, and a small SFT run on 1,500 replies written by their Telugu-speaking support staff. They keep whichever scores better on their own test, not on a public leaderboard.
+
+## Common mistakes
+
+- **Using a base model as a chatbot.** It continues text instead of answering. Download the instruct or chat version unless you plan your own SFT.
+- **Thinking post-training adds knowledge.** It mostly changes behaviour. Facts come from pre-training or from retrieval at run time.
+- **Assuming RLHF makes a model truthful.** It rewards answers people like, and people can prefer confident, fluent text that is wrong.
+- **Treating refusals as a bug in your prompt.** Over-cautious refusals often come from preference tuning. A clearer prompt helps, but some behaviour is baked in.
+- **Mixing up DPO and RLHF in an interview.** Both learn from preference pairs. RLHF trains a reward model first; DPO does not.
+
+## Why chat models behave the way they do
+
+Many everyday quirks trace back to these stages.
+
+- **Sycophancy.** Models tend to agree with you, because agreeable answers were often preferred during preference tuning.
+- **Long, padded answers.** If reviewers rewarded thorough answers, the model learns that longer looks better.
+- **Uneven languages.** Hindi or Tamil quality depends on how much of that language was in pre-training and in the SFT examples.
+- **Knowledge cut-off.** The model knows nothing after its pre-training data was collected, unless you give it fresh information.
+
+## From demo to production
+
+- **Read the model card.** It usually says which stages the model went through, what data was used and which languages were covered.
+- **Pick the right version.** Use instruct or chat versions for applications. Use a base model only if you will do your own SFT, or for plain text completion.
+- **Test in your languages.** Score the model on real questions in each language your users write in, including mixed Hinglish or Tanglish.
+- **Keep your own pairs.** When reviewers fix a reply or pick between two drafts, store it. These become SFT and preference data later.
+
+## Practice
+
+1. Ask any chat assistant a simple question, then the same question with "Continue this text:" in front. Note how the answer changes. You are partly pushing it back toward base-model behaviour.
+2. Write two SFT examples and two preference pairs for a task from your own work. Make the rejected answers realistic, not obviously bad.
+3. Explain RLHF and DPO to a friend in under a minute each, using the words "preference pair" and "reward model".
+
+For more depth, chapter 2 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers post-training and preference tuning.
+
+**You are done when you can** name the three stages, say what data each uses and what each adds, and explain the difference between RLHF and DPO.
