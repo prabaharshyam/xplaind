@@ -31,6 +31,10 @@ flashcards:
     a: "The most useful evals come from observed failure patterns, not generic metrics."
   - q: "Why report scores by category?"
     a: "A change can raise the average while breaking a critical category such as refusals or escalations."
+  - q: "How big a difference can 100 cases reliably detect?"
+    a: "Roughly 10 points. A rule of thumb: for every 3 times smaller difference you want to see, you need about 10 times more cases (30 points: about 10 cases; 3 points: about 1,000)."
+  - q: "What is bootstrapping an eval?"
+    a: "Re-sampling your test cases with replacement many times and re-scoring. If the scores swing widely, the set is too small to trust."
   - q: "How do you keep a test set useful?"
     a: "Add new failures, retire cases that no longer reflect reality, and avoid tuning so hard on it that it stops representing users."
 exercise:
@@ -50,8 +54,8 @@ ask:
   - "How many test cases do I need?"
   - "How do I know if my model judge is reliable?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -106,7 +110,47 @@ This lesson follows a policyholder email assistant at an insurance broker in Pun
 
 **How many cases.** Thirty well-chosen cases catch most big regressions; a hundred give stable numbers by category. What matters more than size is coverage: every category users care about, and enough cases in critical categories, such as escalations, that one miss is visible. With seven escalation cases, one miss is a 14-point drop that nobody can ignore. Grow the set as the product grows, and split off a small "smoke" set of about ten cases that runs in seconds for quick checks while you work.
 
-**Calibrating a model judge.** Have two people grade 30 outputs with the same rubric, then have the judge grade them. Compare. If agreement is low, the rubric is usually unclear: rewrite it with examples of pass and fail, and test again. Recheck agreement whenever you change the judge's model or prompt.
+**Evaluate each step, not only the end.** If an app extracts details from an email and then drafts a reply, test the extraction on its own too. When the final score drops, per-step scores tell you which step broke.
+
+**Keep several small sets, not one.** One set that looks like real traffic tells you how the app does overall. Add a set of known hard cases, a set of out-of-scope inputs the app should decline, and a set with the typos, mixed languages and Romanised text real users send. If you care about something, give it a test set.
+
+**Is a difference real?** A 4-point gain on 60 cases may be noise. A rough rule from OpenAI: to be about 95% sure one version is better, you need around 10 cases to see a 30-point difference, 100 for 10 points, 1,000 for 3 points and 10,000 for 1 point. Every 3 times smaller difference needs about 10 times more cases. So use small sets to catch big regressions, and bigger ones before trusting small gains.
+
+**Bootstrap to check stability.** Re-sample your cases with replacement, score each re-sample, and see how much the score moves. If one re-sample gives 90% and another 70%, the set is too small to compare versions.
+
+```python
+import json, random, statistics
+from collections import defaultdict
+
+def run_eval(cases, app, checks):
+    """cases: dicts with 'input', 'category' and expectations. checks: functions(case, output) -> bool."""
+    rows = []
+    for case in cases:
+        out = app(case["input"])
+        rows.append({"category": case["category"], "passed": all(check(case, out) for check in checks)})
+    return rows
+
+def report(rows, bootstraps=1000, seed=7):
+    by_cat = defaultdict(list)
+    for r in rows:
+        by_cat[r["category"]].append(r["passed"])
+    for cat, results in sorted(by_cat.items()):
+        print(f"{cat:<12} {sum(results)}/{len(results)}")
+    rng = random.Random(seed)
+    scores = [statistics.mean(rng.choice(rows)["passed"] for _ in rows) for _ in range(bootstraps)]
+    scores.sort()
+    print(f"overall {statistics.mean(r['passed'] for r in rows):.0%}, "
+          f"95% of re-samples between {scores[25]:.0%} and {scores[-26]:.0%}")
+
+# cases = [json.loads(line) for line in open("evals/cases.jsonl")]
+# report(run_eval(cases, my_app, [no_dosage_advice, keeps_policy_number, escalates_when_needed]))
+```
+
+If the range printed at the end is wide, collect more cases before arguing about small differences.
+
+**Watch for averages that mislead.** Version A can beat version B in every category and still lose overall, if the categories have very different sizes. This is Simpson's paradox. It is one more reason to read scores by category, not only the total.
+
+**Calibrating a model judge.** Have two people grade 30 outputs with the same rubric, then have the judge grade them. Compare. If agreement is low, the rubric is usually unclear: rewrite it with examples of pass and fail, and test again. Recheck agreement whenever you change the judge's model or prompt, and run the judge at temperature 0 so the same answer gets the same grade. The lessons on LLM judges and on scoring open-ended answers go deeper.
 
 ## A worked example
 
@@ -130,9 +174,23 @@ Results: the old prompt scores 71% on the judge and misses 3 of 7 escalations; t
 - **Unchecked model judges.** Compare with human grades.
 - **A frozen set.** Add every new failure.
 
+## When a small eval is enough
+
+- **Early prototypes**: 20 to 30 cases you read by hand beat an elaborate pipeline.
+- **Big, obvious changes**, such as a new model that is clearly better or worse, show up on a small set.
+- **Closed tasks**, such as classification, can be scored by code alone, with no judge needed.
+
+## From demo to production
+
+- **One command, in CI**: run the eval on every prompt, model, retrieval or code change, and block a release when a critical category gets worse.
+- **Version everything with the results**: test set, rubric, judge prompt and model, app prompt and settings, so any two runs can be compared.
+- **Check the eval itself**: do higher scores match what users and reviewers say is better? If two metrics always move together, drop one; if they never agree, investigate.
+- **Mind the cost**: run the quick smoke set while you work, and the full set before a release.
+- **Feed production back in**: failures from logs, complaints and online evals become new cases every week.
+
 ## Practice
 
-Read Hamel Husain's "Your AI product needs evals" linked below.
+Read Hamel Husain's "Your AI product needs evals" linked below. For more depth, chapters 3 and 4 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) cover evaluation methods, data slicing, sample sizes and checking an evaluation pipeline.
 
 This lesson's check is a project: push an eval script and a test set of at least 30 cases for one of your apps, with a README showing the score before and after one change and what the change was.
 

@@ -145,3 +145,19 @@ test("the sixth batch of book-informed lessons render with their sections, a dia
     expect((await wcag(page)).violations).toEqual([]);
   }
 });
+
+test("deepened lessons have code and the new sections (LQ-7)", async ({ page }) => {
+  const lessons: [string, string][] = [
+    ["evals-test-sets", "When a small eval is enough"],
+    ["cost-control", "When cutting cost is the wrong goal"],
+    ["prompt-injection", "When the risk is lower"],
+  ];
+  for (const [id, extra] of lessons) {
+    await page.goto(`/stop/${id}`);
+    await expect(page.getByRole("heading", { level: 2, name: extra })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "From demo to production" })).toBeVisible();
+    await expect(page.locator("pre").first()).toBeVisible();
+    expect(await overflow(page)).toBe(false);
+    expect((await wcag(page)).violations).toEqual([]);
+  }
+});
