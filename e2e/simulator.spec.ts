@@ -1,5 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { loadContent } from "../src/lib/content/load";
+
+const { bundle } = loadContent(path.resolve(__dirname, "../content"));
+const questionByText = new Map(bundle.interview.map((q) => [q.data.question, q.data]));
 
 const wcag = (page: import("@playwright/test").Page) =>
   new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
@@ -28,7 +33,12 @@ test("a typed mock interview ends with a report on key points", async ({ page })
     if (i === 3) {
       await page.getByRole("button", { name: "Skip this question" }).click();
     } else {
-      await answer.fill("We retrieve relevant chunks with hybrid search, ground the answer in that context, cite the source and measure recall on a test set.");
+      // Answer with words from the question's own key points, so the report always quotes a covered point
+      // whichever questions the pool holds as content grows.
+      const asked = (await page.getByRole("heading", { level: 2 }).first().textContent())?.trim() ?? "";
+      const rubric = questionByText.get(asked)?.rubric ?? [];
+      const words = rubric.slice(0, 2).map((p) => p.keywords[0]).join(" and ");
+      await answer.fill(`I would start with ${words}, then explain the trade-offs and how I would test it.`);
       await answer.press("Enter");
     }
   }
