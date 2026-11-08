@@ -33,6 +33,10 @@ flashcards:
     a: "Track retirement dates, test the replacement early, and ship the switch as a normal tested release."
   - q: "What does good rollback look like?"
     a: "One action, such as moving an alias or redeploying the previous tag, done in minutes."
+  - q: "What should a release file pin?"
+    a: "The prompt versions, the exact model snapshot, generation settings, tool definitions version and index version, so one id describes the whole behaviour."
+  - q: "How can CI catch an upcoming model retirement?"
+    a: "Keep a file of models in use with their announced retirement dates, and fail or warn when any date is less than, say, 60 days away."
 exercise:
   title: "Find what changed"
   setup: "A Kochi travel company's booking assistant started recommending the wrong refund rules on Tuesday. Since Monday: the marketing team edited the system prompt in an admin panel; the gateway alias 'chat-default' started pointing to a newer model; and the index was rebuilt with a new chunk size. Traces record only the model alias."
@@ -50,8 +54,8 @@ ask:
   - "What is a prompt registry?"
   - "How do I prepare for a model deprecation?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -106,6 +110,70 @@ This lesson follows the support assistant at a fintech in Gurugram, where three 
 
 **Model switches.** Treat a new model as a release candidate: run the full golden set, compare cost and latency, check refusals and tone on sample conversations in each language you serve, and roll out gradually. Prompts tuned for one model often need small changes for the next.
 
+**Prompts as files, releases as one manifest.**
+
+```text
+prompts/
+  answer.v13.md
+  answer.v14.md
+  rewrite.v4.md
+release.yaml
+```
+
+```yaml
+# release.yaml
+release: assistant-2026.11.3
+model: claude-sonnet-5-5-YYYYMMDD     # a dated snapshot where the provider offers one
+settings: {max_tokens: 600}
+prompts: {answer: v14, rewrite: v4}
+index: policies-2026-11-01
+tools: tools-v7
+```
+
+```python
+import hashlib, json, yaml
+from pathlib import Path
+
+def load_release(path="release.yaml"):
+    rel = yaml.safe_load(open(path))
+    rel["prompt_text"] = {name: Path(f"prompts/{name}.{ver}.md").read_text()
+                          for name, ver in rel["prompts"].items()}
+    blob = json.dumps({k: rel[k] for k in ("model", "settings", "prompts", "index", "tools")}, sort_keys=True)
+    rel["fingerprint"] = hashlib.sha256(blob.encode()).hexdigest()[:10]
+    return rel
+
+RELEASE = load_release()     # log RELEASE["release"] and RELEASE["fingerprint"] on every trace
+```
+
+The fingerprint changes if anyone edits the release without renaming it, which catches "small" untracked changes.
+
+**Checks in CI.** Fail the build when the release points to something missing or risky:
+
+```python
+import re
+from datetime import date
+
+RETIREMENTS = yaml.safe_load(open("model-retirements.yaml"))     # {model_id: "YYYY-MM-DD"}
+
+def check_release(rel):
+    problems = []
+    for name, ver in rel["prompts"].items():
+        if not Path(f"prompts/{name}.{ver}.md").exists():
+            problems.append(f"missing prompt file {name}.{ver}")
+    if not re.search(r"\d{8}$", rel["model"]):
+        problems.append("model is not pinned to a dated snapshot")
+    retire = RETIREMENTS.get(rel["model"])
+    if retire and (date.fromisoformat(retire) - date.today()).days < 60:
+        problems.append(f"{rel['model']} retires on {retire}; plan the switch")
+    return problems
+```
+
+Where a provider does not offer dated names, pin what you can (your gateway's alias, reviewed) and run the golden set on a schedule to catch silent changes.
+
+**Promotion and rollback.** Production reads `release.yaml` from the deployed commit, so promoting is merging a pull request and rolling back is redeploying the previous commit. If you use a prompt registry instead, the same rule applies: the app reads an alias, and promotion moves the alias after the golden set passes.
+
+**A changelog humans read.** Next to `release.yaml`, keep a short `CHANGELOG.md`: release id, date, what changed, the eval results compared with the previous release, and who approved. Clients' reviewers often ask for exactly this.
+
 ## A worked example
 
 A Gurugram fintech's support assistant had prompts edited directly in an admin panel by three teams. One Friday, complaint volume doubled. Nobody could say what had changed; traces showed only the model name.
@@ -136,6 +204,23 @@ Two months later a new prompt version passes evals but customer feedback dips in
 - **Ignoring deprecation dates.** A forced last-minute switch is a risky release.
 - **Changing several parts in one release.** When quality drops, you cannot tell which part caused it.
 - **No owner per prompt.** Someone must approve each change and answer for its effect.
+- **Editing a prompt file in place** instead of adding a new version.
+- **Model aliases that change silently** under a fixed name.
+- **No retirement calendar**, so a deprecation becomes an emergency.
+
+## When lighter versioning is fine
+
+- **A prototype** with one prompt: keep it in Git and note the model you used.
+- **Personal tools** where nobody else depends on consistent behaviour.
+- **Fixed batch jobs run once**, where recording the prompt and model in the output is enough.
+
+## From demo to production
+
+- **Pin every part in one release file**, and log the release id and fingerprint on every trace.
+- **Run the golden set** on every release change in CI.
+- **Track model retirement dates** and test replacements early.
+- **Keep a changelog** with eval results and approvals.
+- **Roll back by redeploying** the previous release.
 
 ## Practice
 
@@ -144,5 +229,6 @@ Read MLflow's prompt registry docs.
 1. Move your app's prompts into versioned files or a registry with aliases.
 2. Record a release identifier (prompt versions, model snapshot, settings, index version) in every trace.
 3. Change a prompt, run your golden set in CI, promote it, then roll it back with one action.
+4. Add check_release to CI, then point release.yaml at a prompt version that does not exist and confirm the build fails.
 
 **You are done when you can** answer "what exactly produced this answer?" for any past request, and roll back in under five minutes.

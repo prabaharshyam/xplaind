@@ -34,6 +34,10 @@ flashcards:
     a: "A cheap model that fails often and needs retries or humans can cost more overall."
   - q: "Which other levers combine well with tiering?"
     a: "Prompt caching, shorter prompts and outputs, fewer retrieved chunks, and caching identical answers."
+  - q: "How do you know a cascade saves money?"
+    a: "Compare cost per successful task, including the large-model calls for escalated items and any human fixes, against sending everything to the large model."
+  - q: "What should a batch job do with failed items?"
+    a: "Collect them by id into a new, smaller batch or a real-time retry queue, and report how many failed and why."
 exercise:
   title: "Cut the bill"
   setup: "A Surat e-commerce marketplace runs three AI tasks on its largest model in real time: (A) categorising 2 million new product listings a month, uploaded in nightly seller batches; (B) answering buyer chat questions; (C) writing a weekly summary of seller complaints for managers. Monthly spend is ₹18 lakh."
@@ -51,8 +55,8 @@ ask:
   - "When should I use a batch API?"
   - "What is a model cascade?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -104,6 +108,87 @@ Every route needs its own eval. The real question is not "is the small model goo
 
 **Running a batch job.** Write one line per request with your own id, submit, and record the batch id. When results arrive, match them by id, write successes, and collect failures into a new batch. Make every write idempotent, so rerunning a batch after a crash does not create duplicates.
 
+**A cascade in code.** Small model first, a strict validator, the large model only when the check fails:
+
+```python
+import json
+import anthropic
+from pydantic import BaseModel, ValidationError
+
+client = anthropic.Anthropic()
+SMALL, LARGE = "claude-haiku-5-5", "claude-sonnet-5-5"     # check the docs for current names
+
+class Resume(BaseModel):
+    name: str
+    years_experience: float
+    skills: list[str]
+    last_employer: str | None = None
+
+def extract(model, text):
+    r = client.messages.create(model=model, max_tokens=500,
+        messages=[{"role": "user", "content": "Return only JSON with name, years_experience, skills, "
+                   f"last_employer (null if absent).\n\n{text}"}])
+    out = "".join(b.text for b in r.content if b.type == "text")
+    return out, r.usage
+
+def valid(raw, text):
+    try:
+        item = Resume.model_validate_json(raw)
+    except ValidationError:
+        return None
+    if not 0 <= item.years_experience <= 50 or not item.skills:
+        return None
+    if item.name.split()[0].lower() not in text.lower():      # the name must appear in the resume
+        return None
+    return item
+
+def cascade(text, stats):
+    raw, usage = extract(SMALL, text)
+    stats["small_calls"] += 1
+    if (item := valid(raw, text)):
+        return item
+    stats["escalated"] += 1
+    raw, usage = extract(LARGE, text)
+    return valid(raw, text)            # None goes to a person
+```
+
+Track the escalation rate. If it climbs, the small model is struggling with a new kind of input, and the savings are shrinking.
+
+**Batch requests with Anthropic's Message Batches API.** Submit non-urgent work in one go and collect results by your own ids:
+
+```python
+import time
+
+def run_batch(items):
+    batch = client.messages.batches.create(requests=[
+        {"custom_id": it["id"],
+         "params": {"model": SMALL, "max_tokens": 500,
+                    "messages": [{"role": "user", "content": f"Return only JSON ...\n\n{it['text']}"}]}}
+        for it in items])
+    while client.messages.batches.retrieve(batch.id).processing_status != "ended":
+        time.sleep(60)
+    done, failed = {}, []
+    for result in client.messages.batches.results(batch.id):
+        if result.result.type == "succeeded":
+            msg = result.result.message
+            done[result.custom_id] = "".join(b.text for b in msg.content if b.type == "text")
+        else:
+            failed.append(result.custom_id)
+    return done, failed            # resubmit `failed`, or send them to the real-time path
+```
+
+Batch processing is priced lower than normal calls and can take up to a day; check the current price and turnaround, with the date. Validate batch outputs exactly as you would real-time ones.
+
+**Cost per successful task, measured.** Over a sample of 200 items, record for each path the model calls made, tokens, cost and whether the final result was correct. Then compare:
+
+| Path | Accuracy | Cost per item |
+| --- | --- | --- |
+| Large model for everything | measured | measured |
+| Cascade | measured | measured, including escalations |
+| Cascade plus batch for uploads | measured | measured |
+
+Pick the cheapest path that meets the accuracy bar for that task.
+
 ## A worked example
 
 A Pune HR-tech company screens resumes for its clients. Each resume gets structured extraction (name, skills, experience) and a fit summary against the job description. Volume: 400,000 resumes a month, mostly uploaded in bulk the evening before a hiring drive.
@@ -132,6 +217,24 @@ Monthly spend falls to about ₹5 lakh. Recruiter ratings of the summaries are u
 - **No escalation path.** A cascade without a reliable failure check sends bad answers onwards.
 - **Ignoring retries in the maths.** Count cost per successful task.
 - **Forgetting partial batch failures.** Some items always fail; plan the rerun.
+- **A weak validator** that passes bad small-model outputs, so the cascade saves money by losing quality.
+- **Ignoring failed batch items**, which silently go missing.
+- **Comparing cost per call** instead of cost per successful task.
+
+## When tiering and batching are not worth it
+
+- **Low volume**: the savings are smaller than the engineering time.
+- **Every request is urgent**, so batching does not fit.
+- **The small model fails your evals** on the traffic you would send it.
+- **There is no reliable validator** for the cascade to escalate on.
+
+## From demo to production
+
+- **Track escalation rate and cost per successful task** per feature.
+- **Re-evaluate routes** on every model or prompt change.
+- **Handle batch failures** by id, with retries and a report.
+- **Keep urgent and batch work on separate limits** so overnight jobs never slow daytime users.
+- **Record prices with dates** in the cost comparison.
 
 ## Practice
 
@@ -140,5 +243,8 @@ Read your provider's batch processing guide and the RouteLLM post.
 1. Pick one feature and evaluate a small and a large model on 50 golden cases. Record accuracy and cost per case for each.
 2. Build a cascade: small model first with a validator, escalating failures to the large model. Measure the blended accuracy and cost.
 3. Run 100 non-urgent requests through a batch API, handle any failed items, and compare the cost with real-time calls.
+4. Run 50 resumes through the cascade, record the escalation rate and cost per correct extraction, and compare with the large model alone.
+
+For more depth, chapter 9 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers batching and inference cost, and chapter 10 covers model routers.
 
 **You are done when you can** show a before-and-after table of cost and quality for one feature and justify the split.
