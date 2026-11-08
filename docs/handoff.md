@@ -1,3 +1,5 @@
+> **Superseded on 2026-11-08 by [HANDOVER.md](HANDOVER.md).** This file is the early handoff (25 to 26 October) and is kept for history. Start with HANDOVER.md.
+
 # Handoff: where the build stands
 
 Written 2026-10-25 so a new Claude Code session can pick up without the earlier chat. Read `CLAUDE.md`, `docs/PRD.md` and `docs/decisions.md` first. This file adds what those do not say.

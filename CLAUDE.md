@@ -2,6 +2,8 @@
 
 Free-first AI learning path for India. Read docs/PRD.md before changing anything. Requirement IDs (PL-1, RM-2 and so on) are the spec.
 
+New to this repo, or taking over from another account? Read docs/HANDOVER.md first: it covers the product, the owner, the services, the content system, the workflow and what is pending.
+
 ## Stack
 Next.js App Router, TypeScript strict, Tailwind, Supabase (Postgres, auth with Google, GitHub, email and password or an email link, row-level security), Zod, Vitest, Playwright, GitHub Actions.
 
