@@ -1,0 +1,189 @@
+---
+id: ai-app-in-layers
+level: P2
+theme: ops
+title: "Grow an AI app in layers: context, guardrails, routing, caching and agents"
+outcome: "Start an AI product as a single model call and add context, guardrails, a router and gateway, caches and agent steps only when a real need appears, with monitoring from day one."
+answer: "Start with one model call, then add parts only as needs appear: context, guardrails, a router and gateway, caches, then agent loops and actions. Watch every layer from the first day."
+why_it_matters: "Teams often build a complex AI platform before they have a single happy user, then cannot tell which part broke. Growing the system one layer at a time keeps it simple, cheap and debuggable, and it is the architecture story interviewers expect you to tell."
+hours: 3
+gap_tags: []
+primary_resource: huyenchip-genai-platform
+alternates: [eugeneyan-llm-patterns]
+videos: [yt-redis-what-is-a-semantic-cache, yt-krish-naik-what-are-llm-gateways-with-detailed-implementation]
+more: [dlai-safe-and-reliable-ai-via-guardrails]
+format: deep
+key_terms: [model-router, llm-gateway, guardrails, semantic-cache]
+check:
+  type: mcq
+  question_ids: [ai-app-in-layers-1, ai-app-in-layers-2, ai-app-in-layers-3]
+flashcards:
+  - q: "What is the simplest AI app architecture?"
+    a: "The app sends the user's query to a model and returns the answer. No context, no guardrails, no caching."
+  - q: "What usually comes first when an app grows?"
+    a: "Better context: retrieval from documents or data, and tools to look things up, so the model answers from the right facts."
+  - q: "What do input guardrails protect against?"
+    a: "Leaking private data to outside services, and harmful or injected instructions reaching the model."
+  - q: "What do output guardrails catch?"
+    a: "Wrong format, unsupported or unsafe content, and leaked personal data, before the user sees it. Then retry, fall back or hand to a person."
+  - q: "What does a model router do?"
+    a: "Decides where each request goes: a cheap or strong model, a specialist, a stock reply, or a person, usually with a small, fast classifier."
+  - q: "What does a gateway add?"
+    a: "One place for all model calls: keys, access control, cost limits, logging, retries and fallbacks between providers."
+  - q: "Why is a semantic cache risky?"
+    a: "It reuses an answer for a question that only seems similar. A loose match returns a wrong answer, so set the threshold carefully and measure."
+  - q: "When should you add agent loops and write actions?"
+    a: "Last, and only when tasks really need several steps or need to change something, with approvals and limits on what the agent can do."
+exercise:
+  title: "A clinic-booking assistant in Pune"
+  setup: "A chain of 40 clinics in Pune launched a WhatsApp assistant that is a single model call with a long prompt. It answers questions about timings and fees, but patients also ask about their lab reports, try to book appointments, and sometimes share Aadhaar and phone numbers. Costs are rising, and the same ten questions make up 40% of traffic."
+  questions:
+    - q: "What should they add first, and why?"
+      a: "Context: retrieve current timings, fees and doctor schedules from their system, so answers are right instead of guessed from a long prompt."
+    - q: "Which guardrails does this assistant need?"
+      a: "Input: mask Aadhaar and phone numbers before calling the model. Output: block medical advice beyond the policy, and check that stated fees match the source."
+    - q: "How can they cut cost on the repeated questions safely?"
+      a: "Route the top FAQs to stock answers or an exact cache keyed on a normalised question. Use a semantic cache only after testing that its matches are reliably the same question."
+    - q: "Should the assistant book appointments by itself?"
+      a: "Only after the rest works: as a tool with confirmation from the patient, limits on what it can change, and logging of every booking."
+ask:
+  - "What components does a production LLM app need?"
+  - "What is the difference between a model router and a gateway?"
+  - "When is a semantic cache a good idea?"
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-08
+---
+
+## What it is
+
+Every AI product starts the same way: your app sends a question to a model and shows the answer. That is a complete, working architecture. Most real products grow from there by adding parts, and the order matters.
+
+A common order, as many teams grow:
+
+1. **Enhance context.** Give the model the right information: retrieval from documents, data lookups, tools.
+2. **Put in guardrails.** Check what goes into the model and what comes out.
+3. **Add a router and a gateway.** Send each request to the right place, and manage all model calls in one spot.
+4. **Add caches.** Avoid paying twice for the same work.
+5. **Add agent patterns.** Loops, several steps and actions that change things in the world.
+
+Alongside all of this, from the first day: **monitoring**, so you can see what each part does.
+
+This is not a strict recipe. The point is to add a layer only when a real problem asks for it, so the system stays as simple as the product allows.
+
+```flow
+title: One request through a grown AI app
+User question -> Input guardrails | mask personal data, block injection
+Input guardrails -> Router | intent: FAQ, account, out of scope
+Router -[FAQ]-> Cache | exact or semantic
+Cache -[miss]-> Retrieve context | documents, data, tools
+Router -[account]-> Retrieve context
+Router -[out of scope]-> Stock reply
+Retrieve context -> Gateway | keys, limits, retries, fallback
+Gateway -> Model
+Model -> Output guardrails | format, facts, safety
+Output guardrails -[fail]-> Retry or hand to a person
+Output guardrails -[pass]-> Answer and log the trace
+```
+
+## How it works
+
+**Step 1: enhance context.** A model only knows its training data and what you put in the prompt. Most early quality problems are missing or stale facts, so the first addition is usually retrieval (documents, a database, a search index) or tools (an order lookup, a calculator). The RAG and tool-calling lessons cover these in depth.
+
+**Step 2: guardrails.** There are two kinds.
+
+- **Input guardrails** stop private data leaking to outside services, for example by masking Aadhaar numbers, phone numbers and names before the model call, and catch harmful or injected instructions.
+- **Output guardrails** check the answer before the user sees it: valid format, no unsupported claims, no personal data, nothing against your policy. When a check fails you can retry, fall back to another model, return a safe message or hand to a person.
+
+Guardrails add latency, especially on streamed answers, where you must decide whether to check text before or while it is shown. Keep fast checks inline and slower ones on a sample.
+
+**Step 3: router and gateway.**
+
+- A **router** decides where a request goes, usually with a small, fast intent classifier. It can send easy questions to a cheap model and hard ones to a strong model, send billing disputes to a person, answer out-of-scope questions with a polite stock reply without calling a model at all, or ask for clarification when a message is ambiguous ("Freeze my account, or the weather?").
+- A **gateway** is one place through which every model call passes. It holds the API keys so they are not scattered across services, controls who may use which model, enforces spend limits, logs every call, and retries or falls back to another provider when one is down.
+
+**Step 4: caches.**
+
+- **Exact cache:** the same normalised question, template version and model gives the same stored answer. Safe and simple.
+- **Semantic cache:** reuse an answer when a new question *means* the same as an old one, matched with embeddings and a similarity threshold. It can save a lot when questions repeat, but a loose match returns the wrong answer ("refund for order 1" is close to "refund for order 2"). Only add it when the hit rate is high and you have measured its mistakes.
+An exact cache key that is safe to reuse includes everything that changes the answer:
+
+```python
+import hashlib, re
+
+def cache_key(question, template_version, model, day):
+    """Same key only when the answer would be the same: same words, prompt, model and day."""
+    normalised = re.sub(r"\s+", " ", question.strip().lower())
+    raw = f"{normalised}|{template_version}|{model}|{day}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+# cache_key("What are Dr Mehta's timings?", "v7", "fast-model", "2026-11-08")
+```
+
+- **Prompt caching** and the **KV cache** happen at the model provider or server; keep the fixed part of your prompt first so they work.
+
+**Step 5: agent patterns.** So far each request flows one way. Agent patterns add loops (retrieve again if the first answer is incomplete), several steps, and **write actions** such as sending an email or booking an appointment. They make the system far more capable and far riskier. Add them last, with approvals for anything that changes data, limits on what tools can do, and budgets on steps and spend.
+
+**Monitoring from day one.** Log every request as a trace: the input, retrieved context, model, prompt version, output, guardrail results, latency and cost, with personal data masked. Track a few signals on a dashboard: error and refusal rates, guardrail triggers, cost per request, latency, and user feedback. As the system grows, traces are how you find which layer failed.
+
+| Layer | Add it when | Typical tools | New risk it brings |
+| --- | --- | --- | --- |
+| Context | Answers miss or invent facts | Vector search, SQL, APIs | Wrong or stale documents |
+| Guardrails | Real users and real data arrive | PII masking, validators, judge checks | Latency, false blocks |
+| Router | Requests differ in difficulty or type | Small classifier, rules | Misrouted requests |
+| Gateway | More than one model, service or team | LiteLLM, cloud gateways | A single point of failure |
+| Cache | Many repeated questions | Redis, vector index | Stale or wrong reuse |
+| Agents and actions | Tasks need several steps or changes | Agent SDKs, LangGraph | Runaway loops, harmful actions |
+
+## A worked example
+
+A chain of 40 clinics in Pune runs a WhatsApp assistant. It began as one model call with a long prompt listing timings and fees. Six months in, there are four problems: fees quoted are sometimes out of date, patients share Aadhaar and phone numbers in messages, the same ten questions make up 40% of traffic, and patients keep asking it to book appointments.
+
+They grow it in order:
+
+1. **Context.** Timings, fees and doctor schedules now come from the clinic system at question time. Out-of-date fees disappear.
+2. **Guardrails.** Aadhaar and phone numbers are masked before any model call. An output check blocks anything that reads like a diagnosis and confirms fees match the clinic system.
+3. **Router.** A small classifier sends the top FAQs to fixed answers, lab-report questions to a secure link, and anything urgent to a phone number, with no model call.
+4. **Exact cache** for the remaining repeated questions, keyed on the normalised question and the date, because schedules change daily.
+5. **Booking as a tool**, last: the assistant proposes a slot, the patient confirms with a button, and every booking is logged.
+
+| Measure | Before | After |
+| --- | --- | --- |
+| Model calls per 1,000 messages | 1,000 | 520 |
+| Wrong fee or timing answers (weekly sample) | 6% | under 1% |
+| Messages sent to the model with Aadhaar numbers | Some each day | None |
+| Bookings completed in chat | 0 | 22% of booking requests |
+
+The numbers are for illustration. They did not add a semantic cache: a test showed it matched "Dr Mehta's timings" with "Dr Mehra's timings".
+
+## Common mistakes
+
+- **Building the whole platform first.** Five layers before ten users means five places to debug and nothing learned.
+- **Adding agents before context works.** An agent that acts on wrong facts does more damage, faster.
+- **Guardrails that only log.** A check that does not block, retry or escalate protects nothing.
+- **A semantic cache on questions with details.** Order numbers, names and dates make similar questions mean different things.
+- **No traces.** Without a trace per request, you cannot tell whether retrieval, the router or the model failed.
+- **Keys and limits spread across services.** A gateway, even a simple one, keeps spend and access in one place.
+
+## When to stay simple
+
+- **Internal tools for a handful of people** may never need a router, gateway or cache.
+- **Low volume** makes caching and routing savings too small to matter.
+- **Read-only answers** do not need agent loops or write actions.
+
+## From demo to production
+
+- **Write down why each layer exists**, with the problem it solved and its measured effect.
+- **Test layers separately**: retrieval recall, router accuracy, guardrail false-block rate, cache error rate.
+- **Version everything together**: prompts, router model, guardrail rules and cache keys, so a release can be rolled back as one.
+- **Fail safely**: if a layer is down, the request should fall back to a simpler path, not an error page.
+
+## Practice
+
+1. Draw the architecture of an AI feature you know as it is today. Which of the five layers does it have?
+2. For each missing layer, write the problem that would justify adding it, and how you would measure it.
+3. Pick one repeated question type and decide: stock answer, exact cache, semantic cache or nothing. Explain why.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) and her free article "Building a generative AI platform" walk through this architecture step by step.
+
+**You are done when you can** draw the five layers in order, explain the difference between a router and a gateway, and say when a semantic cache is safe.

@@ -91,3 +91,21 @@ test("the third batch of book-informed lessons render with their sections, a dia
     expect((await wcag(page)).violations).toEqual([]);
   }
 });
+
+test("the fourth batch of book-informed lessons render with their sections, a diagram and code (LQ-4)", async ({ page }) => {
+  const lessons: [string, RegExp, string][] = [
+    ["scoring-open-ended-answers", /Scoring open-ended answers/, "When to keep it simple"],
+    ["ai-app-in-layers", /Grow an AI app in layers/, "When to stay simple"],
+    ["catching-hallucinations", /Catching hallucinations/, "When detection is not enough"],
+  ];
+  for (const [id, title, extra] of lessons) {
+    await page.goto(`/stop/${id}`);
+    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: extra })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Common mistakes" })).toBeVisible();
+    await expect(page.locator("figure:has(svg)").first()).toBeVisible();
+    await expect(page.locator("pre").first()).toBeVisible();
+    expect(await overflow(page)).toBe(false);
+    expect((await wcag(page)).violations).toEqual([]);
+  }
+});

@@ -1,0 +1,180 @@
+---
+id: catching-hallucinations
+level: P1
+theme: evals
+title: "Catching hallucinations: why models make things up and how to detect it"
+outcome: "Explain why models hallucinate, find the questions where yours does, and detect unsupported claims automatically with judge checks, claim-by-claim verification, entailment models and self-consistency."
+answer: "Models make things up when they build on their own guesses or answer beyond what they know. Catch it by checking each claim against a source, with a judge or entailment model, or by resampling."
+why_it_matters: "A single confident, invented fact can cost a client, a court case or a patient's trust. Teams that measure hallucination per question type, and catch it automatically, can ship AI into serious work; teams that hope for the best cannot."
+hours: 3
+gap_tags: []
+primary_resource: arxiv-selfcheckgpt
+alternates: [arxiv-safe-long-form-factuality]
+videos: [yt-anthropic-why-do-ai-models-hallucinate, yt-donato-capitella-hallucination-detection-for-rag]
+more: [dlai-quality-safety-llm-applications]
+format: deep
+key_terms: [hallucination, factual-consistency, faithfulness, verifier, grounding]
+check:
+  type: mcq
+  question_ids: [catching-hallucinations-1, catching-hallucinations-2, catching-hallucinations-3]
+flashcards:
+  - q: "What is a hallucination?"
+    a: "A confident answer, or part of one, that is not supported by the facts or the source the model was given."
+  - q: "What is 'snowballing' in hallucination?"
+    a: "The model treats its own earlier wrong statement as a fact and keeps building on it, adding more errors to justify the first."
+  - q: "Name two question types that often cause hallucination."
+    a: "Niche topics the model rarely saw, and questions about things that do not exist, such as what someone said about a subject they never discussed."
+  - q: "What is local versus global factual consistency?"
+    a: "Local: the answer agrees with a given source, such as a document or policy. Global: it agrees with widely accepted facts."
+  - q: "How does claim-by-claim checking work?"
+    a: "Split the answer into single claims, make each one stand alone, find evidence for each, and judge each claim as supported or not."
+  - q: "What does an entailment (NLI) model do?"
+    a: "Given a source and a claim, it labels the claim as supported, contradicted or neither. It is a small, cheap checker for factual consistency."
+  - q: "What is the idea behind SelfCheckGPT?"
+    a: "Sample the model several more times. If the new answers disagree with the original, the original is probably made up."
+  - q: "What reduces hallucination before you need to detect it?"
+    a: "Giving the model the facts (retrieval), asking it to answer only from them and say when it does not know, and requiring citations."
+exercise:
+  title: "A tax-help assistant for Indian freelancers"
+  setup: "A Bengaluru fintech runs an assistant that answers freelancers' income tax questions using retrieved sections of the Income Tax Act and CBDT circulars. A lawyer reviewing 100 answers found 9 with an unsupported claim, mostly about rare deductions and about circulars that do not exist."
+  questions:
+    - q: "What should they measure first?"
+      a: "Hallucination rate by question type. The review already points to rare deductions and questions about non-existent circulars, so those need their own test cases."
+    - q: "How can they detect unsupported claims automatically?"
+      a: "Split each answer into claims and check each against the retrieved sections, with a judge model or an entailment model. Flag any claim with no support."
+    - q: "What should the assistant do when the sources do not answer the question?"
+      a: "Say so clearly and point to a chartered accountant, instead of answering from general knowledge."
+    - q: "Is sampling the answer five times and comparing a good everyday check here?"
+      a: "Useful for spot checks, but too costly for every answer. Checking claims against the retrieved sources is cheaper and more direct."
+ask:
+  - "Why do language models hallucinate?"
+  - "How can I detect hallucinations automatically?"
+  - "How do I reduce hallucinations in a RAG app?"
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-08
+---
+
+## What it is
+
+A **hallucination** is a confident answer, or part of one, that is not supported by facts or by the source the model was given. A law firm was fined in 2023 for submitting court filings with cases a chatbot had invented. The danger is not that the model is unsure; it is that it sounds sure.
+
+There are two useful kinds of correctness:
+
+- **Local factual consistency**: does the answer agree with a given source, such as the retrieved document, the company policy or the data? This matters for summaries, support assistants and RAG apps.
+- **Global factual consistency**: does it agree with widely accepted facts? This matters for open chat, research and fact-checking.
+
+Local consistency is much easier to check, because you have the source in hand. That is one more reason to give models their facts through retrieval.
+
+**Why it happens.** Two explanations are widely discussed:
+
+1. **Self-delusion, or snowballing.** The model cannot tell the text it was given from the text it wrote. If an early sentence is slightly wrong, later sentences treat it as fact and build on it.
+2. **Teaching beyond what the model knows.** In training, models copy answers written by people who knew things the model did not. That teaches them to produce confident answers even without the knowledge behind them.
+
+In practice, hallucinations cluster in two places: **niche topics** the model saw rarely, and **questions about things that do not exist** ("What did the RBI say about X?" when it said nothing).
+
+```flow
+title: Checking an answer for unsupported claims
+Answer -> Split into single claims
+Split into single claims -> Make each claim stand alone | replace "it" with the subject
+Make each claim stand alone -> Find evidence | retrieved source or search
+Find evidence -> Judge each claim | supported, contradicted, unknown
+Judge each claim -> Any unsupported?
+Any unsupported? -[no]-> Show the answer
+Any unsupported? -[yes]-> Remove, rewrite or refuse | and log for review
+```
+
+## How it works
+
+**Prevent first.** Detection catches what slips through; prevention cuts how much there is.
+
+- Give the model the facts: retrieval for documents, tools for live data.
+- Tell it to answer only from the provided sources, and to say "I don't know" or "the documents don't cover this" otherwise.
+- Ask for citations to the source passage for each claim, and check that the cited passage exists.
+- Keep temperature low for factual tasks, and break long tasks into smaller steps so errors do not snowball.
+
+**Find where your model hallucinates.** Before building detectors, read failing answers and group them. Build test cases that target the weak spots: rare topics, questions with false premises, questions the sources cannot answer. A test set without these will report a reassuring number that real users will not see.
+
+**Detect with a judge.** Give a judge model the source and the answer, and ask whether the answer contains anything the source does not support. Strong models do this well, especially on short answers. Check the judge against human labels on a sample before trusting it.
+
+**Detect claim by claim.** Long answers mix true and false statements, so a single verdict hides problems. Google DeepMind's SAFE method shows the pattern: split the answer into single claims, rewrite each to stand alone, search for evidence, then judge each claim. For RAG apps, the "search" step is just the retrieved passages.
+
+**Detect with an entailment model.** Natural language inference (NLI) models take a premise (the source) and a hypothesis (a claim) and say **entailment** (supported), **contradiction** or **neutral** (cannot tell). Small, open models trained for this run fast and cheaply on every claim.
+
+**Detect by sampling again.** SelfCheckGPT samples several fresh answers to the same question. If they disagree with the original answer's claims, those claims are probably made up, because a model tends to repeat what it really knows and vary what it invents. It needs no source, but it multiplies cost, so use it for spot checks or high-stakes answers.
+
+A simple claim checker with an entailment model:
+
+```python
+def unsupported_claims(answer, sources, split_claims, entails):
+    """split_claims(text) -> list of standalone claims.
+    entails(premise, claim) -> 'entailment' | 'contradiction' | 'neutral'."""
+    flagged = []
+    for claim in split_claims(answer):
+        verdicts = [entails(src, claim) for src in sources]
+        if "entailment" not in verdicts:
+            flagged.append({"claim": claim, "contradicted": "contradiction" in verdicts})
+    return flagged
+
+# for item in unsupported_claims(reply, retrieved_passages, split_claims, nli):
+#     log_for_review(item)
+```
+
+| Method | Needs a source? | Cost per answer | Best for |
+| --- | --- | --- | --- |
+| Judge model on the whole answer | Yes, or search | Medium | Short answers, quick checks |
+| Claim-by-claim with a judge | Yes, or search | Higher | Long answers with many facts |
+| Entailment (NLI) model per claim | Yes | Low | Every answer in a RAG app |
+| Sampling again (self-consistency) | No | High | Spot checks, open questions |
+| Citation check | Yes | Very low | Any app that shows sources |
+
+## A worked example
+
+A fintech in Bengaluru runs an assistant that answers freelancers' income tax questions from retrieved sections of the Income Tax Act and CBDT circulars. A tax lawyer reviews 100 answers and finds 9 with an unsupported claim. Six are about rare deductions, and three describe circulars that do not exist.
+
+Their steps:
+
+1. **Targeted test set.** 150 questions: common ones, rare deductions, and 30 questions with false premises ("What does the 2025 circular on freelancer GST under section 44ADA say?").
+2. **Prevention.** The prompt now says to answer only from the passages, to say plainly when they do not cover the question, and to cite the section for each claim.
+3. **Detection on every answer.** An entailment model checks each claim against the retrieved passages. Unsupported claims are removed and, if the core answer depends on them, the assistant says it cannot answer and suggests a chartered accountant.
+4. **Weekly review.** A judge model scores a sample, and the lawyer reviews everything the checks flagged.
+
+| Measure on the 150-question set | Before | After |
+| --- | --- | --- |
+| Answers with any unsupported claim | 11% | 2% |
+| False-premise questions answered as if true | 60% | 7% |
+| Answers that refuse when they should not | 1% | 4% |
+
+The numbers are for illustration. Note the trade-off in the last row: stricter checks make the assistant refuse a little more often. The team tracks both numbers, because an assistant that refuses everything is also a failure.
+
+## Common mistakes
+
+- **Testing only questions the model knows well.** Add rare topics and false-premise questions, or your score flatters you.
+- **One verdict for a long answer.** Check claims one by one; one invented figure can hide inside nine true sentences.
+- **Trusting citations without checking them.** Confirm the cited passage exists and supports the claim.
+- **Checking against general knowledge when you have the source.** In a RAG app, judge against the retrieved passages.
+- **Counting only hallucinations.** Track refusals too, so fixes do not make the assistant useless.
+- **Assuming a bigger model fixes it.** Larger models hallucinate less on common facts but still invent on niche and false-premise questions.
+
+## When detection is not enough
+
+- **High-stakes answers**, such as legal, medical or financial advice, need a qualified person in the loop.
+- **No reliable source exists.** If you cannot say what the facts are, no checker can.
+- **Real-time voice** may leave no time for claim checks; restrict it to safe, scripted topics instead.
+
+## From demo to production
+
+- **Run cheap checks on every answer** (citations, entailment) and expensive ones on a sample.
+- **Log every flagged claim** with the source, so reviewers can fix retrieval or documents.
+- **Track hallucination and refusal rates by topic**, and alert on sudden changes after a model or prompt update.
+- **Feed confirmed failures into the test set**, so they never come back unnoticed.
+
+## Practice
+
+1. Ask any chat assistant three questions about something that does not exist, such as a made-up government scheme. How often does it play along?
+2. Take one long answer, split it into claims by hand, and mark each as supported or not by a source.
+3. Write a prompt rule and an output check that would have stopped the worst claim you found.
+
+For more depth, chapters 2 and 4 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) cover why hallucinations happen and how to measure factual consistency.
+
+**You are done when you can** give the two explanations of why models hallucinate, name two kinds of questions that trigger it, and describe three ways to detect it.

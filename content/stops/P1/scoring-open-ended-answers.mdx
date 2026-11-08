@@ -1,0 +1,179 @@
+---
+id: scoring-open-ended-answers
+level: P1
+theme: evals
+title: "Scoring open-ended answers: exact checks, similarity and side-by-side comparison"
+outcome: "Pick the right way to score an AI answer: run it, match it, compare it with a reference by words or meaning, or compare two answers side by side, and know each method's blind spots."
+answer: "Score what you can check exactly first. Where there are many right answers, compare meaning with embeddings or use a judge, and to choose between two systems, compare answers side by side."
+why_it_matters: "A score that does not track quality sends a team in the wrong direction for weeks. Knowing which measure fits which task, and how each one can mislead, is the difference between an eval you can trust and a number on a dashboard."
+hours: 2.5
+gap_tags: []
+primary_resource: eugeneyan-task-specific-evals
+alternates: [lmarena-how-it-works]
+videos: [yt-hugging-face-what-is-the-bleu-metric, yt-hugging-face-what-is-the-rouge-metric]
+more: [dlai-evaluating-debugging-generative-ai]
+format: deep
+key_terms: [exact-match, lexical-similarity, semantic-similarity, pairwise-comparison, evals]
+check:
+  type: mcq
+  question_ids: [scoring-open-ended-answers-1, scoring-open-ended-answers-2, scoring-open-ended-answers-3]
+flashcards:
+  - q: "What is functional correctness?"
+    a: "Checking whether the output does its job: the code passes tests, the SQL returns the right rows, the JSON matches the schema. It is the most trustworthy score when you can get it."
+  - q: "When does exact match work?"
+    a: "For short, closed answers such as a number, a date, a label or a multiple-choice letter, after small clean-ups like lowercasing."
+  - q: "What do BLEU and ROUGE measure?"
+    a: "How many words and word sequences an answer shares with a reference answer. They reward matching words, not matching meaning."
+  - q: "Why can lexical similarity mislead?"
+    a: "A correct answer in different words scores low, and a wrong answer that copies the reference's words scores high. References can also be wrong or incomplete."
+  - q: "How is semantic similarity measured?"
+    a: "Turn both texts into embeddings and compare them, usually with cosine similarity. It catches paraphrases but depends on the embedding model."
+  - q: "What is pairwise comparison?"
+    a: "Showing two answers side by side and asking which is better. People find it easier than giving a score out of 10, and many votes can be turned into a ranking."
+  - q: "When should you not decide by preference votes?"
+    a: "When the question has a right answer the voter may not know, such as maths, law or health facts. Popular is not the same as correct."
+  - q: "What is the safest order for choosing a scoring method?"
+    a: "Functional checks first, then exact match, then a judge or similarity for open text, and pairwise comparison to choose between two systems."
+exercise:
+  title: "Scoring a Hindi customer-reply assistant"
+  setup: "A Delhi electronics retailer has an assistant that drafts replies to customer emails in Hindi and English. Each reply must include the order number, the refund amount when there is one, and a polite closing. The team has 300 past emails with replies written by their best agents, and they want to compare two prompt versions."
+  questions:
+    - q: "Which parts can be checked exactly?"
+      a: "Whether the order number and refund amount in the draft match the email and the order system. These are facts with one right value."
+    - q: "Why is ROUGE against the agents' replies a weak measure here?"
+      a: "A good reply can use completely different words from the agent's, especially across Hindi and English, and still be right. ROUGE would punish it."
+    - q: "How should they choose between the two prompt versions?"
+      a: "Show reviewers, or a checked judge model, both drafts for the same emails side by side in random order and count wins, alongside the exact fact checks."
+    - q: "When would a preference vote be risky here?"
+      a: "If voters cannot see the order data, they may prefer a fluent reply that states the wrong refund amount. Facts must be checked, not voted on."
+ask:
+  - "How do I evaluate open-ended LLM answers?"
+  - "Are BLEU and ROUGE still useful for LLMs?"
+  - "What is pairwise evaluation and when should I use it?"
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-08
+---
+
+## What it is
+
+Testing a calculator is easy: 2 + 2 must be 4. Testing an AI that writes emails, summaries or explanations is harder, because there are many good answers. This lesson covers the main ways to put a number on such answers, and when each one fits.
+
+There are four families, from most to least exact:
+
+1. **Functional correctness.** Does the output work? Generated code passes its tests, a generated SQL query returns the right rows, an extracted invoice total matches the ledger.
+2. **Exact match.** Is the answer the same as the reference? Good for numbers, dates, labels and multiple-choice letters.
+3. **Similarity to a reference.** How close is the answer to a known good one, either in **words** (lexical similarity, such as BLEU and ROUGE) or in **meaning** (semantic similarity, using embeddings)?
+4. **Judgement.** A person or a judge model rates the answer, either alone (a score out of 5) or against another answer (**pairwise comparison**). The lesson on LLM judges covers judge prompts in depth.
+
+```flow
+title: Choosing how to score an answer
+Answer to score -> Can you run or test it? | code, SQL, schema
+Can you run or test it? -[yes]-> Functional check | the most trustworthy
+Can you run or test it? -[no]-> One right short answer? | number, label, date
+One right short answer? -[yes]-> Exact match
+One right short answer? -[no]-> Have good reference answers?
+Have good reference answers? -[yes]-> Meaning similarity or a judge with the reference
+Have good reference answers? -[no]-> Judge with a rubric
+Meaning similarity or a judge with the reference -> Choosing between two systems? -[yes]-> Side-by-side comparison
+```
+
+## How it works
+
+**Functional correctness.** If you can execute or test it, do that first. A code assistant is scored by running unit tests. A text-to-SQL feature runs both the generated and the reference query on a test database and compares the results. An extraction feature checks fields against the system of record. Nothing else is as reliable. OpenAI found that on a coding benchmark, word-overlap scores were similar for correct and incorrect solutions, so only running the code told them apart.
+
+**Exact match**, with care. Normalise first: lowercase, trim spaces, standardise number formats. Watch for answers that contain the right value inside a wrong one: "Born on 12 September 1929" contains "1929" but is wrong if the true date is 12 June. For labels, compare the label field, not the whole sentence.
+
+**Lexical similarity.** Split both texts into words or word pairs and count the overlap. BLEU (from machine translation) and ROUGE (from summarisation) are the best-known versions. A related idea, **edit distance**, counts how many letter changes turn one string into another, useful for names and codes.
+
+Their weaknesses are serious for modern models:
+
+- A correct answer in different words scores low. "How is it going?" shares little with "How are you?"
+- A wrong answer that copies the reference's words scores high. "Let's eat, grandma" and "Let's eat grandma" are nearly identical by words.
+- References can be missing good answers, or simply wrong.
+
+They still help as cheap smoke alarms, for example to notice that a template change broke every reply.
+
+**Semantic similarity.** Turn the answer and the reference into embeddings and compare them with cosine similarity, from -1 to 1. Paraphrases score high. It is cheap at scale, but the score depends on the embedding model, it can rate "refund approved" and "refund rejected" as close, and the right threshold must be set by checking against people's judgements.
+
+```python
+import numpy as np
+
+def cosine(a, b):
+    a, b = np.asarray(a), np.asarray(b)
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+def score(answer, reference, embed, must_include=()):
+    """embed(text) returns a vector. must_include holds facts that need an exact check."""
+    facts_ok = all(f.lower() in answer.lower() for f in must_include)
+    return {"facts_ok": facts_ok, "meaning": round(cosine(embed(answer), embed(reference)), 3)}
+
+# score(draft, agent_reply, embed, must_include=["ORD-48213", "₹2,499"])
+```
+
+Notice the pattern: exact checks for the facts that must be right, similarity for the wording.
+
+**Pairwise comparison.** It is easier to say which of two songs you prefer than to score each out of 10. The same holds for answers. Show the same question with two answers, in random order and without labels, and ask which is better, allowing a tie. Count wins. With many models, ranking methods such as Elo or Bradley–Terry turn wins into a league table; this is how public arenas rank chatbots from millions of votes.
+
+Two limits matter:
+
+- **Preference is not correctness.** If the voter does not know the right answer, as with a maths result or a medical fact, they may prefer the confident wrong one. Vote on style and helpfulness; check facts separately.
+- **It needs many comparisons**, and the number of pairs grows fast as you add models. For a product decision between two prompts or two models, 100 to 300 side-by-side comparisons on your own questions are usually enough.
+
+| Method | Best for | Cost | Main risk |
+| --- | --- | --- | --- |
+| Functional check | Code, SQL, extraction, formats | Low once built | Tests that miss cases |
+| Exact match | Numbers, labels, short facts | Very low | Right value inside a wrong answer |
+| Lexical (BLEU, ROUGE) | Smoke tests, translation drift | Very low | Rewards copying words, not meaning |
+| Semantic similarity | Paraphrased answers with a reference | Low | Close meaning scores for opposite facts |
+| Judge with rubric | Open text without a reference | Medium | Judge bias; check it against people |
+| Pairwise comparison | Choosing between two systems | Medium to high | Preference mistaken for correctness |
+
+## A worked example
+
+An electronics retailer in Delhi has an assistant that drafts replies to customer emails in Hindi and English. Each reply must quote the right order number and refund amount and close politely. The team wants to compare prompt A (current) with prompt B (new) using 300 past emails and their best agents' replies.
+
+They try ROUGE against the agents' replies first. Prompt A scores 0.41 and prompt B 0.33, which suggests B is worse. Reading the drafts tells a different story: B writes shorter, clearer Hindi that shares fewer words with the agents' longer replies.
+
+So they score in three layers:
+
+| Layer | Prompt A | Prompt B |
+| --- | --- | --- |
+| Order number and refund amount correct (exact check against the order system) | 94% | 97% |
+| Meaning close to the agent's reply (cosine above 0.80) | 88% | 90% |
+| Side-by-side wins judged by two senior agents, 150 emails, ties allowed | 38% | 51% (11% ties) |
+| ROUGE-L against the agent's reply | 0.41 | 0.33 |
+
+The numbers are for illustration. B wins on facts and on preference, and loses only on word overlap, which they drop from the dashboard. They keep the exact checks running on every release.
+
+## Common mistakes
+
+- **Using BLEU or ROUGE as the main quality score** for chat, summaries or explanations.
+- **Letting a similarity score check facts.** "Approved" and "rejected" can look close. Check key facts exactly.
+- **Voting on questions with right answers.** Preference finds what people like, not what is true.
+- **Showing answers in a fixed order.** People and judges favour the first or the longer answer. Randomise order and compare similar lengths.
+- **Trusting a threshold nobody checked.** Pick similarity thresholds by comparing with human judgements on a sample.
+- **One number for everything.** Most products need a few scores: facts, format, meaning, preference.
+
+## When to keep it simple
+
+- **Closed tasks:** classification, extraction and routing are scored with exact checks and precision and recall. No similarity or judges needed.
+- **Early prototypes:** read 30 answers yourself before building any metric.
+- **Rare high-stakes answers:** legal or medical outputs need expert review, whatever the scores say.
+
+## From demo to production
+
+- **Layer the scores:** exact checks on every response, a judge or similarity on a sample, side-by-side comparison for releases.
+- **Version the references** with the test set, and fix wrong ones as you find them.
+- **Re-check the metrics against people** every few months, because a metric that drifts away from human judgement is worse than none.
+- **Report scores by segment:** language, topic, length. An overall gain can hide a drop in Hindi replies.
+
+## Practice
+
+1. Take ten answers from any AI feature with reference answers. Score them by exact match, by word overlap and by your own judgement. Where do the three disagree?
+2. Write the exact facts each answer must contain, and build a check for them.
+3. Compare two prompts side by side on ten questions in random order. Did your preferences match the word-overlap scores?
+
+For more depth, chapter 3 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers exact evaluation, similarity measures and comparative evaluation.
+
+**You are done when you can** choose a scoring method for a given task, explain why BLEU and ROUGE mislead on open answers, and say when a preference vote cannot be trusted.
