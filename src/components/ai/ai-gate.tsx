@@ -3,6 +3,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon } from "@/components/art/icons";
+import { AiAllowance } from "@/components/billing/ai-allowance";
+import type { AiKind } from "@/lib/ai/limits";
 
 export type AiAccess = "off" | "on";
 
@@ -14,9 +16,15 @@ export function useAiAccess(enabled: boolean): AiAccess {
   return enabled ? "on" : "off";
 }
 
-/** Shows children when AI is on; otherwise explains that it is not switched on yet. */
-export function AiGate({ access, children }: { access: AiAccess; next?: string; children: ReactNode }) {
-  if (access === "on") return <>{children}</>;
+/** Shows children when AI is on, with today's allowance for `kind` (PAY-4); otherwise explains that it is not switched on yet. */
+export function AiGate({ access, kind, label = "AI turns", children }: { access: AiAccess; next?: string; kind?: AiKind; label?: string; children: ReactNode }) {
+  if (access === "on")
+    return (
+      <>
+        {kind && <AiAllowance kind={kind} label={label} />}
+        {children}
+      </>
+    );
   return (
     <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900">
       <p className="flex items-center gap-2 font-semibold">

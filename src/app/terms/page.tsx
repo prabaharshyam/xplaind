@@ -10,18 +10,34 @@ export const metadata: Metadata = pageMeta({
   path: "/terms",
 });
 
-const UPDATED = "3 November 2026";
+const UPDATED = "8 November 2026";
 
 const A = "font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300";
 
 const TERMS: { title: string; body: ReactNode }[] = [
   {
     title: "Using Xplaind",
-    body: "Xplaind is free to use for your own learning. You may share links to any page. Please do not copy lessons in bulk, resell them, or try to break, overload or scrape the site.",
+    body: "Xplaind's roadmaps, lessons, videos, practice and project guides are free to use for your own learning. You may share links to any page. Please do not copy lessons in bulk, resell them, or try to break, overload or scrape the site.",
   },
   {
     title: "Accounts",
     body: "Accounts are for people aged 18 and over. Keep your sign-in safe; you are responsible for what happens under your account. You can delete it at any time in Settings.",
+  },
+  {
+    title: "Pro passes",
+    body: (
+      <>
+        A Pro pass is a one-time payment for 30 days, 6 months or 12 months of higher daily AI limits. It does not renew by itself. Payments are taken by Cashfree. Passes are for people aged 18 and over, are for your own use, and cannot be shared or resold. The limits are listed on the{" "}
+        <Link href="/pricing" className={A}>
+          pricing page
+        </Link>
+        ; if we have to switch AI off for more than a day, write to us and we add those days to your pass. Refunds follow our{" "}
+        <Link href="/refunds" className={A}>
+          refund policy
+        </Link>
+        .
+      </>
+    ),
   },
   {
     title: "Learning, not a guarantee",
@@ -29,7 +45,7 @@ const TERMS: { title: string; body: ReactNode }[] = [
   },
   {
     title: "AI helpers can be wrong",
-    body: "The AI tutor, X Bot, resume review, interview feedback and book helper write answers with AI. Check anything important before you rely on it. Each has a daily limit so the service stays free for everyone, and we may pause them at any time.",
+    body: "The AI tutor, X Bot, resume review, interview feedback and book helper write answers with AI. Check anything important before you rely on it. Each has a daily limit, which a Pro pass raises, and we may pause them at any time.",
   },
   {
     title: "Your content",

@@ -1,8 +1,8 @@
 // Whether AI features are on, from the host's settings (SC-1: never from the repository).
 import { supabaseServiceKey } from "@/lib/supabase/config";
-import { DEFAULT_MODEL, DEFAULT_MONTHLY_CAP_USD, positiveNumber } from "./limits";
+import { DEFAULT_FAST_MODEL, DEFAULT_MODEL, DEFAULT_MONTHLY_CAP_USD, positiveNumber } from "./limits";
 
-export type AiSettings = { apiKey: string; model: string; monthlyCapUsd: number };
+export type AiSettings = { apiKey: string; model: string; fastModel: string; monthlyCapUsd: number };
 
 /** The AI settings, or null when AI is off: no key, no database for the spend guard, or the kill switch on. */
 export function aiSettings(): AiSettings | null {
@@ -13,6 +13,7 @@ export function aiSettings(): AiSettings | null {
   return {
     apiKey,
     model: process.env.AI_MODEL?.trim() || DEFAULT_MODEL,
+    fastModel: process.env.AI_FAST_MODEL?.trim() || DEFAULT_FAST_MODEL,
     monthlyCapUsd: positiveNumber(process.env.AI_MONTHLY_CAP_USD, DEFAULT_MONTHLY_CAP_USD),
   };
 }

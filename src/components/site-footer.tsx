@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { proOpen } from "@/lib/billing/config";
 import { AccountLink, SignedInLinks } from "./account-link";
 import { Icon } from "./art/icons";
 import { BrandLogo } from "./brand-logo";
@@ -124,6 +125,14 @@ export function SiteFooter() {
             <Link href="/terms" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
               Terms
             </Link>
+            <Link href="/refunds" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
+              Refunds and cancellations
+            </Link>
+            {proOpen() && (
+              <Link href="/pricing" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
+                Pricing
+              </Link>
+            )}
           </p>
           <p>No ads and no sponsored rankings. Book links are affiliate links. Prices show the date we checked them.</p>
         </div>

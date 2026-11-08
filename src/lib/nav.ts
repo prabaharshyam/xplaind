@@ -56,6 +56,7 @@ export const NAV_GROUPS: Group[] = [
       { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English" },
       { href: "/ai/roadmap", label: "AI roadmap generator", note: "A plan for your goal and hours" },
       { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work" },
+      ...(process.env.NEXT_PUBLIC_PRO_OPEN === "1" ? [{ href: "/pricing", label: "Pro and pricing", note: "More AI help each day, from ₹249" }] : []),
     ],
   },
 ];

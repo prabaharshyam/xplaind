@@ -21,6 +21,20 @@ export const DAILY_LIMIT: Record<AiKind, number> = {
 };
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
+/**
+ * PAY-1: the high-volume helpers (the AI tutor and X Bot) run on the fast, low-cost model, so
+ * daily allowances stay affordable; reviews and grading keep the strongest model (AI_MODEL).
+ */
+export const DEFAULT_FAST_MODEL = "claude-haiku-5-5";
+export const FAST_KINDS: readonly AiKind[] = ["tutor", "bot"];
+
+/** The model for one feature: the fast model for FAST_KINDS, otherwise the main model. */
+export function modelFor(kind: AiKind, main: string, fast: string): string {
+  return FAST_KINDS.includes(kind) ? fast : main;
+}
+
+/** Server-side fallback is offered for the larger models only, so the fast model is called without it. */
+export const offersFallback = (model: string): boolean => !model.startsWith("claude-haiku");
 export const DEFAULT_MONTHLY_CAP_USD = 20;
 
 /** US dollars per million tokens. Checked 2026-10-26 on Anthropic's pricing page. */
@@ -59,6 +73,8 @@ export function positiveNumber(value: string | undefined, fallback: number): num
 
 export const LIMIT_MESSAGE = {
   day: "You have used today's AI turns for this feature. They reset at midnight India time, so try again tomorrow.",
+  /** PAY-4: the same, when a Pro pass would give more today. */
+  dayUpgrade: "You have used today's free AI turns for this feature. They reset at midnight India time, or a Pro pass gives you more today.",
   month: "This month's AI allowance is used up. It resets on the 1st. Everything else on Xplaind still works.",
   off: "AI features are switched off for now. Everything else on Xplaind still works.",
 } as const;

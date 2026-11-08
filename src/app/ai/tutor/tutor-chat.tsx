@@ -33,7 +33,7 @@ export function TutorChat({ enabled, paths, titles }: { enabled: boolean; paths:
         <h2 id="tutor-chat" className="sr-only">
           Chat with your AI tutor
         </h2>
-        <AiGate access={access} next="/ai/tutor">
+        <AiGate access={access} next="/ai/tutor" kind="tutor" label="tutor questions">
           <AiChat
             endpoint="/api/ai/tutor"
             extra={{ context }}

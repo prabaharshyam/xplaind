@@ -104,7 +104,9 @@ Review sign-off: AI-drafted content carries `drafted_with_ai: true` and `reviewe
 | `NEXT_PUBLIC_SIGNUPS_OPEN` | `true` opens sign-ups. Unset keeps the whole site running without accounts (SU-4). Check its current state in Vercel |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Lets "Continue with Google" show xplaind.in |
 | `ANTHROPIC_API_KEY` | **Secret.** AI features |
-| `AI_MONTHLY_CAP_USD`, `AI_KILL_SWITCH`, `AI_MODEL` | Spend cap, instant off switch, optional model override |
+| `AI_MONTHLY_CAP_USD`, `AI_KILL_SWITCH`, `AI_MODEL`, `AI_FAST_MODEL` | Spend cap, instant off switch, optional model overrides (main model and the fast model for the tutor and X Bot) |
+| `PAYMENTS_MODE` | `sandbox` or `production` turns Pro passes on (PAY-1). Empty keeps Pro closed |
+| `CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY` | **Secret.** Cashfree Payment Gateway keys; sandbox and live keys differ |
 | `RESEND_API_KEY` | **Secret.** Weekly emails |
 | `CRON_SECRET` | **Secret.** Protects `/api/cron/weekly`; Vercel sends it as a bearer token |
 | `COMMIT_EMAIL_FROM` | Optional sender, default `Xplaind <hello@xplaind.in>` |
@@ -287,9 +289,10 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 1. Turn on the weekly "Commit to 90 days" emails if not done: run `supabase/migrations/20261107000000_commitments.sql`, set `RESEND_API_KEY` and `CRON_SECRET` in Vercel, verify the sending domain in Resend, optionally set `COMMIT_EMAIL_FROM`.
 2. Confirm sign-in is fully set up (Google, GitHub, email) and decide when to open sign-ups (`NEXT_PUBLIC_SIGNUPS_OPEN=true`).
 3. Set `ANTHROPIC_API_KEY`, `AI_MONTHLY_CAP_USD` and a matching spend limit in the Anthropic Console if AI tools should run in production.
-4. Add an Amazon Associates India tag (`AMAZON_IN_TAG`) so book links earn.
-5. Fill in the missing video view counts: `npm run videos:views -- --missing`, commit `content/video-views.yaml`.
-6. Review the remaining AI-drafted content (see 7) and the resources marked UNVERIFIED, then flip `reviewed_by` and `verified_by` to his name. A lawyer should review the privacy policy and terms before a public launch.
+4. Pro passes (PAY-1 to PAY-6): run `supabase/migrations/20261108000000_payments.sql`; create the Cashfree account and finish KYC; in the Cashfree dashboard set the payment webhook to `https://xplaind.in/api/billing/webhook`; set `PAYMENTS_MODE=sandbox` plus the sandbox keys on a Preview deployment to test, then the live keys and `PAYMENTS_MODE=production` to launch. Decide GST with a CA (receipts say "not a tax invoice" until then). Approve the refund policy wording at /refunds. Set `NEXT_PUBLIC_CONTACT_EMAIL` (Cashfree checks for a contact address). Raise `AI_MONTHLY_CAP_USD` as passes sell: Pro calls skip the cap but still count towards it.
+5. Add an Amazon Associates India tag (`AMAZON_IN_TAG`) so book links earn.
+6. Fill in the missing video view counts: `npm run videos:views -- --missing`, commit `content/video-views.yaml`.
+7. Review the remaining AI-drafted content (see 7) and the resources marked UNVERIFIED, then flip `reviewed_by` and `verified_by` to his name. A lawyer should review the privacy policy and terms before a public launch.
 
 **Work Claude can pick up, in the order the owner has signalled interest:**
 - More book-informed lessons, in small batches with his review each time: training stages (SFT, RLHF, DPO), reasoning models, fine-tuning and synthetic data, choosing a model, evaluation basics, benchmarks and their limits, inference speed and cost, building an AI system in layers. Plus about 30 to 40 matching interview questions in `content/questions/interview`.
@@ -297,7 +300,7 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 - Collect more real testimonials as beta testers use the site (SO-1).
 - Review the PRD against what is built; some older rows predate later decisions.
 
-**Do not start without being asked:** upsell or Pro plan pop-ups, XP or badges, more system design content, a system design mock interview, ads or trackers.
+**Do not start without being asked:** more upsell pop-ups beyond the one at a daily AI limit (PAY-4), locking any lesson, roadmap, practice or project content behind Pro, XP or badges, more system design content, a system design mock interview, ads or trackers.
 
 **Open owner decision (older, still unanswered in the repo):** whether the placement test must always ask 12 questions (needs about 10 questions at B1) or may end early when the bank runs out.
 

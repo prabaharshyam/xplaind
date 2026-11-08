@@ -69,7 +69,7 @@ export function InterviewReviewPanel({ access, state, answered }: { access: AiAc
           <p className="text-xs text-zinc-600 dark:text-zinc-400">Each question below now also shows what the AI found right, wrong and missing.</p>
         </div>
       ) : (
-        <AiGate access={access} next="/interview/simulator">
+        <AiGate access={access} next="/interview/simulator" kind="interview" label="mock interview reports">
           <p className="mt-1 leading-7">
             The checks above match words. The AI reads your answers for meaning: what is right, what is wrong or misleading, and how well you understand each concept.
           </p>

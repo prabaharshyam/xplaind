@@ -1,3 +1,4 @@
+import { proOpen } from "@/lib/billing/config";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GuideCover } from "@/components/guide-cover";
@@ -35,7 +36,9 @@ const STEPS: { icon: IconName; title: string; text: string }[] = [
 const FAQ = [
   {
     q: "Is Xplaind free?",
-    a: "Yes. Every roadmap, lesson, practice question, project guide and mock interview on Xplaind costs nothing. The AI tools are free too, with a daily limit so they stay free for everyone. Some of the outside courses we recommend charge for a certificate or the course itself; we always show the price and the date we checked it.",
+    a: `Yes. Every roadmap, lesson, practice question, project guide and mock interview on Xplaind costs nothing. The AI tools are free too, with a daily limit so they stay free for everyone.${
+      proOpen() ? " If you want more AI help each day, an optional Pro pass raises the limits, from ₹249." : ""
+    } Some of the outside courses we recommend charge for a certificate or the course itself; we always show the price and the date we checked it.`,
   },
   {
     q: "How is this different from YouTube and online courses?",
