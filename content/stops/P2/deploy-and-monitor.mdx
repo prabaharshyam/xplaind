@@ -34,6 +34,10 @@ flashcards:
     a: "To a test environment first with evals, then to a small share of users, with the previous version ready to roll back."
   - q: "Why set a daily cost alert from day one?"
     a: "One script or heavy user can multiply costs overnight; the alert lets you act before the bill arrives."
+  - q: "What are TTFT and TPOT?"
+    a: "Time to first token: how long until the reply starts. Time per output token: how fast it continues. Total latency is TTFT plus TPOT times output tokens."
+  - q: "How do metrics, logs and traces differ?"
+    a: "Metrics are totals that show something is wrong. Logs are the events that show what happened. A trace links one request's steps, with time and cost for each."
 exercise:
   title: "Plan the launch"
   setup: "Sana in Mysuru is launching a Kannada and English recipe assistant for her cooking channel's 20,000 followers. Her plan: run it on her laptop with ngrok, keep the API key in app.js so the browser can call the model directly, and check it when followers complain."
@@ -51,8 +55,8 @@ ask:
   - "What should I monitor in an LLM application?"
   - "How do I roll back a bad prompt change?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -93,6 +97,79 @@ This lesson follows Arjun, a final-year student in Coimbatore, deploying a RAG a
 - *Online evals*: a judge scoring a sample of live answers.
 
 Quality can drop without any error: a provider updates a model, documents change, users start asking new kinds of questions.
+
+**Latency has two parts.** For a streamed reply, users feel **time to first token** (TTFT) and then **time per output token** (TPOT). Total time is roughly TTFT + TPOT × output tokens: a 1.2-second TTFT and 30 ms per token for 300 tokens is about 10 seconds in total, though the user starts reading after 1.2. People read at very roughly 100 to 150 ms per token, so faster streaming than that is barely noticed, while a slow first token always is. Report **percentiles** (p50, p95), never just the average: nine replies at 100 ms and one at 3,000 ms average 390 ms, which describes nobody.
+
+**Metrics, logs and traces.** Metrics are totals that tell you something went wrong at 3:05. Logs are the individual events that tell you what happened at 3:05. A **trace** joins every step of one request (retrieval, prompt, model call, tool calls, final answer) with the time and cost of each, so you can see which step failed. Tools such as Langfuse, LangSmith, Arize Phoenix or plain OpenTelemetry collect them.
+
+**Signals from how people behave.** Users rarely press thumbs down, but their behaviour speaks: stopping a reply half-way, pressing regenerate, rephrasing the same question, or long conversations on a task that should take two turns. Track these alongside explicit ratings.
+
+**Three kinds of drift.** Quality can change with no code change of yours:
+
+- **Your own changes**: a prompt edit, a new document set, a different chunk size.
+- **Your users change**: new kinds of questions, a new language, longer inputs after exam results are announced.
+- **The model changes**: a provider updates or retires a model behind the same name. Pin dated model versions where offered, and re-run evals before moving.
+
+**How good is your monitoring?** Three numbers from software operations: **time to detect** a problem, **time to resolve** it, and **change failure rate**, the share of releases that need a fix or rollback. A high change failure rate means your evals should catch more before release.
+
+**A small logging wrapper.** Before buying a tool, a few lines give you most of the value. This one streams a reply, measures TTFT and total time, and writes one JSON line per request:
+
+```python
+import json, time, uuid
+import anthropic
+
+client = anthropic.Anthropic()
+PRICES = {"input": 3 / 1e6, "output": 15 / 1e6}       # USD per token; check current prices
+USD_TO_INR = 84
+VERSION = "rag-v14"                                    # prompt and code version
+
+def answer(user_id, question, system, messages):
+    start, first, rid = time.monotonic(), None, str(uuid.uuid4())
+    record = {"id": rid, "user": user_id, "version": VERSION, "model": "claude-sonnet-5-5"}
+    try:
+        with client.messages.stream(model=record["model"], max_tokens=600,
+                                    system=system, messages=messages) as stream:
+            parts = []
+            for text in stream.text_stream:
+                first = first or time.monotonic()
+                parts.append(text)
+            final = stream.get_final_message()
+        u = final.usage
+        record |= {"ok": True, "stop": final.stop_reason,
+                   "in": u.input_tokens, "out": u.output_tokens,
+                   "cost_inr": round((u.input_tokens * PRICES["input"] + u.output_tokens * PRICES["output"]) * USD_TO_INR, 3)}
+        return "".join(parts), rid
+    except anthropic.APIError as err:
+        record |= {"ok": False, "error": type(err).__name__}
+        raise
+    finally:
+        now = time.monotonic()
+        record |= {"ttft_ms": round(((first or now) - start) * 1000), "total_ms": round((now - start) * 1000)}
+        with open("requests.jsonl", "a") as f:
+            f.write(json.dumps(record) + "\n")
+```
+
+The question and answer text are left out on purpose; see the privacy note below. A daily job reads the file and checks the thresholds:
+
+```python
+import json, statistics
+
+def daily_report(path="requests.jsonl", cost_limit_inr=150, error_limit=0.02):
+    rows = [json.loads(line) for line in open(path)]
+    ok = [r for r in rows if r["ok"]]
+    p95 = statistics.quantiles([r["total_ms"] for r in ok], n=20)[-1]
+    errors = 1 - len(ok) / len(rows)
+    cost = sum(r["cost_inr"] for r in ok)
+    alerts = [msg for bad, msg in [
+        (errors > error_limit, f"error rate {errors:.1%}"),
+        (cost > cost_limit_inr, f"cost ₹{cost:.0f}"),
+        (any(r["stop"] == "max_tokens" for r in ok), "some replies were cut off"),
+    ] if bad]
+    return {"requests": len(rows), "p95_ms": round(p95), "errors": f"{errors:.1%}",
+            "cost_inr": round(cost), "alerts": alerts}
+```
+
+**Privacy in logs.** Full prompts and replies make debugging much easier, but they are personal data. Under India's Digital Personal Data Protection Act, say in your privacy notice what you keep and why, keep it only as long as needed, mask phone numbers, email addresses and ID numbers, and limit who can read the logs. Many teams log metadata for every request and full text for a small, consented, masked sample.
 
 **Release safely.** Deploy changes to a test environment first, run your evals, then release, ideally to a small share of users before everyone. Keep the previous version ready to roll back.
 
@@ -140,11 +217,32 @@ He submits the link and a one-page report of the week's numbers as his project.
 - **No alerts.** Problems are found by users.
 - **Secrets in the code or image.** Use the platform's secrets.
 - **Big-bang releases without a rollback.**
+- **Averages instead of percentiles.** One slow request hides in an average; the p95 shows it.
+- **Logs without the version.** Without the model and prompt version on each line, you cannot tell which release caused a change.
+- **Logging everything forever.** Personal data in logs needs masking, a retention limit and restricted access.
+
+## When simple is enough
+
+- **A personal tool or a one-day demo**: print token usage and errors to the console.
+- **A small internal pilot** with a handful of users: one log file, the daily report above and a weekly read of conversations.
+- **A hosted no-code assistant**, where the platform's own usage page covers cost and errors.
+
+Add tracing tools, online evals and staged releases when real users depend on the app or the pipeline has several steps.
+
+## From demo to production
+
+- **Decide what failures to catch first**, then pick metrics for them: wrong format, missing answers, slow replies, runaway cost.
+- **Break every metric down** by version, model, feature and day, so a change can be traced to its cause.
+- **Pin model versions** and re-run evals before switching.
+- **Write a one-page runbook**: who gets alerts, how to roll back, how to switch to a backup model.
+- **Feed what you find back into evals**: every real failure becomes a test case.
 
 ## Practice
 
 Watch the Full Stack Deep Learning LLMOps lecture linked below.
 
 This lesson's check is a project: deploy one of your LLM apps and share its link, plus a link to a short report or dashboard with a week of latency, cost, error and feedback numbers.
+
+For more depth, chapters 9 and 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) cover latency metrics, monitoring, observability and drift.
 
 **You are done when you can** show your live app, its dashboard, one alert that fired and what you changed because of the data.

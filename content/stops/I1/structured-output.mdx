@@ -34,6 +34,10 @@ flashcards:
     a: "Parses JSON text and checks it against the model, raising a ValidationError that names each failing field."
   - q: "What is a JSON schema?"
     a: "A description of a JSON shape: fields, types, required fields and allowed values, used by providers to constrain output."
+  - q: "What is constrained decoding?"
+    a: "At each step, the model may only pick tokens that keep the output valid under a grammar or schema, so the shape is guaranteed."
+  - q: "Why can valid-JSON output still fail to parse?"
+    a: "If the reply hits the max_tokens limit, the JSON is cut off mid-way. Check the stop reason before parsing."
 exercise:
   title: "Design the schema"
   setup: "A recruitment startup in Noida extracts job postings from WhatsApp messages like: 'Hiring 3 delivery executives in Gurgaon, 18k-22k pm + incentives, bike must, call 98xxxxxx10'. Some posts have no salary, some give a range, some list two roles. The site filters by city, role type (full-time, part-time, contract) and minimum salary."
@@ -51,8 +55,8 @@ ask:
   - "How do I validate AI output with Pydantic?"
   - "Why does my model invent values for missing fields?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -121,7 +125,66 @@ Validation catches wrong types (the price as the text "about 500"), missing fiel
 
 **Retry with the error, not blindly.** When validation fails, send the model its previous reply and the exact validation message, such as "price_inr: input should be a valid integer, got '18k'". Most errors are fixed in one retry. Retrying without the error usually repeats the same mistake.
 
+**Five layers, from light to heavy.** You can push a model towards the right shape at several points:
+
+| Layer | How it works | Reliability | Cost |
+| --- | --- | --- | --- |
+| Prompting | Instructions plus an exact example | Good on strong models, never guaranteed | Free |
+| Post-processing | Code fixes common slips, such as a missing closing bracket or a code fence around the JSON | Works when mistakes are small and repeat | Cheap |
+| Retry | Ask again, with the validation error, until it fits | High, but each retry costs a call | Extra calls and delay |
+| Constrained decoding | The provider or library only lets the model pick tokens that keep the output valid | Shape guaranteed | Slightly slower; only supported formats |
+| Fine-tuning | Train on many examples in your format | High for one fixed format | Data and training effort |
+
+The first three are bandages for a model that is nearly right. Constrained decoding is what providers' structured-output features and open-source libraries such as Outlines, guidance and llama.cpp grammars use: when the model is about to choose its next token, every token that would break the grammar is removed from the choices. Models make the same few mistakes again and again, so post-processing can go a long way: LinkedIn reported that a forgiving parser lifted correctly formatted YAML from 90% to 99.99%.
+
+**Valid JSON is not correct JSON.** Older "JSON mode" features promise only that the reply parses, not that it has your fields. Even schema-constrained output can carry a wrong value. And any JSON can be cut off if the reply hits `max_tokens`, so check the stop reason first.
+
 **Check values, not just types.** A schema can confirm that `price_inr` is a positive integer, but not that ₹18,000 is plausible for a two-year-old phone. Add business checks after validation: prices within a sensible range for the category, cities from a known list, dates not in the future. Values that pass the schema but fail a business check go to review just like invalid ones. This two-layer approach, schema first and business rules second, is the same pattern used for invoice extraction and almost every other structured-output pipeline.
+
+**The whole pipeline in code.** One common way to get a guaranteed shape is to give the model a single tool whose input is your schema and require it to use that tool. This runs with Anthropic's Python SDK; other providers have equivalents:
+
+```python
+import anthropic
+from pydantic import ValidationError
+
+client = anthropic.Anthropic()
+TOOL = {"name": "save_listing", "description": "Save one product listing.",
+        "input_schema": Listing.model_json_schema()}
+CITIES = {"Jaipur", "Ajmer", "Udaipur", "Jodhpur"}
+
+def business_errors(item):
+    errors = []
+    if not 100 <= item.price_inr <= 500_000:
+        errors.append(f"price_inr {item.price_inr} is outside 100 to 500000")
+    if item.city and item.city not in CITIES:
+        errors.append(f"city {item.city!r} is not a city we serve")
+    return errors
+
+def extract(text, max_attempts=2):
+    messages = [{"role": "user", "content": "Extract the listing. Use null for anything not stated.\n\n" + text}]
+    for _ in range(max_attempts):
+        reply = client.messages.create(
+            model="claude-sonnet-5-5", max_tokens=500, messages=messages,   # check the docs for current names
+            tools=[TOOL], tool_choice={"type": "tool", "name": "save_listing"},
+        )
+        if reply.stop_reason == "max_tokens":
+            return None, "cut off: raise max_tokens"
+        call = next(b for b in reply.content if b.type == "tool_use")
+        try:
+            item = Listing.model_validate(call.input)
+            problems = business_errors(item)
+        except ValidationError as err:
+            item, problems = None, [str(err)]
+        if not problems:
+            return item, "ok"
+        # Send the exact error back so the model can fix it.
+        messages += [{"role": "assistant", "content": reply.content},
+                     {"role": "user", "content": [{"type": "tool_result", "tool_use_id": call.id,
+                                                   "is_error": True, "content": "; ".join(problems)}]}]
+    return None, "to moderator: " + "; ".join(problems)
+```
+
+Every outcome is either a valid `Listing` or a clear reason, which is what lets the moderator queue show exactly what went wrong. Count each outcome per day; a rise in one kind of error is often the first sign that inputs have changed.
 
 ## A worked example
 
@@ -155,6 +218,22 @@ Because nothing invalid reaches the database, the price filters and city search 
 - **Retrying forever.** Retry once with the error, then send to a person.
 
 - **Changing the schema without updating tests.** Keep a set of sample inputs with expected outputs and rerun it whenever the schema changes.
+- **Ignoring the stop reason.** A reply cut off at `max_tokens` is broken JSON, however good the model.
+- **Huge, deeply nested schemas.** Every extra field is another chance to be wrong. Ask only for what your code uses, and split very large extractions into steps.
+
+## When you do not need a schema
+
+- **The reply goes straight to a person**, such as a chat answer or an email draft. Plain text is fine.
+- **One label from a short list**, where a strict prompt plus a check that the reply is one of the allowed words is enough.
+- **Quick exploration** in a notebook, before you know which fields matter.
+
+## From demo to production
+
+- **Version the schema** like an API, and keep old versions readable while records written with them exist.
+- **Keep a test set** of real messy inputs with expected outputs, and run it on every schema, prompt or model change.
+- **Log every outcome**: valid first time, fixed by retry, cut off, sent to review. Watch the rates by day.
+- **Give reviewers context**: the original text, the model's attempt and the exact error.
+- **Mind cost**: retries and long schemas add tokens, so track tokens per valid record, not per call.
 
 ## Practice
 
@@ -163,5 +242,8 @@ Read the structured outputs guide linked below.
 1. Define a Pydantic model for an invoice, a job posting or a product listing.
 2. Extract it from ten messy real-world texts using structured output, and validate each.
 3. Add one retry with the validation error and a review list for the rest; report how many passed at each step.
+4. Run the `extract` function above on your ten texts with `max_tokens` set to 30, and see how the cut-off case is handled.
+
+For more depth, chapter 2 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers prompting, post-processing, constrained sampling and fine-tuning for structured outputs.
 
 **You are done when you can** explain why validation is needed even with structured output, and show your pass rates.

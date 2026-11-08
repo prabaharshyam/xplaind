@@ -161,3 +161,19 @@ test("deepened lessons have code and the new sections (LQ-7)", async ({ page }) 
     expect((await wcag(page)).violations).toEqual([]);
   }
 });
+
+test("the second batch of deepened lessons have code and the new sections (LQ-7)", async ({ page }) => {
+  const lessons: [string, string][] = [
+    ["structured-output", "When you do not need a schema"],
+    ["first-llm-api-call", "When you do not need the API yet"],
+    ["deploy-and-monitor", "When simple is enough"],
+  ];
+  for (const [id, extra] of lessons) {
+    await page.goto(`/stop/${id}`);
+    await expect(page.getByRole("heading", { level: 2, name: extra })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "From demo to production" })).toBeVisible();
+    await expect(page.locator("pre").first()).toBeVisible();
+    expect(await overflow(page)).toBe(false);
+    expect((await wcag(page)).violations).toEqual([]);
+  }
+});
