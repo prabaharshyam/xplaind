@@ -34,6 +34,10 @@ flashcards:
     a: "A notes file or to-do list lets progress survive compaction on long tasks."
   - q: "What is the first debugging step for a failing agent step?"
     a: "Log and read the exact context the model received; the cause is usually visible there."
+  - q: "What is context rot?"
+    a: "Models tend to get less accurate as the context grows, even on simple tasks, so more context is not always better. Keep only what helps."
+  - q: "Why keep an agent's notes outside the context?"
+    a: "A notes file or to-do list survives compaction and restarts, so progress and decisions are not lost when old history is summarised away."
 exercise:
   title: "Trim the context"
   setup: "A Mumbai legal-tech agent reviews a company's 400 vendor contracts for renewal dates and penalty clauses. Each step currently sends: a 6,000-token system prompt of if-then rules, 18 tool definitions, every contract read so far in full, and every search result. After about 25 contracts it slows sharply, starts mixing up vendors, and then hits the context limit."
@@ -51,8 +55,8 @@ ask:
   - "How do I stop my agent's context from growing too large?"
   - "What should a compaction summary keep?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -109,6 +113,66 @@ This lesson follows a GST reconciliation agent at a consultancy in Chennai.
 
 **Measuring the effect.** Log token counts by part on every step for a handful of tasks, before and after each change. Watch three numbers: tokens per task, cost per task and task success. A change that cuts tokens but lowers success has removed something the model needed.
 
+**Clear old tool results in code.** Keep the latest few results whole and replace older ones with a one-line note:
+
+```python
+def clear_old_results(messages, keep_last=3, max_chars=400):
+    """Anthropic-style messages: tool results are blocks of type 'tool_result' in user turns."""
+    seen = 0
+    for msg in reversed(messages):
+        if msg["role"] != "user" or not isinstance(msg["content"], list):
+            continue
+        for block in msg["content"]:
+            if block.get("type") != "tool_result":
+                continue
+            seen += 1
+            text = str(block.get("content", ""))
+            if seen > keep_last and len(text) > max_chars:
+                block["content"] = f"[cleared: {len(text)} chars; first line: {text.splitlines()[0][:120]}]"
+    return messages
+```
+
+The model still sees that the call happened and roughly what it returned, but not 5,000 tokens of it. If it needs the details again, it can call the tool again.
+
+**A compaction prompt with fixed sections.** A free-form "summarise this" loses constraints. Ask for the parts the agent needs to continue:
+
+```python
+COMPACT_PROMPT = """Summarise this work so another assistant can continue it with no other context.
+Use exactly these headings:
+TASK: the original request and every constraint, word for word where possible
+DECISIONS: what was decided and why, one line each
+RESULTS SO FAR: totals and key facts, with ids
+OPEN ITEMS: what remains, with ids
+NEXT STEP: the single next action
+Leave out how each step was done."""
+```
+
+Run it when the context passes a threshold, start a fresh conversation with the system prompt plus the summary, and log both token counts.
+
+**Notes outside the context.** For long tasks, give the agent two tiny tools and tell it to update its notes after each milestone:
+
+```python
+from pathlib import Path
+
+NOTES = Path("runs/notes-{run_id}.md")
+
+def read_notes(run_id):
+    p = Path(str(NOTES).format(run_id=run_id))
+    return p.read_text() if p.exists() else "(no notes yet)"
+
+def write_notes(run_id, text):
+    p = Path(str(NOTES).format(run_id=run_id))
+    p.parent.mkdir(exist_ok=True)
+    p.write_text(text[:4000])                    # keep notes short
+    return "saved"
+```
+
+After compaction or a restart, the agent reads its notes first and carries on.
+
+**More context can mean worse answers.** Studies of long inputs find accuracy falls as context grows, even for simple lookups, and facts in the middle of long inputs are used less reliably. Context engineering is about giving the model the smallest set of tokens that lets it do the task well, not filling the window.
+
+**Order matters.** Put stable content (system prompt, tool definitions) first so it can be cached, the working material in the middle, and the current question and latest results last, where models attend best.
+
 ## A worked example
 
 An agent for a Chennai GST consultancy reconciles a client's purchase register against supplier filings: thousands of invoices, mismatches to explain and a final report.
@@ -137,6 +201,25 @@ The agent now handles 3,000 mismatches in one run. Cost per invoice falls by 70%
 - **Compacting away the goal.** A summary must keep the task, constraints and open items, not just recent events.
 - **Twenty tools for a five-tool task.** Each one costs tokens and invites wrong choices.
 - **Never looking at the actual context.** Log and read what the model received on failing steps; the cause is usually visible.
+- **Free-form compaction summaries** that drop constraints. Use fixed headings.
+- **Clearing results without a note**, so the model repeats the same call.
+- **Changing tool order between calls**, which breaks prompt caching.
+
+## When context engineering can wait
+
+- **Short tasks** that finish in a few steps well inside the window.
+- **Single calls** with a fixed prompt and one input.
+- **Low volume**, where the extra tokens cost little and quality is already fine.
+
+It matters most for long agent runs, long chats, large documents and anything where cost or accuracy drops as context grows.
+
+## From demo to production
+
+- **Log tokens by part** on every step: system, tools, history, results.
+- **Set thresholds** for clearing and compaction, and log when each fires.
+- **Test compaction** by comparing results on the same tasks with and without it.
+- **Keep notes per run** in storage, linked to the trace.
+- **Order context for caching**, and check cache hit rates after changes.
 
 ## Practice
 
@@ -145,5 +228,7 @@ Read Anthropic's article on context engineering for agents and the context windo
 1. Take any agent you have built and log the full context sent on its last step. Count tokens by part: system prompt, tools, history, tool results.
 2. Add clearing of old tool results and a compaction step when context passes a threshold you choose.
 3. Run the same five tasks before and after and compare tokens per task and task success.
+
+For more depth, chapter 5 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers context length and where in the context models attend best, and chapter 6 covers memory for agents.
 
 **You are done when you can** show where your agent's tokens go, and one change that cut them without hurting results.

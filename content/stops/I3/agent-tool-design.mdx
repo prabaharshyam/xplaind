@@ -34,6 +34,10 @@ flashcards:
     a: "So risky actions such as refunds and deletions can have approval and separate logging, while reads run freely."
   - q: "What usually causes wrong tool choices?"
     a: "Overlapping tools or unclear descriptions."
+  - q: "How do you find tools an agent does not need?"
+    a: "Remove one tool at a time and rerun your task set. If results do not drop, remove the tool for good."
+  - q: "Why do tool descriptions have a cost?"
+    a: "Every tool's name, description and schema is sent on every call, using tokens and leaving less room for everything else."
 exercise:
   title: "Redesign the tool set"
   setup: "A Chennai hospital's appointment assistant has these tools: get_patient, get_patient_v2, list_doctors, list_slots, list_departments, book (which also cancels if given cancel=true), and run_query(sql). Results are full database rows with 60 fields. When a slot is taken, book returns 'Error 409'. In tests the model picks the wrong tool in a fifth of tasks."
@@ -51,8 +55,8 @@ ask:
   - "How many tools should an agent have?"
   - "Should I give my agent a SQL tool?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -107,6 +111,59 @@ This lesson follows a support agent at a travel company in Gurugram whose tools 
 
 **Testing a tool set.** Run the same 20 tasks after every change to names, descriptions or schemas, and count three numbers: wrong tool chosen, invalid arguments, and calls per task. Small wording changes move these numbers more than people expect.
 
+**A well-shaped tool in code.** Define arguments with Pydantic, generate the schema from it, and shape the result for the model:
+
+```python
+from typing import Literal
+from pydantic import BaseModel, Field, ValidationError
+
+class SearchTrips(BaseModel):
+    """Find a customer's trips. Use when they ask about a booking but give no reference.
+    Returns at most 5 trips, newest first. Does not change or cancel anything."""
+    status: Literal["upcoming", "past", "cancelled"] = "upcoming"
+    city: str | None = Field(default=None, description="Destination city, e.g. Kochi")
+
+TOOL = {"name": "search_trips", "description": SearchTrips.__doc__.strip(),
+        "input_schema": SearchTrips.model_json_schema()}
+
+def search_trips(customer_id, raw_args, db):
+    try:
+        args = SearchTrips.model_validate(raw_args)
+    except ValidationError as err:
+        field = err.errors()[0]["loc"][0]
+        return f"Invalid {field}. Status must be upcoming, past or cancelled."
+    trips = db.find_trips(customer_id, args.status, args.city)       # customer_id from the session
+    if not trips:
+        where = f" to {args.city}" if args.city else ""
+        return f"No {args.status} trips{where}. Ask the customer for the booking reference."
+    lines = [f"{t.ref}: {t.city}, {t.date:%d %b %Y}, {t.status}" for t in trips[:5]]
+    more = f" (showing 5 of {len(trips)}; ask for a city or date to narrow)" if len(trips) > 5 else ""
+    return "\n".join(lines) + more
+```
+
+The description says when to use the tool, what it returns and what it does not do. The result is a few readable lines with the ids the next tool needs, not raw database rows. Every failure path says what to do next.
+
+**Find tools that earn their place.** More tools give more abilities but more chances to choose wrongly, and every description is sent on every call. Two simple experiments:
+
+- **Remove one at a time.** Run your task set without each tool. If success does not drop, the tool can go.
+- **Plot the calls.** Count calls per tool over a week of traces, and note which tool usually follows which. A tool never called may be badly described; two tools almost always called back to back are candidates to merge.
+
+```python
+from collections import Counter
+
+def tool_usage(runs):
+    """runs: list of lists of tool names, in order, one list per run."""
+    calls, pairs = Counter(), Counter()
+    for names in runs:
+        calls.update(names)
+        pairs.update(zip(names, names[1:]))
+    return calls.most_common(), pairs.most_common(5)
+```
+
+**Version tools like APIs.** Renaming a parameter or changing what a tool returns can quietly break agent behaviour. Keep tool definitions in code next to the prompt, review changes together, and rerun the tool-choice tests on every change.
+
+**One server, many agents.** If several apps need the same tools, expose them once through the Model Context Protocol (MCP) so each app does not reimplement them. Design rules stay the same: narrow tools, clear descriptions, helpful errors, permission checks inside the tool.
+
 ## A worked example
 
 A Gurugram travel company's support agent first had 14 tools mirroring the booking API: `get_booking`, `get_booking_v2`, `list_segments`, `get_pnr_status`, `get_fare_rules`, `create_refund_request`, and more. In tests, the model picked the wrong one in 22% of tasks and often called `get_booking` and `get_booking_v2` both, doubling cost.
@@ -137,6 +194,22 @@ Wrong tool choices drop to 3%, average tool calls per task fall from 4.1 to 2.3,
 - **Raw, huge results.** They waste tokens and hide the relevant field. Return what the task needs.
 - **Silent failures.** Returning an empty list for an error leaves the model guessing. Say what went wrong and what to do.
 - **Mixing read and write.** You cannot put approval on just the risky actions if one tool does both.
+- **Raw API responses as tool results.** Hundreds of fields waste tokens and confuse the model.
+- **Changing a tool without rerunning tool tests.** Small wording changes shift which tool the model picks.
+
+## When tool design matters less
+
+- **One or two tools** with clearly different jobs: a plain description and schema are usually enough.
+- **Fixed workflows** where your code, not the model, decides which function runs.
+- **Prototypes** testing whether an idea works at all: polish tools once the task is proven.
+
+## From demo to production
+
+- **Keep a tool-choice test set** (task, expected tool, expected arguments) and run it on every change.
+- **Track per-tool error rates and calls per task** from traces.
+- **Set timeouts and result-size limits** inside every tool.
+- **Check permissions inside the tool**, using the session's user id.
+- **Review the tool list quarterly**: remove unused tools, merge chained ones.
 
 ## Practice
 
@@ -145,5 +218,8 @@ Read Anthropic's article on writing tools for agents and the tool-use overview i
 1. Pick a small domain (a library, a clinic's appointments, a college's fee records) and design three to five tools for an assistant, with full schemas.
 2. Write 15 realistic user tasks and run them against a model with your tools, logging every call and argument.
 3. Change one description or merge two tools to fix the most common mistake, and rerun.
+4. Remove each of your tools in turn, rerun the 15 tasks, and drop any tool whose removal does not hurt.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers tool selection, removing tools to test their value and studying which tools are used together.
 
 **You are done when you can** show your tool set, the before-and-after rate of wrong tool calls, and the error message that helped the model recover.

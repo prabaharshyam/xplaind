@@ -33,6 +33,10 @@ flashcards:
     a: "Mask personal data, restrict access and set retention periods."
   - q: "What can you measure from logs?"
     a: "Success rate, steps per task, cost per task, slowest steps and most common errors."
+  - q: "How do metrics, logs and traces work together when debugging?"
+    a: "A metric shows something went wrong, logs show what happened, and a trace links one run's steps so you can see which step failed."
+  - q: "What should be logged besides inputs and outputs?"
+    a: "Model name and version, sampling settings, prompt version, tool versions, timings, tokens, cost and the final outcome."
 exercise:
   title: "Debug from the log"
   setup: "A Chennai bank's card-services agent told a customer 'your card has been blocked'. The customer's card was used fraudulently an hour later. The log shows: step 1 model calls get_cards(customer 4471); step 2 tool returns two cards ending 1123 and 8890; step 3 model calls block_card('1123'); step 4 tool returns success; step 5 model replies 'your card has been blocked'. The customer had asked to block the card ending 8890."
@@ -50,8 +54,8 @@ ask:
   - "Which tools are good for tracing agents?"
   - "How do I turn agent failures into tests?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -111,6 +115,65 @@ This lesson follows a logistics company in Hyderabad whose shipment agent someti
 
 **Keeping logs useful as volume grows.** Store every run with an error, a refusal or negative feedback, plus a sample of the rest. Keep them long enough to cover your release cycle, so you can compare before and after a change.
 
+**A small tracer you can write yourself.** Before adopting a tool, a few lines give every step a run id, a timing and a structured record:
+
+```python
+import json, time, uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
+
+RUN_ID = ContextVar("run_id", default=None)
+STEP = ContextVar("step", default=0)
+
+def start_run(user, prompt_version, model):
+    rid = uuid.uuid4().hex[:8]
+    RUN_ID.set(rid); STEP.set(0)
+    write({"run": rid, "type": "run_start", "user": user, "prompt": prompt_version, "model": model})
+    return rid
+
+def write(record):
+    record["at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    with open("traces.jsonl", "a") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+@contextmanager
+def step(kind, name, **inputs):
+    STEP.set(STEP.get() + 1)
+    rec = {"run": RUN_ID.get(), "step": STEP.get(), "type": kind, "name": name, "inputs": inputs}
+    t0 = time.monotonic()
+    try:
+        yield rec                           # the caller sets rec["output"], tokens, cost
+    except Exception as err:
+        rec["error"] = f"{type(err).__name__}: {err}"
+        raise
+    finally:
+        rec["ms"] = round((time.monotonic() - t0) * 1000)
+        write(rec)
+
+# Use it around every model and tool call:
+start_run("cust-2231", "v6", "chat-default")
+with step("tool", "get_tracking", id="SHP-77812") as rec:
+    rec["output"] = "Nagpur hub, 3 Nov 21:40"
+```
+
+**Reading a run back.** The same file answers "what happened in run 9c1f?":
+
+```python
+def show(run_id, path="traces.jsonl"):
+    rows = [json.loads(l) for l in open(path) if json.loads(l)["run"] == run_id]
+    for r in sorted(rows, key=lambda r: r.get("step", 0)):
+        what = r.get("error") or str(r.get("output", ""))[:60]
+        print(f'{r.get("step", "-"):>2} {r["type"]:<9} {r.get("name", ""):<14} {r.get("ms", ""):>6} ms  {what}')
+```
+
+When you move to a tracing tool, keep the same fields. Most tools accept OpenTelemetry spans, so the move is mostly changing where records are sent.
+
+**Log everything that changes behaviour.** The model name and version, sampling settings, the prompt template version, the final prompt actually sent, tool versions and retrieval settings. When a bug appears weeks later, the question is always "what was different about this run?", and only logged settings can answer it.
+
+**Watching the data changes your mind.** Teams that read real runs regularly find their idea of a good answer shifts: they spot failure types they had not imagined and requirements nobody wrote down. Feed those into the prompt and into the eval set.
+
+**Agent metrics from traces.** Group by run and compute: success rate, steps per run, cost per run, share of runs with a tool error, and the tools most often followed by a failure. A rising steps-per-run number is often the first sign that a prompt or tool change confused the agent.
+
 ## A worked example
 
 A Hyderabad logistics company's agent answers "Where is my shipment?" by calling tracking, delay-reason and ETA tools. Customers report occasional wrong delivery dates.
@@ -146,11 +209,31 @@ The ETA tool timed out, and the model invented a date instead of saying it did n
 - **Reading logs only after complaints.** Review a sample regularly.
 
 - **No versions on runs.** Without prompt and model versions, you cannot tell whether a change made things better or worse.
+- **Logs that arrive late.** If traces show up 15 minutes after the event, live debugging waits for them.
+- **Logging the prompt template but not the final prompt.** Bugs often hide in what was filled in.
+
+## When simple logging is enough
+
+- **A single model call with no tools**: one log line per request with tokens, time and outcome is enough.
+- **A prototype you run yourself**: printing each step to the console works until other people use it.
+- **Fixed workflows** with two or three steps: ordinary application logs with a shared request id may do.
+
+Move to full traces when runs have many steps, tools fail in ways that matter, or several people need to debug the same system.
+
+## From demo to production
+
+- **Trace every run**, store all failures and negative-feedback runs, and sample the rest.
+- **Mask personal data before writing**, restrict access, and set retention to cover your release cycle.
+- **Make one run easy to open** from a support ticket: put the run id in the user-facing error message.
+- **Alert on trace metrics**: tool error rate, steps per run and cost per run.
+- **Turn interesting runs into test cases** with one click or one command.
 
 ## Practice
 
 Take the DeepLearning.AI course on evaluating agents linked below; its tracing sections are directly relevant.
 
 This lesson's check is a project: push your agent with step-by-step logs, plus a short write-up of one failed run: what the logs showed and what you changed. Submit the repository link.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers metrics, logs and traces, and chapter 6 covers agent failure modes.
 
 **You are done when you can** open any run and say exactly where and why it went wrong.

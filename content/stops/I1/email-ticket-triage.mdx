@@ -33,6 +33,10 @@ flashcards:
     a: "Indian customers write in English, Hindi, Tamil, Hinglish and more, and accuracy can differ a lot between them."
   - q: "Name three triage metrics."
     a: "Classification accuracy on a weekly sample, share routed correctly first time, time to first response, and how much agents edit drafts."
+  - q: "What does a confusion matrix show for triage?"
+    a: "For each true category, how often each predicted category was chosen, so you see which categories get mixed up, not just overall accuracy."
+  - q: "Why watch the share of 'other or unclear' over time?"
+    a: "A rising share often means customers are writing about something new, such as a new plan or an outage type, that needs its own category."
 exercise:
   title: "Triage five messages"
   setup: "A Pune electricity distribution company's inbox uses categories: outage, billing, new connection, meter fault, complaint, other. Key-account customers (hospitals, factories) are always high priority. Five emails arrive: (1) 'Light gayi hai since 2 hours in Kothrud, please fix' (2) 'My bill for October is ₹18,400, usually ₹2,000, please check' (3) From City Hospital: 'Voltage fluctuating in ICU wing' (4) 'I will file a case in consumer court if this is not resolved' (5) 'Do you sell solar panels?'"
@@ -50,8 +54,8 @@ ask:
   - "How accurate does AI triage need to be?"
   - "When can AI send replies automatically?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -106,6 +110,59 @@ These definitions go straight into the prompt. When the team changes a category,
 
 **Why start with drafts.** Even at 92% classification accuracy, a wrong automatic reply to an angry customer does real damage. Drafts let agents fix the 8% while saving time on the 92%. Measure how much agents edit each draft: when most drafts for a category go out unchanged for several weeks, that category is a candidate for automatic sending, starting with simple acknowledgements.
 
+**Rules first, then the model, in code.** Fixed rules run before any model call, so they cannot be talked out of:
+
+```python
+from typing import Literal
+from pydantic import BaseModel
+
+Category = Literal["outage", "slow_speed", "billing", "relocation", "other"]
+
+class Triage(BaseModel):
+    category: Category
+    priority: Literal["p1", "p2", "p3"]
+    account_id: str | None = None
+    summary: str
+    unsure: bool
+
+KEY_ACCOUNTS = {"ACC-1001", "ACC-2040"}
+LEGAL_WORDS = ("legal notice", "consumer court", "police complaint", "lawyer")
+
+def triage(message, sender_account, classify):
+    text = message.lower()
+    if any(w in text for w in LEGAL_WORDS):
+        return {"queue": "senior", "priority": "p1", "reason": "legal words"}
+    if "delete my data" in text or "erase my data" in text:
+        return {"queue": "privacy", "priority": "p2", "reason": "data request"}
+    t: Triage = classify(message)                 # structured output from the model
+    if t.unsure or t.category == "other":
+        return {"queue": "general", "priority": t.priority, "reason": "unsure"}
+    priority = "p1" if sender_account in KEY_ACCOUNTS else t.priority
+    return {"queue": t.category, "priority": priority, "summary": t.summary, "account": t.account_id}
+```
+
+**Measure where it goes wrong.** Overall accuracy hides which categories are confused. Build a confusion table from your labelled set:
+
+```python
+from collections import Counter
+
+def confusion(pairs):
+    """pairs: list of (true_category, predicted_category)."""
+    counts = Counter(pairs)
+    cats = sorted({c for p in pairs for c in p})
+    print("true \\ predicted".ljust(14) + "".join(c[:9].ljust(10) for c in cats))
+    for t in cats:
+        print(t[:13].ljust(14) + "".join(str(counts[(t, p)]).ljust(10) for p in cats))
+    acc = sum(counts[(c, c)] for c in cats) / len(pairs)
+    print(f"accuracy {acc:.0%}")
+```
+
+If "slow_speed" is often predicted as "outage", tighten the two definitions and add examples of each near the boundary. Report accuracy per language too: Hinglish messages often do worse than English ones until you add examples.
+
+**Mistakes have different costs.** Sending an outage to billing delays a fix for a whole area; sending billing to general costs a few minutes. Decide with the team which confusions matter most, and watch those cells of the table rather than the average.
+
+**Watch the inbox change.** Track the share of each category and of "other" per week. A new plan launch, a festival sale or an outage changes the mix. A rising "other" usually means a new category is needed.
+
 ## A worked example
 
 A Chennai broadband provider's support inbox gets about 2,500 emails a day. Previously two staff spent the morning sorting them; urgent outages waited hours.
@@ -130,6 +187,22 @@ The main confusion, slow speed versus outage, was solved by a product decision r
 - **Auto-sending replies too early.** Start with drafts and measure.
 - **Testing only in English.** Test the languages customers actually write in.
 - **No "unsure" path.** Forcing a category on every message hides errors.
+- **Only overall accuracy.** Look at which categories are confused, and per language.
+- **Legal and privacy routing left to the model.** Use fixed rules before the model runs.
+
+## When AI triage is not needed
+
+- **Low volume**: one person reading every message is quick and accurate.
+- **The help desk's own rules already work**, such as routing by form fields the customer fills in.
+- **Categories change weekly**, so there is nothing stable to learn from.
+
+## From demo to production
+
+- **Label a weekly sample** of 50 messages and track accuracy and the confusion table.
+- **Keep category definitions in one file** shared by the prompt, the help desk and the test set.
+- **Log every decision** with the rule or model output that made it.
+- **Alert on spikes** in any category, especially outages.
+- **Review automatic replies** monthly before widening them to more categories.
 
 ## Practice
 
@@ -138,5 +211,6 @@ Read n8n's AI docs and a prompting best-practices guide.
 1. Collect 50 real or realistic messages for a support inbox, in at least two languages, and label them with five categories and a priority.
 2. Build a triage workflow that classifies, extracts one key field and routes to a sheet per category, with an "unsure" path.
 3. Measure accuracy against your labels and add one rule-based escalation.
+4. Build the confusion table for your 50 labelled messages and fix the most confused pair of categories.
 
 **You are done when you can** show your accuracy on the test set, the most common confusion and how you handled it.

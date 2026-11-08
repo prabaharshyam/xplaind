@@ -34,6 +34,10 @@ flashcards:
     a: "For checking, audit and debugging: anyone can see exactly what the extraction was based on."
   - q: "How do human corrections improve the system?"
     a: "They become test cases and show which fields, suppliers or photo types fail most, guiding prompt and process fixes."
+  - q: "What does the last character of a GSTIN do?"
+    a: "It is a check digit calculated from the first 14 characters, so a misread character usually makes the check fail."
+  - q: "Why compare money in paise or with Decimal?"
+    a: "Floating-point sums can be off by a fraction of a paisa, making correct totals look wrong. Integers or Decimal compare exactly."
 exercise:
   title: "Validate this invoice"
   setup: "The AI extracts from a supplier invoice: GSTIN '24ABCDE1234F1Z' (14 characters), invoice number 'TX-4471', date '31/02/2026', two lines of ₹12,000 and ₹8,500, subtotal ₹20,500, CGST ₹1,845, SGST ₹1,845, total ₹24,190. The supplier master lists this supplier with a different GSTIN, and invoice TX-4471 from them was already recorded last week."
@@ -51,8 +55,8 @@ ask:
   - "What validation checks should I add to document extraction?"
   - "How do I handle blurry or handwritten documents?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -108,6 +112,59 @@ This lesson follows a textile trader in Surat processing about 900 supplier invo
 
 **Confidence and review queues.** Reviewers should not have to recheck every field. Show the fields that failed a rule first, then fields the model marked uncertain or left null, and let reviewers approve the rest with one action. Track how long reviews take; if a reviewer needs more than a minute per document, the screen needs work, not the reviewer.
 
+**Validation rules in code.** These checks run after extraction and decide whether a document goes straight through:
+
+```python
+import re
+from datetime import date
+from decimal import Decimal
+
+GSTIN_RE = re.compile(r"^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
+CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+def gstin_ok(g):
+    if not GSTIN_RE.match(g or ""):
+        return False
+    total = 0
+    for i, ch in enumerate(g[:14]):
+        p = CHARS.index(ch) * (1 if i % 2 == 0 else 2)
+        total += p // 36 + p % 36
+    return CHARS[(36 - total % 36) % 36] == g[14]
+
+def check_invoice(inv, supplier_state, our_state, seen_numbers):
+    problems = []
+    if not gstin_ok(inv["supplier_gstin"]):
+        problems.append("supplier GSTIN fails format or check digit")
+    elif inv["supplier_gstin"][:2] != supplier_state:
+        problems.append("GSTIN state code does not match the supplier's state")
+    if inv["invoice_date"] > date.today():
+        problems.append("invoice date is in the future")
+    lines = [Decimal(l["qty"]) * Decimal(l["rate"]) for l in inv["lines"]]
+    if any(abs(c - Decimal(l["amount"])) > Decimal("0.01") for c, l in zip(lines, inv["lines"])):
+        problems.append("a line amount is not quantity × rate")
+    subtotal = sum(lines)
+    if abs(subtotal - Decimal(inv["subtotal"])) > Decimal("0.01"):
+        problems.append("lines do not add up to the subtotal")
+    tax = Decimal(inv.get("cgst") or 0) + Decimal(inv.get("sgst") or 0) + Decimal(inv.get("igst") or 0)
+    if supplier_state == our_state and inv.get("igst"):
+        problems.append("IGST charged on an intra-state supply")
+    if supplier_state != our_state and (inv.get("cgst") or inv.get("sgst")):
+        problems.append("CGST/SGST charged on an inter-state supply")
+    if abs(subtotal + tax - Decimal(inv["total"])) > Decimal("1.00"):      # allow rupee rounding
+        problems.append("subtotal plus tax does not equal the total")
+    if (inv["supplier_gstin"], inv["invoice_number"]) in seen_numbers:
+        problems.append("duplicate invoice number for this supplier")
+    return problems
+```
+
+An empty list means straight through; anything else goes to review with the problems listed first. Money is handled with `Decimal`, never floats.
+
+**Measure field accuracy properly.** Have people key in 50 to 100 documents by hand as a gold set. For each field, count exact matches between extraction and the gold value, after normalising (dates to one format, amounts to two decimals). Report per field, not one overall number: a 98% overall score can hide 80% on invoice dates.
+
+**Straight-through rate against error rate.** Loosening rules sends more documents straight through but lets more errors into the books. Track both. A good target is set with the finance team: for example, at least 70% straight through with fewer than 1 in 500 wrong fields reaching the ledger.
+
+**Feed corrections back.** Every reviewer correction is a labelled example. Add the hard ones to your test set, and when a supplier's layout causes repeated mistakes, add a short supplier-specific hint to the prompt or a dedicated rule.
+
 ## A worked example
 
 A Surat textile trader receives about 900 supplier invoices a month as PDFs and phone photos on WhatsApp and email.
@@ -139,6 +196,23 @@ The biggest single improvement was not technical: asking the 30 most frequent su
 - **Measuring nothing.** Track straight-through rate and sample accuracy.
 
 - **Sending every page to the most expensive model.** Use text extraction for digital PDFs and keep vision models for scans and photos; it cuts cost a lot.
+- **Float arithmetic on money.** Use paise as integers or `Decimal`.
+- **One accuracy number for all fields.** Measure each field separately.
+- **Not checking for duplicates.** A re-sent invoice gets paid twice.
+
+## When extraction automation is not worth it
+
+- **A few documents a month**: typing them in is cheaper than building and checking a pipeline.
+- **Structured data already exists**: e-invoices, bank statement exports or an API from the supplier beat reading PDFs.
+- **Every document needs expert judgement** anyway, such as legal contracts reviewed clause by clause.
+
+## From demo to production
+
+- **Keep a gold set** of hand-keyed documents and measure per-field accuracy on every change.
+- **Store the original, the extraction, the checks and the approver** for audit.
+- **Alert when straight-through rate drops**, which often means a supplier changed their layout.
+- **Mask personal and bank details** in logs and review screens where not needed.
+- **Review rules with finance** every quarter, especially tax rules after GST changes.
 
 ## Practice
 
@@ -147,5 +221,6 @@ Read n8n's AI integration docs and a model provider's structured outputs guide.
 1. Collect ten invoices or receipts (your own bills work) and write a schema for the fields you need.
 2. Build an n8n workflow that extracts the fields with an AI step and validates the arithmetic and one format rule.
 3. Route failures to a review sheet and measure how many of the ten went straight through and how many fields were correct.
+4. Run check_invoice on your ten documents, and plant one wrong digit in a GSTIN and one in a line amount to confirm both are caught.
 
 **You are done when you can** show your straight-through rate, your field accuracy and one error your validation caught.

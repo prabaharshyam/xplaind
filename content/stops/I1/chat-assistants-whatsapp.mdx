@@ -33,6 +33,10 @@ flashcards:
     a: "So a wrong booking or order is caught by the customer before it happens, not after."
   - q: "Name three metrics for a chat assistant."
     a: "Share of conversations resolved without a person, hand-over rate and reasons, customer ratings, and wrong-answer reports."
+  - q: "Why must a WhatsApp webhook check the signature?"
+    a: "Anyone can post to a public URL. The X-Hub-Signature-256 header, an HMAC of the body with your app secret, proves the message came from Meta."
+  - q: "Why deduplicate incoming messages by id?"
+    a: "WhatsApp can deliver the same message more than once, for example after a slow reply. Without a check, the assistant answers or books twice."
 exercise:
   title: "Design the clinic bot's rules"
   setup: "A dental clinic in Nashik wants a WhatsApp assistant. Messages include: 'What are your Sunday timings?', 'Book me with Dr Kulkarni tomorrow evening', 'My tooth is bleeding badly after extraction', 'Is root canal covered by my insurance?', and a promotional message the clinic wants to send to all past patients about teeth whitening."
@@ -50,8 +54,8 @@ ask:
   - "What are WhatsApp template messages?"
   - "When should a chatbot hand over to a human?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -108,6 +112,72 @@ This lesson follows a multi-specialty clinic in Madurai whose reception is flood
 
 **Message costs.** WhatsApp charges businesses according to its pricing model, which depends on the type of message and the country. Check the current pricing page and include it in the client's running-cost estimate, with the date you checked.
 
+**A WhatsApp Cloud API webhook in code.** Meta calls your URL once to verify it, then posts every incoming message. A minimal FastAPI version; check Meta's current docs for the API version and fields:
+
+```python
+import hashlib, hmac, os
+import httpx
+from fastapi import FastAPI, Request, Response, BackgroundTasks, HTTPException
+
+app = FastAPI()
+VERIFY_TOKEN = os.environ["WA_VERIFY_TOKEN"]
+APP_SECRET = os.environ["WA_APP_SECRET"].encode()
+TOKEN, PHONE_ID = os.environ["WA_TOKEN"], os.environ["WA_PHONE_NUMBER_ID"]
+SEEN = set()                                     # use Redis or a table in production
+
+@app.get("/whatsapp")
+def verify(request: Request):
+    q = request.query_params
+    if q.get("hub.mode") == "subscribe" and q.get("hub.verify_token") == VERIFY_TOKEN:
+        return Response(q.get("hub.challenge"))
+    raise HTTPException(status_code=403)
+
+@app.post("/whatsapp")
+async def receive(request: Request, tasks: BackgroundTasks):
+    raw = await request.body()
+    sig = request.headers.get("X-Hub-Signature-256", "")
+    expected = "sha256=" + hmac.new(APP_SECRET, raw, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        raise HTTPException(status_code=401)
+    for entry in (await request.json()).get("entry", []):
+        for change in entry.get("changes", []):
+            for msg in change["value"].get("messages", []):
+                if msg["id"] in SEEN:
+                    continue                     # a repeat delivery
+                SEEN.add(msg["id"])
+                if msg.get("type") == "text":
+                    tasks.add_task(handle, msg["from"], msg["text"]["body"])
+    return {"ok": True}                          # reply fast; work happens in the background
+
+async def handle(wa_id, text):
+    answer = assistant_reply(wa_id, text)        # retrieval, tools and hand-over rules
+    async with httpx.AsyncClient() as http:
+        await http.post(f"https://graph.facebook.com/v21.0/{PHONE_ID}/messages",
+                        headers={"Authorization": f"Bearer {TOKEN}"},
+                        json={"messaging_product": "whatsapp", "to": wa_id,
+                              "type": "text", "text": {"body": answer[:4000]}})
+```
+
+Answer the webhook within a few seconds and do the model call in the background, or WhatsApp may retry and you will see duplicates.
+
+**Hand-over rules in code, not only the prompt.** Decide before calling the model, from the message and the conversation so far:
+
+```python
+HANDOVER_WORDS = {"complaint", "refund", "lawyer", "consumer court", "chargeback"}
+
+def needs_person(text, state):
+    t = text.lower()
+    return (any(w in t for w in HANDOVER_WORDS)
+            or state["failed_answers"] >= 2
+            or state.get("asked_for_person"))
+```
+
+When it returns true, stop the bot for that chat, post the conversation and a summary to the staff inbox, and tell the customer when they will hear back.
+
+**The 24-hour window in code.** Store the time of each customer's last message. Before sending, check whether it was within 24 hours; if not, send an approved template instead of free text, or do not send at all.
+
+**Staying grounded.** Answer from the business's own sheet or documents with retrieval, include the source in logs, and refuse when nothing relevant is found: "I don't have that information; I've asked the team to reply." A wrong price or timing sent on WhatsApp is screenshotted and shared.
+
 ## A worked example
 
 A multi-specialty clinic in Madurai gets hundreds of WhatsApp messages a day: timings, doctor availability, fees, lab report status, appointment booking.
@@ -142,6 +212,24 @@ After a month, 68% of conversations are fully handled, reception's phone calls d
 
 - **Long, email-style replies.** Chat users read on phones; keep answers to a few lines and offer "more details?" instead.
 - **No owner for the knowledge sheet.** Name the person who updates timings, prices and leave days, and when.
+- **Skipping the signature check** on the webhook.
+- **Doing slow work before replying** to the webhook, which causes retries and duplicate answers.
+- **Free-text messages outside the 24-hour window.** They fail or break policy; use approved templates.
+
+## When a chat assistant is not worth it
+
+- **Very few messages a day**: a person with saved quick replies is cheaper and warmer.
+- **Most questions need judgement**, such as custom quotes or complaints.
+- **The business cannot keep its information up to date**: the bot will repeat stale prices and timings.
+- **Customers mostly call**, not message: a voice assistant or better IVR may fit better.
+
+## From demo to production
+
+- **Verify signatures and deduplicate** every incoming message.
+- **Keep the knowledge sheet owned by the business**, with a date on each entry and a weekly check.
+- **Log every conversation** with sources, tools called, hand-overs and ratings, masked.
+- **Watch hand-over reasons weekly** and add the most common answer to the sheet.
+- **Budget messaging costs** from the current WhatsApp pricing, with the date you checked it.
 
 ## Practice
 
@@ -150,5 +238,6 @@ Read the WhatsApp Business Platform overview and n8n's AI docs.
 1. Build a website or test chat assistant for a small business you know, answering from a sheet of 20 FAQs, with a refusal when the answer is not there.
 2. Add one action (for example, booking into a sheet) with a confirmation step, and a hand-over path.
 3. Test with 20 questions in two languages, including three it should hand over.
+4. Send the same message twice to your webhook with the same id and confirm the assistant answers only once.
 
 **You are done when you can** show correct grounded answers, a confirmation before an action and a clean hand-over.

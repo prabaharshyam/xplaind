@@ -33,6 +33,10 @@ flashcards:
     a: "Falling decision times with no edits or rejections, often on screens without enough evidence."
   - q: "What should happen if nobody responds to an approval?"
     a: "Remind, escalate or cancel safely. Never approve by default."
+  - q: "Why write the approval policy as a pure function?"
+    a: "It can be unit-tested with every tool and amount, reviewed by non-engineers as a table, and changed without touching the agent's prompt."
+  - q: "What is rubber-stamping, and how do you spot it?"
+    a: "Approvers clicking approve without reading. Signs: decisions in a second or two, near-zero edits and rejections, and approvals of planted bad requests."
 exercise:
   title: "Write the approval rules"
   setup: "A Hyderabad property-management company's agent handles tenant requests. Its tools: read_lease, read_payment_history, schedule_plumber (can be rescheduled free), waive_late_fee (amount), send_notice_to_tenant, and terminate_lease. Managers are often on site visits and respond within two to six hours."
@@ -50,8 +54,8 @@ ask:
   - "How do I pause and resume an agent?"
   - "How do I design a good approval screen?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -100,6 +104,71 @@ This lesson follows a returns and refunds agent at an e-commerce company in Jaip
 
 **Loosening with evidence.** Approval is not permanent. After a month or two of data, look at each rule's approval, edit and rejection rates. Where people approve almost everything without edits, raise the threshold a little and watch complaints. Where they edit often, improve the agent's examples first.
 
+**The policy as a pure function.** Keep the rules out of the prompt and in code you can test:
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Decision:
+    route: str            # "auto", "approve" or "handover"
+    approver: str | None = None
+    reason: str = ""
+
+def policy(tool, args, context):
+    if tool in {"read_order", "track_shipment"}:
+        return Decision("auto", reason="read-only")
+    if tool == "issue_return_label":
+        return Decision("auto", reason="reversible")
+    if tool == "refund":
+        amount, age = args["amount_inr"], context["order_age_days"]
+        if amount <= 1000 and age <= 30:
+            return Decision("auto", reason="small refund within 30 days")
+        if amount <= 25000:
+            return Decision("approve", "support_lead", "refund above auto limit")
+        return Decision("approve", "finance_manager", "large refund")
+    if context.get("mentions_legal_action"):
+        return Decision("handover", reason="legal risk")
+    return Decision("approve", "support_lead", "unknown tool: default to a person")
+
+assert policy("refund", {"amount_inr": 800}, {"order_age_days": 12}).route == "auto"
+assert policy("refund", {"amount_inr": 40000}, {"order_age_days": 3}).approver == "finance_manager"
+```
+
+Unknown tools default to a person, never to "auto". The agent loop calls `policy` before running any tool; "approve" saves a pending action and pauses the run.
+
+**A durable pending action.** Store each request with everything the approver needs and an idempotency key, so a double click or a retry cannot run it twice:
+
+```python
+import sqlite3, time, uuid
+
+db = sqlite3.connect("approvals.db")
+db.execute("""CREATE TABLE IF NOT EXISTS pending (
+    id TEXT PRIMARY KEY, run_id TEXT, tool TEXT, args TEXT, summary TEXT,
+    approver TEXT, status TEXT DEFAULT 'waiting', decided_by TEXT, note TEXT,
+    created REAL, decided REAL)""")
+
+def request(run_id, tool, args_json, summary, approver):
+    pid = uuid.uuid4().hex
+    db.execute("INSERT INTO pending (id, run_id, tool, args, summary, approver, created) VALUES (?,?,?,?,?,?,?)",
+               (pid, run_id, tool, args_json, summary, approver, time.time()))
+    db.commit()
+    return pid
+
+def decide(pid, user, approve, note="", new_args_json=None):
+    cur = db.execute("""UPDATE pending SET status=?, decided_by=?, note=?, decided=?, args=COALESCE(?, args)
+                        WHERE id=? AND status='waiting'""",
+                     ("approved" if approve else "rejected", user, note, time.time(), new_args_json, pid))
+    db.commit()
+    return cur.rowcount == 1        # False if already decided: the second click does nothing
+```
+
+When `decide` succeeds, your code resumes the paused run with the decision. Check in `decide` that `user` holds the approver role named on the request; the person who asked the agent should not approve their own large refund.
+
+**Timeouts as a scheduled job.** Every few minutes, find waiting requests older than the limit: remind at 30 minutes, escalate to the next approver at 2 hours, and cancel safely with a message to the customer at 24 hours. Cancelling is the default end state, never approving.
+
+**Test the approvers too.** Every so often, put a deliberately wrong request in the queue, such as a refund for an order that was never delivered to that customer. If it gets approved, the cards need better evidence, or the queue is too long for careful review.
+
 ## A worked example
 
 An e-commerce company in Jaipur deploys an agent to handle return and refund requests.
@@ -125,6 +194,25 @@ In the first month, leads approve 91%, edit 6% (mostly partial refunds where onl
 - **Approval screens without evidence.** People cannot judge, so they click approve.
 - **Defaulting to approve on timeout.** Silence is not consent. Escalate or cancel.
 - **Not learning from edits.** Edits and rejections are the best data you have about where the agent is wrong.
+- **Approval rules written only in the prompt.** The model can skip them; code cannot.
+- **Letting the requester approve.** Separate who asks from who approves for money and data changes.
+- **No idempotency on approvals.** A double click runs the action twice.
+
+## When approval steps are not needed
+
+- **Read-only agents** that only look things up and answer.
+- **Fully reversible, low-cost actions** with an undo, such as adding a note or a tag.
+- **Actions already inside tight limits in code**, such as refunds under a small cap per customer per month, where errors cost less than the review.
+
+Approvals have a cost in delay and staff time. Use them where a mistake is expensive, irreversible or visible to people outside the company.
+
+## From demo to production
+
+- **Keep the policy in code with tests**, and review it as a table with the business owners.
+- **Store every request and decision** with who, when, what changed and why.
+- **Alert on queue age** and on spikes in requests per agent.
+- **Review rates monthly** by rule: approval, edit, rejection, time to decide.
+- **Plant test requests** now and then to check approvers are reading.
 
 ## Practice
 
@@ -133,5 +221,8 @@ Read LangGraph's interrupts guide, or the approval section of the agents-in-Lang
 1. List the tools of an agent you have built and rate each read-only, reversible or irreversible. Write the approval rules.
 2. Add a durable pause before one risky tool, and a small script or page that shows the proposed action with its reason and lets you approve, edit or reject.
 3. Log every decision with the time taken, and write the query that would show approval, edit and rejection rates.
+4. Write unit tests for your policy function covering every tool, the threshold amounts on both sides, and an unknown tool.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) discusses the risks of write actions and why trust must come before autonomy.
 
 **You are done when you can** pause your agent, close the program, restart it the next day and resume from the approval.

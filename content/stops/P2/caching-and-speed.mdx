@@ -34,6 +34,10 @@ flashcards:
     a: "Perceived speed: users see the first words within a second or two, though total generation time is the same."
   - q: "Name three other speed levers."
     a: "Shorter outputs, smaller models for simple steps, and running independent calls in parallel."
+  - q: "Why does a long prompt slow the first token?"
+    a: "The model must read the whole input before writing. Prompt caching skips re-reading a stable prefix, so the first token comes sooner."
+  - q: "When does semantic caching go wrong?"
+    a: "When two questions look alike but need different answers, such as 'refund for order 41' and 'refund for order 14', or questions whose answers depend on the user."
 exercise:
   title: "Speed it up"
   setup: "A Noida tax-filing app's assistant answers questions about a user's uploaded Form 16 and the tax rules. Each request currently starts with today's date and the user's name, then the 8,000-token tax rules, then the user's Form 16, then the question. Answers take 7 seconds to appear in full. Many users ask the same general questions, such as 'what is the standard deduction?'"
@@ -51,8 +55,8 @@ ask:
   - "What is semantic caching and is it safe?"
   - "How do I make my LLM app feel faster?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -108,6 +112,86 @@ Caches expire after a period of no use; check your provider's rules on minimum l
 
 **Invalidating response caches.** Include every input that changes the answer in the key: the question, the template or document version, the prompt version and the model. Set an expiry even for stable answers, and clear entries when the source changes. A cached wrong answer is worse than a slow right one, because it repeats until someone notices.
 
+**Where the time goes.** A reply has two phases. First the model reads the whole input (**prefill**); then it writes the reply one token at a time (**decode**). Long inputs slow the first token; long outputs slow everything after it. So a 20,000-token document mostly hurts time to first token, and a 1,000-token answer mostly hurts total time. Caching helps the first; shorter answers and smaller models help the second.
+
+**Prompt caching in code.** With Anthropic's API you mark the end of the stable prefix, and the usage report tells you what was read from cache:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+POLICY = open("returns_policy.md").read()          # long, rarely changes
+
+def ask(question):
+    reply = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=400,  # check the docs for current names
+        system=[
+            {"type": "text", "text": "You answer questions about our returns policy. Be brief."},
+            {"type": "text", "text": POLICY, "cache_control": {"type": "ephemeral"}},   # cache up to here
+        ],
+        messages=[{"role": "user", "content": question}],   # changing part goes last
+    )
+    u = reply.usage
+    print(f"cache write {u.cache_creation_input_tokens}, cache read {u.cache_read_input_tokens}, "
+          f"uncached {u.input_tokens}")
+    return reply
+
+ask("Can I return a kurta after 10 days?")       # first call writes the cache
+ask("Do you refund shipping charges?")           # later calls read it, cheaper and faster
+```
+
+Writing to the cache costs a little more than normal input; reading costs much less. It pays off when the same prefix is used several times within the cache lifetime. Other providers cache automatically or with different settings; the principle, stable content first, is the same.
+
+**A response cache in code.** For repeated identical requests, a dictionary or Redis store keyed by everything that affects the answer:
+
+```python
+import hashlib, json, time
+
+CACHE, TTL_SECONDS = {}, 24 * 3600
+PROMPT_VERSION, MODEL = "faq-v3", "claude-sonnet-5-5"
+
+def cache_key(question, doc_version):
+    norm = " ".join(question.lower().split())
+    raw = json.dumps([norm, doc_version, PROMPT_VERSION, MODEL])
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+def cached_answer(question, doc_version, compute):
+    key = cache_key(question, doc_version)
+    hit = CACHE.get(key)
+    if hit and time.time() - hit["at"] < TTL_SECONDS:
+        return hit["answer"]
+    answer = compute(question)
+    CACHE[key] = {"answer": answer, "at": time.time()}
+    return answer
+```
+
+Only cache answers that are the same for every user. Anything that depends on the user's account, orders or permissions should either skip the cache or include the user's id in the key.
+
+**Running independent calls in parallel.** If a page needs a summary, a sentiment label and three tags from the same review, run the calls at the same time. Total wait becomes the slowest call, not the sum:
+
+```python
+import asyncio
+import anthropic
+
+aclient = anthropic.AsyncAnthropic()
+
+async def one(instruction, text):
+    r = await aclient.messages.create(model="claude-haiku-5-5", max_tokens=150,
+                                      messages=[{"role": "user", "content": f"{instruction}\n\n{text}"}])
+    return "".join(b.text for b in r.content if b.type == "text")
+
+async def analyse(review):
+    return await asyncio.gather(
+        one("Summarise in one line:", review),
+        one("Answer positive, negative or mixed:", review),
+        one("Give three topic tags, comma-separated:", review),
+    )
+```
+
+Respect your rate limits when you fan out; a burst of parallel calls can trigger 429 errors.
+
+**Semantic caching, carefully.** Matching similar questions by embedding can raise hit rates, but every wrong match serves a wrong answer. Use a high similarity threshold, limit it to general questions with no personal or numeric details, and measure how often matches are wrong before trusting it.
+
 ## A worked example
 
 A Chennai legal-tech company's contract assistant answers questions about a 40-page agreement the lawyer uploads, typically 10 questions per contract.
@@ -137,6 +221,23 @@ Cost per contract session falls by about 70%, and lawyers stop complaining that 
 - **No expiry or invalidation for response caches.**
 - **Not streaming in chat interfaces.**
 - **Assuming streaming makes generation faster.** It makes waiting feel shorter.
+- **Caching per-user answers globally.** One user's order details reach another user.
+- **Measuring averages only.** Report p50 and p95 for time to first token and total time.
+
+## When caching does not help
+
+- **Every request is different**, with no long shared prefix and few repeated questions.
+- **Traffic is low and spread out**, so cached prefixes expire before the next request.
+- **Answers must be fresh every time**, such as live prices or stock levels.
+- **The slow part is elsewhere**: retrieval, a slow tool or your own server. Measure before optimising the model call.
+
+## From demo to production
+
+- **Log cache read and write tokens** on every call, and track the hit rate per feature.
+- **Track time to first token and total time** at p50 and p95, by feature and model.
+- **Version cache keys** with the prompt, model and data, and clear caches on release.
+- **Set expiries everywhere**, and an explicit invalidation path when source data changes.
+- **Test the cache with two accounts** to prove no personal answer crosses users.
 
 ## Practice
 
@@ -145,5 +246,8 @@ Read the prompt caching guide linked below, and the streaming guide.
 1. Restructure one of your prompts so stable content comes first, enable caching, and compare token costs over five requests.
 2. Add streaming to a chat interface and measure time to first token before and after.
 3. Add a response cache with an expiry for one repeated question type.
+4. Add the prompt-caching example to one of your apps, send five questions in a row, and record cache read tokens and time to first token for each.
+
+For more depth, chapter 9 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers prefill and decode, prompt caching and parallelism, and chapter 10 covers exact and semantic caches.
 
 **You are done when you can** explain what prompt caching saves, where the unchanging part must go, and why streaming helps even though total time is the same.

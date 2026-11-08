@@ -34,6 +34,10 @@ flashcards:
     a: "Tasks to refuse or escalate, failing tools, missing information that needs a question, and prompt injection attempts."
   - q: "Why read failed transcripts?"
     a: "Scores show that something changed; transcripts show why, which tells you what to fix."
+  - q: "What is the difference between pass@k and pass^k?"
+    a: "pass@k: the task succeeds in at least one of k runs. pass^k: it succeeds in all k runs. Users feel pass^k, since every conversation must work."
+  - q: "How do you trust a model grader?"
+    a: "Grade a sample by hand, compare with the model grader's verdicts, and use it only where agreement is high. Recheck after changing its prompt or model."
 exercise:
   title: "Design the agent eval"
   setup: "A Bhubaneswar telecom's agent handles plan changes: it checks the customer's current plan, offers eligible plans, changes the plan after confirmation, and escalates disputes over bills above ₹2,000. Testing so far: the team tries five chats by hand and reads the final messages."
@@ -51,8 +55,8 @@ ask:
   - "What is pass at k for agents?"
   - "How do I build a sandbox for agent testing?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -111,6 +115,54 @@ This lesson follows a course-refund agent at an edtech company in Hyderabad.
 
 **Turning transcripts into fixes.** When a task fails, read its trajectory and name the failing step: wrong tool, wrong argument, skipped check, or bad final reply. Fix the tool, description or prompt that caused it, rerun that task several times, then rerun the whole suite to make sure nothing else broke.
 
+**An eval harness in code.** Each task carries its seed data, its success check and the trajectory rules it must obey:
+
+```python
+from dataclasses import dataclass, field
+from typing import Callable
+
+@dataclass
+class Task:
+    id: str
+    prompt: str
+    seed: dict                                   # starting state for the sandbox
+    success: Callable[[dict], bool]              # checks the final sandbox state
+    rules: list[Callable[[list], str | None]] = field(default_factory=list)
+
+def no_refund_without_quote(trace):
+    names = [s["name"] for s in trace if s["type"] == "tool"]
+    if "issue_refund" in names and ("get_quote" not in names or names.index("get_quote") > names.index("issue_refund")):
+        return "refund issued before a quote"
+
+def at_most(n):
+    return lambda trace: f"{len(trace)} steps" if len(trace) > n else None
+
+def run_suite(tasks, run_agent, make_sandbox, k=3):
+    results = []
+    for t in tasks:
+        outcomes = []
+        for _ in range(k):
+            box = make_sandbox(t.seed)           # fresh state every run
+            trace = run_agent(t.prompt, box)
+            broken = [msg for rule in t.rules if (msg := rule(trace))]
+            outcomes.append({"ok": t.success(box.state) and not broken, "broken": broken,
+                             "steps": len(trace)})
+        results.append({"task": t.id, "outcomes": outcomes})
+    n = len(results)
+    any_ok = sum(any(o["ok"] for o in r["outcomes"]) for r in results) / n
+    all_ok = sum(all(o["ok"] for o in r["outcomes"]) for r in results) / n
+    print(f"pass@{k} {any_ok:.0%}   pass^{k} {all_ok:.0%}")
+    return results
+```
+
+**Two ways to count success.** **pass@k** counts a task as solved if any of k runs succeeds; it measures what the agent *can* do. **pass^k** counts it only if all k runs succeed; it measures what users can *rely on*. An agent at 90% per run has a pass^3 of about 73% if runs are independent. Agent benchmarks for customer-service tasks report pass^k for exactly this reason.
+
+**Calibrate model graders.** For open-ended checks (was the reply accurate and polite?), grade 50 transcripts by hand, run the model grader on the same 50, and count agreement. If it agrees on fewer than about 85% of cases, improve the rubric or keep that check human. Recheck whenever the grader's prompt or model changes.
+
+**Cost and time per task.** Record tokens, cost and wall-clock time for every run alongside success. A change that adds 3 points of success but doubles cost may not be worth it; a change that keeps success and halves cost usually is.
+
+**Grow the suite from production.** Each week, add two or three tasks drawn from real failures or unusual requests in the traces, with the customer's details replaced by seed data.
+
 ## A worked example
 
 An ed-tech company in Hyderabad has an agent that handles course-refund requests: checks enrolment, applies the refund policy, issues refunds under ₹5,000 after approval, and escalates the rest.
@@ -140,6 +192,25 @@ Each task runs three times. Baseline: 82% success, 71% success on all three runs
 - **Evals against real systems.** Use a resettable sandbox.
 - **Only happy paths.** Include refusals, escalations, tool failures and injection attempts.
 - **Never reading transcripts.** Scores tell you that it failed, not why.
+- **Reporting one run per task.** Run several and report both pass@k and pass^k.
+- **Trusting a model grader nobody checked** against human grades.
+- **A shared sandbox between runs.** Leftover state from one run makes the next pass or fail by accident.
+
+## When a lighter evaluation is enough
+
+- **Read-only agents with a few tools**: a set of questions with expected answers and a step limit check may be enough.
+- **Early prototypes**: ten tasks read by hand tell you more than a harness you keep rewriting.
+- **Fixed workflows**: test each step like ordinary code, plus a few end-to-end cases.
+
+Invest in sandboxes, trajectory rules and repeated runs once agents act on real systems or many users depend on them.
+
+## From demo to production
+
+- **Run the suite on every prompt, tool and model change**, with history kept.
+- **Gate releases on safety violations** (zero allowed) and on pass^k for critical tasks.
+- **Keep seed data and sandboxes in the repository**, so anyone can reproduce a failure.
+- **Recalibrate model graders** each quarter against fresh human grades.
+- **Add production failures** as new tasks every week.
 
 ## Practice
 
@@ -148,5 +219,8 @@ Read Anthropic's article on agent evals and take DeepLearning.AI's short course 
 1. Write 20 tasks for an agent you have built, including at least four that should be refused or escalated and two with a failing tool.
 2. Build a sandbox with seeded data that resets per task, and implement code checks and two trajectory rules.
 3. Run each task three times and report success, all-runs success, average steps and safety violations.
+4. Compute pass@3 and pass^3 for your 20 tasks and list the tasks that pass sometimes but not always.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers agent failure modes and how to measure them, and chapter 3 covers using models as judges.
 
 **You are done when you can** show a table of these metrics before and after one change, and explain one failure from its transcript.

@@ -34,6 +34,10 @@ flashcards:
     a: "Every agent's steps under one request id, so one request shows the whole flow."
   - q: "When should you avoid multiple agents?"
     a: "When the task is sequential and tightly coupled; one agent with good tools usually wins on cost and reliability."
+  - q: "How do you test a reviewer agent?"
+    a: "Feed it drafts with known, planted mistakes and count how many it catches. A reviewer that passes bad drafts gives false confidence."
+  - q: "What causes most multi-agent failures?"
+    a: "Unclear roles and agents not passing on what they know, more often than weak models. Clear briefs and hand-off summaries fix much of it."
 exercise:
   title: "Pick the pattern"
   setup: "A Pune insurance company wants: (A) a customer assistant covering policy questions, claims status and premium payments, where only some staff-approved flows may take payments; (B) a weekly market report built from ten separate competitor websites; (C) customer letters about claim rejections that must follow regulatory wording and include specific reference numbers."
@@ -51,8 +55,8 @@ ask:
   - "How do I stop agents passing a conversation back and forth?"
   - "Is a multi-agent system better than a single agent?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -112,6 +116,56 @@ This lesson follows a customer assistant at a bank in Bengaluru, rebuilt from on
 
 **Writing role descriptions.** Each agent's description should say what it handles, what it must hand off, and what it must never do. Overlaps cause the worst failures: two agents that both think they handle refunds will either argue or both act. Read the descriptions side by side and remove every overlap before testing.
 
+**A hand-off in code.** A hand-off is a tool whose arguments carry the summary the next agent needs. Your code, not the model, moves the conversation and counts transfers:
+
+```python
+AGENTS = {
+    "front_desk": {"tools": ["get_profile", "transfer"], "prompt": "Greet, verify, route."},
+    "cards":      {"tools": ["block_card", "card_status", "transfer"], "prompt": "Card issues only."},
+    "loans":      {"tools": ["loan_balance", "transfer"], "prompt": "Loan questions only."},
+}
+TRANSFER_TOOL = {
+    "name": "transfer",
+    "description": "Hand the customer to another team. Use only for requests outside your role.",
+    "input_schema": {"type": "object", "properties": {
+        "to": {"type": "string", "enum": list(AGENTS)},
+        "summary": {"type": "string", "description": "Who the verified customer is, what they asked, what is done, what remains"},
+    }, "required": ["to", "summary"]},
+}
+MAX_TRANSFERS = 3
+
+def handle_transfer(state, args):
+    state["transfers"] += 1
+    if state["transfers"] > MAX_TRANSFERS or args["to"] == state["agent"]:
+        state["agent"] = "human_queue"
+        return "Passing you to a person who can help with all of this."
+    state["handoff_notes"].append({"from": state["agent"], "to": args["to"], "summary": args["summary"]})
+    state["agent"] = args["to"]
+    return f"Transferred to {args['to']}."
+```
+
+The receiving agent starts with its own prompt and tools, the hand-off summary and the last few turns, not the whole history. Only the `cards` agent holds `block_card`, so a confused front-desk agent cannot block a card.
+
+**Test the reviewer with planted mistakes.** A generator-and-reviewer pair is only as good as the reviewer:
+
+```python
+PLANTED = [
+    ("Interest is 12% a year; the EMI on ₹5 lakh over 5 years is ₹4,000.", "wrong EMI"),   # real EMI is about ₹11,100
+    ("You can withdraw your fixed deposit any time without penalty.", "missing penalty"),
+    ("This loan is guaranteed approved.", "promise of approval"),
+]
+
+def reviewer_recall(review_fn):
+    caught = sum(1 for draft, _ in PLANTED if not review_fn(draft)["pass"])
+    return caught / len(PLANTED)
+```
+
+Keep a set of 20 to 50 planted mistakes from real reviews, and track recall every time you change the reviewer's prompt or model. Also check it does not fail good drafts too often, or writers will learn to ignore it.
+
+**Why systems of agents fail.** Studies of multi-agent failures find most problems are not about weak models: roles overlap or are vague, agents do not pass on what they found, someone stops too early, or nobody checks the final result. Write each role's boundaries, require hand-off summaries, and give one agent (or your code) clear responsibility for checking the finished answer.
+
+**Count the extra cost.** Each agent repeats instructions and tool definitions, and summaries are extra calls. Measure tokens per task against a single-agent baseline and decide whether the gain in quality or speed pays for it.
+
 ## A worked example
 
 A Bengaluru bank's customer assistant handles balances, card blocks, loan queries and complaints.
@@ -143,6 +197,24 @@ A generator-reviewer pair is added only for complaint responses, where a reviewe
 - **Lossy hand-offs.** Pass a summary and recent turns, and test that users never need to repeat key details.
 - **No loop limits.** Agents can hand work back and forth forever.
 - **Traces per agent only.** One request must show every agent's steps together.
+- **Untested reviewers.** Measure how many planted mistakes they catch.
+- **Agents that can transfer to themselves.** Block it in code, and cap transfers.
+
+## When one agent is enough
+
+- **One domain with a handful of tools**: a single agent is cheaper and easier to debug.
+- **Sequential, tightly coupled steps**, where splitting only adds hand-off losses.
+- **Low volume**, where the engineering cost of several agents is not repaid.
+
+Split into several agents when domains need different permissions, work can run in parallel, or one context cannot hold everything.
+
+## From demo to production
+
+- **Trace every agent under one request id**, with hand-off summaries visible.
+- **Track transfer rates and loops** per agent pair, and review the worst conversations weekly.
+- **Keep permissions per agent**, enforced in tool code.
+- **Measure reviewer recall** on planted mistakes every release.
+- **Hold a single-agent baseline** and compare cost and quality on every major change.
 
 ## Practice
 
@@ -151,5 +223,7 @@ Read the LangChain multi-agent guide and Anthropic's multi-agent research write-
 1. Build a front-desk agent that hands off to two specialists with different tools.
 2. Add a hand-off limit and a transfer to a human when it is reached.
 3. Compare it with a single agent holding all the tools on 20 test conversations: wrong-tool rate, tokens and user repetition.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers multi-agent reflection, with one agent acting and another evaluating.
 
 **You are done when you can** say which pattern you chose, why, and what it cost compared with one agent.

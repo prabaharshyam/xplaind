@@ -34,6 +34,10 @@ flashcards:
     a: "Removing the person from every store: source documents, chunks, embeddings, logs, traces and, on schedule, backups."
   - q: "Why do model vendors' terms matter for compliance?"
     a: "Their retention, training use and data location become part of your system's compliance."
+  - q: "Why keep the data flow map in code or config?"
+    a: "A check can then flag any flow missing a purpose, retention period or vendor, and the map stays in step with the system as it changes."
+  - q: "What must an erasure request reach?"
+    a: "Every store holding the person's data: the database, the search index, caches, logs and, on their normal cycle, backups, plus vendors who process it."
 exercise:
   title: "Map the obligations"
   setup: "A Hyderabad edtech builds an AI tutor for students in India and a pilot with a school group in Germany. The tutor stores chat histories, sends questions to an external model provider, keeps traces for 90 days, and some Indian users are 15 to 17 years old. A large US school district asks for the company's SOC 2 report before buying."
@@ -51,8 +55,8 @@ ask:
   - "Do I need SOC 2 to sell to enterprises?"
   - "How do I handle data deletion requests in a RAG system?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -116,6 +120,59 @@ This lesson follows a health-tech company in Pune building an AI scribe for clin
 
 **Talking to the privacy officer.** Bring the data flow map, not opinions. For each flow, say what data moves, why, where it is stored, for how long, which vendor sees it and how it is deleted. Privacy officers ask the same few questions every time: purpose, lawful ground, minimisation, retention, security, rights and breach handling. Having written answers turns a month of email into a two-hour meeting.
 
+**A data flow map you can check.** Write each flow as data, and let a script find the gaps a privacy officer would find:
+
+```python
+FLOWS = [
+    {"name": "chat messages to model", "data": ["message text"], "purpose": "answer the question",
+     "lawful_ground": "consent", "store": "none at vendor (zero retention)", "vendor": "model provider",
+     "retention_days": 0, "region": "check vendor terms"},
+    {"name": "conversation logs", "data": ["masked message text", "user id"], "purpose": "quality review",
+     "lawful_ground": "consent", "store": "Postgres, Mumbai", "vendor": None, "retention_days": 30},
+    {"name": "search index", "data": ["policy documents"], "purpose": "retrieval",
+     "lawful_ground": "not personal data", "store": "vector DB, Mumbai", "vendor": "hosted DB",
+     "retention_days": None},
+]
+REQUIRED = ["purpose", "lawful_ground", "store", "retention_days"]
+
+def gaps(flows):
+    out = []
+    for f in flows:
+        out += [f"{f['name']}: missing {k}" for k in REQUIRED if k not in f]
+        if f.get("lawful_ground") != "not personal data" and f.get("retention_days") is None:
+            out.append(f"{f['name']}: personal data with no retention period")
+        if f.get("vendor") and "region" not in f and "Mumbai" not in str(f.get("store")):
+            out.append(f"{f['name']}: vendor region not recorded")
+    return out
+
+print(gaps(FLOWS) or "no gaps")
+```
+
+Keep the map in the repository, review it with every new feature, and give the privacy officer the printed version.
+
+**Retention and erasure in code.** Two jobs every system needs:
+
+```python
+def nightly_retention(db):
+    db.execute("DELETE FROM conversation_logs WHERE created_at < now() - interval '30 days'")
+    db.execute("DELETE FROM uploads WHERE created_at < now() - interval '90 days'")
+
+def erase_user(user_id, db, index, cache):
+    db.execute("DELETE FROM conversation_logs WHERE user_id = %s", (user_id,))
+    db.execute("DELETE FROM memories WHERE user_id = %s", (user_id,))
+    index.delete(filter={"owner": user_id})          # documents the user uploaded
+    cache.delete_pattern(f"user:{user_id}:*")
+    db.execute("INSERT INTO erasure_log (user_id_hash, at) VALUES (sha256(%s::bytea), now())", (user_id,))
+```
+
+The erasure log records that a request was carried out without keeping the identity in clear. Backups expire on their own cycle; say so in the privacy notice.
+
+**The DPDP Rules.** The Act's Rules were notified in 2025, with duties coming into force in phases. They add detail on notices, consent managers, security safeguards, breach reporting timelines and children's data. Check the current dates and text before a launch.
+
+**If you serve the EU.** Besides GDPR, the EU AI Act sorts AI systems by risk. Most chat and content tools carry transparency duties (tell people they are dealing with AI, label generated content), while high-risk uses such as hiring, credit scoring or education assessment carry heavy duties: risk management, data governance, human oversight, logging and documentation. Its obligations apply in phases; check which apply on your launch date.
+
+**Vendor terms change.** Model providers update data-use and retention terms. Record the version and date of the terms you reviewed in the data flow map, and recheck them at least once a year and on any change notice.
+
 ## A worked example
 
 A Pune health-tech company builds an AI scribe that drafts clinical notes from doctor-patient conversations, for clinics in India and one US hospital network.
@@ -135,6 +192,25 @@ For buyers generally: the company starts a SOC 2 Type II audit, and keeps the mo
 - **Collecting everything in case it is useful later.** Purpose limitation and minimisation say no.
 - **No erasure path through derived data.** Deleting the source document but not its chunks, embeddings and logs is not erasure.
 - **Engineers giving legal opinions.** Describe the system precisely; let lawyers interpret the law.
+- **Erasure that misses the index, logs or caches.** Map every store.
+- **A data flow map nobody updates.** Keep it in the repository and check it.
+- **Assuming the vendor's terms never change.** Record the date you checked.
+
+## When compliance work is lighter
+
+- **No personal data at all**, such as a bot over public government circulars: focus on accuracy and security.
+- **A prototype with synthetic data** that never touches real users.
+- **Internal tools on non-personal company data**, where contracts and security policy still apply but privacy law mostly does not.
+
+Treat anything with real users' names, contact details, messages, health, money or children's data as needing the full process.
+
+## From demo to production
+
+- **Keep the data flow map in code** and run the gap check in CI.
+- **Run retention jobs nightly** and alert if they fail.
+- **Test erasure end to end** with a test user each quarter.
+- **Keep a breach response plan** with names, timelines and templates.
+- **Recheck vendor terms** yearly and on every change notice.
 
 ## Practice
 
@@ -143,5 +219,6 @@ Read PRS's summary of the DPDP Bill, GDPR.eu's overview and the SOC 2 section of
 1. Draw a data flow map for one AI system you have built: every place personal data goes, why, for how long and which vendor sees it.
 2. For each flow, write the DPDP question a privacy officer would ask (purpose, consent, retention, security, erasure) and your answer.
 3. Read one model provider's data usage and retention terms, and summarise them in five lines for a client.
+4. Write the FLOWS list for your own system and fix every gap the check reports.
 
 **You are done when you can** walk a privacy officer through your data flow map and show how an erasure request removes a person from every store.

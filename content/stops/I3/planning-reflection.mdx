@@ -34,6 +34,10 @@ flashcards:
     a: "Otherwise the agent can loop forever on a requirement it cannot meet. One or two rounds is typical."
   - q: "When is planning a waste?"
     a: "For trivial tasks such as a two-step lookup, where a plan only adds a call."
+  - q: "Why check a plan in code before running it?"
+    a: "Catching an unknown tool, a missing step or a blown budget in the plan is far cheaper than undoing actions halfway through."
+  - q: "What does Reflexion add to reflection?"
+    a: "After a failed attempt, the agent writes down why it failed, and that note is given to the next attempt, so it learns within the task."
 exercise:
   title: "Choose the pattern"
   setup: "A Chandigarh consultancy wants three agents: (A) answer 'what is the GST rate on X?' from a rate table; (B) prepare a 10-section market-entry report on a city, using web search, government data and internal notes; (C) write SQL for analysts' questions and return results. Report drafts in tests often skip sections, and SQL sometimes fails to run or returns totals that do not match a known dashboard."
@@ -51,8 +55,8 @@ ask:
   - "When should an agent make a plan first?"
   - "How does self-reflection improve agent results?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -103,6 +107,64 @@ This lesson follows a venture fund in Bengaluru building an agent that writes on
 
 **Making reflection useful.** A vague critique prompt such as "improve this" produces vague changes. Give the critic a specific checklist and ask for a pass or fail with a reason for each item. Send only the failed items back for revision. This keeps revisions focused and makes it easy to measure which checks fail most, which tells you what to improve in the main prompt.
 
+**Plan-then-execute with a checked plan.** Ask for the plan as structured data, check it in code, and only then run it:
+
+```python
+from pydantic import BaseModel, Field
+
+TOOLS = {"web_search", "fetch_page", "compare_table"}
+MAX_STEPS, MAX_SEARCHES = 8, 5
+
+class Step(BaseModel):
+    tool: str
+    purpose: str
+    inputs: dict
+
+class Plan(BaseModel):
+    goal: str
+    steps: list[Step] = Field(min_length=1)
+
+def check_plan(plan: Plan):
+    problems = []
+    if len(plan.steps) > MAX_STEPS:
+        problems.append(f"{len(plan.steps)} steps; the limit is {MAX_STEPS}")
+    unknown = {s.tool for s in plan.steps} - TOOLS
+    if unknown:
+        problems.append(f"unknown tools: {sorted(unknown)}")
+    if sum(s.tool == "web_search" for s in plan.steps) > MAX_SEARCHES:
+        problems.append("too many searches")
+    if plan.steps[-1].tool != "compare_table":
+        problems.append("the plan must end by building the comparison table")
+    return problems
+```
+
+Get the plan from the model as structured output (the structured-output lesson shows how), run `check_plan`, and send any problems back for one revision. If it still fails, stop and ask a person. Showing the checked plan to the user before running also builds trust: "I will search three makers, read their spec pages and build a table. Go ahead?"
+
+**Planning in natural language or in calls.** A plan can name exact function calls (`web_search(query="Ather 450X range")`) or describe steps in words ("find each maker's real-world range"), which a second step translates into calls. Exact calls are easier to check; word plans survive changes to tool names and are easier for people to read. Many teams use words for the plan and exact calls for execution.
+
+**Reflection with a checklist.** Ask the critic for a verdict per item, not a rewrite:
+
+```python
+CHECKLIST = [
+    "Every maker has price, range and service network filled in",
+    "Every number has a source link",
+    "Prices are in rupees and say ex-showroom or on-road",
+    "No maker is missing from the final table",
+]
+
+CRITIC_PROMPT = (
+    "Check the draft against each item. Reply as JSON: "
+    '[{"item": ..., "pass": true or false, "reason": ...}]. Do not rewrite the draft.\n\n'
+    "Checklist:\n" + "\n".join(f"- {c}" for c in CHECKLIST)
+)
+```
+
+Send only the failed items back to the writer, allow one or two revision rounds, and log which items fail most. Where a rule can be checked in code (every row has three numbers, every number has a link), check it in code and skip the model critic for that item.
+
+**Learning from a failed attempt.** In the Reflexion approach, when an attempt fails a check, the agent writes a short note on why ("I used launch prices; the brief asked for current on-road prices") and the next attempt starts with that note. It is cheap to add and helps most on tasks with a clear pass or fail, such as code that must pass tests.
+
+**The cost of thinking aloud.** Thoughts, plans and critiques are all tokens. Examples of the format in the prompt add more. Measure tokens and time per task with and without each addition, and keep only what improves results enough to pay for itself.
+
 ## A worked example
 
 A Bengaluru venture fund wants an agent that prepares a one-page brief on a startup from public sources: funding history, founders, product, competitors and red flags.
@@ -137,6 +199,23 @@ Each step runs a short ReAct loop with a cap of five tool calls. Every section i
 - **Endless self-critique.** Cap reflection rounds, and stop when the critique repeats itself.
 - **Model critique where code would do.** If a rule can check it (sums, schemas, tests), use the rule.
 - **Hiding the plan.** Showing users the plan builds trust and lets them correct the course early.
+- **Plans nobody checks.** An unchecked plan can name tools that do not exist or blow the budget.
+- **Critics that rewrite.** Ask for pass or fail per item; rewriting hides what was wrong.
+
+## When to skip planning and reflection
+
+- **Short tasks with one or two tool calls**: plain ReAct is enough.
+- **Tight latency budgets**: every planning and critique call adds seconds.
+- **Outputs a person always reviews** before use, where a critic adds little.
+- **Tasks with no checkable requirements**, where a critic has nothing firm to judge.
+
+## From demo to production
+
+- **Store every plan, re-plan and critique** in the run trace.
+- **Track re-plan rate and critique failure rate by item**; both point to prompt fixes.
+- **Cap revision rounds** in code, and hand over when the cap is hit.
+- **Show plans to users for long or costly tasks**, and let them edit or cancel.
+- **Measure cost per task** with and without each pattern before keeping it.
 
 ## Practice
 
@@ -145,5 +224,8 @@ Read the planning and reflection sections of Lilian Weng's post and the Hugging 
 1. Build a small research agent that answers "Compare three Indian EV two-wheeler makers on price, range and service network" with plain ReAct. Log the steps.
 2. Add a planning call and per-step limits. Compare coverage, steps and cost over five runs.
 3. Add one deterministic check and one model critique before the final answer, with at most one revision.
+4. Add check_plan to your research agent, log how often the first plan fails it, and list the most common problem.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers plan generation, ReAct, Reflexion and reflection costs.
 
 **You are done when you can** show the three versions' step counts, costs and quality side by side and justify which you would ship.

@@ -34,6 +34,10 @@ flashcards:
     a: "Summarise or trim old turns, retrieve only relevant passages, set max_tokens, and truncate oversized inputs with a warning."
   - q: "What does prompt caching do?"
     a: "Makes a repeated, identical beginning of a prompt, such as a long system prompt, much cheaper and faster on later calls."
+  - q: "Why can a model miss facts in a long context?"
+    a: "Models use information at the start and end of a long input better than the middle, so a detail buried in the middle can be overlooked."
+  - q: "What is a context budget?"
+    a: "A plan for how many tokens each part of the input may use: system prompt, history, retrieved text, tool results and room for the reply."
 exercise:
   title: "Estimate the conversation cost"
   setup: "A chatbot has a 1,000-token system prompt. Each user question is about 100 tokens and each answer about 200 tokens. History is resent every turn. Assume ₹0.0003 per input token and ₹0.0015 per output token."
@@ -51,8 +55,8 @@ ask:
   - "What happens when a conversation exceeds the context window?"
   - "How does prompt caching save money?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -117,6 +121,60 @@ By turn 10, most of what you pay for is history. Summarising older turns into a 
 
 **Count before you send.** For anything a user can paste, such as a document or a long message, count tokens before calling the model. If it is too long, either retrieve only the relevant parts, summarise it first, or tell the user plainly that it is too long. Failing with a clear message is far better than a silent cut-off or a surprise bill.
 
+**Count tokens in code.** Count before sending anything a user can make large. With Anthropic's SDK, the count uses the same tokenizer the model will use:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+MODEL = "claude-sonnet-5-5"                  # check the docs for current names
+
+def count(system, messages):
+    return client.messages.count_tokens(model=MODEL, system=system, messages=messages).input_tokens
+
+english = [{"role": "user", "content": "Please send the electricity bill for October."}]
+hindi = [{"role": "user", "content": "कृपया अक्टूबर का बिजली का बिल भेजें।"}]
+print(count("Be brief.", english), count("Be brief.", hindi))   # the Hindi line usually costs more
+```
+
+For open models, the model's own tokenizer from Hugging Face (`AutoTokenizer.from_pretrained(...)`) gives exact counts offline. Rough rules such as "4 characters per token" hold only for English.
+
+**A context budget.** Decide in advance how the window is shared, so one part cannot crowd out the others:
+
+| Part | Budget (example, 16,000-token target) | When over budget |
+| --- | --- | --- |
+| System prompt and tools | 2,000 | Shorten; move rarely used rules into retrieval |
+| Conversation history | 4,000 | Summarise older turns |
+| Retrieved passages | 6,000 | Fewer, better chunks |
+| Tool results | 2,000 | Return only needed fields |
+| Reply (`max_tokens`) | 2,000 | Ask for shorter answers |
+
+The target is usually far below the model's maximum, because cost and delay grow with every token, and quality often drops before the limit.
+
+**Keeping history within budget.** Keep the latest turns word for word and fold older ones into a running summary:
+
+```python
+def fit_history(history, summary, budget_tokens, count_fn, keep_last=6):
+    """history: list of {"role", "content"} turns, oldest first."""
+    recent = history[-keep_last:]
+    older = history[:-keep_last]
+    if older:
+        summary = summarise(summary, older)       # one cheap model call, done rarely
+    prefix = [{"role": "user", "content": f"Summary of the earlier conversation: {summary}"},
+              {"role": "assistant", "content": "Understood."}] if summary else []
+    msgs = prefix + recent
+    while count_fn(msgs) > budget_tokens and len(recent) > 2:
+        recent = recent[2:]                       # drop the oldest user-assistant pair
+        msgs = prefix + recent
+    return msgs, summary
+```
+
+`summarise` is your own function: a short model call that merges the old summary with the turns being folded in. Summarise only when the history crosses the budget, not on every turn.
+
+**Long context is not free attention.** Models are not equally good at using every part of a long input. Tests that hide one fact in a long document (often called "needle in a haystack") show facts in the middle are found less reliably than those near the start or end. Put the most important instructions at the start, the question at the end, and give retrieved passages in order of relevance.
+
+**Maximum and effective context.** A model may accept 200,000 tokens or more, but how well it uses them varies by task. Test your own case: hide a known fact at different positions in a realistic document and check whether answers stay correct.
+
 ## A worked example
 
 A Chennai e-learning company builds a doubt-solving chatbot for Class 10 students in Tamil and English.
@@ -141,6 +199,24 @@ At their model's prices, a ten-turn chat cost about four times as much as a two-
 - **Stuffing whole documents in.** Retrieve what is relevant.
 
 - **Assuming a bigger context window solves everything.** Very long inputs cost more, are slower, and details in the middle are often missed. Send what is relevant, not everything you have.
+- **Estimating Indian-language tokens with English rules.** Count with the real tokenizer.
+- **Filling the window because it is there.** Every extra token adds cost and delay and can reduce accuracy.
+
+## When you need not manage context closely
+
+- **Short, single-turn calls**, such as classifying a message: count once while designing and move on.
+- **Low volume internal tools**, where a bigger bill is cheaper than the engineering time.
+- **Batch jobs over short records**, where every input is similar in size.
+
+Manage context closely for long chats, pasted documents, agents with many tool results and anything in Indian languages at scale.
+
+## From demo to production
+
+- **Log input and output tokens per call**, split by part where you can: system, history, retrieved, tools.
+- **Enforce budgets in code**, not just in the prompt.
+- **Cap user input length** with a clear message, and count before sending.
+- **Alert on token growth**: a rising average input size often means history or retrieval is not being trimmed.
+- **Re-check budgets when you change models**, because tokenizers and prices differ.
 
 ## Practice
 
@@ -149,5 +225,8 @@ Read the context windows guide linked below, and the token-counting page.
 1. Count tokens for the same 100-word paragraph in English and in an Indian language you know.
 2. Estimate the cost of a 10-turn conversation for your app with current prices, then with history summarised after five turns.
 3. Add a `max_tokens` cap and a warning for oversized inputs to one of your apps.
+4. Hide one fact at the start, middle and end of a 30-page document, ask about it each time, and note where the model misses it.
+
+For more depth, chapter 2 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers tokens and tokenization, and chapter 5 covers context length and how well models use long inputs.
 
 **You are done when you can** estimate a request's cost from token counts and list everything that counts towards the context window.
