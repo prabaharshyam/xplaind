@@ -34,6 +34,10 @@ flashcards:
     a: "They appear on every page and pollute every chunk and its embedding."
   - q: "What should you track per parsed document?"
     a: "Pages, characters per page, tables found and OCR confidence, plus a sample compared with the original."
+  - q: "How can code tell a scanned page from a digital one?"
+    a: "Count extractable characters per page. A page with almost no text but an image covering it is very likely a scan that needs OCR."
+  - q: "Why keep OCR confidence scores?"
+    a: "Low-confidence words and pages can be flagged for review or reprocessing, instead of silently feeding garbled text into the index."
 exercise:
   title: "Diagnose the garbled answers"
   setup: "A Bengaluru property firm's RAG assistant answers questions about 300 lease agreements. Answers about rent escalation are often wrong though retrieval finds the right pages. Inspection shows: rent schedules are tables that come out as one jumbled line; older leases are scanned with Kannada and English text; every page has the firm's letterhead and 'Confidential' footer; and the clause numbering is lost."
@@ -51,8 +55,8 @@ ask:
   - "How do I handle tables in PDFs?"
   - "How do I OCR documents in Indian languages?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -104,6 +108,64 @@ This lesson follows an insurance company in Kochi whose assistant found the righ
 
 A practical pattern: run cheap text extraction first, then send only pages that fail checks, such as low character counts or detected tables, through layout-aware parsing or OCR. That keeps cost down on large document sets.
 
+**Route pages from cheap to expensive.** Try plain extraction, and send only weak pages to OCR:
+
+```python
+import fitz                                       # PyMuPDF
+import pytesseract
+from PIL import Image
+import io
+
+def page_text(page, min_chars=200, langs="eng+hin+tam"):
+    text = page.get_text("text")
+    if len(text.strip()) >= min_chars:
+        return text, "digital", None
+    pix = page.get_pixmap(dpi=300)
+    img = Image.open(io.BytesIO(pix.tobytes("png")))
+    data = pytesseract.image_to_data(img, lang=langs, output_type=pytesseract.Output.DICT)
+    words = [(w, int(c)) for w, c in zip(data["text"], data["conf"]) if w.strip() and int(c) >= 0]
+    conf = sum(c for _, c in words) / len(words) if words else 0
+    return " ".join(w for w, _ in words), "ocr", conf
+
+def parse_pdf(path):
+    pages = []
+    for i, page in enumerate(fitz.open(path), start=1):
+        text, how, conf = page_text(page)
+        pages.append({"page": i, "text": text, "method": how, "ocr_conf": conf,
+                      "needs_review": how == "ocr" and conf < 70})
+    return pages
+```
+
+Tesseract needs its language packs installed for Hindi, Tamil and others. Pages with low average confidence go to a review list, or to a stronger OCR service or vision model.
+
+**Tables as row-wise text.** `pdfplumber` finds tables in digital PDFs; write each row with its headers so it survives chunking:
+
+```python
+import pdfplumber
+
+def tables_as_text(path):
+    out = []
+    with pdfplumber.open(path) as pdf:
+        for n, page in enumerate(pdf.pages, start=1):
+            for table in page.extract_tables():
+                header, *rows = table
+                for row in rows:
+                    cells = [f"{h}: {v}" for h, v in zip(header, row) if h and v]
+                    if cells:
+                        out.append({"page": n, "text": "; ".join(cells)})
+    return out
+
+# "Plan: Gold; Premium: ₹12,450; Sum insured: ₹5,00,000"
+```
+
+Each row is now a self-contained sentence a retriever can match and a model can quote.
+
+**Layout-aware tools for the hard pages.** Open-source parsers such as Docling and Unstructured, and cloud document services, detect columns, headings and tables together. They are slower and sometimes paid, so keep them for pages that fail cheap checks.
+
+**Vision models as parsers.** For messy scans, forms and tables with merged cells, sending the page image to a vision model with a request for Markdown output often beats classic OCR. Check numbers carefully: vision models occasionally misread digits, so compare totals where you can.
+
+**Record how each page was read.** Store the method, confidence and parser version per page. When answers go wrong, you can see at once whether the source text was ever right.
+
 ## A worked example
 
 A Kochi insurance company's RAG assistant gives wrong answers about premiums and exclusions. Retrieval logs show the right pages are found, but the text is garbled.
@@ -134,6 +196,23 @@ On the 80-question golden set, correct answers rise from 62% to 84% without any 
 - **Ignoring reading order.** Multi-column pages are common in policies, circulars and reports.
 - **English-only OCR.** Set the languages your documents use, such as Hindi, Tamil or Malayalam, and check a sample page in each.
 - **Never comparing output with the page.** Print a few parsed pages next to the originals before indexing anything. Ten minutes of spot checks finds most parsing bugs.
+- **Missing language packs**, so Hindi or Tamil pages come out as junk with no error.
+- **Flattening tables into running text.** Keep headers with every row.
+- **Not recording which pages were OCRed**, so weak text cannot be traced.
+
+## When simple extraction is enough
+
+- **Clean digital PDFs** with single columns and few tables.
+- **Text sources** such as HTML pages, Markdown or Word files with clear headings.
+- **Structured exports** (CSV, JSON, database dumps), which need no parsing at all.
+
+## From demo to production
+
+- **Route pages by checks**: cheap extraction first, OCR or layout tools only for weak pages.
+- **Store method, confidence and parser version** per page.
+- **Sample parsed pages weekly** against the originals, especially tables and scans.
+- **Track characters per page and tables found** per document to catch parser failures.
+- **Re-parse when tools improve**, using the raw copies you kept.
 
 ## Practice
 
@@ -142,5 +221,6 @@ Read Docling's overview and Unstructured's article on parsing PDFs.
 1. Collect five varied documents: a two-column report, a document with a table, a scanned page, a slide deck and a government circular in an Indian language.
 2. Parse them with simple text extraction and with a layout-aware tool, and compare the outputs for reading order and tables.
 3. Convert one table into row-wise text with headers, and measure whether answers to three table questions improve in your RAG app.
+4. Run parse_pdf on your scanned page with and without the Indian-language pack and compare the confidence and text.
 
 **You are done when you can** show the same page parsed badly and well, and explain which parsing choice fixed it.

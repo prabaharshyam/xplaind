@@ -33,6 +33,10 @@ flashcards:
     a: "Old versions still contain personal data, so deletion must propagate, for example by rebuilding affected versions without the records."
   - q: "What is enough for a small team?"
     a: "Dated folders in cloud storage with a manifest (row counts, hash, source query, pipeline commit) and the path logged in each training run."
+  - q: "What does Delta Lake or Iceberg time travel let you do?"
+    a: "Query a table as it was at an earlier version or date, so a training run can name exactly which snapshot it used."
+  - q: "How should an erasure request affect old dataset versions?"
+    a: "Rebuild the affected versions without the person's records, record the rebuild in the manifest, and retrain or document why existing models are kept."
 exercise:
   title: "Trace the regression"
   setup: "A churn model at an OTT platform in Mumbai had recall 0.68 last month. After retraining on new data, recall is 0.54. Version manifests show: last month's dataset had 1.2 million rows and 9% churners; this month's has 1.1 million rows and 4% churners. The pipeline code changed in a merge three weeks ago that 'tidied up' the subscription status join."
@@ -50,8 +54,8 @@ ask:
   - "How do I reproduce an old machine learning model?"
   - "How do I handle data deletion requests with versioned datasets?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -110,6 +114,76 @@ Write the manifest automatically when the dataset is built, store it next to the
 
 **Choosing a tool.** For a team of two or three, dated folders and a manifest are enough. DVC adds pointer files in Git and commands to pull and push data, which helps once several people train models. Lakehouse table formats such as Delta Lake and Apache Iceberg add "time travel", so you can query a table as it was on a given date, which suits teams whose training data already lives in a warehouse. Whatever you choose, the rule is the same: a training run must record exactly which data version it used, and that version must never change afterwards.
 
+**Write the manifest automatically.** A few lines at the end of the dataset build:
+
+```python
+import hashlib, json, subprocess
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from pathlib import Path
+
+def file_hash(path, chunk=1 << 20):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while block := f.read(chunk):
+            h.update(block)
+    return "sha256:" + h.hexdigest()
+
+def write_manifest(data_path, df, label_col, notes=""):
+    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
+    manifest = {
+        "version": Path(data_path).stem,
+        "hash": file_hash(data_path),
+        "rows": int(len(df)),
+        "positive_share": round(float(df[label_col].mean()), 4),
+        "columns": list(df.columns),
+        "pipeline_commit": commit,
+        "created": datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(timespec="seconds"),
+        "notes": notes,
+    }
+    Path(data_path).with_suffix(".manifest.json").write_text(json.dumps(manifest, indent=2))
+    return manifest
+```
+
+**Compare with the previous version, and fail on surprises.**
+
+```python
+def compare(old, new, max_share_change=0.3, max_row_change=0.2):
+    problems = []
+    if set(old["columns"]) != set(new["columns"]):
+        problems.append(f"columns changed: {set(old['columns']) ^ set(new['columns'])}")
+    if abs(new["rows"] - old["rows"]) / old["rows"] > max_row_change:
+        problems.append(f"rows {old['rows']} -> {new['rows']}")
+    rel = abs(new["positive_share"] - old["positive_share"]) / max(old["positive_share"], 1e-9)
+    if rel > max_share_change:
+        problems.append(f"positive share {old['positive_share']:.2%} -> {new['positive_share']:.2%}")
+    return problems
+```
+
+Print the comparison in the pull request that built the data. A failure is not always wrong, but someone must explain it in the notes before training.
+
+**DVC in four commands.** Data stays in cloud storage; Git tracks small pointer files:
+
+```bash
+dvc init
+dvc remote add -d store s3://my-bucket/dvc       # or Azure, GCS, a shared drive
+dvc add data/claims-train-2026-10-01.parquet     # writes a .dvc pointer file
+git add data/*.dvc .gitignore && git commit -m "Training data 2026-10-01" && dvc push
+```
+
+Anyone can then `git checkout` a commit and `dvc pull` to get exactly that data.
+
+**Time travel in a lakehouse.** If training data lives in Delta Lake tables, record the table version with each run and read it back exactly:
+
+```sql
+SELECT * FROM claims_train VERSION AS OF 42;
+SELECT * FROM claims_train TIMESTAMP AS OF '2026-10-01T00:00:00+05:30';
+```
+
+Old versions are removed by cleanup jobs after a retention period, so keep that period longer than you need to reproduce models, or export important snapshots.
+
+**Erasure across versions.** When a person asks for erasure, find every dataset version containing their records (keep an index of record ids per version), rebuild those versions without them, and note it in each manifest. Decide with the privacy lead whether models trained on the old versions must be retrained.
+
 ## A worked example
 
 A Chennai health-insurance company retrains its claim-fraud model and finds recall dropped from 0.72 to 0.61.
@@ -132,6 +206,23 @@ Later, a customer's erasure request requires deleting their records. The team re
 - **No link from model to data.** Log the data version in every run.
 - **Ignoring label changes.** They change models as much as feature changes.
 - **Forgetting privacy in old versions.** Retention and erasure apply to every copy.
+- **Manifests written by hand**, which drift from the real data.
+- **No check on label share or row counts** between versions.
+- **Forgetting old versions in erasure requests.**
+
+## When versioning can stay simple
+
+- **Prompt-only AI apps with no training data**: version prompts, test sets and indexes instead.
+- **One person, one small dataset**: a dated folder with a manifest is enough.
+- **Data that never changes**, such as a fixed public benchmark: record its name and hash once.
+
+## From demo to production
+
+- **Make dataset versions immutable** and log the version with every training run.
+- **Write and compare manifests automatically** in CI.
+- **Link models to data versions** in the model registry.
+- **Index record ids per version** so erasure requests can be honoured.
+- **Set retention** for old versions longer than your reproducibility needs.
 
 ## Practice
 
@@ -140,5 +231,6 @@ Follow DVC's get-started guide and the data versioning lesson of Made With ML.
 1. Put a dataset under version control with DVC (or dated, hashed folders with a manifest) and link it to a training run.
 2. Change the data (add rows, fix labels), create a new version, and write a comparison report between versions.
 3. Add a data check that fails when the label share changes beyond a threshold.
+4. Build two versions of your dataset, one with a relabelled slice, and make the compare function fail on the label-share change.
 
 **You are done when you can** reproduce a past model from its recorded code and data versions, and explain the difference between two dataset versions.

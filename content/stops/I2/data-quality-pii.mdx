@@ -33,6 +33,10 @@ flashcards:
     a: "Replacing personal data with placeholders like PERSON_1 before the model call, then swapping the real values back into the answer."
   - q: "Why measure the PII detector's recall?"
     a: "No detector is perfect, especially on Indian names and mixed-language text. Measured recall shows how much personal data slips through."
+  - q: "How do you measure a personal-data detector?"
+    a: "Label the personal data in a sample of real documents by hand, run the detector, and count what share of labelled items it found (recall) and how many of its finds were real (precision)."
+  - q: "Why use realistic fake data for staging and tests?"
+    a: "It keeps formats and edge cases close to real data without exposing anyone. Tools such as Faker can generate Indian names, addresses and phone numbers."
 exercise:
   title: "Decide the treatment"
   setup: "A bank in Hyderabad builds an assistant that drafts replies to customer complaint emails. Emails contain names, mobile numbers, account numbers, PAN numbers and sometimes Aadhaar numbers. Data flows: (1) emails indexed so staff can search past complaints; (2) the email text sent to an external model to draft a reply; (3) application logs and traces; (4) a staging environment for testing."
@@ -50,8 +54,8 @@ ask:
   - "What is the difference between masking and pseudonymisation?"
   - "Can I send customer data to an external AI model?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -115,6 +119,81 @@ No detector is perfect. Measure its recall on a labelled sample of real document
 
 **Masking in practice.** Reversible masking keeps a mapping, such as PERSON_1 to the real name, only in memory for the length of the request. The prompt says "PERSON_1 was discharged on...", the model writes "Call PERSON_1 to check...", and the code swaps the real name back before the nurse sees it. The external model never receives the identity, and the mapping is never logged.
 
+**Quality checks in code.** Plain functions that return the failing rows, so each batch can be split into clean and quarantined:
+
+```python
+import re
+from datetime import date
+
+RULES = {
+    "policy number present": lambda r: bool(r.get("policy_no")),
+    "claim date not in future": lambda r: r["claim_date"] <= date.today(),
+    "amount positive": lambda r: r["amount_paise"] > 0,
+    "PIN code 6 digits": lambda r: bool(re.fullmatch(r"[1-9]\d{5}", r.get("pin", ""))),
+    "text long enough": lambda r: len(r.get("text", "")) > 200,
+}
+
+def check_batch(rows, unique_key="claim_id"):
+    clean, quarantine, seen = [], [], set()
+    for r in rows:
+        failed = [name for name, ok in RULES.items() if not _safe(ok, r)]
+        if r.get(unique_key) in seen:
+            failed.append("duplicate id")
+        seen.add(r.get(unique_key))
+        (quarantine if failed else clean).append({**r, "_failed": failed} if failed else r)
+    print(f"{len(clean)} clean, {len(quarantine)} quarantined")
+    return clean, quarantine
+
+def _safe(rule, row):
+    try:
+        return rule(row)
+    except (KeyError, TypeError):
+        return False
+```
+
+Count failures per rule per batch. A sudden jump in one rule usually means the source changed format, not that the data got worse.
+
+**Detecting personal data with Presidio.** Microsoft's open-source Presidio combines patterns, context words and named-entity models. Recent versions include recognisers for some Indian identifiers such as PAN and Aadhaar; add your own for others:
+
+```python
+from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
+
+analyzer = AnalyzerEngine()
+analyzer.registry.add_recognizer(PatternRecognizer(
+    supported_entity="IN_IFSC",
+    patterns=[Pattern("ifsc", r"\b[A-Z]{4}0[A-Z0-9]{6}\b", 0.6)],
+    context=["ifsc", "branch", "bank"]))
+
+text = "Refund to Lakshmi Narayanan, IFSC HDFC0001234, mobile 9840012345."
+for r in analyzer.analyze(text=text, language="en"):
+    print(r.entity_type, text[r.start:r.end], round(r.score, 2))
+```
+
+**Measure the detector, by type and language.** Hand-label 100 real snippets (masked copies are fine for the labels), then:
+
+```python
+def detector_recall(labelled, detect):
+    """labelled: list of (text, set of (start, end, type)); detect returns the same shape."""
+    found = total = 0
+    for text, gold in labelled:
+        hits = detect(text)
+        total += len(gold)
+        found += sum(any(abs(s - hs) < 3 and abs(e - he) < 3 for hs, he, _ in hits) for s, e, _ in gold)
+    return found / total if total else 1.0
+```
+
+Indian names, transliterated text and mixed scripts are where detectors miss most; report recall for those separately.
+
+**Fake data for staging.** Never copy production data into staging. Generate it:
+
+```python
+from faker import Faker
+fake = Faker("en_IN")
+print(fake.name(), fake.phone_number(), fake.address())
+```
+
+Keep the same shapes and edge cases (long names, missing fields, Hindi text) so staging catches the bugs production would.
+
 ## A worked example
 
 A Coimbatore hospital group wants an assistant that summarises discharge notes for follow-up calls. Notes include patient names, phone numbers, addresses, diagnoses and doctors' names.
@@ -144,6 +223,23 @@ Testing the detector on 200 hand-labelled notes finds 97% of phone numbers but o
 - **One rule for every flow.** The index, prompts, logs and test data need different treatments.
 - **Masking that breaks the task.** If the model needs a date to answer, masking it ruins the result. Decide per field.
 - **Forgetting free text.** Personal data hides in comments, notes and email bodies, not just in named columns.
+- **Copying production data into staging or tests.** Generate realistic fakes instead.
+- **One overall detector score.** Measure recall by identifier type and language.
+- **Rules that crash on a missing field** instead of recording a failure.
+
+## When lighter checks are enough
+
+- **Public or synthetic data only**, with no personal information: quality checks still matter, PII detection much less.
+- **A one-off analysis** you run and check by hand.
+- **Data that arrives already validated** from a trusted system with its own contracts and checks.
+
+## From demo to production
+
+- **Run quality checks on every batch**, quarantine failures and alert on jumps per rule.
+- **Measure detector recall** on a labelled sample every quarter and after changes.
+- **Mask by default in logs and traces**, and document each exception.
+- **Use generated data** in staging and tests.
+- **Review masking rules** whenever new document types or languages arrive.
 
 ## Practice
 
@@ -152,5 +248,8 @@ Read the Presidio overview and the Great Expectations introduction.
 1. Write five quality checks for a dataset of your choice and run them, quarantining failures to a separate file.
 2. Build a masking function with patterns for Indian mobile numbers, PAN and email plus a name detector, and test it on 30 sentences you write, including Indian names in two languages.
 3. Implement reversible masking around one model call and show the restored output.
+4. Measure your masking function's recall on 30 labelled sentences, split by English and the second language you used.
+
+For more depth, chapter 8 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers data quality checks, and chapter 10 covers detecting and masking sensitive data.
 
 **You are done when you can** report your detector's measured recall per type of personal data, and show masked logs alongside a correct unmasked answer.

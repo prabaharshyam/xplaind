@@ -34,6 +34,10 @@ flashcards:
     a: "Rebuild all vectors into a new index, evaluate it, then switch over; old and new vectors cannot be mixed."
   - q: "What should pipeline health tracking include?"
     a: "Documents processed, failed and skipped, chunks written, embedding cost, and the age of the newest document per source."
+  - q: "Why build chunk ids from the document id and position?"
+    a: "Then updating or deleting a document can remove exactly its old chunks by id prefix, with no orphaned chunks left searchable."
+  - q: "What is an index alias?"
+    a: "A name the application reads, pointing to one physical index. Switching the alias to a new index changes what is served instantly, and switching back is the rollback."
 exercise:
   title: "Fix the pipeline"
   setup: "A Kanpur leather exporter's RAG assistant indexes product specs from SharePoint and order status from the ERP. Problems: re-processing after a chunking change means re-downloading 20,000 files over three days; edited specs appear twice in results; order status in answers is a day old because indexing runs nightly; and after a new embedding model was switched on for new documents only, search got worse."
@@ -51,8 +55,8 @@ ask:
   - "How do I keep a RAG index in sync with source systems?"
   - "How do I change embedding models without downtime?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -110,6 +114,63 @@ This lesson follows the assistant of a port operator in Chennai answering questi
 
 **Atomic updates.** Updating a document means deleting its old chunks and inserting new ones. Do both in one transaction, or write the new chunks first and then delete the old ones by version, so a search never sees half a document or none. Skipping files whose content hash has not changed keeps embedding costs down, sharply so on document libraries that change slowly.
 
+**One ingestion step in code.** Stable ids, a content hash, versions on every chunk and an atomic replace:
+
+```python
+import hashlib
+
+PARSER_V, CHUNKER_V, EMBED_MODEL = "pdf-3", "headings-350-50", "multilingual-e5-base@2024-06"
+
+def ingest_document(db, source, source_id, raw_bytes, parse, chunk, embed):
+    doc_id = f"{source}:{source_id}"
+    digest = hashlib.sha256(raw_bytes).hexdigest()
+    row = db.fetchone("SELECT content_hash, versions FROM documents WHERE id = %s", (doc_id,))
+    versions = {"parser": PARSER_V, "chunker": CHUNKER_V, "embed": EMBED_MODEL}
+    if row and row[0] == digest and row[1] == versions:
+        return "skipped"                                   # nothing changed
+    text = parse(raw_bytes)
+    pieces = chunk(text)
+    vectors = embed([p["text"] for p in pieces])
+    with db.transaction():                                 # searches never see half a document
+        db.execute("DELETE FROM chunks WHERE doc_id = %s", (doc_id,))
+        for i, (p, v) in enumerate(zip(pieces, vectors)):
+            db.execute("""INSERT INTO chunks (id, doc_id, section, body, embedding, parser_v, chunker_v, embed_model)
+                          VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                       (f"{doc_id}#c{i}", doc_id, p["section"], p["text"], v, PARSER_V, CHUNKER_V, EMBED_MODEL))
+        db.execute("""INSERT INTO documents (id, content_hash, versions, indexed_at) VALUES (%s,%s,%s, now())
+                      ON CONFLICT (id) DO UPDATE SET content_hash = EXCLUDED.content_hash,
+                      versions = EXCLUDED.versions, indexed_at = now()""", (doc_id, digest, versions))
+    return f"indexed {len(pieces)} chunks"
+
+def delete_document(db, source, source_id):
+    with db.transaction():
+        db.execute("DELETE FROM chunks WHERE doc_id = %s", (f"{source}:{source_id}",))
+        db.execute("DELETE FROM documents WHERE id = %s", (f"{source}:{source_id}",))
+```
+
+Embedding happens before the transaction, so the slow, costly part is outside the lock. A change of parser, chunker or embedding version re-processes the document even if the file is unchanged.
+
+**Swapping indexes with an alias.** In Postgres, a view can act as the alias:
+
+```sql
+-- Build chunks_v2 alongside chunks_v1, evaluate it, then switch in one statement:
+CREATE OR REPLACE VIEW chunks_live AS SELECT * FROM chunks_v2;
+-- Rollback is the same statement pointing back to chunks_v1.
+```
+
+Vector databases such as Qdrant and search engines such as OpenSearch have native aliases that work the same way.
+
+**Freshness as a number.** For each source, record the newest source modification time you have indexed, and alert when it falls behind the agreed target:
+
+```sql
+SELECT split_part(id, ':', 1) AS source,
+       max(indexed_at) AS last_indexed,
+       now() - max(indexed_at) AS lag
+FROM documents GROUP BY 1 ORDER BY lag DESC;
+```
+
+**Backfills without hurting users.** Re-embedding a whole library (after a model change) can take hours and hit rate limits. Run it against the new index only, with a concurrency limit, during off-peak hours, and resume from the last completed document if it stops.
+
 ## A worked example
 
 A Chennai port operator's assistant answers questions about tariffs, notices to shipping agents and berth schedules.
@@ -133,6 +194,25 @@ In month four, you change chunking for tables to keep rows together. Because raw
 - **Mixing embedding model versions.** Search quietly degrades. Rebuild and switch.
 - **Same schedule for everything.** Match freshness to how fast each source changes and how much it matters.
 - **No freshness alert.** A stuck pipeline looks fine until someone asks about yesterday's notice.
+- **Embedding inside the database transaction**, holding locks while slow API calls run.
+- **No versions on chunks**, so you cannot tell which parser or model produced them.
+- **Re-embedding everything after every change** instead of only changed documents.
+
+## When a simple script is enough
+
+- **A fixed set of documents** loaded once for a demo or pilot.
+- **A handful of files that change monthly**: re-index everything on a schedule.
+- **A managed RAG service** that already handles sync, versions and deletions.
+
+Build the full pipeline once documents change often, come from several sources, or must be fresh within agreed times.
+
+## From demo to production
+
+- **Keep raw copies**, stable ids and versions on every chunk.
+- **Replace documents atomically**, and skip unchanged ones by hash.
+- **Swap indexes through an alias**, with the old index kept for rollback.
+- **Alert on freshness lag** per source against the agreed target.
+- **Log per-run counts and embedding cost.**
 
 ## Practice
 
@@ -141,5 +221,6 @@ Read dbt's ETL versus ELT piece and Debezium's feature overview.
 1. Restructure your RAG ingestion so raw files land in a folder or bucket first, each document gets a stable id and each chunk records parser and embedding versions.
 2. Make updates replace a document's old chunks and skip unchanged files by content hash. Show a changed file updating and a deleted file disappearing.
 3. Change the chunk size, rebuild into a new index, compare the two on your golden set and switch over.
+4. Change only the chunker version string, rerun ingestion, and confirm every document is re-processed while a second run skips them all.
 
 **You are done when you can** change the embedding model or chunking without downtime and prove the new index is better before switching.

@@ -33,6 +33,10 @@ flashcards:
     a: "A latency budget and a cost-per-request ceiling, then maximise quality within them."
   - q: "Why revisit the decision?"
     a: "Prices fall, models improve and usage grows, so the best trade-off changes every few months."
+  - q: "What is the Pareto frontier of options?"
+    a: "The options that no other option beats on every measure at once. Anything off the frontier is worse than some option on all of quality, cost and speed, and can be dropped."
+  - q: "Why report p95 latency, not the average?"
+    a: "Averages hide the slow tail. One in twenty users waiting six seconds is what people remember, and the p95 shows it."
 exercise:
   title: "Make the call"
   setup: "A Delhi travel company's booking assistant compares options on 200 test questions. Small model: 79% accuracy, ₹0.05 per request, 1.4 s p95. Large model: 88%, ₹0.50, 4.2 s. Router: 86%, ₹0.18, 2.5 s. Wrong answers about refund rules cause costly disputes; general travel tips matter less. The agreed latency budget is first words within 1.5 s at p95."
@@ -50,8 +54,8 @@ ask:
   - "What is model routing?"
   - "How do I explain AI trade-offs to a product manager?"
 drafted_with_ai: true
-reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_by: "UNREVIEWED"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -120,6 +124,51 @@ This lesson follows a health-insurance company in Hyderabad whose call-centre ag
 
 **Measuring the router.** A router saves money only if it sends the right requests to the right model. Label a sample of test questions as easy or hard, run the router, and count two kinds of mistake: hard questions sent to the small model, which hurt quality, and easy ones sent to the large model, which waste money. The first kind matters more. If it is common in a high-risk category, route that whole category to the strong model, as the insurer did for exclusions and claims.
 
+**A weighted comparison in code.** Score each option by category with business weights, then show cost and latency next to it:
+
+```python
+WEIGHTS = {"exclusions": 3.0, "claims": 3.0, "premiums": 2.0, "general": 1.0}
+
+def weighted_quality(results):
+    """results: list of (category, correct_bool)."""
+    num = sum(WEIGHTS[c] * ok for c, ok in results)
+    den = sum(WEIGHTS[c] for c, _ in results)
+    return num / den
+
+def p95(values):
+    v = sorted(values)
+    return v[int(0.95 * (len(v) - 1))]
+
+def summarise(option_runs):
+    """option_runs: name -> list of dicts with category, correct, cost_inr, ms."""
+    table = []
+    for name, runs in option_runs.items():
+        table.append({"option": name,
+                      "quality": round(weighted_quality([(r["category"], r["correct"]) for r in runs]), 3),
+                      "cost_inr": round(sum(r["cost_inr"] for r in runs) / len(runs), 3),
+                      "p95_ms": p95([r["ms"] for r in runs])})
+    return table
+```
+
+**Drop options nobody should pick.** An option is dominated if another is at least as good on quality, cost and speed, and better on one:
+
+```python
+def frontier(table):
+    def dominates(a, b):
+        better_or_equal = a["quality"] >= b["quality"] and a["cost_inr"] <= b["cost_inr"] and a["p95_ms"] <= b["p95_ms"]
+        strictly = a["quality"] > b["quality"] or a["cost_inr"] < b["cost_inr"] or a["p95_ms"] < b["p95_ms"]
+        return better_or_equal and strictly
+    return [o for o in table if not any(dominates(other, o) for other in table if other is not o)]
+```
+
+What remains is the real choice, and it is a business choice: how much quality is worth how many rupees and milliseconds.
+
+**Budgets first, then maximise quality.** Agree a ceiling for cost per request and a p95 latency target with the product owner, filter the frontier to options inside both, and pick the best quality among them. This turns a vague debate into a short meeting.
+
+**Prices and models move.** Store the comparison with the date and the prices used. When a provider cuts prices or ships a new model, re-run the same test set and update the table; the best choice often changes within months.
+
+**Quality per rupee is not the whole story.** For safety-critical categories, set a minimum quality that no saving can buy below, and route those categories to the strong model regardless of cost.
+
 ## A worked example
 
 A Hyderabad health-insurance company's assistant answers policy questions for its call-centre agents.
@@ -149,6 +198,23 @@ The product owner's view: agents are on live calls, so latency matters a lot; wr
 - **Missing free wins.** Streaming and caching first.
 - **Never revisiting the decision.**
 - **Choosing without the product owner.** The trade-off is a business decision; show the table and let them weigh it.
+- **Unweighted accuracy** when some mistakes cost far more than others.
+- **Keeping dominated options** in the discussion.
+- **A comparison with no date or prices recorded**, which goes stale silently.
+
+## When a full trade-off study is not needed
+
+- **Low volume**: the strongest model at a few rupees a day is fine; optimise later.
+- **One option meets every target** with room to spare.
+- **Early prototypes**, where learning whether the task works at all comes first.
+
+## From demo to production
+
+- **Keep the comparison table** with dates, prices and the test set version.
+- **Track quality, cost per request and p95 latency** in production by feature.
+- **Set minimum quality** for high-risk categories that routing cannot go below.
+- **Re-run the comparison** on price changes, new models and big traffic changes.
+- **Measure the router's mistakes** by category every month.
 
 ## Practice
 
@@ -157,5 +223,8 @@ Reread Chip Huyen's production article linked below, focusing on cost and latenc
 1. Build a table of quality, cost per request and p95 latency for two or three options in your app.
 2. Write a one-paragraph recommendation for a product owner, with the trade-off stated plainly.
 3. Apply one change that improves speed without hurting quality, and measure it.
+4. Feed your option table to the frontier function and write one sentence on why each dropped option was dominated.
+
+For more depth, chapter 4 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers choosing models against cost and latency, and chapter 9 covers latency and cost metrics.
 
 **You are done when you can** present a trade-off table and justify a choice in terms a non-engineer understands.
