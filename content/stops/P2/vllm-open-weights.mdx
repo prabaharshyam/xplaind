@@ -34,6 +34,10 @@ flashcards:
     a: "The model revision and the vLLM version, with evals before every upgrade."
   - q: "Why does an OpenAI-compatible API help?"
     a: "Existing client code and gateways work unchanged; switching often means changing only a model alias."
+  - q: "Which vLLM metrics show you need more capacity?"
+    a: "Requests waiting in the queue and KV cache usage. A growing queue or a cache near full means add replicas, shorten contexts or reduce concurrency."
+  - q: "Can vLLM return JSON that matches a schema?"
+    a: "Yes. Its OpenAI-compatible server supports structured output requests, constraining generation to a JSON schema."
 exercise:
   title: "Plan the self-hosting"
   setup: "A Kochi hospital must keep patient discharge summaries on its own servers. It wants a model to draft summaries in English and Malayalam, about 8,000 requests a day, peaking at 25 concurrent requests with 6,000-token contexts. It has two 48 GB GPUs and a Kubernetes cluster. An engineer suggests picking the top model on a public leaderboard."
@@ -52,7 +56,7 @@ ask:
   - "How much GPU memory does a 14B model need?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -108,6 +112,77 @@ Key settings: maximum context length (shorter means more concurrent requests fit
 
 **Operating it.** Watch the queue length and cache usage: a growing queue means you need more capacity or shorter contexts. Keep one spare GPU or replica so a failure or an upgrade does not stop service. Store the weights in an internal registry or volume, because downloading them at start-up from the internet is slow and may be blocked on locked-down networks.
 
+**Running vLLM in a container.** Weights in a volume, a pinned image, the OpenAI-compatible server on port 8000:
+
+```bash
+docker run --gpus all --rm -p 8000:8000 \
+  -v /data/hf-cache:/root/.cache/huggingface \
+  -e HF_TOKEN \
+  vllm/vllm-openai:v0.10.1 \
+  --model Qwen/Qwen2.5-7B-Instruct --max-model-len 8192 \
+  --gpu-memory-utilization 0.90 --served-model-name chat-local
+```
+
+`--served-model-name` sets the name clients use, so you can change the underlying model without changing apps.
+
+**Calling it like any OpenAI-style API, with structured output.**
+
+```python
+from openai import OpenAI
+from pydantic import BaseModel
+
+class Claim(BaseModel):
+    policy_number: str
+    amount_inr: int
+    reason: str
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="not-needed-locally")
+r = client.chat.completions.create(
+    model="chat-local",
+    messages=[{"role": "user", "content": "Extract: Policy HX-22981, claim of Rs 18,400 for a cracked windscreen."}],
+    response_format={"type": "json_schema", "json_schema": {"name": "claim", "schema": Claim.model_json_schema()}},
+)
+print(Claim.model_validate_json(r.choices[0].message.content))
+```
+
+The server constrains generation to the schema, so the reply parses; still validate values, as the structured-output lesson explains.
+
+**Load testing before go-live.** Send realistic prompts at increasing concurrency and record time to first token, tokens per second and errors:
+
+```python
+import asyncio, time
+from openai import AsyncOpenAI
+
+aclient = AsyncOpenAI(base_url="http://localhost:8000/v1", api_key="x")
+
+async def one(prompt):
+    t0 = time.perf_counter(); first = None
+    stream = await aclient.chat.completions.create(model="chat-local", stream=True, max_tokens=300,
+                                                   messages=[{"role": "user", "content": prompt}])
+    async for chunk in stream:
+        if first is None and chunk.choices and chunk.choices[0].delta.content:
+            first = time.perf_counter() - t0
+    return first, time.perf_counter() - t0
+
+async def run(prompts, concurrency):
+    sem = asyncio.Semaphore(concurrency)
+    async def limited(p):
+        async with sem:
+            return await one(p)
+    results = await asyncio.gather(*(limited(p) for p in prompts))
+    ttft = sorted(r[0] for r in results if r[0]); total = sorted(r[1] for r in results)
+    print(f"c={concurrency}: p95 first token {ttft[int(0.95 * (len(ttft) - 1))]:.2f}s, "
+          f"p95 total {total[int(0.95 * (len(total) - 1))]:.2f}s")
+
+# for c in (1, 8, 32, 64): asyncio.run(run(sample_prompts, c))
+```
+
+The concurrency where p95 first-token time crosses your budget is the capacity of one replica.
+
+**Watch the metrics.** vLLM exposes Prometheus metrics on `/metrics`, including requests running and waiting, and KV cache usage. Alert when requests wait for long or cache usage stays near full, and scale replicas on those signals rather than CPU.
+
+**Reuse shared prefixes.** Prefix caching lets requests that start with the same system prompt or document skip recomputing it, which helps chat and RAG workloads. Check that it is on in your version, and keep shared content at the start of prompts.
+
 ## A worked example
 
 A Chennai insurance company must keep claim documents on its own servers. It wants extraction of 20 fields from claim forms and short grounded answers for its claims staff, about 30,000 requests a day.
@@ -131,6 +206,23 @@ vLLM runs in containers on the client's Kubernetes cluster, behind the same gate
 - **Quantizing without measuring.** Some tasks lose more quality than others. Run your evals.
 - **Ignoring licences.** Some open-weight licences restrict commercial use or large deployments.
 - **Unpinned versions.** A new model revision or engine release can change outputs. Pin and evaluate.
+- **Scaling on CPU** for a GPU server; scale on queue and cache metrics.
+- **Unpinned images and model revisions**, so a restart changes behaviour.
+- **No load test**, so capacity is discovered by users.
+
+## When not to self-host with vLLM
+
+- **Low or spiky volume**, where idle GPUs cost more than API calls.
+- **You need the strongest models**, which may only be available as APIs.
+- **No one to operate it**: GPUs, drivers, upgrades and on-call are real work.
+
+## From demo to production
+
+- **Pin the image and the model revision**, with weights cached on volumes.
+- **Load test** each model and setting change, and record capacity per replica.
+- **Alert and scale on queue length and KV cache usage.**
+- **Put it behind the gateway** with an alias and a fallback.
+- **Keep a spare replica** for failures and rolling upgrades.
 
 ## Practice
 
@@ -139,5 +231,8 @@ Follow the vLLM quickstart on any GPU you can access (a free notebook GPU is eno
 1. Serve a small instruct model with vLLM and call it with an OpenAI-compatible client.
 2. Calculate the weight memory for a 7B, 14B and 70B model at 16-bit and 4-bit, and estimate how many GPUs each needs.
 3. Run your extraction or RAG golden set against the self-hosted model and an API model, and compare accuracy, latency and cost per 1,000 requests.
+4. Run the load test at four concurrency levels and write down the highest one that keeps p95 first-token time under 2 seconds.
+
+For more depth, chapter 9 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers inference servers, batching, prefix caching and measuring throughput and latency.
 
 **You are done when you can** serve a model behind an OpenAI-compatible endpoint and justify its size, quantization and GPU choice with numbers.

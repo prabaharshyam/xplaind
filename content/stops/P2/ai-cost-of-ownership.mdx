@@ -33,6 +33,10 @@ flashcards:
     a: "Cost per unit the client cares about, such as per resolved ticket or claim, compared with the value per unit."
   - q: "Why consider price trends?"
     a: "API prices have tended to fall, so long GPU commitments can age badly."
+  - q: "What is the crossover point in a cost comparison?"
+    a: "The usage level at which two options cost the same. Below it one is cheaper, above it the other, so it tells the client when to revisit the choice."
+  - q: "Why express cost per resolved ticket or per claim?"
+    a: "Clients judge value per unit of work. ₹4 per resolved ticket against ₹60 of staff time is a decision; a monthly token bill on its own is not."
 exercise:
   title: "Build the comparison"
   setup: "A Chandigarh university plans an AI study assistant for 15,000 students. A pilot measured 6 requests per student per day on 120 teaching days a year, 2,500 input and 400 output tokens per request. Exam weeks see triple the usual traffic. The IT team proposes buying GPUs to self-host 'because APIs are expensive'. They have one engineer with no GPU experience."
@@ -51,7 +55,7 @@ ask:
   - "What should a total cost of ownership include?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -111,6 +115,53 @@ This lesson follows an insurance company in Kolkata planning a claims-document a
 
 **The value side.** Cost alone cannot justify a system. Pair it with value from the pilot: minutes saved per task times tasks per month, errors avoided, faster turnaround for customers. Put cost and value per unit side by side, so leaders can see the margin, not just the bill.
 
+**A cost model you can rerun.** Keep the assumptions in one place, with the date each price was checked:
+
+```python
+PRICES = {"checked": "2026-11-08", "usd_to_inr": 84,
+          "in_per_m": 3.0, "out_per_m": 15.0, "cache_read_ratio": 0.1,      # USD per million tokens
+          "gpu_hour_inr": 250, "engineer_month_inr": 250_000}
+
+def api_month(requests, in_tok, out_tok, cached_share=0.5, small_share=0.0, small_ratio=0.25):
+    p = PRICES
+    per_req_usd = (in_tok * (1 - cached_share) * p["in_per_m"] + in_tok * cached_share * p["in_per_m"] * p["cache_read_ratio"]
+                   + out_tok * p["out_per_m"]) / 1e6
+    blended = per_req_usd * (1 - small_share + small_share * small_ratio)       # share sent to a cheaper model
+    return requests * blended * p["usd_to_inr"]
+
+def self_host_month(gpus, engineers=1.5, infra_inr=150_000):
+    p = PRICES
+    return gpus * p["gpu_hour_inr"] * 730 + engineers * p["engineer_month_inr"] + infra_inr
+
+def table(base_requests, in_tok=3000, out_tok=400, gpus=4):
+    print(f"prices checked {PRICES['checked']}")
+    for label, mult in [("half usage", 0.5), ("measured", 1), ("double usage", 2)]:
+        a = api_month(base_requests * mult, in_tok, out_tok, small_share=0.4) + 0.3 * PRICES["engineer_month_inr"]
+        s = self_host_month(gpus if mult <= 1 else gpus * 2)
+        print(f"{label:<13} API ₹{a/1e5:6.1f} lakh   self-hosted ₹{s/1e5:6.1f} lakh")
+
+table(base_requests=600_000)
+```
+
+Swap in the client's real usage from traces and current quotes. The printed date keeps everyone honest about when prices were true.
+
+**Find the crossover.** Step usage up until the self-hosted line drops below the API line:
+
+```python
+def crossover(in_tok=3000, out_tok=400, gpus_per_million=2):
+    for r in range(100_000, 20_000_001, 100_000):
+        gpus = max(1, round(r / 1e6 * gpus_per_million))
+        if self_host_month(gpus) < api_month(r, in_tok, out_tok, small_share=0.4):
+            return r
+    return None
+```
+
+`gpus_per_million` must come from a load test, not a guess. If the crossover is far above expected usage, the decision is easy; if it is close, plan to revisit as usage grows.
+
+**Count every line.** Beyond tokens and GPUs: embeddings and re-embedding, vector database, tracing and log storage, evaluation runs (judge calls add up), staging environments, security reviews, and the people who run, monitor and improve the system. Leaving out people is the most common error in these comparisons.
+
+**Pair cost with value.** For each unit of work, put the measured value next to the cost: minutes saved times the loaded staff cost per minute, errors avoided, faster turnaround. A one-line ratio ("₹4 of AI cost per ticket, ₹60 of staff time saved") is what decision-makers remember.
+
 ## A worked example
 
 A Kolkata insurance company plans to roll out a claims-document assistant to 2,000 staff. Measured in the pilot: 25 requests per user per working day, 3,000 input tokens (mostly retrieved passages) and 300 output tokens per request. That is about 1.1 million requests a month.
@@ -137,6 +188,23 @@ Over a year, A costs about ₹1 crore and B about ₹1.75 crore. B only wins if 
 - **Sizing for the average.** Self-hosted capacity must cover peaks; APIs absorb them.
 - **Ignoring price trends.** API prices have fallen steadily; three-year GPU commitments may not age well.
 - **No value side.** A cost model without the hours or errors saved cannot justify anything.
+- **Leaving people out** of the self-hosted (and the API) cost.
+- **Prices with no date**, quietly out of date months later.
+- **Guessing GPU counts** instead of measuring capacity with a load test.
+
+## When a detailed cost model is not needed
+
+- **A pilot under a small, fixed budget**: a spend cap and a weekly look at the bill are enough.
+- **No real alternative**, such as data rules forcing on-premises hosting: model the cost for budgeting, not choosing.
+- **Tiny usage**, where the cost is a rounding error next to the value.
+
+## From demo to production
+
+- **Keep the cost model in the repository** with dated prices and measured usage.
+- **Update it monthly** from traces and the real bill, and explain differences.
+- **Track cost per unit of work** next to value per unit.
+- **Recompute the crossover** when usage, prices or models change.
+- **Include every line**: evals, tracing, storage, staging and people.
 
 ## Practice
 
@@ -145,5 +213,7 @@ Use an independent comparison site to collect current prices for three models, a
 1. From your own app's traces, measure average input and output tokens per request.
 2. Build a spreadsheet for 100, 1,000 and 10,000 daily users comparing an API option and a self-hosted option, including people and infrastructure.
 3. Add a sensitivity table (usage halved and doubled, output length doubled) and one line of value per month.
+
+For more depth, chapter 4 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers the cost side of model APIs versus self-hosting, and chapter 9 covers inference cost.
 
 **You are done when you can** present a one-page cost comparison with a recommendation and the usage level at which it would change.

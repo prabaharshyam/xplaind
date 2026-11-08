@@ -33,6 +33,10 @@ flashcards:
     a: "Agreed thresholds on the test set that must be met before launch, such as 85% correct with citations."
   - q: "Why include open questions?"
     a: "Recording undecided trade-offs and their options keeps the team honest and focuses client decisions."
+  - q: "How do you turn daily requests into a peak load estimate?"
+    a: "Divide daily requests by the busy hours they fall in, multiply by a peak factor (often 2 to 3), and convert to requests and tokens per minute to compare with rate limits."
+  - q: "What is a latency budget?"
+    a: "A target for total response time, split into an allowance for each step (retrieval, reranking, model first token, tools), so each part has a number to meet."
 exercise:
   title: "Sketch the design"
   setup: "A Bhopal state health department wants an assistant for 5,000 field health workers to answer questions about vaccination schedules and scheme rules from 300 guideline PDFs in Hindi and English. Workers use basic Android phones on patchy mobile data. Guidelines change a few times a year. Data must stay in India."
@@ -51,7 +55,7 @@ ask:
   - "How do I list failure modes for an AI system?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -116,6 +120,48 @@ If you are building rather than interviewing, grow the system one layer at a tim
 
 **Keeping it current.** Treat the document as living. When a decision changes, update the page and note the date and reason in a short decision log at the end. New team members and client reviewers then read one accurate page instead of reconstructing history from chat threads.
 
+**Back-of-envelope numbers in code.** Capacity, rate limits and cost decide many design choices; work them out before drawing boxes:
+
+```python
+def estimate(daily_requests, busy_hours=8, peak_factor=2.5,
+             in_tokens=3_500, out_tokens=350, price_in=3, price_out=15, usd_to_inr=84,
+             tpm_limit=400_000):
+    """Prices in USD per million tokens; check current prices and note the date."""
+    peak_per_min = daily_requests / (busy_hours * 60) * peak_factor
+    tokens_per_min = peak_per_min * (in_tokens + out_tokens)
+    cost_day = daily_requests * (in_tokens * price_in + out_tokens * price_out) / 1e6 * usd_to_inr
+    return {
+        "peak requests per minute": round(peak_per_min, 1),
+        "peak tokens per minute": round(tokens_per_min),
+        "within rate limit": tokens_per_min < tpm_limit,
+        "cost per day ₹": round(cost_day),
+        "cost per month ₹": round(cost_day * 30),
+    }
+
+print(estimate(daily_requests=20_000))
+```
+
+If peak tokens per minute exceed the provider limit, the design needs a higher tier, caching, a smaller model for some steps or a queue. If the monthly cost surprises the client, find out now, not after launch.
+
+**A latency budget, step by step.** Write down a target and an allowance for each step, then measure against it:
+
+| Step | Allowance (p95) |
+| --- | --- |
+| Auth, parsing the request | 50 ms |
+| Query rewrite (small model) | 400 ms |
+| Hybrid search | 150 ms |
+| Reranking 30 candidates | 250 ms |
+| Model, time to first token | 1,200 ms |
+| Total to first token | about 2 s |
+
+Each component owner now has a number. When the total slips, the trace shows which step broke its allowance.
+
+**The architecture in layers.** A useful order for adding parts, from essential to optional: the model call with good context (retrieval, tools); guardrails on inputs and outputs; a router and gateway (several models, fallbacks, keys, budgets); caching; and finally agent patterns with write actions. Each layer adds capability and new failure modes, so add one when a measured need appears.
+
+**Design decisions as records.** Keep a short decision log in the document: date, decision, options considered, reason, who agreed. For example: "2026-11-02: hybrid search with reranker; vector-only missed policy codes (recall 71% vs 89%); agreed with client IT." Later reviewers and new team members see why, not just what.
+
+**A template to start from.** Store the design document as Markdown in the repository with the eight headings in this lesson, the estimate output, the latency budget, the failure-mode table and the decision log. Review it in pull requests like code.
+
 ## A worked example
 
 Design summary for an internal assistant at a Mumbai general insurer, answering underwriters' questions from 2,000 policy wordings, circulars and underwriting guidelines:
@@ -143,11 +189,30 @@ The document took two days and prevented a month of rework when the compliance t
 - **No evaluation plan.** "We'll see how it does" is not a plan.
 - **Ignoring constraints.** Latency, cost and data rules shape the design.
 - **Long documents nobody reads.** Two to four clear pages.
+- **Skipping the capacity and cost estimate**, then discovering rate limits or the bill after launch.
+- **One latency target for the whole system** with no allowance per step.
+- **Design decisions with no recorded reason**, so they get relitigated every month.
+
+## When a full design document is overkill
+
+- **A one-week prototype** to test an idea: a half-page note with the goal, the data and the success measure is enough.
+- **A small internal tool** with few users and no sensitive data.
+- **A change inside an existing system**, which needs an update to its design document, not a new one.
+
+## From demo to production
+
+- **Keep the design document in the repository**, updated with every major change.
+- **Re-run the capacity and cost estimate** when traffic, models or prices change.
+- **Measure each step against its latency allowance** from traces.
+- **Maintain the decision log** with dates and reasons.
+- **Review failure modes** after every incident and add new rows.
 
 ## Practice
 
 Read Eugene Yan's patterns for building LLM-based systems linked below.
 
 This lesson's check is a project: write a two to four page design document for an AI product, covering users and success metrics, components, request flow, failure modes and guards, evaluation and operations.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers AI application architecture layer by layer, and chapter 9 covers latency and cost.
 
 **You are done when you can** walk someone through your design in ten minutes and answer "what happens when this part fails?" for every component.

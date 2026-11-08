@@ -33,6 +33,10 @@ flashcards:
     a: "Judge scores drift and have blind spots; a person grading about 50 samples every few weeks keeps them honest."
   - q: "Why slice online scores?"
     a: "A steady average can hide one topic, language or version getting much worse."
+  - q: "Name three implicit feedback signals in a chat app."
+    a: "Stopping a reply half-way, pressing regenerate, and asking the same question again in other words within a minute or two."
+  - q: "What is a degenerate feedback loop?"
+    a: "When the system learns from feedback on what it already shows, it can narrow towards what got clicked before, hiding better options that were never shown."
 exercise:
   title: "Find the cause"
   setup: "A Delhi edtech's tutor assistant scored 89% offline. A month after launch: negative feedback rose from 5% to 9%; the judge's faithfulness score is steady at 0.94; average answer length doubled after a prompt change two weeks ago; and the negative-feedback reason most chosen is 'too long'. Hindi conversations show twice the negative rate of English ones."
@@ -51,7 +55,7 @@ ask:
   - "How often should I review AI conversations?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -110,6 +114,63 @@ This lesson follows a telecom's customer assistant in Chennai whose negative fee
 
 **Telling the client.** Share the online dashboard and the weekly cause counts, not only the offline score. Clients trust a team that spots a problem, explains it and shows it fixed far more than a team that only reports a high launch number.
 
+**Deterministic sampling.** Pick traces for the judge by hashing the trace id, so the same trace is always in or out of the sample, and reruns and dashboards agree:
+
+```python
+import hashlib
+
+def in_sample(trace_id, rate=0.08):
+    h = int(hashlib.sha256(trace_id.encode()).hexdigest()[:8], 16)
+    return h / 0xFFFFFFFF < rate
+
+def should_judge(trace):
+    return (in_sample(trace["id"])
+            or trace.get("feedback") == "down"
+            or trace.get("guardrail_triggered")
+            or trace.get("stop_reason") == "max_tokens")
+```
+
+**Implicit signals from the conversation.** People rarely press thumbs down, but their behaviour says a lot. A small detector run over finished conversations:
+
+```python
+from difflib import SequenceMatcher
+
+def implicit_signals(turns):
+    """turns: list of {"role", "text", "at" (seconds), "stopped_early", "regenerated"}."""
+    flags = []
+    users = [t for t in turns if t["role"] == "user"]
+    for a, b in zip(users, users[1:]):
+        similar = SequenceMatcher(None, a["text"].lower(), b["text"].lower()).ratio() > 0.6
+        if similar and b["at"] - a["at"] < 90:
+            flags.append("rephrased within 90 s")
+    if any(t.get("stopped_early") for t in turns):
+        flags.append("stopped a reply")
+    if any(t.get("regenerated") for t in turns):
+        flags.append("regenerated")
+    if any(w in t["text"].lower() for t in users for w in ("wrong", "not what i asked", "galat")):
+        flags.append("said it was wrong")
+    return flags
+```
+
+Count flags per day and per version next to explicit ratings. A version with fewer thumbs down but more rephrasing is probably not better.
+
+**Design feedback carefully.** Ask at natural moments (after an answer, not mid-task), keep it one tap, and offer two or three reasons after a thumbs down. Remember who gives feedback: unhappy users and very happy ones, so explicit ratings are skewed. Feedback on the first of two options shown is also higher just because it was first. Compare versions by the same feedback design, not across redesigns.
+
+**One query for the dashboard.** If traces land in Postgres, a daily view by version is a few lines:
+
+```sql
+SELECT date(created_at AT TIME ZONE 'Asia/Kolkata') AS day, app_version,
+       count(*) AS requests,
+       avg(CASE WHEN feedback = 'down' THEN 1.0 ELSE 0 END) AS thumbs_down_rate,
+       avg(CASE WHEN judge_verdict = 'fail' THEN 1.0 END) AS judge_fail_rate,
+       avg(CASE WHEN refused THEN 1.0 ELSE 0 END) AS refusal_rate
+FROM traces
+WHERE created_at > now() - interval '30 days'
+GROUP BY 1, 2 ORDER BY 1, 2;
+```
+
+**Beware loops that narrow.** If you rank or recommend from feedback, you mostly learn about what you already showed. Keep a small share of traffic exploring other options, and judge changes with offline evals as well, not only clicks.
+
 ## A worked example
 
 A Chennai telecom's customer assistant passed its offline golden set at 91%. Six weeks after launch, negative feedback crept from 6% to 11%.
@@ -137,6 +198,23 @@ Fixes: the marketing team's plan launches now trigger an indexing job; an alert 
 - **Collecting feedback and never reading it.** Schedule the weekly review.
 - **Only averages.** A steady average can hide one topic or language getting much worse. Slice by topic, language and version.
 - **Fixing without adding tests.** The same failure returns after the next change.
+- **Random sampling that changes on every run.** Hash the trace id so samples are stable.
+- **Trusting explicit ratings alone.** Few people give them, and they skew negative and positive.
+- **Optimising only for clicks or thumbs**, which can narrow the product towards what it already does.
+
+## When online evals can wait
+
+- **Before launch**: offline evals on a good test set come first.
+- **Very low traffic**: read every conversation instead of sampling.
+- **Internal tools with a few experts**, who tell you directly when something is wrong.
+
+## From demo to production
+
+- **Score from traces asynchronously**, never in the response path.
+- **Store feedback and implicit flags with the trace id and version.**
+- **Alert on sudden changes** by version and topic, not on single bad conversations.
+- **Run the weekly cause review** and share the counts with the client.
+- **Recheck the judge** against human grades every few weeks.
 
 ## Practice
 
@@ -145,5 +223,8 @@ Read Langfuse's evaluation overview and Eugene Yan's piece on the evaluation pro
 1. Add a thumbs up or down with three reasons to your app, stored with the trace id.
 2. Write two automatic checks (citation present, response under a length limit) and one judge for faithfulness, run on a 10% sample after responses are sent.
 3. Grade 30 judged samples yourself and compute how often you agree with the judge.
+4. Run implicit_signals over a week of your own conversations and compare the flagged ones with those that got a thumbs down.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers explicit and conversational feedback, feedback design and its biases, and chapter 3 covers judges.
 
 **You are done when you can** show a weekly view of your online scores and one change you made because of them.

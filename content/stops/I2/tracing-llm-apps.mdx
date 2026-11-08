@@ -33,6 +33,10 @@ flashcards:
     a: "Was the right passage retrieved and put in the prompt? That separates retrieval failures from generation failures."
   - q: "What is OpenTelemetry?"
     a: "The common open standard for traces, which many AI tracing tools build on."
+  - q: "What are the OpenTelemetry GenAI conventions?"
+    a: "Standard attribute names for model calls, such as gen_ai.request.model and gen_ai.usage.input_tokens, so different tracing tools read your spans the same way."
+  - q: "What is tail sampling?"
+    a: "Deciding whether to keep a trace after it finishes, so all traces with errors or slow steps are kept while only a sample of normal ones is stored."
 exercise:
   title: "Read the trace"
   setup: "A Jaipur bank's assistant told a customer the fixed-deposit rate for senior citizens is 7.1%; the current rate is 7.6%. The trace shows: rewrite_query 0.3 s 'senior citizen FD rate'; hybrid_search top: doc 'FD rates April 2026' (0.74), 'FD rates October 2026' (0.72); rerank keeps the April document first; generate 2.1 s quotes 7.1% from the April document. The trace has no prompt version tag."
@@ -51,7 +55,7 @@ ask:
   - "How do I keep personal data out of traces?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -99,6 +103,47 @@ This lesson follows a state-government helpdesk assistant in Bhubaneswar that ga
 
 **Cost and latency by step.** Because every span records time and tokens, totals by step are easy to chart. Teams are often surprised: a query-rewrite call on a large model can cost more than the answer itself, or a reranker can add more delay than the model does.
 
+**Tracing with plain OpenTelemetry.** Most LLM tracing tools (Langfuse, Arize Phoenix and others) accept OpenTelemetry data, so instrumenting with the standard keeps you free to switch:
+
+```python
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+provider = TracerProvider()
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))   # endpoint and auth from env vars
+trace.set_tracer_provider(provider)
+tracer = trace.get_tracer("policy-rag")
+
+def answer(question, user_id, session_id):
+    with tracer.start_as_current_span("answer") as root:
+        root.set_attributes({"app.release": "assistant-2026.11.3", "user.id": user_id, "session.id": session_id})
+        with tracer.start_as_current_span("retrieve") as span:
+            hits = search(question)
+            span.set_attributes({"retrieval.ids": [h["id"] for h in hits],
+                                 "retrieval.top_score": hits[0]["score"] if hits else 0})
+        with tracer.start_as_current_span("generate") as span:
+            reply = call_model(question, hits)
+            span.set_attributes({"gen_ai.request.model": reply.model,
+                                 "gen_ai.usage.input_tokens": reply.usage.input_tokens,
+                                 "gen_ai.usage.output_tokens": reply.usage.output_tokens})
+        return reply
+```
+
+The `gen_ai.*` names follow OpenTelemetry's conventions for generative AI, which tracing tools understand. Point `OTEL_EXPORTER_OTLP_ENDPOINT` at your tool, self-hosted in an Indian region if the client requires it.
+
+**Mask before export.** Strip personal data in your code before it goes into span attributes or events. A small helper applied to every prompt and answer you attach, using the masking patterns from the security lessons, is enough to start; review a sample of stored traces to check it works.
+
+**Keep the traces that matter.** Sampling everything at 10% loses most of the rare failures you need. Two common approaches:
+
+- **Head sampling with exceptions**: always keep traces for requests that error, get a thumbs down or exceed a latency threshold (mark them with an attribute your exporter or collector checks), and sample the rest.
+- **Tail sampling in an OpenTelemetry Collector**: the collector waits for each trace to finish, then keeps all with errors or slow spans and a percentage of the others.
+
+**Cost and latency by step, from the traces.** Group spans by name and sum time and tokens per day. A chart of "share of total cost by step" often shows a cheap win, such as a rewrite step running on a large model, or retrieval that is slow because of one oversized filter.
+
+**From trace to test case.** Add a button or command that takes a trace id and writes its question, retrieved ids and expected answer into the eval set. The easier this is, the faster the eval set grows with real failures.
+
 ## A worked example
 
 A Bhubaneswar state-government helpdesk assistant answers citizens' questions about schemes. An official reports: "It told a farmer the instalment under the state's crop-support scheme is ₹4,000. It is ₹2,000." (The scheme and amounts here are made up for the example.)
@@ -131,6 +176,23 @@ You add `effective_from` metadata and a filter, re-run the trace's query in a te
 - **Tracing personal data unmasked.** Traces become a sensitive data store. Mask, restrict and expire.
 - **Never looking.** Traces are only useful if someone reads them; review a sample every week.
 - **Not turning failures into tests.** Every traced bad answer is a ready-made eval case.
+- **Tracing only the model call**, so retrieval and tool problems are invisible.
+- **Uniform sampling** that throws away most rare failures.
+- **Proprietary tracing calls everywhere**, making a later switch painful; prefer OpenTelemetry.
+
+## When simple logs are enough
+
+- **A single model call per request** with no retrieval or tools: one structured log line with tokens, time and outcome may do.
+- **A prototype only you use.**
+- **Batch jobs** where per-item logs and a summary report cover debugging.
+
+## From demo to production
+
+- **Trace every step** with release, user and session attributes.
+- **Mask personal data before export**, and set retention and access controls.
+- **Keep all failures and slow requests**, sample the rest.
+- **Chart cost and latency by step** weekly.
+- **Turn bad traces into eval cases** with one command.
 
 ## Practice
 
@@ -139,5 +201,8 @@ Read Langfuse's tracing overview and OpenTelemetry's page on traces.
 1. Add tracing to your RAG app with a free, self-hostable tool, recording rewrite, retrieval (with document ids and scores), reranking and generation as separate spans.
 2. Tag traces with an app version and a prompt version, and mask email addresses and phone numbers before sending.
 3. Ask ten questions, find the slowest step and the most expensive request, and save one bad answer's trace as an eval case.
+4. Export your traces to a self-hosted tool through OpenTelemetry, then switch the endpoint to a second tool and confirm the same spans appear.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers logs, traces and what to record for AI applications.
 
 **You are done when you can** open any answer's trace and say which step caused a wrong answer.

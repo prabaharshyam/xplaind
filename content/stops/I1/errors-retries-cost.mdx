@@ -33,6 +33,10 @@ flashcards:
     a: "A monthly spending limit or alert, a max_tokens cap on every call, per-user daily limits, and logging tokens and cost per request."
   - q: "What is a fallback?"
     a: "What happens when calls keep failing: a cached answer, a simpler model, a friendly 'try again', or routing to a person."
+  - q: "What does a circuit breaker do?"
+    a: "After several failures in a row it stops calling the failing service for a while and uses the fallback straight away, so users are not left waiting."
+  - q: "When should you use a batch API?"
+    a: "For work that can wait hours, such as overnight summaries or evals. Providers often charge much less for batch requests, and they do not count against normal rate limits in the same way."
 exercise:
   title: "Fix the retry loop"
   setup: "An app in Indore calls a model API for each of 2,000 product descriptions. Its code: while True: try the call; on any error, retry immediately. It runs 50 calls at once, has no timeout and no max_tokens. One night the bill is ₹45,000 instead of ₹4,000. Logs show many 429 errors, and one 400 error ('input too long') for a description pasted from a PDF, retried 3,000 times."
@@ -51,7 +55,7 @@ ask:
   - "What is a rate limit and how do I handle it?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -112,6 +116,83 @@ After that, stop and use the fallback. For interactive features, users will not 
 
 **Cost per request.** Every response tells you how many input and output tokens were used. Multiply by the provider's current prices and log the result with the request id, user and feature. A weekly look at cost per feature and per user shows quickly whether one feature, one user or one bug is driving the bill.
 
+**A retry wrapper in code.** Retry only what can succeed later, honour `retry-after`, and stop:
+
+```python
+import random, time
+import anthropic
+
+RETRYABLE = (anthropic.RateLimitError, anthropic.APIConnectionError,
+             anthropic.APITimeoutError, anthropic.InternalServerError)
+
+def with_retries(call, attempts=4, base=1.0, cap=20.0):
+    for attempt in range(attempts):
+        try:
+            return call()
+        except RETRYABLE as err:
+            if attempt == attempts - 1:
+                raise
+            header = getattr(getattr(err, "response", None), "headers", {}) or {}
+            wait = float(header.get("retry-after", 0)) or min(cap, base * 2 ** attempt) + random.random()
+            time.sleep(wait)
+        # Anything else (400, 401, 403, 404) is raised immediately: fix the request instead.
+
+client = anthropic.Anthropic(max_retries=0)    # turn off SDK retries so they do not stack with yours
+reply = with_retries(lambda: client.messages.create(
+    model="claude-sonnet-5-5", max_tokens=300,  # check the docs for current names
+    messages=[{"role": "user", "content": "Summarise this complaint in one line: ..."}]))
+```
+
+Either use the SDK's built-in retries or your own wrapper, never both, or one failure can trigger a dozen requests.
+
+**A circuit breaker.** When a provider is down, retries make each user wait the whole retry time. A breaker remembers recent failures and skips straight to the fallback:
+
+```python
+class Breaker:
+    def __init__(self, threshold=5, cool_off=60):
+        self.fails, self.threshold, self.cool_off, self.opened = 0, threshold, cool_off, 0.0
+
+    def call(self, primary, fallback):
+        if self.fails >= self.threshold and time.time() - self.opened < self.cool_off:
+            return fallback()                      # open: do not even try
+        try:
+            result = primary()
+            self.fails = 0
+            return result
+        except RETRYABLE:
+            self.fails += 1
+            if self.fails >= self.threshold:
+                self.opened = time.time()
+            return fallback()
+```
+
+The fallback can be a smaller model from the same or another provider, a cached answer, or a clear message. Test it by pointing the primary at a wrong URL.
+
+**Limit concurrency.** For jobs that fan out, cap how many calls run at once so you stay inside rate limits:
+
+```python
+import asyncio
+SEM = asyncio.Semaphore(8)                       # at most 8 calls in flight
+
+async def limited(coro_factory):
+    async with SEM:
+        return await coro_factory()
+```
+
+**Batch work that can wait.** Overnight jobs, such as summarising the day's tickets or running evals, can go through a batch API. With Anthropic's, you submit many requests at once and collect results later, at a lower price than normal calls:
+
+```python
+batch = client.messages.batches.create(requests=[
+    {"custom_id": f"ticket-{t['id']}",
+     "params": {"model": "claude-haiku-5-5", "max_tokens": 200,
+                "messages": [{"role": "user", "content": f"Summarise: {t['text']}"}]}}
+    for t in tickets
+])
+print(batch.id, batch.processing_status)         # poll later, then fetch the results
+```
+
+Check the provider's current batch pricing and turnaround time, and note the date you checked.
+
 ## A worked example
 
 Fatima's app summarises customer reviews for 300 small sellers each night. One morning she finds the job failed halfway and the bill was three times normal.
@@ -157,6 +238,25 @@ She also truncates each review to 4,000 characters, sets `max_tokens=300` for su
 - **No spending limit or alerts.**
 - **No `max_tokens` cap.**
 - **Double retries.** Check what the SDK already does before adding your own.
+- **SDK retries plus your own retries.** Failures multiply into floods of requests.
+- **Retrying forever during an outage.** Use a circuit breaker and a fallback.
+- **Running urgent and batch work through the same limits**, so overnight jobs starve daytime users.
+
+## When simple handling is enough
+
+- **A personal script**: the SDK's default retries and a spending alert are plenty.
+- **Low-traffic internal tools**, where an occasional "please try again" costs little.
+- **One-off batch jobs** you watch yourself and can rerun.
+
+Add circuit breakers, fallbacks, concurrency limits and per-user caps when real users depend on the feature or traffic is high.
+
+## From demo to production
+
+- **One retry layer**, with logged attempts and reasons.
+- **A circuit breaker and fallback** for every user-facing model call.
+- **Separate limits and keys** for interactive and batch work.
+- **Alert on error rate, retry rate and spend** per feature.
+- **Test the fallback path** regularly by breaking the primary on purpose in staging.
 
 ## Practice
 
@@ -165,5 +265,6 @@ Read the API errors and rate limits pages linked below.
 1. Write a wrapper that retries only retryable errors with exponential backoff and jitter, and test it with a fake function that fails twice with 429 and then succeeds.
 2. Make it fail fast on a 400 error.
 3. Set a spending limit or alert on your API account and add `max_tokens` to every call in one of your apps.
+4. Add the circuit breaker to your wrapper, point the primary at a wrong URL, and confirm users get the fallback within a second after the breaker opens.
 
 **You are done when you can** explain which errors to retry and how, and name three guards that cap what your app can spend.

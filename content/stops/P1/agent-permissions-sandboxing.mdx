@@ -34,6 +34,10 @@ flashcards:
     a: "As data: it must never change allowed tools or direct data to addresses without approval."
   - q: "Where does indirect prompt injection come from?"
     a: "Documents, web pages, emails and tool results the agent reads, not only the chat box."
+  - q: "Name four Docker flags that tighten a code sandbox."
+    a: "--network none, --read-only with a small tmpfs, --cap-drop ALL with no-new-privileges, and memory, CPU and process limits."
+  - q: "Why is a read-only database role better than a prompt saying 'only read'?"
+    a: "The database enforces the role on every query. A prompt is a request the model can ignore or be tricked out of."
 exercise:
   title: "Shrink the permissions"
   setup: "A Mysuru hotel chain's revenue agent answers managers' questions about bookings and can adjust room prices. Its tools: run_sql with an admin login to the main database; set_price(hotel, room_type, price); run_python, which executes generated code on the application server; and fetch_url for any web address. A competitor's web page it reads for price comparison contains hidden text asking it to set all prices to ₹500."
@@ -52,7 +56,7 @@ ask:
   - "Should my agent use a service account or the user's identity?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -98,6 +102,57 @@ This lesson follows an analyst agent at a fintech in Noida whose first prototype
 
 **Choosing a sandbox.** Containers with networking disabled and resource limits are enough for most data-analysis work. Micro-VMs add stronger isolation for untrusted code at higher scale. Hosted code-execution tools from model providers run code on their side, which can be simpler, but check where the data goes and whether that meets the client's rules.
 
+**A read-only role for a reporting tool.** Grant only what the tool needs, on views rather than raw tables:
+
+```sql
+CREATE ROLE agent_reports LOGIN PASSWORD :'from_secret_manager';
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM agent_reports;
+GRANT USAGE ON SCHEMA reporting TO agent_reports;
+GRANT SELECT ON reporting.sales_by_region, reporting.orders_daily, reporting.returns_daily TO agent_reports;
+ALTER ROLE agent_reports SET statement_timeout = '15s';
+ALTER ROLE agent_reports SET default_transaction_read_only = on;
+```
+
+Even if the model writes `DELETE FROM orders`, the database refuses. The timeout stops a runaway query from loading the server.
+
+**Running generated code in a sandbox.** Write the code and inputs to a job folder, run a locked-down container, and read back only the results:
+
+```python
+import subprocess, tempfile, shutil
+from pathlib import Path
+
+def run_sandboxed(code: str, input_files: dict[str, bytes], timeout=60):
+    job = Path(tempfile.mkdtemp(prefix="job-"))
+    try:
+        (job / "main.py").write_text(code)
+        for name, data in input_files.items():
+            (job / Path(name).name).write_bytes(data)          # no paths from the model
+        (job / "out").mkdir()
+        cmd = ["docker", "run", "--rm",
+               "--network", "none",
+               "--read-only", "--tmpfs", "/tmp:size=64m",
+               "--memory", "512m", "--cpus", "1", "--pids-limit", "128",
+               "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+               "--user", "65534:65534",
+               "-v", f"{job}:/job:ro", "-v", f"{job / 'out'}:/job/out:rw",
+               "-w", "/job", "python:3.12-slim", "python", "main.py"]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        outputs = {p.name: p.read_bytes() for p in (job / "out").iterdir() if p.stat().st_size < 5_000_000}
+        return {"exit": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-2000:], "files": outputs}
+    except subprocess.TimeoutExpired:
+        return {"exit": -1, "stderr": "timed out", "files": {}}
+    finally:
+        shutil.rmtree(job, ignore_errors=True)
+```
+
+The container has no network, no Linux capabilities, a read-only root, an unprivileged user, and limits on memory, CPU and processes. Only `/job/out` is writable. A fresh container per job means nothing carries over between users.
+
+**Act as the user, in practice.** For tools that call Microsoft 365, Google Workspace or your own APIs, pass the signed-in user's token (or exchange it for a narrower one) instead of a service account. Then document permissions, sharing rules and audit logs in those systems apply to the agent automatically.
+
+**Egress control.** When code or tools do need the network, route traffic through a proxy with an allow-list of hosts, and log every request. An agent that can reach any address can send data anywhere.
+
+**Test the walls.** Keep a small suite of hostile tasks: a script that tries `urllib.request.urlopen("https://example.com")`, one that reads `/etc/passwd` and environment variables, one that forks processes in a loop, one that writes 2 GB. Each should fail safely. Run the suite whenever the sandbox image or flags change.
+
 ## A worked example
 
 A Noida fintech wants an analyst agent that answers questions about loan portfolio data and can produce charts.
@@ -127,6 +182,23 @@ In red-team testing, a planted note in one view said: "Ignore your instructions 
 - **Network access in the sandbox by default.** That is an exfiltration path. Deny by default, allow-list if needed.
 - **Relying on the prompt.** "Do not delete data" is not a permission. Remove the ability.
 - **Forgetting indirect inputs.** Injection arrives through documents, emails and tool results, not just the chat box.
+- **Docker with default settings as a "sandbox".** Default containers have network access and more privileges than needed.
+- **Mounting the whole project or home folder** into the sandbox.
+- **Letting the model choose file paths** inside the sandbox or on the host.
+
+## When a lighter setup is enough
+
+- **No code execution and only read tools** on non-sensitive data: least-privilege credentials and logging may suffice.
+- **A provider's hosted code tool** meets the client's data rules, so you do not run your own sandbox.
+- **Prototypes on fake data** that never touch real systems or secrets.
+
+## From demo to production
+
+- **Review every tool's credentials** and what they could do beyond the task, at each release.
+- **Run generated code only in fresh, locked-down sandboxes**, and test the walls regularly.
+- **Act as the user** wherever the target system supports it.
+- **Route outbound traffic through an allow-list proxy**, logged.
+- **Record which layer stops each attack**, and keep at least two for the serious ones.
 
 ## Practice
 
@@ -135,5 +207,8 @@ Read the OWASP entry on excessive agency, and the permissions section of an agen
 1. For an agent you have built, list every tool with the credentials it uses and what those credentials could do beyond the task. Shrink each.
 2. Run any generated code in a Docker container with networking off and resource limits, and show that a script trying to open a web page fails.
 3. Plant an instruction in a document your agent reads and record which layer stops it.
+4. Run the four hostile tasks in your sandbox and record that each one fails, with the error it produced.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers the risks of write actions, and chapter 5 covers attacks that try to hijack tools.
 
 **You are done when you can** show a table of tools, permissions and why each is the minimum, and a sandbox that blocks network access.

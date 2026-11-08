@@ -33,6 +33,10 @@ flashcards:
     a: "It becomes a single point of failure for every AI feature, so run several instances with health checks and monitoring."
   - q: "Why mask prompts in gateway logs?"
     a: "The gateway sees every request, so unmasked logs make it the largest sensitive data store you have."
+  - q: "What is a virtual key in a gateway?"
+    a: "A key the gateway issues to one team or feature, mapped to real provider keys it never sees, with its own allowed models, budget and logs."
+  - q: "Why must a fallback model be tested on your evals?"
+    a: "A different model can change format, tone or accuracy. If the fallback breaks your output parser or quality bar, it turns an outage into silent errors."
 exercise:
   title: "Plan the gateway"
   setup: "A Pune healthtech has three AI features: a symptom-intake chatbot for patients in India, a coding assistant for its engineers, and a nightly job summarising doctor notes. Each team calls providers directly with its own keys. Patient data must stay in India. Last month a provider's rate limit took the chatbot down for 30 minutes, and nobody knows which feature drives the ₹9 lakh monthly bill."
@@ -51,7 +55,7 @@ ask:
   - "How do I track AI costs by team?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -111,6 +115,63 @@ This lesson follows a fintech in Bengaluru where five AI features from four team
 
 **Rolling out a gateway.** Move one low-risk feature first, compare its errors, latency and cost with before, then migrate the others one at a time. Keep each team's old direct keys working for a short overlap, then revoke them, so the gateway becomes the only path to providers.
 
+**A gateway configuration.** LiteLLM's proxy is a common open-source choice; other gateways follow the same ideas. One file defines aliases, real models, fallbacks and the admin key:
+
+```yaml
+# litellm-config.yaml
+model_list:
+  - model_name: chat-default                 # the alias apps use
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5     # check the docs for current names
+      api_key: os.environ/ANTHROPIC_API_KEY
+      timeout: 30
+  - model_name: chat-backup
+    litellm_params:
+      model: bedrock/<model id from your Bedrock console>
+      aws_region_name: ap-south-1
+  - model_name: fast
+    litellm_params:
+      model: anthropic/claude-haiku-5-5
+
+litellm_settings:
+  num_retries: 2
+  fallbacks: [{"chat-default": ["chat-backup"]}]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/GATEWAY_DB_URL     # stores keys, budgets and spend
+```
+
+Run it with two or more instances behind a load balancer: `litellm --config litellm-config.yaml --port 4000`.
+
+**Apps call the alias, not the provider.** Any OpenAI-compatible client works:
+
+```python
+import os
+from openai import OpenAI
+
+client = OpenAI(base_url="https://gateway.internal.example.in", api_key=os.environ["TEAM_CLAIMS_KEY"])
+reply = client.chat.completions.create(model="chat-default",
+                                       messages=[{"role": "user", "content": "Summarise this claim: ..."}])
+```
+
+Switching every app to a new model is now one line in the gateway config, reviewed like code and tested on the golden set first.
+
+**Keys with budgets per team.** The admin creates a virtual key for each feature:
+
+```bash
+curl -s https://gateway.internal.example.in/key/generate \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H "Content-Type: application/json" \
+  -d '{"models": ["chat-default", "fast"], "max_budget": 50, "budget_duration": "30d",
+       "metadata": {"team": "claims", "owner": "platform-lead"}}'
+```
+
+The team never sees the provider keys; revoking their virtual key cuts them off without rotating anything else. Budgets are in the gateway's currency setting (often US dollars), so convert and note the rate.
+
+**Region-aware routing.** For Indian personal data, point the aliases used by those features only at Indian-region endpoints, and keep a separate alias for features allowed to use other regions. Log the region of every call so an audit can confirm the rule held.
+
+**The gateway is critical infrastructure.** Monitor its own latency (it should add only milliseconds), error rate and database health, keep it close to your apps, and have a documented emergency path, such as a feature flag that sends one critical feature directly to its provider.
+
 ## A worked example
 
 A Bengaluru fintech has five AI features built by four teams. Each team has its own provider keys; finance sees one big monthly bill. A provider outage last month took down the customer chatbot for 50 minutes.
@@ -139,6 +200,25 @@ The next provider incident causes 90 seconds of slower responses while the fallb
 - **Model names hard-coded in apps.** Use aliases so upgrades and swaps are central.
 - **No per-feature attribution.** Cost reports by provider alone do not tell you what to fix.
 - **Gateway logs with full prompts and no masking.** The gateway becomes the biggest sensitive data store you have.
+- **A single gateway instance** that takes every AI feature down when it fails.
+- **Untested fallbacks**, which break output formats or quality when they first fire.
+- **Model names in application code** instead of gateway aliases.
+
+## When a gateway is overkill
+
+- **One app with one provider**: the provider SDK with retries and a budget alert is enough.
+- **A small team** that would spend more time running the gateway than it saves.
+- **A managed platform** that already provides keys, budgets and routing.
+
+A gateway pays off once several teams or apps share providers, keys and budgets.
+
+## From demo to production
+
+- **Run at least two instances** with health checks and their own monitoring.
+- **Keep the config in Git**, reviewed, and tested on the golden set for model changes.
+- **Issue virtual keys** per team with budgets and owners.
+- **Route personal data to approved regions only**, and log regions.
+- **Drill fallbacks** by breaking the primary in staging.
 
 ## Practice
 
@@ -147,5 +227,7 @@ Read the LiteLLM gateway docs and the RouteLLM post.
 1. Run an open-source gateway locally in Docker with two model providers (or two models from one provider) behind one alias.
 2. Configure a fallback, then break the primary (a wrong key) and show requests still succeed.
 3. Create two keys with different budgets and show the second is refused after its budget is spent.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers routers and gateways in an AI architecture.
 
 **You are done when you can** switch a feature's model without changing its code, and show a cost report by key.

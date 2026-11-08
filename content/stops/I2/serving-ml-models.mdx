@@ -34,6 +34,10 @@ flashcards:
     a: "A planned decision when the model is unavailable, such as a simple rule or routing to manual review."
   - q: "What should every prediction log record?"
     a: "Inputs or their summaries, the output, the model version and a timestamp, with personal data masked."
+  - q: "How do you send a stable share of users to a canary model?"
+    a: "Hash each user's id to a number from 0 to 99 and send users below the canary percentage to the new model, so each user always sees the same version."
+  - q: "Why load the model at start-up, not per request?"
+    a: "Loading takes seconds and memory. Doing it once in the app's start-up keeps each prediction fast and avoids running out of memory under load."
 exercise:
   title: "Choose and plan the serving"
   setup: "A Surat diamond exporter has two models: (A) a demand forecast per product for the next month, used by planners each Monday; (B) a price check that flags unusual quotes while a salesperson types into the order system, which must respond within 200 milliseconds. A new version of (B) is ready, and a partner system sends weights in carats while the internal system uses cents."
@@ -52,7 +56,7 @@ ask:
   - "What is a feature store?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -111,6 +115,76 @@ This lesson follows a non-banking finance company in Kolkata serving one default
 
 **Keeping batch and real-time consistent.** When a model is served both ways, both paths must load the same registered version and call the same feature code. A useful test scores a sample of records through the batch job and through the API and checks that every score matches.
 
+**A real-time service in code.** Load once at start-up, validate inputs against training ranges, record the version with every prediction:
+
+```python
+from contextlib import asynccontextmanager
+import mlflow.pyfunc, pandas as pd
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+MODELS = {}
+
+@asynccontextmanager
+async def lifespan(app):
+    MODELS["champion"] = mlflow.pyfunc.load_model("models:/claims-fraud@champion")
+    MODELS["challenger"] = mlflow.pyfunc.load_model("models:/claims-fraud@challenger")
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+class Claim(BaseModel):
+    claim_amount_inr: float = Field(gt=0, le=5_000_000)        # the range seen in training
+    policy_age_days: int = Field(ge=0, le=20_000)
+    hospital_tier: int = Field(ge=1, le=3)
+    prior_claims: int = Field(ge=0, le=50)
+
+@app.post("/score")
+def score(claim: Claim, user_id: str):
+    X = pd.DataFrame([claim.model_dump()])
+    main = float(MODELS["champion"].predict(X)[0])
+    shadow = float(MODELS["challenger"].predict(X)[0])          # logged, never used for the decision
+    log_prediction(user_id, claim, main=main, shadow=shadow)
+    return {"score": main, "model": "champion"}
+```
+
+Pydantic rejects out-of-range inputs with a clear 422 before the model sees them.
+
+**A canary by user hash.** When the challenger is ready for real decisions, route a stable slice of users to it:
+
+```python
+import hashlib
+
+def bucket(user_id: str) -> int:
+    return int(hashlib.sha256(user_id.encode()).hexdigest()[:8], 16) % 100
+
+def pick_model(user_id: str, canary_percent: int = 5) -> str:
+    return "challenger" if bucket(user_id) < canary_percent else "champion"
+```
+
+The same user always gets the same model, which keeps their experience consistent and the comparison clean. Raise the percentage in steps (5, 25, 50, 100) while watching outcomes and errors for each group.
+
+**Batch scoring with a version stamp.**
+
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+def score_batch(in_path, out_path, alias="champion"):
+    model_uri = f"models:/claims-fraud@{alias}"
+    model = mlflow.pyfunc.load_model(model_uri)
+    df = pd.read_parquet(in_path)
+    df["score"] = model.predict(df[FEATURES])
+    df["model_version"] = mlflow.MlflowClient().get_model_version_by_alias("claims-fraud", alias).version
+    df["scored_at"] = datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(timespec="seconds")
+    df.to_parquet(out_path)
+    print(f"{len(df)} rows; score mean {df['score'].mean():.3f}; share above 0.8: {(df['score'] > 0.8).mean():.1%}")
+```
+
+The printed summary is a cheap monitor: a big jump in the mean or the high-score share is worth a look before anyone acts on the list.
+
+**A consistency test.** Score 500 records through both the batch job and the API, and assert the scores match to a small tolerance. A difference means the two paths compute features differently, the most common silent bug in served models.
+
 ## A worked example
 
 A Kolkata NBFC (non-banking finance company) has a trained default-risk model.
@@ -134,6 +208,23 @@ One early bug: the service received income in lakhs from one partner channel and
 - **No input validation.** Unit mismatches and missing fields silently ruin predictions.
 - **All-at-once deployment.** Use shadow and canary releases.
 - **No fallback.** Decide what happens when the model is unavailable.
+- **No input range checks**, so out-of-range values give confident nonsense.
+- **Random canary assignment per request**, so one user sees both models.
+- **Batch and real-time paths computing features differently.**
+
+## When you may not need a serving service
+
+- **Scores needed daily or weekly**: a batch job writing to a table is cheaper and simpler.
+- **Models small enough to run in the client app or database**, such as rules or a small tree exported as SQL.
+- **A hosted ML platform** the client already runs, which provides endpoints, canaries and monitoring.
+
+## From demo to production
+
+- **Load from a registry alias** and log the version with every prediction.
+- **Validate inputs** against training ranges.
+- **Roll out with shadow, then a hash-based canary**, watching outcomes per group.
+- **Test batch and real-time consistency** in CI.
+- **Track p95 latency, errors and score distributions.**
 
 ## Practice
 
@@ -142,5 +233,6 @@ Read BentoML's introduction and the serving section of Google's Rules of ML; reu
 1. Write a batch scoring script that loads a saved pipeline, scores a CSV and writes results with the model version.
 2. Serve the same pipeline as a FastAPI endpoint with input validation and a latency measurement.
 3. Run a new model version in shadow mode on the same inputs and compare outputs.
+4. Add the hash-based canary at 10%, send 1,000 fake user ids, and confirm about 100 reach the challenger and each id always lands in the same group.
 
 **You are done when you can** serve a model both ways with identical predictions for the same inputs, and explain your rollout plan.

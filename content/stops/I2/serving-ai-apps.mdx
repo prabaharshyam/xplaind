@@ -33,6 +33,10 @@ flashcards:
     a: "On deploy, stop accepting new requests and let in-flight ones, including long streams, finish within a grace period."
   - q: "How should jobs taking minutes be handled?"
     a: "Accept the job, return an id at once, process it on a background queue, and let the client poll or get a webhook."
+  - q: "What is load shedding?"
+    a: "Refusing extra requests quickly with a 429 or 503 when the service is at capacity, so the requests already accepted still finish in good time."
+  - q: "Why must the graceful shutdown period exceed the longest stream?"
+    a: "Otherwise a deploy cuts off answers mid-stream for users who are still reading them."
 exercise:
   title: "Fix the evening slowdown"
   setup: "A Patna exam-prep app's AI answer service runs one Uvicorn process. At 9 pm, students wait 15 seconds before any text appears, some requests hang for minutes, PDF uploads for summarising freeze everyone, and the platform's health check calls the model, so instances get restarted whenever the provider is slow."
@@ -51,7 +55,7 @@ ask:
   - "When should I use a background job queue?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -107,6 +111,78 @@ async def answer(req: Request, body: Question):
 
 **Measuring before and after.** Record three numbers per request: time to first token, total time and whether it timed out. Look at the 95th percentile, not the average, because the slowest requests are the ones users complain about. Load-test with a tool such as Locust at the expected evening peak before launch, and again after each change.
 
+**A real streaming endpoint.** Forward tokens from the model as server-sent events, with a timeout, a concurrency cap and disconnect handling:
+
+```python
+import asyncio, json
+import anthropic
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+app = FastAPI()
+client = anthropic.AsyncAnthropic(timeout=30, max_retries=2)
+SLOTS = asyncio.Semaphore(50)                     # at most 50 model calls at once per process
+
+class Question(BaseModel):
+    text: str
+
+@app.post("/answer")
+async def answer(req: Request, body: Question):
+    if SLOTS.locked():
+        raise HTTPException(status_code=429, detail="Busy, please retry in a few seconds")
+    async def events():
+        async with SLOTS:
+            try:
+                async with client.messages.stream(
+                        model="claude-sonnet-5-5", max_tokens=600,         # check the docs for current names
+                        messages=[{"role": "user", "content": body.text}]) as stream:
+                    async for text in stream.text_stream:
+                        if await req.is_disconnected():
+                            return                                         # stop paying for unread tokens
+                        yield f"data: {json.dumps({'text': text})}\n\n"
+                yield "data: [DONE]\n\n"
+            except anthropic.APIError:
+                yield f"data: {json.dumps({'error': 'The AI service is unavailable. Please try again.'})}\n\n"
+    return StreamingResponse(events(), media_type="text/event-stream")
+
+@app.get("/health")
+async def health():
+    return {"ok": True}
+```
+
+Encoding each chunk as JSON keeps newlines inside the text from breaking the event format. Leaving the `async with` closes the stream, which stops generation when the user disconnects.
+
+**Running it.** Several worker processes, a graceful timeout longer than the longest stream:
+
+```bash
+gunicorn app.main:app -k uvicorn.workers.UvicornWorker --workers 4 \
+  --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 90
+```
+
+**Background jobs with a queue.** Long work goes to a worker; the request returns a job id at once. With Redis Queue:
+
+```python
+from redis import Redis
+from rq import Queue
+
+queue = Queue("ingest", connection=Redis.from_url("redis://redis:6379"))
+
+@app.post("/documents")
+async def upload(doc_id: str):
+    job = queue.enqueue("workers.index_pdf", doc_id, job_timeout=1800, retry=None)
+    return {"job_id": job.id, "status_url": f"/jobs/{job.id}"}
+
+@app.get("/jobs/{job_id}")
+async def job_status(job_id: str):
+    job = queue.fetch_job(job_id)
+    return {"status": job.get_status() if job else "unknown"}
+```
+
+Celery, Arq and cloud task queues follow the same pattern.
+
+**Readiness that tells the truth.** `/ready` should check the database and the vector store with a fast query and a short timeout, and return 503 during start-up until models or indexes are loaded. The platform then sends traffic only to instances that can actually answer.
+
 ## A worked example
 
 A Lucknow edtech's doubt-solving assistant ran as one Uvicorn process. During evening study hours, students waited 12 seconds for any text. A third of requests timed out at the load balancer's 30-second limit, and uploads of handwritten notes for OCR froze the server for everyone.
@@ -136,6 +212,23 @@ Timeouts fell from 33% to under 1% in the evening peak, and the number of studen
 - **Health checks that call the model.** They cost money and fail when the provider is slow, taking healthy instances out.
 - **Long jobs inside requests.** Use a queue for anything that can take more than a few seconds of CPU.
 - **No load test before launch.** The first evening peak should not be the first time the service sees real traffic.
+- **No cap on concurrent model calls**, so a burst hits provider rate limits and every request slows.
+- **Raw text in SSE events**, where a newline inside the answer breaks the stream.
+- **Ready checks that only say the process is alive.**
+
+## When simpler serving is fine
+
+- **Internal tools with a few users**: one process, timeouts and a health check are enough.
+- **Batch jobs** that never face users: a scheduled script beats a web service.
+- **Platform-hosted functions**, such as serverless routes, where the platform manages workers and shutdown.
+
+## From demo to production
+
+- **Cap concurrency** per process and shed load with a clear 429.
+- **Set timeouts** inner to outer: model call, request, load balancer.
+- **Stream with disconnect handling**, and set graceful shutdown longer than the longest stream.
+- **Move long work to a queue** with job ids and status.
+- **Track time to first token, total time and timeouts** at p95.
 
 ## Practice
 
@@ -144,5 +237,8 @@ Read FastAPI's deployment concepts page and its custom responses page on streami
 1. Add a streaming endpoint to your FastAPI app that forwards model tokens to the client, and measure time to first token before and after.
 2. Add timeouts on the model call and the request, `/health` and `/ready` endpoints, and run with four workers.
 3. Move one slow task to a background job with a job id and a status endpoint.
+4. Send 100 concurrent requests to your endpoint with a load tool and confirm extra requests get a fast 429 instead of timing out.
+
+For more depth, chapter 9 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers latency, throughput and streaming.
 
 **You are done when you can** show time to first token under a second, a timeout returning a helpful error, and a slow job that no longer blocks other users.

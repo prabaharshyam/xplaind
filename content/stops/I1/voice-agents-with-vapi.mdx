@@ -32,6 +32,10 @@ flashcards:
     a: "Say so clearly and hand over: transfer to a human, take a message, or send a link by SMS. Never invent answers."
   - q: "What must you tell callers?"
     a: "That they are speaking with an AI assistant, and if you record calls, that the call is recorded, as consumer and privacy rules require."
+  - q: "Where does the delay in a voice agent come from?"
+    a: "Detecting that the caller stopped, speech-to-text, the model's first token, any tool call, and text-to-speech. Each adds time, so trim all of them."
+  - q: "Why confirm numbers back to the caller?"
+    a: "Speech-to-text often mishears digits, names and dates, especially on noisy phone lines. Repeating them back catches errors before a booking is made."
 exercise:
   title: "Fix the agent"
   setup: "Each test call went wrong. Name the likely cause and a fix."
@@ -49,8 +53,8 @@ ask:
   - "How can I make my voice agent respond faster?"
   - "Can a Vapi agent speak Hindi or Tamil?"
 drafted_with_ai: true
-reviewed_by: "UNREVIEWED"
-reviewed_on: 2026-11-02
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -99,6 +103,58 @@ Your server or n8n webhook -[result]-> LLM + prompt
 
 **Web calls too.** The same assistant can run in a website or app through Vapi's web SDK, so a "Talk to us" button starts a voice conversation in the browser with no phone line at all. This is a cheap way to prototype before buying numbers.
 
+**A tool server in code.** When the assistant calls a tool, Vapi sends a POST request to your server URL, and your server replies with results the agent speaks. A small FastAPI handler; check Vapi's current docs for the exact payload fields:
+
+```python
+import os
+from fastapi import FastAPI, Request, HTTPException
+
+app = FastAPI()
+SECRET = os.environ["VAPI_SERVER_SECRET"]          # the secret you set on the assistant
+
+@app.post("/vapi/tools")
+async def tools(request: Request):
+    if request.headers.get("x-vapi-secret") != SECRET:
+        raise HTTPException(status_code=401)
+    body = await request.json()
+    results = []
+    for call in body["message"].get("toolCallList", []):
+        name, args = call["function"]["name"], call["function"]["arguments"]
+        if name == "book_slot":
+            result = book_slot(**args)             # your validation and booking code
+        else:
+            result = "Sorry, I can't do that on this call."
+        results.append({"toolCallId": call["id"], "result": result})
+    return {"results": results}
+
+def book_slot(date, time, name, phone):
+    if not (phone.isdigit() and len(phone) == 10):
+        return "The phone number should be 10 digits. Please ask the caller to repeat it."
+    slot = calendar.find(date, time)
+    if not slot:
+        return f"{time} on {date} is taken. The nearest free times are {calendar.nearest(date, time)}."
+    calendar.book(slot, name, phone)
+    return f"Booked {name} for {time} on {date}. Read the date and time back to the caller."
+```
+
+Results are written to be spoken: short, with the next thing to say. Validation lives in your code, not just the prompt.
+
+**A latency budget.** Callers notice gaps over about a second. Add up the parts and trim each:
+
+| Part | Typical range | How to cut it |
+| --- | --- | --- |
+| Deciding the caller has stopped | 0.2 to 0.8 s | Tune endpointing; shorter for quick answers |
+| Speech to text | 0.1 to 0.4 s | Streaming transcriber close to India |
+| Model's first token | 0.3 to 1.5 s | Smaller, faster model; short prompt |
+| Tool call | 0.1 to 2 s | Fast tools; say "let me check" before slow ones |
+| Text to speech, first audio | 0.1 to 0.5 s | Streaming voice; short first sentence |
+
+Measure from real call logs, not the dashboard's best case, and look at the slowest calls, not only the average.
+
+**Testing calls before going live.** Write 20 scripted calls covering normal bookings, interruptions, wrong numbers, background noise, Hindi or Tamil mid-sentence, and out-of-scope requests. Run them by phone with different speakers, and score each: booking correct, facts right, no invented answers, handed over when it should.
+
+**Rules for calling in India.** Recording a call and storing transcripts is processing personal data: say so in the first message and in your privacy notice, and keep recordings only as long as needed. Outbound calls for promotion or reminders fall under TRAI's rules for commercial communication, which cover registration, number series and consent. Check the current rules before any outbound campaign.
+
 ## A worked example
 
 Dr Rao's dental clinic in Visakhapatnam misses about 40 calls a week, mostly appointment requests after 7 p.m. Faizan, an automation freelancer, builds a voice receptionist.
@@ -124,6 +180,24 @@ After launch, the end-of-call reports go to a sheet the receptionist checks each
 **No way out.** Always offer a human, a callback or a message. Being stuck with a bot is the fastest way to lose a customer.
 
 **Ignoring cost per minute.** Transcriber, model, voice and telephony each charge per minute or per token. Estimate monthly minutes and check current prices before you quote.
+- **Not checking the webhook secret.** Anyone who finds the URL can call your tools.
+- **Long, written-style tool results.** They sound slow and stiff when read aloud.
+- **Testing only with your own voice.** Accents, noise and languages change accuracy.
+
+## When a voice agent is the wrong choice
+
+- **Callers need to compare many options**, such as long price lists: a WhatsApp message or web page is easier.
+- **Very sensitive conversations**, such as medical results or debt collection, where a person should speak.
+- **Poor transcription for your callers' languages**, confirmed in tests.
+- **A simple IVR menu already works**, and callers are happy with it.
+
+## From demo to production
+
+- **Log every call** with transcript, tool calls, latency per part and outcome.
+- **Review ten calls a week**, five failed and five random.
+- **Alert on long gaps, high transfer rates and failed tool calls.**
+- **Keep a human path** on every call: transfer or take a message.
+- **Retest the 20 scripted calls** after every prompt, voice, transcriber or model change.
 
 ## Practice
 
@@ -131,3 +205,4 @@ After launch, the end-of-call reports go to a sheet the receptionist checks each
 2. Do the "Fix the agent" exercise above.
 3. Follow Vapi's quickstart, linked below, to make your first web call to an assistant.
 4. Do the project check: a clinic or coaching-centre receptionist with a real booking tool and five tested calls.
+5. Build the FastAPI tool server, point a Vapi assistant at it through a tunnel, and make three test calls that hit valid, taken and badly heard slots.

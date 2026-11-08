@@ -33,6 +33,10 @@ flashcards:
     a: "Letting the runner sign in to the cloud with short-lived credentials, instead of storing long-lived keys as secrets."
   - q: "How does tagging images with the commit hash help rollback?"
     a: "Rolling back is just redeploying the previous commit's image, which can be a single button or command."
+  - q: "What is OIDC between GitHub Actions and a cloud?"
+    a: "The workflow gets a short-lived token from GitHub that the cloud trusts for a named repository and branch, so no long-lived cloud keys are stored as secrets."
+  - q: "Why run the smoke eval only when prompts or retrieval change?"
+    a: "It calls a model and costs money and time. A paths filter runs it on the pull requests that can change AI behaviour and skips the rest."
 exercise:
   title: "Find the gaps in this pipeline"
   setup: "A Gurugram startup's pipeline: CI runs only on pushes to main, not on pull requests. Tests run, but there is no eval. The AWS access key is pasted into the workflow file. The deploy job rebuilds the Docker image separately for staging and production. Nobody has ever rolled back."
@@ -51,7 +55,7 @@ ask:
   - "How do I store secrets in GitHub Actions safely?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -102,6 +106,90 @@ This lesson follows the handover of a claims assistant to an insurer's engineeri
 
 **Secrets in practice.** The workflow needs some secrets: a model API key for the smoke eval, credentials to push images, credentials to deploy. Store them in the repository's or environment's secret settings, where they are encrypted and hidden in logs. Give each environment its own secrets, so a staging key can never touch production. For cloud access, prefer OpenID Connect: the cloud trusts the specific repository and branch, and issues a credential that expires after a short time, often an hour. There is then no long-lived key to leak at all.
 
+**A complete workflow.** CI on every pull request, a smoke eval only when AI files change, and build plus deploy on main:
+
+```yaml
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: {enable-cache: true}
+      - run: uv sync --frozen
+      - run: uv run ruff check . && uv run mypy src && uv run pytest -q
+
+  smoke-eval:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changed
+        with:
+          filters: |
+            ai: ['prompts/**', 'src/retrieval/**', 'evals/**']
+      - uses: astral-sh/setup-uv@v5
+        if: steps.changed.outputs.ai == 'true'
+      - if: steps.changed.outputs.ai == 'true'
+        run: uv sync --frozen && uv run python evals/smoke.py --min-accuracy 0.85
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.EVAL_API_KEY }}
+
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: {contents: read, packages: write}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
+      - uses: docker/build-push-action@v6
+        with: {push: true, tags: "ghcr.io/${{ github.repository }}:${{ github.sha }}"}
+
+  deploy-production:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production                    # requires a reviewer's approval
+    permissions: {id-token: write, contents: read}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: {role-to-assume: "${{ vars.DEPLOY_ROLE_ARN }}", aws-region: ap-south-1}
+      - run: ./scripts/deploy.sh ghcr.io/${{ github.repository }}:${{ github.sha }}
+```
+
+The production job gets cloud access through OIDC (`id-token: write` and a role the cloud trusts), so no long-lived cloud keys sit in GitHub. Azure and Google Cloud have equivalent login actions.
+
+**The smoke eval script decides with its exit code.** Any non-zero exit fails the job:
+
+```python
+import argparse, json, sys
+from app.answer import answer                 # your pipeline
+
+p = argparse.ArgumentParser(); p.add_argument("--min-accuracy", type=float, default=0.85)
+args = p.parse_args()
+cases = [json.loads(l) for l in open("evals/smoke.jsonl")]
+correct = sum(c["expected"].lower() in answer(c["question"]).lower() for c in cases)
+acc = correct / len(cases)
+print(f"smoke accuracy {acc:.0%} on {len(cases)} cases")
+sys.exit(0 if acc >= args.min_accuracy else 1)
+```
+
+**Pin actions.** Third-party actions run with access to your repository. Pin them to a version (or, for stricter setups, a full commit hash) and review updates, so a compromised action cannot slip into your pipeline.
+
+**Cancel superseded runs.** The `concurrency` block cancels the older run when you push again to the same branch, which saves runner minutes and model calls.
+
 ## A worked example
 
 You hand over a claims-assistant to a Kochi insurer's engineering team. Their lead, Anjali, wants every change tested and nothing in production without her team's sign-off.
@@ -150,6 +238,23 @@ A week later a teammate changes the prompt and the smoke eval drops from 0.89 to
 
 - **Flaky tests left in place.** A test that fails randomly teaches people to rerun CI until it passes, and then real failures get ignored too. Fix or remove flaky tests quickly.
 - **Evals that call a live model on every PR without a budget.** Keep the PR eval small and cheap, cache what you can, and run the full suite on a schedule.
+- **Long-lived cloud keys stored as secrets** when OIDC is available.
+- **Running paid evals on every push** instead of only on relevant changes.
+- **Unpinned third-party actions.**
+
+## When a lighter pipeline is enough
+
+- **A personal project**: lint and tests on push are plenty.
+- **Platforms with built-in deploys**, such as Vercel previews, where CI only needs checks.
+- **Notebooks and research code** that never deploy.
+
+## From demo to production
+
+- **Require CI and review** before merging to main.
+- **Use environments** with approvals and separate secrets for production.
+- **Deploy with OIDC**, not stored cloud keys.
+- **Gate AI changes** on a smoke eval and run the full eval nightly.
+- **Practise rollback** to the previous image tag.
 
 ## Practice
 
@@ -158,5 +263,6 @@ Follow GitHub's Actions quickstart and the page on deployment environments.
 1. Add a workflow that runs lint and tests on every pull request in one of your repositories.
 2. Add a job that builds and pushes your Docker image tagged with the commit hash on merges to main.
 3. Create staging and production environments, require your own approval for production, and practice a rollback to the previous image.
+4. Add the paths filter so your smoke eval runs only when prompts or retrieval code change, and open two pull requests to show it running once and skipping once.
 
 **You are done when you can** show a failing PR blocked by CI, an approval gate before production, and a rollback you performed.

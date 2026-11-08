@@ -33,6 +33,10 @@ flashcards:
     a: "For exact values, JSON validity, required fields, word limits, citations present and banned phrases."
   - q: "How can judge costs be kept down?"
     a: "Use smaller models where agreement stays high, and run judges offline or on samples."
+  - q: "Why is a judge 'a model plus a prompt'?"
+    a: "Change either the judge's model or its prompt and you have a different judge, so old and new scores are not comparable without recalibrating."
+  - q: "What does Cohen's kappa add to plain agreement?"
+    a: "It corrects for agreement expected by chance. If 90% of outputs pass, two graders who always say pass agree 90% of the time while knowing nothing."
 exercise:
   title: "Fix the judge"
   setup: "A Bengaluru support team uses a judge prompt: 'Rate this reply from 1 to 10 for quality.' Scores average 8.7 even for replies customers complained about. In A-versus-B tests, the judge picks reply A 68% of the time. Longer replies score higher. The judge also checks whether replies include the ticket number, which it gets wrong now and then."
@@ -51,7 +55,7 @@ ask:
   - "How many human grades do I need to calibrate a judge?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -106,6 +110,55 @@ This lesson follows a legal-tech startup in Chennai measuring whether its judgme
 
 **Where judges fit in the pipeline.** Run code checks first and skip the judge for outputs that already fail them, which saves calls. Run the judge on every case in offline evals, and on a small random sample of live traffic for online monitoring. Send judge failures in production to a review queue, where people confirm or overturn them, and add the confirmed ones to the test set.
 
+**A judge in code.** Ask for evidence first and a verdict last, as structured output, so verdicts are easy to count and reasons easy to read:
+
+```python
+import json
+import anthropic
+
+client = anthropic.Anthropic()
+JUDGE_MODEL = "claude-sonnet-5-5"           # pin a dated version where offered
+JUDGE_PROMPT = """You check one thing: does the ANSWER contain any claim not supported by the PASSAGES?
+Ignore style, length and tone.
+PASS example: every number and fact in the answer appears in a passage.
+FAIL example: the answer gives a fee the passages never mention.
+Reply only with JSON: {"unsupported_claims": [...], "verdict": "pass" or "fail"}"""
+
+def judge(question, passages, answer):
+    msg = f"QUESTION:\n{question}\n\nPASSAGES:\n{passages}\n\nANSWER:\n{answer}"
+    r = client.messages.create(model=JUDGE_MODEL, max_tokens=400, system=JUDGE_PROMPT,
+                               messages=[{"role": "user", "content": msg}])
+    text = "".join(b.text for b in r.content if b.type == "text")
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return {"verdict": "error", "raw": text}       # count these; do not guess
+```
+
+Use the structured-output features from that lesson when you need a guaranteed shape; the fallback above at least counts broken replies instead of hiding them.
+
+**Agreement with people, in code.** Compare judge and human labels on the same cases, and correct for chance:
+
+```python
+def agreement(human, judge):
+    """Two equal-length lists of 'pass' / 'fail'."""
+    n = len(human)
+    observed = sum(h == j for h, j in zip(human, judge)) / n
+    p_h, p_j = human.count("pass") / n, judge.count("pass") / n
+    expected = p_h * p_j + (1 - p_h) * (1 - p_j)
+    kappa = (observed - expected) / (1 - expected) if expected < 1 else 1.0
+    missed = sum(h == "fail" and j == "pass" for h, j in zip(human, judge))
+    return {"agreement": round(observed, 2), "kappa": round(kappa, 2), "failures_missed": missed}
+```
+
+Kappa above about 0.6 is usually workable and above 0.8 strong. Read every case in `failures_missed`: those are the problems the judge would let through.
+
+**A judge is a model plus a prompt.** Change either and you have a new judge whose scores are not comparable with the old one's. Store the judge's model version and prompt version with every score, and when you change either, rerun it on the calibration set before trusting new numbers.
+
+**Kinds of judges.** Besides a general model with a rubric, there are specialised ones: reward models trained to score outputs, small classifiers fine-tuned for one check (toxicity, faithfulness), and comparison judges that pick the better of two answers. Specialised judges are cheaper and more consistent for one narrow job; general judges are flexible and quick to start.
+
+**Judges disagree with themselves.** Run the same judge twice on the same case and it may give different verdicts. Measure this on your calibration set; if more than a few percent flip, tighten the rubric, use temperature 0 where supported, or take the majority of three runs for close cases.
+
 ## A worked example
 
 A Chennai legal-tech startup summarises court judgments. They want to measure whether summaries contain unsupported claims.
@@ -130,6 +183,24 @@ The faithfulness judge now runs on every model or prompt change, and lawyers spo
 - **Ignoring position and length bias.**
 - **Using a judge for things code can check.**
 - **Never rechecking after changing the judge.**
+- **Comparing scores from different judge versions.** Recalibrate first.
+- **Hiding unparseable judge replies.** Count them as errors and look at them.
+- **Only reporting agreement**, not chance-corrected agreement or missed failures.
+
+## When not to use an LLM judge
+
+- **Code can decide**: exact values, formats, word counts, required fields, banned phrases.
+- **A reference answer exists and must match exactly**, such as a number or a category.
+- **High-stakes verdicts** that people must own, such as medical or legal correctness: use experts, and the judge only to prioritise their review.
+- **You have not checked agreement yet**: until you do, the judge's score is a guess.
+
+## From demo to production
+
+- **Pin the judge's model and prompt versions** and store them with every score.
+- **Keep a calibration set** of 50 to 100 human-graded cases and rerun it on every judge change.
+- **Track judge error and flip rates.**
+- **Send judge failures to human review** in production, and add confirmed ones to the test set.
+- **Budget judge cost** separately and sample live traffic rather than judging everything.
 
 ## Practice
 
@@ -138,5 +209,8 @@ Read the evaluation section of Eugene Yan's LLM patterns article linked below.
 1. Write a yes-or-no judge prompt for one quality of your app's outputs.
 2. Grade 30 outputs yourself and compute how often the judge agrees.
 3. Test for position bias in a pairwise comparison by swapping the order.
+4. Run the agreement function on your 30 graded outputs and read every failure the judge missed.
+
+For more depth, chapter 3 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers AI as a judge: how it works, its biases and limits, and specialised judges.
 
 **You are done when you can** show your judge's agreement rate with human grades and one bias you found and handled.

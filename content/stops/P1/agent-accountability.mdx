@@ -34,6 +34,10 @@ flashcards:
     a: "A way for affected people to report a problem and reach a human, an investigation using the records, and a fix with lessons learned."
   - q: "Why review an agent's scope regularly?"
     a: "Evidence from actions, overrides, complaints and incidents may show the scope should shrink or can safely grow."
+  - q: "How can CI keep an agent card honest?"
+    a: "A test compares the tools the agent can actually call in code with the tools listed on its card, and fails the build if they differ."
+  - q: "What makes an audit log trustworthy?"
+    a: "Append-only storage, no edit rights for the agent's own service, a run id linking every step, and versions of prompt, model and tools on each record."
 exercise:
   title: "Assign the accountability"
   setup: "A Pune housing-finance company deploys an agent that pre-checks home-loan applications: it reads documents, flags missing items, and sends applicants an email listing what to upload. Underwriters make credit decisions. Nobody is named as the agent's owner; its allowed actions are described only in a Slack thread; logs record final emails but not the agent's steps; and applicants have no way to question a flag."
@@ -52,7 +56,7 @@ ask:
   - "What does the EU AI Act say about human oversight?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -108,6 +112,61 @@ This lesson follows a motor-insurance renewal agent at an insurance broker in De
 
 **Accountability for vendors.** When an agent uses a third-party model or tool, the contract should say who handles what: incident notification, data use, record retention and changes to the model. Your organisation still answers to customers, so the agent card names the vendor and what the contract covers.
 
+**Keep the agent card next to the code.** Store it as a file in the repository and test it, so it cannot drift from what the agent really does:
+
+```yaml
+# agents/renewals.card.yaml
+purpose: Renew motor policies after the customer confirms
+owners: {business: Head of retail operations, technical: Platform lead, risk: Compliance officer}
+tools:
+  get_vehicle: {kind: read}
+  get_quotes: {kind: read}
+  purchase_policy: {kind: write, approval: customer_confirmation}
+never: [change cover type without confirmation, add add-ons without confirmation]
+last_reviewed: 2026-10-01
+```
+
+```python
+import yaml
+from datetime import date, timedelta
+from agents.renewals import TOOLS          # the tool definitions the agent really uses
+
+def test_card_matches_code():
+    card = yaml.safe_load(open("agents/renewals.card.yaml"))
+    assert set(card["tools"]) == {t["name"] for t in TOOLS}, "card and code list different tools"
+    for name, spec in card["tools"].items():
+        if spec["kind"] == "write":
+            assert "approval" in spec, f"{name} writes but has no approval rule"
+
+def test_card_reviewed_recently():
+    card = yaml.safe_load(open("agents/renewals.card.yaml"))
+    assert date.today() - card["last_reviewed"] < timedelta(days=180), "card review overdue"
+```
+
+Adding a tool without updating the card now fails the build, which forces the conversation with the owners.
+
+**An audit record that answers the five questions.** One append-only table, written by the platform, never editable by the agent's service account:
+
+```sql
+CREATE TABLE agent_audit (
+  id bigserial PRIMARY KEY,
+  run_id text NOT NULL,
+  at timestamptz NOT NULL DEFAULT now(),
+  actor text NOT NULL,           -- the customer, the agent, or the approver's staff id
+  kind text NOT NULL,            -- request, tool_call, approval, result
+  detail jsonb NOT NULL,         -- tool name and arguments, what the approver saw, the outcome
+  prompt_version text, model text, tool_versions jsonb
+);
+-- Reconstruct one run in order:
+SELECT at AT TIME ZONE 'Asia/Kolkata', actor, kind, detail FROM agent_audit WHERE run_id = $1 ORDER BY at;
+```
+
+Grant the application role `INSERT` and `SELECT` only. Keep records for the period your sector requires, and export them to cheaper storage rather than deleting early.
+
+**Sector expectations in India.** Regulators are setting out what they expect from AI in their sectors. The RBI, for example, has published a framework for responsible AI in financial services that stresses governance, named accountability and audit trails. Read the current guidance for your client's sector before design, not after launch.
+
+**Responsibility does not move to the vendor.** If a model provider's update changes behaviour, your organisation still answers to the customer. That is why the card names the pinned model version and the evals it passed, and why model changes go through the same review as code changes.
+
 ## A worked example
 
 A Delhi insurance broker deploys an agent that renews motor policies. It checks the vehicle's details, fetches quotes from three insurers and recommends one. After the customer confirms, it completes the purchase through the insurer's API.
@@ -136,6 +195,25 @@ Three months in, a customer complains that zero-depreciation cover was dropped a
 - **Approvals without context.** People approving blind are not providing oversight.
 - **Records you cannot query.** Investigations need answers in hours.
 - **No route for affected people.** Harm with no way to report it becomes a public complaint.
+- **An agent card that lives in a slide deck.** Keep it in the repository and test it.
+- **Audit tables the agent's service can edit or delete.**
+- **No versions on audit records.** You cannot say which prompt or model made a decision.
+
+## When a lighter process is enough
+
+- **Internal read-only assistants**, such as a policy search for staff: a named owner, a short card and ordinary logs suffice.
+- **Prototypes** that never touch real customers or systems.
+- **Personal productivity tools** used by one person on their own data.
+
+Full cards, approval identity, append-only audits and redress paths become necessary once an agent acts for customers, handles money or personal data, or works in a regulated sector.
+
+## From demo to production
+
+- **Test the card in CI** against the agent's real tools, and fail on overdue reviews.
+- **Write audits to append-only storage** with run ids and versions.
+- **Run the five-question drill** on one real action each month and time it.
+- **Track redress cases** to closure, and add each to the eval suite.
+- **Review scope quarterly** with the business owner, with numbers on actions, overrides and complaints.
 
 ## Practice
 
@@ -144,5 +222,6 @@ Read the overview of the NIST AI Risk Management Framework and the EU AI Act sum
 1. Write an agent card for an agent you have built: purpose, users, tools, allowed and forbidden actions, approvals, known limits, owners.
 2. Check that your audit records could answer: who asked, what the agent did, who approved, and which versions were in use.
 3. Design the redress path: how an affected person reports a problem and what happens next, with a time limit.
+4. Add the card-matches-code test to your agent's repository, then add a new tool without updating the card and confirm the build fails.
 
 **You are done when you can** take one action your agent performed and show, from documents and records alone, who was accountable for it and why it happened.

@@ -34,6 +34,10 @@ flashcards:
     a: "The model changes the data it later learns from, such as never seeing outcomes for blocked transactions."
   - q: "How do you keep unbiased labels despite feedback loops?"
     a: "Keep a small random holdout or human-review sample that bypasses the model's decision."
+  - q: "What are common rules of thumb for PSI?"
+    a: "Below about 0.1 little change, 0.1 to 0.25 a moderate shift worth watching, above 0.25 a large shift worth investigating. Agree your own limits."
+  - q: "Why keep a small random holdout from a model's decisions?"
+    a: "It gives unbiased outcomes to measure the model on, because decisions the model blocks would otherwise never show what would have happened."
 exercise:
   title: "Read the dashboard"
   setup: "A Hyderabad insurer's claim-fraud model flags about 4% of claims each day. On Monday, flags jump to 15% for claims from one hospital network, while all other sources stay near 4%. Drift reports show the 'days between admission and claim' feature for that network is now always 0. Separately, over six months, the share of flagged claims later confirmed as fraud has slowly fallen from 40% to 28%."
@@ -52,7 +56,7 @@ ask:
   - "How often should I retrain a model?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -116,6 +120,55 @@ This lesson follows a buy-now-pay-later company in Bengaluru whose credit model 
 
 **Writing the runbook.** For each alert, write who owns it, the first three things to check, how to switch to the fallback, and when to roll back. Keep the fallback ready and tested, such as a simpler model without the troublesome feature or a rules policy, so containment takes minutes.
 
+**Population stability index in code.** Bucket a feature on the training data, then compare live data in the same buckets:
+
+```python
+import numpy as np
+
+def psi(expected, actual, buckets=10):
+    edges = np.unique(np.quantile(expected, np.linspace(0, 1, buckets + 1)))
+    edges[0], edges[-1] = -np.inf, np.inf
+    e = np.histogram(expected, edges)[0] / len(expected)
+    a = np.histogram(actual, edges)[0] / len(actual)
+    e, a = np.clip(e, 1e-6, None), np.clip(a, 1e-6, None)
+    return float(np.sum((a - e) * np.log(a / e)))
+
+def drift_report(train_df, live_df, features, warn=0.1, alert=0.25):
+    rows = []
+    for f in features:
+        value = psi(train_df[f].dropna(), live_df[f].dropna())
+        missing_change = live_df[f].isna().mean() - train_df[f].isna().mean()
+        level = "alert" if value > alert else "warn" if value > warn else "ok"
+        rows.append((f, round(value, 3), f"{missing_change:+.1%}", level))
+    return sorted(rows, key=lambda r: -r[1])
+```
+
+Common rules of thumb treat PSI below 0.1 as stable and above 0.25 as a big shift, but agree thresholds with the model owner and check them against past months. Libraries such as Evidently produce similar reports with charts.
+
+**Prediction rates by segment.** Upstream bugs often show first as a jump in the share of positive predictions for one partner or region:
+
+```python
+def rate_alerts(today, history, min_change=0.10):
+    """today/history: dict segment -> approval rate; history holds the 30-day average."""
+    return {s: (history[s], r) for s, r in today.items()
+            if s in history and abs(r - history[s]) > min_change}
+```
+
+**A holdout for honest outcomes.** If the model blocks a transaction, you never learn whether it was fraud. Let a small random share (agreed with the business and risk teams, often well under 1%) skip the model's decision and go to normal handling or human review, and record the outcome:
+
+```python
+import random
+
+def decide(txn, model_score, threshold=0.8, holdout_rate=0.005):
+    if random.random() < holdout_rate:
+        return {"action": "review", "holdout": True}       # outcome measured without the model's influence
+    return {"action": "block" if model_score > threshold else "allow", "holdout": False}
+```
+
+Measure precision and recall on the holdout to see how the model really performs as the world changes.
+
+**Drift for LLM apps.** The same ideas apply to inputs (question length, language mix, topics) and outputs (refusal rate, answer length, citation rate, judge scores). A rising share of Hindi questions or a new topic cluster is drift that may need new documents or prompt changes, not retraining.
+
 ## A worked example
 
 A Bengaluru BNPL (buy now, pay later) company's credit model approves small loans at checkout.
@@ -145,6 +198,23 @@ A 2% random sample of borderline applicants is approved regardless of score, so 
 - **Alerting on every small drift.** Set thresholds and severities, or alerts get ignored.
 - **Waiting for labels to notice problems.** Watch inputs and predictions daily.
 - **Ignoring feedback loops.** Keep unbiased samples for learning.
+- **Alerting on every PSI wobble**, which teaches people to ignore alerts.
+- **No holdout**, so outcomes only exist for cases the model allowed.
+- **Only monitoring inputs**, not prediction rates by segment.
+
+## When lighter monitoring is fine
+
+- **A model used once for a one-off analysis.**
+- **Low-impact recommendations** where people always decide, and errors are cheap.
+- **Stable inputs**, such as a fixed sensor in a controlled process, where error and range checks catch most problems.
+
+## From demo to production
+
+- **Save baselines** with every model version.
+- **Run drift and segment reports** daily, with agreed thresholds and owners.
+- **Keep a random holdout** where decisions hide outcomes, agreed with the business.
+- **Track performance as labels arrive**, by segment.
+- **Write runbooks** with fallback and rollback steps for each alert.
 
 ## Practice
 
@@ -153,5 +223,8 @@ Read Evidently's introduction and the monitoring lessons in Made With ML and Goo
 1. Save baseline statistics from a training set, then simulate drift (shift one feature, break another) in a new batch and detect both with a drift report.
 2. Build a small dashboard of approval or positive-prediction rate by segment over simulated days.
 3. Write a one-page monitoring and retraining policy: what is checked, thresholds, who is alerted and what they do.
+4. Run drift_report on your baseline and the simulated batch, and check that the shifted feature is flagged and the stable ones are not.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers monitoring, drift and metrics for AI applications.
 
 **You are done when you can** show an alert caused by a simulated upstream bug and explain the runbook response.

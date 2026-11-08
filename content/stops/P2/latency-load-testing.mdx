@@ -33,6 +33,10 @@ flashcards:
     a: "Real-model load tests cost money and use up rate limits; a fake server with realistic delays finds most bottlenecks."
   - q: "What should a load test watch?"
     a: "p50, p95 and p99 latency, error rate, CPU, memory, database connections and provider 429 responses."
+  - q: "Why use a fake model server in load tests?"
+    a: "It replies with realistic delays without spending money or hitting rate limits, so you can test your own system's limits many times before one short run on the real model."
+  - q: "What does a ramp test show that a fixed-load test does not?"
+    a: "The point where latency starts climbing or errors appear as users increase, which is your real capacity."
 exercise:
   title: "Find the bottleneck"
   setup: "A Lucknow exam board's results assistant must handle 2,000 concurrent students on results day. A first load test against a fake model shows p95 latency rising sharply after 300 users, with CPU at 30% and many requests waiting for database connections. A short test against the real model shows 429 errors from 900 users. Answers average 450 tokens."
@@ -51,7 +55,7 @@ ask:
   - "How do I find the bottleneck in a slow AI app?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -102,6 +106,69 @@ This lesson follows an intercity bus operator in Jaipur preparing its booking as
 
 **Reporting the result.** Show a chart of p95 against users, the budget line, the bottleneck found at each round and the fix, and the next ceiling you expect. Clients value knowing where the system will break next, because it tells them what to plan for.
 
+**A fake model server.** Same streaming shape as the real API, delays sampled from your traces:
+
+```python
+import asyncio, json, random
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+
+app = FastAPI()
+FIRST_TOKEN_S = [0.6, 0.8, 0.9, 1.1, 1.4, 2.2]       # sampled from real traces
+TOKENS_PER_S = 60
+REPLY = "This is a fixed answer of realistic length used only for load testing. " * 6
+
+@app.post("/v1/messages")
+async def messages():
+    async def stream():
+        await asyncio.sleep(random.choice(FIRST_TOKEN_S))
+        for word in REPLY.split():
+            yield f"data: {json.dumps({'text': word + ' '})}\n\n"
+            await asyncio.sleep(1 / TOKENS_PER_S)
+        yield "data: [DONE]\n\n"
+    return StreamingResponse(stream(), media_type="text/event-stream")
+```
+
+Point your app's model base URL at it through configuration in the test environment only. Add a switch to return 429 errors for a share of requests, to test your retries and fallbacks.
+
+**A Locust test that ramps up.**
+
+```python
+from locust import HttpUser, task, between, LoadTestShape
+import random
+
+QUESTIONS = [l.strip() for l in open("load/questions.txt")]     # real questions, masked
+
+class Learner(HttpUser):
+    wait_time = between(5, 20)                                   # think time between messages
+
+    @task
+    def ask(self):
+        with self.client.post("/answer", json={"text": random.choice(QUESTIONS)},
+                              stream=True, catch_response=True, timeout=60) as r:
+            for _ in r.iter_lines():
+                pass                                             # read the whole stream
+            if r.status_code != 200:
+                r.failure(f"status {r.status_code}")
+
+class Ramp(LoadTestShape):
+    steps = [(60, 10), (120, 50), (180, 100), (240, 200), (300, 300)]   # (end second, users)
+    def tick(self):
+        t = self.get_run_time()
+        for end, users in self.steps:
+            if t < end:
+                return users, 10
+        return None
+```
+
+Run with `locust -f load/locustfile.py --host https://staging.example.in --csv results`. The CSV files give p50, p95 and p99 per step; plot p95 against users and mark your budget line.
+
+**Time to first token needs its own measurement.** Locust's built-in timing covers the whole request. For streaming, also record first-byte time in the app's own traces, and read p95 first-token time from there for each ramp step.
+
+**One controlled run on the real model.** After fixing bottlenecks with the fake server, run a short test against the real model at the expected peak, within your rate limits and budget, to confirm provider latency and limits. Agree the run in advance with whoever owns the API account.
+
+**Read results with traces open.** When p95 jumps at 100 users, open the slowest traces from that minute. The step that grew (database waits, reranker, queueing for model slots) is the bottleneck, and the fix table above usually names the remedy.
+
 ## A worked example
 
 A Jaipur intercity bus operator is launching an AI assistant for bus bookings and complaints, expected to peak at 500 concurrent users during festival travel.
@@ -127,6 +194,23 @@ The final test meets the budget at 550 users. The launch day peak reaches 480 us
 - **Unrealistic traffic.** Identical tiny prompts with no think time give misleading numbers.
 - **Burning money on real-model load tests.** Use a fake model for most rounds.
 - **Forgetting provider limits.** They are often the real ceiling. Check and raise them early.
+- **Load-testing against the real model for every round**, burning budget and rate limits.
+- **No think time**, so a few test users behave like thousands.
+- **Measuring only total time** for streamed answers; track first-token time too.
+
+## When a full load test can wait
+
+- **Internal tools with a handful of users**: a quick check with ten concurrent requests is enough.
+- **Batch systems**, where throughput per hour matters more than per-user latency; test that instead.
+- **Platforms that scale for you** with generous limits, for early pilots, as long as rate limits are checked.
+
+## From demo to production
+
+- **Keep a latency budget by step** and compare traces against it.
+- **Load-test before launch and before big changes**, mostly with a fake model server.
+- **Report p50, p95, p99 and errors** per ramp step, with the bottleneck found.
+- **Re-test when traffic patterns change**, such as exam season or a festival sale.
+- **Alert on p95 first-token time** in production.
 
 ## Practice
 
@@ -135,5 +219,8 @@ Read the Google SRE chapter on monitoring and Locust's first-test guide.
 1. Write a latency budget for your app, by step, using traces from ten real requests.
 2. Build a fake model endpoint that waits a realistic time and streams a fixed reply, and point your app at it.
 3. Load-test with Locust from 10 to 200 users, record p50, p95 and errors at each step, and find and fix the first bottleneck.
+4. Run the Locust ramp against your app with the fake model server and note the user count where p95 first crosses your budget.
+
+For more depth, chapter 9 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers latency metrics, percentiles and the trade-off between throughput and latency.
 
 **You are done when you can** show a chart of p95 against users, name the first bottleneck and the change that moved it.

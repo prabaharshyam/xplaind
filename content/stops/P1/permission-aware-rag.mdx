@@ -33,6 +33,10 @@ flashcards:
     a: "Retrieve candidates, then ask the source system as the user whether each may be opened, before anything reaches the model."
   - q: "What tests does permission-aware RAG need?"
     a: "Personas with different roles and 'must not see' questions, run in CI."
+  - q: "Why resolve nested groups ahead of time?"
+    a: "Users can sit in groups inside groups. Flattening them at sign-in or index time lets the search filter use a simple overlap check."
+  - q: "What is defence in depth for permission-aware RAG?"
+    a: "Filtering in the search query and also enforcing the same rule in the database, such as with row-level security, so one bug does not leak documents."
 exercise:
   title: "Find the leaks"
   setup: "A Gurugram consulting firm's knowledge assistant indexes 40,000 SharePoint files. The current design: chunks have no permission data; the API reads the user's department from a field in the request; retrieval takes the top 20 chunks and then removes any from folders marked 'Confidential' by name; and the index is rebuilt monthly. A junior analyst received an answer quoting a partner-only pricing memo."
@@ -51,7 +55,7 @@ ask:
   - "How do I sync SharePoint permissions into a vector database?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -104,6 +108,81 @@ This lesson follows an assistant at an asset management company in Mumbai over r
 
 **Agreeing the sync window.** Permission changes cannot take effect instantly in an index. Measure the real lag, agree it with the client's security team in writing, and alert when a sync fails or runs late. For the most sensitive sources, such as board papers, consider checking at source as a second layer.
 
+**Deny by default in the schema.** Make it impossible to index a chunk without access data:
+
+```sql
+CREATE TABLE chunks (
+  id text PRIMARY KEY,
+  doc_id text NOT NULL,
+  body text NOT NULL,
+  embedding vector(384) NOT NULL,
+  allowed_groups text[] NOT NULL CHECK (cardinality(allowed_groups) > 0)
+);
+CREATE INDEX ON chunks USING gin (allowed_groups);
+
+-- The search, with the user's groups from the verified token as $2:
+SELECT id, body FROM chunks
+WHERE allowed_groups && $2
+ORDER BY embedding <=> $1
+LIMIT 20;
+```
+
+`&&` means "the two arrays share at least one value". A chunk with no groups cannot be inserted at all.
+
+**A second lock with row-level security.** If the application sets the user's groups on the database session, Postgres can enforce the same rule even if someone forgets the `WHERE`:
+
+```sql
+ALTER TABLE chunks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY read_by_group ON chunks FOR SELECT
+  USING (allowed_groups && string_to_array(current_setting('app.user_groups', true), ','));
+-- per request, inside a transaction:
+-- SELECT set_config('app.user_groups', 'hr-core,all-staff', true);
+```
+
+Connect as a role that does not own the table, because table owners skip policies unless you also run `ALTER TABLE chunks FORCE ROW LEVEL SECURITY`.
+
+**Flatten nested groups.** Directories put groups inside groups. Resolve them once, with a guard against cycles:
+
+```python
+def expand_groups(user_groups, parents_of):
+    """parents_of: dict mapping a group to the groups that contain it."""
+    seen, stack = set(), list(user_groups)
+    while stack:
+        g = stack.pop()
+        if g in seen:
+            continue
+        seen.add(g)
+        stack.extend(parents_of.get(g, []))
+    return sorted(seen)
+```
+
+Cache the result for the session, and refresh it when the user signs in again or the directory changes.
+
+**Persona tests that check ids, not answers.**
+
+```python
+import pytest
+
+PERSONAS = {
+    "analyst":    {"groups": ["all-staff"],             "never": {"board-2026-q3-c1", "salaries-c4"}},
+    "hr_staff":   {"groups": ["all-staff", "hr-core"],  "never": {"board-2026-q3-c1"}},
+    "contractor": {"groups": ["contractors"],           "never": {"handbook-c2", "salaries-c4"}},
+}
+QUESTIONS = ["What did the board decide about the Pune office?", "What is the salary band for level 5?",
+             "What is the leave policy?"]
+
+@pytest.mark.parametrize("persona", PERSONAS)
+def test_never_retrieves_restricted(persona, search):
+    p = PERSONAS[persona]
+    for q in QUESTIONS:
+        ids = {c["id"] for c in search(q, groups=p["groups"])}
+        assert not ids & p["never"], f"{persona} retrieved {ids & p['never']} for: {q}"
+```
+
+The test fails if a forbidden chunk is even retrieved, long before a model could repeat it.
+
+**Caches, summaries and memories leak too.** A cached answer, a stored conversation summary or an agent memory built from restricted documents must carry the same access rules, or be keyed per user. Check every place retrieved text is stored after retrieval.
+
 ## A worked example
 
 A Mumbai asset management company wants one assistant over research notes, HR policies, board papers and client agreements.
@@ -131,6 +210,23 @@ During the pilot, the HR team restricts a draft policy. The permission sync runs
 - **Syncing content but not rights.** A document locked down today stays visible in the index.
 - **Trusting identity from the request body.** Take user and groups only from a verified token.
 - **No negative tests.** Test what each persona must not see, not just what they should.
+- **Caching answers across users** built from restricted documents.
+- **Asserting on the model's answer instead of retrieved ids** in permission tests.
+- **Nested groups not expanded**, so users miss documents they should see, or tests pass for the wrong reason.
+
+## When permission-aware retrieval is not needed
+
+- **Everyone may read everything**, such as public policies or a published handbook.
+- **A single user's own documents**, where the index is per user anyway.
+- **A few clear audiences**, where separate indexes per audience are simpler.
+
+## From demo to production
+
+- **Enforce access in the query and in the database**, deny by default.
+- **Run persona tests in CI** on every change to ingestion, search or sync.
+- **Measure and alert on permission sync lag** against the agreed window.
+- **Scope caches, summaries and memories** by user or by access group.
+- **Log the groups used** for each search, for audits.
 
 ## Practice
 
@@ -139,5 +235,8 @@ Read Microsoft's security filter pattern and Pinecone's article on RAG with acce
 1. Add an `allowed_groups` field to every chunk in your RAG index, with at least three groups across your documents.
 2. Read the user's groups from a (real or simulated) verified token and filter inside the search.
 3. Write five "must not see" tests across three personas and run them in your test suite.
+4. Add the row-level security policy, remove the WHERE clause from your search on purpose, and confirm restricted chunks still do not appear.
+
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers guardrails against leaking private information, and chapter 6 covers retrieval.
 
 **You are done when you can** show two users asking the same question and getting different, correct answers, and a test proving a restricted document never reaches the model.

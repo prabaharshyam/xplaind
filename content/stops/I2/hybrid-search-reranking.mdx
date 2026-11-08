@@ -34,6 +34,10 @@ flashcards:
     a: "Retrieve 20 to 50 and keep 3 to 8, because the reranker cannot rescue a passage that is not in the list."
   - q: "Why filter inside the search, not after?"
     a: "Filtering after taking the top 5 can leave nothing; filtering first means only in-scope documents compete."
+  - q: "Why might you shift weight towards keyword search for some queries?"
+    a: "Queries with codes, part numbers, PAN-like strings or rare names depend on exact words, which keyword search matches better than embeddings."
+  - q: "How do you keep superseded documents out of results?"
+    a: "Store effective dates and a current flag on every chunk, and filter on them in the search query so old versions never compete."
 exercise:
   title: "Diagnose the retrieval"
   setup: "A Mumbai bank's assistant over 9,000 pages of circulars and product terms has these failures on its golden set: (1) 'What is the penalty under circular RBI/2025-26/41?' returns unrelated circulars; (2) 'How do I stop my card if it is lost?' misses the passage titled 'Hotlisting a card'; (3) questions about current savings rates often return the 2024 rate sheet; (4) the right passage is often found at rank 9 or 12 but only the top 5 go to the prompt."
@@ -52,7 +56,7 @@ ask:
   - "Which reranker should I use?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -100,6 +104,56 @@ This lesson follows an insurance company in Chennai whose agents ask detailed qu
 
 Tune these on the golden set, not by feel, and record latency alongside recall each time.
 
+**Hybrid search inside Postgres.** With full-text search and pgvector in one table, a single query can fuse both with reciprocal rank fusion:
+
+```sql
+WITH kw AS (
+  SELECT id, row_number() OVER (ORDER BY ts_rank(tsv, q) DESC) AS r
+  FROM chunks, websearch_to_tsquery('english', $1) q
+  WHERE tsv @@ q AND access_group = ANY($3) AND effective_from <= current_date
+  ORDER BY ts_rank(tsv, q) DESC LIMIT 40
+), vec AS (
+  SELECT id, row_number() OVER (ORDER BY embedding <=> $2) AS r
+  FROM chunks
+  WHERE access_group = ANY($3) AND effective_from <= current_date
+  ORDER BY embedding <=> $2 LIMIT 40
+)
+SELECT c.id, c.section, c.body,
+       coalesce(1.0 / (60 + kw.r), 0) + coalesce(1.0 / (60 + vec.r), 0) AS score
+FROM chunks c
+LEFT JOIN kw ON kw.id = c.id
+LEFT JOIN vec ON vec.id = c.id
+WHERE kw.id IS NOT NULL OR vec.id IS NOT NULL
+ORDER BY score DESC LIMIT 30;
+```
+
+`tsv` is a stored `tsvector` column built from the chunk text. The same permission and date filters apply to both sides, so nothing the user may not see is ever a candidate.
+
+**Weighted fusion when one side matters more.** Normalise each list's scores to 0 to 1, then mix:
+
+```python
+import re
+
+def minmax(scores):
+    lo, hi = min(scores.values()), max(scores.values())
+    return {k: (v - lo) / (hi - lo) if hi > lo else 1.0 for k, v in scores.items()}
+
+def looks_exact(query):
+    return bool(re.search(r"\b[A-Z]{2,}-?\d{2,}\b|\b\d{6,}\b", query))     # codes, long numbers
+
+def weighted(query, kw_scores, vec_scores):
+    alpha = 0.7 if looks_exact(query) else 0.4                            # weight on keywords
+    kw, vec = minmax(kw_scores), minmax(vec_scores)
+    ids = set(kw) | set(vec)
+    return sorted(ids, key=lambda i: alpha * kw.get(i, 0) + (1 - alpha) * vec.get(i, 0), reverse=True)
+```
+
+Set the weights from your golden set: try 0.3, 0.5 and 0.7 on each query type and keep what wins.
+
+**Indian-language text.** Keyword search splits words by spaces and may stem them for English only. For Hindi or Tamil, use a "simple" text configuration (no stemming), consider transliterated copies of key fields so "biryani" and "बिरयानी" both match, and lean more on a multilingual embedding model.
+
+**Latency budget.** Two searches plus a reranker add up. Run the keyword and vector searches in parallel, cap candidates at what recall needs, and measure p95 latency for each stage. If the reranker is the slow part, try a smaller one or fewer candidates before dropping it.
+
 ## A worked example
 
 An insurance company in Chennai has 4,000 pages of policy wordings, endorsements and circulars. Agents ask questions such as "Is flood covered under HOME-PLUS for Chennai after the 2026 revision?"
@@ -133,6 +187,24 @@ Each step fixed a different kind of failure, which is why reading the failed que
 - **No golden set.** Without measured recall you cannot tell whether hybrid search helped or just felt better.
 - **Filtering after retrieval.** Taking the top 5 and then dropping out-of-scope ones can leave you with nothing. Filter inside the search.
 - **Forgetting tokenisation for Indian text.** Keyword search on Tamil or Hindi needs an analyser that handles those scripts, or matches fail silently.
+- **English stemming on Indian-language text.** Use a simple configuration and multilingual embeddings.
+- **Different filters on the keyword and vector sides**, so one side returns documents the other would exclude.
+
+## When plain vector search is enough
+
+- **Questions in natural language** with no codes, numbers or rare names.
+- **Small collections**, where the right passage is almost always near the top anyway.
+- **Tight latency budgets** where your golden set shows hybrid adds little.
+
+Test it: if recall at 5 barely moves with hybrid and reranking, keep the simpler system.
+
+## From demo to production
+
+- **Apply the same filters to both searches**, inside the queries.
+- **Record recall and latency per query type** for every setting change.
+- **Log both candidate lists and the fused order** for debugging.
+- **Keep effective dates and current flags** on every chunk.
+- **Retune weights** when the document mix or user questions change.
 
 ## Practice
 
@@ -141,5 +213,8 @@ Read the Weaviate article on hybrid search and Pinecone's piece on rerankers.
 1. Take your RAG app from the earlier lesson and build a golden set of 30 questions, a third of them with exact codes, names or numbers.
 2. Measure recall at 5 for vector only, BM25 only (the `rank_bm25` package is enough), and both merged with RRF.
 3. Add a free cross-encoder reranker (for example a small model from the sentence-transformers library) over the top 30 and measure again, along with the added latency.
+4. Split your golden set into questions with codes or names and questions without, and report recall at 5 for each with vector only and with hybrid.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers term-based and embedding retrieval, combining them, and reranking.
 
 **You are done when you can** show a table of recall and latency for the four set-ups and explain which you would ship and why.

@@ -32,6 +32,10 @@ flashcards:
     a: "Under a non-disclosure agreement, through a secure link that expires."
   - q: "Why keep the library current?"
     a: "Answers about last year's architecture are wrong answers, and overclaims can become contract breaches."
+  - q: "Why give every library answer a review date?"
+    a: "Systems change. A dated answer can be flagged when it is old, so you never send a client last year's architecture as if it were current."
+  - q: "What should you do with a question the library cannot answer?"
+    a: "Ask the control's owner, write a precise answer with evidence or a dated plan, get it reviewed, and add it to the library."
 exercise:
   title: "Answer the AI section"
   setup: "A Mumbai bank sends your startup these questions about its document-AI product: (1) Is client data used to train AI models? (2) Where is data processed? (3) How do you prevent prompt injection? (4) Do you perform penetration tests on AI endpoints? Facts: your model provider is contracted not to train on data; all processing is in an Indian cloud region; you run an injection test set and keep human approval for outbound actions; the last penetration test did not cover the AI endpoints."
@@ -50,7 +54,7 @@ ask:
   - "What is the CAIQ?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -111,6 +115,54 @@ This lesson follows Meera, an FDE at an AI startup in Bengaluru, answering a lar
 
 **Working with the client's reviewers.** Expect follow-up calls. Bring the engineer who knows the system, the data flow map and the evidence. Answer only what you know, write down anything you need to check, and send it the same day. Reviewers trust vendors who say "we do not do that yet, and here is the plan" far more than vendors who claim everything.
 
+**The answer library as data.** Store answers in a file the team reviews like code, and let a script do the bookkeeping:
+
+```yaml
+# security-answers.yaml
+- id: enc-at-rest
+  question: Is customer data encrypted at rest?
+  answer: >
+    Yes. Postgres and object storage use AES-256 with keys in Azure Key Vault (Central India), rotated yearly.
+  owner: platform-lead
+  evidence: [docs/architecture.pdf#storage, key-vault-policy.pdf]
+  reviewed: 2026-09-14
+  tags: [encryption, storage]
+- id: ai-training
+  question: Is our data used to train AI models?
+  answer: >
+    No. Our model provider's enterprise terms exclude training on API data; retention is 30 days for abuse
+    monitoring (terms version and clause attached).
+  owner: cto
+  evidence: [provider-terms-2026-07.pdf]
+  reviewed: 2026-07-30
+  tags: [ai, vendor]
+```
+
+```python
+import yaml
+from datetime import date, timedelta
+
+def load(path="security-answers.yaml"):
+    return yaml.safe_load(open(path))
+
+def stale(answers, max_age_days=180):
+    cutoff = date.today() - timedelta(days=max_age_days)
+    return [(a["id"], a["owner"]) for a in answers if a["reviewed"] < cutoff or not a.get("evidence")]
+
+def suggest(question, answers, top=3):
+    words = set(question.lower().split())
+    scored = sorted(answers, key=lambda a: -len(words & set((a["question"] + " " + " ".join(a["tags"])).lower().split())))
+    return [a["id"] for a in scored[:top]]
+```
+
+Run `stale` monthly and send each owner their list. Use `suggest` (or embeddings, for large libraries) to find candidate answers for a new questionnaire, but have a person check every answer before it goes out: a model or keyword match can pick an answer that is close but wrong.
+
+**Drafting with AI, carefully.** A model can draft answers from your library and architecture notes, which saves time on long questionnaires. Rules: it may only use the library and attached documents, every draft cites the library ids it used, and a named person approves each answer. Never let a model invent a control you do not have.
+
+**The AI section, kept current.** List your model providers with the date you checked their terms, the regions used, what data is sent and whether it is masked, guardrails and their test results, kill switches, how prompt and model changes are tested, and the sub-processor list. Update this section the same week anything in it changes.
+
+**Evidence that ages well.** Link to living documents (the current architecture diagram, the latest eval and penetration test summaries) rather than pasting text that goes stale. Keep the CI results for injection tests and permission tests exportable as a short PDF, because AI-specific evidence is what reviewers are least likely to have seen before.
+
 ## A worked example
 
 A Bengaluru AI startup, after a successful pilot with a large private bank, receives a 240-question spreadsheet with a two-week deadline. The FDE, Meera, coordinates.
@@ -136,6 +188,23 @@ Two questions reveal real gaps: no formal yearly penetration test of the AI endp
 - **Vague AI answers.** "We use industry-standard AI security" means nothing. Name providers, regions, terms and controls.
 - **Forgetting sub-processors.** A tracing or email tool that sees client data counts.
 - **Letting the library go stale.** Answers about last year's architecture are wrong answers.
+- **Answers with no owner or review date.** Nobody notices when they go out of date.
+- **Sending AI-drafted answers without a person checking each one.**
+- **Forgetting new sub-processors**, such as a tracing tool added last month.
+
+## When a full library is overkill
+
+- **Your first one or two questionnaires**: answer them carefully, then turn the answers into the library.
+- **Small clients** who ask a few questions by email: answer directly, with the same precision.
+- **Internal projects** covered by the company's own security review process.
+
+## From demo to production
+
+- **Keep the library in version control** with owners, dates and evidence links.
+- **Flag stale answers monthly** and on every architecture change.
+- **Maintain the sub-processor list** with purpose and location for each.
+- **Export AI test results** (injection, permissions, guardrails) as evidence.
+- **Track each questionnaire** with its date, version of answers sent and follow-ups promised.
 
 ## Practice
 
@@ -144,5 +213,6 @@ Download the CSA CAIQ (free) and skim its control domains; reread the OWASP Top 
 1. Pick 20 CAIQ questions and answer them for a system you have built, with evidence links or "not yet" plus a plan.
 2. Write ten AI-specific questions a bank might add, and answer them precisely.
 3. List every sub-processor in your system with its purpose and data location.
+4. Turn your 20 CAIQ answers into a YAML library with owners and dates, and run the stale check on it.
 
 **You are done when you can** hand a reviewer your answers and evidence and have every answer stand up to one follow-up question.

@@ -34,6 +34,10 @@ flashcards:
     a: "A list of risks with likelihood, impact, controls and owner for each, mappable to several frameworks at once."
   - q: "What does proportionality mean in AI governance?"
     a: "Matching effort to risk: light documentation for low-risk tools, the full set for high-risk systems."
+  - q: "What is the four-fifths rule of thumb?"
+    a: "In selection tasks, if one group's selection rate is below 80% of the highest group's rate, treat it as a warning sign of adverse impact to investigate."
+  - q: "Why keep the risk register in a checked file?"
+    a: "A script can flag high risks with no control, no owner or stale evidence, so the register stays useful instead of becoming a forgotten spreadsheet."
 exercise:
   title: "Classify and control"
   setup: "A Kolkata fintech has three AI systems: (A) an internal assistant that drafts marketing emails; (B) a model that pre-screens personal loan applications and suggests approve or refer; (C) a chatbot on its website answering product questions. It wants to offer (B) to a lender in Ireland."
@@ -52,7 +56,7 @@ ask:
   - "What are India's AI Governance Guidelines?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -122,6 +126,59 @@ This lesson follows an HR-tech company in Bengaluru preparing its resume-screeni
 
 **Building evidence as you go.** The cheapest compliance is a side effect of good engineering. Save every eval report with its date and version, keep logs queryable, record approvals, and write the system card when the design is fresh. Trying to rebuild this evidence months later for an auditor takes far longer and is less convincing.
 
+**A register a script can check.** Keep risks as data, score them, and fail a review when a serious risk lacks controls, an owner or recent evidence:
+
+```python
+from datetime import date
+
+LEVEL = {"low": 1, "medium": 2, "high": 3}
+RISKS = [
+    {"id": "R1", "risk": "Unfair ranking by college tier", "likelihood": "medium", "impact": "high",
+     "controls": ["remove college names from input", "quarterly fairness eval"],
+     "owner": "Head of data science", "evidence": "fairness-2026-Q3.pdf", "evidence_date": date(2026, 9, 30)},
+    {"id": "R2", "risk": "Candidate data sent to a vendor that trains on it", "likelihood": "low", "impact": "high",
+     "controls": ["zero-retention contract"], "owner": "", "evidence": None, "evidence_date": None},
+]
+
+def review(risks, today=date.today(), max_age_days=120):
+    findings = []
+    for r in risks:
+        score = LEVEL[r["likelihood"]] * LEVEL[r["impact"]]
+        if score >= 3:
+            if not r["controls"]:
+                findings.append(f"{r['id']}: score {score} with no controls")
+            if not r["owner"]:
+                findings.append(f"{r['id']}: no owner")
+            if not r["evidence_date"] or (today - r["evidence_date"]).days > max_age_days:
+                findings.append(f"{r['id']}: evidence missing or older than {max_age_days} days")
+    return findings
+```
+
+**Fairness checks in code.** For a screening or ranking system, compare outcomes across groups on a labelled test set. Two simple numbers go a long way:
+
+```python
+from collections import defaultdict
+
+def by_group(rows):
+    """rows: dicts with 'group', 'selected' (bool) and 'correct' (bool)."""
+    g = defaultdict(lambda: {"n": 0, "selected": 0, "correct": 0})
+    for r in rows:
+        s = g[r["group"]]
+        s["n"] += 1; s["selected"] += r["selected"]; s["correct"] += r["correct"]
+    rates = {k: v["selected"] / v["n"] for k, v in g.items()}
+    top = max(rates.values())
+    for k, v in g.items():
+        ratio = rates[k] / top if top else 1
+        flag = "  <- below four-fifths" if ratio < 0.8 else ""
+        print(f"{k:<16} n={v['n']:<4} selected {rates[k]:.0%}  accuracy {v['correct'] / v['n']:.0%}  ratio {ratio:.2f}{flag}")
+```
+
+Groups worth checking in India often include gender, state or region, language of the input, college tier and urban versus rural. Small groups give noisy rates, so collect enough cases per group before drawing conclusions, and look at accuracy per group as well as selection rates.
+
+**Link risks to tests.** Each control in the register should point to something that runs: an eval, a CI test, a dashboard alert or a scheduled review. If a control cannot be pointed at anything, it is an intention, not a control.
+
+**Proportionality in practice.** Write down the tier for each system and what documentation that tier needs. A one-page card and a light register for low-risk tools; the full register, fairness evals, human oversight records and incident drills for high-risk ones. Revisit the tier when the use changes, such as an internal tool starting to decide things for customers.
+
 ## A worked example
 
 A Bengaluru HR-tech company sells a resume-screening assistant to Indian employers and wants its first European client.
@@ -147,6 +204,25 @@ The European client's procurement team accepts the documentation pack. The same 
 - **Ignoring the EU AI Act because you are in India.** It applies to systems used in the EU.
 - **Fairness tested only on overall accuracy.** Measure by group, including language and region.
 - **Oversight in name only.** A human who cannot or does not override is not oversight.
+- **Controls that point at nothing that runs.** Link each control to a test, eval or alert.
+- **Fairness checked once at launch.** Data and users change; repeat it on a schedule.
+- **Drawing conclusions from tiny groups.** Collect enough cases per group first.
+
+## When a framework is overkill
+
+- **Personal or team productivity tools** on non-sensitive data: a short card and normal security practice are enough.
+- **Prototypes** that never reach real users.
+- **Low-impact internal drafting tools**, where a person always reviews and owns the output.
+
+Use the full register, mapping and evidence for systems that decide or strongly influence things about people: hiring, lending, insurance, health, education and public services.
+
+## From demo to production
+
+- **Keep the register in the repository** and run the review check before each release.
+- **Schedule fairness evals** by group, with results stored as evidence.
+- **Name an owner** for every serious risk, and review the register quarterly.
+- **Record the tier** of each system and what it requires.
+- **Map controls once** to the frameworks your buyers and regulators use, and reuse the mapping.
 
 ## Practice
 
@@ -155,5 +231,6 @@ Read the EU AI Act summary, the NIST AI RMF overview and browse a few cases in t
 1. Classify three AI use cases you know (an internal chatbot, a loan pre-screening tool, an exam proctoring tool) by EU AI Act risk tier, with reasons.
 2. Write a risk register of at least eight risks for one of them, with controls and owners.
 3. Map each control to an EU AI Act obligation and a NIST AI RMF function.
+4. Run the by_group check on a labelled set for one of your systems and write one paragraph on what the numbers show.
 
 **You are done when you can** explain to a risk committee which tier your system falls into, what that requires and what evidence you have.

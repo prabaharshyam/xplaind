@@ -33,6 +33,10 @@ flashcards:
     a: "Service identities get short-lived credentials automatically, with only the permissions they need, so there are no long-lived keys to leak."
   - q: "Why do clients often prefer a cloud's managed models?"
     a: "The data stays under their existing cloud contract, region and security controls."
+  - q: "Which cloud regions are in India?"
+    a: "AWS has Mumbai and Hyderabad; Azure has Central India (Pune), South India (Chennai) and West India (Mumbai); Google Cloud has Mumbai and Delhi. Check each service's availability per region."
+  - q: "Why call models through your cloud provider's model service?"
+    a: "Data stays under the client's existing cloud contract, region and identity controls, and billing is on their usual account, which often speeds approval."
 exercise:
   title: "Review a cloud design"
   setup: "A teammate's design for a Mumbai NBFC's loan-document assistant on AWS: a virtual machine in the Singapore region because it was cheaper; PostgreSQL with a public IP and a password in the code; the app uses the admin's personal access key; no budget alert; documents in an S3 bucket set to public 'so the app can read them'."
@@ -51,7 +55,7 @@ ask:
   - "How do I estimate cloud costs for an AI app?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -108,6 +112,47 @@ This lesson follows a pharma company in Hyderabad as you design its document ass
 
 Learn one cloud properly, then use a table like this to translate.
 
+**Deploy a container in an Indian region.** On Google Cloud, one command deploys a private service with its own identity and secrets from Secret Manager:
+
+```bash
+gcloud run deploy claims-api \
+  --image asia-south1-docker.pkg.dev/my-project/apps/claims-api:3f9c2e1 \
+  --region asia-south1 \
+  --service-account claims-api@my-project.iam.gserviceaccount.com \
+  --no-allow-unauthenticated \
+  --set-secrets MODEL_API_KEY=model-api-key:latest,DATABASE_URL=db-url:latest \
+  --min-instances 1 --max-instances 10 --cpu 1 --memory 1Gi
+```
+
+`--no-allow-unauthenticated` means only callers with permission (a load balancer, a gateway or signed-in users through it) can reach it. `--max-instances` caps cost if traffic spikes. AWS (ECS on Fargate) and Azure (Container Apps) take the same ideas in different syntax: an image, a region, an identity, secrets by reference, and scaling limits.
+
+**A budget alert on day one.**
+
+```bash
+gcloud billing budgets create --billing-account=XXXXXX-XXXXXX-XXXXXX \
+  --display-name="claims-pilot" --budget-amount=20000INR \
+  --threshold-rule=percent=0.5 --threshold-rule=percent=0.9 --threshold-rule=percent=1.0
+```
+
+Every cloud has an equivalent. Send alerts to a shared channel, not one person's inbox.
+
+**Models through your cloud.** Calling a model through the client's cloud keeps traffic under their contract and identity controls. With Anthropic's SDK, the Bedrock client uses the same message shape:
+
+```python
+from anthropic import AnthropicBedrock
+
+client = AnthropicBedrock(aws_region="ap-south-1")      # uses the service's IAM role, not a key
+reply = client.messages.create(
+    model="<the model id shown in your Bedrock console>", max_tokens=300,
+    messages=[{"role": "user", "content": "Summarise this claim note: ..."}])
+```
+
+Check which models and features each Indian region offers before promising data residency; some arrive in Indian regions later than in others.
+
+**Where the money goes.** For a typical AI app, model tokens and managed databases dominate, then compute, then data transfer out of the cloud. Tag every resource with the project and environment so the bill can be split, and look at the cost breakdown weekly in the first month.
+
+**Private by default.** Put databases and vector stores on private networks with no public address, reach model services through private endpoints where offered, and expose only the load balancer or gateway to the internet.
+
 ## A worked example
 
 A Hyderabad pharma company on Azure wants a document assistant for its regulatory team. Requirements: data stays in India, no public database, sign-in with company accounts.
@@ -141,6 +186,23 @@ The client's cloud team approves in one review, mainly because every choice matc
 - **Picking a region for latency alone.** Check residency rules and model availability first.
 
 - **No budget alert.** A forgotten GPU machine or a runaway loop can cost lakhs in a weekend. Set alerts on the first day.
+- **Services left publicly reachable** when they should sit behind a gateway or load balancer.
+- **No maximum instance count**, so a traffic spike or a bug scales the bill without limit.
+- **Untagged resources**, so nobody can tell which project costs what.
+
+## When you need less cloud
+
+- **A prototype or demo**: a platform such as Vercel, Render or Railway and a hosted database is faster.
+- **The client runs everything on-premises**: learn their platform instead.
+- **A single static site with an API key on a server function**: a full virtual network is overkill.
+
+## From demo to production
+
+- **Choose regions** for users, data residency and model availability, and record why.
+- **Use service identities and secret references**, never stored keys.
+- **Keep data services private**, with only the gateway public.
+- **Set budgets and maximum instances** from day one.
+- **Tag resources** by project and environment, and review costs weekly at first.
 
 ## Practice
 
@@ -149,5 +211,6 @@ Complete Microsoft Learn's cloud concepts modules, then the architecture and ser
 1. On a free account, deploy your containerised API to a serverless container service in an Indian region.
 2. Add object storage and a managed PostgreSQL that is reachable only privately, and give the app a service identity instead of keys.
 3. Price the set-up for 50,000 requests a month with the provider's calculator and set a budget alert.
+4. Deploy with a maximum instance count and a budget alert, then check the cost breakdown after a day of test traffic.
 
 **You are done when you can** draw your deployment with region, network boundaries and identities, and explain each line of its estimated monthly bill.

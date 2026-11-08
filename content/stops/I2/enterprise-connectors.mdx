@@ -33,6 +33,10 @@ flashcards:
     a: "Source id, URL, title, author, modified time, path or object type, owner, and access rights."
   - q: "What should each sync run record?"
     a: "Items read, added, changed, deleted and failed, and the time taken, with alerts when a connector stops or failures jump."
+  - q: "Why store a content hash for each synced item?"
+    a: "If a file's metadata changed but its text did not, the hash matches and you skip re-parsing and re-embedding, saving time and money."
+  - q: "How does a Microsoft Graph delta query report deletions?"
+    a: "Deleted items come back in the delta results with a 'deleted' marker, so the connector can remove their chunks from the index."
 exercise:
   title: "Fix the connector"
   setup: "A Pune manufacturer's maintenance assistant reads 60,000 manuals from a network file share and work orders from SAP. The current connector re-reads every file every night, takes nine hours, and sometimes runs into the morning shift. Retired manuals still appear in answers. Last week the job crashed at file 41,000 and restarted from the beginning. Nobody noticed when it failed for three days."
@@ -51,7 +55,7 @@ ask:
   - "How do I sync permissions from SharePoint?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -103,6 +107,72 @@ This lesson follows a sales assistant for a consumer-goods company in Gurugram, 
 
 **Build, buy or borrow.** Integration platforms such as Airbyte or Fivetran save weeks for common systems, and a search platform's bundled connectors may already read permissions. They still need checking: confirm they report deletions, read access rights, and expose run counts you can alert on. Write your own when the system is unusual, such as an in-house database or a vendor portal, or when the client's security team will not approve a third-party tool.
 
+**An incremental connector in code.** Microsoft Graph's delta query for a SharePoint or OneDrive library returns changed and deleted items, page by page, ending with a link to use next time:
+
+```python
+import hashlib, json, time
+from pathlib import Path
+import httpx
+
+STATE = Path("state/sharepoint-delta.json")
+
+def get(client, url):
+    for attempt in range(5):
+        r = client.get(url)
+        if r.status_code in (429, 503):
+            time.sleep(int(r.headers.get("Retry-After", 2 ** attempt)))
+            continue
+        r.raise_for_status()
+        return r.json()
+    raise RuntimeError("gave up after repeated throttling")
+
+def sync(token, drive_id, index):
+    counts = {"read": 0, "upserted": 0, "deleted": 0, "skipped": 0, "failed": 0}
+    url = (json.loads(STATE.read_text())["delta_link"] if STATE.exists()
+           else f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/delta")
+    with httpx.Client(headers={"Authorization": f"Bearer {token}"}, timeout=30) as client:
+        while url:
+            page = get(client, url)
+            for item in page.get("value", []):
+                counts["read"] += 1
+                try:
+                    if "deleted" in item:
+                        index.delete_doc(item["id"]); counts["deleted"] += 1
+                    elif "file" in item:
+                        text = download_and_parse(client, item)            # your parser
+                        digest = hashlib.sha256(text.encode()).hexdigest()
+                        if index.hash_of(item["id"]) == digest:
+                            counts["skipped"] += 1
+                        else:
+                            index.upsert_doc(item["id"], text, digest, meta_from(item))
+                            counts["upserted"] += 1
+                except Exception:
+                    counts["failed"] += 1
+            url = page.get("@odata.nextLink")
+            if not url and "@odata.deltaLink" in page:
+                STATE.parent.mkdir(exist_ok=True)
+                STATE.write_text(json.dumps({"delta_link": page["@odata.deltaLink"]}))
+    print(counts)
+    return counts
+```
+
+The first run has no saved link, so it reads everything; later runs get only changes. Save the delta link only after the last page succeeds, so a failed run repeats rather than skips changes. If a saved link stops working, fall back to a full re-scan.
+
+**A weekly reconciliation.** Even good change feeds miss things. Compare ids:
+
+```python
+def reconcile(source_ids: set, index_ids: set, index):
+    stale = index_ids - source_ids
+    for doc_id in stale:
+        index.delete_doc(doc_id)
+    missing = source_ids - index_ids
+    return {"removed_stale": len(stale), "missing_to_fetch": len(missing)}
+```
+
+**Skip unchanged content.** A file's modified time changes when someone renames it or edits a property. Store a hash of the extracted text with each document and skip re-embedding when it matches. On large libraries this saves most of the embedding cost.
+
+**Respect the source.** Run big first loads at night in the client's time zone, keep concurrency low, and agree limits with their IT team. Getting a client's SharePoint throttled during office hours is a fast way to lose trust.
+
 ## A worked example
 
 A Gurugram consumer-goods company wants a sales assistant over SharePoint (product sheets, trade-scheme circulars) and Salesforce (accounts, opportunities).
@@ -128,6 +198,22 @@ In week three, the regional team renames a SharePoint site and the delta token b
 - **No resume after failure.** A crash at page 9,000 should not restart from page 1.
 - **Silent connectors.** If nobody is alerted when a sync stops, the assistant quietly goes stale.
 - **No runbook for the client's IT team.** Write down what to do when tokens break, permissions change or a site is renamed.
+- **Saving the sync cursor before the run finishes.** A crash then skips changes forever.
+- **Re-embedding every modified file** even when only its metadata changed.
+
+## When you do not need a custom connector
+
+- **A one-off load** of a fixed set of files: export them once and ingest.
+- **A platform connector already covers the system**, reports deletions and reads permissions.
+- **Users can upload the few documents they need** directly.
+
+## From demo to production
+
+- **Record per-run counts** and alert on stalls or failure spikes.
+- **Save cursors only after success**, and keep a full re-scan fallback.
+- **Reconcile ids weekly** to catch missed deletions.
+- **Hash content** to skip unchanged documents.
+- **Agree schedules and limits** with the client's IT team, in writing.
 
 ## Practice
 
@@ -136,5 +222,6 @@ Read the Microsoft Graph overview, then pick any API with paging that you can us
 1. Write a connector that pulls all items with paging, honours rate limits and stores a cursor so it can resume.
 2. Add an incremental mode that fetches only items changed since the last run, and a check that detects deleted items.
 3. Record per-run counts (read, added, updated, deleted, failed) and print a one-line summary.
+4. Run your connector, delete a file at the source, rerun, and confirm the file's chunks are gone from the index.
 
 **You are done when you can** run your connector twice in a row and show the second run fetching only what changed, including a deletion.

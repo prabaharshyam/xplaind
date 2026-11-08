@@ -34,6 +34,10 @@ flashcards:
     a: "With a precise scope, output format and length limit, and only the tools that part needs."
   - q: "What should you check before choosing a vendor SDK?"
     a: "Lock-in to one vendor's models, how sessions are stored, and whether traces export to the client's observability tools."
+  - q: "Why give each sub-agent its own budget?"
+    a: "One stuck sub-agent can otherwise eat the whole task's tokens and time. Separate caps let the lead report a gap and finish."
+  - q: "What should the lead agent do when one sub-agent fails?"
+    a: "Finish with what the others found, say clearly which part is missing and why, and offer to retry that part, rather than failing the whole task."
 exercise:
   title: "Single agent or sub-agents?"
   setup: "Three proposals at a Gurugram consultancy: (A) compare 12 Indian states' solar policies, reading long government documents for each; (B) fill a 40-field client onboarding form from one uploaded PDF; (C) refactor one 3,000-line Python module. A single-agent prototype of (A) runs out of context after five states. The client uses one model vendor under an enterprise contract and requires every step to appear in its observability tool."
@@ -52,7 +56,7 @@ ask:
   - "How much more do multi-agent systems cost?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -107,6 +111,55 @@ Check how locked-in the SDK is to one vendor's models, how it stores sessions, a
 
 **Measuring whether the split paid off.** Run the same ten requests both ways. Record wall-clock time, total tokens, cost, and a quality score from a reviewer using a fixed rubric. A split that is faster and better but four times the cost may still be right, as here, when each brief replaces days of analyst time. The decision belongs in writing with the numbers.
 
+**A lead and sub-agents in plain code.** You do not need a framework to see the pattern. The lead writes briefs, sub-agents run in parallel with their own fresh context, and the lead only sees their short reports:
+
+```python
+import asyncio
+import anthropic
+
+client = anthropic.AsyncAnthropic()
+LEAD, WORKER = "claude-opus-5-5", "claude-sonnet-5-5"     # check the docs for current names
+
+async def sub_agent(brief, max_tokens=1200):
+    try:
+        r = await asyncio.wait_for(client.messages.create(
+            model=WORKER, max_tokens=max_tokens,
+            system="You research one narrow area. Report in at most 200 words with a source link per claim, "
+                   "then list open questions.",
+            messages=[{"role": "user", "content": brief}]), timeout=120)
+        return "".join(b.text for b in r.content if b.type == "text")
+    except Exception as err:
+        return f"FAILED: {type(err).__name__}"
+
+async def research(question, areas):
+    briefs = [f"Question: {question}\nYour area: {a}. Stay inside it; other agents cover the rest."
+              for a in areas]
+    reports = await asyncio.gather(*(sub_agent(b) for b in briefs))
+    joined = "\n\n".join(f"## {a}\n{r}" for a, r in zip(areas, reports))
+    final = await client.messages.create(
+        model=LEAD, max_tokens=1500,
+        messages=[{"role": "user", "content": f"Write a brief answering: {question}\n"
+                   "Use only these reports. Say plainly if any area FAILED.\n\n" + joined}])
+    return "".join(b.text for b in final.content if b.type == "text")
+
+# asyncio.run(research("EV subsidy policies", ["Maharashtra", "Karnataka", "Tamil Nadu"]))
+```
+
+In a real system each sub-agent would run its own tool loop (search, fetch, read) rather than a single call, but the shape is the same: briefs out, short reports back, the lead's context stays small.
+
+**The token bill.** Every sub-agent carries its own instructions, tool definitions and reading. Anthropic reported that its multi-agent research system used roughly 15 times the tokens of a normal chat. That can be worth it for a research brief that saves an analyst two days; it is rarely worth it for a support reply.
+
+**Picking an SDK, concretely.** Vendor SDKs (OpenAI's Agents SDK, Anthropic's Claude Agent SDK, Google's Agent Development Kit and others) differ mainly in four places. Check each with a one-day spike before committing:
+
+| Question | Why it matters |
+| --- | --- |
+| Can it use other vendors' models? | Switching later without a rewrite |
+| Where do sessions and state live? | Data residency and restarts |
+| Do traces export to OpenTelemetry or your tracing tool? | One view across systems |
+| How are permissions and approvals for built-in tools set? | Safety in production |
+
+**Context isolation cuts both ways.** A sub-agent sees only its brief, so it cannot use something another sub-agent found unless the lead passes it on. When work in one area depends on another, run those steps in order, or give the lead a second round to send follow-up briefs.
+
 ## A worked example
 
 A Hyderabad consulting firm wants due-diligence briefs on mid-sized Indian manufacturers: financials, legal cases, management, market and ESG news.
@@ -133,6 +186,23 @@ Wall-clock time drops to 9 minutes and coverage improves. Token use rises 3.5 ti
 - **Ignoring token cost.** Measure cost per task before and after; multi-agent can multiply it.
 - **Locking in without noticing.** If the client may switch model vendors, check how much of your code depends on one SDK.
 - **No traces across agents.** When an answer is wrong you must see which sub-agent produced which claim.
+- **No per-sub-agent limits.** One stuck worker consumes the whole budget.
+- **Failing the whole task when one part fails.** Report the gap and deliver the rest.
+
+## When one agent is better
+
+- **Tightly coupled work**, such as editing one codebase or filling one form, where each step depends on the last.
+- **Short tasks** that one agent finishes in a few steps.
+- **Tight budgets**: several agents multiply token cost.
+- **Strict latency needs** with little to parallelise.
+
+## From demo to production
+
+- **Trace the lead and every sub-agent** under one run id.
+- **Set per-agent and whole-task budgets** for tokens, time and money.
+- **Keep briefs as versioned templates**, and test them like prompts.
+- **Compare against a single-agent baseline** on cost and quality before and after changes.
+- **Plan for partial failure**: clear user messages when one area could not be covered.
 
 ## Practice
 
@@ -141,5 +211,7 @@ Read Anthropic's write-up of its multi-agent research system, and skim the docs 
 1. Build a single-agent version of a research task (for example, "summarise the policies of three Indian states on EV subsidies") with a vendor SDK or your own loop.
 2. Rebuild it with a lead agent and one sub-agent per state, each returning at most 200 words with sources.
 3. Compare time, tokens and quality, and write three sentences on whether the split was worth it.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers agents, planning with several components and the cost of extra model calls.
 
 **You are done when you can** explain when sub-agents help, what they cost, and what an SDK gives you beyond the basic loop.

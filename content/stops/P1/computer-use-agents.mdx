@@ -34,6 +34,10 @@ flashcards:
     a: "Submitting forms, paying, sending messages and deleting or overwriting files."
   - q: "How should captchas and one-time passwords be handled?"
     a: "Handed to a person by design. Never try to defeat them."
+  - q: "How can a browser agent be kept to approved sites?"
+    a: "Intercept every request in the browser and block any host not on an allow list, in addition to network rules on the container."
+  - q: "What makes a scripted browser tool safe to hand to an agent?"
+    a: "Fixed steps written by you, a narrow input, a success check after each important step and a clear error when the page is not as expected."
 exercise:
   title: "Choose the rung"
   setup: "A Coimbatore textile exporter wants to automate: (A) fetching daily exchange rates, which a bank publishes through an API; (B) downloading shipping bills from a government portal with stable pages and an OTP at login; (C) entering invoice data into a 15-year-old desktop ERP with no API; (D) checking three buyer portals whose layouts change often."
@@ -52,7 +56,7 @@ ask:
   - "How do I run a browser agent safely?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -109,6 +113,63 @@ Use the highest rung that works, and combine them: scripted tools for the known 
 
 **Measuring the value.** Track hours saved, success rate per step, average time per action and the number of hand-backs. Hand-backs are not failures of the project; they are the system working as designed. If they cluster on one page, that page is a candidate for a scripted tool instead.
 
+**A scripted browser tool with a success check.** This uses Playwright's Python API. The agent only sees one tool, `download_notice`, with one argument:
+
+```python
+from pathlib import Path
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+
+ALLOWED = {"www.example-gov.in"}                       # the only site this tool may reach
+
+def download_notice(notice_id: str) -> str:
+    if not notice_id.isdigit():
+        return "notice_id must be digits only."
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(accept_downloads=True)
+        page.route("**/*", lambda route: route.continue_()
+                   if route.request.url.split("/")[2] in ALLOWED else route.abort())
+        try:
+            page.goto("https://www.example-gov.in/notices", timeout=20_000)
+            page.get_by_label("Notice number").fill(notice_id)
+            page.get_by_role("button", name="Search").click()
+            with page.expect_download(timeout=20_000) as dl:
+                page.get_by_role("link", name="Download PDF").click()
+            path = Path("downloads") / f"notice-{notice_id}.pdf"
+            dl.value.save_as(path)
+            if path.stat().st_size < 1_000:                 # success check: a real PDF, not an error page
+                return "Download looked empty; a person should check this notice."
+            return f"Saved {path}"
+        except PWTimeout:
+            page.screenshot(path=f"downloads/failed-{notice_id}.png")
+            return "The site did not respond as expected; screenshot saved for a person."
+        finally:
+            browser.close()
+```
+
+Labels and roles (`get_by_label`, `get_by_role`) survive layout changes better than CSS paths. Every exit returns a sentence the agent can pass on.
+
+**The screenshot loop, sketched.** Computer-use models work in a loop your code drives:
+
+```python
+for step in range(MAX_STEPS):
+    shot = take_screenshot()
+    action = model_decide(goal, history, shot)        # e.g. {"type": "click", "x": 412, "y": 300}
+    if action["type"] == "done":
+        break
+    if is_risky(action, current_url()):               # submit, pay, send, delete
+        if not ask_person(action, shot):
+            break
+    perform(action)
+    history.append(action)
+```
+
+Providers offer computer-use tools with their own action formats; the shape above stays the same. The `is_risky` check is your code, using the page address and the element under the click, not the model's opinion.
+
+**Isolation in practice.** Run the browser in a container with no access to your internal network, an outbound allow list, a fresh profile per task and a dedicated low-permission account. Delete the container after each task so cookies and downloads do not leak between runs.
+
+**How good are they?** Public benchmarks of web and desktop tasks show steady progress, but agents still fail many everyday tasks that people finish easily, especially long ones with pop-ups, logins or unusual layouts. Measure on your own tasks before promising anything.
+
 ## A worked example
 
 A Pune chartered accountancy firm spends hours each month downloading clients' tax documents from a government portal and an older accounting desktop app with no API.
@@ -134,6 +195,23 @@ Results: the monthly download work for 120 clients falls from about 60 staff hou
 - **Trusting on-screen text.** Pages can carry injected instructions.
 - **No human before irreversible actions.** Submissions and payments need approval.
 - **Trying to beat captchas.** Respect them; hand the step to a person.
+- **Reusing a browser profile across tasks.** Cookies and sessions leak from one job to the next.
+- **CSS-path selectors in scripted tools.** They break on small layout changes; prefer labels and roles.
+
+## When not to use a computer-use agent
+
+- **An API or export exists**, or can be requested from the vendor.
+- **The steps are fixed**: a scripted Playwright tool is faster, cheaper and more reliable.
+- **The site forbids automation** in its terms, or uses captchas to block it.
+- **Mistakes are costly and hard to spot**, such as tax filings, unless a person checks every submission.
+
+## From demo to production
+
+- **Isolate every session** in a fresh container with an allow list and a dedicated account.
+- **Record screenshots or video** of every run, kept as long as audits need.
+- **Require approval** before any submit, pay, send or delete.
+- **Track success per step and hand-back rate**, and script the pages that fail most.
+- **Monitor site changes**: a daily scripted check on each portal catches layout changes before users do.
 
 ## Practice
 
@@ -142,5 +220,6 @@ Read the computer-use tool docs and Playwright's getting-started page.
 1. Script a browser task on a public site with Playwright (for example, fetch the latest notices from a government website) and expose it to an agent as one tool.
 2. Run a browser or computer-use agent in a container on a harmless task, with screenshots saved for every step.
 3. Add an approval step before any form submission, and test with a page containing a hidden instruction.
+4. Add the allow-list route to your scripted tool, then point it at a page that loads a script from another site, and confirm the request is blocked.
 
 **You are done when you can** explain which rung of the ladder you used for each step and why.

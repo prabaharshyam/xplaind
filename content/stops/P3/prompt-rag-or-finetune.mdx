@@ -33,6 +33,10 @@ flashcards:
     a: "A well-designed prompt, RAG for knowledge, and possibly a fine-tuned small model for one high-volume step."
   - q: "What must you have to compare approaches?"
     a: "A shared evaluation set run on every option."
+  - q: "What did studies comparing RAG and fine-tuning for new knowledge find?"
+    a: "Retrieval usually beat fine-tuning at injecting new facts. Fine-tuning shines at form: style, format and consistent behaviour on a narrow task."
+  - q: "What goes into a fine-tuning break-even calculation?"
+    a: "Monthly savings from a cheaper model or shorter prompts, against training cost, data preparation, evaluation and retraining whenever the base model or task changes."
 exercise:
   title: "Diagnose and choose"
   setup: "A Chennai bank's AI team faces three problems: (1) the assistant does not know this month's fixed-deposit rates; (2) its replies to complaints are sometimes curt and skip the required apology and reference number; (3) a large model tags 5 million transactions a month into 40 categories, which costs too much, and they have 80,000 labelled transactions."
@@ -51,7 +55,7 @@ ask:
   - "How many examples do I need to fine-tune a model?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -112,6 +116,49 @@ It needs hundreds to thousands of quality examples, evaluation, and repeating wh
 
 **Testing prompt fixes first.** Before any larger change, spend an afternoon on the prompt: state the task and format plainly, add two or three good examples including an edge case, and run the test set. Teams are often surprised how many problems this solves, and it sets a fair baseline for judging RAG or fine-tuning.
 
+**Run all candidates on one test set.** The fairest comparison uses the same questions, the same graders and the same cost and latency measurements:
+
+```python
+def compare(approaches, test_set, grade):
+    """approaches: dict name -> function(question) returning (answer, cost_inr, latency_ms)."""
+    rows = []
+    for name, fn in approaches.items():
+        scores, costs, lat = [], [], []
+        for case in test_set:
+            answer, cost, ms = fn(case["question"])
+            scores.append(grade(case, answer)); costs.append(cost); lat.append(ms)
+        lat.sort()
+        rows.append((name, sum(scores) / len(scores), sum(costs) / len(costs), lat[int(0.95 * (len(lat) - 1))]))
+    print(f"{'approach':<22}{'quality':>8}{'₹/req':>8}{'p95 ms':>8}")
+    for name, q, c, p95 in rows:
+        print(f"{name:<22}{q:>8.0%}{c:>8.2f}{p95:>8.0f}")
+    return rows
+
+# compare({"prompt v3": prompt_only, "prompt + RAG": with_rag, "fine-tuned small": tuned}, tests, grade)
+```
+
+Split the test set by problem type: questions that need private or recent facts, and questions about format or behaviour. RAG should win the first group and fine-tuning may win the second; if not, your diagnosis was wrong.
+
+**When fine-tuning pays off, in numbers.**
+
+```python
+def finetune_break_even(requests_per_month, cost_now_inr, cost_tuned_inr,
+                        build_cost_inr, upkeep_per_month_inr, life_months=6):
+    saving = (cost_now_inr - cost_tuned_inr) * requests_per_month - upkeep_per_month_inr
+    total = saving * life_months - build_cost_inr
+    months = build_cost_inr / saving if saving > 0 else float("inf")
+    return {"monthly saving ₹": round(saving), f"net over {life_months} months ₹": round(total),
+            "months to break even": round(months, 1)}
+
+print(finetune_break_even(2_000_000, 0.40, 0.06, build_cost_inr=600_000, upkeep_per_month_inr=50_000))
+```
+
+`build_cost_inr` should include people's time to collect and check data and run evals, not just GPU hours. A short `life_months` is realistic: a new base model often arrives within months and the work repeats.
+
+**Facts belong in retrieval.** Studies comparing the two for new knowledge found retrieval usually wins, and fine-tuning on facts the base model never saw can even encourage confident errors. Use fine-tuning to teach form (format, tone, a narrow classification) and retrieval to supply facts.
+
+**Order of attempts.** Prompt, then prompt plus retrieval or tools, then fine-tuning only if a measured gap remains and the numbers above make sense. Each step keeps the previous one as the baseline.
+
 ## A worked example
 
 Three problems at a Pune software company:
@@ -133,6 +180,24 @@ Three problems at a Pune software company:
 - **Choosing by fashion.** Diagnose knowledge versus behaviour.
 - **No evaluation set.** You cannot compare approaches without one.
 - **Forgetting maintenance.** Fine-tuned models need retraining; RAG needs fresh indexes.
+- **Comparing approaches on different test sets** or with different graders.
+- **Leaving people's time out** of the fine-tuning cost.
+- **Fine-tuning to add facts** that change, which retrieval handles better.
+
+## When the choice is already clear
+
+- **The answer must cite private documents**: retrieval, whatever else you add.
+- **Low volume**: fine-tuning rarely pays back; improve the prompt.
+- **The task changes every few weeks**: prompts and retrieval adapt faster than retraining.
+- **You have no labelled examples**: fine-tuning is not possible yet; start collecting them from reviewed outputs.
+
+## From demo to production
+
+- **Keep one test set** split by problem type, and use it for every approach.
+- **Record quality, cost and p95 latency** for each option with dates.
+- **Recalculate break-even** when prices, volumes or models change.
+- **Collect reviewed outputs** as future training data, even if you do not fine-tune yet.
+- **Re-test fine-tuned models** against new base models with good prompts when they appear.
 
 ## Practice
 
@@ -141,5 +206,8 @@ Read Chip Huyen's article on building LLM applications for production linked bel
 1. For three problems you know, say whether each is a knowledge or a behaviour problem and pick an approach.
 2. For one, try two prompt improvements and measure on a small test set.
 3. Write half a page on when fine-tuning would become worth it for that problem.
+4. Run compare on your small test set with your current prompt and one improved prompt, and fill in the break-even numbers for a fine-tuned option.
+
+For more depth, chapter 7 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers when to fine-tune, and how fine-tuning compares with RAG for knowledge and form.
 
 **You are done when you can** explain to a teammate why a weekly-changing handbook needs RAG, not fine-tuning, and why prompting comes first.

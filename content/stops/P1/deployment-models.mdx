@@ -34,6 +34,10 @@ flashcards:
     a: "Their commercial use terms and limits; open weights do not mean no licence terms."
   - q: "What else must follow the deployment's data rules?"
     a: "The whole stack: traces, logs, vector stores and backups, not only the model."
+  - q: "What does an API-versus-self-hosting break-even depend on?"
+    a: "Steady monthly token volume, the API's price per token, GPU cost per hour for enough capacity at peak, and the people needed to run it."
+  - q: "What must an air-gapped bundle include?"
+    a: "Container images, model weights, Python and system packages, the vector database, monitoring tools and documentation, each with versions and checksums."
 exercise:
   title: "Recommend the deployment"
   setup: "Three prospects: (A) a Jaipur travel startup wants an itinerary assistant using public data, launching in a month with two engineers; (B) a Mumbai insurer wants a claims assistant over customer documents, has an approved Google Cloud tenancy in Mumbai, and its rules require data to stay in India; (C) a Hyderabad government research lab wants document search on a network with no internet connection."
@@ -52,7 +56,7 @@ ask:
   - "How do I keep AI data in India?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -112,6 +116,51 @@ This lesson follows three clients, in Bengaluru, Mumbai and Hyderabad, who each 
 
 **Bill of materials for offline sites.** For an air-gapped build, list every artefact: container images with pinned versions, model weights with checksums, Python and system packages, the vector database, monitoring tools that work offline, and documentation. The client's security team scans and transfers them. Missing one package can delay a release by weeks, so rehearse the install on a disconnected test machine first.
 
+**API or self-hosted, in numbers.** A first comparison you can redo with real quotes (record the date of each price):
+
+```python
+def monthly_costs(tokens_in_m, tokens_out_m, api_in_usd, api_out_usd,
+                  gpu_hour_inr, gpus, hours=730, ops_people=0.5, ops_cost_inr=250_000, usd_to_inr=84):
+    """tokens in millions per month; API prices in USD per million tokens."""
+    api = (tokens_in_m * api_in_usd + tokens_out_m * api_out_usd) * usd_to_inr
+    self_host = gpu_hour_inr * gpus * hours + ops_people * ops_cost_inr
+    return {"API ₹/month": round(api), "self-hosted ₹/month": round(self_host),
+            "cheaper": "API" if api < self_host else "self-hosted"}
+
+print(monthly_costs(tokens_in_m=900, tokens_out_m=120, api_in_usd=0.8, api_out_usd=4,
+                    gpu_hour_inr=250, gpus=2))
+```
+
+GPUs cost money every hour whether used or not, so self-hosting wins only at high, steady volume, or when data rules leave no choice. Include the people: someone has to patch, monitor and upgrade the serving stack.
+
+**Route by sensitivity.** In a hybrid design, a small rule decides where each request goes:
+
+```python
+SENSITIVE_FIELDS = {"aadhaar", "pan", "medical_history", "bank_account"}
+
+def route(request):
+    if request.get("classification") == "restricted" or SENSITIVE_FIELDS & set(request.get("fields", [])):
+        return "self_hosted"            # stays on the client's servers
+    return "cloud_model"                # stronger model, client's cloud region
+```
+
+Write the rule with the client's data owner, test it with examples from each data class, and log the route for every request.
+
+**Building an air-gapped bundle.** On a connected build machine, gather everything with versions and checksums, then transfer through the client's approved process:
+
+```bash
+mkdir -p bundle/{images,models,wheels}
+docker pull vllm/vllm-openai:v0.10.1 && docker save vllm/vllm-openai:v0.10.1 | gzip > bundle/images/vllm.tar.gz
+docker save claims-api:1.4.0 | gzip > bundle/images/claims-api.tar.gz
+huggingface-cli download org/model-8b-instruct --revision <commit> --local-dir bundle/models/model-8b
+pip download -r requirements.txt -d bundle/wheels
+(cd bundle && find . -type f -exec sha256sum {} \; > SHA256SUMS)
+```
+
+On the offline side, `sha256sum -c SHA256SUMS` proves nothing changed in transit, `docker load` restores images, and `pip install --no-index --find-links wheels -r requirements.txt` installs without the internet. Rehearse the whole install on a machine with networking disabled before the real visit.
+
+**Plan upgrades from the start.** Every option needs a path for new model versions: an API changes by itself (pin and test), the client's cloud adds models on its own schedule, and self-hosted or offline setups need a repeatable bundle-and-test process.
+
 ## A worked example
 
 Three clients, three answers:
@@ -133,6 +182,23 @@ Three clients, three answers:
 - **Ignoring who operates it.** A self-hosted model nobody at the client can upgrade becomes a liability.
 - **Treating "open-weight" as "no licence terms".** Read each model's licence for commercial use limits.
 - **Forgetting the rest of the stack.** Traces, logs and vector stores must follow the same rules as the model.
+- **Comparing GPU cost with API cost** without counting idle hours and the people to run it.
+- **Air-gapped installs never rehearsed offline**, which fail on the first missing package.
+- **No upgrade path** for models in self-hosted or offline setups.
+
+## When the choice is simple
+
+- **Low or uncertain volume and no strict data rules**: start with an API or the client's cloud model service.
+- **Data may never leave the premises**: self-hosted or air-gapped, whatever the cost.
+- **A pilot to prove value**: use the fastest option allowed, and revisit before scaling.
+
+## From demo to production
+
+- **Record the data rules and the decision** with dates and the people who agreed.
+- **Redo the cost comparison** with real volumes after the first months.
+- **Log the route** for every request in hybrid setups.
+- **Keep a tested bundle process** for offline and self-hosted upgrades.
+- **Pin and test model versions** whichever option you choose.
 
 ## Practice
 
@@ -141,5 +207,8 @@ Read one cloud provider's data privacy page for its model service, and the vLLM 
 1. Write a one-page comparison of four deployment models for a client of your choice, scoring data control, model quality, cost at their volume, time to launch and skills needed.
 2. List the questions you would ask in the first meeting to choose between them.
 3. Sketch the bill of materials for an air-gapped version of your RAG app: every image, package and weight file you would need to transfer.
+4. Run monthly_costs with your own volumes at three traffic levels and find roughly where self-hosting would start to pay.
+
+For more depth, chapter 4 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers model APIs versus self-hosting: data privacy, performance, cost and control.
 
 **You are done when you can** recommend a deployment model for a stated client and defend it against the obvious objection from their risk team.

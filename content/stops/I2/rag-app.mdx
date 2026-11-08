@@ -34,6 +34,10 @@ flashcards:
     a: "Retrieval: the right passage was never found, often because of parsing, chunking or missing keyword search."
   - q: "How do you keep a RAG app current and safe?"
     a: "Re-index changed documents, filter superseded ones, and filter retrieval by each user's permissions."
+  - q: "What is reciprocal rank fusion?"
+    a: "A simple way to merge keyword and vector results: each document scores 1/(k + rank) in each list, the scores are added, and the highest total wins."
+  - q: "Why rewrite follow-up questions before retrieval?"
+    a: "'What about for ITI students?' means nothing on its own. Rewriting it with the chat history into a full question lets search find the right passages."
 exercise:
   title: "Plan the RAG app"
   setup: "A Visakhapatnam port authority wants a staff assistant over 120 documents: tariff schedules (tables), standard operating procedures, scanned older circulars and a monthly notice that replaces the previous month's. Staff have different clearance levels. The first prototype answers well in a demo but nobody has measured it."
@@ -52,7 +56,7 @@ ask:
   - "How do I evaluate a RAG system?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -131,6 +135,66 @@ Returning `top` along with the answer lets the interface link each citation to i
 
 **Debugging a wrong answer.** Look at the retrieved passages first. If the right passage is missing, the problem is ingestion or retrieval: parsing, chunking, filters or search. If it is present and the answer is still wrong, the problem is the prompt or the model. This one check saves a lot of guessing.
 
+**A small RAG app you can run.** This uses an open embedding model, BM25 for keywords, reciprocal rank fusion to merge them, and Anthropic's API to answer with citations. Install `sentence-transformers rank_bm25 anthropic`:
+
+```python
+import numpy as np
+from rank_bm25 import BM25Okapi
+from sentence_transformers import SentenceTransformer
+import anthropic
+
+embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")   # small, English
+client = anthropic.Anthropic()
+
+def ingest(chunks):
+    """chunks: list of {"id", "title", "page", "text"}."""
+    texts = [f"{c['title']}. {c['text']}" for c in chunks]
+    vectors = embedder.encode(texts, normalize_embeddings=True)
+    bm25 = BM25Okapi([t.lower().split() for t in texts])
+    return {"chunks": chunks, "vectors": vectors, "bm25": bm25}
+
+def search(index, question, k=5, pool=20):
+    q = embedder.encode([question], normalize_embeddings=True)[0]
+    by_vector = np.argsort(-(index["vectors"] @ q))[:pool]
+    by_keyword = np.argsort(-index["bm25"].get_scores(question.lower().split()))[:pool]
+    fused = {}
+    for ranking in (by_vector, by_keyword):
+        for rank, i in enumerate(ranking):
+            fused[int(i)] = fused.get(int(i), 0) + 1 / (60 + rank)      # reciprocal rank fusion
+    best = sorted(fused, key=fused.get, reverse=True)[:k]
+    return [index["chunks"][i] for i in best]
+
+def answer(index, question):
+    hits = search(index, question)
+    passages = "\n\n".join(f"[{n}] {h['title']}, page {h['page']}\n{h['text']}" for n, h in enumerate(hits, 1))
+    reply = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=500,          # check the docs for current names
+        system="Answer only from the passages. Cite like [2] after each sentence. "
+               "If they do not contain the answer, say so and suggest who to ask.",
+        messages=[{"role": "user", "content": f"Passages:\n{passages}\n\nQuestion: {question}"}])
+    return "".join(b.text for b in reply.content if b.type == "text"), hits
+```
+
+At a few thousand chunks this runs in memory on a laptop. Past that, move the vectors to a vector database or pgvector and keep the same functions.
+
+**Rewrite follow-ups before searching.** In a chat, "What about for ITI students?" retrieves nothing useful. Before retrieval, ask a small, fast model to rewrite the latest message into a standalone question using the last few turns ("What is the fee waiver limit for ITI students?"), and search with that. Log both versions.
+
+**Measure retrieval with a few lines.** For each golden question, record which chunk ids should be found:
+
+```python
+def recall_at_k(index, golden, k=5):
+    """golden: list of (question, set_of_correct_chunk_ids)."""
+    hits = 0
+    for q, correct in golden:
+        found = {h["id"] for h in search(index, q, k=k)}
+        hits += bool(found & correct)
+    return hits / len(golden)
+```
+
+Run it before and after every change to chunking, embedding model, filters or fusion settings. A change that improves answers on three questions you tried by hand but drops recall from 88% to 79% is a step back.
+
+**Two kinds of retrieval quality.** **Context recall**: did the passages include what was needed? **Context precision**: how much of what was retrieved was actually relevant? Low recall gives wrong or "I don't know" answers; low precision wastes tokens and can distract the model.
+
 ## A worked example
 
 A college in Coimbatore builds an assistant for students' questions about academic regulations, fees, exams and scholarships, from 25 PDFs.
@@ -157,11 +221,29 @@ Testing with 50 questions (including eight unanswerable): 40 of the 42 answerabl
 - **Skipping retrieval evaluation.** Most failures are retrieval failures.
 - **Ignoring scanned documents and tables.** They need OCR and table-aware parsing.
 - **Indexing once and forgetting.** Documents change; re-index.
+- **Searching with the raw follow-up message.** Rewrite it into a standalone question first.
+- **Changing several retrieval settings at once.** Change one and rerun recall.
+
+## When you do not need RAG
+
+- **The documents fit in the context** and rarely change: put them in the prompt, cached.
+- **The answer lives in a database**, such as order status or fees paid: use a tool or a query, not text search.
+- **Questions need reasoning over the whole collection**, such as "which policies contradict each other?": RAG finds pieces, not overviews.
+
+## From demo to production
+
+- **Keep a golden set** with expected chunks and answers, and run recall and answer checks on every change.
+- **Log the rewritten query, retrieved ids and scores** with every answer.
+- **Re-index on document change**, and remove superseded versions.
+- **Filter by permissions before ranking**, never after the model sees text.
+- **Track "I don't know" rate by topic**, which points to missing documents.
 
 ## Practice
 
 Read Anthropic's contextual retrieval article linked below.
 
 This lesson's check is a project: push a RAG app over 20 or more documents that answers with sources and says when it does not know. Include a README with five example questions, the answers it gave and which source each came from. Adding one failure you found and fixed makes it stronger.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers RAG architecture, term-based and embedding retrieval, combining them, query rewriting and evaluating retrieval.
 
 **You are done when you can** show cited answers, a correct refusal and how you measured retrieval.

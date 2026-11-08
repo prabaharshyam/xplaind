@@ -33,6 +33,10 @@ flashcards:
     a: "There is no fixed standard. A useful rule of thumb is at least a fifth, so guessing is measured."
   - q: "What is faithfulness?"
     a: "Whether every claim in the answer is supported by the passages provided, regardless of whether it is true in the world."
+  - q: "What does an API citations feature return?"
+    a: "Structured citations with each answer sentence: which document, and the exact text quoted from it, so you can show and check the source without parsing brackets."
+  - q: "Why track refusal rate on a hard golden set?"
+    a: "Too high means retrieval is failing; near zero on questions the documents cannot answer means the model is guessing."
 exercise:
   title: "Ground the answer"
   setup: "A Delhi telecom's support assistant answers plan questions from tariff documents. Asked 'Does the ₹599 plan include international roaming?', it retrieves three passages about the ₹599 plan's data and calls, none about roaming, and answers: 'Yes, international roaming is included in select countries.' The answer cites 'Tariff Guide.pdf'."
@@ -51,7 +55,7 @@ ask:
   - "How should a chatbot say it does not know?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -100,6 +104,61 @@ This lesson follows an HR assistant pilot at an IT services firm in Bengaluru.
 
 **Showing sources to users.** Put the citation next to the sentence it supports, and make it open the quoted passage with its section and page. Users then check answers that matter to them, such as leave rules before a long holiday, and they report mismatches, which feed back into the golden set.
 
+**Built-in citations in code.** Anthropic's API can cite passed documents directly. Send each passage as a document with citations turned on:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+def cited_answer(question, passages):
+    docs = [{"type": "document",
+             "source": {"type": "text", "media_type": "text/plain", "data": p["text"]},
+             "title": f"{p['title']}, section {p['section']}, page {p['page']}",
+             "citations": {"enabled": True}} for p in passages]
+    reply = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=600,          # check the docs for current names
+        system="Answer only from the documents. If they do not answer the question, say so "
+               "and suggest who to contact.",
+        messages=[{"role": "user", "content": docs + [{"type": "text", "text": question}]}])
+    parts = []
+    for block in reply.content:
+        if block.type != "text":
+            continue
+        cites = [f'{passages[c.document_index]["title"]}: "{c.cited_text}"' for c in (block.citations or [])]
+        parts.append({"text": block.text, "sources": cites})
+    return parts
+```
+
+Each piece of the answer comes with the exact text it relied on, ready to show next to the sentence. Pieces with no citations are the ones to look at: either general wording or an unsupported claim.
+
+**Checks for bracket-style citations.** When you ask for `[n]` markers in plain text, check them in code:
+
+```python
+import re
+
+def check_citations(answer, n_passages, passages_text):
+    problems = []
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+", answer.strip()) if s]
+    for s in sentences:
+        ids = [int(x) for x in re.findall(r"\[(\d+)\]", s)]
+        if not ids and len(s.split()) > 5:
+            problems.append(f"no citation: {s[:60]}")
+        for i in ids:
+            if not 1 <= i <= n_passages:
+                problems.append(f"cites [{i}] but only {n_passages} passages were sent")
+    for quote in re.findall(r'"([^"]{12,})"', answer):
+        if not any(quote in p for p in passages_text):
+            problems.append(f"quote not in any passage: {quote[:40]}")
+    return problems
+```
+
+Answers with problems can be regenerated once, shown with a warning, or sent to review, depending on the stakes.
+
+**Grounding is not truth.** A perfectly cited answer can still be wrong if the source is outdated or wrong. Filter superseded documents at retrieval, show the document's date with each citation, and let users report a wrong source.
+
+**Faithfulness at scale.** For a golden set and a sample of live traffic, split each answer into claims and check each against the cited passages with a judge model. Track the share of unsupported claims over time, by topic.
+
 ## A worked example
 
 A Bengaluru IT services firm wants an HR assistant over its leave, travel and reimbursement policies. In the pilot, an employee asks: "Can I carry forward unused sick leave?"
@@ -125,6 +184,25 @@ On the 80-question golden set, faithfulness rises from 0.81 to 0.96 and the shar
 - **Trusting model-written citation numbers.** Models sometimes cite a passage that does not support the claim. Check citations automatically.
 - **Refusals with no next step.** Point the user to a person, a team or a form.
 - **Hiding sources from users.** Showing the quoted passage builds trust and lets users catch mistakes the system missed.
+- **Parsing citations with no checks.** Verify ids exist and quotes match.
+- **Hiding uncited sentences.** They are the most likely to be unsupported.
+- **Citing outdated documents.** Show dates and filter superseded versions.
+
+## When citations matter less
+
+- **Creative or drafting tasks** where the model is not stating facts from documents.
+- **Answers from a database or tool**, such as an order status, where the tool result is the source.
+- **Internal brainstorming**, where people treat the output as ideas, not facts.
+
+Citations are essential whenever users act on facts: policies, prices, eligibility, health, legal and financial information.
+
+## From demo to production
+
+- **Use built-in citations** where your provider offers them, and log them.
+- **Run citation checks on every answer**, and faithfulness checks on a sample.
+- **Show sources with dates** next to each sentence.
+- **Track refusal and unsupported-claim rates** by topic.
+- **Let users report wrong sources** and route reports to document owners.
 
 ## Practice
 
@@ -133,5 +211,8 @@ Read the citations guide linked below, and the RAGAS page on faithfulness.
 1. Add ids and source labels to every passage your RAG app sends, and require a citation per sentence.
 2. Add ten unanswerable questions to your golden set. Measure how many your app refuses before and after adding a refusal example to the prompt.
 3. Write a check that rejects any answer citing a passage id that was not sent.
+4. Switch your app to the built-in citations API and compare how many answers have an unsupported sentence before and after.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers RAG, and chapter 4 covers checking factual consistency against sources.
 
 **You are done when you can** show an answer where every sentence links to a real passage, and a refusal that tells the user where to go next.

@@ -34,6 +34,10 @@ flashcards:
     a: "It exposes the whole database to whatever the model writes. Task-shaped tools limit what can happen."
   - q: "How can MCP carry prompt injection?"
     a: "Tool descriptions and results flow into the model, so a malicious server or poisoned record can carry hidden instructions."
+  - q: "What besides tools can an MCP server offer?"
+    a: "Resources, which are data the host can read such as files or records, and prompts, which are reusable templates the user can pick."
+  - q: "What is tool poisoning in MCP?"
+    a: "A server whose tool descriptions or results hide instructions for the model, such as telling it to read secrets or call another tool."
 exercise:
   title: "Review the MCP server"
   setup: "A Kochi shipping company's IT team finds a free community MCP server for their ERP. It offers tools: run_sql(query), get_shipment(id), update_shipment(id, fields), and send_email(to, body). It connects with one admin database account set in a config file. It keeps no logs. Staff want to install it in their desktop assistants today."
@@ -52,7 +56,7 @@ ask:
   - "Is it safe to install third-party MCP servers?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -123,6 +127,55 @@ The function's name, type hints and docstring become the tool's schema, so the t
 
 **Designing the tools.** The same advice as any agent tool applies: few, task-shaped tools with clear descriptions and helpful errors. Because many different hosts will use one server, good descriptions matter even more; you cannot tune a prompt in each host to make up for a vague tool. Keep write tools narrow, such as `log_observation` writing only to a notes table, so even a confused or manipulated model can do little harm.
 
+**More than tools.** A server can offer three kinds of things. **Tools** are functions the model may call. **Resources** are data the host can read and show or attach, such as a file, a ticket or a database row, addressed by a URI. **Prompts** are reusable templates a user can pick from a menu, such as "summarise this ticket thread". Tools are model-driven; resources and prompts are usually chosen by the app or the user.
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("tickets")
+
+@mcp.resource("ticket://{ticket_id}")
+def ticket(ticket_id: str) -> str:
+    """The full text of one ticket."""
+    t = ticket_db.get(ticket_id)
+    return f"{t.title}\n\n{t.body}"
+
+@mcp.prompt()
+def summarise_ticket(ticket_id: str) -> str:
+    return f"Summarise ticket {ticket_id} in five bullets and list open questions."
+```
+
+**Writing your own client.** Hosts such as desktop assistants and code editors already include clients, but you can connect from your own Python code with the same SDK:
+
+```python
+import asyncio
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+async def main():
+    server = StdioServerParameters(command="python", args=["tickets_server.py"])
+    async with stdio_client(server) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools = await session.list_tools()
+            print([t.name for t in tools.tools])
+            result = await session.call_tool("search_tickets", {"query": "refund", "status": "open"})
+            print(result.content[0].text)
+
+asyncio.run(main())
+```
+
+Your app would pass `tools.tools` to the model as tool definitions and route the model's tool calls to `session.call_tool`, the same round trip as the tool-calling lesson.
+
+**Test a server before connecting a model.** The MCP Inspector, run with `npx @modelcontextprotocol/inspector`, opens a page where you can list a server's tools, call them with your own arguments and see the raw results. Most bugs show up here faster than through a chat.
+
+**Threats specific to MCP.**
+
+- **Tool poisoning**: a tool description or result tells the model to do something else, such as read `~/.ssh` or send data to a URL. Read the descriptions of third-party servers, and treat results as data.
+- **Changed after approval**: a server you approved can update its tool descriptions later. Pin versions and review changes.
+- **Name clashes**: two servers offering a tool with the same name can confuse the model about which one runs. Prefix tool names with the server's purpose.
+- **Too much reach**: one server with a company-wide token can expose everything. Prefer servers that act as the signed-in user, with OAuth scopes as narrow as the task.
+
 ## A worked example
 
 A Pune manufacturing company's engineers use an AI assistant in their IDE and another in their chat tool. Both need access to the maintenance log database.
@@ -147,6 +200,25 @@ When IT later adds a new spare-parts system, they add a second MCP server, and b
 - **Exposing the whole database.** Offer task-shaped tools, not a `run_sql` tool, unless the users are database administrators.
 - **Treating tool results as trusted.** Text from a ticket or document can contain injected instructions; the host must treat it as data.
 - **No logging.** You cannot investigate what an assistant did without a record of tool calls.
+- **Installing third-party servers without reading their tool descriptions and code.**
+- **Unpinned server versions.** A later update can change what tools do or say.
+- **One service-account token for everyone.** User permissions stop applying.
+
+## When you do not need MCP
+
+- **One app with a few tools** that only it uses: plain tool definitions in code are simpler.
+- **Fixed workflows** where your code calls functions directly and no model chooses tools.
+- **Strict environments** where every new connection needs a security review: start with a single in-process tool set, and move to MCP once the tools are shared.
+
+MCP pays off when several hosts or agents need the same tools, or when you want users to plug existing assistants into your systems.
+
+## From demo to production
+
+- **Run remote servers behind OAuth** with narrow scopes, ideally through the company's single sign-on.
+- **Log every call** centrally with user, tool, arguments and result size.
+- **Pin and review server versions**, including changes to tool descriptions.
+- **Keep an approved-server list** for the company, and block others.
+- **Rate-limit and time out** every tool, and require approval for write tools.
 
 ## Practice
 
@@ -155,5 +227,6 @@ Take Anthropic's free Introduction to Model Context Protocol course, or read the
 1. Build a local MCP server with two tools over a small SQLite database of your choice (books, fees, appointments).
 2. Connect it to an MCP-capable client and ask questions that need both tools.
 3. Add a write tool that only inserts into one table, log every call to a file, and try a prompt injection hidden in one record to see how your client handles it.
+4. Open your server in the MCP Inspector, call each tool with bad arguments, and improve every error message that would not help a model recover.
 
 **You are done when you can** explain host, client and server, show your server working in a real client, and name three security questions you would ask about any MCP server.

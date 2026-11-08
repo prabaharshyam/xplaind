@@ -34,6 +34,10 @@ flashcards:
     a: "In CI: fast checks on every pull request, blocking merges on failure, and the full eval before deploying."
   - q: "What happens to every production bug?"
     a: "It becomes a new regression test case."
+  - q: "How do you set a tolerance for score changes?"
+    a: "Run the same version several times to see how much scores move by chance, and set the tolerance just above that noise. Critical categories get no tolerance."
+  - q: "Why pin model versions in tests?"
+    a: "A provider can update a model behind the same name. Pinned, dated versions make test results comparable from day to day."
 exercise:
   title: "Set up the gates"
   setup: "A Chennai insurtech's claims-summary feature returns JSON with fields claim_id, summary and risk_flags. Changes to prompts are made directly and checked by reading two outputs. Last month, a prompt change made risk_flags empty for motor claims, and a provider's model update changed date formats, breaking a downstream report. Both reached production."
@@ -52,7 +56,7 @@ ask:
   - "Should I upgrade to a newer model version?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -101,6 +105,66 @@ This lesson follows a quiz-generation feature at an edtech company in Noida that
 
 **Setting tolerances.** Run the full tier several times on the same version to see how much scores move from randomness alone. Set the overall tolerance just above that noise. For critical categories, such as safety and refusals, allow no drop at all, and add more cases there so a single failure is clearly visible.
 
+**The fast tier in code.** Property checks are plain tests. This one uses pytest and runs the quiz generator on a few saved chapters:
+
+```python
+import json, pytest
+from quiz import generate_quiz             # your app's function
+
+CHAPTERS = json.load(open("tests/fast_chapters.json"))   # 15 saved chapters
+
+@pytest.mark.parametrize("chapter", CHAPTERS, ids=lambda c: c["id"])
+def test_quiz_shape(chapter):
+    quiz = json.loads(generate_quiz(chapter["text"]))
+    assert 3 <= len(quiz["questions"]) <= 10
+    for q in quiz["questions"]:
+        assert len(q["options"]) == 4
+        assert len(set(q["options"])) == 4, "duplicate options"
+        assert q["answer"] in q["options"]
+
+def test_refuses_out_of_scope():
+    out = generate_quiz("Write me a poem about cricket.")
+    assert json.loads(out).get("error") == "not_a_chapter"
+```
+
+**The baseline comparison in code.** The full tier writes one score per case with its category; this script compares a candidate run with the stored production run:
+
+```python
+import json
+from collections import defaultdict
+
+CRITICAL = {"safety", "refusals"}
+
+def by_category(path):
+    scores = defaultdict(list)
+    for line in open(path):
+        r = json.loads(line)
+        scores[r["category"]].append(r["score"])
+    return {c: sum(v) / len(v) for c, v in scores.items()}
+
+def compare(baseline_path, candidate_path, tolerance=0.02):
+    base, cand = by_category(baseline_path), by_category(candidate_path)
+    problems = []
+    for cat, b in base.items():
+        drop = b - cand.get(cat, 0)
+        limit = 0 if cat in CRITICAL else tolerance
+        if drop > limit:
+            problems.append(f"{cat}: {b:.2f} -> {cand.get(cat, 0):.2f}")
+    return problems
+
+problems = compare("evals/production.jsonl", "evals/candidate.jsonl")
+print("PASS" if not problems else "FAIL\n" + "\n".join(problems))
+raise SystemExit(1 if problems else 0)       # a non-zero exit fails the CI job
+```
+
+**Measure the noise before trusting a drop.** Run the full tier three to five times on the unchanged production version. If history accuracy moves between 0.84 and 0.87 on its own, a candidate at 0.85 has not regressed. For small categories, add cases: with 20 cases, one failure is a 5-point swing.
+
+**Flaky cases.** Some cases pass on one run and fail on the next. Run them three times and require two passes, or fix the case: often the expected answer is ambiguous. Never just delete a flaky case without understanding it.
+
+**Keep the bill small.** Full evals with a judge cost money on every run. Cache outputs for unchanged inputs and prompts, use a cheaper judge for routine runs and a stronger one before releases, and run the full tier on labels or nightly rather than on every push.
+
+**Pin what you test.** Record the exact model version, prompt version, retrieval settings and judge prompt with every run. A score is only comparable with another score made the same way.
+
 ## A worked example
 
 A Noida ed-tech company's quiz-generation feature creates multiple-choice questions from chapter text, as JSON.
@@ -127,6 +191,24 @@ Months later, the provider's newer model scores 3 points higher overall but retu
 - **Upgrading models without running evals.**
 - **Not adding production bugs to the test set.**
 - **Letting the fast tier grow slow.** If it takes more than a few minutes, people skip it. Move slow cases to the full tier.
+- **Changing the judge and the app at the same time.** You cannot tell which change moved the score.
+- **Deleting failing cases to get green.** Fix the app or fix the case, and write down why.
+
+## When lighter testing is enough
+
+- **A prototype that changes daily**: a handful of smoke checks beats a full suite you keep rewriting.
+- **Internal tools with a few expert users**, who report problems fast: keep the fast tier, run the full tier before big changes only.
+- **Fixed, deterministic steps**, such as parsing a known file format: ordinary unit tests are enough.
+
+Add the full tier, baselines and critical categories once real users depend on the output.
+
+## From demo to production
+
+- **Block merges on the fast tier**, and keep it under a few minutes.
+- **Run the full tier before every prompt, model or retrieval release**, and post the category table on the pull request.
+- **Store every run** with its commit and versions, and chart scores over time to catch slow decline.
+- **Review the test set quarterly**: retire stale cases, add new user patterns and every production bug.
+- **Have a model upgrade checklist**: full tier, format checks for every downstream consumer, cost and latency comparison.
 
 ## Practice
 
@@ -135,5 +217,8 @@ Revisit Hamel Husain's evals article linked below.
 1. Split your eval set into a fast tier (10 to 20 cases with code checks) and a full tier.
 2. Run the fast tier automatically on every push with a CI workflow.
 3. Make a change that improves one category and breaks another, and show that your setup catches it.
+4. Run your full tier three times on one unchanged version, note how much each category moves, and set your tolerance from that.
+
+For more depth, chapters 3 and 4 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) cover evaluation methods and building an evaluation pipeline.
 
 **You are done when you can** show a pull request blocked by a failing regression check, and explain what decided whether to adopt a new model.

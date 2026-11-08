@@ -34,6 +34,10 @@ flashcards:
     a: "Generation: the prompt, grounding instructions or the model, not retrieval."
   - q: "Why keep the test set fixed?"
     a: "So you can compare changes fairly. A change can help some questions and hurt others; only a fixed set shows the net effect."
+  - q: "What does nDCG reward that recall does not?"
+    a: "Putting the most relevant passages at the very top, with graded relevance, rather than just having a correct one somewhere in the top k."
+  - q: "Can a model write your retrieval test questions?"
+    a: "It can draft them from passages to save time, but a person should check and edit each, and real user questions should make up much of the set."
 exercise:
   title: "Diagnose with the numbers"
   setup: "An HR assistant at an IT company in Chennai is tested on 50 questions. Version A: recall at 5 is 92%, faithfulness 0.71, correctness 64%. Version B, after a prompt change: recall at 5 still 92%, faithfulness 0.94, correctness 85%. Version C, after switching to larger chunks: recall at 5 drops to 78%, correctness 74%."
@@ -52,7 +56,7 @@ ask:
   - "How do I build a test set for RAG?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -106,6 +110,48 @@ Recall at 5 = 3 of 4 = 75%. MRR = (1.0 + 0.33 + 0 + 0.5) ÷ 4, about 0.46.
 
 **Using a model as a judge.** Tools such as RAGAS use a model to score faithfulness and relevance at scale. They are useful but not perfect. Score a sample of 20 by hand and compare; if the judge disagrees with people often, fix its instructions before trusting its numbers.
 
+**The metrics in code.** Each test case lists the ids of passages that answer it; the retriever returns ranked ids:
+
+```python
+import math
+
+def metrics(cases, retrieve, k=5):
+    """cases: list of (question, set_of_relevant_ids). Empty set = unanswerable."""
+    recall = precision = mrr = ndcg = 0.0
+    answerable = [c for c in cases if c[1]]
+    for q, relevant in answerable:
+        ranked = retrieve(q)[:k]
+        hits = [1 if r in relevant else 0 for r in ranked]
+        recall += any(hits)
+        precision += sum(hits) / k
+        mrr += next((1 / (i + 1) for i, h in enumerate(hits) if h), 0)
+        dcg = sum(h / math.log2(i + 2) for i, h in enumerate(hits))
+        ideal = sum(1 / math.log2(i + 2) for i in range(min(len(relevant), k)))
+        ndcg += dcg / ideal
+    n = len(answerable)
+    return {"recall@k": recall / n, "precision@k": precision / n, "mrr": mrr / n, "ndcg@k": ndcg / n}
+```
+
+Unanswerable cases are left out of these numbers on purpose; check them separately by whether the final answer says it does not know.
+
+**Break results down.** One overall recall hides problems. Tag each question (exact code, vague, Hindi, multi-part, recent policy) and report recall per tag. A drop on "recent policy" questions after an ingestion change usually means new documents were not indexed.
+
+```python
+from collections import defaultdict
+
+def by_tag(cases_with_tags, retrieve, k=5):
+    groups = defaultdict(list)
+    for q, rel, tag in cases_with_tags:
+        groups[tag].append((q, rel))
+    return {tag: metrics(cs, retrieve, k)["recall@k"] for tag, cs in groups.items()}
+```
+
+**Small sets are noisy.** With 30 questions, one question is more than 3 points. Do not celebrate or panic over a 3-point change; look at which questions flipped and why. Grow the set over time, especially in the tags that matter most.
+
+**Drafting questions with a model.** To get started fast, give a model a passage and ask for two questions it answers, in the words a user would use. A person then edits or rejects each, and records the passage as the expected answer. Mark these as synthetic and keep adding real questions from logs: models tend to reuse the passage's own words, which makes retrieval look easier than it is.
+
+**Retrieval and answers together.** For each case, store the retrieved ids, the answer and the verdicts. Then any wrong answer falls into one of two buckets at a glance: the right passage was missing (retrieval problem) or present (generation problem).
+
 ## A worked example
 
 A Kochi bank's internal assistant answers staff questions from 900 circulars. Staff complain that answers are often wrong.
@@ -139,6 +185,23 @@ The model was never the problem; it had been faithfully answering from the wrong
 - **Optimising recall while precision collapses.** Track both.
 - **Test sets made of easy questions.** Include vague, multi-part and unanswerable ones, as real users ask them.
 - **Changing several things before re-testing.** Change one setting, rerun the set, record the numbers, then change the next.
+- **Only synthetic questions**, which use the documents' own wording and flatter retrieval.
+- **One overall number.** Break recall down by question type.
+- **Mixing unanswerable questions into recall**, which hides both numbers.
+
+## When a lighter check is enough
+
+- **A small prototype**: ten questions checked by hand tell you whether retrieval is broadly working.
+- **A collection that rarely changes**, where one careful test at launch plus spot checks may do.
+- **Answers that people always verify** against the source before use.
+
+## From demo to production
+
+- **Keep the test set in the repository**, tagged by question type, and run it on every retrieval change.
+- **Record recall, precision, MRR and nDCG** with the settings and index version.
+- **Add every reported wrong answer** as a new question.
+- **Spot-check model-judged scores by hand** each month.
+- **Alert when recall drops** on any important tag.
 
 ## Practice
 
@@ -147,5 +210,8 @@ Read the RAGAS metrics page linked below.
 1. Write 30 questions for your RAG app with the correct passage for each.
 2. Compute recall at 5 and precision at 5, and list the misses.
 3. Make one retrieval change and rerun on the same set.
+4. Tag your 30 questions by type and report recall at 5 per tag before and after your retrieval change.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers evaluating retrieval with context precision and recall, and chapter 4 covers building evaluation sets.
 
 **You are done when you can** explain what recall at 5 measures, where to look first when the right chunk was not retrieved, and show before-and-after numbers.

@@ -34,6 +34,10 @@ flashcards:
     a: "A variant of parent-child: return a few sentences either side of the matched sentence."
   - q: "When should you add one of these techniques?"
     a: "Only when your golden set shows the specific failure it fixes, because each adds cost or latency."
+  - q: "What is contextual retrieval?"
+    a: "Prepending a short, model-written note on where each chunk sits in its document before embedding and keyword indexing, so vague chunks become findable."
+  - q: "Why route queries to techniques instead of using all of them?"
+    a: "Each technique adds calls and delay. Most queries work with plain hybrid search; extra steps should run only on the kinds of queries they help."
 exercise:
   title: "Match the fix to the failure"
   setup: "A Bengaluru telecom's support assistant fails in four ways on its golden set: (1) 'What about prepaid?' after a question about international roaming returns general prepaid plans; (2) 'Roaming charges Dubai?' retrieves pages that mention Dubai only in passing; (3) the right 120-token chunk is found but the answer misses the exception for business plans in the next paragraph; (4) 'Compare the Gold and Platinum plan data limits' only returns the Gold plan page."
@@ -52,7 +56,7 @@ ask:
   - "What chunk size should I use for parent-child retrieval?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -100,6 +104,62 @@ A small, fast model does this well. Log the rewrites: when retrieval fails, the 
 
 Routing matters: running every technique on every query adds latency and cost for little gain on the queries that already work.
 
+**Rewriting, multi-query and HyDE in code.** One small, fast model handles all three:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+FAST = "claude-haiku-5-5"                         # check the docs for current names
+
+def ask(prompt, max_tokens=200):
+    r = client.messages.create(model=FAST, max_tokens=max_tokens,
+                               messages=[{"role": "user", "content": prompt}])
+    return "".join(b.text for b in r.content if b.type == "text").strip()
+
+def standalone(question, last_turns):
+    history = "\n".join(f"{t['role']}: {t['text']}" for t in last_turns[-4:])
+    return ask(f"Rewrite the last question so it makes sense on its own. Reply with the question only.\n\n"
+               f"{history}\nuser: {question}")
+
+def variants(question, n=3):
+    text = ask(f"Write {n} different ways a bank's policy documents might phrase this question. "
+               f"One per line, no numbering.\n\n{question}")
+    return [question] + [l for l in text.splitlines() if l.strip()][:n]
+
+def hyde(question):
+    return ask(f"Write a short, formal policy paragraph that would answer: {question}", max_tokens=150)
+
+def route(question, history, search):
+    q = standalone(question, history) if history else question
+    if len(q.split()) < 8:
+        return search(hyde(q))                     # short and vague: search with a fake answer
+    if " and " in q or " vs " in q or "compare" in q.lower():
+        results = [search(v) for v in variants(q)]
+        return fuse(results)                       # reciprocal rank fusion, as in the RAG lesson
+    return search(q)
+```
+
+Log the original question, each rewrite and which route ran. When an answer goes wrong, the rewrite is often the cause.
+
+**Parent-child in code.** Store children with a `parent_id`, search children, return parents once each:
+
+```python
+def parent_child(question, search_children, get_parent, k_children=12, k_parents=4):
+    seen, parents = set(), []
+    for child in search_children(question, k=k_children):
+        if child["parent_id"] not in seen:
+            seen.add(child["parent_id"])
+            parents.append(get_parent(child["parent_id"]))
+        if len(parents) == k_parents:
+            break
+    return parents
+```
+
+**Contextual retrieval.** At ingestion, ask a model to write one or two sentences placing each chunk in its document ("This is from the 2026 FD rates circular, section on senior citizens"), and prepend it before both embedding and keyword indexing. Anthropic reported this cut failed retrievals by about half in its tests, and by about two thirds combined with reranking. It costs one call per chunk, once; with the full document in a cached prompt, that cost drops a lot.
+
+**Measure each technique on its own target.** Report recall separately for follow-ups, short queries and compound queries, with the technique on and off. Keep a technique only for the query types where it clearly helps.
+
 ## A worked example
 
 A Delhi bank's internal assistant answers staff questions about 900 pages of circulars. The golden set shows three failure clusters.
@@ -123,6 +183,22 @@ A Delhi bank's internal assistant answers staff questions about 900 pages of cir
 - **Trusting HyDE's text.** The hypothetical answer is only a search key. Never show it to the user or let it into the final prompt.
 - **Huge parents.** Returning whole 20-page documents blows the context budget and buries the answer. Parents should be sections, not files.
 - **Ignoring latency.** Two extra model calls before retrieval can double response time. Use a small model and measure.
+- **Not logging rewrites.** A bad rewrite looks like a retrieval failure.
+- **Turning on every technique for every query.** Route by query type and measure.
+
+## When basic retrieval is enough
+
+- **Single questions without chat history**, phrased in the documents' own language.
+- **Small, well-structured collections**, where plain hybrid search already finds the right passage.
+- **Tight latency budgets**, where an extra model call before search is too slow.
+
+## From demo to production
+
+- **Log the original query, rewrites, route and retrieved ids** for every request.
+- **Measure recall per query type** with each technique on and off.
+- **Cache rewrites and HyDE outputs** for repeated questions.
+- **Re-run contextual chunk notes** when documents change.
+- **Budget the extra calls** in latency and cost per request.
 
 ## Practice
 
@@ -131,5 +207,8 @@ Read Weaviate's advanced RAG guide and the HyDE paper's abstract and first figur
 1. Add a query-rewrite step to your RAG app that uses the last two turns. Test it on five follow-up questions.
 2. Implement HyDE behind a switch and compare recall at 5 on your short and long questions separately.
 3. Re-index with 150-token children pointing to section-sized parents, and compare answer correctness on ten questions that need nearby context.
+4. Add contextual notes to 50 chunks and compare recall at 5 with and without them on your golden set.
+
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers query rewriting, contextual retrieval and retrieval optimisation.
 
 **You are done when you can** say, from your own measurements, which technique fixed which kind of question and what each cost in latency or tokens.
