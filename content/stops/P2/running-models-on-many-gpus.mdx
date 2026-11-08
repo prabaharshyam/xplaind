@@ -1,0 +1,166 @@
+---
+id: running-models-on-many-gpus
+level: P2
+theme: ops
+title: "Running models on many GPUs: replicas, tensor and pipeline parallelism"
+outcome: "Explain how a model is spread across GPUs, choose between copying it (replicas) and splitting it (tensor or pipeline parallelism) for serving or training, and size a deployment."
+answer: "If the model fits on one GPU, run copies of it to serve more users. If it does not fit, split it: each layer across GPUs (tensor) or groups of layers across GPUs (pipeline)."
+why_it_matters: "Open models of 70B parameters and more do not fit on one GPU, and real traffic needs more than one copy. Choosing how to spread a model decides cost, speed and reliability, and it is a standard question in ML platform interviews."
+hours: 2.5
+gap_tags: []
+primary_resource: hf-train-gpu-many
+alternates: [hf-ultrascale-playbook]
+videos: [yt-simon-oz-how-llms-use-multiple-gpus, yt-faradawn-yang-tensor-data-expert-parallelism]
+more: []
+format: deep
+key_terms: [data-parallelism, tensor-parallelism, pipeline-parallelism, gpu, vllm]
+check:
+  type: mcq
+  question_ids: [running-models-on-many-gpus-1, running-models-on-many-gpus-2, running-models-on-many-gpus-3]
+flashcards:
+  - q: "What is replica (data) parallelism?"
+    a: "Running full copies of the model on several GPUs. For serving, each copy handles different requests; for training, each handles different batches."
+  - q: "What is tensor parallelism?"
+    a: "Splitting each layer's matrix work across several GPUs that compute at the same time. It lets a too-big model run and can cut latency."
+  - q: "What is pipeline parallelism?"
+    a: "Putting different groups of layers on different GPUs, so data passes from one to the next. Good for training throughput; adds delay to single requests."
+  - q: "Why does tensor parallelism need fast links between GPUs?"
+    a: "The GPUs exchange partial results inside every layer. Over slow connections, the communication can cancel out the speed-up."
+  - q: "Which parallelism is usually avoided for low-latency serving?"
+    a: "Pipeline parallelism, because each request must pass through every stage in turn."
+  - q: "What is the first question when sizing a deployment?"
+    a: "Does one copy of the model, with its KV cache, fit on one GPU? If yes, use replicas; if no, split it."
+  - q: "What do context and sequence parallelism help with?"
+    a: "Very long inputs, by splitting the sequence or the operations on it across GPUs."
+  - q: "What extra memory does training need beyond the weights?"
+    a: "Gradients and optimiser states, often several times the weights, which is why training uses tricks like sharding these across GPUs."
+exercise:
+  title: "Serving a 70B model for a Hyderabad insurer"
+  setup: "A Hyderabad insurer wants to self-host a 70-billion-parameter open model for an internal assistant used by 2,000 staff, with a p95 first-token time under 2 seconds. They have servers with 8 GPUs of 80 GB each, connected by fast links inside each server."
+  questions:
+    - q: "Does the model fit on one GPU at 16-bit precision?"
+      a: "No. 70 billion parameters at 2 bytes is about 140 GB, more than one 80 GB GPU, before the KV cache."
+    - q: "How should they split it inside one server?"
+      a: "Tensor parallelism across 4 GPUs (or 2 at 8-bit precision), using the fast links inside the server, which leaves room for the KV cache."
+    - q: "How do they serve more users?"
+      a: "Run two copies on the 8 GPUs (two groups of 4), and add servers with more copies as traffic grows, behind a load balancer."
+    - q: "Why not pipeline parallelism across two servers?"
+      a: "Each request would pass through both servers in turn over a slower network, adding delay, and it is not needed when the model fits inside one server."
+ask:
+  - "How do you run a model that doesn't fit on one GPU?"
+  - "What is the difference between tensor and pipeline parallelism?"
+  - "How many GPUs do I need to serve a 70B model?"
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-08
+---
+
+## What it is
+
+A single GPU has a fixed amount of memory and speed. Two different problems push you to use many:
+
+1. **The model is too big for one GPU.** A 70B model at 16-bit precision needs about 140 GB for its weights alone, more than a single 80 GB GPU.
+2. **One copy cannot serve all your users.** Even if the model fits, traffic may need several copies.
+
+There are two basic answers: **copy** the model, or **split** it.
+
+- **Replica parallelism** (called **data parallelism** in training): run full copies on several GPUs. Each copy serves different requests, or trains on different batches.
+- **Model parallelism**: split one model across GPUs. The two main ways are **tensor parallelism** (split the work inside each layer) and **pipeline parallelism** (split the layers into groups).
+
+Real systems often combine them: a model split across 4 GPUs, with several such groups as replicas.
+
+```flow
+title: Choosing how to spread a model
+Model and expected traffic -> Fits on one GPU with KV cache room?
+Fits on one GPU with KV cache room? -[yes]-> Replicas | one copy per GPU
+Fits on one GPU with KV cache room? -[no]-> Fits inside one server?
+Fits inside one server? -[yes]-> Tensor parallelism across its GPUs
+Fits inside one server? -[no]-> Tensor inside servers, pipeline across them
+Replicas -> Add copies for more traffic | behind a load balancer
+Tensor parallelism across its GPUs -> Add copies for more traffic | behind a load balancer
+Tensor inside servers, pipeline across them -> Add copies for more traffic | behind a load balancer
+```
+
+## How it works
+
+**Replicas.** The simplest and most robust option: every GPU (or group of GPUs) holds a whole model and handles its own requests. More replicas means more throughput, and if one fails the others keep serving. With models of different sizes and GPUs of different memory, deciding what to place where becomes a packing puzzle: three 13B models on one 40 GB GPU, or one 34B model?
+
+**Tensor parallelism.** A layer is mostly matrix multiplication. Split the matrices across, say, 4 GPUs: each computes its slice at the same time, then they exchange results. This makes a too-big model fit, and can reduce latency because the work is shared. The catch is communication: GPUs talk inside every layer, so they need very fast links, such as the high-speed connections between GPUs inside one server. Across slower networks, tensor parallelism usually stops paying off.
+
+**Pipeline parallelism.** Put layers 1 to 20 on GPU 1, 21 to 40 on GPU 2, and so on. A request passes through each stage in turn. Splitting batches into small "micro-batches" keeps all stages busy, which helps training throughput. For serving, each request waits on every stage plus the network hops between them, so pipeline parallelism is avoided when latency matters. It is mostly used to span servers when a model is too big for one.
+
+**Long inputs.** **Context parallelism** splits a very long input across GPUs, and **sequence parallelism** splits the operations on it. They matter mainly for very long context windows.
+
+**Training needs more.** Besides weights, training holds gradients and optimiser states, often several times the size of the weights. Data parallelism with **sharding** (spreading those states across GPUs, as in ZeRO or FSDP) plus tensor and pipeline parallelism lets large teams train very large models. For fine-tuning, LoRA and quantisation usually remove the need for most of this.
+
+Serving engines handle the details. With vLLM, splitting a model across 4 GPUs is one setting:
+
+```python
+from vllm import LLM, SamplingParams
+
+# Split each layer across 4 GPUs in this server (tensor parallelism).
+llm = LLM(model="your-org/your-70b-model", tensor_parallel_size=4)
+out = llm.generate(["Summarise this claim note: ..."], SamplingParams(max_tokens=200))
+print(out[0].outputs[0].text)
+
+# More users? Run more copies (replicas) on other GPU groups or servers
+# behind a load balancer. Spanning servers adds pipeline_parallel_size.
+```
+
+| Approach | What it splits | Best for | Main cost |
+| --- | --- | --- | --- |
+| Replicas (data parallelism) | Nothing; full copies | More users, reliability | Needs the model to fit per copy |
+| Tensor parallelism | Work inside each layer | Too-big models, lower latency | Needs very fast links between GPUs |
+| Pipeline parallelism | Groups of layers | Very big models across servers; training | Adds delay per request |
+| Context or sequence parallelism | The input sequence | Very long contexts | Complexity |
+| Sharded data parallelism (training) | Gradients and optimiser states | Training big models | Communication overhead |
+
+## A worked example
+
+An insurer in Hyderabad wants to self-host a 70B open model for 2,000 staff, with a p95 first-token time under 2 seconds. Each server has 8 GPUs of 80 GB, with fast links inside the server.
+
+1. **Does it fit on one GPU?** 70 billion × 2 bytes ≈ 140 GB at 16-bit. No.
+2. **Inside one server?** Yes. Tensor parallelism across 4 GPUs gives 320 GB, leaving plenty for the KV cache of many concurrent chats. At 8-bit precision, 2 GPUs could hold it if quality is confirmed on their test set.
+3. **More users.** Each server holds two copies (two groups of 4 GPUs). Load tests show one copy comfortably handles their busy-hour traffic within the latency budget, so two copies in one server give headroom and survive a GPU failure.
+
+| Set-up | GPUs used | Busy-hour p95 first token | Notes |
+| --- | --- | --- | --- |
+| Tensor 4, one copy | 4 | 1.4 s | No spare if a GPU fails |
+| Tensor 4, two copies | 8 | 0.9 s | Chosen: headroom and failover |
+| Tensor 2 at 8-bit, four copies | 8 | 0.8 s | Needs a quality check after quantising |
+| Pipeline across two servers | 16 | 2.6 s | Slower and costlier; not needed |
+
+The numbers are for illustration. They also plan to test the 8-bit option, which could double capacity on the same hardware if quality holds.
+
+## Common mistakes
+
+- **Splitting a model that fits on one GPU.** Replicas are simpler and usually faster.
+- **Tensor parallelism across slow networks.** Keep it inside a server with fast links.
+- **Forgetting the KV cache** when checking whether a model fits.
+- **Pipeline parallelism for chat serving.** It adds delay to every request.
+- **No headroom.** A single copy has no failover; one GPU fault takes the service down.
+- **Sizing from average traffic.** Size for the busy hour, with load tests at real prompt lengths.
+
+## When you do not need any of this
+
+- **Hosted APIs**: the provider handles it.
+- **Small models** that fit on one GPU with room to spare: just add replicas when needed.
+- **Fine-tuning with LoRA and quantisation**, which often fits on a single GPU.
+
+## From demo to production
+
+- **Measure memory per copy** (weights plus KV cache at your context length and concurrency) before buying GPUs.
+- **Load-test each layout** with real prompt and reply lengths.
+- **Keep at least two copies** for any service people depend on.
+- **Monitor per replica**: utilisation, queue length, latency and errors.
+- **Re-plan after model changes**, as size and context length change the layout.
+
+## Practice
+
+1. For a 7B, a 34B and a 70B model at 16-bit and 8-bit, work out how many 24 GB, 48 GB and 80 GB GPUs each needs for the weights.
+2. Draw a layout for serving a 70B model to 500 users with failover, and say which parallelism each part uses.
+3. Explain to a friend why tensor parallelism wants fast links between GPUs and pipeline parallelism does not.
+
+For more depth, chapter 9 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers replica, tensor, pipeline, context and sequence parallelism.
+
+**You are done when you can** decide between replicas and splitting for a given model and GPU, explain tensor versus pipeline parallelism, and size a simple serving layout.

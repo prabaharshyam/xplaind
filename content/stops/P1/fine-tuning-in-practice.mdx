@@ -1,0 +1,183 @@
+---
+id: fine-tuning-in-practice
+level: P1
+theme: llm
+title: "Fine-tuning in practice: tools, settings and reading the loss curve"
+outcome: "Run a fine-tune sensibly: pick a base model, method and tool, set learning rate, batch size and epochs, read the loss curves, and debug a run that is not learning."
+answer: "Prove the pipeline on a small model, start with LoRA, then tune learning rate, batch size and epochs by watching training and validation loss. Most failed runs are data or settings, not the model."
+why_it_matters: "Knowing why to fine-tune is half the job; the other half is a run that actually works. Teams lose days to runs that diverge, overfit or silently learn nothing. A few practical habits make fine-tuning predictable and cheap."
+hours: 3
+gap_tags: []
+primary_resource: unsloth-lora-hyperparameters
+alternates: [hf-peft-docs]
+videos: [yt-prof-ryan-ahmed-accuracy-epochs-learning-rate-batch-size-loss, yt-ai-engineer-fine-tuning-and-merging-llms-maxime-labonne]
+more: [dlai-finetuning-large-language-models]
+format: deep
+key_terms: [learning-rate, batch-size, epoch, gradient-accumulation, overfitting]
+check:
+  type: mcq
+  question_ids: [fine-tuning-in-practice-1, fine-tuning-in-practice-2, fine-tuning-in-practice-3]
+flashcards:
+  - q: "What three choices start every fine-tune?"
+    a: "A base model, a method (such as LoRA or full fine-tuning) and a tool or framework to run it."
+  - q: "Why test on the cheapest model first?"
+    a: "To prove the code, data format and saving all work before spending money on the model you care about."
+  - q: "What does the learning rate control?"
+    a: "How big each update to the weights is. Too high and the loss jumps around or explodes; too low and it barely falls."
+  - q: "What is gradient accumulation for?"
+    a: "When memory only allows tiny batches, it adds up several small batches before each update, so training is as stable as with a bigger batch."
+  - q: "How many epochs should you use?"
+    a: "It depends on data size: one or two passes for very large sets, several for small ones. Stop when validation loss stops falling."
+  - q: "What does it mean when training loss falls but validation loss rises?"
+    a: "Overfitting: the model is memorising the training examples. Use fewer epochs, more data or a lower learning rate."
+  - q: "What is prompt loss weight?"
+    a: "How much the prompt tokens count in the loss compared with the response. Usually small or zero, so the model learns to write responses, not prompts."
+  - q: "A quick sanity check before a long run?"
+    a: "Train on a handful of examples and check the model can memorise them. If loss will not fall even there, the pipeline is broken."
+exercise:
+  title: "A short-answer grader that will not learn"
+  setup: "A Chennai ed-tech company is fine-tuning an open 8B model with LoRA to grade students' short answers in English and Tamil as correct, partly correct or wrong, with a one-line reason. They have 2,400 graded examples. Run 1 used a learning rate of 2e-3 and 3 epochs: the loss jumped around and the model's outputs became gibberish. Run 2 used 1e-6 and 3 epochs: the loss barely moved and outputs looked like the base model's."
+  questions:
+    - q: "What went wrong in run 1?"
+      a: "The learning rate was far too high, so updates overshot and training diverged. Lower it by about ten times."
+    - q: "What went wrong in run 2?"
+      a: "The learning rate was far too low, so the weights hardly changed. Raise it; LoRA runs commonly sit around 1e-4 to 2e-4."
+    - q: "Run 3 uses 2e-4. Training loss falls steadily, and validation loss falls until epoch 2, then rises. What should they do?"
+      a: "Keep the checkpoint from the end of epoch 2. After that the model starts memorising the training set."
+    - q: "How should they judge the result?"
+      a: "On an untouched test set of real answers in both languages, against the best prompt-only baseline, and checking per-language accuracy."
+ask:
+  - "What learning rate should I use for LoRA fine-tuning?"
+  - "How many epochs should I fine-tune for?"
+  - "Why is my fine-tuned model worse than the base model?"
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-08
+---
+
+## What it is
+
+The fine-tuning lessons explain what fine-tuning changes and how LoRA saves memory. This lesson is about running one well: the choices you make at the start, the few settings that matter most, and how to tell from the loss curves whether it is working.
+
+Every fine-tune starts with three choices:
+
+1. **A base model.** For a first test of whether the task is possible, use the strongest model you can afford: if it cannot learn the task, weaker ones will not. Then try smaller models to cut cost.
+2. **A method.** Start with **LoRA** or another light method. It needs less memory and less data, and many adapters can share one base model when serving. Try full fine-tuning later, if you have thousands of examples or more and LoRA falls short.
+3. **A tool.** The easiest is a provider's fine-tuning service: upload data, get a model back, but with few settings and only their models. Open-source frameworks such as Hugging Face TRL and PEFT, Unsloth, Axolotl, LLaMA-Factory and LitGPT run on your own GPUs and give you every setting.
+
+Two common development paths:
+
+- **Progression path.** Test the code on the cheapest model, test the data on a middling model, push quality with the best one, then compare several sizes to find the best price and performance.
+- **Distillation path.** Fine-tune a strong model on a small, excellent dataset, use it to generate more training data, then train a cheaper model on that.
+
+```flow
+title: A fine-tuning run you can trust
+Clean data and a locked test set -> Smoke test on the smallest model | does the code run end to end?
+Smoke test on the smallest model -> Overfit 20 examples | can loss fall at all?
+Overfit 20 examples -> Real run with LoRA | watch training and validation loss
+Real run with LoRA -> Loss healthy?
+Loss healthy? -[jumps or explodes]-> Lower the learning rate
+Loss healthy? -[barely moves]-> Raise the learning rate or check the data
+Loss healthy? -[validation rises]-> Fewer epochs, keep the best checkpoint
+Loss healthy? -[yes]-> Evaluate on the test set against the prompt baseline
+Lower the learning rate -> Real run with LoRA
+Raise the learning rate or check the data -> Real run with LoRA
+Fewer epochs, keep the best checkpoint -> Evaluate on the test set against the prompt baseline
+```
+
+## How it works
+
+**Learning rate** is the size of each step when weights are updated. It is the setting most likely to make or break a run.
+
+- Too high: the loss jumps around or shoots up, and outputs can turn to nonsense.
+- Too low: the loss barely falls and the model hardly changes.
+- Useful values range widely, from about 1e-7 to 1e-3. LoRA runs commonly start around 1e-4 to 2e-4; full fine-tuning uses much smaller values, often a tenth or less of the rate used at the end of pre-training.
+- A **schedule** often warms up briefly, then lowers the rate towards the end.
+
+**Batch size** is how many examples each update learns from. Very small batches (fewer than about 8) can make training unstable; larger batches give steadier updates but need more memory. When memory is tight, **gradient accumulation** adds up several small batches before each update, giving the stability of a bigger batch without the memory.
+
+**Epochs** are full passes over the training data. Very large datasets may need only one or two; a few thousand examples may keep improving for several. Let the validation loss decide: keep training while it falls, stop when it starts rising.
+
+**Prompt loss weight** controls how much the prompt part of each example counts. At inference the user writes the prompt and the model writes the response, so most setups count the response fully and the prompt little or not at all (many tools default to masking the prompt; some use around 10%).
+
+**Reading the curves.** Plot training loss and validation loss after every few dozen steps.
+
+| What you see | Likely cause | What to do |
+| --- | --- | --- |
+| Loss spikes or becomes NaN | Learning rate too high, or bad data | Lower the rate; check for empty or huge examples |
+| Loss flat from the start | Rate too low, wrong labels, or loss on wrong tokens | Raise the rate; check the data format and masking |
+| Training falls, validation rises | Overfitting | Fewer epochs, more data, keep the earlier checkpoint |
+| Both still falling at the end | Undertrained | More epochs or more data |
+| Loss fine, outputs poor | Data teaches the wrong thing, or prompt format differs at inference | Read examples; use the exact chat template in training and use |
+
+**Habits that save days.**
+
+- **Smoke test** the whole pipeline on a tiny model and a few examples: load, train, save, reload, generate.
+- **Overfit on purpose**: train on 20 examples until the model repeats them. If it cannot, something is broken.
+- **Save checkpoints** to a folder that exists, often enough that a crash costs minutes, not hours.
+- **Use the same chat template** in training and in use. A mismatch quietly ruins results.
+- **Log every setting** and the data version with each run.
+
+A tiny helper to read your loss logs:
+
+```python
+def diagnose(train_loss, val_loss):
+    """Lists of loss values measured at the same steps."""
+    if any(x != x or x > 10 * train_loss[0] for x in train_loss):   # NaN or blow-up
+        return "Unstable: lower the learning rate and check for bad examples."
+    if train_loss[-1] > 0.95 * train_loss[0]:
+        return "Not learning: raise the learning rate or check data and masking."
+    best = val_loss.index(min(val_loss))
+    if best < len(val_loss) - 1:
+        return f"Overfitting after step {best}: keep that checkpoint or use fewer epochs."
+    return "Both still falling: more epochs or more data may help."
+
+print(diagnose([2.1, 1.6, 1.2, 0.9, 0.7], [2.0, 1.6, 1.4, 1.5, 1.7]))
+```
+
+## A worked example
+
+An ed-tech company in Chennai is fine-tuning an open 8B model with LoRA to grade short answers in English and Tamil as correct, partly correct or wrong, with a one-line reason. They have 2,400 graded answers, keep 300 as a locked test set and 200 for validation.
+
+First, a smoke test on a 0.5B model with 20 examples: the run, saving and reloading all work, and the model memorises the 20 examples. Then the real runs:
+
+| Run | Learning rate | Epochs | What the curves showed | Test accuracy |
+| --- | --- | --- | --- | --- |
+| 1 | 2e-3 | 3 | Loss jumped, then exploded; outputs gibberish | Not usable |
+| 2 | 1e-6 | 3 | Loss barely moved; outputs like the base model | 61% |
+| 3 | 2e-4 | 3 | Validation best at end of epoch 2, then rose | 84% (epoch-2 checkpoint) |
+| Prompt-only baseline | n/a | n/a | n/a | 72% |
+
+The numbers are for illustration. Run 3's epoch-2 checkpoint beats the prompt baseline by 12 points. Tamil accuracy is 6 points below English, so the next step is more Tamil examples, not more tuning.
+
+## Common mistakes
+
+- **Starting with a full fine-tune on a huge model.** Prove the task with LoRA first.
+- **Skipping the smoke test.** A typo in a save path can waste a night's training.
+- **Judging by training loss alone.** Only validation and test results show real learning.
+- **Using all epochs blindly.** Keep the checkpoint where validation was best.
+- **Changing many settings at once.** Change one, compare, then the next.
+- **A different prompt format in production.** The model learned one template; give it the same one.
+
+## When to stop tuning settings
+
+- **Validation results are stable across sensible settings.** Further gains will come from data, not knobs.
+- **One segment lags**, such as a language or a question type: add examples for it.
+- **The prompt baseline is close.** If fine-tuning only wins by a point or two, the upkeep may not be worth it.
+
+## From demo to production
+
+- **Record each run**: data version, base model, method, every setting, curves and test scores.
+- **Keep the best checkpoint and its exact template**, and test the deployed model on the same test set.
+- **Re-run the recipe** when the base model or data changes; a recorded recipe makes it routine.
+- **Monitor after launch**, since real inputs drift away from training data.
+
+## Practice
+
+1. Fine-tune a small open model on 50 examples of any task with a free notebook. Try three learning rates and plot the loss curves.
+2. Deliberately overfit 20 examples, and confirm the model repeats them.
+3. Use the diagnose helper on your curves and write down which checkpoint you would keep and why.
+
+For more depth, chapter 7 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers fine-tuning methods, frameworks and hyperparameters.
+
+**You are done when you can** describe a safe order for a fine-tuning project, set a starting learning rate, batch size and epochs, and diagnose a run from its loss curves.
