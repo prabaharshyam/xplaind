@@ -34,6 +34,10 @@ flashcards:
     a: "Multiply input tokens and output tokens by the model's current prices per token and add them."
   - q: "How should you choose a model at first?"
     a: "Start with a mid-sized model, test on your real task, then try a smaller one for cost or a larger one for quality."
+  - q: "Why stream a reply?"
+    a: "The user sees words as they are written instead of waiting for the whole answer, which makes long replies feel much faster."
+  - q: "Which API errors are worth retrying?"
+    a: "Rate limits, overload and timeouts, with a wait that grows each time. Errors in your request, such as a bad key or invalid input, will fail again."
 exercise:
   title: "Predict what the API does"
   setup: "Meera in Chennai writes a chatbot. Call 1 sends messages: user 'My name is Meera.' The reply is 'Nice to meet you, Meera!'. Call 2 sends only: user 'What is my name?'. Call 3 sends: user 'My name is Meera.', assistant 'Nice to meet you, Meera!', user 'What is my name?'. Each call uses max_tokens=50. Call 3 reports 40 input and 12 output tokens. Assume ₹0.0002 per input token and ₹0.0008 per output token."
@@ -52,7 +56,7 @@ ask:
   - "How much does an LLM API call cost?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -115,6 +119,62 @@ The reply's `content` is a list of blocks. Newer models can put a thinking block
 | Reply `usage` | Tokens used | Log it from day one |
 | Reply stop reason | Why it stopped: finished, or hit the token limit | If it hit the limit, the answer is cut off |
 
+**Streaming.** A long reply can take ten seconds or more to finish. With streaming, the API sends text as it is written, so the user starts reading in about a second. Chat interfaces almost always stream; background jobs, such as summarising a thousand files overnight, usually do not need to.
+
+**Errors and retries.** API calls fail now and then, and your code should expect it:
+
+| Error | What it means | What to do |
+| --- | --- | --- |
+| 401 or 403 | Key missing, wrong or not allowed | Fix the key; do not retry |
+| 400 | Something in your request is invalid | Read the message and fix the request |
+| 429 | Rate limit: too many requests or tokens per minute | Wait and retry, slowing down |
+| 500, 529 or a timeout | Provider error or overload | Retry with a growing wait; switch to a backup model if it continues |
+
+Anthropic's SDK already retries rate limits, overloads and connection errors a couple of times with growing waits; you can set how many with `max_retries` and how long to wait with `timeout`. Your code still needs to decide what the user sees if every retry fails.
+
+**A small chat program.** This puts the pieces together: history, streaming, a token check before sending, cut-off detection and errors.
+
+```python
+import anthropic
+
+client = anthropic.Anthropic(max_retries=3, timeout=60)
+MODEL = "claude-sonnet-5-5"            # check the docs for current model names
+SYSTEM = "You help students in Kerala plan their study week. Be brief."
+history = []
+
+def ask(text):
+    history.append({"role": "user", "content": text})
+    size = client.messages.count_tokens(model=MODEL, system=SYSTEM, messages=history).input_tokens
+    if size > 20_000:
+        history.pop()
+        return "This conversation is too long. Please start a new one."
+    try:
+        with client.messages.stream(model=MODEL, max_tokens=500, system=SYSTEM, messages=history) as stream:
+            for chunk in stream.text_stream:
+                print(chunk, end="", flush=True)        # words appear as they arrive
+            reply = stream.get_final_message()
+    except anthropic.RateLimitError:
+        history.pop()
+        return "Busy right now. Please try again in a minute."
+    except anthropic.APIStatusError as err:
+        history.pop()
+        return f"The AI service returned an error ({err.status_code})."
+    except anthropic.APIConnectionError:
+        history.pop()
+        return "Could not reach the AI service. Check the connection."
+    history.append({"role": "assistant", "content": reply.content})
+    if reply.stop_reason == "max_tokens":
+        print("\n[reply cut off at the length limit]")
+    print(f"\n(tokens in {reply.usage.input_tokens}, out {reply.usage.output_tokens})")
+
+ask("I have maths and chemistry exams in two weeks. Make a plan for Monday.")
+ask("Move chemistry to the evening.")             # the model sees the first turn too
+```
+
+On an error, the user's message is removed from the history, so the next attempt does not send two user messages in a row.
+
+**Sampling settings.** Some models accept settings such as `temperature`, which controls how varied the wording is; the lesson on how models pick words explains them. Newer models may fix some of these settings, so check the model's documentation before relying on them.
+
 **Conversation history costs money.** Because you resend the whole history every turn, long chats get more expensive with each message: turn 20 pays for turns 1 to 19 again as input. Real apps trim or summarise old turns, and keep the system prompt stable so providers can cache it and charge less for the repeated part.
 
 ## A worked example
@@ -146,11 +206,30 @@ The length check took Vikram two lines and protects every future user from a sur
 - **Ignoring usage numbers.** Track tokens from your first call.
 
 - **Printing the whole response object into logs.** It can contain user text. Log ids, token counts and timings instead.
+- **Assuming every call succeeds.** Handle rate limits, overloads and timeouts, and show the user a clear message.
+- **Retrying everything.** A bad key or invalid request fails the same way every time.
+- **Ignoring the stop reason.** A reply that hit `max_tokens` is incomplete.
+
+## When you do not need the API yet
+
+- **One-off tasks**: the chat app is faster for a single summary or draft.
+- **Spreadsheet or no-code work**: tools such as n8n or a spreadsheet add-on may already call the model for you.
+- **Learning prompts**: try prompts in the provider's console or workbench first, then move the one that works into code.
+
+## From demo to production
+
+- **Keep the key on the server.** Never ship it in a mobile app or browser code; the browser calls your server, and your server calls the model.
+- **Set limits per user**: requests per minute and tokens per day, so one user or script cannot run up the bill.
+- **Log metadata**: request id, model, tokens, time taken, stop reason and error type.
+- **Pin a model version** where the provider offers dated names, and test before moving to a new one.
+- **Plan for outages**: a clear message to the user, and a backup model for important features.
 
 ## Practice
 
 Follow the provider getting-started guide linked below for your language.
 
 This lesson's check is a small project: push a command-line or web app that calls an LLM API, keeps the API key out of the code, and prints the token usage of each call. Submit the repository link.
+
+For more depth, chapter 2 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers sampling settings, and chapter 9 covers latency, streaming and the cost of API calls.
 
 **You are done when you can** call a model from a script, continue a two-turn conversation, and say what a call cost.
