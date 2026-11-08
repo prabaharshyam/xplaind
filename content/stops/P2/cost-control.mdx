@@ -33,6 +33,8 @@ flashcards:
     a: "Retry storms, looping agents, a single huge document or one heavy user."
   - q: "How do you prove a cost cut did no harm?"
     a: "Show eval scores and user satisfaction before and after, next to the cost change."
+  - q: "How do you work out cost per request?"
+    a: "Input tokens times the input price plus output tokens times the output price, with cached input billed lower. Output usually costs several times more per token."
 exercise:
   title: "Find the savings"
   setup: "A Jaipur travel portal spends ₹8 lakh a month on AI. Logs by feature: hotel description rewriting for 50,000 listings each night takes 50%; the booking chat takes 30%; review sentiment tagging takes 20%. The chat's system prompt is 5,000 tokens and replies average 600 tokens though users read only the first lines. There are no spending alerts."
@@ -51,7 +53,7 @@ ask:
   - "Should I use a smaller model to save money?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -87,6 +89,32 @@ This lesson follows a customer-service platform in Kolkata that wanted to halve 
 **Batching.** Work that can wait (nightly summaries, bulk classification, embedding a corpus) can go through batch APIs, which providers typically offer at a large discount in exchange for results within hours.
 
 **Limits.** Daily caps per user, step limits on agents, spending alerts and hard limits in the provider console.
+
+**Know the arithmetic.** Cost per request is input tokens times the input price plus output tokens times the output price, with cached input usually billed far lower. A small calculator keeps estimates honest:
+
+```python
+def cost_per_request_inr(input_tokens, output_tokens, in_price_usd_per_m, out_price_usd_per_m,
+                         cached_share=0.0, cache_discount=0.9, usd_to_inr=85):
+    """Prices are US dollars per million tokens. cached_share: fraction of input served from the prompt cache."""
+    fresh = input_tokens * (1 - cached_share)
+    cached = input_tokens * cached_share * (1 - cache_discount)
+    usd = ((fresh + cached) * in_price_usd_per_m + output_tokens * out_price_usd_per_m) / 1e6
+    return usd * usd_to_inr
+
+def monthly_cost_inr(requests_per_month, **kw):
+    return requests_per_month * cost_per_request_inr(**kw)
+
+# A chat reply: 3,000 input tokens (60% cached), 250 output, $3 / $15 per million tokens
+per = cost_per_request_inr(3000, 250, 3, 15, cached_share=0.6)
+print(round(per, 2), round(monthly_cost_inr(300_000, input_tokens=3000, output_tokens=250,
+      in_price_usd_per_m=3, out_price_usd_per_m=15, cached_share=0.6)))
+```
+
+Prices and the exchange rate change, so read them from the provider's current page, and record the date you checked. Two things the arithmetic shows quickly: output tokens usually cost several times more than input, and long prompts repeated on every call add up fast.
+
+**Language matters too.** The same reply can need several times more tokens in Hindi, Tamil or Bengali than in English, depending on the tokenizer, so measure tokens per request for each language you serve. The lesson on AI in Indian languages covers this.
+
+**Route by difficulty.** A small, fast classifier or rules can send easy requests to a cheap model, out-of-scope questions to a stock reply with no model call, and only hard ones to the strongest model. The lesson on growing an AI app in layers covers routers and gateways.
 
 **Watch for surprises.** Retry storms, agents looping, a single huge document, or one heavy user can multiply costs overnight.
 
@@ -141,9 +169,23 @@ The next month's bill is ₹2.7 lakh, with no change in customer satisfaction sc
 - **No alerts or caps.**
 - **Cutting cost without checking quality.** Run the evals on every change.
 
+## When cutting cost is the wrong goal
+
+- **The feature is not working yet.** Get quality right on your evals first; optimise later.
+- **The savings are tiny.** Saving ₹2,000 a month is not worth weeks of engineering or a measurable quality drop.
+- **Latency or trust matters more.** A cheaper model that is slower or makes more mistakes on a high-stakes task can cost more in support and lost users.
+
+## From demo to production
+
+- **Tag every call** with feature, user, model and prompt version, and store tokens and cost.
+- **Set budgets per feature** with alerts, and hard limits at the provider.
+- **Review the cost dashboard weekly**, alongside quality metrics, and re-check after every model or prompt change.
+- **Re-price regularly.** Providers cut prices and release cheaper models; a choice from six months ago may now be overpaying.
+- **Keep the cheaper path tested**, such as a smaller fallback model, so you can switch quickly if costs spike.
+
 ## Practice
 
-Read Chip Huyen's article on building LLM applications for production linked below, especially the cost sections.
+Read Chip Huyen's article on building LLM applications for production linked below, especially the cost sections. For more depth, chapters 9 and 10 of her book *AI Engineering* (O'Reilly, 2025) cover inference cost, batch APIs, routing and caching.
 
 1. Add cost logging per call with feature and user tags to one of your apps, and find the most expensive feature.
 2. Test that feature with a smaller model on your eval set and decide whether to switch.

@@ -13,7 +13,7 @@ This document holds no secrets and must never hold any. Keys live in Vercel and 
 1. Read `CLAUDE.md` (the project rules, short) and `AGENTS.md` (Next.js 16 is not the Next.js you know; read `node_modules/next/dist/docs/` before writing framework code).
 2. Run `npm install`, then `npm run check` (lint, typecheck, unit tests, content validation). Everything should pass.
 3. Run `npm run dev` and open the home page, a roadmap (`/roadmap/ai-engineer`), a lesson (`/stop/rag-app`), `/videos`, `/interview`. Look at it in light and dark, at 360 px wide and at desktop width. Most owner feedback is about how pages look and read.
-4. Skim `docs/PRD.md` headings and the newest rows (BR-4, CS-3, FOCUS-1, VD-1, LQ-1, CM-90, IP-1 to IP-3, SE-1). Requirement IDs such as `RM-2` are the spec and go at the start of every commit message.
+4. Skim `docs/PRD.md` headings and the newest rows (PAY-1 to PAY-6, LQ-1 to LQ-7, VD-1, VD-2, BR-4, CS-3, FOCUS-1, CM-90, IP-1 to IP-3, SE-1). Requirement IDs such as `RM-2` are the spec and go at the start of every commit message.
 5. Read section 3 (the owner) and section 12 (what is pending) before proposing anything.
 
 Starter prompt you can paste into a new Claude session:
@@ -295,7 +295,8 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 7. Review the remaining AI-drafted content (see 7) and the resources marked UNVERIFIED, then flip `reviewed_by` and `verified_by` to his name. A lawyer should review the privacy policy and terms before a public launch.
 
 **Work Claude can pick up, in the order the owner has signalled interest:**
-- More book-informed lessons, in small batches with his review each time: training stages (SFT, RLHF, DPO), reasoning models, fine-tuning and synthetic data, choosing a model, evaluation basics, benchmarks and their limits, inference speed and cost, building an AI system in layers. Plus about 30 to 40 matching interview questions in `content/questions/interview`.
+- Deepen older lessons to the depth of the book-informed ones (runnable code, "when not to", "from demo to production", book reference), in batches of three, most-used roadmap lessons first. Done so far: evals-test-sets, cost-control, prompt-injection (LQ-7). Next by roadmap use and length: structured-output, first-llm-api-call, deploy-and-monitor, security-privacy, agent-loop, tool-calling, regression-tests, agent-logs, caching-and-speed, tokens-and-context. A deepened lesson goes back to `reviewed_by: "UNREVIEWED"` until he reviews it again.
+- The book-informed series is complete (LQ-1 to LQ-6, 18 lessons, 36 interview questions): sampling, how fine-tuning works, LoRA and memory maths; how chat models are made, choosing a model, synthetic data and distillation; reasoning models, inside LLM inference, building a training dataset; scoring open-ended answers, AI app in layers, catching hallucinations; AI in Indian languages, model size and scaling, perplexity and cross-entropy; fine-tuning in practice, model merging, running models on many GPUs. The book (Chip Huyen, *AI Engineering*, O'Reilly 2025) is cited as further reading, never copied, and the PDF is not in the repo.
 - Bring cheatsheets back, redesigned (the infographic layout from PR 42 is in git history; ask the owner what was unclear about the old one).
 - Collect more real testimonials as beta testers use the site (SO-1).
 - Review the PRD against what is built; some older rows predate later decisions.
@@ -319,6 +320,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **2 Nov (also):** fewer AI tools. The AI roadmap editor and AI course generator were removed and the AI coach was merged into the tutor; the roadmap generator, tutor, notes-to-test tool and resume review stay.
 - **4 to 6 Nov:** many owner-list rounds (roadmap drawer, lesson layout, topic tracks, "Commit to 90 days", a DataCamp-style minimal direction). XP and badges were removed, and month-based durations were removed from the site.
 - **6 to 7 Nov:** research on AI interview prep demand and on AlgoMaster (a Claude doc, "Xplaind: the AlgoMaster for AI roles", may no longer be reachable after an account change). PR 36: lesson layout fix, data engineering channel videos, testimonials, cheatsheets. PR 37: the Interview section (patterns and worked designs). PR 38: software engineering and Git track, "Commit to 90 days". PR 39: the minimal look, site-wide (BR-3).
+- **8 Nov (later):** PR 44: this handover. PR 45 and 48 to 51: book-informed lessons batches 2 to 6 (LQ-2 to LQ-6). PR 46: every DeepLearning.AI course and Andrew Ng's courses as video courses (VD-2). PR 47: Pro passes with Cashfree in test mode, tiered AI limits, pricing, billing and refund pages (PAY-1 to PAY-6). Then deepening older lessons (LQ-7).
 - **7 to 8 Nov:** PR 40: three book-informed lessons (LQ-1). PR 41: videos page by topic with filters and view counts (VD-1). PR 42: sideways testimonials with excerpts, example-week card, line-art covers, infographic cheatsheets (BR-4). PR 43: cheatsheets paused, reviewed marks, product focus recorded (CS-3, FOCUS-1).
 
 `docs/decisions.md` stops at 3 November. Add new decisions there as you make them.
