@@ -275,7 +275,7 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 - **The sitemap test lists every public route.** Add a new public page to `src/app/sitemap.ts`, or mark it private in the test, or the test fails.
 - **YouTube rate limits.** Fetching watch pages in bulk gets redirected to an "unusual traffic" page after a few hundred requests. Do not circumvent it. Fetch slowly, resume with `--missing`, or run from a normal connection.
 - **Adding a new kind of content touches several files:** `schema.ts`, `types.ts` (the Bundle), `load.ts`, `index.ts`, `testing.ts` (the valid test bundle) and `validate.ts`. Follow how `testimonials` and `videoViews` were added.
-- **The requirement ID `SE-1` is used twice in the PRD**: once for the software engineering and Git track (2026-11-07) and once for search engine visibility (production is open to search engines). The SE family is search; the Git track deserves its own ID such as `SW-1`. Renaming needs a PRD edit and care with old commit messages, so ask the owner first.
+- **Requirement IDs are unique again (9 Nov).** Five IDs had been used twice; the later meanings were renamed: the software engineering track is SWE-1, "Content first" is BR-8, trust pages BR-9, the XP removal AC-12, spaced repetition IQ-10. Older commits and code comments may still use the old names.
 - **Commit trailers and PR footers** are added by the Claude tooling. Do not copy model names into repo files.
 - **A dashboard crash on Vercel (2026-11-03)** came from content files missing from the serverless bundle. `next.config.ts` ships `content/**` with every route (`outputFileTracingIncludes`). Keep it.
 - **The first placement test can end before 12 questions** if the question bank runs out at the learner's level. That is intended (see `docs/decisions.md`, slice S2).
@@ -292,14 +292,14 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 4. Pro passes (PAY-1 to PAY-6): run `supabase/migrations/20261108000000_payments.sql`; create the Cashfree account and finish KYC; in the Cashfree dashboard set the payment webhook to `https://xplaind.in/api/billing/webhook`; set `PAYMENTS_MODE=sandbox` plus the sandbox keys on a Preview deployment to test, then the live keys and `PAYMENTS_MODE=production` to launch. Decide GST with a CA (receipts say "not a tax invoice" until then). Approve the refund policy wording at /refunds. Set `NEXT_PUBLIC_CONTACT_EMAIL` (Cashfree checks for a contact address). Raise `AI_MONTHLY_CAP_USD` as passes sell: Pro calls skip the cap but still count towards it.
 5. Add an Amazon Associates India tag (`AMAZON_IN_TAG`) so book links earn.
 6. Fill in the missing video view counts: `npm run videos:views -- --missing`, commit `content/video-views.yaml`.
-7. Review the remaining AI-drafted content (see 7) and the resources marked UNVERIFIED, then flip `reviewed_by` and `verified_by` to his name. A lawyer should review the privacy policy and terms before a public launch.
+7. All AI-drafted lessons, glossary terms and guides were reviewed by him by 9 Nov; review new drafts and any resources marked UNVERIFIED as they appear. A lawyer should review the privacy policy and terms before a public launch.
 
 **Work Claude can pick up, in the order the owner has signalled interest:**
 - Deepen older lessons to the depth of the book-informed ones (runnable code, "when not to", "from demo to production", book reference where the book covers it). Done (LQ-7): the first nine in three batches (PR 52 to 54), then, at the owner's request, every remaining lesson in the agents, automation, voice, evals, governance, LLM, retrieval, data, ops and security themes in one pass (74 lessons, PR 55). He reviewed and approved the whole pass on 8 Nov. Not deepened, by design: beginner B-level lessons, DSA, Rust, system design, software engineering, career, client-delivery and product lessons; the 11 classic ML lessons (I1 and I2 `ml` theme) followed in a second single pass (PR 56), with every code example run for real on scikit-learn and PyTorch (CPU) using synthetic data. How the pass was done: per-lesson spec files applied by a small script (sections inserted before the worked example, Common mistakes extended, the two new sections before Practice, two flashcards added); every Python block was parse-checked and the riskier ones run against mocks.
 - The book-informed series is complete (LQ-1 to LQ-6, 18 lessons, 36 interview questions): sampling, how fine-tuning works, LoRA and memory maths; how chat models are made, choosing a model, synthetic data and distillation; reasoning models, inside LLM inference, building a training dataset; scoring open-ended answers, AI app in layers, catching hallucinations; AI in Indian languages, model size and scaling, perplexity and cross-entropy; fine-tuning in practice, model merging, running models on many GPUs. The book (Chip Huyen, *AI Engineering*, O'Reilly 2025) is cited as further reading, never copied, and the PDF is not in the repo.
 - Bring cheatsheets back, redesigned (the infographic layout from PR 42 is in git history; ask the owner what was unclear about the old one).
 - Collect more real testimonials as beta testers use the site (SO-1).
-- Review the PRD against what is built; some older rows predate later decisions.
+- PRD reviewed against the build on 9 Nov: see "Status review, 2026-11-09" at the top of docs/PRD.md for what is superseded and what is not built yet (PL-7, part of PL-8, IQ-10, ED-5, ED-7, AC-9).
 
 **Do not start without being asked:** more upsell pop-ups beyond the one at a daily AI limit (PAY-4), locking any lesson, roadmap, practice or project content behind Pro, XP or badges, more system design content, a system design mock interview, ads or trackers.
 
@@ -323,7 +323,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **8 Nov (later):** PR 44: this handover. PR 45 and 48 to 51: book-informed lessons batches 2 to 6 (LQ-2 to LQ-6). PR 46: every DeepLearning.AI course and Andrew Ng's courses as video courses (VD-2). PR 47: Pro passes with Cashfree in test mode, tiered AI limits, pricing, billing and refund pages (PAY-1 to PAY-6). PR 52 to 54: deepening older lessons, three batches of three (LQ-7). PR 55: the remaining 74 AI-engineering lessons deepened in one pass (LQ-7). PR 56: the 11 classic ML lessons (LQ-7).
 - **7 to 8 Nov:** PR 40: three book-informed lessons (LQ-1). PR 41: videos page by topic with filters and view counts (VD-1). PR 42: sideways testimonials with excerpts, example-week card, line-art covers, infographic cheatsheets (BR-4). PR 43: cheatsheets paused, reviewed marks, product focus recorded (CS-3, FOCUS-1).
 
-`docs/decisions.md` stops at 3 November. Add new decisions there as you make them.
+`docs/decisions.md` is up to date to 9 November. Add new decisions there as you make them.
 
 ---
 

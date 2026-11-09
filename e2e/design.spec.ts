@@ -8,7 +8,7 @@ const overflow = (page: import("@playwright/test").Page) =>
 
 test.use({ viewport: { width: 360, height: 740 } });
 
-test("a lesson on a phone starts with the answer and keeps Learning, Done and Skip in a bottom bar (BR-3)", async ({ page }) => {
+test("a lesson on a phone starts with the answer and keeps Learning, Done and Skip in a bottom bar (BR-8)", async ({ page }) => {
   await page.goto("/stop/python-basics");
   const answer = page.getByRole("heading", { name: "Quick answer" });
   await expect(answer).toBeVisible();
@@ -24,7 +24,7 @@ test("a lesson on a phone starts with the answer and keeps Learning, Done and Sk
   expect(await overflow(page)).toBe(false);
 });
 
-test("a roadmap leads with its first lesson and keeps the PDF as a second choice (BR-3)", async ({ page }) => {
+test("a roadmap leads with its first lesson and keeps the PDF as a second choice (BR-8)", async ({ page }) => {
   await page.goto("/roadmap/ai-engineer");
   const start = page.getByRole("link", { name: "Start the first lesson" });
   await expect(start).toBeVisible();
@@ -33,7 +33,7 @@ test("a roadmap leads with its first lesson and keeps the PDF as a second choice
   expect(await overflow(page)).toBe(false);
 });
 
-test("the Library folds its filters on phones and names levels in words (BR-3)", async ({ page }) => {
+test("the Library folds its filters on phones and names levels in words (BR-8)", async ({ page }) => {
   await page.goto("/library");
   const toggle = page.getByRole("button", { name: "Topic and level" });
   await expect(toggle).toBeVisible();
@@ -45,7 +45,7 @@ test("the Library folds its filters on phones and names levels in words (BR-3)",
   expect(await overflow(page)).toBe(false);
 });
 
-test("the About, Privacy and Terms pages are linked from the footer and accessible (BR-4)", async ({ page }) => {
+test("the About, Privacy and Terms pages are linked from the footer and accessible (BR-9)", async ({ page }) => {
   for (const [name, href, h1] of [
     ["About", "/about", /Help India learn AI faster/],
     ["Privacy", "/privacy", "Privacy policy"],
