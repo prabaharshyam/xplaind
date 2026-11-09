@@ -34,6 +34,10 @@ flashcards:
     a: "More data or augmentation, dropout, weight decay, a smaller network, and early stopping."
   - q: "When do neural networks usually beat gradient-boosted trees?"
     a: "On images, audio, text and very large datasets. On ordinary tabular data, boosted trees usually match or beat them."
+  - q: "What is a gradient check?"
+    a: "Comparing the gradient from backpropagation with a slow numerical estimate (nudge a weight, see how the loss changes). If they match, the backward pass is right."
+  - q: "Why can't a model with no hidden layer solve XOR?"
+    a: "XOR's classes cannot be separated by one straight line. A hidden layer with a non-linear activation bends the space so they can."
 exercise:
   title: "Read the training run"
   setup: "Kavya in Hyderabad trains a network to predict customer churn from 30 tabular features. Run 1, learning rate 0.5: the loss jumps around and never settles. Run 2, learning rate 0.001: training loss falls for 100 epochs; validation loss falls until epoch 20, then rises. Her features include income in rupees, from 5,000 to 50,00,000, next to ratings from 1 to 5, unscaled. A gradient-boosted model on the same data beats her best network."
@@ -52,7 +56,7 @@ ask:
   - "What is the difference between machine learning and deep learning?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -103,6 +107,60 @@ This lesson follows an agritech startup in Bengaluru that classifies leaf photos
 
 **A training loop in words.** For each epoch, shuffle the data and split it into batches. For each batch, run the forward pass, compute the loss, run backpropagation to get gradients, and let the optimiser update the weights. After each epoch, compute the validation loss without updating weights, and save the model if it is the best so far. Every deep learning library, from PyTorch to Keras, follows this pattern.
 
+**A network from scratch, in NumPy.** Building one tiny network by hand makes forward pass, loss, backpropagation and gradient descent concrete. This one learns XOR, which no straight line can separate:
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=float)
+y = np.array([[0], [1], [1], [0]], dtype=float)
+
+W1, b1 = rng.normal(0, 1, (2, 8)), np.zeros((1, 8))
+W2, b2 = rng.normal(0, 1, (8, 1)), np.zeros((1, 1))
+sigmoid = lambda z: 1 / (1 + np.exp(-z))
+
+def forward(X):
+    h = np.tanh(X @ W1 + b1)              # hidden layer with a non-linearity
+    return h, sigmoid(h @ W2 + b2)        # output probability
+
+lr = 0.5
+for step in range(3000):
+    h, p = forward(X)
+    loss = -np.mean(y * np.log(p + 1e-9) + (1 - y) * np.log(1 - p + 1e-9))    # cross-entropy
+    d_out = (p - y) / len(X)                       # gradient at the output (sigmoid + cross-entropy)
+    dW2, db2 = h.T @ d_out, d_out.sum(0, keepdims=True)
+    d_h = (d_out @ W2.T) * (1 - h ** 2)            # chain rule through tanh
+    dW1, db1 = X.T @ d_h, d_h.sum(0, keepdims=True)
+    W2 -= lr * dW2; b2 -= lr * db2; W1 -= lr * dW1; b1 -= lr * db1
+    if step % 1000 == 0:
+        print(f"step {step}: loss {loss:.3f}")
+
+print("predictions:", forward(X)[1].round(2).ravel())     # close to 0, 1, 1, 0
+```
+
+Every framework does exactly these steps, just automatically and on much bigger networks.
+
+**Check the backward pass numerically.** Nudge one weight and see how the loss moves; it should match the computed gradient:
+
+```python
+def loss_of(W1_):
+    h = np.tanh(X @ W1_ + b1); p = sigmoid(h @ W2 + b2)
+    return -np.mean(y * np.log(p + 1e-9) + (1 - y) * np.log(1 - p + 1e-9))
+
+h, p = forward(X)
+d_h = (((p - y) / len(X)) @ W2.T) * (1 - h ** 2)
+analytic = (X.T @ d_h)[0, 0]
+eps = 1e-5
+W_plus, W_minus = W1.copy(), W1.copy(); W_plus[0, 0] += eps; W_minus[0, 0] -= eps
+numeric = (loss_of(W_plus) - loss_of(W_minus)) / (2 * eps)
+print(f"analytic {analytic:.6f}  numeric {numeric:.6f}")
+```
+
+**Initialisation and scale matter.** Weights that start too large make activations saturate and gradients vanish; too small and signals fade layer by layer. Frameworks use careful defaults (such as Kaiming or Xavier initialisation) for this reason. Standardise inputs too, so no feature dominates just by its units.
+
+**Neural networks on tabular data, honestly.** On ordinary business tables, gradient-boosted trees usually match or beat a neural network with far less tuning. Try a network when you have very large data, need to combine tables with text or images, or want embeddings learned for high-cardinality categories, and compare against boosting on the same split.
+
 ## A worked example
 
 A Bengaluru agritech startup classifies leaf photos as healthy or as one of four diseases. As a first step, they build a small fully connected network on 64-number features extracted from each image (colour and texture statistics) to learn the mechanics:
@@ -128,6 +186,23 @@ The lesson they draw: on hand-made tabular features, the network has no edge. Th
 - **Unscaled inputs.** Normalise features; training becomes unstable otherwise.
 - **Neural networks for small tabular datasets by default.** Try boosted trees first.
 - **Not fixing random seeds when comparing.** Results vary between runs; compare fairly.
+- **Unscaled inputs**, which make training slow or unstable.
+- **Skipping a baseline**: on tables, compare with gradient boosting before choosing a network.
+- **Trusting a hand-written backward pass** without a gradient check.
+
+## When not to use a neural network
+
+- **Small tabular datasets**: boosted trees or logistic regression are usually better and simpler.
+- **Decisions that need simple explanations**, such as credit approvals with reason codes.
+- **No GPU budget and tight latency** for a large network, where a smaller model would do.
+
+## From demo to production
+
+- **Standardise inputs** with statistics saved from training, and apply the same at serving.
+- **Track training and validation loss** for every run, and keep the best checkpoint.
+- **Compare with a strong baseline** on the same split before shipping.
+- **Fix seeds and record settings** so runs can be repeated.
+- **Monitor input drift**, since networks fail quietly on unfamiliar inputs.
 
 ## Practice
 
@@ -136,5 +211,6 @@ Watch 3Blue1Brown's neural networks series and work through the neural networks 
 1. Draw a small network for a problem you know and count its weights.
 2. Train a small network on a public dataset with a library of your choice; plot training and validation loss per epoch.
 3. Add dropout and early stopping, and compare validation results with a gradient-boosted model on the same features.
+4. Remove the hidden layer from the NumPy network (connect inputs straight to the output) and show that XOR can no longer be learned.
 
 **You are done when you can** explain forward pass, loss, backpropagation and gradient descent in your own words, and read a pair of loss curves to diagnose overfitting.

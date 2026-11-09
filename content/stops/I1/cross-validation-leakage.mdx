@@ -33,6 +33,10 @@ flashcards:
     a: "They fit preprocessing like scaling and imputation on the training fold only, inside each split, preventing leakage."
   - q: "Name three warning signs of leakage."
     a: "Surprisingly high scores, one feature with overwhelming importance, and a big drop when scoring a truly new period."
+  - q: "What is nested cross-validation for?"
+    a: "Tuning settings in an inner loop and scoring in an outer loop, so the reported score is not inflated by having chosen settings on the same folds."
+  - q: "How can you show leakage from feature selection?"
+    a: "Select the 'best' features from random noise using all labels, then cross-validate: the score looks good. Selecting inside the pipeline drops it to chance."
 exercise:
   title: "Find the leaks"
   setup: "A Bengaluru lender predicts whether a loan will default within 12 months. The notebook: (1) splits 200,000 loans randomly into train and test; (2) many customers have several loans; (3) fills missing income with the mean of the whole dataset before splitting; (4) includes the feature 'number of collection calls', recorded after a payment is missed; (5) tries 40 model settings and picks the one with the best test score. Reported AUC: 0.94."
@@ -51,7 +55,7 @@ ask:
   - "Why did my model perform worse in production than in testing?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -113,6 +117,62 @@ This lesson follows a hospital network in Chennai whose readmission model looked
 
 **Leakage from feature engineering.** Many leaks enter through features built from event logs: "number of support calls", "last status", "days since last payment". Each must be computed only from events before the prediction moment. A safe habit is to fix a "prediction time" column for every row and filter every source table to events before it when building features.
 
+**Leakage you can watch happen.** Pure noise has no signal, so an honest score should be around 0.5. Selecting features on all the data first makes noise look predictive:
+
+```python
+import numpy as np
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.pipeline import make_pipeline
+
+rng = np.random.default_rng(0)
+X = rng.normal(size=(200, 5000))                  # 5,000 random features
+y = rng.integers(0, 2, 200)                       # random labels
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+
+X_leaky = SelectKBest(f_classif, k=20).fit_transform(X, y)          # chose features using every label
+print("leaky:", cross_val_score(LogisticRegression(max_iter=1000), X_leaky, y, cv=cv).mean().round(2))
+
+honest = make_pipeline(SelectKBest(f_classif, k=20), LogisticRegression(max_iter=1000))
+print("honest:", cross_val_score(honest, X, y, cv=cv).mean().round(2))
+```
+
+The leaky version scores far above 0.5 on random data; the pipeline version, which selects features inside each training fold, falls back to chance. The same applies to scaling, imputing and target encoding.
+
+**Grouped and time splits in code.**
+
+```python
+from sklearn.model_selection import GroupKFold, TimeSeriesSplit
+
+def grouped_score(model, X, y, customer_ids):
+    return cross_val_score(model, X, y, cv=GroupKFold(n_splits=5), groups=customer_ids).mean()
+
+def time_score(model, X_sorted, y_sorted, gap=0):
+    """Rows must be sorted by time. gap leaves rows out between train and test."""
+    return cross_val_score(model, X_sorted, y_sorted, cv=TimeSeriesSplit(n_splits=5, gap=gap)).mean()
+```
+
+`gap` matters when labels take time to arrive: if churn is judged 30 days later, leave a 30-day gap so training labels never overlap the test period.
+
+**Tuning without fooling yourself.** Choosing settings by cross-validation score and reporting that same score is optimistic. Nested cross-validation tunes inside and scores outside:
+
+```python
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.datasets import make_classification
+
+Xc, yc = make_classification(n_samples=2000, n_features=20, random_state=1)
+inner = GridSearchCV(HistGradientBoostingClassifier(random_state=1),
+                     {"max_depth": [3, 6], "learning_rate": [0.05, 0.1]}, cv=3, scoring="roc_auc")
+outer = cross_val_score(inner, Xc, yc, cv=5, scoring="roc_auc")
+print("nested ROC AUC:", outer.mean().round(3), "±", outer.std().round(3))
+```
+
+When data is plentiful, a simpler route is a separate test period you score once, at the end.
+
+**A test that catches leaks.** For each feature, train a one-feature model; any single feature with near-perfect accuracy deserves a hard look. Add the check to your training pipeline and print the top five.
+
 ## A worked example
 
 A Chennai hospital network predicts 30-day readmission from discharge records.
@@ -147,6 +207,23 @@ The drop from 0.91 to 0.77 was not the model getting worse. It was the measureme
 
 - **Tuning with cross-validation, then reporting the cross-validation score as final.** After many tuning rounds, even the cross-validation score is optimistic. Keep a separate final test set.
 - **Assuming leakage is rare.** It is one of the most common reasons models fail after launch. Check for it every time, especially with features built from logs or event tables.
+- **Selecting features or tuning on all the data** before cross-validating.
+- **No gap** between training and test periods when labels arrive late.
+- **Reporting the best tuned score** as if it were an untouched estimate.
+
+## When simple splits are enough
+
+- **Lots of independent rows**, no time order and no repeated entities: one random hold-out set may do.
+- **Quick comparisons early on**, where a single validation split gives direction.
+- **Pretrained models used as they are**, where you only need a clean test set, not cross-validation.
+
+## From demo to production
+
+- **Put every preprocessing step in a pipeline** fitted on training folds only.
+- **Match the split to production**: time, groups or both, with gaps for late labels.
+- **Keep a final test period** and score it once per model version.
+- **Run single-feature leak checks** in the training pipeline.
+- **Compare offline scores with the first weeks in production**; a big drop points to leakage.
 
 ## Practice
 
@@ -155,5 +232,6 @@ Read scikit-learn's cross-validation guide and common pitfalls page, and do the 
 1. On a dataset with repeated entities or time order, compare random k-fold with grouped or time-based splits.
 2. Show leakage from fitting a scaler on all data, then fix it with a pipeline.
 3. Keep a final test set aside, tune on cross-validation only, and report the test score once.
+4. Run the noise experiment yourself, then repeat it with a StandardScaler instead of feature selection and note how much smaller the leak is.
 
 **You are done when you can** explain which split matches your use case and show a score that dropped when you removed a leak.

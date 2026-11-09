@@ -34,6 +34,10 @@ flashcards:
     a: "Because in real use the model predicts the future. Random splits leak future patterns into training and overstate performance."
   - q: "Why use two thresholds for fraud?"
     a: "A lower one sends cases for review, and a much higher one blocks automatically only when precision is very high."
+  - q: "Why split by time for fraud or churn models?"
+    a: "In production the model scores the future. A random split lets it learn from later data about earlier cases, so results look better than they will be."
+  - q: "What does CalibratedClassifierCV do?"
+    a: "It refits a mapping from a model's raw scores to probabilities on held-out folds, so a score of 0.3 means roughly a 30% chance."
 exercise:
   title: "Choose the threshold"
   setup: "A telecom company in Kolkata predicts which prepaid customers will leave next month. A retention call costs ₹40 and saves a leaving customer 25% of the time; a saved customer is worth ₹1,200. The call centre can make 2,000 calls a month. Threshold A flags 2,000 customers, of whom 900 would leave. Threshold B flags 5,000, of whom 1,600 would leave."
@@ -52,7 +56,7 @@ ask:
   - "What is a good threshold for a classifier?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -100,6 +104,53 @@ This lesson follows a payments company in Pune as it replaces fraud rules with a
 
 **Reading a model's mistakes.** After choosing a threshold, read 50 false positives and 50 false negatives by hand. Patterns appear quickly: genuine festival-season spikes flagged as fraud, or a new fraud pattern the training data never saw. Each pattern suggests a fix: a feature such as "days to Diwali", more recent training data, or a rule for a specific case. Metrics tell you how often the model is wrong; reading cases tells you why.
 
+**A baseline and a stronger model, compared properly.** Synthetic transactions with 1% fraud, split by time (the first 80% for training):
+
+```python
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.metrics import average_precision_score, confusion_matrix
+
+X, y = make_classification(n_samples=30_000, n_features=15, n_informative=8,
+                           weights=[0.99], class_sep=1.0, random_state=3)
+cut = int(0.8 * len(y))                                   # pretend rows are in time order
+X_tr, X_te, y_tr, y_te = X[:cut], X[cut:], y[:cut], y[cut:]
+
+logit = make_pipeline(StandardScaler(), LogisticRegression(class_weight="balanced", max_iter=2000))
+gbm = HistGradientBoostingClassifier(class_weight="balanced", max_iter=300, learning_rate=0.05, random_state=3)
+for name, model in [("logistic", logit), ("boosting", gbm)]:
+    model.fit(X_tr, y_tr)
+    print(name, "PR AUC", round(average_precision_score(y_te, model.predict_proba(X_te)[:, 1]), 3))
+```
+
+`class_weight="balanced"` makes each fraud case count as much as many genuine ones during training, so the model does not simply learn "never fraud".
+
+**Calibrate, then pick the threshold in rupees.** Class weights distort probabilities; calibration fixes them:
+
+```python
+from sklearn.calibration import CalibratedClassifierCV
+
+cal = CalibratedClassifierCV(HistGradientBoostingClassifier(max_iter=300, learning_rate=0.05, random_state=3),
+                             method="isotonic", cv=3).fit(X_tr, y_tr)
+p = cal.predict_proba(X_te)[:, 1]
+
+COST_FN, COST_FP = 15_000, 200            # missed fraud, analyst review
+t = COST_FP / (COST_FP + COST_FN)         # flag when expected loss from missing exceeds review cost
+tn, fp, fn, tp = confusion_matrix(y_te, p >= t).ravel()
+print(f"threshold {t:.3f}: caught {tp}, missed {fn}, false alarms {fp}")
+print(f"cost of errors ₹{fn * COST_FN + fp * COST_FP:,}")
+```
+
+With calibrated probabilities, the best threshold follows from the costs directly: flag a case when its chance of fraud times ₹15,000 is more than ₹200.
+
+**Capacity limits change the rule.** If analysts can review only 300 cases a day, sort by score and take the top 300; measure recall at that budget instead of at a threshold.
+
+**Explain individual decisions.** For a logistic model, each feature's contribution is its coefficient times its (scaled) value. For boosted trees, permutation importance shows which features matter overall, and tools such as SHAP explain single predictions. Credit and insurance decisions often need such explanations for customers and regulators.
+
 ## A worked example
 
 A Pune payments company has 2 million UPI merchant transactions a month, of which about 0.3% are later confirmed fraud.
@@ -123,6 +174,23 @@ They set a second, higher threshold that blocks transactions automatically only 
 - **One threshold for all actions.** Review and automatic blocking need different precision.
 
 - **No baseline.** Without comparing to current rules or a simple model, you cannot show the new model is worth it.
+- **Random splits on time-ordered data**, which leak the future.
+- **Using class-weighted probabilities as real probabilities** without calibrating.
+- **Ignoring review capacity**: a threshold that flags 5,000 cases a day for a team of three is not a solution.
+
+## When a simple rule beats a model
+
+- **Very few positive examples**, too few to learn from: start with expert rules and collect labels.
+- **A clear rule already works**, such as blocking cards reported stolen.
+- **Decisions must be explainable in one sentence** and a short scorecard meets the bar.
+
+## From demo to production
+
+- **Split by time** and test on the most recent period.
+- **Calibrate** before setting thresholds from costs.
+- **Set thresholds from costs or capacity**, agreed with the business, and revisit them.
+- **Monitor precision and recall** as labels arrive, by segment.
+- **Keep explanations** available for each decision where customers or regulators may ask.
 
 ## Practice
 
@@ -131,5 +199,6 @@ Work through Google's classification module.
 1. Train logistic regression and a tree-based model on a public imbalanced dataset (credit card fraud or churn), testing on held-out data.
 2. Plot precision and recall against the threshold, and choose a threshold from costs you assume.
 3. Report the confusion matrix at your threshold and explain it in rupees.
+4. Change COST_FN to ₹5,000 and to ₹50,000, rerun, and write how the threshold and the number of false alarms change.
 
 **You are done when you can** justify a threshold with costs and capacity, and explain why accuracy misleads on rare events.

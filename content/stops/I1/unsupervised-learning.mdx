@@ -34,6 +34,10 @@ flashcards:
     a: "To prioritise records for human review, not as final verdicts."
   - q: "How do you judge whether clusters are useful?"
     a: "Describe and name them with business users, check they stay stable on reruns, and test whether acting on them improves an outcome."
+  - q: "What does the silhouette score tell you?"
+    a: "How much closer records are to their own cluster than to the next one, from -1 to 1. It helps compare k values, but business meaning still decides."
+  - q: "How can you check that clusters are stable?"
+    a: "Re-run clustering on different random samples or seeds and measure agreement, for example with the adjusted Rand index. Unstable clusters should not drive decisions."
 exercise:
   title: "Interpret the clusters"
   setup: "A Pune gym chain clusters 30,000 members on visits per week, average session minutes, share of group classes, share of morning visits and months since joining. Before scaling, one cluster contains almost everyone who joined long ago, regardless of behaviour. After scaling, k-means with k=4 gives clusters described as: A, 5 visits a week, mornings, weights; B, 2 visits, evenings, group classes; C, under 1 visit a week, falling; D, new joiners, high early visits."
@@ -52,7 +56,7 @@ ask:
   - "How do I find anomalies in my data?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -107,6 +111,70 @@ This lesson follows a supermarket chain in Kochi segmenting 400,000 loyalty-card
 
 **The hard part is meaning.** Algorithms always return clusters, even in random data. The real work is describing each one with averages and real examples, naming it with the business team, and proving it is useful with a test. A cluster nobody can describe or act on is not a segment.
 
+**Choosing k with evidence, not just the elbow.**
+
+```python
+import numpy as np
+from sklearn.datasets import make_blobs
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score, adjusted_rand_score
+
+X, _ = make_blobs(n_samples=3000, centers=4, n_features=6, cluster_std=1.6, random_state=8)
+Xs = StandardScaler().fit_transform(X)
+
+for k in range(2, 8):
+    labels = KMeans(n_clusters=k, n_init=10, random_state=8).fit_predict(Xs)
+    print(k, "silhouette", round(silhouette_score(Xs, labels, sample_size=2000, random_state=8), 3))
+```
+
+**Check stability before naming segments.**
+
+```python
+def stability(Xs, k, runs=5, frac=0.8, seed=0):
+    rng = np.random.default_rng(seed)
+    ref = KMeans(n_clusters=k, n_init=10, random_state=0).fit(Xs)
+    scores = []
+    for r in range(runs):
+        idx = rng.choice(len(Xs), int(frac * len(Xs)), replace=False)
+        other = KMeans(n_clusters=k, n_init=10, random_state=r + 1).fit(Xs[idx])
+        scores.append(adjusted_rand_score(ref.predict(Xs[idx]), other.labels_))
+    return round(float(np.mean(scores)), 3)
+
+print("stability at k=4:", stability(Xs, 4), " at k=7:", stability(Xs, 7))
+```
+
+An adjusted Rand index near 1 means the same records keep landing together; much lower values mean the segments are artefacts of one run.
+
+**Describe clusters in business terms.** Join cluster labels back to the original, unscaled columns and summarise:
+
+```python
+import pandas as pd
+
+def describe(df, labels):
+    d = df.assign(cluster=labels)
+    summary = d.groupby("cluster").agg(["mean", "median"]).round(1)
+    summary["size"] = d.cluster.value_counts().sort_index()
+    return summary
+```
+
+Then read ten real records from each cluster before giving it a name such as "weekend family shoppers".
+
+**Anomaly scores for a review queue.**
+
+```python
+from sklearn.ensemble import IsolationForest
+
+iso = IsolationForest(n_estimators=300, contamination="auto", random_state=8).fit(Xs)
+scores = -iso.score_samples(Xs)                  # higher = more unusual
+queue = np.argsort(-scores)[:20]
+print("top anomaly scores:", scores[queue][:5].round(3))
+```
+
+Send the top cases to a person with the features that make them stand out (for example, how many standard deviations each value is from the median), and record what they decide. Those decisions become labels for a supervised model later.
+
+**PCA for a first look.** `PCA(n_components=2).fit_transform(Xs)` gives coordinates to plot; `explained_variance_ratio_` says how much of the variation the two axes capture. If it is small, the picture may hide real structure.
+
 ## A worked example
 
 A Kochi supermarket chain with 400,000 loyalty-card customers wants segments for marketing.
@@ -141,6 +209,23 @@ A three-month test sends segment-specific offers to half of each segment. Respon
 - **Anomaly scores as verdicts.** Use them to prioritise human review.
 
 - **Clustering on features that cannot be acted on.** Segments defined by data the business cannot use for targeting rarely change anything.
+- **Choosing k from the elbow alone**, without stability or business meaning.
+- **Naming clusters from averages only**, without reading real records.
+- **Treating anomaly scores as verdicts** rather than a review order.
+
+## When not to use unsupervised methods
+
+- **You have labels for what you care about**: supervised models answer the question directly.
+- **Segments must follow fixed rules**, such as regulatory customer categories.
+- **Too few records or features** to form meaningful groups.
+
+## From demo to production
+
+- **Fix seeds and record settings**, so segments are reproducible.
+- **Check stability** before each release of new segments.
+- **Re-cluster on a schedule** and map new clusters to old names deliberately.
+- **Track cluster sizes over time**; big shifts mean behaviour or data changed.
+- **Feed review decisions on anomalies** back as labels.
 
 ## Practice
 
@@ -149,5 +234,6 @@ Read scikit-learn's clustering overview, especially the comparison chart, and th
 1. Cluster customers in a public retail dataset with k-means for several k values, and describe each cluster in a sentence.
 2. Run PCA and plot the first two components coloured by cluster.
 3. Use Isolation Forest to find the 20 most unusual records and explain what makes three of them unusual.
+4. Run the stability check for k from 2 to 7 on your data and choose k using both silhouette and stability.
 
 **You are done when you can** present named, described clusters and one way a business would use them.

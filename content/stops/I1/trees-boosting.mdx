@@ -33,6 +33,10 @@ flashcards:
     a: "Correlated features share importance unpredictably, and a leaky feature can look like the most important one."
   - q: "What can trees not do well?"
     a: "Extrapolate beyond target values they saw, or learn directly from raw images, audio or text, where neural networks win."
+  - q: "What does early stopping do in boosting?"
+    a: "It holds back part of the training data and stops adding trees when the score there stops improving, choosing the number of trees for you."
+  - q: "Why can permutation importance beat built-in importance?"
+    a: "It measures how much the score drops when a feature's values are shuffled on held-out data, which reflects real use better than split counts."
 exercise:
   title: "Diagnose the boosting run"
   setup: "A Mumbai insurer trains LightGBM to predict claims. Run A: depth 15, learning rate 0.3, 2,000 trees, no early stopping: training AUC 0.99, validation AUC 0.70. Run B: depth 6, learning rate 0.03, early stopping after 50 rounds without improvement: stops at 640 trees, training AUC 0.84, validation AUC 0.80. The top feature in both runs is 'claim_settled_amount'."
@@ -51,7 +55,7 @@ ask:
   - "What are SHAP values in simple words?"
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
-reviewed_on: 2026-10-27
+reviewed_on: 2026-11-08
 ---
 
 ## What it is
@@ -105,6 +109,55 @@ This lesson follows a digital lender in Gurugram predicting 90-day defaults on p
 
 Tune on a validation set split by time, then confirm once on a later test period. A gap between training and validation scores that keeps growing is the clearest sign of overfitting.
 
+**Three models on one split, in code.**
+
+```python
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
+from sklearn.metrics import roc_auc_score
+
+X, y = make_classification(n_samples=12_000, n_features=20, n_informative=10, flip_y=0.03, random_state=4)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.25, random_state=4)
+
+models = {
+    "single tree": DecisionTreeClassifier(max_depth=6, random_state=4),
+    "random forest": RandomForestClassifier(n_estimators=300, min_samples_leaf=5, n_jobs=-1, random_state=4),
+    "boosting": HistGradientBoostingClassifier(learning_rate=0.05, max_iter=2000, max_depth=6,
+                                               early_stopping=True, validation_fraction=0.15,
+                                               n_iter_no_change=30, random_state=4),
+}
+for name, m in models.items():
+    m.fit(X_tr, y_tr)
+    tr = roc_auc_score(y_tr, m.predict_proba(X_tr)[:, 1])
+    te = roc_auc_score(y_te, m.predict_proba(X_te)[:, 1])
+    print(f"{name:<14} train {tr:.3f}  test {te:.3f}")
+print("trees used by boosting:", models["boosting"].n_iter_)
+```
+
+Early stopping chose the number of trees from up to 2,000. The gap between train and test scores shows overfitting at a glance.
+
+**Importance that reflects real use.**
+
+```python
+from sklearn.inspection import permutation_importance
+
+r = permutation_importance(models["boosting"], X_te, y_te, scoring="roc_auc", n_repeats=5, random_state=4)
+top = np.argsort(-r.importances_mean)[:5]
+for i in top:
+    print(f"feature {i}: drop in AUC {r.importances_mean[i]:.3f} ± {r.importances_std[i]:.3f}")
+```
+
+Correlated features share importance, so one may look unimportant only because its twin carries the signal. Check by dropping both together.
+
+**Constraints that match common sense.** If risk should never go down as the EMI-to-income ratio rises, say so. `HistGradientBoostingClassifier(monotonic_cst=[...])` takes 1, -1 or 0 per feature, which makes the model easier to defend to credit committees and often more robust on new data.
+
+**Native categorical support.** Pass `categorical_features="from_dtype"` with pandas categorical columns, and the boosting model splits on categories directly, without one-hot encoding. LightGBM, XGBoost and CatBoost offer the same with more tuning options; CatBoost is known for strong defaults on data with many categories.
+
+**Tune a little, carefully.** A small search over learning rate, depth and minimum samples per leaf, scored on a time-based validation set, usually captures most of the gain. Large searches tend to overfit the validation set itself.
+
 ## A worked example
 
 A Gurugram digital lender predicts 90-day default on personal loans from 120 features: bureau data, bank-statement summaries, application details and app usage.
@@ -135,6 +188,24 @@ A warning sign during development: a feature "number of collection calls" had ve
 - **Skipping explanations in regulated uses.** Lending and insurance decisions need reasons.
 
 - **Comparing models on different test sets.** Evaluate every candidate on the same later-period data, or the comparison means nothing.
+- **No early stopping**, so the number of trees is a guess.
+- **Reading built-in importance as truth** when features are correlated.
+- **Large hyperparameter searches** that overfit the validation set.
+
+## When trees are not the right tool
+
+- **Images, audio and free text**, where neural networks and pretrained models win.
+- **Predictions far outside the training range**, which trees cannot extrapolate to.
+- **A fully transparent formula is required**: logistic regression or a scorecard may be easier to approve.
+- **Tiny datasets**, where a simple linear model often generalises better.
+
+## From demo to production
+
+- **Use early stopping** and record the chosen number of trees.
+- **Validate on a later time period** and watch the train-test gap.
+- **Add monotonic constraints** where the business rule is clear.
+- **Store permutation importance** with each model version, and compare across versions.
+- **Keep explanations** for individual decisions where customers or regulators may ask.
 
 ## Practice
 
@@ -143,5 +214,6 @@ Read scikit-learn's ensembles guide and XGBoost's introduction; do the XGBoost l
 1. On a public tabular dataset, train a decision tree, a random forest and a gradient-boosted model, and compare them on a held-out set.
 2. Tune learning rate, depth and number of trees with early stopping, and record the best validation score.
 3. Produce SHAP explanations for three individual predictions and write them in plain language.
+4. Add a monotonic constraint on one feature, retrain, and compare the test score and a plot of predictions against that feature.
 
 **You are done when you can** explain why boosting beats a single tree, show your tuning results and explain one prediction in plain words.
