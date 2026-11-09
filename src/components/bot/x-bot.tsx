@@ -85,6 +85,23 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
     };
   }, []);
 
+  // MB-7 (2026-11-09): on phones the launcher tucks half off the right edge while the reader scrolls
+  // down, so it never sits on lesson text or buttons, and slides back as soon as they scroll up.
+  useEffect(() => {
+    const phone = matchMedia("(max-width: 639px)");
+    let last = scrollY;
+    const onScroll = () => {
+      const el = root.current;
+      if (!el) return;
+      const y = scrollY;
+      if (phone.matches && y > 120 && y > last + 4) el.setAttribute("data-tucked", "");
+      else if (y < last - 4 || y <= 120) el.removeAttribute("data-tucked");
+      last = y;
+    };
+    addEventListener("scroll", onScroll, { passive: true });
+    return () => removeEventListener("scroll", onScroll);
+  }, []);
+
   // Say hello once ever, a few seconds into the first visit, and tuck the bubble away after a
   // few seconds so it never sits on top of the page's own buttons.
   useEffect(() => {
@@ -270,7 +287,7 @@ export function XBot({ aiOn }: { aiOn: boolean }) {
       )}
 
       {hint && !open && (
-        <button type="button" onClick={show} className="xbot-hint absolute right-1 bottom-[3.75rem] w-max max-w-[12rem] rounded-2xl rounded-br-sm bg-zinc-900 px-3 py-2 text-left text-sm text-white shadow-lg sm:bottom-[4.5rem] dark:bg-white dark:text-zinc-900">
+        <button type="button" onClick={show} className="xbot-hint absolute right-1 bottom-[3.75rem] max-sm:hidden w-max max-w-[12rem] rounded-2xl rounded-br-sm bg-zinc-900 px-3 py-2 text-left text-sm text-white shadow-lg sm:bottom-[4.5rem] dark:bg-white dark:text-zinc-900">
           Stuck? Ask me anything!
         </button>
       )}

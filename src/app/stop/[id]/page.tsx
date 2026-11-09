@@ -35,6 +35,7 @@ import { aiEnabled } from "@/lib/ai/settings";
 import { levelWords } from "@/lib/levels";
 import { CopyCode } from "@/components/copy-code";
 import { FlowDiagram } from "@/components/flow-diagram";
+import { runsInBrowser } from "@/lib/playground/runs-in-browser";
 
 /** Lesson text: headings, lists, code and tables styled without a typography plugin. Code scrolls inside its box at 360px. */
 const PROSE =
@@ -50,7 +51,8 @@ function LessonPre(props: React.ComponentProps<"pre">) {
   if (/\blanguage-flow\b/.test(lang) && text) return <FlowDiagram source={text} />;
   // Text blocks (language-text) are program output and logs: no Copy button on those.
   const pre = /\blanguage-text\b/.test(lang) ? <pre tabIndex={0} {...props} /> : <CopyCode><pre tabIndex={0} {...props} className={`${props.className ?? ""} pr-16`} /></CopyCode>;
-  if (!text || !/\blanguage-(python|py)\b/.test(lang)) return pre;
+  // PG-6: only code whose imports Pyodide can load gets the button; the rest stays copyable.
+  if (!text || !/\blanguage-(python|py)\b/.test(lang) || !runsInBrowser(text)) return pre;
   return (
     <RunnableCode code={text.replace(/\n$/, "")} aiOn={aiEnabled()}>
       {pre}

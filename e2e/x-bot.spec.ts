@@ -47,3 +47,24 @@ test("X Bot stays out of the mock interview (XB-1)", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "Mock interview" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ask X Bot for help" })).toHaveCount(0);
 });
+
+test("on a phone, X Bot tucks aside while the reader scrolls down a lesson and comes back on scroll up (MB-7)", async ({ page }) => {
+  await page.goto("/stop/what-is-automation");
+  const root = page.locator(".xbot-root");
+  const launcher = page.getByRole("button", { name: "Ask X Bot for help" });
+  await expect(launcher).toBeVisible();
+  for (let i = 0; i < 6; i++) await page.mouse.wheel(0, 400);
+  await expect(root).toHaveAttribute("data-tucked", "");
+  const tucked = await launcher.boundingBox();
+  expect(tucked && tucked.x + tucked.width).toBeGreaterThan(360);       // half off the right edge
+  // Smooth scrolling (Lenis) keeps moving for a moment; wait until the page is still, then scroll up.
+  await expect.poll(async () => {
+    const a = await page.evaluate(() => scrollY);
+    await page.waitForTimeout(200);
+    return (await page.evaluate(() => scrollY)) === a;
+  }).toBe(true);
+  await page.mouse.wheel(0, -300);
+  await expect(root).not.toHaveAttribute("data-tucked", "");
+  await launcher.click();                                               // still one tap to open
+  await expect(page.getByRole("dialog", { name: "X Bot" })).toBeVisible();
+});

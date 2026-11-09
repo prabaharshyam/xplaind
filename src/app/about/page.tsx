@@ -5,7 +5,8 @@ import { Icon } from "@/components/art/icons";
 import { JsonLd } from "@/components/json-ld";
 import { PageHero } from "@/components/page-hero";
 import { primaryButton, secondaryButton, secondaryButtonSm } from "@/components/ui";
-import { getPaths, getStops } from "@/lib/content";
+import { getContent, getPaths, getStops } from "@/lib/content";
+import { proOpen } from "@/lib/billing/config";
 import { pageMeta } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 
@@ -32,6 +33,11 @@ const BELIEFS = [
     text: "No one can pay to be listed or ranked. Some book links earn a small commission; the code that orders courses and books never reads it, and a test keeps it that way.",
   },
   {
+    icon: "check" as const,
+    title: "Learning stays free",
+    text: "Every roadmap, lesson, video, practice set, interview answer and project guide is free, with no lock and no daily limit. That does not change.",
+  },
+  {
     icon: "shield" as const,
     title: "Your data stays small",
     text: "No ads and no tracking scripts. Progress stays on your device unless you choose to make an account, and you can delete an account and everything in it from Settings.",
@@ -55,6 +61,8 @@ const STORY = [
 export default function AboutPage() {
   const roles = getPaths().length;
   const lessons = getStops().length;
+  const picks = getContent().resources.length;
+  const pro = proOpen();
   return (
     <main>
       <JsonLd
@@ -81,7 +89,7 @@ export default function AboutPage() {
         icon="compass"
         eyebrow="About Xplaind"
         title="Help India learn AI faster, in the right order"
-        lead="Xplaind is a free, step-by-step place to learn AI for a career: roadmaps for real roles, plain-English lessons, projects and interview practice."
+        lead={`All ${roles} roadmaps, ${lessons} written lessons and ${picks} course picks are free, forever: a step-by-step place to learn AI for a career, with projects and interview practice.`}
       />
 
       <div className="mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-14">
@@ -99,6 +107,16 @@ export default function AboutPage() {
               learn, in what order, which free course or video teaches it best, what to build, and how to explain it in an interview.
               Today that is {lessons} lessons, each written to be read in one sitting.
             </p>
+            {pro && (
+              <p>
+                The AI tools cost us money each time they run, so a free account gets a daily allowance and a{" "}
+                <Link href="/pricing" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                  Pro pass
+                </Link>{" "}
+                gives more AI help each day: more AI tutor answers, mock interview feedback and resume reviews. Pro never unlocks lessons,
+                because nothing is locked.
+              </p>
+            )}
           </div>
         </section>
 

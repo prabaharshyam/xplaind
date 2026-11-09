@@ -434,3 +434,13 @@ After the book series, older lessons looked thin beside the new ones. The owner 
 ## 2026-11-09: PRD status review and unique IDs
 
 A pass compared the PRD with the build. Superseded rows and features not built yet (PL-7, part of PL-8, spaced repetition, the weekly link check, /admin, landing email capture) are marked at the top of the PRD and on each row. Five requirement IDs had been used twice; the later meanings were renamed (SWE-1, BR-8, BR-9, AC-12, IQ-10). The sitemap's page date was bumped and /llms.txt now lists the Interview section's pages, projects, AI tools, books, papers, jobs and pricing.
+
+## 2026-11-09: one free AI try, then sign in (AG-1), and three smaller changes
+
+The owner wanted to stop AI spend from anonymous visitors that brings no sign-ups, and asked for one free sample before sign-in. The gate counts every AI tool together (one try a day), uses the existing daily-rotating visitor hash, and switches on only when sign-ups are open: while sign-ups are on hold no one could sign in, so turning it on earlier would simply break the AI tools. Under-18s, who cannot hold accounts, keep the one free try. Sign-in uses the existing site-wide prompt with Google and an email link; progress and practice already move to the account on first sign-in (AC-2), while notes and books stay on the device by design (MB-4).
+
+The About page now makes the promise exact: every roadmap, lesson and course pick is free, forever. A Pro paragraph appears only once Pro is open and names only what Pro really does (more AI help each day). The owner chose not to advertise features that do not exist yet, such as code review or capstone grading.
+
+Lessons already ran Python in place (PG-4), but the button also appeared on code that cannot run in a browser (model SDKs, servers, PyTorch). It now appears only where Pyodide can run the code, and 34 technical lessons that had none gained a short "Try it in your browser" example, each run before it was added. On phones, X Bot now tucks half off the edge while the reader scrolls down, so it never covers lesson text or buttons.
+
+The owner asked to leave old URL redirects for now: no blog slug has ever changed in this repo and no /path/ route ever existed.
