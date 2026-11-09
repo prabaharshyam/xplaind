@@ -7,7 +7,7 @@ import { siteUrl } from "@/lib/site";
 import { THEMES } from "@/lib/themes";
 
 /** The last day the site's own pages (home, menus, tools) changed. Bump it with page changes. */
-export const PAGES_UPDATED_ON = "2026-11-04";
+export const PAGES_UPDATED_ON = "2026-11-09";
 
 // IQ-3: every public page, including each interview question. /result and /go are
 // left out: one is personal, the other only redirects.

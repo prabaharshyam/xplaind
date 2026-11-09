@@ -386,3 +386,51 @@ CI on the dashboard fix failed two tests that had failed now and then before.
 
 The owner's mock interview on an iPhone heard the first answer but not the second, although the timer ran and "Listening…" showed. Every iPhone browser uses Safari's speech engine, which runs one recognition at a time and gives a new recogniser no audio while the previous one is still shutting down; the simulator made a new recogniser for each question. It also restarted recognition by itself after a pause, which iOS may refuse when no tap started it, while the screen still said "Listening…". Now one recogniser serves the whole interview and is aborted between questions, and a sound check turns the microphone off with a plain message ("isn't picking up any sound… tap to try again, or type") if no audio arrives within 5 seconds of a start or an automatic restart. Two e2e tests use a stand-in that behaves like Safari's engine; both fail on the old code and pass now. It still needs a check on a real iPhone.
 
+
+## 2026-11-04: roadmap topic panel, shorter home page, guide covers (RM-13, BR-5, BL-1)
+
+Testers and the owner found the home page too long to read and roadmaps slow to scan. Tapping a roadmap topic now opens a side panel with the plain answer, key terms, the status buttons and the best course, so a learner can judge a topic without leaving the roadmap. Home page cards were cut to one short sentence each, keeping every section and promise. Every guide got its own cover picture with no text in it, used on cards and as the share image.
+
+## 2026-11-04: Google sign-in on our own domain, playground starters, menu moves (AC-1a, PG-5, NV-1)
+
+Google's sign-in window showed the Supabase address, which looked like spam to the owner, so the form now uses Google's own button and verifies the token on xplaind.in. The playground gained grouped starter programs (warm-ups, AI ideas) so learners have something to run straight away. Papers and free books, and the weekly plan, moved into the menu groups where people looked for them. A learner who already has an account is now told so, instead of being asked to check their email.
+
+## 2026-11-06 to 07: the owner's lists of 6 November (RM-14, RM-15, AC-12, MB-5, MB-6)
+
+A batch of owner requests. The black text diagrams in lessons became clean drawn flow diagrams, because they looked broken on phones. Lessons got an "On this page" column on the left on wide screens. XP, ranks and badges were removed: points did not motivate learners and confused them; streaks and progress stay. "Ask me from my book" became "Study from my notes & books" and can make flashcards as well as tests. Month-based duration estimates were removed from the site at the owner's request.
+
+## 2026-11-07: testimonials, cheatsheets and the Interview section (SO-1, CS-1, IP-1 to IP-3)
+
+Testimonials are shown only in users' own words, with permission, and the section hides when there are none; samples appear on previews only. Research on interview-prep demand led to an Interview section modelled on how coding-interview sites teach patterns: named AI interview patterns, worked LLM system design answers in a 35-minute shape, and an Interview menu group.
+
+## 2026-11-07: software engineering track and Commit to 90 days (SWE-1, CM-90)
+
+At the owner's request, a software engineering and Git track was added for learners who need Git and basic engineering practice. For accountability, signed-in learners can opt in to a weekly email for 13 weeks with one-click unsubscribe; it is off by default and sent through Resend on a Vercel Cron schedule.
+
+## 2026-11-07: the minimal look (BR-3)
+
+The owner asked for a calmer, DataCamp-like site: plain white or dark pages, simple cards, less text and fewer badges, keeping only the home road and the particle headers. The pastel palette and card tilt animations were retired site-wide.
+
+## 2026-11-07 to 08: videos by topic and video courses (VD-1, VD-2)
+
+Videos were grouped by YouTube channel, which is not how learners search. /videos became one list filtered by topic, level and length, with view counts. Every DeepLearning.AI course and Andrew Ng's courses were added as video courses, shown in lesson panels and a Video courses tab, with embeddable ones playable on the page.
+
+## 2026-11-08: cheatsheets paused, and the product focus (CS-3, FOCUS-1)
+
+The owner paused cheatsheets ("we'll do this later"); the files stay in content and the pages redirect to Practice until a redesign is agreed. The owner also fixed the focus: Xplaind is a one-stop platform for AI education, and system design stays at its current basics, with no more system design content or features.
+
+## 2026-11-08: book-informed lessons (LQ-1 to LQ-6)
+
+To raise the depth of lessons, the owner chose a reference book (Chip Huyen, *AI Engineering*, O'Reilly 2025). Rule: lessons are written in our own words with Indian examples, the book is cited as further reading and never copied, and the PDF stays out of the repo. Eighteen new lessons in six reviewed batches of three, each with checks, glossary terms, resources and two interview questions, covered the book's main topics that had no lesson.
+
+## 2026-11-08: Pro passes with Cashfree, in test mode (PAY-1 to PAY-6)
+
+The owner asked for a way to earn without locking learning. Decision: every lesson, roadmap, video, practice set, interview answer and project stays free; Pro only raises daily AI limits. Passes are one-time (30 days, 6 months, 12 months) with no auto-renewal, which is simpler for Indian learners and avoids mandate rules. The owner chose Cashfree over Razorpay. Payments are confirmed by re-fetching the order from Cashfree (paid, in rupees, exact amount) before a pass is granted; the webhook is verified with Cashfree's signature. Under-18s cannot buy. Everything stays in sandbox until the owner sets live keys. On reusing the Cashfree account of the owner's other business: fine for sandbox; for live, Cashfree must approve xplaind.in on that account, or a separate account is opened.
+
+## 2026-11-08 to 09: deepening every lesson (LQ-7)
+
+After the book series, older lessons looked thin beside the new ones. The owner first approved batches of three (9 lessons), then asked for "the entire thing in a single shot": 74 more lessons in the AI-engineering themes in one PR, then the 11 classic ML lessons in another. Each gained runnable code, a "when not to" section, "From demo to production" and two flashcards. For the ML pass every code example was run for real on scikit-learn and PyTorch. Beginner, DSA, Rust, system design, software engineering, career, client-delivery and product lessons were left as they are by design. The owner reviewed and approved all of it, and on 9 November also approved the remaining 24 lessons, 37 glossary terms and 1 guide that were still drafts.
+
+## 2026-11-09: PRD status review and unique IDs
+
+A pass compared the PRD with the build. Superseded rows and features not built yet (PL-7, part of PL-8, spaced repetition, the weekly link check, /admin, landing email capture) are marked at the top of the PRD and on each row. Five requirement IDs had been used twice; the later meanings were renamed (SWE-1, BR-8, BR-9, AC-12, IQ-10). The sitemap's page date was bumped and /llms.txt now lists the Interview section's pages, projects, AI tools, books, papers, jobs and pricing.

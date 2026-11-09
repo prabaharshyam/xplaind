@@ -19,7 +19,7 @@ export const isRating = (v: unknown): v is Rating => v === 0 || v === 1 || v ===
 /**
  * Practice order: questions never rated first (in content order), then missed,
  * then partly, then got it. Within a rating, the one rated longest ago comes
- * first. Release 2 replaces this with spaced repetition (IQ-8).
+ * first. Release 2 replaces this with spaced repetition (IQ-10).
  */
 export function practiceOrder(ids: readonly string[], ratings: Ratings): string[] {
   const position = new Map(ids.map((id, i) => [id, i]));
