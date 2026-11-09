@@ -57,6 +57,12 @@ test("on a phone, X Bot tucks aside while the reader scrolls down a lesson and c
   await expect(root).toHaveAttribute("data-tucked", "");
   const tucked = await launcher.boundingBox();
   expect(tucked && tucked.x + tucked.width).toBeGreaterThan(360);       // half off the right edge
+  // Smooth scrolling (Lenis) keeps moving for a moment; wait until the page is still, then scroll up.
+  await expect.poll(async () => {
+    const a = await page.evaluate(() => scrollY);
+    await page.waitForTimeout(200);
+    return (await page.evaluate(() => scrollY)) === a;
+  }).toBe(true);
   await page.mouse.wheel(0, -300);
   await expect(root).not.toHaveAttribute("data-tucked", "");
   await launcher.click();                                               // still one tap to open
