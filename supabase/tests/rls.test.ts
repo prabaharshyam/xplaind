@@ -232,6 +232,7 @@ describe("AI for guests without an account (SU-5)", () => {
         "insert into ai_guest_usage (visitor, day, kind) values ('x', '2026-11-05', 'x')",
         "update ai_guest_usage set cost_usd = 0",
         "select public.ai_reserve_guest('x', 'x', '2026-11-05', '2026-11-01', 99, 999)",
+        "select public.ai_reserve_guest_sample('x', 'x', '2026-11-05', '2026-11-01', 99, 999)",
         "select public.ai_record_guest('x', 'x', '2026-11-05', 0, 0, -100)",
         "select public.ai_month_spend('2026-11-01')",
       ]) {
@@ -239,6 +240,24 @@ describe("AI for guests without an account (SU-5)", () => {
         expect(err.code, sql).toBe(PERMISSION_DENIED);
       }
     }
+  });
+});
+
+describe("one free AI try for guests once sign-ups are open (AG-1)", () => {
+  const sample = async (visitor: string, kind: string, day: string) =>
+    (await q("select public.ai_reserve_guest_sample($1, $2, $3, '2026-11-01', 1, 1000) as r", [visitor, kind, day])).rows[0].r;
+
+  it("allows one call a day in total across every AI tool, then asks to sign in", async () => {
+    expect(await sample("hash-s1", "tutor", "2026-11-09")).toBe("ok");
+    expect(await sample("hash-s1", "resume", "2026-11-09")).toBe("signin");
+    expect(await sample("hash-s1", "tutor", "2026-11-09")).toBe("signin");
+    expect(await sample("hash-s2", "resume", "2026-11-09")).toBe("ok");
+    expect(await sample("hash-s1", "tutor", "2026-11-10")).toBe("ok");
+  });
+
+  it("still stops at the monthly cap", async () => {
+    const r = (await q("select public.ai_reserve_guest_sample('hash-s3', 'tutor', '2026-11-09', '2026-11-01', 1, 0) as r")).rows[0].r;
+    expect(r).toBe("month");
   });
 });
 

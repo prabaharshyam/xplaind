@@ -20,6 +20,12 @@ export const DAILY_LIMIT: Record<AiKind, number> = {
   resume: 5,
 };
 
+/**
+ * AG-1 (2026-11-09, owner decision): once sign-ups are open, a visitor without an account gets this many
+ * AI actions a day in total, across every AI tool, as a free sample; after that they are asked to sign in.
+ */
+export const GUEST_SAMPLE = 1;
+
 export const DEFAULT_MODEL = "claude-opus-5-5";
 /**
  * PAY-1: the high-volume helpers (the AI tutor and X Bot) run on the fast, low-cost model, so
@@ -77,6 +83,8 @@ export const LIMIT_MESSAGE = {
   dayUpgrade: "You have used today's free AI turns for this feature. They reset at midnight India time, or a Pro pass gives you more today.",
   month: "This month's AI allowance is used up. It resets on the 1st. Everything else on Xplaind still works.",
   off: "AI features are switched off for now. Everything else on Xplaind still works.",
+  /** AG-1: a guest's free sample is used. */
+  signin: "You have used today's free AI try. Sign in free with Google or an email link to keep using the AI tools. Lessons, roadmaps and practice stay open without an account.",
 } as const;
 
 type UsageLike = {

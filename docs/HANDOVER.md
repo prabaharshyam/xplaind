@@ -287,7 +287,7 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 
 **Owner actions (Claude cannot do these):**
 1. Turn on the weekly "Commit to 90 days" emails if not done: run `supabase/migrations/20261107000000_commitments.sql`, set `RESEND_API_KEY` and `CRON_SECRET` in Vercel, verify the sending domain in Resend, optionally set `COMMIT_EMAIL_FROM`.
-2. Confirm sign-in is fully set up (Google, GitHub, email) and decide when to open sign-ups (`NEXT_PUBLIC_SIGNUPS_OPEN=true`).
+2. Confirm sign-in is fully set up (Google, GitHub, email) and decide when to open sign-ups (`NEXT_PUBLIC_SIGNUPS_OPEN=true`). Opening sign-ups also switches on AG-1: visitors without an account then get one free AI try a day before being asked to sign in.
 3. Set `ANTHROPIC_API_KEY`, `AI_MONTHLY_CAP_USD` and a matching spend limit in the Anthropic Console if AI tools should run in production.
 4. Pro passes (PAY-1 to PAY-6): run `supabase/migrations/20261108000000_payments.sql`; create the Cashfree account and finish KYC; in the Cashfree dashboard set the payment webhook to `https://xplaind.in/api/billing/webhook`; set `PAYMENTS_MODE=sandbox` plus the sandbox keys on a Preview deployment to test, then the live keys and `PAYMENTS_MODE=production` to launch. Decide GST with a CA (receipts say "not a tax invoice" until then). Approve the refund policy wording at /refunds. Set `NEXT_PUBLIC_CONTACT_EMAIL` (Cashfree checks for a contact address). Raise `AI_MONTHLY_CAP_USD` as passes sell: Pro calls skip the cap but still count towards it.
 5. Add an Amazon Associates India tag (`AMAZON_IN_TAG`) so book links earn.
