@@ -252,7 +252,7 @@ export default function PricingPage() {
                     <th scope="row" className="p-3 font-medium">
                       {KIND_LABEL[k]}
                     </th>
-                    {/* AG-1: once sign-ups are open, guests share one free try a day across every AI tool. */}
+                    {/* AG-1: once sign-ups are open, AI needs a free account. */}
                     {!guestSample ? (
                       <td className="p-3">{TIER_LIMITS.guest[k]}</td>
                     ) : i === 0 ? (
@@ -262,7 +262,7 @@ export default function PricingPage() {
                         }
                         className="p-3 align-top"
                       >
-                        1 try a day in total, then sign in free
+                        Sign up free to use AI
                       </td>
                     ) : null}
                     <td className="p-3">{TIER_LIMITS.free[k]}</td>

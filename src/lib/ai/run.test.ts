@@ -115,29 +115,22 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
   it("counts a signed-in learner without an 18+ profile, and everyone during the sign-up hold, as a guest", async () => {
     profile = null;
     rpc.mockResolvedValue({ data: "day", error: null });
-    expect(((await runAi(req)) as Response).status).toBe(429);
-    expect(rpc.mock.calls[0][0]).toBe("ai_reserve_guest_sample");
+    expect(((await runAi(req)) as Response).status).toBe(401);
+    expect(rpc).not.toHaveBeenCalled();
     vi.stubEnv("NEXT_PUBLIC_SIGNUPS_OPEN", "");
     profile = { id: "u1" };
-    await runAi(req);
-    expect(rpc.mock.calls[1][0]).toBe("ai_reserve_guest");
+    expect(((await runAi(req)) as Response).status).toBe(429);
+    expect(rpc.mock.calls[0][0]).toBe("ai_reserve_guest");
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("gives a guest one free AI try a day across all tools once sign-ups are open, then asks them to sign in (AG-1)", async () => {
+  it("refuses AI to a visitor without an account once sign-ups are open, spending nothing (AG-1)", async () => {
     user = null;
-    rpc.mockResolvedValueOnce({ data: "ok", error: null }).mockResolvedValueOnce({ data: null, error: null });
-    create.mockResolvedValue(reply('{"answer":"42"}'));
-    expect(await runAi(req)).toEqual({ data: { answer: "42" } });
-    expect(rpc.mock.calls[0]).toEqual([
-      "ai_reserve_guest_sample",
-      expect.objectContaining({ p_visitor: "visitor-hash", p_kind: "tutor", p_total_max: 1, p_month_cap_usd: 20 }),
-    ]);
-    rpc.mockResolvedValueOnce({ data: "signin", error: null });
     const res = (await runAi(req)) as Response;
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({ signin: true, error: expect.stringMatching(/Sign in free/) });
-    expect(create).toHaveBeenCalledTimes(1);
+    expect(await res.json()).toMatchObject({ signin: true, error: expect.stringMatching(/Sign up free/) });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it("is off without the database for the spend guard, even with a key", async () => {
