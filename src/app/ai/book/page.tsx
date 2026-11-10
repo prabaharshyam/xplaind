@@ -24,7 +24,7 @@ export default function BookPage() {
         crumbs={[{ href: "/practice", label: "Practice" }]}
       />
       <div className="mx-auto max-w-3xl px-4 py-8">
-        {/* SU-5: AI tools work without an account. */}
+        {/* AG-1: needs an account once sign-ups are open; while they are on hold, guests keep their limits (SU-5). */}
         <BookStudio aiOn={aiEnabled()} />
       </div>
     </main>

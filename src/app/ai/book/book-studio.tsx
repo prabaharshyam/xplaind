@@ -34,6 +34,14 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
   const current = view.kind === "test" || view.kind === "report" ? tests.find((t) => t.id === view.id) : undefined;
   const deck = view.kind === "deck" ? decks.find((d) => d.id === view.id) : undefined;
 
+  // AG-1: signed out, the whole tool is a sign-up card, not just its last button.
+  if (access === "signin")
+    return (
+      <AiGate access={access} next="/ai/book">
+        {null}
+      </AiGate>
+    );
+
   return (
     <div ref={top} className="scroll-mt-20">
       {view.kind === "home" && (
