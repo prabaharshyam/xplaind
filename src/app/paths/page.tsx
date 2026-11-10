@@ -12,9 +12,9 @@ import { YourPath } from "./your-path";
 export const metadata: Metadata = {
   // SE-8: "ai career roadmap", "ai career paths", "how to start a career in ai".
   ...pageMeta({
-    title: "AI Career Roadmaps 2026: 9 Free AI Career Paths",
+    title: "AI Career Roadmaps 2026: 9 AI Career Paths, Step by Step",
     description:
-      "9 free AI career roadmaps: AI engineer, generative AI, agentic AI, ML, MLOps, FDE, AI product manager, automation and governance, and who each suits.",
+      "9 AI career roadmaps, from first lesson to job-ready: AI engineer, generative AI, agentic AI, ML, MLOps, FDE, AI product manager, automation and governance, and who each suits.",
     path: "/paths",
   }),
 };

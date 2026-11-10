@@ -28,8 +28,8 @@ export async function generateMetadata({ params }: PageProps<"/topics/[theme]">)
   const lessons = lessonsOf(id);
   // SE-8: "<topic> tutorial for beginners", "learn <topic> free".
   return pageMeta({
-    title: [`${titleCase(t.label)} Tutorial for Beginners: ${lessons.length} Free Lessons`, `${titleCase(t.label)} Tutorial: ${lessons.length} Free Lessons`, `Learn ${titleCase(t.label)} Free`, titleCase(t.label)],
-    description: `Learn ${inSentence(t.label)} from scratch, free: ${lessons.length} short plain-English lessons in order, from ${lessons[0]?.title ?? ""} onwards, each with the best free course, a quiz and interview questions.`,
+    title: [`${titleCase(t.label)} Tutorial for Beginners: ${lessons.length} Lessons`, `${titleCase(t.label)} Tutorial: ${lessons.length} Lessons`, `Learn ${titleCase(t.label)}`, titleCase(t.label)],
+    description: `Learn ${inSentence(t.label)} from scratch: ${lessons.length} short plain-English lessons in order, from ${lessons[0]?.title ?? ""} onwards, each with the best course, a quiz and interview questions.`,
     path: `/topics/${id}`,
   });
 }

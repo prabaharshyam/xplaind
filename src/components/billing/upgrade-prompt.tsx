@@ -44,11 +44,11 @@ export function UpgradePrompt() {
           <Icon name="sparkles" size={18} />
         </p>
         <h2 id="upgrade-title" className="mt-3 text-xl font-semibold">
-          Today&apos;s free AI turns are used
+          Today&apos;s AI turns are used
         </h2>
         <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{state?.message}</p>
         <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
-          Lessons, roadmaps, practice cards and the code playground stay free, with no limit.
+          Lessons, roadmaps, practice cards and the code playground stay open, with no limit.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link href={state?.href ?? "/pricing"} className={primaryButton} onClick={() => dialog.current?.close()}>

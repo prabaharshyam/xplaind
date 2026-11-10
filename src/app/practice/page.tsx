@@ -10,9 +10,9 @@ import { PracticeView } from "./practice-view";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["AI Interview Questions Practice: Free Flashcards & Quizzes", "AI Interview Practice: Free Flashcards"],
+  title: ["AI Interview Questions Practice: Flashcards & Quizzes", "AI Interview Practice: Flashcards"],
   description:
-    "Practise AI interview questions free: flashcards and quizzes on LLMs, RAG, agents, ML and system design. Answer out loud, then check the model answer.",
+    "Practise AI interview questions until you can answer out loud: flashcards and quizzes on LLMs, RAG, agents, ML and system design. Answer out loud, then check the model answer.",
   path: "/practice",
 });
 

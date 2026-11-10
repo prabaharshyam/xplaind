@@ -104,7 +104,7 @@ export const SITE_GUIDE: BotEntry[] = [
   {
     k: "guide",
     t: "Do I need an account?",
-    a: "The site works without an account: progress is saved in your browser. Sign in with your email to keep it across devices and to use the AI tools. Learners under 18 use the site without an account.",
+    a: "Lessons, topics, practice and guides work without an account, and progress is saved in your browser. Sign up to see the full roadmaps, keep progress across devices and use the AI tools. Learners under 18 use the lessons without an account.",
     h: "/signin",
     w: "account sign signin login free cost price pay money register",
   },

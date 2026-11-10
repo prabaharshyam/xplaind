@@ -7,9 +7,9 @@ import { ResumeStudio } from "./resume-studio";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["Free AI Resume Review for AI & Tech Jobs (ATS Check)", "Free AI Resume Review (ATS Check)"],
+  title: ["AI Resume Review for AI & Tech Jobs: Get Shortlisted", "AI Resume Review (ATS Check)"],
   description:
-    "Free AI resume checker for AI and tech jobs in India: see what recruiters and ATS look for, with rewritten lines and the keywords you are missing.",
+    "AI resume checker for AI and tech jobs in India: see what recruiters and ATS look for, with rewritten lines and the keywords you are missing.",
   path: "/ai/resume",
 });
 

@@ -36,7 +36,7 @@ export function SignUpDialog() {
         <div className="max-h-[90vh] overflow-y-auto p-5 sm:p-6">
           <div className="mb-3 flex items-start justify-between gap-3">
             <h2 id="signup-title" className="text-xl font-semibold tracking-tight">
-              Sign up free
+              Sign up
             </h2>
             <button
               type="button"

@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: PageProps<"/roadmap/genai-eng
   return level
     ? pageMeta({
         title: [`Generative AI Roadmap, ${level.id}: ${titleCase(level.name)}`, `${titleCase(level.name)} (${level.id})`],
-        description: `Level ${level.id} of the free generative AI roadmap. At the end you can: ${level.can_do}. About ${level.draft_hours} hours, with the best free course for each step.`,
+        description: `Level ${level.id} of the generative AI roadmap. At the end you can: ${level.can_do}. About ${level.draft_hours} hours, with the best course for each step.`,
         path: `/roadmap/genai-engineer/${level.id.toLowerCase()}`,
       })
     : {};

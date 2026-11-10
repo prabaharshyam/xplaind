@@ -7,9 +7,9 @@ import { TutorChat } from "./tutor-chat";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["Free AI Tutor: Learn AI With Personal Explanations", "Free AI Tutor for Learning AI"],
+  title: ["AI Tutor: Learn AI With Explanations Made for You", "AI Tutor for Learning AI"],
   description:
-    "A free AI tutor for learning AI: it explains any AI or ML topic, plans your week and answers AI career questions for India. It knows your progress.",
+    "An AI tutor for learning AI: it explains any AI or ML topic, plans your week and answers AI career questions for India. It knows your progress.",
   path: "/ai/tutor",
 });
 

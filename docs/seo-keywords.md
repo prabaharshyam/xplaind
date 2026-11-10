@@ -6,7 +6,7 @@ Researched 10 Nov 2026. Owner request: rank xplaind.in for AI learning searches 
 
 - **Demand signals:** Google India autocomplete (`gl=in`) for about 30 seed phrases. Autocomplete lists what people in India actually type, most-searched first. It does not give monthly volumes.
 - **Volumes:** no keyword tool with volumes was connected (Ahrefs and Semrush need sign-in). One public figure: "AI courses" has about 33,100 searches a month in India, the largest market for that phrase (Semrush, quoted in a third-party blog, not verified by us). Before the next round, get real volumes from Google Search Console (free, after verification) and Google Keyword Planner (free with a Google Ads account).
-- **Competition:** the first page for most of these phrases is course sellers (Scaler, Simplilearn, Great Learning, Logicmojo), news sites and roadmap.sh. Xplaind's edge is that it is free, in order, and India-specific, so titles lead with "free", "step by step" and "India".
+- **Competition:** the first page for most of these phrases is course sellers (Scaler, Simplilearn, Great Learning, Logicmojo), news sites and roadmap.sh. Xplaind's edge is that it is in order, outcome-led (job-ready, portfolio, interviews) and India-specific, so titles lead with "step by step", "job-ready" and "India". By the owner's decision (10 Nov 2026) Xplaind is never called free; searches containing "free" are reached through pages about outside free courses, such as the free-courses guide.
 
 ## Keyword clusters and the page that targets each
 
@@ -33,7 +33,8 @@ Researched 10 Nov 2026. Owner request: rank xplaind.in for AI learning searches 
 ## Rules for titles and descriptions (SE-8)
 
 - Titles: at most 60 characters with the most-searched words first. " | Xplaind" is added only when it still fits (`fitTitle` in `src/lib/seo.ts`).
-- Descriptions: at most 155 characters. Say what the page gives the reader and that it is free.
+- Descriptions: at most 155 characters. Say what the page helps the reader do: the outcome, not the price.
+- Never call Xplaind or its features free. "Free" appears only as a fact about an outside course or book.
 - Never claim "best" or "#1" for Xplaind itself. Never show a price without its check date (RM-6).
 
 ## Owner actions that code cannot do

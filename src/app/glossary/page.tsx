@@ -10,7 +10,7 @@ export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
   title: ["AI Glossary: AI Terms Explained in Plain English", "AI Glossary: Terms Explained Simply"],
   description:
-    "AI terms explained in plain English, from tokens, embeddings and RAG to agents, fine-tuning and MLOps, each linked to a free lesson that teaches it.",
+    "AI terms explained in plain English, from tokens, embeddings and RAG to agents, fine-tuning and MLOps, each linked to the lesson that teaches it.",
   path: "/glossary",
 });
 

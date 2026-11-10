@@ -8,9 +8,9 @@ import { THEMES } from "@/lib/themes";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["AI Topics: Free Lessons on RAG, Agents, LLMs, ML, Python", "AI Topics: Free Lessons by Topic"],
+  title: ["AI Topics: Lessons on RAG, Agents, LLMs, ML and Python", "AI Topics: Lessons by Topic"],
   description:
-    "Free AI lessons by topic: AI basics, Python, LLMs, RAG, agents, evals, deployment, machine learning, automation, AI product, DSA and system design.",
+    "AI lessons by topic: AI basics, Python, LLMs, RAG, agents, evals, deployment, machine learning, automation, AI product, DSA and system design.",
   path: "/topics",
 });
 

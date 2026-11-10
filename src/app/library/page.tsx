@@ -8,9 +8,9 @@ import { LibraryBrowser } from "./library-browser";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["AI Lessons Library: Every Free Lesson and Video by Topic", "AI Lessons Library"],
+  title: ["AI Lessons Library: Every Lesson and Video by Topic", "AI Lessons Library"],
   description:
-    "Every free Xplaind AI lesson, video lesson and AI skill in one place, by topic and level, from AI basics and Python to RAG, agents and MLOps.",
+    "Every Xplaind AI lesson, video lesson and AI skill in one place, by topic and level, from AI basics and Python to RAG, agents and MLOps.",
   path: "/library",
 });
 

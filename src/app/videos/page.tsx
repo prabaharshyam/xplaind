@@ -15,9 +15,9 @@ import { VideoTabs } from "./video-tabs";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["Free AI Video Courses: Andrew Ng, DeepLearning.AI & More", "Free AI Video Courses by Topic"],
+  title: ["AI Video Courses: Andrew Ng, DeepLearning.AI and More", "AI Video Courses by Topic"],
   description:
-    "Free AI video courses and lessons by topic: every DeepLearning.AI and Andrew Ng course plus the best YouTube teachers, filtered by level and length.",
+    "AI video courses and lessons by topic: every DeepLearning.AI and Andrew Ng course plus the best YouTube teachers, filtered by level and length.",
   path: "/videos",
 });
 

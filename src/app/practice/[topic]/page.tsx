@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PageProps<"/practice/[topic]"
   return topic
     ? pageMeta({
         title: [`${titleCase(interviewTopicLabel(topic))} Interview Questions: Practice Flashcards`, `${titleCase(interviewTopicLabel(topic))} Interview Questions Practice`, `${titleCase(interviewTopicLabel(topic))} Interview Practice`],
-        description: `Practise ${interviewTopicLabel(topic)} interview questions with free flashcards: answer out loud, check the model answer and rate yourself. Missed ones come back first.`,
+        description: `Practise ${interviewTopicLabel(topic)} interview questions with flashcards: answer out loud, check the model answer and rate yourself. Missed ones come back first.`,
         path: `/practice/${topic}`,
       })
     : {};

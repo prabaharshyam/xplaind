@@ -22,14 +22,14 @@ import { primaryButtonLg, secondaryButtonLg } from "@/components/ui";
 
 export const metadata: Metadata = {
   // SE-8: the brand first, then what people search for ("learn AI free", "AI course", "AI engineer roadmap").
-  title: { absolute: "Xplaind: Learn AI Free | AI Courses & Career Roadmaps, India" },
+  title: { absolute: "Xplaind: Learn AI for the Job You Want | AI Roadmaps, India" },
   description:
-    "Xplaind is a free AI learning platform for India: step-by-step roadmaps for 9 AI jobs, 200+ plain-English lessons, projects and AI interview prep.",
+    "Xplaind is an AI learning platform for India: step-by-step roadmaps to 9 AI jobs, 200+ plain-English lessons, portfolio projects and AI interview prep.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Xplaind: learn AI free, step by step, for the AI job you want",
+    title: "Xplaind: learn AI step by step, for the AI job you want",
     description:
-      "Free AI career roadmaps, plain-English lessons, hand-picked courses, guided projects and mock interviews. Built for learners in India.",
+      "AI career roadmaps, plain-English lessons, hand-picked courses, guided projects and mock interviews, so you get job-ready in the right order. Built for India.",
     url: "/",
   },
 };
@@ -45,13 +45,13 @@ const STEPS: { icon: IconName; title: string; text: string }[] = [
 const FAQ = [
   {
     q: "What is Xplaind?",
-    a: "Xplaind (xplaind.in) is a free AI learning platform for India. It gives you a step-by-step roadmap for the AI job you want, from AI engineer and generative AI engineer to AI product manager, a short plain-English lesson for every topic on it, the best free course or video for each topic, guided projects for your portfolio and AI interview questions with answers. It is not related to xplaind.com, a different website about accounting and finance.",
+    a: "Xplaind (xplaind.in) is an AI learning platform for India. It gives you a step-by-step roadmap for the AI job you want, from AI engineer and generative AI engineer to AI product manager, a short plain-English lesson for every topic on it, the best course or video for each topic, guided projects for your portfolio and AI interview questions with answers. It is not related to xplaind.com, a different website about accounting and finance.",
   },
   {
-    q: "Is Xplaind free?",
-    a: `Yes. Every roadmap, lesson, practice question, project guide and mock interview on Xplaind costs nothing. The AI tools are free too with a free account, with a daily limit so they stay free for everyone.${
-      proOpen() ? " If you want more AI help each day, an optional Pro pass raises the limits, from ₹249." : ""
-    } Some of the outside courses we recommend charge for a certificate or the course itself; we always show the price and the date we checked it.`,
+    q: "What will I be able to do at the end?",
+    a: `Each roadmap ends with what the job asks for: you can build and explain the projects a hiring manager looks for, answer the interview questions for your role out loud, and show a resume that passes the filters. Along the way, every topic has a short lesson, a quick check and the course or video that teaches it best, so you always know your next step.${
+      proOpen() ? " If you want more AI help each day, an optional Pro pass raises the AI tool limits, from ₹249." : ""
+    } Some outside courses we recommend charge for a certificate or the course itself; we always show the price and the date we checked it.`,
   },
   {
     q: "How is this different from YouTube and online courses?",
@@ -76,8 +76,8 @@ const FAQ = [
   {
     q: "Do I need an account?",
     a: accountsEnabled()
-      ? "Not to start learning. Every lesson, topic, practice card, interview answer, project guide and guide on the blog is open without signing up, and you can preview the start of every roadmap. A free account shows the full roadmaps, keeps your progress in sync across your phone and laptop, and unlocks the AI tutor and other AI tools, the mock interview, the PDF roadmaps and the library of research papers and books. Accounts are for learners aged 18 and over; under-18s can still read every lesson."
-      : "Not to start. You can read every lesson, follow any roadmap and practice with the cards and interview questions without signing up, and your progress is saved in your browser. A free account keeps your progress in sync across your phone and laptop, and unlocks the mock interview, the PDF roadmaps and the library of research papers and books. Accounts are for learners aged 18 and over.",
+      ? "Not to start learning. Every lesson, topic, practice card, interview answer, project guide and guide on the blog is open without signing up, and you can preview the start of every roadmap. An account shows the full roadmaps, keeps your progress in sync across your phone and laptop, and unlocks the AI tutor and other AI tools, the mock interview, the PDF roadmaps and the library of research papers and books. Accounts are for learners aged 18 and over; under-18s can still read every lesson."
+      : "Not to start. You can read every lesson, follow any roadmap and practice with the cards and interview questions without signing up, and your progress is saved in your browser. An account keeps your progress in sync across your phone and laptop, and unlocks the mock interview, the PDF roadmaps and the library of research papers and books. Accounts are for learners aged 18 and over.",
   },
 ];
 
@@ -113,7 +113,7 @@ export default function Home() {
       <section data-hero className="home-hero relative flex min-h-[calc(100svh-3.5rem)] items-center" aria-labelledby="hero-heading">
         <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6">
           <p data-hero-fade className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-violet-900 ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-100 dark:ring-violet-800">
-            <span className="size-1.5 rounded-full bg-violet-600" /> Xplaind · Free AI learning platform for India
+            <span className="size-1.5 rounded-full bg-violet-600" /> Xplaind · AI learning platform for India
           </p>
           <h1 id="hero-heading" className="mt-6 max-w-5xl text-[2.6rem] leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-[4.25rem]">
             <Words text="Everything you need to learn AI," />{" "}

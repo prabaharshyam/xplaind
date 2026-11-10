@@ -9,7 +9,7 @@ import { formatDay } from "@/lib/roadmap/cost";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["Learn AI Guides: How to Start, Free Courses, AI Careers", "Learn AI Guides and AI Career Advice"],
+  title: ["Learn AI Guides: How to Start, Courses, AI Careers", "Learn AI Guides and AI Career Advice"],
   description:
     "Plain guides to learning AI in India: how to start, how to become an AI engineer, free AI courses with certificates and how to prepare for AI interviews.",
   path: "/blog",

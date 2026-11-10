@@ -10,7 +10,7 @@ import { kindLabel, resourceEmbed } from "@/lib/content/media";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["Best AI Courses Online, Free & Paid, Hand-Picked", "Best AI Courses Online, Hand-Picked"],
+  title: ["Best AI Courses Online, Hand-Picked for Each Role", "Best AI Courses Online, Hand-Picked"],
   description:
     "The best AI courses online, free and paid, from Google, Microsoft, AWS, NVIDIA, DeepLearning.AI and more. Filter by role, level and free certificate.",
   path: "/resources",

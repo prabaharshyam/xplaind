@@ -40,8 +40,8 @@ export function titleCase(text: string): string {
 /** SE-8: title variants for a role roadmap, longest first. */
 export function roadmapTitles(name: string, year: string): string[] {
   return [
-    `${name} Roadmap ${year}: Free, Step by Step`,
-    `${name} Roadmap ${year}: Free Guide`,
+    `${name} Roadmap ${year}: Step by Step to Job-Ready`,
+    `${name} Roadmap ${year}: Step by Step`,
     `${name} Roadmap ${year}`,
     `${name} Roadmap`,
   ];

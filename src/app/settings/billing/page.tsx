@@ -37,7 +37,7 @@ async function Billing() {
             <strong>Pro</strong> ({PLANS[pass.plan_id].name}), valid until {istDate(pass.valid_until)}. It does not renew by itself.
           </p>
         ) : (
-          <p className="mt-2 leading-7">Free. {pass ? `Your last pass ended on ${istDate(pass.valid_until)}.` : ""}</p>
+          <p className="mt-2 leading-7">Standard plan. {pass ? `Your last pass ended on ${istDate(pass.valid_until)}.` : ""}</p>
         )}
         {proOpen() && (
           <Link href="/pricing" className={`${primaryButton} mt-4`}>

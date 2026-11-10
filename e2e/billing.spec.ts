@@ -6,7 +6,7 @@ const overflow = (page: Page) => page.evaluate(() => document.documentElement.sc
 
 test("the pricing page shows the free plan, the three passes and the daily AI allowance (PAY-5)", async ({ page }) => {
   await page.goto("/pricing");
-  await expect(page.getByRole("heading", { level: 1, name: "Learn for free. Get more AI help with Pro." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Learn AI step by step. Get more AI help with Pro." })).toBeVisible();
   for (const price of ["₹0", "₹249", "₹1,199", "₹1,999"]) await expect(page.getByText(price, { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Most popular")).toBeVisible();
   const table = page.getByRole("table", { name: "AI turns per day, by account" });
@@ -38,6 +38,6 @@ test("lessons, roadmaps and the playground stay open without signing in (PAY-1)"
   ] as const) {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
-    await expect(page.getByText("Today's free AI turns are used")).toBeHidden();
+    await expect(page.getByText("Today's AI turns are used")).toBeHidden();
   }
 });

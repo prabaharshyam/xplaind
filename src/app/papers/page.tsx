@@ -28,7 +28,7 @@ export default function PapersPage() {
         icon="book"
         eyebrow="Library"
         title="Research papers and free AI books"
-        lead={`${papers.length} papers that built modern AI and ${books.length} free books, each with one plain line on why it matters. Downloads are free with an account.`}
+        lead={`${papers.length} papers that built modern AI and ${books.length} free books, each with one plain line on why it matters. Downloads come with your account.`}
       />
       <div className="mx-auto max-w-4xl px-4 py-8 md:px-6">
         <p className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm leading-6 dark:border-zinc-800 dark:bg-zinc-900">

@@ -9,7 +9,7 @@ import { Simulator } from "./simulator";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["AI Mock Interview: Practise Out Loud, Get a Free Report", "AI Mock Interview Simulator"],
+  title: ["AI Mock Interview: Practise Out Loud, Get a Report", "AI Mock Interview Simulator"],
   description:
     "A timed AI mock interview: answer real AI interview questions out loud or by typing, then see the key points you covered, your pace and what to fix.",
   path: "/interview/simulator",

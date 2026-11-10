@@ -6,9 +6,9 @@ import { ProjectList, type ProjectCardView } from "./project-list";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["AI Projects for Beginners: Free Guided Portfolio Projects", "AI Projects for Beginners: Guided, Free"],
+  title: ["AI Projects for Beginners: Build a Portfolio That Gets Hired", "AI Projects for Beginners: Guided"],
   description:
-    "Free AI projects from beginner to advanced: a RAG chatbot, an AI agent, an automation and more, step by step with hints and a rubric for your portfolio.",
+    "AI projects from beginner to advanced: a RAG chatbot, an AI agent, an automation and more, step by step with hints and a rubric for your portfolio.",
   path: "/projects",
 });
 

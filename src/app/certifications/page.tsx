@@ -8,7 +8,7 @@ import { formatDay } from "@/lib/roadmap/cost";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["AI Certifications 2026: Exam Fees & Free Prep Courses", "AI Certifications: Fees & Free Prep"],
+  title: ["AI Certifications 2026: Exam Fees & Prep Courses", "AI Certifications: Fees & Prep"],
   description:
     "AI certifications from AWS, Microsoft, Google Cloud, NVIDIA and Databricks: who each suits, the exam fee with its check date, and free courses to prepare.",
   path: "/certifications",

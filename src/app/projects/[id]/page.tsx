@@ -16,7 +16,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/projects/[id]">): Promise<Metadata> {
   const p = getProject((await params).id);
-  return p ? pageMeta({ title: [`${p.title}: Free Guided AI Project`, `${p.title}: AI Project`, p.title], description: p.summary, path: `/projects/${p.id}`, type: "article" }) : {};
+  return p ? pageMeta({ title: [`${p.title}: Guided AI Portfolio Project`, `${p.title}: AI Project`, p.title], description: p.summary, path: `/projects/${p.id}`, type: "article" }) : {};
 }
 
 /** GP-2: one guided project, from brief to submission. */

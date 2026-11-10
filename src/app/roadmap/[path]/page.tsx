@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PageProps<"/roadmap/[path]">)
     ? pageMeta({
         // SE-8: matches "<role> roadmap 2026", "... for beginners" and "... free" searches.
         title: roadmapTitles(path.name, contentUpdatedOn().slice(0, 4)),
-        description: `Free ${path.name} roadmap ${contentUpdatedOn().slice(0, 4)} for beginners: ${path.stages.reduce((n, s) => n + s.lessons.length, 0)} topics in ${path.stages.length} stages, each with a free lesson, the best course and a project. ${path.tagline}`,
+        description: `${path.name} roadmap ${contentUpdatedOn().slice(0, 4)}, from beginner to job-ready: ${path.stages.reduce((n, s) => n + s.lessons.length, 0)} topics in ${path.stages.length} stages, each with a lesson, the best course and a project. ${path.tagline}`,
         path: `/roadmap/${path.id}`,
       })
     : {};

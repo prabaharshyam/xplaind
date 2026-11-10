@@ -23,7 +23,7 @@ export function siteGraph(): Record<string, unknown> {
         url: `${base}/`,
         name: "Xplaind",
         alternateName: ["Xplaind.in", "Xplaind AI"],
-        description: "A free AI learning platform for India: AI career roadmaps, plain-English lessons, projects and interview practice.",
+        description: "An AI learning platform for India: AI career roadmaps, plain-English lessons, projects and interview practice.",
         inLanguage: "en-IN",
         publisher: { "@id": `${base}/#org` },
       },
@@ -36,7 +36,7 @@ export function siteGraph(): Record<string, unknown> {
         logo: { "@type": "ImageObject", url: `${base}/brand/xplaind-icon-512.png`, width: 512, height: 512 },
         image: `${base}/brand/xplaind-logo.png`,
         description:
-          "Xplaind is a free AI learning platform for India. It gives learners a step-by-step roadmap for each AI job, a plain-English lesson for every topic, the best free course for it, guided projects and AI interview practice.",
+          "Xplaind is an AI learning platform for India. It gives learners a step-by-step roadmap for each AI job, a plain-English lesson for every topic, the best course for it, guided projects and AI interview practice.",
         founder: { "@type": "Person", name: "Shyam Prabahar", sameAs: ["https://www.linkedin.com/in/shyam-prabahar/"] },
         areaServed: { "@type": "Country", name: "India" },
         knowsAbout: [

@@ -7,7 +7,7 @@ import type { AiKind } from "@/lib/ai/limits";
 
 type Usage = { show: false } | { show: true; tier: "guest" | "free" | "pro"; used: number; limit: number };
 
-/** PAY-4: "4 of 10 free AI turns left today", so a learner sees the limit before reaching it. Shown only once Pro is open. */
+/** PAY-4: "4 of 10 AI turns left today", so a learner sees the limit before reaching it. Shown only once Pro is open. */
 export function AiAllowance({ kind, label }: { kind: AiKind; label: string }) {
   const [usage, setUsage] = useState<Usage>({ show: false });
   const load = useCallback(() => {
@@ -29,7 +29,7 @@ export function AiAllowance({ kind, label }: { kind: AiKind; label: string }) {
   return (
     <p aria-live="polite" className="mb-3 inline-flex flex-wrap items-center gap-x-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm dark:border-zinc-800 dark:bg-zinc-900">
       <span>
-        {left} of {usage.limit} {pro ? "Pro" : "free"} {label} left today
+        {left} of {usage.limit} {pro ? "Pro " : ""}{label} left today
       </span>
       {!pro && (
         <Link href="/pricing" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">

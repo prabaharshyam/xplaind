@@ -10,7 +10,7 @@ export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
   title: ["Online Python Compiler for AI: Run Code in Your Browser", "Online Python Playground for AI Learners"],
   description:
-    "Free online Python compiler for AI learners: run Python in your browser with NumPy and pandas, nothing to install, with starter programs on tokens and RAG.",
+    "Online Python compiler for AI learners: run Python in your browser with NumPy and pandas, nothing to install, with starter programs on tokens and RAG.",
   path: "/playground",
 });
 

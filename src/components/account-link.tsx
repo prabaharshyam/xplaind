@@ -63,7 +63,7 @@ export function AccountLink({ className }: { className?: string }) {
 
 /**
  * AC-6: the header's main button. Signed in it opens your progress; everyone else gets one
- * plain next step (sign up free, or start learning). "Continue learning" was taken out of the
+ * plain next step (sign up, or start learning). "Continue learning" was taken out of the
  * header on 2026-11-06: it confused first-time visitors.
  */
 export function AccountButton({ className }: { className: string }) {
@@ -78,7 +78,7 @@ export function AccountButton({ className }: { className: string }) {
   if (state === "out") {
     return (
       <Link href="/signin" className={className}>
-        Sign up free
+        Sign up
       </Link>
     );
   }

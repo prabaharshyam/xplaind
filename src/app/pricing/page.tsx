@@ -16,9 +16,9 @@ import { accountsEnabled } from "@/lib/supabase/config";
 import { BuyPass } from "./buy-pass";
 
 export const metadata: Metadata = pageMeta({
-  title: "Pricing: lessons and roadmaps free, Pro passes from ₹249",
+  title: "Pricing: Pro passes for more AI help, from ₹249",
   description:
-    "Every Xplaind roadmap, lesson, video, practice card and project guide is free. A Pro pass gives you more AI tutor, interview feedback and resume review each day, from ₹249.",
+    "Every Xplaind roadmap, lesson, video, practice card and project guide comes with your account. A Pro pass gives you more AI tutor, interview feedback and resume review each day, from ₹249.",
   path: "/pricing",
 });
 
@@ -42,16 +42,16 @@ const FREE = [
 
 const FAQ: { q: string; a: string }[] = [
   {
-    q: "Are the roadmaps and lessons still free?",
-    a: "Yes. Every roadmap, lesson, video, practice card, interview answer and project guide is free, with no daily limit. Pro only changes how much AI help you get each day.",
+    q: "Do I need Pro for the roadmaps and lessons?",
+    a: "No. Every roadmap, lesson, video, practice card, interview answer and project guide comes with your account, with no daily limit. Pro only changes how much AI help you get each day.",
   },
   {
     q: "Why charge for AI help?",
-    a: "Each AI answer costs us money to run. The free allowance stays, and a pass covers the cost of heavier use, so Xplaind stays independent, with no ads and no sponsored rankings.",
+    a: "Each AI answer costs us money to run. The standard daily allowance stays, and a pass covers the cost of heavier use, so Xplaind stays independent, with no ads and no sponsored rankings.",
   },
   {
     q: "Does it renew by itself?",
-    a: "No. A pass is one payment for 30 days, 6 months or 12 months. When it ends you go back to the free allowance, and you buy again only if you want to. Buying while a pass runs adds the time on at the end.",
+    a: "No. A pass is one payment for 30 days, 6 months or 12 months. When it ends you go back to the standard allowance, and you buy again only if you want to. Buying while a pass runs adds the time on at the end.",
   },
   {
     q: "How can I pay?",
@@ -79,8 +79,8 @@ export default function PricingPage() {
         shape="icon:star"
         icon="star"
         eyebrow="Pricing"
-        title="Learn for free. Get more AI help with Pro."
-        lead="Every roadmap, lesson and course link on Xplaind is free, for good. A Pro pass gives you much more AI tutoring, interview feedback and resume review each day."
+        title="Learn AI step by step. Get more AI help with Pro."
+        lead="Every roadmap, lesson and course link on Xplaind comes with your account, for good. A Pro pass gives you much more AI tutoring, interview feedback and resume review each day."
       />
       <div className="mx-auto max-w-6xl px-4 pt-4 pb-16 md:px-6">
         {!open && (
@@ -89,7 +89,7 @@ export default function PricingPage() {
             className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 leading-7 dark:border-zinc-800 dark:bg-zinc-900"
           >
             Pro passes are not on sale yet. Until they are, everything on
-            Xplaind, including the AI helpers, works with today&apos;s free
+            Xplaind, including the AI helpers, works with today&apos;s standard
             daily limits.
           </p>
         )}
@@ -105,7 +105,7 @@ export default function PricingPage() {
 
         <ul className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           <li className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="text-lg font-semibold">Free</h2>
+            <h2 className="text-lg font-semibold">Standard</h2>
             <p className="mt-2 text-3xl font-semibold">₹0</p>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
               For everyone, always
@@ -161,7 +161,7 @@ export default function PricingPage() {
                       size={16}
                       className="mt-1 shrink-0 text-violet-700 dark:text-violet-300"
                     />
-                    Everything in Free
+                    Everything in Standard
                   </li>
                   <li className="flex gap-2">
                     <Icon
@@ -236,7 +236,7 @@ export default function PricingPage() {
                     Without an account
                   </th>
                   <th scope="col" className="p-3 font-semibold">
-                    Free account
+                    Your account
                   </th>
                   <th scope="col" className="p-3 font-semibold">
                     Pro
@@ -252,7 +252,7 @@ export default function PricingPage() {
                     <th scope="row" className="p-3 font-medium">
                       {KIND_LABEL[k]}
                     </th>
-                    {/* AG-1: once sign-ups are open, AI needs a free account. */}
+                    {/* AG-1: once sign-ups are open, AI needs an account. */}
                     {!guestSample ? (
                       <td className="p-3">{TIER_LIMITS.guest[k]}</td>
                     ) : i === 0 ? (
@@ -262,7 +262,7 @@ export default function PricingPage() {
                         }
                         className="p-3 align-top"
                       >
-                        Sign up free to use AI
+                        Sign up to use AI
                       </td>
                     ) : null}
                     <td className="p-3">{TIER_LIMITS.free[k]}</td>

@@ -10,9 +10,9 @@ import type { IconName } from "@/lib/themes";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["Free AI Tools for Learning AI: Tutor, Resume Review, More", "Free AI Tools for Learning AI"],
+  title: ["AI Tools for Learning AI: Tutor, Resume Review and More", "AI Tools for Learning AI"],
   description:
-    "Free AI tools for AI learners: an AI tutor that knows your progress, AI resume review, interview feedback, tests from your notes and a personal AI roadmap.",
+    "AI tools that help you learn AI and get hired: an AI tutor that knows your progress, AI resume review, interview feedback, tests from your notes and a personal AI roadmap.",
   path: "/ai",
 });
 
@@ -78,7 +78,7 @@ export default function AiToolsPage() {
         icon="sparkles"
         eyebrow="AI tools"
         title="Learn faster with AI that knows our lessons"
-        lead="AI helpers built on Claude, an AI model from Anthropic, plus study tools for interviews and research papers. Free with a free account."
+        lead="AI helpers built on Claude, an AI model from Anthropic, plus study tools for interviews and research papers. All with your account."
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         {!on && (

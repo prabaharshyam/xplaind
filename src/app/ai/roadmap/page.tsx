@@ -6,9 +6,9 @@ import { RoadmapStudio } from "./roadmap-studio";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["AI Roadmap Generator: Your Personal Plan to Learn AI", "AI Roadmap Generator: Free Personal Plan"],
+  title: ["AI Roadmap Generator: Your Personal Plan to Learn AI", "AI Roadmap Generator: Your Personal Plan"],
   description:
-    "Give your goal, starting point and weekly hours, and get a free week-by-week plan to learn AI, linked to our lessons. Change it in plain words.",
+    "Give your goal, starting point and weekly hours, and get a week-by-week plan to learn AI, linked to our lessons. Change it in plain words.",
   path: "/ai/roadmap",
 });
 
