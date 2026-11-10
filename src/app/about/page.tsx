@@ -11,8 +11,8 @@ import { pageMeta } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = pageMeta({
-  title: "About Xplaind",
-  description: "Why Xplaind exists, the story of its founder Shyam Prabahar, what it believes, and how its free AI roadmaps, lessons and course picks are made.",
+  title: ["About Xplaind: an AI Learning Platform for India", "About Xplaind"],
+  description: "Xplaind (xplaind.in) is an AI learning platform for India, founded by Shyam Prabahar: why it exists, what it believes and how its roadmaps and lessons are made.",
   path: "/about",
 });
 
@@ -34,8 +34,8 @@ const BELIEFS = [
   },
   {
     icon: "check" as const,
-    title: "Learning stays free",
-    text: "Every roadmap, lesson, video, practice set, interview answer and project guide is free, with no lock and no daily limit. That does not change.",
+    title: "Learning is never locked",
+    text: "Every roadmap, lesson, video, practice set, interview answer and project guide is open to every learner, with no daily limit. That does not change.",
   },
   {
     icon: "shield" as const,
@@ -52,9 +52,9 @@ const STORY = [
   "The topper from Sivakasi suddenly felt like the slowest person in the room. Within a few months I had decided to quit, go home and join a local arts and science college, where nobody would ask me to speak English.",
   "But I couldn’t let go of that dream. I gathered whatever courage I had left and went back.",
   "There was no coach and no course, and nobody to show me the way. Just me, a few books, and practice every single day. Slowly, by God’s grace, the words started coming.",
-  "In my third year I started freelancing, using a laptop the government gave me free in 12th grade and an internet dongle a friend got me: ₹3,000 for 10 GB a month. I designed hundreds of logos and websites, mostly for clients abroad. Every call with them was an English class I was getting paid for. By my final year, I was paying part of my own college fees.",
+  "In my third year I started freelancing, using a laptop the government gave me in 12th grade and an internet dongle a friend got me: ₹3,000 for 10 GB a month. I designed hundreds of logos and websites, mostly for clients abroad. Every call with them was an English class I was getting paid for. By my final year, I was paying part of my own college fees.",
   "That boy who walked out of class went on to manage marketing budgets worth millions, work at Cognizant, build his own startup, lead a team of 20+ at Amazon, and today drive enterprise AI adoption at one of the world’s top automotive companies.",
-  "When ChatGPT arrived in early 2023, I knew AI would change every job, so I went all in. I learnt it the way I had learnt everything else: on my own, for free or nearly free, never spending lakhs on a course. I’ve been championing AI ever since, with my teams, my friends and on social media.",
+  "When ChatGPT arrived in early 2023, I knew AI would change every job, so I went all in. I learnt it the way I had learnt everything else: on my own, from online courses and daily practice, never spending lakhs on a course. I’ve been championing AI ever since, with my teams, my friends and on social media.",
 ];
 
 /** TR-1: who we are and how the site is made, so a visitor can decide whether to trust it with their time. */
@@ -89,7 +89,7 @@ export default function AboutPage() {
         icon="compass"
         eyebrow="About Xplaind"
         title="Help India learn AI faster, in the right order"
-        lead={`All ${roles} roadmaps, ${lessons} written lessons and ${picks} course picks are free, forever: a step-by-step place to learn AI for a career, with projects and interview practice.`}
+        lead={`All ${roles} roadmaps, ${lessons} written lessons and ${picks} course picks, in order: a step-by-step place to learn AI for a career, with projects and interview practice.`}
       />
 
       <div className="mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-14">
@@ -104,12 +104,12 @@ export default function AboutPage() {
             </p>
             <p>
               Xplaind fixes the order. Pick one of {roles} AI roles and you get a roadmap from your first lesson to interview day: what to
-              learn, in what order, which free course or video teaches it best, what to build, and how to explain it in an interview.
+              learn, in what order, which course or video teaches it best, what to build, and how to explain it in an interview.
               Today that is {lessons} lessons, each written to be read in one sitting.
             </p>
             {pro && (
               <p>
-                The AI tools cost us money each time they run, so a free account gets a daily allowance and a{" "}
+                The AI tools cost us money each time they run, so every account gets a daily allowance and a{" "}
                 <Link href="/pricing" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
                   Pro pass
                 </Link>{" "}
@@ -153,7 +153,7 @@ export default function AboutPage() {
             </p>
             <p>Then I thought: why not build one place that does this for everyone?</p>
             <p>
-              That&apos;s Xplaind: a clear path, in the right order, in plain English. Every course and video on it is free to learn, and only a
+              That&apos;s Xplaind: a clear path, in the right order, in plain English. Most courses and videos on it cost nothing to learn, and only a
               handful charge if you want the certificate.
             </p>
             <p>You don&apos;t need an expensive school, perfect English or lakhs of rupees. I didn&apos;t.</p>

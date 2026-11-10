@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
 import { PageHero } from "@/components/page-hero";
 import { getPaths } from "@/lib/content";
 
-export const metadata: Metadata = {
-  title: "Top 25 AI interview questions for every role",
-  description: "The 25 interview questions most worth preparing for each AI role, with scenario and real-life questions, clear explanations and examples you can tell.",
-  alternates: { canonical: "/interview/top" },
-};
+export const metadata: Metadata = pageMeta({
+  title: ["Top 25 AI Interview Questions and Answers, by Role", "Top 25 AI Interview Questions"],
+  description: "The 25 interview questions most worth preparing for each AI role, from AI engineer to AI product manager, with clear answers and examples you can tell.",
+  path: "/interview/top",
+});
 
 /** IQ-8: pick a role's Top 25. */
 export default function TopIndexPage() {

@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
@@ -8,12 +9,13 @@ import { getPaths } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { InterviewList } from "./interview-list";
 
-export const metadata: Metadata = {
-  title: "AI interview questions with answers",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Interview Questions and Answers (Freshers & Experienced)", "AI Interview Questions and Answers"],
   description:
-    "AI interview questions for every AI role, from GenAI engineer and forward deployed engineer to AI product manager and ML engineer, each with a short answer, a deeper answer, follow-ups and common mistakes.",
-  alternates: { canonical: "/interview" },
-};
+    "AI interview questions and answers for freshers and experienced, for every AI role: a short answer to say out loud, a deeper answer and common mistakes.",
+  path: "/interview",
+});
 
 const HUB: { href: string; title: string; text: string; icon: IconName }[] = [
   { href: "/interview/patterns", title: "Interview patterns", text: "RAG, agents, evals, serving and safety: the ideas every AI round reuses, and how to say them.", icon: "flow" },

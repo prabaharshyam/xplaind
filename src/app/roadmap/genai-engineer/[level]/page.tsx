@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { pageMeta } from "@/lib/seo";
+import { pageMeta, titleCase } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { muted, textLink } from "@/components/ui";
@@ -20,7 +20,11 @@ export async function generateMetadata({ params }: PageProps<"/roadmap/genai-eng
   const id = fromSlug((await params).level);
   const level = id && roadmapData().levels.find((l) => l.id === id);
   return level
-    ? pageMeta({ title: `${level.id} ${level.name}: GenAI engineer roadmap level`, description: `${level.can_do}.`, path: `/roadmap/genai-engineer/${level.id.toLowerCase()}` })
+    ? pageMeta({
+        title: [`Generative AI Roadmap, ${level.id}: ${titleCase(level.name)}`, `${titleCase(level.name)} (${level.id})`],
+        description: `Level ${level.id} of the generative AI roadmap. At the end you can: ${level.can_do}. About ${level.draft_hours} hours, with the best course for each step.`,
+        path: `/roadmap/genai-engineer/${level.id.toLowerCase()}`,
+      })
     : {};
 }
 

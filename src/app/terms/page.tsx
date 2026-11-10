@@ -6,7 +6,7 @@ import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
   title: "Terms of use",
-  description: "The plain-English terms for using Xplaind's free AI roadmaps, lessons, AI helpers and tools.",
+  description: "The plain-English terms for using Xplaind's AI roadmaps, lessons, AI helpers and tools.",
   path: "/terms",
 });
 
@@ -17,7 +17,7 @@ const A = "font-medium text-violet-800 underline underline-offset-2 dark:text-vi
 const TERMS: { title: string; body: ReactNode }[] = [
   {
     title: "Using Xplaind",
-    body: "Xplaind's roadmaps, lessons, videos, practice and project guides are free to use for your own learning. You may share links to any page. Please do not copy lessons in bulk, resell them, or try to break, overload or scrape the site.",
+    body: "You may use Xplaind's roadmaps, lessons, videos, practice and project guides for your own learning. You may share links to any page. Please do not copy lessons in bulk, resell them, or try to break, overload or scrape the site.",
   },
   {
     title: "Accounts",

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { pageMeta } from "@/lib/seo";
+import { pageMeta, roadmapTitles } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import { contentUpdatedOn, getPath, getPaths } from "@/lib/content";
 import { RoadmapPage } from "../roadmap-page";
@@ -15,8 +15,9 @@ export async function generateMetadata({ params }: PageProps<"/roadmap/[path]">)
   const path = getPath((await params).path);
   return path
     ? pageMeta({
-        title: `${path.name} roadmap ${contentUpdatedOn().slice(0, 4)}`,
-        description: `${path.tagline} Every topic in order, with a plain-English lesson, video lessons and a project per stage.`,
+        // SE-8: matches "<role> roadmap 2026", "... for beginners" and "... free" searches.
+        title: roadmapTitles(path.name, contentUpdatedOn().slice(0, 4)),
+        description: `${path.name} roadmap ${contentUpdatedOn().slice(0, 4)}, from beginner to job-ready: ${path.stages.reduce((n, s) => n + s.lessons.length, 0)} topics in ${path.stages.length} stages, each with a lesson, the best course and a project. ${path.tagline}`,
         path: `/roadmap/${path.id}`,
       })
     : {};

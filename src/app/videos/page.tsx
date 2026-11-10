@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { getContent, getStops, getVideoViews } from "@/lib/content";
@@ -12,11 +13,13 @@ import { CourseBrowser } from "./course-browser";
 import { type TopicChip, VideoBrowser } from "./video-browser";
 import { VideoTabs } from "./video-tabs";
 
-export const metadata: Metadata = {
-  title: "AI video lessons and courses by topic, including every Andrew Ng and DeepLearning.AI course",
-  description: "Filter hand-picked AI video lessons and free video courses, from DeepLearning.AI and Andrew Ng to the best teachers on YouTube, by topic, level and length.",
-  alternates: { canonical: "/videos" },
-};
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Video Courses: Andrew Ng, DeepLearning.AI and More", "AI Video Courses by Topic"],
+  description:
+    "AI video courses and lessons by topic: every DeepLearning.AI and Andrew Ng course plus the best YouTube teachers, filtered by level and length.",
+  path: "/videos",
+});
 
 const fmt = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 

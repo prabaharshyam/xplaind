@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
 import { PageHero } from "@/components/page-hero";
@@ -9,9 +10,13 @@ import { CODING_LABEL, roadmapHref } from "@/lib/paths";
 import { YourPath } from "./your-path";
 
 export const metadata: Metadata = {
-  alternates: { canonical: "/paths" },
-  title: "AI career roadmaps: choose your role",
-  description: "AI career paths, from AI Engineer to MLOps Engineer, each with lessons, courses, projects and interview practice.",
+  // SE-8: "ai career roadmap", "ai career paths", "how to start a career in ai".
+  ...pageMeta({
+    title: "AI Career Roadmaps 2026: 9 AI Career Paths, Step by Step",
+    description:
+      "9 AI career roadmaps, from first lesson to job-ready: AI engineer, generative AI, agentic AI, ML, MLOps, FDE, AI product manager, automation and governance, and who each suits.",
+    path: "/paths",
+  }),
 };
 
 export default function PathsPage() {

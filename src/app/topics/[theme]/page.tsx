@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { inSentence, pageMeta, titleCase } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LessonCard } from "@/components/lesson-card";
@@ -25,11 +26,12 @@ export async function generateMetadata({ params }: PageProps<"/topics/[theme]">)
   if (!THEMES.some((t) => t.id === id)) return {};
   const t = themeOf(id);
   const lessons = lessonsOf(id);
-  return {
-    title: `${t.label}: lessons, in order`,
-    description: `Learn ${t.label.toLowerCase()} for free: ${lessons.length} plain-English lessons, from ${lessons[0]?.title ?? ""} onwards, each with the best free course and a quick check.`,
-    alternates: { canonical: `/topics/${id}` },
-  };
+  // SE-8: "<topic> tutorial for beginners", "learn <topic> free".
+  return pageMeta({
+    title: [`${titleCase(t.label)} Tutorial for Beginners: ${lessons.length} Lessons`, `${titleCase(t.label)} Tutorial: ${lessons.length} Lessons`, `Learn ${titleCase(t.label)}`, titleCase(t.label)],
+    description: `Learn ${inSentence(t.label)} from scratch: ${lessons.length} short plain-English lessons in order, from ${lessons[0]?.title ?? ""} onwards, each with the best course, a quiz and interview questions.`,
+    path: `/topics/${id}`,
+  });
 }
 
 /** One topic: its lessons from easiest to hardest, the roadmaps that use them, and interview questions. */

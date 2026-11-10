@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { aiEnabled } from "@/lib/ai/settings";
@@ -5,12 +6,13 @@ import { getStops } from "@/lib/content";
 import { EXAMPLES } from "@/lib/playground/examples";
 import { PlaygroundStudio } from "./playground-studio";
 
-export const metadata: Metadata = {
-  title: "Python code playground for AI learners",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["Online Python Compiler for AI: Run Code in Your Browser", "Online Python Playground for AI Learners"],
   description:
-    "Write and run Python in your browser, free and with nothing to install: NumPy, pandas and starter programs on tokens, embeddings and RAG. Stuck on an error? The AI tutor explains it.",
-  alternates: { canonical: "/playground" },
-};
+    "Online Python compiler for AI learners: run Python in your browser with NumPy and pandas, nothing to install, with starter programs on tokens and RAG.",
+  path: "/playground",
+});
 
 export default function PlaygroundPage() {
   const wanted = new Set(EXAMPLES.flatMap((e) => (e.lesson ? [e.lesson] : [])));

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/json-ld";
@@ -18,11 +19,12 @@ export async function generateMetadata({ params }: PageProps<"/interview/for/[pa
   const path = getPath((await params).path);
   if (!path) return {};
   const n = getInterviewViews().filter((q) => q.paths.includes(path.id)).length;
-  return {
-    title: `${path.name} interview questions and answers`,
-    description: `${n} ${path.name} interview questions with short answers you can say out loud, deeper answers, follow-ups and common mistakes. Then practice them in a timed mock interview.`,
-    alternates: { canonical: `/interview/for/${path.id}` },
-  };
+  // SE-8: "<role> interview questions and answers for freshers".
+  return pageMeta({
+    title: [`${path.name} Interview Questions and Answers (${n})`, `${path.name} Interview Questions and Answers`, `${path.name} Interview Questions`],
+    description: `${n} ${path.name} interview questions and answers for freshers and experienced: a short answer to say out loud, a deeper answer, follow-ups and common mistakes.`,
+    path: `/interview/for/${path.id}`,
+  });
 }
 
 /** IQ-3: one role's interview questions, for people who search by job title. */

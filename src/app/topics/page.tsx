@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
@@ -5,11 +6,13 @@ import { PageHero } from "@/components/page-hero";
 import { getStops } from "@/lib/content";
 import { THEMES } from "@/lib/themes";
 
-export const metadata: Metadata = {
-  title: "AI topics: RAG, agents, Python, ML and more",
-  description: "Every Xplaind lesson grouped by topic: language models, RAG, agents, evaluation, deployment, machine learning, automation, product and more.",
-  alternates: { canonical: "/topics" },
-};
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Topics: Lessons on RAG, Agents, LLMs, ML and Python", "AI Topics: Lessons by Topic"],
+  description:
+    "AI lessons by topic: AI basics, Python, LLMs, RAG, agents, evals, deployment, machine learning, automation, AI product, DSA and system design.",
+  path: "/topics",
+});
 
 export default function TopicsPage() {
   const stops = getStops();

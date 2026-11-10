@@ -28,13 +28,22 @@ const display = localFont({
 export const metadata: Metadata = {
   // SE-3: absolute links, the site's name and share previews for every page.
   metadataBase: new URL(siteUrl()),
-  title: { default: "Xplaind: learn AI for the job you want", template: "%s | Xplaind" },
+  title: { default: "Xplaind: learn AI step by step, for the AI job you want", template: "%s | Xplaind" },
   description:
-    "Step-by-step AI career roadmaps, plain-English lessons with video lessons, projects and interview practice, built to help India learn AI faster.",
+    "Xplaind is an AI learning platform for India: step-by-step AI career roadmaps, plain-English lessons, hand-picked courses, projects and interview practice.",
   applicationName: "Xplaind",
   openGraph: { siteName: "Xplaind", locale: "en_IN", type: "website" },
   twitter: { card: "summary_large_image" },
   category: "education",
+  // SE-8: Search Console and Bing Webmaster Tools ownership tags, set in Vercel once the owner has the codes.
+  ...(process.env.GOOGLE_SITE_VERIFICATION || process.env.BING_SITE_VERIFICATION
+    ? {
+        verification: {
+          ...(process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : {}),
+          ...(process.env.BING_SITE_VERIFICATION ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } } : {}),
+        },
+      }
+    : {}),
   // Not listed in search results until launch (see src/lib/indexing.ts).
   ...(allowIndexing() ? {} : { robots: { index: false, follow: false } }),
 };

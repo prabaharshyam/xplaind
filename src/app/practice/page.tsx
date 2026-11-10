@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
@@ -7,11 +8,13 @@ import { getGlossary } from "@/lib/content";
 import { getInterviewViews, quizPoolFor } from "@/lib/content/interview";
 import { PracticeView } from "./practice-view";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/practice" },
-  title: "Practice AI interview questions",
-  description: "Practice AI interview questions as flashcards: answer out loud, compare with the model answer, rate yourself and take quick quizzes.",
-};
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Interview Questions Practice: Flashcards & Quizzes", "AI Interview Practice: Flashcards"],
+  description:
+    "Practise AI interview questions until you can answer out loud: flashcards and quizzes on LLMs, RAG, agents, ML and system design. Answer out loud, then check the model answer.",
+  path: "/practice",
+});
 
 /** Terms learners meet first, shown as a taste of the glossary (only those that exist are shown). */
 const STARTER_TERMS = ["token", "embedding", "rag", "hallucination", "fine-tuning", "prompt-engineering", "agent", "vector-database"];

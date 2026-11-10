@@ -25,7 +25,7 @@ export default function RefundsPage() {
       <div className="mx-auto max-w-3xl px-4 pt-4 pb-16 md:px-6">
         <h2 className={H2}>What you buy</h2>
         <p className={P}>
-          A Pro pass is a one-time payment for 30 days, 6 months or 12 months of higher daily AI limits on Xplaind. Lessons, roadmaps, videos, practice and project guides are free and do not need a pass. Prices are on the{" "}
+          A Pro pass is a one-time payment for 30 days, 6 months or 12 months of higher daily AI limits on Xplaind. Lessons, roadmaps, videos, practice and project guides do not need a pass. Prices are on the{" "}
           <Link href="/pricing" className={A}>
             pricing page
           </Link>
@@ -33,7 +33,7 @@ export default function RefundsPage() {
         </p>
 
         <h2 className={H2}>Cancelling</h2>
-        <p className={P}>There is nothing to cancel. A pass does not renew and we never charge you again by ourselves. When it ends, your account goes back to the free daily limits.</p>
+        <p className={P}>There is nothing to cancel. A pass does not renew and we never charge you again by ourselves. When it ends, your account goes back to the standard daily limits.</p>
 
         <h2 className={H2}>Refunds</h2>
         <ul className={`${P} list-disc pl-6`}>

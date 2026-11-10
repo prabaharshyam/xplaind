@@ -1,14 +1,16 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { aiEnabled } from "@/lib/ai/settings";
 import { RoadmapStudio } from "./roadmap-studio";
 
-export const metadata: Metadata = {
-  title: "AI roadmap generator: a personal plan to learn AI",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Roadmap Generator: Your Personal Plan to Learn AI", "AI Roadmap Generator: Your Personal Plan"],
   description:
-    "Tell us your goal, your starting point and your hours. Get a personal, week-by-week AI learning roadmap linked to our lessons, then change it in plain words.",
-  alternates: { canonical: "/ai/roadmap" },
-};
+    "Give your goal, starting point and weekly hours, and get a week-by-week plan to learn AI, linked to our lessons. Change it in plain words.",
+  path: "/ai/roadmap",
+});
 
 export default function AiRoadmapPage() {
   return (
@@ -23,7 +25,7 @@ export default function AiRoadmapPage() {
         crumbs={[{ href: "/ai", label: "AI tools" }]}
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
-        {/* SU-5: AI tools work without an account. */}
+        {/* AG-1: needs an account once sign-ups are open; while they are on hold, guests keep their limits (SU-5). */}
         <RoadmapStudio enabled={aiEnabled()} />
       </div>
     </main>

@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
@@ -5,12 +6,13 @@ import { card, muted, textLink } from "@/components/ui";
 import { getCertifications, getContent, getPath, getResource } from "@/lib/content";
 import { formatDay } from "@/lib/roadmap/cost";
 
-export const metadata: Metadata = {
-  title: "AI certifications: fees and free prep",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Certifications 2026: Exam Fees & Prep Courses", "AI Certifications: Fees & Prep"],
   description:
-    "AI certifications from AWS, Microsoft, Google Cloud, NVIDIA and Databricks: who each suits, what it covers, the exam fee with the date we checked it, and the free courses that prepare you.",
-  alternates: { canonical: "/certifications" },
-};
+    "AI certifications from AWS, Microsoft, Google Cloud, NVIDIA and Databricks: who each suits, the exam fee with its check date, and free courses to prepare.",
+  path: "/certifications",
+});
 
 /** US dollars, labelled so nobody reads them as rupees. */
 const usd = (n: number) => `US$${n.toLocaleString("en-IN")}`;

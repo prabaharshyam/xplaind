@@ -48,11 +48,11 @@ export function AiGate({
     return (
       <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950">
         <p className="flex items-center gap-2 font-semibold">
-          <Icon name="lock" size={18} /> Sign up free to use the AI tools
+          <Icon name="lock" size={18} /> Sign up to use the AI tools
         </p>
         <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">
           The AI tutor, interview feedback, resume review and the other AI tools
-          need a free account. Lessons, topics and practice stay open without
+          need an account. Lessons, topics and practice stay open without
           one.
         </p>
         <button
@@ -64,7 +64,7 @@ export function AiGate({
             )
           }
         >
-          Sign up free
+          Create your account
         </button>
         <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
           Accounts are for learners aged 18 and over.

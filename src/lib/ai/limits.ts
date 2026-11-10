@@ -74,11 +74,11 @@ export function positiveNumber(value: string | undefined, fallback: number): num
 export const LIMIT_MESSAGE = {
   day: "You have used today's AI turns for this feature. They reset at midnight India time, so try again tomorrow.",
   /** PAY-4: the same, when a Pro pass would give more today. */
-  dayUpgrade: "You have used today's free AI turns for this feature. They reset at midnight India time, or a Pro pass gives you more today.",
+  dayUpgrade: "You have used today's AI turns for this feature. They reset at midnight India time, or a Pro pass gives you more today.",
   month: "This month's AI allowance is used up. It resets on the 1st. Everything else on Xplaind still works.",
   off: "AI features are switched off for now. Everything else on Xplaind still works.",
-  /** AG-1: AI needs a free account once sign-ups are open. */
-  signin: "Sign up free with Google or an email link to use the AI tools. Lessons, topics and practice stay open without an account.",
+  /** AG-1: AI needs an account once sign-ups are open. */
+  signin: "Sign up with Google or an email link to use the AI tools. Lessons, topics and practice stay open without an account.",
 } as const;
 
 type UsageLike = {
