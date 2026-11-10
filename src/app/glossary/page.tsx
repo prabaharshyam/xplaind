@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DraftNote } from "@/components/draft-note";
@@ -5,11 +6,13 @@ import { PageHero } from "@/components/page-hero";
 import { muted, textLink } from "@/components/ui";
 import { getGlossary, lessonsWithTerm } from "@/lib/content";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/glossary" },
-  title: "AI glossary: plain-English meanings of AI terms",
-  description: "Plain-English meanings of the AI terms you will meet, from tokens to agents, each linked to the lesson that teaches it.",
-};
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Glossary: AI Terms Explained in Plain English", "AI Glossary: Terms Explained Simply"],
+  description:
+    "AI terms explained in plain English, from tokens, embeddings and RAG to agents, fine-tuning and MLOps, each linked to a free lesson that teaches it.",
+  path: "/glossary",
+});
 
 const letterOf = (term: string) => (/^[a-z]/i.test(term) ? term[0].toUpperCase() : "#");
 

@@ -166,7 +166,7 @@ export function SignInForm({
         </button>
       </p>
       <p className="text-xs leading-5 text-zinc-600 dark:text-zinc-400">
-        Accounts are for people aged 18 or over. Lessons, roadmaps and videos stay open to everyone without an account. You can
+        Accounts are for people aged 18 or over. Lessons, topics and videos stay open to everyone without an account. You can
         export or delete your data any time in{" "}
         <Link href="/settings" className="underline underline-offset-2">
           Settings

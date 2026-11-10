@@ -11,8 +11,8 @@ import { pageMeta } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = pageMeta({
-  title: "About Xplaind",
-  description: "Why Xplaind exists, the story of its founder Shyam Prabahar, what it believes, and how its free AI roadmaps, lessons and course picks are made.",
+  title: ["About Xplaind: a Free AI Learning Platform for India", "About Xplaind"],
+  description: "Xplaind (xplaind.in) is a free AI learning platform for India, founded by Shyam Prabahar: why it exists, what it believes and how its roadmaps and lessons are made.",
   path: "/about",
 });
 

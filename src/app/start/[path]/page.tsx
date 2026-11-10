@@ -16,8 +16,8 @@ export async function generateMetadata({ params }: PageProps<"/start/[path]">): 
   const path = getPath((await params).path);
   return path
     ? pageMeta({
-        title: `${path.name} level test`,
-        description: `A 10-minute test that finds where to start on the ${path.name} roadmap, so you skip what you already know. No sign-up needed.`,
+        title: [`${path.name} Skills Test: Find Your Level, Free`, `${path.name} Skills Test`, `${path.name} level test`],
+        description: `A free 10-minute ${path.name} skills test that finds where to start on the roadmap, so you skip what you already know. No sign-up needed.`,
         path: `/start/${path.id}`,
       })
     : {};

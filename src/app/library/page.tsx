@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHero } from "@/components/page-hero";
@@ -5,11 +6,13 @@ import { libraryItems, TOPIC_LABEL } from "@/lib/content/library";
 import { THEMES } from "@/lib/themes";
 import { LibraryBrowser } from "./library-browser";
 
-export const metadata: Metadata = {
-  title: "Library: lessons, video lessons and skills",
-  description: "Every Xplaind lesson, video lesson and AI skill in one place, tagged by topic and level so you can filter to what you need.",
-  alternates: { canonical: "/library" },
-};
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Lessons Library: Every Free Lesson and Video by Topic", "AI Lessons Library"],
+  description:
+    "Every free Xplaind AI lesson, video lesson and AI skill in one place, by topic and level, from AI basics and Python to RAG, agents and MLOps.",
+  path: "/library",
+});
 
 export default function LibraryPage() {
   const items = libraryItems();

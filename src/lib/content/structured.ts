@@ -7,6 +7,54 @@ import { siteUrl } from "@/lib/site";
 
 const ORG = { "@type": "Organization", "@id": `${siteUrl()}/#org`, name: "Xplaind", url: siteUrl() };
 
+/**
+ * SE-8: who "Xplaind" is, for Google's site name and knowledge panel and for AI answers. Search
+ * engines mixed the brand up with xplaind.com, an unrelated site, so the graph names the site,
+ * its other spellings, its logo, founder and audience, and says what it teaches.
+ */
+export function siteGraph(): Record<string, unknown> {
+  const base = siteUrl();
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${base}/#website`,
+        url: `${base}/`,
+        name: "Xplaind",
+        alternateName: ["Xplaind.in", "Xplaind AI"],
+        description: "A free AI learning platform for India: AI career roadmaps, plain-English lessons, projects and interview practice.",
+        inLanguage: "en-IN",
+        publisher: { "@id": `${base}/#org` },
+      },
+      {
+        "@type": ["Organization", "EducationalOrganization"],
+        "@id": `${base}/#org`,
+        name: "Xplaind",
+        alternateName: "Xplaind.in",
+        url: `${base}/`,
+        logo: { "@type": "ImageObject", url: `${base}/brand/xplaind-icon-512.png`, width: 512, height: 512 },
+        image: `${base}/brand/xplaind-logo.png`,
+        description:
+          "Xplaind is a free AI learning platform for India. It gives learners a step-by-step roadmap for each AI job, a plain-English lesson for every topic, the best free course for it, guided projects and AI interview practice.",
+        founder: { "@type": "Person", name: "Shyam Prabahar", sameAs: ["https://www.linkedin.com/in/shyam-prabahar/"] },
+        areaServed: { "@type": "Country", name: "India" },
+        knowsAbout: [
+          "Artificial intelligence",
+          "Generative AI",
+          "Large language models",
+          "Retrieval-augmented generation",
+          "AI agents",
+          "Machine learning",
+          "MLOps",
+          "Prompt engineering",
+          "AI careers in India",
+        ],
+      },
+    ],
+  };
+}
+
 export function lessonGraph(stop: Stop, paths: Goal[]): Record<string, unknown> {
   const url = `${siteUrl()}/stop/${stop.id}`;
   const terms = new Map(getGlossary().map((g) => [g.id, g.term]));

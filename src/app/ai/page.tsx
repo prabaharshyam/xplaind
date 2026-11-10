@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "@/components/art/icons";
@@ -7,12 +8,13 @@ import { getStops } from "@/lib/content";
 import { aiEnabled } from "@/lib/ai/settings";
 import type { IconName } from "@/lib/themes";
 
-export const metadata: Metadata = {
-  title: "AI tools to learn AI faster",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["Free AI Tools for Learning AI: Tutor, Resume Review, More", "Free AI Tools for Learning AI"],
   description:
-    "AI tools for learners: a personal AI roadmap, an AI tutor in every lesson, a resume review, a Python code playground and AI feedback on interview answers.",
-  alternates: { canonical: "/ai" },
-};
+    "Free AI tools for AI learners: an AI tutor that knows your progress, AI resume review, interview feedback, tests from your notes and a personal AI roadmap.",
+  path: "/ai",
+});
 
 type Tool = { href: string; title: string; text: string; icon: IconName; tone: string; ai: boolean; give: string; get: string };
 
@@ -76,7 +78,7 @@ export default function AiToolsPage() {
         icon="sparkles"
         eyebrow="AI tools"
         title="Learn faster with AI that knows our lessons"
-        lead="AI helpers built on Claude, an AI model from Anthropic, plus study tools for interviews and research papers. Free, and no account needed."
+        lead="AI helpers built on Claude, an AI model from Anthropic, plus study tools for interviews and research papers. Free with a free account."
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         {!on && (

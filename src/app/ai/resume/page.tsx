@@ -1,15 +1,17 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { aiEnabled } from "@/lib/ai/settings";
 import { getPaths } from "@/lib/content";
 import { ResumeStudio } from "./resume-studio";
 
-export const metadata: Metadata = {
-  title: "Free AI resume review for AI and tech jobs",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["Free AI Resume Review for AI & Tech Jobs (ATS Check)", "Free AI Resume Review (ATS Check)"],
   description:
-    "Upload your resume and get a list of fixes that help it get shortlisted: what recruiters and applicant tracking systems look for, rewritten lines and missing keywords. No account needed.",
-  alternates: { canonical: "/ai/resume" },
-};
+    "Free AI resume checker for AI and tech jobs in India: see what recruiters and ATS look for, with rewritten lines and the keywords you are missing.",
+  path: "/ai/resume",
+});
 
 export default function ResumePage() {
   return (

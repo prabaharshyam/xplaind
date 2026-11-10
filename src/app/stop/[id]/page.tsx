@@ -99,7 +99,8 @@ export async function generateMetadata({ params }: PageProps<"/stop/[id]">): Pro
   // SE-3: answer-first: the plain answer is what search and AI results quote.
   return pageMeta({
     // Add the search phrase only while the whole title still fits in a result.
-    title: stop.title.length <= 32 ? `${stop.title}: explained simply` : stop.title,
+    // SE-8: the lesson's name plus the words people search with, when they fit.
+    title: [`${stop.title}: explained simply, with examples`, `${stop.title}: explained simply`, stop.title],
     description: stop.answer,
     path: `/stop/${stop.id}`,
     type: "article",

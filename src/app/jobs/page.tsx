@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "@/components/art/icons";
@@ -5,12 +6,13 @@ import { PageHero } from "@/components/page-hero";
 import { getPaths } from "@/lib/content";
 import { getJobs, jobLinks } from "@/lib/content/jobs";
 
-export const metadata: Metadata = {
-  title: "AI jobs and salaries in India",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Engineer Salary in India 2026 & AI Jobs for Freshers", "AI Jobs and Salaries in India"],
   description:
-    "Typical salaries for AI roles in India by experience, from AI Engineer to AI Product Manager, the skills job posts ask for, and live openings on Naukri and LinkedIn.",
-  alternates: { canonical: "/jobs" },
-};
+    "AI engineer salary in India by experience, from freshers up, for 9 AI roles, plus the skills AI job posts ask for and live AI jobs on Naukri and LinkedIn.",
+  path: "/jobs",
+});
 
 const fmtDate = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 

@@ -511,6 +511,8 @@ export const BLOG_DESCRIPTION_MAX = 170;
 export const BlogFrontmatter = z.strictObject({
   id: Slug,
   title: Text.max(90),
+  /** SE-8: a shorter title for search results, at most 60 characters, led by the words people search for. */
+  seo_title: Text.max(60).optional(),
   /** The search snippet: one or two sentences. */
   description: Text.max(BLOG_DESCRIPTION_MAX),
   published_on: IsoDate,

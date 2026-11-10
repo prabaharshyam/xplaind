@@ -63,7 +63,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can students under 18 buy a pass?",
-    a: "No. Accounts and passes are for people aged 18 and over. Everything free on Xplaind works without an account.",
+    a: "No. Accounts and passes are for people aged 18 and over. Lessons, topics, practice and videos stay open without an account.",
   },
 ];
 

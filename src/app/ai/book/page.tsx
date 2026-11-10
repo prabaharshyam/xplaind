@@ -1,14 +1,16 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { aiEnabled } from "@/lib/ai/settings";
 import { BookStudio } from "./book-studio";
 
-export const metadata: Metadata = {
-  title: "Study from my notes & books: tests and flashcards from your own PDF",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["Study From Your Notes: AI Tests & Flashcards From a PDF", "AI Tests & Flashcards From Your PDF"],
   description:
-    "Upload your textbook or notes as a PDF or Word file. Take a timed MCQ test written from it, or make flashcards from it. Every answer quotes its page, and the report shows what to reread.",
-  alternates: { canonical: "/ai/book" },
-};
+    "Upload your textbook or notes as a PDF or Word file and get a timed MCQ test or flashcards written from it. Every answer cites its page.",
+  path: "/ai/book",
+});
 
 /** MB-1 to MB-5: "Study from my notes & books" (renamed from "Ask me from my book" on 2026-11-06). The book is read in the browser and never stored. */
 export default function BookPage() {

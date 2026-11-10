@@ -1,14 +1,16 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { getPaths, getProjects, getStop, stagesWithGuide } from "@/lib/content";
 import { ProjectList, type ProjectCardView } from "./project-list";
 
-export const metadata: Metadata = {
-  title: "Guided AI projects: build a portfolio step by step",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["AI Projects for Beginners: Free Guided Portfolio Projects", "AI Projects for Beginners: Guided, Free"],
   description:
-    "Step-by-step AI projects for every role: a brief, steps with hints, a rubric to check your work and the lessons each one uses. Build the portfolio employers ask for.",
-  alternates: { canonical: "/projects" },
-};
+    "Free AI projects from beginner to advanced: a RAG chatbot, an AI agent, an automation and more, step by step with hints and a rubric for your portfolio.",
+  path: "/projects",
+});
 
 /** GP-3: every guided project, filterable by path and difficulty. */
 export default function ProjectsPage() {

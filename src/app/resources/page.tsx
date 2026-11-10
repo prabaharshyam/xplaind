@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
@@ -7,12 +8,13 @@ import { costLabel } from "@/lib/roadmap/cost";
 import { CourseDirectory, type DirectoryRow } from "./course-directory";
 import { kindLabel, resourceEmbed } from "@/lib/content/media";
 
-export const metadata: Metadata = {
-  title: "AI courses and certificates, hand-picked",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["Best AI Courses Online, Free & Paid, Hand-Picked", "Best AI Courses Online, Hand-Picked"],
   description:
-    "Every AI course we recommend, from Google, Microsoft, AWS, NVIDIA, OpenAI, Anthropic, Hugging Face, DeepLearning.AI and more. Filter by path, level and certificate.",
-  alternates: { canonical: "/resources" },
-};
+    "The best AI courses online, free and paid, from Google, Microsoft, AWS, NVIDIA, DeepLearning.AI and more. Filter by role, level and free certificate.",
+  path: "/resources",
+});
 
 /** RM-2: the course directory. Every course on every path, each linked to the lessons that use it. */
 export default function ResourcesPage() {

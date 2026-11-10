@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
+import { fitTitle } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
@@ -25,8 +26,9 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/blog/[slug]">): Promise<Metadata> {
   const post = getBlogPost((await params).slug);
   if (!post) return {};
+  const fit = fitTitle(post.seo_title ? [post.seo_title, post.title] : [post.title]);
   return {
-    title: post.title,
+    title: fit.brand ? fit.text : { absolute: fit.text },
     description: post.description,
     alternates: { canonical: `/blog/${post.id}` },
     openGraph: {

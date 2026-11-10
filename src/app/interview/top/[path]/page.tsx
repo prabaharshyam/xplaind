@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DraftNote } from "@/components/draft-note";
@@ -18,11 +19,11 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/interview/top/[path]">): Promise<Metadata> {
   const path = getPath((await params).path);
   if (!path) return {};
-  return {
-    title: `Top 25 ${path.name} interview questions and answers, with examples`,
-    description: `The 25 ${path.name} interview questions most worth preparing: scenario, use-case and real-life questions, each with a short answer, a clear explanation and an example you can tell in the interview.`,
-    alternates: { canonical: `/interview/top/${path.id}` },
-  };
+  return pageMeta({
+    title: [`Top 25 ${path.name} Interview Questions with Answers`, `Top 25 ${path.name} Interview Questions`, `${path.name}: Top 25 Questions`],
+    description: `The 25 ${path.name} interview questions most worth preparing, mostly scenario questions, each with a short answer, a clear explanation and an example to tell.`,
+    path: `/interview/top/${path.id}`,
+  });
 }
 
 /** IQ-8: one role's Top 25 interview questions on one page, to read, print and practice. */

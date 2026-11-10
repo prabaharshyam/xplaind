@@ -1,3 +1,4 @@
+import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GuideCover } from "@/components/guide-cover";
@@ -6,12 +7,13 @@ import { muted } from "@/components/ui";
 import { getBlogPosts } from "@/lib/content";
 import { formatDay } from "@/lib/roadmap/cost";
 
-export const metadata: Metadata = {
-  title: "Blog: how to learn AI, courses and careers",
+export const metadata: Metadata = pageMeta({
+  // SE-8: search-led title and description.
+  title: ["Learn AI Guides: How to Start, Free Courses, AI Careers", "Learn AI Guides and AI Career Advice"],
   description:
-    "Plain guides on learning AI: where to start, free certifications from big tech, YouTube channels worth your time, and how to prepare for AI interviews in India.",
-  alternates: { canonical: "/blog" },
-};
+    "Plain guides to learning AI in India: how to start, how to become an AI engineer, free AI courses with certificates and how to prepare for AI interviews.",
+  path: "/blog",
+});
 
 const BLOG_THEMES = ["career", "ai-basics", "using-ai", "llm", "agents"] as const;
 

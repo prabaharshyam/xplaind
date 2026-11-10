@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { pageMeta } from "@/lib/seo";
+import { pageMeta, titleCase } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import { getInterviewViews, quizPoolFor } from "@/lib/content/interview";
 import { INTERVIEW_TOPIC_IDS, type InterviewTopicId, interviewTopicLabel } from "@/lib/interview-topics";
@@ -16,8 +16,8 @@ export async function generateMetadata({ params }: PageProps<"/practice/[topic]"
   const topic = asTopic((await params).topic);
   return topic
     ? pageMeta({
-        title: `Practice ${interviewTopicLabel(topic)} interview questions`,
-        description: `Flashcards for ${interviewTopicLabel(topic)} interview questions: answer out loud, check the model answer and rate yourself. Missed questions come back first.`,
+        title: [`${titleCase(interviewTopicLabel(topic))} Interview Questions: Practice Flashcards`, `${titleCase(interviewTopicLabel(topic))} Interview Questions Practice`, `${titleCase(interviewTopicLabel(topic))} Interview Practice`],
+        description: `Practise ${interviewTopicLabel(topic)} interview questions with free flashcards: answer out loud, check the model answer and rate yourself. Missed ones come back first.`,
         path: `/practice/${topic}`,
       })
     : {};
