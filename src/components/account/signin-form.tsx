@@ -25,7 +25,8 @@ export const REASONS: Record<SignUpReason, string> = {
   practice: "Create a free account to save your practice and see missed questions again.",
   tools: "Create a free account to use the AI tools.",
   library: "Create a free account to download research papers and free AI books.",
-  ai: "You have used today's free AI try. Sign in free to keep using the AI tutor, mock interview feedback, resume review and the other AI tools.",
+  ai: "Create a free account to use the AI tutor, interview feedback, resume review and the other AI tools.",
+  roadmap: "Create a free account to see the full roadmap and track your progress on it.",
 };
 
 const PERKS = ["Download roadmap PDFs and research papers", "Practice mock interviews and use the AI tools", "Save your progress and streak on every device"];

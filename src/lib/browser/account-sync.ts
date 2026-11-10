@@ -18,7 +18,7 @@ export const isSignedIn = (): boolean => signedIn;
 export const accountsOn = (): boolean => publicSupabase() !== null;
 
 /** SU-1: what needs an account. Shown on the sign-up prompt. */
-export type SignUpReason = "pdf" | "interview" | "progress" | "practice" | "tools" | "library" | "ai";
+export type SignUpReason = "pdf" | "interview" | "progress" | "practice" | "tools" | "library" | "ai" | "roadmap";
 export const SIGNUP_EVENT = "xp:signup";
 
 /** SU-2: may this device save progress? Always, while accounts are off; otherwise only when signed in. */

@@ -14,7 +14,6 @@ import { todayInIST } from "@/lib/dates";
 import {
   type AiKind,
   costUsd,
-  GUEST_SAMPLE,
   LIMIT_MESSAGE,
   modelFor,
   monthStart,
@@ -53,27 +52,22 @@ export async function runAi<S extends z.ZodType>(
   const day = todayInIST();
   const monthCap =
     who.tier === "pro" ? PRO_MONTH_CAP_USD : settings.monthlyCapUsd;
-  // AG-1: once sign-ups are open, a guest gets one free AI action a day across all tools, then signs in.
+  // AG-1 (owner decision, 2026-11-10): once sign-ups are open, AI needs an account; nothing is spent on guests.
   // While sign-ups are on hold (SU-4) nobody can sign in, so guests keep their per-feature limits (SU-5).
-  const sample = who.guest && accountsEnabled();
-  const { data: verdict, error } = sample
-    ? await admin.rpc("ai_reserve_guest_sample", {
-        p_visitor: who.id,
-        p_kind: req.kind,
-        p_day: day,
-        p_month_start: monthStart(day),
-        p_total_max: GUEST_SAMPLE,
-        p_month_cap_usd: monthCap,
-      })
-    : await admin.rpc(who.guest ? "ai_reserve_guest" : "ai_reserve", {
-        ...(who.guest ? { p_visitor: who.id } : { p_user: who.id }),
-        p_kind: req.kind,
-        p_day: day,
-        p_month_start: monthStart(day),
-        p_daily_max: limitFor(req.kind, who),
-        // PAY-1: a learner with a pass is bounded by their own daily limits, not the site's free monthly cap.
-        p_month_cap_usd: monthCap,
-      });
+  if (who.guest && accountsEnabled())
+    return json({ error: LIMIT_MESSAGE.signin, signin: true }, 401);
+  const { data: verdict, error } = await admin.rpc(
+    who.guest ? "ai_reserve_guest" : "ai_reserve",
+    {
+      ...(who.guest ? { p_visitor: who.id } : { p_user: who.id }),
+      p_kind: req.kind,
+      p_day: day,
+      p_month_start: monthStart(day),
+      p_daily_max: limitFor(req.kind, who),
+      // PAY-1: a learner with a pass is bounded by their own daily limits, not the site's free monthly cap.
+      p_month_cap_usd: monthCap,
+    },
+  );
   // Fail closed: if the guard cannot be checked, no money is spent.
   if (error)
     return problem(
