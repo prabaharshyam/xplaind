@@ -51,7 +51,7 @@ export function AccountLink({ className }: { className?: string }) {
   const state = useAccountState();
   if (state !== "out") return null;
   return (
-    <Link href="/signin" className={className}>
+    <Link href="/signin?mode=signin" className={className}>
       Sign in
     </Link>
   );
@@ -59,7 +59,7 @@ export function AccountLink({ className }: { className?: string }) {
 
 /**
  * AC-6: the header's main button. Signed in it opens your progress; everyone else gets one
- * plain next step ("Get started", or start learning). "Continue learning" was taken out of the
+ * plain next step ("Sign up", or start learning when accounts are off). "Continue learning" was taken out of the
  * header on 2026-11-06: it confused first-time visitors.
  */
 export function AccountButton({ className }: { className: string }) {
@@ -73,14 +73,22 @@ export function AccountButton({ className }: { className: string }) {
   }
   if (state === "out") {
     return (
-      <Link href="/signin" className={className}>
-        Get started
+      <Link href="/signin?mode=signup" className={className}>
+        Sign up
+      </Link>
+    );
+  }
+  // While the account check runs, show the same "Sign up" signed-out visitors get, so the label does not flicker.
+  if (state === "unknown") {
+    return (
+      <Link href="/signin?mode=signup" className={className}>
+        Sign up
       </Link>
     );
   }
   return (
     <Link href="/paths" className={className}>
-      Get started
+      Start learning
     </Link>
   );
 }
@@ -93,7 +101,7 @@ export function SignInLink({ className, label = "Sign in" }: { className: string
   const state = useAccountState();
   if (state !== "out") return null;
   return (
-    <Link href="/signin" className={className}>
+    <Link href="/signin?mode=signin" className={className}>
       {label}
     </Link>
   );

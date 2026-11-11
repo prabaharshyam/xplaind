@@ -41,7 +41,7 @@ export function SiteHeader() {
             >
               <AccountButton className="flex min-h-12 items-center justify-center rounded-full bg-violet-700 px-6 text-base font-medium text-white hover:bg-violet-800" />
               <SignInLink
-                label="Sign in or create an account"
+                label="Sign in"
                 className="-mt-3 flex min-h-12 items-center justify-center rounded-full border border-violet-200 bg-white px-6 text-base font-medium text-violet-950 hover:bg-violet-50 dark:border-violet-800 dark:bg-zinc-900 dark:text-violet-100"
               />
               <PhoneNavLinks />
