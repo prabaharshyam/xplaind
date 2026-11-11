@@ -7,7 +7,8 @@ import { GuideCover } from "@/components/guide-cover";
 import { Icon } from "@/components/art/icons";
 import { RoleGrid } from "@/components/home/role-grid";
 import { Testimonials } from "@/components/home/testimonials";
-import { MiniCourses, MiniInterview, MiniLesson, MiniNotes, MiniPlan, MiniRoadmap } from "@/components/home/showcase";
+import { MiniInterview, MiniLesson, MiniNotes, MiniPlan, MiniResume, MiniRoadmap } from "@/components/home/showcase";
+import { FeatureDeck } from "@/components/home/feature-deck";
 import { ContinueCard } from "@/components/continue-card";
 import { Words } from "@/components/motion/words";
 import { RoadScene } from "@/components/three/road-scene";
@@ -227,143 +228,106 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Milestone 2: learn. */}
-      <section aria-labelledby="do-heading" className="py-20 md:py-28">
+      {/* Milestone 2, UX-4 (owner request 2026-11-11): every feature in one deck of cards with tabs, instead of three long sections. */}
+      <section aria-labelledby="do-heading" className="pt-6 pb-20 md:pt-10 md:pb-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <Gate n={2} label="Learn" />
-          <h2 id="do-heading" data-words className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
-            <Words text="Learn it properly, without the overwhelm" />
-          </h2>
-          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">Everything a topic needs, on one page.</p>
-          <div className="mt-10 grid gap-6 md:grid-cols-2" data-rise-group>
-            <Feature
-              title="See the whole journey on one map"
-              text="Every topic for your role, in order. Tap one to see what it is."
-              href="/roadmap/genai-engineer"
-              cta="Open a roadmap"
-            >
-              <div className="mx-auto max-w-[280px] text-zinc-600 dark:text-zinc-400">
-                <MiniRoadmap />
-              </div>
-            </Feature>
-            <Feature
-              title="Understand each topic in 20 minutes"
-              text="A plain-English explainer, an example from Indian work life and a quick check."
-              href="/topics"
-              cta="Browse lessons"
-            >
-              <div className="mx-auto max-w-[300px]">
-                <MiniLesson />
-              </div>
-            </Feature>
-            <Feature
-              title="Only the courses worth your time"
-              text="One picked for each lesson, from Google, AWS, OpenAI, Anthropic and more."
-              href="/resources"
-              cta="Browse courses"
-            >
-              <div className="mx-auto max-w-[320px]">
-                <MiniCourses />
-              </div>
-            </Feature>
-            <Feature
-              title="Write and run code in your browser"
-              text="Python with nothing to install. The AI tutor explains your errors."
-              href="/playground"
-              cta="Open the playground"
-            >
-              <pre aria-hidden="true" className="mx-auto max-w-[300px] overflow-hidden rounded-2xl bg-zinc-950 p-4 font-mono text-xs leading-5 text-emerald-200">
-                {`>>> tokens = "Learn AI".split()\n>>> len(tokens)\n2\n>>> print("You can do this")\nYou can do this`}
-              </pre>
-            </Feature>
+          <Gate n={2} label="Learn, practise, get hired" />
+          <div className="mt-4 grid gap-4 md:grid-cols-[1.3fr_1fr] md:items-end">
+            <h2 id="do-heading" data-words className="max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
+              <Words text="Everything you need to get job-ready" />
+            </h2>
+            <p className="max-w-md text-lg leading-8 text-zinc-700 md:justify-self-end dark:text-zinc-300">
+              A map for your role, a 20-minute lesson for every topic, practice that sticks, and help getting hired. Pick one to see it.
+            </p>
           </div>
-        </div>
-      </section>
-
-      {/* MB-5, owner request 2026-11-06: "Study from my notes & books" is a product on its own, so it gets its own spotlight. */}
-      <section aria-labelledby="notes-heading" className="py-16 md:py-24">
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <div className="grid items-center gap-10 rounded-2xl border border-zinc-200 bg-white p-6 md:grid-cols-2 md:p-12 dark:border-zinc-800 dark:bg-zinc-900">
-            <div>
-              <p className="text-sm font-semibold text-violet-800 dark:text-violet-300">Study from my notes &amp; books</p>
-              <h2 id="notes-heading" data-words className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">
-                <Words text="Turn your own notes into a test and flashcards" />
-              </h2>
-              <p className="mt-3 text-lg leading-8 text-zinc-700 dark:text-zinc-300">
-                Upload a textbook, class notes or a work document. Get questions written only from it, so you study what your exam or job needs.
-              </p>
-              <ul className="mt-5 flex flex-col gap-3">
-                {[
-                  "A PDF or Word file, read on your device and never stored",
-                  "A timed test with a report, or a deck of flashcards",
-                  "Every answer shows the page it came from",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-3">
-                    <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
-                      <Icon name="check" size={14} />
-                    </span>
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link href="/ai/book" className={`${primaryButtonLg} mt-7`}>
-                Try it with your notes
-              </Link>
-            </div>
-            <MiniNotes />
+          <div className="mt-10">
+            <FeatureDeck
+              cards={[
+                {
+                  id: "roadmaps",
+                  tab: "Roadmaps",
+                  eyebrow: "Roadmaps",
+                  title: "See the whole journey on one map",
+                  text: "Every topic your AI role needs, in order, from your first lesson to interview day. Tap any topic to see what it is.",
+                  cta: { href: "/paths", label: "Choose your role" },
+                  more: { href: "/roadmap/genai-engineer", label: "See a roadmap" },
+                  tone: "violet",
+                  visual: (
+                    <div className="mx-auto max-w-[300px] text-zinc-600 dark:text-zinc-400">
+                      <MiniRoadmap />
+                    </div>
+                  ),
+                },
+                {
+                  id: "lessons",
+                  tab: "Lessons",
+                  eyebrow: "Lessons and courses",
+                  title: "Understand any topic in 20 minutes",
+                  text: "A plain-English explainer, an example from Indian work life, a quick check, and the one course or video worth your time.",
+                  cta: { href: "/stop/what-is-ai", label: "Read the first lesson" },
+                  more: { href: "/topics", label: "Browse topics" },
+                  tone: "sky",
+                  visual: (
+                    <div className="mx-auto max-w-[320px]">
+                      <MiniLesson />
+                    </div>
+                  ),
+                },
+                {
+                  id: "notes",
+                  tab: "Your notes",
+                  eyebrow: "Study from my notes & books",
+                  title: "Turn your own notes into a test and flashcards",
+                  text: "Upload a textbook, class notes or a work document. Get questions written only from it.",
+                  points: ["Read on your device and never stored", "A timed test with a report, or flashcards", "Every answer shows the page it came from"],
+                  cta: { href: "/ai/book", label: "Try it with your notes" },
+                  tone: "emerald",
+                  visual: <MiniNotes />,
+                },
+                {
+                  id: "interviews",
+                  tab: "Interviews",
+                  eyebrow: "Interview practice",
+                  title: "Practise interviews out loud",
+                  text: `${interview.length} real AI interview questions. Answer out loud, against the clock, and see what you covered.`,
+                  cta: { href: "/interview/simulator", label: "Start a mock interview" },
+                  more: { href: "/interview", label: "Question bank" },
+                  tone: "rose",
+                  visual: (
+                    <div className="mx-auto max-w-[320px]">
+                      <MiniInterview />
+                    </div>
+                  ),
+                },
+                {
+                  id: "plan",
+                  tab: "Weekly plan",
+                  eyebrow: "Stay on track",
+                  title: "A plan for your week, sized to your hours",
+                  text: "The next lessons for your role, fitted to the time you have, with a streak that shows the days you learnt.",
+                  cta: { href: "/plan", label: "Plan my week" },
+                  more: { href: "/playground", label: "Code playground" },
+                  tone: "amber",
+                  visual: (
+                    <div className="mx-auto max-w-[320px]">
+                      <MiniPlan />
+                    </div>
+                  ),
+                },
+                {
+                  id: "hired",
+                  tab: "Get hired",
+                  eyebrow: "Resume and jobs",
+                  title: "Get shortlisted, and know what the job pays",
+                  text: "Fixes for your resume in order of importance, the keywords recruiters search for, and salaries and live openings for every AI role in India.",
+                  cta: { href: "/ai/resume", label: "Review my resume" },
+                  more: { href: "/jobs", label: "Jobs and salaries" },
+                  tone: "teal",
+                  visual: <MiniResume />,
+                },
+              ]}
+            />
           </div>
-        </div>
-      </section>
-
-      {/* Milestone 3: practice, prove it and get hired. */}
-      <section aria-labelledby="hired-heading" className="py-20 md:py-28">
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <Gate n={3} label="Practice and get hired" />
-          <h2 id="hired-heading" data-words className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
-            <Words text="Build it, say it out loud, get hired" />
-          </h2>
-          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">Learning is half the job. These tools cover the other half.</p>
-          <div className="mt-10 grid gap-6 md:grid-cols-2" data-rise-group>
-            <Feature
-              title="Practice interviews out loud"
-              text={`${interview.length} real questions. Answer out loud, against the clock, and see what you covered.`}
-              href="/interview/simulator"
-              cta="Start a mock interview"
-            >
-              <div className="mx-auto max-w-[300px]">
-                <MiniInterview />
-              </div>
-            </Feature>
-            <Feature
-              title="Stay on track, week after week"
-              text="A weekly plan sized to your hours, and a streak that shows the days you learnt."
-              href="/plan"
-              cta="Plan my week"
-            >
-              <div className="mx-auto max-w-[300px]">
-                <MiniPlan />
-              </div>
-            </Feature>
-          </div>
-          <ul className="mt-6 grid gap-6 md:grid-cols-2" data-rise-group>
-            {[
-              { href: "/ai/resume", icon: "star" as const, title: "Get your resume shortlisted", text: "Get fixes in order of importance and the keywords recruiters look for.", cta: "Review my resume" },
-              { href: "/jobs", icon: "target" as const, title: "Know what the job pays", text: "Salaries for every AI role in India, and live openings.", cta: "See jobs and salaries" },
-            ].map((c) => (
-              <li key={c.href} data-rise className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
-                  <Icon name={c.icon} size={24} />
-                </span>
-                <div>
-                  <h3 className="text-xl font-semibold">{c.title}</h3>
-                  <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{c.text}</p>
-                  <Link href={c.href} className="mt-3 inline-block font-medium text-violet-800 hover:underline dark:text-violet-300">
-                    {c.cta} →
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
         </div>
       </section>
 
@@ -405,7 +369,7 @@ export default function Home() {
         <div className="mx-auto max-w-3xl px-4">
           {/* Left-aligned on phones like the other milestones; centred as a closing call on larger screens. */}
           <div className="flex justify-start md:justify-center">
-            <Gate n={4} label="Your AI career" />
+            <Gate n={3} label="Your AI career" />
           </div>
           <h2 id="final-heading" data-words className="mt-5 text-4xl font-semibold tracking-tight text-balance md:text-6xl">
             <Words text="Your AI career starts with one 20-minute lesson." />
@@ -504,34 +468,5 @@ function Gate({ n, label }: { n: number; label: string }) {
       <span className="grid size-6 place-items-center rounded-full bg-violet-700 text-xs font-semibold text-white">{n}</span>
       Milestone {n} · {label}
     </p>
-  );
-}
-
-function Feature({
-  title,
-  text,
-  href,
-  cta,
-  children,
-}: {
-  title: string;
-  text: string;
-  href: string;
-  cta: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div data-rise className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center justify-center border-b border-zinc-200 bg-zinc-50 p-6 md:min-h-[21rem] md:p-8 dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="w-full">{children}</div>
-      </div>
-      <div className="flex flex-1 flex-col p-6">
-        <h3 className="text-xl font-semibold">{title}</h3>
-        <p className="mt-2 flex-1 leading-7 text-zinc-700 dark:text-zinc-300">{text}</p>
-        <Link href={href} className="mt-4 font-medium text-violet-800 hover:underline dark:text-violet-300">
-          {cta} →
-        </Link>
-      </div>
-    </div>
   );
 }

@@ -84,7 +84,7 @@ test("the video courses tab lists DeepLearning.AI and Andrew Ng courses and filt
   await expect(page.locator("dialog[open] iframe")).toHaveAttribute("src", /videoseries\?list=/);
   await page.keyboard.press("Escape");
   await page.getByLabel("Search by title, teacher or lesson").fill("CS229");
-  await expect(page.getByRole("link", { name: /Watch the course\s*: Stanford CS229/ })).toHaveAttribute("href", /^\/go\//);
+  await expect(page.getByRole("link", { name: /Start the course\s*: Stanford CS229/ })).toHaveAttribute("href", /^\/go\//);
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });
@@ -94,5 +94,5 @@ test("a lesson's Watch & learn panel lists its video courses after its videos (V
   const panel = page.locator("section", { has: page.getByRole("heading", { name: "Watch & learn" }) }).first();
   await expect(panel).toContainText(/video lessons? and \d video courses? for this topic/);
   await expect(panel.getByText("Agentic AI", { exact: true })).toBeVisible();
-  await expect(panel.getByRole("link", { name: /Watch the course\s*: Agentic AI/ })).toHaveAttribute("href", /^\/go\/dlai-agentic-ai/);
+  await expect(panel.getByRole("link", { name: /Start the course\s*: Agentic AI/ })).toHaveAttribute("href", /^\/go\/dlai-agentic-ai/);
 });

@@ -37,7 +37,7 @@ describe("video courses (VD-2)", () => {
     const base = { type: "course", provider: "DeepLearning.AI", certificate: true };
     expect(kindLabel({ ...base, url: "https://www.deeplearning.ai/courses/agentic-ai", tags: ["video-course"] })).toBe("Video course");
     expect(kindLabel({ ...base, url: "https://www.youtube.com/playlist?list=PLabc123", tags: ["video-course"] })).toBe("Video course");
-    expect(openLabel("Video course")).toBe("Watch the course");
+    expect(openLabel("Video course")).toBe("Start the course");
   });
 
   it("does not play a video whose owner turned off embedding", () => {

@@ -60,10 +60,11 @@ const TYPE_LABEL: Record<string, string> = {
  * other videos without a certificate are a "Short video lesson".
  */
 export function kindLabel(r: { url: string; type: string; provider: string; certificate: boolean; tags?: string[] }): string {
+  // Owner's label for Google Skills paths wins, even when a path is also listed as a video course (VD-2).
+  if (r.provider === "Google Skills") return "Google's video lessons";
   // VD-2: a whole course taught on video, such as a DeepLearning.AI short course or a lecture series.
   if (r.tags?.includes("video-course")) return "Video course";
   if (isYouTube(r.url)) return "Video lesson";
-  if (r.provider === "Google Skills") return "Google's video lessons";
   if (r.type === "video" && !r.certificate) return "Short video lesson";
   return TYPE_LABEL[r.type] ?? "Resource";
 }
@@ -72,7 +73,7 @@ export function kindLabel(r: { url: string; type: string; provider: string; cert
 export function openLabel(label: string): string {
   if (/video lesson/i.test(label)) return "Watch the video lesson";
   if (label === "Course") return "Open the course";
-  if (label === "Video course") return "Watch the course";
+  if (label === "Video course") return "Start the course";
   if (label === "Article") return "Read the article";
   if (label === "Documentation") return "Read the docs";
   if (label === "Book") return "Open the book";
