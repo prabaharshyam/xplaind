@@ -464,3 +464,8 @@ The site had no error or loading pages, so any hiccup showed the framework's bar
 Smaller requests: the header button says "Get started"; the footer had both "Your progress" and "Your dashboard" pointing to the same page, so it keeps one; the Video courses tab adds courses from Anthropic, Google, Microsoft, Harvard, fast.ai and NVIDIA, with a "From" filter, and its button says "Start the course".
 
 The Google sign-in window showed the Supabase address because NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set in production. Google's own button (AC-1a) is already built and switches on with that setting; the steps are for the owner. Ideas for "Study from my notes & books" from studying StudyFetch are in docs/notes-tool-ideas.md, for the owner to choose from.
+
+## 2026-11-11: only "Sign up" and "Sign in" (AC-12)
+
+The owner, already holding an account but signed out on a phone, was told "Create your account" on a roadmap, and the phone menu offered "Get started" next to "Sign in or create an account", which mean the same thing. Every account prompt now offers the same two buttons, "Sign up" and "Sign in", and the sign-in dialog opens on whichever tab was chosen. The header's main button says "Sign up" (it said "Get started" since earlier the same day), and "Start learning" shows only while accounts are switched off.
+

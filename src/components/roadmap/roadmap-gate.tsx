@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useAccountState } from "@/components/account-link";
 import { Icon } from "@/components/art/icons";
-import { primaryButton } from "@/components/ui";
-import { SIGNUP_EVENT } from "@/lib/browser/account-sync";
+import { AuthChoice } from "@/components/account/auth-choice";
 
 /**
  * RG-1 (owner decision, 2026-11-10): once accounts are on, a signed-out visitor sees a preview of a roadmap
@@ -33,24 +32,14 @@ export function RoadmapGate({
         id="roadmap-gate-h"
         className="flex items-center gap-2 text-lg font-semibold"
       >
-        <Icon name="lock" size={18} /> Sign up to see the full roadmap
+        <Icon name="lock" size={18} /> Sign in or sign up to see the full roadmap
       </h2>
       <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
         {sections ? `All ${sections} stages and ` : "All "}
         {topics} topics in order, with your progress saved on every device.
         It takes a few seconds, no card needed.
       </p>
-      <button
-        type="button"
-        className={`${primaryButton} mt-4`}
-        onClick={() =>
-          window.dispatchEvent(
-            new CustomEvent(SIGNUP_EVENT, { detail: { reason: "roadmap" } }),
-          )
-        }
-      >
-        Create your account
-      </button>
+      <AuthChoice reason="roadmap" className="mt-4" />
       <p className="mt-4 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
         Accounts are for learners aged 18 and over. Under 18? Every lesson is
         still open:{" "}

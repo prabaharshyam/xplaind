@@ -3,11 +3,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon } from "@/components/art/icons";
+import { AuthChoice } from "@/components/account/auth-choice";
 import { AiAllowance } from "@/components/billing/ai-allowance";
 import { useAccountState } from "@/components/account-link";
-import { primaryButton } from "@/components/ui";
 import type { AiKind } from "@/lib/ai/limits";
-import { SIGNUP_EVENT } from "@/lib/browser/account-sync";
 
 /** "signin": AI is on but this visitor has no account (AG-1, 2026-11-10: no AI without an account). */
 export type AiAccess = "off" | "on" | "signin";
@@ -48,24 +47,14 @@ export function AiGate({
     return (
       <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950">
         <p className="flex items-center gap-2 font-semibold">
-          <Icon name="lock" size={18} /> Sign up to use the AI tools
+          <Icon name="lock" size={18} /> Sign in or sign up to use the AI tools
         </p>
         <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">
           The AI tutor, interview feedback, resume review and the other AI tools
           need an account. Lessons, topics and practice stay open without
           one.
         </p>
-        <button
-          type="button"
-          className={`${primaryButton} mt-3`}
-          onClick={() =>
-            window.dispatchEvent(
-              new CustomEvent(SIGNUP_EVENT, { detail: { reason: "ai" } }),
-            )
-          }
-        >
-          Create your account
-        </button>
+        <AuthChoice reason="ai" className="mt-3" />
         <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
           Accounts are for learners aged 18 and over.
         </p>

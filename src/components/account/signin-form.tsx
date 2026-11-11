@@ -19,14 +19,14 @@ const ERRORS: Record<string, string> = {
 };
 
 export const REASONS: Record<SignUpReason, string> = {
-  pdf: "Create your account to download your roadmap.",
-  interview: "Create your account to take the mock interview.",
-  progress: "Create your account to save your progress and streak.",
-  practice: "Create your account to save your practice and see missed questions again.",
-  tools: "Create your account to use the AI tools.",
-  library: "Create your account to download research papers and open-access AI books.",
-  ai: "Create your account to use the AI tutor, interview feedback, resume review and the other AI tools.",
-  roadmap: "Create your account to see the full roadmap and track your progress on it.",
+  pdf: "Sign in or sign up to download your roadmap.",
+  interview: "Sign in or sign up to take the mock interview.",
+  progress: "Sign in or sign up to save your progress and streak.",
+  practice: "Sign in or sign up to save your practice and see missed questions again.",
+  tools: "Sign in or sign up to use the AI tools.",
+  library: "Sign in or sign up to download research papers and open-access AI books.",
+  ai: "Sign in or sign up to use the AI tutor, interview feedback, resume review and the other AI tools.",
+  roadmap: "Sign in or sign up to see the full roadmap and track your progress on it.",
 };
 
 const PERKS = ["Download roadmap PDFs and research papers", "Practice mock interviews and use the AI tools", "Save your progress and streak on every device"];
@@ -153,7 +153,7 @@ export function SignInForm({
         type="submit"
         className="min-h-12 rounded-full bg-violet-700 px-4 font-semibold text-white hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
       >
-        {mode === "signup" ? "Create account" : "Sign in"}
+        {mode === "signup" ? "Sign up" : "Sign in"}
       </button>
       <button type="submit" formAction="/auth/email-link" formNoValidate className="text-sm text-violet-800 underline underline-offset-2 dark:text-violet-300">
         {mode === "signup" ? "No password? Email me a sign-in link" : "Forgot your password? Email me a sign-in link"}
@@ -162,7 +162,7 @@ export function SignInForm({
       <p className="text-center text-sm">
         {mode === "signup" ? "Already have an account? " : "New to Xplaind? "}
         <button type="button" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300" onClick={() => setMode(mode === "signup" ? "signin" : "signup")}>
-          {mode === "signup" ? "Sign in" : "Create an account"}
+          {mode === "signup" ? "Sign in" : "Sign up"}
         </button>
       </p>
       <p className="text-xs leading-5 text-zinc-600 dark:text-zinc-400">

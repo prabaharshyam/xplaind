@@ -12,11 +12,15 @@ import { SignInForm } from "./signin-form";
 export function SignUpDialog() {
   const ref = useRef<HTMLDialogElement>(null);
   const [reason, setReason] = useState<SignUpReason | null>(null);
+  // AC-12: "Sign in" buttons open the same dialog on the sign-in tab.
+  const [mode, setMode] = useState<"signup" | "signin">("signup");
   const [next, setNext] = useState("/");
 
   useEffect(() => {
     const open = (e: Event) => {
-      setReason((e as CustomEvent<{ reason: SignUpReason }>).detail.reason);
+      const detail = (e as CustomEvent<{ reason: SignUpReason; mode?: "signup" | "signin" }>).detail;
+      setReason(detail.reason);
+      setMode(detail.mode === "signin" ? "signin" : "signup");
       setNext(`${location.pathname}${location.search}`);
       if (!ref.current?.open) ref.current?.showModal();
     };
@@ -36,7 +40,7 @@ export function SignUpDialog() {
         <div className="max-h-[90vh] overflow-y-auto p-5 sm:p-6">
           <div className="mb-3 flex items-start justify-between gap-3">
             <h2 id="signup-title" className="text-xl font-semibold tracking-tight">
-              Sign up
+              Sign in or sign up
             </h2>
             <button
               type="button"
@@ -47,7 +51,7 @@ export function SignUpDialog() {
               <span className="sr-only">Close</span>
             </button>
           </div>
-          <SignInForm next={next} reason={reason} />
+          <SignInForm key={`${reason}-${mode}`} next={next} reason={reason} initialMode={mode} />
         </div>
       )}
     </dialog>
