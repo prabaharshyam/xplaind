@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/art/icons";
-import { primaryButton, secondaryButton } from "@/components/ui";
+import { primaryButton, primaryButtonSm, secondaryButton } from "@/components/ui";
 
 export type DeckTone = "violet" | "emerald" | "sky" | "amber" | "rose" | "teal";
 
@@ -145,14 +145,14 @@ export function FeatureDeck({ cards }: { cards: DeckCard[] }) {
                 aria-hidden={!front}
                 inert={!front}
                 style={pose(offset, n)}
-                className={`deck-card grid min-w-0 origin-bottom-left gap-8 rounded-[2rem] p-6 shadow-[0_30px_60px_-30px_rgba(46,16,101,0.35),0_10px_24px_-14px_rgba(0,0,0,0.18)] md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:items-center md:p-10 ${TONE[c.tone]}`}
+                className={`deck-card grid min-w-0 origin-bottom-left grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-[2rem] p-5 shadow-[0_30px_60px_-30px_rgba(46,16,101,0.35),0_10px_24px_-14px_rgba(0,0,0,0.18)] md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:content-normal md:items-center md:gap-8 md:p-10 ${TONE[c.tone]}`}
               >
                 <div>
-                  <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{c.eyebrow}</p>
-                  <h3 className="mt-2 text-3xl leading-tight font-semibold tracking-tight text-balance md:text-4xl">{c.title}</h3>
-                  <p className="mt-3 text-lg leading-8 text-zinc-800 dark:text-zinc-200">{c.text}</p>
+                  <p className="hidden text-sm font-semibold text-zinc-700 md:block dark:text-zinc-300">{c.eyebrow}</p>
+                  <h3 className="text-2xl leading-tight font-semibold tracking-tight text-balance md:mt-2 md:text-4xl">{c.title}</h3>
+                  <p className="mt-2 line-clamp-3 text-base leading-7 text-zinc-800 md:mt-3 md:line-clamp-none md:text-lg md:leading-8 dark:text-zinc-200">{c.text}</p>
                   {c.points && (
-                    <ul className="mt-4 flex flex-col gap-2">
+                    <ul className="mt-4 hidden flex-col gap-2 md:flex">
                       {c.points.map((p) => (
                         <li key={p} className="flex items-start gap-2.5 leading-7">
                           <span className="mt-1 grid size-5 shrink-0 place-items-center rounded-full bg-white/80 text-zinc-900 dark:bg-white/15 dark:text-white">
@@ -163,18 +163,33 @@ export function FeatureDeck({ cards }: { cards: DeckCard[] }) {
                       ))}
                     </ul>
                   )}
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <Link href={c.cta.href} className={primaryButton}>
-                      {c.cta.label}
-                    </Link>
-                    {c.more && (
-                      <Link href={c.more.href} className={`${secondaryButton} bg-white/70 dark:bg-white/10`}>
-                        {c.more.label}
+                  <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 md:mt-6 md:gap-3">
+                    <span className="contents md:hidden">
+                      <Link href={c.cta.href} className={primaryButtonSm}>
+                        {c.cta.label}
                       </Link>
+                    </span>
+                    <span className="hidden md:contents">
+                      <Link href={c.cta.href} className={primaryButton}>
+                        {c.cta.label}
+                      </Link>
+                    </span>
+                    {c.more && (
+                      <>
+                        {/* Phones: a quiet text link, so both actions fit on one line. */}
+                        <Link href={c.more.href} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold whitespace-nowrap text-zinc-900 underline-offset-4 hover:underline md:hidden dark:text-white">
+                          {c.more.label} <span aria-hidden="true">→</span>
+                        </Link>
+                        <span className="hidden md:contents">
+                          <Link href={c.more.href} className={`${secondaryButton} bg-white/70 dark:bg-white/10`}>
+                            {c.more.label}
+                          </Link>
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>
-                <div className="rounded-3xl bg-white/80 p-4 shadow-sm ring-1 ring-black/5 md:p-6 dark:bg-zinc-900/70 dark:ring-white/10">{c.visual}</div>
+                <div className="deck-visual min-w-0 overflow-hidden rounded-3xl bg-white/80 p-3 shadow-sm ring-1 ring-black/5 md:overflow-visible md:p-6 dark:bg-zinc-900/70 dark:ring-white/10">{c.visual}</div>
               </article>
             );
           })}
