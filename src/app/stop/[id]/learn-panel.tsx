@@ -54,7 +54,7 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
               )}
               {!r.embed && (
                 <a href={`/go/${r.id}?stop=${encodeURIComponent(stopId)}`} target="_blank" rel="noopener" className={`inline-flex min-h-11 items-center text-sm ${textLink}`}>
-                  {r.kindLabel === "Video course" ? "Watch the course" : /video/i.test(r.kindLabel) ? "Watch it" : "Open it"}
+                  {r.kindLabel === "Video course" ? "Start the course" : /video/i.test(r.kindLabel) ? "Watch it" : "Open it"}
                   <span className="sr-only">: {r.title} (opens in a new tab)</span>
                 </a>
               )}

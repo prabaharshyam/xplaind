@@ -46,15 +46,11 @@ export function ClaimOnSignIn() {
   return null;
 }
 
-/** Footer link: "Sign in" or "Your dashboard". Hidden until accounts are switched on. */
+/** Footer link: "Sign in" for signed-out visitors. The footer always links "Your dashboard" itself, so it is not repeated here. */
 export function AccountLink({ className }: { className?: string }) {
   const state = useAccountState();
-  if (state === "unknown" || state === "off") return null;
-  return state === "in" ? (
-    <Link href="/dashboard" className={className}>
-      Your dashboard
-    </Link>
-  ) : (
+  if (state !== "out") return null;
+  return (
     <Link href="/signin" className={className}>
       Sign in
     </Link>
@@ -63,7 +59,7 @@ export function AccountLink({ className }: { className?: string }) {
 
 /**
  * AC-6: the header's main button. Signed in it opens your progress; everyone else gets one
- * plain next step (sign up, or start learning). "Continue learning" was taken out of the
+ * plain next step ("Get started", or start learning). "Continue learning" was taken out of the
  * header on 2026-11-06: it confused first-time visitors.
  */
 export function AccountButton({ className }: { className: string }) {
@@ -78,13 +74,13 @@ export function AccountButton({ className }: { className: string }) {
   if (state === "out") {
     return (
       <Link href="/signin" className={className}>
-        Sign up
+        Get started
       </Link>
     );
   }
   return (
     <Link href="/paths" className={className}>
-      Start learning
+      Get started
     </Link>
   );
 }

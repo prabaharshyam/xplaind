@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ALL } from "./browse";
-import { type CourseRow, EMPTY_COURSE_FILTER, courseLength, filterCourses, formatHours } from "./courses";
+import { type CourseRow, EMPTY_COURSE_FILTER, courseLength, filterCourses, formatHours, platformOf } from "./courses";
 
 const row = (o: Partial<CourseRow> & { id: string }): CourseRow => ({
   title: o.id,
@@ -59,5 +59,19 @@ describe("filterCourses (VD-2)", () => {
     expect(formatHours(1)).toBe("about 1 hour");
     expect(formatHours(2.4)).toBe("about 2.5 hours");
     expect(formatHours(68)).toBe("about 68 hours");
+  });
+});
+
+describe("platform filter (VD-2)", () => {
+  it("files provider names under one platform", () => {
+    expect(platformOf("Anthropic Academy")).toBe("Anthropic");
+    expect(platformOf("DeepLearningAI on YouTube")).toBe("DeepLearning.AI");
+    expect(platformOf("Google Skills")).toBe("Google");
+    expect(platformOf("Harvard CS50")).toBe("Harvard");
+    expect(platformOf("fast.ai")).toBe("fast.ai");
+  });
+
+  it("keeps only the chosen platform", () => {
+    expect(filterCourses(rows, { ...EMPTY_COURSE_FILTER, platform: "Stanford" }).map((r) => r.id)).toEqual(["cs229"]);
   });
 });

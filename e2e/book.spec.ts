@@ -148,8 +148,10 @@ test("after reading a file, the learner can choose flashcards instead of a test 
   expect((await wcag(page)).violations).toEqual([]);
 });
 
-test("the home page has its own section for Study from my notes & books (MB-6)", async ({ page }) => {
+test("the home page has its own card for Study from my notes & books (MB-6, UX-4)", async ({ page }) => {
   await page.goto("/");
-  const section = page.getByRole("region", { name: "Turn your own notes into a test and flashcards" });
-  await expect(section.getByRole("link", { name: "Try it with your notes" })).toHaveAttribute("href", "/ai/book");
+  await page.getByRole("tab", { name: "Your notes" }).click();
+  const card = page.getByRole("tabpanel", { name: "Your notes" });
+  await expect(card.getByRole("heading", { name: "Turn your own notes into a test and flashcards" })).toBeVisible();
+  await expect(card.getByRole("link", { name: "Try it with your notes" })).toHaveAttribute("href", "/ai/book");
 });

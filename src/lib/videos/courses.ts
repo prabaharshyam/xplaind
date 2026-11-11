@@ -35,10 +35,25 @@ export type CourseFilter = {
   length: CourseLength;
   /** Only courses Andrew Ng teaches. */
   andrewNg: boolean;
+  /** "all", or a platform from platformOf, such as "Anthropic". */
+  platform: string;
   sort: CourseSort;
 };
 
-export const EMPTY_COURSE_FILTER: CourseFilter = { query: "", topic: ALL, band: ALL, length: ALL, andrewNg: false, sort: "newest" };
+export const EMPTY_COURSE_FILTER: CourseFilter = { query: "", topic: ALL, band: ALL, length: ALL, andrewNg: false, platform: ALL, sort: "newest" };
+
+/** The platform a course comes from, so "Anthropic Academy" and "Anthropic" file together. */
+export function platformOf(provider: string): string {
+  const p = provider.toLowerCase();
+  if (p.includes("deeplearning")) return "DeepLearning.AI";
+  if (p.includes("anthropic") || p.includes("claude")) return "Anthropic";
+  if (p.includes("google")) return "Google";
+  if (p.includes("microsoft")) return "Microsoft";
+  if (p.includes("nvidia")) return "NVIDIA";
+  if (p.includes("stanford")) return "Stanford";
+  if (p.includes("harvard") || p.includes("cs50")) return "Harvard";
+  return provider;
+}
 
 export const ANDREW_NG = "Andrew Ng";
 
@@ -54,6 +69,7 @@ export function matchesCourse(row: CourseRow, f: CourseFilter): boolean {
   if (f.band !== ALL && !row.level.startsWith(f.band)) return false;
   if (f.length !== ALL && courseLength(row.hours) !== f.length) return false;
   if (f.andrewNg && !row.instructors.includes(ANDREW_NG)) return false;
+  if (f.platform !== ALL && platformOf(row.provider) !== f.platform) return false;
   const words = normalise(f.query).split(/\s+/).filter(Boolean);
   const haystack = normalise(`${row.title} ${row.provider} ${row.instructors.join(" ")} ${row.lesson?.title ?? ""}`);
   return words.every((w) => haystack.includes(w));

@@ -6,6 +6,7 @@ import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { MotionEffects, PageEnter } from "@/components/motion/motion-effects";
 import { SiteMotion } from "@/components/motion/site-motion";
 import { SiteFooter } from "@/components/site-footer";
+import { NavProgress } from "@/components/nav-progress";
 import { SiteHeader } from "@/components/site-header";
 import { aiEnabled } from "@/lib/ai/settings";
 import { allowIndexing } from "@/lib/indexing";
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <MotionEffects />
         {/* These read the URL, so pages with dynamic URLs render them in the browser. */}
         <Suspense fallback={null}>
+          <NavProgress />
           <PageEnter />
           <SiteMotion />
           <XBot aiOn={aiEnabled()} />

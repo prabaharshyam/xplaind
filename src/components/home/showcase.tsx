@@ -184,3 +184,36 @@ export function MiniNotes() {
     </div>
   );
 }
+
+/** UX-4: the "Get hired" card: a resume score with its top fixes, and a salary band. Example data, labelled as such. */
+export function MiniResume() {
+  const fixes = [
+    { text: "Lead with your RAG project, not your degree", done: true },
+    { text: "Add numbers: 'answers 300 questions a day'", done: true },
+    { text: "Missing keyword: evaluation" },
+  ];
+  return (
+    <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+      <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
+        <span>Resume review · AI Engineer</span>
+        <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">Example</span>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <span className="grid size-14 place-items-center rounded-full border-4 border-emerald-500 text-lg font-semibold">78</span>
+        <span className="text-sm leading-5">Shortlist-ready after <b>3 fixes</b></span>
+      </div>
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {fixes.map((f) => (
+          <li key={f.text} className="flex items-center gap-2 rounded-2xl bg-zinc-50 px-3 py-1.5 dark:bg-zinc-950">
+            <span className={`grid size-4 shrink-0 place-items-center rounded-full text-[10px] ${f.done ? "bg-emerald-500 text-white" : "border border-amber-500"}`}>{f.done ? "✓" : ""}</span>
+            <span className="min-w-0 flex-1 truncate">{f.text}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 rounded-2xl bg-teal-50 px-3 py-2 text-xs text-teal-900 dark:bg-teal-950 dark:text-teal-100">
+        AI Engineer, 0–2 years: <span className="text-sm font-semibold">₹6–12 lakh</span> a year
+      </div>
+    </div>
+  );
+}
+

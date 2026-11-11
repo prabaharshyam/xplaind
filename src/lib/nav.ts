@@ -1,6 +1,9 @@
-// NV-1 and NV-2: the main menu's groups and "you are here". No imports, so it is safe anywhere.
+// NV-1 and NV-2: the main menu's groups and "you are here". Type-only imports, so it is safe anywhere.
+import type { IconName } from "@/lib/themes";
 
-type Item = { href: string; label: string; note: string };
+/** UX-3: each menu item has an icon on a soft tile in one of these tones. */
+export type NavTone = "violet" | "indigo" | "sky" | "teal" | "emerald" | "amber" | "rose";
+type Item = { href: string; label: string; note: string; icon: IconName; tone: NavTone };
 type Group = { id: string; label: string; items: Item[] };
 
 /** NV-1: the main menu, grouped by what the visitor wants to do. */
@@ -9,22 +12,22 @@ export const NAV_GROUPS: Group[] = [
     id: "learn",
     label: "Learn",
     items: [
-      { href: "/paths", label: "Roadmaps", note: "A step-by-step path for each AI role" },
-      { href: "/library", label: "Library", note: "Every lesson, video and skill" },
-      { href: "/topics", label: "Topics", note: "Lessons grouped by subject" },
-      { href: "/videos", label: "Videos", note: "Filter by topic" },
-      { href: "/projects", label: "Projects", note: "Guided builds for your portfolio" },
-      { href: "/glossary", label: "Glossary", note: "AI words in plain English" },
-      { href: "/papers", label: "Papers and free books", note: "Landmark research and free AI books" },
+      { href: "/paths", label: "Roadmaps", note: "A step-by-step path for each AI role", icon: "map", tone: "violet" },
+      { href: "/library", label: "Library", note: "Every lesson, video and skill", icon: "table", tone: "indigo" },
+      { href: "/topics", label: "Topics", note: "Lessons grouped by subject", icon: "flow", tone: "sky" },
+      { href: "/videos", label: "Videos", note: "Filter by topic", icon: "play", tone: "rose" },
+      { href: "/projects", label: "Projects", note: "Guided builds for your portfolio", icon: "rocket", tone: "amber" },
+      { href: "/glossary", label: "Glossary", note: "AI words in plain English", icon: "chat", tone: "teal" },
+      { href: "/papers", label: "Papers and free books", note: "Landmark research and free AI books", icon: "book", tone: "emerald" },
     ],
   },
   {
     id: "practice",
     label: "Practice",
     items: [
-      { href: "/practice", label: "Practice cards", note: "Flashcards for interview questions" },
-      { href: "/playground", label: "Code playground", note: "Run Python in your browser" },
-      { href: "/plan", label: "Weekly plan", note: "This week's lessons for your hours" },
+      { href: "/practice", label: "Practice cards", note: "Flashcards for interview questions", icon: "check", tone: "emerald" },
+      { href: "/playground", label: "Code playground", note: "Run Python in your browser", icon: "code", tone: "sky" },
+      { href: "/plan", label: "Weekly plan", note: "This week's lessons for your hours", icon: "target", tone: "amber" },
     ],
   },
   {
@@ -32,19 +35,19 @@ export const NAV_GROUPS: Group[] = [
     id: "interview",
     label: "Interview",
     items: [
-      { href: "/interview/patterns", label: "Interview patterns", note: "The ideas AI interviews are built on" },
-      { href: "/interview/design", label: "System design answers", note: "Worked LLM designs, step by step" },
-      { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report" },
-      { href: "/interview/answers", label: "Interview Q&A", note: "Every question and answer, by role" },
-      { href: "/interview", label: "Question bank", note: "Every question, by topic and role" },
+      { href: "/interview/patterns", label: "Interview patterns", note: "The ideas AI interviews are built on", icon: "flow", tone: "violet" },
+      { href: "/interview/design", label: "System design answers", note: "Worked LLM designs, step by step", icon: "server", tone: "indigo" },
+      { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report", icon: "mic", tone: "rose" },
+      { href: "/interview/answers", label: "Interview Q&A", note: "Every question and answer, by role", icon: "chat", tone: "teal" },
+      { href: "/interview", label: "Question bank", note: "Every question, by topic and role", icon: "search", tone: "amber" },
     ],
   },
   {
     id: "career",
     label: "Career",
     items: [
-      { href: "/jobs", label: "Jobs and salaries", note: "Pay by role, skills and live openings" },
-      { href: "/ai/resume", label: "Resume review", note: "Fixes that get you shortlisted" },
+      { href: "/jobs", label: "Jobs and salaries", note: "Pay by role, skills and live openings", icon: "star", tone: "amber" },
+      { href: "/ai/resume", label: "Resume review", note: "Fixes that get you shortlisted", icon: "cert", tone: "emerald" },
     ],
   },
   {
@@ -52,11 +55,11 @@ export const NAV_GROUPS: Group[] = [
     id: "ai",
     label: "AI tools",
     items: [
-      { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards" },
-      { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English" },
-      { href: "/ai/roadmap", label: "AI roadmap generator", note: "A plan for your goal and hours" },
-      { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work" },
-      ...(process.env.NEXT_PUBLIC_PRO_OPEN === "1" ? [{ href: "/pricing", label: "Pro and pricing", note: "More AI help each day, from ₹249" }] : []),
+      { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards", icon: "book", tone: "violet" },
+      { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English", icon: "robot", tone: "teal" },
+      { href: "/ai/roadmap", label: "AI roadmap generator", note: "A plan for your goal and hours", icon: "map", tone: "sky" },
+      { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work", icon: "sparkles", tone: "amber" },
+      ...(process.env.NEXT_PUBLIC_PRO_OPEN === "1" ? [{ href: "/pricing", label: "Pro and pricing", note: "More AI help each day, from ₹249", icon: "star", tone: "rose" } as Item] : []),
     ],
   },
 ];

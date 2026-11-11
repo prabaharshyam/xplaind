@@ -15,9 +15,9 @@ import { VideoTabs } from "./video-tabs";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["AI Video Courses: Andrew Ng, DeepLearning.AI and More", "AI Video Courses by Topic"],
+  title: ["AI Video Courses: DeepLearning.AI, Anthropic, Google & More", "AI Video Courses by Topic"],
   description:
-    "AI video courses and lessons by topic: every DeepLearning.AI and Andrew Ng course plus the best YouTube teachers, filtered by level and length.",
+    "AI video courses and lessons by topic: DeepLearning.AI, Anthropic, Google, Microsoft, Harvard and Stanford courses plus the best YouTube teachers.",
   path: "/videos",
 });
 
@@ -79,7 +79,7 @@ export default function VideosPage() {
         icon="play"
         eyebrow="Video lessons"
         title="AI video lessons, by topic"
-        lead={`${rows.length} hand-picked videos from ${teachers} teachers, and ${courses.length} free video courses, including every DeepLearning.AI course and Andrew Ng's Stanford lectures. Choose a topic, level and length.`}
+        lead={`${rows.length} hand-picked videos from ${teachers} teachers, and ${courses.length} video courses from DeepLearning.AI, Anthropic, Google, Microsoft, Harvard, NVIDIA, fast.ai and Andrew Ng's Stanford lectures. Choose a topic, level and length.`}
       />
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <VideoTabs

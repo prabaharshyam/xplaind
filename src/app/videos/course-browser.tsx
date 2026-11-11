@@ -5,11 +5,11 @@ import { useMemo, useState } from "react";
 import { Icon } from "@/components/art/icons";
 import { CourseThumb } from "@/components/course-thumb";
 import { WatchButton } from "@/components/video-player";
-import { secondaryButtonSm, textLink } from "@/components/ui";
+import { secondaryButtonSm } from "@/components/ui";
 import { levelWords } from "@/lib/levels";
 import type { IconName } from "@/lib/themes";
 import { ALL } from "@/lib/videos/browse";
-import { ANDREW_NG, type CourseFilter, type CourseLength, type CourseRow, type CourseSort, EMPTY_COURSE_FILTER, filterCourses, formatHours } from "@/lib/videos/courses";
+import { ANDREW_NG, platformOf, type CourseFilter, type CourseLength, type CourseRow, type CourseSort, EMPTY_COURSE_FILTER, filterCourses, formatHours } from "@/lib/videos/courses";
 import type { TopicChip } from "./video-browser";
 
 const BANDS = [
@@ -46,12 +46,18 @@ export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: Top
   const shown = useMemo(() => filterCourses(rows, filter), [rows, filter]);
   const topicName = useMemo(() => new Map(topics.map((t) => [t.id, t.label])), [topics]);
   const ng = useMemo(() => rows.filter((r) => r.instructors.includes(ANDREW_NG)).length, [rows]);
+  // Platforms, most courses first, so the big providers lead the list.
+  const platforms = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const r of rows) n.set(platformOf(r.provider), (n.get(platformOf(r.provider)) ?? 0) + 1);
+    return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [rows]);
   const set = (patch: Partial<CourseFilter>) => {
     setFilter((f) => ({ ...f, ...patch }));
     setLimit(PAGE);
   };
   const chips = [{ id: ALL, label: "All topics", count: rows.length, from: "#52525b", to: "#a1a1aa", icon: "compass" as IconName }, ...topics];
-  const filtered = filter.topic !== ALL || filter.band !== ALL || filter.length !== ALL || filter.andrewNg || filter.query.trim() !== "";
+  const filtered = filter.topic !== ALL || filter.band !== ALL || filter.length !== ALL || filter.platform !== ALL || filter.andrewNg || filter.query.trim() !== "";
 
   return (
     <>
@@ -92,7 +98,18 @@ export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: Top
           </div>
         </fieldset>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">From</span>
+            <select value={filter.platform} onChange={(e) => set({ platform: e.target.value })} className={field}>
+              <option value={ALL}>All platforms</option>
+              {platforms.map(([p, n]) => (
+                <option key={p} value={p}>
+                  {p} ({n})
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">Level</span>
             <select value={filter.band} onChange={(e) => set({ band: e.target.value })} className={field}>
@@ -160,8 +177,9 @@ export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: Top
                   {c.embed ? (
                     <WatchButton embed={c.embed} title={c.title} className={`self-start ${secondaryButtonSm}`} />
                   ) : (
-                    <a href={`/go/${c.id}`} target="_blank" rel="noopener" className={`inline-flex min-h-11 items-center text-sm font-medium ${textLink}`}>
-                      Watch the course
+                    <a href={`/go/${c.id}`} target="_blank" rel="noopener" className={`self-start ${secondaryButtonSm}`}>
+                      Start the course
+                      <Icon name="send" size={14} />
                       <span className="sr-only">: {c.title} (opens in a new tab)</span>
                     </a>
                   )}

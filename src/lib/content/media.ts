@@ -72,7 +72,7 @@ export function kindLabel(r: { url: string; type: string; provider: string; cert
 export function openLabel(label: string): string {
   if (/video lesson/i.test(label)) return "Watch the video lesson";
   if (label === "Course") return "Open the course";
-  if (label === "Video course") return "Watch the course";
+  if (label === "Video course") return "Start the course";
   if (label === "Article") return "Read the article";
   if (label === "Documentation") return "Read the docs";
   if (label === "Book") return "Open the book";
