@@ -70,8 +70,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <UpgradePrompt />
         <MotionEffects />
         {/* These read the URL, so pages with dynamic URLs render them in the browser. */}
+        {/* UX-2: its own boundary, because it reads the query string. */}
         <Suspense fallback={null}>
           <NavProgress />
+        </Suspense>
+        <Suspense fallback={null}>
           <PageEnter />
           <SiteMotion />
           <XBot aiOn={aiEnabled()} />
