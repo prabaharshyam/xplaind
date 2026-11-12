@@ -22,26 +22,24 @@ export const rupees = (paise: number) => `₹${new Intl.NumberFormat("en-IN").fo
 export type Tier = "guest" | "free" | "pro";
 
 /**
- * Daily AI turns per feature once Pro is open (PAY-1). Fast, cheap features (the tutor and X Bot)
+ * Daily AI turns per feature once Pro is open (PAY-1). Fast, cheap features (the tutor and Ask your notes)
  * get the most; reviews that run on the strongest model get fewer. Pro limits are generous but
  * real, so one learner cannot run up a bill bigger than their pass.
  */
 export const TIER_LIMITS: Record<Tier, Record<AiKind, number>> = {
-  guest: { roadmap: 1, tutor: 5, grade: 2, interview: 1, bot: 10, book: 1, resume: 1, notes: 5 },
-  free: { roadmap: 2, tutor: 10, grade: 3, interview: 1, bot: 20, book: 2, resume: 1, notes: 20 },
-  pro: { roadmap: 10, tutor: 50, grade: 20, interview: 5, bot: 50, book: 10, resume: 3, notes: 100 },
+  guest: { tutor: 5, grade: 2, interview: 1, book: 1, resume: 1, notes: 5 },
+  free: { tutor: 10, grade: 3, interview: 1, book: 2, resume: 1, notes: 20 },
+  pro: { tutor: 50, grade: 20, interview: 5, book: 10, resume: 3, notes: 100 },
 };
 
 /** Plain names for the pricing table and the usage counter. */
 export const KIND_LABEL: Record<AiKind, string> = {
   tutor: "AI tutor questions",
-  bot: "X Bot answers",
   grade: "Interview answer feedback",
   interview: "Full mock interview reports",
   book: "Tests or flashcards from your notes",
   notes: "Questions about your notes",
   resume: "Resume reviews",
-  roadmap: "AI roadmaps",
 };
 
 /**

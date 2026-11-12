@@ -8,7 +8,6 @@ import { lessonsByPath, pathRef } from "@/lib/content/paths";
 import { accountsEnabled } from "@/lib/supabase/config";
 import { currentUser, userClient } from "@/lib/supabase/server";
 import { PageHero } from "@/components/page-hero";
-import { CommitCard } from "./commit-card";
 import { Dashboard } from "./dashboard";
 import { ProgressOverview } from "./progress-overview";
 import { primaryButtonSm } from "@/components/ui";
@@ -21,13 +20,8 @@ async function SignedIn() {
   const user = client ? await currentUser(client) : null;
   if (!user) redirect("/signin?next=/dashboard");
   const levels = getContent().levels.map(({ data: l }) => ({ id: l.id, name: l.name, draft_hours: l.draft_hours }));
-  const paths = getPaths().map((p) => ({ id: p.id, name: p.name }));
   return (
     <>
-      {/* CM-90: the 90-day weekly emails, opt-in only. */}
-      <div className="mt-6">
-        <CommitCard paths={paths} defaultPath={paths[0]?.id ?? ""} />
-      </div>
       <Dashboard email={user.email} levels={levels} paths={getPaths().map(pathRef)} stopsByPath={lessonsByPath()} />
     </>
   );
@@ -38,9 +32,9 @@ export default function DashboardPage() {
     <main>
       <PageHero
         size="full" shape="barChart" theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your streak and what you have finished.">
-        {/* WP-1: this week's plan, one tap from progress. */}
+        {/* FOCUS-2: the weekly plan and the Monday emails live together under "Stay on track". */}
         <Link href="/plan" className={primaryButtonSm}>
-          See this week&apos;s study plan →
+          Stay on track this week →
         </Link>
       </PageHero>
       <div className="mx-auto max-w-3xl px-4 py-8">

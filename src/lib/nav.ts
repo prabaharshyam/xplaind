@@ -27,7 +27,7 @@ export const NAV_GROUPS: Group[] = [
     items: [
       { href: "/practice", label: "Practice cards", note: "Flashcards for interview questions", icon: "check", tone: "emerald" },
       { href: "/playground", label: "Code playground", note: "Run Python in your browser", icon: "code", tone: "sky" },
-      { href: "/plan", label: "Weekly plan", note: "This week's lessons for your hours", icon: "target", tone: "amber" },
+      { href: "/plan", label: "Stay on track", note: "This week's plan, reminders and Monday emails", icon: "target", tone: "amber" },
     ],
   },
   {
@@ -57,7 +57,6 @@ export const NAV_GROUPS: Group[] = [
     items: [
       { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards", icon: "book", tone: "violet" },
       { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English", icon: "robot", tone: "teal" },
-      { href: "/ai/roadmap", label: "AI roadmap generator", note: "A plan for your goal and hours", icon: "map", tone: "sky" },
       { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work", icon: "sparkles", tone: "amber" },
       ...(process.env.NEXT_PUBLIC_PRO_OPEN === "1" ? [{ href: "/pricing", label: "Pro and pricing", note: "More AI help each day, from ₹249", icon: "star", tone: "rose" } as Item] : []),
     ],

@@ -20,7 +20,6 @@ export const THEMES = [
   { id: "dsa", label: "Data structures and algorithms", from: "#7e22ce", to: "#f9a8d4", icon: "tree" },
   { id: "software-engineering", label: "Software engineering", from: "#334155", to: "#93c5fd", icon: "code" },
   { id: "system-design", label: "System design", from: "#0f766e", to: "#a5b4fc", icon: "server" },
-  { id: "rust", label: "Rust", from: "#b7410e", to: "#fdba74", icon: "code" },
   { id: "ai-tools", label: "AI tools", from: "#db2777", to: "#a78bfa", icon: "sparkles" },
 ] as const;
 

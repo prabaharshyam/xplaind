@@ -41,7 +41,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/jobs",
     "/playground",
     "/plan",
-    "/ai/roadmap",
     "/ai/book",
     "/ai/resume",
     ...getPaths().map((p) => `/interview/for/${p.id}`),

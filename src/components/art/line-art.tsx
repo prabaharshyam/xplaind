@@ -248,7 +248,6 @@ export const THEME_SCENES: Record<string, Scene> = {
   dsa: ["tree", "grid", "code", "loop", "nodes"],
   "software-engineering": ["branch", "terminal", "checklist", "layers", "code"],
   "system-design": ["layers", "server", "db", "cloud", "flow"],
-  rust: ["cube", "gear", "code", "chip", "terminal"],
   "ai-tools": ["sparkle", "play", "mic", "pencil", "bubble"],
 };
 

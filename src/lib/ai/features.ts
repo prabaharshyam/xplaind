@@ -2,42 +2,11 @@
 // database, no UI. Every learner-typed string goes through asData (SC-5).
 import { z } from "zod";
 import { asData, DATA_RULE, HOUSE_STYLE } from "./prompt";
-import { ModelRoadmap, type RoadmapRequest } from "./roadmap";
 
 export type CatalogLesson = { id: string; title: string; level: string };
 
 /** One line per lesson, so the model can link real lessons instead of inventing them. */
 export const catalogText = (lessons: CatalogLesson[]) => lessons.map((l) => `${l.id} | ${l.title} | ${l.level}`).join("\n");
-
-const LEVEL_WORDS = { new: "new to AI and to coding", some: "has used AI tools and knows a little coding", experienced: "already writes code professionally" };
-
-// ---------------------------------------------------------------- roadmap --
-
-const roadmapSystem = (catalog: CatalogLesson[]) =>
-  [
-    "You design personal AI learning roadmaps for Xplaind, an AI learning site.",
-    HOUSE_STYLE,
-    DATA_RULE,
-    "A roadmap has 3 to 6 stages in a sensible order. Each stage has 2 to 6 topics. Each topic has a short 'why' tied to the learner's goal, 2 to 5 subtopics, and realistic hours.",
-    "The stage weeks must add up to roughly the learner's available weeks, and topic hours must fit their weekly hours.",
-    "Where a lesson in the catalog below teaches the topic, set lesson_id to that exact id; otherwise set lesson_id to null. Never invent ids.",
-    "End with one portfolio project that proves the goal, and up to 5 short practical tips.",
-    "Lesson catalog (id | title | level):",
-    catalogText(catalog),
-  ].join("\n\n");
-
-export function roadmapPrompt(req: RoadmapRequest, catalog: CatalogLesson[]) {
-  const system = roadmapSystem(catalog);
-  const user = [
-    "Make a roadmap for this learner.",
-    asData("goal", req.goal, 300),
-    req.background ? asData("background", req.background, 600) : "",
-    `Starting point: ${LEVEL_WORDS[req.level]}. Time: ${req.hoursPerWeek} hours a week for ${req.weeks} weeks.`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-  return { system, messages: [{ role: "user" as const, content: user }], schema: ModelRoadmap };
-}
 
 // ------------------------------------------------------------ coach, tutor --
 
@@ -75,6 +44,8 @@ export function tutorPrompt(
   lesson: { title: string; outcome: string; body: string } | null,
   req: { turns: z.infer<typeof ChatTurn>[]; context?: string },
   catalog: CatalogLesson[],
+  /** FOCUS-2: on its own page the tutor also helps learners find their way around the site (it took over from X Bot). */
+  siteGuide = "",
 ) {
   const role = lesson
     ? `You are the Xplaind AI tutor, helping a learner with the lesson "${lesson.title}". They are reading it now. Its goal: ${lesson.outcome}`
@@ -87,41 +58,13 @@ export function tutorPrompt(
     "When asked to plan, give concrete next actions sized to the learner's time, preferring Xplaind's own lessons from the catalog. Be honest about job markets and timelines; never promise jobs or salaries.",
     CHAT_FORMAT,
     ...(lesson ? ["Stay grounded in the lesson text below; if you go beyond it, say so.", "The lesson text:", lesson.body.slice(0, 30_000)] : []),
+    ...(!lesson && siteGuide ? ["If the learner asks how to use Xplaind or where to find something, point to the right page from this list. Never make up a page, a course or a price.", "Pages on Xplaind (path | what it is for):", siteGuide] : []),
     "Lesson catalog (id | title | level):",
     catalogText(catalog),
   ].join("\n\n");
   const messages = chatMessages(req.turns);
   if (req.context && messages.length) {
     messages[0] = { role: "user", content: `${asData("learner_progress", req.context, 1500)}\n\n${messages[0].content}` };
-  }
-  return { system, messages, schema: ChatReply };
-}
-
-// ------------------------------------------------------------------ x bot --
-
-export const BotRequest = z.strictObject({
-  turns: z.array(ChatTurn).min(1).max(30),
-  /** The page the learner is on, so X Bot can talk about it. */
-  page: z.strictObject({ path: z.string().max(200), title: z.string().max(200) }),
-});
-
-/** XB-3: X Bot answers doubts about AI topics and about using Xplaind, from any page. */
-export function botPrompt(req: z.infer<typeof BotRequest>, catalog: CatalogLesson[], siteGuide: string) {
-  const system = [
-    "You are X Bot, the small, cheerful helper that floats on every page of Xplaind, a site for learning AI. You help a learner clear a doubt about an AI topic or find their way around the site.",
-    HOUSE_STYLE,
-    DATA_RULE,
-    "Be warm and a little playful, but get to the point: answer the doubt first in plain words with an everyday example, then point to where on Xplaind to go deeper. Keep most replies under 150 words. If the question is not about learning, AI or the site, say kindly what you can help with. Never make up a page, a course or a price.",
-    CHAT_FORMAT,
-    "Pages on Xplaind (path | what it is for):",
-    siteGuide,
-    "Lesson catalog (id | title | level):",
-    catalogText(catalog),
-  ].join("\n\n");
-  const messages = chatMessages(req.turns);
-  if (messages.length) {
-    const here = `${asData("current_page_path", req.page.path, 200)}\n${asData("current_page_title", req.page.title, 200)}`;
-    messages[0] = { role: "user", content: `${here}\n\n${messages[0].content}` };
   }
   return { system, messages, schema: ChatReply };
 }

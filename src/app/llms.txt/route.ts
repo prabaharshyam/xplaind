@@ -56,7 +56,6 @@ export function GET(): Response {
     "## AI tools",
     `- [AI tools](${base}/ai): AI tools built on Xplaind's own lessons`,
     `- [AI tutor](${base}/ai/tutor): ask any doubt and get an answer from Xplaind's lessons`,
-    `- [Roadmap generator](${base}/ai/roadmap): a personal study plan for your goal and time`,
     `- [Study from my notes and books](${base}/ai/book): tests and flashcards from your own PDF`,
     `- [Resume review](${base}/ai/resume): feedback on an AI resume against a target role`,
     `- [Code playground](${base}/playground): run Python in the browser`,

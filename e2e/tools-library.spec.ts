@@ -46,12 +46,13 @@ test("the papers library lists landmark papers and free books with their hosts (
   expect((await wcag(page)).violations).toEqual([]);
 });
 
-test("the Rust and AI tools topics have their lessons, and the Rust post links into them", async ({ page }) => {
-  await page.goto("/topics/rust");
-  await expect(page.getByRole("link", { name: /Rust ownership, borrowing and lifetimes/ })).toBeVisible();
+test("the AI tools topic has its lessons, and the removed Rust track sends old links on (FOCUS-2)", async ({ page }) => {
   await page.goto("/topics/ai-tools");
   await expect(page.getByRole("link", { name: /Build AI voice agents with Vapi/ })).toBeVisible();
+  await page.goto("/topics/rust");
+  await expect(page).toHaveURL(/\/topics$/);
+  await page.goto("/stop/rust-ownership-borrowing");
+  await expect(page).toHaveURL(/\/topics$/);
   await page.goto("/blog/rust-programming-language-2026");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Rust");
-  await expect(page.getByRole("link", { name: "Ownership, borrowing and lifetimes", exact: true })).toHaveAttribute("href", "/stop/rust-ownership-borrowing");
+  await expect(page).toHaveURL(/\/blog$/);
 });

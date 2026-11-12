@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { SignUpDialog } from "@/components/account/signup-dialog";
-import { XBot } from "@/components/bot/x-bot";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { MotionEffects, PageEnter } from "@/components/motion/motion-effects";
 import { SiteMotion } from "@/components/motion/site-motion";
 import { SiteFooter } from "@/components/site-footer";
 import { NavProgress } from "@/components/nav-progress";
 import { SiteHeader } from "@/components/site-header";
-import { aiEnabled } from "@/lib/ai/settings";
 import { allowIndexing } from "@/lib/indexing";
 import { siteUrl } from "@/lib/site";
 import { GeistSans } from "geist/font/sans";
@@ -77,7 +75,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Suspense fallback={null}>
           <PageEnter />
           <SiteMotion />
-          <XBot aiOn={aiEnabled()} />
         </Suspense>
       </body>
     </html>

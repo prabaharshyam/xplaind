@@ -45,7 +45,7 @@ const TERMS: { title: string; body: ReactNode }[] = [
   },
   {
     title: "AI helpers can be wrong",
-    body: "The AI tutor, X Bot, resume review, interview feedback and book helper write answers with AI. Check anything important before you rely on it. Each has a daily limit, which a Pro pass raises, and we may pause them at any time.",
+    body: "The AI tutor, resume review, interview feedback and book helper write answers with AI. Check anything important before you rely on it. Each has a daily limit, which a Pro pass raises, and we may pause them at any time.",
   },
   {
     title: "Your content",
