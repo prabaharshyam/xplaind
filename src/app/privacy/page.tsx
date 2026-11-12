@@ -29,6 +29,11 @@ const STORED: [string, string, string][] = [
     "Until you delete your account in Settings, which removes all of it at once.",
   ],
   [
+    "Sign-in timeout (accounts only)",
+    "A small cookie on this site with the time of your last visit. It is never sent anywhere else and is not used for tracking.",
+    "So we can sign you out after 7 days away, or 30 days after you signed in, whichever comes first. It lasts 30 days.",
+  ],
+  [
     "A roadmap PDF request",
     "Name, email, experience and, only if you give it, a phone number, with the consent you ticked.",
     "To send that roadmap's updates and tips. Kept until you ask us to delete it. Under-18s get the PDF without giving any details.",

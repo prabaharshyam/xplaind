@@ -5,6 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { setSignedIn } from "@/lib/browser/account-sync";
 import { publicSupabase } from "@/lib/signups";
 import { browserClient } from "@/lib/supabase/browser";
+import { SEEN_COOKIE, seenCookie, sessionExpiry, toMs } from "@/lib/account/session-timeout";
+
+const readSeen = () => toMs(document.cookie.split("; ").find((c) => c.startsWith(`${SEEN_COOKIE}=`))?.slice(SEEN_COOKIE.length + 1));
 
 /** "off" until accounts are switched on for this deployment. */
 export type AccountState = "off" | "unknown" | "in" | "out";
@@ -20,7 +23,20 @@ export function useAccountState(): AccountState {
       setSignedIn(inNow);
       setState(inNow ? "in" : "out");
     };
-    void client.auth.getSession().then(({ data }) => apply(!!data.session));
+    void client.auth.getSession().then(async ({ data }) => {
+      const session = data.session;
+      if (session) {
+        // AC-13: sign out after 7 days away, or 30 days after signing in; otherwise record this visit.
+        const now = Date.now();
+        if (sessionExpiry({ now, signedInAt: toMs(session.user.last_sign_in_at), lastSeen: readSeen() })) {
+          await client.auth.signOut();
+          apply(false);
+          return;
+        }
+        document.cookie = seenCookie(now, location.protocol === "https:");
+      }
+      apply(!!session);
+    });
     const { data } = client.auth.onAuthStateChange((_event, session) => apply(!!session));
     return () => data.subscription.unsubscribe();
   }, []);
