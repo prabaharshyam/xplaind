@@ -39,6 +39,13 @@ describe("ranking ignores affiliate and commission fields (ED-2)", () => {
       const code = text.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
       expect(code).not.toMatch(/affiliate|commission/i);
     });
+
+    // PAY-1: a Pro pass raises AI limits only; it never changes what is recommended or in what order.
+    it(`${file} never reads billing, passes or plans`, () => {
+      const text = fs.readFileSync(path.join(__dirname, file), "utf8");
+      const code = text.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+      expect(code).not.toMatch(/billing|entitlement|proOpen|\btier\b|\bpass_(month|6month|year)\b/i);
+    });
   }
 
   it("orders identically whatever the affiliate flag says, and never reads it", () => {

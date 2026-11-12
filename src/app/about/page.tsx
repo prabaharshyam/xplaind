@@ -86,16 +86,22 @@ export default function AboutPage() {
               learn, in what order, which course or video teaches it best, what to build, and how to explain it in an interview.
               Today that is {lessons} lessons, each written to be read in one sitting.
             </p>
-            {pro && (
-              <p>
-                The AI tools cost us money each time they run, so every account gets a daily allowance and a{" "}
-                <Link href="/pricing" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
-                  Pro pass
-                </Link>{" "}
-                gives more AI help each day: more AI tutor answers, mock interview feedback and resume reviews. Pro never unlocks lessons,
-                because nothing is locked.
-              </p>
-            )}
+            <p>
+              The AI tools cost us money each time they run, so every account gets a daily allowance.{" "}
+              {pro ? (
+                <>
+                  A{" "}
+                  <Link href="/pricing" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                    Pro pass
+                  </Link>{" "}
+                  gives
+                </>
+              ) : (
+                "Pro passes, coming soon, will give"
+              )}{" "}
+              more AI help each day: more AI tutor answers, mock interview feedback and resume reviews. Pro never unlocks lessons, because
+              nothing is locked.
+            </p>
           </div>
         </section>
 

@@ -473,3 +473,7 @@ The owner, already holding an account but signed out on a phone, was told "Creat
 
 Sessions renewed themselves forever. The owner chose: signed out after 7 days without a visit, and always after 30 days. Supabase's own session limits are a paid-plan setting, so the app enforces them: a first-party cookie records the last visit, the browser checks on every page and the proxy on account pages and APIs. The lesson's reading-progress line was inside the page's entrance animation, whose transform made the "fixed" line scroll with the content on phones; it now lives on the page body.
 
+
+## 2026-11-12: how the site earns money, now with Pro passes (PAY-1, ED-3, BK-2)
+
+The owner asked for the trust pages to reflect the paid plans. "How we rank", the affiliate disclosure and About now name two sources of income: Pro passes and book commissions. The passes are one-time payments for 30 days, 6 months or 12 months, with no auto-renewal, so the pages call them passes, not subscriptions. While passes are not on sale (PAYMENTS_MODE unset), the pages say "coming soon" or "not on sale yet" and link to /pricing only once it sells. A new ED-2 test checks that the ranking files never read billing, passes or plans, so the line "Pro never changes a ranking" stays true.

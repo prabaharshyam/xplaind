@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
-import { muted } from "@/components/ui";
+import Link from "next/link";
+import { muted, textLink } from "@/components/ui";
+import { proOpen } from "@/lib/billing/config";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/how-we-rank" },
   title: "How we rank",
-  description: "How Xplaind picks the best course for each topic, checks every link and price, and keeps commissions out of the ranking.",
+  description: "How Xplaind picks the best course for each topic, checks every link and price, earns money from Pro passes and book links, and keeps both out of the ranking.",
 };
 
 // ED-3. Draft wording for the owner to review before launch (slice S7 finishes the
 // trust pages). Keep it true to the code: ranking ignores affiliate fields (ED-2).
 export default function HowWeRankPage() {
+  const pro = proOpen();
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 leading-7 [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_li]:mt-1 [&_p]:mt-3 [&_ul]:list-disc [&_ul]:pl-6">
       <h1 className="text-3xl font-semibold tracking-tight">How we rank</h1>
@@ -39,10 +42,32 @@ export default function HowWeRankPage() {
       </p>
 
       <h2>How the site earns money</h2>
+      <p>Xplaind earns money in two ways, and neither one changes what we recommend.</p>
+      <ul>
+        <li>
+          <strong className="font-semibold">Pro passes{pro ? "" : " (coming soon)"}.</strong> The AI helpers, such as the AI tutor, mock
+          interview feedback and resume review, cost us money every time they run. Every account gets a daily AI allowance. A Pro pass, for
+          30 days, 6 months or 12 months, gives you much more each day. It is one payment with no auto-renewal. Pro never unlocks lessons,
+          because nothing is locked, and it never changes a ranking.{" "}
+          {pro ? (
+            <>
+              <Link href="/pricing" className={textLink}>
+                See Pro passes and prices
+              </Link>
+              .
+            </>
+          ) : (
+            "Passes are not on sale yet."
+          )}
+        </li>
+        <li>
+          <strong className="font-semibold">Book links.</strong> Some links, mostly to books, are affiliate links: if you buy, we may earn a
+          small commission at no extra cost to you. Every affiliate link is labelled on its card.
+        </li>
+      </ul>
       <p>
-        Some links, mostly to books, are affiliate links: if you buy, we may earn a small commission at no extra
-        cost to you. Every affiliate link is labelled on its card. The code that orders courses never reads
-        whether a link earns a commission, and an automated test checks that on every change.
+        The code that orders courses and books never reads whether a link earns a commission or whether you have a Pro pass, and an automated
+        test checks that on every change.
       </p>
 
       <h2>How links are checked</h2>
