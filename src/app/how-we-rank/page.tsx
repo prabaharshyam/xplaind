@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { muted, textLink } from "@/components/ui";
+import { textLink } from "@/components/ui";
 import { proOpen } from "@/lib/billing/config";
 
 export const metadata: Metadata = {
@@ -9,14 +9,12 @@ export const metadata: Metadata = {
   description: "How Xplaind picks the best course for each topic, checks every link and price, earns money from Pro passes and book links, and keeps both out of the ranking.",
 };
 
-// ED-3. Draft wording for the owner to review before launch (slice S7 finishes the
-// trust pages). Keep it true to the code: ranking ignores affiliate fields (ED-2).
+// ED-3. Keep it true to the code: ranking ignores affiliate fields and Pro passes (ED-2).
 export default function HowWeRankPage() {
   const pro = proOpen();
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 leading-7 [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_li]:mt-1 [&_p]:mt-3 [&_ul]:list-disc [&_ul]:pl-6">
       <h1 className="text-3xl font-semibold tracking-tight">How we rank</h1>
-      <p className={muted}>Draft. This page will be reviewed before launch.</p>
 
       <h2>How a course is picked</h2>
       <p>
