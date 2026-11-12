@@ -469,3 +469,7 @@ The Google sign-in window showed the Supabase address because NEXT_PUBLIC_GOOGLE
 
 The owner, already holding an account but signed out on a phone, was told "Create your account" on a roadmap, and the phone menu offered "Get started" next to "Sign in or create an account", which mean the same thing. Every account prompt now offers the same two buttons, "Sign up" and "Sign in", and the sign-in dialog opens on whichever tab was chosen. The header's main button says "Sign up" (it said "Get started" since earlier the same day), and "Start learning" shows only while accounts are switched off.
 
+## 2026-11-12: sign-in timeout; reading line on phones (AC-13, MO-2)
+
+Sessions renewed themselves forever. The owner chose: signed out after 7 days without a visit, and always after 30 days. Supabase's own session limits are a paid-plan setting, so the app enforces them: a first-party cookie records the last visit, the browser checks on every page and the proxy on account pages and APIs. The lesson's reading-progress line was inside the page's entrance animation, whose transform made the "fixed" line scroll with the content on phones; it now lives on the page body.
+

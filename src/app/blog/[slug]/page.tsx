@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
+import { ReadingProgress } from "@/components/reading-progress";
 import { fitTitle } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -53,7 +54,7 @@ export default async function BlogPostPage({ params }: PageProps<"/blog/[slug]">
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
       {/* MO-2: a reading-progress bar under the top bar. */}
-      <div aria-hidden="true" className="lx-progress" />
+      <ReadingProgress />
       <JsonLd
         data={{
           "@context": "https://schema.org",

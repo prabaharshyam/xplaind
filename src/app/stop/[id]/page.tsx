@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ReadingProgress } from "@/components/reading-progress";
 import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { Fragment } from "react";
@@ -159,7 +160,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
   return (
     <main>
       {/* MO-2: a reading-progress bar under the top bar. */}
-      <div aria-hidden="true" className="lx-progress" />
+      <ReadingProgress />
       <LessonVisit stopId={stop.id} />
       <JsonLd data={lessonGraph(stop, paths)} />
       {/* A11Y-1: the light end of a topic's colours is blended in only a third of the way, and a dark layer sits
