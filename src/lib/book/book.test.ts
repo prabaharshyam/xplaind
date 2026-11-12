@@ -208,6 +208,8 @@ describe("flashcards from the learner's file (MB-5)", () => {
       { id: "c2", front: "B", back: "b", quote: "q", page: 4, section: "Cells" },
     ],
     marks: { c2: "again" as const },
+    schedule: {},
+    source: "ai" as const,
   };
 
   it("studies the cards marked again first", () => {

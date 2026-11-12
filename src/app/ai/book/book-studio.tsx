@@ -10,8 +10,11 @@ import { type Book, buildBook, pickExcerpts } from "@/lib/book/chunk";
 import { MAX_FILE_MB, readBookFile } from "@/lib/book/read-file";
 import { type BookQuestion, type BookTest, bookReport, DIFFICULTY_LABEL, type Difficulty, formatSeconds, pageList } from "@/lib/book/report";
 import { addBookTest, deleteBookTest, finishBookTest, retakeBookTest, useBookTests } from "@/lib/browser/book-store";
-import { type BookCard, type BookDeck, addDeck, deckCsv, deleteDeck, markCard, studyOrder, useDecks } from "@/lib/browser/book-cards-store";
+import { type BookCard, type BookDeck, addDeck, deckCsv, deleteDeck, markCard, useDecks } from "@/lib/browser/book-cards-store";
+import { dueCards, missedAsCards, nextDue } from "@/lib/book/loop";
+import { useToday } from "@/lib/browser/hooks";
 import { todayInIST } from "@/lib/dates";
+import { AskNotes, RetestPanel } from "./study-loop";
 
 const COUNTS = [5, 10, 15, 20, 25];
 const MINUTES = [5, 10, 15, 20, 30, 45, 60];
@@ -19,12 +22,17 @@ const CARD_COUNTS = [10, 15, 20, 30];
 
 type View = { kind: "home" } | { kind: "setup"; book: Book } | { kind: "test"; id: string } | { kind: "report"; id: string } | { kind: "deck"; id: string };
 
-/** MB-1 to MB-5: upload a book or notes, get a timed MCQ test or flashcards written from it, with a grounded report. */
+/**
+ * MB-1 to MB-5: upload a book or notes, get a timed MCQ test or flashcards written from it, with a grounded report.
+ * MB-8 to MB-10, the study loop: ask your notes, test, retest what you missed, and review cards when they are due.
+ * The open file lives only in this component's memory; tests and cards are kept on the device.
+ */
 export function BookStudio({ aiOn }: { aiOn: boolean }) {
   const access = useAiAccess(aiOn);
   const tests = useBookTests();
   const decks = useDecks();
   const [view, setView] = useState<View>({ kind: "home" });
+  const [book, setBook] = useState<Book | null>(null);
   const top = useRef<HTMLDivElement>(null);
 
   const go = (v: View) => {
@@ -48,7 +56,10 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
         <Home
           tests={tests}
           decks={decks}
-          onBook={(book) => go({ kind: "setup", book })}
+          onBook={(b) => {
+            setBook(b);
+            go({ kind: "setup", book: b });
+          }}
           onOpen={(t) => go(t.result ? { kind: "report", id: t.id } : { kind: "test", id: t.id })}
           onDeck={(d) => go({ kind: "deck", id: d.id })}
         />
@@ -64,7 +75,10 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
             go({ kind: "test", id: current.id });
           }}
           onHome={() => go({ kind: "home" })}
-        />
+          onDeck={(id) => go({ kind: "deck", id })}
+        >
+          <RetestPanel test={current} book={book} access={access} onBook={setBook} onReady={(id) => go({ kind: "test", id })} />
+        </Report>
       )}
     </div>
   );
@@ -74,6 +88,10 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
 
 function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; decks: BookDeck[]; onBook: (b: Book) => void; onOpen: (t: BookTest) => void; onDeck: (d: BookDeck) => void }) {
   const inputId = useId();
+  // Read after hydration: the page is prerendered, and "today" must be the learner's, not the build's.
+  const today = useToday() ?? "";
+  const due = decks.map((d) => ({ deck: d, n: dueCards(d.cards, d.schedule, today).length })).filter((x) => x.n > 0);
+  const dueTotal = due.reduce((a, x) => a + x.n, 0);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +113,29 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
 
   return (
     <div className="flex flex-col gap-8">
+      {decks.length > 0 && (
+        <section aria-labelledby="due-h" className="flex flex-col items-start gap-3 rounded-2xl bg-violet-50 p-5 sm:flex-row sm:items-center sm:gap-4 dark:bg-violet-950/40">
+          <span className="hidden size-12 shrink-0 place-items-center rounded-2xl bg-violet-700 text-white sm:grid" aria-hidden="true">
+            <Icon name="target" size={24} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id="due-h" className="text-lg font-semibold">
+              {dueTotal ? `${dueTotal} ${dueTotal === 1 ? "card" : "cards"} due today` : "No cards due today"}
+            </h2>
+            <p className="text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+              {dueTotal
+                ? "A few minutes now keeps them from fading. Cards you know come back less often."
+                : "Every card is on schedule. Come back when the next ones are due."}
+            </p>
+          </div>
+          {due[0] && (
+            <button type="button" className={primaryButton} onClick={() => onDeck(due.sort((a, b) => b.n - a.n)[0].deck)}>
+              Review now
+            </button>
+          )}
+        </section>
+      )}
+
       <section aria-labelledby="upload-h" className="rounded-2xl border-2 border-dashed border-zinc-300 bg-white p-6 text-center dark:border-zinc-700 dark:bg-zinc-900">
         <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-teal-500 to-violet-500 text-white">
           <Icon name="book" size={28} />
@@ -138,13 +179,17 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
           </h2>
           <ul className="mt-3 flex flex-col gap-3">
             {decks.map((d) => {
-              const knew = d.cards.filter((c) => d.marks[c.id] === "knew").length;
+              const dueNow = dueCards(d.cards, d.schedule, today).length;
+              const next = nextDue(d.schedule);
               return (
                 <li key={d.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold">{d.book}</p>
+                    <p className="font-semibold">
+                      {d.source === "missed" ? "Missed questions: " : ""}
+                      {d.book}
+                    </p>
                     <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                      {d.cards.length} cards · {d.createdOn} · you knew {knew}
+                      {d.cards.length} cards · {d.createdOn} · {dueNow ? `${dueNow} due today` : next ? `next review ${next}` : "not studied yet"}
                     </p>
                   </div>
                   <button type="button" className={secondaryButton} onClick={() => onDeck(d)} aria-label={`Study the flashcards: ${d.book}, ${d.createdOn}`}>
@@ -173,6 +218,7 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{t.book}</p>
                     <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {t.retest ? "Retest · " : ""}
                       {t.questions.length} questions · {DIFFICULTY_LABEL[t.difficulty]} · {t.minutes} min · {t.createdOn}
                       {r ? ` · scored ${r.percent}%` : " · not taken yet"}
                     </p>
@@ -196,7 +242,7 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
 // ----------------------------------------------------------------- setup --
 
 function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: ReturnType<typeof useAiAccess>; onBack: () => void; onReady: (id: string) => void; onDeck: (id: string) => void }) {
-  const [mode, setMode] = useState<"test" | "cards">("test");
+  const [mode, setMode] = useState<"test" | "cards" | "ask">("test");
   const [cardCount, setCardCount] = useState(15);
   const [chosen, setChosen] = useState<string[]>(book.sections);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
@@ -244,11 +290,12 @@ function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: 
 
       <fieldset>
         <legend className="text-lg font-semibold">What do you want?</legend>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
           {(
             [
+              ["ask", "Ask your notes", "Questions answered only from your file, with the page"],
               ["test", "A timed test", "Multiple-choice questions and a report on what to reread"],
-              ["cards", "Flashcards", "Cards to flip and learn, saved on this device"],
+              ["cards", "Flashcards", "Cards to flip and learn, brought back when they are due"],
             ] as const
           ).map(([m, label, note]) => (
             <label key={m} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 ${mode === m ? "border-violet-600 bg-violet-50 dark:bg-violet-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
@@ -262,6 +309,10 @@ function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: 
         </div>
       </fieldset>
 
+      {mode === "ask" ? (
+        <AskNotes book={book} access={access} />
+      ) : (
+      <>
       <fieldset className="flex flex-col gap-2">
         <legend className="text-lg font-semibold">Which chapters?</legend>
         <div className="flex gap-3 text-sm">
@@ -362,6 +413,8 @@ function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: 
           </p>
         )}
       </AiGate>
+      </>
+      )}
     </div>
   );
 }
@@ -482,9 +535,11 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
 
 // ---------------------------------------------------------------- report --
 
-function Report({ test, onRetake, onHome }: { test: BookTest; onRetake: () => void; onHome: () => void }) {
+function Report({ test, onRetake, onHome, onDeck, children }: { test: BookTest; onRetake: () => void; onHome: () => void; onDeck: (id: string) => void; children?: React.ReactNode }) {
   const result = test.result!;
   const r = bookReport(test, result.answers, result.seconds);
+  const missed = missedAsCards(test, result.answers);
+  const [savedDeck, setSavedDeck] = useState<string | null>(null);
   const [pdf, setPdf] = useState<"idle" | "busy" | "error">("idle");
   const tone = r.percent >= 80 ? "bg-emerald-600" : r.percent >= 60 ? "bg-amber-500" : "bg-rose-600";
 
@@ -532,6 +587,35 @@ function Report({ test, onRetake, onHome }: { test: BookTest; onRetake: () => vo
           </p>
         )}
       </section>
+
+      {missed.length > 0 && (
+        <div className="flex flex-col gap-4">
+          {children}
+          <section aria-labelledby="missed-h" className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-5 dark:border-zinc-800">
+            <div className="min-w-0 flex-1">
+              <h3 id="missed-h" className="text-lg font-semibold">
+                Keep the {missed.length} you missed coming back
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+                Turn them into review cards with the right answer and the quote from your file. They come back tomorrow, then less often as you get them right. No AI needed.
+              </p>
+            </div>
+            {savedDeck ? (
+              <button type="button" className={secondaryButton} onClick={() => onDeck(savedDeck)}>
+                Review them now
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={secondaryButton}
+                onClick={() => setSavedDeck(addDeck({ createdOn: todayInIST(), book: test.book, cards: missed, source: "missed" }))}
+              >
+                Add to my review cards
+              </button>
+            )}
+          </section>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section aria-labelledby="strong-h" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900 dark:bg-emerald-950/30">
@@ -627,14 +711,15 @@ function Report({ test, onRetake, onHome }: { test: BookTest; onRetake: () => vo
 
 /** MB-5: study a deck card by card: flip, then say whether you knew it. "Again" cards come first next time. */
 function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
-  const [order] = useState(() => studyOrder(deck));
+  const today = todayInIST();
+  const [order, setOrder] = useState(() => dueCards(deck.cards, deck.schedule, today));
   const [i, setI] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [knew, setKnew] = useState(0);
   const card = order[i];
 
   const mark = (m: "knew" | "again") => {
-    markCard(deck.id, card.id, m);
+    markCard(deck.id, card.id, m, today);
     if (m === "knew") setKnew((k) => k + 1);
     setFlipped(false);
     setI(i + 1);
@@ -658,22 +743,35 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
           Download the cards (CSV)
         </button>
       </div>
-      <h2 className="text-xl font-semibold">{deck.book}</h2>
-      {i >= order.length ? (
+      <h2 className="text-xl font-semibold">
+        {deck.source === "missed" ? "Missed questions: " : ""}
+        {deck.book}
+      </h2>
+      {order.length === 0 ? (
+        <div role="status" className="rounded-2xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-2xl font-semibold">Nothing due today</p>
+          <p className="mt-1 text-zinc-600 dark:text-zinc-400">{nextDue(deck.schedule) ? `The next cards come back on ${nextDue(deck.schedule)}.` : "All caught up."}</p>
+          <button
+            type="button"
+            className={`${secondaryButton} mt-4`}
+            onClick={() => {
+              setOrder(deck.cards);
+              setI(0);
+            }}
+          >
+            Go through all {deck.cards.length} anyway
+          </button>
+        </div>
+      ) : i >= order.length ? (
         <div role="status" className="rounded-2xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-2xl font-semibold">
             You knew {knew} of {order.length}
           </p>
-          <p className="mt-1 text-zinc-600 dark:text-zinc-400">The cards you marked &ldquo;Again&rdquo; come first next time.</p>
-          <button
-            type="button"
-            className={`${primaryButton} mt-4`}
-            onClick={() => {
-              setI(0);
-              setKnew(0);
-            }}
-          >
-            Go through them again
+          <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+            Cards you marked &ldquo;Again&rdquo; come back tomorrow. The ones you knew come back later, a little further apart each time.
+          </p>
+          <button type="button" className={`${primaryButton} mt-4`} onClick={onHome}>
+            Done for today
           </button>
         </div>
       ) : (

@@ -8,11 +8,11 @@ export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
   title: ["Study From Your Notes: AI Tests & Flashcards From a PDF", "AI Tests & Flashcards From Your PDF"],
   description:
-    "Upload your textbook or notes as a PDF or Word file and get a timed MCQ test or flashcards written from it. Every answer cites its page.",
+    "Upload your textbook or notes as a PDF or Word file. Ask it questions, take a timed MCQ test, retest what you missed and review flashcards when they are due. Every answer cites its page.",
   path: "/ai/book",
 });
 
-/** MB-1 to MB-5: "Study from my notes & books" (renamed from "Ask me from my book" on 2026-11-06). The book is read in the browser and never stored. */
+/** MB-1 to MB-5, MB-8 to MB-10: "Study from my notes & books" (renamed from "Ask me from my book" on 2026-11-06). The book is read in the browser and never stored. */
 export default function BookPage() {
   return (
     <main>
@@ -22,7 +22,7 @@ export default function BookPage() {
         icon="book"
         eyebrow="Practice · AI tool"
         title="Study from my notes & books"
-        lead="Upload your book or notes as a PDF or Word file. Get a timed test or a deck of flashcards written from it. Every answer shows the page it came from, and the report tells you what to reread."
+        lead="Upload your book or notes as a PDF or Word file. Ask it questions, take a timed test, retest what you missed, and review flashcards when they are due. Every answer shows the page it came from."
         crumbs={[{ href: "/practice", label: "Practice" }]}
       />
       <div className="mx-auto max-w-3xl px-4 py-8">

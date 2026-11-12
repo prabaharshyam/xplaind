@@ -25,6 +25,8 @@ const Test = z.object({
   difficulty: z.enum(["easy", "medium", "hard"]),
   minutes: z.number().int().min(1).max(180),
   questions: z.array(Question).min(1).max(30),
+  /** MB-9: written from the sections the learner missed in an earlier test. */
+  retest: z.boolean().optional(),
   result: z
     .object({ answers: z.array(z.number().int().min(0).max(3).nullable()), seconds: z.number().int().min(0), finishedOn: z.string().max(10) })
     .optional(),
