@@ -1,6 +1,6 @@
 # Ideas for "Study from my notes & books", from studying StudyFetch
 
-Researched 11 Nov 2026 at the owner's request, from studyfetch.com's home page, features menu and feature section. StudyFetch is a US study app (founded 2023, claims 8M+ users) that turns uploaded course material into many study formats around one AI tutor called Sparky. Nothing here is built yet; these are proposals for the owner to choose from.
+Researched 11 Nov 2026 at the owner's request, from studyfetch.com's home page, features menu and feature section. StudyFetch is a US study app (founded 2023, claims 8M+ users) that turns uploaded course material into many study formats around one AI tutor called Sparky. Ideas 1 to 3 (the study loop) were built on 12 Nov 2026 as MB-8 to MB-10, with missed questions turned into review cards; the rest are proposals for the owner to choose from.
 
 ## What we have today
 
@@ -77,6 +77,6 @@ Each idea notes its cost to run, because every AI call costs money and AI needs 
 - **Storing users' files on a server.** Our "read on your device" is a trust advantage. Keep anything that needs the server, such as YouTube, as opt-in and clearly labelled.
 - **A playful mascot as the tutor's face.** We already have X Bot. Keep one character, not two.
 
-## Suggested first slice
+## Suggested first slice (built 2026-11-12 as MB-8 to MB-10)
 
 Build ideas 1 to 3 together as "Study loop": ask your notes, then test, then retest what you missed, with spaced repetition in between. They share the excerpt picker and report code, need only the existing tutor and test endpoints, and turn a one-off test into a daily habit.

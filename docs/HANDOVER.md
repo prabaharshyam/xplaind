@@ -91,7 +91,7 @@ Review sign-off: AI-drafted content carries `drafted_with_ai: true` and `reviewe
 | AI | Anthropic API | Server-side only. Monthly spend cap and kill switch in settings. Default model is set in `src/lib/ai` and the `AI_MODEL` variable |
 | Domain | `xplaind.in` | Older docs say `xplaind.ai`; the live domain is `.in` |
 | Community | WhatsApp group, link in `content/community` | The Community page was removed; the site links straight to WhatsApp |
-| Affiliate | Amazon Associates India | `AMAZON_IN_TAG`. Books only. The owner may not have a tag yet |
+| Affiliate | Amazon Associates India | `AMAZON_IN_TAG` (set, 12 Nov). Books only |
 | OAuth | Google Cloud OAuth client, GitHub OAuth app | Callbacks point at the Supabase auth URL |
 
 **Environment variables.** Names only. Values live in Vercel (Settings, Environment Variables) and in `.env.local` for local runs. `.env.example` lists most of them.
@@ -290,10 +290,10 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 2. Confirm sign-in is fully set up (Google, GitHub, email) and decide when to open sign-ups (`NEXT_PUBLIC_SIGNUPS_OPEN=true`). Sign-ups are open (10 Nov), which switches on AG-1 (no AI without an account) and RG-1 (roadmaps show a preview, then ask for an account). Setting the variable back to false lifts both.
 3. Set `ANTHROPIC_API_KEY`, `AI_MONTHLY_CAP_USD` and a matching spend limit in the Anthropic Console if AI tools should run in production.
 4. Pro passes (PAY-1 to PAY-6): run `supabase/migrations/20261108000000_payments.sql`; create the Cashfree account and finish KYC; in the Cashfree dashboard set the payment webhook to `https://xplaind.in/api/billing/webhook`; set `PAYMENTS_MODE=sandbox` plus the sandbox keys on a Preview deployment to test, then the live keys and `PAYMENTS_MODE=production` to launch. Decide GST with a CA (receipts say "not a tax invoice" until then). Approve the refund policy wording at /refunds. Set `NEXT_PUBLIC_CONTACT_EMAIL` (Cashfree checks for a contact address). Raise `AI_MONTHLY_CAP_USD` as passes sell: Pro calls skip the cap but still count towards it.
-5. Add an Amazon Associates India tag (`AMAZON_IN_TAG`) so book links earn.
+5. Done 12 Nov: the Amazon Associates India tag (`AMAZON_IN_TAG`, xplaind-21) is set and book links carry it.
 6. Fill in the missing video view counts: `npm run videos:views -- --missing`, commit `content/video-views.yaml`.
-7. All AI-drafted lessons, glossary terms and guides were reviewed by him by 9 Nov; review new drafts and any resources marked UNVERIFIED as they appear. A lawyer should review the privacy policy and terms before a public launch.
-8. SEO (SE-8, 10 Nov): verify xplaind.in in Google Search Console and Bing Webmaster Tools, submit the sitemap and request indexing for the key pages; steps and the keyword map are in `docs/seo-keywords.md`. Review the two new guides (how to become an AI engineer in India; free AI courses with certificate) and mark them reviewed.
+7. All AI-drafted lessons, glossary terms and guides were reviewed by him by 9 Nov; review new drafts and any resources marked UNVERIFIED as they appear. The owner reviewed the privacy policy with a lawyer on 12 Nov.
+8. SEO (SE-8, 10 Nov): verify xplaind.in in Google Search Console and Bing Webmaster Tools, submit the sitemap and request indexing for the key pages; steps and the keyword map are in `docs/seo-keywords.md`. The two new guides (how to become an AI engineer in India; free AI courses with certificate) were reviewed by the owner on 12 Nov.
 
 **Work Claude can pick up, in the order the owner has signalled interest:**
 - Deepen older lessons to the depth of the book-informed ones (runnable code, "when not to", "from demo to production", book reference where the book covers it). Done (LQ-7): the first nine in three batches (PR 52 to 54), then, at the owner's request, every remaining lesson in the agents, automation, voice, evals, governance, LLM, retrieval, data, ops and security themes in one pass (74 lessons, PR 55). He reviewed and approved the whole pass on 8 Nov. Not deepened, by design: beginner B-level lessons, DSA, Rust, system design, software engineering, career, client-delivery and product lessons; the 11 classic ML lessons (I1 and I2 `ml` theme) followed in a second single pass (PR 56), with every code example run for real on scikit-learn and PyTorch (CPU) using synthetic data. How the pass was done: per-lesson spec files applied by a small script (sections inserted before the worked example, Common mistakes extended, the two new sections before Practice, two flashcards added); every Python block was parse-checked and the riskier ones run against mocks.
@@ -301,6 +301,8 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 - Bring cheatsheets back, redesigned (the infographic layout from PR 42 is in git history; ask the owner what was unclear about the old one).
 - Collect more real testimonials as beta testers use the site (SO-1).
 - PRD reviewed against the build on 9 Nov: see "Status review, 2026-11-09" at the top of docs/PRD.md for what is superseded and what is not built yet (PL-7, part of PL-8, IQ-10, ED-5, ED-7, AC-9).
+
+- The notes tool's study loop (MB-8 to MB-10) is built. Next candidates from docs/notes-tool-ideas.md: Indian exam formats (idea 4), chapter summaries (5), read-aloud recaps (6) and a match game (7). Open question for the owner: keep the book's text on the device so a retest needs no re-upload (see decisions, 12 Nov).
 
 **Do not start without being asked:** more upsell pop-ups beyond the one at a daily AI limit (PAY-4), locking any lesson, roadmap, practice or project content behind Pro, XP or badges, more system design content, a system design mock interview, ads or trackers.
 

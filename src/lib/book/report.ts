@@ -24,6 +24,8 @@ export type BookTest = {
   difficulty: Difficulty;
   minutes: number;
   questions: BookQuestion[];
+  /** MB-9: written from the sections the learner missed in an earlier test. */
+  retest?: boolean;
   /** Set once the learner submits. Index of the chosen option, or null when skipped. */
   result?: { answers: (number | null)[]; seconds: number; finishedOn: string };
 };

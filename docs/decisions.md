@@ -477,3 +477,12 @@ Sessions renewed themselves forever. The owner chose: signed out after 7 days wi
 ## 2026-11-12: how the site earns money, now with Pro passes (PAY-1, ED-3, BK-2)
 
 The owner asked for the trust pages to reflect the paid plans. "How we rank", the affiliate disclosure and About now name two sources of income: Pro passes and book commissions. The passes are one-time payments for 30 days, 6 months or 12 months, with no auto-renewal, so the pages call them passes, not subscriptions. While passes are not on sale (PAYMENTS_MODE unset), the pages say "coming soon" or "not on sale yet" and link to /pricing only once it sells. A new ED-2 test checks that the ranking files never read billing, passes or plans, so the line "Pro never changes a ranking" stays true.
+
+## 2026-11-12: the study loop for "Study from my notes & books" (MB-8 to MB-10)
+
+The owner asked for the "study loop" proposed in docs/notes-tool-ideas.md (ideas 1 to 3): ask your notes, test, retest what you missed, with spaced repetition in between.
+
+- **Ask your notes runs on the fast model with its own allowance (`notes`).** One question costs a fraction of a test, and sharing the `book` allowance (2 a day on a free account) would make a chat useless. The browser picks the matching passages, so the file still never leaves the device whole; with no matching passage there is no AI call at all.
+- **Grounding is checked, not trusted.** An answer is shown as "from your notes" only when one of its quotes is found word for word in the passage it cites; otherwise the learner sees "not in your notes". This keeps the tool's promise that every answer shows its page.
+- **The file is still not stored.** A retest needs passages from the weak sections, so if the file is not open the learner opens it again; it is matched by title. Keeping the book's text on the device (IndexedDB) would remove that step, but it changes the "we keep no copy of your file" promise; left for the owner to decide.
+- **Spaced repetition is a simple Leitner schedule** (1, 2, 4, 8, 16, 32 days) kept with each deck on the device, and missed test questions can become a review deck without AI. Interview practice keeps its own order (IQ-10 is unchanged).

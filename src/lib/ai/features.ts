@@ -417,6 +417,64 @@ export function cleanBookCards(out: BookCardsOutput, excerpts: BookExcerpt[], co
     .map((c, i) => ({ id: `c${i + 1}`, front: c.front, back: c.back, quote: c.quote, page: c.page, section: c.section }));
 }
 
+/**
+ * MB-8: "Ask your notes". A question answered only from the few excerpts of the learner's own file
+ * that match it best (picked in the browser), with exact quotes, or a plain "not in your notes".
+ */
+export const BookAskRequest = z.strictObject({
+  book: z.string().max(160),
+  question: z.string().trim().min(2).max(500),
+  /** The last few turns, so "and the second one?" makes sense. */
+  turns: z.array(ChatTurn).max(6).default([]),
+  excerpts: z.array(BookExcerpt).max(8),
+});
+
+export const BookAskOutput = z.object({
+  found: z.boolean(),
+  answer: z.string(),
+  citations: z.array(z.object({ excerpt_id: z.string(), quote: z.string() })),
+  follow_ups: z.array(z.string()),
+});
+export type BookAskOutput = z.infer<typeof BookAskOutput>;
+
+export function bookAskPrompt(req: z.infer<typeof BookAskRequest>) {
+  const system = [
+    "You answer a learner's question about their own notes or book, using only the numbered excerpts you are given from it.",
+    HOUSE_STYLE,
+    DATA_RULE,
+    "Use only the excerpts: never outside knowledge, even if you know the answer. If the excerpts do not answer the question, set found to false and say in one short sentence that it is not in the parts of their notes that matched, and suggest what to search for instead. Never guess.",
+    "answer: plain text, under 150 words, in simple English; short paragraphs or '- ' bullets. citations: one to three exact quotes that support the answer, each 8 to 40 words copied character for character from one excerpt, with that excerpt's id. follow_ups: 2 short questions the learner could ask next that the excerpts can answer.",
+  ].join("\n\n");
+  const history = req.turns.slice(-6).map((t) => (t.role === "user" ? `Learner: ${t.text.slice(0, 500)}` : `You: ${t.text.slice(0, 800)}`)).join("\n");
+  const user = [
+    asData("book_title", req.book, 160),
+    ...req.excerpts.map((e) => asData(`excerpt_${e.id}`, `[${e.id}] ${e.section}, page ${e.page}\n${e.text}`, 2000)),
+    ...(history ? [asData("conversation_so_far", history, 4000)] : []),
+    asData("question", req.question, 500),
+  ].join("\n\n");
+  return { system, messages: [{ role: "user" as const, content: user }], schema: BookAskOutput };
+}
+
+export type BookAnswer = { found: boolean; answer: string; citations: { quote: string; page: number; section: string }[]; followUps: string[] };
+
+export const NOT_IN_NOTES = "I could not find this in your notes. Try other words from your file, or check that the chapter is in the file you opened.";
+
+/** MB-8: an answer counts as found only with at least one quote that really is in the excerpt it cites. */
+export function cleanBookAnswer(out: BookAskOutput, excerpts: BookExcerpt[]): BookAnswer {
+  const byId = new Map(excerpts.map((e) => [e.id, e]));
+  const seen = new Set<string>();
+  const citations = out.citations.flatMap((c) => {
+    const e = byId.get(c.excerpt_id);
+    const quote = clip(c.quote, 400);
+    if (!e || seen.has(quote) || !quoteIn(quote, e.text)) return [];
+    seen.add(quote);
+    return [{ quote, page: e.page, section: e.section }];
+  }).slice(0, 3);
+  const followUps = out.follow_ups.map((f) => line(f, 160)).filter(Boolean).slice(0, 2);
+  if (!out.found || citations.length === 0) return { found: false, answer: out.found ? NOT_IN_NOTES : clip(out.answer, 600) || NOT_IN_NOTES, citations: [], followUps };
+  return { found: true, answer: clip(out.answer, 2000), citations, followUps };
+}
+
 // ----------------------------------------------------------------- resume --
 
 /** RV-1: a resume (text read in the browser) and, optionally, the role and a job post to aim at. */
