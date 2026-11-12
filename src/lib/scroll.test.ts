@@ -26,7 +26,7 @@ describe("nothing scrolls the page by itself (NV-4)", () => {
   });
 
   it("chat boxes scroll their own list, not the page", () => {
-    for (const f of ["src/components/ai/ai-chat.tsx", "src/components/bot/x-bot.tsx"]) {
+    for (const f of ["src/components/ai/ai-chat.tsx"]) {
       const src = readFileSync(f, "utf8");
       expect(src, f).toContain("scrollTop = ");
       expect(src, f).not.toContain("scrollIntoView(");

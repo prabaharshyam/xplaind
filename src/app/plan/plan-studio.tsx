@@ -10,11 +10,12 @@ import { setPath } from "@/lib/browser/progress-store";
 import { serverSnapshot, subscribe } from "@/lib/browser/storage";
 import { currentPlan, googleCalendarLink, HOUR_CHOICES, nextMonday, type PlanLesson, planWeek, reminderIcs, weekOf } from "@/lib/plan/weekly";
 import { Skeleton } from "@/components/skeleton";
+import { CommitCard } from "./commit-card";
 
 const DEFAULT_HOURS = 6;
 const fmt = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
 
-/** WP-1 to WP-3: this week's lessons for the chosen role, sized to the learner's hours, with a weekly reminder. */
+/** WP-1 to WP-3 and CM-90, together as "Stay on track" (FOCUS-2): this week's lessons for the chosen role, sized to the learner's hours, with a weekly reminder. */
 export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; name: string }[]; lessons: Record<string, PlanLesson[]>; planUrl: string }) {
   const today = useToday();
   const progress = useProgress();
@@ -143,8 +144,8 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
         </div>
 
         <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950/30">
-          <h2 className="font-semibold">Weekly reminder</h2>
-          <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">A calendar reminder every Monday at 9 am that opens this plan.</p>
+          <h2 className="font-semibold">Calendar reminder</h2>
+          <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">A reminder every Monday at 9 am that opens this plan. No account needed.</p>
           <div className="mt-3 flex flex-col gap-2">
             <a href={googleCalendarLink(remindFrom, planUrl)} target="_blank" rel="noopener noreferrer" className={primaryButton}>
               Add to Google Calendar
@@ -154,6 +155,8 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
             </button>
           </div>
         </div>
+
+        <CommitCard paths={paths} defaultPath={pathId} />
       </aside>
     </div>
   );

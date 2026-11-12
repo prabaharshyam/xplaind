@@ -12,7 +12,7 @@ export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
   title: ["AI Tools for Learning AI: Tutor, Resume Review and More", "AI Tools for Learning AI"],
   description:
-    "AI tools that help you learn AI and get hired: an AI tutor that knows your progress, AI resume review, interview feedback, tests from your notes and a personal AI roadmap.",
+    "AI tools that help you learn AI and get hired: an AI tutor that knows your progress, AI resume review, interview feedback, and tests and flashcards from your notes.",
   path: "/ai",
 });
 
@@ -30,7 +30,6 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     tools: [
       { href: "/ai/book", title: "Study from my notes & books", text: "Turns your textbook or notes into a timed test or flashcards, and shows what to reread.", icon: "book", tone: "from-teal-500 to-teal-700", ai: true, give: "A PDF of your book or notes", get: "A test and a page-by-page report" },
       { href: "/ai/tutor", title: "AI tutor", text: "Explains any AI topic in plain English, with examples, and knows which lessons you have done.", icon: "chat", tone: "from-violet-500 to-violet-700", ai: true, give: "Your question", get: "A clear answer and lessons to read" },
-      { href: "/ai/roadmap", title: "AI roadmap generator", text: "Builds a stage-by-stage plan for your goal, level and hours, linked to our lessons.", icon: "map", tone: "from-sky-500 to-violet-600", ai: true, give: "Your goal and weekly hours", get: "A personal roadmap to tick off" },
     ],
   },
   {
@@ -164,9 +163,9 @@ export default function AiToolsPage() {
             How the AI tools work
           </h2>
           {[
-            ["A daily allowance", "Everyone gets a few roadmaps, reviews and grades a day, and more tutor messages. It resets at midnight India time."],
+            ["A daily allowance", "Everyone gets a few reviews and grades a day, and more tutor messages. It resets at midnight India time."],
             ["Your words are data, not commands", "What you type is sent to Anthropic only to write your answer. It is never used to rank courses, and we never sell it."],
-            ["AI can be wrong", "Generated roadmaps, reviews and answers are a starting point, not the last word. Check anything important against a trusted source."],
+            ["AI can be wrong", "Reviews and answers are a starting point, not the last word. Check anything important against a trusted source."],
           ].map(([h, p]) => (
             <div key={h} className="rounded-2xl bg-zinc-100 p-5 dark:bg-zinc-900">
               <h3 className="font-semibold">{h}</h3>

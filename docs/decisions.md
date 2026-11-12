@@ -486,3 +486,13 @@ The owner asked for the "study loop" proposed in docs/notes-tool-ideas.md (ideas
 - **Grounding is checked, not trusted.** An answer is shown as "from your notes" only when one of its quotes is found word for word in the passage it cites; otherwise the learner sees "not in your notes". This keeps the tool's promise that every answer shows its page.
 - **The file is still not stored.** A retest needs passages from the weak sections, so if the file is not open the learner opens it again; it is matched by title. Keeping the book's text on the device (IndexedDB) would remove that step, but it changes the "we keep no copy of your file" promise; left for the owner to decide.
 - **Spaced repetition is a simple Leitner schedule** (1, 2, 4, 8, 16, 32 days) kept with each deck on the device, and missed test questions can become a review deck without AI. Interview practice keeps its own order (IQ-10 is unchanged).
+
+## 2026-11-12: a narrower product (FOCUS-2)
+
+The owner asked for a focus review and chose four of its recommendations.
+
+- **AI roadmap generator removed.** It competed with the nine hand-built roadmaps, which are the product, and every use cost a call on the strongest model. Old links go to /paths. Roadmaps saved by it on a learner's device are no longer shown.
+- **X Bot merged into the AI tutor.** Two chat helpers made people unsure which to ask. The floating bot, its instant answers and its API are gone. Its "how do I use the site" notes now feed the tutor on /ai/tutor, so the tutor can point to the right page. The tutor inside lessons stays grounded in the lesson only.
+- **Weekly plan and 90-day emails merged as "Stay on track"** at /plan. The plan and calendar reminder work without an account; the Monday email opt-in shows to signed-in learners and asks others to sign in. It is hidden when accounts are off.
+- **Rust track dropped** as off-topic for AI careers. Lessons, the blog post, the Rust-only glossary terms and the Rust-only resources were deleted; old URLs redirect permanently so search engines move on. DSA, system design basics and software engineering stay because AI job interviews use them.
+- Not chosen: removing jobs and salaries, and demoting "Study from my notes & books".

@@ -29,8 +29,6 @@ const ORDER: AiKind[] = [
   "resume",
   "book",
   "notes",
-  "roadmap",
-  "bot",
 ];
 
 const FREE = [

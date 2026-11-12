@@ -2,13 +2,19 @@
 
 import { useEffect, useId, useState } from "react";
 import { Icon } from "@/components/art/icons";
+import { AuthChoice } from "@/components/account/auth-choice";
+import { useAccountState } from "@/components/account-link";
 import { primaryButton, secondaryButton } from "@/components/ui";
 import { COMMIT_CONSENT } from "@/lib/commit/plan";
 
 type Status = { active: false } | { active: true; pathId: string; week: number };
 
-/** CM-90: opt in to one email a week for 13 weeks, or stop them. Off unless the learner ticks the box. */
+/**
+ * CM-90: opt in to one email a week for 13 weeks, or stop them. Off unless the learner ticks the box.
+ * FOCUS-2: part of "Stay on track" on /plan, beside the weekly plan and its calendar reminder.
+ */
 export function CommitCard({ paths, defaultPath }: { paths: { id: string; name: string }[]; defaultPath: string }) {
+  const account = useAccountState();
   const [status, setStatus] = useState<Status | null>(null);
   const [pathId, setPathId] = useState(defaultPath);
   const [consent, setConsent] = useState(false);
@@ -17,11 +23,12 @@ export function CommitCard({ paths, defaultPath }: { paths: { id: string; name: 
   const ids = { path: useId(), consent: useId() };
 
   useEffect(() => {
+    if (account !== "in") return;
     fetch("/api/commit")
       .then((r) => (r.ok ? r.json() : { active: false }))
       .then(setStatus)
       .catch(() => setStatus({ active: false }));
-  }, []);
+  }, [account]);
 
   const call = async (method: "POST" | "DELETE") => {
     setBusy(true);
@@ -39,16 +46,28 @@ export function CommitCard({ paths, defaultPath }: { paths: { id: string; name: 
     setStatus(method === "POST" ? { active: true, pathId, week: 1 } : { active: false });
   };
 
+  // Accounts switched off: the plan and calendar reminder still work, so the email offer just stays hidden.
+  if (account === "off" || account === "unknown") return null;
+  if (account === "out")
+    return (
+      <section aria-labelledby="commit-h" className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 id="commit-h" className="font-semibold">
+          A Monday email for 13 weeks
+        </h2>
+        <p className="mt-1 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+          With an account, get one short email each Monday: what you finished and your next three lessons. Stop with one click.
+        </p>
+        <AuthChoice reason="progress" className="mt-3" />
+      </section>
+    );
   if (!status) return null;
   const pathName = (id: string) => paths.find((p) => p.id === id)?.name ?? id;
 
   return (
-    <section aria-labelledby="commit-h" className="rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 id="commit-h" className="flex items-center gap-2 text-lg font-semibold">
-        <span className="grid size-9 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-          <Icon name="fire" size={18} />
-        </span>
-        Commit to 90 days
+    <section aria-labelledby="commit-h" className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+      <h2 id="commit-h" className="flex items-center gap-2 font-semibold">
+        <Icon name="fire" size={18} />
+        A Monday email for 13 weeks
       </h2>
       {status.active ? (
         <>

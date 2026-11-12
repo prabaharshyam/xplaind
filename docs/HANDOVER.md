@@ -13,7 +13,7 @@ This document holds no secrets and must never hold any. Keys live in Vercel and 
 1. Read `CLAUDE.md` (the project rules, short) and `AGENTS.md` (Next.js 16 is not the Next.js you know; read `node_modules/next/dist/docs/` before writing framework code).
 2. Run `npm install`, then `npm run check` (lint, typecheck, unit tests, content validation). Everything should pass.
 3. Run `npm run dev` and open the home page, a roadmap (`/roadmap/ai-engineer`), a lesson (`/stop/rag-app`), `/videos`, `/interview`. Look at it in light and dark, at 360 px wide and at desktop width. Most owner feedback is about how pages look and read.
-4. Skim `docs/PRD.md` headings and the newest rows (PAY-1 to PAY-6, LQ-1 to LQ-7, VD-1, VD-2, BR-4, CS-3, FOCUS-1, CM-90, IP-1 to IP-3, SE-1). Requirement IDs such as `RM-2` are the spec and go at the start of every commit message.
+4. Skim `docs/PRD.md` headings and the newest rows (FOCUS-2, MB-8 to MB-10, PAY-1 to PAY-6, LQ-1 to LQ-7, VD-1, VD-2, BR-4, CS-3, FOCUS-1, CM-90, IP-1 to IP-3, SE-1). Requirement IDs such as `RM-2` are the spec and go at the start of every commit message.
 5. Read section 3 (the owner) and section 12 (what is pending) before proposing anything.
 
 Starter prompt you can paste into a new Claude session:
@@ -32,7 +32,7 @@ What a learner gets:
 - **About 198 lessons**, each in one format: a one-sentence answer, what it is, how it works, a worked example, common mistakes, practice, key terms, a best course, videos, a quick check, and an AI tutor. Most are "deep lessons" with a diagram, a table, flashcards and an exercise.
 - **Learning tools**: a topic library, a glossary of 315 terms, 23 guided projects, 361 videos filterable by topic, papers and free books, a Python playground that runs in the browser, a weekly study plan, and a placement test.
 - **Interview practice**: a question bank (175 questions with rubrics), flashcards, a timed mock interview with browser speech-to-text and a report, 28 interview patterns, and 10 worked system design answers.
-- **AI tools** (need Claude API keys on the server): an AI tutor, an AI roadmap generator, "study from my notes and books" (turn a PDF into a test and flashcards), a resume review, answer grading, and the X Bot mascot.
+- **AI tools** (need Claude API keys on the server): an AI tutor (which also points learners around the site), "study from my notes and books" (turn a PDF into a test and flashcards), a resume review, answer grading, and the X Bot mascot.
 - **Career**: jobs and salaries by role, live openings.
 - **Accounts** (Supabase, currently held back by a switch, see 6): progress saved to the account, roadmap PDF downloads, weekly email plan.
 - Trust rules: no ads, no sponsored placement, no paid ranking, affiliate links (books only) are labelled and never change order, prices always show the date they were checked.
@@ -104,7 +104,7 @@ Review sign-off: AI-drafted content carries `drafted_with_ai: true` and `reviewe
 | `NEXT_PUBLIC_SIGNUPS_OPEN` | `true` opens sign-ups. Unset keeps the whole site running without accounts (SU-4). Check its current state in Vercel |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Lets "Continue with Google" show xplaind.in |
 | `ANTHROPIC_API_KEY` | **Secret.** AI features |
-| `AI_MONTHLY_CAP_USD`, `AI_KILL_SWITCH`, `AI_MODEL`, `AI_FAST_MODEL` | Spend cap, instant off switch, optional model overrides (main model and the fast model for the tutor and X Bot) |
+| `AI_MONTHLY_CAP_USD`, `AI_KILL_SWITCH`, `AI_MODEL`, `AI_FAST_MODEL` | Spend cap, instant off switch, optional model overrides (main model and the fast model for the tutor and Ask your notes) |
 | `PAYMENTS_MODE` | `sandbox` or `production` turns Pro passes on (PAY-1). Empty keeps Pro closed |
 | `CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY` | **Secret.** Cashfree Payment Gateway keys; sandbox and live keys differ |
 | `RESEND_API_KEY` | **Secret.** Weekly emails |
@@ -189,7 +189,7 @@ Snapshot (2026-11-08): 198 lessons, 603 resources, 54 placement questions, 459 c
 
 **Videos page** reads `content/video-views.yaml`. 300 of 381 video ids have counts; about 81 are missing because YouTube rate-limited the build environment. A video with no count shows no figure and sorts last. Fill them by running `npm run videos:views -- --missing` on a normal connection and committing the one changed file. Do not try to evade a YouTube rate limit.
 
-**Unreviewed content** (still flagged): about 25 lessons (Rust, data structures, caching and other older ones), 37 glossary terms, 1 blog post, and any resource whose `verified_by` says UNVERIFIED (links were checked by script only).
+**Unreviewed content** (still flagged): about 18 lessons (data structures, caching and other older ones), 37 glossary terms, 1 blog post, and any resource whose `verified_by` says UNVERIFIED (links were checked by script only).
 
 **The reference book.** The owner has Chip Huyen's *AI Engineering* (O'Reilly, 2025). It was used as a reference for what to cover and how deep, and every lesson written from it is in our own words with the book cited as further reading. Never copy its text, code or diagrams, and never add the PDF to the repository. About 12 gaps were identified: how a model picks its next word, training stages (SFT, RLHF, DPO), reasoning models, fine-tuning data, synthetic data and distillation, choosing a model, evaluation basics, benchmarks and their limits, inference speed and cost, and building an AI system in layers. Three are written (sampling, how fine-tuning works, LoRA and memory maths).
 
@@ -204,14 +204,14 @@ PRD IDs in brackets.
 - Lesson pages `/stop/<id>`: "On this page" list on the left (RM-15), a Watch and learn panel, flashcards, exercise, quick check, AI tutor.
 - Placement test `/start`, `/result` (PL).
 - Library, topics, videos by topic with view counts (VD-1), glossary, papers and free books, guided projects, code playground (Pyodide in a web worker), weekly plan (`/plan`).
-- Topic tracks added late: DSA, system design (basics), software engineering and Git (SE-1), Rust, AI tools guides (vibe coding, n8n, Vapi voice agents, animation video, Google Veo and Flow video).
+- Topic tracks added late: DSA, system design (basics), software engineering and Git (SE-1), AI tools guides (the Rust track was dropped on 12 Nov, FOCUS-2) (vibe coding, n8n, Vapi voice agents, animation video, Google Veo and Flow video).
 
 **Interview and practice**
 - Question bank `/interview`, Q&A by role, Top 25 sets, flashcards at `/practice` (IQ, PR).
 - Mock interview `/interview/simulator`, browser speech-to-text, typed fallback, a report on key points with no model call; a signed-in learner can add one AI review (VS, IQ-7a).
 - Interview patterns `/interview/patterns` and worked designs `/interview/design` (IP-1 to IP-3).
 
-**AI tools (need server keys, behind caps)** `/ai`: tutor, roadmap generator, "study from my notes and books" (PDF to test and flashcards, read in the browser), resume review, answer grading, X Bot mascot (XB), plus guides to AI at work. Open to guests with a lower daily limit; see AC and SU rows.
+**AI tools (need server keys, behind caps)** `/ai`: tutor, "study from my notes and books" (PDF to test and flashcards, read in the browser), resume review, answer grading, plus guides to AI at work. Open to guests with a lower daily limit; see AC and SU rows.
 
 **Career** `/jobs` salaries and openings (JB), resume review, weekly plan, and "Commit to 90 days" (CM-90): an opt-in weekly email for 13 weeks with one-click unsubscribe, stored in `public.commitments`.
 
@@ -320,6 +320,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **26 Oct:** AI features with guards and caps; topic tracking and one roadmap design; guided projects; X Bot; Top 25 interview sets; content review pass.
 - **27 to 31 Oct:** video lessons, labels and launch sign-off; videos everywhere, library, tracks, pastel 3D look.
 - **1 to 3 Nov:** search and AI visibility; books with affiliate links; sign-up gates; papers library; Rust and AI-tool guides; the home road flight (MO-6 to MO-8); sign-ups put on hold (SU-4); AI tools open to guests (SU-5); brand system (BR-1 to BR-4 original set); About and founder story; accessibility fixes; two Vercel crashes fixed.
+- **12 Nov:** the notes tool's study loop (MB-8 to MB-10, PR 68); a narrower product (FOCUS-2): the AI roadmap generator, X Bot and the Rust track removed, and the weekly plan and Monday emails merged as "Stay on track".
 - **2 Nov (also):** fewer AI tools. The AI roadmap editor and AI course generator were removed and the AI coach was merged into the tutor; the roadmap generator, tutor, notes-to-test tool and resume review stay.
 - **4 to 6 Nov:** many owner-list rounds (roadmap drawer, lesson layout, topic tracks, "Commit to 90 days", a DataCamp-style minimal direction). XP and badges were removed, and month-based durations were removed from the site.
 - **6 to 7 Nov:** research on AI interview prep demand and on AlgoMaster (a Claude doc, "Xplaind: the AlgoMaster for AI roles", may no longer be reachable after an account change). PR 36: lesson layout fix, data engineering channel videos, testimonials, cheatsheets. PR 37: the Interview section (patterns and worked designs). PR 38: software engineering and Git track, "Commit to 90 days". PR 39: the minimal look, site-wide (BR-3).

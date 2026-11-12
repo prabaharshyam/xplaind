@@ -7,7 +7,6 @@ import { currentPathId } from "@/lib/paths";
 import { scoreAnswers } from "@/lib/placement/score";
 import { badgesOf, activeDays, rankOf, streakOf, xpOf } from "@/lib/game/xp";
 import { parseActivity, rawActivity } from "./activity-store";
-import { parseAi, rawAi } from "./ai-store";
 import { parseAttempt, rawAttempt } from "./attempt-store";
 import { parsePractice, rawPractice } from "./practice-store";
 import { parseProgress, rawProgress } from "./progress-store";
@@ -44,12 +43,6 @@ export function useCurrentPathId(known: readonly string[]): string {
   const progress = useProgress();
   const { attempt } = useAttempt();
   return currentPathId(known, progress.path, attempt?.goal);
-}
-
-/** Roadmaps and courses generated with AI on this device. */
-export function useAi() {
-  const raw = useSyncExternalStore(subscribe, rawAi, serverSnapshot);
-  return useMemo(() => parseAi(raw), [raw]);
 }
 
 export function useActivity() {

@@ -301,10 +301,10 @@ export default function Home() {
                 },
                 {
                   id: "plan",
-                  tab: "Weekly plan",
+                  tab: "Stay on track",
                   eyebrow: "Stay on track",
                   title: "A plan for your week, sized to your hours",
-                  text: "The next lessons for your role, fitted to the time you have, with a streak that shows the days you learnt.",
+                  text: "The next lessons for your role, fitted to the time you have, a Monday reminder in your calendar and, if you like, a short progress email every Monday.",
                   cta: { href: "/plan", label: "Plan my week" },
                   more: { href: "/playground", label: "Code playground" },
                   tone: "amber",

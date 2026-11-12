@@ -25,7 +25,17 @@ const nextConfig: NextConfig = {
       ["ai-for-beginners", "ai-engineer"],
     ];
     // 2026-11-02: the AI coach was merged into the AI tutor.
-    const merged = [{ source: "/ai/coach", destination: "/ai/tutor", permanent: true }];
+    // 2026-11-12 (FOCUS-2): the AI roadmap generator was removed; the hand-built roadmaps are the product.
+    const merged = [
+      { source: "/ai/coach", destination: "/ai/tutor", permanent: true },
+      { source: "/ai/roadmap", destination: "/paths", permanent: true },
+      // The Rust track was dropped as off-topic for AI careers; its pages go to the topic list and the blog.
+      { source: "/topics/rust", destination: "/topics", permanent: true },
+      ...["why-rust", "rust-basics", "rust-ownership-borrowing", "rust-structs-enums-matching", "rust-errors-traits-generics", "rust-concurrency-async", "rust-for-ai-and-python"].map(
+        (id) => ({ source: `/stop/${id}`, destination: "/topics", permanent: true }),
+      ),
+      { source: "/blog/rust-programming-language-2026", destination: "/blog", permanent: true },
+    ];
     // 2026-11-08: cheatsheets are paused for now; old links land on Practice. Temporary, since they come back.
     const paused = [
       { source: "/cheatsheets", destination: "/practice", permanent: false },

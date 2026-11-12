@@ -20,7 +20,7 @@ describe("line scenes", () => {
   it("prefers a role or project scene, then the topic's, then a safe default", () => {
     expect(sceneFor("ai-engineer", "llm")).toBe(ROLE_SCENES["ai-engineer"]);
     expect(sceneFor("first-llm-app", "llm")).toBe(PROJECT_SCENES["first-llm-app"]);
-    expect(sceneFor("topic-rust", "rust")).toBe(THEME_SCENES.rust);
+    expect(sceneFor("topic-agents", "agents")).toBe(THEME_SCENES.agents);
     expect(sceneFor("x", "nope")).toBe(THEME_SCENES["ai-basics"]);
   });
 
