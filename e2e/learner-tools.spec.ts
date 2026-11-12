@@ -48,7 +48,7 @@ test("jobs and salaries show every role with dated pay, skills and live job link
 
 test("Stay on track lists this week's lessons, follows the hours and offers a reminder (WP-1 to WP-3, FOCUS-2)", async ({ page }) => {
   await page.goto("/plan");
-  await expect(page.getByText("Stay on track", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("main").getByText("Stay on track", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your week" })).toBeVisible();
   const lessons = page.locator("main ol > li a[href^='/stop/']");
   await expect(lessons.first()).toBeVisible();
