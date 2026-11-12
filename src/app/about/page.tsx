@@ -17,31 +17,10 @@ export const metadata: Metadata = pageMeta({
 });
 
 const BELIEFS = [
-  {
-    icon: "map" as const,
-    title: "Order beats volume",
-    text: "There is no shortage of AI content. What people lack is the right next step. Every roadmap here puts topics in the order you need them, so you never wonder what to learn next.",
-  },
-  {
-    icon: "chat" as const,
-    title: "Plain English first",
-    text: "Each lesson opens with a one-line answer in plain words, then builds up the idea step by step. Key terms link to a glossary that explains them simply.",
-  },
-  {
-    icon: "scale" as const,
-    title: "Picks are earned, not paid for",
-    text: "No one can pay to be listed or ranked. Some book links earn a small commission; the code that orders courses and books never reads it, and a test keeps it that way.",
-  },
-  {
-    icon: "check" as const,
-    title: "Learning is never locked",
-    text: "Every roadmap, lesson, video, practice set, interview answer and project guide is open to every learner, with no daily limit. That does not change.",
-  },
-  {
-    icon: "shield" as const,
-    title: "Your data stays small",
-    text: "No ads and no tracking scripts. Progress stays on your device unless you choose to make an account, and you can delete an account and everything in it from Settings.",
-  },
+  { icon: "map" as const, title: "Order beats volume", text: "Every roadmap puts topics in the order you need them, so you always know what to learn next." },
+  { icon: "chat" as const, title: "Plain English first", text: "Each lesson opens with a one-line answer, then builds the idea step by step." },
+  { icon: "scale" as const, title: "Picks are earned", text: "No one can pay to be listed or ranked. The code that orders courses never reads commissions." },
+  { icon: "shield" as const, title: "Open and private", text: "Every lesson is open to everyone. No ads, no tracking scripts, and you can delete your account anytime." },
 ] as const;
 
 /** The founder's story up to AI (TR-2). The ending, with its emphasis, is written out in the page. */
@@ -166,14 +145,21 @@ export default function AboutPage() {
           <h2 id="believe-h" className="text-2xl font-semibold tracking-tight md:text-3xl">
             What we believe
           </h2>
-          <ul className="mt-6 grid gap-4 sm:grid-cols-2">
-            {BELIEFS.map((b) => (
-              <li key={b.title} className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="grid size-10 place-items-center rounded-2xl bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300" aria-hidden="true">
+          <ul className="mt-6 grid gap-px overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-200 sm:grid-cols-2 dark:border-zinc-800 dark:bg-zinc-800">
+            {BELIEFS.map((b, i) => (
+              <li key={b.title} className="flex gap-4 bg-white p-5 md:p-6 dark:bg-zinc-900">
+                <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300" aria-hidden="true">
                   <Icon name={b.icon} size={20} />
                 </span>
-                <h3 className="mt-3 text-lg font-semibold">{b.title}</h3>
-                <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">{b.text}</p>
+                <div>
+                  <h3 className="text-base font-semibold">
+                    <span className="mr-2 text-sm font-medium text-zinc-500 tabular-nums dark:text-zinc-400" aria-hidden="true">
+                      0{i + 1}
+                    </span>
+                    {b.title}
+                  </h3>
+                  <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">{b.text}</p>
+                </div>
               </li>
             ))}
           </ul>
