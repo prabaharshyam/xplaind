@@ -55,9 +55,8 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
 /** An app icon: a rounded square in the tool's colours with a soft highlight, like a product's icon. */
 function AppIcon({ icon, tone }: { icon: IconName; tone: string }) {
   return (
-    <span aria-hidden="true" className={`relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-[1.1rem] bg-gradient-to-br ${tone} text-white ring-1 ring-black/5`}>
-      <span className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent" />
-      <Icon name={icon} size={26} strokeWidth={1.75} className="relative" />
+    <span aria-hidden="true" data-tone={tone} className="grid size-12 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+      <Icon name={icon} size={22} strokeWidth={1.5} />
     </span>
   );
 }
@@ -107,8 +106,8 @@ export default function AiToolsPage() {
                             <span className="block text-lg leading-6 font-semibold">{t.title}</span>
                             <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-medium">
                               {t.ai ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-                                  <Icon name="sparkles" size={12} /> Uses AI
+                                <span className="text-zinc-600 dark:text-zinc-400">
+                                  Uses AI
                                 </span>
                               ) : (
                                 <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">No AI needed</span>

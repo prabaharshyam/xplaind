@@ -97,7 +97,7 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
       {/* RD-1: a banner, not a small link, so learners see the download straight away. */}
       <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-start gap-4">
-          <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+          <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
             <Icon name="download" size={26} />
           </span>
           <div>

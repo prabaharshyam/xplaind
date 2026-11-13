@@ -627,7 +627,7 @@ function TopicCard({
   const style = STATE_STYLE[state];
   return (
     <div
-      className={`h-full rounded-2xl border-2 transition hover:-translate-y-px ${style.card} ${below && state === "todo" ? "opacity-80" : ""}`}
+      className={`h-full rounded-2xl border-2 transition-colors ${style.card} ${below && state === "todo" ? "opacity-80" : ""}`}
     >
       <div className="flex min-h-12 items-center gap-2 py-1.5 pr-1.5 pl-3">
         <TopicLink

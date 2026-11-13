@@ -16,10 +16,10 @@ async function Card({ params }: { params: Promise<{ id: string }> }) {
   return (
     <>
       <div className="flex aspect-[1200/630] w-full flex-col justify-between rounded-2xl bg-emerald-800 p-6 text-white">
-        <p className="text-sm font-medium tracking-wide opacity-90">{card.goal} path</p>
+        <p className="text-sm font-medium opacity-90">{card.goal} path</p>
         <div>
           {card.name && <p className="text-lg">{card.name} is at</p>}
-          <p className="text-4xl font-bold">
+          <p className="text-4xl font-semibold">
             {levelText(card.level)}: {card.levelName}
           </p>
         </div>

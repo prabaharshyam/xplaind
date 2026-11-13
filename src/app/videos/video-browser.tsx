@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Icon } from "@/components/art/icons";
 import { CourseThumb } from "@/components/course-thumb";
 import { WatchButton } from "@/components/video-player";
 import { secondaryButtonSm } from "@/components/ui";
@@ -77,9 +76,7 @@ export function VideoBrowser({ rows, topics, checkedOn }: { rows: VideoRow[]; to
                     on ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-black" : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
                   }`}
                 >
-                  <span className="grid size-6 place-items-center rounded-full text-white" style={{ background: `linear-gradient(135deg, ${t.from}, ${t.to})` }}>
-                    <Icon name={t.icon} size={13} />
-                  </span>
+                  <span aria-hidden="true" className="mx-1 size-2 shrink-0 rounded-full" style={{ background: t.from }} />
                   {t.label}
                   <span className={on ? "text-white/80 dark:text-black/70" : "text-zinc-600 dark:text-zinc-400"}>{t.count}</span>
                 </button>

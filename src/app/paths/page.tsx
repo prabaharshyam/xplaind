@@ -39,7 +39,7 @@ export default function PathsPage() {
             <li key={p.id} className="">
               <Link
                 href={roadmapHref(p.id)}
-                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900"
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <Cover theme={p.theme ?? "llm"} seed={p.id} className="h-28" iconSize={36} />
                 <span className="flex flex-1 flex-col gap-2 p-5">

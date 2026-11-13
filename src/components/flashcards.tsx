@@ -48,7 +48,7 @@ export function Flashcards({ cards, storageKey, title = "Test your understanding
         </p>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden="true">
-        <div className="h-full bg-emerald-600 transition-all" style={{ width: `${(Math.min(i, cards.length) / cards.length) * 100}%` }} />
+        <div className="h-full bg-emerald-600 transition-[width]" style={{ width: `${(Math.min(i, cards.length) / cards.length) * 100}%` }} />
       </div>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
         {(

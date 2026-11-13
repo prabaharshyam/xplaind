@@ -46,7 +46,7 @@ export default function ContactPage() {
       <div className="mx-auto max-w-3xl px-4 pt-4 pb-16 md:px-6">
         <ul className="mt-8 grid gap-4 sm:grid-cols-2">
           <li className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-            <span className="grid size-10 place-items-center rounded-2xl bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300" aria-hidden="true">
+            <span className="grid size-10 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300" aria-hidden="true">
               <Icon name="chat" size={20} />
             </span>
             <h2 className="mt-3 text-lg font-semibold">Email</h2>
@@ -56,7 +56,7 @@ export default function ContactPage() {
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">We reply within 2 working days.</p>
           </li>
           <li className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-            <span className="grid size-10 place-items-center rounded-2xl bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300" aria-hidden="true">
+            <span className="grid size-10 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300" aria-hidden="true">
               <Icon name="mic" size={20} />
             </span>
             <h2 className="mt-3 text-lg font-semibold">Phone</h2>

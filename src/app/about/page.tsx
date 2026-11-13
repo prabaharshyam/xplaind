@@ -154,7 +154,7 @@ export default function AboutPage() {
           <ul className="mt-6 grid gap-px overflow-hidden rounded-3xl border border-zinc-200 bg-zinc-200 sm:grid-cols-2 dark:border-zinc-800 dark:bg-zinc-800">
             {BELIEFS.map((b, i) => (
               <li key={b.title} className="flex gap-4 bg-white p-5 md:p-6 dark:bg-zinc-900">
-                <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300" aria-hidden="true">
+                <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300" aria-hidden="true">
                   <Icon name={b.icon} size={20} />
                 </span>
                 <div>

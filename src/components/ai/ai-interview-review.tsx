@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Icon } from "@/components/art/icons";
 import type { AnswerReview, InterviewReview } from "@/lib/ai/features";
 import { aiPost } from "./ai-client";
 import { type AiAccess, AiGate } from "./ai-gate";
@@ -41,7 +40,7 @@ export function InterviewReviewPanel({ access, state, answered }: { access: AiAc
   return (
     <section aria-labelledby="ai-review-h" className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 md:p-5 dark:border-violet-900 dark:bg-violet-950/20">
       <h3 id="ai-review-h" className="flex items-center gap-2 text-xl font-semibold">
-        <Icon name="sparkles" size={18} /> AI analysis of your answers
+        AI analysis of your answers
       </h3>
       {review ? (
         <div aria-live="polite" className="mt-2 flex flex-col gap-3">
@@ -79,7 +78,7 @@ export function InterviewReviewPanel({ access, state, answered }: { access: AiAc
             disabled={busy}
             className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-violet-700 px-4 font-medium text-white hover:bg-violet-800 disabled:opacity-60"
           >
-            <Icon name="sparkles" size={16} /> {busy ? "Analysing your answers…" : `Analyse all ${answered} answers with AI`}
+            {busy ? "Analysing your answers…" : `Analyse all ${answered} answers with AI`}
           </button>
           <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
             Your answers are sent to Claude, Anthropic&apos;s AI model, to grade them against the reference answers. 3 reviews a day.
@@ -100,7 +99,7 @@ export function AnswerReviewBlock({ r }: { r: AnswerReview }) {
   return (
     <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900 dark:bg-violet-950/20">
       <p className="flex flex-wrap items-center gap-2 font-semibold">
-        <Icon name="sparkles" size={16} /> AI: {r.score} / 5 · {UNDERSTANDING_LABEL[r.understanding]}
+        AI: {r.score} / 5 · {UNDERSTANDING_LABEL[r.understanding]}
       </p>
       <p className="mt-1">{r.verdict}</p>
       {r.correct.length > 0 && (

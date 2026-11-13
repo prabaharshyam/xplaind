@@ -87,9 +87,7 @@ export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: Top
               const on = filter.topic === t.id;
               return (
                 <button key={t.id} type="button" aria-pressed={on} onClick={() => set({ topic: t.id })} className={chip(on)}>
-                  <span className="grid size-6 place-items-center rounded-full text-white" style={{ background: `linear-gradient(135deg, ${t.from}, ${t.to})` }}>
-                    <Icon name={t.icon} size={13} />
-                  </span>
+                  <span aria-hidden="true" className="mx-1 size-2 shrink-0 rounded-full" style={{ background: t.from }} />
                   {t.label}
                   <span className={on ? "text-white/80 dark:text-black/70" : "text-zinc-600 dark:text-zinc-400"}>{t.count}</span>
                 </button>

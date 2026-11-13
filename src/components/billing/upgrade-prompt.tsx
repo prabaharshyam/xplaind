@@ -40,8 +40,8 @@ export function UpgradePrompt() {
       className="m-auto w-[min(28rem,calc(100vw-2rem))] max-w-none rounded-2xl bg-white p-0 text-zinc-900 backdrop:bg-black/60 dark:bg-zinc-900 dark:text-white"
     >
       <div className="p-6">
-        <p className="grid size-10 place-items-center rounded-full bg-violet-700 text-white">
-          <Icon name="sparkles" size={18} />
+        <p className="grid size-10 place-items-center rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+          <Icon name="bolt" size={18} />
         </p>
         <h2 id="upgrade-title" className="mt-3 text-xl font-semibold">
           Today&apos;s AI turns are used

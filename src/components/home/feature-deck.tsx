@@ -22,12 +22,14 @@ export type DeckCard = {
 };
 
 const TONE: Record<DeckTone, string> = {
-  violet: "bg-violet-100 dark:bg-violet-950",
-  emerald: "bg-emerald-100 dark:bg-emerald-950",
-  sky: "bg-sky-100 dark:bg-sky-950",
-  amber: "bg-amber-100 dark:bg-amber-950",
-  rose: "bg-rose-100 dark:bg-rose-950",
-  teal: "bg-teal-100 dark:bg-teal-950",
+  // One quiet surface for every card: the stack reads from its offset and hairline, and the colour
+  // stays in the small product previews on each card.
+  violet: "bg-zinc-50 dark:bg-zinc-900",
+  emerald: "bg-zinc-50 dark:bg-zinc-900",
+  sky: "bg-zinc-50 dark:bg-zinc-900",
+  amber: "bg-zinc-50 dark:bg-zinc-900",
+  rose: "bg-zinc-50 dark:bg-zinc-900",
+  teal: "bg-zinc-50 dark:bg-zinc-900",
 };
 
 /** Where a card sits relative to the one in front: 0 is the front, 1 to 3 fan out behind, the last has just left. */
@@ -145,7 +147,7 @@ export function FeatureDeck({ cards }: { cards: DeckCard[] }) {
                 aria-hidden={!front}
                 inert={!front}
                 style={pose(offset, n)}
-                className={`deck-card grid min-w-0 origin-bottom-left grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-[2rem] p-5 shadow-[0_30px_60px_-30px_rgba(46,16,101,0.35),0_10px_24px_-14px_rgba(0,0,0,0.18)] md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:content-normal md:items-center md:gap-8 md:p-10 ${TONE[c.tone]}`}
+                className={`deck-card grid min-w-0 origin-bottom-left grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-3xl p-5 shadow-[0_24px_48px_-28px_rgba(0,0,0,0.22),0_8px_20px_-14px_rgba(0,0,0,0.12)] ring-1 ring-zinc-200 dark:ring-zinc-800 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:content-normal md:items-center md:gap-8 md:p-10 ${TONE[c.tone]}`}
               >
                 <div>
                   <p className="hidden text-sm font-semibold text-zinc-700 md:block dark:text-zinc-300">{c.eyebrow}</p>
@@ -189,7 +191,7 @@ export function FeatureDeck({ cards }: { cards: DeckCard[] }) {
                     )}
                   </div>
                 </div>
-                <div className="deck-visual min-w-0 overflow-hidden rounded-3xl bg-white/80 p-3 shadow-sm ring-1 ring-black/5 md:overflow-visible md:p-6 dark:bg-zinc-900/70 dark:ring-white/10">{c.visual}</div>
+                <div className="deck-visual min-w-0 overflow-hidden rounded-2xl bg-white p-3 shadow-sm ring-1 ring-zinc-200 md:overflow-visible md:p-6 dark:bg-zinc-950 dark:ring-zinc-800">{c.visual}</div>
               </article>
             );
           })}
@@ -198,7 +200,7 @@ export function FeatureDeck({ cards }: { cards: DeckCard[] }) {
 
       <div className="mt-6 flex items-center justify-center gap-3 md:hidden" aria-hidden="true">
         {cards.map((c, i) => (
-          <span key={c.id} className={`h-1.5 rounded-full transition-all ${i === active ? "w-6 bg-zinc-900 dark:bg-white" : "w-1.5 bg-zinc-300 dark:bg-zinc-700"}`} />
+          <span key={c.id} className={`h-1.5 rounded-full transition-colors ${i === active ? "w-6 bg-zinc-900 dark:bg-white" : "w-1.5 bg-zinc-300 dark:bg-zinc-700"}`} />
         ))}
       </div>
     </div>

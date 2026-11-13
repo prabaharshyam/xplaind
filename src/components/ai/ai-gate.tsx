@@ -63,7 +63,7 @@ export function AiGate({
   return (
     <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900">
       <p className="flex items-center gap-2 font-semibold">
-        <Icon name="sparkles" size={18} /> AI features are not switched on yet
+        AI features are not switched on yet
       </p>
       <p className="mt-1 text-zinc-700 dark:text-zinc-300">
         They are coming soon. Everything else on Xplaind works today: the{" "}

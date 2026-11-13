@@ -72,9 +72,7 @@ export function AiChat({
         ))}
         {busy && (
           <p className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400" role="status">
-            <span className="size-2 animate-bounce rounded-full bg-violet-500" />
-            <span className="size-2 animate-bounce rounded-full bg-violet-500 [animation-delay:150ms]" />
-            <span className="size-2 animate-bounce rounded-full bg-violet-500 [animation-delay:300ms]" />
+            <span aria-hidden="true" className="size-2 rounded-full bg-zinc-400 motion-safe:animate-pulse" />
             Thinking…
           </p>
         )}
@@ -131,8 +129,8 @@ function Bubble({ role, text, lessons }: Turn) {
   return (
     <div className={`flex gap-2 ${mine ? "justify-end" : ""}`}>
       {!mine && (
-        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-600 to-teal-500 text-white" aria-hidden="true">
-          <Icon name="sparkles" size={15} />
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300" aria-hidden="true">
+          <Icon name="chat" size={15} />
         </span>
       )}
       <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${mine ? "bg-zinc-900 text-white dark:bg-white dark:text-black" : "bg-zinc-100 dark:bg-zinc-800"}`}>

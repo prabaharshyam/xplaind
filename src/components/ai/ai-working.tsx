@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Icon } from "@/components/art/icons";
 
 /** Shown while the model works: AI answers can take up to a minute, so say what is happening. */
 export function AiWorking({ steps }: { steps: string[] }) {
@@ -13,9 +12,7 @@ export function AiWorking({ steps }: { steps: string[] }) {
   return (
     <div role="status" className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900">
       <p className="flex items-center gap-2 font-medium">
-        <span className="grid size-8 animate-pulse place-items-center rounded-full bg-violet-600 text-white">
-          <Icon name="sparkles" size={16} />
-        </span>
+        <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-violet-700 motion-safe:animate-pulse dark:bg-violet-300" />
         {steps[i]}
       </p>
       <ol className="mt-3 flex flex-wrap gap-2 text-xs" aria-hidden="true">

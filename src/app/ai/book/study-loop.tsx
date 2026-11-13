@@ -76,7 +76,7 @@ export function AskNotes({ book, access }: { book: Book; access: Access }) {
               </li>
             ) : (
               <li key={k} className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                <p className="text-xs font-semibold tracking-wide text-teal-800 uppercase dark:text-teal-300">{t.answer.found ? "From your notes" : "Not in your notes"}</p>
+                <p className="text-sm font-medium text-teal-800 dark:text-teal-300">{t.answer.found ? "From your notes" : "Not in your notes"}</p>
                 <div className="mt-1 leading-7 whitespace-pre-line">{t.text}</div>
                 {t.answer.citations.map((c, j) => (
                   <figure key={j} className="mt-3 rounded-2xl border-l-4 border-teal-600 bg-teal-50 p-3 dark:bg-teal-950/30">
@@ -243,7 +243,7 @@ export function RetestPanel({ test, book, access, onBook, onReady }: { test: Boo
               </p>
             ) : (
               <button type="button" className={primaryButton} onClick={() => void write()}>
-                <Icon name="sparkles" size={18} /> Write my retest
+                Write my retest
               </button>
             )}
           </AiGate>
