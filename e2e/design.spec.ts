@@ -86,7 +86,7 @@ test("key pages pass the accessibility check in dark mode too (A11Y-3)", async (
 test("the menu is grouped and marks the section you are in (NV-1 to NV-3)", async ({ page }) => {
   await page.goto("/jobs");
   const menu = page.locator(".site-header details.site-menu");
-  await menu.locator("summary").click();
+  await menu.locator(":scope > summary").click();
   const panel = menu.getByRole("navigation", { name: "Main" });
   await expect(panel).toBeVisible();
   // Full height: the panel reaches the bottom of the screen.
@@ -94,6 +94,11 @@ test("the menu is grouped and marks the section you are in (NV-1 to NV-3)", asyn
   expect(box.y + box.height).toBeGreaterThan(730);
   await expect(panel.getByRole("link", { name: "Jobs and salaries" })).toHaveAttribute("aria-current", "page");
   await expect(panel.getByText("Learn", { exact: true })).toBeVisible();
+  // NV-5: groups are folded; the one you are in starts open, and tapping another opens it and closes the first.
+  await expect(panel.getByRole("link", { name: "Roadmaps", exact: true })).toBeHidden();
+  await panel.locator("summary", { hasText: "Learn" }).click();
+  await expect(panel.getByRole("link", { name: "Roadmaps", exact: true })).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Jobs and salaries" })).toBeHidden();
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/roadmap/ai-engineer");
