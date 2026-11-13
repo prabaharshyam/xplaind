@@ -141,14 +141,21 @@ function DesktopMenus({ path }: { path: string }) {
 
 function PhoneMenu({ path }: { path: string }) {
   const active = activeGroup(path);
+  // NV-5 (owner request, 2026-11-13): one row per group, folded, so the menu stays short; tapping a group
+  // opens its links. The group of the page you are on starts open. Plain <details>, so it works without JavaScript.
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
       {NAV_GROUPS.map((g) => (
-        <section key={g.id} aria-labelledby={`nav-${g.id}`}>
-          <p id={`nav-${g.id}`} className={`px-3 text-sm font-semibold ${active === g.id ? "text-violet-800 dark:text-violet-300" : "text-zinc-600 dark:text-zinc-400"}`}>
+        <details key={g.id} name="phone-nav" open={active === g.id} className="group/acc">
+          <summary
+            className={`flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-3 text-lg font-semibold [&::-webkit-details-marker]:hidden ${active === g.id ? "text-violet-800 dark:text-violet-300" : "text-zinc-900 dark:text-zinc-100"}`}
+          >
             {g.label}
-          </p>
-          <ul className="mt-1">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 text-zinc-500 transition-transform duration-200 group-open/acc:rotate-180 dark:text-zinc-400" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </summary>
+          <ul className="pb-3">
             {g.items.map((i) => (
               <li key={i.href}>
                 <Link
@@ -162,7 +169,7 @@ function PhoneMenu({ path }: { path: string }) {
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       ))}
     </div>
   );

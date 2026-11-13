@@ -160,13 +160,14 @@ test("the top bar is the same light, frosted bar on the home page and after leav
 test("the phone menu closes after a page is chosen", async ({ page }) => {
   await page.goto("/");
   const menu = page.locator(".site-header details.site-menu");
-  await menu.locator("summary").click();
+  await menu.locator(":scope > summary").click();
   await expect(menu).toHaveAttribute("open", "");
+  await menu.locator("summary", { hasText: "Learn" }).click();
   await menu.getByRole("link", { name: "Library", exact: true }).click();
   await expect(page).toHaveURL(/\/library$/);
   await expect(menu).not.toHaveAttribute("open");
   // Escape closes it too
-  await menu.locator("summary").click();
+  await menu.locator(":scope > summary").click();
   await expect(menu).toHaveAttribute("open", "");
   await page.keyboard.press("Escape");
   await expect(menu).not.toHaveAttribute("open");

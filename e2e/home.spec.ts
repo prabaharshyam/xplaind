@@ -46,9 +46,9 @@ test("the home page says what to do and leads to roadmaps, topics, courses and i
   await expect(page.getByText("Honest by design")).toHaveCount(0);
   await expect(page.getByText("Where this is going")).toHaveCount(0);
   const nav = page.getByRole("banner");
-  await nav.locator(".site-menu summary").click(); // phone width: the links sit in the menu
+  await nav.locator(".site-menu > summary").click(); // phone width: the links sit in the menu
   for (const [name, href] of [["Library", "/library"], ["Videos", "/videos"], ["Practice cards", "/practice"], ["Mock interview", "/interview/simulator"], ["Jobs and salaries", "/jobs"], ["Roadmaps", "/paths"]]) {
-    await expect(nav.getByRole("link", { name, exact: true }).first()).toHaveAttribute("href", href);
+    await expect(nav.getByRole("link", { name, exact: true, includeHidden: true }).first()).toHaveAttribute("href", href); // NV-5: inside folded groups
   }
 });
 
