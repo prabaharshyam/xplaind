@@ -10,6 +10,7 @@ they are kept here so every session has them. CLAUDE.md says which skill to use 
 | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill | ui-ux-pro-max |
 | https://github.com/Leonxlnx/taste-skill | design-taste-frontend (taste v2) |
 | https://github.com/pbakaus/impeccable | impeccable |
+| https://github.com/heydamir/unslop | unslop (by Damir Sokolovsky, CC BY 4.0; added 2026-11-13) |
 | https://github.com/google-labs-code/stitch-skills | taste-design, shadcn-ui |
 | https://github.com/cloudai-x/threejs-skills | threejs-* (fundamentals, materials, shaders and more) |
 | https://github.com/dgreenheck/webgpu-claude-skill | webgpu-threejs-tsl |

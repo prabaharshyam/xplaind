@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { primaryButton, secondaryButton } from "@/components/ui";
 import { type PlanId, rupees } from "@/lib/billing/plans";
 
@@ -96,6 +96,13 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
     setPromo({ code: body.code, percentOff: body.percentOff, amount: body.amount });
   };
 
+  // A modal <dialog> left open makes the whole page inert. The router keeps this page mounted but
+  // hidden after navigating away, so close the dialog whenever this component is hidden or removed.
+  useEffect(() => {
+    const d = dialog.current;
+    return () => d?.close();
+  }, []);
+
   const reopen = () => {
     if (dialog.current && !dialog.current.open) dialog.current.showModal();
   };
@@ -109,7 +116,10 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
     }
     const order = (await res.json().catch(() => null)) as (RazorpayOrder & { free?: boolean }) | null;
     // PAY-9: a 100% code needs no payment; the server has already started the pass.
-    if (res.ok && order?.free) return router.push(`/pricing/return?order_id=${encodeURIComponent(order.receipt)}`);
+    if (res.ok && order?.free) {
+      dialog.current?.close();
+      return router.push(`/pricing/return?order_id=${encodeURIComponent(order.receipt)}`);
+    }
     if (!res.ok || !order?.order_id || !order.key_id) throw new Error(order?.error ?? "Could not start the payment. Please try again.");
     await loadSdk("razorpay");
     const checkout = new window.Razorpay!({
