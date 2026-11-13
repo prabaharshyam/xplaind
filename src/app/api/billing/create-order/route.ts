@@ -7,9 +7,10 @@ import { z } from "zod";
 import { json, problem, rateLimit, readJson, requireSession } from "@/lib/account/http";
 import { proOpen, razorpayConfig } from "@/lib/billing/config";
 import { PLANS, PLAN_IDS, newOrderId } from "@/lib/billing/plans";
+import { checkPromo, discountedPaise } from "@/lib/billing/promo";
 import { createRazorpayOrder, MIN_PAISE } from "@/lib/billing/razorpay";
 
-const Body = z.strictObject({ planId: z.enum(PLAN_IDS), agree: z.literal(true) });
+const Body = z.strictObject({ planId: z.enum(PLAN_IDS), agree: z.literal(true), promo: z.string().max(40).optional() });
 
 export async function POST(request: Request) {
   const config = razorpayConfig();
@@ -26,18 +27,35 @@ export async function POST(request: Request) {
   if (!profile) return problem(403, "Please finish setting up your account, and confirm you are 18 or older, before buying a pass.");
 
   const plan = PLANS[parsed.data.planId];
-  if (plan.paise < MIN_PAISE) return problem(400, "That amount is too small to pay online.");
+  // PAY-9: a promo code, checked on the server; the discounted amount is priced here, never by the browser.
+  let promo: { code: string; percentOff: number } | null = null;
+  if (parsed.data.promo?.trim()) {
+    const check = await checkPromo(session.admin, parsed.data.promo, plan.id, session.user.id);
+    if (!check.ok) return problem(400, check.reason);
+    promo = check;
+  }
+  const amount = discountedPaise(plan.paise, promo?.percentOff ?? 0);
+  if (amount > 0 && amount < MIN_PAISE) return problem(400, "That amount is too small to pay online.");
   const orderId = newOrderId(Date.now(), randomBytes(12).toString("base64url"));
   const { error } = await session.admin.from("payments").insert({
     order_id: orderId,
     user_id: session.user.id,
     plan_id: plan.id,
-    amount_paise: plan.paise,
+    amount_paise: amount,
     environment: config.mode,
+    ...(promo ? { promo_code: promo.code, discount_percent: promo.percentOff } : {}),
   });
   if (error) return problem(500, "Could not start the payment. Please try again.");
 
-  const created = await createRazorpayOrder(config, { amountPaise: plan.paise, receipt: orderId, notes: { plan: plan.id } });
+  // PAY-9: 100% off needs no payment; the pass starts now and the code is used up in the same step.
+  if (amount === 0) {
+    const { data: granted, error: grantError } = await session.admin.rpc("grant_pass", { p_order: orderId, p_cf_payment: null, p_now: new Date().toISOString() });
+    if (granted === "used") return problem(400, "You have already used this promo code.");
+    if (grantError || (granted !== "granted" && granted !== "already")) return problem(500, "Could not start your pass. Please try again or contact us.");
+    return json({ free: true, receipt: orderId });
+  }
+
+  const created = await createRazorpayOrder(config, { amountPaise: amount, receipt: orderId, notes: { plan: plan.id, ...(promo ? { promo: promo.code } : {}) } });
   if (!created.ok) {
     await session.admin.from("payments").update({ status: "failed" }).eq("order_id", orderId);
     // A 401 from Razorpay means our keys are wrong: a problem on our side, so the learner is not sent to sign in.

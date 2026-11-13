@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { primaryButton, secondaryButton } from "@/components/ui";
-import type { PlanId } from "@/lib/billing/plans";
+import { type PlanId, rupees } from "@/lib/billing/plans";
 
 type CashfreeCheckout = { checkout: (o: { paymentSessionId: string; redirectTarget: "_self" }) => Promise<unknown> };
 type RazorpaySuccess = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string };
@@ -55,6 +55,11 @@ const field =
  * RZ-1: with Razorpay, asks only for consent (Razorpay's own window asks for the phone), opens the
  * Standard Checkout window, and hands its result to our server to verify before showing success.
  */
+type Promo = { code: string; percentOff: number; amount: number };
+
+/** PAY-9: promo codes work on the 30-day pass, through Razorpay. */
+const takesPromo = (planId: PlanId, provider: Provider) => provider === "razorpay" && planId === "pass_month";
+
 export function BuyPass({ planId, label, price, popular, provider = "cashfree" }: { planId: PlanId; label: string; price: string; popular?: boolean; provider?: Provider }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const router = useRouter();
@@ -63,19 +68,48 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [promo, setPromo] = useState<Promo | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const promoId = useId();
+  const showPromo = takesPromo(planId, provider);
+  const toPay = promo ? (promo.amount === 0 ? "Free" : rupees(promo.amount)) : price;
+
+  const applyPromo = async () => {
+    const c = code.trim();
+    if (!c || checking) return;
+    setChecking(true);
+    setPromoError(null);
+    const res = await fetch("/api/billing/promo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planId, code: c }) }).catch(() => null);
+    setChecking(false);
+    if (res?.status === 401) {
+      dialog.current?.close();
+      router.push("/signin?next=/pricing");
+      return;
+    }
+    const body = (await res?.json().catch(() => null)) as (Promo & { error?: string }) | null;
+    if (!res?.ok || !body?.code) {
+      setPromo(null);
+      return setPromoError(body?.error ?? "Could not check the code. Please try again.");
+    }
+    setPromo({ code: body.code, percentOff: body.percentOff, amount: body.amount });
+  };
 
   const reopen = () => {
     if (dialog.current && !dialog.current.open) dialog.current.showModal();
   };
 
   const payRazorpay = async () => {
-    const res = await fetch("/api/billing/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planId, agree }) });
+    const res = await fetch("/api/billing/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planId, agree, ...(promo ? { promo: promo.code } : {}) }) });
     if (res.status === 401) {
       dialog.current?.close();
       router.push("/signin?next=/pricing");
       return;
     }
-    const order = (await res.json().catch(() => null)) as RazorpayOrder | null;
+    const order = (await res.json().catch(() => null)) as (RazorpayOrder & { free?: boolean }) | null;
+    // PAY-9: a 100% code needs no payment; the server has already started the pass.
+    if (res.ok && order?.free) return router.push(`/pricing/return?order_id=${encodeURIComponent(order.receipt)}`);
     if (!res.ok || !order?.order_id || !order.key_id) throw new Error(order?.error ?? "Could not start the payment. Please try again.");
     await loadSdk("razorpay");
     const checkout = new window.Razorpay!({
@@ -160,6 +194,48 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
             {label}, {price}
           </h2>
           <p className="text-sm leading-6 text-zinc-700 dark:text-zinc-300">One payment by UPI, card or net banking. It does not renew by itself.</p>
+          {showPromo && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor={promoId} className="text-sm font-medium">
+                Promo code <span className="font-normal text-zinc-600 dark:text-zinc-400">(if you have one)</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id={promoId}
+                  value={code}
+                  onChange={(e) => {
+                    setCode(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 32));
+                    setPromo(null);
+                    setPromoError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void applyPromo();
+                    }
+                  }}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  maxLength={32}
+                  aria-describedby={`${promoId}-msg`}
+                  className={`${field} min-w-0 flex-1 uppercase`}
+                />
+                <button type="button" disabled={checking || code.trim().length < 3 || busy} className={`${secondaryButton} disabled:opacity-50`} onClick={() => void applyPromo()}>
+                  {checking ? "Checking…" : "Apply"}
+                </button>
+              </div>
+              <p id={`${promoId}-msg`} aria-live="polite" className="min-h-5 text-sm">
+                {promo ? (
+                  <span className="text-teal-800 dark:text-teal-300">
+                    {promo.code.toUpperCase()} applied: {promo.percentOff}% off. You pay {promo.amount === 0 ? "nothing" : rupees(promo.amount)} instead of <s>{price}</s>.
+                  </span>
+                ) : promoError ? (
+                  <span className="text-rose-800 dark:text-rose-300">{promoError}</span>
+                ) : null}
+              </p>
+            </div>
+          )}
           {provider === "cashfree" && (
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">Mobile number</span>
@@ -198,7 +274,7 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
           )}
           <div className="flex flex-wrap gap-3">
             <button type="submit" disabled={busy} className={`${primaryButton} disabled:opacity-60`}>
-              {busy ? "Opening the payment page…" : `Pay ${price}`}
+              {busy ? (promo?.amount === 0 ? "Starting your pass…" : "Opening the payment page…") : promo?.amount === 0 ? "Start my free pass" : `Pay ${toPay}`}
             </button>
             <button type="button" disabled={busy} className={secondaryButton} onClick={() => dialog.current?.close()}>
               Cancel

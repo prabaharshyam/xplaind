@@ -118,6 +118,17 @@ describe("confirmRazorpay (RZ-1)", () => {
     }
   });
 
+  it("accepts a promo order only at the plan price after its own discount (PAY-9)", async () => {
+    const half = { ...row, amount_paise: 12_450, discount_percent: 50 };
+    razorpay({ ...order, amount: 12_450 }, { ...captured, amount: 12_450 });
+    expect((await confirmRazorpay(admin(half).client, config, "order_ABC123", "pay_XYZ789")).result).toBe("granted");
+    // A row whose discount was tampered with no longer matches its amount.
+    razorpay({ ...order, amount: 12_450 }, { ...captured, amount: 12_450 });
+    const wrong = admin({ ...half, discount_percent: 90 });
+    expect((await confirmRazorpay(wrong.client, config, "order_ABC123", "pay_XYZ789")).result).toBe("unknown");
+    expect(wrong.rpc).not.toHaveBeenCalled();
+  });
+
   it("reports failed payments, and does not grant twice", async () => {
     razorpay(order, { ...captured, status: "failed" });
     expect((await confirmRazorpay(admin(row).client, config, "order_ABC123", "pay_XYZ789")).result).toBe("failed");

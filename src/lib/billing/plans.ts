@@ -29,7 +29,9 @@ export const perDay = (p: Plan): string => {
 };
 
 /** ₹249, ₹999. */
-export const rupees = (paise: number) => `₹${new Intl.NumberFormat("en-IN").format(paise / 100)}`;
+/** Whole rupees as ₹1,499; part rupees always with two decimals, as ₹124.50. */
+export const rupees = (paise: number) =>
+  `₹${new Intl.NumberFormat("en-IN", paise % 100 ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {}).format(paise / 100)}`;
 
 /** Who is asking, for the AI limits: a visitor without an account, a signed-in learner, or a learner with a pass. */
 export type Tier = "guest" | "free" | "pro";
