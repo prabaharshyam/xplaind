@@ -56,7 +56,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can students under 18 buy a pass?",
-    a: "No. Accounts and passes are for people aged 18 and over. Lessons, topics, practice and videos stay open without an account.",
+    a: "No. Accounts and passes are for people aged 18 and over. Without an account you can still read the quick answer and the first part of every lesson and preview every roadmap.",
   },
 ];
 

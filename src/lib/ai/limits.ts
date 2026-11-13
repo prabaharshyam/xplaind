@@ -79,7 +79,7 @@ export const LIMIT_MESSAGE = {
   month: "This month's AI allowance is used up. It resets on the 1st. Everything else on Xplaind still works.",
   off: "AI features are switched off for now. Everything else on Xplaind still works.",
   /** AG-1: AI needs an account once sign-ups are open. */
-  signin: "Sign up with Google or an email link to use the AI tools. Lessons, topics and practice stay open without an account.",
+  signin: "The AI tools are part of Pro. Sign up free to try each one a few times.",
 } as const;
 
 type UsageLike = {

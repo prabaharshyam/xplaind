@@ -50,7 +50,7 @@ const FAQ = [
   {
     q: "What will I be able to do at the end?",
     a: `Each roadmap ends with what the job asks for: you can build and explain the projects a hiring manager looks for, answer the interview questions for your role out loud, and show a resume that passes the filters. Along the way, every topic has a short lesson, a quick check and the course or video that teaches it best, so you always know your next step.${
-      proOpen() ? " If you want more AI help each day, an optional Pro pass raises the AI tool limits, from ₹249." : ""
+      proOpen() ? " The AI tools (tutor, interview feedback, resume review and the rest) are part of an optional Pro pass, from ₹249; a free account lets you try each one a few times." : ""
     } Some outside courses we recommend charge for a certificate or the course itself; we always show the price and the date we checked it.`,
   },
   {
@@ -76,7 +76,7 @@ const FAQ = [
   {
     q: "Do I need an account?",
     a: accountsEnabled()
-      ? "Not to start learning. Every lesson, topic, practice card, interview answer, project guide and guide on the blog is open without signing up, and you can preview the start of every roadmap. An account shows the full roadmaps, keeps your progress in sync across your phone and laptop, and unlocks the AI tutor and other AI tools, the mock interview, the PDF roadmaps and the library of research papers and books. Accounts are for learners aged 18 and over; under-18s can still read every lesson."
+      ? "For the full lessons, yes, a free one. Anyone can read the quick answer and the first part of every lesson, preview every roadmap, take the level test and read the guides on the blog. A free account opens the full lessons, every video lesson and course, the project guides, the full roadmaps, progress synced across your phone and laptop, the mock interview, the PDF roadmaps and the library of research papers and books. The AI tools are part of Pro; a free account lets you try each one a few times. Accounts are for learners aged 18 and over."
       : "Not to start. You can read every lesson, follow any roadmap and practice with the cards and interview questions without signing up, and your progress is saved in your browser. An account keeps your progress in sync across your phone and laptop, and unlocks the mock interview, the PDF roadmaps and the library of research papers and books. Accounts are for learners aged 18 and over.",
   },
 ];
@@ -131,7 +131,7 @@ export default function Home() {
             </Link>
           </div>
           <ul data-hero-fade className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-700 dark:text-zinc-300" aria-label="Why it is easy to start">
-            {["No sign-up to start", "Plain English", "No paid rankings"].map((t) => (
+            {["Plain English", "Every topic in order", "No paid rankings"].map((t) => (
               <li key={t} className="flex items-center gap-2">
                 <Icon name="tick" size={16} className="text-zinc-500 dark:text-zinc-400" /> {t}
               </li>
@@ -369,7 +369,7 @@ export default function Home() {
             <Words text="Your AI career starts with one 20-minute lesson" />
           </h2>
           <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-800 md:mx-auto dark:text-zinc-200">
-            Pick a role and open the first topic. No sign-up, nothing to install.
+            Pick a role and open the first topic. Free, with nothing to install.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row md:justify-center">
             <Link href="/paths" className={primaryButtonLg}>

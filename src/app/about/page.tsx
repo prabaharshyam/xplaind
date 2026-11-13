@@ -196,7 +196,7 @@ export default function AboutPage() {
           <h2 id="next-h" className="text-2xl font-semibold tracking-tight">
             Start with one lesson
           </h2>
-          <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">No sign-up needed. Pick a role and the first lesson takes about 20 minutes.</p>
+          <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">Free to learn. Pick a role and the first lesson takes about 20 minutes.</p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/paths" className={primaryButton}>
               Choose your AI role

@@ -1,5 +1,7 @@
 "use client";
 
+import { GateCard, useContentLocked } from "@/components/account/content-gate";
+
 import { ResourceNotice } from "@/components/resource-card";
 import { useMemo, useState } from "react";
 import { CourseThumb } from "@/components/course-thumb";
@@ -38,6 +40,8 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 const PAGE = 24;
+/** CG-1: how many a signed-out visitor sees before the free sign-up card. */
+const PREVIEW = 6;
 
 const field =
   "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
@@ -46,6 +50,8 @@ const field =
 export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: { id: string; name: string }[] }) {
   const [filter, setFilter] = useState<DirectoryFilter>(EMPTY_FILTER);
   const [limit, setLimit] = useState(PAGE);
+  const locked = useContentLocked();
+  const cap = locked ? PREVIEW : limit;
   const shown = useMemo(() => filterDirectory(rows, filter), [rows, filter]);
   const themes = useMemo(() => THEMES.filter((t) => rows.some((r) => r.themes.includes(t.id))), [rows]);
   const set = (patch: Partial<DirectoryFilter>) => {
@@ -136,18 +142,18 @@ export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: 
       </div>
 
       <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400" aria-live="polite">
-        Showing {Math.min(limit, shown.length)} of {shown.length}
+        Showing {Math.min(cap, shown.length)} of {shown.length}
         {shown.length !== rows.length ? ` (${rows.length} in all)` : ""}
       </p>
 
       <ul className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {shown.slice(0, limit).map((r) => (
+        {shown.slice(0, cap).map((r) => (
           <li key={r.id}>
             <CourseCard r={r} />
           </li>
         ))}
       </ul>
-      {shown.length > limit && (
+      {!locked && shown.length > limit && (
         <div className="mt-8 flex justify-center">
           <button
             type="button"
@@ -157,6 +163,9 @@ export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: 
             Show more courses
           </button>
         </div>
+      )}
+      {locked && shown.length > PREVIEW && (
+        <GateCard reason="courses" title="Sign up free to see every course" text={`You are seeing the first ${PREVIEW} of ${shown.length}. Sign up to see every course and certification, with prices and the date we checked them.`} />
       )}
       {shown.length === 0 && (
         <p className="mt-4">

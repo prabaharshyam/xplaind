@@ -1,5 +1,7 @@
 "use client";
 
+import { GateCard, useContentLocked } from "@/components/account/content-gate";
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/art/icons";
@@ -32,6 +34,8 @@ const SORTS: { id: CourseSort; label: string }[] = [
 ];
 
 const PAGE = 24;
+/** CG-1: how many a signed-out visitor sees before the free sign-up card. */
+const PREVIEW = 6;
 const field =
   "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
 const chip = (on: boolean) =>
@@ -43,6 +47,8 @@ const chip = (on: boolean) =>
 export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: TopicChip[] }) {
   const [filter, setFilter] = useState<CourseFilter>(EMPTY_COURSE_FILTER);
   const [limit, setLimit] = useState(PAGE);
+  const locked = useContentLocked();
+  const cap = locked ? PREVIEW : limit;
   const shown = useMemo(() => filterCourses(rows, filter), [rows, filter]);
   const topicName = useMemo(() => new Map(topics.map((t) => [t.id, t.label])), [topics]);
   const ng = useMemo(() => rows.filter((r) => r.instructors.includes(ANDREW_NG)).length, [rows]);
@@ -142,12 +148,12 @@ export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: Top
       </div>
 
       <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400" aria-live="polite">
-        Showing {Math.min(limit, shown.length)} of {shown.length}
+        Showing {Math.min(cap, shown.length)} of {shown.length}
         {filtered ? ` (${rows.length} in all)` : ""}
       </p>
 
       <ul className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {shown.slice(0, limit).map((c) => (
+        {shown.slice(0, cap).map((c) => (
           <li key={c.id}>
             <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" aria-labelledby={`c-${c.id}`}>
               <CourseThumb provider={c.provider} kindLabel="Video course" embed={c.embed} hours={c.hours} certificate={false} className="h-36" />
@@ -188,12 +194,15 @@ export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: Top
         ))}
       </ul>
 
-      {shown.length > limit && (
+      {!locked && shown.length > limit && (
         <div className="mt-8 flex justify-center">
           <button type="button" onClick={() => setLimit((l) => l + PAGE)} className="min-h-12 rounded-full border border-zinc-300 px-6 font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800">
             Show more courses
           </button>
         </div>
+      )}
+      {locked && shown.length > PREVIEW && (
+        <GateCard reason="videos" title="Sign up free to see every video course" text={`You are seeing the first ${PREVIEW} of ${shown.length}. Sign up to see them all.`} />
       )}
       {shown.length === 0 && (
         <p className="mt-4">
