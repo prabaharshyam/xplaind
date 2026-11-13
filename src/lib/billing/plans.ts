@@ -5,17 +5,30 @@ import type { AiKind } from "@/lib/ai/limits";
 export const PLAN_IDS = ["pass_month", "pass_6month", "pass_year"] as const;
 export type PlanId = (typeof PLAN_IDS)[number];
 
-export type Plan = { id: PlanId; name: string; months: number; paise: number; note: string; popular?: boolean };
+export type Plan = { id: PlanId; name: string; months: number; days: number; paise: number; note: string; popular?: boolean };
 
 export const PLANS: Record<PlanId, Plan> = {
-  pass_month: { id: "pass_month", name: "30-day pass", months: 1, paise: 24_900, note: "Try Pro for a month" },
-  pass_6month: { id: "pass_6month", name: "Placement pass, 6 months", months: 6, paise: 119_900, note: "₹200 a month, for a placement season", popular: true },
-  pass_year: { id: "pass_year", name: "Career pass, 12 months", months: 12, paise: 199_900, note: "₹167 a month, for a year of steady learning" },
+  pass_month: { id: "pass_month", name: "30-day pass", months: 1, days: 30, paise: 24_900, note: "Try Pro for a month" },
+  pass_6month: { id: "pass_6month", name: "Placement pass, 6 months", months: 6, days: 182, paise: 99_900, note: "One full placement season", popular: true },
+  pass_year: { id: "pass_year", name: "Career pass, 12 months", months: 12, days: 365, paise: 149_900, note: "A whole year of steady learning" },
 };
 
 export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && (PLAN_IDS as readonly string[]).includes(v);
 
-/** ₹249, ₹1,199. */
+/**
+ * PAY-8 (2026-11-13, owner decision): the longer passes show their saving against buying the 30-day
+ * pass month after month, the only reference price that is real (never an invented "was" price).
+ * Pure, for the pricing page and tests.
+ */
+export const monthlyEquivalentPaise = (p: Plan): number => PLANS.pass_month.paise * p.months;
+export const savingPercent = (p: Plan): number => Math.round((1 - p.paise / monthlyEquivalentPaise(p)) * 100);
+/** "₹5.5": the price per day, one decimal below ₹10. */
+export const perDay = (p: Plan): string => {
+  const r = p.paise / 100 / p.days;
+  return `₹${r < 10 ? (Math.round(r * 10) / 10).toString() : Math.round(r).toString()}`;
+};
+
+/** ₹249, ₹999. */
 export const rupees = (paise: number) => `₹${new Intl.NumberFormat("en-IN").format(paise / 100)}`;
 
 /** Who is asking, for the AI limits: a visitor without an account, a signed-in learner, or a learner with a pass. */

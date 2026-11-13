@@ -514,3 +514,7 @@ The owner asked for Razorpay Standard Checkout, with test keys, while the Cashfr
 ## 2026-11-13: a one-time AI trial for free accounts (PAY-7)
 
 The owner asked for at most 2 or 3 AI tries on a free account, then a prompt for Pro, and chose a one-time trial per feature over a daily allowance. It is counted from the existing ai_usage rows (no new table): today's allowance is the trial minus the uses on earlier days, and the existing locked guard stops today's uses there. Lessons, roadmaps, practice and projects stay open without limits (PAY-1); only the AI helpers are limited. A learner who used AI before this change keeps those uses on their count, so some may already be at their trial's end.
+
+## 2026-11-13: pricing page that sells on value, new prices (PAY-8)
+
+The owner found the pricing page cluttered and unconvincing and asked for pricing psychology: a struck-through price with "50% off", the value and outcomes of Pro, 6 months at ₹999, and questions as dropdowns. A "was" price that was never charged is a misleading discount under Indian consumer law, so the owner chose savings against the real monthly price instead: 6 months ₹999 against 6 × ₹249 = ₹1,494 (save 33%), and 12 months moved to ₹1,499 against ₹2,988 (save 50%) so the longest pass is the cheapest per month. The page uses anchoring (the struck monthly total), the price per day, a recommended middle option, outcomes before numbers, risk reversal (the 7-day refund), and fewer choices on screen. "Most popular" became "Recommended" because there are no sales yet to back it.
