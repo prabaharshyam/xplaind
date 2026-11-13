@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
+import { BUSINESS } from "@/lib/business";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
@@ -9,9 +10,9 @@ export const metadata: Metadata = pageMeta({
   path: "/privacy",
 });
 
-const UPDATED = "8 November 2026";
+const UPDATED = "13 November 2026";
 
-const contact = process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim();
+const contact: string = BUSINESS.email;
 
 const H2 = "mt-12 text-2xl font-semibold tracking-tight";
 const P = "mt-3 leading-7 text-zinc-800 dark:text-zinc-200";
@@ -81,6 +82,15 @@ export default function PrivacyPage() {
       </PageHero>
 
       <div className="mx-auto max-w-3xl px-4 pt-4 pb-16 md:px-6">
+        <h2 className={H2}>Who we are</h2>
+        <p className={P}>
+          Xplaind (xplaind.in) is a brand of {BUSINESS.legalName} (GSTIN {BUSINESS.gstin}), which is responsible for your data. Contact us at{" "}
+          <a href={`mailto:${BUSINESS.email}`} className={A}>
+            {BUSINESS.email}
+          </a>{" "}
+          or {BUSINESS.phone}.
+        </p>
+
         <h2 className={H2}>What we store, why and for how long</h2>
         <ul className="mt-5 flex flex-col gap-4">
           {STORED.map(([what, data, why]) => (

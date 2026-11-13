@@ -58,7 +58,8 @@ export const NAV_GROUPS: Group[] = [
       { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards", icon: "book", tone: "violet" },
       { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English", icon: "robot", tone: "teal" },
       { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work", icon: "sparkles", tone: "amber" },
-      ...(process.env.NEXT_PUBLIC_PRO_OPEN === "1" ? [{ href: "/pricing", label: "Pro and pricing", note: "More AI help each day, from ₹249", icon: "star", tone: "rose" } as Item] : []),
+      // BIZ-1: prices are always public, so payment gateways and visitors can see what is sold.
+      { href: "/pricing", label: "Pro and pricing", note: "More AI help each day, from ₹249", icon: "star", tone: "rose" },
     ],
   },
 ];

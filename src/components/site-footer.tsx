@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { proOpen } from "@/lib/billing/config";
+import { BUSINESS } from "@/lib/business";
 import { AccountLink, SignedInLinks } from "./account-link";
 import { Icon } from "./art/icons";
 import { BrandLogo } from "./brand-logo";
@@ -128,14 +128,26 @@ export function SiteFooter() {
             <Link href="/refunds" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
               Refunds and cancellations
             </Link>
-            {proOpen() && (
-              <Link href="/pricing" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
-                Pricing
-              </Link>
-            )}
+            <Link href="/pricing" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
+              Pricing
+            </Link>
+            <Link href="/contact" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
+              Contact
+            </Link>
           </p>
           <p>No ads and no sponsored rankings. Book links are affiliate links. Prices show the date we checked them.</p>
         </div>
+        {/* BIZ-1: the business behind the brand, as payment gateways and the GST rules expect. */}
+        <p className="mt-4 text-xs text-zinc-600 dark:text-zinc-400">
+          Xplaind is a brand of {BUSINESS.legalName} · GSTIN {BUSINESS.gstin} ·{" "}
+          <a href={`mailto:${BUSINESS.email}`} className={link}>
+            {BUSINESS.email}
+          </a>{" "}
+          ·{" "}
+          <a href={BUSINESS.phoneHref} className={link}>
+            {BUSINESS.phone}
+          </a>
+        </p>
       </div>
     </footer>
   );

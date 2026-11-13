@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
+import { BUSINESS } from "@/lib/business";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
@@ -9,8 +10,8 @@ export const metadata: Metadata = pageMeta({
   path: "/refunds",
 });
 
-const UPDATED = "8 November 2026";
-const contact = process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim();
+const UPDATED = "13 November 2026";
+const contact: string = BUSINESS.email;
 const H2 = "mt-10 text-2xl font-semibold tracking-tight";
 const P = "mt-3 leading-7 text-zinc-800 dark:text-zinc-200";
 const A = "font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300";
@@ -30,6 +31,16 @@ export default function RefundsPage() {
             pricing page
           </Link>
           .
+        </p>
+
+        <h2 className={H2}>Delivery</h2>
+        <p className={P}>
+          A Pro pass is a digital service. It starts on your Xplaind account as soon as the payment is confirmed, usually within a minute, and you can
+          see it in{" "}
+          <Link href="/settings/billing" className={A}>
+            Settings, Billing
+          </Link>
+          . Nothing is shipped. If your pass has not started within an hour of paying, contact us and we fix it or refund you.
         </p>
 
         <h2 className={H2}>Cancelling</h2>
@@ -60,7 +71,18 @@ export default function RefundsPage() {
           <Link href="/settings/billing" className={A}>
             Settings, Billing
           </Link>
-          . We reply within 2 working days.
+          , or call us on{" "}
+          <a href={BUSINESS.phoneHref} className={A}>
+            {BUSINESS.phone}
+          </a>{" "}
+          ({BUSINESS.hours}). We reply within 2 working days. All contact details are on our{" "}
+          <Link href="/contact" className={A}>
+            contact page
+          </Link>
+          .
+        </p>
+        <p className={`${P} text-sm text-zinc-600 dark:text-zinc-400`}>
+          Xplaind is a brand of {BUSINESS.legalName} (GSTIN {BUSINESS.gstin}).
         </p>
       </div>
     </main>

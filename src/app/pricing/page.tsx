@@ -11,6 +11,7 @@ import {
   TIER_LIMITS,
   rupees,
 } from "@/lib/billing/plans";
+import { BUSINESS } from "@/lib/business";
 import { pageMeta } from "@/lib/seo";
 import { accountsEnabled } from "@/lib/supabase/config";
 import { BuyPass } from "./buy-pass";
@@ -82,16 +83,35 @@ export default function PricingPage() {
         lead="Every roadmap, lesson and course link on Xplaind comes with your account, for good. A Pro pass gives you much more AI tutoring, interview feedback and resume review each day."
       />
       <div className="mx-auto max-w-6xl px-4 pt-4 pb-16 md:px-6">
-        {!open && (
-          <p
-            role="status"
-            className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 leading-7 dark:border-zinc-800 dark:bg-zinc-900"
-          >
-            Pro passes are not on sale yet. Until they are, everything on
-            Xplaind, including the AI helpers, works with today&apos;s standard
-            daily limits.
+        {/* BIZ-1: what is sold, by whom, and how it is delivered, in one place for learners and the payment gateway. */}
+        <section aria-labelledby="what-h" className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-5 leading-7 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 id="what-h" className="text-lg font-semibold">
+            What you can buy
+          </h2>
+          <p className="mt-1 text-zinc-800 dark:text-zinc-200">
+            Xplaind sells one thing: <strong className="font-semibold">Pro passes</strong>, a one-time payment for 30 days, 6 months or 12 months of
+            higher daily limits on the AI helpers (AI tutor, interview feedback, mock interview reports, resume review and study from your notes).
+            Lessons, roadmaps, videos, practice and project guides need no pass. All prices are in Indian rupees and include GST. A pass is a
+            digital service that starts on your account as soon as the payment is confirmed; nothing is shipped, and nothing renews by itself.
           </p>
-        )}
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            Sold by {BUSINESS.legalName} (GSTIN {BUSINESS.gstin}). Questions:{" "}
+            <Link href="/contact" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+              contact us
+            </Link>
+            . Refunds:{" "}
+            <Link href="/refunds" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+              refund and cancellation policy
+            </Link>
+            .
+          </p>
+          {!open && (
+            <p role="status" className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+              Online payment for passes opens shortly. Until then, everything on Xplaind, including the AI helpers, works with the standard daily
+              limits.
+            </p>
+          )}
+        </section>
         {open && sandbox && (
           <p
             role="status"
@@ -150,6 +170,7 @@ export default function PricingPage() {
                 )}
                 <h2 className="text-lg font-semibold">{p.name}</h2>
                 <p className="mt-2 text-3xl font-semibold">{rupees(p.paise)}</p>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">One-time payment, GST included</p>
                 <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                   {p.note}
                 </p>
@@ -199,7 +220,7 @@ export default function PricingPage() {
                     />
                   ) : (
                     <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                      On sale soon
+                      Online payment opens shortly
                     </p>
                   )}
                 </div>

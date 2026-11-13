@@ -11,8 +11,12 @@ test("the pricing page shows the free plan, the three passes and the daily AI al
   await expect(page.getByText("Most popular")).toBeVisible();
   const table = page.getByRole("table", { name: "AI turns per day, by account" });
   await expect(table.getByRole("row", { name: /AI tutor questions 5 10 50/ })).toBeVisible();
-  // Pro is closed in this build (no PAYMENTS_MODE): no buy buttons, a clear notice, and no Pricing link in the menu.
-  await expect(page.getByText("Pro passes are not on sale yet.")).toBeVisible();
+  // BIZ-1: what is sold, by whom and how it is delivered is on the page. Pro is closed in this build
+  // (no PAYMENTS_MODE): prices stay visible, with a clear notice and no buy buttons.
+  await expect(page.getByRole("heading", { name: "What you can buy" })).toBeVisible();
+  await expect(page.getByText(/Sold by ZEREH Venture \(GSTIN 33GDZPS4274J1ZK\)/)).toBeVisible();
+  await expect(page.getByText("One-time payment, GST included").first()).toBeVisible();
+  await expect(page.getByText(/Online payment for passes opens shortly/)).toBeVisible();
   await expect(page.getByRole("button", { name: /^Buy for/ })).toHaveCount(0);
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
@@ -40,4 +44,26 @@ test("lessons, roadmaps and the playground stay open without signing in (PAY-1)"
     await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
     await expect(page.getByText("Today's AI turns are used")).toBeHidden();
   }
+});
+
+test("the contact page, the footer and the policies name the business and how to reach it (BIZ-1)", async ({ page }) => {
+  await page.goto("/contact");
+  await expect(page.getByRole("heading", { level: 1, name: "Talk to us" })).toBeVisible();
+  const main = page.getByRole("main");
+  await expect(main.getByRole("link", { name: "hello@xplaind.in" })).toHaveAttribute("href", "mailto:hello@xplaind.in");
+  await expect(main.getByRole("link", { name: "+91 8608761359" })).toHaveAttribute("href", "tel:+918608761359");
+  await expect(main.getByText("33GDZPS4274J1ZK")).toBeVisible();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+
+  const footer = page.getByRole("contentinfo");
+  await expect(footer.getByText(/Xplaind is a brand of ZEREH Venture/)).toBeVisible();
+  for (const [name, href] of [["Privacy", "/privacy"], ["Terms", "/terms"], ["Refunds and cancellations", "/refunds"], ["Pricing", "/pricing"], ["Contact", "/contact"]] as const) {
+    await expect(footer.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
+  }
+
+  await page.goto("/terms");
+  await expect(page.getByRole("heading", { name: "Who we are" })).toBeVisible();
+  await page.goto("/refunds");
+  await expect(page.getByRole("heading", { name: "Delivery" })).toBeVisible();
 });
