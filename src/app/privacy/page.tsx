@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
 import { BUSINESS } from "@/lib/business";
+import { paymentProvider, providerName } from "@/lib/billing/config";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
@@ -46,7 +47,7 @@ const STORED: [string, string, string][] = [
   ],
   [
     "Pro pass payments (18 and over only)",
-    "The pass you bought, its price, the date, our order number, Cashfree's payment reference, and when your pass ends. Your mobile number goes to Cashfree for the payment and is not stored by us. We never see or store card, UPI or bank details.",
+    `The pass you bought, its price, the date, our order number, ${providerName()}'s payment reference, and when your pass ends. Your mobile number goes to ${providerName()} for the payment and is not stored by us. We never see or store card, UPI or bank details.`,
     "Kept for 8 years for tax and accounting, as the law requires. If you delete your account, the record stays but is no longer linked to you.",
   ],
   [
@@ -60,7 +61,10 @@ const PROCESSORS: [string, string][] = [
   ["Vercel", "Hosts the website."],
   ["Supabase", "Stores accounts and the data above, and sends sign-in emails."],
   ["Google and GitHub", "Only if you choose to sign in with them."],
-  ["Cashfree Payments", "Takes payments for Pro passes, only if you buy one. It receives the amount, your email and mobile number, and handles your UPI, card or bank details itself."],
+  [
+    paymentProvider() === "razorpay" ? "Razorpay" : "Cashfree Payments",
+    "Takes payments for Pro passes, only if you buy one. It receives the amount, your email and mobile number, and handles your UPI, card or bank details itself.",
+  ],
   ["Anthropic", "Writes AI answers. It receives only the text of that request, such as your question, your code and its error, or your resume text, when you press the button."],
   ["YouTube", "Plays videos inside lessons from its privacy-enhanced (no-cookie) player, and only after you press play."],
   ["jsDelivr", "Delivers the Python engine for the code playground the first time you press Run. Your code runs in your browser and is not sent anywhere."],

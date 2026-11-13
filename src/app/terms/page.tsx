@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { PageHero } from "@/components/page-hero";
 import { BUSINESS } from "@/lib/business";
+import { providerName } from "@/lib/billing/config";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
@@ -44,7 +45,7 @@ const TERMS: { title: string; body: ReactNode }[] = [
     title: "Pro passes",
     body: (
       <>
-        A Pro pass is a one-time payment for 30 days, 6 months or 12 months of higher daily AI limits. Prices are in Indian rupees and include GST. It does not renew by itself. Payments are taken by Cashfree. Passes are for people aged 18 and over, are for your own use, and cannot be shared or resold. The limits are listed on the{" "}
+        A Pro pass is a one-time payment for 30 days, 6 months or 12 months of higher daily AI limits. Prices are in Indian rupees and include GST. It does not renew by itself. Payments are taken by {providerName()}. Passes are for people aged 18 and over, are for your own use, and cannot be shared or resold. The limits are listed on the{" "}
         <Link href="/pricing" className={A}>
           pricing page
         </Link>

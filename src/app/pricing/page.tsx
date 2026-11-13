@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Icon } from "@/components/art/icons";
 import { PageHero } from "@/components/page-hero";
 import { AI_KINDS, type AiKind } from "@/lib/ai/limits";
-import { paymentsConfig, proOpen } from "@/lib/billing/config";
+import { activePayments, paymentProvider, proOpen, providerName } from "@/lib/billing/config";
 import {
   KIND_LABEL,
   PLANS,
@@ -55,7 +55,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How can I pay?",
-    a: "By UPI (Google Pay, PhonePe, Paytm and others), debit or credit card, or net banking, through Cashfree. We never see or store your card or UPI details.",
+    a: `By UPI (Google Pay, PhonePe, Paytm and others), debit or credit card, or net banking, through ${providerName()}. We never see or store your card or UPI details.`,
   },
   {
     q: "Can I get a refund?",
@@ -70,7 +70,8 @@ const FAQ: { q: string; a: string }[] = [
 /** PAY-5: what is free, what Pro adds, and the three passes. */
 export default function PricingPage() {
   const open = proOpen();
-  const sandbox = paymentsConfig()?.mode === "sandbox";
+  const sandbox = activePayments()?.mode === "sandbox";
+  const provider = paymentProvider();
   const guestSample = accountsEnabled();
   return (
     <main>
@@ -117,7 +118,7 @@ export default function PricingPage() {
             role="status"
             className="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 leading-7 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
           >
-            Test mode: payments go to Cashfree&apos;s sandbox and no real money
+            Test mode: payments go to {providerName()}&apos;s test environment and no real money
             moves.
           </p>
         )}
@@ -213,6 +214,7 @@ export default function PricingPage() {
                 <div className="mt-auto pt-5">
                   {open ? (
                     <BuyPass
+                      provider={provider}
                       planId={id}
                       label={p.name}
                       price={rupees(p.paise)}
