@@ -5,17 +5,30 @@ import type { AiKind } from "@/lib/ai/limits";
 export const PLAN_IDS = ["pass_month", "pass_6month", "pass_year"] as const;
 export type PlanId = (typeof PLAN_IDS)[number];
 
-export type Plan = { id: PlanId; name: string; months: number; paise: number; note: string; popular?: boolean };
+export type Plan = { id: PlanId; name: string; months: number; days: number; paise: number; note: string; popular?: boolean };
 
 export const PLANS: Record<PlanId, Plan> = {
-  pass_month: { id: "pass_month", name: "30-day pass", months: 1, paise: 24_900, note: "Try Pro for a month" },
-  pass_6month: { id: "pass_6month", name: "Placement pass, 6 months", months: 6, paise: 119_900, note: "₹200 a month, for a placement season", popular: true },
-  pass_year: { id: "pass_year", name: "Career pass, 12 months", months: 12, paise: 199_900, note: "₹167 a month, for a year of steady learning" },
+  pass_month: { id: "pass_month", name: "30-day pass", months: 1, days: 30, paise: 24_900, note: "Try Pro for a month" },
+  pass_6month: { id: "pass_6month", name: "Placement pass, 6 months", months: 6, days: 182, paise: 99_900, note: "One full placement season", popular: true },
+  pass_year: { id: "pass_year", name: "Career pass, 12 months", months: 12, days: 365, paise: 149_900, note: "A whole year of steady learning" },
 };
 
 export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && (PLAN_IDS as readonly string[]).includes(v);
 
-/** ₹249, ₹1,199. */
+/**
+ * PAY-8 (2026-11-13, owner decision): the longer passes show their saving against buying the 30-day
+ * pass month after month, the only reference price that is real (never an invented "was" price).
+ * Pure, for the pricing page and tests.
+ */
+export const monthlyEquivalentPaise = (p: Plan): number => PLANS.pass_month.paise * p.months;
+export const savingPercent = (p: Plan): number => Math.round((1 - p.paise / monthlyEquivalentPaise(p)) * 100);
+/** "₹5.5": the price per day, one decimal below ₹10. */
+export const perDay = (p: Plan): string => {
+  const r = p.paise / 100 / p.days;
+  return `₹${r < 10 ? (Math.round(r * 10) / 10).toString() : Math.round(r).toString()}`;
+};
+
+/** ₹249, ₹999. */
 export const rupees = (paise: number) => `₹${new Intl.NumberFormat("en-IN").format(paise / 100)}`;
 
 /** Who is asking, for the AI limits: a visitor without an account, a signed-in learner, or a learner with a pass. */
@@ -27,8 +40,10 @@ export type Tier = "guest" | "free" | "pro";
  * real, so one learner cannot run up a bill bigger than their pass.
  */
 export const TIER_LIMITS: Record<Tier, Record<AiKind, number>> = {
-  guest: { tutor: 5, grade: 2, interview: 1, book: 1, resume: 1, notes: 5 },
-  free: { tutor: 10, grade: 3, interview: 1, book: 2, resume: 1, notes: 20 },
+  /** Visitors without an account (only while sign-ups are on hold; AG-1 asks them to sign up). Never more than the free trial. */
+  guest: { tutor: 2, grade: 1, interview: 1, book: 1, resume: 1, notes: 2 },
+  /** PAY-7: for free accounts these are a one-time trial per feature, not a daily allowance. */
+  free: { tutor: 3, grade: 3, interview: 2, book: 2, resume: 2, notes: 3 },
   pro: { tutor: 50, grade: 20, interview: 5, book: 10, resume: 3, notes: 100 },
 };
 
@@ -49,6 +64,14 @@ export const KIND_LABEL: Record<AiKind, string> = {
 export function dailyLimit(kind: AiKind, tier: Tier, proOpen: boolean, before: Record<AiKind, number>): number {
   return proOpen ? TIER_LIMITS[tier][kind] : before[kind];
 }
+
+/**
+ * PAY-7 (2026-11-13, owner decision): once Pro is open, a free account gets a one-time trial of each
+ * AI helper (TIER_LIMITS.free), not a daily allowance. What is left today is the trial minus every
+ * use on earlier days; the daily guard then stops today's uses at that number, so the lifetime total
+ * never passes the trial. Pure, for tests.
+ */
+export const trialLeftToday = (trial: number, usedBeforeToday: number): number => Math.max(0, trial - Math.max(0, usedBeforeToday));
 
 /** A new order id: "xp_", the time in base 36 and random letters. Cashfree allows 3 to 45 of [A-Za-z0-9_-]. */
 export function newOrderId(now: number, random: string): string {

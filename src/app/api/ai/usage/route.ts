@@ -4,7 +4,7 @@ import { json } from "@/lib/account/http";
 import { AI_KINDS, type AiKind } from "@/lib/ai/limits";
 import { accountsEnabled } from "@/lib/supabase/config";
 import { aiSettings } from "@/lib/ai/settings";
-import { aiCaller, limitFor } from "@/lib/ai/who";
+import { aiCaller, limitFor, onTrial, usedBefore } from "@/lib/ai/who";
 import { proOpen } from "@/lib/billing/config";
 import { todayInIST } from "@/lib/dates";
 import { serviceClient } from "@/lib/supabase/server";
@@ -21,5 +21,7 @@ export async function GET(request: Request) {
     ? await admin.from("ai_guest_usage").select("calls").eq("visitor", who.id).eq("day", day).eq("kind", kind).maybeSingle()
     : await admin.from("ai_usage").select("calls").eq("user_id", who.id).eq("day", day).eq("kind", kind).maybeSingle();
   const limit = limitFor(kind, who);
-  return json({ show: true, tier: who.tier, used: Math.min(limit, data?.calls ?? 0), limit }, 200);
+  // PAY-7: a free account sees its whole trial: every use so far, not just today's.
+  const used = (data?.calls ?? 0) + (onTrial(who) ? await usedBefore(admin, who, kind, day) : 0);
+  return json({ show: true, tier: who.tier, trial: onTrial(who), used: Math.min(limit, used), limit }, 200);
 }

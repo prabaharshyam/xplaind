@@ -4,18 +4,28 @@ import { expect, test, type Page } from "@playwright/test";
 const wcag = (page: Page) => new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
 
-test("the pricing page shows the free plan, the three passes and the daily AI allowance (PAY-5)", async ({ page }) => {
+test("the pricing page leads with value, shows honest savings, a free-vs-Pro table and folded questions (PAY-5, PAY-7, PAY-8)", async ({ page }) => {
   await page.goto("/pricing");
-  await expect(page.getByRole("heading", { level: 1, name: "Learn AI step by step. Get more AI help with Pro." })).toBeVisible();
-  for (const price of ["₹0", "₹249", "₹1,199", "₹1,999"]) await expect(page.getByText(price, { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Most popular")).toBeVisible();
-  const table = page.getByRole("table", { name: "AI turns per day, by account" });
-  await expect(table.getByRole("row", { name: /AI tutor questions 5 10 50/ })).toBeVisible();
-  // BIZ-1: what is sold, by whom and how it is delivered is on the page. Pro is closed in this build
-  // (no PAYMENTS_MODE): prices stay visible, with a clear notice and no buy buttons.
+  await expect(page.getByRole("heading", { level: 1, name: "Learn AI faster with Pro" })).toBeVisible();
+  for (const price of ["₹249", "₹999", "₹1,499"]) await expect(page.getByText(price, { exact: true }).first()).toBeVisible();
+  // PAY-8: savings only against the real monthly price, and the price per day.
+  await expect(page.getByText("Save 33% compared with 6 monthly passes")).toBeVisible();
+  await expect(page.getByText("Save 50% compared with 12 monthly passes")).toBeVisible();
+  await expect(page.locator("s", { hasText: "₹1,494" })).toBeVisible();
+  await expect(page.getByText("₹5.5 a day")).toBeVisible();
+  await expect(page.getByText("Recommended")).toBeVisible();
+  // PAY-7: a free account gets a one-time trial of each AI helper; Pro is per day.
+  const table = page.getByRole("table", { name: "AI helper uses: free trial in total, Pro per day" });
+  await expect(table.getByRole("row", { name: /AI tutor questions 3 tries in total 50 every day/ })).toBeVisible();
+  // Questions are folded: the answer shows only after opening the question.
+  const q = page.locator("details", { hasText: "Does it renew by itself?" });
+  await expect(q.getByText(/A pass is one payment/)).toBeHidden();
+  await q.locator("summary").click();
+  await expect(q.getByText(/A pass is one payment/)).toBeVisible();
+  // BIZ-1: what is sold, by whom and how it is delivered stays on the page, at the end. Pro is closed in
+  // this build (no PAYMENTS_MODE): prices stay visible, with a clear notice and no buy buttons.
   await expect(page.getByRole("heading", { name: "What you can buy" })).toBeVisible();
   await expect(page.getByText(/Sold by ZEREH Venture \(GSTIN 33GDZPS4274J1ZK\)/)).toBeVisible();
-  await expect(page.getByText("One-time payment, GST included").first()).toBeVisible();
   await expect(page.getByText(/Online payment for passes opens shortly/)).toBeVisible();
   await expect(page.getByRole("button", { name: /^Buy for/ })).toHaveCount(0);
   expect(await overflow(page)).toBe(false);

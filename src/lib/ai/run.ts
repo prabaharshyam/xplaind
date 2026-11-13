@@ -21,7 +21,7 @@ import {
   tokenUses,
 } from "./limits";
 import { aiSettings } from "./settings";
-import { aiCaller, limitFor } from "./who";
+import { aiCaller, allowanceToday, limitFor, onTrial } from "./who";
 
 /** Effectively no site-wide cap for Pro calls; the kill switch still stops everything. */
 const PRO_MONTH_CAP_USD = 1_000_000;
@@ -63,7 +63,7 @@ export async function runAi<S extends z.ZodType>(
       p_kind: req.kind,
       p_day: day,
       p_month_start: monthStart(day),
-      p_daily_max: limitFor(req.kind, who),
+      p_daily_max: who.guest ? limitFor(req.kind, who) : await allowanceToday(admin, who, req.kind, day),
       // PAY-1: a learner with a pass is bounded by their own daily limits, not the site's free monthly cap.
       p_month_cap_usd: monthCap,
     },
@@ -76,6 +76,9 @@ export async function runAi<S extends z.ZodType>(
     );
   if (verdict === "signin")
     return json({ error: LIMIT_MESSAGE.signin, signin: true }, 401);
+  // PAY-7: a free account's one-time trial of this feature is used up; Pro unlocks it.
+  if (verdict === "day" && onTrial(who))
+    return json({ error: LIMIT_MESSAGE.trial, upgrade: "/pricing" }, 429);
   // PAY-4: when a pass would give more today, say so, and the browser offers the pricing page.
   if (verdict === "day" && proOpen() && who.tier !== "pro")
     return json({ error: LIMIT_MESSAGE.dayUpgrade, upgrade: "/pricing" }, 429);
