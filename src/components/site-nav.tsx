@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/art/icons";
 import { NAV_GROUPS, type NavTone, activeGroup, under } from "@/lib/nav";
@@ -139,38 +139,86 @@ function DesktopMenus({ path }: { path: string }) {
   );
 }
 
+/**
+ * NV-6 (owner request, 2026-11-13): the phone menu as a set of big, numbered rows that unfold.
+ * Each group is a row: a mono number (the road-marker signature), the name in the display face and a
+ * hint of what is inside. Tapping a row unfolds its links as tiles that cascade in, the plus turns
+ * into a minus and the other rows step back. One group open at a time; the group you are in starts
+ * open. The rows rise in one after another when the menu opens (globals.css, .site-menu[open]).
+ * Under reduced motion everything simply appears.
+ */
 function PhoneMenu({ path }: { path: string }) {
   const active = activeGroup(path);
-  // NV-5 (owner request, 2026-11-13): one row per group, folded, so the menu stays short; tapping a group
-  // opens its links. The group of the page you are on starts open. Plain <details>, so it works without JavaScript.
+  const [open, setOpen] = useState<string | null>(active ?? null);
+  // A new page opens its own group (adjusted during render, not in an effect).
+  const [seen, setSeen] = useState(active);
+  if (seen !== active) {
+    setSeen(active);
+    setOpen(active ?? null);
+  }
+
   return (
-    <div className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
-      {NAV_GROUPS.map((g) => (
-        <details key={g.id} name="phone-nav" open={active === g.id} className="group/acc">
-          <summary
-            className={`flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-3 text-lg font-semibold [&::-webkit-details-marker]:hidden ${active === g.id ? "text-violet-800 dark:text-violet-300" : "text-zinc-900 dark:text-zinc-100"}`}
-          >
-            {g.label}
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 text-zinc-500 transition-transform duration-200 group-open/acc:rotate-180 dark:text-zinc-400" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </summary>
-          <ul className="pb-3">
-            {g.items.map((i) => (
-              <li key={i.href}>
-                <Link
-                  href={i.href}
-                  aria-current={current(path, i.href)}
-                  className="group/item flex min-h-12 items-center gap-3 rounded-2xl px-3 py-1.5 text-base font-medium text-zinc-900 hover:bg-violet-50 aria-[current=page]:bg-violet-50 aria-[current=page]:text-violet-900 dark:text-zinc-100 dark:hover:bg-white/5 dark:aria-[current=page]:bg-white/5 dark:aria-[current=page]:text-white"
-                >
-                  <Tile icon={i.icon} tone={i.tone} size="size-9" />
-                  {i.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ))}
+    <div className="flex flex-col gap-1">
+      {NAV_GROUPS.map((g, gi) => {
+        const isOpen = open === g.id;
+        const dim = open !== null && !isOpen;
+        const panelId = `phone-nav-${g.id}`;
+        return (
+          <div key={g.id} data-nav-row style={{ "--i": gi } as React.CSSProperties} className={`transition-opacity duration-300 ${dim ? "opacity-45" : "opacity-100"}`}>
+            <button
+              type="button"
+              aria-expanded={isOpen}
+              aria-controls={panelId}
+              onClick={() => setOpen(isOpen ? null : g.id)}
+              className="group/row flex w-full items-center gap-4 rounded-2xl px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+            >
+              <span aria-hidden="true" className={`w-6 shrink-0 font-mono text-xs tabular-nums transition-colors duration-300 ${isOpen || active === g.id ? "text-violet-700 dark:text-violet-300" : "text-zinc-400 dark:text-zinc-500"}`}>
+                {String(gi + 1).padStart(2, "0")}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={`block font-display text-[1.75rem] leading-9 font-semibold tracking-tight transition-colors duration-300 ${active === g.id ? "text-violet-800 dark:text-violet-300" : "text-zinc-950 dark:text-white"}`}>
+                  {g.label}
+                </span>
+                <span className="block truncate text-sm text-zinc-500 dark:text-zinc-400">{g.items.map((i) => i.label).join(" · ")}</span>
+              </span>
+              <span
+                aria-hidden="true"
+                className={`relative grid size-10 shrink-0 place-items-center rounded-full border transition-[background-color,border-color,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  isOpen ? "rotate-180 border-violet-700 bg-violet-700 text-white dark:border-violet-400 dark:bg-violet-400 dark:text-zinc-950" : "border-zinc-300 text-zinc-700 group-active/row:scale-95 dark:border-zinc-700 dark:text-zinc-200"
+                }`}
+              >
+                <span className="absolute h-[1.5px] w-3.5 rounded-full bg-current" />
+                <span className={`absolute h-3.5 w-[1.5px] rounded-full bg-current transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isOpen ? "scale-y-0" : "scale-y-100"}`} />
+              </span>
+            </button>
+            {/* The panel unfolds by animating its grid row from 0fr to 1fr, so it needs no measuring. */}
+            <div
+              id={panelId}
+              inert={!isOpen}
+              className={`grid transition-[grid-template-rows,visibility] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${isOpen ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]"}`}
+            >
+              <ul className="min-h-0 overflow-hidden">
+                <li className="grid grid-cols-2 gap-2 px-3 pt-1 pb-4">
+                  {g.items.map((i, ii) => (
+                    <Link
+                      key={i.href}
+                      href={i.href}
+                      aria-current={current(path, i.href)}
+                      style={{ transitionDelay: isOpen ? `${80 + ii * 40}ms` : "0ms" }}
+                      className={`group/item flex min-h-[4.5rem] flex-col justify-between gap-2 rounded-2xl bg-zinc-100 p-3 text-sm font-medium text-zinc-900 transition-[opacity,transform,background-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-zinc-200 aria-[current=page]:bg-violet-700 aria-[current=page]:text-white motion-reduce:transition-none dark:bg-white/[0.06] dark:text-zinc-100 dark:hover:bg-white/10 dark:aria-[current=page]:bg-violet-500 ${
+                        isOpen ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+                      }`}
+                    >
+                      <Tile icon={i.icon} tone={i.tone} size="size-8" />
+                      <span className="leading-5">{i.label}</span>
+                    </Link>
+                  ))}
+                </li>
+              </ul>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -162,7 +162,7 @@ test("the phone menu closes after a page is chosen", async ({ page }) => {
   const menu = page.locator(".site-header details.site-menu");
   await menu.locator(":scope > summary").click();
   await expect(menu).toHaveAttribute("open", "");
-  await menu.locator("summary", { hasText: "Learn" }).click();
+  await menu.getByRole("button", { name: /^Learn/ }).click();
   await menu.getByRole("link", { name: "Library", exact: true }).click();
   await expect(page).toHaveURL(/\/library$/);
   await expect(menu).not.toHaveAttribute("open");
