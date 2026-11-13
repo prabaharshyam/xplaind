@@ -30,3 +30,12 @@ describe("activeGroup (NV-2)", () => {
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });
 });
+
+describe("Pro has its own place (NV-7)", () => {
+  it("keeps the pricing page out of every menu group and names the AI group AI Studio", async () => {
+    const { NAV_GROUPS, PRO_LINK } = await import("./nav");
+    expect(NAV_GROUPS.flatMap((g) => g.items).some((i) => i.href === "/pricing")).toBe(false);
+    expect(PRO_LINK.href).toBe("/pricing");
+    expect(NAV_GROUPS.find((g) => g.id === "ai")?.label).toBe("AI Studio");
+  });
+});

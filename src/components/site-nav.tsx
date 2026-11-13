@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/art/icons";
-import { NAV_GROUPS, type NavTone, activeGroup, under } from "@/lib/nav";
+import { NAV_GROUPS, PRO_LINK, type NavTone, activeGroup, under } from "@/lib/nav";
 import type { IconName } from "@/lib/themes";
 
 /** UX-3: the soft icon tile beside each menu item, one tone per item. */
@@ -135,6 +135,11 @@ function DesktopMenus({ path }: { path: string }) {
           </div>
         </details>
       ))}
+      <Link href={PRO_LINK.href} aria-current={current(path, PRO_LINK.href)} className={`${tab(under(path, PRO_LINK.href))} gap-1.5`}>
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-violet-600 dark:bg-violet-400" />
+        {PRO_LINK.label}
+        {under(path, PRO_LINK.href) && dot}
+      </Link>
     </div>
   );
 }
@@ -219,6 +224,22 @@ function PhoneMenu({ path }: { path: string }) {
           </div>
         );
       })}
+      {/* NV-7: Pro on its own, after the groups. */}
+      <div data-nav-row style={{ "--i": NAV_GROUPS.length } as React.CSSProperties} className="px-3 pt-4">
+        <Link
+          href={PRO_LINK.href}
+          aria-current={current(path, PRO_LINK.href)}
+          className="group/pro flex items-center gap-4 rounded-3xl bg-violet-50 p-4 ring-1 ring-violet-200 transition-colors hover:bg-violet-100 dark:bg-violet-500/10 dark:ring-violet-500/30 dark:hover:bg-violet-500/15"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-xl font-semibold tracking-tight text-violet-950 dark:text-white">{PRO_LINK.title}</span>
+            <span className="mt-0.5 block text-sm leading-5 text-violet-900/80 dark:text-violet-200/80">{PRO_LINK.note}</span>
+          </span>
+          <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-violet-700 text-white transition-transform duration-300 group-hover/pro:translate-x-0.5 dark:bg-violet-400 dark:text-zinc-950">
+            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </span>
+        </Link>
+      </div>
     </div>
   );
 }
