@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
 import { BUSINESS } from "@/lib/business";
+import { providerName } from "@/lib/billing/config";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
@@ -51,7 +52,7 @@ export default function RefundsPage() {
           <li>Ask within 7 days of buying and we refund the full amount, whatever the reason. Your pass ends when the refund is made.</li>
           <li>After 7 days we do not refund the unused part of a pass.</li>
           <li>If you were charged but your pass did not start, or you were charged twice, we refund the extra payment in full, at any time.</li>
-          <li>Refunds go back to the way you paid, through Cashfree, within 5 to 7 working days of our approval. Your bank may take a few more days to show it.</li>
+          <li>Refunds go back to the way you paid, through {providerName()}, within 5 to 7 working days of our approval. Your bank may take a few more days to show it.</li>
         </ul>
 
         <h2 className={H2}>How to ask</h2>

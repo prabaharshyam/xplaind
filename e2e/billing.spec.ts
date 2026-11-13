@@ -67,3 +67,9 @@ test("the contact page, the footer and the policies name the business and how to
   await page.goto("/refunds");
   await expect(page.getByRole("heading", { name: "Delivery" })).toBeVisible();
 });
+
+test("the Razorpay order and verify APIs stay shut while payments are off, and reject bad input (RZ-1)", async ({ request }) => {
+  expect((await request.post("/api/billing/create-order", { data: { planId: "pass_month", agree: true } })).status()).toBe(503);
+  expect((await request.post("/api/billing/verify-payment", { data: { razorpay_order_id: "order_ABC123456" } })).status()).toBe(503);
+  expect((await request.post("/api/billing/razorpay-webhook", { data: {} })).status()).toBe(503);
+});

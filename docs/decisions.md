@@ -500,3 +500,13 @@ The owner asked for a focus review and chose four of its recommendations.
 ## 2026-11-13: ready for Cashfree onboarding (BIZ-1)
 
 Cashfree's checklist for a new merchant site: published privacy, terms and refund pages, a contact page with email and phone, the parent business named on the site, pricing and what is sold clearly visible, and the site public. The policies already existed (PAY-6); this adds /contact, the "brand of ZEREH Venture" footer line with the GSTIN, "Who we are" in privacy and terms, a Delivery section in refunds, and a pricing page that always shows the passes and their prices. The owner chose: prices include GST; show the GSTIN; no registered address on the site for now. Receipts keep "not a tax invoice" until GST invoices are built. The Pricing link is now always in the menu and footer (PAY-5 amended), because reviewers and visitors must find it before payments open.
+
+## 2026-11-13: Razorpay Standard Checkout beside Cashfree (RZ-1)
+
+The owner asked for Razorpay Standard Checkout, with test keys, while the Cashfree application is pending. Xplaind already had a full Pro pass flow (orders table, grant_pass, receipts, refunds), so Razorpay plugs into it instead of a separate, generic "pay any amount" endpoint:
+
+- **The amount never comes from the browser.** create-order takes a plan id; the price comes from src/lib/billing/plans.ts. A generic amount field would let anyone pay ₹1 for a year's pass.
+- **The signature is necessary but not enough.** After the HMAC check, the server asks Razorpay for the order and payment and checks the receipt (our order id), amount, currency and status before granting, the same rule as Cashfree (PAY-3). A webhook covers learners who close the tab after paying.
+- **One gateway at a time**, chosen by PAYMENTS_PROVIDER, so policies and receipts name the right processor. Test and live keys are tied to PAYMENTS_MODE so a live key can never run in "test mode".
+- **No Razorpay npm package.** The integration is two API calls and an HMAC, done with fetch like the Cashfree code; one less dependency to keep updated.
+- **Keys** live only in the host's settings (Vercel) and a git-ignored .env.local for local runs. The browser gets the key id from create-order; no NEXT_PUBLIC_ copy is needed. The test key secret was shared in a chat, so it should be regenerated in the Razorpay dashboard before real use; live keys are separate anyway.
