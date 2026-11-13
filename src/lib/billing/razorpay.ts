@@ -5,7 +5,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RazorpayConfig } from "./config";
 import type { Confirmed } from "./confirm";
-import { PLANS, isPlanId } from "./plans";
+import { PLANS, isPlanId, type PlanId } from "./plans";
+import { discountedPaise } from "./promo";
 
 const API = "https://api.razorpay.com/v1";
 /** Razorpay rejects orders below ₹1. */
@@ -96,10 +97,13 @@ export async function confirmRazorpay(
   const ours = order.data.receipt;
   if (!ours || !/^xp_[A-Za-z0-9_-]{6,42}$/.test(ours)) return { result: "unknown", orderId: null };
 
-  const { data: row } = await admin.from("payments").select("plan_id, amount_paise, status, environment").eq("order_id", ours).maybeSingle();
+  // select * so this works before and after the promo migration (PAY-9 adds discount_percent).
+  const { data: row } = await admin.from("payments").select("*").eq("order_id", ours).maybeSingle();
   if (!row || !isPlanId(row.plan_id) || row.environment !== c.mode) return { result: "unknown", orderId: ours };
   if (row.status === "paid") return { result: "already", orderId: ours };
-  if (order.data.currency !== "INR" || order.data.amount !== row.amount_paise || order.data.amount !== PLANS[row.plan_id].paise) return { result: "unknown", orderId: ours };
+  // The amount must be the plan's price after the order's own discount (PAY-9), and match our row.
+  const expected = discountedPaise(PLANS[row.plan_id as PlanId].paise, Number(row.discount_percent ?? 0));
+  if (order.data.currency !== "INR" || order.data.amount !== row.amount_paise || order.data.amount !== expected) return { result: "unknown", orderId: ours };
 
   let payment: RazorpayPayment | undefined;
   if (paymentId) {

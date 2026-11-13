@@ -50,6 +50,7 @@ export default function RefundsPage() {
         <h2 className={H2}>Refunds</h2>
         <ul className={`${P} list-disc pl-6`}>
           <li>Ask within 7 days of buying and we refund the full amount, whatever the reason. Your pass ends when the refund is made.</li>
+          <li>A pass bought with a promo code is refunded at the price you paid. A pass that was free with a code has nothing to refund.</li>
           <li>After 7 days we do not refund the unused part of a pass.</li>
           <li>If you were charged but your pass did not start, or you were charged twice, we refund the extra payment in full, at any time.</li>
           <li>Refunds go back to the way you paid, through {providerName()}, within 5 to 7 working days of our approval. Your bank may take a few more days to show it.</li>

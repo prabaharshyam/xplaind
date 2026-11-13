@@ -355,3 +355,57 @@ describe("Pro passes (PAY-2)", () => {
     expect((await q("select user_id, status from payments where order_id = 'xp_d_000001'")).rows[0]).toEqual({ user_id: null, status: "paid" });
   });
 });
+
+describe("Promo codes (PAY-9)", () => {
+  const E = "00000000-0000-4000-8000-0000000000e1";
+  const F = "00000000-0000-4000-8000-0000000000f1";
+  const order = (id: string, user: string, paise: number, code: string | null, pct: number) =>
+    q("insert into payments (order_id, user_id, plan_id, amount_paise, environment, promo_code, discount_percent) values ($1, $2, 'pass_month', $3, 'sandbox', $4, $5)", [id, user, paise, code, pct]);
+  const grant = async (id: string) => (await q("select public.grant_pass($1, null, '2026-11-13T10:00:00+05:30') as r", [id])).rows[0].r;
+
+  beforeAll(async () => {
+    await q("insert into auth.users (id, email) values ($1, 'e@example.com'), ($2, 'f@example.com')", [E, F]);
+    await q("insert into promo_codes (code, percent_off) values ('testfree', 100), ('testhalf', 50)");
+  });
+
+  it("stores codes in lower case only, and no learner or visitor can read or add codes", async () => {
+    expect((await fails(q("insert into promo_codes (code, percent_off) values ('UPPER', 10)"))).code).toBe("23514");
+    expect((await fails(q("insert into promo_codes (code, percent_off) values ('zeroff', 0)"))).code).toBe("23514");
+    for (const user of [E, null]) {
+      for (const sql of ["select * from promo_codes", "insert into promo_codes (code, percent_off) values ('mine', 100)"]) {
+        const err = await fails(asUser(db.client, user, () => q(sql)));
+        expect(err.code, sql).toBe(PERMISSION_DENIED);
+      }
+    }
+  });
+
+  it("a free order grants the pass and uses the code; a second free order with it grants nothing", async () => {
+    await order("xp_e_free01", E, 0, "testfree", 100);
+    expect(await grant("xp_e_free01")).toBe("granted");
+    expect((await q("select code, order_id from promo_redemptions where user_id = $1", [E])).rows).toEqual([{ code: "testfree", order_id: "xp_e_free01" }]);
+    await order("xp_e_free02", E, 0, "testfree", 100);
+    expect(await grant("xp_e_free02")).toBe("used");
+    expect((await q("select status from payments where order_id = 'xp_e_free02'")).rows[0].status).toBe("failed");
+    expect((await q("select valid_until from entitlements where user_id = $1", [E])).rows[0].valid_until.toISOString()).toBe("2026-12-13T04:30:00.000Z");
+  });
+
+  it("an abandoned order does not use the code; another account can use the same code", async () => {
+    await order("xp_f_half01", F, 12450, "testhalf", 50);
+    expect((await q("select count(*)::int as n from promo_redemptions where user_id = $1", [F])).rows[0].n).toBe(0);
+    await order("xp_f_free01", F, 0, "testfree", 100);
+    expect(await grant("xp_f_free01")).toBe("granted");
+  });
+
+  it("a learner reads only their own redemptions and cannot write any", async () => {
+    const mine = await asUser(db.client, E, async () => (await q("select code from promo_redemptions")).rows);
+    expect(mine).toEqual([{ code: "testfree" }]);
+    const err = await fails(asUser(db.client, E, () => q(`insert into promo_redemptions (user_id, code, order_id) values ('${E}', 'testhalf', 'xp_f_half01')`)));
+    expect(err.code).toBe(PERMISSION_DENIED);
+    expect((await fails(asUser(db.client, null, () => q("select * from promo_redemptions")))).code).toBe(PERMISSION_DENIED);
+  });
+
+  it("removes redemptions with the account", async () => {
+    await q("delete from auth.users where id = $1", [F]);
+    expect((await q("select count(*)::int as n from promo_redemptions where user_id = $1", [F])).rows[0].n).toBe(0);
+  });
+});
