@@ -6,6 +6,19 @@ const rpc = vi.fn();
 const create = vi.fn();
 let profile: { id: string } | null = { id: "u1" };
 let user: { id: string; email: null } | null = { id: "u1", email: null };
+/** PAY-7: rows of earlier days' usage of one feature, for the free trial. */
+let pastUsage: { calls: number }[] = [];
+
+/** A chainable fake query: .eq() and .lt() keep chaining, .maybeSingle() gives the profile, awaiting gives usage rows. */
+function query() {
+  const q = {
+    eq: () => q,
+    lt: () => q,
+    maybeSingle: async () => ({ data: profile }),
+    then: (ok: (v: { data: unknown }) => unknown) => Promise.resolve({ data: pastUsage }).then(ok),
+  };
+  return q;
+}
 
 vi.mock("@/lib/account/http", () => ({
   problem: (status: number, message: string) => Response.json({ error: message }, { status }),
@@ -14,7 +27,7 @@ vi.mock("@/lib/account/http", () => ({
   visitorKey: () => "visitor-hash",
 }));
 vi.mock("@/lib/supabase/server", () => ({
-  serviceClient: () => ({ rpc, from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: profile }) }) }) }) }),
+  serviceClient: () => ({ rpc, from: () => ({ select: () => query() }) }),
   userClient: async () => ({}),
   currentUser: async () => user,
 }));
@@ -81,16 +94,19 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     expect(create.mock.calls[0][0]).toMatchObject({ model: "claude-opus-5-5", fallbacks: "default" });
   });
 
-  it("uses the free learner's lower limit once Pro is open, and offers a pass at the limit (PAY-1, PAY-4)", async () => {
+  it("gives a free account a one-time trial once Pro is open, counted across days, then offers a pass (PAY-7)", async () => {
     vi.stubEnv("PAYMENTS_MODE", "sandbox");
     vi.stubEnv("CASHFREE_APP_ID", "app");
     vi.stubEnv("CASHFREE_SECRET_KEY", "secret");
+    pastUsage = [{ calls: 1 }, { calls: 1 }];
     rpc.mockResolvedValueOnce({ data: "day", error: null });
     const res = (await runAi(req)) as Response;
-    expect(rpc.mock.calls[0][1]).toMatchObject({ p_kind: "tutor", p_daily_max: 10 });
+    // The tutor trial is 3; two were used on earlier days, so one is left today.
+    expect(rpc.mock.calls[0][1]).toMatchObject({ p_kind: "tutor", p_daily_max: 1 });
     expect(res.status).toBe(429);
-    expect(await res.json()).toMatchObject({ upgrade: "/pricing" });
+    expect(await res.json()).toMatchObject({ upgrade: "/pricing", error: expect.stringMatching(/free tries/) });
     expect(create).not.toHaveBeenCalled();
+    pastUsage = [];
   });
 
   it("never calls the model when the kill switch is on", async () => {

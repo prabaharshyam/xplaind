@@ -510,3 +510,7 @@ The owner asked for Razorpay Standard Checkout, with test keys, while the Cashfr
 - **One gateway at a time**, chosen by PAYMENTS_PROVIDER, so policies and receipts name the right processor. Test and live keys are tied to PAYMENTS_MODE so a live key can never run in "test mode".
 - **No Razorpay npm package.** The integration is two API calls and an HMAC, done with fetch like the Cashfree code; one less dependency to keep updated.
 - **Keys** live only in the host's settings (Vercel) and a git-ignored .env.local for local runs. The browser gets the key id from create-order; no NEXT_PUBLIC_ copy is needed. The test key secret was shared in a chat, so it should be regenerated in the Razorpay dashboard before real use; live keys are separate anyway.
+
+## 2026-11-13: a one-time AI trial for free accounts (PAY-7)
+
+The owner asked for at most 2 or 3 AI tries on a free account, then a prompt for Pro, and chose a one-time trial per feature over a daily allowance. It is counted from the existing ai_usage rows (no new table): today's allowance is the trial minus the uses on earlier days, and the existing locked guard stops today's uses there. Lessons, roadmaps, practice and projects stay open without limits (PAY-1); only the AI helpers are limited. A learner who used AI before this change keeps those uses on their count, so some may already be at their trial's end.

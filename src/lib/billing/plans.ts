@@ -27,8 +27,10 @@ export type Tier = "guest" | "free" | "pro";
  * real, so one learner cannot run up a bill bigger than their pass.
  */
 export const TIER_LIMITS: Record<Tier, Record<AiKind, number>> = {
-  guest: { tutor: 5, grade: 2, interview: 1, book: 1, resume: 1, notes: 5 },
-  free: { tutor: 10, grade: 3, interview: 1, book: 2, resume: 1, notes: 20 },
+  /** Visitors without an account (only while sign-ups are on hold; AG-1 asks them to sign up). Never more than the free trial. */
+  guest: { tutor: 2, grade: 1, interview: 1, book: 1, resume: 1, notes: 2 },
+  /** PAY-7: for free accounts these are a one-time trial per feature, not a daily allowance. */
+  free: { tutor: 3, grade: 3, interview: 2, book: 2, resume: 2, notes: 3 },
   pro: { tutor: 50, grade: 20, interview: 5, book: 10, resume: 3, notes: 100 },
 };
 
@@ -49,6 +51,14 @@ export const KIND_LABEL: Record<AiKind, string> = {
 export function dailyLimit(kind: AiKind, tier: Tier, proOpen: boolean, before: Record<AiKind, number>): number {
   return proOpen ? TIER_LIMITS[tier][kind] : before[kind];
 }
+
+/**
+ * PAY-7 (2026-11-13, owner decision): once Pro is open, a free account gets a one-time trial of each
+ * AI helper (TIER_LIMITS.free), not a daily allowance. What is left today is the trial minus every
+ * use on earlier days; the daily guard then stops today's uses at that number, so the lifetime total
+ * never passes the trial. Pure, for tests.
+ */
+export const trialLeftToday = (trial: number, usedBeforeToday: number): number => Math.max(0, trial - Math.max(0, usedBeforeToday));
 
 /** A new order id: "xp_", the time in base 36 and random letters. Cashfree allows 3 to 45 of [A-Za-z0-9_-]. */
 export function newOrderId(now: number, random: string): string {

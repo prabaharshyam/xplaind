@@ -43,15 +43,15 @@ const FREE = [
 const FAQ: { q: string; a: string }[] = [
   {
     q: "Do I need Pro for the roadmaps and lessons?",
-    a: "No. Every roadmap, lesson, video, practice card, interview answer and project guide comes with your account, with no daily limit. Pro only changes how much AI help you get each day.",
+    a: "No. Every roadmap, lesson, video, practice card, interview answer and project guide comes with your account, with no daily limit. Pro only changes how much AI help you get.",
   },
   {
     q: "Why charge for AI help?",
-    a: "Each AI answer costs us money to run. The standard daily allowance stays, and a pass covers the cost of heavier use, so Xplaind stays independent, with no ads and no sponsored rankings.",
+    a: "Each AI answer costs us money to run. Every account can try each AI helper a few times for free; a pass covers the cost of regular use, so Xplaind stays independent, with no ads and no sponsored rankings.",
   },
   {
     q: "Does it renew by itself?",
-    a: "No. A pass is one payment for 30 days, 6 months or 12 months. When it ends you go back to the standard allowance, and you buy again only if you want to. Buying while a pass runs adds the time on at the end.",
+    a: "No. A pass is one payment for 30 days, 6 months or 12 months. When it ends you go back to a free account, and you buy again only if you want to. Buying while a pass runs adds the time on at the end.",
   },
   {
     q: "How can I pay?",
@@ -147,7 +147,7 @@ export default function PricingPage() {
                   size={16}
                   className="mt-1 shrink-0 text-violet-700 dark:text-violet-300"
                 />
-                AI helpers with a daily allowance
+                Try each AI helper for free (2 or 3 times)
               </li>
             </ul>
             <Link
@@ -233,35 +233,36 @@ export default function PricingPage() {
 
         <section aria-labelledby="limits" className="mt-14">
           <h2 id="limits" className="text-2xl font-semibold">
-            Daily AI allowance
+            AI helpers: free trial and Pro
           </h2>
           <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
-            Counts reset at midnight India time. The limits keep costs fair for
-            everyone, Pro included.
+            A free account can try each AI helper a few times, once. Pro gives a
+            daily allowance that resets at midnight India time. The limits keep
+            costs fair for everyone, Pro included.
           </p>
           <div
             role="region"
-            aria-label="Daily AI allowance table"
+            aria-label="AI helper limits table"
             tabIndex={0}
             className="mt-4 overflow-x-auto rounded-2xl border border-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800"
           >
             <table className="w-full min-w-[32rem] text-left text-sm">
               <caption className="sr-only">
-                AI turns per day, by account
+                AI helper uses: free trial in total, Pro per day
               </caption>
               <thead className="bg-zinc-50 dark:bg-zinc-900">
                 <tr>
                   <th scope="col" className="p-3 font-semibold">
-                    Each day
+                    AI helper
                   </th>
                   <th scope="col" className="p-3 font-semibold">
                     Without an account
                   </th>
                   <th scope="col" className="p-3 font-semibold">
-                    Your account
+                    Free account (one-time trial)
                   </th>
                   <th scope="col" className="p-3 font-semibold">
-                    Pro
+                    Pro (every day)
                   </th>
                 </tr>
               </thead>
@@ -287,7 +288,9 @@ export default function PricingPage() {
                         Sign up to use AI
                       </td>
                     ) : null}
-                    <td className="p-3">{TIER_LIMITS.free[k]}</td>
+                    <td className="p-3">
+                      {TIER_LIMITS.free[k]} {TIER_LIMITS.free[k] === 1 ? "try" : "tries"}
+                    </td>
                     <td className="p-3 font-semibold">{TIER_LIMITS.pro[k]}</td>
                   </tr>
                 ))}

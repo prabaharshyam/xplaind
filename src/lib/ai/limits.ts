@@ -72,6 +72,8 @@ export function positiveNumber(value: string | undefined, fallback: number): num
 
 export const LIMIT_MESSAGE = {
   day: "You have used today's AI turns for this feature. They reset at midnight India time, so try again tomorrow.",
+  /** PAY-7: a free account has used its one-time trial of this feature. */
+  trial: "You have used your free tries of this AI tool. A Pro pass unlocks it with a generous daily allowance, from ₹249.",
   /** PAY-4: the same, when a Pro pass would give more today. */
   dayUpgrade: "You have used today's AI turns for this feature. They reset at midnight India time, or a Pro pass gives you more today.",
   month: "This month's AI allowance is used up. It resets on the 1st. Everything else on Xplaind still works.",

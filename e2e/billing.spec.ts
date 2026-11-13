@@ -9,8 +9,9 @@ test("the pricing page shows the free plan, the three passes and the daily AI al
   await expect(page.getByRole("heading", { level: 1, name: "Learn AI step by step. Get more AI help with Pro." })).toBeVisible();
   for (const price of ["₹0", "₹249", "₹1,199", "₹1,999"]) await expect(page.getByText(price, { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Most popular")).toBeVisible();
-  const table = page.getByRole("table", { name: "AI turns per day, by account" });
-  await expect(table.getByRole("row", { name: /AI tutor questions 5 10 50/ })).toBeVisible();
+  // PAY-7: a free account gets a one-time trial of each AI helper; Pro is per day.
+  const table = page.getByRole("table", { name: "AI helper uses: free trial in total, Pro per day" });
+  await expect(table.getByRole("row", { name: /AI tutor questions 5 3 tries 50/ })).toBeVisible();
   // BIZ-1: what is sold, by whom and how it is delivered is on the page. Pro is closed in this build
   // (no PAYMENTS_MODE): prices stay visible, with a clear notice and no buy buttons.
   await expect(page.getByRole("heading", { name: "What you can buy" })).toBeVisible();

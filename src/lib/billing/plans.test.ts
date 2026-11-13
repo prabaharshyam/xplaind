@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DAILY_LIMIT } from "@/lib/ai/limits";
-import { PLANS, TIER_LIMITS, dailyLimit, isPlanId, newOrderId, rupees } from "./plans";
+import { PLANS, TIER_LIMITS, dailyLimit, isPlanId, newOrderId, rupees, trialLeftToday } from "./plans";
 
 describe("Pro passes and limits (PAY-1)", () => {
   it("prices the three passes in paise and shows them in rupees", () => {
@@ -20,6 +20,18 @@ describe("Pro passes and limits (PAY-1)", () => {
       expect(dailyLimit(kind, "pro", true, DAILY_LIMIT)).toBeGreaterThan(dailyLimit(kind, "free", true, DAILY_LIMIT));
       expect(dailyLimit(kind, "free", true, DAILY_LIMIT)).toBeGreaterThanOrEqual(dailyLimit(kind, "guest", true, DAILY_LIMIT));
     }
+  });
+
+  it("gives a free account a one-time trial of 2 or 3 tries per AI helper (PAY-7)", () => {
+    for (const n of Object.values(TIER_LIMITS.free)) expect([2, 3]).toContain(n);
+  });
+
+  it("counts the trial across days: what is left today is the trial minus every earlier use (PAY-7)", () => {
+    expect(trialLeftToday(3, 0)).toBe(3);
+    expect(trialLeftToday(3, 2)).toBe(1);
+    expect(trialLeftToday(3, 3)).toBe(0);
+    expect(trialLeftToday(3, 10)).toBe(0);
+    expect(trialLeftToday(3, -1)).toBe(3);
   });
 
   it("makes order ids Cashfree accepts", () => {
