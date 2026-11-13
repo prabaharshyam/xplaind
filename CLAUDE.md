@@ -34,7 +34,7 @@ This repo uses Next.js 16 with Cache Components on. Its APIs differ from older v
 
 When building or changing UI in this project, use these skills:
 
-- **Visual direction:** `design-taste-frontend` (Taste v2) for the premium, agency-grade look; `ui-ux-pro-max` to pick palette, type and style; `frontend-design` as the baseline. Use at most two taste skills at once — if they disagree, `design-taste-frontend` wins. `impeccable` for audit/polish passes.
+- **Visual direction:** `design-taste-frontend` (Taste v2) for the premium, agency-grade look; `ui-ux-pro-max` to pick palette, type and style; `frontend-design` as the baseline. Use at most two taste skills at once — if they disagree, `design-taste-frontend` wins. `impeccable` for audit/polish passes; `unslop` to find and remove AI-looking tells (glows, gradient text, emoji labels, uneven spacing) screen by screen.
 - **3D:** `threejs-*` skills (vanilla Three.js), `r3f-best-practices` / `r3f-fundamentals` (React Three Fiber), `webgpu-threejs-tsl` for WebGPU/TSL, `web-shaders` for GLSL/WGSL.
 - **Motion & scroll:** `gsap-*` skills (timelines, ScrollTrigger, useGSAP); Lenis as the ONLY smooth-scroll engine; `emil-design-eng` for micro-interactions, `review-animations` to audit them; `vercel-react-view-transitions` for page transitions.
 - **Award-style pages:** `build-awwwards-quality-sites` for heroes and scroll storytelling; `scroll-cinematic` for Apple-style frame-sequence scroll.
