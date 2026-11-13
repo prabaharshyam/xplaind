@@ -137,7 +137,7 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
       )}
 
       <section aria-labelledby="upload-h" className="rounded-2xl border-2 border-dashed border-zinc-300 bg-white p-6 text-center dark:border-zinc-700 dark:bg-zinc-900">
-        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-teal-500 to-violet-500 text-white">
+        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
           <Icon name="book" size={28} />
         </span>
         <h2 id="upload-h" className="mt-3 text-xl font-semibold">
@@ -397,11 +397,11 @@ function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: 
           />
         ) : mode === "cards" ? (
           <button type="button" onClick={() => void makeCards()} disabled={chosen.length === 0} className={`${primaryButton} self-start disabled:opacity-50`}>
-            <Icon name="sparkles" size={18} /> Make my flashcards
+            Make my flashcards
           </button>
         ) : (
           <button type="button" onClick={() => void generate()} disabled={chosen.length === 0} className={`${primaryButton} self-start disabled:opacity-50`}>
-            <Icon name="sparkles" size={18} /> Write my test
+            Write my test
           </button>
         )}
         <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
@@ -794,7 +794,7 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
               aria-label={`Card ${i + 1}`}
               className="card-flip relative flex min-h-72 flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-6 outline-none md:p-8 dark:border-zinc-800 dark:bg-zinc-900"
             >
-              <p className="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
+              <p className="flex items-center justify-between gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
                 <span>{flipped ? "Answer" : "Question"}</span>
                 <span className="min-w-0 truncate normal-case">
                   {card.section}, page {card.page}

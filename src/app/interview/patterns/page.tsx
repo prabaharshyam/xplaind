@@ -34,7 +34,7 @@ export default function PatternsPage() {
           return (
             <section key={c} aria-labelledby={`cat-${c}`}>
               <h2 id={`cat-${c}`} className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-                <span className="grid size-9 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+                <span className="grid size-9 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                   <Icon name={CATEGORY[c].icon} size={18} />
                 </span>
                 {CATEGORY[c].label}
@@ -45,7 +45,7 @@ export default function PatternsPage() {
                   <li key={p.id}>
                     <Link
                       href={`/interview/patterns/${p.id}`}
-                      className="flex h-full flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-5 transition hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-zinc-800 dark:bg-zinc-900"
+                      className="flex h-full flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-5 transition-colors dark:border-zinc-800 dark:bg-zinc-900"
                     >
                       <span className="text-lg font-semibold">{p.name}</span>
                       <span className="text-sm leading-6 text-zinc-700 dark:text-zinc-300">{p.summary}</span>

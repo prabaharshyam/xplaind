@@ -110,7 +110,7 @@ export function ResumeStudio({ enabled, roles }: { enabled: boolean; roles: stri
 
           {error && <AiError message={error} />}
           <button type="submit" className={primaryButton} disabled={reading}>
-            <Icon name="sparkles" size={18} /> Review my resume
+            Review my resume
           </button>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Your file is read in your browser. Only its text is sent to the AI, for this one review, and Xplaind does not store it. You may remove your phone number and

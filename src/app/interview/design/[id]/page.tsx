@@ -34,7 +34,7 @@ function Head({ n, id }: { n: number; id: (typeof STEPS)[number]["id"] }) {
   const s = STEPS.find((x) => x.id === id)!;
   return (
     <h2 id={`${id}-h`} className="flex flex-wrap items-center gap-3 text-xl font-semibold">
-      <span className="grid size-8 place-items-center rounded-full bg-violet-700 text-sm font-bold text-white">{n}</span>
+      <span className="grid size-8 place-items-center rounded-full bg-zinc-100 text-sm font-medium text-zinc-800 tabular-nums dark:bg-zinc-800 dark:text-zinc-200">{n}</span>
       {s.title}
       <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{s.time}</span>
     </h2>

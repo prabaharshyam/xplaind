@@ -110,11 +110,11 @@ function DesktopMenus({ path }: { path: string }) {
             {active === g.id && <span className="sr-only"> (current section)</span>}
           </summary>
           <div
-            className={`nav-panel absolute top-full left-0 z-50 mt-3 rounded-3xl border border-zinc-200/80 bg-white p-3 shadow-[0_24px_60px_-20px_rgba(46,16,101,0.35),0_8px_20px_-12px_rgba(0,0,0,0.15)] dark:border-zinc-800 dark:bg-zinc-900 ${
+            className={`nav-panel absolute top-full left-0 z-50 mt-3 rounded-3xl border border-zinc-200/80 bg-white p-3 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.18),0_8px_20px_-12px_rgba(0,0,0,0.15)] dark:border-zinc-800 dark:bg-zinc-900 ${
               g.items.length > 4 ? "w-[38rem]" : "w-[22rem]"
             }`}
           >
-            <p className="px-3 pt-1 pb-2 text-xs font-semibold tracking-[0.12em] text-zinc-500 uppercase dark:text-zinc-400">{g.label}</p>
+            <p className="px-3 pt-1 pb-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">{g.label}</p>
             <ul className={g.items.length > 4 ? "grid grid-cols-2 gap-1" : "flex flex-col gap-1"}>
               {g.items.map((i) => (
                 <li key={i.href}>

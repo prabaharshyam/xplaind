@@ -4,7 +4,6 @@ import { ResourceNotice } from "@/components/resource-card";
 import { useMemo, useState } from "react";
 import { CourseThumb } from "@/components/course-thumb";
 import type { Embed } from "@/lib/content/media";
-import { Icon } from "@/components/art/icons";
 import { ALL, type DirectoryFilter, type DirectoryItem, EMPTY_FILTER, filterDirectory } from "@/lib/roadmap/directory";
 import { THEMES, type ThemeId, themeOf } from "@/lib/themes";
 
@@ -83,9 +82,7 @@ export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: 
                     on ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-black" : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
                   }`}
                 >
-                  <span className="grid size-6 place-items-center rounded-full text-white" style={{ background: `linear-gradient(135deg, ${t.from}, ${t.to})` }}>
-                    <Icon name={t.icon} size={13} />
-                  </span>
+                  <span aria-hidden="true" className="mx-1 size-2 shrink-0 rounded-full" style={{ background: t.from }} />
                   {t.label}
                 </button>
               );

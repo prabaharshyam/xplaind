@@ -50,9 +50,7 @@ export function TopicChips({ counts }: { counts: Record<string, number> }) {
             href={`/topics/${t.id}`}
             className="flex min-h-11 items-center gap-2 rounded-full bg-white py-2 pr-4 pl-2 text-sm text-zinc-900 ring-1 ring-zinc-200 hover:ring-zinc-400 focus-visible:outline-2 focus-visible:outline-violet-700 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-violet-900"
           >
-            <span className="grid size-7 place-items-center rounded-full text-white" style={{ background: `linear-gradient(135deg, ${t.from}, ${t.to})` }}>
-              <Icon name={t.icon} size={15} />
-            </span>
+            <span aria-hidden="true" className="mx-1 size-2 shrink-0 rounded-full" style={{ background: t.from }} />
             {t.label}
             <span className="text-zinc-600 dark:text-zinc-400">{counts[t.id]}</span>
           </Link>

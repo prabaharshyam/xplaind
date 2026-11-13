@@ -110,9 +110,9 @@ export default function PricingPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-lg font-semibold">{p.name}</h3>
                   {best ? (
-                    <span className="rounded-full bg-violet-700 px-3 py-1 text-xs font-semibold text-white">Recommended</span>
+                    <span className="text-sm font-medium text-violet-800 dark:text-violet-300">Recommended</span>
                   ) : save ? (
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+                    <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
                       Best value
                     </span>
                   ) : null}

@@ -2,7 +2,7 @@
 // The brand system is written down in docs/brand.md: violet is the one action colour, every
 // button is a pill in one of three sizes, and nothing a finger taps is under 44 px tall.
 const core =
-  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Small (44 px): inside cards, toolbars and lists. */
 const sm = "min-h-11 px-4 text-sm";
@@ -13,10 +13,10 @@ const lg = "min-h-14 px-8 text-lg";
 
 const primary = "bg-violet-700 text-white hover:bg-violet-800";
 const secondary =
-  "border border-violet-200 bg-white text-violet-950 hover:border-violet-300 hover:bg-violet-50 dark:border-violet-800 dark:bg-zinc-900 dark:text-violet-100 dark:hover:bg-violet-950";
+  "border border-zinc-300 bg-white text-zinc-900 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-500 dark:hover:bg-zinc-800";
 const quiet = "text-violet-800 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-violet-950/60";
 
-// MO-5: deep violet for the main action, white with a violet edge for the rest.
+// MO-5: deep violet for the main action; the rest are quiet neutral (UX-6), so violet means "do this".
 export const primaryButton = `${core} ${md} ${primary}`;
 export const primaryButtonSm = `${core} ${sm} ${primary}`;
 export const primaryButtonLg = `${core} ${lg} ${primary}`;

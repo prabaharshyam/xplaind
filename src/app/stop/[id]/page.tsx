@@ -360,7 +360,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
 
           <section id="tutor" aria-labelledby="tutor-h" className={`mt-8 scroll-mt-24 ${CARD}`}>
             <h2 id="tutor-h" className="flex items-center gap-2 text-xl font-semibold">
-              <Icon name="sparkles" size={22} className="text-violet-700 dark:text-violet-300" /> Stuck? Ask the AI tutor
+              <Icon name="chat" size={20} className="text-zinc-500 dark:text-zinc-400" /> Stuck? Ask the AI tutor
             </h2>
             <p className={`mt-1 text-sm ${muted}`}>It has read this lesson and answers questions about it, with new examples.</p>
             <div className="mt-4">

@@ -78,7 +78,7 @@ function InterviewTracks() {
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tracks.map((t) => (
           <Link key={t.theme} href={`/topics/${t.theme}`} className="flex items-start gap-3 rounded-2xl bg-white p-4 ring-1 ring-zinc-200 hover:ring-violet-400 dark:bg-zinc-900 dark:ring-zinc-800">
-            <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+            <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               <Icon name={t.icon} size={22} />
             </span>
             <span>

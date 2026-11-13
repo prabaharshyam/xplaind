@@ -161,7 +161,7 @@ export function CodeRunner({
           <div className="mt-3">
             {!explain.text && (
               <button type="button" onClick={askAi} disabled={explain.busy} className={secondaryButtonSm}>
-                <Icon name="sparkles" size={16} /> {explain.busy ? "Asking the AI tutor…" : "Explain this error with AI"}
+                {explain.busy ? "Asking the AI tutor…" : "Explain this error with AI"}
               </button>
             )}
             {explain.fail && <p className="mt-2 text-sm text-rose-300">{explain.fail}</p>}

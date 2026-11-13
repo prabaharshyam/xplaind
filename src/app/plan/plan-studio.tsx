@@ -70,7 +70,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
           </p>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden="true">
-          <div className="h-full rounded-full bg-gradient-to-r from-violet-600 to-emerald-500 transition-[width]" style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }} />
+          <div className="h-full rounded-full bg-violet-700 transition-[width] dark:bg-violet-400" style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }} />
         </div>
 
         <ol className="mt-6 space-y-3">
@@ -79,7 +79,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
             const started = progress.stops[l.id]?.status === "in_progress";
             return (
               <li key={l.id} className={`flex items-center gap-4 rounded-2xl border p-4 ${isDone ? "border-emerald-300 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30" : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"}`}>
-                <span className={`grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold ${isDone ? "bg-emerald-600 text-white" : "bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200"}`}>
+                <span className={`grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold ${isDone ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"}`}>
                   {isDone ? <Icon name="tick" size={16} label="Done" /> : i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -95,7 +95,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
             );
           })}
           <li className="flex items-center gap-4 rounded-2xl border border-dashed border-violet-300 p-4 dark:border-violet-800">
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               <Icon name="check" size={16} />
             </span>
             <div className="min-w-0 flex-1">

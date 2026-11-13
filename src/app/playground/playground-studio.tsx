@@ -68,7 +68,7 @@ export function PlaygroundStudio({ aiOn, lessonTitles }: { aiOn: boolean; lesson
       <div className="min-w-0">
         {!shared && (
           <p className="mb-3 flex items-start gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-amber-950 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900">
-            <Icon name="sparkles" size={18} className="mt-0.5 shrink-0" />
+            <Icon name="bolt" size={18} className="mt-0.5 shrink-0" />
             <span>
               <strong className="font-semibold">Try this:</strong> {example.tip}
             </span>

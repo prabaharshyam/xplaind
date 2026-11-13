@@ -47,9 +47,9 @@ export default function InterviewPage() {
             <li key={h.href}>
               <Link
                 href={h.href}
-                className="flex h-full items-start gap-4 rounded-2xl border border-zinc-200 bg-white p-5 transition hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-zinc-800 dark:bg-zinc-900"
+                className="flex h-full items-start gap-4 rounded-2xl border border-zinc-200 bg-white p-5 transition-colors dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200">
+                <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                   <Icon name={h.icon} size={20} />
                 </span>
                 <span>

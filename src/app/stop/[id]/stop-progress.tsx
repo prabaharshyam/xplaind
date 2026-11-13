@@ -50,10 +50,10 @@ export function StopProgressPanel({ stopId, title, check }: { stopId: string; ti
         <McqCheck
           stopId={stopId}
           questions={check.questions}
-          onPassed={(p) => celebrate(p === 100 ? "Perfect score. Lesson done!" : "Lesson done!")}
+          onPassed={(p) => celebrate(p === 100 ? "Perfect score. Lesson done" : "Lesson done")}
         />
       ) : (
-        <ProjectCheck stopId={stopId} brief={check.brief} savedUrl={record?.projectUrl} onDone={() => celebrate("Your project is in. Lesson done!")} />
+        <ProjectCheck stopId={stopId} brief={check.brief} savedUrl={record?.projectUrl} onDone={() => celebrate("Your project is in. Lesson done")} />
       )}
 
       <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">

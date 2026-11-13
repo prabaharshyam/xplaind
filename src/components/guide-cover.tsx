@@ -22,7 +22,7 @@ export function GuideCover({
         alt="" // the card title names the link; the guide page carries the alt text
         fill
         sizes="(min-width: 1024px) 24rem, (min-width: 640px) 50vw, 100vw"
-        className="object-cover transition duration-500 group-hover:scale-[1.03] motion-reduce:transition-none"
+        className="object-cover"
       />
     </span>
   );

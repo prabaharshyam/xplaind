@@ -78,7 +78,7 @@ export default function JobsPage() {
                         <td className="py-1.5" aria-hidden="true">
                           <span className="relative block h-3 rounded-full bg-zinc-100 dark:bg-zinc-800">
                             <span
-                              className="absolute inset-y-0 rounded-full bg-gradient-to-r from-violet-500 to-emerald-500"
+                              className="absolute inset-y-0 rounded-full bg-violet-600 dark:bg-violet-400"
                               style={{ left: `${(b.min / top) * 100}%`, width: `${Math.max(3, ((b.max - b.min) / top) * 100)}%` }}
                             />
                           </span>
