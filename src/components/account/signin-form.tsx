@@ -27,6 +27,10 @@ export const REASONS: Record<SignUpReason, string> = {
   library: "Sign in or sign up to download research papers and open-access AI books.",
   ai: "Sign in or sign up to use the AI tutor, interview feedback, resume review and the other AI tools.",
   roadmap: "Sign in or sign up to see the full roadmap and track your progress on it.",
+  lesson: "Sign in or sign up, free, to read the whole lesson.",
+  videos: "Sign in or sign up, free, to see every video lesson and video course.",
+  courses: "Sign in or sign up, free, to see every course and certification.",
+  project: "Sign in or sign up, free, to see every step of the project.",
 };
 
 const PERKS = ["Download roadmap PDFs and research papers", "Practice mock interviews and use the AI tools", "Save your progress and streak on every device"];
@@ -166,7 +170,7 @@ export function SignInForm({
         </button>
       </p>
       <p className="text-xs leading-5 text-zinc-600 dark:text-zinc-400">
-        Accounts are for people aged 18 or over. Lessons, topics and videos stay open to everyone without an account. You can
+        Accounts are for people aged 18 or over. Without an account you can read the start of every lesson and preview every roadmap. You can
         export or delete your data any time in{" "}
         <Link href="/settings" className="underline underline-offset-2">
           Settings

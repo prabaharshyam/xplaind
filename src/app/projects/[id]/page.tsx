@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
+import { ContentGate } from "@/components/account/content-gate";
 import { notFound } from "next/navigation";
 import { DraftNote } from "@/components/draft-note";
 import { PageHero } from "@/components/page-hero";
@@ -94,6 +95,8 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[id]"
             </ul>
           </section>
 
+          {/* CG-1: the brief, what you need and what you deliver are open; the steps need a free account. */}
+          <ContentGate reason="project" title="Sign up free to see every step" text={`The ${p.steps.length} steps, the rubric to check yourself against, and ideas to go further.`}>
           <ProjectGuide id={p.id} steps={p.steps} rubric={p.rubric} />
 
           {p.stretch.length > 0 && (
@@ -108,6 +111,7 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[id]"
               </ul>
             </section>
           )}
+          </ContentGate>
           {p.drafted_with_ai && (
             <div className="mt-8">
               <DraftNote />

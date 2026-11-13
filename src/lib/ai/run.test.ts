@@ -144,7 +144,7 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     user = null;
     const res = (await runAi(req)) as Response;
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({ signin: true, error: expect.stringMatching(/Sign up with Google/) });
+    expect(await res.json()).toMatchObject({ signin: true, error: expect.stringMatching(/part of Pro. Sign up free/) });
     expect(rpc).not.toHaveBeenCalled();
     expect(create).not.toHaveBeenCalled();
   });

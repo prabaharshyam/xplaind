@@ -51,8 +51,7 @@ export function AiGate({
         </p>
         <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">
           The AI tutor, interview feedback, resume review and the other AI tools
-          need an account. Lessons, topics and practice stay open without
-          one.
+          are part of Pro. Sign up free to try each one a few times.
         </p>
         <AuthChoice reason="ai" className="mt-3" />
         <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">

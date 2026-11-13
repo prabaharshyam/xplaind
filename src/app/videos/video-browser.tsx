@@ -1,5 +1,7 @@
 "use client";
 
+import { GateCard, useContentLocked } from "@/components/account/content-gate";
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CourseThumb } from "@/components/course-thumb";
@@ -31,6 +33,8 @@ const SORTS: { id: SortKey; label: string }[] = [
 ];
 
 const PAGE = 24;
+/** CG-1: how many a signed-out visitor sees before the free sign-up card. */
+const PREVIEW = 6;
 const field =
   "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
 
@@ -38,6 +42,8 @@ const field =
 export function VideoBrowser({ rows, topics, checkedOn }: { rows: VideoRow[]; topics: TopicChip[]; checkedOn: string | null }) {
   const [filter, setFilter] = useState<VideoFilter>(EMPTY_VIDEO_FILTER);
   const [limit, setLimit] = useState(PAGE);
+  const locked = useContentLocked();
+  const cap = locked ? PREVIEW : limit;
   const shown = useMemo(() => filterVideos(rows, filter), [rows, filter]);
   const topicName = useMemo(() => new Map(topics.map((t) => [t.id, t.label])), [topics]);
   const set = (patch: Partial<VideoFilter>) => {
@@ -120,12 +126,12 @@ export function VideoBrowser({ rows, topics, checkedOn }: { rows: VideoRow[]; to
       </div>
 
       <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400" aria-live="polite">
-        Showing {Math.min(limit, shown.length)} of {shown.length}
+        Showing {Math.min(cap, shown.length)} of {shown.length}
         {filtered ? ` (${rows.length} in all)` : ""}
       </p>
 
       <ul className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {shown.slice(0, limit).map((v) => (
+        {shown.slice(0, cap).map((v) => (
           <li key={v.id}>
             <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" aria-labelledby={`v-${v.id}`}>
               <CourseThumb provider={v.channel ?? "YouTube"} kindLabel="Video lesson" embed={{ kind: "video", id: v.id }} hours={v.minutes / 60} certificate={false} className="h-36" />
@@ -156,7 +162,7 @@ export function VideoBrowser({ rows, topics, checkedOn }: { rows: VideoRow[]; to
         ))}
       </ul>
 
-      {shown.length > limit && (
+      {!locked && shown.length > limit && (
         <div className="mt-8 flex justify-center">
           <button
             type="button"
@@ -166,6 +172,9 @@ export function VideoBrowser({ rows, topics, checkedOn }: { rows: VideoRow[]; to
             Show more videos
           </button>
         </div>
+      )}
+      {locked && shown.length > PREVIEW && (
+        <GateCard reason="videos" title="Sign up free to see every video lesson" text={`You are seeing the first ${PREVIEW} of ${shown.length}. Sign up to see them all, with filters by topic, level and length.`} />
       )}
       {shown.length === 0 && (
         <p className="mt-4">

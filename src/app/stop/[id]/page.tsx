@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ReadingProgress } from "@/components/reading-progress";
 import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
+import { ContentGate } from "@/components/account/content-gate";
 import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
@@ -234,6 +235,8 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             <p className="mt-2 leading-7">{stop.why_it_matters}</p>
           </section>
 
+          {/* CG-1: the quick answer and why it matters are open to everyone; the rest needs a free account. */}
+          <ContentGate reason="lesson" title="Sign up free to read the whole lesson" text={`The rest of this lesson: ${sections.length || 1} ${sections.length === 1 ? "part" : "parts"}, video lessons, the best course, practice and a quick check.`}>
           {explainer ? (
             sections.map((sec, i) => (
               <Fragment key={sec.title}>
@@ -388,6 +391,8 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
             </section>
           )}
 
+          </ContentGate>
+
           {home && (
             <div className="xl:hidden">
               <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />
@@ -453,7 +458,9 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
         </div>
         <aside className="hidden min-w-0 xl:order-3 xl:block xl:pt-10">
           <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col gap-4 overflow-y-auto pb-4">
-            <LearnPanel stopId={stop.id} items={learn} headingId="learn-side" />
+            <ContentGate reason="lesson" title="" text="" fallback={null}>
+              <LearnPanel stopId={stop.id} items={learn} headingId="learn-side" />
+            </ContentGate>
             {home && <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />}
           </div>
         </aside>

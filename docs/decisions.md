@@ -522,3 +522,8 @@ The owner found the pricing page cluttered and unconvincing and asked for pricin
 ## 2026-11-13: promo codes (PAY-9)
 
 The owner asked for four promo codes, at 100%, 50%, 25% and 10% off, that take a learner through to Pro at the offer price. The owner chose once per account with no overall cap, and only on the 30-day pass. Because the repository is public, the code names are not in it: they live only in the promo_codes table and are added in the Supabase SQL editor, which also lets the owner switch a code off or add an expiry without a release. A 100% code makes a ₹0 order that is granted at once, since a payment gateway cannot take ₹0. The code is used up inside grant_pass, in the same transaction as the pass, so an abandoned checkout keeps the code and two quick free orders cannot both use it.
+
+## 2026-11-13: learning free with an account, AI tools for Pro (CG-1, PAY-10)
+
+The home page said "No sign-up to start" while the full roadmaps already needed an account. The owner asked for one rule: learning materials (lessons, videos, courses) are free with a sign-up, and everything that costs money to run, the AI tools, is for Pro. Two choices were put to the owner. Content: gating everything would hide lessons from Google and from under-18s (who cannot have accounts, PV-2), so the owner chose an open preview (the quick answer and why it matters, the first 6 videos and courses, each project's brief) with the rest behind a free sign-up. AI: the owner kept the small one-time trial for free accounts (PAY-7), so people can try each tool before buying.
+

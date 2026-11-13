@@ -48,7 +48,7 @@ export function UpgradePrompt() {
         </h2>
         <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{state?.message}</p>
         <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
-          Lessons, roadmaps, practice cards and the code playground stay open, with no limit.
+          Lessons, roadmaps, videos, practice cards and the code playground stay free with your account, with no limit.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link href={state?.href ?? "/pricing"} className={primaryButton} onClick={() => dialog.current?.close()}>

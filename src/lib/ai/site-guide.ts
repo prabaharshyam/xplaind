@@ -71,12 +71,12 @@ export const SITE_GUIDE: GuideEntry[] = [
   },
   {
     t: "Use the AI tools",
-    a: "Anyone can generate a personal roadmap, ask the AI tutor (on its own page or inside every lesson), and get AI feedback on interview answers, within a small daily allowance. No account needed.",
+    a: "The AI tools (the AI tutor, interview feedback, resume review and study from your notes) are part of Pro. A free account lets you try each one a few times; a Pro pass gives a daily allowance.",
     h: "/ai",
   },
   {
     t: "Do I need an account?",
-    a: "Lessons, topics, practice and guides work without an account, and progress is saved in your browser. Sign up to see the full roadmaps, keep progress across devices and use the AI tools. Learners under 18 use the lessons without an account.",
+    a: "Anyone can read the quick answer and the first part of every lesson, preview every roadmap and take the level test. A free account opens the full lessons, videos, courses, project guides and roadmaps, and keeps progress across devices. The AI tools are part of Pro, with a free trial of each. Learners under 18 can read the lesson previews without an account.",
     h: "/signin",
   },
   {
