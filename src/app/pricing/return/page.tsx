@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Your payment", robots: { index: fals
 
 const text = (): Record<Confirmed, [string, string]> => ({
   granted: ["Pro is on", "Thank you. Your pass is active now, and your higher daily AI limits apply straight away. Your receipt is in Settings, under Billing."],
-  already: ["Pro is on", "This payment is confirmed and your pass is active. Your receipt is in Settings, under Billing."],
+  already: ["Pro is on", "Your pass is confirmed and active. Your receipt is in Settings, under Billing."],
   pending: ["Confirming your payment", `${providerName()} has not confirmed this payment yet. It usually takes a few seconds; reload this page in a moment. If money left your account and the pass does not start within an hour, contact us with the order number below.`],
   failed: ["The payment did not go through", "This order was not paid, so your pass has not started. If your bank shows a debit, it is normally reversed within 5 to 7 working days. You can try again from the pricing page."],
   unknown: ["We could not find that payment", "Check the link, or see your payments in Settings, under Billing. If you paid and the pass has not started, contact us with the order number below."],
