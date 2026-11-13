@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { PageHero } from "@/components/page-hero";
+import { BUSINESS } from "@/lib/business";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
@@ -10,11 +11,27 @@ export const metadata: Metadata = pageMeta({
   path: "/terms",
 });
 
-const UPDATED = "8 November 2026";
+const UPDATED = "13 November 2026";
 
 const A = "font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300";
 
 const TERMS: { title: string; body: ReactNode }[] = [
+  {
+    title: "Who we are",
+    body: (
+      <>
+        Xplaind (xplaind.in) is a brand of {BUSINESS.legalName}, GSTIN {BUSINESS.gstin}. In these terms, &ldquo;we&rdquo; means {BUSINESS.legalName}. You can reach us at{" "}
+        <a href={`mailto:${BUSINESS.email}`} className={A}>
+          {BUSINESS.email}
+        </a>{" "}
+        or {BUSINESS.phone}; see our{" "}
+        <Link href="/contact" className={A}>
+          contact page
+        </Link>
+        .
+      </>
+    ),
+  },
   {
     title: "Using Xplaind",
     body: "You may use Xplaind's roadmaps, lessons, videos, practice and project guides for your own learning. You may share links to any page. Please do not copy lessons in bulk, resell them, or try to break, overload or scrape the site.",
@@ -27,7 +44,7 @@ const TERMS: { title: string; body: ReactNode }[] = [
     title: "Pro passes",
     body: (
       <>
-        A Pro pass is a one-time payment for 30 days, 6 months or 12 months of higher daily AI limits. It does not renew by itself. Payments are taken by Cashfree. Passes are for people aged 18 and over, are for your own use, and cannot be shared or resold. The limits are listed on the{" "}
+        A Pro pass is a one-time payment for 30 days, 6 months or 12 months of higher daily AI limits. Prices are in Indian rupees and include GST. It does not renew by itself. Payments are taken by Cashfree. Passes are for people aged 18 and over, are for your own use, and cannot be shared or resold. The limits are listed on the{" "}
         <Link href="/pricing" className={A}>
           pricing page
         </Link>

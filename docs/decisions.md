@@ -496,3 +496,7 @@ The owner asked for a focus review and chose four of its recommendations.
 - **Weekly plan and 90-day emails merged as "Stay on track"** at /plan. The plan and calendar reminder work without an account; the Monday email opt-in shows to signed-in learners and asks others to sign in. It is hidden when accounts are off.
 - **Rust track dropped** as off-topic for AI careers. Lessons, the blog post, the Rust-only glossary terms and the Rust-only resources were deleted; old URLs redirect permanently so search engines move on. DSA, system design basics and software engineering stay because AI job interviews use them.
 - Not chosen: removing jobs and salaries, and demoting "Study from my notes & books".
+
+## 2026-11-13: ready for Cashfree onboarding (BIZ-1)
+
+Cashfree's checklist for a new merchant site: published privacy, terms and refund pages, a contact page with email and phone, the parent business named on the site, pricing and what is sold clearly visible, and the site public. The policies already existed (PAY-6); this adds /contact, the "brand of ZEREH Venture" footer line with the GSTIN, "Who we are" in privacy and terms, a Delivery section in refunds, and a pricing page that always shows the passes and their prices. The owner chose: prices include GST; show the GSTIN; no registered address on the site for now. Receipts keep "not a tax invoice" until GST invoices are built. The Pricing link is now always in the menu and footer (PAY-5 amended), because reviewers and visitors must find it before payments open.

@@ -1,3 +1,4 @@
+import { BUSINESS } from "@/lib/business";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -27,7 +28,9 @@ async function Receipt({ params }: { params: PageProps<"/settings/billing/receip
   return (
     <>
       <h1 className="text-3xl font-semibold tracking-tight">Payment receipt{p.environment === "sandbox" ? " (test payment)" : ""}</h1>
-      <p className="mt-2 text-zinc-700 dark:text-zinc-300">Xplaind (xplaind.in). Paid through Cashfree.</p>
+      <p className="mt-2 text-zinc-700 dark:text-zinc-300">
+        Xplaind (xplaind.in), a brand of {BUSINESS.legalName}, GSTIN {BUSINESS.gstin}. Paid through Cashfree. Price includes GST.
+      </p>
       <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-2xl border border-zinc-200 p-5 dark:border-zinc-800">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
