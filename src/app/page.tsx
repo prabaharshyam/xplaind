@@ -18,7 +18,6 @@ import { getInterviewViews } from "@/lib/content/interview";
 import { getJobs } from "@/lib/content/jobs";
 import { pathView } from "@/lib/content/paths";
 import { CODING_LABEL } from "@/lib/paths";
-import type { IconName } from "@/lib/themes";
 import { primaryButtonLg, secondaryButtonLg } from "@/components/ui";
 
 export const metadata: Metadata = {
@@ -36,10 +35,10 @@ export const metadata: Metadata = {
 };
 
 
-const STEPS: { icon: IconName; title: string; text: string }[] = [
-  { icon: "compass", title: "Choose the job you want", text: "Pick an AI role, or let the 10-minute level test suggest one." },
-  { icon: "map", title: "Follow the roadmap, one topic at a time", text: "Each topic is a 20-minute lesson, the best course and a quick check." },
-  { icon: "trophy", title: "Prove it and get hired", text: "Build projects, practice interviews out loud and see live openings." },
+const STEPS: { title: string; text: string }[] = [
+  { title: "Choose the job you want", text: "Pick an AI role, or let the 10-minute level test suggest one." },
+  { title: "Follow the roadmap, one topic at a time", text: "Each topic is a 20-minute lesson, the best course and a quick check." },
+  { title: "Prove it and get hired", text: "Build projects, practice interviews out loud and see live openings." },
 ];
 
 
@@ -113,47 +112,45 @@ export default function Home() {
       {/* Hero: the promise first (one place, the right order), then the market as proof. Works before any animation runs. */}
       <section data-hero className="home-hero relative flex min-h-[calc(100svh-3.5rem)] items-center" aria-labelledby="hero-heading">
         <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6">
-          <p data-hero-fade className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-violet-900 ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-100 dark:ring-violet-800">
-            <span className="size-1.5 rounded-full bg-violet-600" /> Xplaind · AI learning platform for India
-          </p>
+          <p data-hero-fade className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Xplaind · AI learning platform for India</p>
           <h1 id="hero-heading" className="mt-6 max-w-5xl text-[2.6rem] leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-[4.25rem]">
             <Words text="Everything you need to learn AI," />{" "}
-            <span data-hero-fade className="block bg-gradient-to-r from-violet-700 via-violet-600 to-teal-700 bg-clip-text pb-1 text-transparent dark:from-violet-300 dark:via-violet-300 dark:to-teal-300">
-              in one place, in the right order.
+            <span data-hero-fade className="block pb-1 text-zinc-500 dark:text-zinc-400">
+              in one place, in the right order
             </span>
           </h1>
           <p data-hero-fade className="mt-6 max-w-2xl text-lg leading-8 text-zinc-800 md:text-xl md:leading-9 dark:text-zinc-200">
             No more jumping between random videos. One roadmap per role takes you from the basics to job-ready.
           </p>
           <div data-hero-fade className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a data-magnetic href="#roles" className={primaryButtonLg}>
-              <Icon name="compass" size={18} /> Choose your role
+            <a href="#roles" className={primaryButtonLg}>
+              Choose your role
             </a>
-            <Link data-magnetic href="/start" className={secondaryButtonLg}>
-              <Icon name="sparkles" size={18} /> Find my level in 10 minutes
+            <Link href="/start" className={secondaryButtonLg}>
+              Find my level in 10 minutes
             </Link>
           </div>
-          <ul data-hero-fade className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-zinc-800 dark:text-zinc-200" aria-label="Why it is easy to start">
+          <ul data-hero-fade className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-700 dark:text-zinc-300" aria-label="Why it is easy to start">
             {["No sign-up to start", "Plain English", "No paid rankings"].map((t) => (
-              <li key={t} className="flex items-center gap-1.5">
-                <Icon name="tick" size={16} className="text-emerald-700 dark:text-emerald-400" /> {t}
+              <li key={t} className="flex items-center gap-2">
+                <Icon name="tick" size={16} className="text-zinc-500 dark:text-zinc-400" /> {t}
               </li>
             ))}
             <li>
-              <Link href="/interview/simulator" className="flex items-center gap-1.5 text-violet-900 underline-offset-4 hover:underline dark:text-violet-200">
-                <Icon name="mic" size={16} /> I have an interview soon
+              <Link href="/interview/simulator" className="text-violet-800 underline underline-offset-4 hover:text-violet-950 dark:text-violet-300 dark:hover:text-violet-200">
+                I have an interview soon
               </Link>
             </li>
           </ul>
 
           {/* JB-4: the market behind the promise, each figure sourced and dated. */}
           <div data-hero-fade className="mt-10 max-w-4xl">
-            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Why now: India&apos;s AI job market</p>
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Why now: India&apos;s AI job market</p>
             <dl className="mt-3 grid gap-3 sm:grid-cols-3">
               {market.stats.map((m) => (
                 <div key={m.label} className="flex flex-col-reverse justify-end rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
                   <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
-                  <dd className="text-3xl font-semibold tracking-tight text-violet-800 md:text-4xl dark:text-violet-300">{m.value}</dd>
+                  <dd className="text-3xl font-semibold tracking-tight text-zinc-900 tabular-nums md:text-4xl dark:text-white">{m.value}</dd>
                 </div>
               ))}
             </dl>
@@ -181,10 +178,7 @@ export default function Home() {
           <ol className="mt-8 grid gap-6 md:grid-cols-3" data-rise-group>
             {STEPS.map((s, i) => (
               <li key={s.title} data-rise className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="flex items-center gap-3">
-                  <span className="grid size-10 place-items-center rounded-full bg-violet-700 font-semibold text-white">{i + 1}</span>
-                  <Icon name={s.icon} size={24} className="text-emerald-700 dark:text-emerald-400" />
-                </span>
+                <Marker n={i + 1} label={`Step ${i + 1}`} />
                 <h3 className="mt-4 text-xl font-semibold">{s.title}</h3>
                 <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{s.text}</p>
               </li>
@@ -372,13 +366,13 @@ export default function Home() {
             <Gate n={3} label="Your AI career" />
           </div>
           <h2 id="final-heading" data-words className="mt-5 text-4xl font-semibold tracking-tight text-balance md:text-6xl">
-            <Words text="Your AI career starts with one 20-minute lesson." />
+            <Words text="Your AI career starts with one 20-minute lesson" />
           </h2>
           <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-800 md:mx-auto dark:text-zinc-200">
             Pick a role and open the first topic. No sign-up, nothing to install.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row md:justify-center">
-            <Link data-magnetic href="/paths" className={primaryButtonLg}>
+            <Link href="/paths" className={primaryButtonLg}>
               Start my roadmap
             </Link>
             <Link href="/start" className={secondaryButtonLg}>
@@ -427,7 +421,7 @@ export default function Home() {
               <details key={f.q} className="group p-5">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
                   {f.q}
-                  <span aria-hidden="true" className="text-xl transition group-open:rotate-45">
+                  <span aria-hidden="true" className="text-xl text-zinc-500 transition-transform duration-200 group-open:rotate-45 dark:text-zinc-400">
                     +
                   </span>
                 </summary>
@@ -464,9 +458,23 @@ export default function Home() {
 /** A milestone marker: the gate the reader has just reached on the road. */
 function Gate({ n, label }: { n: number; label: string }) {
   return (
-    <p data-gate className="inline-flex items-center gap-2 rounded-full bg-white py-1 pr-3 pl-1 text-sm font-medium text-violet-900 ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-100 dark:ring-violet-800">
-      <span className="grid size-6 place-items-center rounded-full bg-violet-700 text-xs font-semibold text-white">{n}</span>
-      Milestone {n} · {label}
+    <p data-gate>
+      <Marker n={n} label={`Milestone ${n}`} text={label} />
     </p>
+  );
+}
+
+/**
+ * The signature detail: a distance marker on the road, a mono number and a short rule. Used only
+ * for the steps and milestones, so the page reads as one road from the first step to the last.
+ */
+function Marker({ n, label, text }: { n: number; label: string; text?: string }) {
+  return (
+    <span className="flex items-center gap-3 font-mono text-sm text-zinc-600 tabular-nums dark:text-zinc-400">
+      <span className="sr-only">{label}{text ? ": " : ""}</span>
+      <span aria-hidden="true" className="text-zinc-900 dark:text-white">{String(n).padStart(2, "0")}</span>
+      <span aria-hidden="true" className="h-px w-8 bg-zinc-300 dark:bg-zinc-700" />
+      {text && <span>{text}</span>}
+    </span>
   );
 }
