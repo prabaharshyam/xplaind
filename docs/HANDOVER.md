@@ -352,3 +352,11 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 ## 15. Appendix: PRD requirement families
 
 `AC` accounts · `AI` AI tools · `A11Y` accessibility · `BK` books and affiliate · `BL` blog · `BR` brand and look · `CM` commitments and reminders · `CO` spend caps · `CS` cheatsheets (paused) · `ED` editorial rules · `FOCUS` product focus · `GP` guided projects · `IP` interview patterns · `IQ` interview questions and mock review · `JB` jobs and salaries · `LB` papers and free books · `LQ` book-informed lessons · `MB` study from notes and books · `MO` motion and 3D · `NV` navigation · `PG` code playground · `PL` placement test · `PR` practice · `PV` privacy · `QA` quality and performance · `RD` roadmap PDF · `RM` roadmaps and lessons · `RV` resume review · `SC` security · `SE` search and AI answer visibility · `SO` social proof · `SU` sign-up gates · `TR` trust and founder story · `VD` videos page · `VS` voice and mock interview · `WP` weekly plan · `XB` X Bot.
+
+## Restore points
+
+- **Before the unslop passes (UX-5, UX-6), 13 Nov 2026.** The site exactly as it was is saved on the branch `backup/pre-unslop-2026-11-13` (commit `1b76ae7`). The unslop change is one squash commit on main, `22e21a4` (PR 75). To roll back in one step, either:
+  - revert it: `git revert 22e21a4` on a branch, then merge that PR; or
+  - in Vercel, open Deployments, find the production deployment of `1b76ae7` and choose "Instant Rollback" (fastest, no code change; the next merge to main deploys again).
+  Keep the backup branch; do not delete it.
+
