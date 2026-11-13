@@ -53,16 +53,21 @@ export const NAV_GROUPS: Group[] = [
   {
     // 2026-11-06, owner request: each AI tool in a dropdown, straight to its own page.
     id: "ai",
-    label: "AI tools",
+    // NV-7 (owner request, 2026-11-13): the AI tools are part of Pro, so the group reads as a studio.
+    label: "AI Studio",
     items: [
       { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards", icon: "book", tone: "violet" },
       { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English", icon: "robot", tone: "teal" },
       { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work", icon: "sparkles", tone: "amber" },
-      // BIZ-1: prices are always public, so payment gateways and visitors can see what is sold.
-      { href: "/pricing", label: "Pro and pricing", note: "More AI help each day, from ₹249", icon: "star", tone: "rose" },
     ],
   },
 ];
+/**
+ * NV-7: Pro has its own place, not inside a group: a "Pro" link in the desktop bar and a card at
+ * the foot of the phone menu. BIZ-1: prices are always public, so gateways and visitors see what is sold.
+ */
+export const PRO_LINK = { href: "/pricing", label: "Pro", title: "Xplaind Pro", note: "Daily AI tutor, interview feedback and resume reviews, from ₹249" } as const;
+
 export const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 
 /** Which group the current page belongs to, so the menu can say "you are here". Pure, for tests. */
