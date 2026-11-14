@@ -22,6 +22,7 @@ import {
 } from "./limits";
 import { aiSettings } from "./settings";
 import { aiCaller, allowanceToday, limitFor, onTrial } from "./who";
+import { bump } from "@/lib/funnel";
 
 /** Effectively no site-wide cap for Pro calls; the kill switch still stops everything. */
 const PRO_MONTH_CAP_USD = 1_000_000;
@@ -84,6 +85,8 @@ export async function runAi<S extends z.ZodType>(
     return json({ error: LIMIT_MESSAGE.dayUpgrade, upgrade: "/pricing" }, 429);
   if (verdict === "day" || verdict === "month")
     return problem(429, LIMIT_MESSAGE[verdict as "day" | "month"]);
+  // AN-1: a free account using one of its trial turns, counted without identifying anyone.
+  if (onTrial(who)) await bump(admin, "ai_trial_used");
   const model = modelFor(req.kind, settings.model, settings.fastModel);
 
   const client = new Anthropic({

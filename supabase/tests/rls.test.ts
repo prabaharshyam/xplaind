@@ -409,3 +409,56 @@ describe("Promo codes (PAY-9)", () => {
     expect((await q("select count(*)::int as n from promo_redemptions where user_id = $1", [F])).rows[0].n).toBe(0);
   });
 });
+
+describe("Week pass, referrals and funnel counts (PAY-11, RF-1, AN-1)", () => {
+  const G = "00000000-0000-4000-8000-0000000000a7";
+  const H = "00000000-0000-4000-8000-0000000000b7";
+  const order = (id: string, user: string, plan: string, paise: number, referrer: string | null = null, pct = 0) =>
+    q("insert into payments (order_id, user_id, plan_id, amount_paise, environment, referrer, discount_percent) values ($1, $2, $3, $4, 'sandbox', $5, $6)", [id, user, plan, paise, referrer, pct]);
+  const grant = async (id: string) => (await q("select public.grant_pass($1, 'pay', '2026-11-14T10:00:00+05:30') as r", [id])).rows[0].r;
+  const until = async (user: string) => (await q("select valid_until from entitlements where user_id = $1", [user])).rows[0]?.valid_until as Date | undefined;
+
+  beforeAll(async () => {
+    await q("insert into auth.users (id, email) values ($1, 'g@example.com'), ($2, 'h@example.com')", [G, H]);
+    await q("insert into referral_codes (user_id, code) values ($1, 'gggg2345')", [G]);
+  });
+
+  it("a week pass lasts 7 days", async () => {
+    await order("xp_g_week01", G, "pass_week", 9900);
+    expect(await grant("xp_g_week01")).toBe("granted");
+    expect((await until(G))!.toISOString()).toBe("2026-11-21T04:30:00.000Z");
+  });
+
+  it("a friend's first paid pass gives the referrer 7 more days, once, and is counted as a purchase", async () => {
+    await order("xp_h_ref001", H, "pass_month", 22410, G, 10);
+    expect(await grant("xp_h_ref001")).toBe("granted");
+    expect((await until(G))!.toISOString()).toBe("2026-11-28T04:30:00.000Z");
+    expect((await q("select referrer, order_id from referrals where referred_user = $1", [H])).rows).toEqual([{ referrer: G, order_id: "xp_h_ref001" }]);
+    await order("xp_h_ref002", H, "pass_month", 24900, G, 0);
+    expect(await grant("xp_h_ref002")).toBe("granted");
+    expect((await until(G))!.toISOString()).toBe("2026-11-28T04:30:00.000Z");
+    expect((await q("select count from funnel_daily where day = '2026-11-14' and event = 'purchase'")).rows[0].count).toBeGreaterThanOrEqual(3);
+  });
+
+  it("a learner reads only their own code and rewards; nobody reads the funnel or writes any of it", async () => {
+    expect(await asUser(db.client, G, async () => (await q("select code from referral_codes")).rows)).toEqual([{ code: "gggg2345" }]);
+    expect(await asUser(db.client, H, async () => (await q("select code from referral_codes")).rows)).toEqual([]);
+    expect(await asUser(db.client, G, async () => (await q("select referred_user from referrals")).rows)).toEqual([{ referred_user: H }]);
+    for (const user of [G, null]) {
+      for (const sql of [
+        "select * from funnel_daily",
+        "select public.funnel_bump('purchase')",
+        `insert into referral_codes (user_id, code) values ('${H}', 'hhhh2345')`,
+        `insert into referrals (referred_user, referrer, order_id) values ('${H}', '${G}', 'xp_h_ref001')`,
+      ]) {
+        const err = await fails(asUser(db.client, user, () => q(sql)));
+        expect(err.code, sql).toBe(PERMISSION_DENIED);
+      }
+    }
+  });
+
+  it("funnel events outside the list are refused", async () => {
+    expect((await fails(q("select public.funnel_bump('who_clicked')"))).code).toBe("23514");
+  });
+});
+

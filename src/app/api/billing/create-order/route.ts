@@ -7,7 +7,10 @@ import { z } from "zod";
 import { json, problem, rateLimit, readJson, requireSession } from "@/lib/account/http";
 import { proOpen, razorpayConfig } from "@/lib/billing/config";
 import { PLANS, PLAN_IDS, newOrderId } from "@/lib/billing/plans";
+import { cookies } from "next/headers";
 import { checkPromo, discountedPaise } from "@/lib/billing/promo";
+import { REF_COOKIE, REF_PERCENT, referralFor } from "@/lib/billing/referral";
+import { bump } from "@/lib/funnel";
 import { createRazorpayOrder, MIN_PAISE } from "@/lib/billing/razorpay";
 
 const Body = z.strictObject({ planId: z.enum(PLAN_IDS), agree: z.literal(true), promo: z.string().max(40).optional() });
@@ -34,7 +37,10 @@ export async function POST(request: Request) {
     if (!check.ok) return problem(400, check.reason);
     promo = check;
   }
-  const amount = discountedPaise(plan.paise, promo?.percentOff ?? 0);
+  // RF-1: without a promo code, a friend's link takes 10% off the first pass (never both).
+  const ref = promo ? null : await referralFor(session.admin, (await cookies()).get(REF_COOKIE)?.value, session.user.id);
+  const percentOff = promo?.percentOff ?? (ref ? REF_PERCENT : 0);
+  const amount = discountedPaise(plan.paise, percentOff);
   if (amount > 0 && amount < MIN_PAISE) return problem(400, "That amount is too small to pay online.");
   const orderId = newOrderId(Date.now(), randomBytes(12).toString("base64url"));
   const { error } = await session.admin.from("payments").insert({
@@ -44,8 +50,10 @@ export async function POST(request: Request) {
     amount_paise: amount,
     environment: config.mode,
     ...(promo ? { promo_code: promo.code, discount_percent: promo.percentOff } : {}),
+    ...(ref ? { referrer: ref.referrer, discount_percent: REF_PERCENT } : {}),
   });
   if (error) return problem(500, "Could not start the payment. Please try again.");
+  await bump(session.admin, "checkout_start");
 
   // PAY-9: 100% off needs no payment; the pass starts now and the code is used up in the same step.
   if (amount === 0) {

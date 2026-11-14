@@ -7,6 +7,7 @@ import { KIND_LABEL, PLANS, TIER_LIMITS, type PlanId, monthlyEquivalentPaise, pe
 import { BUSINESS } from "@/lib/business";
 import { pageMeta } from "@/lib/seo";
 import { BuyPass } from "./buy-pass";
+import { FunnelPing } from "@/components/funnel-ping";
 
 export const metadata: Metadata = pageMeta({
   title: "Xplaind Pro: AI Tutor, Interview Coach and Resume Review, from ₹249",
@@ -68,6 +69,7 @@ export default function PricingPage() {
   const rows = ORDER.filter((k) => AI_KINDS.includes(k));
   return (
     <main>
+      <FunnelPing event="pricing_view" />
       {/* Hero: the promise, the lowest daily price, and the four reasons it is safe to try. */}
       <section aria-labelledby="pricing-h" className="mx-auto max-w-6xl px-4 pt-12 pb-10 md:px-6 md:pt-20 md:pb-14">
         <h1 id="pricing-h" className="max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance md:text-6xl">
@@ -149,6 +151,22 @@ export default function PricingPage() {
             );
           })}
         </ul>
+        {/* PAY-11: a small first purchase, for an interview this week. */}
+        <div className="mt-5 flex flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between md:px-8 dark:border-zinc-800 dark:bg-zinc-900">
+          <div>
+            <h3 className="text-lg font-semibold">
+              {PLANS.pass_week.name}, {rupees(PLANS.pass_week.paise)}
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-zinc-700 dark:text-zinc-300">Interview this week? Everything in Pro for 7 days, {perDay(PLANS.pass_week)} a day. One payment.</p>
+          </div>
+          <div className="sm:w-56 sm:shrink-0">
+            {open ? (
+              <BuyPass provider={provider} planId="pass_week" label={PLANS.pass_week.name} price={rupees(PLANS.pass_week.paise)} />
+            ) : (
+              <p className="text-sm text-zinc-700 dark:text-zinc-300">Online payment opens shortly</p>
+            )}
+          </div>
+        </div>
         <p className="mt-4 text-sm text-zinc-700 dark:text-zinc-300">
           Prices in Indian rupees, GST included. Every pass includes everything in Pro below.
         </p>

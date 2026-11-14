@@ -2,12 +2,14 @@
 // page, the AI guard and tests share one set of numbers. Prices are in paise (₹1 = 100 paise).
 import type { AiKind } from "@/lib/ai/limits";
 
-export const PLAN_IDS = ["pass_month", "pass_6month", "pass_year"] as const;
+export const PLAN_IDS = ["pass_week", "pass_month", "pass_6month", "pass_year"] as const;
 export type PlanId = (typeof PLAN_IDS)[number];
 
 export type Plan = { id: PlanId; name: string; months: number; days: number; paise: number; note: string; popular?: boolean };
 
 export const PLANS: Record<PlanId, Plan> = {
+  // PAY-11 (2026-11-14, owner decision): a small first purchase, full Pro for a week.
+  pass_week: { id: "pass_week", name: "7-day pass", months: 0, days: 7, paise: 9_900, note: "For an interview this week" },
   pass_month: { id: "pass_month", name: "30-day pass", months: 1, days: 30, paise: 24_900, note: "Try Pro for a month" },
   pass_6month: { id: "pass_6month", name: "Placement pass, 6 months", months: 6, days: 182, paise: 99_900, note: "One full placement season", popular: true },
   pass_year: { id: "pass_year", name: "Career pass, 12 months", months: 12, days: 365, paise: 149_900, note: "A whole year of steady learning" },

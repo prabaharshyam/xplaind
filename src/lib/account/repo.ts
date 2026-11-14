@@ -127,7 +127,10 @@ export async function refreshBadges(admin: SupabaseClient, userId: string, state
 
 /** AC-1: the profile is created on first sign-in, carrying the 18+ timestamp given when the link was requested. */
 export async function ensureProfile(admin: SupabaseClient, userId: string, adultConfirmedAt: string): Promise<void> {
-  must(await admin.from("profiles").upsert({ id: userId, adult_confirmed_at: adultConfirmedAt }, { onConflict: "id", ignoreDuplicates: true }));
+  const res = await admin.from("profiles").upsert({ id: userId, adult_confirmed_at: adultConfirmedAt }, { onConflict: "id", ignoreDuplicates: true }).select("id");
+  must(res);
+  // AN-1: a new profile is a new sign-up; counted, never identified.
+  if (Array.isArray(res.data) && res.data.length > 0) await admin.rpc("funnel_bump", { p_event: "signup" });
 }
 
 /** Whether a learner already has a profile, so a returning Google or GitHub user needs no new tick. */

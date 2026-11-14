@@ -6,6 +6,7 @@ import { Celebrate } from "@/components/celebrate";
 import { McqQuiz, type McqQuestion } from "@/components/mcq-quiz";
 import { TopicStatus } from "@/components/roadmap/topic-status";
 import { muted, primaryButton, textLink } from "@/components/ui";
+import { sendFunnel } from "@/components/funnel-ping";
 import { useProgress } from "@/lib/browser/hooks";
 import { setStop } from "@/lib/browser/progress-store";
 import { todayInIST } from "@/lib/dates";
@@ -33,7 +34,11 @@ export function StopProgressPanel({ stopId, title, check }: { stopId: string; ti
   const status = statusOf(progress.stops, stopId);
   const [party, setParty] = useState<string | null>(null);
   const celebrate = (message: string) => {
-    if (status !== "done") setParty(message);
+    if (status !== "done") {
+      setParty(message);
+      // AN-1: the very first lesson a learner finishes on this device, counted without an identifier.
+      if (!Object.values(progress.stops).some((s) => s?.status === "done")) sendFunnel("first_lesson");
+    }
   };
 
   return (

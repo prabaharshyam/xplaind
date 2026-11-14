@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { primaryButton, secondaryButton } from "@/components/ui";
-import { type PlanId, rupees } from "@/lib/billing/plans";
+import { PLANS, type PlanId, rupees } from "@/lib/billing/plans";
 
 type CashfreeCheckout = { checkout: (o: { paymentSessionId: string; redirectTarget: "_self" }) => Promise<unknown> };
 type RazorpaySuccess = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string };
@@ -74,7 +74,17 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
   const [checking, setChecking] = useState(false);
   const promoId = useId();
   const showPromo = takesPromo(planId, provider);
-  const toPay = promo ? (promo.amount === 0 ? "Free" : rupees(promo.amount)) : price;
+  // RF-1: a friend's link takes 10% off a first pass; a promo code replaces it rather than adding to it.
+  const [friendOff, setFriendOff] = useState(0);
+  const friendPrice = friendOff ? rupees(Math.round((PLANS[planId].paise * (100 - friendOff)) / 100)) : null;
+  const toPay = promo ? (promo.amount === 0 ? "Free" : rupees(promo.amount)) : (friendPrice ?? price);
+  const checkOffer = () => {
+    if (provider !== "razorpay") return;
+    void fetch("/api/billing/offer")
+      .then((r) => (r.ok ? (r.json() as Promise<{ percent: number }>) : { percent: 0 }))
+      .then((o) => setFriendOff(o.percent || 0))
+      .catch(() => undefined);
+  };
 
   const applyPromo = async () => {
     const c = code.trim();
@@ -187,7 +197,10 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
 
   return (
     <>
-      <button type="button" className={`${popular ? primaryButton : secondaryButton} w-full justify-center`} onClick={() => dialog.current?.showModal()}>
+      <button type="button" className={`${popular ? primaryButton : secondaryButton} w-full justify-center`} onClick={() => {
+          dialog.current?.showModal();
+          checkOffer();
+        }}>
         Buy for {price}
         <span className="sr-only">: {label}</span>
       </button>
@@ -204,6 +217,11 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
             {label}, {price}
           </h2>
           <p className="text-sm leading-6 text-zinc-700 dark:text-zinc-300">One payment by UPI, card or net banking. It does not renew by itself.</p>
+          {friendPrice && !promo && (
+            <p className="rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+              A friend invited you: {friendOff}% off your first pass. You pay {friendPrice} instead of <s>{price}</s>.
+            </p>
+          )}
           {showPromo && (
             <div className="flex flex-col gap-1">
               <label htmlFor={promoId} className="text-sm font-medium">
