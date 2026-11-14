@@ -6,12 +6,12 @@ export type GuideEntry = { t: string; a: string; h: string };
 export const SITE_GUIDE: GuideEntry[] = [
   {
     t: "Where should I start?",
-    a: "Pick the job you want on the Roadmaps page and open its roadmap. If you already know some AI, take the 10-minute level test first: it skips what you know and gives you the next five steps.",
+    a: "Pick the job you want on the Roadmaps page and open its roadmap. If you already know some AI, take the 2-minute level check first: it skips what you know and gives you the next five steps.",
     h: "/paths",
   },
   {
     t: "Find my level with the placement test",
-    a: "The level test takes about 10 minutes, needs no sign-up, and places you on a roadmap so you skip topics you already know.",
+    a: "The 2-minute level check (or the full test, about 10 minutes) needs no sign-up and places you on a roadmap so you skip topics you already know.",
     h: "/start",
   },
   {

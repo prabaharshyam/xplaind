@@ -16,7 +16,7 @@ type Role = {
 };
 
 const field =
-  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
+  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
 
 /** PF-1 (free, off by default) and CT-1 (Pro): the public profile and the certificates, in Settings. */
 export function ProfileAndCertificates() {
@@ -98,7 +98,7 @@ export function ProfileAndCertificates() {
             </span>
           </label>
           <label htmlFor={ids.on} className="flex items-center gap-3">
-            <input id={ids.on} type="checkbox" checked={profile.enabled} onChange={(e) => setProfile({ ...profile, enabled: e.target.checked })} className="size-5 accent-violet-700" />
+            <input id={ids.on} type="checkbox" checked={profile.enabled} onChange={(e) => setProfile({ ...profile, enabled: e.target.checked })} className="size-5 accent-brand-700" />
             <span>Make my profile public</span>
           </label>
           <div className="flex flex-wrap gap-3">
@@ -143,7 +143,7 @@ export function ProfileAndCertificates() {
                   <li>
                     {r.eligibility.projectPassed ? "✓" : "○"} A guided project passed review{" "}
                     {!r.eligibility.projectPassed && (
-                      <Link href="/projects" className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                      <Link href="/projects" className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
                         choose a project
                       </Link>
                     )}

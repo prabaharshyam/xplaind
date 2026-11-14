@@ -4,35 +4,36 @@ One page that every new screen follows, so the site looks like one product. The 
 
 ## Promise and voice
 
-- **Promise:** everything you need to learn AI, in one place, in the right order.
+- **Promise:** the AI career path, mapped, from first lesson to first offer.
 - **Mission:** help India learn AI faster.
-- **Voice:** a patient senior colleague. Plain English, short sentences, the visitor's own words ("I keep watching tutorials and still can't build anything"). Say what happens next ("Start the first lesson", not "Get started"). No hype words, no exclamation marks in body text, no claims without a source and a date.
+- **Voice (BR-10, 2026-11-14): calm authority.** A senior mentor who has hired AI engineers, not a marketer. Specific over superlative ("22 guided projects reviewed against a rubric", not "tons of projects"). Outcomes before features: what the learner can do or show afterwards. Confident, not loud: no hype words, no countdowns, no "Hurry", no exclamation marks anywhere in the interface, no "Hi!". Plain English and short sentences stay; premium means precise, not complicated. Say what happens next ("Take the 2-minute level check", not "Get started"). No claims without a source and a date.
 
 ## Logo
 
 - The wordmark is `public/brand/xplaind-wordmark.png` (with `-dark` for dark pages); the version with the tagline "AI, explained simply." is `xplaind-logo.png`.
-- "XPL" and "ND" are ink (#111111 on light, #FAFAFA on dark). "AI" is brand violet: #7C3AED on light, #A78BFA on dark.
-- Square (1:1) versions for profile pictures, app stores and sign-in screens: `xplaind-logo-square.png` (1024 px, white), `-dark` (1024 px, near-black), `-transparent`, and `xplaind-icon-512.png`, the X mark with its violet bar (also the favicon).
+- "XPL" and "ND" are ink (#111111 on light, #FAFAFA on dark). "AI" is brand teal: #0E4A50 on light, sea glass #7FD1C7 on dark.
+- Square (1:1) versions for profile pictures, app stores and sign-in screens: `xplaind-logo-square.png` (1024 px, white), `-dark` (1024 px, near-black), `-transparent`, and `xplaind-icon-512.png`, the X mark with its teal bar (also the favicon). The dark square sits on deep teal ink (#0A2E33).
 - Keep clear space of at least the height of the "X" around it. Never recolour, stretch, outline or put it on a busy picture.
 
 ## Colour
 
-Seven colour families in all. Anything else is a bug.
+Deep teal and brass (BR-10, owner decision 2026-11-14, replacing violet). Low-saturation colour reads as established and premium, and no Indian AI ed-tech brand owns deep teal. One accent does the work; everything else is neutral.
 
 | Role | Tailwind family | Use it for |
 | --- | --- | --- |
-| Primary | `violet` (700 for buttons, 800 for links on light; 300 for links on dark) | Main buttons, every text link, active and selected states, focus rings |
-| Accent | `teal` | The second colour in gradients, highlights, the X on X Bot's antenna |
-| Success | `emerald` | Done, correct, progress bars. Never for links or buttons |
-| Warning and XP | `amber` | "Why it matters", in-progress, XP and streaks, price notes |
+| Primary | `brand` (deep teal: 700 #0E4A50 for buttons, 800 for links on light; 300 #7FD1C7 "sea glass" for links on dark) | Main buttons, every text link, active and selected states, focus rings |
+| Achievement | `brass` (300 #D9B26A on dark or as a fill; 700 for text on light) | Only what a learner earns: readiness scores, certificates, finished roles. Never for buttons or links, never small brass text on white |
+| Success | `emerald` | Done, correct. Never for links or buttons |
+| Warning | `amber` | In progress, price notes |
 | Error | `rose` | Errors, wrong answers, destructive buttons, recording |
 | Information | `sky` | Neutral tags such as "worked example" or "docs" |
 | Neutral | `zinc` | Text, borders, surfaces |
 
-- Pages are a calm near-white (#FBFAFF) or near-black (#0E0B1C). Colour washes belong only in page headers and the home page's sky, never behind reading text.
+- Ink (body text and headings) is #0A2E33 on light and #E6EFED on dark. Pages are white (#FFFFFF) or deep teal-black (#071A1D). The hero sky is a soft mist (#E8F1EF to white). Colour washes never sit behind reading text.
+- Lesson headers are one deep teal gradient (#0A2E33 to #0E4A50) for every topic.
 - Cards are solid white (`bg-white`, dark `bg-zinc-900`) with a `zinc-200` border. No see-through cards over content.
-- The headline gradient runs violet-700 to teal-700 (light) and violet-300 to teal-300 (dark), so both ends pass contrast.
-- Categories that need many hues (roadmap stages, course covers) use, in order: violet, sky, emerald, amber, rose, teal. Topic art (`src/lib/themes.ts`) is the one place with its own wider illustration palette.
+- Menu icon tiles share one calm teal tint. Topic art (`src/lib/themes.ts`) keeps a hue per topic, but every hue is muted to low saturation so the family sits quietly beside the teal.
+- Contrast: teal on white 9.9:1, link teal on white 11.6:1, sea glass on the dark page 10.1:1, brass-700 on white 7.0:1.
 
 ## Type
 
@@ -47,7 +48,7 @@ Seven colour families in all. Anything else is a bug.
 ## Buttons
 
 - Every button is a pill from `ui.ts` in one of three sizes: small 44 px (`…Sm`), normal 48 px, large 56 px (`…Lg`).
-- `primaryButton` (filled violet) is the one main action on a screen. `secondaryButton` (white with a violet edge) is the alternative. `quietButton` and `textLink` are for everything else.
+- `primaryButton` (filled deep teal) is the one main action on a screen. `secondaryButton` (white with a neutral edge) is the alternative. `quietButton` and `textLink` are for everything else.
 - Nothing a finger taps is under 44 px tall on a phone. Header controls on large screens may be 40 px, and small tag chips inside cards may be smaller as long as they keep space between them.
 - Video buttons are secondary with a play icon. Red is never used for a normal action.
 
@@ -63,4 +64,4 @@ Seven colour families in all. Anything else is a bug.
 
 ## Mascot
 
-- X Bot is violet with teal details, a dark face screen and light eyes. It greets a visitor once, ever, and is 48 px on phones so it never covers buttons.
+- X Bot is deep teal with sea-glass details, a dark face screen and light eyes. It greets a visitor once, ever, and is 48 px on phones so it never covers buttons.

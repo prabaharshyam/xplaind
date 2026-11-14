@@ -166,7 +166,7 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
       <JsonLd data={lessonGraph(stop, paths)} />
       {/* A11Y-1: the light end of a topic's colours is blended in only a third of the way, and a dark layer sits
           over the art, so white text keeps at least 4.5:1 contrast on every topic. */}
-      <header className="relative overflow-hidden text-white" style={{ background: `linear-gradient(135deg, ${theme.from}, color-mix(in srgb, ${theme.to} 35%, ${theme.from}))` }}>
+      <header className="relative overflow-hidden text-white" style={{ background: "linear-gradient(135deg, #0a2e33, #0e4a50)" }}>
         <Cover theme={stop.theme} seed={stop.id} plain className="absolute inset-0 opacity-60" />
         <div aria-hidden="true" className="absolute inset-0 bg-black/[0.22]" />
         <div className="relative mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row md:items-end md:justify-between md:px-6 md:py-12">
@@ -437,14 +437,14 @@ export default async function StopPage({ params }: PageProps<"/stop/[id]">) {
               </p>
             )}
             <p className="mt-3 flex flex-wrap items-center gap-2 text-sm" aria-label="Tags">
-              <Link href={`/library?topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-violet-50 px-3 font-medium text-violet-900 ring-1 ring-violet-200 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200 dark:ring-violet-900">
+              <Link href={`/library?topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-brand-50 px-3 font-medium text-brand-900 ring-1 ring-brand-200 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-900">
                 {theme.label}
               </Link>
-              <Link href={`/library?level=${stop.level}`} className="inline-flex min-h-11 items-center rounded-full bg-violet-50 px-3 font-medium text-violet-900 ring-1 ring-violet-200 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200 dark:ring-violet-900">
+              <Link href={`/library?level=${stop.level}`} className="inline-flex min-h-11 items-center rounded-full bg-brand-50 px-3 font-medium text-brand-900 ring-1 ring-brand-200 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-900">
                 {levelWords(stop.level)}: {level?.name}
               </Link>
               {stop.videos.length > 0 && (
-                <Link href={`/library?kind=video&topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-violet-50 px-3 font-medium text-violet-900 ring-1 ring-violet-200 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200 dark:ring-violet-900">
+                <Link href={`/library?kind=video&topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-brand-50 px-3 font-medium text-brand-900 ring-1 ring-brand-200 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-900">
                   Video lessons
                 </Link>
               )}

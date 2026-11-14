@@ -181,7 +181,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
                     value={n}
                     checked={count === n}
                     onChange={() => setCount(n)}
-                    className="accent-violet-700"
+                    className="accent-brand-700"
                   />
                   {n}
                 </label>
@@ -481,7 +481,7 @@ function QuestionScreen({
             }
           }}
           aria-pressed={listening}
-          className={`${listening ? "bg-rose-700 text-white hover:bg-rose-800" : "bg-violet-700 text-white hover:bg-violet-800"} inline-flex min-h-14 items-center justify-center gap-3 rounded-full px-6 py-3 text-lg font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700`}
+          className={`${listening ? "bg-rose-700 text-white hover:bg-rose-800" : "bg-brand-700 text-white hover:bg-brand-800"} inline-flex min-h-14 items-center justify-center gap-3 rounded-full px-6 py-3 text-lg font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700`}
         >
           <span
             aria-hidden="true"

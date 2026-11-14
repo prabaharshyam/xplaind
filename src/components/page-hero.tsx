@@ -51,7 +51,7 @@ export function PageHero({
               ))}
             </nav>
           )}
-          {eyebrow && <p className="text-sm font-semibold text-violet-800 dark:text-violet-300">{eyebrow}</p>}
+          {eyebrow && <p className="text-sm font-semibold text-brand-800 dark:text-brand-300">{eyebrow}</p>}
           <h1 data-hero-title className="mt-1 text-3xl leading-tight font-semibold tracking-tight text-balance md:text-[2.75rem] md:leading-[1.1]">{title}</h1>
           {lead && <div className={`mt-3 max-w-2xl text-zinc-700 dark:text-zinc-300 ${full ? "text-lg leading-8" : "text-base leading-7 md:text-lg md:leading-8"}`}>{lead}</div>}
           {children && <div className={full ? "mt-5" : "mt-4"}>{children}</div>}

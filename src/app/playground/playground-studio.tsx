@@ -22,7 +22,7 @@ export function PlaygroundStudio({ aiOn, lessonTitles }: { aiOn: boolean; lesson
   const code = shared ?? example.code;
 
   const button = (on: boolean) =>
-    `min-h-11 rounded-2xl border px-3 py-2 text-left text-sm font-medium lg:w-full ${on ? "border-2 border-violet-600 bg-violet-50 dark:bg-violet-950" : "border-zinc-200 bg-white hover:border-violet-300 dark:border-zinc-800 dark:bg-zinc-900"}`;
+    `min-h-11 rounded-2xl border px-3 py-2 text-left text-sm font-medium lg:w-full ${on ? "border-2 border-brand-600 bg-brand-50 dark:bg-brand-950" : "border-zinc-200 bg-white hover:border-brand-300 dark:border-zinc-800 dark:bg-zinc-900"}`;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[17rem_minmax(0,1fr)]">
@@ -78,7 +78,7 @@ export function PlaygroundStudio({ aiOn, lessonTitles }: { aiOn: boolean; lesson
         {!shared && example.lesson && lessonTitles[example.lesson] && (
           <p className="mt-3 text-sm text-zinc-700 dark:text-zinc-300">
             Learn the idea behind it:{" "}
-            <Link href={`/stop/${example.lesson}`} className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+            <Link href={`/stop/${example.lesson}`} className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
               {lessonTitles[example.lesson]}
             </Link>
           </p>

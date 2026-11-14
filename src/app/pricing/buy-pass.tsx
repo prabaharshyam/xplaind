@@ -48,7 +48,7 @@ function loadSdk(provider: Provider): Promise<void> {
 type RazorpayOrder = { order_id: string; amount: number; currency: string; key_id: string; receipt: string; email: string | null; description: string; error?: string };
 
 const field =
-  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
+  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
 
 /**
  * PAY-3: asks for the two things Cashfree needs (a mobile number and consent), then opens Cashfree's checkout.
@@ -140,7 +140,7 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
       name: "Xplaind",
       description: order.description,
       prefill: order.email ? { email: order.email } : undefined,
-      theme: { color: "#6d28d9" },
+      theme: { color: "#0e4a50" },
       handler: (r) => {
         setError(null);
         void (async () => {
@@ -282,14 +282,14 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
           </label>
           )}
           <label className="flex items-start gap-3 text-sm leading-6">
-            <input type="checkbox" required checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-1 size-5 accent-violet-700" />
+            <input type="checkbox" required checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-1 size-5 accent-brand-700" />
             <span>
               I am 18 or older and I agree to the{" "}
-              <Link href="/terms" className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+              <Link href="/terms" className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
                 terms
               </Link>{" "}
               and the{" "}
-              <Link href="/refunds" className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+              <Link href="/refunds" className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
                 refund policy
               </Link>
               .

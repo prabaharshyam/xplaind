@@ -28,7 +28,7 @@ export function InterviewReadiness() {
       {roles.length === 0 ? (
         <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">
           Take a mock interview for your role and get it reviewed by AI to see how ready you are.{" "}
-          <Link href="/interview/simulator" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <Link href="/interview/simulator" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
             Start a mock interview
           </Link>
         </p>
@@ -44,7 +44,7 @@ export function InterviewReadiness() {
                 </span>
               </div>
               <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" role="meter" aria-label={`${r.name} readiness`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={r.score}>
-                <div className="h-full rounded-full bg-violet-700 dark:bg-violet-400" style={{ width: `${r.score}%` }} />
+                <div className="h-full rounded-full bg-brass-400 dark:bg-brass-300" style={{ width: `${r.score}%` }} />
               </div>
               {r.change !== null && r.change !== 0 && (
                 <p className={`mt-1 text-sm tabular-nums ${r.change > 0 ? "text-emerald-800 dark:text-emerald-300" : "text-rose-800 dark:text-rose-300"}`}>

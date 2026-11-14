@@ -14,7 +14,7 @@ export function DownloadLink({ url, title, kind }: { url: string; title: string;
       onClick={(e) => {
         if (!needAccount("library")) e.preventDefault();
       }}
-      className="inline-flex min-h-11 items-center rounded-full bg-violet-700 px-4 text-sm font-semibold text-white hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+      className="inline-flex min-h-11 items-center rounded-full bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
     >
       {pdf ? "Download PDF" : kind === "book" ? "Read free online" : "Open"}
       <span className="sr-only">: {title} (opens in a new tab)</span>

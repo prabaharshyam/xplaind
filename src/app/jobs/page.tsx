@@ -44,7 +44,7 @@ export default function JobsPage() {
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <nav aria-label="Roles" className="flex flex-wrap gap-2">
           {roles.map(({ path }) => (
-            <a key={path.id} href={`#${path.id}`} className="inline-flex min-h-11 items-center rounded-full border border-zinc-300 bg-white px-3 text-sm font-medium hover:border-violet-400 dark:border-zinc-700 dark:bg-zinc-900">
+            <a key={path.id} href={`#${path.id}`} className="inline-flex min-h-11 items-center rounded-full border border-zinc-300 bg-white px-3 text-sm font-medium hover:border-brand-400 dark:border-zinc-700 dark:bg-zinc-900">
               {path.name}
             </a>
           ))}
@@ -78,7 +78,7 @@ export default function JobsPage() {
                         <td className="py-1.5" aria-hidden="true">
                           <span className="relative block h-3 rounded-full bg-zinc-100 dark:bg-zinc-800">
                             <span
-                              className="absolute inset-y-0 rounded-full bg-violet-600 dark:bg-violet-400"
+                              className="absolute inset-y-0 rounded-full bg-brand-600 dark:bg-brand-400"
                               style={{ left: `${(b.min / top) * 100}%`, width: `${Math.max(3, ((b.max - b.min) / top) * 100)}%` }}
                             />
                           </span>
@@ -94,7 +94,7 @@ export default function JobsPage() {
                 <h3 className="mt-5 text-sm font-semibold text-zinc-600 dark:text-zinc-400">Skills job posts ask for</h3>
                 <ul className="mt-2 flex flex-wrap gap-2">
                   {role.skills.map((s) => (
-                    <li key={s} className="rounded-full bg-violet-50 px-3 py-1 text-sm text-violet-950 ring-1 ring-violet-200 dark:bg-violet-950/40 dark:text-violet-100 dark:ring-violet-900">
+                    <li key={s} className="rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-950 ring-1 ring-brand-200 dark:bg-brand-950/40 dark:text-brand-100 dark:ring-brand-900">
                       {s}
                     </li>
                   ))}
@@ -119,7 +119,7 @@ export default function JobsPage() {
                     Live jobs on LinkedIn <span aria-hidden="true">↗</span>
                     <span className="sr-only">(opens in a new tab)</span>
                   </a>
-                  <Link href={`/roadmap/${path.id}`} className="inline-flex min-h-11 items-center gap-1 px-2 text-sm font-medium text-violet-800 hover:underline dark:text-violet-300">
+                  <Link href={`/roadmap/${path.id}`} className="inline-flex min-h-11 items-center gap-1 px-2 text-sm font-medium text-brand-800 hover:underline dark:text-brand-300">
                     <Icon name="map" size={16} /> Roadmap to get there
                   </Link>
                 </div>

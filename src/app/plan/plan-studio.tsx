@@ -62,7 +62,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
       <section aria-labelledby="week-heading" className="min-w-0">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-violet-800 dark:text-violet-300">
+            <p className="text-sm font-medium text-brand-800 dark:text-brand-300">
               {fmt(week.start)} – {fmt(week.end)}
             </p>
             <h2 id="week-heading" className="mt-1 text-2xl font-semibold">
@@ -74,7 +74,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
           </p>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden="true">
-          <div className="h-full rounded-full bg-violet-700 transition-[width] dark:bg-violet-400" style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }} />
+          <div className="h-full rounded-full bg-brand-700 transition-[width] dark:bg-brand-400" style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }} />
         </div>
 
         <ol className="mt-6 space-y-3">
@@ -98,7 +98,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
               </li>
             );
           })}
-          <li className="flex items-center gap-4 rounded-2xl border border-dashed border-violet-300 p-4 dark:border-violet-800">
+          <li className="flex items-center gap-4 rounded-2xl border border-dashed border-brand-300 p-4 dark:border-brand-800">
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               <Icon name="check" size={16} />
             </span>
@@ -148,7 +148,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
           <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">Changing these makes a new plan for this week. Saved on this device.</p>
         </div>
 
-        <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950/30">
+        <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-900 dark:bg-brand-950/30">
           <h2 className="font-semibold">Calendar reminder</h2>
           <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">A reminder every Monday at 9 am that opens this plan. No account needed.</p>
           <div className="mt-3 flex flex-col gap-2">

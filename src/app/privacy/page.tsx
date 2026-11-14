@@ -17,7 +17,7 @@ const contact: string = BUSINESS.email;
 
 const H2 = "mt-12 text-2xl font-semibold tracking-tight";
 const P = "mt-3 leading-7 text-zinc-800 dark:text-zinc-200";
-const A = "font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300";
+const A = "font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300";
 
 const STORED: [string, string, string][] = [
   [

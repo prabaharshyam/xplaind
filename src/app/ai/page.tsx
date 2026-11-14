@@ -29,7 +29,7 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     lead: "Understand topics faster and know what to learn next.",
     tools: [
       { href: "/ai/book", title: "Study from my notes & books", text: "Turns your textbook or notes into a timed test or flashcards, and shows what to reread.", icon: "book", tone: "from-teal-500 to-teal-700", ai: true, give: "A PDF of your book or notes", get: "A test and a page-by-page report" },
-      { href: "/ai/tutor", title: "AI tutor", text: "Explains any AI topic in plain English, with examples, and knows which lessons you have done.", icon: "chat", tone: "from-violet-500 to-violet-700", ai: true, give: "Your question", get: "A clear answer and lessons to read" },
+      { href: "/ai/tutor", title: "AI tutor", text: "Explains any AI topic in plain English, with examples, and knows which lessons you have done.", icon: "chat", tone: "from-brand-500 to-brand-700", ai: true, give: "Your question", get: "A clear answer and lessons to read" },
     ],
   },
   {
@@ -47,7 +47,7 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     lead: "Get past the recruiter and into the interview.",
     tools: [
       { href: "/ai/resume", title: "Resume review", text: "Fixes in order of importance, rewritten lines and the keywords recruiters search for.", icon: "star", tone: "from-amber-400 to-amber-600", ai: true, give: "Your resume and target role", get: "A ranked list of fixes" },
-      { href: "/interview/answers", title: "Interview Q&A by role", text: "Every interview question for your role with a short and a deeper answer, on one page.", icon: "target", tone: "from-violet-600 to-teal-600", ai: false, give: "The role you want", get: "Every question with answers" },
+      { href: "/interview/answers", title: "Interview Q&A by role", text: "Every interview question for your role with a short and a deeper answer, on one page.", icon: "target", tone: "from-brand-600 to-teal-600", ai: false, give: "The role you want", get: "Every question with answers" },
     ],
   },
 ];
@@ -98,7 +98,7 @@ export default function AiToolsPage() {
                     <li key={t.href}>
                       <Link
                         href={t.href}
-                        className="group relative flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-violet-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-violet-800"
+                        className="group relative flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-brand-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-brand-800"
                       >
                         <span className="flex items-start gap-4">
                           <AppIcon icon={t.icon} tone={t.tone} />
@@ -124,7 +124,7 @@ export default function AiToolsPage() {
                           <span className="font-medium text-zinc-900 dark:text-zinc-100">{t.get}</span>
                         </span>
                         <span className="mt-auto flex items-center justify-end pt-4">
-                          <span className="inline-flex h-10 items-center gap-1.5 rounded-full bg-violet-700 px-4 text-sm font-semibold text-white transition group-hover:bg-violet-800">
+                          <span className="inline-flex h-10 items-center gap-1.5 rounded-full bg-brand-700 px-4 text-sm font-semibold text-white transition group-hover:bg-brand-800">
                             Open<span className="sr-only"> {t.title}</span>
                             <span aria-hidden="true" className="transition group-hover:translate-x-0.5">
                               →

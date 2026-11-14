@@ -83,7 +83,7 @@ export function InterviewList({
             <li key={q.id}>
               <Link
                 href={`/interview/${q.id}`}
-                className="block rounded-2xl border border-zinc-200 p-3 hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:hover:border-zinc-600"
+                className="block rounded-2xl border border-zinc-200 p-3 hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-800 dark:hover:border-zinc-600"
               >
                 <span className="block font-medium">{q.question}</span>
                 <span className={`mt-1 block text-sm ${muted}`}>

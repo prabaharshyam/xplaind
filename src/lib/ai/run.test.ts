@@ -104,7 +104,7 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     // The tutor trial is 3; two were used on earlier days, so one is left today.
     expect(rpc.mock.calls[0][1]).toMatchObject({ p_kind: "tutor", p_daily_max: 1 });
     expect(res.status).toBe(429);
-    expect(await res.json()).toMatchObject({ upgrade: "/pricing", error: expect.stringMatching(/free tries/) });
+    expect(await res.json()).toMatchObject({ upgrade: "/pricing", error: expect.stringMatching(/last free try/) });
     expect(create).not.toHaveBeenCalled();
     pastUsage = [];
   });
@@ -144,7 +144,7 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     user = null;
     const res = (await runAi(req)) as Response;
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({ signin: true, error: expect.stringMatching(/part of Pro. Sign up free/) });
+    expect(await res.json()).toMatchObject({ signin: true, error: expect.stringMatching(/part of Pro. Create a free account/) });
     expect(rpc).not.toHaveBeenCalled();
     expect(create).not.toHaveBeenCalled();
   });
@@ -159,7 +159,7 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     rpc.mockResolvedValueOnce({ data: "day", error: null });
     const day = (await runAi(req)) as Response;
     expect(day.status).toBe(429);
-    expect((await day.json()).error).toMatch(/tomorrow/);
+    expect((await day.json()).error).toMatch(/resets at midnight India time/);
     rpc.mockResolvedValueOnce({ data: "month", error: null });
     const month = (await runAi(req)) as Response;
     expect(month.status).toBe(429);

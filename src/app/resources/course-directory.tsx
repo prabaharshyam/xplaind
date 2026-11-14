@@ -44,7 +44,7 @@ const PAGE = 24;
 const PREVIEW = 6;
 
 const field =
-  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
+  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
 
 /** RM-2: every course as a picture card, filterable. Rendered on the server, so search engines see the list. */
 export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: { id: string; name: string }[] }) {
@@ -134,7 +134,7 @@ export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: 
               type="checkbox"
               checked={filter.certificateOnly}
               onChange={(e) => set({ certificateOnly: e.target.checked })}
-              className="size-5 accent-violet-700"
+              className="size-5 accent-brand-700"
             />
             <span className="text-sm">Only courses with a certificate or badge</span>
           </label>
@@ -170,7 +170,7 @@ export function CourseDirectory({ rows, paths }: { rows: DirectoryRow[]; paths: 
       {shown.length === 0 && (
         <p className="mt-4">
           Nothing matches.{" "}
-          <button type="button" onClick={() => set(EMPTY_FILTER)} className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <button type="button" onClick={() => set(EMPTY_FILTER)} className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
             Clear the filters
           </button>
         </p>

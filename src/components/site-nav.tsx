@@ -8,16 +8,10 @@ import { Icon } from "@/components/art/icons";
 import { NAV_GROUPS, PRO_LINK, type NavTone, activeGroup, under } from "@/lib/nav";
 import type { IconName } from "@/lib/themes";
 
-/** UX-3: the soft icon tile beside each menu item, one tone per item. */
-const TONE: Record<NavTone, string> = {
-  violet: "bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200",
-  indigo: "bg-violet-50 text-violet-900 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-100 dark:ring-violet-500/30",
-  sky: "bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200",
-  teal: "bg-teal-100 text-teal-800 dark:bg-teal-500/15 dark:text-teal-200",
-  emerald: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200",
-  amber: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200",
-  rose: "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200",
-};
+/** UX-3: the soft icon tile beside each menu item. */
+/** BR-10: one calm tile for every item, in the brand teal, so the menu reads as one family. */
+const CALM = "bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-200";
+const TONE: Record<NavTone, string> = { violet: CALM, indigo: CALM, sky: CALM, teal: CALM, emerald: CALM, amber: CALM, rose: CALM };
 
 function Tile({ icon, tone, size = "size-10" }: { icon: IconName; tone: NavTone; size?: string }) {
   return (
@@ -92,10 +86,10 @@ function DesktopMenus({ path }: { path: string }) {
   }, [path]);
 
   const tab = (on: boolean) =>
-    `relative flex h-10 items-center gap-1 rounded-full px-3 text-sm transition hover:bg-violet-50 hover:text-violet-950 dark:hover:bg-white/10 dark:hover:text-white ${
-      on ? "font-semibold text-violet-900 dark:text-white" : "text-zinc-700 dark:text-zinc-300"
+    `relative flex h-10 items-center gap-1 rounded-full px-3 text-sm transition hover:bg-brand-50 hover:text-brand-950 dark:hover:bg-white/10 dark:hover:text-white ${
+      on ? "font-semibold text-brand-900 dark:text-white" : "text-zinc-700 dark:text-zinc-300"
     }`;
-  const dot = <span aria-hidden="true" className="absolute inset-x-3 -bottom-[9px] h-0.5 rounded-full bg-violet-700 dark:bg-violet-300" />;
+  const dot = <span aria-hidden="true" className="absolute inset-x-3 -bottom-[9px] h-0.5 rounded-full bg-brand-700 dark:bg-brand-300" />;
 
   return (
     <div ref={root} className="flex items-center gap-1">
@@ -121,7 +115,7 @@ function DesktopMenus({ path }: { path: string }) {
                   <Link
                     href={i.href}
                     aria-current={current(path, i.href)}
-                    className="group/item flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-zinc-50 aria-[current=page]:bg-violet-50 dark:hover:bg-white/5 dark:aria-[current=page]:bg-white/5"
+                    className="group/item flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-zinc-50 aria-[current=page]:bg-brand-50 dark:hover:bg-white/5 dark:aria-[current=page]:bg-white/5"
                   >
                     <Tile icon={i.icon} tone={i.tone} />
                     <span className="flex flex-col pt-0.5">
@@ -136,7 +130,7 @@ function DesktopMenus({ path }: { path: string }) {
         </details>
       ))}
       <Link href={PRO_LINK.href} aria-current={current(path, PRO_LINK.href)} className={`${tab(under(path, PRO_LINK.href))} gap-1.5`}>
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-violet-600 dark:bg-violet-400" />
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-brand-600 dark:bg-brand-400" />
         {PRO_LINK.label}
         {under(path, PRO_LINK.href) && dot}
       </Link>
@@ -175,13 +169,13 @@ function PhoneMenu({ path }: { path: string }) {
               aria-expanded={isOpen}
               aria-controls={panelId}
               onClick={() => setOpen(isOpen ? null : g.id)}
-              className="group/row flex w-full items-center gap-4 rounded-2xl px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+              className="group/row flex w-full items-center gap-4 rounded-2xl px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
             >
-              <span aria-hidden="true" className={`w-6 shrink-0 font-mono text-xs tabular-nums transition-colors duration-300 ${isOpen || active === g.id ? "text-violet-700 dark:text-violet-300" : "text-zinc-400 dark:text-zinc-500"}`}>
+              <span aria-hidden="true" className={`w-6 shrink-0 font-mono text-xs tabular-nums transition-colors duration-300 ${isOpen || active === g.id ? "text-brand-700 dark:text-brand-300" : "text-zinc-400 dark:text-zinc-500"}`}>
                 {String(gi + 1).padStart(2, "0")}
               </span>
               <span className="min-w-0 flex-1">
-                <span className={`block font-display text-[1.75rem] leading-9 font-semibold tracking-tight transition-colors duration-300 ${active === g.id ? "text-violet-800 dark:text-violet-300" : "text-zinc-950 dark:text-white"}`}>
+                <span className={`block font-display text-[1.75rem] leading-9 font-semibold tracking-tight transition-colors duration-300 ${active === g.id ? "text-brand-800 dark:text-brand-300" : "text-zinc-950 dark:text-white"}`}>
                   {g.label}
                 </span>
                 <span className="block truncate text-sm text-zinc-500 dark:text-zinc-400">{g.items.map((i) => i.label).join(" · ")}</span>
@@ -189,7 +183,7 @@ function PhoneMenu({ path }: { path: string }) {
               <span
                 aria-hidden="true"
                 className={`relative grid size-10 shrink-0 place-items-center rounded-full border transition-[background-color,border-color,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                  isOpen ? "rotate-180 border-violet-700 bg-violet-700 text-white dark:border-violet-400 dark:bg-violet-400 dark:text-zinc-950" : "border-zinc-300 text-zinc-700 group-active/row:scale-95 dark:border-zinc-700 dark:text-zinc-200"
+                  isOpen ? "rotate-180 border-brand-700 bg-brand-700 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-zinc-950" : "border-zinc-300 text-zinc-700 group-active/row:scale-95 dark:border-zinc-700 dark:text-zinc-200"
                 }`}
               >
                 <span className="absolute h-[1.5px] w-3.5 rounded-full bg-current" />
@@ -210,7 +204,7 @@ function PhoneMenu({ path }: { path: string }) {
                       href={i.href}
                       aria-current={current(path, i.href)}
                       style={{ transitionDelay: isOpen ? `${80 + ii * 40}ms` : "0ms" }}
-                      className={`group/item flex min-h-[4.5rem] flex-col justify-between gap-2 rounded-2xl bg-zinc-100 p-3 text-sm font-medium text-zinc-900 transition-[opacity,transform,background-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-zinc-200 aria-[current=page]:bg-violet-700 aria-[current=page]:text-white motion-reduce:transition-none dark:bg-white/[0.06] dark:text-zinc-100 dark:hover:bg-white/10 dark:aria-[current=page]:bg-violet-500 ${
+                      className={`group/item flex min-h-[4.5rem] flex-col justify-between gap-2 rounded-2xl bg-zinc-100 p-3 text-sm font-medium text-zinc-900 transition-[opacity,transform,background-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-zinc-200 aria-[current=page]:bg-brand-700 aria-[current=page]:text-white motion-reduce:transition-none dark:bg-white/[0.06] dark:text-zinc-100 dark:hover:bg-white/10 dark:aria-[current=page]:bg-brand-500 ${
                         isOpen ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
                       }`}
                     >
@@ -229,13 +223,13 @@ function PhoneMenu({ path }: { path: string }) {
         <Link
           href={PRO_LINK.href}
           aria-current={current(path, PRO_LINK.href)}
-          className="group/pro flex items-center gap-4 rounded-3xl bg-violet-50 p-4 ring-1 ring-violet-200 transition-colors hover:bg-violet-100 dark:bg-violet-500/10 dark:ring-violet-500/30 dark:hover:bg-violet-500/15"
+          className="group/pro flex items-center gap-4 rounded-3xl bg-brand-50 p-4 ring-1 ring-brand-200 transition-colors hover:bg-brand-100 dark:bg-brand-500/10 dark:ring-brand-500/30 dark:hover:bg-brand-500/15"
         >
           <span className="min-w-0 flex-1">
-            <span className="block font-display text-xl font-semibold tracking-tight text-violet-950 dark:text-white">{PRO_LINK.title}</span>
-            <span className="mt-0.5 block text-sm leading-5 text-violet-900/80 dark:text-violet-200/80">{PRO_LINK.note}</span>
+            <span className="block font-display text-xl font-semibold tracking-tight text-brand-950 dark:text-white">{PRO_LINK.title}</span>
+            <span className="mt-0.5 block text-sm leading-5 text-brand-900/80 dark:text-brand-200/80">{PRO_LINK.note}</span>
           </span>
-          <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-violet-700 text-white transition-transform duration-300 group-hover/pro:translate-x-0.5 dark:bg-violet-400 dark:text-zinc-950">
+          <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-700 text-white transition-transform duration-300 group-hover/pro:translate-x-0.5 dark:bg-brand-400 dark:text-zinc-950">
             <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
           </span>
         </Link>

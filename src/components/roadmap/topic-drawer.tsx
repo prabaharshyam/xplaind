@@ -13,7 +13,7 @@ import { levelText } from "@/lib/levels";
 
 const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   course: { label: "Course", cls: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200" },
-  video: { label: "Video", cls: "bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200" },
+  video: { label: "Video", cls: "bg-brand-100 text-brand-900 dark:bg-brand-950 dark:text-brand-200" },
   article: { label: "Article", cls: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200" },
   docs: { label: "Official docs", cls: "bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200" },
   book: { label: "Book", cls: "bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200" },
@@ -149,7 +149,7 @@ function DrawerBody({ d, onClose }: { d: TopicDetail; onClose: () => void }) {
         {paid.length > 0 && <CourseList title="Paid courses" items={paid} />}
 
         {d.questions > 0 && (
-          <Link href={`/stop/${d.id}#interview`} className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <Link href={`/stop/${d.id}#interview`} className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
             {d.questions} interview {d.questions === 1 ? "question" : "questions"} on this topic
           </Link>
         )}
@@ -176,7 +176,7 @@ function CourseList({ title, items }: { title: string; items: DrawerCourse[] }) 
           return (
             <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
-              {c.pick === "best" && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900 dark:bg-violet-950 dark:text-violet-200">Best pick</span>}
+              {c.pick === "best" && <span className="rounded bg-brand-100 px-1.5 py-0.5 text-xs font-medium text-brand-900 dark:bg-brand-950 dark:text-brand-200">Best pick</span>}
               <a href={`/go/${c.id}`} target="_blank" rel="noopener" className="font-medium underline underline-offset-2">
                 {c.title}
                 <span className="sr-only"> (opens in a new tab)</span>

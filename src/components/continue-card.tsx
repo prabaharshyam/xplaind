@@ -25,7 +25,7 @@ export function ContinueCard({ titles }: { titles: Record<string, string> }) {
   if (!last) return null;
   return (
     <section aria-labelledby="continue-h" className="rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 id="continue-h" className="text-sm font-semibold text-violet-800 dark:text-violet-300">
+      <h2 id="continue-h" className="text-sm font-semibold text-brand-800 dark:text-brand-300">
         Continue where you left off
       </h2>
       <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -40,7 +40,7 @@ export function ContinueCard({ titles }: { titles: Record<string, string> }) {
       {account === "out" && (
         <p className="mt-3 text-sm text-zinc-700 dark:text-zinc-300">
           Your place is saved on this device.{" "}
-          <Link href="/signin" className="font-semibold text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <Link href="/signin" className="font-semibold text-brand-800 underline underline-offset-2 dark:text-brand-300">
             Sign up
           </Link>{" "}
           to keep it on every device.

@@ -20,8 +20,8 @@ const LEVELS = ["B1", "B2", "B3", "I1", "I2", "I3", "P1", "P2", "P3"] as const;
 const PAGE = 48;
 
 const chip = (on: boolean) =>
-  `inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 ${
-    on ? "bg-violet-700 text-white shadow-sm" : "bg-white text-zinc-800 ring-1 ring-zinc-300 hover:bg-violet-50 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-violet-950"
+  `inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
+    on ? "bg-brand-700 text-white shadow-sm" : "bg-white text-zinc-800 ring-1 ring-zinc-300 hover:bg-brand-50 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-brand-950"
   }`;
 
 const KIND_STYLE: Record<LibraryKind, string> = {
@@ -104,10 +104,10 @@ export function LibraryBrowser({ items, topics, channels }: { items: LibraryItem
             className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium dark:border-zinc-700 dark:bg-zinc-900"
           >
             <Icon name="flow" size={16} /> {filtersOpen ? "Hide filters" : "Topic and level"}
-            {active > 0 && <span className="grid size-5 place-items-center rounded-full bg-violet-700 text-xs text-white">{active}</span>}
+            {active > 0 && <span className="grid size-5 place-items-center rounded-full bg-brand-700 text-xs text-white">{active}</span>}
           </button>
           {active > 0 && (
-            <button type="button" onClick={() => router.replace(`${pathname}${kind !== "all" ? `?kind=${kind}` : ""}`, { scroll: false })} className="min-h-11 px-2 text-sm font-medium text-violet-800 underline underline-offset-4 dark:text-violet-300">
+            <button type="button" onClick={() => router.replace(`${pathname}${kind !== "all" ? `?kind=${kind}` : ""}`, { scroll: false })} className="min-h-11 px-2 text-sm font-medium text-brand-800 underline underline-offset-4 dark:text-brand-300">
               Clear
             </button>
           )}
@@ -170,7 +170,7 @@ export function LibraryBrowser({ items, topics, channels }: { items: LibraryItem
             <p className="line-clamp-2 text-card text-zinc-700 dark:text-zinc-300">{i.channel && i.kind === "video" ? `${i.channel} · ${i.summary}` : i.summary}</p>
             <p className="mt-auto flex flex-wrap gap-1.5 pt-1">
               {i.topics.map((t) => (
-                <button key={t} type="button" onClick={() => set("topic", t)} className="rounded-full bg-violet-50 px-2 py-1 text-xs text-violet-900 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200">
+                <button key={t} type="button" onClick={() => set("topic", t)} className="rounded-full bg-brand-50 px-2 py-1 text-xs text-brand-900 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200">
                   {topics.find((x) => x.id === t)?.label ?? t}
                 </button>
               ))}

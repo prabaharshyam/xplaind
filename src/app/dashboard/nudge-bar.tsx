@@ -39,7 +39,7 @@ export function NudgeBar({ path, lessons, hasTest }: { path: { id: string; name:
   return (
     <section aria-label="Suggested next steps" className="flex flex-col gap-3">
       {list.map((n) => (
-        <div key={n.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950/30">
+        <div key={n.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-900 dark:bg-brand-950/30">
           <p className="min-w-0 flex-1 leading-7">{n.text}</p>
           <Link href={n.href} className={primaryButtonSm}>
             {n.cta}

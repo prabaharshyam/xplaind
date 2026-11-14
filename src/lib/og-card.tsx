@@ -34,8 +34,8 @@ export function ogCard({ eyebrow, title, footer, from, to }: { eyebrow: string; 
           flexDirection: "column",
           justifyContent: "space-between",
           padding: "64px 72px",
-          background: `linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 55%, #ecfeff 100%)`,
-          color: "#17132a",
+          background: `linear-gradient(135deg, #f4f7f6 0%, #eef6f5 55%, #ffffff 100%)`,
+          color: "#0a2e33",
           fontFamily: "sans-serif",
         }}
       >
@@ -43,7 +43,7 @@ export function ogCard({ eyebrow, title, footer, from, to }: { eyebrow: string; 
           {/* eslint-disable-next-line @next/next/no-img-element -- next/og draws plain img tags */}
           {LOGO ? <img src={LOGO} alt="" width={254} height={40} /> : <div style={{ fontSize: 34, fontWeight: 800 }}>XPLAIND</div>}
           <div style={{ width: 3, height: 34, borderRadius: 2, background: `linear-gradient(180deg, ${from}, ${to})`, marginLeft: 6 }} />
-          <div style={{ fontSize: 26, color: "#6d28d9", fontWeight: 600 }}>{eyebrow}</div>
+          <div style={{ fontSize: 26, color: "#0e4a50", fontWeight: 600 }}>{eyebrow}</div>
         </div>
         <div style={{ fontSize: title.length > 48 ? 64 : 78, fontWeight: 800, lineHeight: 1.08, letterSpacing: -1.5, maxWidth: 1000 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 28, color: "#3f3a56" }}>

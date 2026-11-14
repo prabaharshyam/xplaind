@@ -57,7 +57,7 @@ const link = "rounded text-zinc-600 underline-offset-4 hover:text-zinc-950 hover
 export function SiteFooter() {
   const whatsapp = getCommunity().whatsapp_url;
   return (
-    <footer className="site-footer relative mt-16 overflow-hidden border-t border-zinc-200 bg-white text-sm dark:border-white/10 dark:bg-[#0e0b1c]">
+    <footer className="site-footer relative mt-16 overflow-hidden border-t border-zinc-200 bg-white text-sm dark:border-white/10 dark:bg-[#071a1d]">
       <div className="mx-auto max-w-6xl px-4 pt-12 pb-8 md:px-6">
         <div className="grid gap-10 lg:grid-cols-[1.1fr_2fr]">
           <div className="max-w-sm">
@@ -77,7 +77,7 @@ export function SiteFooter() {
                 href={whatsapp || "/community"}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-violet-700 px-4 font-medium text-white hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-brand-700 px-4 font-medium text-white hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
               >
                 <Icon name="chat" size={16} /> Join the community
                 <span className="sr-only"> on WhatsApp (opens in a new tab)</span>
@@ -113,7 +113,7 @@ export function SiteFooter() {
           </nav>
         </div>
 
-        <div className="mt-12 flex flex-col gap-3 border-t border-violet-100 pt-6 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:text-zinc-400">
+        <div className="mt-12 flex flex-col gap-3 border-t border-brand-100 pt-6 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:text-zinc-400">
           <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>© Xplaind. AI, explained simply.</span>
             <Link href="/about" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>

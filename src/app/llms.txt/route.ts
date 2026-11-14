@@ -19,7 +19,7 @@ export function GET(): Response {
     "## Start here",
     `- [Choose a path](${base}/paths): every AI role, who each suits and how long it takes`,
     `- [How to learn AI](${base}/blog/how-to-learn-ai): a step-by-step plan from zero`,
-    `- [Find my level](${base}/start): a 10-minute placement test that finds your level`,
+    `- [Find my level](${base}/start): a 2-minute level check, or a fuller 10-minute test, that finds your level`,
     "",
     "## Learning paths",
     ...paths.map((p) => `- [${p.name}](${base}/roadmap/${p.id}): ${p.tagline}`),

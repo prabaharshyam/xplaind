@@ -37,7 +37,7 @@ const PAGE = 24;
 /** CG-1: how many a signed-out visitor sees before the free sign-up card. */
 const PREVIEW = 6;
 const field =
-  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
+  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
 const chip = (on: boolean) =>
   `flex min-h-11 items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 text-sm ${
     on ? "border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-black" : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
@@ -77,7 +77,7 @@ export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: Top
           <legend className="text-sm font-medium">Teacher</legend>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" aria-pressed={filter.andrewNg} onClick={() => set({ andrewNg: !filter.andrewNg })} className={chip(filter.andrewNg)}>
-              <span className="grid size-6 place-items-center rounded-full bg-violet-700 text-white">
+              <span className="grid size-6 place-items-center rounded-full bg-brand-700 text-white">
                 <Icon name="star" size={13} />
               </span>
               Taught by Andrew Ng
@@ -171,7 +171,7 @@ export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: Top
                 {c.lesson && (
                   <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                     For the lesson{" "}
-                    <Link href={`/stop/${c.lesson.id}`} className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                    <Link href={`/stop/${c.lesson.id}`} className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
                       {c.lesson.title}
                     </Link>
                   </p>
@@ -207,7 +207,7 @@ export function CourseBrowser({ rows, topics }: { rows: CourseRow[]; topics: Top
       {shown.length === 0 && (
         <p className="mt-4">
           No courses match.{" "}
-          <button type="button" onClick={() => set(EMPTY_COURSE_FILTER)} className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <button type="button" onClick={() => set(EMPTY_COURSE_FILTER)} className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
             Clear the filters
           </button>
         </p>

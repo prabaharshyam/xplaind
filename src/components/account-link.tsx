@@ -188,16 +188,16 @@ export function AccountMenu() {
   }, [state]);
   if (state !== "in") return null;
   const initial = (email?.[0] ?? "?").toUpperCase();
-  const item = "flex min-h-11 w-full items-center rounded-2xl px-3 text-left text-sm font-medium text-zinc-900 hover:bg-violet-50 dark:text-zinc-100 dark:hover:bg-white/5";
+  const item = "flex min-h-11 w-full items-center rounded-2xl px-3 text-left text-sm font-medium text-zinc-900 hover:bg-brand-50 dark:text-zinc-100 dark:hover:bg-white/5";
   return (
     <details ref={menu} className="account-menu group relative hidden sm:block">
       <summary
         aria-label="Your account"
-        className="grid size-10 cursor-pointer list-none place-items-center rounded-full bg-violet-100 text-sm font-semibold text-violet-900 ring-1 ring-violet-200 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-100 dark:ring-violet-800 [&::-webkit-details-marker]:hidden"
+        className="grid size-10 cursor-pointer list-none place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-900 ring-1 ring-brand-200 hover:bg-brand-200 dark:bg-brand-950 dark:text-brand-100 dark:ring-brand-800 [&::-webkit-details-marker]:hidden"
       >
         <span aria-hidden="true">{initial}</span>
       </summary>
-      <div className="absolute top-full right-0 z-50 mt-3 w-64 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-violet-950/10 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="absolute top-full right-0 z-50 mt-3 w-64 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-brand-950/10 dark:border-zinc-800 dark:bg-zinc-900">
         {email && (
           <p className="truncate px-3 pt-2 pb-1 text-sm text-zinc-600 dark:text-zinc-400">
             Signed in as <span className="font-medium text-zinc-900 dark:text-zinc-100">{email}</span>

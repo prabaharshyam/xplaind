@@ -13,7 +13,7 @@ export const metadata: Metadata = pageMeta({
   path: "/contact",
 });
 
-const A = "font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300";
+const A = "font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300";
 
 /** BIZ-1: how to reach the people behind Xplaind, and the business that runs it. */
 export default function ContactPage() {

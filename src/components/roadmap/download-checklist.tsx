@@ -131,7 +131,7 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
           {/* PV-2: with accounts on, the PDF needs an account and accounts are 18+, so this path is only for accounts-off sites. */}
           {!accountsOn() && (
             <label className="flex min-h-11 items-center gap-2">
-              <input type="checkbox" checked={minor} onChange={(e) => setMinor(e.target.checked)} className="size-5 accent-violet-700" />I am under 18
+              <input type="checkbox" checked={minor} onChange={(e) => setMinor(e.target.checked)} className="size-5 accent-brand-700" />I am under 18
             </label>
           )}
 
@@ -171,7 +171,7 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
                 </select>
               </div>
               <label className="flex items-start gap-2 text-sm leading-6 sm:col-span-2">
-                <input type="checkbox" checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} className="mt-1 size-5 shrink-0 accent-violet-700" />
+                <input type="checkbox" checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} className="mt-1 size-5 shrink-0 accent-brand-700" />
                 {CONSENT_TEXT}
               </label>
             </div>

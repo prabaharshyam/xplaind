@@ -50,7 +50,7 @@ export function ProgressOverview() {
 
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         Saved in this browser. Clearing your browser data clears it.{" "}
-        <Link href="/paths" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+        <Link href="/paths" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
           Continue learning
         </Link>
       </p>

@@ -35,7 +35,7 @@ export function CopyCode({ children }: { children: ReactNode }) {
       <button
         type="button"
         onClick={copy}
-        className="absolute top-2 right-2 rounded-full border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-violet-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+        className="absolute top-2 right-2 rounded-full border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-brand-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
       >
         <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
         <span className="sr-only"> code</span>

@@ -36,7 +36,7 @@ export const metadata: Metadata = {
 
 
 const STEPS: { title: string; text: string }[] = [
-  { title: "Choose the job you want", text: "Pick an AI role, or let the 10-minute level test suggest one." },
+  { title: "Choose the job you want", text: "Pick an AI role, or let the 2-minute level check suggest where to start." },
   { title: "Follow the roadmap, one topic at a time", text: "Each topic is a 20-minute lesson, the best course and a quick check." },
   { title: "Prove it and get hired", text: "Build projects, practice interviews out loud and see live openings." },
 ];
@@ -114,30 +114,30 @@ export default function Home() {
         <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6">
           <p data-hero-fade className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Xplaind · AI learning platform for India</p>
           <h1 id="hero-heading" className="mt-6 max-w-5xl text-[2.6rem] leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-[4.25rem]">
-            <Words text="Everything you need to learn AI," />{" "}
+            <Words text="The AI career path, mapped." />{" "}
             <span data-hero-fade className="block pb-1 text-zinc-500 dark:text-zinc-400">
-              in one place, in the right order
+              From first lesson to first offer.
             </span>
           </h1>
           <p data-hero-fade className="mt-6 max-w-2xl text-lg leading-8 text-zinc-800 md:text-xl md:leading-9 dark:text-zinc-200">
-            No more jumping between random videos. One roadmap per role takes you from the basics to job-ready.
+            One roadmap for the role you want, with lessons, projects and mock interviews in the order that gets you hired.
           </p>
           <div data-hero-fade className="mt-8 flex flex-col gap-3 sm:flex-row">
             <a href="#roles" className={primaryButtonLg}>
               Choose your role
             </a>
             <Link href="/start" className={secondaryButtonLg}>
-              Find my level in 10 minutes
+              Take the 2-minute level check
             </Link>
           </div>
           <ul data-hero-fade className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-700 dark:text-zinc-300" aria-label="Why it is easy to start">
-            {["Plain English", "Every topic in order", "No paid rankings"].map((t) => (
+            {["Built for India's AI roles", "Mock interviews built in", "Independent, no paid rankings"].map((t) => (
               <li key={t} className="flex items-center gap-2">
                 <Icon name="tick" size={16} className="text-zinc-500 dark:text-zinc-400" /> {t}
               </li>
             ))}
             <li>
-              <Link href="/interview/simulator" className="text-violet-800 underline underline-offset-4 hover:text-violet-950 dark:text-violet-300 dark:hover:text-violet-200">
+              <Link href="/interview/simulator" className="text-brand-800 underline underline-offset-4 hover:text-brand-950 dark:text-brand-300 dark:hover:text-brand-200">
                 I have an interview soon
               </Link>
             </li>
@@ -195,16 +195,16 @@ export default function Home() {
             <h2 id="roles-heading" data-words className="max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
               <Words text="Choose your AI role" />
             </h2>
-            <Link href="/paths" className="shrink-0 text-sm font-medium whitespace-nowrap text-violet-800 hover:underline dark:text-violet-300">
+            <Link href="/paths" className="shrink-0 text-sm font-medium whitespace-nowrap text-brand-800 hover:underline dark:text-brand-300">
               Compare all roles →
             </Link>
           </div>
           <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">
             One roadmap per job. Not sure?{" "}
-            <Link href="/start" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
-              Find my level
-            </Link>{" "}
-            in 10 minutes.
+            <Link href="/start" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+              Take the 2-minute level check
+            </Link>
+            .
           </p>
           <div className="mt-8" data-rise-group>
             <RoleGrid
@@ -390,7 +390,7 @@ export default function Home() {
               <h2 id="guides-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
                 <Words text="Guides" />
               </h2>
-              <Link href="/blog" className="font-medium text-violet-800 hover:underline dark:text-violet-300">
+              <Link href="/blog" className="font-medium text-brand-800 hover:underline dark:text-brand-300">
                 All guides →
               </Link>
             </div>

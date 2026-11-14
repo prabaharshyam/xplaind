@@ -91,7 +91,7 @@ export default function AboutPage() {
               {pro ? (
                 <>
                   A{" "}
-                  <Link href="/pricing" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                  <Link href="/pricing" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
                     Pro pass
                   </Link>{" "}
                   gives
@@ -142,7 +142,7 @@ export default function AboutPage() {
               handful charge if you want the certificate.
             </p>
             <p>You don&apos;t need an expensive school, perfect English or lakhs of rupees. I didn&apos;t.</p>
-            <p className="text-xl font-semibold text-violet-800 dark:text-violet-300">Let&apos;s learn AI together.</p>
+            <p className="text-xl font-semibold text-brand-800 dark:text-brand-300">Let&apos;s learn AI together.</p>
             <p className="text-base text-zinc-600 italic dark:text-zinc-400">— Shyam Prabahar, founder</p>
           </div>
         </section>
@@ -181,7 +181,7 @@ export default function AboutPage() {
             </li>
             <li>
               <strong className="font-semibold">Course and video picks</strong> follow published ranking rules that never look at commissions.
-              Every price shows the date we checked it. <Link href="/how-we-rank" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">How we rank</Link>
+              Every price shows the date we checked it. <Link href="/how-we-rank" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">How we rank</Link>
             </li>
             <li>
               <strong className="font-semibold">Salaries and market numbers</strong> name their sources and the date we checked them.
@@ -192,7 +192,7 @@ export default function AboutPage() {
           </ul>
         </section>
 
-        <section aria-labelledby="next-h" className="mt-14 rounded-2xl bg-violet-50 p-6 md:p-8 dark:bg-violet-950/40">
+        <section aria-labelledby="next-h" className="mt-14 rounded-2xl bg-brand-50 p-6 md:p-8 dark:bg-brand-950/40">
           <h2 id="next-h" className="text-2xl font-semibold tracking-tight">
             Start with one lesson
           </h2>

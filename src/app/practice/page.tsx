@@ -55,7 +55,7 @@ export default function PracticePage() {
         {/* The glossary sits below the cards, so the cards are the first thing on the page (owner, 2026-11-06). */}
         <section aria-labelledby="glossary-heading" className="mt-12 rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-start gap-4">
-            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-violet-700 text-white">
+            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-brand-700 text-white">
               <Icon name="book" size={24} />
             </span>
             <div className="min-w-0">
@@ -71,14 +71,14 @@ export default function PracticePage() {
             <ul className="mt-4 flex flex-wrap gap-2" aria-label="Popular terms">
               {starters.map((t) => (
                 <li key={t.id}>
-                  <Link href={`/glossary#${t.id}`} className="inline-flex min-h-11 items-center rounded-full border border-violet-300 bg-white px-3 text-sm font-medium text-violet-900 hover:bg-violet-100 dark:border-violet-800 dark:bg-zinc-900 dark:text-violet-200 dark:hover:bg-violet-950">
+                  <Link href={`/glossary#${t.id}`} className="inline-flex min-h-11 items-center rounded-full border border-brand-300 bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-100 dark:border-brand-800 dark:bg-zinc-900 dark:text-brand-200 dark:hover:bg-brand-950">
                     {t.term}
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-          <Link href="/glossary" className="mt-4 inline-flex min-h-11 items-center gap-1 font-medium text-violet-800 hover:underline dark:text-violet-300">
+          <Link href="/glossary" className="mt-4 inline-flex min-h-11 items-center gap-1 font-medium text-brand-800 hover:underline dark:text-brand-300">
             Open the AI glossary →
           </Link>
         </section>

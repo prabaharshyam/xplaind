@@ -45,13 +45,13 @@ export function AiGate({
     );
   if (access === "signin")
     return (
-      <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950">
+      <div className="rounded-2xl border border-brand-200 bg-brand-50 p-5 dark:border-brand-900 dark:bg-brand-950">
         <p className="flex items-center gap-2 font-semibold">
           <Icon name="lock" size={18} /> Sign in or sign up to use the AI tools
         </p>
         <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">
           The AI tutor, interview feedback, resume review and the other AI tools
-          are part of Pro. Sign up free to try each one a few times.
+          are part of Pro. Create a free account to try each one a few times.
         </p>
         <AuthChoice reason="ai" className="mt-3" />
         <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">

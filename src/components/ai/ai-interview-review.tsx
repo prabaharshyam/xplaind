@@ -45,7 +45,7 @@ export function InterviewReviewPanel({ access, state, answered }: { access: AiAc
   if (access === "off" || answered === 0) return null;
   const { review, busy, error, run } = state;
   return (
-    <section aria-labelledby="ai-review-h" className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 md:p-5 dark:border-violet-900 dark:bg-violet-950/20">
+    <section aria-labelledby="ai-review-h" className="rounded-2xl border border-brand-200 bg-brand-50/60 p-4 md:p-5 dark:border-brand-900 dark:bg-brand-950/20">
       <h3 id="ai-review-h" className="flex items-center gap-2 text-xl font-semibold">
         AI analysis of your answers
       </h3>
@@ -58,7 +58,7 @@ export function InterviewReviewPanel({ access, state, answered }: { access: AiAc
               [
                 ["What you do well", review.strengths, "text-emerald-800 dark:text-emerald-300"],
                 ["Concepts to work on", review.gaps, "text-rose-800 dark:text-rose-300"],
-                ["Do this next", review.next_steps, "text-violet-800 dark:text-violet-300"],
+                ["Do this next", review.next_steps, "text-brand-800 dark:text-brand-300"],
               ] as const
             ).map(([title, items, tone]) =>
               items.length ? (
@@ -86,7 +86,7 @@ export function InterviewReviewPanel({ access, state, answered }: { access: AiAc
             type="button"
             onClick={run}
             disabled={busy}
-            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-violet-700 px-4 font-medium text-white hover:bg-violet-800 disabled:opacity-60"
+            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-brand-700 px-4 font-medium text-white hover:bg-brand-800 disabled:opacity-60"
           >
             {busy ? "Analysing your answers…" : `Analyse all ${answered} answers with AI`}
           </button>
@@ -110,7 +110,7 @@ function ReadinessCard({ r }: { r: Readiness }) {
     <div className="rounded-2xl bg-white p-4 dark:bg-zinc-900">
       <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Interview readiness for this role</p>
       <p className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-4xl font-semibold tracking-tight tabular-nums">{r.score}%</span>
+        <span className="text-4xl font-semibold tracking-tight text-brass-700 tabular-nums dark:text-brass-300">{r.score}%</span>
         <span className="font-medium">{readinessLabel(r.score)}</span>
         {r.change !== null && r.change !== 0 && (
           <span className={`text-sm font-medium tabular-nums ${r.change > 0 ? "text-emerald-800 dark:text-emerald-300" : "text-rose-800 dark:text-rose-300"}`}>
@@ -121,7 +121,7 @@ function ReadinessCard({ r }: { r: Readiness }) {
       </p>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
         The average of your last {Math.min(3, r.sessions)} reviewed {Math.min(3, r.sessions) === 1 ? "interview" : "interviews"} for this role. See every role on your{" "}
-        <Link href="/dashboard" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+        <Link href="/dashboard" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
           dashboard
         </Link>
         .
@@ -134,14 +134,14 @@ function ReadinessCard({ r }: { r: Readiness }) {
 export function AnswerReviewBlock({ r, locked = false }: { r: AnswerReview; locked?: boolean }) {
   if (locked)
     return (
-      <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900 dark:bg-violet-950/20">
+      <div className="mt-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-4 dark:border-brand-900 dark:bg-brand-950/20">
         <p className="font-semibold">
           AI: {r.score} / 5 · {UNDERSTANDING_LABEL[r.understanding]}
         </p>
         <p className="mt-1">{r.verdict}</p>
         <p className="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
           See what you got right, what was wrong, what you missed and a stronger answer to practise with{" "}
-          <Link href="/pricing" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <Link href="/pricing" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
             Pro
           </Link>
           .
@@ -149,7 +149,7 @@ export function AnswerReviewBlock({ r, locked = false }: { r: AnswerReview; lock
       </div>
     );
   return (
-    <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900 dark:bg-violet-950/20">
+    <div className="mt-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-4 dark:border-brand-900 dark:bg-brand-950/20">
       <p className="flex flex-wrap items-center gap-2 font-semibold">
         AI: {r.score} / 5 · {UNDERSTANDING_LABEL[r.understanding]}
       </p>

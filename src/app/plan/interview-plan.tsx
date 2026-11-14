@@ -60,7 +60,7 @@ export function InterviewPlan({ today, pathId, pathName, lessons, hours, state }
           <ol className="mt-4 space-y-3">
             {plan.weeks.map((w, i) => (
               <li key={w.start} className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
-                <p className="text-sm font-medium text-violet-800 dark:text-violet-300">
+                <p className="text-sm font-medium text-brand-800 dark:text-brand-300">
                   Week {i + 1} · {fmt(w.start)} to {fmt(w.end)}
                 </p>
                 {w.lessonIds.length > 0 && (
@@ -77,11 +77,11 @@ export function InterviewPlan({ today, pathId, pathName, lessons, hours, state }
                 {w.practice && (
                   <p className="mt-2 text-sm leading-6">
                     {w.lessonIds.length ? "Also: " : ""}
-                    <Link href={`/interview/simulator?path=${pathId}`} className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                    <Link href={`/interview/simulator?path=${pathId}`} className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
                       mock interviews
                     </Link>{" "}
                     and{" "}
-                    <Link href="/interview" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                    <Link href="/interview" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
                       interview questions for your role
                     </Link>
                     .

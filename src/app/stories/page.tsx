@@ -12,7 +12,7 @@ export const metadata: Metadata = pageMeta({
   path: "/stories",
 });
 
-const A = "font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300";
+const A = "font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300";
 const day = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
 
 /** OS-1 and SO-1: learners' outcomes and words, only real ones, shared with their permission. */
@@ -71,7 +71,7 @@ export default function StoriesPage() {
           </section>
         )}
 
-        <section aria-labelledby="share-h" className="mt-14 rounded-3xl bg-violet-50 p-6 md:p-8 dark:bg-violet-950/30">
+        <section aria-labelledby="share-h" className="mt-14 rounded-3xl bg-brand-50 p-6 md:p-8 dark:bg-brand-950/30">
           <h2 id="share-h" className="text-xl font-semibold">
             Did Xplaind help you?
           </h2>

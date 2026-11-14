@@ -14,7 +14,7 @@ export const metadata: Metadata = pageMeta({
 
 const UPDATED = "13 November 2026";
 
-const A = "font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300";
+const A = "font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300";
 
 const TERMS: { title: string; body: ReactNode }[] = [
   {
@@ -103,7 +103,7 @@ export default function TermsPage() {
         <ol className="mt-8 flex flex-col gap-8">
           {TERMS.map((t, i) => (
             <li key={t.title} className="grid grid-cols-[2.5rem_1fr] gap-3">
-              <span aria-hidden="true" className="grid size-10 place-items-center rounded-full bg-violet-50 font-semibold text-violet-800 dark:bg-violet-950 dark:text-violet-300">
+              <span aria-hidden="true" className="grid size-10 place-items-center rounded-full bg-brand-50 font-semibold text-brand-800 dark:bg-brand-950 dark:text-brand-300">
                 {i + 1}
               </span>
               <div>

@@ -77,7 +77,7 @@ export function BatchEnquiryForm({ email }: { email: string }) {
         <textarea value={form.message} onChange={set("message")} rows={3} maxLength={1000} placeholder="For example: final-year CSE students, placement season starts in January" className={`${field} font-normal`} />
       </label>
       <label className="flex items-start gap-3 text-sm leading-6">
-        <input type="checkbox" checked={form.consent} onChange={set("consent")} className="mt-1 size-5 shrink-0 accent-violet-700" />
+        <input type="checkbox" checked={form.consent} onChange={set("consent")} className="mt-1 size-5 shrink-0 accent-brand-700" />
         {ENQUIRY_CONSENT}
       </label>
       {error && (
