@@ -29,7 +29,7 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
     });
 
   const arrow =
-    "grid size-11 place-items-center rounded-full border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
+    "grid size-11 place-items-center rounded-full border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   return (
     <div className="mt-8">
@@ -66,7 +66,7 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
                     type="button"
                     aria-expanded={full}
                     onClick={() => toggle(t.name)}
-                    className="mt-2 min-h-11 text-sm font-medium text-violet-800 underline underline-offset-4 dark:text-violet-300"
+                    className="mt-2 min-h-11 text-sm font-medium text-brand-800 underline underline-offset-4 dark:text-brand-300"
                   >
                     {full ? "Show less" : "Read more"}
                     <span className="sr-only"> from {t.name}</span>

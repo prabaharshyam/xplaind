@@ -114,8 +114,8 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
   return (
     <div className="flex flex-col gap-8">
       {decks.length > 0 && (
-        <section aria-labelledby="due-h" className="flex flex-col items-start gap-3 rounded-2xl bg-violet-50 p-5 sm:flex-row sm:items-center sm:gap-4 dark:bg-violet-950/40">
-          <span className="hidden size-12 shrink-0 place-items-center rounded-2xl bg-violet-700 text-white sm:grid" aria-hidden="true">
+        <section aria-labelledby="due-h" className="flex flex-col items-start gap-3 rounded-2xl bg-brand-50 p-5 sm:flex-row sm:items-center sm:gap-4 dark:bg-brand-950/40">
+          <span className="hidden size-12 shrink-0 place-items-center rounded-2xl bg-brand-700 text-white sm:grid" aria-hidden="true">
             <Icon name="target" size={24} />
           </span>
           <div className="min-w-0 flex-1">
@@ -298,8 +298,8 @@ function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: 
               ["cards", "Flashcards", "Cards to flip and learn, brought back when they are due"],
             ] as const
           ).map(([m, label, note]) => (
-            <label key={m} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 ${mode === m ? "border-violet-600 bg-violet-50 dark:bg-violet-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
-              <input type="radio" name="mode" value={m} checked={mode === m} onChange={() => setMode(m)} className="mt-0.5 size-5 accent-violet-700" />
+            <label key={m} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 ${mode === m ? "border-brand-600 bg-brand-50 dark:bg-brand-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
+              <input type="radio" name="mode" value={m} checked={mode === m} onChange={() => setMode(m)} className="mt-0.5 size-5 accent-brand-700" />
               <span>
                 <span className="block font-medium">{label}</span>
                 <span className="block text-sm text-zinc-600 dark:text-zinc-400">{note}</span>
@@ -781,7 +781,7 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
               Card {i + 1} of {order.length}
             </span>
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden="true">
-              <span className="block h-full rounded-full bg-violet-700 transition-[width] duration-300" style={{ width: `${Math.round((i / order.length) * 100)}%` }} />
+              <span className="block h-full rounded-full bg-brand-700 transition-[width] duration-300" style={{ width: `${Math.round((i / order.length) * 100)}%` }} />
             </span>
           </div>
           <div className="relative pb-3">

@@ -80,7 +80,7 @@ export function ProjectGuide({ id, steps, rubric }: { id: string; steps: Step[];
                       </details>
                     )}
                     <label className="mt-3 flex min-h-11 w-fit cursor-pointer items-center gap-2 font-medium">
-                      <input type="checkbox" className="size-5 accent-violet-700" checked={done} onChange={() => save({ steps: toggle(record?.steps, i) })} />
+                      <input type="checkbox" className="size-5 accent-brand-700" checked={done} onChange={() => save({ steps: toggle(record?.steps, i) })} />
                       I have done this step
                     </label>
                   </div>
@@ -111,7 +111,7 @@ export function ProjectGuide({ id, steps, rubric }: { id: string; steps: Step[];
                 </p>
               </div>
               <label className="mt-2 flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm font-medium">
-                <input type="checkbox" className="size-5 accent-violet-700" checked={met.has(i)} onChange={() => save({ rubric: toggle(record?.rubric, i) })} />
+                <input type="checkbox" className="size-5 accent-brand-700" checked={met.has(i)} onChange={() => save({ rubric: toggle(record?.rubric, i) })} />
                 My project meets this
               </label>
             </li>

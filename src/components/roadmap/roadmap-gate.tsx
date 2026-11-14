@@ -26,7 +26,7 @@ export function RoadmapGate({
   return (
     <section
       aria-labelledby="roadmap-gate-h"
-      className="rounded-2xl border border-violet-200 bg-violet-50 p-5 md:p-6 dark:border-violet-900 dark:bg-violet-950"
+      className="rounded-2xl border border-brand-200 bg-brand-50 p-5 md:p-6 dark:border-brand-900 dark:bg-brand-950"
     >
       <h2
         id="roadmap-gate-h"
@@ -45,7 +45,7 @@ export function RoadmapGate({
         still open:{" "}
         <Link
           href="/topics"
-          className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300"
+          className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300"
         >
           browse lessons by topic
         </Link>

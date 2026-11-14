@@ -9,7 +9,7 @@ export default function Image() {
     eyebrow: "AI career roadmaps",
     title: "Learn AI for the job you want. One clear roadmap per role.",
     footer: "Plain-English lessons, video lessons, projects and interview practice",
-    from: "#7c3aed",
+    from: "#0e4a50",
     to: "#14b8a6",
   });
 }

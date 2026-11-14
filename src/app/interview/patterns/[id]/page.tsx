@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: PageProps<"/interview/pattern
 const card = "rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.03] md:p-6 dark:border-zinc-800 dark:bg-zinc-900";
 
 function List({ title, items, tone }: { title: string; items: string[]; tone: "violet" | "emerald" | "rose" }) {
-  const dot = { violet: "bg-violet-500", emerald: "bg-emerald-500", rose: "bg-rose-500" }[tone];
+  const dot = { violet: "bg-brand-500", emerald: "bg-emerald-500", rose: "bg-rose-500" }[tone];
   return (
     <section className={card} aria-label={title}>
       <h2 className="text-lg font-semibold">{title}</h2>
@@ -52,8 +52,8 @@ export default async function PatternPage({ params }: PageProps<"/interview/patt
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:px-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex min-w-0 flex-col gap-6">
           {p.reviewed_by === "UNREVIEWED" && <DraftNote />}
-          <section className="rounded-2xl border border-violet-200 bg-violet-50/60 p-5 md:p-6 dark:border-violet-900 dark:bg-violet-950/30" aria-labelledby="say-h">
-            <h2 id="say-h" className="text-sm font-semibold text-violet-900 dark:text-violet-200">
+          <section className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 md:p-6 dark:border-brand-900 dark:bg-brand-950/30" aria-labelledby="say-h">
+            <h2 id="say-h" className="text-sm font-semibold text-brand-900 dark:text-brand-200">
               Say it in the interview
             </h2>
             <p className="mt-2 text-lg leading-8">{p.say_it}</p>

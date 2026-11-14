@@ -41,7 +41,7 @@ export function CourseThumb({
           className="object-cover"
         />
         <span className="absolute inset-0 grid place-items-center">
-          <span className={`grid place-items-center rounded-full bg-violet-700/95 text-white ${size ==="sm" ? "size-8" : "size-11"}`}>
+          <span className={`grid place-items-center rounded-full bg-brand-700/95 text-white ${size ==="sm" ? "size-8" : "size-11"}`}>
             <Icon name="play" size={size === "sm" ? 12 : 18} />
           </span>
         </span>

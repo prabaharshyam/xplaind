@@ -40,7 +40,7 @@ export function TutorChat({ enabled, paths, titles }: { enabled: boolean; paths:
           <AiChat
             endpoint="/api/ai/tutor"
             extra={{ context, language }}
-            greeting="Hi! I'm your AI tutor. Ask me to explain any AI topic, plan your week, or help with your next step into an AI job."
+            greeting="I'm your AI tutor. Ask me to explain any AI topic, plan your week, or work out your next step into an AI role."
             starters={["Explain RAG like I am new to it", "Explain embeddings in Hindi", "What should I learn this week?", "I have 5 hours a week. Make me a plan.", "How do I get my first AI job in India?"]}
             placeholder="Ask your AI tutor"
           />

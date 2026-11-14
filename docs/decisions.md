@@ -544,3 +544,10 @@ The owner asked for research on what would make learners happy and convince them
 - **CB-1:** no batch price is shown. The owner has not set one, and a public number would tie our hands on discounts by batch size, so the page quotes on enquiry. Batches are delivered by turning on Pro for each learner's own account, not with shared codes, because promo codes today only work on the 30-day pass through Razorpay. Learners stay 18+ (PV-2).
 - **OS-1:** outcomes use the testimonials file with a date the learner confirmed, rather than a new system, so the owner adds one in the same place as a quote. There are none yet, and the page says so rather than showing invented ones.
 - **OP-1:** the pricing page now leads with outcomes and keeps every price, saving and policy line it had (PAY-5, PAY-7, PAY-8, BIZ-1).
+
+## 2026-11-14: rebrand to Deep Teal and Brass (BR-10)
+
+- The owner found the violet look not premium. Research (the Zhou et al. study on saturation and status, plus Indian colour associations) and six directions shown on the real site led to Deep Teal and Brass. Violet is BYJU'S colour in Indian ed-tech and the most common AI-product gradient. Deep teal is unclaimed, low in saturation and carries no religious or political meaning in India.
+- The Tailwind `violet-*` classes became a `brand-*` scale defined once in globals.css, so a future colour change is one block.
+- Brass is kept for achievements so it keeps its meaning. Topic hues stay (they help people tell topics apart) but are muted. Lesson headers drop the per-topic colours for one teal gradient.
+- The logo PNGs were recoloured in place: same files, teal "AI". Blog and guide cover illustrations still carry their own colours and can be redrawn later.

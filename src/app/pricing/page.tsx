@@ -91,7 +91,7 @@ export default function PricingPage() {
         <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {["One payment, no auto-renewal", "Full refund within 7 days", "UPI, cards and net banking", "Price includes GST"].map((t) => (
             <li key={t} className="flex items-center gap-2">
-              <Icon name="tick" size={16} className="shrink-0 text-violet-700 dark:text-violet-300" />
+              <Icon name="tick" size={16} className="shrink-0 text-brand-700 dark:text-brand-300" />
               {t}
             </li>
           ))}
@@ -116,12 +116,12 @@ export default function PricingPage() {
             return (
               <li
                 key={id}
-                className={`flex flex-col rounded-3xl p-6 md:p-7 ${best ? "order-first bg-violet-50 ring-2 ring-violet-700 md:order-none dark:bg-violet-950/50 dark:ring-violet-400" : "bg-zinc-50 dark:bg-zinc-900"}`}
+                className={`flex flex-col rounded-3xl p-6 md:p-7 ${best ? "order-first bg-brand-50 ring-2 ring-brand-700 md:order-none dark:bg-brand-950/50 dark:ring-brand-400" : "bg-zinc-50 dark:bg-zinc-900"}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-lg font-semibold">{p.name}</h3>
                   {best ? (
-                    <span className="text-sm font-medium text-violet-800 dark:text-violet-300">Recommended</span>
+                    <span className="text-sm font-medium text-brand-800 dark:text-brand-300">Recommended</span>
                   ) : save ? (
                     <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
                       Best value
@@ -220,7 +220,7 @@ export default function PricingPage() {
             },
           ].map((v) => (
             <li key={v.t}>
-              <p className="text-3xl font-semibold tracking-tight text-violet-800 dark:text-violet-300">{v.n}</p>
+              <p className="text-3xl font-semibold tracking-tight text-brand-800 dark:text-brand-300">{v.n}</p>
               <h3 className="mt-2 text-xl font-semibold">{v.t}</h3>
               <p className="mt-2 max-w-md leading-7 text-zinc-800 dark:text-zinc-200">{v.d}</p>
             </li>
@@ -252,7 +252,7 @@ export default function PricingPage() {
               </li>
             ))}
           </ul>
-          <Link href="/stories" className="mt-5 inline-flex min-h-11 items-center font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <Link href="/stories" className="mt-5 inline-flex min-h-11 items-center font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
             Read learner stories
           </Link>
         </section>
@@ -263,7 +263,7 @@ export default function PricingPage() {
         <h2 id="compare-h" className="text-3xl font-semibold tracking-tight md:text-4xl">
           Free account or Pro
         </h2>
-        <div role="region" aria-label="Free account and Pro compared" tabIndex={0} className="mt-8 overflow-x-auto rounded-3xl bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:bg-zinc-900">
+        <div role="region" aria-label="Free account and Pro compared" tabIndex={0} className="mt-8 overflow-x-auto rounded-3xl bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-zinc-900">
           <table className="w-full min-w-[30rem] text-left">
             <caption className="sr-only">AI helper uses: free trial in total, Pro per day</caption>
             <thead>
@@ -274,7 +274,7 @@ export default function PricingPage() {
                 <th scope="col" className="p-4 font-semibold md:px-6">
                   Free account
                 </th>
-                <th scope="col" className="p-4 font-semibold text-violet-800 md:px-6 dark:text-violet-300">
+                <th scope="col" className="p-4 font-semibold text-brand-800 md:px-6 dark:text-brand-300">
                   Pro
                 </th>
               </tr>
@@ -319,7 +319,7 @@ export default function PricingPage() {
       </section>
 
       {/* Risk reversal. */}
-      <section aria-labelledby="refund-h" className="mt-20 bg-violet-700 text-white md:mt-28">
+      <section aria-labelledby="refund-h" className="mt-20 bg-brand-700 text-white md:mt-28">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-14 md:grid-cols-[1.4fr_1fr] md:items-center md:px-6 md:py-16">
           <div>
             <h2 id="refund-h" className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
@@ -331,7 +331,7 @@ export default function PricingPage() {
             </p>
           </div>
           <div className="flex flex-col items-start gap-3 md:items-end">
-            <a href="#plans-h" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 py-3 font-semibold text-violet-900 transition hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.97]">
+            <a href="#plans-h" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 py-3 font-semibold text-brand-900 transition hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.97]">
               Choose your pass
             </a>
             <Link href="/refunds" className="text-sm font-medium underline underline-offset-4">
@@ -349,9 +349,9 @@ export default function PricingPage() {
         <div className="mt-8 flex flex-col gap-3">
           {FAQ.map((f) => (
             <details key={f.q} className="group rounded-2xl bg-zinc-50 dark:bg-zinc-900">
-              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-5 py-4 text-lg font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-5 py-4 text-lg font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 [&::-webkit-details-marker]:hidden">
                 {f.q}
-                <span aria-hidden="true" className="shrink-0 text-2xl leading-none text-violet-700 transition-transform group-open:rotate-45 dark:text-violet-300">
+                <span aria-hidden="true" className="shrink-0 text-2xl leading-none text-brand-700 transition-transform group-open:rotate-45 dark:text-brand-300">
                   +
                 </span>
               </summary>
@@ -360,7 +360,7 @@ export default function PricingPage() {
                 {f.q.startsWith("Can I get a refund") && (
                   <>
                     {" "}
-                    <Link href="/refunds" className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                    <Link href="/refunds" className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
                       Read the refund policy
                     </Link>
                     .
@@ -384,11 +384,11 @@ export default function PricingPage() {
           Lessons, roadmaps, videos, practice and project guides need no pass. All prices are in Indian rupees and include GST. A pass is a
           digital service that starts on your account as soon as the payment is confirmed; nothing is shipped, and nothing renews by itself.
           Sold by {BUSINESS.legalName} (GSTIN {BUSINESS.gstin}). Questions:{" "}
-          <Link href="/contact" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <Link href="/contact" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
             contact us
           </Link>
           . Refunds:{" "}
-          <Link href="/refunds" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <Link href="/refunds" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
             refund and cancellation policy
           </Link>
           .

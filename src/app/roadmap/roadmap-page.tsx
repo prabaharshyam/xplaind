@@ -43,10 +43,10 @@ export function RoadmapPage({ path }: { path: Goal }) {
         </div>
         {/* JB-3: what the role pays and live openings, one tap away. */}
         <p className="mt-3 flex flex-wrap gap-x-5 text-sm">
-          <Link href={`/jobs#${path.id}`} className="inline-flex min-h-11 items-center gap-1 font-medium text-violet-800 underline-offset-4 hover:underline dark:text-violet-300">
+          <Link href={`/jobs#${path.id}`} className="inline-flex min-h-11 items-center gap-1 font-medium text-brand-800 underline-offset-4 hover:underline dark:text-brand-300">
             Salaries and live jobs for this role →
           </Link>
-          <Link href="/plan" className="inline-flex min-h-11 items-center gap-1 font-medium text-violet-800 underline-offset-4 hover:underline dark:text-violet-300">
+          <Link href="/plan" className="inline-flex min-h-11 items-center gap-1 font-medium text-brand-800 underline-offset-4 hover:underline dark:text-brand-300">
             Plan my week →
           </Link>
         </p>
@@ -77,14 +77,14 @@ function InterviewTracks() {
       <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">Coding interviews for this role usually include a DSA round and a system design round, and the job expects solid engineering habits. Add these tracks alongside your roadmap.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tracks.map((t) => (
-          <Link key={t.theme} href={`/topics/${t.theme}`} className="flex items-start gap-3 rounded-2xl bg-white p-4 ring-1 ring-zinc-200 hover:ring-violet-400 dark:bg-zinc-900 dark:ring-zinc-800">
+          <Link key={t.theme} href={`/topics/${t.theme}`} className="flex items-start gap-3 rounded-2xl bg-white p-4 ring-1 ring-zinc-200 hover:ring-brand-400 dark:bg-zinc-900 dark:ring-zinc-800">
             <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               <Icon name={t.icon} size={22} />
             </span>
             <span>
               <span className="block font-semibold">{t.title}</span>
               <span className="mt-0.5 block text-sm text-zinc-700 dark:text-zinc-300">{t.lead}</span>
-              <span className="mt-1 block text-xs font-medium text-violet-800 dark:text-violet-300">{count(t.theme)} lessons with video lessons</span>
+              <span className="mt-1 block text-xs font-medium text-brand-800 dark:text-brand-300">{count(t.theme)} lessons with video lessons</span>
             </span>
           </Link>
         ))}

@@ -20,7 +20,7 @@ export function RoleGrid({ roles }: { roles: RoleCard[] }) {
         <li key={r.id}>
           <Link
             href={`/roadmap/${r.id}`}
-            className="group flex h-full flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 transition-colors hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"
+            className="group flex h-full flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 transition-colors hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"
           >
             <span aria-hidden="true" className="grid size-10 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               <Icon name={THEMES.find((t) => t.id === r.theme)?.icon ?? "book"} size={18} />
@@ -48,7 +48,7 @@ export function TopicChips({ counts }: { counts: Record<string, number> }) {
         <li key={t.id} className="">
           <Link
             href={`/topics/${t.id}`}
-            className="flex min-h-11 items-center gap-2 rounded-full bg-white py-2 pr-4 pl-2 text-sm text-zinc-900 ring-1 ring-zinc-200 hover:ring-zinc-400 focus-visible:outline-2 focus-visible:outline-violet-700 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-violet-900"
+            className="flex min-h-11 items-center gap-2 rounded-full bg-white py-2 pr-4 pl-2 text-sm text-zinc-900 ring-1 ring-zinc-200 hover:ring-zinc-400 focus-visible:outline-2 focus-visible:outline-brand-700 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-brand-900"
           >
             <span aria-hidden="true" className="mx-1 size-2 shrink-0 rounded-full" style={{ background: t.from }} />
             {t.label}

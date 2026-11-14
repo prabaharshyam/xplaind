@@ -58,7 +58,7 @@ export function SearchBox({
   return (
     <div className="relative w-full">
       <div
-        className={`flex items-center gap-3 rounded-2xl border border-zinc-300 bg-white text-zinc-900 shadow-sm focus-within:border-violet-600 focus-within:ring-2 focus-within:ring-violet-600/30 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 ${big ? "h-14 px-5" : "h-12 px-4"}`}
+        className={`flex items-center gap-3 rounded-2xl border border-zinc-300 bg-white text-zinc-900 shadow-sm focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600/30 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 ${big ? "h-14 px-5" : "h-12 px-4"}`}
       >
         <Icon name="search" size={big ? 22 : 18} className="shrink-0 text-zinc-600 dark:text-zinc-400" />
         <input

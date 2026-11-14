@@ -65,7 +65,7 @@ export function weeklyEmail(i: WeeklyEmailInput): { subject: string; text: strin
 <div style="max-width:560px;margin:0 auto;padding:24px">
 <p style="font-size:13px;color:#52525b;margin:0 0 8px">Week ${i.week} of 13</p>
 <p style="font-size:16px;line-height:24px;margin:0 0 16px">${esc(lead)}</p>
-${links.length ? `<p style="font-size:16px;font-weight:bold;margin:0 0 8px">Next up</p><ul style="padding-left:20px;margin:0 0 16px">${links.map((l) => `<li style="margin:0 0 6px;font-size:16px;line-height:24px"><a href="${esc(l.url)}" style="color:#6d28d9">${esc(l.title)}</a></li>`).join("")}</ul>` : `<p style="font-size:16px">You have done every lesson on this path.</p>`}
+${links.length ? `<p style="font-size:16px;font-weight:bold;margin:0 0 8px">Next up</p><ul style="padding-left:20px;margin:0 0 16px">${links.map((l) => `<li style="margin:0 0 6px;font-size:16px;line-height:24px"><a href="${esc(l.url)}" style="color:#0e4a50">${esc(l.title)}</a></li>`).join("")}</ul>` : `<p style="font-size:16px">You have done every lesson on this path.</p>`}
 <p style="font-size:16px;line-height:24px;margin:0 0 24px">${esc(close)}</p>
 <p style="font-size:13px;color:#52525b;margin:0">Xplaind · <a href="${esc(i.unsubscribeUrl)}" style="color:#52525b">Stop these emails</a></p>
 </div></body></html>`;

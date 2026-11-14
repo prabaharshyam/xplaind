@@ -85,7 +85,7 @@ export function AiChat({
       {!busy && followUps.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2" aria-label="Suggested questions">
           {followUps.map((f) => (
-            <button key={f} type="button" onClick={() => void send(f)} className="rounded-full border border-violet-300 bg-white px-3 py-1.5 text-left text-sm hover:bg-violet-50 dark:border-violet-800 dark:bg-zinc-900 dark:hover:bg-violet-950">
+            <button key={f} type="button" onClick={() => void send(f)} className="rounded-full border border-brand-300 bg-white px-3 py-1.5 text-left text-sm hover:bg-brand-50 dark:border-brand-800 dark:bg-zinc-900 dark:hover:bg-brand-950">
               {f}
             </button>
           ))}
@@ -112,10 +112,10 @@ export function AiChat({
             rows={2}
             maxLength={1500}
             placeholder={placeholder}
-            className="w-full resize-none rounded-2xl border border-zinc-300 bg-white px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+            className="w-full resize-none rounded-2xl border border-zinc-300 bg-white px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
           />
         </label>
-        <button type="submit" disabled={busy || !draft.trim()} className="min-h-12 self-end rounded-2xl bg-violet-700 px-4 font-medium text-white hover:bg-violet-800 disabled:opacity-50">
+        <button type="submit" disabled={busy || !draft.trim()} className="min-h-12 self-end rounded-2xl bg-brand-700 px-4 font-medium text-white hover:bg-brand-800 disabled:opacity-50">
           Send
         </button>
       </form>
@@ -140,7 +140,7 @@ function Bubble({ role, text, lessons }: Turn) {
           <ul className="mt-3 space-y-1 border-t border-zinc-300 pt-2 text-sm dark:border-zinc-700">
             {lessons.map((l) => (
               <li key={l.id}>
-                <Link href={`/stop/${l.id}`} className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                <Link href={`/stop/${l.id}`} className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
                   Lesson: {l.title}
                 </Link>
               </li>

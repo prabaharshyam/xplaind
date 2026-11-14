@@ -46,7 +46,7 @@ export function VideoTabs({ tabs }: { tabs: Tab[] }) {
                 if (e.key === "ArrowLeft") move(i, -1);
               }}
               className={`-mb-px min-h-11 border-b-2 px-3 text-sm font-medium ${
-                on ? "border-violet-700 text-zinc-900 dark:border-violet-400 dark:text-white" : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
+                on ? "border-brand-700 text-zinc-900 dark:border-brand-400 dark:text-white" : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
               }`}
             >
               {t.label} <span className="text-zinc-600 dark:text-zinc-400">{t.count}</span>

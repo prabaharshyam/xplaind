@@ -55,9 +55,9 @@ import { RoadmapGate, useRoadmapLocked } from "./roadmap-gate";
 /** MO-5: pastel milestones on the spine, one colour per stage, dark text for contrast. */
 const SECTION_COLOURS = [
   {
-    chip: "bg-violet-200 text-violet-950 ring-1 ring-violet-400",
-    node: "bg-violet-100 ring-violet-400 dark:bg-violet-950 dark:ring-violet-700",
-    badge: "bg-violet-700",
+    chip: "bg-brand-200 text-brand-950 ring-1 ring-brand-400",
+    node: "bg-brand-100 ring-brand-400 dark:bg-brand-950 dark:ring-brand-700",
+    badge: "bg-brand-700",
   },
   {
     chip: "bg-sky-200 text-sky-950 ring-1 ring-sky-400",
@@ -295,7 +295,7 @@ export function RoadmapView({
                   <li key={s.id}>
                     <a
                       href={`#${sectionAnchor(s.id)}`}
-                      className={`flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 ${SECTION_COLOURS[i % SECTION_COLOURS.length].chip}`}
+                      className={`flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 ${SECTION_COLOURS[i % SECTION_COLOURS.length].chip}`}
                     >
                       {s.code}
                       <span className="sr-only"> {s.title}</span>
@@ -307,7 +307,7 @@ export function RoadmapView({
             <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
-                className="size-5 accent-violet-700"
+                className="size-5 accent-brand-700"
                 checked={hideFinished}
                 onChange={(e) => setHideFinished(e.target.checked)}
               />
@@ -318,7 +318,7 @@ export function RoadmapView({
           <ol className="relative flex flex-col gap-12">
             <span
               aria-hidden="true"
-              className="absolute top-2 bottom-2 left-4 w-0 -translate-x-1/2 border-l-2 border-dashed border-violet-300 md:left-1/2 dark:border-violet-800"
+              className="absolute top-2 bottom-2 left-4 w-0 -translate-x-1/2 border-l-2 border-dashed border-brand-300 md:left-1/2 dark:border-brand-800"
             />
             {model.sections.map((s, i) => (
               <Section
@@ -565,7 +565,7 @@ function Section({
               {/* dotted branch from the cluster to the milestone */}
               <span
                 aria-hidden="true"
-                className={`absolute top-1/2 hidden w-10 border-t-2 border-dotted border-violet-300 md:block dark:border-violet-800 ${ci === 0 ? "right-0" : "left-0"}`}
+                className={`absolute top-1/2 hidden w-10 border-t-2 border-dotted border-brand-300 md:block dark:border-brand-800 ${ci === 0 ? "right-0" : "left-0"}`}
               />
               <ul className="grid grid-cols-1 gap-2 rounded-2xl border border-zinc-200 bg-white p-2 sm:grid-cols-2 md:grid-cols-1 dark:border-zinc-800 dark:bg-white/[0.03]">
                 {c.map(tile)}
@@ -648,7 +648,7 @@ function TopicCard({
           aria-label={`${marking ? "Close" : "Mark"} ${topic.title}`}
           title={`${style.label}${topic.hours !== null ? ` · about ${topic.hours} h` : ""}${below ? " · below your level" : ""}`}
           onClick={() => setMarking((m) => !m)}
-          className="grid size-9 shrink-0 place-items-center rounded-full hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-violet-700 dark:hover:bg-white/10"
+          className="grid size-9 shrink-0 place-items-center rounded-full hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-brand-700 dark:hover:bg-white/10"
         >
           {marking ? (
             <Icon name="close" size={14} />

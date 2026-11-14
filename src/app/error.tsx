@@ -29,7 +29,7 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
 
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-start justify-center gap-4 px-4 py-16">
-      <p className="text-sm font-semibold text-violet-800 dark:text-violet-300">Something went wrong</p>
+      <p className="text-sm font-semibold text-brand-800 dark:text-brand-300">Something went wrong</p>
       <h1 className="text-3xl font-semibold tracking-tight text-balance">This page did not load properly</h1>
       <p className="leading-7 text-zinc-700 dark:text-zinc-300">
         It is usually a weak connection or a short hiccup on our side. Your progress is safe. Try again, and if it keeps happening, go back

@@ -26,11 +26,11 @@ async function Certificate({ params }: { params: PageProps<"/certificate/[id]">[
   const date = issued.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
   return (
     <>
-      <article className="rounded-3xl border border-zinc-200 bg-white p-8 text-center shadow-sm md:p-14 dark:border-zinc-800 dark:bg-zinc-900 print:border-zinc-400 print:shadow-none">
+      <article className="rounded-3xl border-2 border-brass-300 bg-white p-8 text-center md:p-14 dark:border-brass-400/60 dark:bg-zinc-900 print:border-zinc-400">
         <div className="flex justify-center">
           <BrandLogo height={32} />
         </div>
-        <p className="mt-8 font-mono text-sm text-zinc-500 dark:text-zinc-400">Certificate of completion</p>
+        <p className="mt-8 text-sm font-medium text-brass-700 dark:text-brass-300">Certificate of completion</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight md:text-5xl">{c.name_on_certificate}</h1>
         <p className="mt-4 text-lg leading-8 text-zinc-700 dark:text-zinc-300">completed the</p>
         <p className="mt-1 font-display text-2xl font-semibold md:text-3xl">{title}</p>

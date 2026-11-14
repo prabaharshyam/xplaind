@@ -44,9 +44,9 @@ export function PracticeView({
                 <Link
                   href={t.id ? `/practice/${t.id}` : "/practice"}
                   aria-current={active ? "page" : undefined}
-                  className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 ${
+                  className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 ${
                     active
-                      ? "border-violet-700 bg-violet-700 text-white"
+                      ? "border-brand-700 bg-brand-700 text-white"
                       : "border-zinc-300 hover:border-zinc-500 dark:border-zinc-700"
                   }`}
                 >
@@ -122,7 +122,7 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
                   Card {index + 1} of {queue.length}
                 </span>
                 <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden="true">
-                  <span className="block h-full rounded-full bg-violet-700 transition-[width] duration-300" style={{ width: `${done}%` }} />
+                  <span className="block h-full rounded-full bg-brand-700 transition-[width] duration-300" style={{ width: `${done}%` }} />
                 </span>
               </div>
               {/* A deck: the card on top, with two cards peeking out behind it. */}

@@ -95,7 +95,7 @@ export function CommitCard({ paths, defaultPath }: { paths: { id: string; name: 
               ))}
             </select>
             <label htmlFor={ids.consent} className="flex items-start gap-3 text-sm leading-6">
-              <input id={ids.consent} type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 size-5 shrink-0 accent-violet-700" />
+              <input id={ids.consent} type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 size-5 shrink-0 accent-brand-700" />
               {COMMIT_CONSENT}
             </label>
             <button type="button" className={`${primaryButton} self-start`} disabled={!consent || busy} onClick={() => void call("POST")}>

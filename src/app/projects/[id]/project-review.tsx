@@ -13,7 +13,7 @@ const LEVEL = {
 } as const;
 
 const field =
-  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700";
+  "min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
 
 /**
  * PR-1: "Get your project reviewed". The learner gives a public GitHub link (optional) and what they
@@ -79,7 +79,7 @@ export function ProjectReviewPanel({ projectId, enabled }: { projectId: string; 
                 </ul>
               </div>
             )}
-            <button type="button" className="self-start text-sm font-medium text-violet-800 underline underline-offset-4 dark:text-violet-300" onClick={() => setResult(null)}>
+            <button type="button" className="self-start text-sm font-medium text-brand-800 underline underline-offset-4 dark:text-brand-300" onClick={() => setResult(null)}>
               Review an updated version
             </button>
           </div>

@@ -67,7 +67,7 @@ export function ResumeStudio({ enabled, roles }: { enabled: boolean; roles: stri
         <AiWorking steps={["Reading your resume", "Checking it like a recruiter", "Checking it like an ATS", "Writing your fixes"]} />
       ) : (
         <form onSubmit={submit} className="space-y-6">
-          <div className="rounded-2xl border-2 border-dashed border-violet-300 bg-violet-50/50 p-5 dark:border-violet-800 dark:bg-violet-950/20">
+          <div className="rounded-2xl border-2 border-dashed border-brand-300 bg-brand-50/50 p-5 dark:border-brand-800 dark:bg-brand-950/20">
             <label htmlFor={fileId} className="block font-semibold">
               Upload your resume
             </label>
@@ -77,7 +77,7 @@ export function ResumeStudio({ enabled, roles }: { enabled: boolean; roles: stri
               type="file"
               accept=".pdf,application/pdf,.txt,text/plain"
               onChange={(e) => void pick(e.target.files?.[0])}
-              className="mt-3 block w-full text-sm file:mr-3 file:min-h-11 file:rounded-full file:border-0 file:bg-violet-700 file:px-4 file:font-medium file:text-white"
+              className="mt-3 block w-full text-sm file:mr-3 file:min-h-11 file:rounded-full file:border-0 file:bg-brand-700 file:px-4 file:font-medium file:text-white"
             />
             {reading && <p className="mt-2 text-sm">Reading your file…</p>}
             {fileName && !reading && (
@@ -186,7 +186,7 @@ function Review({ review, onAgain }: { review: ResumeReview; onAgain: () => void
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Add the ones you genuinely have. Applicant tracking systems match on these words.</p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {review.missing_keywords.map((k) => (
-              <li key={k} className="rounded-full bg-violet-50 px-3 py-1 text-sm ring-1 ring-violet-200 dark:bg-violet-950/40 dark:ring-violet-900">
+              <li key={k} className="rounded-full bg-brand-50 px-3 py-1 text-sm ring-1 ring-brand-200 dark:bg-brand-950/40 dark:ring-brand-900">
                 {k}
               </li>
             ))}
@@ -225,7 +225,7 @@ function CopyBlock({ label, text }: { label: string; text: string }) {
         <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{label}</p>
         <button
           type="button"
-          className="min-h-11 rounded-full px-3 text-sm font-medium text-violet-800 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-white/10"
+          className="min-h-11 rounded-full px-3 text-sm font-medium text-brand-800 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-white/10"
           onClick={() =>
             void navigator.clipboard?.writeText(text).then(() => {
               setCopied(true);

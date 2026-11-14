@@ -15,7 +15,7 @@ export function LessonTutor({ enabled, lessonId, title, starters }: { enabled: b
         endpoint="/api/ai/tutor"
         extra={{ lessonId, language }}
         compact
-        greeting={`Hi! I've read "${title}" with you. Ask me to explain any part again, give another example, or quiz you.`}
+        greeting={`I've read "${title}" with you. Ask me to explain a part another way, show an example, or test you.`}
         starters={starters.length ? [...starters, "Quiz me on this lesson"] : ["Explain this more simply", "Give me another example from India", "Quiz me on this lesson", "How is this used in a real job?"]}
         placeholder="Ask about this lesson"
       />

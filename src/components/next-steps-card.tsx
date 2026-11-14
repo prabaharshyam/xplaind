@@ -55,7 +55,7 @@ export function NextStepsCard({
               <li key={s.id}>
                 <Link
                   href={`/stop/${s.id}`}
-                  className="flex min-h-12 gap-3 rounded-2xl border border-zinc-200 p-3 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                  className="flex min-h-12 gap-3 rounded-2xl border border-zinc-200 p-3 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-brand-700 dark:border-zinc-800 dark:hover:bg-zinc-900"
                 >
                   <span aria-hidden="true" className="font-semibold text-emerald-800 dark:text-emerald-400">
                     {n + 1}

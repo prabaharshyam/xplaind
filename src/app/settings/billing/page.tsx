@@ -61,7 +61,7 @@ async function Billing() {
                   {STATUS[p.status] ?? p.status} · {istDate(p.paid_at ?? p.created_at)} · Order {p.order_id}
                 </p>
                 {p.status === "paid" && (
-                  <Link href={`/settings/billing/receipt/${p.order_id}`} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                  <Link href={`/settings/billing/receipt/${p.order_id}`} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
                     View receipt<span className="sr-only"> for order {p.order_id}</span>
                   </Link>
                 )}
@@ -74,7 +74,7 @@ async function Billing() {
       </section>
       <p className="mt-6 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
         Passes are one-time payments, so there is nothing to cancel. For a refund within 7 days of buying, see the{" "}
-        <Link href="/refunds" className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+        <Link href="/refunds" className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
           refund policy
         </Link>
         .

@@ -33,7 +33,7 @@ async function Profile({ params }: { params: PageProps<"/u/[handle]">["params"] 
           <ul className="mt-3 flex flex-col gap-2">
             {record.certificates.map((c) => (
               <li key={c.id}>
-                <Link href={`/certificate/${c.id}`} className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                <Link href={`/certificate/${c.id}`} className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
                   {record.roles.find((r) => r.pathId === c.pathId)?.name ?? c.pathId}
                 </Link>
               </li>
@@ -58,7 +58,7 @@ async function Profile({ params }: { params: PageProps<"/u/[handle]">["params"] 
                   {r.readiness !== null && ` · interview readiness ${r.readiness}% (${readinessLabel(r.readiness)})`}
                 </p>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-                  <div className="h-full rounded-full bg-violet-700 dark:bg-violet-400" style={{ width: `${r.total ? Math.round((r.done / r.total) * 100) : 0}%` }} />
+                  <div className="h-full rounded-full bg-brand-700 dark:bg-brand-400" style={{ width: `${r.total ? Math.round((r.done / r.total) * 100) : 0}%` }} />
                 </div>
               </li>
             ))}
@@ -74,7 +74,7 @@ async function Profile({ params }: { params: PageProps<"/u/[handle]">["params"] 
           <ul className="mt-3 flex flex-col gap-2">
             {record.passedProjects.map((p) => (
               <li key={p.id} className="flex justify-between gap-3">
-                <Link href={`/projects/${p.id}`} className="text-violet-800 underline underline-offset-2 dark:text-violet-300">
+                <Link href={`/projects/${p.id}`} className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
                   {p.title}
                 </Link>
                 <span className="text-sm text-zinc-600 tabular-nums dark:text-zinc-400">{p.score}/100</span>

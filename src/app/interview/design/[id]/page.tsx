@@ -45,7 +45,7 @@ const Bullets = ({ items }: { items: string[] }) => (
   <ul className="mt-3 flex flex-col gap-2">
     {items.map((t) => (
       <li key={t} className="flex gap-3 leading-7">
-        <span aria-hidden="true" className="mt-2.5 size-1.5 shrink-0 rounded-full bg-violet-500" />
+        <span aria-hidden="true" className="mt-2.5 size-1.5 shrink-0 rounded-full bg-brand-500" />
         {t}
       </li>
     ))}
@@ -68,7 +68,7 @@ export default async function DesignPage({ params }: PageProps<"/interview/desig
             {STEPS.map((s, i) => (
               <li key={s.id}>
                 <a href={`#${s.id}`} className="flex items-baseline gap-2 rounded-2xl px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                  <span className="text-xs font-semibold text-violet-700 dark:text-violet-300">{i + 1}</span>
+                  <span className="text-xs font-semibold text-brand-700 dark:text-brand-300">{i + 1}</span>
                   <span>
                     {s.title}
                     <span className="block text-xs text-zinc-600 dark:text-zinc-400">{s.time}</span>
@@ -80,8 +80,8 @@ export default async function DesignPage({ params }: PageProps<"/interview/desig
         </nav>
         <div className="flex min-w-0 flex-col gap-6">
           {d.reviewed_by === "UNREVIEWED" && <DraftNote />}
-          <blockquote className="rounded-2xl border border-violet-200 bg-violet-50/60 p-5 text-lg leading-8 dark:border-violet-900 dark:bg-violet-950/30">
-            <span className="block text-sm font-semibold text-violet-900 dark:text-violet-200">The question</span>
+          <blockquote className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 text-lg leading-8 dark:border-brand-900 dark:bg-brand-950/30">
+            <span className="block text-sm font-semibold text-brand-900 dark:text-brand-200">The question</span>
             &ldquo;{d.prompt}&rdquo;
           </blockquote>
           <section id="clarify" aria-labelledby="clarify-h" className={card}>
@@ -171,7 +171,7 @@ export default async function DesignPage({ params }: PageProps<"/interview/desig
             <ul className="mt-2 flex flex-wrap gap-2">
               {patterns.map((p) => (
                 <li key={p.id}>
-                  <Link href={`/interview/patterns/${p.id}`} className="inline-flex min-h-11 items-center rounded-full border border-violet-200 px-3 text-sm font-medium text-violet-900 hover:bg-violet-50 dark:border-violet-900 dark:text-violet-200 dark:hover:bg-violet-950">
+                  <Link href={`/interview/patterns/${p.id}`} className="inline-flex min-h-11 items-center rounded-full border border-brand-200 px-3 text-sm font-medium text-brand-900 hover:bg-brand-50 dark:border-brand-900 dark:text-brand-200 dark:hover:bg-brand-950">
                     {p.name}
                   </Link>
                 </li>

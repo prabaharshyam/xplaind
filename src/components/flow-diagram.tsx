@@ -38,7 +38,7 @@ function Svg({ layout, marker, className }: { layout: FlowLayout; marker: string
           {e.label && e.lx !== undefined && e.ly !== undefined && (
             <g>
               <rect x={e.lx - (e.label.length * 6.4 + 12) / 2} y={e.ly - 10} width={e.label.length * 6.4 + 12} height="20" rx="10" className="fill-white dark:fill-zinc-900" />
-              <text x={e.lx} y={e.ly + 4} textAnchor="middle" fontSize="12" fontWeight="500" className="fill-violet-800 dark:fill-violet-300">
+              <text x={e.lx} y={e.ly + 4} textAnchor="middle" fontSize="12" fontWeight="500" className="fill-brand-800 dark:fill-brand-300">
                 {e.label}
               </text>
             </g>
@@ -57,7 +57,7 @@ function Svg({ layout, marker, className }: { layout: FlowLayout; marker: string
               width={n.w}
               height={n.h}
               rx={n.decision ? n.h / 2 : 12}
-              className={n.decision ? "fill-violet-50 stroke-violet-300 dark:fill-violet-950 dark:stroke-violet-800" : "fill-white stroke-zinc-200 dark:fill-zinc-900 dark:stroke-zinc-700"}
+              className={n.decision ? "fill-brand-50 stroke-brand-300 dark:fill-brand-950 dark:stroke-brand-800" : "fill-white stroke-zinc-200 dark:fill-zinc-900 dark:stroke-zinc-700"}
               strokeWidth="1.25"
               style={{ filter: "drop-shadow(0 1px 1.5px rgb(9 9 11 / 0.06))" }}
             />
@@ -101,7 +101,7 @@ export function FlowDiagram({ source }: { source: string }) {
   return (
     <figure className="not-prose my-5 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-950/40">
       {flow.title && <figcaption className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">{flow.title}</figcaption>}
-      <div tabIndex={0} role="group" aria-label={`Diagram${flow.title ? `: ${flow.title}` : ""}. Scroll sideways if it is wider than the screen.`} className="-mx-1 flex overflow-x-auto px-1 pb-1 focus-visible:outline-2 focus-visible:outline-violet-700 [&>svg]:mx-auto">
+      <div tabIndex={0} role="group" aria-label={`Diagram${flow.title ? `: ${flow.title}` : ""}. Scroll sideways if it is wider than the screen.`} className="-mx-1 flex overflow-x-auto px-1 pb-1 focus-visible:outline-2 focus-visible:outline-brand-700 [&>svg]:mx-auto">
         <Svg layout={wide} marker={`a${id}w`} className={tall ? "hidden sm:block" : ""} />
         {tall && <Svg layout={tall} marker={`a${id}t`} className="sm:hidden" />}
       </div>

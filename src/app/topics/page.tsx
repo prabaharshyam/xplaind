@@ -23,7 +23,7 @@ export default function TopicsPage() {
       <ul className="mx-auto grid max-w-6xl gap-5 px-4 py-10 sm:grid-cols-2 lg:grid-cols-3 md:px-6">
         {topics.map((t) => (
           <li key={t.id} className="">
-            <Link href={`/topics/${t.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-800 dark:bg-zinc-900">
+            <Link href={`/topics/${t.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-800 dark:bg-zinc-900">
               <Cover theme={t.id} seed={`topic-${t.id}`} className="h-28" iconSize={36} />
               <span className="p-4">
                 <span className="block text-lg font-semibold group-hover:underline">{t.label}</span>

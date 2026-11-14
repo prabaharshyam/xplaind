@@ -70,7 +70,7 @@ export function AskNotes({ book, access }: { book: Book; access: Access }) {
         <ol className="flex flex-col gap-3" aria-live="polite">
           {turns.map((t, k) =>
             t.role === "user" ? (
-              <li key={k} className="max-w-[85%] self-end rounded-2xl bg-violet-700 px-4 py-2.5 text-white">
+              <li key={k} className="max-w-[85%] self-end rounded-2xl bg-brand-700 px-4 py-2.5 text-white">
                 <span className="sr-only">You asked: </span>
                 {t.text}
               </li>
@@ -217,7 +217,7 @@ export function RetestPanel({ test, book, access, onBook, onReady }: { test: Boo
   };
 
   return (
-    <section aria-labelledby="retest-h" className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950/30">
+    <section aria-labelledby="retest-h" className="rounded-2xl border border-brand-200 bg-brand-50 p-5 dark:border-brand-900 dark:bg-brand-950/30">
       <h3 id="retest-h" className="flex items-center gap-2 text-lg font-semibold">
         <Icon name="target" size={18} /> Test me on what I missed
       </h3>

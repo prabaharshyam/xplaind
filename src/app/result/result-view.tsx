@@ -38,7 +38,7 @@ export function ResultView({
       <div className="flex flex-col gap-4">
         <h1 className="text-3xl font-semibold tracking-tight">Your level</h1>
         <p className="leading-7 text-zinc-700 dark:text-zinc-300">
-          There is no saved result on this device yet. The test takes five to ten minutes.
+          There is no saved result on this device yet. The quick check takes about 2 minutes.
         </p>
         <Link href="/start" className={primaryButton}>
           Find my level
@@ -97,9 +97,9 @@ export function ResultView({
             : `That puts your first step at ${result.startLevel}.`}
         </p>
         {attempt.quick && (
-          <p className="rounded-2xl border border-violet-200 bg-violet-50 p-4 leading-7 dark:border-violet-900 dark:bg-violet-950/30">
+          <p className="rounded-2xl border border-brand-200 bg-brand-50 p-4 leading-7 dark:border-brand-900 dark:bg-brand-950/30">
             This comes from the 2-minute check, so it is a first guess.{" "}
-            <Link href="/start" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+            <Link href="/start" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
               Take the full test
             </Link>{" "}
             any time for a sharper start point.
@@ -142,7 +142,7 @@ export function ResultView({
                   {stop ? (
                     <Link
                       href={`/stop/${stop.id}`}
-                      className="text-violet-800 underline underline-offset-2 dark:text-violet-300"
+                      className="text-brand-800 underline underline-offset-2 dark:text-brand-300"
                     >
                       Review: {stop.title}
                     </Link>

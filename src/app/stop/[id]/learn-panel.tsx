@@ -24,7 +24,7 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
   return (
     <section aria-labelledby={headingId} className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
       <h2 id={headingId} className="flex items-center gap-2 text-sm font-semibold">
-        <span className="grid size-7 place-items-center rounded-full bg-violet-700 text-white">
+        <span className="grid size-7 place-items-center rounded-full bg-brand-700 text-white">
           <Icon name="play" size={13} />
         </span>
         Watch &amp; learn
@@ -37,7 +37,7 @@ export function LearnPanel({ stopId, items, headingId }: { stopId: string; items
           <li key={r.id} className="rounded-2xl border border-zinc-100 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-950">
             {r.embed && <CourseThumb provider={r.provider} kindLabel={r.kindLabel} embed={r.embed} hours={r.hours} certificate={r.certificate} size="sm" className="mb-2 aspect-video rounded-2xl" />}
             <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-              <span className={/video/i.test(r.kindLabel) ? "text-violet-800 dark:text-violet-300" : "text-teal-800 dark:text-teal-300"}>{r.kindLabel}</span>
+              <span className={/video/i.test(r.kindLabel) ? "text-brand-800 dark:text-brand-300" : "text-teal-800 dark:text-teal-300"}>{r.kindLabel}</span>
               {i === 0 && <span className="rounded-full bg-zinc-900 px-1.5 py-px text-xs text-white dark:bg-white dark:text-zinc-900">Start here</span>}
             </p>
             <p className="mt-1 text-sm leading-5 font-medium">{r.title}</p>

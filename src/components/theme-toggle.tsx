@@ -33,8 +33,8 @@ export function ThemeToggle({ className = "", labelled = false }: { className?: 
       aria-label={theme ? `Switch to ${next} mode` : "Switch light or dark mode"}
       className={
         labelled
-          ? `flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left text-base font-medium text-zinc-900 hover:bg-violet-50 dark:text-zinc-100 dark:hover:bg-white/5 ${className}`
-          : `grid size-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 ${className}`
+          ? `flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left text-base font-medium text-zinc-900 hover:bg-brand-50 dark:text-zinc-100 dark:hover:bg-white/5 ${className}`
+          : `grid size-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 ${className}`
       }
     >
       {/* Moon in light mode, sun in dark mode: the icon shows where the switch takes you. */}

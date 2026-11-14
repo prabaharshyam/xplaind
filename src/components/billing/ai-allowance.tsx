@@ -32,7 +32,7 @@ export function AiAllowance({ kind, label }: { kind: AiKind; label: string }) {
         {usage.trial ? `${left} of ${usage.limit} free tries left` : `${left} of ${usage.limit} ${pro ? "Pro " : ""}${label} left today`}
       </span>
       {!pro && (
-        <Link href="/pricing" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+        <Link href="/pricing" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
           {usage.trial && left === 0 ? "Unlock with Pro" : "Get more with Pro"}
         </Link>
       )}

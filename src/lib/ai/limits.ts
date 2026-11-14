@@ -71,15 +71,15 @@ export function positiveNumber(value: string | undefined, fallback: number): num
 }
 
 export const LIMIT_MESSAGE = {
-  day: "You have used today's AI turns for this feature. They reset at midnight India time, so try again tomorrow.",
+  day: "That was today's last turn for this tool. It resets at midnight India time.",
   /** PAY-7: a free account has used its one-time trial of this feature. */
-  trial: "You have used your free tries of this AI tool. A Pro pass unlocks it with a generous daily allowance, from ₹249.",
+  trial: "That was your last free try of this tool. Pro includes it every day, from ₹99 for 7 days.",
   /** PAY-4: the same, when a Pro pass would give more today. */
-  dayUpgrade: "You have used today's AI turns for this feature. They reset at midnight India time, or a Pro pass gives you more today.",
+  dayUpgrade: "That was today's last turn for this tool. It resets at midnight India time, or Pro gives you more today.",
   month: "This month's AI allowance is used up. It resets on the 1st. Everything else on Xplaind still works.",
   off: "AI features are switched off for now. Everything else on Xplaind still works.",
   /** AG-1: AI needs an account once sign-ups are open. */
-  signin: "The AI tools are part of Pro. Sign up free to try each one a few times.",
+  signin: "The AI tools are part of Pro. Create a free account to try each one a few times.",
 } as const;
 
 type UsageLike = {

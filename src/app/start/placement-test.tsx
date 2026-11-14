@@ -84,7 +84,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         <div className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">Your path</p>
           <p className="font-medium">{goal.name}</p>
-          <Link href="/paths" className="text-sm text-violet-800 underline underline-offset-2 dark:text-violet-300">
+          <Link href="/paths" className="text-sm text-brand-800 underline underline-offset-2 dark:text-brand-300">
             Choose a different path
           </Link>
         </div>
@@ -95,7 +95,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
             {WEEKLY_HOUR_CHOICES.map((h) => (
               <label
                 key={h}
-                className="flex min-h-12 min-w-16 cursor-pointer items-center justify-center rounded-2xl border border-zinc-300 px-4 py-2 has-[:checked]:border-violet-700 has-[:checked]:bg-violet-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-violet-700 dark:border-zinc-700 dark:has-[:checked]:bg-violet-950"
+                className="flex min-h-12 min-w-16 cursor-pointer items-center justify-center rounded-2xl border border-zinc-300 px-4 py-2 has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-700 dark:border-zinc-700 dark:has-[:checked]:bg-brand-950"
               >
                 <input
                   type="radio"
@@ -145,7 +145,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         aria-valuemax={total}
         aria-valuenow={answered}
       >
-        <div className="h-full bg-violet-700" style={{ width: `${(answered / total) * 100}%` }} />
+        <div className="h-full bg-brand-700" style={{ width: `${(answered / total) * 100}%` }} />
       </div>
 
       <fieldset className="flex min-w-0 flex-col gap-3" key={question.id}>
@@ -166,12 +166,12 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         {options.map((o) => (
           <label
             key={o.id}
-            className="flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border border-zinc-300 p-3 has-[:checked]:border-violet-700 has-[:checked]:bg-violet-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-violet-700 dark:border-zinc-700 dark:has-[:checked]:bg-violet-950"
+            className="flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border border-zinc-300 p-3 has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-700 dark:border-zinc-700 dark:has-[:checked]:bg-brand-950"
           >
             <input
               type="radio"
               name="answer"
-              className="mt-1.5 size-4 accent-violet-700"
+              className="mt-1.5 size-4 accent-brand-700"
               checked={selected === o.id}
               onChange={() => setSelected(o.id)}
             />

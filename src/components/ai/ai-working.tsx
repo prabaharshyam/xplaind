@@ -12,12 +12,12 @@ export function AiWorking({ steps }: { steps: string[] }) {
   return (
     <div role="status" className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900">
       <p className="flex items-center gap-2 font-medium">
-        <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-violet-700 motion-safe:animate-pulse dark:bg-violet-300" />
+        <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-brand-700 motion-safe:animate-pulse dark:bg-brand-300" />
         {steps[i]}
       </p>
       <ol className="mt-3 flex flex-wrap gap-2 text-xs" aria-hidden="true">
         {steps.map((s, j) => (
-          <li key={s} className={`rounded-full px-2.5 py-1 ${j <= i ? "bg-violet-600 text-white" : "bg-white text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400"}`}>
+          <li key={s} className={`rounded-full px-2.5 py-1 ${j <= i ? "bg-brand-600 text-white" : "bg-white text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400"}`}>
             {j + 1}
           </li>
         ))}

@@ -105,8 +105,8 @@ export default async function TopInterviewPage({ params }: PageProps<"/interview
                 ))}
 
                 {q.example && (
-                  <figure className="mt-4 rounded-2xl border-l-4 border-violet-600 bg-violet-50 p-4 dark:bg-violet-950/30">
-                    <figcaption className="text-sm font-semibold text-violet-900 dark:text-violet-200">An example you can use in the interview</figcaption>
+                  <figure className="mt-4 rounded-2xl border-l-4 border-brand-600 bg-brand-50 p-4 dark:bg-brand-950/30">
+                    <figcaption className="text-sm font-semibold text-brand-900 dark:text-brand-200">An example you can use in the interview</figcaption>
                     {q.example.split(/\n\n+/).map((p, k) => (
                       <p key={k} className="mt-1 leading-7">
                         {p}

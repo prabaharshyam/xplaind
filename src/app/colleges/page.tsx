@@ -14,7 +14,7 @@ export const metadata: Metadata = pageMeta({
   path: "/colleges",
 });
 
-const A = "font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300";
+const A = "font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300";
 
 const GETS: { icon: "mic" | "check" | "target" | "cert" | "chat" | "map"; t: string; d: string }[] = [
   { icon: "map", t: "A roadmap for each role", d: "Nine AI roles, each with lessons, quick checks and guided projects. Students start with a 2-minute level check, so nobody repeats what they know." },
@@ -52,7 +52,7 @@ export default function CollegesPage() {
           <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {GETS.map((g) => (
               <li key={g.t} className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <span aria-hidden="true" className="grid size-10 place-items-center rounded-2xl bg-violet-50 text-violet-800 dark:bg-violet-950/50 dark:text-violet-300">
+                <span aria-hidden="true" className="grid size-10 place-items-center rounded-2xl bg-brand-50 text-brand-800 dark:bg-brand-950/50 dark:text-brand-300">
                   <Icon name={g.icon} size={20} />
                 </span>
                 <h3 className="mt-3 text-lg font-semibold">{g.t}</h3>
@@ -69,7 +69,7 @@ export default function CollegesPage() {
           <ol className="mt-6 grid gap-4 md:grid-cols-4">
             {HOW.map((h, i) => (
               <li key={h} className="rounded-2xl bg-zinc-50 p-5 dark:bg-zinc-900">
-                <span className="grid size-9 place-items-center rounded-full bg-violet-700 font-semibold text-white dark:bg-violet-400 dark:text-zinc-950">{i + 1}</span>
+                <span className="grid size-9 place-items-center rounded-full bg-brand-700 font-semibold text-white dark:bg-brand-400 dark:text-zinc-950">{i + 1}</span>
                 <p className="mt-3 leading-7">{h}</p>
               </li>
             ))}
@@ -91,7 +91,7 @@ export default function CollegesPage() {
             </h2>
             <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">The price per student depends on the batch size and how long the passes run. A person replies within 2 working days.</p>
             <p className="mt-4 flex items-center gap-2 text-sm">
-              <Icon name="send" size={16} className="shrink-0 text-violet-700 dark:text-violet-300" />
+              <Icon name="send" size={16} className="shrink-0 text-brand-700 dark:text-brand-300" />
               Or write to{" "}
               <a href={`mailto:${BUSINESS.email}?subject=Xplaind%20for%20our%20batch`} className={`${A} break-all`}>
                 {BUSINESS.email}

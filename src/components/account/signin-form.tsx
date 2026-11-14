@@ -55,7 +55,7 @@ function GitHubMark() {
 }
 
 const provider =
-  "flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white px-4 font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
+  "flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white px-4 font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 const field = "min-h-12 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950";
 
 /**
@@ -155,17 +155,17 @@ export function SignInForm({
 
       <button
         type="submit"
-        className="min-h-12 rounded-full bg-violet-700 px-4 font-semibold text-white hover:bg-violet-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+        className="min-h-12 rounded-full bg-brand-700 px-4 font-semibold text-white hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
       >
         {mode === "signup" ? "Sign up" : "Sign in"}
       </button>
-      <button type="submit" formAction="/auth/email-link" formNoValidate className="text-sm text-violet-800 underline underline-offset-2 dark:text-violet-300">
+      <button type="submit" formAction="/auth/email-link" formNoValidate className="text-sm text-brand-800 underline underline-offset-2 dark:text-brand-300">
         {mode === "signup" ? "No password? Email me a sign-in link" : "Forgot your password? Email me a sign-in link"}
       </button>
 
       <p className="text-center text-sm">
         {mode === "signup" ? "Already have an account? " : "New to Xplaind? "}
-        <button type="button" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300" onClick={() => setMode(mode === "signup" ? "signin" : "signup")}>
+        <button type="button" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300" onClick={() => setMode(mode === "signup" ? "signin" : "signup")}>
           {mode === "signup" ? "Sign in" : "Sign up"}
         </button>
       </p>

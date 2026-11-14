@@ -217,9 +217,9 @@ async function mount(el: HTMLElement): Promise<() => void> {
   roadGeometry.setIndex(index);
 
   const colors = {
-    uA: { value: new THREE.Color("#a78bfa") },
-    uB: { value: new THREE.Color("#8b5cf6") },
-    uC: { value: new THREE.Color("#2dd4bf") },
+    uA: { value: new THREE.Color("#7fd1c7") },
+    uB: { value: new THREE.Color("#2a9488") },
+    uC: { value: new THREE.Color("#d9b26a") },
   };
   const shared = { uTime: { value: 0 }, uDark: { value: darkQuery.matches ? 1 : 0 }, uFar: { value: FAR } };
   const roadMaterial = new THREE.ShaderMaterial({
@@ -280,8 +280,8 @@ async function mount(el: HTMLElement): Promise<() => void> {
         uTime: shared.uTime,
         uDark: shared.uDark,
         uNear: { value: 0 },
-        uA: { value: new THREE.Color(["#8b5cf6", "#0ea5e9", "#14b8a6", "#f59e0b"][i]) },
-        uB: { value: new THREE.Color(["#c4b5fd", "#bae6fd", "#a7f3d0", "#fde68a"][i]) },
+        uA: { value: new THREE.Color(["#0e4a50", "#2a9488", "#1b7a72", "#d9b26a"][i]) },
+        uB: { value: new THREE.Color(["#b5d8d3", "#d9ebe8", "#7fd1c7", "#ead3a1"][i]) },
       },
       transparent: true,
     });
