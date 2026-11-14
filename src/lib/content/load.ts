@@ -24,6 +24,7 @@ import {
   PlacementQuestion,
   Resource,
   StopFrontmatter,
+  StopTranslation,
 } from "./schema";
 import { type Bundle, type Entry, type Issue, emptyBundle } from "./types";
 
@@ -125,6 +126,40 @@ function loadStops(root: string, issues: Issue[]): Bundle["stops"] {
       issues.push({ severity: "error", file, message: `a ${parsed.data.level} stop belongs at stops/${parsed.data.level}/${parsed.data.id}.mdx` });
     } else if (stem !== parsed.data.id) {
       issues.push({ severity: "error", file, message: `id "${parsed.data.id}" must match the file name "${stem}"` });
+    }
+    out.push({ file, data: { ...parsed.data, body: (match[2] ?? "").trim() } });
+  }
+  return out;
+}
+
+/** LT-1: content/translations/<lang>/<id>.mdx, a lesson in another language. */
+function loadTranslations(root: string, issues: Issue[]): Bundle["translations"] {
+  const out: Bundle["translations"] = [];
+  const dir = path.join(root, "translations");
+  if (!fs.existsSync(dir)) return out;
+  for (const rel of listFiles(dir)) {
+    const file = `translations/${rel}`;
+    const text = fs.readFileSync(path.join(root, file), "utf8");
+    const match = FRONTMATTER.exec(text);
+    if (!match) {
+      issues.push({ severity: "error", file, message: "no frontmatter found; the file must start with a --- block" });
+      continue;
+    }
+    let raw: unknown;
+    try {
+      raw = parseYaml(match[1]);
+    } catch (e) {
+      issues.push({ severity: "error", file, message: `frontmatter YAML could not be read: ${(e as Error).message.split("\n")[0]}` });
+      continue;
+    }
+    const parsed = StopTranslation.safeParse(raw);
+    if (!parsed.success) {
+      issues.push(...zodToIssues(file, parsed.error));
+      continue;
+    }
+    const [dirLang, ...restParts] = rel.split(/[\\/]/);
+    if (restParts.length !== 1 || dirLang !== parsed.data.lang || path.basename(rel, ".mdx") !== parsed.data.id) {
+      issues.push({ severity: "error", file, message: `a ${parsed.data.lang} translation of "${parsed.data.id}" belongs at translations/${parsed.data.lang}/${parsed.data.id}.mdx` });
     }
     out.push({ file, data: { ...parsed.data, body: (match[2] ?? "").trim() } });
   }
@@ -233,5 +268,6 @@ export function loadContent(root: string): { bundle: Bundle; issues: Issue[] } {
   bundle.videoViews = loadVideoViews(root, issues);
   bundle.patterns = loadYamlDir(root, "interview/patterns", InterviewPattern, issues);
   bundle.designs = loadYamlDir(root, "interview/designs", SystemDesign, issues);
+  bundle.translations = loadTranslations(root, issues);
   return { bundle, issues };
 }

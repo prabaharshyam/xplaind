@@ -203,6 +203,37 @@ export type StopFrontmatter = z.infer<typeof StopFrontmatter>;
 
 export type Stop = StopFrontmatter & { body: string };
 
+// --------------------------------------------------------------- translations ---
+
+/** LT-1: the languages a lesson can be read in besides English. */
+export const LESSON_LANGS = [
+  { id: "ta", label: "தமிழ்", name: "Tamil", htmlLang: "ta" },
+  { id: "hi", label: "हिन्दी", name: "Hindi", htmlLang: "hi" },
+] as const;
+export type LessonLang = (typeof LESSON_LANGS)[number]["id"];
+
+/**
+ * LT-1: a lesson translated into an everyday spoken style (casual Tamil with English tech words,
+ * casual Hindi), at content/translations/<lang>/<id>.mdx. The MDX body keeps the English lesson's
+ * level-2 sections in the same order; code, numbers and technical terms stay as they are.
+ */
+export const StopTranslation = z.strictObject({
+  id: Slug,
+  lang: z.enum(LESSON_LANGS.map((l) => l.id) as [LessonLang, ...LessonLang[]]),
+  title: Text.max(120),
+  outcome: Text.max(300),
+  answer: Text.max(500),
+  why_it_matters: Text.max(500),
+  flashcards: z.array(Flashcard).max(10).default([]),
+  exercise: Exercise.optional(),
+  ask: z.array(Text.max(120)).max(6).default([]),
+  /** Who translated it and when; a native speaker's review is recorded in reviewed_by. */
+  translated_on: IsoDate,
+  reviewed_by: Text.optional(),
+});
+export type StopTranslation = z.infer<typeof StopTranslation> & { body: string };
+
+
 // -------------------------------------------------------------- questions ---
 
 const Option = z.strictObject({ id: Slug, text: Text });

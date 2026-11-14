@@ -551,3 +551,10 @@ The owner asked for research on what would make learners happy and convince them
 - The Tailwind `violet-*` classes became a `brand-*` scale defined once in globals.css, so a future colour change is one block.
 - Brass is kept for achievements so it keeps its meaning. Topic hues stay (they help people tell topics apart) but are muted. Lesson headers drop the per-topic colours for one teal gradient.
 - The logo PNGs were recoloured in place: same files, teal "AI". Blog and guide cover illustrations still carry their own colours and can be redrawn later.
+
+## 2026-11-14: lesson translations demo (LT-1)
+
+- The owner asked for whole lessons in English, casual Tamil ("Tanglish") and casual Hindi, starting with one lesson for review before merging.
+- Script: Tamil is written in Tamil script in spoken style ("பண்ணுது", "-னா"), and Hindi in Devanagari in spoken style. Both keep English for technical terms, product names, code and numbers, the way people talk at work. The alternative is Tanglish or Hinglish in English letters; it is a quick swap if the owner prefers it.
+- Each language gets its own URL rather than a toggle that swaps text, so search engines and shared links show the right language, and the English page stays the canonical one.
+- Translations are AI-drafted and need a native speaker's read before more lessons are done; `reviewed_by` records it.

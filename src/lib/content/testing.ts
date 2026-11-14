@@ -241,6 +241,7 @@ export function validBundle(): Bundle {
     videoViews: null,
     patterns: [],
     designs: [],
+    translations: [],
   };
 }
 
