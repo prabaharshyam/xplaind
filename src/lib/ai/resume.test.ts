@@ -27,10 +27,17 @@ describe("resume review (RV-1, RV-2)", () => {
       strengths: ["a"],
       fixes: [fix("low"), fix("high"), fix("medium"), fix("high", "")],
       missing_keywords: ["RAG", "RAG", "Docker"],
+      job_match: 72.4,
+      linkedin_headline: "  GenAI engineer  ",
+      linkedin_about: "About me",
     });
     expect(r.score).toBe(100);
     expect(r.fixes.map((f) => f.priority)).toEqual(["high", "medium", "low"]);
     expect(r.missing_keywords).toEqual(["RAG", "Docker"]);
     expect(cleanResumeReview({ ...r, score: Number.NaN }).score).toBe(0);
+    // JM-1: a job match only when there was a job post; LinkedIn copy trimmed.
+    expect(r.job_match).toBe(72);
+    expect(r.linkedin_headline).toBe("GenAI engineer");
+    expect(cleanResumeReview({ ...r, job_match: 80 }, false).job_match).toBeNull();
   });
 });

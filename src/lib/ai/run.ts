@@ -23,6 +23,7 @@ import {
 import { aiSettings } from "./settings";
 import { aiCaller, allowanceToday, limitFor, onTrial } from "./who";
 import { bump } from "@/lib/funnel";
+import type { Tier } from "@/lib/billing/plans";
 
 /** Effectively no site-wide cap for Pro calls; the kill switch still stops everything. */
 const PRO_MONTH_CAP_USD = 1_000_000;
@@ -39,7 +40,7 @@ export type AiRequest<S extends z.ZodType> = {
 /** Runs one guarded call. Returns the checked output, or a Response to send back as is. */
 export async function runAi<S extends z.ZodType>(
   req: AiRequest<S>,
-): Promise<{ data: z.infer<S> } | Response> {
+): Promise<{ data: z.infer<S>; tier: Tier } | Response> {
   const settings = aiSettings();
   if (!settings) return problem(503, LIMIT_MESSAGE.off);
 
@@ -157,7 +158,7 @@ export async function runAi<S extends z.ZodType>(
   const checked = req.schema.safeParse(safeJson(text));
   if (!checked?.success)
     return problem(502, "The answer came back incomplete. Please try again.");
-  return { data: checked.data };
+  return { data: checked.data, tier: who.tier };
 }
 
 function safeJson(text: string): unknown {

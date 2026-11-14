@@ -462,3 +462,76 @@ describe("Week pass, referrals and funnel counts (PAY-11, RF-1, AN-1)", () => {
   });
 });
 
+describe("Interview readiness (IR-1)", () => {
+  const J = "00000000-0000-4000-8000-0000000000c9";
+  const K = "00000000-0000-4000-8000-0000000000d9";
+  beforeAll(async () => {
+    await q("insert into auth.users (id, email) values ($1, 'j@example.com'), ($2, 'k@example.com')", [J, K]);
+    await q("insert into interview_readiness (user_id, path_id, score, answered) values ($1, 'ai-engineer', 60, 5), ($2, 'ai-engineer', 80, 5)", [J, K]);
+  });
+
+  it("a learner reads only their own scores, and only the server writes them", async () => {
+    expect(await asUser(db.client, J, async () => (await q("select score from interview_readiness")).rows)).toEqual([{ score: 60 }]);
+    for (const user of [J, null]) {
+      const err = await fails(asUser(db.client, user, () => q(`insert into interview_readiness (user_id, path_id, score, answered) values ('${J}', 'ai-engineer', 100, 5)`)));
+      expect(err.code).toBe(PERMISSION_DENIED);
+    }
+    expect((await fails(asUser(db.client, null, () => q("select * from interview_readiness")))).code).toBe(PERMISSION_DENIED);
+  });
+
+  it("refuses scores out of range and goes with the account", async () => {
+    expect((await fails(q("insert into interview_readiness (user_id, path_id, score, answered) values ($1, 'x', 101, 5)", [J]))).code).toBe("23514");
+    await q("delete from auth.users where id = $1", [K]);
+    expect((await q("select count(*)::int as n from interview_readiness where user_id = $1", [K])).rows[0].n).toBe(0);
+  });
+});
+
+describe("Project reviews (PR-1)", () => {
+  const L = "00000000-0000-4000-8000-0000000000e9";
+  beforeAll(async () => {
+    await q("insert into auth.users (id, email) values ($1, 'l@example.com')", [L]);
+    await q("insert into project_reviews (user_id, project_id, score, passed, repo_url) values ($1, 'rag-bot', 82, true, 'https://github.com/l/rag-bot')", [L]);
+  });
+
+  it("a learner reads only their own reviews; nobody but the server writes them", async () => {
+    expect(await asUser(db.client, L, async () => (await q("select project_id, passed from project_reviews")).rows)).toEqual([{ project_id: "rag-bot", passed: true }]);
+    expect(await asUser(db.client, "00000000-0000-4000-8000-0000000000c1", async () => (await q("select * from project_reviews")).rows)).toEqual([]);
+    const err = await fails(asUser(db.client, L, () => q(`insert into project_reviews (user_id, project_id, score, passed) values ('${L}', 'rag-bot', 100, true)`)));
+    expect(err.code).toBe(PERMISSION_DENIED);
+  });
+
+  it("refuses links that are not https", async () => {
+    expect((await fails(q("insert into project_reviews (user_id, project_id, score, passed, repo_url) values ($1, 'x1', 50, false, 'javascript:alert(1)')", [L]))).code).toBe("23514");
+  });
+});
+
+
+describe("Public profiles and certificates (PF-1, CT-1)", () => {
+  const M = "00000000-0000-4000-8000-0000000000f1";
+  const N = "00000000-0000-4000-8000-0000000000f2";
+  beforeAll(async () => {
+    await q("insert into auth.users (id, email) values ($1, 'm@example.com'), ($2, 'n@example.com')", [M, N]);
+    await q("insert into public_profiles (user_id, handle, display_name) values ($1, 'm-learner', 'Meera')", [M]);
+    await q("insert into certificates (id, user_id, path_id, name_on_certificate) values ('abcdefghjk', $1, 'ai-engineer', 'Meera')", [M]);
+  });
+
+  it("a profile is off until the learner turns it on", async () => {
+    expect((await q("select enabled from public_profiles where user_id = $1", [M])).rows[0].enabled).toBe(false);
+  });
+
+  it("a learner reads only their own profile and certificates; nobody but the server writes them", async () => {
+    expect(await asUser(db.client, M, async () => (await q("select handle from public_profiles")).rows)).toEqual([{ handle: "m-learner" }]);
+    expect(await asUser(db.client, N, async () => (await q("select * from public_profiles")).rows)).toEqual([]);
+    expect(await asUser(db.client, N, async () => (await q("select * from certificates")).rows)).toEqual([]);
+    expect((await fails(asUser(db.client, M, () => q(`update public_profiles set enabled = true where user_id = '${M}'`)))).code).toBe(PERMISSION_DENIED);
+    expect((await fails(asUser(db.client, M, () => q(`insert into certificates (id, user_id, path_id, name_on_certificate) values ('zzzzzzzzzz', '${M}', 'x', 'Meera')`)))).code).toBe(PERMISSION_DENIED);
+  });
+
+  it("one certificate per role, unique handles, and both go with the account", async () => {
+    expect((await fails(q("insert into certificates (id, user_id, path_id, name_on_certificate) values ('bcdefghjkm', $1, 'ai-engineer', 'Meera')", [M]))).code).toBe("23505");
+    expect((await fails(q("insert into public_profiles (user_id, handle, display_name) values ($1, 'm-learner', 'Neel')", [N]))).code).toBe("23505");
+    await q("delete from auth.users where id = $1", [M]);
+    expect((await q("select count(*)::int as n from certificates where user_id = $1", [M])).rows[0].n).toBe(0);
+    expect((await q("select count(*)::int as n from public_profiles where user_id = $1", [M])).rows[0].n).toBe(0);
+  });
+});

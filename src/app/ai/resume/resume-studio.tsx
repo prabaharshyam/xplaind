@@ -137,6 +137,12 @@ function Review({ review, onAgain }: { review: ResumeReview; onAgain: () => void
           </h2>
           <p className="mt-1 leading-7">{review.verdict}</p>
         </div>
+        {review.job_match !== null && (
+          <div className="text-center">
+            <p className="text-5xl font-semibold tabular-nums">{review.job_match}%</p>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">match with the job post</p>
+          </div>
+        )}
       </div>
 
       {review.strengths.length > 0 && (
@@ -188,6 +194,15 @@ function Review({ review, onAgain }: { review: ResumeReview; onAgain: () => void
         </div>
       )}
 
+      {(review.linkedin_headline || review.linkedin_about) && (
+        <div>
+          <h3 className="text-lg font-semibold">Your LinkedIn, to match</h3>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Written only from what your resume says. Check every line before you post it.</p>
+          {review.linkedin_headline && <CopyBlock label="Headline" text={review.linkedin_headline} />}
+          {review.linkedin_about && <CopyBlock label="About" text={review.linkedin_about} />}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3">
         <button type="button" onClick={onAgain} className={secondaryButton}>
           Review another version
@@ -198,5 +213,30 @@ function Review({ review, onAgain }: { review: ResumeReview; onAgain: () => void
       </div>
       <p className="text-xs text-zinc-600 dark:text-zinc-400">Made by Claude, an AI model from Anthropic. It can be wrong, so use your judgement.</p>
     </section>
+  );
+}
+
+/** JM-1: a block of generated text with a copy button. */
+function CopyBlock({ label, text }: { label: string; text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{label}</p>
+        <button
+          type="button"
+          className="min-h-11 rounded-full px-3 text-sm font-medium text-violet-800 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-white/10"
+          onClick={() =>
+            void navigator.clipboard?.writeText(text).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            })
+          }
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <p className="mt-1 leading-7 whitespace-pre-line">{text}</p>
+    </div>
   );
 }

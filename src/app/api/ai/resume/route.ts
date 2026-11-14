@@ -12,5 +12,5 @@ export async function POST(request: Request) {
   if (req instanceof Response) return req;
   const out = await runAi({ kind: "resume", ...resumePrompt(req), maxTokens: 6_000, effort: "medium" });
   if (out instanceof Response) return out;
-  return json({ review: cleanResumeReview(out.data) });
+  return json({ review: cleanResumeReview(out.data, Boolean(req.job)) });
 }

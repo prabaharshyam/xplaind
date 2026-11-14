@@ -10,6 +10,8 @@ import { getProject, getProjects, getStop, stagesWithGuide } from "@/lib/content
 import { roadmapHref } from "@/lib/paths";
 import { DIFFICULTY_LABEL } from "../shared";
 import { ProjectGuide } from "./project-guide";
+import { ProjectReviewPanel } from "./project-review";
+import { aiEnabled } from "@/lib/ai/settings";
 
 export function generateStaticParams() {
   return getProjects().map((p) => ({ id: p.id }));
@@ -98,6 +100,7 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[id]"
           {/* CG-1: the brief, what you need and what you deliver are open; the steps need a free account. */}
           <ContentGate reason="project" title="Sign up free to see every step" text={`The ${p.steps.length} steps, the rubric to check yourself against, and ideas to go further.`}>
           <ProjectGuide id={p.id} steps={p.steps} rubric={p.rubric} />
+          <ProjectReviewPanel projectId={p.id} enabled={aiEnabled()} />
 
           {p.stretch.length > 0 && (
             <section aria-labelledby="stretch-h" className="mt-8">
