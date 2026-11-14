@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { InviteFriends } from "@/components/billing/invite-friends";
 import { Skeleton } from "@/components/skeleton";
 import { primaryButton } from "@/components/ui";
 import { proOpen } from "@/lib/billing/config";
@@ -45,6 +46,7 @@ async function Billing() {
           </Link>
         )}
       </section>
+      {proOpen() && <InviteFriends />}
       <section className="mt-6">
         <h2 className="text-lg font-semibold">Payments</h2>
         {payments && payments.length > 0 ? (

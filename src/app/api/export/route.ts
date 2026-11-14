@@ -8,7 +8,7 @@ export async function GET() {
   const { user, client, admin } = session;
 
   // PAY-2: passes and payments are readable by their owner, so they export under the learner's own session.
-  const tables = ["profiles", "quiz_attempts", "stop_progress", "activity_days", "badges", "practice_ratings", "level_cards", "entitlements", "payments", "promo_redemptions"] as const;
+  const tables = ["profiles", "quiz_attempts", "stop_progress", "activity_days", "badges", "practice_ratings", "level_cards", "entitlements", "payments", "promo_redemptions", "referral_codes", "referrals"] as const;
   const out: Record<string, unknown> = { exported_on: todayInIST(), email: user.email };
   for (const table of tables) {
     const { data, error } = await client.from(table).select("*");

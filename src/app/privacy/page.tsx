@@ -126,7 +126,13 @@ export default function PrivacyPage() {
         <h2 className={H2}>Cookies and analytics</h2>
         <p className={P}>
           We use no advertising or tracking cookies and no analytics scripts. If you make an account, a sign-in cookie keeps you signed in. Your
-          progress and settings without an account live in your browser&apos;s own storage, which only this site can read.
+          progress and settings without an account live in your browser&apos;s own storage, which only this site can read. If you open a
+          friend&apos;s invite link, a cookie remembers their code for 30 days so your first pass gets the friend discount.
+        </p>
+        <p className={P}>
+          To see whether the site works, we count a few steps each day: sign-ups, first lessons finished, AI trial turns used, visits to the
+          pricing page, checkouts started, purchases and invite-link visits. Each is one number per day, with nothing about who did it: no
+          name, no account, no device or network address.
         </p>
 
         <h2 className={H2}>Under 18</h2>
