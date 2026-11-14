@@ -96,6 +96,8 @@ const LABELS = {
   en: { answer: "Quick answer", why: "Why it matters", cards: "Test your understanding", part: (i: number, n: number) => `Part ${i} of ${n}` },
   ta: { answer: "சுருக்கமா சொன்னா", why: "இது ஏன் முக்கியம்", cards: "உங்க understanding-ஐ test பண்ணுங்க", part: (i: number, n: number) => `Part ${i} / ${n}` },
   hi: { answer: "सीधा जवाब", why: "ये क्यों ज़रूरी है", cards: "अपनी समझ test करो", part: (i: number, n: number) => `Part ${i} / ${n}` },
+  tanglish: { answer: "Short-aa sonna", why: "Idhu yen mukkiyam", cards: "Unga understanding-a test pannunga", part: (i: number, n: number) => `Part ${i} / ${n}` },
+  hinglish: { answer: "Seedha jawab", why: "Ye kyun zaroori hai", cards: "Apni samajh test karo", part: (i: number, n: number) => `Part ${i} / ${n}` },
 } as const;
 
 /** The lesson page, in English or (LT-1) one of its translations. */

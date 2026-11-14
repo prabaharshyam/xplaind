@@ -209,6 +209,8 @@ export type Stop = StopFrontmatter & { body: string };
 export const LESSON_LANGS = [
   { id: "ta", label: "தமிழ்", name: "Tamil", htmlLang: "ta" },
   { id: "hi", label: "हिन्दी", name: "Hindi", htmlLang: "hi" },
+  { id: "tanglish", label: "Tanglish", name: "Tamil in English letters", htmlLang: "ta-Latn" },
+  { id: "hinglish", label: "Hinglish", name: "Hindi in English letters", htmlLang: "hi-Latn" },
 ] as const;
 export type LessonLang = (typeof LESSON_LANGS)[number]["id"];
 

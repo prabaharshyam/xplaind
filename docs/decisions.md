@@ -555,6 +555,6 @@ The owner asked for research on what would make learners happy and convince them
 ## 2026-11-14: lesson translations demo (LT-1)
 
 - The owner asked for whole lessons in English, casual Tamil ("Tanglish") and casual Hindi, starting with one lesson for review before merging.
-- Script: Tamil is written in Tamil script in spoken style ("பண்ணுது", "-னா"), and Hindi in Devanagari in spoken style. Both keep English for technical terms, product names, code and numbers, the way people talk at work. The alternative is Tanglish or Hinglish in English letters; it is a quick swap if the owner prefers it.
+- Script: Tamil is written in Tamil script in spoken style ("பண்ணுது", "-னா"), and Hindi in Devanagari in spoken style. Both keep English for technical terms, product names, code and numbers, the way people talk at work. The owner then asked to keep those and add Tanglish and Hinglish too (the same spoken style in English letters, as people type on phones), at /tanglish and /hinglish, with lang ta-Latn and hi-Latn.
 - Each language gets its own URL rather than a toggle that swaps text, so search engines and shared links show the right language, and the English page stays the canonical one.
 - Translations are AI-drafted and need a native speaker's read before more lessons are done; `reviewed_by` records it.

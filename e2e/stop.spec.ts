@@ -142,4 +142,10 @@ test("LT-1: a translated lesson has its own page, its language set, and a switch
   await expect(page.locator("main")).toHaveAttribute("lang", "hi");
   await expect(page.getByRole("heading", { level: 2, name: "सीधा जवाब" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Read this lesson in" }).getByRole("link", { name: "English" })).toHaveAttribute("href", "/stop/what-is-ai");
+  // Tanglish and Hinglish: the same lesson in English letters.
+  await page.goto("/stop/what-is-ai/tanglish");
+  await expect(page.locator("main")).toHaveAttribute("lang", "ta-Latn");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("moonum enna-nu");
+  await page.goto("/stop/what-is-ai/hinglish");
+  await expect(page.getByRole("heading", { level: 2, name: "Seedha jawab" })).toBeVisible();
 });
