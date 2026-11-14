@@ -6,7 +6,12 @@ const overflow = (page: Page) => page.evaluate(() => document.documentElement.sc
 
 test("the pricing page leads with value, shows honest savings, a free-vs-Pro table and folded questions (PAY-5, PAY-7, PAY-8)", async ({ page }) => {
   await page.goto("/pricing");
-  await expect(page.getByRole("heading", { level: 1, name: "Learn AI faster with Pro" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Get interview-ready, with proof" })).toBeVisible();
+  // OP-1: outcomes first, then real learners, then batches for colleges.
+  await expect(page.getByRole("heading", { name: "What you walk away with" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "A certificate anyone can check" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Read learner stories" })).toHaveAttribute("href", "/stories");
+  await expect(page.getByRole("link", { name: "Plans for colleges" })).toHaveAttribute("href", "/colleges");
   for (const price of ["₹249", "₹999", "₹1,499"]) await expect(page.getByText(price, { exact: true }).first()).toBeVisible();
   // PAY-8: savings only against the real monthly price, and the price per day.
   await expect(page.getByText("Save 33% compared with 6 monthly passes")).toBeVisible();
@@ -82,4 +87,26 @@ test("the Razorpay order and verify APIs stay shut while payments are off, and r
   expect((await request.post("/api/billing/create-order", { data: { planId: "pass_month", agree: true } })).status()).toBe(503);
   expect((await request.post("/api/billing/verify-payment", { data: { razorpay_order_id: "order_ABC123456" } })).status()).toBe(503);
   expect((await request.post("/api/billing/razorpay-webhook", { data: {} })).status()).toBe(503);
+});
+
+test("CB-1, OS-1: the colleges page takes a batch enquiry and learner stories show only real ones", async ({ page, request }) => {
+  await page.goto("/colleges");
+  await expect(page.getByRole("heading", { level: 1, name: "Placement prep for your whole batch" })).toBeVisible();
+  await page.getByLabel("Number of learners").fill("3");
+  await page.getByRole("button", { name: "Ask for a quote" }).click();
+  await expect(page.locator("main form").getByRole("alert")).toContainText("Please enter the name of your organisation");
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+  // Without a database the API refuses cleanly and stores nothing; bad input is refused first.
+  expect((await request.post("/api/batch-enquiry", { data: { orgName: "X" } })).status()).toBe(400);
+  const ok = { orgName: "Anna College", orgType: "college", contactName: "Priya", email: "tpo@example.edu", phone: "", learners: 50, message: "", consent: true };
+  expect((await request.post("/api/batch-enquiry", { data: ok })).status()).toBe(503);
+
+  await page.goto("/stories");
+  await expect(page.getByRole("heading", { level: 1, name: "What learners say" })).toBeVisible();
+  await expect(page.getByText(/No outcomes to show yet/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "In their own words" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Share your story" })).toHaveAttribute("href", /^mailto:/);
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
 });

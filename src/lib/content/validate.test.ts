@@ -14,6 +14,11 @@ describe("testimonial excerpts (SO-1)", () => {
     b.testimonials = [entry("testimonials/testimonials.yaml", { name: "A", role: "B", quote: "I love this platform. It helps a lot.", excerpt: "I love this platform … It helps a lot." })];
     expect(errorsOf(b)).toEqual([]);
   });
+  it("accept an outcome with the date the learner confirmed it (OS-1)", () => {
+    const b = validBundle();
+    b.testimonials = [entry("testimonials/testimonials.yaml", { name: "A", role: "B", quote: "It helped.", outcome: "Placed as an AI engineer", outcome_on: "2026-11-14" })];
+    expect(errorsOf(b)).toEqual([]);
+  });
 });
 
 describe("a valid bundle", () => {
@@ -35,6 +40,7 @@ describe("broken bundles fail", () => {
     ["a path lists a lesson twice", (b) => b.goals[0].data.stages[1].lessons.push("stop-one"), /listed twice/],
     ["a level-laid path lists a lesson at the wrong level (RM-1)", (b) => (b.goals[0].data.stages = b.goals[0].data.stages.map((st) => ({ ...st, lessons: st.id === "B2" ? ["stop-one"] : [] }))), /B1 lesson, listed at B2/],
     ["a testimonial excerpt is not word for word (SO-1)", (b) => (b.testimonials = [entry("testimonials/testimonials.yaml", { name: "A", role: "B", quote: "I love this platform. It helps a lot.", excerpt: "I really love this platform … It helps a lot." })]), /not word for word/],
+    ["a testimonial outcome has no confirmation date (OS-1)", (b) => (b.testimonials = [entry("testimonials/testimonials.yaml", { name: "A", role: "B", quote: "It helped.", outcome: "Placed as an AI engineer" })]), /needs outcome_on/],
     ["a stop's more list repeats its primary resource", (b) => (b.stops[0].data.more = ["res-one"]), /must all be different/],
     ["a certification's prep resource does not exist", (b) => (b.certifications[0].data.prep = ["nope"]), /prep resource "nope" does not exist/],
     ["a certification names a path that does not exist", (b) => (b.certifications[0].data.paths = ["nope"]), /path "nope" does not exist/],

@@ -538,3 +538,9 @@ The owner asked for research on what would make learners happy and convince them
 - **PP-1:** the interview date lives on the device like the weekly plan, so it needs no account or table. The last week is kept for practice because mock interviews move readiness more than one more lesson does.
 - **QS-1:** the quick check reuses the PL-2 staircase and PL-3 scoring with six questions rather than a new engine. Six questions often cannot pass a level (PL-3 needs two attempts at a level), so the result says it is a first guess and offers the full test. The full test is unchanged.
 - **NG-1:** nudges are shown only on the dashboard, from data on the device, at most two at a time. No email or push notifications were added: the Monday emails (CM-90) already cover the inbox.
+
+## 2026-11-14: batch 6 of making Pro worth buying (CB-1, OS-1, OP-1)
+
+- **CB-1:** no batch price is shown. The owner has not set one, and a public number would tie our hands on discounts by batch size, so the page quotes on enquiry. Batches are delivered by turning on Pro for each learner's own account, not with shared codes, because promo codes today only work on the 30-day pass through Razorpay. Learners stay 18+ (PV-2).
+- **OS-1:** outcomes use the testimonials file with a date the learner confirmed, rather than a new system, so the owner adds one in the same place as a quote. There are none yet, and the page says so rather than showing invented ones.
+- **OP-1:** the pricing page now leads with outcomes and keeps every price, saving and policy line it had (PAY-5, PAY-7, PAY-8, BIZ-1).

@@ -53,7 +53,7 @@ describe("row-level security (SC-2, AC-4)", () => {
   }
 
   it("a signed-out visitor sees nothing and can write nothing", async () => {
-    for (const table of [...OWNED, "email_subscriptions", "resource_clicks", "rate_limits", "roadmap_downloads"]) {
+    for (const table of [...OWNED, "email_subscriptions", "resource_clicks", "rate_limits", "roadmap_downloads", "batch_enquiries"]) {
       const err = await fails(asUser(db.client, null, () => q(`select * from ${table}`)));
       expect(err.code, table).toBe(PERMISSION_DENIED);
     }
@@ -533,5 +533,14 @@ describe("Public profiles and certificates (PF-1, CT-1)", () => {
     await q("delete from auth.users where id = $1", [M]);
     expect((await q("select count(*)::int as n from certificates where user_id = $1", [M])).rows[0].n).toBe(0);
     expect((await q("select count(*)::int as n from public_profiles where user_id = $1", [M])).rows[0].n).toBe(0);
+  });
+});
+
+describe("Batch enquiries (CB-1)", () => {
+  it("only the server reads or writes them, and the batch size is checked", async () => {
+    await q("insert into batch_enquiries (org_name, org_type, contact_name, email, learners, consent_text) values ('Anna College', 'college', 'Priya', 'tpo@example.edu', 120, 'Yes')");
+    expect((await fails(asUser(db.client, A, () => q("select * from batch_enquiries")))).code).toBe(PERMISSION_DENIED);
+    expect((await fails(asUser(db.client, A, () => q("insert into batch_enquiries (org_name, org_type, contact_name, email, learners, consent_text) values ('X', 'college', 'Y', 'y@example.com', 50, 'Yes')")))).code).toBe(PERMISSION_DENIED);
+    expect((await fails(q("insert into batch_enquiries (org_name, org_type, contact_name, email, learners, consent_text) values ('Tiny', 'college', 'Y', 'y@example.com', 3, 'Yes')"))).code).toBe("23514");
   });
 });

@@ -663,7 +663,18 @@ export type Cheatsheet = z.infer<typeof Cheatsheet>;
 /** SO-1: real words from real users, shared with their permission. Never invented. */
 export const TestimonialsFile = z.strictObject({
   testimonials: z
-    .array(z.strictObject({ name: Text.max(60), role: Text.max(60), quote: Text.max(600), excerpt: Text.max(300).optional() }))
+    .array(
+      z.strictObject({
+        name: Text.max(60),
+        role: Text.max(60),
+        quote: Text.max(600),
+        excerpt: Text.max(300).optional(),
+        /** OS-1: what changed for the learner, in a line they agreed to, such as "Placed as an AI engineer at a Chennai start-up". */
+        outcome: Text.max(140).optional(),
+        /** OS-1: the date the learner confirmed the outcome and said it may be shared. */
+        outcome_on: IsoDate.optional(),
+      }),
+    )
     .max(30),
 });
 export type Testimonial = z.infer<typeof TestimonialsFile>["testimonials"][number];

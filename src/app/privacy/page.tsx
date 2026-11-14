@@ -61,6 +61,11 @@ const STORED: [string, string, string][] = [
     "Until you turn the profile off or delete your account. A certificate stays verifiable until you delete your account.",
   ],
   [
+    "A batch enquiry (colleges and companies)",
+    "The organisation, its kind, your name, work email, phone only if you give it, the number of learners, your note and the consent you ticked.",
+    "To reply with a quote. Kept until you ask us to delete it.",
+  ],
+  [
     "Course link clicks",
     "Which course was opened, from which lesson. No user id and no network address.",
     "To learn which picks help. Kept as plain counts.",
