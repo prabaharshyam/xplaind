@@ -12,6 +12,7 @@ import { DEFAULT_PATH_ID, type PathRef, roadmapHref, startFor, testHref } from "
 import { coverage } from "@/lib/roadmap/progress";
 import type { RoadmapStop } from "@/lib/roadmap/types";
 import { Skeleton } from "@/components/skeleton";
+import { NudgeBar } from "./nudge-bar";
 
 type Level = { id: LevelId; name: string; draft_hours: number };
 type Stop = RoadmapStop & { title: string };
@@ -62,6 +63,8 @@ export function Dashboard({
   return (
     <div className="mt-6 flex flex-col gap-8">
       <p className={`text-sm ${muted}`}>Signed in as {email}</p>
+
+      <NudgeBar path={{ id: path.id, name: path.name }} lessons={pathStops.map((s) => ({ id: s.id, title: s.title }))} hasTest={result !== null} />
 
       <section aria-labelledby="level-heading" className="rounded-2xl bg-zinc-100 p-4 dark:bg-zinc-900">
         <h2 id="level-heading" className="text-sm font-medium text-zinc-600 dark:text-zinc-400">

@@ -3,6 +3,8 @@ import { LEVEL_IDS, type LevelId } from "@/lib/levels";
 import {
   FIRST_LEVEL,
   InvalidAttemptError,
+  QUICK_LENGTH,
+  lengthOf,
   TEST_LENGTH,
   currentQuestion,
   gradeChoices,
@@ -189,5 +191,28 @@ describe("isValidStaircase", () => {
   it("rejects a run whose correctness does not match its next level", () => {
     const flipped = good.map((a, i) => (i === 0 ? { ...a, correct: !a.correct } : a));
     expect(isValidStaircase(flipped)).toBe(false);
+  });
+});
+
+describe("QS-1 quick check", () => {
+  const bank = makeBank(6);
+  it("asks QUICK_LENGTH questions on the same staircase and keeps its length", () => {
+    const rng = seededRng(5);
+    let state = startTest(bank, rng, QUICK_LENGTH);
+    expect(lengthOf(state)).toBe(QUICK_LENGTH);
+    let n = 0;
+    while (!state.done) {
+      state = submitAnswer(state, bank, currentQuestion(state, bank)!.correct, rng);
+      n++;
+    }
+    expect(n).toBe(QUICK_LENGTH);
+    expect(state.length).toBe(QUICK_LENGTH);
+    expect(isValidStaircase(state.answers)).toBe(true);
+    expect(resultOf(state).questionsAnswered).toBe(QUICK_LENGTH);
+  });
+  it("a full test stores no length, so saved tests from before still parse the same", () => {
+    const state = startTest(bank, seededRng(1));
+    expect("length" in state).toBe(false);
+    expect(lengthOf(state)).toBe(TEST_LENGTH);
   });
 });

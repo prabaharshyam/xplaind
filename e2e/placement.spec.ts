@@ -141,3 +141,17 @@ test.describe("placement test (PL-2, PL-3, PL-5)", () => {
     await expect(page).toHaveURL(/\/start$/);
   });
 });
+
+test("QS-1: the 2-minute check asks six questions and says the result is a first guess", async ({ page }) => {
+  await page.goto("/start");
+  await page.getByRole("button", { name: "Start the 2-minute check" }).click();
+  for (let n = 1; n <= 6; n++) {
+    await expect(page.getByText(`Question ${n} of up to 6`)).toBeVisible();
+    await answerCurrent(page, "idk");
+    await page.getByRole("button", { name: /^(Next|Finish)$/ }).click();
+  }
+  await expect(page).toHaveURL(/\/result$/);
+  await expect(page.getByText(/This comes from the 2-minute check/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Take the full test" })).toHaveAttribute("href", "/start");
+  expect((await wcag(page)).violations).toEqual([]);
+});

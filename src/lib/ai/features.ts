@@ -2,6 +2,7 @@
 // database, no UI. Every learner-typed string goes through asData (SC-5).
 import { z } from "zod";
 import { asData, DATA_RULE, HOUSE_STYLE } from "./prompt";
+import { LANGUAGE_IDS, type LanguageId, languageRule } from "./languages";
 
 export type CatalogLesson = { id: string; title: string; level: string };
 
@@ -38,11 +39,13 @@ export const TutorRequest = z.strictObject({
   lessonId: z.string().max(80).optional(),
   turns: z.array(ChatTurn).min(1).max(30),
   context: z.string().max(1500).default(""),
+  /** IL-1: the language the learner wants explanations in. */
+  language: z.enum(LANGUAGE_IDS).default("en"),
 });
 
 export function tutorPrompt(
   lesson: { title: string; outcome: string; body: string } | null,
-  req: { turns: z.infer<typeof ChatTurn>[]; context?: string },
+  req: { turns: z.infer<typeof ChatTurn>[]; context?: string; language?: LanguageId },
   catalog: CatalogLesson[],
   /** FOCUS-2: on its own page the tutor also helps learners find their way around the site (it took over from X Bot). */
   siteGuide = "",
@@ -57,6 +60,7 @@ export function tutorPrompt(
     "Explain, give fresh examples and analogies, and check understanding with a quick question when useful. If asked to just do an exercise for them, coach them through it instead.",
     "When asked to plan, give concrete next actions sized to the learner's time, preferring Xplaind's own lessons from the catalog. Be honest about job markets and timelines; never promise jobs or salaries.",
     CHAT_FORMAT,
+    ...(req.language && req.language !== "en" ? [languageRule(req.language)] : []),
     ...(lesson ? ["Stay grounded in the lesson text below; if you go beyond it, say so.", "The lesson text:", lesson.body.slice(0, 30_000)] : []),
     ...(!lesson && siteGuide ? ["If the learner asks how to use Xplaind or where to find something, point to the right page from this list. Never make up a page, a course or a price.", "Pages on Xplaind (path | what it is for):", siteGuide] : []),
     "Lesson catalog (id | title | level):",

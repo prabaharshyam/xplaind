@@ -44,6 +44,8 @@ export type TestState = {
   level: LevelId;
   currentId: string | null;
   done: boolean;
+  /** QS-1: how many questions this test asks; missing means the full TEST_LENGTH. */
+  length?: number;
 };
 
 /** What the test page needs to show a question. It carries the answer: the test has no stakes (PRD, Architecture). */

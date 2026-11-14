@@ -16,6 +16,8 @@ export type SavedAttempt = {
   /** YYYY-MM-DD in India. */
   completedOn: string;
   answers: Answer[];
+  /** QS-1: true when this came from the 2-minute quick check. */
+  quick?: boolean;
 };
 
 export const rawTest = (): string | null => read(TEST_KEY);
