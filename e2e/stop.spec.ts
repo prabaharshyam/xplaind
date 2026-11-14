@@ -129,3 +129,23 @@ test("lesson diagrams are drawn as clean SVG with a text description, and no bla
   expect(await noHorizontalScroll(page)).toBe(false);
   expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations).toEqual([]);
 });
+
+test("LT-1: a translated lesson has its own page, its language set, and a switch back to English", async ({ page }) => {
+  await page.goto("/stop/what-is-ai");
+  const nav = page.getByRole("navigation", { name: "Read this lesson in" });
+  await expect(nav.getByRole("link", { name: "English" })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "தமிழ்" })).toHaveAttribute("href", "/stop/what-is-ai/ta");
+  await page.goto("/stop/what-is-ai/ta");
+  await expect(page.locator("main")).toHaveAttribute("lang", "ta");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("மூணும்");
+  await page.goto("/stop/what-is-ai/hi");
+  await expect(page.locator("main")).toHaveAttribute("lang", "hi");
+  await expect(page.getByRole("heading", { level: 2, name: "सीधा जवाब" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Read this lesson in" }).getByRole("link", { name: "English" })).toHaveAttribute("href", "/stop/what-is-ai");
+  // Tanglish and Hinglish: the same lesson in English letters.
+  await page.goto("/stop/what-is-ai/tanglish");
+  await expect(page.locator("main")).toHaveAttribute("lang", "ta-Latn");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("moonum enna-nu");
+  await page.goto("/stop/what-is-ai/hinglish");
+  await expect(page.getByRole("heading", { level: 2, name: "Seedha jawab" })).toBeVisible();
+});

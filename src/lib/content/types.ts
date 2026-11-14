@@ -17,6 +17,7 @@ import type {
   PlacementQuestion,
   Resource,
   Stop,
+  StopTranslation,
 } from "./schema";
 
 export type Severity = "error" | "warning";
@@ -52,6 +53,8 @@ export type Bundle = {
   videoViews: VideoViews | null;
   patterns: Entry<InterviewPattern>[];
   designs: Entry<SystemDesign>[];
+  /** LT-1: translated lessons. */
+  translations: Entry<StopTranslation>[];
 };
 
 export const emptyBundle = (): Bundle => ({
@@ -73,4 +76,5 @@ export const emptyBundle = (): Bundle => ({
   videoViews: null,
   patterns: [],
   designs: [],
+  translations: [],
 });

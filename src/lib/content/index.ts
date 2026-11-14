@@ -7,7 +7,7 @@ import type { LevelId } from "@/lib/levels";
 import { loadContent } from "./load";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
-import type { BlogPost, Certification, Cheatsheet, InterviewPattern, SystemDesign, Testimonial, Channel, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject } from "./schema";
+import type { BlogPost, Certification, Cheatsheet, InterviewPattern, SystemDesign, Testimonial, Channel, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject, StopTranslation, LessonLang } from "./schema";
 
 let cached: Bundle | undefined;
 
@@ -28,6 +28,11 @@ export function getContent(): Bundle {
 
 export const getStops = (): Stop[] => getContent().stops.map((s) => s.data);
 export const getStop = (id: string): Stop | undefined => getStops().find((s) => s.id === id);
+/** LT-1: a lesson in another language, if there is one. */
+export const getTranslation = (id: string, lang: string): StopTranslation | undefined =>
+  getContent().translations.find((t) => t.data.id === id && t.data.lang === lang)?.data;
+/** LT-1: the languages a lesson can be read in besides English. */
+export const translationLangs = (id: string): LessonLang[] => getContent().translations.filter((t) => t.data.id === id).map((t) => t.data.lang);
 export const getResource = (id: string): Resource | undefined =>
   getContent().resources.find((r) => r.data.id === id)?.data;
 export const getLevel = (id: LevelId): LevelDefinition | undefined =>

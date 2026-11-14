@@ -219,6 +219,23 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     sheetIds.add(c.id);
     for (const l of c.lessons) if (!stopIds.has(l)) error(file, `lesson "${l}" does not exist`, "CS-1");
   }
+  // LT-1: a translation follows its English lesson part for part, so the page can line them up.
+  const lessonById = new Map(bundle.stops.map((x) => [x.data.id, x.data]));
+  const sectionCount = (body: string) => (body.match(/^## /gm) ?? []).length;
+  const seenLang = new Set<string>();
+  for (const { file, data: t } of bundle.translations) {
+    const en = lessonById.get(t.id);
+    if (!en) {
+      error(file, `lesson "${t.id}" does not exist`, "LT-1");
+      continue;
+    }
+    if (seenLang.has(`${t.lang}:${t.id}`)) error(file, `"${t.id}" has two ${t.lang} translations`, "LT-1");
+    seenLang.add(`${t.lang}:${t.id}`);
+    if (t.flashcards.length !== en.flashcards.length) error(file, `has ${t.flashcards.length} flashcards; the English lesson has ${en.flashcards.length}`, "LT-1");
+    if (Boolean(t.exercise) !== Boolean(en.exercise) || (t.exercise && en.exercise && t.exercise.questions.length !== en.exercise.questions.length))
+      error(file, "its Try it exercise must have the same questions as the English lesson", "LT-1");
+    if (sectionCount(t.body) !== sectionCount(en.body)) error(file, `has ${sectionCount(t.body)} parts (## headings); the English lesson has ${sectionCount(en.body)}`, "LT-1");
+  }
   // SO-1: a testimonial's short version is only the person's own words: every piece between
   // the "…" marks must appear in the full quote.
   const squash = (t: string) => t.replace(/\s+/g, " ").trim();
