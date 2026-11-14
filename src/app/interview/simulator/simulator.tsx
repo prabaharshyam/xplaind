@@ -138,6 +138,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
         answers={answers}
         onRetry={() => setStage({ kind: "setup" })}
         aiOn={aiOn}
+        pathId={pathId || null}
       />
     );
   }
@@ -562,14 +563,14 @@ function Meter({ value, band, label }: { value: number; band: Band; label: strin
   );
 }
 
-function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[]; answers: Answer[]; onRetry: () => void; aiOn: boolean }) {
+function Report({ questions, answers, onRetry, aiOn, pathId }: { questions: SimQuestion[]; answers: Answer[]; onRetry: () => void; aiOn: boolean; pathId: string | null }) {
   const results = useMemo(
     () => questions.map((q, i) => analyseAnswer(q, answers[i]?.text ?? "", answers[i]?.seconds ?? 0)),
     [questions, answers],
   );
   const report = useMemo(() => sessionReport(questions, results), [questions, results]);
   const access = useAiAccess(aiOn);
-  const ai = useInterviewReview(questions.map((q, i) => ({ questionId: q.id, answer: answers[i]?.text ?? "" })));
+  const ai = useInterviewReview(questions.map((q, i) => ({ questionId: q.id, answer: answers[i]?.text ?? "" })), pathId);
   const aiById = new Map(ai.review?.answers.map((a) => [a.questionId, a]) ?? []);
   const heading = useRef<HTMLHeadingElement>(null);
   const recorded = useRef(false);
@@ -780,7 +781,7 @@ function Report({ questions, answers, onRetry, aiOn }: { questions: SimQuestion[
                 </div>
               )}
 
-              {aiReview && <AnswerReviewBlock r={aiReview} />}
+              {aiReview && <AnswerReviewBlock r={aiReview} locked={ai.locked} />}
 
               <details className="mt-3">
                 <summary className="min-h-11 cursor-pointer font-medium">Your answer next to the model answer</summary>

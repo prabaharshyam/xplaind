@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
+import { ProfileAndCertificates } from "./profile-and-certificates";
 import { WEEKLY_HOUR_CHOICES } from "@/lib/placement/estimate";
 
 type Card = { id: string; level: string; weeks_active: number; display_name: string | null };
@@ -135,6 +136,8 @@ export function Settings({ email, weeklyHours }: { email: string | null; weeklyH
       </section>
 
       <PasswordSection />
+
+      <ProfileAndCertificates />
 
       <section aria-labelledby="billing-heading" className="flex flex-col gap-3">
         <h2 id="billing-heading" className="text-xl font-semibold">

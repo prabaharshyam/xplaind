@@ -21,6 +21,8 @@ test.describe("accounts switched off", () => {
       ["DELETE", "/api/account"],
       ["POST", "/api/card"],
       ["POST", "/api/profile"],
+      ["PUT", "/api/public-profile"],
+      ["GET", "/api/certificates"],
     ] as const) {
       const res = await request.fetch(path, { method, data: {} });
       expect(res.status(), `${method} ${path}`).toBe(503);

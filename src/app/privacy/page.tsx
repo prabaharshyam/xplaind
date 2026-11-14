@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMeta({
   path: "/privacy",
 });
 
-const UPDATED = "13 November 2026";
+const UPDATED = "14 November 2026";
 
 const contact: string = BUSINESS.email;
 
@@ -49,6 +49,16 @@ const STORED: [string, string, string][] = [
     "Pro pass payments (18 and over only)",
     `The pass you bought, its price, the date, our order number, ${providerName()}'s payment reference, and when your pass ends. Your mobile number goes to ${providerName()} for the payment and is not stored by us. We never see or store card, UPI or bank details.`,
     "Kept for 8 years for tax and accounting, as the law requires. If you delete your account, the record stays but is no longer linked to you.",
+  ],
+  [
+    "Interview readiness and project reviews (accounts only)",
+    "The score of each mock interview review and each AI project review, the role or project, the date, and the GitHub link you gave. Not your answers, your write-up or the README.",
+    "To show your readiness trend and decide certificates. Deleted with your account.",
+  ],
+  [
+    "Public profile and certificates (accounts only, your choice)",
+    "If you turn on a public profile: the handle, name and headline you choose. If you claim a certificate: the name on it, the role and the date. Anyone with the link can see these pages; search engines are asked not to list them.",
+    "Until you turn the profile off or delete your account. A certificate stays verifiable until you delete your account.",
   ],
   [
     "Course link clicks",

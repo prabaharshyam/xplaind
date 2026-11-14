@@ -77,7 +77,7 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     rpc.mockResolvedValueOnce({ data: "ok", error: null }).mockResolvedValueOnce({ data: null, error: null });
     create.mockResolvedValue(reply('{"answer":"42"}'));
     const out = await runAi(req);
-    expect(out).toEqual({ data: { answer: "42" } });
+    expect(out).toEqual({ data: { answer: "42" }, tier: "free" });
     expect(rpc.mock.calls[0][0]).toBe("ai_reserve");
     expect(rpc.mock.calls[0][1]).toMatchObject({ p_kind: "tutor", p_daily_max: 40, p_month_cap_usd: 20 });
     // PAY-1: the tutor runs on the fast model, which has no server-side fallback.
@@ -122,7 +122,7 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     user = null;
     rpc.mockResolvedValueOnce({ data: "ok", error: null }).mockResolvedValueOnce({ data: null, error: null });
     create.mockResolvedValue(reply('{"answer":"42"}'));
-    expect(await runAi(req)).toEqual({ data: { answer: "42" } });
+    expect(await runAi(req)).toEqual({ data: { answer: "42" }, tier: "guest" });
     expect(rpc.mock.calls[0]).toEqual(["ai_reserve_guest", expect.objectContaining({ p_visitor: "visitor-hash", p_kind: "tutor", p_month_cap_usd: 20 })]);
     expect(rpc.mock.calls[0][1]).not.toHaveProperty("p_user");
     expect(rpc.mock.calls[1]).toEqual(["ai_record_guest", expect.objectContaining({ p_visitor: "visitor-hash", p_tokens_in: 1000 })]);

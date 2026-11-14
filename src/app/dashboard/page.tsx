@@ -10,6 +10,7 @@ import { currentUser, userClient } from "@/lib/supabase/server";
 import { PageHero } from "@/components/page-hero";
 import { Dashboard } from "./dashboard";
 import { ProgressOverview } from "./progress-overview";
+import { InterviewReadiness } from "./interview-readiness";
 import { primaryButtonSm } from "@/components/ui";
 import { Skeleton } from "@/components/skeleton";
 
@@ -42,6 +43,7 @@ export default function DashboardPage() {
         <ContinueCard titles={Object.fromEntries(getStops().map((s) => [s.id, s.title]))} />
       </div>
       <ProgressOverview />
+      <InterviewReadiness />
       <h2 className="mt-10 text-xl font-semibold">Your account</h2>
       {accountsEnabled() ? (
         <Suspense fallback={<Skeleton label="Loading your progress…" className="mt-6" />}>
