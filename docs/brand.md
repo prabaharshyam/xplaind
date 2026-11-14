@@ -35,6 +35,11 @@ Deep teal and brass (BR-10, owner decision 2026-11-14, replacing violet). Low-sa
 - Menu icon tiles share one calm teal tint. Topic art (`src/lib/themes.ts`) keeps a hue per topic, but every hue is muted to low saturation so the family sits quietly beside the teal.
 - Contrast: teal on white 9.9:1, link teal on white 11.6:1, sea glass on the dark page 10.1:1, brass-700 on white 7.0:1.
 
+## Blog covers
+
+- Every guide's cover is typographic (BL-2): deep teal ground, a two-line cover line (white, then sea glass) in Bricolage Grotesque, "Xplaind guide" small at the bottom left, and one simple line drawing for the topic on the right, with exactly one brass element. No AI-generated illustrations, stock people or gradients.
+- Add a row to `scripts/blog-covers.ts` and run `npm run covers` (set `PW_CHROMIUM_PATH` if a browser is pre-installed). Keep the cover line short: cards crop the top and bottom.
+
 ## Type
 
 - Headings (h1 to h3) use **Bricolage Grotesque**, a friendly grotesque with optical sizing: big titles get tight, confident letterforms and small headings stay open. It is self-hosted from `@fontsource-variable/bricolage-grotesque`, so builds need no network. Body text and interface use Geist Sans; code uses Geist Mono.
