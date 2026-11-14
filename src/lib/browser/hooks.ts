@@ -10,6 +10,7 @@ import { parseActivity, rawActivity } from "./activity-store";
 import { parseAttempt, rawAttempt } from "./attempt-store";
 import { parsePractice, rawPractice } from "./practice-store";
 import { parseProgress, rawProgress } from "./progress-store";
+import { parseInterviewDate, parsePlan, rawInterviewDate, rawPlan } from "./plan-store";
 import { serverSnapshot, subscribe } from "./storage";
 
 /** The saved test and its placement, or null when there is none (or before hydration). */
@@ -66,4 +67,15 @@ export function useGame() {
       badges: today ? badgesOf(inputs, today) : [],
     };
   }, [progress.stops, practice.ratings, activity.interviews, today]);
+}
+
+/** PP-1: the learner's interview date, kept on this device. */
+export function useInterviewDate(): string | null {
+  return parseInterviewDate(useSyncExternalStore(subscribe, rawInterviewDate, serverSnapshot));
+}
+
+/** WP-2: this week's saved plan, or null. */
+export function useSavedPlan() {
+  const raw = useSyncExternalStore(subscribe, rawPlan, serverSnapshot);
+  return useMemo(() => parsePlan(raw), [raw]);
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { Icon } from "@/components/art/icons";
 import { primaryButton, secondaryButton } from "@/components/ui";
 import { useCurrentPathId, useProgress, useToday } from "@/lib/browser/hooks";
@@ -11,6 +11,7 @@ import { serverSnapshot, subscribe } from "@/lib/browser/storage";
 import { currentPlan, googleCalendarLink, HOUR_CHOICES, nextMonday, type PlanLesson, planWeek, reminderIcs, weekOf } from "@/lib/plan/weekly";
 import { Skeleton } from "@/components/skeleton";
 import { CommitCard } from "./commit-card";
+import { InterviewPlan } from "./interview-plan";
 
 const DEFAULT_HOURS = 6;
 const fmt = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
@@ -25,14 +26,17 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
   const week = today ? weekOf(today) : null;
   const byId = useMemo(() => new Map(Object.values(lessons).flat().map((l) => [l.id, l])), [lessons]);
 
-  const plan = useMemo(() => {
-    if (!week) return null;
-    const state = (id: string) => {
+  const state = useCallback(
+    (id: string) => {
       const s = progress.stops[id]?.status;
       return s === "done" || s === "in_progress" ? s : undefined;
-    };
+    },
+    [progress.stops],
+  );
+  const plan = useMemo(() => {
+    if (!week) return null;
     return currentPlan(saved, week.start, pathId, hours, () => planWeek(lessons[pathId] ?? [], state, hours).items.map((l) => l.id));
-  }, [week, saved, pathId, hours, lessons, progress.stops]);
+  }, [week, saved, pathId, hours, lessons, state]);
 
   // Keep this week's plan fixed once made, so finishing a lesson ticks it instead of swapping it.
   useEffect(() => {
@@ -110,6 +114,7 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
         {items.length > 0 && done === items.length && (
           <p className="mt-4 rounded-2xl bg-emerald-50 p-4 font-medium text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100">Week done. Next week&apos;s plan appears on Monday.</p>
         )}
+        <InterviewPlan today={today!} pathId={pathId} pathName={paths.find((p) => p.id === pathId)?.name ?? "next"} lessons={lessons[pathId] ?? []} hours={hours} state={state} />
       </section>
 
       <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">

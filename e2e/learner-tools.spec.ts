@@ -80,3 +80,17 @@ test("the Practice page points to the AI glossary (PR-9)", async ({ page }) => {
   await expect(page.getByRole("link", { name: "AI glossary", exact: true })).toHaveAttribute("href", "/glossary");
   await expect(page.getByRole("link", { name: "Open the AI glossary →" })).toHaveAttribute("href", "/glossary");
 });
+
+test("PP-1: an interview date makes a plan of weeks ending in mock interviews", async ({ page }) => {
+  await page.goto("/plan");
+  const ist = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date(Date.now() + 21 * 86_400_000));
+  await page.getByLabel("Interview date").fill(ist);
+  await expect(page.getByText(/21 days/)).toBeVisible();
+  await expect(page.getByText(/^Week 1 ·/)).toBeVisible();
+  await expect(page.getByText(/^Week 3 ·/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "mock interviews" })).toHaveAttribute("href", /\/interview\/simulator\?path=/);
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Clear date" }).click();
+  await expect(page.getByText(/^Week 1 ·/)).toHaveCount(0);
+});

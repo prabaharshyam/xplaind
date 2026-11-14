@@ -15,10 +15,10 @@ import {
 import { setPath } from "@/lib/browser/progress-store";
 import { todayInIST } from "@/lib/dates";
 import { DEFAULT_WEEKLY_HOURS, WEEKLY_HOUR_CHOICES } from "@/lib/placement/estimate";
-import { currentQuestion, startTest, submitAnswer, TEST_LENGTH } from "@/lib/placement/select";
+import { currentQuestion, lengthOf, QUICK_LENGTH, startTest, submitAnswer, TEST_LENGTH } from "@/lib/placement/select";
 import type { PublicQuestion } from "@/lib/placement/types";
 import { splitStem } from "@/lib/text";
-import { primaryButton } from "@/components/ui";
+import { primaryButton, secondaryButton } from "@/components/ui";
 
 const IDK = "__idk__";
 
@@ -35,14 +35,15 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
 
   const question = test ? currentQuestion(test.state, bank) : null;
   const answered = test?.state.answers.length ?? 0;
+  const total = test ? lengthOf(test.state) : TEST_LENGTH;
 
   // Move focus to the new question so keyboard and screen-reader users land on it.
   useEffect(() => {
     if (question) headingRef.current?.focus();
   }, [question?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function begin() {
-    saveTest({ goal: goal.id, weeklyHours, state: startTest(bank, Math.random) });
+  function begin(length: number) {
+    saveTest({ goal: goal.id, weeklyHours, state: startTest(bank, Math.random, length) });
     setSelected(null);
   }
 
@@ -57,6 +58,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         weeklyHours: test.weeklyHours,
         completedOn: todayInIST(),
         answers: state.answers,
+        ...(lengthOf(state) < TEST_LENGTH ? { quick: true } : {}),
       });
       clearTest();
       setPath(test.goal);
@@ -73,9 +75,9 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-balance">Find my level</h1>
           <p className="mt-3 leading-7 text-zinc-700 dark:text-zinc-300">
-            About {TEST_LENGTH} multiple-choice questions, five to ten minutes. They get harder when you
-            are right and easier when you are not, so it is fine to say <em>I don&apos;t know</em>.
-            No sign-up, and your answers stay on this device.
+            Start with a 2-minute check of {QUICK_LENGTH} questions, or take the full test of about {TEST_LENGTH} questions
+            (five to ten minutes) for a sharper result. Questions get harder when you are right and easier when you are not,
+            so it is fine to say <em>I don&apos;t know</em>. Your answers stay on this device.
           </p>
         </div>
 
@@ -108,9 +110,14 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
           </div>
         </fieldset>
 
-        <button type="button" className={button} onClick={begin} disabled={bank.length === 0}>
-          Start the test
-        </button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button type="button" className={button} onClick={() => begin(QUICK_LENGTH)} disabled={bank.length === 0}>
+            Start the 2-minute check
+          </button>
+          <button type="button" className={secondaryButton} onClick={() => begin(TEST_LENGTH)} disabled={bank.length === 0}>
+            Start the test
+          </button>
+        </div>
       </div>
     );
   }
@@ -128,17 +135,17 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
       }}
     >
       <p className="text-sm text-zinc-600 dark:text-zinc-400" aria-live="polite">
-        Question {answered + 1} of up to {TEST_LENGTH}
+        Question {answered + 1} of up to {total}
       </p>
       <div
         className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
         role="progressbar"
         aria-label="Test progress"
         aria-valuemin={0}
-        aria-valuemax={TEST_LENGTH}
+        aria-valuemax={total}
         aria-valuenow={answered}
       >
-        <div className="h-full bg-violet-700" style={{ width: `${(answered / TEST_LENGTH) * 100}%` }} />
+        <div className="h-full bg-violet-700" style={{ width: `${(answered / total) * 100}%` }} />
       </div>
 
       <fieldset className="flex min-w-0 flex-col gap-3" key={question.id}>
@@ -174,7 +181,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
       </fieldset>
 
       <button type="submit" className={button} disabled={selected === null}>
-        {answered + 1 >= TEST_LENGTH ? "Finish" : "Next"}
+        {answered + 1 >= total ? "Finish" : "Next"}
       </button>
     </form>
   );

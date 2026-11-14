@@ -6,9 +6,9 @@ import { TestPage } from "./test-page";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
-  title: ["AI Skills Test: Find Your Level in 10 Minutes", "AI Skills Test: Find Your Level"],
+  title: ["AI Skills Test: Find Your Level in 2 Minutes", "AI Skills Test: Find Your Level"],
   description:
-    "A 10-minute AI skills test that finds your level and where to start, so your AI roadmap skips what you already know. No sign-up needed.",
+    "A 2-minute AI skills check, or the full 10-minute test, that finds your level and where to start, so your AI roadmap skips what you already know. No sign-up needed.",
   path: "/start",
 });
 

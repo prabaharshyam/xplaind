@@ -3,11 +3,13 @@
 import { useMemo } from "react";
 import { AiChat } from "@/components/ai/ai-chat";
 import { AiGate, useAiAccess } from "@/components/ai/ai-gate";
+import { LanguagePicker, useTutorLanguage } from "@/components/ai/language-picker";
 import { useAttempt, useCurrentPathId, useGame, useProgress } from "@/lib/browser/hooks";
 
 /** The AI tutor on its own page. It sees a short summary of progress on this device, shown to the learner first. */
 export function TutorChat({ enabled, paths, titles }: { enabled: boolean; paths: { id: string; name: string }[]; titles: Record<string, string> }) {
   const access = useAiAccess(enabled);
+  const language = useTutorLanguage();
   const progress = useProgress();
   const { result } = useAttempt();
   const game = useGame();
@@ -34,11 +36,12 @@ export function TutorChat({ enabled, paths, titles }: { enabled: boolean; paths:
           Chat with your AI tutor
         </h2>
         <AiGate access={access} next="/ai/tutor" kind="tutor" label="tutor questions">
+          <LanguagePicker className="mb-4" />
           <AiChat
             endpoint="/api/ai/tutor"
-            extra={{ context }}
+            extra={{ context, language }}
             greeting="Hi! I'm your AI tutor. Ask me to explain any AI topic, plan your week, or help with your next step into an AI job."
-            starters={["Explain RAG like I am new to it", "What should I learn this week?", "I have 5 hours a week. Make me a plan.", "How do I get my first AI job in India?"]}
+            starters={["Explain RAG like I am new to it", "Explain embeddings in Hindi", "What should I learn this week?", "I have 5 hours a week. Make me a plan.", "How do I get my first AI job in India?"]}
             placeholder="Ask your AI tutor"
           />
         </AiGate>

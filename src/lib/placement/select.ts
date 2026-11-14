@@ -6,6 +6,8 @@ import { scoreAnswers } from "./score";
 import type { Answer, BankQuestion, PlacementResult, Rng, TestState } from "./types";
 
 export const TEST_LENGTH = 12;
+/** QS-1: the 2-minute quick check asks this many questions on the same staircase. */
+export const QUICK_LENGTH = 6;
 export const FIRST_LEVEL: LevelId = "B3";
 
 function pickUnseen<Q extends BankQuestion>(
@@ -20,10 +22,13 @@ function pickUnseen<Q extends BankQuestion>(
   return pool[Math.min(Math.floor(rng() * pool.length), pool.length - 1)];
 }
 
-export function startTest<Q extends BankQuestion>(bank: readonly Q[], rng: Rng): TestState {
+export function startTest<Q extends BankQuestion>(bank: readonly Q[], rng: Rng, length: number = TEST_LENGTH): TestState {
   const first = pickUnseen(bank, [], FIRST_LEVEL, rng);
-  return { answers: [], level: FIRST_LEVEL, currentId: first?.id ?? null, done: first === null };
+  return { answers: [], level: FIRST_LEVEL, currentId: first?.id ?? null, done: first === null, ...(length !== TEST_LENGTH ? { length } : {}) };
 }
+
+/** How many questions this test asks at most. */
+export const lengthOf = (state: TestState): number => state.length ?? TEST_LENGTH;
 
 export function currentQuestion<Q extends BankQuestion>(state: TestState, bank: readonly Q[]): Q | null {
   return state.currentId ? (bank.find((q) => q.id === state.currentId) ?? null) : null;
@@ -57,9 +62,10 @@ export function submitAnswer<Q extends BankQuestion>(
   const answers = [...state.answers, answer];
   const level = answer.correct ? levelUp(question.level) : levelDown(question.level);
 
-  if (answers.length >= TEST_LENGTH) return { answers, level, currentId: null, done: true };
+  const keep = state.length !== undefined ? { length: state.length } : {};
+  if (answers.length >= lengthOf(state)) return { answers, level, currentId: null, done: true, ...keep };
   const next = pickUnseen(bank, answers, level, rng);
-  return { answers, level, currentId: next?.id ?? null, done: next === null };
+  return { answers, level, currentId: next?.id ?? null, done: next === null, ...keep };
 }
 
 export function resultOf(state: TestState): PlacementResult {

@@ -96,6 +96,15 @@ export function ResultView({
             ? "There is no level above P3, so use this path to sharpen what you know and practice for interviews."
             : `That puts your first step at ${result.startLevel}.`}
         </p>
+        {attempt.quick && (
+          <p className="rounded-2xl border border-violet-200 bg-violet-50 p-4 leading-7 dark:border-violet-900 dark:bg-violet-950/30">
+            This comes from the 2-minute check, so it is a first guess.{" "}
+            <Link href="/start" className="font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+              Take the full test
+            </Link>{" "}
+            any time for a sharper start point.
+          </p>
+        )}
         {start && (
           <p className="rounded-2xl bg-zinc-100 p-4 leading-7 dark:bg-zinc-900">
             <span className="font-medium">At {start.id} you work towards:</span> {start.can_do}.
