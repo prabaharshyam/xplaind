@@ -223,6 +223,8 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
   // the "…" marks must appear in the full quote.
   const squash = (t: string) => t.replace(/\s+/g, " ").trim();
   for (const { file, data: t } of bundle.testimonials) {
+    // OS-1: an outcome is shown only with the date the learner confirmed it and agreed to share it.
+    if (Boolean(t.outcome) !== Boolean(t.outcome_on)) error(file, `testimonial "${t.name}": an outcome needs outcome_on (the date the learner confirmed it), and outcome_on needs an outcome`, "OS-1");
     if (!t.excerpt) continue;
     for (const piece of t.excerpt.split("…").map(squash).filter(Boolean)) {
       if (!squash(t.quote).includes(piece)) error(file, `testimonial "${t.name}": the excerpt "${piece.slice(0, 40)}…" is not word for word in the quote`, "SO-1");

@@ -5,14 +5,16 @@ import { AI_KINDS, type AiKind } from "@/lib/ai/limits";
 import { activePayments, paymentProvider, proOpen, providerName } from "@/lib/billing/config";
 import { KIND_LABEL, PLANS, TIER_LIMITS, type PlanId, monthlyEquivalentPaise, perDay, rupees, savingPercent } from "@/lib/billing/plans";
 import { BUSINESS } from "@/lib/business";
+import { getTestimonials } from "@/lib/content";
 import { pageMeta } from "@/lib/seo";
 import { BuyPass } from "./buy-pass";
+import { secondaryButton } from "@/components/ui";
 import { FunnelPing } from "@/components/funnel-ping";
 
 export const metadata: Metadata = pageMeta({
-  title: "Xplaind Pro: AI Tutor, Interview Coach and Resume Review, from ₹249",
+  title: "Xplaind Pro: Get Interview-Ready, with Proof, from ₹99",
   description:
-    "Roadmaps, lessons and projects stay with your account. Xplaind Pro adds a daily AI tutor, interview coach, mock interview reports and resume reviews. 6 months for ₹999, one payment, 7-day refund.",
+    "Roadmaps and lessons stay free with your account. Xplaind Pro adds mock interviews with a readiness score, AI project reviews, resume-to-job match, a verified certificate and an AI tutor in your language. 7 days for ₹99, 6 months for ₹999, 7-day refund.",
   path: "/pricing",
 });
 
@@ -29,7 +31,7 @@ const ORDER: AiKind[] = [
 const FAQ: { q: string; a: string }[] = [
   {
     q: "Which pass should I pick?",
-    a: "If you are preparing for placements or a job switch, the 6-month pass covers a full season of practice for ₹999. The 12-month pass costs the least per day. The 30-day pass is a low-cost way to try Pro.",
+    a: "If you are preparing for placements or a job switch, the 6-month pass covers a full season of practice for ₹999. The 12-month pass costs the least per day. The 30-day pass is a low-cost way to try Pro, and the 7-day pass is for an interview this week.",
   },
   {
     q: "What happens when my free tries run out?",
@@ -40,12 +42,16 @@ const FAQ: { q: string; a: string }[] = [
     a: "No. Every roadmap, lesson, video, practice card, interview answer and project guide comes with your account, with no daily limit. Pro only changes how much AI help you get.",
   },
   {
+    q: "How do I get a certificate?",
+    a: "Finish every lesson on a role's roadmap, pass the quick check (or a project) on at least 80% of them, and pass the AI review of one of the role's guided projects. Then a Pro account can claim the certificate, with a public link anyone can check and an Add to LinkedIn button. It shows what you did on Xplaind; it is not a university or government qualification.",
+  },
+  {
     q: "Why charge for AI help?",
     a: "Each AI answer costs us money to run. Every account can try each AI helper a few times for free; a pass covers the cost of regular use, so Xplaind stays independent, with no ads and no sponsored rankings.",
   },
   {
     q: "Does it renew by itself?",
-    a: "No. A pass is one payment for 30 days, 6 months or 12 months. When it ends you go back to a free account, and you buy again only if you want to. Buying while a pass runs adds the time on at the end.",
+    a: "No. A pass is one payment for 7 days, 30 days, 6 months or 12 months. When it ends you go back to a free account, and you buy again only if you want to. Buying while a pass runs adds the time on at the end.",
   },
   {
     q: "How can I pay?",
@@ -67,17 +73,20 @@ export default function PricingPage() {
   const sandbox = activePayments()?.mode === "sandbox";
   const provider = paymentProvider();
   const rows = ORDER.filter((k) => AI_KINDS.includes(k));
+  const testimonials = getTestimonials();
+  const outcomes = testimonials.filter((t) => t.outcome && t.outcome_on);
+  const stories = (outcomes.length ? outcomes : testimonials).slice(0, 3);
   return (
     <main>
       <FunnelPing event="pricing_view" />
       {/* Hero: the promise, the lowest daily price, and the four reasons it is safe to try. */}
       <section aria-labelledby="pricing-h" className="mx-auto max-w-6xl px-4 pt-12 pb-10 md:px-6 md:pt-20 md:pb-14">
         <h1 id="pricing-h" className="max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance md:text-6xl">
-          Learn AI faster with Pro
+          Get interview-ready, with proof
         </h1>
         <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-800 md:text-xl dark:text-zinc-200">
-          Your roadmap, lessons and projects stay with your account. Pro adds an AI tutor, interview coach and resume reviewer you can use
-          every day, from {perDay(PLANS.pass_year)} a day.
+          Your roadmap and lessons stay free. Pro tells you when you are ready for interviews and gives you things to show a recruiter: a
+          readiness score, reviewed projects, a resume matched to the job and a certificate anyone can check. From {perDay(PLANS.pass_year)} a day.
         </p>
         <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {["One payment, no auto-renewal", "Full refund within 7 days", "UPI, cards and net banking", "Price includes GST"].map((t) => (
@@ -172,27 +181,37 @@ export default function PricingPage() {
         </p>
       </section>
 
-      {/* What the money buys, as outcomes first and numbers second. */}
+      {/* OP-1: what the money buys, as outcomes first and numbers second. */}
       <section aria-labelledby="value-h" className="mx-auto mt-20 max-w-6xl px-4 md:mt-28 md:px-6">
         <h2 id="value-h" className="max-w-2xl text-3xl font-semibold tracking-tight text-balance md:text-4xl">
-          What Pro does for you
+          What you walk away with
         </h2>
-        <ul className="mt-10 grid gap-x-12 gap-y-10 md:grid-cols-2">
+        <ul className="mt-10 grid gap-x-12 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
           {[
             {
+              n: "Score out of 100",
+              t: "Know when you are interview-ready",
+              d: `Take up to ${TIER_LIMITS.pro.interview} mock interviews a day for your role. Each one is reviewed and adds to a readiness score, so you can see yourself getting closer.`,
+            },
+            {
+              n: "Pass or fix",
+              t: "Projects a recruiter will trust",
+              d: "Link your GitHub project and get it marked against the project's rubric, criterion by criterion, with what to fix before you show it.",
+            },
+            {
+              n: "Match %",
+              t: "A resume matched to the job",
+              d: `Up to ${TIER_LIMITS.pro.resume} resume reviews a day: line-by-line fixes, a match score against the job post, and a LinkedIn headline and About section written from your resume.`,
+            },
+            {
+              n: "Verified",
+              t: "A certificate anyone can check",
+              d: "Earn it by passing the checks and a reviewed project, not by clicking through. It has a public link and an Add to LinkedIn button.",
+            },
+            {
               n: `${TIER_LIMITS.pro.tutor} a day`,
-              t: "Never stay stuck on a lesson",
-              d: "Ask the AI tutor anything about the lesson you are reading, your code or your plan, and get a clear answer with the lessons to read next.",
-            },
-            {
-              n: `${TIER_LIMITS.pro.grade} + ${TIER_LIMITS.pro.interview} a day`,
-              t: "Walk into interviews prepared",
-              d: `Get ${TIER_LIMITS.pro.grade} answer reviews and ${TIER_LIMITS.pro.interview} full mock interview reports a day: what you covered, what you missed, and a stronger answer to practise.`,
-            },
-            {
-              n: `${TIER_LIMITS.pro.resume} a day`,
-              t: "Send a resume that gets read",
-              d: "Paste your resume and the role you want. Get line-by-line fixes, the skills to add and how it reads to a recruiter.",
+              t: "Never stuck, in your language",
+              d: "Ask the AI tutor about any lesson, your code or your plan, in English, Hinglish, Hindi, Tamil, Telugu, Kannada, Malayalam, Marathi, Bengali or Gujarati.",
             },
             {
               n: `${TIER_LIMITS.pro.book} + ${TIER_LIMITS.pro.notes} a day`,
@@ -207,7 +226,37 @@ export default function PricingPage() {
             </li>
           ))}
         </ul>
+        <p className="mt-10 max-w-3xl rounded-2xl bg-zinc-50 p-5 leading-7 dark:bg-zinc-900">
+          <span className="font-semibold">Free with every account: </span>
+          every roadmap, lesson, video, practice card and project guide, a 2-minute level check, a week-by-week plan to your interview date and a
+          public profile you can share.
+        </p>
       </section>
+
+      {/* OS-1: real learners only. Outcomes first when there are any; otherwise their words. */}
+      {stories.length > 0 && (
+        <section aria-labelledby="stories-h" className="mx-auto mt-20 max-w-6xl px-4 md:mt-28 md:px-6">
+          <h2 id="stories-h" className="text-3xl font-semibold tracking-tight md:text-4xl">
+            {outcomes.length ? "What learners achieved" : "What learners say"}
+          </h2>
+          <ul className="mt-8 grid gap-5 md:grid-cols-3">
+            {stories.map((t) => (
+              <li key={t.name}>
+                <figure className="h-full rounded-3xl bg-zinc-50 p-6 dark:bg-zinc-900">
+                  {t.outcome && <p className="font-semibold text-emerald-800 dark:text-emerald-300">{t.outcome}</p>}
+                  <blockquote className="mt-2 leading-7 text-zinc-800 dark:text-zinc-200">“{t.excerpt ?? t.quote}”</blockquote>
+                  <figcaption className="mt-3 text-sm font-medium">
+                    {t.name}, <span className="font-normal text-zinc-700 dark:text-zinc-300">{t.role}</span>
+                  </figcaption>
+                </figure>
+              </li>
+            ))}
+          </ul>
+          <Link href="/stories" className="mt-5 inline-flex min-h-11 items-center font-medium text-violet-800 underline underline-offset-2 dark:text-violet-300">
+            Read learner stories
+          </Link>
+        </section>
+      )}
 
       {/* Free against Pro, plainly. */}
       <section aria-labelledby="compare-h" className="mx-auto mt-20 max-w-6xl px-4 md:mt-28 md:px-6">
@@ -251,6 +300,21 @@ export default function PricingPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* CB-1: batches for colleges, institutes and companies. */}
+      <section aria-labelledby="batch-h" className="mx-auto mt-20 max-w-6xl px-4 md:mt-28 md:px-6">
+        <div className="flex flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-6 sm:flex-row sm:items-center sm:justify-between md:p-8 dark:border-zinc-800 dark:bg-zinc-900">
+          <div>
+            <h2 id="batch-h" className="text-2xl font-semibold tracking-tight">
+              Buying for a batch?
+            </h2>
+            <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">Colleges, training institutes and companies can get Pro for 10 or more learners, with one invoice with GST.</p>
+          </div>
+          <Link href="/colleges" className={`${secondaryButton} shrink-0`}>
+            Plans for colleges
+          </Link>
         </div>
       </section>
 
@@ -314,8 +378,9 @@ export default function PricingPage() {
           What you can buy
         </h2>
         <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-          Xplaind sells one thing: <strong className="font-semibold">Pro passes</strong>, a one-time payment for 30 days, 6 months or 12 months
-          of higher limits on the AI helpers (AI tutor, interview feedback, mock interview reports, resume review and study from your notes).
+          Xplaind sells one thing: <strong className="font-semibold">Pro passes</strong>, a one-time payment for 7 days, 30 days, 6 months or 12 months
+          of higher limits on the AI helpers (AI tutor, interview feedback, mock interview reports, project review, resume review and study from your notes)
+          and verified certificates.
           Lessons, roadmaps, videos, practice and project guides need no pass. All prices are in Indian rupees and include GST. A pass is a
           digital service that starts on your account as soon as the payment is confirmed; nothing is shipped, and nothing renews by itself.
           Sold by {BUSINESS.legalName} (GSTIN {BUSINESS.gstin}). Questions:{" "}

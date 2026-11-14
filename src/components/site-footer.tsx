@@ -131,6 +131,12 @@ export function SiteFooter() {
             <Link href="/pricing" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
               Pricing
             </Link>
+            <Link href="/colleges" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
+              For colleges
+            </Link>
+            <Link href="/stories" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
+              Learner stories
+            </Link>
             <Link href="/contact" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>
               Contact
             </Link>
