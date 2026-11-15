@@ -1,0 +1,164 @@
+---
+id: webhooks-basics
+lang: tanglish
+title: "Webhooks"
+outcome: "Webhooks use panni, edhaavadhu nadakkura andha nimishathulaye oru app innoru app-ku solla mudiyum: avai eppadi work aagudhu, eppadi receive panni test panradhu, eppadi secure panradhu, repeats-um failures-um eppadi handle panradhu."
+answer: "Webhook-na, edhaavadhu nadakkura nimishathula oru app call panra URL; details-a JSON-la anuppum, adhanaala innoru app ovvoru sila nimishathukkum check pannaama udanae react pannum."
+why_it_matters: "Payment gateways, e-commerce platforms, forms, CRMs, ovvoru sila nimishathukkum poll pannaama, unga automations-ku udanae solradhu webhooks vazhiyaa thaan. Almost ovvoru serious automation-um idha use pannum, perumbaalaana webhook bugs thavirkka mudiyura sila thappugalaala thaan varum."
+flashcards:
+  - q: "Webhook-na enna?"
+    a: "Edhaavadhu nadakkura nimishathula, neenga kudukkura URL-ku oru app anuppura message. Perumbaalum event-a describe panra JSON body-oda oru HTTP POST."
+  - q: "Webhook-kum polling-kum enna difference?"
+    a: "Polling-na maatram irukkaa-nu thirumba thirumba check panradhu. Webhook edhaavadhu nadandha udanae solludhu, kadhavu irukkaa-nu paarkkama doorbell adikkura maadhiri."
+  - q: "n8n-la test URL-kum production URL-kum enna difference?"
+    a: "Test URL editor-la neenga listen panra varaikkum mattum thaan work aagum. Production URL workflow publish aanadhum work aagum."
+  - q: "Webhook-ku yen vegamaa respond pannanum?"
+    a: "Senders konja nimishathukkulla success reply edhirpaarkkuvaanga. Neenga slow-aa irundha, avanga time out aagi retry pannuvaanga, adhanaala duplicates varum."
+  - q: "Idempotency-na enna?"
+    a: "Oru action-a thirumba seiyyavum safe-aa aakkradhu: ore event-a rendu thadavai process pannalum, oru thadavai pannina maadhiriye effect irukkum, event id check panni."
+  - q: "Oru webhook genuine-nu eppadi verify panradhu?"
+    a: "Sender shared secret vechu serkkura signature-a check pannunga, HTTPS-um neenda, guess panna mudiyaadha URL-um use pannunga, mudiyumna provider-oda API-la irundhu andha object-a thirumba edunga."
+  - q: "Edhuvum thappaa illaadha podhum duplicates yen varudhu?"
+    a: "Vega success reply kidaikkala-na senders retry pannuvaanga, sila neram design-ae at least once deliver pannum, adhanaala ore event rendu thadavai varalaam."
+  - q: "Reconciliation-na enna?"
+    a: "Raathiri maadhiri regular-aa, unga records-a provider-oda API-oda compare panradhu, neenda outages-la lost aana events-a pidikka."
+exercise:
+  title: "Festival-sale outage-a trace pannunga"
+  setup: "Lucknow-la oru sweets shop n8n-la 'payment.captured' webhooks-a receive pannudhu. Workflow: signature verify, 200 OK reply, sheet-la payment id check, apram invoice create panni oru row serkkradhu. Diwali sale-la n8n server restart aagi 3 nimishathukku down aagudhu. Gateway failed deliveries-a 24 maninerathukku retry pannudhu. Oru payment, pay_771, restart-ku konjam munnaadi process aagi sheet-la serndhuduchu, aana 200 OK reply gateway-ku pogala."
+  questions:
+    - q: "pay_771-a gateway enna pannum?"
+      a: "Retry pannum, yenna adhukku 200 OK kidaikkala. So n8n pay_771-a rendaavadhu thadavai receive pannum."
+    - q: "pay_771-ku rendaavadhu invoice-a edhu thadukkum?"
+      a: "Duplicate check: payment id already sheet-la irukku, adhanaala workflow nindrudum."
+    - q: "3 nimisha downtime-la nadandha payments-ku enna aagum?"
+      a: "Server thirumba vandha apram, gateway-oda 24 mani window-kulla retry pannum, adhanaala late-aa process aagum, aana lose aagaadhu."
+    - q: "Server rendu naal down-aa irundhirundha, missing payments-a edhu pidikkum?"
+      a: "Gateway-oda captured payments list-a sheet-oda compare panra raathiri reconciliation."
+ask:
+  - "Webhook-kum API-kum enna difference?"
+  - "n8n-la webhook-a eppadi test panradhu?"
+  - "Duplicate webhook events-a eppadi thadukkiradhu?"
+translated_on: 2026-11-14
+---
+
+## Idhu enna
+
+Neraya automations **edhaavadhu nadakkura nimishathulaye** react pannanum: payment succeed aagudhu, order podapaduthu, form submit aagudhu, support ticket close aagudhu. **Webhook** adha possible aakkudhu.
+
+Webhook-na, event nadakkura udanae, neenga kudukkura web address (URL)-ku oru app anuppura message. Idhu doorbell maadhiri. Ovvoru sila nimishathukkum kadhava paarkkama, adhukku **polling**-nu peyar, yaaraavadhu vandhaa unga-ku solluvaanga.
+
+```flow
+dir: LR
+title: Polling: slow, neraya waste aana requests
+Unga app -[edhaavadhu pudhusaa irukka?]-> Store
+Store -[illa ... illa ... irukku, oru order]-> Unga app
+```
+
+```flow
+dir: LR
+title: Webhook: nadakkum podhae solludhu, fast, waste check illa
+Store -[event-a POST pannum]-> Unga URL (n8n)
+Unga URL (n8n) -[200 OK]-> Store
+```
+
+Message perumbaalum oru HTTP **POST** request, event-a describe panra **JSON** body-oda: enna nadandhuchu, eppo, details.
+
+Indha lesson Jaipur-la oru handicrafts store-a follow pannum. Payment succeed aana udanae invoice email aaganum-nu avanga virumburaanga. Mudiyum podhu, webhooks-a receive panni, test panni, secure panni, safe-aa repeat panna mudiyum.
+
+## Idhu eppadi work aagudhu
+
+### Receive panradhu
+
+Unga automation tool-la irundhu oru URL kidaikkum, n8n-oda **Webhook** node-la irundhu maadhiri. Adha anuppura app-oda settings-la paste panni, endha events anuppanum-nu choose pannunga. Event nadandha, sender unga URL-ku JSON-a post pannum, andha data-oda unga workflow aarambikkum.
+
+### Test URL vs production URL
+
+Neraya tools rendu URLs tharum:
+
+| URL | Eppo work aagum | Edhukku use panradhu |
+| --- | --- | --- |
+| Test URL | Editor-la neenga listen panra podhu | Build panna, debug panna |
+| Production URL | Workflow publish (active) aanadhum | Real events-ku |
+
+Beginners-ku varra oru common thappu, sender settings-la test URL-a appadiyae vittudradhu. Neenga paarkkum podhu ellam work aagum, editor-a mooduna udanae nindrudum.
+
+### Payload-a inspect pannunga
+
+Oru test event-a trigger panni, vandha exact JSON-a paarunga. Field names-um nesting-um provider-padi maarum. Mappings-a nyaabagathula irundhu illa, real sample-la irundhu build pannunga.
+
+### Vegamaa respond pannunga
+
+Senders vega success reply edhirpaarkkuvaanga, perumbaalum konja nimishathukkulla oru HTTP `200 OK`. Unga workflow modhalla PDF generate panra maadhiri slow velai pannina, sender time out aagi **retry** pannalaam. So: udanae reply pannunga, apram velaiya pannunga.
+
+### Retries, duplicates
+
+Unga endpoint fail aanaalum slow-aa irundhaalum, perumbaalaana senders retry pannuvaanga, sila neram pala maninerangala neraya thadavai. Sila design-ae "at least once" deliver pannum. Ethuvaanaalum, **ore event-a onnukku mela thadavai receive pannalaam.**
+
+Idhukku defence **idempotency**: unga actions-a thirumba seiyyavum safe-aa aakkradhu. Event illa payment-oda id vechchu, already process pannittingala-nu check pannunga:
+
+```flow
+Webhook varudhu | payment id = pay_771 -> pay_771 already namma sheet-la irukkaa?
+pay_771 already namma sheet-la irukkaa? -[irukku]-> Nirutthu | duplicate: edhuvum pannaadheenga
+pay_771 already namma sheet-la irukkaa? -[illa]-> Invoice create pannu, email pannu, pay_771-oda oru row serthuko
+```
+
+Oru duplicate "payment captured" ethaiyum rendu invoices-a, rendu emails-a create pannakoodaadhu.
+
+### Security
+
+Unga URL-a theriñjukkittavanga yaaraavadhu fake events-a post pannalaam, real shipment-a trigger panra fake "payment captured" maadhiri. Adha protect pannunga:
+
+| Protection | Enna pannum |
+| --- | --- |
+| **Signature-a verify pannunga** | Neraya providers ovvoru webhook-aiyum shared secret vechu sign pannuvaanga; data-va nambradhukku munnaadi unga workflow signature-a check pannum |
+| **HTTPS, neenda guess panna mudiyaadha path** | URL-a kandupidikka kashtam aakkum, transit-la data-va padikka mudiyaadha maadhiri pannum |
+| **Provider-oda API-la irundhu thirumba edunga** | Mukkiyamaana events-ku, payment unmaiyaave succeed aanadha-nu provider-a nerlaye kelunga |
+
+### Miss aana events
+
+Unga endpoint, sender-oda retry window-a vida neram down-aa irundhaa, events sattham illaama lose aagalaam. Mukkiyamaana flows-ku, **reconciliation** run pannunga, raathiri maadhiri, adhu unga records-a provider-oda API-oda compare panni gaps-a niraikkum.
+
+## Oru example
+
+Jaipur-la oru handicrafts store oru payment gateway use pannudhu. Payment succeed aana udanae invoice email aaganum, accounts sheet-la oru row serkkanum-nu virumburaanga.
+
+Avanga n8n-la idha build panraanga:
+
+| # | Step | Yen |
+| --- | --- | --- |
+| 1 | Gateway dashboard-la "payment captured" events-ku serkkapatta production URL-oda Webhook node | Events-a udanae receive panna |
+| 2 | Gateway-la irundhu copy panna webhook secret vechu signature-a verify pannunga | Fake requests-a reject panna |
+| 3 | Udanae `200 OK` reply pannunga | Gateway time out aagi retry pannaama irukka |
+| 4 | Payment id-a sheet-oda check pannunga; irundha nirutthunga | Duplicates edhuvum pannaadhu |
+| 5 | Invoice PDF create panni, email pannu, payment id-oda row serkkunga | Real velai |
+| 6 | Raathiri: andha naal captured payments-a gateway API-la irundhu eduthu sheet-oda compare pannunga | Miss aanadha pidikka |
+
+**Festival sale.** Diwali sale-la, n8n server restart aagi rendu nimishathukku down aagudhu. Server thirumba vandhadhum gateway miss aana events-a retry pannudhu. Andha events-la rendu, restart-ku konjam munnaadi process aagiduchu, aana adhoda replies gateway-ku pogala, adhanaala rendu thadavai varudhu. Duplicate check rendayum nirutthudhu.
+
+| Situation | Enna nadandhuchu | Edhu handle pannuchu |
+| --- | --- | --- |
+| Theriyaadha sender-la irundhu fake request | Signature match aagala | Step 2: reject aachu |
+| Restart-ku apram event rendu thadavai vandhuchu | Payment id already sheet-la irundhuchu | Step 4: nindruchu |
+| 2 nimisha outage-la anuppina events | Gateway apram retry pannuchu | Steps 1 la irundhu 5 varaikkum, konja nimisham late-aa |
+| Oru vaara raathiri reconciliation | Missing payments edhuvum kidaikkala | Step 6 |
+
+Step 4 illa-na, rendu customers-kum thalaa rendu invoices poyirukkum, accounts sheet-la nadakkaadha ₹8,400 sales kaattirukkum.
+
+## Podhuvaa panra thappugal
+
+- **Production-la test URL use panradhu.** Editor-a mooduna udanae events varaadhu.
+- **Sign pannaadha requests-a nambradhu.** Act panradhukku munnaadi signatures-a verify pannunga.
+- **Slow responses.** Senders retry pannuvaanga, duplicates varum. Modhalla reply pannunga, apram velai.
+- **Duplicate check illama irukkradhu.** Retries rendu invoices, emails, orders-a create pannum.
+- **Reconciliation illama irukkradhu.** Neenda outages-la events sattham illaama lose aagum.
+- **Secrets-a log panradhu.** Webhook secret-a, muzhu payment details-a mathavanga padikkura logs-la ezhudhaadheenga.
+
+## Practice pannunga
+
+Keezha link panni irukkura Zapier-oda webhooks explanation-a, n8n-oda Webhook node docs-a padinga.
+
+1. **Receive.** n8n-la oru webhook workflow create panni, oru form tool illa curl maadhiri command-la irundhu test request vechchu trigger pannunga.
+2. **Duplicates.** Ore event-a rendu thadavai anuppi, rendaavadhu edhuvum pannaadha maadhiri duplicate check serkkunga.
+3. **Security.** Shared-secret check serthu, thappaana secret-oda oru request reject aagradha kaattunga.
+
+**Mudinjadhu-nu eppo sollalaam:** webhooks yen retry pannum-nu explain panna mudiyum, unga duplicate check work aagradha kaatta mudiyum, outage-la miss aana events-a eppadi pidippeenga-nu solla mudiyum.

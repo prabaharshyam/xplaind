@@ -1,0 +1,185 @@
+---
+id: shaping-json
+lang: hi
+title: "JSON पढ़ना और उसे shape देना"
+outcome: "APIs और webhooks से आने वाला nested JSON पढ़ो, ज़रूरी fields चुनो, lists और objects को नया shape दो, और missing values संभालो, automation tool में, बिना भारी code के।"
+answer: "JSON ऐसा text है जिसमें objects curly braces में और lists square brackets में होती हैं। Shape देने का मतलब है ज़रूरी fields चुनना, उनके नाम बदलना और missing values संभालना।"
+why_it_matters: "Automation में हर API, webhook और AI step JSON में बात करता है। ज़्यादातर automation bugs data के shape के bugs होते हैं: कोई field कभी-कभी गायब, जहाँ एक item सोचा वहाँ list, या text में रखा number। JSON पर पकड़ से आप तेज़ बनते हो और आपके workflows भरोसेमंद।"
+flashcards:
+  - q: "JSON क्या है?"
+    a: "JavaScript Object Notation: वो text format जिससे apps data का आदान-प्रदान करते हैं। ये objects, arrays और सरल values से बनता है।"
+  - q: "JSON object और array में क्या फ़र्क है?"
+    a: "Object में curly braces के अंदर नाम वाले fields होते हैं, जैसे एक customer। Array square brackets में items की क्रम वाली list है, जैसे order lines।"
+  - q: "पहली order line की price का path कैसे लिखते हैं?"
+    a: "order.lines[0].price। बाहर से अंदर की ओर नाम follow करो, और array के items को 0 से गिनो।"
+  - q: "Automation में list को items में क्यों बाँटते हैं?"
+    a: "ताकि हर element, जैसे हर order line, आगे के steps में एक-एक करके संभाला जाए, जैसे हर line के लिए sheet की एक row।"
+  - q: "'1,199.00' को जोड़ने से पहले convert क्यों करना पड़ता है?"
+    a: "वो text है, number नहीं। Comma हटाकर convert करो, वरना totals fail होंगे या गलत आएँगे।"
+  - q: "PIN codes और phone numbers text में क्यों रखते हैं?"
+    a: "Number बनने पर शुरू के zeros जा सकते हैं या round हो सकते हैं। ये identifiers हैं, मात्राएँ नहीं।"
+  - q: "Workflow को missing या null field कैसे संभालना चाहिए?"
+    a: "पहले से तय करो: default use करो, step छोड़ दो, या record किसी इंसान को भेज दो। Workflow को fail मत होने दो।"
+  - q: "JSON schema क्या है?"
+    a: "उस shape का description जो JSON में होना चाहिए: कौन-से fields, उनके types और कौन-से ज़रूरी हैं। APIs और AI structured outputs इन्हें use करते हैं।"
+exercise:
+  title: "Payment webhook पढ़ो"
+  setup: "Payment सफल होने पर एक payment gateway ये JSON भेजता है। इसमें दो top-level fields हैं। 'event' एक object है जिसमें 'id' की value 'evt_5521' है। 'payment' एक object है जिसमें 'amount' की value '2,450.00', 'currency' 'INR', 'method' 'upi', 'customer' (जिसमें 'name' 'Rakesh Gupta', 'phone' '09812345678' और 'email' null है), और 'notes' हैं, जो दो objects की array है, हर एक में 'key' और 'value', पहले में key 'invoice' और value 'INV-207'।"
+  questions:
+    - q: "Customer के phone number का path लिखो।"
+      a: "payment.customer.phone"
+    - q: "पहले note की value का path लिखो, और बताओ वो क्या है।"
+      a: "payment.notes[0].value, जो 'INV-207' है।"
+    - q: "Amount को monthly total में जोड़ने से पहले उसके साथ कौन-से दो काम करने होंगे?"
+      a: "Comma हटाओ और text को number में convert करो: '2,450.00' से 2450.0 बनता है।"
+    - q: "Email null है। 'send receipt by email' step को क्या करना चाहिए?"
+      a: "Fail नहीं होना चाहिए। तय नियम के हिसाब से email छोड़ दे, receipt की जगह SMS भेजे, या payment को किसी इंसान के लिए flag कर दे।"
+ask:
+  - "Nested JSON में किसी field का path कैसे ढूँढें?"
+  - "JSON में null का क्या मतलब है?"
+  - "n8n में JSON के अंदर की list पर loop कैसे चलाएँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+लगभग हर automation और AI application apps के बीच data भेजता है, और वो data लगभग हमेशा **JSON** (JavaScript Object Notation) में जाता है: एक text format जिससे apps structured data का आदान-प्रदान करते हैं। अगर आप JSON पढ़ और बदल सकते हो, तो लगभग किसी भी चीज़ को किसी से भी जोड़ सकते हो।
+
+JSON के तीन building blocks हैं:
+
+| Building block | कैसा दिखता है | Example |
+| --- | --- | --- |
+| **Object** | Curly braces में नाम वाले fields | नाम, phone और शहर वाला एक customer |
+| **Array** (list) | Square brackets में items | Order lines की list |
+| **Value** | Quotes में text, number, true या false, या null (खाली) | "Mysuru", 2, true, null |
+
+Objects और arrays एक-दूसरे के अंदर nest होते हैं। Payment webhook में payment का एक object हो सकता है, उसके अंदर customer का object, और उसके अंदर notes की array।
+
+```flow
+title: एक order, nested JSON के रूप में
+order (object) -> id: "ORD-88213"
+order (object) -> customer (object)
+customer (object) -> name: "Nisha Rao"
+customer (object) -> phone: "9845012345"
+customer (object) -> email: null
+order (object) -> lines (array)
+lines (array) -> [0] sku, qty, price
+lines (array) -> [1] sku, qty, price
+order (object) -> shipping (object)
+shipping (object) -> city: "Mysuru"
+shipping (object) -> pin: "570001"
+```
+
+इस lesson में हम एक online tea store के order webhook को देखेंगे कि वो dispatch sheet की rows और customer को SMS कैसे बनता है। Lesson के अंत तक आप किसी अनजान JSON payload से वही निकाल पाओगे जो workflow को चाहिए।
+
+## ये काम कैसे करता है
+
+### Path पढ़ना
+
+Nested field तक पहुँचने के लिए बाहर से अंदर नाम follow करो, dots से जोड़कर। Array के items square brackets में **0** से गिने जाते हैं।
+
+| आपको क्या चाहिए | Path |
+| --- | --- |
+| Order id | `order.id` |
+| Customer का phone | `order.customer.phone` |
+| पहली line की price | `order.lines[0].price` |
+| दूसरी line का SKU | `order.lines[1].sku` |
+| Delivery का PIN code | `order.shipping.pin` |
+
+### असली samples देखो
+
+सिर्फ़ documentation देखकर path का अंदाज़ा कभी मत लगाओ। असली या test event trigger करो और जो JSON आया उसे ठीक से देखो। n8n में output panel हर item को table, raw JSON या schema के रूप में दिखाता है; इसी से सही path ढूँढो और copy करो।
+
+### चुनो और नाम बदलो
+
+ज़्यादातर workflows को बड़े payload में से कुछ ही fields चाहिए। "Edit Fields" या "Set" step से उन्हें चुनो और साफ़ नाम दो: `payment.notes.contact_no` की जगह `customer_phone`। आगे के steps पढ़ना और संभालना बहुत आसान हो जाता है।
+
+### Lists से items, और वापस
+
+अगर कोई field list रखता है, जैसे order lines या attachments, तो उसे **split** करो ताकि हर element आगे के steps के लिए अपना अलग item बन जाए। तब हर line अपनी sheet row बन सकती है। वापस जाने के लिए items को एक list में **aggregate** करो।
+
+```flow
+1 item | lines [A, B] वाला एक order -[lines को split करो]-> Item 1 | order id, line A
+1 item -[lines को split करो]-> Item 2 | order id, line B
+Item 1 -> हर एक की एक sheet row
+Item 2 -> हर एक की एक sheet row
+```
+
+जो fields आगे भी चाहिए, जैसे order id और city, उन्हें हर split item पर रखो।
+
+### Types
+
+Values अक्सर गलत type में आती हैं:
+
+| मिली हुई value | समस्या | Fix |
+| --- | --- | --- |
+| `"1,250.00"` | Comma वाला text, number नहीं | Commas हटाओ, फिर number में convert करो |
+| `"03/11/2026"` | ये 3 November है या 11 March? | Provider जो format बताए उसी से parse करो |
+| `9845012345` number के रूप में | ठीक है, पर `0123` number बनने पर zero खो देता है | Phone numbers, PIN codes और ids को text रखो |
+| `"true"` | Text है, true या false नहीं | Text की तरह compare करो, या convert करो |
+
+### Missing values
+
+कुछ records में fields गायब या `null` हो सकते हैं। पहले से तय करो: default use करो, कोई step छोड़ो, या record किसी इंसान को भेजो। "अगर `customer.email` null है, तो email step छोड़ो और SMS भेजो" एक rule है; जो workflow crash हो जाए वो rule नहीं है।
+
+### APIs और AI steps के लिए JSON बनाना
+
+जब आप किसी API या AI step को data भेजते हो, तो आपको वही shape बनाना होता है जो वो चाहता है। **JSON schema** उस shape का description है: कौन-से fields, उनके types और कौन-से ज़रूरी हैं। अपना output API के documentation से मिलाओ, और AI structured outputs के लिए उस schema से जो आप model को दो।
+
+### Power tools
+
+`jq` और JSONata JSON को query और reshape करने की छोटी languages हैं। कई automation tools मिलते-जुलते expressions support करते हैं। शुरू करने के लिए इनकी ज़रूरत नहीं, पर पेचीदा payloads में ये मदद करते हैं।
+
+## एक example से समझो
+
+बेंगलुरु का एक online tea store, order होने पर ये webhook (छोटा करके) पाता है:
+
+```json
+{
+  "order": {
+    "id": "ORD-88213",
+    "created_at": "2026-11-03T10:42:00+05:30",
+    "customer": { "name": "Nisha Rao", "phone": "9845012345", "email": null },
+    "lines": [
+      { "sku": "TEA-ASSAM-250", "qty": 2, "price": "349.00" },
+      { "sku": "MUG-STEEL", "qty": 1, "price": "1,199.00" }
+    ],
+    "shipping": { "city": "Mysuru", "pin": "570001" }
+  }
+}
+```
+
+Goal: dispatch sheet में हर order line की एक row, और customer को एक SMS।
+
+1. `order.lines` को items में **split** करो, और हर item पर `order.id`, `customer.name`, `shipping.city` और `shipping.pin` रखो।
+2. `price` को commas हटाकर text से number में **convert** करो, फिर line total = qty × price निकालो।
+3. `pin` को text ही **रखो**, ताकि "570001" जैसा है वैसा रहे।
+4. **SMS:** `customer.phone` के आगे +91 जोड़कर use करो। `email` `null` है, इसलिए इस order के लिए email step छोड़ दो।
+
+Dispatch sheet में दो rows बनती हैं:
+
+| Order | Customer | SKU | Qty | Price | Line total | City | PIN |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ORD-88213 | Nisha Rao | TEA-ASSAM-250 | 2 | 349 | 698 | Mysuru | 570001 |
+| ORD-88213 | Nisha Rao | MUG-STEEL | 1 | 1,199 | 1,199 | Mysuru | 570001 |
+
+Conversion step से पहले दूसरी line का total error दिखा रहा था, क्योंकि "1,199.00" text था। Null check से पहले, workflow हर उस customer के लिए fail होता था जिसका email नहीं था, यानी लगभग पाँच में से एक order।
+
+## आम गलतियाँ
+
+- **Path का अंदाज़ा लगाना।** असली samples देखो और सही path copy करो।
+- **List होने पर भी एक item मान लेना।** Lists को items में split करो।
+- **Numbers को text छोड़ देना।** "1,199.00" convert होने तक जुड़ेगा नहीं।
+- **शुरू के zeros खो देना।** PIN codes, phone numbers और ids को text रखो।
+- **Missing fields पर fail हो जाना।** Null और गायब fields के लिए rule पहले से बनाओ।
+- **ये भूल जाना कि array 0 से शुरू होती है।** पहला item `[0]` है, `[1]` नहीं।
+
+## Practice करो
+
+नीचे link किया MDN का JSON guide और n8n का data के साथ काम करने वाला page पढ़ो।
+
+1. **Paths।** ऊपर के sample या किसी असली webhook sample से पाँच fields के path लिखो, जिनमें एक list के अंदर का भी हो।
+2. **Reshape।** n8n में order lines को items में split करो, prices को numbers में convert करो और line totals निकालो।
+3. **Missing data।** ऐसा check जोड़ो जो बिना phone number वाले orders को किसी इंसान के पास भेजे।
+
+**आपका काम पूरा जब:** आप किसी अनजान JSON payload से दस मिनट के अंदर वो fields निकाल और reshape कर सको जो workflow को चाहिए।

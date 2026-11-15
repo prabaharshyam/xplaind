@@ -1,0 +1,164 @@
+---
+id: automation-error-handling
+lang: tanglish
+title: "Error handling, retries"
+outcome: "Automations-a safe-aa fail aaga vaikka mudiyum: temporary errors-a backoff-oda retry pannunga, permanent errors-la niruthunga, sariyaana aal-ku useful details-oda alert pannunga, rerun-la duplicates varaama paathukkunga, enna nadandhuchu-nu oru record vechchukkunga."
+answer: "Nalla automation temporary errors-a valarndhutte pora wait-oda retry pannum, permanent errors-la nikkum, useful details-oda oru aal-ku alert pannum, oru item-a rendu thadavai process pannaadhu."
+why_it_matters: "Ovvoru automation-um eppavaachum fail aagum: API down aagum, password expire aagum, file-oda format vichitthiramaa irukkum. Nambikkaiyaana automation-kum kaivida pattadhukkum difference, failures pidikkapattu, explain pannapattu, recover panna mudiyudha-nu thaan; double payments, lost orders illaama."
+flashcards:
+  - q: "Nalla error handling edhu aindhu velaigal pannum?"
+    a: "Temporary errors-a retry pannum, permanent errors-la nikkum, details-oda oru aal-ku alert pannum, duplicates illaama recover aagum, enna nadandhuchu-nu record pannum."
+  - q: "Moonu temporary errors sollunga."
+    a: "Network blips, timeouts, rate limits (HTTP 429), server errors (HTTP 500 to 504). Retry panna perumbaalum success aagum."
+  - q: "Moonu permanent errors sollunga."
+    a: "Thappaana illa expire aana credentials (401, 403), bad input (400), illaadha record (404). Retry pannaalum sari aagaadhu."
+  - q: "Retry with backoff-na enna?"
+    a: "Konjam thadavai, valarndhutte pora wait-oda retry panradhu, 5 seconds, 30 seconds, apram 2 minutes maadhiri; Retry-After header irundha adha madhikkanum."
+  - q: "Idempotency duplicates-a eppadi thadukkudhu?"
+    a: "Edhaavadhu create panradhukku munnaadi, order id maadhiri unique key-a workflow check pannum. Already irundha onnum pannaadhu; adhanaala rerun safe."
+  - q: "Dead-letter queue-na enna?"
+    a: "'Gavanam thevai' list. Permanent-aa fail aana records reason-oda ingae pogum; adhanaala adha fix panni thirumba process pannalaam, kaanaama pogaadhu."
+  - q: "Useful alert-la enna irukkanum?"
+    a: "Workflow, step, record, error message, run-oda link, mudinja varaikkum adutha enna pannanum-nu."
+  - q: "Errors-oda serthu item counts-ayum yen monitor pannanum?"
+    a: "Oru workflow amaidhiyaa zero items process pannaa, error edhuvum kaattaadhu. 'Items romba kammi' check adha pidikkum."
+exercise:
+  title: "Failures-a classify pannunga"
+  setup: "Coimbatore-la oru automation billing system-la irundhu WhatsApp-ku payment reminders anuppudhu, naalaikku sumaar 1,500. Pona vaaram run log-la: (1) maalai 7 mani-ku 40 calls 429 Too Many Requests thirumbi vandhuchu, (2) oru naal ella call-um 401 Unauthorized thirumbi vandhuchu, (3) 12 customers-oda phone numbers '12345' maadhiri irundhuchu, API 400 Bad Request thirumbi anuppuchu, (4) rerun-ku apram 300 customers-ku ore reminder rendu thadavai pochchu, (5) Sunday run errors illaama mudinjuchu, aana 0 messages anuppuchu, yenna billing export kaaliyaa irundhuchu."
+  questions:
+    - q: "Edhellaam retry pannanum, eppadi?"
+      a: "(1) 429s mattum thaan. Backoff-oda retry pannunga, Retry-After header-a madhinga, konjam attempts-oda cap vechchukkunga."
+    - q: "(2)-la workflow enna pannanum?"
+      a: "Retry pannaama udane nikkanum, WhatsApp token expire aayidichu illa revoke aayidichu-nu owner-ku alert pannanum, enga renew pannanum-nu sollanum."
+    - q: "(3)-la irukkura 12 records enga pogum?"
+      a: "'Needs attention' list-ku, 'invalid phone number'-nu reason-oda; matha reminders thodarndhu pogum."
+    - q: "(4), (5)-a pidichirukkum rendu checks enna?"
+      a: "(4)-ku invoice id plus reminder date maadhiri key-la idempotency check, (5)-ku daily 'expected-a vida kammi messages' alert."
+ask:
+  - "Automation edhellaam errors-a retry pannanum?"
+  - "Workflow rerun aagum podhu duplicate actions-a eppadi thadukkalaam?"
+  - "n8n-la alerts eppadi set up pannalaam?"
+translated_on: 2026-11-14
+---
+
+## Idhu enna
+
+Ovvoru automation-um eppavaachum fail aagum. API down aagum, token expire aagum, customer phone number-a thappaa type pannuvaanga, provider neenga evvalavu vegama anuppalaam-nu limit podum. Kelvi **fail aagumaa** illa, **eppadi** fail aagum-ngradhu thaan. Nalla build panna automation safe-aa fail aagum: edhuvum kaanaama pogaadhu, edhuvum rendu thadavai nadakkaadhu, sariyaana aal-ku enna pannanum-nu theriyum.
+
+**Error handling**-na oru step fail aanaa automation pannra ellaam:
+
+| Vela | Artham |
+| --- | --- |
+| **Retry** | Temporary-aa irukka vaaippu irukkura errors-a thirumba try pannum |
+| **Stop** | Thaane sari aagaadha errors-a record pannum, thirumba thirumba try pannaadhu |
+| **Alert** | Oru aal-ku sollum, act panna podhumaana details-oda |
+| **Recover** | Kaaranam fix aanadhum, actions duplicate aagaama safe-aa reprocess pannum |
+| **Record** | Pinnaadi review panna, enna nadandhuchu-nu history vechchukkum |
+
+Indha lesson Bengaluru-la oru logistics startup-a follow pannum; avanga delivery-update automation duplicate messages anuppuchu, rate limits-la mothichu, oru muzhu naal onnume pannala. Lesson mudiyum podhu, unga sonda automations-a safe-aa fail aaga vaikka mudiyum.
+
+## Idhu eppadi work aagudhu
+
+### Error vagaigala therinjukkunga
+
+```flow
+Oru error varudhu -> Temporary-aa irukkumaa? | timeout, 429, 500-504
+Temporary-aa irukkumaa? -[aama]-> Backoff-oda retry pannunga | appavum fail aanaa alert pannunga
+Temporary-aa irukkumaa? -[illa]-> Oru bad record pathiyaa? | 400, 404, invalid data
+Oru bad record pathiyaa? -[aama]-> Record-a "needs attention"-la podunga | matha ellathayum thodarunga
+Oru bad record pathiyaa? -[illa]-> Muzhu workflow pathiyaa? | 401, 403, expire aana token
+Muzhu workflow pathiyaa? -[aama]-> Ippove niruthunga | fix-oda owner-ku alert pannunga
+```
+
+| Vagai | Examples | Enna pannanum |
+| --- | --- | --- |
+| **Temporary** | Network blips, timeouts, rate limits (HTTP 429), server errors (500 to 504) | Backoff-oda retry |
+| **Permanent** | Thappaana credentials (401, 403), bad input (400), illaadha record (404), invalid data | Nillunga, record pannunga, kaaranatha fix pannunga |
+| **Logic** | Automation odiyuchu, aana thappaana velaiya pannuchu, udhaaranathukku oru field thappaa map aanadhu | Checks-um monitoring-um mattum thaan idhai pidikkum |
+
+### Backoff-oda retry
+
+Temporary errors-a konjam thadavai retry pannunga, ovvoru thadavaiyum adhigama wait pannunga; adhanaala thinaruradhu service-a nerukkama irukkum:
+
+```flow
+dir: LR
+Muyarchi 1 -[fail aanaa]-> 5 s wait -> Muyarchi 2 -[fail aanaa]-> 30 s wait -> Muyarchi 3 -[fail aanaa]-> 2 min wait -> Muyarchi 4 -[fail aanaa]-> Oru aal-ku alert
+```
+
+Service **Retry-After** header anuppinaa adha madhinga: evvalavu neram wait pannanum-nu adhu sariyaa solludhu. Retries-ku eppavum oru cap vainga.
+
+### Idempotency: rendu thadavai odinaalum safe
+
+Retries-um manual reruns-um actions-a repeat pannalaam. Invoice, payment, message maadhiri edhaavadhu create panradhukku munnaadi, order id plus status maadhiri unique key vachchu, adhu already irukkaa-nu check pannunga. Irundha skip pannunga. Appo retries-um reruns-um duplicates-a uruvaakkaadhu.
+
+### Udhavara alerts
+
+| Weak alert | Useful alert |
+| --- | --- |
+| "Workflow failed." | "Delivery SMS workflow, step 'Send SMS', order ORD-4471: 401 Unauthorized. SMS provider token expire aayidichu. Settings, Credentials, SMS provider-la renew pannunga. Run link: ..." |
+
+Owner unmaiyilaye paakkura channel-ku alerts anuppunga: email, Slack, Teams, WhatsApp. Repeated alerts-a group pannunga; oru outage-ku oru message, 500 illa.
+
+### Dead-letter queue
+
+Permanent-aa fail aana records, reason-oda, **"needs attention"** list-ku pogum; adhaye dead-letter queue-nu sila neram solluvaanga. Yaaraavadhu adha fix panni, apram reprocess pannuvaanga. Edhuvum amaidhiyaa kaanaama pogaadhu.
+
+### Partial failures
+
+300 items process panna podhu, oru bad item matha 299-a niruthakoodaadhu. Items-a thaniyaa process pannunga, failures-a serthu, kadaisila report pannunga.
+
+### Monitoring
+
+Naalaikku runs, failures, process aana items-a track pannunga. Oru workflow thidirnu **zero** items process pannaa, edhuvum error illaadha podhum, perumbaalum adhu udanju pochchu-nu artham; udhaaranathukku export kaaliyaa vandhirukkalaam.
+
+### Ownership, runbook
+
+Ovvoru automation-kum peyar solla oru owner-um, oru chinna runbook-um irukkanum: adhu enna pannudhu, podhuvaana failures enna, ovvonnayum eppadi fix panradhu.
+
+## Oru worked example
+
+Bengaluru-la oru logistics startup customers-ku SMS-la delivery updates anuppi, order system-ayum update pannum automation odikkuthu: naalaikku sumaar 8,000 messages.
+
+**Mudhal maadham mosamaa pochchu:**
+
+| Problem | Kaaranam |
+| --- | --- |
+| Maalai peak neram-la messages fail aanadhu | SMS provider workflow-a rate-limit pannuchu (HTTP 429) |
+| Sila customers-ku rendu messages vandhuchu | Fail aana run-a kaiyaala rerun pannaanga, munnaadi anuppina messages thirumba poyiduchu |
+| Oru naal edhuvume anuppala, error-um illa | Login token expire aayiduchu; step loudly fail aagaama kaali result thirumbi kuduthuchu |
+
+**Fixes:**
+
+1. SMS provider-oda 429, 5xx responses-ku **backoff-oda retries**, adhoda Retry-After header-a madhichu, adhigapatcham naalu attempts.
+2. Ovvoru message-kum **oru unique key**, order id plus status, anuppurathukku munnaadi check pannapadum; adhanaala reruns duplicates anuppaadhu.
+3. **Expire aana illa invalid credentials run-a udane niruthum**, retry pannaama, "SMS provider-ku token expire aayidichu, Settings, Credentials-la renew pannunga"-nu owner-ku alert pannum.
+4. **Fail aana records "needs attention" sheet-ku** reason-oda pogum; fix pannina apram oru button adha reprocess pannum.
+5. **Oru daily check**: raathiri 8 mani-kulla 1,000-ku kammiyaa messages anuppina alert pannum.
+
+**Adutha maadham:**
+
+| Measure | Maadham 1 | Maadham 2 |
+| --- | --- | --- |
+| Duplicate messages | Sumaar 900 | 0 |
+| Rate limits-naala lost aana messages | Sumaar 1,200 | 0 (ellaam retry aachu) |
+| Adutha token expiry-a fix panna aana neram | Sumaar 9 mani neram (customer complaint-la thaan therinjuchu) | 20 nimisham (alert-ae enna pannanum-nu sonnuchu) |
+| Gavanam thevai-ngra records | Theriyaadhu | 35, ellathukkum reason irundhuchu, ellaam oru naal-kulla fix aachu |
+
+## Podhuvaa panra thappugal
+
+- **Ellathayum retry panradhu.** Permanent errors-ku fix thevai, retries illa.
+- **Duplicate protection illama irukkradhu.** Retries-um reruns-um double actions-a uruvaakkum.
+- **Details illaadha alerts.** "Workflow failed"-nu sonna enna pannanum-nu theriyaadhu.
+- **Oru bad item muzhu batch-ayum niruthidradhu.** Items-a thaniyaa handle pannunga.
+- **Errors-a mattum paakkradhu.** Onnume pannaadha workflow healthy-aa therila.
+- **Cap-um waits-um illaama retry panradhu.** Outage-a innum mosamaakkum, block-um aagalaam.
+
+## Practice pannunga
+
+Keezha link panni irukkura n8n-oda error handling guide-a padinga, N8N102 course-la error-handling part-a thirumba paarunga.
+
+1. **Retries.** Oru workflow-la oru API step-ku backoff-oda retries serunga, venumnae fail aagura endpoint-a vachchu test pannunga.
+2. **Duplicates, dead letters.** Idempotency check-um, permanent failures-ku "needs attention" list-um serunga.
+3. **Alerts.** Workflow, step, record, error-a solra oru alert-um, daily "items romba kammi" check-um create pannunga.
+
+**Mudinjadhu-nu eppo sollalaam:** unga workflow-a moonu vazhila odachu paakka mudiyum, temporary error, permanent error, bad item, ovvonnukkum sariyaana behaviour-a kaattalaam.

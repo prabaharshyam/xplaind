@@ -1,0 +1,196 @@
+---
+id: python-files-errors
+lang: hi
+title: "Files और errors"
+outcome: "Text और CSV files पढ़ना-लिखना सीखो, और errors को ऐसे handle करो कि program crash न हो।"
+answer: "Python में files `with open(...)` से खोलो, CSV को csv module से पढ़ो, और risky code को try और except में रखो, ताकि error आने पर program crash होने की जगह उसे संभाल ले।"
+why_it_matters: "असली data files में रहता है और असली input गड़बड़ होता है। जो program पहली ही खराब line पर crash हो जाए, वो काम का नहीं। जो समस्या बताकर आगे बढ़ जाए, वही काम का है।"
+flashcards:
+  - q: "Files 'with' से क्यों खोलते हैं?"
+    a: "Block खत्म होते ही file अपने आप बंद हो जाती है, अंदर error आए तब भी। इससे data खोता नहीं और file locked नहीं रहती।"
+  - q: "encoding='utf-8' क्यों लगाते हैं?"
+    a: "ताकि हिंदी, तमिल जैसी भाषाओं का text और ₹ जैसे symbols हर computer पर सही पढ़े और लिखे जाएँ।"
+  - q: "'w' mode से file खोलने पर पुराने content का क्या होता है?"
+    a: "वो मिट जाता है। 'w' सब कुछ replace कर देता है। End में जोड़ना हो तो 'a' use करो।"
+  - q: "Commas पर split करने की जगह csv module क्यों use करें?"
+    a: "Fields के अंदर quotes में commas हो सकते हैं, जैसे address में। csv module quoting सही संभालता है, split नहीं संभालता।"
+  - q: "Exception क्या है?"
+    a: "Run होते समय Python जो error उठाता है, जैसे FileNotFoundError या ValueError। इसे catch न करो तो program रुक जाता है।"
+  - q: "Bare except की जगह specific exceptions क्यों catch करें?"
+    a: "Bare except असली bugs को भी छिपा देता है, जैसे variable के नाम की typo। सिर्फ़ वही errors catch करो जिनकी तुम्हें उम्मीद है और जिन्हें संभालना तुम जानते हो।"
+  - q: "finally किसलिए है?"
+    a: "ऐसे clean-up code के लिए जो error आए या न आए, चलना ही चाहिए। जैसे connection बंद करना या log की एक line लिखना।"
+  - q: "बड़ी file की खराब rows को script कैसे संभाले?"
+    a: "हर row का error अलग से संभालो, failures को उनके line numbers के साथ जमा करो, आगे बढ़ते रहो, और आखिर में report कर दो।"
+exercise:
+  title: "हर file के साथ क्या होता है?"
+  setup: "एक script expenses.csv को csv.DictReader से पढ़ती है और हर row के लिए amount = float(row['amount']) करती है। ये एक try block के अंदर है जो ValueError और KeyError पकड़ता है और उस row को problems list में डाल देता है। File में 5 rows हैं: '1200', '850.50', 'NA', '1,450', और एक row जहाँ amount खाली छोड़ा गया है। उसके बाद script summary.txt को mode 'w' में खोलकर total लिखती है।"
+  questions:
+    - q: "कौन-सी rows problems में जाएँगी, और क्यों?"
+      a: "'NA', '1,450' और खाली amount, तीनों ValueError देते हैं, क्योंकि float text, comma या खाली string नहीं पढ़ सकता। तो तीन rows problems में जाती हैं।"
+    - q: "summary.txt में कौन-सा total लिखा जाएगा?"
+      a: "2050.5, यानी 1200 और 850.50 का जोड़, क्योंकि बस यही दो rows convert हुईं।"
+    - q: "'1,450' वाली row को कैसे बचाओगे?"
+      a: "Convert करने से पहले commas हटा दो: float(row['amount'].replace(',', '')) से 1450.0 मिलता है।"
+    - q: "summary.txt में पिछले महीने के notes पहले से थे। उनका क्या हुआ?"
+      a: "वो मिट गए, क्योंकि mode 'w' file को replace कर देता है। जोड़ने के लिए 'a' use करो, या नए नाम की file में लिखो।"
+ask:
+  - "File लिखते समय 'w' और 'a' में क्या फ़र्क है?"
+  - "Python में CSV file कैसे पढ़ें?"
+  - "क्या हर जगह try और except लगाना चाहिए?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+अब तक के programs का data code के अंदर ही रहता था। असली programs files से data पढ़ते हैं और नतीजे वापस files में लिखते हैं। और असली data गड़बड़ होता है: file गायब, row का format खराब, या number की जगह "NA"। इसके लिए दो skills चाहिए:
+
+- **File input और output:** text और CSV files को सुरक्षित तरीके से खोलना, पढ़ना और लिखना।
+- **Error handling:** **exceptions** पकड़ना ताकि एक खराब input पूरा program crash न करे, और समस्या साफ़ बताना।
+
+```flow
+dir: LR
+Input: payments.csv | 412 rows, उनमें 3 खराब -> हर row के लिए | try: convert करो, total में जोड़ो
+हर row के लिए -[ठीक चला]-> Summary | कुल जमा रकम
+हर row के लिए -[except: खराब row note करो, आगे बढ़ो]-> problems.csv | check करने वाली 3 rows
+```
+
+इस lesson में हम Sana के साथ चलेंगे, जो Mysuru के एक music school की fees संभालती हैं। उनकी script पहली खराब row पर crash हो जाती थी। हम उसे ऐसी script बनाएँगे जो काम पूरा करे और बताए कि क्या check करना है। Lesson के अंत तक आप एक गड़बड़ CSV को सुरक्षित तरीके से process कर पाओगे।
+
+## ये काम कैसे करता है
+
+### `with` से files खोलना
+
+```python
+with open("notes.txt", encoding="utf-8") as f:
+    text = f.read()
+```
+
+`with` block खत्म होते ही file अपने आप बंद कर देता है, अंदर error आए तब भी। हमेशा `encoding="utf-8"` लगाओ, खासकर भारतीय भाषाओं के text और ₹ जैसे symbols के लिए। इसके बिना जो file आपके laptop पर चलती है, वो किसी साथी के laptop पर fail हो सकती है।
+
+### File modes
+
+| Mode | मतलब | खतरा |
+| --- | --- | --- |
+| `"r"` | पढ़ना (default) | File न हो तो fail हो जाता है |
+| `"w"` | लिखना, file में जो पहले से है उसे **replace** करके | पुरानी report को `"w"` से खोला तो वो मिट जाती है |
+| `"a"` | End में जोड़ना | Logs के लिए सुरक्षित |
+| `"x"` | नई file बनाना, पहले से हो तो fail | Overwrite से बचने में काम आता है |
+
+### Line by line पढ़ना
+
+```python
+with open("big_log.txt", encoding="utf-8") as f:
+    for line in f:
+        print(line.strip())     # strip removes the newline at the end
+```
+
+इससे बहुत बड़ी files भी बिना सब कुछ एक साथ memory में लोड किए संभल जाती हैं।
+
+### CSV files
+
+CSV file text के रूप में सेव की गई table होती है: हर line एक row, और fields के बीच commas। Commas पर खुद split करने की जगह `csv` module use करो, क्योंकि fields के अंदर quotes में commas हो सकते हैं, जैसे address में:
+
+```text
+name,address,amount
+Asha,"12, MG Road, Mysuru",1500
+```
+
+```python
+import csv
+with open("orders.csv", newline="", encoding="utf-8") as f:
+    for row in csv.DictReader(f):
+        print(row["customer"], row["amount"])
+```
+
+`csv.DictReader` हर row को dictionary बनाकर देता है, जिसकी keys header से आती हैं। `csv.DictWriter` dictionaries से rows लिखता है। ध्यान रखो कि हर value **text** के रूप में आती है: "1500", 1500 नहीं। Maths करने से पहले convert करो।
+
+### Exceptions
+
+जब कुछ fail होता है, Python **exception raise करता है**: एक error object जिसका type और message होता है। आम वाले:
+
+| Exception | आम वजह |
+| --- | --- |
+| `FileNotFoundError` | File का नाम या folder गलत है |
+| `ValueError` | `int("twenty")` या `float("NA")`: text number नहीं है |
+| `KeyError` | Dictionary या CSV row में ऐसी key या column नहीं है |
+| `ZeroDivisionError` | Zero से भाग, जैसे खाली list का average |
+| `TypeError` | Text को number में जोड़ना |
+
+जिन exceptions की उम्मीद है उन्हें specific नाम से पकड़ो और तय करो कि क्या करना है:
+
+```python
+try:
+    age = int("twenty")
+except ValueError:
+    age = -1          # mark as invalid instead of crashing
+print(age)            # -1
+```
+
+Specific exceptions पकड़ो, सब कुछ नहीं। Bare `except:` असली bugs को भी छिपा देता है, जैसे variable का गलत spelling। जो clean-up हर हाल में चलना चाहिए उसके लिए `finally` use करो, और अपने errors साफ़ message के साथ उठाने के लिए `raise`:
+
+```python
+if amount < 0:
+    raise ValueError(f"Negative amount on line {line_no}")
+```
+
+### खराब rows: जमा करो, crash मत करो
+
+बहुत सारी rows process करते समय हर row का error अलग से संभालो, failures को line numbers के साथ जमा करो, और आखिर में report करो। 400 में से एक खराब row बाकी 399 को नहीं रोकनी चाहिए।
+
+## एक example से समझो
+
+Sana, Mysuru के एक music school की fees संभालती हैं। हर महीने bank उन्हें `payments.csv` भेजता है। उन्हें कुल जमा रकम चाहिए और उन rows की list जो हाथ से check करनी हैं। उनकी पहली script पहले "NA" पर ही crash हो गई, और खराब row scroll करके ढूँढनी पड़ी। उनकी नई script:
+
+```python
+import csv
+
+total = 0
+problems = []
+try:
+    with open("payments.csv", newline="", encoding="utf-8") as f:
+        for line_no, row in enumerate(csv.DictReader(f), start=2):
+            try:
+                amount = float(row["amount"].replace(",", ""))
+                total += amount
+            except (ValueError, KeyError) as e:
+                problems.append((line_no, row.get("student", "?"), str(e)))
+except FileNotFoundError:
+    print("payments.csv not found. Download it from the bank portal first.")
+    raise SystemExit(1)
+
+with open("problems.csv", "w", newline="", encoding="utf-8") as out:
+    writer = csv.writer(out)
+    writer.writerow(["line", "student", "error"])
+    writer.writerows(problems)
+
+print(f"Collected Rs {total:,.2f}; {len(problems)} rows need checking")
+```
+
+`enumerate(..., start=2)` rows को 2 से गिनता है, क्योंकि file की line 1 header है। इससे line numbers वही आते हैं जो Sana को file खोलने पर दिखते हैं।
+
+| Run | Rows | Convert हुईं | Problems | नतीजा |
+| --- | --- | --- | --- | --- |
+| पुरानी script | 412 | Row 37 पर रुक गई | Crash | कोई total नहीं, row हाथ से ढूँढनी पड़ी |
+| नई script | 412 | 409 | 3 ("NA" दो बार, एक खाली) | Total और problems.csv |
+
+इस महीने उन्होंने तीन rows पाँच मिनट में ठीक कर लीं, आधा घंटा गँवाए बिना।
+
+## आम गलतियाँ
+
+- **`with` भूल जाना।** Files खुली रह सकती हैं या data खो सकता है।
+- **`"a"` की जगह `"w"` लगा देना।** पुराना content हमेशा के लिए गया।
+- **CSV lines को commas पर split करना।** `csv` module use करो; quotes वाले commas आपका split तोड़ देंगे।
+- **ये भूल जाना कि CSV values text होती हैं।** Maths से पहले `int()` या `float()` से convert करो।
+- **Bare `except` से सब कुछ पकड़ लेना।** सिर्फ़ वही exceptions पकड़ो जिनकी उम्मीद है।
+- **पहली खराब row पर रुक जाना।** Failures जमा करो और आगे बढ़ो।
+
+## Practice करो
+
+नीचे link किया CS50 Python का file input और output वाला lecture देखो, और errors और exceptions पर Python tutorial पढ़ो।
+
+1. **Category के हिसाब से total।** ऐसा program लिखो जो expenses की CSV पढ़े, category के हिसाब से total निकाले और नतीजा नई CSV में लिखे।
+2. **खराब rows।** तीन खराब rows डालो: amount गायब, number की जगह text, और एक column गायब। Program इन्हें बिना crash हुए report करे।
+3. **गायब file।** Input file न मिले तो traceback की जगह साफ़ message दिखाओ।
+
+**आपका काम पूरा जब:** आप एक गड़बड़ CSV को सुरक्षित तरीके से process कर सको और समझा सको कि `with` और specific `except` क्यों ज़रूरी हैं।

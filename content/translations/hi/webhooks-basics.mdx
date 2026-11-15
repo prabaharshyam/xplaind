@@ -1,0 +1,164 @@
+---
+id: webhooks-basics
+lang: hi
+title: "Webhooks"
+outcome: "Webhooks use करो ताकि एक app दूसरे को उसी पल बता दे जब कुछ होता है: ये कैसे काम करते हैं, इन्हें कैसे receive और test करें, कैसे secure करें, और repeats और failures कैसे संभालें।"
+answer: "Webhook एक URL है जिसे एक app उसी पल call करता है जब कुछ होता है, और details JSON में भेजता है। इससे दूसरा app हर कुछ मिनट में check करने की जगह तुरंत react करता है।"
+why_it_matters: "Payment gateways, e-commerce platforms, forms और CRMs अपने automations को webhooks से तुरंत बताते हैं, हर कुछ मिनट में poll करवाने की जगह। लगभग हर गंभीर automation इनका use करता है, और ज़्यादातर webhook bugs कुछ बचने लायक गलतियों से आते हैं।"
+flashcards:
+  - q: "Webhook क्या है?"
+    a: "एक app का भेजा हुआ message, उस URL पर जो आप देते हो, उसी पल जब कुछ होता है। आमतौर पर ये HTTP POST होता है जिसकी JSON body event बताती है।"
+  - q: "Webhook और polling में क्या फ़र्क है?"
+    a: "Polling का मतलब है बदलाव के लिए बार-बार check करना। Webhook कुछ होते ही बता देता है, जैसे दरवाज़ा बार-बार देखने की जगह doorbell।"
+  - q: "n8n में test URL और production URL में क्या फ़र्क है?"
+    a: "Test URL सिर्फ़ तब चलता है जब आप editor में listen कर रहे हो। Production URL तब चलता है जब workflow publish हो चुका हो।"
+  - q: "Webhook का जवाब जल्दी क्यों देना चाहिए?"
+    a: "Senders कुछ seconds में success reply की उम्मीद करते हैं। देर हुई तो वो time out होकर retry करते हैं, जिससे duplicates बनते हैं।"
+  - q: "Idempotency क्या है?"
+    a: "किसी action को दोहराने पर भी सुरक्षित बनाना: एक ही event दो बार process करने का वही असर हो जो एक बार का होता है, जैसे event id check करके।"
+  - q: "कैसे verify करें कि webhook असली है?"
+    a: "Shared secret से sender की जोड़ी हुई signature check करो, HTTPS और लंबा अनुमान न लगाया जा सकने वाला URL use करो, और हो सके तो provider की API से object दोबारा मँगवाओ।"
+  - q: "कुछ गलत न होने पर भी duplicates क्यों आते हैं?"
+    a: "तेज़ success reply न मिलने पर senders retry करते हैं, और कुछ design से at least once deliver करते हैं, इसलिए वही event दो बार आ सकता है।"
+  - q: "Reconciliation क्या है?"
+    a: "नियमित check, जैसे हर रात, जो आपके records को provider की API से मिलाता है ताकि लंबे outages में खोए events पकड़े जा सकें।"
+exercise:
+  title: "त्योहार की sale वाला outage trace करो"
+  setup: "लखनऊ की एक मिठाई की दुकान n8n में 'payment.captured' webhooks पाती है। Workflow: signature verify करो, 200 OK reply दो, sheet में payment id check करो, फिर invoice बनाओ और एक row जोड़ो। दिवाली sale के दौरान n8n server restart होता है और 3 मिनट बंद रहता है। Gateway fail हुई deliveries को 24 घंटे तक retry करता है। एक payment, pay_771, restart से ठीक पहले process होकर sheet में जुड़ गया, पर 200 OK का reply gateway तक कभी नहीं पहुँचा।"
+  questions:
+    - q: "Gateway pay_771 का क्या करेगा?"
+      a: "Retry करेगा, क्योंकि उसे 200 OK मिला ही नहीं। तो n8n को pay_771 दूसरी बार मिलेगा।"
+    - q: "pay_771 का दूसरा invoice बनने से क्या रोकता है?"
+      a: "Duplicate check: payment id पहले से sheet में है, इसलिए workflow रुक जाता है।"
+    - q: "3 मिनट के downtime में हुए payments का क्या होता है?"
+      a: "Server वापस आने पर gateway उन्हें अपनी 24 घंटे की window में retry करता है, इसलिए वो देर से process होते हैं पर खोते नहीं।"
+    - q: "अगर server दो दिन बंद रहता, तो गायब payments कौन पकड़ता?"
+      a: "रात की reconciliation, जो gateway की captured payments की list को sheet से मिलाती है।"
+ask:
+  - "Webhook और API में क्या फ़र्क है?"
+  - "n8n में webhook को test कैसे करें?"
+  - "Duplicate webhook events को कैसे रोकें?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+कई automations को **उसी पल react** करना होता है जब कुछ होता है: payment सफल हुआ, order आया, form submit हुआ, support ticket बंद हुआ। **Webhook** यही संभव बनाता है।
+
+Webhook एक app का भेजा हुआ message है, उस web address (URL) पर जो आप देते हो, जैसे ही कोई event होता है। ये doorbell जैसा है। हर कुछ मिनट में दरवाज़ा देखने की जगह, जिसे **polling** कहते हैं, आपको तभी बता दिया जाता है जब कोई आता है।
+
+```flow
+dir: LR
+title: Polling: धीमा, बहुत सारी बेकार requests
+Your app -[कुछ नया है?]-> Store
+Store -[नहीं ... नहीं ... हाँ, एक order]-> Your app
+```
+
+```flow
+dir: LR
+title: Webhook: जब होता है तभी पता चलता है, तेज़, कोई बेकार check नहीं
+Store -[event को POST करो]-> Your URL (n8n)
+Your URL (n8n) -[200 OK]-> Store
+```
+
+Message आमतौर पर एक HTTP **POST** request होती है जिसकी **JSON** body event बताती है: क्या हुआ, कब हुआ, और details।
+
+इस lesson में हम जयपुर के एक handicrafts store के साथ चलेंगे जो चाहता है कि payment सफल होते ही invoice email हो जाए। Lesson के अंत तक आप webhooks को receive, test, secure और सुरक्षित तरीके से दोहराना सीख जाओगे।
+
+## ये काम कैसे करता है
+
+### Receive करना
+
+आपका automation tool आपको एक URL देता है, जैसे n8n के **Webhook** node से। उसे भेजने वाले app की settings में paste करो और चुनो कि कौन-से events भेजने हैं। जब event होता है, sender आपके URL पर JSON post करता है, और आपका workflow उसी data के साथ शुरू होता है।
+
+### Test बनाम production URLs
+
+कई tools दो URLs देते हैं:
+
+| URL | कब चलता है | किसके लिए |
+| --- | --- | --- |
+| Test URL | जब आप editor में listen कर रहे हो | Build और debug करने के लिए |
+| Production URL | जब workflow publish (active) हो | असली events के लिए |
+
+Beginners की एक आम गलती है sender की settings में test URL छोड़ देना। जब तक आप देख रहे हो सब चलता है, और editor बंद करते ही रुक जाता है।
+
+### Payload को देखो
+
+एक test event trigger करो और जो JSON आया उसे ठीक से देखो। Field names और nesting provider के हिसाब से अलग होते हैं। अपनी mappings असली sample से बनाओ, याद से नहीं।
+
+### जल्दी जवाब दो
+
+Senders तेज़ success reply चाहते हैं, आमतौर पर कुछ seconds में HTTP `200 OK`। अगर आपका workflow पहले धीमा काम करता है, जैसे PDF बनाना, तो sender time out होकर **retry** कर सकता है। इसलिए: तुरंत reply दो, फिर काम करो।
+
+### Retries और duplicates
+
+अगर आपका endpoint fail हो या धीमा हो, तो ज़्यादातर senders retry करते हैं, कभी-कभी कई घंटों में कई बार। कुछ design से "at least once" deliver करते हैं। दोनों ही हाल में, **आपको वही event एक से ज़्यादा बार मिल सकता है।**
+
+बचाव है **idempotency**: अपने actions को दोहराने पर भी सुरक्षित बनाना। Event या payment के id से check करो कि पहले process हो चुका है या नहीं:
+
+```flow
+Webhook आया | payment id = pay_771 -> क्या pay_771 पहले से हमारी sheet में है?
+क्या pay_771 पहले से हमारी sheet में है? -[हाँ]-> रुक जाओ | duplicate है: कुछ मत करो
+क्या pay_771 पहले से हमारी sheet में है? -[नहीं]-> Invoice बनाओ, email करो, pay_771 के साथ एक row जोड़ो
+```
+
+Duplicate "payment captured" से कभी दो invoices या दो emails नहीं बनने चाहिए।
+
+### Security
+
+जिसे भी आपका URL पता चल जाए, वो नकली events post कर सकता है, जैसे नकली "payment captured" जो असली shipment trigger कर दे। इसे बचाओ:
+
+| Protection | क्या करता है |
+| --- | --- |
+| **Signature verify करो** | कई providers हर webhook पर shared secret से signature लगाते हैं; आपका workflow data पर भरोसा करने से पहले signature check करता है |
+| **HTTPS और लंबा, अनुमान न लगाया जा सकने वाला path** | URL ढूँढना मुश्किल बनाता है और रास्ते में data पढ़ा नहीं जा सकता |
+| **Provider की API से दोबारा मँगवाओ** | ज़रूरी events के लिए provider से सीधे पूछो कि payment सच में सफल हुआ या नहीं |
+
+### छूटे हुए events
+
+अगर आपका endpoint sender की retry window से ज़्यादा देर बंद रहे, तो events चुपचाप खो सकते हैं। ज़रूरी flows के लिए **reconciliation** चलाओ, जैसे हर रात, जो आपके records को provider की API से मिलाकर कमियाँ भर दे।
+
+## एक example से समझो
+
+जयपुर का एक handicrafts store payment gateway use करता है। वो चाहता है कि payment सफल होते ही invoice email हो और accounts sheet में एक row जुड़ जाए।
+
+वो n8n में ये बनाते हैं:
+
+| # | Step | क्यों |
+| --- | --- | --- |
+| 1 | Production URL वाला Webhook node, जो gateway के dashboard में "payment captured" events के लिए जोड़ा गया | Events तुरंत receive करने के लिए |
+| 2 | Gateway से copy किए webhook secret से signature verify करो | नकली requests reject करने के लिए |
+| 3 | तुरंत `200 OK` reply दो | Gateway को time out और retry करने से रोकने के लिए |
+| 4 | Payment id को sheet में check करो; मिल जाए तो रुक जाओ | Duplicates कुछ नहीं करते |
+| 5 | Invoice PDF बनाओ, email करो, payment id के साथ row जोड़ो | असली काम |
+| 6 | हर रात: gateway की API से दिन के captured payments को sheet से मिलाओ | जो छूटा हो उसे पकड़ने के लिए |
+
+**त्योहार की sale।** दिवाली sale के दौरान n8n server restart होता है और दो मिनट बंद रहता है। Server वापस आने पर gateway छूटे events retry करता है। उनमें से दो events restart से ठीक पहले असल में process हो चुके थे, पर उनके replies gateway तक नहीं पहुँचे, इसलिए वो दो बार आते हैं। Duplicate check दोनों को रोक देता है।
+
+| स्थिति | क्या हुआ | किस step ने संभाला |
+| --- | --- | --- |
+| अनजान sender की नकली request | Signature मेल नहीं खाई | Step 2: reject |
+| Restart के बाद event दो बार आया | Payment id पहले से sheet में थी | Step 4: रोका गया |
+| 2 मिनट के outage में भेजे गए events | Gateway ने बाद में retry किए | Steps 1 से 5, कुछ मिनट देर से |
+| रात की reconciliation का एक हफ़्ता | कोई गायब payment नहीं मिला | Step 6 |
+
+Step 4 के बिना, दो customers को दो-दो invoices मिलते, और accounts sheet में ₹8,400 की ऐसी sales दिखतीं जो हुई ही नहीं।
+
+## आम गलतियाँ
+
+- **Production में test URL use करना।** Editor बंद करते ही events आना बंद हो जाते हैं।
+- **बिना signature वाली requests पर भरोसा करना।** कुछ करने से पहले signatures verify करो।
+- **धीमे responses।** Senders retry करते हैं, जिससे duplicates बनते हैं। पहले reply दो, फिर काम करो।
+- **Duplicate check न होना।** Retries से दोहरे invoices, emails या orders बन जाते हैं।
+- **Reconciliation न होना।** लंबे outages में events चुपचाप खो जाते हैं।
+- **Secrets को log करना।** Webhook secret या payment की पूरी details ऐसे logs में मत लिखो जिन्हें दूसरे पढ़ सकें।
+
+## Practice करो
+
+नीचे link किया Zapier का webhooks वाला explanation और n8n के Webhook node के docs पढ़ो।
+
+1. **Receive।** n8n में webhook workflow बनाओ और उसे test request से trigger करो, किसी form tool से या curl जैसे command से।
+2. **Duplicates।** वही event दो बार भेजो और duplicate check जोड़ो ताकि दूसरा कुछ न करे।
+3. **Security।** Shared-secret check जोड़ो और दिखाओ कि गलत secret वाली request reject होती है।
+
+**आपका काम पूरा जब:** आप समझा सको कि webhooks retry क्यों करते हैं, अपना duplicate check चलता हुआ दिखा सको और बता सको कि outage में छूटे events कैसे पकड़ोगे।
