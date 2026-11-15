@@ -1,0 +1,146 @@
+---
+id: git-branches-merging
+lang: hi
+title: "Git branches, merging और rebasing"
+outcome: "Branches बनाना और बदलना, उन्हें वापस merge करना, merge conflict सुलझाना, और team में merge और rebase में से सही चुनना सीखोगे।"
+answer: "Git branch commits की line पर लगा एक खिसकने वाला label है। आप branch पर change बनाते हो, फिर उसे merge करते हो, जो histories को जोड़ता है, या rebase करते हो, जो आपके commits को ऊपर से दोबारा चला देता है।"
+why_it_matters: "हर team branches में काम करती है। Interviewers और teammates उम्मीद करते हैं कि आप main को चालू रखो, घबराए बिना conflicts सुलझाओ, और जानो कि rebase कब safe है और कब नहीं।"
+flashcards:
+  - q: "Git branch असल में क्या है?"
+    a: "एक खिसकने वाला label जो किसी commit की तरफ़ इशारा करता है। Branch पर नया commit बनाने से उसका label आगे बढ़ जाता है। Branch बनाना तुरंत होता है और सस्ता है।"
+  - q: "git switch -c feature/login क्या करता है?"
+    a: "आप जहाँ हो वहाँ से feature/login नाम की branch बनाता है और उस पर switch कर देता है।"
+  - q: "Fast-forward merge क्या है?"
+    a: "जब आपके branch बनाने के बाद main पर कोई नया commit नहीं आया, तब Git बस main का label आपके आखिरी commit तक आगे खिसका देता है। Merge commit की ज़रूरत नहीं पड़ती।"
+  - q: "Merge conflict कब होता है?"
+    a: "जब दोनों branches ने एक ही file की वही lines बदली हों, तब Git तय नहीं कर पाता कि कौन-सा version रखे और आपसे पूछता है।"
+  - q: "Conflict सुलझाना कैसे पूरा करते हैं?"
+    a: "File को अपने मनचाहे version में edit करो, conflict markers हटाओ, file को git add करो, फिर commit करो (या rebase के दौरान git rebase --continue)।"
+  - q: "Merge या rebase: history में क्या फ़र्क पड़ता है?"
+    a: "Merge दोनों lines रखता है और एक merge commit जोड़ता है। Rebase आपके commits को दूसरी branch के ऊपर दोबारा चलाता है, तो history एक सीधी line बन जाती है और commit ids नए हो जाते हैं।"
+  - q: "Rebase का golden rule क्या है?"
+    a: "जिन commits को दूसरे लोग पहले ही pull कर चुके हैं, उन्हें कभी rebase मत करो। Rebase उनके ids बदल देता है, और teammates की copies मेल खाना बंद कर देती हैं।"
+exercise:
+  title: "आगे क्या होगा?"
+  setup: "आज सुबह आपने main से feature/otp branch बनाई। तब से एक teammate ने main में दो commits merge कर दिए हैं। feature/otp पर आपके तीन commits हैं।"
+  questions:
+    - q: "आप git switch main, git pull, फिर git merge feature/otp चलाते हो। क्या ये fast-forward है?"
+      a: "नहीं। आपके branch बनाने के बाद main आगे बढ़ चुका है, इसलिए Git एक merge commit बनाता है जो दोनों lines को जोड़ता है।"
+    - q: "इसकी जगह आप feature/otp पर git rebase main चलाते हो। आपके तीन commits का क्या होता है?"
+      a: "Git उन्हें नए main के ऊपर एक-एक करके दोबारा चलाता है। उन्हें नए ids मिलते हैं, और आपकी branch अब latest main से शुरू होती है।"
+    - q: "Rebase के दौरान Git otp.py में conflict पर रुक जाता है। आप क्या करोगे?"
+      a: "otp.py खोलो, सही code रखो और markers हटाओ, फिर git add otp.py और git rebase --continue चलाओ।"
+    - q: "आपने feature/otp पहले ही push कर दी और एक teammate ने उसे pull कर लिया। क्या अब उसे rebase करना चाहिए?"
+      a: "बेहतर है नहीं। इसकी जगह main को अपनी branch में merge करो, या पहले teammate से बात कर लो, क्योंकि rebase उन commits को बदल देता है जो उसके पास पहले से हैं।"
+ask:
+  - "गलती से किया हुआ merge undo कैसे करूँ?"
+  - "हमारी team को merge commits use करने चाहिए या squash merges?"
+  - "Git क्यों कहता है कि मेरी branch diverge हो गई है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Git में **branch** एक label है जो किसी commit की तरफ़ इशारा करता है। जब आप किसी branch पर नया commit बनाते हो, label आगे खिसककर उसी पर आ जाता है। Branch बस इतनी ही है, इसलिए बनाना तुरंत होता है, और teams हर change के लिए एक बनाती हैं: bug fix, feature, experiment।
+
+Shared branch, जिसे आमतौर पर **main** कहते हैं, हमेशा चालू रहनी चाहिए, क्योंकि सब उसी पर बनाते हैं और वही deploy होती है। इसलिए आप कभी सीधे main पर काम नहीं करते। आप branch बनाते हो, वहाँ अपना change बनाकर test करते हो, और तैयार होने पर उसे वापस लाते हो।
+
+काम वापस लाने के दो तरीके हैं:
+
+- **Merge** history की दो lines को जोड़ता है। अगर आपके branch बनाने के बाद main आगे बढ़ चुका है, तो Git दो parents वाला एक **merge commit** बनाता है। History बिल्कुल दिखाती है कि क्या हुआ, side branch समेत।
+- **Rebase** आपके commits को किसी दूसरी branch के ऊपर दोबारा चला देता है, मानो आपने उसके latest commit से शुरू किया हो। History एक सीधी line बन जाती है, जो पढ़ने में आसान है, पर आपके commits को नए ids मिल जाते हैं।
+
+दोनों का नतीजा एक ही code होता है। फ़र्क इसमें है कि history कैसी दिखती है और ये किसके लिए safe है।
+
+## ये काम कैसे करता है
+
+Team में रोज़ का loop ऐसा दिखता है:
+
+```flow
+title: Feature branch, शुरू से merge तक
+main update करो | git switch main, git pull -> नई branch | git switch -c feature/otp
+नई branch -> छोटे-छोटे commits | git add, git commit
+छोटे-छोटे commits -> Branch push करो | git push -u origin feature/otp
+Branch push करो -> Pull request | review और checks
+Pull request -[main moved on]-> main को अंदर लाओ | merge main, or rebase onto main
+main को अंदर लाओ -> Pull request
+Pull request -[approved, green]-> main में merge करो
+main में merge करो -> Branch delete करो
+```
+
+**बनाना और बदलना।** `git switch -c feature/otp` आप जहाँ हो वहाँ से branch बनाता है और आपको उस पर ले जाता है। `git switch main` वापस ले जाता है। `git branch` branches की list दिखाता है; मौजूदा वाली पर star होता है।
+
+**Merging।** main से `git merge feature/otp` branch को अंदर लाता है। अगर आपके branch बनाने के बाद main नहीं हिला, तो Git **fast-forward** करता है: वो बस main का label आपके आखिरी commit तक खिसका देता है। अगर main आगे बढ़ चुका है, तो Git merge commit बनाता है।
+
+**Conflicts।** अगर दोनों तरफ़ से एक ही file की वही lines बदली गई हैं, तो Git रुक जाता है और file में निशान लगा देता है:
+
+```text
+<<<<<<< HEAD
+OTP_EXPIRY_SECONDS = 300
+=======
+OTP_EXPIRY_SECONDS = 120
+>>>>>>> feature/otp
+```
+
+`=======` के ऊपर वाला हिस्सा आपकी मौजूदा branch का है; नीचे आने वाला change है। आप file को अपने मनचाहे version में edit करते हो, markers मिटाते हो, उस पर `git add` चलाते हो, और commit करते हो। Conflict कोई error नहीं है। ये Git का आपसे पूछा गया सवाल है जिसका जवाब वो अकेले नहीं दे सकता।
+
+**Rebasing।** अपनी branch पर `git rebase main` आपके commits को एक तरफ़ रख देता है, आपकी branch को main की नोक पर ले जाता है, और उन्हें एक-एक करके दोबारा चलाता है। अगर कोई conflict करे, तो Git रुक जाता है; आप file ठीक करते हो, उसे `git add` करते हो और `git rebase --continue` चलाते हो। `git rebase --abort` सब कुछ वैसा ही वापस रख देता है जैसा था।
+
+| | Merge | Rebase |
+| --- | --- | --- |
+| History | दोनों lines रखता है, merge commit जोड़ता है | एक सीधी line |
+| Commit ids | नहीं बदलते | आपके commits को नए ids मिलते हैं |
+| Shared branches पर safe | हाँ | नहीं: सिर्फ़ उन commits पर जो किसी और के पास नहीं हैं |
+| Conflicts | merge में एक बार सुलझाने पड़ते हैं | हर commit पर सुलझाने पड़ सकते हैं |
+| किसके लिए अच्छा | तैयार branch को main में लाना | Review से पहले अपनी branch update करना |
+
+कई teams दोनों मिलाती हैं: काम करते वक़्त अपनी branch को ताज़ा रखने के लिए rebase करो, और जब pull request main में जाए तो merge करो (अक्सर **squash merge**, जो पूरी branch को एक commit बना देता है)।
+
+## एक example से समझो
+
+Priya बेंगलुरु के एक fintech startup में login service पर काम करती है। उसका ticket: OTP expiry पाँच मिनट से घटाकर दो मिनट करना।
+
+वो ताज़ा main से शुरू करती है और branch बनाती है:
+
+```bash
+git switch main
+git pull
+git switch -c feature/otp-expiry
+```
+
+वो `config.py` में `OTP_EXPIRY_SECONDS` बदलती है, test update करती है, और दो बार commit करती है: एक commit change के लिए, एक test के लिए। वो branch push करती है और pull request खोलती है।
+
+उसकी pull request review का इंतज़ार कर रही है, तभी उसका teammate Arjun उसी line में एक change merge कर देता है: उसने value को 300 seconds कर दिया और एक regulator की guideline के बारे में comment लिखा। Priya की pull request अब "This branch has conflicts" दिखाती है।
+
+उसकी branch उसकी अपनी है और किसी और ने उसे pull नहीं किया, इसलिए वो rebase करती है:
+
+```bash
+git fetch origin
+git rebase origin/main
+```
+
+Git उसका पहला commit दोबारा चलाता है और रुक जाता है: `config.py` में conflict है। वो Arjun का comment पढ़ती है, अपनी lead से पूछती है, और पता चलता है कि इस flow के लिए regulator 120 seconds की इजाज़त देता है। वो अपनी value रखती है, Arjun का comment रखती है, markers हटाती है और आगे बढ़ती है:
+
+```bash
+git add config.py
+git rebase --continue
+git push --force-with-lease
+```
+
+`--force-with-lease` GitHub पर उसकी branch बदल देता है, पर तभी जब बीच में किसी और ने उस पर push न किया हो। Rebase के बाद push करने का यही safe तरीका है। Pull request green और conflict-free है; वो approve होती है और एक साफ़ commit बनकर main में squash-merge हो जाती है, और Priya branch delete कर देती है।
+
+## आम गलतियाँ
+
+- **सीधे main पर काम करना।** एक गलत commit सबका base तोड़ देता है। एक line के fix के लिए भी हमेशा branch बनाओ।
+- **बहुत लंबे चलने वाली branches।** तीन हफ़्ते जीने वाली branch में दर्दनाक conflicts जमा हो जाते हैं। छोटे changes को बार-बार merge करो।
+- **Shared branch को rebase करना।** जो commits teammates pull कर चुके हैं उन्हें बदलने से उनके पास ऐसी copies रह जाती हैं जो अब मेल नहीं खातीं। सिर्फ़ अपना unshared काम rebase करो।
+- **सीधा `git push --force`।** ये किसी teammate के commits मिटा सकता है। `--force-with-lease` use करो, और सिर्फ़ अपनी branch पर।
+- **Conflicts आँख बंद करके सुलझाना।** दोनों पढ़े बिना "mine" या "theirs" चुनने से किसी का fix चुपचाप मिट सकता है। दोनों तरफ़ पढ़ो, और बाद में tests चलाओ।
+- **Conflict markers commit कर देना।** Commit से पहले `<<<<<<<` search करो। कई teams इसके लिए CI में check लगाती हैं।
+
+## Practice करो
+
+1. एक practice repository बनाओ जिसमें एक file हो। दो branches बनाओ जो दोनों line 3 बदलें, एक को main में merge करो, फिर दूसरी को merge करके conflict सुलझाओ।
+2. तीन छोटे commits वाली एक branch बनाओ। जब तक वो है, main में एक commit जोड़ो। अपनी branch को main पर rebase करो और पहले और बाद में `git log --oneline --graph --all` देखो।
+3. Rebase के बीच में `git rebase --abort` आज़माओ और पक्का करो कि सब कुछ वैसा ही लौट आया जैसा था।
+4. Interview की तरह ज़ोर से समझाओ कि आप कब merge करोगे और कब rebase, एक मिनट से कम में।
