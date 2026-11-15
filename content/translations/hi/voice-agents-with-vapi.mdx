@@ -1,0 +1,210 @@
+---
+id: voice-agents-with-vapi
+lang: hi
+title: "Vapi से AI voice agents बनाओ: phone और web assistants जो बात करते हैं"
+outcome: "समझा पाओगे कि voice agent बोली हुई बात को बोले हुए जवाब में कैसे बदलता है, prompt, voice और tools के साथ Vapi assistant बना पाओगे, उसे phone number और अपने data से जोड़ पाओगे, और speed और safety के लिए test कर पाओगे।"
+answer: "Voice agent सुनता है, speech को text में transcribe करता है, language model से तय करता है कि क्या बोलना है, और जवाब बोलकर सुनाता है। Vapi एक platform है जो phone और web calls के लिए ये सारे हिस्से जोड़ देता है।"
+why_it_matters: "India में clinics, banks, colleges और shops को रोज़ हज़ारों एक जैसे calls आते हैं। Voice agents अब इनमें से कई को Indian languages में उठाते, book करते और route करते हैं। ये कैसे काम करते हैं और कहाँ फेल होते हैं, ये जानना AI engineers और automation specialists के लिए तेज़ी से बढ़ती skill है।"
+flashcards:
+  - q: "Voice agent के तीन मुख्य हिस्से कौन-से हैं?"
+    a: "Speech-to-text (transcriber), जवाब तय करने वाला language model, और text-to-speech (voice)। Vapi में तीनों आप चुन सकते हो।"
+  - q: "Voice agent में latency क्या है, और ये क्यों मायने रखती है?"
+    a: "Caller के बोलना रोकने और agent के जवाब देने के बीच की देरी। लगभग एक second से ऊपर जाने पर बातचीत अटपटी लगती है और caller agent के ऊपर बोलने लगते हैं।"
+  - q: "Vapi में tool क्या है?"
+    a: "एक function जिसे assistant बातचीत के दौरान call कर सकता है, जैसे slots check करना या booking करना, आमतौर पर आपके server या n8n webhook को call करके।"
+  - q: "First message क्या करता है?"
+    a: "Call connect होते ही assistant यही बोलता है, ताकि caller को पता चले कि वो किससे बात कर रहा है और वो किस काम में मदद कर सकता है।"
+  - q: "Endpointing क्या है?"
+    a: "ये तय करना कि caller ने बोलना खत्म कर दिया है या नहीं। ज़्यादा जल्दी करो तो agent बीच में टोक देता है; ज़्यादा धीमा हो तो call में lag लगता है।"
+  - q: "Voice agent को वो चीज़ कैसे संभालनी चाहिए जो वो नहीं कर सकता?"
+    a: "साफ़ बोल दे और आगे बढ़ा दे: किसी इंसान को transfer करे, message ले ले, या SMS से link भेज दे। कभी जवाब गढ़े नहीं।"
+  - q: "Callers को क्या बताना ज़रूरी है?"
+    a: "कि वो एक AI assistant से बात कर रहे हैं, और अगर calls record करते हो तो ये भी कि call record हो रही है, जैसा consumer और privacy rules माँगते हैं।"
+  - q: "Voice agent में देरी कहाँ से आती है?"
+    a: "ये पहचानने में कि caller रुक गया, speech-to-text, model का पहला token, कोई भी tool call, और text-to-speech। हर एक में समय लगता है, इसलिए सबको छोटा करो।"
+  - q: "Numbers को caller को दोहराकर क्यों confirm करें?"
+    a: "Speech-to-text अक्सर digits, नाम और dates गलत सुन लेता है, खासकर शोर वाली phone lines पर। दोहराने से booking होने से पहले गलतियाँ पकड़ में आ जाती हैं।"
+exercise:
+  title: "Agent को ठीक करो"
+  setup: "हर test call में कुछ गड़बड़ हुई। संभावित वजह बताओ और एक fix बताओ।"
+  questions:
+    - q: "Agent के जवाब देने से पहले callers बार-बार 'Hello? Hello?' कहते रहते हैं।"
+      a: "Latency बहुत ज़्यादा है। तेज़ model और voice use करो, prompt छोटा रखो, और tools जल्दी जवाब दें, या वो चलें तब agent कोई filler line बोल दे।"
+    - q: "Agent रात 3 बजे के appointments book कर रहा है।"
+      a: "उसका tool opening hours check नहीं करता। Booking tool में समय validate करो और prompt में model को hours बताओ।"
+    - q: "ये नाम और Indian जगहों के नाम गलत सुनता है।"
+      a: "ऐसा transcriber चुनो जो Indian English और Hindi अच्छे से समझे, जहाँ supported हो वहाँ custom keywords जोड़ो, और spelling बोलकर confirm करो।"
+    - q: "Caller medical advice माँगता है और agent दे देता है।"
+      a: "Prompt में पक्का rule जोड़ो कि medical सवालों पर मना करे और transfer कर दे, और उसे कई तरह से पूछकर test करो।"
+ask:
+  - "Vapi tool को n8n workflow से कैसे जोड़ूँ?"
+  - "अपने voice agent को तेज़ जवाब देने वाला कैसे बनाऊँ?"
+  - "क्या Vapi agent Hindi या Tamil बोल सकता है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Voice agent** एक AI है जिससे आप phone line पर या web page में बात करते हो, और वो जवाब में बोलता है। अंदर से ये एक सेकंड में कई बार तीन systems की chain चलाता है:
+
+1. **Speech-to-text** (transcriber) caller की audio को शब्दों में बदलता है।
+2. **Language model** तय करता है कि क्या बोलना है और कोई tool use करना है या नहीं।
+3. **Text-to-speech** (voice) जवाब को natural audio में बदलता है।
+
+ये loop खुद बनाओ तो audio streams, interruptions, silence, phone networks और latency सब संभालना पड़ता है। **Vapi** एक developer platform है जो ये सारी plumbing कर देता है। आप एक **assistant** configure करते हो, transcriber, model और voice चुनते हो, उसकी instructions लिखते हो, उसे tools देते हो, और एक phone number या web-call button जोड़ देते हो। Real time में बातचीत Vapi चलाता है।
+
+```flow
+dir: LR
+title: Phone line, streaming audio, turn-taking, interruptions और call logs Vapi संभालता है
+Caller बोलता है -> Transcriber -[text]-> LLM + prompt -[जवाब]-> Voice -> Caller सुनता है
+LLM + prompt -[tool call]-> आपका server या n8n webhook | slots check करना, book करना, order देखना
+आपका server या n8n webhook -[नतीजा]-> LLM + prompt
+```
+
+## ये काम कैसे करता है
+
+**Assistant।** Vapi dashboard में आप एक assistant बनाते हो और ये set करते हो:
+
+- **Model और system prompt:** agent कौन है, क्या कर सकता है, उसे कौन-से facts चाहिए (timings, prices) और पक्के rules (कभी medical advice नहीं देना, booking से पहले हमेशा confirm करना)।
+- **First message:** call connect होने पर वो क्या बोलता है। इसमें बताओ कि वो एक AI assistant है।
+- **Transcriber:** speech-to-text provider और language। Indian English, Hindi और दूसरी भाषाओं में providers की quality अलग-अलग होती है, इसलिए असली बोलने वालों के साथ test करो।
+- **Voice:** text-to-speech provider और voice। ऐसी voice चुनो जो आपके callers को natural लगे, और local नामों का pronunciation test करो।
+
+**Tools।** Tools बातों को काम में बदलते हैं। आप एक function describe करते हो, जैसे `book_slot(date, time, name, phone)`, और Vapi को एक server URL देते हो जिसे वो call करे। Model तय करता है कि इसे कब call करना है; आपका server, या webhook के पीछे n8n workflow, काम करता है और एक नतीजा लौटाता है जिसे agent बोलकर सुनाता है।
+
+**Phone numbers।** आप Vapi से number ले सकते हो या Twilio जैसे telephony provider से अपना ला सकते हो। Inbound calls आपके assistant पर जाती हैं; आप API से outbound calls भी शुरू कर सकते हो, reminders या follow-ups के लिए। किसी client को local number का वादा करने से पहले check करो कि India के लिए कौन-से countries और number types supported हैं।
+
+**बातचीत का behaviour।** Settings तय करती हैं कि agent कब मानेगा कि caller बोल चुका (**endpointing**), caller बीच में टोके तो क्या होगा, background noise कैसे संभलेगा, call की max length, और इंसान को transfer कब करना है।
+
+**Call के बाद।** Vapi transcripts, recordings (अगर enabled हों) और एक end-of-call report रखता है, जो आपके server को भेजी जा सकती है: एक summary, आपके माँगा हुआ structured data, और success criteria। इसी से आप quality review करते हो और CRM में data भेजते हो।
+
+| चिंता | अच्छा कैसा दिखता है | वहाँ कैसे पहुँचें |
+|---|---|---|
+| जवाब में देरी | लगभग 1 second से कम | तेज़ model, छोटा prompt, तेज़ tools |
+| समझना | नाम और numbers सही | उस भाषा के लिए अच्छा transcriber; वापस बोलकर confirm करना |
+| काम पर टिके रहना | scope से बाहर की माँगों को मना करता है | prompt में साफ़ rules; edge cases test करो |
+| Actions | bookings valid हों | सिर्फ़ prompt में नहीं, tool में validate करो |
+| Hand-off | ज़रूरत पर इंसान | transfer या message लेने का रास्ता |
+| भरोसा | caller को पता है कि ये AI है | first message में बताओ; recording rules follow करो |
+
+**Web calls भी।** वही assistant Vapi के web SDK से किसी website या app में चल सकता है, तो "Talk to us" button browser में voice बातचीत शुरू कर देता है, किसी phone line के बिना। Numbers खरीदने से पहले prototype बनाने का ये सस्ता तरीका है।
+
+**Code में एक tool server।** जब assistant कोई tool call करता है, Vapi आपके server URL पर POST request भेजता है, और आपका server ऐसे नतीजे लौटाता है जिन्हें agent बोलता है। एक छोटा FastAPI handler; exact payload fields के लिए Vapi की current docs देखो:
+
+```python
+import os
+from fastapi import FastAPI, Request, HTTPException
+
+app = FastAPI()
+SECRET = os.environ["VAPI_SERVER_SECRET"]          # the secret you set on the assistant
+
+@app.post("/vapi/tools")
+async def tools(request: Request):
+    if request.headers.get("x-vapi-secret") != SECRET:
+        raise HTTPException(status_code=401)
+    body = await request.json()
+    results = []
+    for call in body["message"].get("toolCallList", []):
+        name, args = call["function"]["name"], call["function"]["arguments"]
+        if name == "book_slot":
+            result = book_slot(**args)             # your validation and booking code
+        else:
+            result = "Sorry, I can't do that on this call."
+        results.append({"toolCallId": call["id"], "result": result})
+    return {"results": results}
+
+def book_slot(date, time, name, phone):
+    if not (phone.isdigit() and len(phone) == 10):
+        return "The phone number should be 10 digits. Please ask the caller to repeat it."
+    slot = calendar.find(date, time)
+    if not slot:
+        return f"{time} on {date} is taken. The nearest free times are {calendar.nearest(date, time)}."
+    calendar.book(slot, name, phone)
+    return f"Booked {name} for {time} on {date}. Read the date and time back to the caller."
+```
+
+नतीजे इस तरह लिखे हैं कि बोले जा सकें: छोटे, और साथ में अगली बात क्या कहनी है। Validation आपके code में रहता है, सिर्फ़ prompt में नहीं।
+
+**Latency का budget।** Callers को एक second से ज़्यादा का gap महसूस होता है। सब हिस्सों को जोड़ो और हर एक को छोटा करो:
+
+| हिस्सा | आम range | कैसे घटाएँ |
+| --- | --- | --- |
+| ये तय करना कि caller रुक गया | 0.2 से 0.8 s | Endpointing tune करो; छोटे जवाबों के लिए कम रखो |
+| Speech to text | 0.1 से 0.4 s | India के पास वाला streaming transcriber |
+| Model का पहला token | 0.3 से 1.5 s | छोटा, तेज़ model; छोटा prompt |
+| Tool call | 0.1 से 2 s | तेज़ tools; धीमे वाले से पहले "let me check" बोल दो |
+| Text to speech, पहली audio | 0.1 से 0.5 s | Streaming voice; पहला वाक्य छोटा |
+
+असली call logs से नापो, dashboard के best case से नहीं, और सबसे धीमे calls देखो, सिर्फ़ average नहीं।
+
+**Live जाने से पहले calls test करना।** 20 scripted calls लिखो, जिनमें normal bookings, interruptions, wrong numbers, background noise, बीच वाक्य में Hindi या Tamil, और scope से बाहर की माँगें हों। उन्हें अलग-अलग बोलने वालों के साथ phone से चलाओ, और हर एक को score करो: booking सही, facts सही, कोई गढ़ा हुआ जवाब नहीं, जहाँ ज़रूरी था वहाँ hand over किया।
+
+**India में calling के rules।** Call record करना और transcripts store करना personal data processing है: ये first message में और अपने privacy notice में बताओ, और recordings उतने ही समय रखो जितना ज़रूरी हो। Promotion या reminders के लिए outbound calls TRAI के commercial communication rules में आते हैं, जो registration, number series और consent को cover करते हैं। कोई भी outbound campaign चलाने से पहले current rules देख लो।
+
+**अपने browser में try करो।** Voice agent की देरी step by step जोड़ो। कोई भी step बदलो और total देखो।
+
+```python
+steps_ms = {
+    "caller stops talking (endpointing)": 400,
+    "speech to text": 250,
+    "model's first token": 700,
+    "booking tool": 300,
+    "text to speech, first audio": 200,
+}
+total = sum(steps_ms.values())
+for step, ms in steps_ms.items():
+    print(f"{step:<36} {ms:>5} ms")
+print(f"{'total before the caller hears a reply':<36} {total:>5} ms", "(aim for about 1,000)")
+```
+
+## एक example से समझो
+
+Visakhapatnam में Dr Rao के dental clinic के हफ़्ते में लगभग 40 calls छूट जाते हैं, ज़्यादातर शाम 7 बजे के बाद appointment की माँग वाले। Faizan, एक automation freelancer, एक voice receptionist बनाता है।
+
+वो एक छोटा system prompt लिखता है: clinic का नाम, timings, fixed consultation fees वाली तीन services, इलाज के बारे में कभी बात न करने का rule, और booking से पहले date, time और phone number confirm करने का rule। First message: "Hello, this is the AI assistant for Rao Dental. I can book or change appointments. How can I help?"
+
+वो n8n webhooks की तरफ़ इशारा करते दो tools बनाता है। `check_slots` clinic की Google Sheet से खाली slots पढ़ता है; `book_slot` booking लिखता है और patient को SMS confirmation भेजता है। n8n workflow clinic hours के बाहर के समय reject कर देता है, इसलिए कन्फ्यूज़ हुआ model रात 3 बजे की booking नहीं कर सकता।
+
+Testing में तीन problems मिलती हैं। औसत response time 1.8 seconds है, तो वो तेज़ model पर switch करता है और prompt छोटा करता है, जिससे ये लगभग 0.9 seconds पर आ जाता है। Transcriber "Gajuwaka" गलत सुनता है, तो वो उसे keyword की तरह जोड़ता है और agent से locations दोहरवाता है। एक tester दाँत के दर्द की दवा के बारे में पूछता है; agent जवाब देना शुरू कर देता है, तो वो rule और पक्का करता है और clinic के on-call number पर transfer जोड़ देता है।
+
+Launch के बाद end-of-call reports एक sheet में जाती हैं जिसे receptionist हर सुबह देखती है। After-hours की छूटी हुई bookings लगभग खत्म हो जाती हैं।
+
+## आम गलतियाँ
+
+**लंबे prompts।** हर अतिरिक्त paragraph देरी और confusion बढ़ाता है। Prompt को focused रखो और reference data को tools में डालो।
+
+**Rules लागू करने के लिए model पर भरोसा करना।** अपने tools में भी validate करो: business hours, prices, permissions।
+
+**सिर्फ़ अपनी आवाज़ से test करना।** अलग accents, background noise, interruptions, और बीच वाक्य में मन बदलने वाले लोगों के साथ test करो।
+
+**AI होने की बात न बताना।** Callers को पता होना चाहिए कि वो AI से बात कर रहे हैं, और recording के लिए privacy rules के तहत consent चाहिए। दोनों साफ़ बोलो।
+
+**बाहर निकलने का रास्ता न देना।** हमेशा इंसान, callback या message का option दो। Bot में फँसे रहना customer खोने का सबसे तेज़ तरीका है।
+
+**Cost per minute को ignore करना।** Transcriber, model, voice और telephony हर एक per minute या per token charge करता है। Quote देने से पहले महीने के minutes का अंदाज़ा लगाओ और current prices देखो।
+- **Webhook secret check न करना।** URL जिसे भी मिल जाए, वो आपके tools call कर सकता है।
+- **लंबे, लिखे जाने वाले style के tool results।** बोलकर सुनाने पर ये धीमे और अकड़े हुए लगते हैं।
+- **सिर्फ़ अपनी आवाज़ से test करना।** Accents, शोर और भाषाएँ accuracy बदल देती हैं।
+
+## जब voice agent गलत choice है
+
+- **Callers को कई options compare करने हों**, जैसे लंबी price lists: WhatsApp message या web page आसान है।
+- **बहुत sensitive बातचीत**, जैसे medical results या debt collection, जहाँ इंसान को बात करनी चाहिए।
+- **आपके callers की भाषाओं के लिए transcription कमज़ोर है**, जो tests में confirm हो चुका है।
+- **सादा IVR menu पहले से काम कर रहा है**, और callers उससे खुश हैं।
+
+## Demo से production तक
+
+- **हर call log करो**, transcript, tool calls, हर हिस्से की latency और नतीजे के साथ।
+- **हफ़्ते में दस calls review करो**, पाँच जो फेल हुईं और पाँच random।
+- **लंबे gaps, ज़्यादा transfer rates और failed tool calls पर alert लगाओ।**
+- **हर call पर इंसान तक जाने का रास्ता रखो**: transfer या message लेना।
+- **Prompt, voice, transcriber या model बदलने के बाद हर बार 20 scripted calls दोबारा test करो।**
+
+## Practice करो
+
+1. Watch & learn panel में voice agents की पूरी beginner's guide देखो, फिर 18 मिनट वाला build और receptionist project।
+2. ऊपर वाला "Agent को ठीक करो" exercise करो।
+3. नीचे link की गई Vapi की quickstart follow करो और किसी assistant को अपनी पहली web call करो।
+4. Project check करो: असली booking tool और पाँच tested calls के साथ clinic या coaching-centre का receptionist।
+5. FastAPI tool server बनाओ, एक tunnel से Vapi assistant को उसकी तरफ़ point करो, और तीन test calls करो जो valid, taken और गलत सुने गए slots पर पहुँचें।

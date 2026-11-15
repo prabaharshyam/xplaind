@@ -1,0 +1,228 @@
+---
+id: experiment-tracking
+lang: hi
+title: "Experiment tracking और model registry"
+outcome: "हर training run का code, data, parameters, metrics और model record करो ताकि results की तुलना हो सके और उन्हें दोहराया जा सके, और model versions को registry से staging से production तक manage करो।"
+answer: "Experiment tracking, MLflow जैसे tools से, हर training run का code, data, settings, metrics और model record करती है, और model registry तय करती है कि production में कौन-सा version है।"
+why_it_matters: "Project के छह हफ़्ते बाद \"हमारा सबसे अच्छा model किस run से बना और किस data से?\" का जवाब सेकंडों में मिलना चाहिए। Tracking के बिना teams results खो देती हैं, experiments दोहराती हैं, और auditors को production models समझा नहीं पातीं। किसी भी ML role के लिए ये बुनियादी सफ़ाई है।"
+flashcards:
+  - q: "Experiment tracking क्या है?"
+    a: "हर training run का code version, data version, parameters, metrics, artefacts और model अपने-आप log करना।"
+  - q: "Model registry क्या है?"
+    a: "चुने हुए model versions का store, metadata और stage या alias के साथ, ताकि production एक जाना-पहचाना, approved model load करे।"
+  - q: "Model को दोबारा बनाने के लिए क्या log करना ज़रूरी है?"
+    a: "Code commit, data version या hash, parameters, environment और random seeds।"
+  - q: "Runs की तुलना segment के हिसाब से क्यों करें?"
+    a: "Model overall बेहतर हो सकता है और फिर भी किसी ऐसे region या customer group के लिए बदतर हो सकता है जो मायने रखता है।"
+  - q: "Promotion rule में क्या check होना चाहिए?"
+    a: "कि candidate तय किए metrics पर production से बेहतर है, key segments समेत, हाल के data पर checks पास करता है, और owner की approval है।"
+  - q: "Model को file path की जगह registry से load क्यों करें?"
+    a: "तब deployed version साफ़ और auditable रहता है, और rollback बस alias बदलना होता है।"
+  - q: "Model lineage क्या है?"
+    a: "Production model version से उसके training run, code commit, data version और evaluation results तक की पूरी कड़ी।"
+  - q: "दो experiment tracking tools के नाम बताओ।"
+    a: "MLflow, जो open source है, और Weights and Biases; cloud ML platforms में भी tracking होती है।"
+  - q: "Registry में model alias क्या होता है?"
+    a: "'champion' जैसा एक खिसकाया जा सकने वाला नाम जो किसी एक model version की तरफ़ इशारा करता है। Production alias load करता है, तो promotion और rollback बस उसे खिसकाना है।"
+  - q: "क्या LLM app के experiments भी इसी तरह track कर सकते हैं?"
+    a: "हाँ। Prompt version, model, retrieval settings और eval scores को एक run की तरह log करो, ताकि prompt के बदलावों की तुलना और उन्हें दोहराना model training जैसा हो जाए।"
+exercise:
+  title: "Tracking set up करो"
+  setup: "Kolkata की एक microfinance lender का data scientist loan-default models notebooks में train करता है। Results spreadsheet में paste होते हैं, सबसे अच्छा model model_best_new.pkl नाम से save होकर server पर copy हो जाता है। Regulator पूछता है कि मार्च में एक specific applicant को reject करने वाला model किस data और code से बना था।"
+  questions:
+    - q: "क्या team आज regulator को जवाब दे सकती है?"
+      a: "नहीं। Deployed model का code commit और data version record हुए बिना lineage दिखाई नहीं जा सकती।"
+    - q: "हर training run में क्या log होना चाहिए?"
+      a: "Parameters, overall और segment के हिसाब से metrics (जैसे branch या loan type), Git commit, data snapshot id, library versions और model file।"
+    - q: "Model production तक कैसे पहुँचे?"
+      a: "चुने हुए run का model notes और approval के साथ एक version के रूप में register करो, और server से registry का production alias load करवाओ।"
+    - q: "Lending model के लिए कौन-सा promotion check ठीक रहेगा?"
+      a: "हाल की applications पर मौजूदा model से तुलना करो, और अगर किसी segment की error rates या approval rates तय limit से ज़्यादा खिसकें तो promotion रोक दो।"
+ask:
+  - "MLflow use करना कैसे शुरू करूँ?"
+  - "Experiment tracking और model registry में क्या फ़र्क है?"
+  - "ख़राब model को rollback कैसे करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Experiment tracking** हर training run को अपने-आप log करती है: code version (Git commit), data version, parameters, समय के साथ metrics, plots जैसे artefacts, और trained model। **Model registry** चुने हुए model versions को उनके metadata और एक label (जैसे alias, मसलन "production") के साथ store करती है, ताकि deployment हमेशा एक जाना-पहचाना, approved model use करे।
+
+Tools में MLflow (open source), Weights & Biases, और cloud ML platforms की अपनी built-in tracking आती है। MLflow के हाल के versions इसके लिए खिसकाए जा सकने वाले aliases use करते हैं; उसके पुराने fixed stages (Staging, Production) deprecated हैं।
+
+```flow
+Training run 412 | params: depth=6, lr=0.05, features v3; code git a1b2c3d; data claims-2026-09; PR AUC 0.46 -[सबसे अच्छा run, approved]-> Model registry: fraud-model v14
+Model registry: fraud-model v14 -[alias "production"]-> Production "fraud-model@production" load करता है
+Production "fraud-model@production" load करता है -[rollback: alias खिसकाओ]-> fraud-model v13, पिछला वाला
+```
+
+इस lesson में हम Hyderabad के एक insurer की ML team को देखेंगे, जो अपना claim-fraud model हर महीने दोबारा train करती है।
+
+## ये काम कैसे करता है
+
+**वो सब कुछ log करो जो एक run को define करता है।** Parameters (learning rate, depth, use किए features), metrics (validation और test scores, segment के हिसाब से), Git commit, dataset version या hash, environment (library versions), और outputs (model file, confusion matrix, feature importance plot)।
+
+**Runs की तुलना करो।** Tracking UI runs को उनके parameters और metrics के साथ list करता है, score से sort करता है और runs के बीच metrics को plot करता है। आप देख सकते हो कि depth 6 ने depth 8 को हराया, या कि कोई नया feature सिर्फ़ एक segment में काम आया।
+
+**Reproduce करो।** Code, data और parameters record हों, तो कोई भी दोबारा चलाकर वही model पा सकता है (randomness के दायरे में, जिसे seeds control करते हैं)।
+
+**Winner को register करो।** चुने हुए run का model registry में एक नए version के रूप में promote करो, notes के साथ: क्या बदला, evaluation results, किसने approve किया। Production file path की जगह registry से "production version" load करता है।
+
+**Promotion rules।** Promote करने से पहले: model तय किए metrics पर मौजूदा production model से बेहतर हो, key segments समेत; हाल के data पर checks पास करे; और owner की approval हो। पिछला version rollback के लिए तैयार रखो।
+
+**Lineage।** Audits और debugging के लिए कड़ी साफ़ होनी चाहिए: production model version → training run → code commit → data version → evaluation results।
+
+**क्या log करें, और क्यों:**
+
+| Item | Example | क्यों मायने रखता है |
+| --- | --- | --- |
+| Parameters | `depth=6`, `learning_rate=0.05` | Runs के बीच के फ़र्क समझाते हैं |
+| Metrics | PR AUC 0.46 overall, region के हिसाब से | Winner को निष्पक्ष तरीके से चुनते हैं |
+| Code version | Git commit `a1b2c3d` | Training logic दोहराने देता है |
+| Data version | `claims-2026-09`, hash के साथ | Inputs दोहराने देता है |
+| Environment | Library versions, Python version | "मेरी machine पर तो चल रहा था" से बचाता है |
+| Artefacts | Model file, plots, feature importance | Reviewers को results देखने देते हैं |
+| Seed | `random_state=42` | Randomness को control करता है |
+
+**Script में जोड़ना।** MLflow के साथ tracking बस कुछ lines है: run शुरू करो, parameters और metrics compute होते ही log करो, आख़िर में model log करो, और commit और data version के tags लगाओ। Library run को local folder में या team के shared tracking server पर record करती है। scikit-learn और XGBoost जैसी libraries के लिए autologging चालू करो, तो ज़्यादातर parameters और metrics बिना extra code के मिल जाते हैं। फिर data version और segment metrics खुद जोड़ो, क्योंकि कोई tool उन्हें अंदाज़े से नहीं जान सकता।
+
+**MLflow से training run track करना।**
+
+```python
+import hashlib, subprocess
+import mlflow
+import mlflow.sklearn
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.metrics import average_precision_score
+
+def data_hash(path):
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()[:12]
+
+mlflow.set_experiment("claims-fraud")
+params = {"max_depth": 6, "learning_rate": 0.05, "max_iter": 400}
+
+with mlflow.start_run() as run:
+    mlflow.set_tags({"git_commit": subprocess.getoutput("git rev-parse --short HEAD"),
+                     "data_version": "claims-2026-09", "data_hash": data_hash("data/train.parquet")})
+    mlflow.log_params(params)
+    model = HistGradientBoostingClassifier(**params, random_state=42).fit(X_train, y_train)
+    scores = model.predict_proba(X_val)[:, 1]
+    mlflow.log_metric("pr_auc", average_precision_score(y_val, scores))
+    for region in ["north", "south", "east", "west"]:
+        m = val_region == region
+        mlflow.log_metric(f"pr_auc_{region}", average_precision_score(y_val[m], scores[m]))
+    mlflow.sklearn.log_model(model, artifact_path="model", registered_model_name="claims-fraud")
+```
+
+**Alias से promotion।** Production हमेशा `models:/claims-fraud@champion` load करता है; promote करना मतलब check के बाद alias को खिसकाना:
+
+```python
+from mlflow import MlflowClient
+
+client = MlflowClient()
+
+def promote_if_better(name, candidate_version, metric="pr_auc", segments=("north", "south", "east", "west")):
+    def metrics_of(version):
+        run_id = client.get_model_version(name, version).run_id
+        return client.get_run(run_id).data.metrics
+    try:
+        champ = client.get_model_version_by_alias(name, "champion").version
+    except Exception:
+        champ = None
+    new = metrics_of(candidate_version)
+    if champ:
+        old = metrics_of(champ)
+        if new[metric] < old[metric]:
+            return f"rejected: {metric} {new[metric]:.3f} < {old[metric]:.3f}"
+        worse = [s for s in segments if new[f"{metric}_{s}"] < old[f"{metric}_{s}"] - 0.02]
+        if worse:
+            return f"rejected: worse on {worse}"
+    client.set_registered_model_alias(name, "champion", candidate_version)
+    return f"version {candidate_version} is now champion (was {champ})"
+
+model = mlflow.pyfunc.load_model("models:/claims-fraud@champion")    # in the serving code
+```
+
+Rollback का मतलब है `set_registered_model_alias` से alias को पिछले version पर वापस ले जाना।
+
+**LLM apps के लिए भी यही idea।** Prompt या retrieval के बदलाव को experiment मानो: prompt version, model का नाम, top-k, chunk size और category के हिसाब से eval scores को एक run की तरह log करो। फिर "क्या prompt के v13 ने Hindi सवालों में मदद की?" एक sorted table बन जाता है, याददाश्त का मामला नहीं रहता।
+
+**Tracking server को असली रखो।** Database backend और artefacts के लिए cloud storage वाला shared tracking server, company के sign-in के पीछे, एक laptop की files से कहीं बेहतर है। उसका backup लो; वही हर model decision का इतिहास है।
+
+**Browser में try करो।** एक छोटा experiment log: runs record करो, फिर किसी metric से सबसे अच्छा चुनो। अपने runs भी जोड़ो।
+
+```python
+runs = []
+def log_run(params, metrics, commit):
+    runs.append({"params": params, "metrics": metrics, "commit": commit})
+
+log_run({"depth": 4, "lr": 0.1}, {"pr_auc": 0.41}, "a1b2c3d")
+log_run({"depth": 6, "lr": 0.05}, {"pr_auc": 0.46}, "a1b2c3d")
+log_run({"depth": 8, "lr": 0.05}, {"pr_auc": 0.44}, "f9e8d7c")
+
+best = max(runs, key=lambda r: r["metrics"]["pr_auc"])
+for r in sorted(runs, key=lambda r: -r["metrics"]["pr_auc"]):
+    print(r["metrics"]["pr_auc"], r["params"], r["commit"])
+print("best:", best["params"])
+```
+
+## एक example से समझो
+
+Hyderabad के एक insurer की ML team अपना claim-fraud model हर महीने दोबारा train करती है। Tracking से पहले models `final_v3_really_final.pkl` जैसे नाम की files थे, और auditor के पूछने पर कोई नहीं बता पाता था कि production कौन-सा data version use कर रहा है।
+
+MLflow के साथ:
+
+- हर training run parameters, Git commit, data snapshot id, overall और region के हिसाब से PR AUC, और model log करता है।
+- Comparison view दिखाता है कि "policy शुरू होने के 30 दिन के अंदर दाखिल हुआ claim" जोड़ने से PR AUC overall 0.41 से 0.46 हो गया, और सबसे ज़्यादा फ़ायदा दो regions में हुआ।
+- सबसे अच्छा run version 14 के रूप में notes और reviewer के नाम के साथ register होता है; production, registry का production alias load करता है।
+- एक promotion check script candidate की तुलना पिछले महीने के claims पर मौजूदा production version से करती है, और अगर किसी region का recall दो points से ज़्यादा गिरे तो promotion रोक देती है।
+
+छह महीने बाद जब auditor लौटता है, team एक विवादित claim को flag करने वाले model की पूरी lineage मिनटों में दिखा देती है।
+
+| Run | बदलाव | PR AUC overall | सबसे कमज़ोर region | फ़ैसला |
+| --- | --- | --- | --- | --- |
+| 398 | पिछले महीने का production model | 0.41 | 0.33 | Baseline |
+| 405 | गहरे trees | 0.42 | 0.31 | Reject: सबसे कमज़ोर region गिर गया |
+| 409 | नया feature: शुरू होने के 30 दिन में claim | 0.45 | 0.38 | उम्मीद भरा |
+| 412 | नया feature, tuned learning rate | 0.46 | 0.39 | Review के बाद v14 के रूप में register |
+
+Comparison view ने run 405 में region की गिरावट एक नज़र में दिखा दी। Spreadsheet के ज़माने में उसे overall score देखकर promote कर दिया जाता।
+
+## आम गलतियाँ
+
+- **Spreadsheets में हाथ से tracking।** वो अधूरी रहती है और पुरानी पड़ जाती है।
+- **Data versions log न करना।** अकेले code और parameters से model दोबारा नहीं बनता।
+- **Production में file paths से models load करना।** Registry use करो ताकि deployed version साफ़ रहे।
+- **सिर्फ़ overall score पर promote करना।** Segments और हाल के data को check करो।
+- **Rollback plan नहीं।** पिछला version तैयार रखो।
+- **सिर्फ़ आख़िरी run log करना।** Fail हुए experiments team को सिखाते हैं कि क्या काम नहीं करता; उन्हें रखो।
+- **Seed भूल जाना।** उसके बिना एक ही code और data के दो runs अलग models दे सकते हैं।
+- **Production का registry alias की जगह file path load करना।**
+- **सिर्फ़ overall metrics log करना**, तो promotion key segments check नहीं कर सकता।
+- **एक laptop पर tracking**, तो इतिहास उसी के साथ गायब हो जाता है।
+
+## कब tracking हल्की हो सकती है
+
+- **एक अकेला quick experiment**: results लिखकर रखा हुआ notebook काफ़ी हो सकता है।
+- **सिर्फ़ prompt वाले prototypes**: prompt versions और scores की spreadsheet अच्छी शुरुआत है।
+- **एक बार train हुआ और कम बदलने वाला model**: उसकी lineage एक बार ध्यान से record कर लो।
+
+## Demo से production तक
+
+- **हर run के लिए commit, data version, parameters और segment metrics log करो।**
+- **Registry alias से serve करो**, और automated check व owner की approval से promote करो।
+- **पिछला champion** rollback के लिए तैयार रखो।
+- **Prompt और retrieval experiments** को भी training runs की तरह track करो।
+- **Access control के साथ shared, backed-up tracking server चलाओ।**
+
+## Practice करो
+
+MLflow की tracking guide और Made With ML के experiment tracking और versioning वाले lessons पढ़ो।
+
+1. किसी training script में tracking जोड़ो: parameters, metrics, Git commit, data hash और model।
+2. दो settings बदलते हुए दस experiments चलाओ और उनकी तुलना tracking UI में करो।
+3. सबसे अच्छा model register करो, "current production" model के सामने एक promotion check लिखो, और registered model को एक अलग prediction script में load करो।
+4. अपने दो registered versions पर promote_if_better चलाओ, फिर alias को वापस rollback करो और confirm करो कि serving code पुराना version load करता है।
+
+**आपका काम पूरा जब** आप किसी prediction को उस run, code commit और data version तक वापस trace कर सको जिसने वो model बनाया।

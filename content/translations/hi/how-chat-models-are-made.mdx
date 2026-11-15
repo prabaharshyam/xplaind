@@ -1,0 +1,167 @@
+---
+id: how-chat-models-are-made
+lang: hi
+title: "Chat model कैसे बनता है: pre-training, SFT और preference tuning"
+outcome: "Chat model के पीछे के तीन training stages समझा पाओगे, बता पाओगे कि हर एक क्या जोड़ता है और कितना लगता है, और model चुनते वक्त base model और instruct model का फ़र्क पहचान पाओगे।"
+answer: "Chat model एक base model होता है, जिसे पहले बहुत सारे text पर शब्द predict करने के लिए pre-train किया जाता है, फिर example जवाबों से instructions follow करना सिखाया जाता है (SFT), और फिर लोगों को पसंद आने वाले जवाबों की तरफ़ tune किया जाता है (RLHF या DPO)।"
+why_it_matters: "Stages समझ लो तो रोज़ का बहुत सारा behaviour समझ आ जाता है: base models बहकते क्यों हैं, chat models विनम्र पर कभी-कभी मना क्यों कर देते हैं, और अपना model fine-tune करना इसी process का छोटा रूप क्यों है। Interview में भी ये अक्सर पूछा जाता है।"
+flashcards:
+  - q: "Chat model बनाने वाले तीन stages कौन-से हैं?"
+    a: "बहुत सारे text पर pre-training, prompt और ideal जवाब के जोड़ों पर supervised fine-tuning (SFT), फिर RLHF या DPO से preference tuning।"
+  - q: "Base model किसी सवाल के साथ क्या करता है?"
+    a: "वो text को सबसे likely तरीके से आगे बढ़ाता है। वो जवाब दे भी सकता है, पर और सवाल जोड़ सकता है या बहक सकता है, क्योंकि उसे सिर्फ़ अगला token predict करना सिखाया गया था।"
+  - q: "कौन-सा stage सबसे ज़्यादा compute use करता है?"
+    a: "Pre-training, बहुत फ़र्क के साथ। बाद के stages compute का छोटा हिस्सा लेते हैं पर behaviour बहुत बदल देते हैं।"
+  - q: "SFT के एक example में क्या होता है?"
+    a: "एक prompt और ideal जवाब, जो आम तौर पर trained लोग लिखते हैं, ताकि model अच्छे reply का ढाँचा सीख सके।"
+  - q: "Preference के एक example में क्या होता है?"
+    a: "एक prompt, एक पसंद किया गया जवाब और एक नकारा गया जवाब। लोगों के लिए दो जवाबों की तुलना करना, एक परफ़ेक्ट जवाब लिखने से आसान है।"
+  - q: "RLHF में reward model क्या करता है?"
+    a: "वो तुलनाओं से सीखकर किसी भी जवाब को score देता है कि लोगों को वो कितना पसंद आएगा। फिर chat model को ऊँचे scores कमाने के लिए train किया जाता है।"
+  - q: "DPO, RLHF से कैसे अलग है?"
+    a: "DPO उन्हीं preference pairs से सीखता है पर model को सीधे उन पर train करता है, अलग reward model के बिना। इसे चलाना आसान और ज़्यादा stable है।"
+  - q: "Chat model किसी बेज़रर request को मना क्यों कर सकता है?"
+    a: "Preference tuning सुरक्षित जवाबों को reward देती है। अगर rewards ज़रूरत से ज़्यादा सावधानी की तरफ़ झुक जाएँ, तो model उन चीज़ों को भी मना करना सीख लेता है जिनमें उसे मदद करनी चाहिए।"
+exercise:
+  title: "Hindi support bot के लिए base या instruct?"
+  setup: "Jaipur का एक e-commerce startup ऐसा bot चाहता है जो delivery और refund के सवालों के जवाब Hindi और English में दे। एक open-weight model family दो downloads देती है: एक base model और उसी size का instruct (chat) version। Team के पास अपने support agents के 600 अच्छे पुराने replies हैं और 2,000 ऐसे जोड़े हैं जिनमें एक senior agent ने दो draft replies में से बेहतर वाला चुना है।"
+  questions:
+    - q: "उन्हें कौन-सा download पहले लेना चाहिए, और क्यों?"
+      a: "Instruct version। वो पहले से instructions follow करता है और बातचीत संभालता है। Base model को assistant की तरह behave करने के लिए पहले अपना SFT चाहिए।"
+    - q: "600 अच्छे replies किस काम आ सकते हैं?"
+      a: "SFT data के लिए, अगर वो चाहते हैं कि model उनके tone और policies से prompt से ज़्यादा मिले। कुछ replies उन्हें test set के लिए अलग भी रखने चाहिए।"
+    - q: "चुने हुए 2,000 जोड़े किस तरह की training में काम आ सकते हैं?"
+      a: "Preference tuning में, जैसे DPO। हर जोड़ा एक prompt, एक बेहतर reply और एक बदतर reply है, जो ठीक वही format है जो DPO को चाहिए।"
+    - q: "कोई भी training करने से पहले उन्हें क्या आज़माना चाहिए?"
+      a: "Instruct model पर एक अच्छा prompt, कुछ example replies के साथ, और test set पर score। Training तभी करने लायक है जब वो इससे साफ़ बेहतर निकले।"
+ask:
+  - "Base model जवाब देने की जगह बहकता क्यों है?"
+  - "RLHF और DPO में क्या फ़र्क है?"
+  - "Chat models कभी-कभी बेज़रर requests को मना क्यों कर देते हैं?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+जिन chat assistants को आप रोज़ use करते हो, वो एक बार में train नहीं हुए। वो stages में बनते हैं, और हर stage कुछ अलग जोड़ता है।
+
+1. **Pre-training।** Model बहुत सारा text (web pages, books, code) पढ़ता है और अगला token predict करना सीखता है। इसमें ज़्यादातर पैसा और compute लगता है। नतीजा एक **base model** होता है। उसे language और दुनिया के बारे में बहुत कुछ पता होता है, पर वो सिर्फ़ text को आगे बढ़ाता है।
+2. **Supervised fine-tuning (SFT)।** Base model को prompt और ideal जवाब के examples पर train किया जाता है, जो लोग लिखते या check करते हैं। वो instructions follow करना और assistant की तरह reply करना सीखता है। इसे instruction tuning भी कहते हैं।
+3. **Preference tuning।** लोग एक ही prompt के दो जवाबों की तुलना करके बेहतर वाला चुनते हैं। फिर model को ऐसे tune किया जाता है कि पसंद किए गए जवाब ज़्यादा likely हो जाएँ। दो आम तरीके हैं: **RLHF** (reinforcement learning from human feedback) और **DPO** (direct preference optimisation)।
+
+Stage 2 और 3 को मिलाकर अक्सर **post-training** कहा जाता है। ये total compute का छोटा हिस्सा लेते हैं पर model का behaviour बहुत बदल देते हैं। जब कोई provider किसी model का "base" और "instruct" या "chat" दोनों version निकालता है, तो फ़र्क post-training का होता है।
+
+```flow
+title: कच्चे text से chat model तक
+dir: LR
+बहुत सारा text | web, books, code
+बहुत सारा text -> Pre-training | अगला token predict करना
+Pre-training -> Base model | text को आगे बढ़ाता है
+Base model -> Supervised fine-tuning | prompt और ideal जवाब
+Supervised fine-tuning -> Instruct model | instructions follow करता है
+Instruct model -> Preference tuning | RLHF या DPO
+Preference tuning -> Chat model | helpful, विनम्र, ज़्यादा सुरक्षित
+```
+
+एक काम की तस्वीर: pre-training model को knowledge देती है, SFT उसे helpful होने का format सिखाता है, और preference tuning उसकी समझ बनाती है कि बहुत से संभव जवाबों में से लोग असल में कौन-सा चाहते हैं।
+
+## ये काम कैसे करता है
+
+**Stage 1: pre-training।** Training text को tokens में काटा जाता है। हर जगह के लिए model अगला token guess करता है, अपने guess को असली token से मिलाता है, और अपने weights को ज़रा-सा बदलता है। खरबों tokens पर दोहराने से ये grammar, facts, reasoning patterns और code सिखा देता है। Model क्या सीखता है, ये इस पर बहुत निर्भर है कि वो क्या पढ़ता है। अगर कोई भाषा, जैसे Odia या Assamese, training text में कम है, तो model उसमें कमज़ोर होगा।
+
+Base model को prompt "How do I reset my UPI PIN?" दो, तो वो जवाब दे सकता है, या और सवालों की list बना सकता है, क्योंकि web पर सवालों से भरे pages आम हैं। वो जानबूझकर बेकार नहीं बन रहा। वो likely text predict कर रहा है।
+
+**Stage 2: supervised fine-tuning।** Trained लोग हज़ारों prompts के लिए बढ़िया जवाब लिखते हैं: explanations, summaries, code, विनम्र refusals। OpenAI का InstructGPT काम, जो एक शुरुआती public example है, करीब 13,000 ऐसे demonstration examples पर टिका था। इन्हें लिखना धीमा और महँगा है, क्योंकि मुश्किल सवाल का अच्छा जवाब लिखने में किसी skilled इंसान को बहुत समय लग सकता है। SFT के बाद model सवालों के जवाब देता है, उन्हें आगे बढ़ाता नहीं।
+
+SFT का एक example छोटी chat जैसा दिखता है:
+
+```json
+{"messages": [
+  {"role": "user", "content": "How do I reset my UPI PIN?"},
+  {"role": "assistant", "content": "Open your UPI app, go to the bank account, choose Reset UPI PIN, and verify with your debit card details and the OTP sent to your phone."}
+]}
+```
+
+**Stage 3: preference tuning।** किसी भी prompt के कई ठीक जवाब होते हैं, और कुछ बाकियों से बेहतर होते हैं। अकेला सबसे अच्छा जवाब लिखना मुश्किल है, पर दो जवाबों की तुलना आसान है। इसलिए लोगों को एक prompt और model के दो जवाब दिखाए जाते हैं और पूछा जाता है कि कौन-सा बेहतर है। हर फ़ैसला एक **preference pair** बन जाता है:
+
+```json
+{"prompt": "My order is late. What can I do?",
+ "chosen": "Sorry about the delay. You can track it under My Orders. If it is more than 3 days late, you can ask for a refund there.",
+ "rejected": "Orders are sometimes late. Please wait."}
+```
+
+इन pairs से सीखने के दो मुख्य तरीके हैं।
+
+- **RLHF।** पहले pairs पर एक अलग **reward model** train करो, ताकि वो किसी भी जवाब को score दे सके कि लोगों को वो कितना पसंद आएगा। फिर chat model को reinforcement learning से train करो कि वो ऊँचे score वाले जवाब बनाए, और SFT model के करीब रहे ताकि वो अजीब text की तरफ़ न बह जाए जो संयोग से अच्छा score पा लेता है।
+- **DPO।** Reward model को छोड़ दो। Chat model को सीधे pairs पर train करो, ताकि वो जहाँ से शुरू हुआ था उसके मुक़ाबले chosen जवाब ज़्यादा likely और rejected कम likely हो जाए। इसमें आम training code चलता है, ये सस्ता है और चलाने में ज़्यादा stable है। कई open model families DPO या ऐसे ही तरीकों पर आ गई हैं।
+
+एक तीसरा रूप, **RLAIF**, ये judge करने के लिए कि कौन-सा जवाब बेहतर है, लोगों की जगह किसी strong model को use करता है। ये सस्ता है पर judge model के blind spots भी साथ ले आता है।
+
+| Stage | Training data | क्या जोड़ता है | मोटा cost |
+| --- | --- | --- | --- |
+| Pre-training | खरबों tokens का raw text | Language, facts और code की knowledge | ज़्यादातर compute; सिर्फ़ बड़ी labs करती हैं |
+| Supervised fine-tuning | हज़ारों से दसियों हज़ार prompt और ideal-जवाब के जोड़े | Instructions follow करना, assistant की तरह reply देना | कम compute; महँगा expert लेखन |
+| Preference tuning (RLHF या DPO) | दसियों हज़ार chosen और rejected pairs | बेहतर समझ, tone और safety | कम compute; सस्ती इंसानी तुलनाएँ |
+
+ये figures मोटे patterns हैं, exact numbers नहीं। हर lab की recipe अलग होती है और समय के साथ बदलती है।
+
+**Browser में try करो।** Reward model preferences को scores में बदलता है। देखो कि दो जवाबों की पसंद एक probability कैसे बनती है।
+
+```python
+import math
+
+def prefer_probability(score_a, score_b):
+    return 1 / (1 + math.exp(-(score_a - score_b)))      # the Bradley-Terry form used in reward modelling
+
+pairs = [("helpful, cites the policy", 2.1, "vague answer", 0.4),
+         ("polite refusal", 0.2, "unsafe instructions", -1.5),
+         ("short and right", 1.0, "long and right", 0.9)]
+for a, sa, b, sb in pairs:
+    print(f"P({a!r} preferred over {b!r}) = {prefer_probability(sa, sb):.2f}")
+```
+
+## एक example से समझो
+
+Hyderabad की एक team ऐसा bot बना रही है जो छोटे दुकानदारों को bank statements Telugu और English में समझाता है। वो एक ही open-weight model family के तीन versions की तुलना एक prompt पर करते हैं, "Explain this ₹2,350 debit marked NACH", ये देखने के लिए कि हर stage क्या जोड़ता है।
+
+| Version | Prompt के साथ उसने क्या किया | क्यों |
+| --- | --- | --- |
+| Base model | तीन और lines लिखीं जो forum post जैसी लगती थीं, फिर एक दूसरा सवाल | वो सिर्फ़ text आगे बढ़ाता है; forum posts आम हैं |
+| SFT के बाद | समझाया कि NACH एक automatic debit है, आम तौर पर loan EMI या subscription, एक लंबे, formal paragraph में | उसने helpful जवाब का format सीख लिया |
+| Preference tuning के बाद | वही explanation तीन छोटी lines में दी, bank app में mandate list check करने को कहा, और किसी दूसरी entry को समझाने की पेशकश की | लोगों ने अगले कदम वाले छोटे, practical जवाब पसंद किए थे |
+
+Team chat version को अपना starting point चुनती है। फिर उन्हें दिखता है कि उसके Telugu replies अकड़े हुए हैं और कभी-कभी English में बदल जाते हैं। ये कमी pre-training से आती है, जहाँ Telugu text कम था। कितनी भी prompting pre-training की कमी को पूरा नहीं भर सकती, इसलिए वो 200 असली सवालों पर दो options test करते हैं: Telugu examples वाला सावधानी से लिखा prompt, और उनके Telugu बोलने वाले support staff के लिखे 1,500 replies पर छोटा SFT run। जो उनके अपने test पर बेहतर score करे, वही रखते हैं, public leaderboard पर नहीं।
+
+## आम गलतियाँ
+
+- **Base model को chatbot की तरह use करना।** वो जवाब देने की जगह text आगे बढ़ाता है। Instruct या chat version download करो, जब तक आप अपना SFT करने की योजना न बना रहे हों।
+- **ये सोचना कि post-training knowledge जोड़ती है।** वो ज़्यादातर behaviour बदलती है। Facts pre-training से या run time पर retrieval से आते हैं।
+- **ये मान लेना कि RLHF model को सच्चा बनाता है।** वो उन जवाबों को reward देता है जो लोगों को पसंद आते हैं, और लोग confident, fluent पर गलत text भी पसंद कर सकते हैं।
+- **Refusals को अपने prompt की गलती समझना।** ज़रूरत से ज़्यादा सावधानी वाले refusals अक्सर preference tuning से आते हैं। साफ़ prompt मदद करता है, पर कुछ behaviour model के अंदर पक्का बैठा होता है।
+- **Interview में DPO और RLHF को मिला देना।** दोनों preference pairs से सीखते हैं। RLHF पहले reward model train करता है; DPO नहीं करता।
+
+## Chat models ऐसा behave क्यों करते हैं
+
+रोज़ की बहुत सी आदतें इन्हीं stages से आती हैं।
+
+- **Sycophancy।** Models आपकी हाँ में हाँ मिलाते हैं, क्योंकि preference tuning में सहमत होने वाले जवाब अक्सर पसंद किए गए थे।
+- **लंबे, भरे हुए जवाब।** अगर reviewers ने विस्तृत जवाबों को reward दिया, तो model सीख लेता है कि लंबा बेहतर दिखता है।
+- **भाषाओं में असमानता।** Hindi या Tamil की quality इस पर निर्भर है कि pre-training और SFT examples में उस भाषा का कितना हिस्सा था।
+- **Knowledge cut-off।** Model को pre-training data इकट्ठा होने के बाद की कोई चीज़ नहीं पता, जब तक आप उसे ताज़ा जानकारी न दो।
+
+## Demo से production तक
+
+- **Model card पढ़ो।** उसमें आम तौर पर लिखा होता है कि model किन stages से गुज़रा, कौन-सा data use हुआ और कौन-सी भाषाएँ cover हुईं।
+- **सही version चुनो।** Applications के लिए instruct या chat versions use करो। Base model तब use करो जब आप अपना SFT करोगे, या सादे text completion के लिए।
+- **अपनी भाषाओं में test करो।** अपने users जिन भी भाषाओं में लिखते हैं, उनमें असली सवालों पर model को score करो, mixed Hinglish या Tanglish समेत।
+- **अपने pairs सँभालकर रखो।** जब reviewers कोई reply ठीक करें या दो drafts में से चुनें, तो उसे store करो। बाद में यही SFT और preference data बनता है।
+
+## Practice करो
+
+1. किसी भी chat assistant से कोई सीधा सवाल पूछो, फिर वही सवाल आगे "Continue this text:" लगाकर पूछो। देखो जवाब कैसे बदलता है। आप उसे कुछ हद तक base-model behaviour की तरफ़ वापस धकेल रहे हो।
+2. अपने काम के किसी task के लिए दो SFT examples और दो preference pairs लिखो। Rejected जवाब असली जैसे रखो, साफ़ तौर पर बुरे नहीं।
+3. किसी दोस्त को RLHF और DPO एक-एक मिनट से कम में समझाओ, "preference pair" और "reward model" शब्दों के साथ।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 2 post-training और preference tuning cover करता है।
+
+**आपका काम पूरा जब** आप तीनों stages के नाम बता सको, ये कि हर एक कौन-सा data use करता है और क्या जोड़ता है, और RLHF और DPO का फ़र्क समझा सको।

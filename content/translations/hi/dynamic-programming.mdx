@@ -1,0 +1,156 @@
+---
+id: dynamic-programming
+lang: hi
+title: "Recursion और dynamic programming"
+outcome: "साफ़ base cases के साथ recursive solutions लिखो, overlapping subproblems पहचानो, और धीमी recursion को memoization या bottom-up table से तेज़ dynamic programming में बदलो।"
+answer: "Dynamic programming हर overlapping subproblem को एक बार हल करके उसका जवाब दोबारा use करती है, memoization (recursion में cache) या bottom-up भरी हुई table से।"
+why_it_matters: "Coding interviews में candidates को सबसे ज़्यादा डर dynamic programming से लगता है, और ये fare calculators, text diff tools और spell checkers जैसे असली features को चलाती है। एक साफ़ तरीका आ जाए तो ये routine बन जाती है।"
+flashcards:
+  - q: "हर recursive function के दो हिस्से कौन-से हैं?"
+    a: "एक base case जो सीधे जवाब देता है, और एक recursive case जो छोटे input पर खुद को call करता है।"
+  - q: "Overlapping subproblems क्या हैं?"
+    a: "जब recursion वही छोटा problem बार-बार हल करती है, जैसे fib(5) के अंदर fib(3) एक से ज़्यादा बार।"
+  - q: "Memoization क्या है?"
+    a: "हर result को पहली बार compute होने पर save कर लेना, और बाद की calls में saved जवाब लौटा देना।"
+  - q: "Bottom-up (tabulation) तरीका क्या है?"
+    a: "सबसे छोटे subproblems से पूरे जवाब तक एक table भरना, आम तौर पर recursion की जगह loop से।"
+  - q: "DP problem में 'state' क्या होता है?"
+    a: "Values का सबसे छोटा set जो एक subproblem को पहचानता है, जैसे coin change में बचा हुआ amount।"
+  - q: "DP solution की cost का अंदाज़ा कैसे लगाते हैं?"
+    a: "States की गिनती गुणा हर state पर काम। Coin change में ये amount × coin types की संख्या है।"
+  - q: "Greedy कब काफ़ी नहीं है और DP चाहिए?"
+    a: "जब अभी का सबसे अच्छा चुनाव आगे बेहतर कुल जवाब रोक दे, जैसे 6 के amount के लिए coins 1, 3 और 4 के साथ।"
+exercise:
+  title: "State और recurrence ढूँढो"
+  setup: "हर problem के लिए बताओ कि एक subproblem क्या है और वो छोटे subproblems से कैसे बनता है।"
+  questions:
+    - q: "n सीढ़ियाँ चढ़ने के तरीके, एक बार में 1 या 2 सीढ़ी लेते हुए।"
+      a: "State: n। ways(n) = ways(n-1) + ways(n-2), जहाँ ways(0) = 1 और ways(1) = 1।"
+    - q: "Coins के एक set से amount a बनाने के लिए सबसे कम coins।"
+      a: "State: a। best(a) = 1 + min(best(a - c)), सभी coins c ≤ a पर, जहाँ best(0) = 0।"
+    - q: "एक चोर एक कतार में बने घरों को लूट सकता है, पर दो पड़ोसी घर नहीं। House i तक अधिकतम लूट कितनी?"
+      a: "State: i। best(i) = max(best(i-1), best(i-2) + loot[i])।"
+    - q: "एक शब्द को दूसरे में बदलने के लिए सबसे कम edits (edit distance)।"
+      a: "State: (i, j), यानी एक शब्द के पहले i letters और दूसरे के पहले j। हर cell पड़ोसी cells से insert, delete या replace में जो सबसे सस्ता हो, वो लेता है।"
+ask:
+  - "मैं dynamic programming problem कैसे पहचानूँ?"
+  - "Memoization use करूँ या bottom-up table?"
+  - "Greedy coin change कभी-कभी fail क्यों होता है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Recursion** तब होती है जब कोई function किसी problem को उसके छोटे version पर खुद को call करके हल करता है, जब तक वो **base case** तक न पहुँच जाए जो इतना छोटा हो कि सीधे जवाब दिया जा सके। किसी folder में files गिनना स्वाभाविक रूप से recursive है: यहाँ की files गिनो, फिर हर sub-folder से वही सवाल पूछो।
+
+**Dynamic programming** (DP) तब काम आती है जब कोई recursion वही छोटे problems बार-बार हल करती रहती है। उन्हें दोबारा compute करने की जगह, तुम हर एक को एक बार हल करके उसका जवाब दोबारा use करते हो, या तो results cache करके (**memoization**) या सबसे छोटे case से ऊपर की ओर table भरकर (**tabulation**)।
+
+```flow
+title: Plain recursion से fib(5): वही calls दोहराई जाती हैं (15 calls; fib(35) के लिए लगभग 2.7 crore)
+fib(5) -> fib(4)
+fib(5) -> fib(3), फिर से compute हुआ
+fib(4) -> fib(3)
+fib(4) -> fib(2)
+fib(3) -> fib(2), फिर से
+fib(3) -> fib(1)
+```
+
+```flow
+dir: LR
+title: Memoization के साथ: हर value एक बार, फिर सिर्फ़ lookups
+fib(0) -> fib(1) -> fib(2) -> fib(3) -> fib(4) -> fib(5)
+```
+
+## ये काम कैसे करता है
+
+कोई problem DP के लिए तब ठीक बैठती है जब उसमें दो properties हों। **Optimal substructure**: सबसे अच्छा जवाब छोटे problems के सबसे अच्छे जवाबों से बनता है। **Overlapping subproblems**: वही छोटे problems बार-बार आते हैं।
+
+एक भरोसेमंद तरीके में पाँच steps हैं:
+
+1. **State तय करो**: कौन-सी एक value, या values का छोटा set, एक subproblem को पहचानता है? Coin change में ये बचा हुआ amount है।
+2. **Recurrence लिखो**: किसी state का जवाब छोटे states से कैसे बनता है।
+3. **Base cases set करो**: वो states जिनका जवाब सीधे दिया जा सकता है, जैसे amount 0 के लिए 0 coins।
+4. **क्रम चुनो**: top-down memoization के साथ, या bottom-up table के साथ।
+5. **जवाब निकालो** और cost check करो: states की गिनती गुणा हर state पर काम।
+
+**Top-down memoization** स्वाभाविक recursive code रखती है और उसमें cache जोड़ देती है। Python में `@functools.lru_cache(maxsize=None)` ये एक line में कर देता है। **Bottom-up tabulation** recursion की जगह एक loop लगाती है जो base case से ऊपर की ओर array भरता है। इससे recursion-depth की limits से बचाव होता है और ये अक्सर थोड़ी तेज़ होती है।
+
+| तरीका | कैसा दिखता है | किसके लिए अच्छा | किससे बचें |
+|---|---|---|---|
+| Plain recursion | function खुद को call करता है | छोटे inputs, साफ़ समझ | जब subproblems दोहराएँ तो exponential समय |
+| Memoization (top-down) | recursion + cache | recurrence से जल्दी लिखा जाता है | recursion depth; cache की memory |
+| Tabulation (bottom-up) | table भरने वाला loop | बड़े inputs, अनुमानित speed | भरने का क्रम खुद निकालना पड़ता है |
+| Greedy | अभी का सबसे अच्छा option चुनो | जहाँ greedy चुनाव सिद्ध हो | जब local best ही global best न हो तो गलत जवाब |
+
+**Interviews में DP पहचानना।** किसी sequence या grid पर "number of ways", "minimum cost", "maximum value", "longest" या "can you reach" जैसे वाक्यांश अक्सर DP का इशारा होते हैं। पहले plain recursive version लिखो और उसकी cost ज़ोर से बोलो; फिर दोहराए गए subproblems बताओ और cache जोड़ो। Interviewers रटी हुई table से ज़्यादा धीमे से तेज़ तक का ये रास्ता पसंद करते हैं।
+
+## एक example से समझो
+
+अर्जुन लखनऊ में एक payments kiosk के लिए cash देने वाला feature बना रहा है। कोई amount दिया जाए, तो kiosk उसे 1, 2, 5, 10, 20, 50, 100, 200 और 500 में से सबसे कम coins और notes से चुकाए।
+
+भारतीय denominations के लिए हमेशा सबसे बड़ा note लेना संयोग से ठीक चलता है। पर product एक canteen में भी चलेगा जो 1, 3 और 4 के tokens use करती है। 6 के लिए greedy 4 + 1 + 1 लेता है (तीन tokens), जबकि 3 + 3 दो हैं। इसलिए अर्जुन DP use करता है।
+
+**State:** चुकाने के लिए बचा हुआ amount `a`। **Recurrence:** best(a) = 1 + हर उस coin c के लिए सबसे छोटा best(a − c) जो fit हो। **Base case:** best(0) = 0।
+
+उसका पहला version plain recursion है:
+
+```python
+def fewest(a, coins):
+    if a == 0:
+        return 0
+    return 1 + min(fewest(a - c, coins) for c in coins if c <= a)
+```
+
+₹30 के लिए Indian coins के साथ ये ठीक है; ₹300 के लिए ये व्यावहारिक रूप से कभी खत्म नहीं होता, क्योंकि ये वही amounts अनगिनत बार दोबारा हल करता है।
+
+Cache जोड़ने से ये ठीक हो जाता है:
+
+```python
+from functools import lru_cache
+
+def fewest_coins(amount, coins):
+    @lru_cache(maxsize=None)
+    def best(a):
+        if a == 0:
+            return 0
+        return 1 + min(best(a - c) for c in coins if c <= a)
+    return best(amount)
+```
+
+अब 0 से target तक हर amount एक बार हल होता है: लगभग amount × coins की संख्या जितने steps।
+
+Kiosk के लिए वो bottom-up version use करता है, जो बड़े amounts पर recursion limits से बचाता है:
+
+```python
+def fewest_coins_table(amount, coins):
+    INF = float("inf")
+    best = [0] + [INF] * amount
+    for a in range(1, amount + 1):
+        for c in coins:
+            if c <= a and best[a - c] + 1 < best[a]:
+                best[a] = best[a - c] + 1
+    return best[amount]
+```
+
+नौ denominations के साथ ₹3,000 के लिए ये 27,000 simple steps हैं, किसी भी phone पर instant। 1, 3 और 4 के tokens के साथ ये 6 के amount पर सही जवाब 2 लौटाता है।
+
+## आम गलतियाँ
+
+**Base case न होना, या गलत होना।** Recursion कभी रुकती नहीं या बकवास लौटाती है। पहले base case लिखो।
+
+**बहुत बड़ा state चुनना।** जो values जवाब पर असर नहीं डालतीं उन्हें शामिल करने से states की गिनती कई गुना हो जाती है। सिर्फ़ वही रखो जिस पर आगे का जवाब निर्भर करता है।
+
+**Mutable arguments पर caching।** `lru_cache` को hashable arguments चाहिए। Lists की जगह tuples दो, या list को cached function के बाहर रखो, जैसे ऊपर किया है।
+
+**Recursion limit से टकराना।** Python लगभग 1,000 nested calls पर रुक जाता है। बड़े inputs के लिए bottom-up पर जाओ, या limit सावधानी से बढ़ाओ।
+
+**बिना proof के greedy पर भरोसा।** Greedy तेज़ है और अक्सर सही, पर तुम्हें दिखाना होगा कि वो उस problem में चलता है। 1, 3, 4 tokens का example दिखाता है कि वो कैसे fail होता है।
+
+**सीधे code पर कूद जाना।** ज़्यादातर DP bugs अस्पष्ट state या recurrence से आते हैं। Code से पहले दोनों को एक वाक्य में लिखो।
+
+## Practice करो
+
+1. Watch & learn panel में video lessons देखो; Reducible के पाँच steps ऊपर के तरीके से मेल खाते हैं।
+2. ऊपर का exercise करो और हर recurrence को एक छोटे input पर हाथ से check करो।
+3. Project check करो: coin change तीन तरीकों से, timings के साथ जो दिखाएँ कि DP क्यों ज़रूरी है।
+4. Stretch: दो शब्दों के बीच edit distance 2D table से हल करो, और "kitten" और "sitting" के लिए table print करो।

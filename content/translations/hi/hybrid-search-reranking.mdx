@@ -1,0 +1,206 @@
+---
+id: hybrid-search-reranking
+lang: hi
+title: "Hybrid search, reranking और filters"
+outcome: "Keyword और vector search को मिलाओ, मिले हुए results को cross-encoder से rerank करो, और metadata filters से search को छोटा करो।"
+answer: "Hybrid search keyword search (जो exact शब्द पकड़ती है) और vector search (जो मतलब पकड़ती है) को मिलाती है। फिर reranker top results को दोबारा score करके सबसे सही क्रम बनाता है।"
+why_it_matters: "सादी vector search policy numbers, product codes और नामों जैसे exact शब्द miss कर देती है, और business users ठीक यही type करते हैं। Reranking के साथ hybrid search production RAG में सबसे आम upgrade है, और interview का एक आम सवाल भी।"
+flashcards:
+  - q: "Hybrid search क्या है?"
+    a: "Keyword search और vector search को साथ चलाकर results मिलाना, ताकि exact शब्द और दूसरे शब्दों में कही बातें, दोनों मिलें।"
+  - q: "Vector search कहाँ फेल होती है और keyword search कहाँ सफल?"
+    a: "Exact codes, clause numbers, error ids और दुर्लभ नामों पर, जैसे 'clause 7.3(b)' या 'E-4012'।"
+  - q: "BM25 क्या है?"
+    a: "एक keyword scoring formula जो उन passages को ज़्यादा score देता है जिनमें query के शब्द हों, ख़ासकर दुर्लभ शब्द, और लंबे passages को ज़रूरत से ज़्यादा reward नहीं देता।"
+  - q: "BM25 और cosine scores को बस जोड़ क्यों न दें?"
+    a: "उनके scales अलग हैं, तो एक चुपचाप हावी हो जाता है। उन्हें normalise करो या reciprocal rank fusion use करो।"
+  - q: "Reciprocal rank fusion क्या है?"
+    a: "मिलाने का एक तरीका जो raw scores को ignore करता है और उन items को reward देता है जो किसी भी list में ऊँचे rank पर हों। ये सरल है और आसानी से नहीं टूटता।"
+  - q: "Cross-encoder reranker क्या है?"
+    a: "एक model जो query और passage को साथ पढ़कर relevance का सीधा score देता है; लाखों passages के लिए बहुत धीमा, 20 से 50 के लिए ठीक।"
+  - q: "Reranker को कितने candidates भेजने चाहिए?"
+    a: "20 से 50 retrieve करो और 3 से 8 रखो, क्योंकि जो passage list में है ही नहीं उसे reranker बचा नहीं सकता।"
+  - q: "Filter को search के अंदर क्यों लगाएँ, बाद में नहीं?"
+    a: "Top 5 लेने के बाद filter करने पर कुछ न बचे ऐसा हो सकता है; पहले filter करने से सिर्फ़ दायरे वाले documents आपस में मुक़ाबला करते हैं।"
+  - q: "कुछ queries के लिए weight keyword search की तरफ़ क्यों खिसकाएँ?"
+    a: "जिन queries में codes, part numbers, PAN जैसी strings या दुर्लभ नाम हों, वो exact शब्दों पर टिकी होती हैं, जिन्हें keyword search embeddings से बेहतर match करती है।"
+  - q: "Superseded documents को results से बाहर कैसे रखें?"
+    a: "हर chunk पर effective dates और एक current flag रखो, और search query में उन पर filter लगाओ, ताकि पुराने versions कभी मुक़ाबले में न आएँ।"
+exercise:
+  title: "Retrieval का diagnosis करो"
+  setup: "Mumbai के एक bank का assistant, जो 9,000 पन्नों के circulars और product terms पर चलता है, अपने golden set पर इन failures से जूझ रहा है: (1) 'circular RBI/2025-26/41 के तहत penalty क्या है?' असंबंधित circulars लौटाता है; (2) 'card खो जाए तो उसे कैसे रोकूँ?' 'Hotlisting a card' नाम वाला passage miss कर देता है; (3) savings rates के मौजूदा सवालों पर अक्सर 2024 की rate sheet आती है; (4) सही passage अक्सर rank 9 या 12 पर मिलता है, पर prompt में सिर्फ़ top 5 जाते हैं।"
+  questions:
+    - q: "कौन-सी failure को keyword search चाहिए, और क्यों?"
+      a: "(1): circular number एक exact code है जिसे embeddings ठीक से नहीं संभालते; BM25 उसे सीधे match करता है।"
+    - q: "कौन-सी failure में vector search अच्छी है?"
+      a: "(2): 'card खो जाए तो रोकना' और 'hotlisting a card' का मतलब एक ही है, बस शब्द अलग हैं।"
+    - q: "(3) को कैसे ठीक करोगे?"
+      a: "हर chunk के साथ effective date और status रखो, और search के अंदर filter लगाकर सिर्फ़ मौजूदा लागू documents लो।"
+    - q: "(4) को कैसे ठीक करोगे?"
+      a: "Hybrid search से करीब 40 candidates लाओ और top 5 रखने से पहले उन्हें cross-encoder से rerank करो।"
+ask:
+  - "Vector search की जगह hybrid search कब चाहिए?"
+  - "Reciprocal rank fusion कैसे काम करता है?"
+  - "कौन-सा reranker use करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Vector search उन passages को ढूँढती है जिनका मतलब मिलता-जुलता हो। Keyword search उन्हें ढूँढती है जिनमें वही शब्द हों। हर एक वहाँ फेल होती है जहाँ दूसरी सफल होती है:
+
+- "टूटी phone screen का claim कैसे करूँ?" Vector search accidental damage वाला clause ढूँढ लेती है, भले ही उसमें "breakage of display" लिखा हो। Keyword search शायद न ढूँढे।
+- "Clause 7.3(b) क्या कहता है?" या "error E-4012" Keyword search इसे सही पकड़ लेती है। Vector search कुछ-कुछ मिलते-जुलते clauses लौटाती है।
+
+**Hybrid search** दोनों चलाती है और results मिलाती है। फिर **Reranking** मिले हुए top 20 से 50 results को एक धीमे, ज़्यादा सटीक model से दोबारा क्रम में लगाती है। **Metadata filters** search को पहले ही सही हिस्से तक सीमित कर देते हैं, जैसे एक product, एक state, या किसी date के बाद लागू documents।
+
+```flow
+Query -> BM25 keyword search | top 40, product, state, लागू होने के हिसाब से filtered
+Query -> Vector search | top 40, वही filters
+BM25 keyword search -> Fusion: reciprocal rank | top 40
+Vector search -> Fusion: reciprocal rank
+Fusion: reciprocal rank -> Cross-encoder reranker | query और passage को साथ पढ़ता है
+Cross-encoder reranker -[top 5]-> Prompt
+```
+
+इस lesson में हम Chennai की एक insurance company को देखेंगे, जिसके agents policy wordings के बारे में बारीक सवाल पूछते हैं।
+
+## ये काम कैसे करता है
+
+**Keyword वाला हिस्सा।** ज़्यादातर systems BM25 use करते हैं, एक formula जो उस passage को ऊँचा score देता है जिसमें query के शब्द हों, ख़ासकर दुर्लभ शब्द, और लंबे passages को ज़रूरत से ज़्यादा reward नहीं देता। Elasticsearch, OpenSearch और कई vector databases इसे देते हैं। PostgreSQL की built-in full-text search अपने functions (`ts_rank`) से rank करती है, BM25 से नहीं; extensions BM25 जोड़ देते हैं।
+
+**Vector वाला हिस्सा।** Query को embed करो और सबसे पास के chunk embeddings ढूँढो।
+
+**Fusion।** दोनों scores अलग scales पर हैं, तो उन्हें बस जोड़ नहीं सकते। दो आम हल: हर एक को 0 से 1 में normalise करके weighted sum लो ("alpha" 0.5 हो तो दोनों बराबर), या reciprocal rank fusion use करो, जो raw scores को ignore करता है और किसी भी list में ऊँचे rank वाले items को reward देता है। RRF सरल है और आसानी से टूटता नहीं, तो अच्छा default है।
+
+**Reranking।** Embedding model query और passage को अलग-अलग encode करता है, जो तेज़ है पर बारीकी खो देता है। **Cross-encoder** दोनों को साथ पढ़ता है और relevance का सीधा score देता है। वो दस लाख passages पर चलाने के लिए बहुत धीमा है, पर 40 पर ठीक है। Hybrid search से चौड़ा retrieve करो, rerank करो, और prompt के लिए top 5 रखो।
+
+**Filters।** हर chunk के साथ `doc_type`, `state`, `effective_from` और `access_group` जैसे fields रखो। उन्हें query में लगाओ ताकि अप्रासंगिक या पुराने documents कभी मुक़ाबले में न आएँ। Filters वो जगह भी हैं जहाँ हर user की permissions लागू होती हैं, जिसे बाद का एक lesson cover करता है।
+
+**एक line में reciprocal rank fusion।** हर passage को जिस भी list में वो आता है, वहाँ से 1 भाग (60 जमा उसका rank) का score मिलता है, और scores जुड़ जाते हैं। BM25 में 1st और vectors में 3rd आने वाले passage का score करीब 1/61 + 1/63 होता है; सिर्फ़ एक list में 2nd आने वाले का 1/62। जो passages दोनों तरीकों को पसंद हैं वो ऊपर चढ़ जाते हैं, और कुछ भी raw score scales पर निर्भर नहीं है।
+
+**Settings चुनना:**
+
+| Setting | आम value | कब बढ़ाएँ |
+| --- | --- | --- |
+| हर search से candidates | 20 से 50 | जब सही passage अक्सर list के ठीक बाहर रह जाए |
+| Reranker को भेजे गए candidates | 20 से 50 | जब recall at 50, recall at 5 से बहुत ज़्यादा हो |
+| Prompt के लिए रखे गए passages | 3 से 8 | जब सवालों में कई passages मिलाने पड़ें |
+| Weighted fusion में weight | 0.5 | जब आपका golden set दिखाए कि एक तरफ़ ज़्यादा मदद कर रही है |
+
+इन्हें golden set पर tune करो, अंदाज़े से नहीं, और हर बार recall के साथ latency भी record करो।
+
+**Postgres के अंदर hybrid search।** एक ही table में full-text search और pgvector हों, तो एक अकेली query reciprocal rank fusion से दोनों को मिला सकती है:
+
+```sql
+WITH kw AS (
+  SELECT id, row_number() OVER (ORDER BY ts_rank(tsv, q) DESC) AS r
+  FROM chunks, websearch_to_tsquery('english', $1) q
+  WHERE tsv @@ q AND access_group = ANY($3) AND effective_from <= current_date
+  ORDER BY ts_rank(tsv, q) DESC LIMIT 40
+), vec AS (
+  SELECT id, row_number() OVER (ORDER BY embedding <=> $2) AS r
+  FROM chunks
+  WHERE access_group = ANY($3) AND effective_from <= current_date
+  ORDER BY embedding <=> $2 LIMIT 40
+)
+SELECT c.id, c.section, c.body,
+       coalesce(1.0 / (60 + kw.r), 0) + coalesce(1.0 / (60 + vec.r), 0) AS score
+FROM chunks c
+LEFT JOIN kw ON kw.id = c.id
+LEFT JOIN vec ON vec.id = c.id
+WHERE kw.id IS NOT NULL OR vec.id IS NOT NULL
+ORDER BY score DESC LIMIT 30;
+```
+
+`tsv` chunk text से बना एक stored `tsvector` column है। वही permission और date filters दोनों तरफ़ लगते हैं, तो जो user को देखने की इजाज़त नहीं, वो कभी candidate नहीं बनता।
+
+**जब एक तरफ़ ज़्यादा मायने रखे तो weighted fusion।** हर list के scores को 0 से 1 में normalise करो, फिर मिलाओ:
+
+```python
+import re
+
+def minmax(scores):
+    lo, hi = min(scores.values()), max(scores.values())
+    return {k: (v - lo) / (hi - lo) if hi > lo else 1.0 for k, v in scores.items()}
+
+def looks_exact(query):
+    return bool(re.search(r"\b[A-Z]{2,}-?\d{2,}\b|\b\d{6,}\b", query))     # codes, long numbers
+
+def weighted(query, kw_scores, vec_scores):
+    alpha = 0.7 if looks_exact(query) else 0.4                            # weight on keywords
+    kw, vec = minmax(kw_scores), minmax(vec_scores)
+    ids = set(kw) | set(vec)
+    return sorted(ids, key=lambda i: alpha * kw.get(i, 0) + (1 - alpha) * vec.get(i, 0), reverse=True)
+```
+
+Weights अपने golden set से तय करो: हर query type पर 0.3, 0.5 और 0.7 आज़माओ और जो जीते उसे रखो।
+
+**भारतीय भाषाओं का text।** Keyword search शब्दों को spaces से अलग करती है और शायद सिर्फ़ English के लिए stemming करती है। Hindi या Tamil के लिए "simple" text configuration use करो (बिना stemming), key fields की transliterated copies रखने पर सोचो ताकि "biryani" और "बिरयानी" दोनों match हों, और multilingual embedding model पर ज़्यादा भरोसा करो।
+
+**Latency budget।** दो searches और एक reranker मिलकर जुड़ जाते हैं। Keyword और vector searches parallel चलाओ, candidates को उतना ही रखो जितना recall को चाहिए, और हर stage का p95 latency नापो। अगर reranker ही धीमा हिस्सा है, तो उसे हटाने से पहले छोटा reranker या कम candidates आज़माओ।
+
+## एक example से समझो
+
+Chennai की एक insurance company के पास policy wordings, endorsements और circulars के 4,000 पन्ने हैं। Agents ऐसे सवाल पूछते हैं: "क्या 2026 की revision के बाद Chennai के लिए HOME-PLUS में flood covered है?"
+
+आपके golden set में 60 सवाल हैं जिनके source passages पता हैं। आप recall at 5 नापते हो (उन सवालों का हिस्सा जिनका सही passage top पाँच में है):
+
+- सिर्फ़ vector search: 68%
+- सिर्फ़ BM25: 61%
+- RRF के साथ hybrid: 79%
+- Hybrid, फिर top 40 पर cross-encoder reranker: 88%
+- वही, `product = HOME-PLUS` और revision के बाद की `effective_from` पर filtered: 93%
+
+Failures देखने पर वजह समझ आती है। Vector search उन सवालों में चूकी जिनमें "END-17" जैसे endorsement codes थे। BM25 दूसरे शब्दों में पूछे सवालों में चूका। Reranker ने वो cases ठीक किए जहाँ सही passage आठवें rank पर था। Filter ने पुराना 2024 वाला wording हटा दिया जो मौजूदा वाले से ऊपर आ रहा था।
+
+Reranking ने हर query में करीब 180 milliseconds जोड़े। Client ने recall में 9 points के फ़ायदे के बदले इसे मान लिया, और आपने दोनों numbers eval report में लिखे।
+
+| Set-up | Recall at 5 | जुड़ा latency |
+| --- | --- | --- |
+| सिर्फ़ vector | 68% | Baseline |
+| सिर्फ़ BM25 | 61% | कम |
+| RRF के साथ hybrid | 79% | करीब 20 ms |
+| Hybrid और 40 पर reranker | 88% | करीब 180 ms |
+| साथ में product और effective date के filters | 93% | कुछ नहीं |
+
+हर कदम ने अलग तरह की failure ठीक की, इसीलिए failed सवाल पढ़ना उतना ही मायने रखता था जितना totals देखना।
+
+## आम गलतियाँ
+
+- **Raw scores जोड़ देना।** BM25 और cosine scores अलग scales पर हैं; बड़ा वाला चुपचाप हावी हो जाता है। Normalise करो या RRF use करो।
+- **बहुत कम को rerank करना।** अगर सही passage candidate list में नहीं है, तो reranker उसे बचा नहीं सकता। 20 से 50 retrieve करो, 3 से 8 रखो।
+- **Golden set नहीं।** नापे हुए recall के बिना आप नहीं बता सकते कि hybrid search ने मदद की या बस बेहतर लगी।
+- **Retrieval के बाद filter करना।** Top 5 लेकर फिर दायरे से बाहर वाले हटाने से आपके पास कुछ न बचे, ऐसा हो सकता है। Filter को search के अंदर लगाओ।
+- **भारतीय text के लिए tokenisation भूल जाना।** Tamil या Hindi पर keyword search को ऐसा analyser चाहिए जो उन scripts को संभाले, वरना matches चुपचाप फेल होते हैं।
+- **भारतीय भाषाओं के text पर English stemming।** Simple configuration और multilingual embeddings use करो।
+- **Keyword और vector तरफ़ अलग filters**, तो एक तरफ़ ऐसे documents लौटाती है जिन्हें दूसरी बाहर रखती।
+
+## कब सादी vector search काफ़ी है
+
+- **Natural language वाले सवाल**, जिनमें codes, numbers या दुर्लभ नाम नहीं हैं।
+- **छोटे collections**, जहाँ सही passage वैसे भी लगभग हमेशा top के पास होता है।
+- **सख़्त latency budget**, जहाँ आपका golden set दिखाए कि hybrid से बहुत कम फ़ायदा है।
+
+Test करो: अगर hybrid और reranking से recall at 5 मुश्किल से हिले, तो सादा system रखो।
+
+## Demo से production तक
+
+- **दोनों searches पर वही filters लगाओ**, queries के अंदर।
+- **हर setting बदलने पर query type के हिसाब से recall और latency record करो।**
+- **दोनों candidate lists और fused क्रम log करो**, debugging के लिए।
+- **हर chunk पर effective dates और current flags रखो।**
+- **Weights दोबारा tune करो** जब documents का mix या users के सवाल बदलें।
+
+## Practice करो
+
+Hybrid search पर Weaviate का article और rerankers पर Pinecone का piece पढ़ो।
+
+1. पिछले lesson का अपना RAG app लो और 30 सवालों का golden set बनाओ, जिनमें से एक तिहाई में exact codes, नाम या numbers हों।
+2. सिर्फ़ vector, सिर्फ़ BM25 (`rank_bm25` package काफ़ी है), और दोनों को RRF से मिलाकर, recall at 5 नापो।
+3. Top 30 पर एक free cross-encoder reranker (जैसे sentence-transformers library का कोई छोटा model) जोड़ो और दोबारा नापो, साथ में जुड़ा latency भी।
+4. अपने golden set को उन सवालों में बाँटो जिनमें codes या नाम हैं और जिनमें नहीं हैं, और vector-only और hybrid दोनों के लिए हर एक का recall at 5 report करो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 term-based और embedding retrieval, उन्हें मिलाना, और reranking cover करता है।
+
+**आपका काम पूरा जब** आप चारों set-ups के recall और latency की table दिखा सको और समझा सको कि आप कौन-सा ship करोगे और क्यों।

@@ -1,0 +1,139 @@
+---
+id: caching-cdns
+lang: hi
+title: "Caching और CDNs"
+outcome: "तय कर पाओगे कि क्या और कहाँ cache करना है, सही expiry के साथ cache-aside use कर पाओगे, cached data को काफ़ी fresh रख पाओगे, और static files और media को users के पास वाले CDN से serve कर पाओगे।"
+answer: "Cache data की copies किसी तेज़ जगह रखता है ताकि बार-बार आने वाली requests धीमा काम छोड़ सकें। CDN files को users के पास वाले servers पर रखता है। मुश्किल हिस्सा है पुरानी copies को expire करना।"
+why_it_matters: "System को तेज़ करने और ज़्यादा traffic संभालने का सबसे सस्ता तरीका caching है, और CDNs की वजह से ही India भर में videos और images जल्दी load होते हैं। Invalidation गलत हो जाए तो users को गलत prices या पुराने results दिखते हैं, इसलिए ये interview का पसंदीदा topic है।"
+flashcards:
+  - q: "Cache hit और cache miss क्या हैं?"
+    a: "Hit तब होता है जब data पहले से cache में हो। Miss तब, जब वो न हो, और उसे धीमे source से लाना पड़े।"
+  - q: "Cache-aside pattern कैसे काम करता है?"
+    a: "App पहले cache देखता है; miss होने पर database पढ़ता है, नतीजा expiry के साथ cache में रखता है, फिर लौटाता है।"
+  - q: "TTL का मतलब क्या है?"
+    a: "Time to live: cached item expire होकर दोबारा लाए जाने से पहले कितनी देर तक रहता है।"
+  - q: "CDN क्या करता है?"
+    a: "कई शहरों के servers पर files की copies रखता है, ताकि users आपके origin की जगह पास वाले server से download करें।"
+  - q: "Cache invalidation क्या है?"
+    a: "जब original बदले तब cached data को हटाना या refresh करना, ताकि users को पुरानी values न दिखें।"
+  - q: "Cache stampede क्या है?"
+    a: "जब कोई popular item expire हो जाए और कई requests एक साथ miss करके सब एक ही समय database पर पहुँचें।"
+  - q: "क्या चीज़ें कम ही cache करनी चाहिए, या सिर्फ़ थोड़ी देर के लिए?"
+    a: "वो data जो इसी पल बिल्कुल सही होना चाहिए, जैसे account balances, checkout पर seat availability, या कुछ भी private जो users के बीच share हो सके।"
+exercise:
+  title: "Cache करें या नहीं?"
+  setup: "Festive sale के दौरान एक shopping app की हर चीज़ के लिए तय करो।"
+  questions:
+    - q: "Product images और app की JavaScript files।"
+      a: "CDN पर लंबी expiry के साथ cache करो; file बदले तो file का नाम बदल दो।"
+    - q: "किसी popular phone के product page का text और price।"
+      a: "छोटे TTL के साथ cache करो, जैसे 30 से 60 seconds, और price update होने पर उसे साफ़ करो।"
+    - q: "Checkout पर दिखने वाली बची हुई units की संख्या।"
+      a: "Checkout पर source of truth से live पढ़ो; browse pages पर ज़्यादा से ज़्यादा बहुत छोटा cache।"
+    - q: "User का अपना cart।"
+      a: "इसे user के key वाले तेज़ store में रखो, पर shared page cache में कभी नहीं, ताकि एक user का cart दूसरे को कभी न दिखे।"
+ask:
+  - "Redis और CDN में क्या फ़र्क है?"
+  - "Cache stampede को कैसे रोकूँ?"
+  - "Cache के expire होने का इंतज़ार करने की जगह उसे कब साफ़ करना चाहिए?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Cache** data की एक copy ऐसी जगह रखता है जो उसकी असली जगह से तेज़ या पास हो, ताकि बार-बार आने वाली requests का जवाब वही काम दोबारा किए बिना जल्दी मिल जाए। Memory से पढ़ने में microseconds लगते हैं; database query में milliseconds लग सकते हैं; दुनिया के दूसरे छोर तक request जाने में सैकड़ों milliseconds लगते हैं।
+
+Caches कई layers पर होते हैं:
+
+- **Browser** वो images और scripts रखता है जो वो पहले download कर चुका है;
+- **CDN** (content delivery network) कई शहरों के servers पर files रखता है;
+- **Application cache**, जैसे Redis, महँगी queries या API calls के नतीजे रखता है;
+- **Database** अपनी memory में hot pages रखता है।
+
+```flow
+Patna में User -[1. एक image]-> Kolkata में CDN edge
+Kolkata में CDN edge -[hit]-> लगभग 20 ms में serve
+Kolkata में CDN edge -[miss]-> Origin storage
+Patna में User -[2. product API]-> App server -> Redis cache
+Redis cache -[hit]-> लगभग 1 ms
+Redis cache -[miss]-> Database | नतीजा TTL के साथ Redis में रखा जाता है
+```
+
+## ये काम कैसे करता है
+
+**Cache-aside** application caches का सबसे common pattern है। हर read पर app पहले cache देखता है। Hit हो तो cached value लौटा देता है। Miss हो तो database पढ़ता है, नतीजा expiry के साथ cache में रखता है, और लौटाता है। Writes database में जाती हैं, और फिर app cached copy को delete या update कर देता है।
+
+हर cached item को एक **TTL** (time to live) चाहिए। छोटे TTL data को ज़्यादा fresh रखते हैं पर ज़्यादा misses करते हैं; लंबे TTL तेज़ हैं पर पुराना data serve होने का risk रहता है। Data के type के हिसाब से चुनो, ये देखकर कि वो कितनी बार बदलता है और पुराना होने की कीमत कितनी है।
+
+**Cache invalidation**, यानी source बदलने के बाद cached data को सही रखना, मुश्किल हिस्सा है। Options हैं: items को उनके TTL पर expire होने दो; data लिखते ही key delete करो; या keys को version करो, जैसे `price:v42`, ताकि नया data नई key use करे। CDN पर files के लिए आम तरीका है file के नाम में content hash डालना, जैसे `app.3f9a1c.js`, ताकि बदली हुई file एक नया URL बने और पुरानी copies को कभी साफ़ न करना पड़े।
+
+जब कोई बहुत popular key expire होती है, तो हज़ारों requests एक साथ miss करके सब database पर पहुँच सकती हैं: **cache stampede**। Fixes में शामिल हैं: सिर्फ़ एक request को key refresh करने देना जबकि बाकी इंतज़ार करें या पुरानी value पाएँ, TTLs में थोड़ा random jitter जोड़ना, और hot keys को expire होने से पहले refresh करना।
+
+**CDNs**, जैसे Cloudflare, Akamai, Amazon CloudFront और Google Cloud CDN, के servers India और दुनिया भर में हैं। ये images, video, scripts और यहाँ तक कि पूरे cacheable pages भी user के पास से serve करते हैं, जिससे load time घटता है और आपके origin servers का बोझ हल्का होता है। Video platforms पूरी तरह इन्हीं पर निर्भर हैं।
+
+| क्या | कहाँ cache करें | आम TTL | किस बात का ध्यान रखें |
+|---|---|---|---|
+| Images, video, JS और CSS | CDN और browser | दिनों से एक साल तक, hashed names के साथ | नाम न बदलें तो पुरानी files |
+| Public pages, जैसे published results | CDN | मिनट | updates पर साफ़ करना |
+| महँगी queries के नतीजे | Redis | seconds से मिनट | पुरानी values, stampedes |
+| User sessions | Redis | घंटे | security; users के बीच कभी share नहीं |
+| Balances, checkout पर live inventory | cache न करें, या बहुत थोड़ी देर | ज़्यादा से ज़्यादा seconds | गलत numbers की कीमत पैसे में चुकानी पड़ती है |
+
+**अपने browser में try करो।** एक छोटा cache simulate करो और देखो कि उसके size के साथ hit rate कैसे बदलता है।
+
+```python
+from collections import OrderedDict
+import random
+
+def hit_rate(capacity, requests):
+    cache, hits = OrderedDict(), 0
+    for key in requests:
+        if key in cache:
+            hits += 1; cache.move_to_end(key)
+        else:
+            cache[key] = True
+            if len(cache) > capacity: cache.popitem(last=False)   # evict the least recently used
+    return hits / len(requests)
+
+random.seed(1)
+popular = [f"page-{int(random.paretovariate(1.2))}" for _ in range(5000)]   # a few pages get most traffic
+for size in (5, 20, 100):
+    print(f"cache of {size:>3}: {hit_rate(size, popular):.0%} hits")
+```
+
+## एक example से समझो
+
+Rohan Delhi की एक online test-prep company में काम करता है। जब JEE की answer key आती है, तो लाखों students कुछ ही मिनटों में वही pages खोलते हैं, और site पहले रेंगने लगती थी।
+
+उसने पहले नापा। Answer-key PDF और images ने ज़्यादातर bytes लिए थे; "my score" API ने ज़्यादातर database queries की थीं।
+
+**Static files CDN पर।** उसने PDF, images और front-end files को CDN के पीछे object storage में डाल दिया, content-hashed नामों और एक साल के browser cache के साथ। Guwahati और Kochi के students अब पास के edge servers से download कर रहे थे। Origin bandwidth 90% से ज़्यादा घट गया।
+
+**Hot queries Redis में।** सारे सवालों और सही options वाला page हर student के लिए एक जैसा था। उसने इसे cache-aside से Redis में 5-minute TTL के साथ cache किया। जब board ने किसी विवादित answer को सुधारा, तो एक admin action ने key delete कर दी, ताकि सुधार 5 मिनट बाद नहीं, तुरंत दिखे।
+
+**Stampede से बचाव।** ठीक सुबह 10 बजे cached list expire हो गई जब 20,000 students refresh कर रहे थे, और database spike कर गया। Rohan ने एक lock जोड़ा ताकि एक request key दोबारा बनाए जबकि बाकी एक-दो seconds के लिए पिछली value पाएँ, और साथ में TTLs पर random jitter।
+
+**उसने क्या cache नहीं किया।** हर student का calculated score उनके अपने responses से बनता था और user के हिसाब से store होता था; उसे कभी shared page cache में नहीं डाला गया, इसलिए कोई student कभी किसी दूसरे का score नहीं देख सकता था।
+
+अगली release के दिन peak पर भी page loads एक second से कम रहे, और database अपनी capacity के आधे से ऊपर कभी नहीं गया।
+
+## आम गलतियाँ
+
+**बिना TTL के cache करना।** फिर बदलाव के बाद data हमेशा के लिए गलत रहता है। हमेशा एक expiry रखो, लंबी ही सही।
+
+**Private data को shared cache में रखना।** एक logged-in user के लिए cache हुआ page दूसरे को serve हो सकता है। Personal data को shared caches से बाहर रखो, या उसे user के हिसाब से key करो।
+
+**Writes पर invalidation भूल जाना।** Database update हो पर cache नहीं, तो expiry तक पुरानी value दिखती है। जिस data में freshness मायने रखती है, वहाँ write पर key delete करो।
+
+**ऐसा data cache करना जो बिल्कुल सही होना चाहिए।** Checkout पर seat counts, balances और stock levels उसी पल source of truth से आने चाहिए जब वो मायने रखते हैं।
+
+**Stampedes को ignore करना।** Load के दौरान कोई hot key expire हो जाए तो database बैठ सकता है। Locks, early refresh या jittered TTLs use करो।
+
+**नापने से पहले cache करना।** वो cache करो जो धीमा है और अक्सर पढ़ा जाता है। कम use होने वाले data को cache करने से बस complexity बढ़ती है।
+
+## Practice करो
+
+1. Watch & learn panel में CDNs कैसे काम करते हैं और interviews में caching कैसे आती है, इस पर video lessons देखो।
+2. ऊपर वाला exercise करो।
+3. Project check करो: किसी धीमे function के आगे cache-aside, hit और miss logs और timings के साथ।
+4. किसी बड़ी site पर अपने browser के developer tools खोलो और cached responses और CDN headers ढूँढो।

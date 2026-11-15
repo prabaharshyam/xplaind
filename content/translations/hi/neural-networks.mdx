@@ -1,0 +1,202 @@
+---
+id: neural-networks
+lang: hi
+title: "Neural networks"
+outcome: "समझा पाओगे कि neural network weights और activations की layers से inputs को predictions में कैसे बदलता है, loss, backpropagation और gradient descent से कैसे सीखता है, और overfitting कैसे पहचानें।"
+answer: "Neural network inputs को weighted connections की layers से गुज़ारकर prediction बनाता है, loss से अपनी error नापता है, और backpropagation व gradient descent से weights को ठीक करता है।"
+why_it_matters: "Neural networks image recognition, speech, translation और आज के language models की जान हैं। उनके सीखने का तरीका समझने से आप उन्हें train और debug कर पाते हो, तय कर पाते हो कि trees की जगह उन्हें कब लेना सही है, और समझ पाते हो कि modern AI अंदर से कैसे चलता है।"
+flashcards:
+  - q: "Neural network की एक layer क्या compute करती है?"
+    a: "वो inputs को weights से गुणा करती है, bias जोड़ती है, और नतीजा ReLU जैसे activation function से गुज़ारती है।"
+  - q: "Activation functions की ज़रूरत क्यों है?"
+    a: "उनके बिना ऊपर-नीचे रखी layers एक ही linear model में सिमट जाती हैं और जटिल patterns नहीं पकड़ पातीं।"
+  - q: "Backpropagation क्या है?"
+    a: "Chain rule से ये निकालना कि हर weight ने loss में कितना योगदान दिया, output से पीछे की तरफ़ layer-by-layer।"
+  - q: "Gradient descent क्या है?"
+    a: "Loss घटाने के लिए हर weight को उसके gradient के उलट एक छोटा कदम खिसकाना। Adam हर weight के लिए कदम का size खुद adjust करता है।"
+  - q: "Batch और epoch क्या हैं?"
+    a: "Batch examples का वो group है जिससे weights का एक update होता है। Epoch सारे training data पर एक पूरा चक्कर है।"
+  - q: "Loss curves overfitting कैसे दिखाते हैं?"
+    a: "Training loss गिरता रहता है जबकि validation loss बढ़ने लगता है।"
+  - q: "Overfitting के चार इलाज बताओ।"
+    a: "ज़्यादा data या augmentation, dropout, weight decay, छोटा network, और early stopping।"
+  - q: "Neural networks आम तौर पर gradient-boosted trees को कब हराते हैं?"
+    a: "Images, audio, text और बहुत बड़े datasets पर। आम tabular data पर boosted trees अक्सर बराबर या बेहतर रहते हैं।"
+  - q: "Gradient check क्या है?"
+    a: "Backpropagation के gradient की तुलना एक धीमे numerical अंदाज़े से करना (एक weight को ज़रा हिलाओ, देखो loss कितना बदलता है)। दोनों मिलें तो backward pass सही है।"
+  - q: "बिना hidden layer वाला model XOR क्यों नहीं सुलझा सकता?"
+    a: "XOR की classes को एक सीधी रेखा से अलग नहीं किया जा सकता। Non-linear activation वाली hidden layer space को मोड़ देती है ताकि अलग हो सकें।"
+exercise:
+  title: "Training run पढ़ो"
+  setup: "Hyderabad की Kavya 30 tabular features से customer churn predict करने के लिए एक network train करती है। Run 1, learning rate 0.5: loss इधर-उधर उछलता है और कभी ठहरता नहीं। Run 2, learning rate 0.001: training loss 100 epochs तक गिरता है; validation loss epoch 20 तक गिरता है, फिर बढ़ने लगता है। उसके features में रुपयों में income है, 5,000 से 50,00,000 तक, और उसके बगल में 1 से 5 की ratings, बिना scale किए। उसी data पर एक gradient-boosted model उसके सबसे अच्छे network को हरा देता है।"
+  questions:
+    - q: "Run 1 उसे क्या बताता है?"
+      a: "Learning rate बहुत ऊँचा है, इसलिए कदम आगे निकल जाते हैं। उसे घटाओ।"
+    - q: "Run 2 क्या दिखाता है, और उसे क्या करना चाहिए?"
+      a: "Epoch 20 के बाद overfitting। सबसे अच्छे validation epoch पर early stopping लगाओ, और dropout या weight decay आज़माओ।"
+    - q: "बिना scale किए features क्यों मायने रखते हैं?"
+      a: "Income की बहुत बड़ी values weight updates पर हावी हो जाती हैं और training को unstable कर देती हैं। पहले features को standardise करो।"
+    - q: "क्या उसे network रखना चाहिए?"
+      a: "Tabular churn data के लिए शायद नहीं। Boosted model बेहतर और सरल है; network images, text या audio के लिए करने लायक है।"
+ask:
+  - "Backpropagation कदम-दर-कदम कैसे काम करता है?"
+  - "Learning rate कैसे चुनूँ?"
+  - "Machine learning और deep learning में क्या फ़र्क है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Neural network** layers का एक stack है। हर layer numbers लेती है, उन्हें weights से गुणा करती है, bias जोड़ती है, और नतीजा एक सादे non-linear function से गुज़ारती है जिसे **activation** कहते हैं (जैसे ReLU, जो negatives को zero बना देता है)। एक layer का output अगली layer का input बन जाता है। आख़िरी layer prediction बनाती है: एक number, या हर class की probabilities।
+
+काफ़ी layers और units हों, तो networks बहुत जटिल patterns दिखा सकते हैं। **Deep learning** का मतलब है बहुत सारी layers वाले networks।
+
+```flow
+dir: LR
+Inputs | 64 features -[weights]-> Hidden layer 1 | 128 units, ReLU
+Hidden layer 1 -[weights]-> Hidden layer 2 | 64 units, ReLU
+Hidden layer 2 -[weights]-> Output | 5 units, softmax: leaf spot 0.81
+Output -[backpropagation: हर weight के लिए एक gradient]-> Inputs
+```
+
+इस lesson में हम Bengaluru के एक agritech startup को देखेंगे जो पत्तों की photos को बीमारी के हिसाब से classify करता है।
+
+## ये काम कैसे करता है
+
+**Forward pass।** Input features layers से गुज़रकर एक prediction बनाते हैं।
+
+**Loss।** Loss function नापता है कि prediction कितना गलत है: numbers के लिए mean squared error, classes के लिए cross-entropy।
+
+**Backpropagation।** Chain rule से network निकालता है कि हर weight ने loss में कितना योगदान दिया, output से पीछे की तरफ़ layer-by-layer। इससे हर weight का gradient मिलता है।
+
+**Gradient descent।** हर weight अपने gradient के उलट एक छोटा कदम खिसकता है। Adam जैसे variants हर weight के लिए कदम का size adjust करते हैं और आम तौर पर तेज़ train होते हैं। Training examples के **batches** में होती है; सारे data पर एक पूरा चक्कर एक **epoch** है।
+
+**Non-linearity क्यों मायने रखती है।** Activations के बिना ऊपर-नीचे रखी layers एक ही linear model में सिमट जाती हैं। Activations networks को features मोड़ने और मिलाने देते हैं।
+
+**Overfitting और regularisation।** बहुत सारे weights वाले networks training data को रट सकते हैं। Training और validation loss को साथ देखो: अगर training loss गिरता रहे जबकि validation loss बढ़े, तो network overfit कर रहा है। इलाज: ज़्यादा data, data augmentation, dropout (training में units को random तरीके से बंद करना), weight decay, छोटे networks और early stopping।
+
+**व्यावहारिक settings।** Learning rate (सबसे ज़रूरी), batch size, layers और units की संख्या, epochs। अपनी problem के type के लिए जाने-माने अच्छे defaults से शुरू करो।
+
+**कब use करें।** Images, audio, text और बहुत बड़े datasets में neural networks का दबदबा है। आम tabular business data के लिए gradient-boosted trees अक्सर कम मेहनत में बराबर या बेहतर निकलते हैं।
+
+**Weights गिनना।** Layers के बीच हर connection का एक weight होता है, और हर unit का एक bias। Leaf network में पहली hidden layer में 64 × 128 weights और 128 biases हैं, यानी 8,320 numbers। दूसरी में 128 × 64 + 64 = 8,256, और output layer में 64 × 5 + 5 = 325। कुल मिलाकर data से सीखे गए 16,901 numbers। Modern language models में अरबों होते हैं, पर हर layer में हिसाब वही है।
+
+**Loss curves पढ़ना:**
+
+| आपको क्या दिखता है | इसका मतलब | क्या आज़माएँ |
+| --- | --- | --- |
+| Loss उछलता है या बढ़ता है | Learning rate बहुत ऊँचा | उसे 10 गुना घटाओ |
+| Loss बहुत धीरे गिरता है | Learning rate बहुत कम, या inputs scale नहीं हुए | उसे बढ़ाओ; inputs को standardise करो |
+| Training गिरता है, validation बढ़ता है | Overfitting | Dropout, weight decay, early stopping, ज़्यादा data |
+| दोनों ऊँचे रहते हैं | Underfitting | बड़ा network, ज़्यादा epochs, बेहतर features |
+| दोनों साथ गिरते हैं और ठहर जाते हैं | सेहतमंद | सबसे अच्छे validation epoch पर रुको |
+
+**शब्दों में training loop।** हर epoch में data को shuffle करो और batches में बाँटो। हर batch के लिए forward pass चलाओ, loss compute करो, gradients पाने के लिए backpropagation चलाओ, और optimiser को weights update करने दो। हर epoch के बाद, weights बदले बिना validation loss compute करो, और अगर अब तक का सबसे अच्छा हो तो model save करो। PyTorch से Keras तक, हर deep learning library यही pattern follow करती है।
+
+**NumPy में scratch से network।** एक छोटा network हाथ से बनाने पर forward pass, loss, backpropagation और gradient descent ठोस हो जाते हैं। ये XOR सीखता है, जिसे कोई सीधी रेखा अलग नहीं कर सकती:
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=float)
+y = np.array([[0], [1], [1], [0]], dtype=float)
+
+W1, b1 = rng.normal(0, 1, (2, 8)), np.zeros((1, 8))
+W2, b2 = rng.normal(0, 1, (8, 1)), np.zeros((1, 1))
+sigmoid = lambda z: 1 / (1 + np.exp(-z))
+
+def forward(X):
+    h = np.tanh(X @ W1 + b1)              # hidden layer with a non-linearity
+    return h, sigmoid(h @ W2 + b2)        # output probability
+
+lr = 0.5
+for step in range(3000):
+    h, p = forward(X)
+    loss = -np.mean(y * np.log(p + 1e-9) + (1 - y) * np.log(1 - p + 1e-9))    # cross-entropy
+    d_out = (p - y) / len(X)                       # gradient at the output (sigmoid + cross-entropy)
+    dW2, db2 = h.T @ d_out, d_out.sum(0, keepdims=True)
+    d_h = (d_out @ W2.T) * (1 - h ** 2)            # chain rule through tanh
+    dW1, db1 = X.T @ d_h, d_h.sum(0, keepdims=True)
+    W2 -= lr * dW2; b2 -= lr * db2; W1 -= lr * dW1; b1 -= lr * db1
+    if step % 1000 == 0:
+        print(f"step {step}: loss {loss:.3f}")
+
+print("predictions:", forward(X)[1].round(2).ravel())     # close to 0, 1, 1, 0
+```
+
+हर framework ठीक यही steps करता है, बस अपने-आप और बहुत बड़े networks पर।
+
+**Backward pass को numerically check करो।** एक weight को ज़रा हिलाओ और देखो loss कैसे हिलता है; वो compute किए gradient से मिलना चाहिए:
+
+```python
+def loss_of(W1_):
+    h = np.tanh(X @ W1_ + b1); p = sigmoid(h @ W2 + b2)
+    return -np.mean(y * np.log(p + 1e-9) + (1 - y) * np.log(1 - p + 1e-9))
+
+h, p = forward(X)
+d_h = (((p - y) / len(X)) @ W2.T) * (1 - h ** 2)
+analytic = (X.T @ d_h)[0, 0]
+eps = 1e-5
+W_plus, W_minus = W1.copy(), W1.copy(); W_plus[0, 0] += eps; W_minus[0, 0] -= eps
+numeric = (loss_of(W_plus) - loss_of(W_minus)) / (2 * eps)
+print(f"analytic {analytic:.6f}  numeric {numeric:.6f}")
+```
+
+**Initialisation और scale मायने रखते हैं।** बहुत बड़े weights से शुरू करो तो activations saturate हो जाते हैं और gradients गायब हो जाते हैं; बहुत छोटे हों तो signal layer-दर-layer फीका पड़ता जाता है। इसी वजह से frameworks सावधानी से चुने defaults (जैसे Kaiming या Xavier initialisation) use करते हैं। Inputs को भी standardise करो, ताकि कोई feature सिर्फ़ अपनी units की वजह से हावी न हो।
+
+**Tabular data पर neural networks, ईमानदारी से।** आम business tables पर gradient-boosted trees अक्सर बहुत कम tuning में neural network के बराबर या बेहतर निकलते हैं। Network तब आज़माओ जब data बहुत बड़ा हो, tables को text या images के साथ मिलाना हो, या बहुत सारी categories वाले columns के लिए embeddings सीखने हों, और उसी split पर boosting से तुलना करो।
+
+## एक example से समझो
+
+Bengaluru का एक agritech startup पत्तों की photos को healthy या चार बीमारियों में से किसी एक में classify करता है। पहले कदम के तौर पर वो हर image से निकाले 64-number features (colour और texture statistics) पर एक छोटा fully connected network बनाते हैं, ताकि mechanics सीख सकें:
+
+- 64 features की input layer → ReLU के साथ 128 units की hidden layer → ReLU के साथ 64 units की hidden layer → softmax के साथ 5 units की output layer (5 classes की probabilities);
+- cross-entropy loss, Adam optimiser, learning rate 0.001, 32 के batches, 50 epochs तक।
+
+Loss curves दिखाते हैं कि training loss लगातार गिरता है, जबकि validation loss epoch 14 पर सबसे नीचे जाकर उसके बाद बढ़ता है। 0.3 का dropout जोड़ने और सबसे अच्छे validation epoch पर जल्दी रुकने से 78% validation accuracy मिलती है। उन्हीं 64 features पर gradient-boosted trees 80% तक पहुँचते हैं।
+
+उनका सबक: हाथ से बनाए tabular features पर network का कोई फ़ायदा नहीं है। उनका अगला कदम raw images पर convolutional network है, जो अपने features खुद सीखता है और आम तौर पर बहुत बेहतर करता है। CNN lesson में ये बताया गया है कि कैसे।
+
+| Model | Validation accuracy |
+| --- | --- |
+| Network, बिना regularisation, 50 epochs | 74% |
+| Dropout 0.3 और epoch 14 पर early stopping के साथ network | 78% |
+| उन्हीं 64 features पर gradient-boosted trees | 80% |
+| Raw images पर convolutional network (उनका अगला कदम) | बहुत ज़्यादा होने की उम्मीद |
+
+## आम गलतियाँ
+
+- **Learning rate बहुत ऊँचा या बहुत कम।** Loss curve देखो; सबसे पहले यही tune करना है।
+- **सिर्फ़ training loss देखना।** Overfitting validation loss में दिखता है।
+- **बिना scale किए inputs।** Features normalise करो; वरना training unstable हो जाती है।
+- **छोटे tabular datasets के लिए default में neural networks।** पहले boosted trees आज़माओ।
+- **तुलना करते वक्त random seeds fix न करना।** Runs के बीच results बदलते हैं; निष्पक्ष तुलना करो।
+- **बिना scale किए inputs**, जो training को धीमा या unstable कर देते हैं।
+- **Baseline छोड़ देना**: tables पर network चुनने से पहले gradient boosting से तुलना करो।
+- **हाथ से लिखे backward pass पर बिना gradient check के भरोसा करना।**
+
+## कब neural network use न करें
+
+- **छोटे tabular datasets**: boosted trees या logistic regression आम तौर पर बेहतर और सरल हैं।
+- **ऐसे फ़ैसले जिन्हें सरल explanations चाहिए**, जैसे reason codes वाले credit approvals।
+- **GPU budget नहीं और latency सख़्त** हो, बड़े network के लिए, जहाँ छोटा model चल जाता।
+
+## Demo से production तक
+
+- **Inputs को standardise करो**, training से बचाई statistics के साथ, और serving में वही लगाओ।
+- **हर run के लिए training और validation loss track करो**, और सबसे अच्छा checkpoint रखो।
+- **Ship करने से पहले उसी split पर मज़बूत baseline से तुलना करो।**
+- **Seeds fix करो और settings record करो** ताकि runs दोहराए जा सकें।
+- **Input drift पर नज़र रखो**, क्योंकि networks अनजान inputs पर चुपचाप फेल होते हैं।
+
+## Practice करो
+
+3Blue1Brown की neural networks series देखो और Google की ML Crash Course के neural networks modules हल करो; Dive into Deep Learning को reference की तरह use करो।
+
+1. अपनी जानी-पहचानी किसी problem के लिए एक छोटा network बनाओ और उसके weights गिनो।
+2. अपनी पसंद की library से किसी public dataset पर एक छोटा network train करो; हर epoch का training और validation loss plot करो।
+3. Dropout और early stopping जोड़ो, और validation results की तुलना उन्हीं features पर gradient-boosted model से करो।
+4. NumPy network से hidden layer हटा दो (inputs को सीधे output से जोड़ दो) और दिखाओ कि XOR अब सीखा नहीं जा सकता।
+
+**आपका काम पूरा जब** आप forward pass, loss, backpropagation और gradient descent अपने शब्दों में समझा सको, और loss curves की एक जोड़ी पढ़कर overfitting का diagnosis कर सको।

@@ -1,0 +1,226 @@
+---
+id: audit-logs
+lang: hi
+title: "Audit logs"
+outcome: "एक tamper-resistant log में record कर पाओगे कि किसने क्या पूछा, AI system ने कौन-सा data छुआ, उसने क्या जवाब दिया या क्या किया और क्यों, ताकि investigations और audits में मदद मिले और personal data भी leak न हो।"
+answer: "AI audit log record करता है कि किसने क्या पूछा, system ने कौन-सा data use किया, उसने क्या जवाब दिया या क्या किया और क्यों। इसे ऐसे store किया जाता है कि बदला न जा सके और investigations में काम आए।"
+why_it_matters: "Banks, insurers और hospitals जैसे regulated clients को महीनों बाद भी किसी AI decision को दोबारा खड़ा कर पाना ज़रूरी होता है। Auditors, regulators और client की अपनी risk team इसे माँगेंगे। Audit log के बिना pilot production नहीं बन सकता।"
+flashcards:
+  - q: "Audit log क्या है?"
+    a: "ज़रूरी events का record: किसने क्या किया, कब, किस data पर और नतीजा क्या रहा, जवाबदेही के लिए रखा जाता है।"
+  - q: "Audit logs, application logs और traces से कैसे अलग हैं?"
+    a: "Application logs और traces engineers के debug करने के लिए हैं और खुलकर बदले जा सकते हैं। Audit logs जवाबदेही के सवालों का जवाब देते हैं और पूरे, एक जैसे और tamper-resistant होने चाहिए।"
+  - q: "AI system में किन events का audit होना चाहिए?"
+    a: "Sign-ins, सवाल और जवाब (या उनके references), retrieve किए गए documents, tool actions, approvals और rejections, configuration changes और admin actions।"
+  - q: "हर audit event में कौन-से fields होने चाहिए?"
+    a: "Time zone के साथ timestamp, actor, action, target, outcome, एक request या trace id, और जो app, prompt और model versions चल रहे थे।"
+  - q: "Audit log में कभी क्या नहीं होना चाहिए?"
+    a: "Passwords, tokens और पूरे card numbers। Personal data आमतौर पर ids या hashes के रूप में रखा जाता है, पूरा text ज़्यादा restricted store में।"
+  - q: "Audit logs को tamper-resistant कैसे बनाते हैं?"
+    a: "उन्हें ऐसे append-only store में लिखो जिसे application code edit या delete न कर सके, पढ़ने वालों को सीमित करो, और log तक की access को भी log करो।"
+  - q: "Single sign-on की identity क्यों use करें?"
+    a: "ताकि actor verified हो, user का टाइप किया हुआ नाम नहीं, और record भरोसेमंद बने।"
+  - q: "DPDP Act audit logs को कैसे प्रभावित करता है?"
+    a: "Personal data ज़रूरत से ज़्यादा समय तक नहीं रखा जाना चाहिए, इसलिए retention तय करो और जहाँ हो सके personal details को छोटी retention के साथ अलग store करो।"
+  - q: "Audit log में hash chain क्या है?"
+    a: "हर event पिछले event का hash store करता है। किसी पुराने event को बदलने या हटाने से उसके बाद के सारे hashes टूट जाते हैं, इसलिए छेड़छाड़ पकड़ में आ जाती है।"
+  - q: "Postgres audit table को insert-only कैसे बना सकता है?"
+    a: "App को सिर्फ़ INSERT और SELECT दो, और ऐसा trigger लगाओ जो UPDATE या DELETE पर error दे, ताकि गलतियों से भी history न बदल सके।"
+exercise:
+  title: "Audit events लिखो"
+  setup: "Lucknow का एक hospital insurance pre-authorisation letters का draft बनाने के लिए AI assistant use करता है। Dr Rao (user id doc-118) सुबह 10:15 IST पर patient P-5521 का draft माँगते हैं; assistant patient का admission note और insurer का policy document retrieve करता है; वो एक letter का draft बनाता है; 10:40 पर billing manager (user id bil-007) amount बदलकर उसे भेजने के लिए approve कर देता है।"
+  questions:
+    - q: "इससे कितने audit events बनने चाहिए, और वो कौन-से हैं?"
+      a: "कम से कम चार: Dr Rao की request, दो documents की retrieval, draft का proposal, और billing manager का edit और approval।"
+    - q: "Agent की actions किसके नाम लिखी जानी चाहिए?"
+      a: "'agent on behalf of doc-118' के रूप में, ताकि साफ़ रहे कि AI ने Dr Rao की तरफ़ से काम किया, अपने आप नहीं।"
+    - q: "Retrieval event में क्या record होना चाहिए, और क्या नहीं?"
+      a: "Document ids और versions, जैसे policy document का version। पूरे medical note का text नहीं; उसे restricted store में id से link करो।"
+    - q: "Prompt और model versions क्यों record करें?"
+      a: "अगर letter पर बाद में विवाद हो, तो आप ठीक-ठीक दिखा सकते हो कि कौन-से prompt और model ने वो draft बनाया, और क्या वो तब से बदले हैं।"
+ask:
+  - "Logs, traces और audit logs में क्या फ़र्क है?"
+  - "AI system को अपने audit log में क्या record करना चाहिए?"
+  - "Audit logs कितने समय तक रखने चाहिए?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Audit log** ज़रूरी events का record है: किसने क्या किया, कब, किस data पर, और नतीजा क्या रहा। ये application logs और traces से अलग है:
+
+- **Application logs** engineers को debug करने में मदद करते हैं। ये शोर वाले, थोड़े समय के होते हैं और इनका format खुलकर बदल सकता है।
+- **Traces** किसी request के अंदरूनी steps को detail में दिखाते हैं, engineering और quality के काम के लिए।
+- **Audit logs** जवाबदेही के सवालों का जवाब देते हैं: "3 March को account 4471 के बारे में assistant से किसने पूछा, उसने उन्हें क्या दिखाया और क्या किसी ने refund approve किया?" ये पूरे, एक जैसे, छेड़छाड़ से सुरक्षित और तय अवधि तक रखे जाने चाहिए।
+
+AI systems में audit events में आमतौर पर sign-ins और हर सवाल और जवाब (या उनका reference) शामिल होते हैं। इनमें retrieve किए गए documents, की गई tool actions, approvals और rejections, configuration changes (prompt, model, permissions) और admin actions भी आते हैं।
+
+| | Application logs | Traces | Audit logs |
+|---|---|---|---|
+| किसके लिए | Engineers | Quality और debugging | Compliance और विवाद |
+| क्या रखते हैं | शोर वाली, छोटी lines जिनका format बदलता रहता है | Request का हर अंदरूनी step | किसने क्या किया, कब, किस पर, और नतीजा |
+| रूप | Free text | Spans | तय शक्ल, append-only |
+| कितने समय तक रखे जाते हैं | कुछ दिन | कुछ हफ़्ते | कई साल, policy के हिसाब से |
+
+```flow
+dir: LR
+title: Request id और trace id से जुड़े हुए
+Application logs -[request id]-> Traces
+Traces -[trace id]-> Audit logs
+```
+
+इस lesson में हम Kochi के एक cooperative bank के साथ चलेंगे, जिसे अपने ombudsman को समझाना है कि AI की मदद से लिया गया एक loan decision कैसे हुआ।
+
+## ये काम कैसे करता है
+
+**Event की एक तय शक्ल।** हर event में बताए हुए time zone का timestamp और actor record होता है: user id, कोई service, या "agent on behalf of user X"। इसमें action, target (document या record ids), outcome, details से जोड़ने वाली request या trace id, और जो app, prompt और model versions चल रहे थे, वो भी record होते हैं।
+
+**क्या record नहीं करना है।** Passwords, tokens या पूरे card numbers कभी log मत करो। Personal data के बारे में सोच-समझकर तय करो: अक्सर आप audit log में ids और hashes रखते हो, और पूरा text एक अलग, ज़्यादा restricted store में छोटी retention के साथ, id से link करके रखते हो। Client की retention policy और कानून follow करो; India का DPDP Act कहता है कि personal data ज़रूरत से ज़्यादा समय तक नहीं रखा जाना चाहिए।
+
+**Tamper resistance।** Audit events को ऐसे append-only store में लिखो जिसे application code edit या delete न कर सके: retention locks वाला write-once storage bucket, कोई managed audit service, या अलग log account। लॉग को कौन पढ़ सकता है ये सीमित करो, और log तक की access को भी log करो।
+
+**इसे query करने लायक बनाओ।** Investigations को मिनटों में जवाब चाहिए: "March में इस customer record पर सारी actions", "agent के सुझाए हर refund जिसे किसी इंसान ने approve किया"। Events को ऐसे format में store करो जिसे client के tools search कर सकें।
+
+**Clock और identity।** Synchronised clocks और sign-on की verified identity use करो, user का टाइप किया हुआ नाम कभी नहीं।
+
+**एक audit event, field by field:**
+
+| Field | Example | क्यों |
+| --- | --- | --- |
+| Timestamp | `2026-05-03 11:02:14 IST` | कब, बताए हुए time zone में |
+| Actor | `user=emp-2213` या `agent (on behalf of emp-2213)` | किसने, sign-on से verified |
+| Action | `ask`, `retrieve`, `propose`, `approve` | क्या हुआ |
+| Target | `customer=CUST-4471`, document ids | किस पर |
+| Outcome | `success`, `rejected`, `error` | नतीजा क्या रहा |
+| Links | `request=req-88a1 trace=tr-71f0` | details कहाँ मिलेंगी |
+| Versions | `prompt=v12 model=...` | कौन-सी configuration ने ये बनाया |
+
+**Retention और access, practice में।** Launch से पहले client की compliance team के साथ retention तय करो। जैसे, audit events आठ साल रखो ताकि financial record rules से मेल खाए, पूरे सवाल-जवाब का text 180 दिन तक एक restricted store में, और application logs 30 दिन। Audit log की read access एक छोटे named group को दो, जैसे compliance और security, पूरी engineering team को नहीं, और हर quarter उस list को review करो।
+
+**Postgres में insert-only table।** Permissions के साथ एक trigger, ताकि न app और न कोई लापरवाह admin script history दोबारा लिख सके:
+
+```sql
+CREATE TABLE audit_events (
+  id bigserial PRIMARY KEY,
+  at timestamptz NOT NULL DEFAULT now(),
+  actor text NOT NULL, action text NOT NULL, target text,
+  outcome text NOT NULL, request_id text, versions jsonb,
+  detail jsonb, prev_hash text, hash text NOT NULL
+);
+
+CREATE FUNCTION audit_no_change() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'audit_events is append-only';
+END $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER audit_lock BEFORE UPDATE OR DELETE ON audit_events
+  FOR EACH ROW EXECUTE FUNCTION audit_no_change();
+
+GRANT INSERT, SELECT ON audit_events TO app;
+GRANT USAGE ON SEQUENCE audit_events_id_seq TO app;
+```
+
+**Code में hash chain।** हर event में उससे पहले वाले का hash होता है, इसलिए कोई बदली हुई या गायब row verify करने पर दिख जाती है:
+
+```python
+import hashlib, json
+
+def event_hash(event, prev_hash):
+    body = json.dumps({k: event[k] for k in sorted(event) if k not in ("hash", "prev_hash")},
+                      sort_keys=True, default=str, ensure_ascii=False)
+    return hashlib.sha256((prev_hash or "").encode() + body.encode()).hexdigest()
+
+def append(db, event):
+    with db.transaction():
+        last = db.fetchone("SELECT hash FROM audit_events ORDER BY id DESC LIMIT 1 FOR UPDATE")
+        prev = last[0] if last else None
+        event["prev_hash"], event["hash"] = prev, event_hash(event, prev)
+        db.insert("audit_events", event)
+
+def verify(rows):
+    prev = None
+    for r in rows:                                 # ordered by id
+        if r["prev_hash"] != prev or event_hash(r, prev) != r["hash"]:
+            return f"chain broken at event {r['id']}"
+        prev = r["hash"]
+    return "ok"
+```
+
+`verify` को हर रात चलाओ और सबसे नया hash किसी ऐसी जगह copy करो जहाँ application लिख न सके, जैसे अलग account या compliance को रोज़ का email। तब database access वाला भी chain को चुपचाप दोबारा नहीं लिख सकता।
+
+**Exports के लिए write-once storage।** Cloud object stores objects को retention period तक delete होने से lock कर सकते हैं (जैसे compliance mode में S3 Object Lock)। Audit events को वहाँ रोज़ compressed files के रूप में export करो। इससे main database भी छोटा रहता है।
+
+**Investigators को जो queries चाहिए, पहले से तैयार।**
+
+```sql
+-- Everything that touched one customer in a date range, in IST:
+SELECT at AT TIME ZONE 'Asia/Kolkata', actor, action, outcome, request_id
+FROM audit_events WHERE target = 'customer=CUST-4471'
+  AND at >= '2026-03-01 00:00+05:30' AND at < '2026-04-01 00:00+05:30' ORDER BY at;
+
+-- Agent proposals approved by one manager:
+SELECT a.at, a.target, a.detail->>'amount_inr' AS amount
+FROM audit_events a WHERE a.action = 'approve' AND a.actor = 'emp-1180' ORDER BY a.at;
+```
+
+इन्हें compliance team के लिए named queries या dashboard views की तरह save करो।
+
+**Log की access भी log करो।** Audit events पढ़ना अपने आप में record करने लायक event है: किसने किस customer को कब search किया।
+
+## एक example से समझो
+
+Kochi का एक cooperative bank loan-restructuring requests के जवाब draft करने में staff की मदद के लिए AI agent use करता है। छह महीने बाद एक borrower शिकायत करता है कि उसकी request अन्याय से reject हुई, और bank का ombudsman office पूरी history माँगता है।
+
+क्योंकि हर event का audit हुआ था, bank का compliance officer एक घंटे में ये निकाल लेता है:
+
+```text
+2026-05-03 11:02:14 IST  user=emp-2213 (branch: Aluva)  action=ask
+    request=req-88a1 trace=tr-71f0 customer=CUST-4471 prompt=v12 model=alias:chat-default(2026-04)
+2026-05-03 11:02:19 IST  agent(on behalf of emp-2213)  action=retrieve
+    docs=[policy-restructuring-v6#s4, cust-4471-statement-2026-04]
+2026-05-03 11:02:31 IST  agent(on behalf of emp-2213)  action=propose  type=reject_restructuring  reason_ref=tr-71f0
+2026-05-03 11:09:47 IST  user=emp-0457 (manager)  action=approve  proposal=req-88a1
+```
+
+History दिखाती है कि जो policy version use हुआ था वो तब से revise हो चुका है, और एक manager ने AI की सिफ़ारिश सात मिनट में approve कर दी थी। Bank केस दोबारा खोलता है, और एक नया rule जोड़ता है कि restructuring rejections के लिए approver का लिखित note ज़रूरी होगा। Audit log ने गलती रोकी नहीं, पर उसे दिखाई देने वाली, ठीक करने लायक और ombudsman को समझाने लायक बना दिया।
+
+**Bank ने बाद में क्या बदला।** लिखित note वाले rule के अलावा bank ने दो checks जोड़े। जब कोई manager high-impact AI सिफ़ारिश दो मिनट के अंदर approve करता है, तो एक alert बजता है, जो आँख मूँदकर stamp लगाने का संकेत है। एक monthly report दिखाती है कि managers agent के proposals कितनी बार override करते हैं।
+
+## आम गलतियाँ
+
+- **Debug logs को audit trail की तरह use करना।** वो अधूरे, बदले जा सकने वाले होते हैं और rotate होकर गायब हो जाते हैं।
+- **सब कुछ पूरा record करना।** लंबी retention वाले log में personal data के साथ पूरे prompts एक नया privacy risk बनाते हैं। References store करो और पूरा text छोटी retention के साथ अलग रखो।
+- **Editable storage।** अगर कोई administrator entries चुपचाप delete कर सकता है, तो log कुछ ख़ास साबित नहीं करता।
+- **Version की जानकारी न होना।** Prompt और model versions के बिना आप समझा नहीं सकते कि system ने तब वैसा behave क्यों किया।
+- **Agent को ही actor की तरह log करना।** हमेशा record करो कि उसने किसकी तरफ़ से काम किया, और किसने approve किया।
+- **सिर्फ़ failures का audit करना।** विवाद अक्सर उन decisions के बारे में होते हैं जो "चल गए"। सफल actions और approvals भी record करो।
+- **ऐसी audit rows जिन्हें application update या delete कर सकती है।** उन्हें permissions और trigger से lock करो।
+- **छेड़छाड़ पकड़ने का कोई तरीका न होना।** Hash chain use करो और सबसे नया hash कहीं और रखो।
+- **Incident के दौरान investigation queries बनाना।** उन्हें पहले से लिखो और test करो।
+
+## जब ordinary logs काफ़ी हैं
+
+- **Prototypes और personal tools** जिनके कोई और users नहीं हैं।
+- **Public information पर read-only assistants**, जहाँ किसी के records नहीं बदलते।
+- **थोड़े समय के internal experiments** जो customer data को कभी छूते नहीं।
+
+Formal audit logs तब चाहिए जब system records पर action लेने लगे, personal या financial data संभाले, या client की compliance team पूछे "किसने क्या किया, कब?"।
+
+## Demo से production तक
+
+- **तय event schema use करो**, verified identities, IST timestamps और versions के साथ।
+- **Audit storage को append-only बनाओ**, रोज़ रात hash-chain check के साथ।
+- **रोज़ write-once storage में export करो**, तय की हुई retention के साथ।
+- **Read access को एक named group तक सीमित करो और log करो**, हर quarter review के साथ।
+- **Investigation queries save और test करके रखो।**
+
+## Practice करो
+
+OWASP Logging Cheat Sheet पढ़ो, खासकर क्या log करना है और क्या बाहर रखना है वाले sections।
+
+1. अपने AI app के लिए ऊपर वाले fields के साथ एक audit event schema बनाओ, और ask, retrieve, tool action, approval और configuration change के लिए events emit करो।
+2. उन्हें एक append-only store में लिखो (जैसे object lock वाला cloud bucket, या insert-only permissions वाली अलग database table)।
+3. दो queries लिखो जो investigator को चाहिए होंगी: किसी एक customer id के लिए date range में सारे events, और किसी दिए हुए manager द्वारा approve की गई हर agent action।
+4. Hash chain के साथ दस events insert करो, admin बनकर trigger disable करो और एक row बदलो, और दिखाओ कि verify उस टूट को report करता है।
+
+**आपका काम पूरा जब:** आप अपने audit log से ही, application logs पढ़े बिना, किसी एक request की पूरी कहानी दोबारा बना सको।

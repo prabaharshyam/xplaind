@@ -1,0 +1,200 @@
+---
+id: advanced-retrieval
+lang: hi
+title: "Query rewriting, HyDE और parent-child chunks"
+outcome: "उन सवालों को ठीक कर पाओगे जिन पर plain retrieval गलत निकलता है: vague या compound queries को rewrite करना, hypothetical answer से search करना, और छोटे chunks match करके पूरे sections लौटाना।"
+answer: "जब plain RAG चूक जाए, तो vague सवालों को rewrite करो, hypothetical answer (HyDE) से search करो, और छोटे chunks match करके model को उनका पूरा parent section दो।"
+why_it_matters: "असली users छोटे, vague या दो हिस्सों वाले सवाल पूछते हैं, और जो RAG systems demo में चलते हैं वो इन पर फेल हो जाते हैं। Hybrid search लगने के बाद बाकी ज़्यादातर चूकों को ये तीन techniques ठीक करती हैं, और interviewers पूछना पसंद करते हैं कि कौन-सी कब काम आती है।"
+flashcards:
+  - q: "Query rewriting क्या है?"
+    a: "Model से user के message को बेहतर search queries में बदलवाना, जैसे chat history से follow-up को पूरा करना या compound सवाल को बाँट देना।"
+  - q: "Multi-query retrieval क्या है?"
+    a: "एक सवाल के कई phrasings बनवाना, हर एक से search करना और results merge करना, ताकि jargon का gap पाटा जा सके।"
+  - q: "HyDE क्या है?"
+    a: "Hypothetical document embeddings: model एक plausible answer लिखता है, और आप सवाल की जगह उस answer के embedding से search करते हो।"
+  - q: "HyDE छोटे सवालों में क्यों मदद करता है?"
+    a: "छोटा सवाल और जवाब वाला formal passage embedding में दूर-दूर हो सकते हैं। नकली answer असली passage जैसा दिखता है, इसलिए उसके पास पहुँचता है।"
+  - q: "HyDE कब नुकसान करता है?"
+    a: "जब model का अंदाज़ा पूरे confidence से topic से भटका हो, तो वो search को गलत तरफ़ खींच देता है, और ये हर search से पहले एक model call भी जोड़ता है।"
+  - q: "Parent-child chunks क्या हैं?"
+    a: "सटीक match के लिए छोटे child chunks में search करना, फिर context के लिए model को वो बड़ा parent section देना जिससे हर एक आया था।"
+  - q: "Sentence-window retrieval क्या है?"
+    a: "Parent-child का ही एक रूप: match हुए वाक्य के दोनों तरफ़ कुछ वाक्य भी लौटाना।"
+  - q: "इनमें से कोई technique कब जोड़नी चाहिए?"
+    a: "तभी जब आपका golden set वही failure दिखाए जिसे वो ठीक करती है, क्योंकि हर एक cost या latency जोड़ती है।"
+  - q: "Contextual retrieval क्या है?"
+    a: "Embedding और keyword indexing से पहले हर chunk के आगे model का लिखा एक छोटा note जोड़ना कि वो अपने document में कहाँ आता है, ताकि धुंधले chunks भी ढूँढे जा सकें।"
+  - q: "Queries को techniques तक route क्यों करें, सबको सब पर क्यों न चलाएँ?"
+    a: "हर technique calls और देरी जोड़ती है। ज़्यादातर queries plain hybrid search से चल जाती हैं; extra steps सिर्फ़ उन्हीं तरह की queries पर चलने चाहिए जिनमें वो मदद करते हैं।"
+exercise:
+  title: "Failure के हिसाब से सही fix चुनो"
+  setup: "Bengaluru की एक telecom का support assistant अपने golden set पर चार तरह से फेल होता है: (1) international roaming के सवाल के बाद 'What about prepaid?' पूछने पर general prepaid plans आते हैं; (2) 'Roaming charges Dubai?' ऐसे pages लाता है जिनमें Dubai का ज़िक्र बस यूँ ही आया है; (3) सही 120-token chunk मिल जाता है पर answer में अगले paragraph वाला business plans का exception छूट जाता है; (4) 'Compare the Gold and Platinum plan data limits' सिर्फ़ Gold plan का page लौटाता है।"
+  questions:
+    - q: "(1) को कौन-सी technique ठीक करती है?"
+      a: "Chat history के साथ query rewriting, जो इसे 'international roaming charges for prepaid plans' बना दे।"
+    - q: "(2) के लिए कौन-सी technique try करने लायक है?"
+      a: "HyDE, क्योंकि query छोटी है; सिर्फ़ छोटी queries को इससे route करो और पहले-बाद का recall नापो।"
+    - q: "(3) को कौन-सी ठीक करती है?"
+      a: "Parent-child chunks, ताकि model को exception समेत पूरा sub-section मिले, सिर्फ़ छोटा match हुआ chunk नहीं।"
+    - q: "(4) को कैसे संभालना चाहिए?"
+      a: "Compound सवाल को दो queries में बाँटो, हर plan के लिए एक, और results merge करो।"
+ask:
+  - "RAG में HyDE क्या है?"
+  - "RAG chatbot में follow-up सवाल कैसे संभालूँ?"
+  - "Parent-child retrieval के लिए chunk size कितना रखूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+अच्छा hybrid search भी तब फेल हो जाता है जब query और document एक जैसे नहीं दिखते। तीन techniques ये बदल देती हैं कि आप किससे search करते हो या क्या लौटाते हो:
+
+- **Query rewriting**: model user के message को बेहतर search queries में बदलता है।
+- **HyDE** (hypothetical document embeddings): model एक plausible answer लिखता है, और आप उसी से search करते हो।
+- **Parent-child chunks**: सटीकता के लिए आप छोटे chunks में search करते हो, फिर model को वो बड़ा section देते हो जिससे हर chunk आया था।
+
+हर एक की कुछ कीमत है, आमतौर पर एक extra model call या ज़्यादा tokens, इसलिए एक तभी जोड़ो जब आपका golden set वही problem दिखाए जिसे वो ठीक करती है।
+
+```flow
+User: "और senior citizens के लिए?" -> Chat history के साथ query rewrite | "FD interest rate for senior citizens"
+Chat history के साथ query rewrite -> छोटी queries के लिए optional HyDE | नकली answer लिखो, उसे embed करो
+छोटी queries के लिए optional HyDE -> छोटे child chunks में search | c17, c18, c42
+छोटे child chunks में search -> Parent sections लाओ, duplicates हटाओ | section 3.2, section 7.1
+Parent sections लाओ, duplicates हटाओ -> Model को prompt | सवाल + parent sections
+```
+
+इस lesson में हम Delhi के एक bank के internal assistant के साथ चलेंगे, जो circulars के 900 pages से staff के सवालों के जवाब देता है।
+
+## ये काम कैसे करता है
+
+**Query rewriting** कई तरह की खराब queries संभालती है:
+
+- *Follow-ups।* "और senior citizens के लिए?" अकेले कोई मतलब नहीं रखता। इसे chat history के साथ "Fixed deposit interest rate for senior citizens" में rewrite करो।
+- *Compound सवाल।* "Compare the cancellation rules for Gold and Platinum cards" दो queries बन जाता है, हर card के लिए एक, और results merge होते हैं।
+- *Jargon के gaps।* Users लिखते हैं "PF withdrawal"; documents में लिखा है "provident fund advance"। Rewrite synonyms जोड़ सकता है, या तीन phrasings बना सकता है ("multi-query") और results merge कर सकता है।
+
+एक छोटा, तेज़ model ये अच्छे से कर लेता है। Rewrites को log करो: जब retrieval फेल होता है, तो अक्सर वजह rewrite ही होता है।
+
+**HyDE।** सवाल छोटा होता है और सवाल की शक्ल में लिखा होता है; जो passage उसका जवाब देता है वो लंबा होता है और बयान की शक्ल में लिखा होता है। उनके embeddings दूर-दूर हो सकते हैं। HyDE एक model से एक छोटा, शायद गलत, answer लिखवाता है, उसे embed करता है, और उसी से search करता है। नकली answer असली passage जैसा दिखता है, इसलिए उसके पास पहुँचता है। ये तब सबसे ज़्यादा मदद करता है जब queries छोटी हों और documents formal। जब model का अंदाज़ा पूरे confidence से topic से भटका हो तब ये नुकसान करता है, और हर search से पहले एक model call जोड़ता है।
+
+**Parent-child chunks।** छोटे chunks (100 से 200 tokens) सटीक match करते हैं, पर जवाब देने के लिए ज़रूरी आसपास का context अक्सर उनमें नहीं होता: दो paragraphs बाद वाला exception, table का header। बड़े chunks context देते हैं पर match ठीक से नहीं करते। इसलिए छोटे "child" chunks index करो, हर एक अपने "parent" (section या page) का id रखे। Children में search करो, फिर prompt के लिए उनके parents लाओ और duplicates हटाओ। एक variant, जिसे कभी-कभी sentence-window retrieval कहते हैं, match के दोनों तरफ़ कुछ वाक्य लौटाता है।
+
+**हर technique का cost और फ़ायदा:**
+
+| Technique | क्या ठीक करती है | Extra cost | किन्हें route करें |
+| --- | --- | --- | --- |
+| Query rewriting | Follow-ups, compound सवाल, jargon के gaps | एक छोटा model call | पहले के बाद वाले chat turns; लंबी या compound queries |
+| Multi-query | Jargon और phrasing के gaps | एक call और कई searches | कम top scores वाली queries |
+| HyDE | छोटी, vague queries | एक model call | लगभग आठ शब्दों से छोटी queries |
+| Parent-child | सटीक match के आसपास का context छूटना | ज़्यादा prompt tokens | सारी queries, chunks बनने के बाद |
+
+Routing मायने रखती है: हर query पर हर technique चलाने से latency और cost बढ़ते हैं, और जो queries पहले से चल रही हैं उन पर फ़ायदा कम होता है।
+
+**Rewriting, multi-query और HyDE, code में।** एक छोटा, तेज़ model तीनों संभाल लेता है:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+FAST = "claude-haiku-5-5"                         # check the docs for current names
+
+def ask(prompt, max_tokens=200):
+    r = client.messages.create(model=FAST, max_tokens=max_tokens,
+                               messages=[{"role": "user", "content": prompt}])
+    return "".join(b.text for b in r.content if b.type == "text").strip()
+
+def standalone(question, last_turns):
+    history = "\n".join(f"{t['role']}: {t['text']}" for t in last_turns[-4:])
+    return ask(f"Rewrite the last question so it makes sense on its own. Reply with the question only.\n\n"
+               f"{history}\nuser: {question}")
+
+def variants(question, n=3):
+    text = ask(f"Write {n} different ways a bank's policy documents might phrase this question. "
+               f"One per line, no numbering.\n\n{question}")
+    return [question] + [l for l in text.splitlines() if l.strip()][:n]
+
+def hyde(question):
+    return ask(f"Write a short, formal policy paragraph that would answer: {question}", max_tokens=150)
+
+def route(question, history, search):
+    q = standalone(question, history) if history else question
+    if len(q.split()) < 8:
+        return search(hyde(q))                     # short and vague: search with a fake answer
+    if " and " in q or " vs " in q or "compare" in q.lower():
+        results = [search(v) for v in variants(q)]
+        return fuse(results)                       # reciprocal rank fusion, as in the RAG lesson
+    return search(q)
+```
+
+Original सवाल, हर rewrite और कौन-सा route चला, ये सब log करो। जब कोई answer गलत जाता है, तो अक्सर rewrite ही वजह होता है।
+
+**Parent-child, code में।** Children को `parent_id` के साथ store करो, children में search करो, parents को एक-एक बार लौटाओ:
+
+```python
+def parent_child(question, search_children, get_parent, k_children=12, k_parents=4):
+    seen, parents = set(), []
+    for child in search_children(question, k=k_children):
+        if child["parent_id"] not in seen:
+            seen.add(child["parent_id"])
+            parents.append(get_parent(child["parent_id"]))
+        if len(parents) == k_parents:
+            break
+    return parents
+```
+
+**Contextual retrieval।** Ingestion के समय model से हर chunk के लिए एक-दो वाक्य लिखवाओ जो उसे उसके document में रखें ("This is from the 2026 FD rates circular, section on senior citizens"), और embedding और keyword indexing दोनों से पहले उसे chunk के आगे जोड़ दो। Anthropic ने बताया कि अपने tests में इससे failed retrievals लगभग आधे रह गए, और reranking के साथ मिलाने पर लगभग दो तिहाई कम हुए। इसका cost हर chunk पर एक call है, बस एक बार; पूरा document cached prompt में हो तो ये cost काफ़ी घट जाता है।
+
+**हर technique को उसके अपने target पर नापो।** Follow-ups, छोटी queries और compound queries का recall अलग-अलग report करो, technique on और off दोनों के साथ। Technique को सिर्फ़ उन query types के लिए रखो जहाँ वो साफ़ मदद करती है।
+
+## एक example से समझो
+
+Delhi के एक bank का internal assistant circulars के 900 pages से staff के सवालों के जवाब देता है। Golden set तीन तरह की failures दिखाता है।
+
+*Follow-ups फेल होते हैं।* Home loan prepayment के सवाल के बाद "NRIs के लिए क्या?" पूछने पर NRI account rules आते हैं। आप आख़िरी दो turns का use करने वाला rewrite step जोड़ते हो: query बन जाती है "home loan prepayment charges for NRI borrowers"। Follow-up सवालों पर recall at 5, 41% से बढ़कर 83% हो जाता है।
+
+*छोटे सवाल फेल होते हैं।* "KYC refresh period?" ऐसे pages से match होती है जिनमें KYC का ज़िक्र बस यूँ ही है। HyDE ये लिखता है: "Customers classified as high risk must update KYC every two years, medium risk every eight years and low risk every ten years." इसका embedding असली periodic-update clause के ठीक पास पहुँचता है। छोटी queries पर recall at 5, 58% से 74% हो जाता है। लंबे, specific सवालों पर HyDE से कोई फ़र्क नहीं पड़ा, इसलिए आप सिर्फ़ आठ शब्दों से छोटी queries को इससे route करते हो।
+
+*Answers में exceptions छूट जाते हैं।* सही 150-token chunk मिल जाता है, पर priority-sector loans वाला exception अगले paragraph में है, इसलिए answers गलत होते हैं। Parent-child पर जाने (150 tokens के children, एक sub-section के parents) से ऐसे 11 में से 9 cases ठीक होते हैं, लगभग 40% ज़्यादा prompt tokens की कीमत पर।
+
+| Failure cluster | Fix | पहले Recall at 5 | बाद में |
+| --- | --- | --- | --- |
+| Follow-up सवाल | आख़िरी दो turns के साथ rewrite | 41% | 83% |
+| छोटे सवाल | आठ शब्दों से छोटी queries के लिए HyDE | 58% | 74% |
+| छूटे हुए exceptions | Parent-child chunks | 11 में से 11 फेल | 11 में से 2 फेल |
+
+## आम गलतियाँ
+
+- **सब कुछ एक साथ जोड़ देना।** आप समझ नहीं पाओगे कि किस बदलाव से फ़ायदा हुआ। एक जोड़ो, नापो, रखो या हटाओ।
+- **बातचीत के बिना rewrite करना।** अकेले rewrite किया गया follow-up फिर भी बेमतलब रहता है।
+- **HyDE के text पर भरोसा करना।** Hypothetical answer बस एक search key है। इसे कभी user को मत दिखाओ और final prompt में मत जाने दो।
+- **बहुत बड़े parents।** पूरे 20-page documents लौटाने से context budget फट जाता है और answer दब जाता है। Parents sections होने चाहिए, files नहीं।
+- **Latency को ignore करना।** Retrieval से पहले दो extra model calls से response time दोगुना हो सकता है। छोटा model use करो और नापो।
+- **Rewrites को log न करना।** खराब rewrite retrieval की failure जैसा दिखता है।
+- **हर query पर हर technique चालू कर देना।** Query type के हिसाब से route करो और नापो।
+
+## जब basic retrieval काफ़ी है
+
+- **Chat history के बिना अकेले सवाल**, जो documents की अपनी भाषा में पूछे गए हों।
+- **छोटे, अच्छी तरह structured collections**, जहाँ plain hybrid search पहले से सही passage ढूँढ लेता है।
+- **सख़्त latency budgets**, जहाँ search से पहले एक extra model call बहुत धीमा है।
+
+## Demo से production तक
+
+- **हर request के लिए original query, rewrites, route और retrieved ids log करो।**
+- **हर query type पर recall नापो**, हर technique को on और off करके।
+- **बार-बार आने वाले सवालों के लिए rewrites और HyDE outputs cache करो।**
+- **Documents बदलें तो contextual chunk notes दोबारा बनाओ।**
+- **Extra calls को हर request की latency और cost में budget करो।**
+
+## Practice करो
+
+Weaviate की advanced RAG guide और HyDE paper का abstract और पहला figure पढ़ो।
+
+1. अपने RAG app में एक query-rewrite step जोड़ो जो आख़िरी दो turns use करे। इसे पाँच follow-up सवालों पर test करो।
+2. HyDE को एक switch के पीछे लगाओ और अपने छोटे और लंबे सवालों पर recall at 5 अलग-अलग compare करो।
+3. 150-token children के साथ दोबारा index करो, जो section-size parents की तरफ़ इशारा करें, और पास के context की ज़रूरत वाले दस सवालों पर answer की correctness compare करो।
+4. 50 chunks में contextual notes जोड़ो और अपने golden set पर उनके साथ और उनके बिना recall at 5 compare करो।
+
+और गहराई चाहिए तो Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 query rewriting, contextual retrieval और retrieval optimisation को cover करता है।
+
+**आपका काम पूरा जब:** आप अपने नापे हुए नतीजों से बता सको कि कौन-सी technique ने किस तरह के सवाल ठीक किए और हर एक की latency या tokens में क्या कीमत रही।
