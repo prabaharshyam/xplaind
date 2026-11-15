@@ -1,0 +1,136 @@
+---
+id: databases-replication-sharding
+lang: hi
+title: "Databases: indexes, replication और sharding"
+outcome: "किसी workload के लिए SQL और NoSQL में चुनाव करना, indexes से queries तेज़ करना, replicas से reads बढ़ाना, और सही shard key के साथ data को shards में बाँटना सीखो।"
+answer: "Indexes lookups तेज़ करते हैं। Replication database की copy बनाता है ताकि reads कई servers में बँट सकें। Sharding तब data को key के हिसाब से अलग-अलग databases में बाँटता है, जब एक server काफ़ी न हो।"
+why_it_matters: "Database आम तौर पर system का सबसे मुश्किल हिस्सा होता है जिसे scale करना पड़ता है, और बाद में बदलना सबसे दर्दनाक। Indexes, replicas और sharding आते हों, तो आप growth की planning कर सकते हो और हर design interview के database सवालों के जवाब दे सकते हो।"
+flashcards:
+  - q: "Database index क्या करता है?"
+    a: "किसी column की values का sorted structure रखता है जो rows की तरफ़ इशारा करता है, ताकि उस column से lookup में पूरी table scan न करनी पड़े।"
+  - q: "Index की क्या कीमत होती है?"
+    a: "ज़्यादा storage और धीमे writes, क्योंकि हर insert या update को index भी update करना पड़ता है।"
+  - q: "Read replica क्या है?"
+    a: "Database की एक copy जो primary से changes लेती है और read queries serve करती है, जिससे read load बँट जाता है।"
+  - q: "Replication lag क्या है?"
+    a: "Primary पर हुए change के replicas पर दिखने में लगने वाली देरी। अगर user lagging replica से पढ़े, तो हो सकता है उसे अपना ही update न दिखे।"
+  - q: "Sharding क्या है?"
+    a: "एक table को shard key के हिसाब से कई databases में बाँटना, ताकि हर एक के पास data और load का एक हिस्सा हो।"
+  - q: "अच्छी shard key कैसी होती है?"
+    a: "वो data और traffic को बराबर फैलाती है और एक request को जो data चाहिए वो एक ही shard पर रखती है।"
+  - q: "Relational (SQL) database कब एक मज़बूत default है?"
+    a: "जब data में साफ़ relationships हों और transactions और flexible queries चाहिए हों, जैसे orders, payments और users में।"
+exercise:
+  title: "Database की planning करो"
+  setup: "एक UPI payments app हर transaction की एक row रखता है: transaction ID, sender ID, receiver ID, amount और समय। वो रोज़ 2 करोड़ transactions संभालता है; users ज़्यादातर अपनी ही हाल की history देखते हैं।"
+  questions:
+    - q: "Users 'मेरी आखिरी 20 transactions' लगातार खोलते हैं। कौन-सा index मदद करेगा?"
+      a: "(sender_id, time) पर एक composite index, और receiver के लिए भी ऐसा ही, ताकि database सीधे एक user की rows पर पहुँचे जो पहले से time के क्रम में हैं।"
+    - q: "Reads, writes से दस गुना हैं। Sharding से पहले पहला कदम क्या है?"
+      a: "History screens के लिए read replicas जोड़ो, और writes और balance checks primary पर ही रखो।"
+    - q: "एक user payment करता है और तुरंत history खोलता है, पर payment नहीं दिखती। ऐसा क्यों हुआ, और fix क्या है?"
+      a: "Replication lag: history ऐसे replica से पढ़ी गई जो अभी update नहीं हुआ। User के लिखने के बाद थोड़ी देर तक उसके अपने हाल के writes primary से पढ़ो।"
+    - q: "अगर sharding ज़रूरी हो जाए, तो क्या transaction date अच्छी shard key है?"
+      a: "नहीं: आज के सारे writes एक ही shard पर आएँगे। User ID load को फैलाती है और एक user की history एक जगह रखती है।"
+ask:
+  - "SQL और NoSQL में से कैसे चुनूँ?"
+  - "Partitioning और sharding में क्या फ़र्क है?"
+  - "Composite indexes कैसे काम करते हैं?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+ज़्यादातर systems अपना ज़रूरी data **database** में रखते हैं। Product बढ़ता है तो database आम तौर पर सबसे पहले दबाव में आता है, क्योंकि हर app server उसी से बात करता है और उसका data सही रहना ज़रूरी है। चार idea आपको बहुत दूर तक ले जाते हैं।
+
+- **Model चुनना।** Relational (SQL) databases जैसे PostgreSQL और MySQL data को relationships वाली tables में रखते हैं और transactions support करते हैं। NoSQL databases जैसे DynamoDB, MongoDB और Cassandra इसमें से कुछ छोड़कर आसान horizontal scale या flexible documents देते हैं।
+- **Indexes** चुने हुए columns का sorted structure रखकर lookups को तेज़ बनाते हैं।
+- **Replication** data की copies कई servers पर रखता है, ताकि reads बँटें और failure में भी काम चले।
+- **Sharding** तब data को खुद कई databases में बाँट देता है, जब एक database काफ़ी न हो।
+
+```flow
+App servers -[writes]-> Primary
+Primary -[replication, may lag]-> Replica 1
+Primary -[replication, may lag]-> Replica 2
+App servers -[reads]-> Replica 1
+```
+
+```flow
+dir: LR
+title: जब एक primary काफ़ी न हो: key से shard करो
+user_id % 4 -[0]-> Shard A
+user_id % 4 -[1]-> Shard B
+user_id % 4 -[2]-> Shard C
+user_id % 4 -[3]-> Shard D
+```
+
+## ये काम कैसे करता है
+
+**Access pattern से model चुनो।** ज़्यादातर products के लिए relational database एक मज़बूत default है: orders, users और payments में साफ़ relationships होते हैं, transactions चाहिए होते हैं, और flexible queries से फ़ायदा होता है। NoSQL तब फ़िट बैठता है जब आपको simple key lookups के साथ बहुत ज़्यादा write scale चाहिए, documents का shape flexible चाहिए, या time-series data हो। कई systems दोनों use करते हैं: core data के लिए PostgreSQL और hot, simple data के लिए Redis या कोई key-value store।
+
+**Indexes** किताब के पीछे वाले index जैसे काम करते हैं। इसके बिना किसी customer के orders ढूँढने के लिए हर row scan करनी पड़ती है: O(n)। `customer_id` पर B-tree index हो तो database लगभग O(log n) में सीधे सही rows पर पहुँच जाता है। `(customer_id, created_at)` पर **composite index** उन्हें time के क्रम में sorted भी लौटाता है। Indexes storage खाते हैं और writes धीमे करते हैं, इसलिए उन्हें असली query patterns के लिए जोड़ो, और `EXPLAIN` से check करो कि queries उन्हें use कर रही हैं।
+
+**Replication** हर change को एक **primary** से एक या ज़्यादा **replicas** पर copy करता है। Writes primary पर जाते हैं; reads replicas पर जा सकते हैं। इससे read load बँटता है और primary fail हो तो कोई replica उसकी जगह ले सकता है। ज़्यादातर replication asynchronous होता है, इसलिए replicas milliseconds या seconds पीछे रह सकते हैं। यहीं से वो classic bug आता है जिसमें user कुछ save करता है और अगली screen पर उसे वो दिखता नहीं; fix ये है कि user के अपने ताज़ा writes primary से पढ़े जाएँ।
+
+**Sharding** एक बड़ी table को **shard key** के हिसाब से कई independent databases में बाँट देता है। एक ही key value वाली हर row एक ही shard पर रहती है। अच्छी key data और traffic दोनों को बराबर फैलाती है और जो एक request को चाहिए वो एक shard पर रखती है। Sharding असली complexity जोड़ता है: shards के पार queries धीमी होती हैं, shards के पार transactions मुश्किल होते हैं, और shards जोड़ते समय data हिलाने में सावधानी चाहिए। इसे तब तक टालो जब तक indexes, caching और replicas काफ़ी न रह जाएँ।
+
+| Technique | क्या हल करती है | कीमत |
+|---|---|---|
+| Index | धीमे lookups और sorts | storage, धीमे writes |
+| Read replicas | बहुत ज़्यादा reads; failover | replication lag, ज़्यादा servers |
+| Vertical scaling | सब कुछ, थोड़ी देर के लिए | दाम, एक सीमा |
+| Sharding | एक server के लिए बहुत ज़्यादा data या writes | मुश्किल queries, rebalancing, cross-shard transactions |
+| Caching (अगला lesson) | hot data के बार-बार reads | पुराना data, invalidation |
+
+**अपने browser में try करो।** Consistent hashing में shard जोड़ने पर सिर्फ़ कुछ keys हिलती हैं। इसे चलाओ और तुलना करो।
+
+```python
+import hashlib, bisect
+
+def ring(shards, points=50):
+    r = sorted((int(hashlib.md5(f"{s}-{i}".encode()).hexdigest(), 16), s) for s in shards for i in range(points))
+    return [h for h, _ in r], [s for _, s in r]
+
+def lookup(key, hashes, owners):
+    h = int(hashlib.md5(key.encode()).hexdigest(), 16)
+    return owners[bisect.bisect(hashes, h) % len(hashes)]
+
+keys = [f"user-{i}" for i in range(10_000)]
+before = {k: lookup(k, *ring(["A", "B", "C"])) for k in keys}
+after = {k: lookup(k, *ring(["A", "B", "C", "D"])) for k in keys}
+moved = sum(before[k] != after[k] for k in keys)
+print(f"{moved / len(keys):.0%} of keys moved when adding shard D")
+```
+
+## एक example से समझो
+
+Fatima की team पूरे भारत में concerts और events के लिए एक ticketing platform चलाती है। `bookings` table 30 करोड़ rows तक पहुँच गई थी और pages धीमे हो रहे थे।
+
+**Step 1: indexes।** "My bookings" screen ये चलाती थी: `SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC LIMIT 20`। `EXPLAIN` ने full table scan दिखाया। `(user_id, created_at)` पर एक composite index ने इसे 4 seconds से 3 milliseconds पर ला दिया।
+
+**Step 2: read replicas।** Events browse करना और bookings देखना 90% traffic था। उन्होंने दो replicas जोड़े और वो reads वहाँ भेज दिए, जबकि seat holds और payments primary पर रहे। Primary का CPU 85% से 30% पर आ गया। थोड़े दिन बाद support tickets आने लगे: "मैंने book किया पर मेरा ticket नहीं दिख रहा।" व्यस्त sales के दौरान replica lag दो seconds तक था। उन्होंने app बदल दिया ताकि user के book करने के बाद 30 seconds तक उसकी अपनी bookings primary से पढ़ी जाएँ।
+
+**Step 3: sharding, बाद में।** एक साल बाद, एक superstar के tour की sale ने writes को उस हद से ऊपर धकेल दिया जो एक primary सँभाल सकता था। उन्होंने bookings को `user_id` से shard किया, जिससे writes बराबर फैले और हर user की history एक shard पर रही। उन्होंने `event_id` से sharding पर भी सोचा था, पर एक hit tour की सारी bookings एक ही दबे हुए shard पर आ जातीं, यानी **hot shard**। हर event की seat inventory एक अलग, छोटी table में अपने ही database पर रही, क्योंकि seat holds को एक event के अंदर strong consistency चाहिए थी।
+
+क्रम मायने रखता था: हर कदम अगले से सस्ता था, और अगला कदम उन्होंने तभी उठाया जब measurements ने दिखाया कि ज़रूरत है।
+
+## आम गलतियाँ
+
+**हर चीज़ पर index लगाना।** हर index हर write को धीमा करता है। उन्हीं columns पर index लगाओ जिन पर आपकी असली queries filter और sort करती हैं।
+
+**Replication lag को नज़रअंदाज़ करना।** Write के तुरंत बाद replicas से पढ़ने पर पुराना data दिखता है। "read your own writes" को primary से पढ़ने की planning करो।
+
+**बहुत जल्दी sharding करना।** इससे आगे का हर बदलाव मुश्किल हो जाता है। पहले indexes, query fixes, caching और replicas आज़मा लो।
+
+**ऐसी shard key जो hot spots बनाए।** तारीखें, या कोई एक popular customer या event, load को एक shard पर ढेर कर सकते हैं। ऐसी keys चुनो जिनकी बहुत सारी values बराबर use होती हों।
+
+**Hot paths पर cross-shard joins चाहिए होना।** अगर आम requests को हर shard पढ़ना पड़ता है, तो आपके access pattern के लिए key गलत है।
+
+**NoSQL इसलिए चुनना क्योंकि वो scalable सुनाई देता है।** अगर आपको transactions और flexible queries चाहिए, तो अच्छे से index किया गया relational database अक्सर कई साल आपका साथ देगा।
+
+## Practice करो
+
+1. Watch & learn panel में sharding और replication पर video lessons देखो।
+2. ऊपर वाला exercise करो।
+3. Project check करो: index के साथ और बिना index के एक query का time मापो और query plan पढ़ो।
+4. अपनी जानी-पहचानी किसी app के लिए बताओ कि कौन-सी table को sharding की सबसे ज़्यादा ज़रूरत पड़ेगी और आप कौन-सी key चुनोगे।

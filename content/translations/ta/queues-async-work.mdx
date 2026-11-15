@@ -1,0 +1,133 @@
+---
+id: queues-async-work
+lang: ta
+title: "Message queues, background work"
+outcome: "Message queues, workers வச்சு மெதுவான அல்லது நம்பகமில்லாத வேலையை request path-ல இருந்து எடுக்கவும், consumers-ஐ retry பண்ண safe ஆக்கவும், ஒரு simple queue-க்கும் Kafka மாதிரி event stream-க்கும் இடையில choose பண்ணவும் முடியும்."
+answer: "Message queue background workers-க்கான வேலையை வச்சிருக்கும். அதனால app சீக்கிரம் பதில் சொல்லும், emails அல்லது LLM calls மாதிரி மெதுவான jobs அப்புறம் ஓடும். Workers retry பண்ண safe-ஆ இருக்கணும்."
+why_it_matters: "SMS அனுப்புறது, PDFs generate பண்றது, LLMs-ஐ call பண்றது, payments process பண்றது எல்லாம் ஒரு user காத்திருக்கும்போது பண்றதுக்கு ரொம்ப மெதுவானவை அல்லது நம்பகமில்லாதவை. Queues apps-ஐ வேகமா வச்சு, திடீர் spikes-ஐ தாங்கும்; கிட்டத்தட்ட ஒவ்வொரு உண்மையான system design-லயும் வரும்."
+flashcards:
+  - q: "Message queue-னா என்ன?"
+    a: "Producers அனுப்புற messages-ஐ, consumers process பண்ண தயாராகுற வரை வச்சிருக்குற ஒரு service; ரெண்டையும் பிரிச்சு வைக்கும்."
+  - q: "வேலையை request path-ல இருந்து ஏன் எடுக்கணும்?"
+    a: "User-க்கு வேகமான response கிடைக்கணும்; SMS அனுப்புறது, LLM call பண்றது மாதிரி மெதுவான அல்லது நம்பகமில்லாத வேலை background-ல நடக்கணும்."
+  - q: "At-least-once delivery-னா என்ன?"
+    a: "ஒவ்வொரு message-உம் deliver ஆகும், ஆனா சில ஒரு தடவைக்கு மேல deliver ஆகலாம். அதனால consumers duplicates-ஐ handle பண்ணணும்."
+  - q: "ஒரு consumer-ஐ idempotent ஆக்குறது எது?"
+    a: "ஒரே message-ஐ ரெண்டு தடவை process பண்ணாலும் ஒரு தடவை பண்ண மாதிரியே விளைவு இருக்கணும்; உதாரணம்: process ஆன message IDs-ஐ record பண்றது."
+  - q: "Dead-letter queue-னா என்ன?"
+    a: "பல retries-க்கு அப்புறமும் fail ஆகிக்கிட்டே இருக்குற messages-க்கான தனி queue; மத்ததை block பண்ணாம அவற்றை inspect பண்ணலாம்."
+  - q: "Kafka, simple task queue-ல இருந்து எப்படி வேறுபடுது?"
+    a: "Kafka ஒரு ordered log-ஐ வச்சிருக்கும்; பல consumer groups அதை படிக்கலாம், replay பண்ணலாம். Task queue பொதுவா ஒரு worker ஒரு job-ஐ handle பண்ணதும் அதை delete பண்ணிடும்."
+  - q: "Traffic spikes-க்கு queues எப்படி உதவும்?"
+    a: "திடீர் bursts-ஐ buffer பண்ணும். அதனால database ஒரே நேரத்துல தாக்கப்படாம, workers ஒரே சீரான வேகத்துல process பண்ணுவாங்க."
+exercise:
+  title: "Background work-ஐ design பண்ணுங்க"
+  setup: "ஒரு இந்திய ed-tech app-ல ஒரு learner ஒரு course-ஐ முடிக்கும்போது, app அந்த completion-ஐ save பண்ணணும், ஒரு PDF certificate generate பண்ணணும், அதை email பண்ணணும், ஒரு WhatsApp message அனுப்பணும், ஒரு leaderboard-ஐ update பண்ணணும்."
+  questions:
+    - q: "எந்த step response-க்கு முன்னாடி நடக்கணும், எது queue-ல போகலாம்?"
+      a: "Completion-ஐ response கொடுக்குறதுக்கு முன்னாடி database-ல save பண்ணுங்க. PDF, email, WhatsApp message, leaderboard update-ஐ queue-ல போடுங்க."
+    - q: "WhatsApp provider timeout ஆகி job retry ஆகுது, அதனால சில learners-க்கு ரெண்டு messages போகுது. என்ன fix?"
+      a: "Consumer-ஐ idempotent ஆக்குங்க: completion ID-ஐ key-ஆ வச்சு ஒரு sent flag-ஐ store பண்ணி, ஏற்கனவே அனுப்பியிருந்தா skip பண்ணுங்க."
+    - q: "ஒரு bug-னால ஒரு course-க்கு PDF generation எப்பவும் fail ஆகுது. அது queue-ஐ block பண்ணாம இருக்க என்ன பண்றது?"
+      a: "Backoff-ஓட சில தடவை retry பண்ணுங்க, அப்புறம் job-ஐ dead-letter queue-க்கு நகர்த்தி, யாருக்காவது alert அனுப்புங்க."
+    - q: "Analytics, leaderboard, fraud check மூணும் completions பத்தி தெரிஞ்சுக்கணும். Queue-ஆ event stream-ஆ?"
+      a: "Kafka மாதிரி ஒரு event stream: ஒரு 'course completed' event-ஐ publish பண்ணி, ஒவ்வொரு consumer group-உம் அதை தனித்தனியா படிக்கட்டும்."
+ask:
+  - "RabbitMQ அல்லது SQS-க்கு பதிலா Kafka-வை எப்போ use பண்ணணும்?"
+  - "ஒரு background job-ஐ idempotent ஆக்குறது எப்படி?"
+  - "மெதுவான அல்லது rate limit இருக்குற LLM calls-ஐ எப்படி queue பண்றது?"
+translated_on: 2026-11-14
+---
+
+## இது என்ன
+
+சில வேலைகள் ஒரு user காத்திருக்கும்போது பண்றதுக்கு ரொம்ப மெதுவானவை, நம்பகமில்லாதவை, இல்ல திடீர்னு குவியுறவை: emails, SMS அனுப்புறது, PDFs generate பண்றது, images resize பண்றது, ஒரு LLM-ஐ call பண்றது, ஒரு partner-ஓட API-ஓட sync பண்றது. **Message queue** system-ஓட ஒரு பகுதியை, அதாவது **producer**-ஐ, "இது பண்ணணும்"ன்னு ஒரு message-ஐ போட விடும்; இன்னொரு பகுதி, ஒரு **worker** அல்லது **consumer**, அதை எடுத்து அப்புறம் செய்யும்.
+
+User-க்கு வேகமான response கிடைக்கும், மெதுவான வேலையும் நடக்கும், ஒரு downstream service கொஞ்ச நேரம் down ஆனாலும் messages இழக்கப்படாம காத்திருக்கும்.
+
+```flow
+User -> API | 1. order-ஐ DB-ல save பண்ணு
+API -[வேகமா]-> "Order placed!"
+API -[2. "order placed"-ஐ publish]-> Queue
+Queue -> Worker: SMS அனுப்பு
+Queue -> Worker: stock update
+Queue -> Worker: invoice-ஐ email பண்ணு
+Queue -[backoff-ஓட N retries fail ஆனப்புறம்]-> Dead-letter queue
+```
+
+பொதுவான tools: RabbitMQ, Amazon SQS, Google Pub/Sub, Celery, RQ மாதிரி Redis-based job queues, அதிக volume event streams-க்கு Apache Kafka.
+
+## இது எப்படி work ஆகுது
+
+**Producers-உம் consumers-உம் பிரிக்கப்பட்டிருக்கும்.** எத்தனை workers இருக்காங்க, அவங்க busy-ஆ இருக்காங்களான்னு API தெரிஞ்சுக்க வேண்டாம். Queue வளரும்போது workers-ஐ சேர்க்கலாம், காலியானதும் குறைக்கலாம். Orders திடீர்னு குவிஞ்சா queue நிரம்பும்; workers அதை ஒரே சீரான வேகத்துல காலி பண்ணுவாங்க; இது database-ஐயும் third-party APIs-ஐயும் காப்பாத்தும்.
+
+**Delivery-உம் retries-உம்.** பெரும்பாலான queues **at-least-once delivery**-ஐ தரும்: ஒரு worker வேலை முடிஞ்சதுன்னு confirm பண்ற வரை message queue-ல இருக்கும். Confirm பண்றதுக்கு முன்னாடி worker crash ஆனா, message மறுபடி deliver ஆகும். அதாவது ஒரே message ரெண்டு தடவை process ஆகலாம், அதனால consumers **idempotent**-ஆ இருக்கணும்: வேலையை ரெண்டு தடவை பண்ணாலும் ஒரு தடவை பண்ண மாதிரியே விளைவு. வழக்கமான வழிகள்: செயல்படுறதுக்கு முன்னாடி check பண்ற ஒரு unique job ID, அல்லது insert-க்கு பதிலா "upsert".
+
+Fail ஆன jobs-ஐ **exponential backoff**-ஓட retry பண்ணுங்க (1 second, அப்புறம் 2, 4, 8...), ஏன்னா பல failures தற்காலிகமானவை. சில attempts-க்கு அப்புறம், ஒரு மோசமான message மத்ததை block பண்ணாம இருக்க, அதை ஒரு **dead-letter queue**-க்கு நகர்த்தி, யாருக்காவது alert அனுப்புங்க.
+
+**Task queues vs event streams.** SQS அல்லது RabbitMQ மாதிரி ஒரு task queue ஒவ்வொரு job-ஐயும் ஒரு worker-க்கு கொடுத்து, முடிஞ்சதும் delete பண்ணும். Kafka மாதிரி **event stream** events-ஓட ஒரு ordered, durable log-ஐ வச்சிருக்கும். பல independent **consumer groups**, உதாரணம் analytics, notifications, fraud checks, ஒவ்வொண்ணும் தன் வேகத்துல முழு stream-ஐயும் படிக்கும், பழைய events-ஐ replay-உம் பண்ணலாம். Kafka ரொம்ப அதிக throughput-ஐ handle பண்ணும், ஆனா operational complexity அதிகம்.
+
+| தேவை | நல்ல பொருத்தம் | ஏன் |
+|---|---|---|
+| Background jobs ஓட்டுறது (emails, PDFs, LLM calls) | Redis-ல Celery/RQ, SQS, RabbitMQ | simple, ஒரு job-க்கு ஒரு worker, retries உள்ளேயே இருக்கு |
+| பல services ஒரே event-க்கு react பண்றது | Kafka, Pub/Sub | ஒவ்வொரு consumer group-உம் தனித்தனியா படிக்கும் |
+| Data-வை rebuild பண்ண history-ஐ replay பண்றது | Kafka | events ஒரு குறிப்பிட்ட காலம் வரை வச்சிருக்கும் |
+| ஒரு key-க்கு strict order | Key படி Kafka partitions, SQS FIFO | ஒரு key-க்குள்ள order காப்பாத்தப்படும் |
+| ரொம்ப கம்மி volume, ஒரு server | Python queue + worker thread | கூடுதல் infrastructure வேண்டாம் |
+
+**Interviews-ல**, "notification அனுப்பு", "upload-ஐ process பண்ணு", "மெதுவான third-party API-ஐ call பண்ணு", "spike-ஐ handle பண்ணு"ன்னு கேட்டா, ஒரு queue-ஐ எடுங்க. அப்புறம் interviewers காத்திருக்குற மூணு follow-ups-ஐ சொல்லுங்க: fail ஆனா என்ன நடக்கும் (retries, backoff, dead-letter queue), duplicates வந்தா என்ன நடக்கும் (idempotent consumers), backlog-ஐ எப்படி கவனிப்பீங்க (queue length, job age alerts).
+
+**Browser-லயே try பண்ணுங்க.** Retries-உம் ஒரு dead-letter list-உம் இருக்குற ஒரு queue worker. Failure rate-ஐ மாத்தி ஓட்டுங்க.
+
+```python
+import random
+from collections import deque
+
+random.seed(3)
+queue = deque({"id": i, "tries": 0} for i in range(10))
+done, dead = [], []
+while queue:
+    job = queue.popleft()
+    job["tries"] += 1
+    if random.random() < 0.3:                 # 30% of attempts fail
+        (dead if job["tries"] >= 3 else queue).append(job)
+    else:
+        done.append(job["id"])
+print("done:", done)
+print("dead letters after 3 tries:", [j["id"] for j in dead])
+```
+
+## ஒரு worked example
+
+Isha, Pune-ல ஒரு learning app-க்கு AI study-notes feature-ஐ build பண்றாங்க. Students ஒரு chapter PDF-ஐ upload பண்ணி, AI generate பண்ண summary notes-ஐ பெறுவாங்க. அவங்க முதல் version upload request-க்குள்ளயே LLM-ஐ call பண்ணுச்சு. அதுக்கு 40-ல இருந்து 90 seconds ஆச்சு, phones timeout ஆச்சு, exam season-ல LLM provider rate-limit பண்ணும்போது uploads வெறுமனே fail ஆச்சு.
+
+அவங்க அதை ஒரு queue சுத்தி redesign பண்ணாங்க:
+
+1. Upload endpoint PDF-ஐ object storage-ல store பண்ணி, status `queued` இருக்குற ஒரு `notes_job` row-ஐ உருவாக்கி, job ID-ஓட ஒரு message-ஐ publish பண்ணி, ஒரு second-குள்ள திருப்பிடும். App "உங்க notes தயாராகிட்டு இருக்கு"ன்னு காட்டும்.
+2. Workers queue-ல இருந்து jobs-ஐ எடுத்து, text-ஐ extract பண்ணி, LLM-ஐ call பண்ணி, notes-ஐ save பண்ணி, status-ஐ `done`-ஆ set பண்ணும். App ஒரு status endpoint-ஐ poll பண்ணும் அல்லது ஒரு push notification பெறும்.
+3. Rate limit-ஐ தொட்ட LLM calls exponential backoff-உம் jitter-உம் வச்சு retry ஆகும். Worker concurrency cap பண்ணப்பட்டிருக்கு, அதனால team provider quota-வை ஒருபோதும் தாண்டாது.
+4. Workers idempotent: LLM-ஐ call பண்றதுக்கு முன்னாடி, அந்த job-க்கு ஏற்கனவே notes இருக்கான்னு worker check பண்ணும். Save பண்ணதுக்கு அப்புறம், message-ஐ confirm பண்றதுக்கு முன்னாடி crash ஆனாலும், இனி ரெண்டாவது, காசு செலவாகுற LLM call வராது.
+5. அஞ்சு தடவை fail ஆகுற jobs, உதாரணம் text இல்லாத scanned PDFs, dead-letter queue-க்கு போகும்; student-க்கு text-based PDF-ஐ upload பண்ண சொல்ற தெளிவான message தெரியும்.
+
+அடுத்த exam rush-ல uploads சாதாரணத்தை விட பத்து மடங்கு உயர்ந்துச்சு. Queue சில ஆயிரம் jobs வரை வளர்ந்து இருபது நிமிஷத்துல காலியாச்சு; எந்த request-உம் timeout ஆகல, concurrency cap பண்ணப்பட்டிருந்ததால மாசாந்திர LLM bill budget-க்குள்ளயே இருந்துச்சு.
+
+## பொதுவா பண்ற தப்புகள்
+
+**Request-குள்ளயே மெதுவான வேலை பண்றது.** Users காத்திருப்பாங்க, requests timeout ஆகும், பொறுமையில்லாத users-ஓட retries load-ஐ ரெட்டிப்பாக்கும். Queue-ல போட்டு சீக்கிரம் பதில் சொல்லுங்க.
+
+**Exactly-once processing-ன்னு நினைக்கிறது.** பெரும்பாலான queues at least once deliver பண்ணும். Idempotent consumers இல்லன்னா duplicate SMS, emails, charges அனுப்புவீங்க.
+
+**Backoff இல்லாம என்றென்றைக்கும் retry பண்றது.** உடனுக்குடன் முடிவில்லாத retries திணறிக்கிட்டு இருக்குற service-ஐ அடிக்கும். Exponential backoff, ஒரு retry limit, ஒரு dead-letter queue use பண்ணுங்க.
+
+**Visibility இல்லாம இருக்கிறது.** சத்தமில்லாம வளருற queue-னா, users சத்தமில்லாம காத்திருக்காங்கன்னு அர்த்தம். Queue length-ஐயும் job age-ஐயும் monitor பண்ணி, அவற்றுக்கு alert வையுங்க.
+
+**கொஞ்சம் jobs-க்கு Kafka use பண்றது.** இது சக்தி வாய்ந்தது, ஆனா ஓட்ட கனமானது. பெரும்பாலான background work-க்கு ஒரு managed task queue போதும்.
+
+**ரொம்ப சீக்கிரம் acknowledge பண்ணி வேலையை இழக்கிறது.** வேலை பாதுகாப்பா முடிஞ்சதுக்கு அப்புறம் மட்டும் message-ஐ confirm பண்ணுங்க, இல்லன்னா ஒரு crash அதை இழக்கும்.
+
+## Practice பண்ணுங்க
+
+1. Watch & learn panel-ல இருக்குற Kafka fundamentals, getting started video lessons-ஐ பாருங்க.
+2. மேல இருக்குற exercise-ஐ பண்ணுங்க.
+3. Project check-ஐ பண்ணுங்க: ஒரு status endpoint-ஓடயும் ஒரு idempotent worker-ஓடயும் queue-ல ஓடுற certificate generator.
+4. நீங்க use பண்ற apps-ல background-ல ஓடுதுன்னு தெளிவா தெரியுற ரெண்டு features-ஐ கண்டுபிடிச்சு, அவற்றுக்கு பின்னாடி இருக்குற queue-ஐ வரைங்க.

@@ -1,0 +1,224 @@
+---
+id: serving-ml-models
+lang: ta
+title: "ஒரு model-ஐ serve பண்றது"
+outcome: "Train பண்ண model-ஐ use-க்கு கொண்டு வரலாம், ராத்திரி batch scoring-ஆவோ real-time API-ஆவோ. Consistent preprocessing, input validation, versioning, latency targets, பாதுகாப்பான rollout-ஓட."
+answer: "ஒரு model-ஐ schedule-ல batch scoring-ஆவோ real-time API-ஆவோ serve பண்ணலாம். Training-ல use பண்ண அதே preprocessing-ஐ use பண்ணுங்க, inputs-ஐ validate பண்ணுங்க, ஒவ்வொரு model-க்கும் version வைங்க."
+why_it_matters: "Notebook-ல இருக்குற model எந்த value-வையும் உருவாக்காது. Training-ல இருந்த அதே preprocessing-ஓட, புது versions-ஐ பாதுகாப்பா roll out பண்ற வழியோட அதை நம்பகமா serve பண்றதுல தான் நிறைய ML projects நின்னுடுது. இந்த gap-ஐ மூடக்கூடிய engineers-ஐ employers தேடுறாங்க."
+flashcards:
+  - q: "ரெண்டு முக்கியமான serving patterns என்ன?"
+    a: "Batch inference: schedule-ல நிறைய records-ஐ score பண்றது. Real-time inference: milliseconds-குள்ள ஒரு request-ஐ score பண்ற API."
+  - q: "Batch inference-ஐ எப்போ தேர்ந்தெடுக்கணும்?"
+    a: "Business scores-க்கு காத்திருக்க முடியும்னா எப்பவும். இது எளிமையானது, மலிவானது, monitor பண்றது சுலபம்."
+  - q: "Preprocessing-ஐ model-ஓட ஏன் package பண்ணணும்?"
+    a: "Features training-ல compute ஆனது மாதிரியே சரியா compute ஆகணும். Service-ல திரும்ப implement பண்ணா சத்தமில்லாம prediction errors வரும்."
+  - q: "Real-time service-ல inputs-ஐ ஏன் validate பண்ணணும்?"
+    a: "இல்லாத fields, தப்பான types, unit mismatches, range-க்கு வெளியே இருக்குற values சத்தமில்லாம தப்பான predictions-ஐ கொடுக்கும்."
+  - q: "Shadow mode-னா என்ன?"
+    a: "புது model live requests-ஐ current model-ஓட சேர்ந்து score பண்ணும், ஆனா decisions-ஐ பாதிக்காது. அதனால outputs-ஐ பாதுகாப்பா compare பண்ணலாம்."
+  - q: "Canary release-னா என்ன?"
+    a: "புது model-க்கு முதல்ல ஒரு சின்ன பங்கு traffic-ஐ அனுப்பி, results நல்லா இருந்தா அதிகப்படுத்தறது."
+  - q: "ஒரு model service-க்கு fallback-னா என்ன?"
+    a: "Model கிடைக்காதப்போ என்ன பண்றதுன்னு முன்னாடியே திட்டமிட்ட decision. உதாரணம்: ஒரு எளிய rule அல்லது manual review-க்கு route பண்றது."
+  - q: "ஒவ்வொரு prediction-உம் என்ன log பண்ணணும்?"
+    a: "Inputs அல்லது அவற்றோட summaries, output, model version, timestamp. Personal data mask பண்ணி."
+  - q: "Canary model-க்கு users-ல ஒரு நிலையான பங்கை எப்படி அனுப்பறது?"
+    a: "ஒவ்வொரு user-ஓட id-ஐயும் hash பண்ணி 0-ல இருந்து 99 வரை ஒரு number ஆக்குங்க. Canary percentage-க்கு கீழ இருக்குற users-ஐ புது model-க்கு அனுப்புங்க. அப்போ ஒவ்வொரு user-உம் எப்பவும் ஒரே version-ஐ தான் பார்ப்பாங்க."
+  - q: "Model-ஐ ஒவ்வொரு request-லயும் இல்லாம, start-up-ல ஏன் load பண்ணணும்?"
+    a: "Load ஆக சில seconds-உம் memory-யும் ஆகும். App-ஓட start-up-ல ஒரு தடவை பண்ணா ஒவ்வொரு prediction-உம் வேகமா இருக்கும், load-ல memory தீர்ந்து போறதையும் தவிர்க்கலாம்."
+exercise:
+  title: "Serving-ஐ தேர்ந்தெடுத்து plan பண்ணுங்க"
+  setup: "Surat-ல ஒரு diamond exporter-கிட்ட ரெண்டு models இருக்கு: (A) அடுத்த மாசத்துக்கு ஒவ்வொரு product-க்கும் demand forecast. Planners ஒவ்வொரு Monday-யும் use பண்றாங்க. (B) ஒரு salesperson order system-ல type பண்ணும்போதே வித்தியாசமான quotes-ஐ flag பண்ற price check. இது 200 milliseconds-குள்ள பதில் சொல்லணும். (B)-ஓட புது version ready. ஒரு partner system weights-ஐ carats-ல அனுப்புது, internal system cents-ஐ use பண்ணுது."
+  questions:
+    - q: "ஒவ்வொரு model-க்கும் எந்த serving pattern பொருந்தும்?"
+      a: "(A) batch: வாராவாரம் score பண்ணி ஒரு table-ல எழுதணும். (B) real-time: latency budget-ஓட ஒரு API-ஆ."
+    - q: "(B)-ஓட புது version-ஐ பாதுகாப்பா எப்படி release பண்றது?"
+      a: "Shadow mode-ல ஓட்டுங்க, அதோட flags-ஐ current version-ஓட compare பண்ணுங்க. அப்புறம் முழு rollout-க்கு முன்னாடி ஒரு சின்ன பங்கு traffic-ல canary பண்ணுங்க."
+    - q: "(B)-ஐ carats vs cents பிரச்சனையில இருந்து எப்படி காப்பாத்தறது?"
+      a: "Schema வச்சு expected ranges, units-படி inputs-ஐ validate பண்ணுங்க. Partner channel-ல இருந்து வர்ற values-ஐ reject பண்ணுங்க அல்லது convert பண்ணுங்க."
+    - q: "Price-check service down ஆனா என்ன நடக்கணும்?"
+      a: "ஒரு fallback: sales-ஐ block பண்றதுக்கு பதிலா, order-ஐ 'check ஆகலை'ன்னு marker போட்டு தொடர விடுங்க, அல்லது ஒரு எளிய rule-based limit-ஐ apply பண்ணுங்க."
+ask:
+  - "API-க்கு பதிலா batch inference-ஐ எப்போ use பண்ணணும்?"
+  - "ஒரு புது model version-ஐ பாதுகாப்பா எப்படி deploy பண்றது?"
+  - "Feature store-னா என்ன?"
+translated_on: 2026-11-14
+---
+
+## இது என்ன
+
+**Serving**-னா ஒரு model-ஓட predictions-ஐ அவை தேவைப்படுற இடத்துல கிடைக்க வைக்கறது. ரெண்டு முக்கியமான patterns:
+
+- **Batch inference**: schedule-ல நிறைய records-ஐ score பண்றது (எல்லா customers-க்கும் ராத்திரி churn scores, ஒவ்வொரு store-க்கும் வாராந்திர demand forecasts). Results-ஐ மத்த systems படிக்குற ஒரு table-ல எழுதுவீங்க.
+- **Real-time (online) inference**: milliseconds-குள்ள ஒரு request-ஐ score பண்ற API (payment நேரத்துல fraud check, seller type பண்ணும்போதே price suggestion).
+
+Business காத்திருக்க முடியும்னா எப்பவும் batch-ஐ தேர்ந்தெடுங்க. அது எளிமையானது, மலிவானது, monitor பண்றதும் சுலபம்.
+
+```flow
+title: Batch, ராத்திரி
+Scheduler -> Registry-ல இருந்து model v7-ஐ load பண்றது -> இன்னைக்கு நிலவரப்படி features compute பண்றது -> எல்லா active loans-ஐயும் score பண்றது -> loan_id, score, v7, timestamp எழுதறது -> Collections team-ஓட ranked list
+```
+
+```flow
+title: Real time, ஒவ்வொரு request-க்கும்
+Application form -> FastAPI service | start-up-ல model v7 load ஆகியிருக்கும்
+FastAPI service -> 42 fields-ஐ validate பண்றது
+42 fields-ஐ validate பண்றது -[bad input]-> Reject
+42 fields-ஐ validate பண்றது -> Features compute பண்றது | training-ல use பண்ண அதே code
+Features compute பண்றது -> Score, version-ஐ திருப்பி தருது | 80 ms-குள்ள
+Score, version-ஐ திருப்பி தருது -> Decision | service down-னா manual review
+```
+
+இந்த lesson-ல Kolkata-ல ஒரு non-banking finance company ஒரு default-risk model-ஐ ரெண்டு விதமாவும் serve பண்றதை follow பண்ணுவோம்.
+
+## இது எப்படி work ஆகுது
+
+**முழு prediction path-ஐயும் package பண்ணுங்க.** Model மட்டும் போதாது. Preprocessing, feature computation training-ல இருந்த மாதிரியே இருக்கணும். அவற்றை ஒண்ணா package பண்ணி (scikit-learn pipeline, save பண்ண preprocessing object, shared feature code), model-ஓட சேர்த்து version பண்ணுங்க.
+
+**Batch.** ஒரு scheduled job registered model-ஐ load பண்ணும், scoring நேரத்து நிலவரப்படி features compute பண்ணும், predict பண்ணும், model version, timestamp-ஓட results-ஐ எழுதும், counts, score distributions-ஐ log பண்ணும். ஒரு orchestrator அல்லது எளிய scheduler use பண்ணுங்க.
+
+**Real-time.** ஒரு web service (உதாரணம் FastAPI, அல்லது BentoML மாதிரி model-serving framework) start-up-ல model-ஐ load பண்ணும். ஒவ்வொரு request-ஓட input-ஐயும் ஒரு schema வச்சு validate பண்ணும். Features compute பண்ணும் ("கடைசி ஒரு மணி நேரத்துல transactions" மாதிரி விஷயங்களுக்கு பெரும்பாலும் ஒரு feature store-ல இருந்து). Predict பண்ணி, model version-ஓட score-ஐ திருப்பி தரும். Latency budgets, timeouts வைங்க. Model service fail ஆனா ஒரு fallback-உம் (rule-based decision) வைங்க.
+
+**Input validation.** இல்லாத fields, தப்பான types, training ranges-க்கு வெளியே இருக்குற values இருக்குற requests-ஐ reject பண்ணுங்க அல்லது flag பண்ணுங்க. சத்தமில்லாம garbage உள்ள போனா, சத்தமில்லாம garbage தான் வெளியே வரும்.
+
+**Versioning, rollout.** புது versions-ஐ படிப்படியா deploy பண்ணுங்க: shadow mode (புது model பழையதோட சேர்ந்து score பண்ணும், decisions-ஐ பாதிக்காது), அப்புறம் canary (ஒரு சின்ன பங்கு traffic), அப்புறம் full rollout. Outcomes-ஐ compare பண்ணி, தேவைன்னா rollback பண்ணுங்க.
+
+**Performance.** p95 latency, throughput-ஐ அளந்து பாருங்க. சின்ன models, requests-ஐ batch பண்றது, features-ஐ முன்னாடியே compute பண்றது உதவும். Tree models பொதுவா CPU-ல milliseconds-ல serve ஆகும்.
+
+**Logging.** Monitoring, debugging-க்காக inputs (அல்லது அவற்றோட summaries), outputs, model version-ஐ log பண்ணுங்க. Personal data-வை mask பண்ணி.
+
+**Batch அல்லது real-time:**
+
+| கேள்வி | Batch | Real-time |
+| --- | --- | --- |
+| Score எப்போ தேவை? | சில மணி நேரம் அல்லது நாள் கழிச்சு கிடைச்சா போதும் | Request-குள்ளயே |
+| Cost | குறைவு: schedule-ல ஓடும் | அதிகம்: எப்பவும் ஓடுற service |
+| Monitoring | ஒவ்வொரு run-க்கும் counts, distributions | ஒவ்வொரு request-க்கும் latency, errors, drift |
+| Failure-ஓட தாக்கம் | ஒரு late report | Customer journey block ஆகும், அதனால fallback தேவை |
+| வழக்கமான examples | Churn lists, forecasts, risk reviews | Fraud checks, pricing, credit decisions |
+
+**Rollout path-ஐ வார்த்தைகள்ல.** முதல்ல shadow mode: புது version ஒவ்வொரு request-ஐயும் score பண்ணும், ஆனா அதோட output log மட்டும் ஆகும். Real outcomes பார்க்க போதுமான நேரம் கொடுத்ததுக்கு அப்புறம், ஒவ்வொரு version-ஓட scores உண்மையில நடந்ததை எவ்வளவு நல்லா rank பண்ணுச்சுன்னு segment segment-ஆ compare பண்ணுங்க. அப்புறம் ஒரு சின்ன பங்குல canary, error rates, business measures-ஐ பார்த்துக்கிட்டே. அப்புறம் full rollout. முந்தைய version இன்னும் load ஆகியிருக்கும் அல்லது ஒரு deploy தூரத்துல இருக்கும். ஒவ்வொரு stage-க்கும் ஒரு பெயரிடப்பட்ட owner இருக்கணும். அடுத்த stage-க்கு போக அல்லது rollback பண்ண எழுதின condition, stage ஆரம்பிக்குறதுக்கு முன்னாடியே முடிவு பண்ணியிருக்கணும்.
+
+**Batch-ஐயும் real-time-ஐயும் consistent-ஆ வச்சுக்கறது.** ஒரு model ரெண்டு விதமாவும் serve ஆகும்போது, ரெண்டு paths-உம் அதே registered version-ஐ load பண்ணி அதே feature code-ஐ call பண்ணணும். ஒரு பயனுள்ள test: ஒரு sample records-ஐ batch job வழியாவும் API வழியாவும் score பண்ணி, ஒவ்வொரு score-உம் match ஆகுதான்னு check பண்றது.
+
+**Code-ல ஒரு real-time service.** Start-up-ல ஒரு தடவை load பண்ணுங்க, training ranges-படி inputs-ஐ validate பண்ணுங்க, ஒவ்வொரு prediction-ஓடயும் version-ஐ record பண்ணுங்க:
+
+```python
+from contextlib import asynccontextmanager
+import mlflow.pyfunc, pandas as pd
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+MODELS = {}
+
+@asynccontextmanager
+async def lifespan(app):
+    MODELS["champion"] = mlflow.pyfunc.load_model("models:/claims-fraud@champion")
+    MODELS["challenger"] = mlflow.pyfunc.load_model("models:/claims-fraud@challenger")
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+class Claim(BaseModel):
+    claim_amount_inr: float = Field(gt=0, le=5_000_000)        # the range seen in training
+    policy_age_days: int = Field(ge=0, le=20_000)
+    hospital_tier: int = Field(ge=1, le=3)
+    prior_claims: int = Field(ge=0, le=50)
+
+@app.post("/score")
+def score(claim: Claim, user_id: str):
+    X = pd.DataFrame([claim.model_dump()])
+    main = float(MODELS["champion"].predict(X)[0])
+    shadow = float(MODELS["challenger"].predict(X)[0])          # logged, never used for the decision
+    log_prediction(user_id, claim, main=main, shadow=shadow)
+    return {"score": main, "model": "champion"}
+```
+
+Pydantic, model பார்க்கறதுக்கு முன்னாடியே range-க்கு வெளியே இருக்குற inputs-ஐ தெளிவான 422-ஓட reject பண்ணும்.
+
+**User hash வச்சு ஒரு canary.** Challenger real decisions-க்கு ready ஆனதும், users-ஓட ஒரு நிலையான slice-ஐ அதுக்கு route பண்ணுங்க:
+
+```python
+import hashlib
+
+def bucket(user_id: str) -> int:
+    return int(hashlib.sha256(user_id.encode()).hexdigest()[:8], 16) % 100
+
+def pick_model(user_id: str, canary_percent: int = 5) -> str:
+    return "challenger" if bucket(user_id) < canary_percent else "champion"
+```
+
+ஒரே user-க்கு எப்பவும் அதே model கிடைக்கும். அது அவங்க experience-ஐ consistent-ஆவும், comparison-ஐ clean-ஆவும் வச்சிருக்கும். Percentage-ஐ படிப்படியா உயர்த்துங்க (5, 25, 50, 100). ஒவ்வொரு group-க்கும் outcomes, errors-ஐ பார்த்துக்கிட்டே.
+
+**Version stamp-ஓட batch scoring.**
+
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+def score_batch(in_path, out_path, alias="champion"):
+    model_uri = f"models:/claims-fraud@{alias}"
+    model = mlflow.pyfunc.load_model(model_uri)
+    df = pd.read_parquet(in_path)
+    df["score"] = model.predict(df[FEATURES])
+    df["model_version"] = mlflow.MlflowClient().get_model_version_by_alias("claims-fraud", alias).version
+    df["scored_at"] = datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(timespec="seconds")
+    df.to_parquet(out_path)
+    print(f"{len(df)} rows; score mean {df['score'].mean():.3f}; share above 0.8: {(df['score'] > 0.8).mean():.1%}")
+```
+
+Print ஆகுற summary ஒரு மலிவான monitor: mean அல்லது high-score share-ல பெரிய jump இருந்தா, யாரும் அந்த list-ஐ வச்சு செயல்படறதுக்கு முன்னாடி ஒரு தடவை பாருங்க.
+
+**ஒரு consistency test.** 500 records-ஐ batch job, API ரெண்டு வழியாவும் score பண்ணி, scores ஒரு சின்ன tolerance-குள்ள match ஆகுதுன்னு assert பண்ணுங்க. வித்தியாசம் இருந்தா, ரெண்டு paths-உம் features-ஐ வேற மாதிரி compute பண்ணுதுன்னு அர்த்தம். Serve ஆகுற models-ல இது தான் ரொம்ப பொதுவான silent bug.
+
+## ஒரு நாள், ஒரு example
+
+Kolkata-ல ஒரு NBFC (non-banking finance company)-கிட்ட train பண்ண ஒரு default-risk model இருக்கு.
+
+- **Batch**: ஒவ்வொரு ராத்திரியும், எல்லா active loans-உம் early-warning risk-க்கு score ஆகும். Collections team ஒவ்வொரு காலையும் ஒரு ranked list பார்ப்பாங்க. Job score பண்ண loans எண்ணிக்கையையும், ஒவ்வொரு risk band-லயும் இருக்குற பங்கையும் log பண்ணும். Counts திடீர்னு மாறினா ஒரு alert fire ஆகும்.
+- **Real-time**: Loan application நேரத்துல, ஒரு FastAPI service applicant-ஐ p95-ல 80 milliseconds-குள்ள score பண்ணுது. 42 input fields-ஐ ஒரு Pydantic model வச்சு validate பண்ணுது. Bank-statement features-ஐ training-ல use பண்ண அதே code-ஆல compute பண்ணுது. Service down-னா, application auto-decide ஆகாம manual review-க்கு போகும்.
+- **Rollout**: version 7 ரெண்டு வாரம் version 6-ஓட பக்கத்துல shadow mode-ல ஓடுச்சு. Defaults தெரிய மாசக்கணக்குல ஆகும், அதனால ரெண்டு வார shadow scores அது defaults-ஐ better-ஆ rank பண்ணுதுன்னு நிரூபிக்காது. அதுக்கு பதிலா team அதோட live scores stable-ஆவும் அர்த்தமுள்ளதாவும் இருக்குதான்னு check பண்ணுச்சு. Outcomes தெரிஞ்ச பழைய loans மேல பண்ண back-test-ஐயும் நம்புச்சு. அதுல இது defaults-ஐ better-ஆ rank பண்ணுச்சு. அப்புறம் 20% traffic-க்கு, அப்புறம் 100%-க்கு போச்சு. Rollback-க்காக registry version 6-ஐ ready-ஆ வச்சிருக்கு.
+
+ஒரு ஆரம்ப bug: ஒரு partner channel-ல இருந்து income lakhs-ல வந்துச்சு, இன்னொண்ணுல இருந்து rupees-ல வந்துச்சு. Input range validation முதல் நாளே அதை பிடிச்சுது.
+
+| Version 7-ஓட stage | Traffic | Outcome |
+| --- | --- | --- |
+| Shadow | decisions-ல 0%, 100% scored | Stable live scores; back-test-ல version 6-ஐ விட better |
+| Canary | 20% | Errors, complaints-ல உயர்வு இல்லை |
+| Full rollout | 100% | Version 6 registry-ல ready-ஆ |
+
+## பொதுவா பண்ற தப்புகள்
+
+- **Batch போதுமான இடத்துல real-time பண்றது.** Cost-உம் complexity-யும் கூடும்.
+- **Service-ல preprocessing-ஐ திரும்ப implement பண்றது.** Training-ஓட code-ஐ share பண்ணுங்க.
+- **Input validation இல்லாம இருக்கறது.** Unit mismatches, இல்லாத fields சத்தமில்லாம predictions-ஐ கெடுக்கும்.
+- **எல்லாத்தையும் ஒரே நேரத்துல deploy பண்றது.** Shadow, canary releases use பண்ணுங்க.
+- **Fallback இல்லாம இருக்கறது.** Model கிடைக்காதப்போ என்ன நடக்கும்னு முடிவு பண்ணுங்க.
+- **Input range checks இல்லாம இருக்கறது.** அப்போ range-க்கு வெளியே இருக்குற values confident-ஆன அர்த்தமில்லாத பதிலை தரும்.
+- **ஒவ்வொரு request-க்கும் random canary assignment.** ஒரே user ரெண்டு models-ஐயும் பார்ப்பாங்க.
+- **Batch, real-time paths features-ஐ வேற மாதிரி compute பண்றது.**
+
+## Serving service தேவையில்லாம இருக்கக்கூடிய நேரங்கள்
+
+- **தினமும் அல்லது வாரம் ஒரு தடவை scores தேவை**: ஒரு table-ல எழுதுற batch job மலிவானது, எளிமையானது.
+- **Client app-லயோ database-லயோ ஓடுற அளவுக்கு சின்ன models**, rules அல்லது SQL-ஆ export பண்ண சின்ன tree மாதிரி.
+- Client ஏற்கனவே ஓட்டுற **hosted ML platform**. அது endpoints, canaries, monitoring-ஐ கொடுக்கும்.
+
+## Demo-ல இருந்து production-க்கு
+
+- **Registry alias-ல இருந்து load பண்ணுங்க**, ஒவ்வொரு prediction-ஓடயும் version-ஐ log பண்ணுங்க.
+- Training ranges-படி **inputs-ஐ validate பண்ணுங்க**.
+- **முதல்ல shadow, அப்புறம் hash-based canary-ஓட roll out பண்ணுங்க**, ஒவ்வொரு group-க்கும் outcomes-ஐ பார்த்துக்கிட்டே.
+- CI-ல **batch, real-time consistency-ஐ test பண்ணுங்க**.
+- **p95 latency, errors, score distributions-ஐ track பண்ணுங்க.**
+
+## Practice பண்ணுங்க
+
+BentoML-ஓட introduction-ஐயும், Google-ஓட Rules of ML-ல serving section-ஐயும் படிங்க. FastAPI lesson-ல கத்துக்கிட்டதை மறுபடி use பண்ணுங்க.
+
+1. Save பண்ண pipeline-ஐ load பண்ணி, ஒரு CSV-ஐ score பண்ணி, model version-ஓட results-ஐ எழுதுற ஒரு batch scoring script எழுதுங்க.
+2. அதே pipeline-ஐ input validation, latency measurement-ஓட ஒரு FastAPI endpoint-ஆ serve பண்ணுங்க.
+3. ஒரு புது model version-ஐ அதே inputs-ல shadow mode-ல ஓட்டி, outputs-ஐ compare பண்ணுங்க.
+4. 10%-ல hash-based canary-ஐ சேர்த்து, 1,000 fake user ids-ஐ அனுப்பி, கிட்டத்தட்ட 100 challenger-க்கு போகுதுன்னும், ஒவ்வொரு id-உம் எப்பவும் ஒரே group-ல விழுதுன்னும் confirm பண்ணுங்க.
+
+**முடிஞ்சதுன்னு எப்போ சொல்லலாம்:** ஒரு model-ஐ ரெண்டு விதமாவும் serve பண்ணி, அதே inputs-க்கு ஒரே மாதிரி predictions கிடைக்க வைக்க முடியும், உங்க rollout plan-ஐ explain பண்ணவும் முடியும்.

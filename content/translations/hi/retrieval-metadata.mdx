@@ -1,0 +1,234 @@
+---
+id: retrieval-metadata
+lang: hi
+title: "Retrieval में मदद करने वाला metadata"
+outcome: "वो metadata store करना सीखोगे जो retrieval को precise बनाता है (source, section path, dates, type, owner, language, access), और जहाँ फ़ायदा हो वहाँ summaries और likely questions जैसा generated metadata जोड़ना।"
+answer: "Source, section, date, type, owner और access level जैसा metadata retrieval को precise बनाता है, क्योंकि आप उससे filter कर सकते हो और दिखा सकते हो कि जवाब कहाँ से आया।"
+why_it_matters: "Metadata chunks के ढेर को searchable library बना देता है: filters, citations, freshness, permissions और बेहतर matching, सब इसी से चलते हैं। Ingestion के समय इसे जमा करना सस्ता है और बाद में जोड़ना दर्दनाक, इसलिए अनुभवी RAG engineers इसे सबसे पहले design करते हैं।"
+flashcards:
+  - q: "RAG में metadata क्या है?"
+    a: "Chunk के text के बारे में नहीं, chunk के बारे में जानकारी: जैसे document, section, page, dates, type, language और access groups।"
+  - q: "Metadata कौन-से पाँच काम करता है?"
+    a: "Filters, citations, freshness, permissions, और वो context जोड़कर बेहतर matching जो chunk के text में नहीं है।"
+  - q: "Chunk के लिए contextual text क्या होता है?"
+    a: "Embed करने से पहले chunk के आगे जोड़ा गया title और section path, या model का लिखा एक वाक्य का context।"
+  - q: "Metadata के लिए fixed vocabularies क्यों use करें?"
+    a: "ताकि filters match करें। 'HR', 'Human Resources' और 'hr dept' जैसा free text filtering तोड़ देता है।"
+  - q: "Superseded documents को कैसे संभालें?"
+    a: "Effective dates और 'superseded by' link store करो, और superseded versions को default में filter कर दो, जब तक user history न पूछे।"
+  - q: "Filters कहाँ से आ सकते हैं?"
+    a: "User के context से, जैसे उनका state या access groups, या एक छोटे model से सवाल को देखकर अंदाज़ा लगाकर।"
+  - q: "Filters का अंदाज़ा सावधानी से क्यों लगाएँ?"
+    a: "गलत filter सही जवाब को पूरी तरह छिपा देता है। User context को तरजीह दो और पक्का न हो तो पूछ लो।"
+  - q: "Generated metadata क्या है, और उसकी cost क्या है?"
+    a: "हर chunk के लिए model से लिखवाए गए summaries, keywords या likely questions। Ingestion में हर chunk पर एक model call लगती है, इसलिए पहले फ़ायदा नापो।"
+  - q: "Query filters का अंदाज़ा सावधानी से क्यों लगाएँ?"
+    a: "गलत filter, जैसे गलत state या साल, चुपचाप सही जवाब को छिपा देता है। पक्का न हो तो filter के बिना search करो।"
+  - q: "Ingestion में खराब metadata वाले chunk का क्या होना चाहिए?"
+    a: "उसे quarantine करो और report करो, उसे गलत values के साथ index मत करो, वरना वो filtered searches से गायब हो जाएगा।"
+exercise:
+  title: "Metadata design करो"
+  setup: "भोपाल का एक राज्य सरकार का विभाग 2015 से जारी हुए 6,000 सरकारी orders और circulars पर एक assistant बना रहा है, Hindi और English दोनों में। कई orders पुराने orders में बदलाव करते हैं या उन्हें रद्द करते हैं। कुछ files सिर्फ़ internal use के लिए marked हैं। Officers ऐसे सवाल पूछते हैं: 'district officers के लिए अभी की TA rates' और 'transfers पर 2019 के order में क्या लिखा था?'"
+  questions:
+    - q: "यहाँ कौन-से metadata fields सबसे ज़्यादा मायने रखते हैं?"
+      a: "Order number, issue date, effective dates, amends या supersedes के links, subject, department, language, section और page, और access level।"
+    - q: "'अभी की TA rates' वाले सवाल को कैसे संभालोगे?"
+      a: "सिर्फ़ उन orders तक filter करो जो अभी लागू हैं और superseded वाले हटा दो, फिर सबसे ताज़ा order को उसके number और date के साथ cite करो।"
+    - q: "'2019 का order' वाले सवाल को कैसे संभालोगे?"
+      a: "यहाँ user history पूछ रहा है, इसलिए superseded orders भी शामिल करो और issue year 2019 से filter करो।"
+    - q: "Internal-only files का क्या होना चाहिए?"
+      a: "हर chunk के साथ एक access level store करो और search के अंदर ही officer की clearance से filter करो।"
+ask:
+  - "हर chunk के साथ कौन-सा metadata store करूँ?"
+  - "RAG में document versions कैसे संभालूँ?"
+  - "क्या हर chunk के लिए questions generate करने चाहिए?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Metadata** chunk के बारे में जानकारी है, उसके text के बारे में नहीं। RAG में ये पाँच काम करता है:
+
+- **Filters**: product, region, document type, language या date से searches को सीमित करना।
+- **Citations**: ठीक-ठीक बताना कि जवाब कहाँ से आया (document, section, page, link)।
+- **Freshness**: current versions को तरजीह देना या ज़रूरी करना, superseded वाले हटाना।
+- **Permissions**: तय करना कि chunk कौन देख सकता है।
+- **Better matching**: वो context जोड़ना जो chunk के text में नहीं है, जैसे document का title या section path।
+
+```flow
+Chunk का text | "ये limit 45 दिन है।" अकेले इसे ढूँढना मुश्किल है -> Metadata के साथ store | doc: Leave Policy 2026 (v4), section: Earned leave > Carry forward, page 4, state KA, access: all-employees
+Metadata के साथ store -> Embed किया गया text | "Leave Policy 2026 > Earned leave > Carry forward: ये limit 45 दिन है।"
+Metadata के साथ store -> Query filter | user का state, superseded नहीं, access user के groups में
+```
+
+इस lesson में हम बेंगलुरु की एक IT company के HR assistant के साथ चलेंगे, जो पाँच states के employees को serve करता है।
+
+## ये काम कैसे करता है
+
+**Ingestion के समय जमा करो.** हर chunk के लिए कम से कम ये store करो:
+
+- document id, title, source system और link;
+- section path ("Leave Policy > Earned leave > Carry forward") और page;
+- document type (policy, circular, FAQ, contract);
+- dates: published, effective from, effective to, last modified;
+- language;
+- owner या department;
+- access groups।
+
+**Contextual text.** "ये limit 45 दिन है" जैसा chunk retrieve करना मुश्किल होता है। जो text embed होता है, उसके आगे title और section path जोड़ दो ("Leave Policy v4 > Earned leave > Carry forward: ये limit 45 दिन है"), या model से हर chunk के लिए एक वाक्य का context लिखवा लो। इस तरह की contextual enrichment retrieval की failures काफ़ी हद तक घटा सकती है।
+
+**Generated metadata.** Model हर chunk में एक छोटा summary, keywords या वो सवाल जोड़ सकता है जिनका जवाब chunk देता है। Likely questions embed करने से तब मदद मिलती है जब users documents से बहुत अलग ढंग से बात कहते हैं। Ingestion में हर chunk पर एक model call लगती है, इसलिए पहले अपने golden set पर फ़ायदा नापो।
+
+**Query से filters.** कुछ filters user के context से आते हैं (उनका region, उनके access groups)। बाकी का अंदाज़ा एक छोटे model से सवाल देखकर लगाया जा सकता है ("2026 से Karnataka के leave rules" से region = KA और effective after 2026-01-01 बन जाता है)। अंदाज़ा सावधानी से लगाओ: गलत filter सही जवाब को छिपा देता है।
+
+**Freshness के rules.** Effective dates और "superseded by" link store करो। Superseded documents को default में filter कर दो, जब तक user history न पूछे।
+
+**Consistency.** Fixed vocabularies use करो (department names, document types, region codes), ताकि filters match करें। Metadata को किसी भी दूसरे data की तरह ingestion में validate करो।
+
+**असल में एक chunk record कैसा दिखता है:**
+
+| Field | Example | किस काम के लिए |
+| --- | --- | --- |
+| `doc_id`, `title`, `url` | `HR-LP-2026`, Leave Policy 2026 | Citations और links |
+| `section_path`, `page` | Earned leave, Carry forward; page 4 | Precise citations, contextual text |
+| `doc_type` | `policy` | Filters |
+| `state` | `KA` | User के profile से filters |
+| `effective_from`, `effective_to` | 2026-01-01, open | Freshness |
+| `superseded_by` | none | पुराने versions हटाना |
+| `language` | `en` | Filters, analysers चुनना |
+| `access_groups` | `all-employees` | Permissions |
+
+**Metadata को validate करना.** Metadata को किसी भी दूसरे data जैसा ही मानो। Ingestion में check करो कि ज़रूरी fields हैं, values fixed lists से आई हैं, और effective dates ठीक हैं, जैसे end date, start date के बाद हो। जो chunks fail हों उन्हें reject या quarantine करो, और हर run में counts report करो। "KA" की जगह "Karnatka" लिखा एक document हर Karnataka employee की search से चुपचाप गायब हो जाता है।
+
+**Metadata को code में validate करो.** Fixed vocabularies और date rules, किसी भी चीज़ को index करने से पहले check होते हैं:
+
+```python
+from datetime import date
+from typing import Literal
+from pydantic import BaseModel, field_validator, model_validator
+
+State = Literal["KA", "TN", "MH", "DL", "ALL"]
+DocType = Literal["policy", "circular", "faq", "contract"]
+
+class ChunkMeta(BaseModel):
+    doc_id: str
+    title: str
+    section_path: str
+    page: int
+    doc_type: DocType
+    state: State
+    language: Literal["en", "hi", "ta", "kn", "mr"]
+    effective_from: date
+    effective_to: date | None = None
+    superseded_by: str | None = None
+    access_groups: list[str]
+
+    @field_validator("access_groups")
+    @classmethod
+    def not_empty(cls, v):
+        if not v:
+            raise ValueError("every chunk needs at least one access group")
+        return v
+
+    @model_validator(mode="after")
+    def dates_in_order(self):
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValueError("effective_to is before effective_from")
+        return self
+```
+
+हर chunk को `ChunkMeta.model_validate` से गुज़ारो, जो pass हों उन्हें index करो, और failures को error के साथ एक quarantine table में लिख दो। अब "Karnatka" गायब होने की जगह ज़ोर से fail होता है।
+
+**सवाल से filters का अंदाज़ा, सुरक्षित तरीके से.** एक छोटे model से structured output में filters माँगो, एक confidence के साथ, और उन्हें तभी लगाओ जब सवाल में वो साफ़ लिखे हों:
+
+```python
+class Filters(BaseModel):
+    state: State | None = None
+    year_from: int | None = None
+    doc_type: DocType | None = None
+    explicit: bool        # true only if the user named these in the question
+
+def apply_filters(f: Filters, user_state):
+    filters = {"state": [user_state, "ALL"], "current": True}    # from the profile, always safe
+    if f.explicit:
+        if f.state:
+            filters["state"] = [f.state, "ALL"]
+        if f.year_from:
+            filters["effective_from_gte"] = date(f.year_from, 1, 1)
+        if f.doc_type:
+            filters["doc_type"] = f.doc_type
+    return filters
+```
+
+अगर filtered search से कुछ न मिले, तो inferred filters के बिना एक बार फिर try करो और logs में ये लिख दो।
+
+**किसी document को supersede करना.** जब नया version आए, पुराने को उसी transaction में mark करो:
+
+```sql
+BEGIN;
+UPDATE chunks SET superseded_by = 'HR-LP-2026', effective_to = '2025-12-31' WHERE doc_id = 'HR-LP-2025';
+INSERT INTO chunks (...) VALUES (...);   -- the new version's chunks
+COMMIT;
+```
+
+Default searches `superseded_by IS NULL` से filter करती हैं। History वाले सवाल ("2024 में rule क्या था?") उस filter को हटाकर dates use करते हैं।
+
+**फ़ायदा जाँचो.** अपने golden set पर हर metadata हिस्से (contextual text, generated questions, inferred filters) के साथ और उसके बिना recall at 5 नापो, और सिर्फ़ वही रखो जो मदद करे।
+
+## एक example से समझो
+
+बेंगलुरु की एक IT company का HR assistant पाँच states के employees को serve करता है। Leave और holiday के rules state के हिसाब से अलग हैं, और policies हर साल बदलती हैं।
+
+पहले: chunks में सिर्फ़ file name था। Assistant Karnataka और Maharashtra की holiday lists मिला देता था और कभी-कभी पिछले साल की policy quote कर देता था।
+
+Re-ingestion के बाद, हर chunk में state, policy type, effective dates, version, section path और access groups हैं। Employee का state उनके sign-on profile से आता है और filter की तरह लग जाता है, जब तक वो किसी दूसरे state के बारे में न पूछें। Superseded versions default में बाहर रहते हैं। Embed होने वाला text title और section path से शुरू होता है।
+
+100 सवालों के golden set पर सही जवाब 71% से बढ़कर 90% हो गए। अब citations ऐसे दिखते हैं: "Leave Policy 2026, Karnataka, section 3.2, page 4", और HR staff उन्हें seconds में check कर सकता है।
+
+| 100 सवालों पर measure | पहले | बाद में |
+| --- | --- | --- |
+| सही जवाब | 71% | 90% |
+| गलत state का हवाला देने वाले जवाब | 9 | 0 |
+| पिछले साल की policy का हवाला देने वाले जवाब | 7 | 1 |
+| Citation का format | सिर्फ़ file name | Document, state, section, page |
+
+**Filter का फ़ैसला कैसे होता है.** जब बेंगलुरु का कोई employee पूछता है "October में कितनी holidays हैं?", तो assistant उनके sign-on profile से `state = KA` लगा देता है। जब वो पूछते हैं "Pune office में October की holidays", तो एक छोटा model अलग state पहचान लेता है, और assistant filter लगाने से पहले पूछता है "क्या आपका मतलब Maharashtra की holiday list से है?" पूछने में एक tap लगता है। गलत filter चुपचाप लग जाता तो गलत जवाब मिलता।
+
+## आम गलतियाँ
+
+- **सिर्फ़ file name रखना।** फिर आप filter नहीं कर सकते, ठीक से cite नहीं कर सकते और versions नहीं संभाल सकते।
+- **Metadata values को free text रखना।** "HR", "Human Resources" और "hr dept" filters तोड़ देते हैं। Fixed lists use करो।
+- **Effective dates न होना।** पुराने versions जीतते रहते हैं।
+- **Inferred filters में जल्दबाज़ी।** गलत अनुमान वाला filter सही जवाब छिपा देता है। User context को तरजीह दो और पक्का न हो तो पूछो।
+- **बिना नापे metadata generate करना।** Ingestion में इसका पैसा लगता है; पहले साबित करो कि ये मदद करता है।
+- **Metadata values को free text रखना।** Fixed lists use करो और उन्हें validate करो।
+- **Inferred filters बिना fallback के लगाना।** Results खाली हों तो उनके बिना दोबारा try करो।
+
+## जब कम metadata काफ़ी होता है
+
+- **छोटा, एक topic वाला collection**, जिसमें हर document का एक ही version हो।
+- **सबको सब कुछ देखने की इजाज़त है**, और कुछ भी पुराना नहीं पड़ता।
+- **एक prototype**, जो बस ये जाँच रहा है कि retrieval से कुछ मदद भी मिलती है या नहीं।
+
+जब कई document types, versions, regions या permission groups हों, तब rich metadata का फ़ायदा मिलता है।
+
+## Demo से production तक
+
+- **हर chunk का metadata ingestion में validate करो** और हर run में quarantine के counts report करो।
+- **Transactions में supersede करो**, और superseded documents को default में filter करो।
+- **हर search पर लगे filters log करो**, inferred वाले भी।
+- **Vocabularies की समीक्षा करो** (states, document types, departments), content owners के साथ।
+- **हर metadata feature की value नापो**, golden set पर।
+
+## Practice करो
+
+LlamaIndex का metadata extraction वाला page और Microsoft का security filter pattern पढ़ो।
+
+1. अपने RAG documents को दोबारा ingest करो, हर chunk पर title, section path, type, dates और language के साथ।
+2. Embed होने वाले text के आगे title और section path जोड़ो, और पहले और बाद का recall at 5 compare करो।
+3. किसी एक document के पुराने version पर "superseded" flag लगाओ और दिखाओ कि filtering उसे जवाबों से हटा देती है।
+4. जानबूझकर खराब metadata वाले पाँच chunks को ChunkMeta से गुज़ारो और पक्का करो कि हर एक साफ़ error के साथ quarantine में पहुँचता है।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 metadata filtering और chunks में context जोड़ना समझाता है।
+
+**आपका काम पूरा जब:** आप एक precise citation वाला जवाब दिखा सको, और एक ऐसा सवाल जहाँ metadata filter ने गलत जवाब ठीक किया।

@@ -1,0 +1,211 @@
+---
+id: agent-tool-design
+lang: hi
+title: "Agents के लिए tools डिज़ाइन करना"
+outcome: "ऐसे tools बनाना सीखो जिन्हें model सही तरह से use करे: कम और मक़सद वाले, साफ़ नाम और description वाले, कसे हुए parameters, काम के results और ऐसे errors जिन पर model कुछ कर सके।"
+answer: "अच्छे agent tools कम होते हैं, उनके नाम और description साफ़ होते हैं, parameters कसे हुए और typed होते हैं, results छोटे और काम के होते हैं, और error messages ऐसे होते हैं जिन पर model अगला कदम ले सके।"
+why_it_matters: "Agent उतना ही अच्छा होता है जितने उसके tools। Client pilots में ज़्यादातर agent failures की जड़ धुंधले tool नाम, आपस में टकराते tools या ऐसे results होते हैं जो model को data में डुबो देते हैं। Tool design सही करना सस्ता है और गलत करना बहुत महँगा।"
+flashcards:
+  - q: "Model को tool का क्या दिखता है?"
+    a: "सिर्फ़ उसका नाम, description और parameter schema। इन्हीं से उसे tool चुनना है, arguments भरने हैं और result पढ़ना है।"
+  - q: "अच्छे agent tools में कौन-सी पाँच बातें होती हैं?"
+    a: "कम tools, हर एक का एक साफ़ काम, ऐसे नाम और description जो बताएँ कब use करना है, कसे हुए parameter types, और छोटे actionable results और errors।"
+  - q: "Tools को API endpoint के हिसाब से नहीं, task के हिसाब से क्यों बनाएँ?"
+    a: "Model को बहुत सारी छोटी calls जोड़ने में दिक्कत होती है। एक task-shaped tool का मतलब है गलती के कम मौके।"
+  - q: "Parameters को कैसे constrain करते हैं?"
+    a: "तय विकल्पों के लिए enums, ids के लिए patterns, समझदार defaults और limits, ताकि model values गढ़ न सके।"
+  - q: "Tool result में क्या होना चाहिए?"
+    a: "सिर्फ़ वो कुछ fields जो task को चाहिए, पढ़ने लायक form में, अगले tool के लिए ids के साथ। बड़े results paginate करो और उस पर note लिखो।"
+  - q: "अच्छा tool error कैसा होता है?"
+    a: "वो बताता है कि क्या गलत हुआ और आगे क्या करना है, जैसे id का सही format क्या है और user से check करने को कहो।"
+  - q: "Read tools और write tools को अलग क्यों रखें?"
+    a: "ताकि refund और delete जैसे risky actions पर approval और अलग logging लग सके, और reads बिना रुकावट चलें।"
+  - q: "गलत tool चुने जाने की आम वजह क्या होती है?"
+    a: "आपस में टकराते tools या धुंधले descriptions।"
+  - q: "वो tools कैसे ढूँढें जो agent को चाहिए ही नहीं?"
+    a: "एक बार में एक tool हटाओ और अपना task set फिर चलाओ। अगर results नहीं गिरते, तो उस tool को हमेशा के लिए हटा दो।"
+  - q: "Tool descriptions की कीमत क्यों लगती है?"
+    a: "हर tool का नाम, description और schema हर call में भेजा जाता है। इससे tokens खर्च होते हैं और बाकी चीज़ों के लिए जगह कम बचती है।"
+exercise:
+  title: "Tool set को दोबारा डिज़ाइन करो"
+  setup: "चेन्नई के एक hospital के appointment assistant में ये tools हैं: get_patient, get_patient_v2, list_doctors, list_slots, list_departments, book (जो cancel=true देने पर cancel भी कर देता है), और run_query(sql)। Results 60 fields वाली पूरी database rows होते हैं। जब slot भर चुका हो, तो book 'Error 409' लौटाता है। Tests में model पाँच में से एक task में गलत tool चुनता है।"
+  questions:
+    - q: "कौन-से tools merge या हटाने चाहिए?"
+      a: "get_patient और get_patient_v2 को merge करो, doctors और slots की listing को मिलाकर एक find_slots tool बनाओ, और run_query हटा दो।"
+    - q: "book का booking और cancelling दोनों करना गलत क्यों है?"
+      a: "दो अलग actions एक ही tool में हैं, इसलिए approval और logging सिर्फ़ cancellations पर नहीं लग सकती। इसे book_slot और cancel_appointment में बाँट दो।"
+    - q: "Results कैसे बदलने चाहिए?"
+      a: "सिर्फ़ वो लौटाओ जो task को चाहिए, जैसे doctor, department, तारीख, समय और slot id। 60 raw fields नहीं।"
+    - q: "'Error 409' की जगह क्या होना चाहिए?"
+      a: "ऐसा message जैसे 'वो slot अभी-अभी भर गया। Dr Rao के अगले खाली slots 11:30 और 12:15 हैं; patient से पूछो कौन-सा ठीक रहेगा।'"
+ask:
+  - "AI agent के लिए अच्छा tool description कैसे लिखूँ?"
+  - "एक agent के पास कितने tools होने चाहिए?"
+  - "क्या मुझे अपने agent को SQL tool देना चाहिए?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+जब आप model को tools देते हो, तो उसे सिर्फ़ उनके नाम, descriptions और parameter schemas दिखते हैं। सिर्फ़ इन्हीं से उसे तय करना होता है कि कौन-सा tool सही है, कौन-से arguments देने हैं और result कैसे पढ़ना है। जो tool किसी इंसान developer के लिए बना हो, जैसे internal API के हर endpoint पर पतला wrapper, वो अक्सर model को confuse कर देता है।
+
+अच्छे agent tools में पाँच बातें होती हैं: वो **कम** होते हैं, हर एक का एक **साफ़ काम** होता है, नाम और description बताते हैं कि उन्हें **कब** use करना है, parameters **कसे हुए typed** होते हैं, और results और errors **छोटे और काम के** होते हैं।
+
+| | API-shaped: 14 tools | Task-shaped: 3 tools |
+|---|---|---|
+| Tools | get_booking, get_booking_v2, list_segments, get_pnr_status, get_fare_rules, get_passengers, create_refund_request, ... | get_trip(booking_ref) पढ़ने के लिए; get_cancellation_quote(ref) पढ़ने के लिए; cancel_trip(quote_id) काम करने के लिए, approval के साथ |
+| गलत tool चुना गया | 22% | 3% |
+| हर task में calls | 4.1 | 2.3 |
+
+```flow
+dir: LR
+title: Task-shaped tools
+get_trip(booking_ref) | पढ़ना -> get_cancellation_quote(ref) | पढ़ना
+get_cancellation_quote(ref) -> cancel_trip(quote_id) | काम करता है: approval चाहिए
+```
+
+इस lesson में हम गुड़गाँव की एक travel company के support agent के साथ चलेंगे, जिसके tools booking API के हर endpoint की नकल थे।
+
+## ये काम कैसे करता है
+
+**Tools task के हिसाब से चुनो, API के हिसाब से नहीं।** अगर agents हमेशा पहले customer देखते हैं और फिर उसके open orders, तो एक `get_customer_with_open_orders` tool उन दो calls से बेहतर है जिन्हें model को खुद जोड़ना पड़ता। कम और ऊँचे level के tools का मतलब है गलती के कम मौके।
+
+**Model के लिए नाम और description लिखो।** `search_policies` का description देखो: "Search current HR policies by keywords. Use for questions about leave, travel, reimbursements or conduct. Returns up to 5 passages with policy name and section." इससे model को पता चलता है कि कब call करना है और क्या वापस आएगा। ये भी लिखो कि tool क्या नहीं करता।
+
+**Parameters को constrain करो।** तय विकल्पों के लिए enums (`status: "open" | "closed"`), ids के लिए formats (`pattern: ^ORD-\d{8}$`), समझदार defaults और limits रखो। हर ढीला string model के लिए value गढ़ने का एक मौका है।
+
+**वो लौटाओ जो model को चाहिए।** 200 fields वाला raw JSON मत उड़ेलो। सिर्फ़ वो कुछ fields लौटाओ जो मायने रखते हैं, पढ़ने लायक form में, उन ids के साथ जो model अगले tool को दे सके। बड़े results को paginate या truncate करो और ये बता भी दो ("312 में से 10 दिख रहे हैं; search narrow करो")।
+
+**Errors को instructions की तरह लिखो।** "Error 400" से कुछ सीखने को नहीं मिलता। "No order found with id ORD-2026117. Order ids have 8 digits after ORD-; ask the user to check the id." से model संभल सकता है।
+
+**पढ़ने और करने को अलग रखो।** जो tools कुछ बदलते हैं (refund, send, delete), वो पढ़ने वाले tools से अलग होने चाहिए, ताकि आप उन पर approval माँग सको और उन्हें अलग से log कर सको।
+
+**Tool use को test करो।** 20 असली जैसे tasks लिखो और देखो कि model कौन-से tools किन arguments के साथ call करता है। गलत tool चुनने का मतलब अक्सर होता है कि tools आपस में टकरा रहे हैं या descriptions धुंधले हैं।
+
+**Tool description की checklist:**
+
+| हिस्सा | कमज़ोर | मज़बूत |
+| --- | --- | --- |
+| नाम | `get_data` | `get_trip` |
+| कब use करें | लिखा ही नहीं | "Use first for any question about one trip" |
+| क्या लौटाता है | लिखा ही नहीं | "Flights, passengers, status, whether it can be cancelled online" |
+| क्या नहीं करता | लिखा ही नहीं | "Does not cancel; use cancel_trip after a quote" |
+| Parameter | `id: string` | `booking_ref`, 6 characters के pattern के साथ |
+| Error | "Error 400" | "No trip for ABC12; references are 6 letters or digits" |
+
+**एक tool को दूसरे पर निर्भर बनाना।** `cancel_trip` में quote id माँगना एक छोटी design trick है जिसका असर बहुत बड़ा है। Model पहले quote निकाले बिना cancel कर ही नहीं सकता, इसलिए कुछ होने से पहले customer हमेशा refund amount और fees सुन लेता है, और approval screen पर quote दिखाया जा सकता है। यही idea वहाँ भी लगाओ जहाँ किसी action से पहले check होना चाहिए: जैसे payment जिसके लिए verified invoice id चाहिए, या email जिसके लिए ऐसा draft id चाहिए जो user देख चुका हो।
+
+**Tool set को test करना।** Names, descriptions या schemas में हर बदलाव के बाद वही 20 tasks फिर चलाओ और तीन numbers गिनो: गलत tool चुना गया, invalid arguments, और हर task में calls। शब्दों में छोटे बदलाव इन numbers को उम्मीद से ज़्यादा हिलाते हैं।
+
+**Code में एक अच्छा tool।** Arguments को Pydantic से define करो, उसी से schema बनाओ, और result को model के हिसाब से shape करो:
+
+```python
+from typing import Literal
+from pydantic import BaseModel, Field, ValidationError
+
+class SearchTrips(BaseModel):
+    """Find a customer's trips. Use when they ask about a booking but give no reference.
+    Returns at most 5 trips, newest first. Does not change or cancel anything."""
+    status: Literal["upcoming", "past", "cancelled"] = "upcoming"
+    city: str | None = Field(default=None, description="Destination city, e.g. Kochi")
+
+TOOL = {"name": "search_trips", "description": SearchTrips.__doc__.strip(),
+        "input_schema": SearchTrips.model_json_schema()}
+
+def search_trips(customer_id, raw_args, db):
+    try:
+        args = SearchTrips.model_validate(raw_args)
+    except ValidationError as err:
+        field = err.errors()[0]["loc"][0]
+        return f"Invalid {field}. Status must be upcoming, past or cancelled."
+    trips = db.find_trips(customer_id, args.status, args.city)       # customer_id from the session
+    if not trips:
+        where = f" to {args.city}" if args.city else ""
+        return f"No {args.status} trips{where}. Ask the customer for the booking reference."
+    lines = [f"{t.ref}: {t.city}, {t.date:%d %b %Y}, {t.status}" for t in trips[:5]]
+    more = f" (showing 5 of {len(trips)}; ask for a city or date to narrow)" if len(trips) > 5 else ""
+    return "\n".join(lines) + more
+```
+
+Description बताता है कि tool कब use करना है, क्या लौटाता है और क्या नहीं करता। Result कुछ पढ़ने लायक lines हैं, जिनमें अगले tool के लिए ज़रूरी ids हैं, raw database rows नहीं। हर failure path बताता है कि आगे क्या करना है।
+
+**वो tools ढूँढो जो अपनी जगह कमाते हैं।** ज़्यादा tools से ज़्यादा abilities मिलती हैं, पर गलत चुनने के मौके भी बढ़ते हैं, और हर description हर call में भेजा जाता है। दो आसान experiments:
+
+- **एक बार में एक हटाओ।** हर tool के बिना अपना task set चलाओ। अगर success नहीं गिरता, तो वो tool जा सकता है।
+- **Calls का plot बनाओ।** एक हफ़्ते के traces में हर tool की calls गिनो, और देखो कि आम तौर पर कौन-सा tool किसके बाद आता है। जो tool कभी call नहीं होता, उसका description खराब हो सकता है; जो दो tools लगभग हमेशा साथ-साथ call होते हैं, वो merge के उम्मीदवार हैं।
+
+```python
+from collections import Counter
+
+def tool_usage(runs):
+    """runs: list of lists of tool names, in order, one list per run."""
+    calls, pairs = Counter(), Counter()
+    for names in runs:
+        calls.update(names)
+        pairs.update(zip(names, names[1:]))
+    return calls.most_common(), pairs.most_common(5)
+```
+
+**Tools को API की तरह version करो।** किसी parameter का नाम बदलना या tool क्या लौटाता है ये बदलना, agent के behaviour को चुपचाप तोड़ सकता है। Tool definitions को prompt के पास code में रखो, बदलावों को साथ में review करो, और हर बदलाव पर tool-choice tests फिर चलाओ।
+
+**एक server, कई agents।** अगर कई apps को वही tools चाहिए, तो उन्हें Model Context Protocol (MCP) के ज़रिए एक बार expose करो, ताकि हर app उन्हें दोबारा न बनाए। Design के rules वही रहते हैं: narrow tools, साफ़ descriptions, मददगार errors, और permission checks tool के अंदर।
+
+## एक example से समझो
+
+गुड़गाँव की एक travel company के support agent में पहले 14 tools थे जो booking API की नकल थे: `get_booking`, `get_booking_v2`, `list_segments`, `get_pnr_status`, `get_fare_rules`, `create_refund_request` और भी। Tests में model 22% tasks में गलत tool चुनता था, और अक्सर `get_booking` और `get_booking_v2` दोनों call कर देता था, जिससे cost दुगनी हो जाती थी।
+
+आप support team के असली tasks के हिसाब से इसे दोबारा डिज़ाइन करते हो:
+
+```python
+{
+  "name": "get_trip",
+  "description": "Get a customer's trip by booking reference: flights, passengers, status, "
+                 "and whether it can be cancelled online. Use first for any question about one trip.",
+  "input_schema": {
+    "type": "object",
+    "properties": {"booking_ref": {"type": "string", "pattern": "^[A-Z0-9]{6}$"}},
+    "required": ["booking_ref"]
+  }
+}
+```
+
+बाकी tools बन जाते हैं `get_cancellation_quote` (सिर्फ़ पढ़ता है: refund amount और fees) और `cancel_trip` (काम करता है: quote id माँगता है, इसलिए model को cancel करने से पहले quote निकालना पड़ता है)। Results छोटे summaries हैं, raw API objects नहीं। अनजान reference पर ये लौटता है: "No trip found for ABC12. References are 6 letters or digits; ask the customer to read it from their e-ticket."
+
+गलत tool चुनना 3% पर आ गया, हर task में औसत tool calls 4.1 से घटकर 2.3 हो गईं, और अब `cancel_trip` को human approval step के पीछे रखा जा सकता है।
+
+## आम गलतियाँ
+
+- **हर API endpoint के लिए एक tool।** Model को बहुत सारे छोटे tools जोड़ने में दिक्कत होती है। Tasks के हिसाब से बनाओ।
+- **आपस में टकराते tools।** जब दो tools एक ही सवाल का जवाब दे सकते हैं, तो चुनाव सिक्का उछालने जैसा हो जाता है।
+- **Raw, बहुत बड़े results।** ये tokens बर्बाद करते हैं और ज़रूरी field छिपा देते हैं। वो लौटाओ जो task को चाहिए।
+- **चुप failures।** Error पर खाली list लौटाने से model अंदाज़े लगाता रहता है। बताओ कि क्या गलत हुआ और क्या करना है।
+- **Read और write मिलाना।** अगर एक tool दोनों करता है, तो आप सिर्फ़ risky actions पर approval नहीं लगा सकते।
+- **Tool results में raw API responses।** सैकड़ों fields tokens बर्बाद करते हैं और model को confuse करते हैं।
+- **Tool tests दोबारा चलाए बिना tool बदलना।** शब्दों में छोटे बदलाव से model का चुना हुआ tool बदल जाता है।
+
+## जब tool design कम मायने रखता है
+
+- **एक या दो tools** जिनके काम साफ़ अलग हैं: सीधा description और schema आम तौर पर काफ़ी होता है।
+- **Fixed workflows** जहाँ कौन-सा function चलेगा ये model नहीं, आपका code तय करता है।
+- **Prototypes** जो बस देख रहे हैं कि idea चलता भी है या नहीं: tools को चमकाना तब करो जब task साबित हो जाए।
+
+## Demo से production तक
+
+- **Tool-choice test set रखो** (task, expected tool, expected arguments) और हर बदलाव पर उसे चलाओ।
+- **Traces से हर tool का error rate और हर task की calls track करो।**
+- **हर tool के अंदर timeouts और result-size limits लगाओ।**
+- **Permissions tool के अंदर check करो**, session के user id से।
+- **Tool list की हर तिमाही review करो**: जो use नहीं होते उन्हें हटाओ, जो साथ-साथ चलते हैं उन्हें merge करो।
+
+## Practice करो
+
+Anthropic का agents के लिए tools लिखने वाला article और docs में tool-use overview पढ़ो।
+
+1. एक छोटा domain चुनो (library, किसी clinic के appointments, किसी college के fee records) और एक assistant के लिए तीन से पाँच tools डिज़ाइन करो, पूरे schemas के साथ।
+2. 15 असली जैसे user tasks लिखो और उन्हें अपने tools वाले model पर चलाओ, हर call और argument को log करते हुए।
+3. सबसे आम गलती ठीक करने के लिए एक description बदलो या दो tools merge करो, और फिर चलाओ।
+4. अपने हर tool को बारी-बारी से हटाओ, 15 tasks फिर चलाओ, और जिस tool के हटने से कोई नुकसान न हो उसे छोड़ दो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 tool selection, tools हटाकर उनकी value test करने, और ये देखने के बारे में है कि कौन-से tools साथ में use होते हैं।
+
+**आपका काम पूरा जब:** आप अपना tool set दिखा सको, गलत tool calls का पहले और बाद का rate बता सको, और वो error message दिखा सको जिससे model संभल पाया।
