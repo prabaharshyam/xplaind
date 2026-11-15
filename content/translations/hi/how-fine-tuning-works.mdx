@@ -1,0 +1,174 @@
+---
+id: how-fine-tuning-works
+lang: hi
+title: "Fine-tuning कैसे काम करता है: data, training और क्या गलत हो सकता है"
+outcome: "समझा पाओगे कि fine-tuning model के अंदर क्या बदलता है, साफ़ training set कैसे तैयार करें, fine-tuned model को अच्छे prompt के सामने निष्पक्ष तरीके से कैसे परखें, और उसके मुख्य risks क्या हैं।"
+answer: "Fine-tuning में model को आपके examples पर और training दी जाती है, जिससे उसके weights आपके task की तरफ़ खिसकते हैं। ज़्यादातर काम data और testing का है, और model दूसरे tasks में बदतर हो सकता है।"
+why_it_matters: "Teams fine-tuning तक या तो बहुत जल्दी पहुँच जाती हैं या बहुत देर से। ये जानना कि ये कैसे काम करता है, इसे कैसा data चाहिए और ये कैसे fail होता है, आपको साफ़ हाँ या ना देने लायक बनाता है, जो interviewers और clients दोनों सुनना चाहते हैं।"
+flashcards:
+  - q: "Fine-tuning model में क्या बदलता है?"
+    a: "उसके weights। Model को आपके examples पर थोड़ी और training मिलती है, इसलिए उसका default behaviour आपके task की तरफ़ खिसकता है।"
+  - q: "आगे की training के तीन आम तरह कौन-से हैं?"
+    a: "Raw text पर continued pre-training, prompt और ideal-answer के pairs पर supervised fine-tuning (SFT), और ऐसे pairs पर preference tuning जहाँ एक answer दूसरे से बेहतर हो।"
+  - q: "SFT का एक example कैसा दिखता है?"
+    a: "एक prompt और वो exact answer जो आप चाहते हो, अक्सर एक छोटी chat की तरह लिखा हुआ: एक user message और एक assistant reply।"
+  - q: "Examples की quality उनकी गिनती से ज़्यादा क्यों मायने रखती है?"
+    a: "Model वही copy करता है जो देखता है, गलतियों और असंगति समेत। कुछ सौ बेहतरीन, consistent examples अक्सर हज़ारों लापरवाह examples से बेहतर होते हैं।"
+  - q: "ऐसा test set क्यों रखें जिस पर model कभी train नहीं होता?"
+    a: "असली performance नापने के लिए। अगर test examples training में लीक हो जाएँ, तो score शानदार दिखता है और उसका कोई मतलब नहीं होता।"
+  - q: "Catastrophic forgetting क्या है?"
+    a: "ऐसा model जो आपके task में बेहतर और उन चीज़ों में बदतर हो जाए जो वो पहले कर सकता था, जैसे दूसरे instructions follow करना या आम सवालों के जवाब देना।"
+  - q: "Fine-tuned model को किस baseline को हराना चाहिए?"
+    a: "उसी test set पर कुछ अच्छे examples वाला एक अच्छी तरह लिखा prompt। अगर वो साफ़ तौर पर नहीं जीतता, तो fine-tuning अपने रखरखाव के लायक नहीं।"
+  - q: "Training examples में personal data risky क्यों है?"
+    a: "Model उसे रट सकता है और दोहरा सकता है, और बाद में उसे हटाने का मतलब दोबारा training है। पहले personal data को mask या हटा दो।"
+exercise:
+  title: "क्या इस team को fine-tune करना चाहिए?"
+  setup: "Pune का एक insurer claim emails पाता है और हर एक को 12 categories में से एक में sort करवाना चाहता है। छह examples वाला एक prompt 300 labelled emails पर 78% score करता है। उनके पास agents के labelled किए 40,000 पुराने emails हैं, हालाँकि spot check में पता चलता है कि करीब 10 में से 1 label गलत है। Volume महीने में 200,000 emails है, और मौजूदा model की हर call की cost बहुत ज़्यादा है।"
+  questions:
+    - q: "Training से पहले labels का क्या करना चाहिए?"
+      a: "पहले उन्हें साफ़ करो। करीब 10% गलत labels model को वही गलतियाँ सिखाते हैं। एक sample दोबारा check करो, जिन rules पर agents असहमत थे उन्हें ठीक करो, और labelling guide लिख लो।"
+    - q: "Fine-tuned model को कैसे परखना चाहिए?"
+      a: "300 अनछुए emails पर, उस सबसे अच्छे prompt के सामने जो वो लिख सकें (अभी 78%, और उसे सुधारने की एक दोपहर के बाद शायद ज़्यादा)। Cost और speed भी देखो, क्योंकि goal एक सस्ता model है जो accurate बना रहे।"
+    - q: "Fine-tuned model 91% score करता है पर किसी customer के आम सवाल का अजीब reply देता है। ये क्या है?"
+      a: "Catastrophic forgetting। उसे बहुत संकरा train किया गया था। उसे सिर्फ़ classification के लिए रखो और दूसरे use अलग से test करो।"
+    - q: "एक साल बाद provider base model बंद कर देता है। उनके काम का क्या होगा?"
+      a: "उन्हें नए base model पर दोबारा train करना पड़ेगा। Data, labelling guide और test set को versioned रखो, ताकि ये रोज़ का काम हो, दोबारा से बनाना नहीं।"
+ask:
+  - "Model को fine-tune करने के लिए कितने examples चाहिए?"
+  - "SFT और RLHF में क्या फ़र्क है?"
+  - "क्या fine-tuning model को नए facts सिखा सकता है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Language model की शुरुआत एक **base model** के रूप में होती है, जिसे बहुत सारे text पर अगला token predict करने के लिए train किया जाता है। फिर कंपनियाँ उसे और train करती हैं ताकि वो instructions follow करे और एक मददगार assistant की तरह behave करे। **Fine-tuning** उसी का छोटा रूप है जो आप करते हो: एक मौजूदा model लेकर उसे अपने examples पर train करते रहना, ताकि उसके **weights** (model के अंदर के numbers) आपके task की तरफ़ खिसकें।
+
+आगे की training के तीन तरह आम हैं:
+
+- **Continued pre-training** model को किसी field का और raw text खिलाती है, जैसे legal या medical documents। ये महँगी है और application teams के लिए कम होती है।
+- **Supervised fine-tuning (SFT)** model को एक prompt और वो exact answer दिखाती है जो आप चाहते हो, हज़ारों बार। आमतौर पर यही चुना जाता है।
+- **Preference tuning** (RLHF, या DPO नाम का एक सरल method) model को एक prompt के दो answers दिखाती है और ये कि लोगों ने कौन-सा पसंद किया। ये tone और judgement को आकार देती है।
+
+इसीलिए एक chat model base model से अलग behave करता है: वो तीनों से गुज़रा है। ज़्यादातर application teams बस SFT करती हैं, और कभी-कभी preference tuning।
+
+Fine-tuning model को **कैसे जवाब देना है** सिखाने में सबसे अच्छा है: एक format, एक tone, एक सख़्त routine, एक संकरा classification। **Facts** सिखाने के लिए ये खराब तरीका है, क्योंकि facts बदलते हैं और model फिर भी उन्हें गलत याद रख सकता है। Facts के लिए retrieval use करो। Prompting, RAG या fine-tuning वाला lesson इनमें से चुनने में मदद करता है। ये lesson उसके बारे में है कि fine-tune करने का फ़ैसला होने के बाद क्या होता है।
+
+```flow
+title: Fine-tuning का loop
+Task और test तय करो | अच्छा क्या माना जाएगा?
+Task और test तय करो -> Examples इकट्ठा करो और साफ़ करो | पहले quality
+Examples इकट्ठा करो और साफ़ करो -> Train, validation और test में बाँटो | test बंद रहता है
+Train, validation और test में बाँटो -> कुछ passes train करो | validation loss देखो
+कुछ passes train करो -> Prompt baseline से बेहतर?
+Prompt baseline से बेहतर? -[नहीं]-> Data ठीक करो या रुक जाओ | अक्सर problem data में होती है
+Data ठीक करो या रुक जाओ -> Examples इकट्ठा करो और साफ़ करो
+Prompt baseline से बेहतर? -[हाँ]-> पुरानी abilities check करो | forgetting
+पुरानी abilities check करो -> Deploy करो और monitor करो | चीज़ें बदलें तो दोबारा train करो
+```
+
+ये lesson Pune के एक insurer के साथ चलता है जो claim emails को 12 categories में sort करना चाहता है।
+
+## ये काम कैसे करता है
+
+1. **Training set से पहले test लिखो।** तय करो कि इस task के लिए "अच्छा" का मतलब क्या है, और सही answers के साथ असली examples का एक छोटा test set बनाओ। इसके बिना तुम बता नहीं सकते कि fine-tuning से फ़ायदा हुआ या नहीं।
+2. **Examples इकट्ठा करो।** हर एक में एक input और ideal output होता है। जहाँ हो सके असली पुराना काम use करो, जिसे किसी इंसान ने check किया हो। कितने चाहिए ये task पर निर्भर है: कुछ सौ बेहतरीन examples एक format सिखा सकते हैं, और मुश्किल task को हज़ारों चाहिए हो सकते हैं।
+3. **उन्हें साफ़ करो।** Duplicates हटाओ, गलत labels ठीक करो, सारे examples में format एक जैसा करो, और personal data निकाल दो। Model वही copy करता है जो देखता है, गलतियाँ भी।
+4. **Data बाँटो।** ज़्यादातर **training** में जाता है। एक छोटा हिस्सा **validation** है, जो training के दौरान progress check करने के लिए use होता है। तीसरा हिस्सा **test set** है, जिसे आख़िर तक छूना नहीं है।
+5. **Train करो।** Model examples को कुछ बार पढ़ता है (हर पूरा pass एक epoch है) और उसके weights ideal answers को ज़्यादा likely बनाने के लिए खिसकते हैं। तुम **loss** देखते हो, एक number जो नापता है कि model कितना गलत है। Training loss गिरना चाहिए। अगर validation loss बढ़ने लगे जबकि training loss गिरता रहे, तो model examples को रट रहा है, यानी **overfitting**। वहीं रुक जाओ।
+6. **मज़बूत baseline के सामने test करो।** निष्पक्ष तुलना आलसी prompt वाले base model से नहीं है। वो एक अच्छी तरह लिखे prompt और कुछ अच्छे examples वाले base model से है। Fine-tuning को रखने लायक होने के लिए उसे साफ़ तौर पर हराना होगा।
+7. **देखो कि क्या भूल गया।** तुम्हारे task से बिल्कुल अलग prompts try करो। एक संकरा fine-tune model को आम instructions में बदतर बना सकता है, जिसे **catastrophic forgetting** कहते हैं।
+8. **Deploy करो और सारे हिस्से रखो।** Data, labelling guide, settings और test set को version करो, क्योंकि जब base model या तुम्हारे rules बदलेंगे तब तुम दोबारा train करोगे।
+
+SFT का एक example आमतौर पर JSON की एक line की तरह store होता है, एक छोटी chat की तरह लिखा हुआ:
+
+```json
+{"messages": [
+  {"role": "user", "content": "Classify this claim email.\n\nSubject: Hospital bill for my father\nBody: He was admitted on 3 March for 4 days at a Pune hospital. Please process the cashless request."},
+  {"role": "assistant", "content": "health_cashless"}
+]}
+```
+
+एक छोटी script data बाँटती है और test set को सुरक्षित रखती है:
+
+```python
+import json, random
+
+random.seed(7)                       # same split every time
+rows = [json.loads(line) for line in open("claims_clean.jsonl")]
+random.shuffle(rows)
+
+n = len(rows)
+test = rows[: int(n * 0.05)]         # locked away until the end
+valid = rows[int(n * 0.05): int(n * 0.15)]
+train = rows[int(n * 0.15):]
+
+for name, part in [("train", train), ("valid", valid), ("test", test)]:
+    with open(f"{name}.jsonl", "w") as f:
+        for r in part:
+            f.write(json.dumps(r) + "\n")
+print(len(train), len(valid), len(test))
+```
+
+यहाँ duplicates मायने रखते हैं। अगर वही email training और test दोनों में है, तो test score फूला हुआ दिखता है। Split करने से पहले exact और लगभग-एक-जैसे duplicates हटाओ।
+
+**Hosted या open weights?** कुछ providers तुम्हें अपने models API से fine-tune करने देते हैं और नतीजा तुम्हारे लिए host करते हैं, जो simple है पर तुम्हें उनसे बाँध देता है। Open-weight models में तुम model खुद train और serve करते हो, जो control देता है पर GPUs और skills माँगता है। Availability और prices बदलते रहते हैं, इसलिए provider की मौजूदा documentation देखो। अगला lesson बताता है कि बिना बहुत बड़े GPU के open models कैसे train करें।
+
+## एक example से समझो
+
+Pune का insurer महीने में 200,000 claim emails को 12 categories में sort करता है। एक बड़े model पर छह examples वाला prompt 300 labelled emails पर 78% score करता है, और इस volume के लिए हर call की cost बहुत ज़्यादा है।
+
+उनके पास agents के labelled किए 40,000 emails हैं। Training से पहले वो 400 का sample check करते हैं और पाते हैं कि करीब 10 में से 1 label गलत है, ज़्यादातर इसलिए कि दो agents ने "health reimbursement" और "health cashless" को अलग-अलग तरह से use किया था। वो एक पन्ने का labelling guide लिखते हैं, दो senior agents से उलझाने वाली categories दोबारा label करवाते हैं, और 3,000 duplicate emails हटाते हैं। वो नाम, phone numbers और policy numbers mask करते हैं, जो India के data protection law के तहत personal data हैं।
+
+वो 30,000 साफ़ किए examples पर एक छोटे open-weight model को fine-tune करते हैं, 2,000 validation के लिए रखते हैं और 300 मूल test emails को अनछुआ। Validation loss दूसरे pass के बाद सुधरना बंद हो जाता है, इसलिए वो वहीं रुक जाते हैं।
+
+| Option | 300 test emails पर accuracy | हर email की relative cost | Notes |
+| --- | --- | --- | --- |
+| बड़ा model, छह-example वाला prompt | 78% | 1x (baseline) | बदलना आसान, इस volume पर महँगा |
+| वही prompt, errors देखकर सुधारा हुआ | 84% | 1x | एक दोपहर का काम |
+| Fine-tuned छोटा model | 91% | करीब 0.1x | Data का रखरखाव और दोबारा training चाहिए |
+
+इस table के numbers सिर्फ़ समझाने के लिए हैं, ताकि दिखे कि तुलना कैसे करें। असली बात method है: fine-tune को *सुधरे हुए* prompt (84%) के सामने परखा जाता है, पहले वाले (78%) के सामने नहीं।
+
+Fine-tuned model इस संकरे task के लिए cost और accuracy दोनों में साफ़ जीतता है। पर जब किसी ने उसमें एक आम सवाल टाइप किया, तो जवाब अजीब था, यानी forgetting। चूँकि उसे सिर्फ़ classify करने के लिए use किया जाता है, इससे फ़र्क नहीं पड़ता। वो एक rule जोड़ते हैं कि वो कभी customers से बात नहीं करेगा।
+
+## आम गलतियाँ
+
+- **Test की जगह training set से शुरू करना।** Test के बिना तुम बता नहीं सकते कि कुछ सुधरा या नहीं।
+- **गंदे labels पर train करना।** Model गलतियाँ और असहमतियाँ सीख लेता है।
+- **कमज़ोर prompt से तुलना करना।** पहले prompt सुधारो, फिर देखो कि fine-tuning अब भी जीतता है या नहीं।
+- **Test examples को training में लीक होने देना।** Splits के बीच duplicates ऐसा score देते हैं जो शानदार दिखता है और जिसका कोई मतलब नहीं।
+- **Facts जोड़ने के लिए fine-tuning use करना।** Policies और prices बदलते हैं, और fine-tune को update करना धीमा है। Retrieval use करो।
+- **Forgetting को नज़रअंदाज़ करना।** Model को उन tasks पर test करो जिनके लिए उसे train नहीं किया, या उसके use की जगह सीमित करो।
+- **Training examples में personal data डालना।** Model उसे दोहरा सकता है, और इसका एकमात्र इलाज दोबारा training है।
+
+## कब fine-tuning गलत tool है
+
+- Problem जानकारी के गायब या बदलते रहने की है। Retrieval या tools use करो।
+- बेहतर prompt आज़माया नहीं गया। उसमें हफ़्ते नहीं, मिनट लगते हैं।
+- तुम्हारे पास test set नहीं है, या कुछ सौ अच्छे examples से कम हैं।
+- Task हर महीने बदलता है। तुम लगातार दोबारा train करते रहोगे।
+- तुम्हें दिखाना है कि answer कहाँ से आया। Fine-tuned model sources cite नहीं कर सकता, जबकि retrieval कर सकता है।
+- Volume कम है। रखरखाव की cost बचत से ज़्यादा होगी।
+
+## Demo से production तक
+
+- **हर चीज़ version करो।** Data, cleaning script, labelling guide, settings और test set को version control में रखो, और लिखो कि कौन-सा result किस model से आया।
+- **दोबारा training की planning करो।** Base models बंद होते हैं और बदले जाते हैं, और तुम्हारे rules बदलते हैं। अगर दोबारा training तकलीफ़देह है, तो project सड़ जाएगा।
+- **Launch के बाद देखते रहो।** हर हफ़्ते असली inputs और outputs का sample लो, और अपने test set से compare करो। अगर emails का तरह बदल जाए, तो accuracy चुपचाप गिरती है।
+- **एक fallback रखो।** अगर fine-tuned model down हो या confused हो, तो prompt-based version पर route करो।
+- **Data को document करो।** वो कहाँ से आया, किसने label किया, क्या हटाया गया। Clients और auditors पूछते हैं।
+
+## Practice करो
+
+पहले कागज़ पर exercise करो, फिर एक छोटा असली।
+
+1. अपने काम का कोई task चुनो। लिखो कि "अच्छा" का क्या मतलब है और सही answers के साथ दस test examples।
+2. तीन examples के साथ जितना अच्छा prompt लिख सको लिखो, और उसे उन दस पर score करो।
+3. लिखो कि तुम असल में कितने साफ़ किए examples इकट्ठा कर सकते हो, और उन्हें कौन check करेगा।
+4. फ़ैसला करो: fine-tune, prompt सुधारना, या retrieval। इसे सही ठहराने के लिए तीन लाइनें लिखो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 7 बताता है कि fine-tune कब करें और इसमें कौन-सी costs आती हैं।
+
+**आपका काम पूरा जब:** आप समझा सको कि test data अनदेखा क्यों रहना चाहिए, सबसे अच्छे prompt से तुलना क्यों करते हैं, और fine-tuning model को बदतर कैसे बना सकता है इसका एक तरीका बता सको।

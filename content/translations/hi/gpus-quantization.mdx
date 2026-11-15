@@ -1,0 +1,194 @@
+---
+id: gpus-quantization
+lang: hi
+title: "GPUs और quantization"
+outcome: "समझोगे कि GPU पर model को क्या सीमित करता है (weights और cache की memory, compute और bandwidth), GPU के types और गिनती कैसे चुनें, और model को fit करने और तेज़ चलाने के लिए quantization कैसे use करें।"
+answer: "GPU पर model को उसके weights और cache की memory सीमित करती है। Quantization weights को कम bits में रखता है, जैसे 8 या 4, ताकि model fit हो जाए और थोड़े नुकसान के साथ सस्ता चले।"
+why_it_matters: "Self-hosting के फ़ैसले असल में GPU के फ़ैसले हैं, और भारतीय cloud regions में GPUs महँगे और कम मिलते हैं। जो platform engineers deployment का size मोटे हिसाब से निकाल लेते हैं, वो clients के महीने के लाखों बचाते हैं और गलत hardware खरीदने से बचते हैं।"
+flashcards:
+  - q: "अपने GPU पर language model चलाने में क्या रुकावट बनता है?"
+    a: "Weights और KV cache के लिए GPU memory, और memory bandwidth, जो आमतौर पर generation की speed को सीमित करती है।"
+  - q: "Weights को कितनी memory चाहिए?"
+    a: "Parameters गुणा हर parameter के bytes: 16-bit पर करीब 2 bytes, 8-bit पर 1 और 4-bit पर 0.5, इसलिए 7B model को करीब 14, 7 या 4 GB चाहिए।"
+  - q: "KV cache क्या है?"
+    a: "हर active request के हर token की attention keys और values का saved रूप; ये context length और concurrency के साथ बढ़ता है।"
+  - q: "KV cache weights से ज़्यादा मायने क्यों रख सकता है?"
+    a: "बहुत सारी concurrent लंबी requests को weights से भी ज़्यादा memory चाहिए हो सकती है, जो तय करती है कि कितने users fit होंगे।"
+  - q: "Quantization क्या है?"
+    a: "Weights को, और कभी-कभी cache को, कम bits में रखना, जिससे memory घटती है और अक्सर speed बढ़ती है, थोड़ी quality की कीमत पर।"
+  - q: "Quantize करने के बाद evals दोबारा क्यों चलाएँ?"
+    a: "कुछ tasks, जैसे maths, code और भारतीय भाषाओं का text, averages से ज़्यादा quality खो सकते हैं।"
+  - q: "Tensor parallelism से model की copies कब बेहतर हैं?"
+    a: "जब model एक GPU पर fit हो जाए: अलग copies ज़्यादा simple होती हैं और आमतौर पर throughput बेहतर scale करती हैं।"
+  - q: "Throughput और latency के बीच trade-off क्या है?"
+    a: "बड़े batches overall ज़्यादा tokens per second देते हैं, पर हर user को जवाब देर से मिलता है।"
+  - q: "KV cache के अंदाज़े के numbers कहाँ मिलते हैं?"
+    a: "Model की config.json में: layers की संख्या, key-value heads की संख्या और head size (या hidden size को attention heads से भाग देकर)।"
+  - q: "bitsandbytes से 4-bit NF4 loading क्या देता है?"
+    a: "एक GPU पर model को उसकी 16-bit memory के करीब चौथाई में fit करने का तेज़ तरीका, experiments और LoRA training के लिए अच्छा, कुछ speed और quality की कीमत पर।"
+exercise:
+  title: "Deployment का size निकालो"
+  setup: "Pune का एक insurer claims summarisation के लिए एक 8B model self-host करना चाहता है। Peak load tests में 30 active requests दिखती हैं, हर एक में 4,000 tokens तक का context। उसके cloud region में 24 GB और 80 GB के GPUs मिलते हैं। 16-bit पर, model की configuration में KV cache को करीब 0.13 MB प्रति token चाहिए। एक 4-bit version team के eval पर 1 point कम score करता है; एक FP8 version 16-bit जितना ही score करता है पर उसे नए GPUs चाहिए।"
+  questions:
+    - q: "16-bit weights को कितनी memory चाहिए?"
+      a: "करीब 16 GB: 8 अरब parameters गुणा 2 bytes।"
+    - q: "Peak पर कितना KV cache चाहिए?"
+      a: "करीब 30 × 4,000 × 0.13 MB, यानी लगभग 15.6 GB।"
+    - q: "क्या 16-bit एक 24 GB card पर fit होगा?"
+      a: "नहीं: weights और cache मिलाकर करीब 32 GB हैं। एक 80 GB card पर fit होगा, या 4-bit weights करीब 4 से 5 GB के होकर 24 GB card पर fit हो जाएँगे।"
+    - q: "आप options में से कैसे चुनोगे?"
+      a: "Cost और eval compare करो: अगर 1 point का नुकसान चलेगा, तो 24 GB cards पर 4-bit सबसे सस्ता है; वरना बड़े cards पर 16-bit या FP8।"
+ask:
+  - "LLM चलाने के लिए कितनी GPU memory चाहिए?"
+  - "KV cache क्या है?"
+  - "क्या quantization से model की quality गिरती है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+अपने hardware पर language model चलाना ज़्यादातर **GPU memory** और **memory bandwidth** का सवाल है:
+
+- **Weights** को GPU memory में fit होना होता है। 16-bit precision पर हर parameter 2 bytes लेता है।
+- **KV cache** हर active request के हर token का attention data रखता है; ये context length और concurrency के साथ बढ़ता है।
+- **Generation की speed** आमतौर पर इससे सीमित होती है कि हर नए token के लिए weights memory से कितनी तेज़ी से पढ़े जा सकते हैं, सीधे compute से नहीं।
+
+**Quantization** weights को (और कभी-कभी cache को) कम bits में रखता है, जैसे 16 की जगह 8 या 4, जिससे memory घटती है और अक्सर speed बढ़ती है, थोड़ी quality की कीमत पर।
+
+| एक 48 GB GPU, एक 14B model | Weights | KV cache | Users served |
+|---|---|---|---|
+| 16-bit weights | 28 GB | 20 GB | करीब 25 |
+| 4-bit weights | 9 GB | 35 GB | करीब 45 |
+
+Weights की memory ≈ parameters × हर parameter के bytes। KV cache ≈ हर request के tokens × active requests × हर token का cache size।
+
+```flow
+dir: LR
+Weights को 4-bit में quantize करो -> Weights 28 GB से घटकर 9 GB -> KV cache के लिए ज़्यादा जगह -> 25 की जगह करीब 45 users
+```
+
+ये lesson Hyderabad की एक analytics firm के साथ चलता है जो self-hosted extraction model के लिए GPUs का size निकाल रही है।
+
+## ये काम कैसे करता है
+
+**Weights।** Memory ≈ parameters × हर parameter के bytes। 7B model: 16-bit पर करीब 14 GB, 8-bit पर 7 GB, 4-bit पर 3.5 से 4 GB। 70B model: 16-bit पर करीब 140 GB, यानी कई GPUs, या 4-bit पर करीब 35 से 40 GB।
+
+**KV cache।** Context के हर token के लिए, हर layer keys और values रखती है। मध्यम size के model में ये प्रति token दसियों से कुछ सौ kilobytes हो सकता है। इसे context length और concurrent requests से गुणा करो: 8,000 tokens की 32 requests को weights से भी ज़्यादा memory चाहिए हो सकती है। vLLM जैसे engines इस memory को कुशलता से संभालते हैं, पर जो memory है ही नहीं वो नहीं बना सकते। छोटे maximum contexts और quantized caches से ज़्यादा requests fit होती हैं।
+
+**GPU के choices।** Data-centre GPUs मुख्य रूप से memory size (24 GB से 80 GB और ज़्यादा), memory bandwidth और FP8 जैसे low-precision formats के support में अलग होते हैं। छोटे models अक्सर सस्ते 24 से 48 GB cards पर अच्छे चलते हैं; बड़े models को high-memory cards और उनके बीच तेज़ links चाहिए। किसी GPU के आसपास design करने से पहले देखो कि तुम्हारा cloud भारतीय regions में क्या देता है, और quotas क्या हैं।
+
+**Model को फैलाना।** Tensor parallelism हर layer को एक machine के GPUs में बाँट देता है; इसके लिए GPU-to-GPU तेज़ links चाहिए। छोटे model की कई copies, हर एक अपने GPU पर, ज़्यादा simple है और जब model एक card पर fit हो तो throughput बेहतर scale करती है।
+
+**Quantization के methods।** Weight-only methods (जैसे 4-bit पर GPTQ और AWQ) थोड़ी quality खोकर memory घटाते हैं; नए GPUs पर FP8 आधी memory में लगभग 16-bit जैसी quality देता है। अपने evals हमेशा दोबारा चलाओ: कुछ tasks (maths, code, भारतीय भाषाओं का text) averages से ज़्यादा खो सकते हैं।
+
+**Throughput बनाम latency।** बड़े batches overall ज़्यादा tokens per second देते हैं पर हर user को जवाब देर से मिलता है। अपने latency budget के हिसाब से batch size और concurrency tune करो।
+
+**Weights की memory एक नज़र में:**
+
+| Model size | 16-bit | 8-bit | 4-bit |
+| --- | --- | --- | --- |
+| 7B | करीब 14 GB | करीब 7 GB | करीब 4 GB |
+| 14B | करीब 28 GB | करीब 14 GB | करीब 8 से 9 GB |
+| 32B | करीब 64 GB | करीब 32 GB | करीब 18 से 20 GB |
+| 70B | करीब 140 GB | करीब 70 GB | करीब 35 से 40 GB |
+
+**KV cache का अंदाज़ा।** Model की configuration में उसके layers, key-value heads और head size लिखे होते हैं। प्रति token cache करीब 2 (keys और values) × layers × key-value heads × head size × हर value के bytes होता है। इसे अपने allowed context length से और peak active requests से गुणा करो, जो user numbers से अंदाज़ा लगाने की जगह load test में नापे गए हों। Engine के काम करने के लिए कुछ memory खाली रखो। GPUs खरीदने या reserve करने से पहले ये हिसाब करने से सबसे महँगी sizing गलतियाँ रुकती हैं।
+
+**Quantization चुनना।** अपने budget में fit होने वाली सबसे ऊँची precision से शुरू करो। GPUs support करें तो FP8 try करो, फिर 8-bit, फिर 4-bit weight-only methods। हर एक के लिए अपना eval और एक छोटा load test चलाओ, और peak पर quality, memory, tokens per second और latency record करो। वो सबसे सस्ता option चुनो जिसकी quality का नुकसान तुम्हारा client लिखित में मान ले।
+
+**Code में एक memory planner।** Model की configuration पढ़ो और अपने traffic के लिए weights और KV cache का अंदाज़ा लगाओ:
+
+```python
+import json
+
+def memory_gb(config_path, params_billion, weight_bits=16, kv_bits=16, context_tokens=4000, concurrent=20):
+    cfg = json.load(open(config_path))
+    layers = cfg["num_hidden_layers"]
+    kv_heads = cfg.get("num_key_value_heads", cfg["num_attention_heads"])
+    head_dim = cfg.get("head_dim") or cfg["hidden_size"] // cfg["num_attention_heads"]
+    weights = params_billion * 1e9 * weight_bits / 8
+    kv_per_token = 2 * layers * kv_heads * head_dim * kv_bits / 8
+    kv_total = kv_per_token * context_tokens * concurrent
+    return {"weights GB": round(weights / 1e9, 1),
+            "KV per token KB": round(kv_per_token / 1e3, 1),
+            "KV total GB": round(kv_total / 1e9, 1),
+            "total with 10% overhead GB": round((weights + kv_total) * 1.1 / 1e9, 1)}
+
+# memory_gb("config.json", params_billion=8, weight_bits=8)
+```
+
+Grouped-query attention वाले एक आम 8B model के लिए (32 layers, 8 key-value heads, head size 128) cache 16-bit पर करीब 131 KB प्रति token है, इसलिए 4,000 tokens की 20 requests को weights के ऊपर करीब 10 GB चाहिए।
+
+**Quantized model load करना।** Transformers में quick experiments के लिए 4-bit loading कुछ ही lines में हो जाती है:
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+
+bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
+                         bnb_4bit_compute_dtype=torch.bfloat16)
+model = AutoModelForCausalLM.from_pretrained("org/model-8b-instruct", quantization_config=bnb,
+                                             device_map="auto")
+print(round(model.get_memory_footprint() / 1e9, 1), "GB")
+```
+
+Serving के लिए, तेज़ quantized kernels वाला engine चुनो: vLLM AWQ या GPTQ से पहले से quantized checkpoints load कर सकता है, या जिन GPUs पर support हो वहाँ FP8 में quantize कर सकता है (`vllm serve org/model-8b-instruct --quantization fp8`)।
+
+**Cache को भी quantize करो।** Long-context workloads में KV cache weights से बड़ा हो सकता है। vLLM जैसे engines उसे 8-bit में रख सकते हैं, यानी उसकी memory लगभग आधी, अक्सर बहुत कम quality नुकसान के साथ। इसे भी weight quantization की तरह test करो।
+
+**अपने task पर quality का नुकसान नापो।** हर precision पर golden set चलाओ और सिर्फ़ overall नहीं, category के हिसाब से compare करो। Quantization अक्सर सबसे पहले लंबी reasoning, maths और कम आम भाषाओं को चोट पहुँचाता है, इसलिए भारतीय भाषाओं के cases अलग से देखो। Precision वहीं रखो जहाँ गिरावट मंज़ूर हो।
+
+**Speed सिर्फ़ memory नहीं है।** Generation अक्सर memory bandwidth से सीमित होता है: हर token weights एक बार पढ़ता है, इसलिए छोटे weights का मतलब तेज़ tokens हो सकता है। पर कुछ quantized formats पुराने GPUs पर, जहाँ मिलते-जुलते kernels नहीं हैं, धीमे चलते हैं। अपने असली hardware पर tokens per second और पहले token तक का time benchmark करो।
+
+## एक example से समझो
+
+Hyderabad की एक analytics firm 200 concurrent users के लिए, 6,000 tokens तक के prompts के साथ, एक extraction model self-host करना चाहती है।
+
+Candidate: एक 14B instruct model। 16-bit पर weights को करीब 28 GB चाहिए। 200 requests × 6,000 tokens के लिए KV cache का अंदाज़ा एक card से कहीं ज़्यादा है, पर load tests में असली concurrency औसतन 40 active requests है। 48 GB GPU पर 4-bit AWQ weights (करीब 9 GB) के साथ cache के लिए करीब 35 GB बचते हैं: इस model की configuration में उस context length पर करीब 40 से 50 active requests के लिए काफ़ी।
+
+Evals: 16-bit field accuracy में 95.1% लाता है; 4-bit 94.6%। मंज़ूर।
+
+Plan: तीन 48 GB GPUs, हर एक अपने 4-bit model की copy चलाता हुआ, एक load balancer के पीछे, नापे हुए peak के हिसाब से और एक GPU की extra गुंजाइश के साथ। इसकी cost मूल proposal की करीब एक तिहाई है, जिसमें tensor parallelism के साथ 16-bit model चलाते हुए दो 80 GB GPUs थे, और इस workload के लिए throughput बेहतर है।
+
+| Option | GPUs | Field accuracy | Relative cost |
+| --- | --- | --- | --- |
+| Tensor parallelism के साथ 16-bit | दो 80 GB | 95.1% | 3 |
+| 4-bit AWQ, तीन copies | तीन 48 GB | 94.6% | 1 |
+
+## आम गलतियाँ
+
+- **सिर्फ़ weights के हिसाब से size निकालना।** Concurrency KV cache तय करता है।
+- **बिना evals के quantize करना।** अपने tasks और भाषाओं पर नुकसान नापो।
+- **जो model एक GPU पर fit हो उसे बाँट देना।** Copies आमतौर पर tensor parallelism से बेहतर scale करती हैं।
+- **ये मान लेना कि कोई GPU type मिलेगा ही।** Regional availability और quotas जल्दी check करो।
+- **Maximum context ज़रूरत से बहुत ऊँचा।** ये cache की memory बर्बाद करता है; उसे उतना रखो जितना users सच में भेजते हैं।
+- **KV अंदाज़ों में grouped-query attention भूल जाना**; attention heads नहीं, key-value heads use करो।
+- **सिर्फ़ English tests पर quantization परखना** जबकि users भारतीय भाषाओं में लिखते हैं।
+- **ये मान लेना कि 4-bit हमेशा तेज़ है।** अपने GPU पर benchmark करो।
+
+## कब GPUs के बारे में सोचने की ज़रूरत नहीं
+
+- **Hosted API** या client की cloud model service use करना।
+- **CPUs पर छोटे models**, जैसे embeddings या classifiers जो GPU के बिना भी काफ़ी तेज़ चलते हैं।
+- **कम volume**, जहाँ घंटे के हिसाब से GPU किराए पर लेना API calls से महँगा पड़ता है।
+
+## Demo से production तक
+
+- **Memory की planning करो** weights, peak concurrency पर KV cache और overhead के लिए, extra गुंजाइश के साथ।
+- **Precision और quantization method** release file में record करो।
+- **हर precision बदलाव पर golden set चलाओ**, category और भाषा के हिसाब से।
+- **Speed benchmark करो** बड़े पैमाने पर खरीदने या किराए पर लेने से पहले असली GPUs पर।
+- **Production में GPU memory और utilisation** monitor करो।
+
+## Practice करो
+
+Hugging Face के quantization पर posts और vLLM PagedAttention post पढ़ो।
+
+1. 7B, 14B, 32B और 70B models के लिए 16, 8 और 4 bits पर weight memory निकालो।
+2. किसी एक open model की configuration (layers, heads, head size) से प्रति token KV cache size ढूँढो और 4,000 tokens की 20 requests की memory का अंदाज़ा लगाओ।
+3. अगर GPU मिल सके, तो एक छोटा model 16-bit और 4-bit पर serve करो, और memory use, speed और अपना eval score compare करो।
+4. दो open models की config files पर 16-bit और 4-bit weights के साथ memory_gb चलाओ और तय करो कि 4,000 tokens पर 10 users के लिए कौन-सा एक 24 GB GPU पर fit होता है।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 7 memory का हिसाब और quantization कवर करता है, और chapter 9 inference optimisation।
+
+**आपका काम पूरा जब:** आप किसी दिए गए model, context length और concurrency के लिए GPU deployment का size निकाल सको, और quantization के choice को evals से सही ठहरा सको।

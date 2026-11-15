@@ -1,0 +1,144 @@
+---
+id: design-url-shortener
+lang: hi
+title: "Design walkthrough: URL shortener"
+outcome: "URL shortener को शुरू से आख़िर तक design करना, requirements और estimates से लेकर short-code generation, storage, तेज़ redirects के लिए caching और click analytics तक, system design track की हर चीज़ use करते हुए।"
+answer: "URL shortener short codes को लंबे links से जोड़ता है। Unique codes बनाओ, उन्हें code से key करके store करो, तेज़ redirects के लिए hot codes को cache करो और clicks को background में गिनो।"
+why_it_matters: "URL shortener सबसे आम पहला system design interview सवाल है, क्योंकि ये छोटी-सी जगह में हर building block को छूता है। एक design को पूरा हल करने से वो लय सीखने को मिलती है जो आप किसी भी system में दोहराओगे।"
+flashcards:
+  - q: "URL shortener की मुख्य functional requirements क्या हैं?"
+    a: "लंबे URL के लिए short code बनाना, short code को उसके लंबे URL पर redirect करना, और वैकल्पिक रूप से clicks और expiry track करना।"
+  - q: "URL shortener read-heavy क्यों है?"
+    a: "हर link एक बार बनता है पर कई बार click होता है, अक्सर हर write पर 100 या ज़्यादा reads।"
+  - q: "7 base62 characters कितने codes की इजाज़त देते हैं?"
+    a: "62⁷, करीब 3.5 लाख करोड़, सालों तक की ज़रूरत से कहीं ज़्यादा।"
+  - q: "Short codes बनाने के दो तरीके क्या हैं?"
+    a: "एक unique counter ID को base62 में encode करना, या URL का hash बनाकर कुछ characters लेना, collisions को संभालते हुए।"
+  - q: "Redirects 301 हों या 302?"
+    a: "हर click गिनना हो तो 302, क्योंकि browsers 301 को cache कर सकते हैं और आपके server को छोड़ सकते हैं।"
+  - q: "Click counting को queue पर क्यों रखें?"
+    a: "ताकि redirects तेज़ रहें; click event background में record होता है और बाद में aggregate होता है।"
+  - q: "Links table के लिए स्वाभाविक shard key क्या है?"
+    a: "Short code, क्योंकि हर redirect ठीक एक code को ढूँढता है।"
+exercise:
+  title: "Size निकालो"
+  setup: "आपका shortener रोज़ 1 करोड़ नए links बनाएगा और अपनी ज़िंदगी में हर link पर औसतन 100 redirects serve करेगा, और हर link की row करीब 500 bytes की है। Links 5 साल रखे जाते हैं।"
+  questions:
+    - q: "औसतन हर second करीब कितने नए links?"
+      a: "1 करोड़ ÷ करीब 1 लाख seconds ≈ 115 प्रति second।"
+    - q: "औसतन हर second करीब कितने redirects, और ये क्या इशारा करता है?"
+      a: "Writes का 100 गुना: करीब 11,500 प्रति second। Reads हावी हैं, इसलिए database के आगे cache ज़रूरी है।"
+    - q: "5 साल के links के लिए कितना storage?"
+      a: "1 करोड़ × 365 × 5 ≈ 1,825 करोड़ links × 500 bytes ≈ 9 TB, indexes और replicas से पहले।"
+    - q: "क्या 5 साल के लिए 6 base62 characters काफ़ी हैं?"
+      a: "62⁶ करीब 5,700 करोड़ है, 1,825 करोड़ links के लिए काफ़ी, पर गुंजाइश कम; 7 characters बढ़त के लिए कहीं ज़्यादा जगह देते हैं।"
+ask:
+  - "Short codes बनाने के लिए URL को hash करूँ या counter use करूँ?"
+  - "URL shortener के spam में गलत use को कैसे रोकूँ?"
+  - "100 गुना traffic के लिए ये design कैसे बदलेगा?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**URL shortener**, जैसे bit.ly या banks और delivery apps के SMS में आने वाले short links, एक लंबे address को `xpl.in/aZ3k9Qb` जैसे छोटे में बदल देता है। Short link खोलने पर आप original page पर redirect हो जाते हो, और service आम तौर पर clicks गिनती है।
+
+ये सीधा लगता है, और इसीलिए interviewers को पसंद है: एक छोटी समस्या जो requirements, estimates, ID generation, database design, caching, sharding, background work और abuse prevention को छूती है। ये lesson इसे track के पहले lesson के पाँच steps के साथ हल करता है।
+
+```flow
+title: Create
+Client -[लंबा URL POST करो]-> API | नया ID 125, base62 से "aZ3k9Qb"
+API -> Links DB | code से sharded
+```
+
+```flow
+title: Redirect: hot path
+Client -[GET /aZ3k9Qb]-> Load balancer -> API
+API -> Redis cache
+Redis cache -[hit]-> 302 redirect
+Redis cache -[miss]-> Links DB -> 302 redirect
+API -[click event]-> Queue -> Analytics workers
+```
+
+## ये काम कैसे करता है
+
+**1. Requirements।** Functional: लंबे URL के लिए short code बनाना; code को उसके URL पर redirect करना; वैकल्पिक रूप से custom codes, expiry dates और click stats। Non-functional: redirects बहुत तेज़ होने चाहिए (100 ms से काफ़ी कम) और highly available, क्योंकि campaign SMS में टूटा हुआ short link बहुत दिखता है। Codes unique होने चाहिए और क्रम से अंदाज़ा लगाने में मुश्किल। Service को spam और phishing के गलत use का भी सामना करना होगा।
+
+**2. Estimates।** मान लो रोज़ 1 करोड़ नए links, करीब 115 writes प्रति second, और औसतन हर link पर 100 redirects, करीब 11,500 reads प्रति second, peaks कई गुना ज़्यादा। 5 साल में ये करीब 1,825 करोड़ links हैं; हर एक करीब 500 bytes का, तो करीब 9 TB। ये **read-heavy** system है, इसलिए redirect path सबसे ज़्यादा मायने रखता है।
+
+**3. Short codes।** दो मुख्य तरीके:
+
+| तरीका | कैसे काम करता है | फ़ायदे | नुकसान |
+|---|---|---|---|
+| Counter + base62 | हर link के लिए एक unique number, अंकों 0-9, a-z, A-Z में लिखा हुआ | कोई collisions नहीं, छोटे codes | क्रमिक codes का अंदाज़ा लग सकता है; distributed counter चाहिए |
+| URL का hash | जैसे hash के पहले 7 characters | एक ही URL को एक ही code | Collisions पकड़कर retry करने होंगे |
+| Random code | 7 random base62 characters | अंदाज़ा नहीं लगता | Insert पर collisions check करो |
+
+आम चुनाव है एक counter service जो हर app server को IDs की ranges देती है, ताकि servers को हर request पर आपस में coordinate न करना पड़े। Base62 encoding से पहले number को shuffle किया जाता है, ताकि codes साफ़ तौर पर क्रमिक न दिखें। सात base62 characters करीब 3.5 लाख करोड़ codes की इजाज़त देते हैं।
+
+**4. Storage, caching और scaling।** मुख्य table सरल है: `code` (primary key), `long_url`, `created_at`, `expires_at`, `owner_id`। हर redirect code से एक lookup है, जो key-value store या code को primary key वाली relational table के लिए ठीक है। जब एक database काफ़ी न हो, तो code से shard करो; तब हर request ठीक एक shard को छूती है।
+
+क्योंकि reads हावी हैं और links कम बदलते हैं, आगे Redis जैसा cache लगाओ: ज़्यादातर redirects database को छूते ही नहीं। Popular links cache में hot रहते हैं। Redirects के लिए, अगर आप हर click गिनना चाहते हो तो **302** लौटाओ; 301 को browsers cache कर सकते हैं, जो फिर आपके server को छोड़ देते हैं।
+
+**5. Analytics और abuse।** Clicks को synchronously गिनना redirects को धीमा कर देगा। इसकी जगह redirect handler एक छोटा click event queue में डालता है और तुरंत लौट आता है; workers हर link के clicks को घंटे के हिसाब से analytics store में aggregate करते हैं। Abuse के लिए, नए URLs को malware और phishing lists से check करो, हर user और IP के लिए link बनाने पर rate-limit लगाओ, और reports मिलने पर code को जल्दी disable कर सको।
+
+**अपने browser में आज़माओ।** Short codes बस base 62 में लिखे numbers हैं। कुछ ids आज़माओ।
+
+```python
+ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+def encode(n):
+    s = ""
+    while True:
+        n, r = divmod(n, 62)
+        s = ALPHABET[r] + s
+        if n == 0:
+            return s
+
+def decode(s):
+    n = 0
+    for ch in s:
+        n = n * 62 + ALPHABET.index(ch)
+    return n
+
+for i in (1, 61, 62, 125_000_000):
+    print(i, "->", encode(i), "->", decode(encode(i)))
+print("7 characters hold", f"{62 ** 7:,}", "codes")
+```
+
+## एक example से समझो
+
+Karthik से Bengaluru की एक product company के interview में ये सवाल पूछा जाता है। वो पहले चार मिनट requirements पर लगाता है। वो interviewer से confirm करता है: रोज़ 1 करोड़ links, redirects p95 पर 50 ms से कम, रोज़ के click counts काफ़ी हैं, और custom codes एक stretch goal हैं।
+
+वो estimates board पर लिखता है, फिर मुख्य बात कहता है: "ये हर write पर करीब सौ reads हैं, इसलिए design redirect path के चारों ओर बना है।"
+
+Codes के लिए, वो एक counter सुझाता है। एक छोटी ID service हर app server को एक बार में 10,000 IDs का block देती है, इसलिए servers को उससे कम ही बात करनी पड़ती है। ID को एक reversible shuffle से गुज़ारकर सात characters में base62 में encode किया जाता है, ताकि codes क्रमिक न दिखें। Interviewer पूछता है कि अगर ID service बंद हो जाए तो क्या होगा। वो बताता है कि servers के पास पहले से IDs के blocks हैं और वो कुछ समय तक links बनाते रह सकते हैं, और ID service खुद standby के साथ चलती है।
+
+Redirect path के लिए: load balancer, stateless API servers, code से key किया Redis cache जिसमें आम links के लिए एक दिन का TTL है, और code से sharded links database replicas के साथ। वो अंदाज़ा लगाता है कि 90% cache hit rate के साथ, database पर peak पर बस करीब 1,000 से 2,000 reads प्रति second आते हैं।
+
+Analytics के लिए, हर redirect `{code, time, country}` को एक queue में भेजता है। Workers इन्हें घंटे के counts में roll up करते हैं। वो trade-off बताता है: click counts एक मिनट पीछे हो सकते हैं, जो "रोज़ के काफ़ी हैं" वाली requirement से मेल खाता है।
+
+फिर आता है एक link जो cricket match के ad में viral हो जाता है। वो समझाता है कि वो उस Redis node के cache में बैठा रहेगा जिससे वो map होता है, और CDN या load balancer आगे के spikes सोख सकते हैं। वो failure cases और abuse controls पर बात ख़त्म करता है।
+
+बाद में feedback ये था कि उसने हर decision को किसी number या requirement से जोड़े रखा, और यही वो आदत है जो ये track बनाता है।
+
+## आम गलतियाँ
+
+**Read-to-write ratio को नज़रअंदाज़ करना।** Write path को बारीकी से design करना और redirects को बाद की बात मानना असली बात चूकना है। Hot path से शुरू करो।
+
+**आसानी से अंदाज़ा लगने वाले codes।** सीधे क्रमिक codes से कोई भी हर link पर चल सकता है, private वाले भी। IDs को shuffle करो या random codes use करो।
+
+**Collision handling नहीं।** Hash या random codes टकरा सकते हैं। Unique constraint लगाओ और नए code से retry करो।
+
+**Redirect path पर clicks गिनना।** हर click पर analytics database में लिखना redirects को धीमा करता है और उन्हें analytics से जोड़ देता है। Click events को queue करो।
+
+**Counts चाहिए तब 301 use करना।** Browsers permanent redirects को cache करते हैं और आपके server से पूछना बंद कर देते हैं।
+
+**Abuse को भूल जाना।** Shorteners spammers और phishers में popular हैं। Rate limits, URL scanning और जल्दी takedown, design का हिस्सा हैं।
+
+## Practice करो
+
+1. Watch & learn panel में video lessons देखो, जिसमें इसी सवाल का पूरा mock interview भी है।
+2. ऊपर वाला sizing exercise करो।
+3. Project check करो: cache और background click counting के साथ एक mini shortener बनाओ, और scaling note लिखो।
+4. किसी दोस्त के साथ इसी सवाल पर पाँच steps use करके 35 मिनट का mock interview करो, फिर roles बदल लो।

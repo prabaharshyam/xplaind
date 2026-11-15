@@ -1,0 +1,208 @@
+---
+id: agent-budgets-kill-switches
+lang: hi
+title: "Loop limits, budgets और kill switches"
+outcome: "Agent के steps, tokens, समय और खर्च पर हर task, user और दिन के हिसाब से सख़्त limits लगाओ, और ऐसा kill switch बनाओ जो agent या पूरे feature को तुरंत रोक दे।"
+answer: "हर agent के steps, tokens, समय और खर्च पर task, user और दिन के हिसाब से cap लगाओ, और ऐसा kill switch बनाओ जो agent या पूरे feature को तुरंत रोक दे।"
+why_it_matters: "Loop में फँसा agent एक रात में महीने भर का budget उड़ा सकता है या एक ही email पाँच सौ बार भेज सकता है। Limits और kill switch बनाना सस्ता है, और client की finance या risk team अक्सर सबसे पहले यही पूछती है।"
+flashcards:
+  - q: "Agents को loop limits क्यों चाहिए?"
+    a: "Agent fail होते tools, hand-offs या बेअंत सुधार के loop में फँस सकता है, जिससे tokens जलते हैं, systems पर बोझ पड़ता है और actions दोहराए जाते हैं।"
+  - q: "Step cap कैसे चुनते हैं?"
+    a: "असली runs से: अगर 95% tasks 12 steps में पूरे हो जाते हैं, तो cap लगभग 25 रखो।"
+  - q: "Agent limit पर पहुँचे तो क्या होना चाहिए?"
+    a: "साफ़-सुथरे ढंग से रुके: state save करे, user को बताए कि क्या हुआ और क्या बाकी है, और उसे जाँचने लायक failure की तरह log करे।"
+  - q: "Repetition check क्या है?"
+    a: "जब एक ही tool एक ही arguments के साथ, या एक ही error, लगातार कई बार आए, तो जल्दी रुक जाना।"
+  - q: "Budgets को shared store में क्यों रखें?"
+    a: "हर server की memory में रखी गिनती अलग-अलग चलती है, इसलिए असली कुल खर्च cap से कहीं ज़्यादा हो सकता है।"
+  - q: "Kill switch क्या है?"
+    a: "हर task या tool call से पहले check होने वाला flag, जिससे operator बिना deploy किए कोई tool, agent या पूरा feature बंद कर सके।"
+  - q: "Provider के spend limits की क्या भूमिका है?"
+    a: "आपके अपने caps के पीछे बचाव की आख़िरी लाइन, अकेला control नहीं।"
+  - q: "Actions के लिए idempotency keys क्यों use करें?"
+    a: "ताकि एक ही key वाला retry या loop में दोहराया गया action, जैसे refund, सिर्फ़ एक बार हो।"
+  - q: "User का रोज़ का budget कैसे गिनना चाहिए?"
+    a: "Shared store में atomic increment से, जैसे Asia/Kolkata समय के हिसाब से हर user और दिन के लिए एक database row या Redis key, और हर model call से पहले check।"
+  - q: "Kill switch को start-up पर नहीं, runtime में check क्यों करना चाहिए?"
+    a: "Servers कई दिन चल सकते हैं। सिर्फ़ start-up पर पढ़ा गया flag अगले restart तक कुछ नहीं करता, जो उसका मकसद ही खत्म कर देता है।"
+exercise:
+  title: "Limits तय करो"
+  setup: "Indore का एक logistics startup एक agent चलाता है जो delivery routes दोबारा plan करता है और drivers को messages भेजता है। आम tasks में 6 से 10 steps लगते हैं और लगभग ₹2 का model खर्च होता है। पिछले महीने एक नए इलाके के लिए map tool errors देने लगा, agent घंटों retry करता रहा, drivers को 400 duplicate messages भेजे और ₹60,000 खर्च कर दिए। उसे रोकने के लिए emergency deploy करना पड़ा। Budgets हर server की memory में गिने जाते हैं।"
+  questions:
+    - q: "Per-task कौन-सी limits लगाओगे?"
+      a: "लगभग 20 steps, tokens का cap और समय की limit, साथ में तीन एक जैसी tool errors के बाद task खत्म करना।"
+    - q: "Duplicate messages कैसे रोकोगे?"
+      a: "हर driver message को route और बदलाव के हिसाब से एक idempotency key दो, ताकि दोहराए गए messages सिर्फ़ एक बार जाएँ।"
+    - q: "Emergency deploy की जगह क्या होना चाहिए?"
+      a: "हर tool के लिए और पूरे agent के लिए एक kill switch, जो हर task से पहले check हो और admin screen से पलटा जा सके।"
+    - q: "Budgets कैसे गिनने चाहिए?"
+      a: "Shared database या cache में, रोज़ के feature cap के साथ, लगभग 80% पर alert, और backstop के तौर पर provider का spend limit।"
+ask:
+  - "AI agent को loop में फँसने से कैसे रोकूँ?"
+  - "AI feature के लिए spending limits कैसे तय करूँ?"
+  - "AI system में kill switch क्या होता है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Agent खुद तय करता है कि कितने steps लेने हैं। आम तौर पर ये उसकी ताकत है। कभी-कभी agent loop में फँस जाता है: कोई tool बार-बार fail होता है और वो बार-बार retry करता है, दो agents काम एक-दूसरे को लौटाते रहते हैं, या वो किसी draft को "सुधारता" ही रहता है। Limits के बिना loop tokens जलाता है, आगे के systems पर बोझ डालता है और actions दोहराता है।
+
+तीन controls इसे रोकते हैं:
+
+- **Loop limits**: हर task में steps या tool calls की अधिकतम गिनती।
+- **Budgets**: tokens, समय और पैसे पर cap, हर task, हर user और हर दिन के लिए, पूरे feature के लिए भी।
+- **Kill switches**: operator के लिए agent, tool या पूरे feature को बिना deploy किए रोकने का तेज़ और भरोसेमंद तरीका।
+
+```flow
+Every task | 15 steps तक, 60,000 tokens तक, 90 s तक -> Shared store | database या cache
+Every tool call | kill switch on? वही call 3 बार? रुको; idempotency key set -> Shared store
+Every day | user का खर्च ₹15 तक, feature ₹40,000 तक, ₹30,000 पर alert -> Shared store
+Shared store -> Provider spend limit | backstop
+```
+
+इस lesson में हम Bengaluru की एक edtech company के homework-help agent के साथ चलेंगे, जिसने एक रात में हफ़्ते भर के budget का दस गुना खर्च कर दिया।
+
+## ये काम कैसे करता है
+
+**Per-task limits।** Loop में steps और tool calls गिनो और असली runs से चुने cap पर रुक जाओ (अगर 95% tasks 12 steps में पूरे होते हैं, तो cap 25)। Tokens और बीता समय भी track करो। Limit पर पहुँचो तो साफ़ ढंग से रुको: state save करो, user को बताओ कि क्या हुआ और क्या बाकी है, और उसे जाँचने लायक failure की तरह log करो।
+
+**Repetition checks।** पकड़ो कि एक ही tool एक ही arguments के साथ लगातार कई बार call हुआ, या वही error बार-बार आई, और जल्दी रुक जाओ।
+
+**Per-user और रोज़ के budgets।** हर user का रोज़ का खर्च गिनो और cap के बाद शालीनता से मना करो। पूरे feature के लिए रोज़ का cap रखो, जिस पर, मान लो, 80% पर alert आए। इन्हें shared store (database या cache) में रखो, agent की memory में नहीं, ताकि ये सभी servers पर लागू रहें।
+
+**Provider-side limits।** ज़्यादातर model providers हर key या project पर spend limits या alerts लगाने देते हैं। इन्हें बचाव की आख़िरी लाइन की तरह use करो, अकेली नहीं।
+
+**Kill switches।** एक configuration flag जिसे आपका code हर task से पहले, और बेहतर हो तो हर tool call से पहले, check करे, कई levels के साथ: एक tool बंद करो (सारे refunds रोको), agent बंद करो (किसी इंसान की queue या simple form पर लौट जाओ), feature बंद करो। इसे admin screen या config service से बिना redeploy किए पलटो। इसे नियमित रूप से test करो, fire drill की तरह।
+
+**Actions के लिए idempotency।** हर action को एक unique key दो, ताकि एक ही key वाला retry या loop में दोहराया "send refund" सिर्फ़ एक बार हो।
+
+**Control की परतें:**
+
+| Layer | Example | किसे रोकता है |
+| --- | --- | --- |
+| Per task | 15 steps, 60,000 tokens, 90 seconds | एक बेकाबू task |
+| Repetition | 3 एक जैसी errors पर task खत्म | Retry loops |
+| Per user per day | ₹15 का model खर्च | एक user, या एक script, का budget खाली कर देना |
+| Feature per day | ₹40,000, ₹30,000 पर alert | कई users में फैली खराबी |
+| Kill switch | हर tool और हर agent के लिए toggle | कुछ भी, seconds में |
+| Provider limit | API project पर महीने का hard cap | बाकी सब fail हो जाए तब |
+
+**Kill-switch drill चलाना।** महीने में एक बार, पहले staging में और फिर किसी शांत घंटे में production में, हर switch पलटो और तीन चीज़ें check करो: tasks seconds में रुकते हैं, users को error की जगह साफ़ message दिखता है, और app का बाकी हिस्सा चलता रहता है। समय नापो, लिखो कि किसने किया, और वापस on कर दो। जो teams कभी practice नहीं करतीं, उन्हें असली incident में पता चलता है कि switch सिर्फ़ start-up पर check होता था, या on-call में किसी को पता ही नहीं था कि वो कहाँ है।
+
+**User को कौन-सा message दिखाएँ।** रुका हुआ task कभी crash जैसा नहीं दिखना चाहिए। आसान शब्दों में बताओ कि क्या हुआ और user इसके बदले क्या कर सकता है, जैसे "मैं ये वाला हल नहीं कर पाया; आपके teacher मदद कर सकते हैं", या "Homework help अभी आराम कर रहा है; कल फिर try करना।" हर stop को कारण के साथ log करो, ताकि team देख सके कि limits कहीं बहुत tight तो नहीं।
+
+**Code में एक budget।** हर user का रोज़ का खर्च atomic update से गिनो, ताकि दो servers एक ही user को cap के पार न जाने दें:
+
+```python
+import sqlite3
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+db = sqlite3.connect("budgets.db", isolation_level=None)
+db.execute("CREATE TABLE IF NOT EXISTS spend (user_id TEXT, day TEXT, paise INTEGER, PRIMARY KEY (user_id, day))")
+DAILY_CAP_PAISE = 1500                                   # ₹15 per user per day
+
+def today():
+    return datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
+
+def can_spend(user_id, estimate_paise):
+    row = db.execute("SELECT paise FROM spend WHERE user_id=? AND day=?", (user_id, today())).fetchone()
+    return (row[0] if row else 0) + estimate_paise <= DAILY_CAP_PAISE
+
+def record_spend(user_id, paise):
+    db.execute("""INSERT INTO spend (user_id, day, paise) VALUES (?, ?, ?)
+                  ON CONFLICT(user_id, day) DO UPDATE SET paise = paise + excluded.paise""",
+               (user_id, today(), paise))
+```
+
+हर model call से पहले estimate के साथ `can_spend` check करो और बाद में usage report से असली cost record करो। पैसे को पूरे paise में गिनो, floating-point rupees में नहीं। Postgres या Redis में यही pattern एक `INSERT ... ON CONFLICT` या expiry के साथ `INCRBY` होता है।
+
+**Code में एक kill switch।** Flags को shared store से छोटे cache के साथ पढ़ो, ताकि बदलाव हर जगह seconds में लागू हो:
+
+```python
+import json, time
+
+_cache = {"at": 0.0, "flags": {}}
+
+def flags():
+    if time.time() - _cache["at"] > 5:                   # refresh every 5 seconds
+        _cache["flags"] = json.loads(config_store.get("agent_flags") or "{}")
+        _cache["at"] = time.time()
+    return _cache["flags"]
+
+def allowed(agent, tool=None):
+    f = flags()
+    if f.get("all_agents_off") or f.get(f"{agent}_off"):
+        return False
+    return not (tool and f.get(f"tool_{tool}_off"))
+
+# In the loop, before every model call and every tool call:
+if not allowed("homework_helper", tool="send_email"):
+    stop_cleanly("Homework help is resting; try again tomorrow.")
+```
+
+`config_store` वो shared store है जो आपके पास पहले से है: database row, Redis, या कोई feature-flag service। अगर store तक पहुँचा न जाए, तो सुरक्षित तरीके से fail करो: write tools को बंद मानो।
+
+**Numbers चुनना।** Limits असली runs से तय करो, अंदाज़े से नहीं। एक हफ़्ते में हर task के steps, tokens और cost का distribution देखो: अगर 95% tasks 12 steps और ₹2 में पूरे होते हैं, तो 25 steps और ₹6 का cap बेकाबू runs को रोकता है और आम use को नुकसान नहीं पहुँचाता। Model या prompts बदलो तो numbers दोबारा देखो, क्योंकि दोनों से आम cost बदलती है।
+
+**दीवार से पहले alert।** Feature के पूरे budget पर, दिन के cap के 50% और 80% पर team को warning मिलनी चाहिए, alert में सबसे ज़्यादा खर्च करने वाले users और task types के साथ, ताकि cap सबको काट दे उससे पहले कोई कदम उठा सके।
+
+## एक worked example
+
+Bengaluru की एक edtech के homework-help agent ने एक महीना ठीक चला। फिर एक Sunday रात maths tool में बदलाव के बाद एक तरह के सवाल पर वो error देने लगा। Agent छोटे-छोटे फ़र्क के साथ retry करता रहा, और कुछ students "try again" दबाते रहे। Monday सुबह तक एक feature ₹1.8 lakh खर्च कर चुका था, यानी आम हफ़्ते का दस गुना।
+
+Fixes:
+
+- Per task: ज़्यादा से ज़्यादा 15 steps, 60,000 tokens और 90 seconds। लगातार तीन एक जैसी tool errors पर task "मैं ये वाला हल नहीं कर पाया; आपके teacher मदद कर सकते हैं" कहकर खत्म।
+- Per student: रोज़ ₹15 का model खर्च, और उसके बाद friendly "कल फिर आना" message।
+- Feature: रोज़ ₹40,000 का cap, ₹30,000 पर on-call engineer के phone पर alert।
+- Kill switch: हर tool और पूरे agent के लिए admin toggle, हर task से पहले check। Agent बंद करने पर "homework help आराम कर रहा है" का banner दिखता है और app का बाकी हिस्सा चलता रहता है।
+- Provider: API project पर महीने का hard spend limit, backstop के तौर पर।
+
+दो हफ़्ते बाद ऐसी ही एक tool खराबी को repetition check ने कुछ ही मिनटों में रोक दिया, खर्च ₹600 रहा, और किसी student के शिकायत करने से पहले alert ने team को बता दिया।
+
+| Incident | Cost | कैसे खत्म हुआ |
+| --- | --- | --- |
+| पहली tool खराबी, कोई limits नहीं | रात भर में ₹1.8 lakh | Monday सुबह पता चला |
+| दो हफ़्ते बाद वैसी ही खराबी | ₹600 | Repetition check ने मिनटों में रोका; alert on-call तक पहुँचा |
+
+## आम गलतियाँ
+
+- **Step cap नहीं।** सबसे सस्ती सुरक्षा; पहले यही जोड़ो।
+- **Memory में रखे budgets।** हर server अलग गिनता है और असली कुल cap से बहुत आगे निकल जाता है। Shared store use करो।
+- **ऐसा kill switch जिसके लिए deploy चाहिए।** Incident में seconds चाहिए, build pipeline नहीं।
+- **चुपचाप रुक जाना।** User को बताओ कि क्या हुआ और log करो; रुका हुआ task एक bug है जिसे ठीक करना है।
+- **Non-idempotent actions को retry करना।** Idempotency keys use करो ताकि loops payments या messages न दोहरा सकें।
+- **एक server की memory में budgets।** कई servers पर बँटे users को cap का कई गुना मिल जाता है।
+- **पैसे के लिए floating-point।** Paise को integers में गिनो।
+- **सिर्फ़ start-up पर पढ़ा जाने वाला kill switch।** वो अगले restart तक कुछ नहीं करता।
+- **Fail open होना।** अगर flag store बंद हो, तो जोखिम वाले tools को बंद मानो।
+
+## जब सरल limits काफ़ी हैं
+
+- **आपकी अपनी team का prototype**: step cap और provider का spend alert काफ़ी हो सकता है।
+- **Fixed workflows जिनमें एक-दो model calls हैं**, जहाँ हर request की cost का अंदाज़ा पहले से होता है।
+- **Read-only internal tools** जिनके कुछ ही users हैं।
+
+Per-user budgets, feature caps और परतों वाले kill switches तब मायने रखते हैं जब बाहर के लोग agent runs चला सकें या agents actions ले सकें।
+
+## Demo से production तक
+
+- **Budgets और flags को shared storage में रखो**, हर model और tool call से पहले check करो।
+- **रोज़ की limits के लिए Asia/Kolkata के दिन use करो**, ताकि वो तब reset हों जब आपके users उम्मीद करते हैं।
+- **Feature budgets पर 50% और 80% पर alert दो**, सबसे ज़्यादा खर्च करने वालों की list के साथ।
+- **हर महीने kill switches की drill करो** और लिखो कि हर एक में कितना समय लगा।
+- **हर stop को कारण के साथ log करो**, और देखो कि limits सही रखी हैं या नहीं।
+
+## Practice करो
+
+Unbounded consumption पर OWASP की entry पढ़ो।
+
+1. अपने बनाए किसी agent में step, token और time caps जोड़ो, साफ़ stop message के साथ।
+2. एक repetition check जोड़ो जो तीन एक जैसी tool errors के बाद task खत्म कर दे, और जानबूझकर तोड़े हुए tool से उसे trigger करो।
+3. एक छोटी database table में per-user रोज़ का budget और config file से पढ़ा जाने वाला kill switch जोड़ो, और दोनों को काम करते दिखाओ।
+4. अपने server की दो copies चलाओ, एक user के requests दोनों पर भेजो, और साबित करो कि shared budget फिर भी cap पर रुकता है।
+
+**आपका काम पूरा जब** आप जानबूझकर कोई tool तोड़कर दिखा सको कि agent आपकी limits के भीतर रुक जाता है, log entry और alert के साथ।

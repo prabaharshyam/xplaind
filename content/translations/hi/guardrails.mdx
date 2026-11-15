@@ -1,0 +1,228 @@
+---
+id: guardrails
+lang: hi
+title: "Guardrails"
+outcome: "Model के आसपास input और output checks लगाओगे: topic limits, personal data masking, format validation और policy checks, और हर एक के लिए rules या models में से चुनना।"
+answer: "Guardrails model के आसपास के checks हैं: input checks off-topic या unsafe requests को रोकते हैं और personal data mask करते हैं, और output checks user के देखने से पहले format और policy validate करते हैं।"
+why_it_matters: "Clients की legal और brand teams पूछती हैं कि assistant को medical सलाह देने, customer का अपमान करने या phone number leak करने से क्या रोकता है। Guardrails इसका ठोस जवाब हैं, और ये तय करते हैं कि pilot अपना risk review पास करता है या नहीं।"
+flashcards:
+  - q: "Guardrails क्या हैं?"
+    a: "Model से पहले और बाद में, और actions से पहले चलने वाले checks, जो system को उसके rules के अंदर रखते हैं और वो पकड़ते हैं जो prompts और training चूक जाते हैं।"
+  - q: "Input, output और action guardrails क्या हैं?"
+    a: "Input अंदर आने वाली चीज़ें check करता है, output model जो बनाता है उसे, और action checks tool call के असर में आने से पहले चलते हैं।"
+  - q: "तीन तरह के checks बताओ, सबसे सस्ता पहले।"
+    a: "Rules जैसे regular expressions और schema validation, छोटे classifiers, और model checks।"
+  - q: "Guardrail कौन-से actions ले सकता है?"
+    a: "विनम्र message के साथ block करना, mask करना, model से दोबारा try करवाकर rewrite करना, या किसी इंसान को route करना।"
+  - q: "Prompt में 'कभी medical सलाह मत दो' guardrail क्यों नहीं है?"
+    a: "वो एक request है जिसे model ignore कर सकता है। Control output को check करता है और rule टूटने पर कुछ करता है।"
+  - q: "Guardrails को कौन-सी दो error rates report करनी चाहिए?"
+    a: "जो block होना चाहिए उस पर catch rate, और जायज़ requests पर false-block rate।"
+  - q: "Guardrails को कई भाषाओं में test क्यों करें?"
+    a: "भारतीय users भाषाएँ मिलाते हैं, और English पर tune किए checks अक्सर Hindi, Tamil या Hinglish messages को चूक जाते हैं या गलती से block कर देते हैं।"
+  - q: "Guardrail की latency कम कैसे रखें?"
+    a: "सस्ते rule checks पहले चलाओ, जहाँ हो सके checks parallel चलाओ, और model checks तभी use करो जब rules फ़ैसला न कर सकें।"
+  - q: "कोई rule असली Aadhaar number को किसी भी 12 digits से कैसे अलग करे?"
+    a: "Aadhaar numbers का आख़िरी digit Verhoeff check digit होता है। उसे check करने से ज़्यादातर random 12-digit numbers, जैसे order ids, reject हो जाते हैं और गलत matches घटते हैं।"
+  - q: "Streaming के साथ output guardrails मुश्किल क्यों हैं?"
+    a: "Check करने के लिए पूरा reply बनने से पहले ही शब्द user तक पहुँच जाते हैं। Text आते-आते chunks में check करो, और सख़्त checks actions के लिए रखो, जो stream नहीं होते।"
+exercise:
+  title: "Guardrails चुनो"
+  setup: "Kochi के एक bank का assistant customers के accounts और loans के सवालों के जवाब देता है। Risk team के rules: किसी दूसरे customer का data कभी न बताओ; specific stocks पर investment सलाह कभी न दो; पूरा card number या PIN कभी न माँगो; सिर्फ़ banking सवालों के जवाब दो; और ₹10,000 से ऊपर के fund transfers के लिए one-time password चाहिए। Customers English और Malayalam में लिखते हैं।"
+  questions:
+    - q: "कौन-से rules एक सादा rule check लागू कर सकता है?"
+      a: "Card numbers और PINs को mask करना, replies में account numbers का signed-in customer से मेल खाना check करना, और transfers पर ₹10,000 वाला OTP rule।"
+    - q: "किसके लिए classifier या model check चाहिए?"
+      a: "Replies में stock-specific investment सलाह और off-topic सवाल पहचानना, जिन्हें rules भरोसे से नहीं परख सकते।"
+    - q: "Investment-advice check चालू होने पर क्या होना चाहिए?"
+      a: "ज़्यादा सख़्त instruction के साथ एक बार regenerate करो; फिर भी fail हो तो safe template भेजो और human advisor का option दो।"
+    - q: "आप guardrails को कैसे test करोगे?"
+      a: "English और Malayalam में एक red-team set, जिसमें ऐसे messages हों जो block होने चाहिए और मिलते-जुलते ऐसे जो पास होने चाहिए, और दोनों error rates report करो।"
+ask:
+  - "AI applications में guardrails क्या हैं?"
+  - "NeMo Guardrails use करूँ या अपने खुद के लिखूँ?"
+  - "Guardrails में false positives कैसे नापूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Guardrails** वो checks हैं जो model से पहले और बाद में चलते हैं, ताकि system अपने rules के अंदर रहे। ये अकेले किसी model को safe नहीं बनाते; ये एक layer हैं जो वो पकड़ती है जो prompts और model training चूक जाते हैं।
+
+- **Input guardrails** उस पर चलते हैं जो user (या कोई document, या कोई tool) भेजता है: off-topic requests, गाली-गलौज, prompt injection की कोशिशें, personal data जो model तक नहीं पहुँचना चाहिए।
+- **Output guardrails** उस पर चलते हैं जो model बनाता है: गलत format, मना किए गए topics, personal data, बिना आधार के दावे, tone।
+- **Action guardrails** tool call के असर में आने से पहले चलते हैं: amount limits, allowed recipients, ज़रूरी approvals।
+
+```flow
+User का text, documents, tool results -> Input: Aadhaar, PAN, phone mask करो -> Input: injection classifier -> Input: topic के अंदर है?
+Input: injection classifier -[flag हुआ]-> एक fixed message
+Input: topic के अंदर है? -> Model -> Output: medical advice या claim का वादा?
+Output: medical advice या claim का वादा? -[हाँ]-> एक बार regenerate, फिर safe template और इंसान
+Output: medical advice या claim का वादा? -[नहीं]-> Output: सिर्फ़ customer का अपना policy number
+Output: सिर्फ़ customer का अपना policy number -> Action: limits, allowed recipients, approvals -> Tool चलता है
+```
+
+हर trigger reason के साथ log होता है।
+
+ये lesson Chennai की एक health-insurance कंपनी के policy assistant के साथ चलता है।
+
+## ये काम कैसे करता है
+
+हर check एक rule, एक classifier या एक model का फ़ैसला होता है, सबसे सस्ते से सबसे flexible तक:
+
+- **Rules**: Aadhaar, PAN या phone numbers के लिए regular expressions; domains की allow-lists; JSON output की schema validation; maximum lengths। तेज़, predictable, test करने में आसान। जहाँ भी rule फ़ैसला कर सके वहाँ इन्हें use करो।
+- **Classifiers**: एक ही फ़ैसले के लिए train किए छोटे models, जैसे toxicity, prompt injection या topic। तेज़ और सस्ते, जाने-माने error rates के साथ।
+- **Model checks**: एक language model से पूछा जाता है "क्या ये reply specific medical dosage की सलाह देता है? yes या no में जवाब दो।" Flexible, धीमा, और खुद भी गलत हो सकता है।
+
+हर check के trigger होने पर एक **action** होता है: विनम्र message के साथ block, mask (phone number की जगह [PHONE] लिख देना), rewrite (model से बिना उस problem के दोबारा try करवाना), या किसी इंसान को route करना।
+
+सस्ते checks पहले चलाओ और जहाँ हो सके parallel में, ताकि guardrails latency कम जोड़ें। हर trigger reason के साथ log करो, क्योंकि guardrails false positives भी बनाते हैं, और जायज़ users का block होना भी एक cost है।
+
+**Testing।** एक red-team set बनाओ: ऐसी requests जो block होनी चाहिए (English, Hindi, Hinglish और Tamil में, अगर तुम्हारे users वो लिखते हैं) और मिलती-जुलती ऐसी जो पास होनी चाहिए। Catch rate और false-block rate दोनों नापो, और हर change पर दोबारा चलाओ।
+
+**सही check चुनना:**
+
+| लागू करने वाला rule | सबसे अच्छा check | क्यों |
+| --- | --- | --- |
+| Logs में Aadhaar या PAN नहीं | Regular expression, साथ में Aadhaar checksum | सटीक और तेज़ |
+| Output valid JSON होना चाहिए | Schema validation | सटीक |
+| कोई prompt injection नहीं | छोटा classifier | तेज़, जाना-माना error rate |
+| सिर्फ़ product सवाल | Examples के साथ model check | समझदारी चाहिए |
+| Medical treatment की सलाह नहीं | Model check | समझदारी चाहिए |
+| सिर्फ़ ₹5,000 से कम का refund | Tool के arguments पर rule | सटीक |
+
+**Blocked message डिज़ाइन करना।** Block product का हिस्सा है। बताओ कि assistant किस चीज़ में मदद कर सकता है, user की भाषा में, और अगला कदम दो, जैसे कोई human agent या सही page। "आपका message flag हुआ" बिना आगे का रास्ता बताए कभी मत कहो। Trigger और reason log करो, और हर हफ़्ते blocks का एक sample review करो, क्योंकि false blocks तब तक दिखते नहीं जब तक कोई देखे नहीं।
+
+**Code की तरह guardrails।** हर check को अपने छोटे function में, अपने tests के साथ रखो, और उसकी configuration, जैसे thresholds और word lists, version control में। तब changes किसी भी दूसरे code की तरह review और red-team set से गुज़रते हैं, और incident के समय तुम देख सकते हो कि हर check का कौन-सा version चल रहा था।
+
+**Code में एक guard pipeline।** पहले सस्ते rules, checks parallel में, आख़िर में एक फ़ैसला:
+
+```python
+import asyncio, re
+from dataclasses import dataclass
+
+@dataclass
+class Verdict:
+    action: str          # "allow", "mask", "block" or "human"
+    reason: str = ""
+    text: str = ""
+
+D = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],
+     [4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],
+     [8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]]
+P = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],
+     [9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]]
+
+def verhoeff_ok(digits):
+    c = 0
+    for i, ch in enumerate(reversed(digits)):
+        c = D[c][P[i % 8][int(ch)]]
+    return c == 0
+
+def mask_aadhaar(text):
+    def swap(m):
+        digits = re.sub(r"\D", "", m.group(0))
+        return "[AADHAAR]" if verhoeff_ok(digits) else m.group(0)
+    return re.sub(r"\b[2-9]\d{3}\s?\d{4}\s?\d{4}\b", swap, text)
+
+async def injection_score(text):      # a small classifier you host or call; returns 0 to 1
+    ...
+
+async def off_topic(text):            # a model check with examples; returns True or False
+    ...
+
+async def check_input(text):
+    text = mask_aadhaar(text)
+    score, wander = await asyncio.gather(injection_score(text), off_topic(text))
+    if score is not None and score > 0.9:
+        return Verdict("block", "likely prompt injection")
+    if wander:
+        return Verdict("block", "off topic", "I can help with orders, returns and delivery. What do you need?")
+    return Verdict("allow", text=text)
+```
+
+Rule सबसे पहले चलता है और उसकी कोई cost नहीं; classifier और model check एक साथ चलते हैं, इसलिए सबसे धीमा वाला delay तय करता है, उनका जोड़ नहीं।
+
+**Catch rate और false blocks दोनों साथ नापो।** एक red-team set जिस पर "should block" या "should pass" लिखा हो:
+
+```python
+def guard_report(cases, guard):
+    """cases: list of (text, should_block, language)."""
+    from collections import defaultdict
+    stats = defaultdict(lambda: {"caught": 0, "bad": 0, "false_block": 0, "good": 0})
+    for text, should_block, lang in cases:
+        blocked = guard(text).action in {"block", "human"}
+        s = stats[lang]
+        if should_block:
+            s["bad"] += 1; s["caught"] += blocked
+        else:
+            s["good"] += 1; s["false_block"] += blocked
+    for lang, s in stats.items():
+        print(f"{lang}: catch {s['caught']}/{s['bad']}, false blocks {s['false_block']}/{s['good']}")
+```
+
+भाषा के हिसाब से report करो: English पर tune किया guard अक्सर Hinglish के हमले चूक जाता है और Tamil text को ज़रूरत से ज़्यादा block करता है।
+
+**Streaming और output checks।** अगर तुम replies stream करते हो, तो output checks हर वाक्य पर या हर कुछ सौ characters आने पर चलाओ, और कोई fail हो तो एक छोटे message के साथ stream रोक दो। Actions (tool calls) के लिए streaming की कोई समस्या नहीं: कुछ भी चलाने से पहले पूरे arguments check करो।
+
+**Retries और fallbacks।** Quality की failures के लिए, जैसे खाली या बिगड़ा हुआ reply, एक retry अक्सर ठीक कर देती है। Safety की failures के लिए, उसी request को इस उम्मीद में दोबारा मत भेजो कि अलग answer आएगा; block करो या किसी इंसान को सौंपो।
+
+## एक example से समझो
+
+Chennai की एक health-insurance कंपनी customers के लिए policy assistant deploy करती है। Risk team की ज़रूरतें: कोई medical सलाह नहीं, दूसरे customers के data का खुलासा नहीं, claim approval का कोई वादा नहीं, और सिर्फ़ कंपनी के products के बारे में सवाल।
+
+आपके guardrails:
+
+1. **Input, rule**: text के model या logs तक पहुँचने से पहले Aadhaar, PAN और phone numbers mask करो।
+2. **Input, classifier**: user text और retrieved documents पर prompt-injection detector; flag हुए inputs का जवाब एक fixed message से दिया जाता है।
+3. **Input, model check**: क्या ये कंपनी के insurance products के बारे में है? अगर नहीं, तो reply: "मैं आपकी policy, claims और premiums के सवालों में मदद कर सकता हूँ।"
+4. **Output, model check**: क्या reply specific medical treatment की सलाह देता है या कहता है कि claim approve होगा? अगर हाँ, तो ज़्यादा सख़्त instruction के साथ एक बार regenerate करो; फिर भी fail हो तो safe template भेजो और human agent का option दो।
+5. **Output, rule**: reply में signed-in customer के अलावा कोई policy number नहीं है।
+
+300 messages के red-team set पर, system जो block होना चाहिए उसका 96% block करता है और जायज़ सवालों में से 2.5% गलती से block करता है, ज़्यादातर "maruthuvam" (medical treatment) के बारे में Tamil messages, जो असल में hospital cover के बारे में पूछ रहे थे। तुम topic check के prompt में Tamil examples जोड़ते हो और false-block rate 1% पर आ जाता है। Guardrails 95th percentile पर 220 milliseconds जोड़ते हैं, जिसे client मान लेता है।
+
+| 300 red-team messages पर नाप | पहला version | Tamil examples जोड़ने के बाद |
+| --- | --- | --- |
+| Block होने वाले messages जो पकड़े गए | 96% | 96% |
+| जायज़ messages जो गलती से block हुए | 2.5% | 1% |
+| जोड़ी गई latency, 95th percentile | 220 ms | 220 ms |
+
+## आम गलतियाँ
+
+- **Guardrails सिर्फ़ system prompt में।** Prompt में "कभी medical सलाह मत दो" एक request है, control नहीं। Outputs check करो।
+- **हर चीज़ के लिए model checks।** जहाँ rule फ़ैसला कर सके वहाँ rules use करो; वो तेज़ हैं और test हो सकते हैं।
+- **सिर्फ़ catches नापना।** False blocks असली users को परेशान करते हैं। दोनों track करो।
+- **सिर्फ़ English में testing।** भारतीय users भाषाएँ मिलाते हैं; तुम्हारा red-team set भी मिला-जुला होना चाहिए।
+- **चुपचाप block करना।** User को बताओ कि तुम किसमें मदद कर सकते हो, और log करो कि क्यों block किया।
+- **हर 12-digit number को Aadhaar मान लेना।** Check digit से गलत matches घटाओ।
+- **Safety block के बाद retry** करते रहना जब तक model कुछ ऐसा न दे जो पास हो जाए।
+- **हर check को क्रम से चलाना**, जिससे उनकी delays जुड़ जाती हैं।
+
+## कब कम guardrails भी चलेंगे
+
+- **भरोसेमंद staff के internal tools** non-sensitive data पर: schema checks और logging काफ़ी हो सकते हैं।
+- **कोई free-text input नहीं**, जैसे सिर्फ़ buttons और forms: उसकी जगह fields validate करो।
+- **Provider की built-in safety** पहले से आम harmful content कवर करती है, और तुम्हारा domain कोई खास risk नहीं जोड़ता।
+
+जैसे-जैसे stakes बढ़ें और जोड़ो: personal data, पैसा, health, बच्चे, public users या असली दुनिया में actions।
+
+## Demo से production तक
+
+- **हर check को tested code की तरह रखो**, उसकी configuration version control में।
+- **हर trigger log करो** check, version और reason के साथ, और हर हफ़्ते blocks का sample review करो।
+- **हर change पर भाषा के हिसाब से catch और false-block rates track करो।**
+- **Guardrail की latency का budget रखो** और checks parallel चलाओ।
+- **Blocked messages product team के साथ लिखो**, हर भाषा में जिसे तुम support करते हो।
+
+## Practice करो
+
+NeMo Guardrails का overview और LLM applications के लिए OWASP Top 10 पढ़ो।
+
+1. दस rules लिखो जिन्हें तुम्हारे assistant को मानना है, और हर एक के लिए तय करो कि उसे rule, classifier या model check में से कौन लागू करेगा।
+2. Rules से personal-data masking और एक model-based output check लागू करो।
+3. कम से कम दो भाषाओं में 40 messages का एक red-team set बनाओ (20 block होने चाहिए, 20 मिलते-जुलते पास होने चाहिए), और catch और false-block rates report करो।
+4. अपने 40 messages पर भाषा के हिसाब से बाँटकर guard_report चलाओ, और जिस भाषा का false-block rate सबसे खराब हो उसे पहले ठीक करो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 input और output guardrails, latency और streaming के साथ उनके trade-offs, और fallbacks कवर करता है।
+
+**आपका काम पूरा जब:** आप अपने guardrails की list, हर एक का action, और अपने red-team set पर दोनों error rates दिखा सको।

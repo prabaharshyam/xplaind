@@ -1,0 +1,184 @@
+---
+id: evals-test-sets
+lang: hi
+title: "Test sets और evals"
+outcome: "LLM app के लिए test set बनाओगे और हर change को उसी पर score करोगे।"
+answer: "Eval set असली inputs की एक fixed list है, जिसके साथ expected answers या grading rules होते हैं। LLM app में हर change के बाद इसे चलाओ, ताकि पता चले quality बढ़ी या घटी।"
+why_it_matters: "Evals के बिना हर prompt change बस एक अंदाज़ा है। जो teams अच्छे AI products ship करती हैं, वो पहले measure करती हैं। और \"आपने इसे evaluate कैसे किया?\" अब interview का आम सवाल है।"
+flashcards:
+  - q: "Evals क्या होते हैं?"
+    a: "ऐसे दोहराए जा सकने वाले tests जो AI app को एक fixed test set पर चलाकर हर output को score करते हैं, ताकि हर change को एक comparable number मिले।"
+  - q: "Test cases कहाँ से आने चाहिए?"
+    a: "असली inputs से, जैसे logs, tickets और documents। साथ में पहले से पता मुश्किल cases और हर पुराना failure।"
+  - q: "Test set में किन चार तरह के cases होने चाहिए?"
+    a: "आम cases, edge cases, ऐसे cases जिन्हें refuse या escalate करना चाहिए, और पुराने failures।"
+  - q: "हर case के लिए 'अच्छा' कैसे define कर सकते हैं?"
+    a: "एक exact expected value, ज़रूरी facts या citations, ऐसी बातें जो answer में नहीं होनी चाहिए, या एक rubric जिसे इंसान या model judge लगाए।"
+  - q: "सबसे सस्ता और भरोसेमंद scoring order क्या है?"
+    a: "पहले code checks, फिर open-ended quality के लिए calibrated model judges, फिर एक sample का human review।"
+  - q: "Scorers लिखने से पहले outputs क्यों पढ़ें?"
+    a: "सबसे काम के evals देखे गए failure patterns से बनते हैं, generic metrics से नहीं।"
+  - q: "Scores category के हिसाब से क्यों report करें?"
+    a: "कोई change average बढ़ा सकता है और फिर भी refusals या escalations जैसी ज़रूरी category तोड़ सकता है।"
+  - q: "100 cases कितना बड़ा फ़र्क भरोसे से पकड़ सकते हैं?"
+    a: "लगभग 10 points। मोटा नियम: जितना 3 गुना छोटा फ़र्क देखना हो, उतने करीब 10 गुना ज़्यादा cases चाहिए (30 points: करीब 10 cases; 3 points: करीब 1,000)।"
+  - q: "Eval को bootstrap करना क्या है?"
+    a: "अपने test cases को replacement के साथ बार-बार re-sample करके दोबारा score करना। अगर scores बहुत हिलें, तो set इतना छोटा है कि उस पर भरोसा नहीं किया जा सकता।"
+  - q: "Test set को काम का कैसे रखें?"
+    a: "नए failures जोड़ते रहो, जो cases अब सच्चाई नहीं दिखाते उन्हें हटाओ, और set पर इतना tune मत करो कि वो users जैसा रहे ही नहीं।"
+exercise:
+  title: "Eval बनाओ"
+  setup: "Lucknow के एक hospital का appointment assistant WhatsApp messages का जवाब Hindi और English में देता है। Team तीन-चार messages हाथ से try करके prompts बदल देती है। पिछले हफ़्ते एक change के बाद वो दवा की dosage की सलाह देने लगा, जो उसे कभी नहीं देनी चाहिए, और दो दिन तक किसी को पता नहीं चला।"
+  questions:
+    - q: "पहले test cases कहाँ से आने चाहिए?"
+      a: "दोनों भाषाओं के anonymised असली WhatsApp messages से, जिनमें bookings, cancellations, रास्ता पूछना और doctor की ज़रूरत वाले सवाल शामिल हों।"
+    - q: "आप कौन-से code checks जोड़ोगे?"
+      a: "Dosage या दवा की सलाह वाले patterns न हों, booking id हो तो सही हो, और medical सवालों पर escalation mark हो।"
+    - q: "Model judge को कैसे use करना चाहिए?"
+      a: "Politeness और completeness के लिए, और उस पर भरोसा करने से पहले करीब 30 replies पर उसके grades को दो staff members के grades से मिलाकर देखो।"
+    - q: "पिछले हफ़्ते की problem कौन-सी चीज़ पकड़ लेती?"
+      a: "Medical-advice cases की एक category, जो हमेशा escalate होनी चाहिए, हर change पर check होती, और results category के हिसाब से report होते।"
+ask:
+  - "अपने AI app के लिए evals लिखना कैसे शुरू करूँ?"
+  - "कितने test cases चाहिए?"
+  - "कैसे पता चले कि मेरा model judge भरोसेमंद है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Evals** किसी AI application के लिए दोहराए जा सकने वाले tests हैं। आप app को realistic inputs के एक fixed **test set** पर चलाते हो और हर output को score करते हो। इससे हर change (नया prompt, model या retrieval setting) को एक number मिलता है, जिसे पिछले number से compare कर सकते हो। Evals के बिना teams अंदाज़े से prompts बदलती हैं और बता नहीं पातीं कि चीज़ें बेहतर हुईं या बदतर।
+
+```flow
+Real inputs | logs, tickets -> Test set: 60 cases | routine 35, claims 10, complaints 8, must escalate 7
+Hard cases -> Test set: 60 cases
+Past failures -> Test set: 60 cases
+Test set: 60 cases -> App version N -> Outputs -> Scorers | code checks, then a model judge, then a human sample
+Scorers -> Results by version and category -> Ship only if no category gets worse
+```
+
+ये lesson Pune के एक insurance broker के policyholder email assistant के साथ चलता है, जहाँ team इस बात पर बहस कर रही थी कि कौन-सा prompt बेहतर है।
+
+## ये काम कैसे करता है
+
+**Test set असलियत से बनाओ।** जहाँ हो सके असली user inputs इकट्ठा करो (logs, support tickets, sample documents), और साथ में वो cases जो तुम्हें पता है मुश्किल हैं। शुरुआत में 30 से 100 का target रखो, जिनमें ये हों:
+
+- आम, रोज़ के cases;
+- edge cases (लंबे inputs, अजीब formats, मिली-जुली भाषाएँ);
+- ऐसे cases जिन्हें refuse या escalate करना चाहिए;
+- पुराने failures (हर bug एक test case बनता है)।
+
+**हर case के लिए तय करो कि अच्छा क्या है।** Task के हिसाब से:
+
+- एक exact expected value (category, निकाला हुआ field, number);
+- ज़रूरी facts या citations जो answer में होने चाहिए;
+- वो बातें जो answer को नहीं करनी चाहिए (refund का वादा करना, medical सलाह देना);
+- एक rubric जिसे इंसान या model judge लगाए (सही, पूरा, विनम्र)।
+
+**सबसे सस्ते भरोसेमंद तरीके से score करो।** पहले code checks: exact match, JSON validity, ज़रूरी keywords, length limits, सही citations। Open-ended quality के लिए model judges, जिनकी human grades से agreement check की गई हो। एक sample का human review, खासकर शुरू में।
+
+**Data देखो।** Scorers लिखने से पहले 50 से 100 असली outputs पढ़ो और note करो कि वो कैसे fail होते हैं। सबसे काम के evals देखे गए failure patterns से निकलते हैं, generic metrics से नहीं।
+
+**हर change पर चलाओ और compare करो।** Versions और scores की एक table रखो, case की category के हिसाब से। जो change average बढ़ाए पर refusals तोड़ दे, वो improvement नहीं है।
+
+**इसे ज़िंदा रखो।** जैसे-जैसे users को नई problems मिलें, नए cases जोड़ो; जो cases अब असलियत नहीं दिखाते उन्हें हटाओ; set पर इतना tune कभी मत करो कि वो users जैसा न रहे।
+
+**एक results table जो बहस ख़त्म कर दे:**
+
+| Version | Judge score | Escalations पकड़े | Policy number बचा रहा | Approval का वादा किया |
+| --- | --- | --- | --- | --- |
+| पुराना prompt | 71% | 7 में से 4 | 60 में से 58 | 0 |
+| नया prompt | 78% | 7 में से 3 | 60 में से 59 | 0 |
+| Escalation rules के साथ | 80% | 7 में से 7 | 60 में से 60 | 0 |
+
+**पहले outputs पढ़ो।** एक भी scorer लिखने से पहले app को 50 से 100 असली inputs पर चलाओ और हर output पढ़ो। हर खराब output के लिए एक छोटा note लिखो: "दूसरा सवाल ignore कर दिया", "policy की एक clause गढ़ दी", "complaint के लिए बहुत formal था"। Notes को group करो। सबसे बड़े groups तुम्हारे पहले evals बनते हैं, जहाँ हो सके code checks की तरह। इस step में अक्सर एक दोपहर लगती है और ये हफ़्तों तक गलत चीज़ें measure करने से बचा देता है।
+
+**इसे एक command बनाओ।** जिस eval को कोई चलाता नहीं, वो eval नहीं है। Test set को repository में रखो, एक script लिखो जो हर case चलाए और table print करे, और हर prompt, model या retrieval change पर उसे CI में चलाओ। हर run के results version के साथ save करो, ताकि किन्हीं भी दो runs को compare कर सको।
+
+**कितने cases।** तीस अच्छे से चुने cases ज़्यादातर बड़े regressions पकड़ लेते हैं; सौ cases category के हिसाब से stable numbers देते हैं। Size से ज़्यादा coverage मायने रखती है: users की परवाह वाली हर category, और ज़रूरी categories में, जैसे escalations में, इतने cases कि एक miss भी दिखे। सात escalation cases में एक miss का मतलब 14 points की गिरावट है, जिसे कोई ignore नहीं कर सकता। Product बढ़े तो set भी बढ़ाओ, और करीब दस cases का एक छोटा "smoke" set अलग रखो जो सेकंडों में चलता है, ताकि काम करते हुए quick checks हो सकें।
+
+**सिर्फ़ आख़िरी नतीजा नहीं, हर step evaluate करो।** अगर app किसी email से details निकालता है और फिर reply draft करता है, तो extraction को भी अलग से test करो। जब final score गिरे, तो per-step scores बताते हैं कि कौन-सा step टूटा।
+
+**एक बड़े set की जगह कई छोटे sets रखो।** जो set असली traffic जैसा दिखता है, वो बताता है कि app overall कैसा कर रहा है। उसके साथ जाने-माने मुश्किल cases का एक set, out-of-scope inputs का एक set जिन्हें app को मना करना चाहिए, और एक set जिसमें typos, मिली-जुली भाषाएँ और Romanised text हो जैसा असली users भेजते हैं। जिस चीज़ की तुम्हें परवाह है, उसका एक test set बनाओ।
+
+**क्या फ़र्क असली है?** 60 cases पर 4 points का gain सिर्फ़ noise हो सकता है। OpenAI का एक मोटा नियम है: करीब 95% पक्का होने के लिए कि एक version बेहतर है, 30 points का फ़र्क देखने के लिए लगभग 10 cases, 10 points के लिए 100, 3 points के लिए 1,000 और 1 point के लिए 10,000 cases चाहिए। जितना 3 गुना छोटा फ़र्क, उतने करीब 10 गुना ज़्यादा cases। इसलिए छोटे sets से बड़े regressions पकड़ो, और छोटे gains पर भरोसा करने से पहले बड़े sets use करो।
+
+**Stability check करने के लिए bootstrap करो।** अपने cases को replacement के साथ re-sample करो, हर re-sample को score करो, और देखो score कितना हिलता है। अगर एक re-sample 90% दे और दूसरा 70%, तो set इतना छोटा है कि versions को compare नहीं कर सकते।
+
+```python
+import json, random, statistics
+from collections import defaultdict
+
+def run_eval(cases, app, checks):
+    """cases: dicts with 'input', 'category' and expectations. checks: functions(case, output) -> bool."""
+    rows = []
+    for case in cases:
+        out = app(case["input"])
+        rows.append({"category": case["category"], "passed": all(check(case, out) for check in checks)})
+    return rows
+
+def report(rows, bootstraps=1000, seed=7):
+    by_cat = defaultdict(list)
+    for r in rows:
+        by_cat[r["category"]].append(r["passed"])
+    for cat, results in sorted(by_cat.items()):
+        print(f"{cat:<12} {sum(results)}/{len(results)}")
+    rng = random.Random(seed)
+    scores = [statistics.mean(rng.choice(rows)["passed"] for _ in rows) for _ in range(bootstraps)]
+    scores.sort()
+    print(f"overall {statistics.mean(r['passed'] for r in rows):.0%}, "
+          f"95% of re-samples between {scores[25]:.0%} and {scores[-26]:.0%}")
+
+# cases = [json.loads(line) for line in open("evals/cases.jsonl")]
+# report(run_eval(cases, my_app, [no_dosage_advice, keeps_policy_number, escalates_when_needed]))
+```
+
+अगर आख़िर में print हुई range चौड़ी है, तो छोटे फ़र्कों पर बहस करने से पहले और cases इकट्ठा करो।
+
+**ऐसे averages से सावधान रहो जो गुमराह करें।** Version A हर category में version B से बेहतर हो सकता है और फिर भी overall हार सकता है, अगर categories के size बहुत अलग हों। इसे Simpson's paradox कहते हैं। यही एक और वजह है कि scores सिर्फ़ total नहीं, category के हिसाब से पढ़ो।
+
+**Model judge को calibrate करना।** दो लोगों से एक ही rubric से 30 outputs grade करवाओ, फिर judge से grade करवाओ। मिलाकर देखो। अगर agreement कम है, तो rubric आमतौर पर साफ़ नहीं है: उसे pass और fail के examples के साथ दोबारा लिखो और फिर test करो। Judge का model या prompt बदलो तो agreement दोबारा check करो, और judge को temperature 0 पर चलाओ ताकि एक ही answer को एक ही grade मिले। LLM judges और open-ended answers को score करने वाले lessons इसमें और गहराई तक जाते हैं।
+
+## एक example से समझो
+
+Pune के एक insurance broker का assistant policyholders के emails के reply draft करता है। Team इस पर बहस कर रही है कि नया prompt बेहतर है या नहीं।
+
+वो एक eval बनाते हैं:
+
+- 60 असली emails (anonymised): 35 आम सवाल, 10 claims-status के सवाल, 8 complaints, 7 जिन्हें इंसान चाहिए (legal धमकियाँ, medical details)।
+- Code checks: email में policy number था तो reply में भी हो; कोई reply claim approval का वादा न करे; सातों escalation cases पर "needs human" mark हो।
+- एक model judge, rubric के साथ (policy की wording के हिसाब से सही, हर सवाल का जवाब दे, विनम्र), जिसे 30 replies पर दो staff members के grades से calibrate किया गया (85% agreement)।
+
+Results: पुराना prompt judge पर 71% लाता है और 7 में से 3 escalations miss करता है; नया prompt 78% लाता है पर 4 escalations miss करता है। दोनों में से कोई मंज़ूर नहीं। तीसरा version साफ़ escalation rules जोड़ता है: 80% और 7 में से 7 escalations पकड़े गए। Table ने बहस एक दोपहर में निपटा दी।
+
+**Broker ने क्या बनाए रखा।** अब team खराब reply की हर complaint को उसकी category के साथ नए case की तरह जोड़ती है। तीन महीने बाद set 60 से बढ़कर 140 cases का हो गया है, और prompts पर बहस table से निपट जाती है, आमतौर पर कुछ मिनटों में।
+
+## आम गलतियाँ
+
+- **Test set ही नहीं।** Changes को दो-चार examples देखकर परखा जाता है।
+- **सिर्फ़ गढ़े हुए test cases।** असली inputs use करो।
+- **सिर्फ़ averages देखना।** Categories देखो, खासकर safety cases।
+- **बिना check किए model judges।** उन्हें human grades से compare करो।
+- **जमा हुआ set।** हर नया failure जोड़ो।
+
+## कब छोटा eval काफ़ी है
+
+- **शुरुआती prototypes**: 20 से 30 cases जो तुम हाथ से पढ़ते हो, किसी भारी pipeline से बेहतर हैं।
+- **बड़े, साफ़ changes**, जैसे कोई नया model जो साफ़ तौर पर बेहतर या बदतर है, छोटे set पर भी दिख जाते हैं।
+- **Closed tasks**, जैसे classification, सिर्फ़ code से score हो सकते हैं, judge की ज़रूरत नहीं।
+
+## Demo से production तक
+
+- **एक command, CI में**: हर prompt, model, retrieval या code change पर eval चलाओ, और जब कोई ज़रूरी category बदतर हो तो release रोक दो।
+- **हर चीज़ results के साथ version करो**: test set, rubric, judge का prompt और model, app का prompt और settings, ताकि किन्हीं भी दो runs को compare कर सको।
+- **Eval को ही check करो**: क्या ऊँचे scores वही हैं जिन्हें users और reviewers बेहतर कहते हैं? अगर दो metrics हमेशा साथ-साथ चलें, तो एक छोड़ दो; अगर कभी न मिलें, तो जाँच करो।
+- **Cost का ध्यान रखो**: काम करते समय quick smoke set चलाओ, और release से पहले पूरा set।
+- **Production को वापस अंदर लाओ**: logs, complaints और online evals से मिले failures हर हफ़्ते नए cases बनते हैं।
+
+## Practice करो
+
+नीचे link किया हुआ Hamel Husain का "Your AI product needs evals" पढ़ो। और गहराई चाहिए तो Chip Huyen की *AI Engineering* (O'Reilly, 2025) के chapters 3 और 4 में evaluation methods, data slicing, sample sizes और evaluation pipeline को check करना बताया गया है।
+
+इस lesson का check एक project है: अपने किसी app के लिए एक eval script और कम से कम 30 cases का test set push करो, एक README के साथ जिसमें एक change से पहले और बाद का score हो और ये भी कि वो change क्या था।
+
+**आपका काम पूरा जब:** आप अपना eval एक command से चला सको और दिखा सको कि एक change ने scores को category के हिसाब से कैसे बदला।

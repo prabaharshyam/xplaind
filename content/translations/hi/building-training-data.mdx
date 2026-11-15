@@ -1,0 +1,189 @@
+---
+id: building-training-data
+lang: hi
+title: "Training dataset बनाना: quality, coverage और quantity"
+outcome: "Fine-tuning के लिए dataset plan करना, लिखना, check करना और उसका size तय करना: सही format, ऐसी labelling guide जिस पर सब एकमत हों, काफ़ी variety, और ऐसा test जो बताए कि और data से फ़ायदा होगा या नहीं।"
+answer: "अच्छा training set relevant, consistent, varied और सही format में होता है। 50 से 100 बढ़िया examples से शुरू करो, देखो कि वो help करते हैं या नहीं, और set तभी बढ़ाओ जब तक gains आते रहें।"
+why_it_matters: "Fine-tuning से निराशा मिले, तो वजह अक्सर data होता है, model या settings नहीं। जो teams साफ़ और अच्छी coverage वाला dataset बना लेती हैं, वो सैकड़ों examples में result पा लेती हैं, जबकि बाकी हज़ारों में भी fail हो जाती हैं।"
+flashcards:
+  - q: "Training set के तीन tests कौन-से हैं?"
+    a: "Quality (examples सही और consistent हैं या नहीं), coverage (वो users के लाए cases को cover करते हैं या नहीं) और quantity (काफ़ी हैं या नहीं)।"
+  - q: "SFT example कैसा दिखता है?"
+    a: "एक instruction या chat, और उसका आदर्श जवाब।"
+  - q: "Preference example कैसा दिखता है?"
+    a: "एक prompt, उसका बेहतर जवाब और एक बुरा जवाब। इसे DPO जैसे preference tuning में use करते हैं।"
+  - q: "High-quality example के छह signs बताओ।"
+    a: "Task से relevant, task की ज़रूरत के हिसाब से, बाकी examples के साथ consistent, सही format में, duplicate नहीं, और use करने की इजाज़त वाला।"
+  - q: "कितने examples से शुरू करना चाहिए?"
+    a: "करीब 50 से 100 बढ़िया examples। अगर वो साफ़ help करते हैं, तो और examples और help करेंगे; अगर बिल्कुल help नहीं करते, तो बड़ा set शायद ही कुछ ठीक करे।"
+  - q: "कैसे पता चले कि और data जमा करना सही रहेगा?"
+    a: "अपने set के 25%, 50% और 100% पर train करो और test score plot करो। Curve ऊपर जा रही है तो और जमा करो; सपाट है तो रुक जाओ।"
+  - q: "Labelling guide क्यों लिखते हैं?"
+    a: "ताकि अलग-अलग लोग एक ही case को एक तरह से label करें। Labellers का आपस में disagreement model को inconsistent होना सिखा देता है।"
+  - q: "Human experts का काम हूबहू copy करने में क्या risk है?"
+    a: "Experts वो steps छोड़ देते हैं जो उन्हें obvious लगते हैं, और उनकी आदतें model के लिए सही नहीं भी हो सकतीं। देखो वो कैसे काम करते हैं, और हर step लिखो।"
+exercise:
+  title: "Hyderabad के लिए rental agreement summariser"
+  setup: "Hyderabad का एक legal-tech startup एक fine-tuned model चाहता है जो residential rental agreements (English और Telugu में) पढ़े और एक fixed summary दे: rent, deposit, lock-in, notice period, escalation और unusual clauses। उनके पास 3,000 agreements हैं पर summaries नहीं, दो हफ़्ते के लिए दो lawyers हैं, और AI help के लिए budget है।"
+  questions:
+    - q: "Lawyers के 1,000 summaries लिखने से पहले उन्हें क्या करना चाहिए?"
+      a: "एक labelling guide लिखें जिसमें मुश्किल clauses के examples हों। दोनों lawyers वही 30 agreements summarise करें, compare करें, और guide तब तक ठीक करें जब तक ज़्यादातर बातों पर सहमत न हों।"
+    - q: "कौन-से agreements label करने हैं, ये कैसे चुनें?"
+      a: "वो variety cover करो जो users भेजेंगे: दोनों भाषाएँ, छोटे और लंबे, standard और unusual, scanned और typed। बस पहली 1,000 files मत उठा लो।"
+    - q: "Quality खोए बिना काम तेज़ कैसे हो?"
+      a: "एक strong model से हर summary fixed format में draft करवाओ, और lawyers उन drafts को ठीक करें। Check करना शुरू से लिखने से तेज़ है।"
+    - q: "600 examples के बाद कैसे पता चलेगा कि और data जमा करना चाहिए या नहीं?"
+      a: "150, 300 और 600 examples पर fine-tune करो और हर model को उसी अनछुए test set पर score करो। Scores अब भी बढ़ रहे हैं तो और जमा करो; सपाट हैं तो quality सुधारो।"
+ask:
+  - "LLM को fine-tune करने के लिए कितने examples चाहिए?"
+  - "Training example को high quality क्या बनाता है?"
+  - "Labelling guide कैसे लिखूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Data curation** का मतलब है उन examples को चुनना, लिखना, साफ़ करना और balance करना जिनसे model सीखता है। Fine-tuning में यही ज़्यादातर काम है: training run खुद शायद एक घंटे में हो जाए, पर data में हफ़्ते लगते हैं।
+
+Format इस पर depend करता है कि आप क्या सिखा रहे हो:
+
+- **Supervised fine-tuning (SFT):** एक instruction या chat, और उसका आदर्श जवाब।
+- **Preference tuning (DPO या RLHF):** एक prompt, एक बेहतर जवाब और एक बुरा जवाब।
+- **Continued pre-training:** आपके field का सादा text, जैसे legal judgements।
+- **Reward model या judge:** ऐसे जवाब जिनके साथ एक score या label हो।
+
+हर dataset को तीन चीज़ों पर परखा जाता है। खाना पकाने से समझो:
+
+- **Quality** ताज़ी सामग्री है: हर example सही और consistent है।
+- **Coverage** सही मिलावट है: examples उन cases को cover करते हैं जो users सच में लाते हैं।
+- **Quantity** मेज़ के लिए काफ़ी खाना है: task के लिए काफ़ी examples हैं।
+
+Curation में data हटाना भी आता है। अगर आपके model में कोई बुरी आदत है, जैसे हर जवाब में बिन माँगी सलाह जोड़ देना, तो वो आदत दिखाने वाले training examples ढूँढो, उन्हें निकालो, और वो behaviour दिखाने वाले examples जोड़ो जो आप चाहते हो।
+
+```flow
+title: Training dataset बनाना
+Task और output format तय करो -> Labelling guide लिखो | मुश्किल cases के साथ
+Labelling guide लिखो -> Pilot: दो लोग वही 30 label करें | compare करो
+Pilot: दो लोग वही 30 label करें -> काफ़ी सहमति है?
+काफ़ी सहमति है? -[नहीं]-> Guide ठीक करो
+Guide ठीक करो -> Pilot: दो लोग वही 30 label करें
+काफ़ी सहमति है? -[हाँ]-> Varied पहला set label करो | 50 से 100
+Varied पहला set label करो -> साफ़ करो: dedupe, format, personal data mask
+साफ़ करो: dedupe, format, personal data mask -> Fine-tune और test करो | अनछुआ test set
+Fine-tune और test करो -> और data से अब भी सुधार हो रहा है?
+और data से अब भी सुधार हो रहा है? -[हाँ]-> और label करो, वही guide
+और label करो, वही guide -> साफ़ करो: dedupe, format, personal data mask
+और data से अब भी सुधार हो रहा है? -[नहीं]-> Quantity नहीं, quality सुधारो
+```
+
+## ये काम कैसे करता है
+
+**Quality.** Example high quality तब है जब वो:
+
+1. जिस task के लिए train कर रहे हो, उससे **relevant** हो।
+2. **Task की ज़रूरत के हिसाब से हो।** Task को छोटे जवाब चाहिए तो examples छोटे हों; हर score के साथ वजह चाहिए तो examples में वजह हो।
+3. बाकी examples के साथ **consistent** हो। एक ही case को दो लोग label करें तो ज़्यादातर सहमत होने चाहिए।
+4. **सही format में** हो, ठीक वैसा जैसा model को produce करना है, बिना किसी फ़ालतू HTML या टूटे JSON के।
+5. **Unique** हो। Duplicates कुछ cases का वज़न ज़्यादा कर देते हैं और आपके test set में भी leak हो सकते हैं।
+6. **Use करने की इजाज़त वाला** हो: ऐसा कोई personal data नहीं जो आप use नहीं कर सकते, और ऐसा कोई content नहीं जिस पर train करने का आपको हक़ नहीं।
+
+Quality के volume से बेहतर होने के सबूत मज़बूत हैं। LIMA study ने एक बड़े model को सिर्फ़ 1,000 सोच-समझकर चुने examples पर fine-tune किया, और उसके जवाब को लोगों ने अक्सर एक top commercial model जितना अच्छा माना। Yi models बनाने वाली team ने पाया कि 10,000 ध्यान से लिखे examples, सैकड़ों हज़ार noisy examples से बेहतर निकले।
+
+**Labelling guide.** बड़े पैमाने पर label करवाने से पहले लिखो कि perfect output कैसा दिखता है, मुश्किल cases के examples के साथ और ये भी कि उन्हें कैसे handle करना है। फिर एक pilot चलाओ: दो लोग वही 30 items label करें, आप compare करो, और जहाँ वो असहमत थे वहाँ guide ठीक करो। तब तक दोहराओ जब तक सहमति ऊँची न हो जाए। Quality बढ़ाने का ये सबसे सस्ता step है।
+
+**Coverage.** Real users अलग-अलग तरह के होते हैं, इसलिए आपका data भी वैसा होना चाहिए। लिखो कि inputs किन तरीकों से अलग होते हैं, जैसे भाषा, लंबाई, topic, कठिनाई, format (typed या scanned), और single-turn या multi-turn, और पक्का करो कि mix में हर एक का हिस्सा हो। Meta ने Llama 3 के पिछले versions से बेहतर होने का ज़्यादातर श्रेय नए architecture को नहीं, बेहतर data quality और variety को दिया। फिर भी ज़्यादा variety अपने आप बेहतर नहीं होती: बेमतलब data जोड़ने से model आपके task पर और बुरा हो सकता है।
+
+**Quantity.** कोई fixed संख्या नहीं है। ये इन पर depend करता है:
+
+- **Task।** Reviews को positive और negative में बाँटने के लिए, financial filings पर सवालों के जवाब देने से बहुत कम examples चाहिए।
+- **Base model।** वो जितना पहले से करीब है, उतने कम examples चाहिए। Data कम हो तो strong model से शुरू करो।
+- **Method।** LoRA और दूसरे हल्के methods सैकड़ों से कुछ हज़ार examples में काम करते हैं; full fine-tuning को आम तौर पर दसियों हज़ार या ज़्यादा चाहिए।
+
+Practical तरीका: **50 से 100 बढ़िया examples** से शुरू करो। ज़्यादातर cases में उनसे साफ़ सुधार दिखता है। अगर वो साफ़ help करते हैं, तो और data और help करेगा। अगर कुछ नहीं होता, तो अपना prompt format और settings check करो; बड़ा set शायद ही एक फ़ेल हुए छोटे set को बचाए।
+
+फिर **learning curve** नापो: जो भी data है उसके 25%, 50% और 100% पर train करो, और हर एक को उसी test set पर score करो। Data जोड़ते जाने पर gains आम तौर पर घटते हैं। Curve अब भी तेज़ी से ऊपर जा रही है तो और जमा करो; सपाट है तो मेहनत quality पर लगाओ।
+
+ये छोटी script learning curve के लिए data बाँटती है और labellers की सहमति check करती है:
+
+```python
+import json, random
+
+def subsets(rows, fractions=(0.25, 0.5, 1.0), seed=7):
+    rows = rows[:]
+    random.Random(seed).shuffle(rows)       # same order every time, so subsets nest
+    return {f: rows[: int(len(rows) * f)] for f in fractions}
+
+def agreement(labels_a, labels_b):
+    """Share of items two labellers marked the same way."""
+    same = sum(a == b for a, b in zip(labels_a, labels_b))
+    return same / len(labels_a)
+
+train = [json.loads(line) for line in open("train.jsonl")]
+for f, part in subsets(train).items():
+    with open(f"train_{int(f * 100)}.jsonl", "w") as out:
+        out.writelines(json.dumps(r) + "\n" for r in part)
+
+print(agreement(["late_fee", "deposit", "lock_in"], ["late_fee", "deposit", "notice"]))  # 0.67
+```
+
+**तेज़ करने के तरीके।** लोगों को शुरू से लिखने से तेज़ है draft को check और ठीक करना, इसलिए कई teams एक strong model से हर जवाब draft करवाती हैं और experts उसे ठीक करते हैं। Bias से सावधान रहो: लोग fluent draft को बहुत आसानी से मान लेते हैं, इसलिए ठीक किए गए items का एक random sample खुद check करो।
+
+| Step | अच्छा कैसा दिखता है | आम failure |
+| --- | --- | --- |
+| Labelling guide | लिखे हुए rules और हल किए मुश्किल cases | "समझदारी से label कर दो" |
+| Pilot | दो लोग, वही 30 items, ऊँची सहमति | समय बचाने के लिए छोड़ दिया |
+| Coverage plan | Input types की list, target counts के साथ | जो files पहले मिलीं वही |
+| पहला set | 50 से 100 बढ़िया, varied examples | 5,000 बिना check किए examples |
+| Cleaning | Dedupe किया, एक format, personal data masked | Test items training में copy हो गए |
+| Learning curve | 25%, 50% और 100% पर scores | एक training run, कोई comparison नहीं |
+
+## एक example से समझो
+
+Hyderabad का एक legal-tech startup ऐसा model चाहता है जो residential rental agreements, English और Telugu में, पढ़े और एक fixed summary दे: rent, deposit, lock-in period, notice period, सालाना बढ़ोतरी और unusual clauses। उनके पास 3,000 agreements हैं, दो हफ़्ते के लिए दो lawyers हैं, और AI help के लिए पैसे हैं।
+
+1. **Guide और pilot।** Lawyers दो पन्ने की guide लिखते हैं। 30 agreements के pilot में वो 70% fields पर सहमत होते हैं, ज़्यादातर इस पर असहमत कि "unusual" क्या गिना जाए। वो guide में unusual clauses के बारह examples जोड़ते हैं; अगला pilot 92% तक पहुँचता है।
+2. **Coverage।** वो ऐसे agreements चुनते हैं जो users के upload से मेल खाएँ: 60% English और 40% Telugu, पाँचवाँ हिस्सा scanned, और standard व custom दोनों formats।
+3. **Drafts और review।** एक strong model हर summary को fixed format में draft करता है, और lawyers उन्हें ठीक करते हैं। हर lawyer 25 की जगह रोज़ करीब 80 कर लेता है।
+4. **Cleaning।** Duplicate templates हटाए जाते हैं, tenant और owner के नाम और Aadhaar numbers mask किए जाते हैं, और 120 agreements test set के तौर पर अलग रख दिए जाते हैं।
+5. **Learning curve।**
+
+| Training examples | 120 test agreements पर सही fields |
+| --- | --- |
+| 150 | 68% |
+| 300 | 76% |
+| 600 | 81% |
+
+ये numbers सिर्फ़ समझाने के लिए हैं। Curve अब भी ऊपर जा रही है, इसलिए 600 और जमा करना शायद सही रहेगा। Telugu का score English से 9 points पीछे है, इसलिए अगला batch Telugu agreements की तरफ़ झुका होगा।
+
+## आम गलतियाँ
+
+- **Guide लिखे बिना label करना।** लोग असहमत होते हैं, और model वही असहमति सीख लेता है।
+- **जो data आसानी से मिले वही ले लेना।** Coverage के gaps production में blind spots बन जाते हैं।
+- **मान लेना कि ज़्यादा हमेशा बेहतर है।** हज़ार noisy examples, सौ साफ़ examples से हार सकते हैं।
+- **Test items का training में leak होना।** Split से पहले duplicates हटाओ, और test set को अनछुआ रखो।
+- **Experts के workflow को आँख मूँदकर copy करना।** Experts वो steps छोड़ देते हैं जो उन्हें obvious लगते हैं। देखो वो कैसे काम करते हैं और हर step लिख लो।
+- **Multi-turn cases भूल जाना।** अगर users बातचीत करते हैं, तो बातचीत पर ही train करो, follow-ups और corrections समेत।
+
+## कब training dataset की ज़रूरत नहीं
+
+- **एक अच्छा prompt पहले से काम चला देता है।** पहले वो नापो।
+- **समस्या facts की कमी है।** Retrieval को update करना dataset से तेज़ है।
+- **Test करने का कोई तरीका नहीं है।** पहले test set बनाओ; वही बताता है कि training से कुछ फ़र्क पड़ा या नहीं।
+
+## Demo से production तक
+
+- **Data का version रखो**, guide और cleaning script के साथ, ताकि आप कोई भी model दोबारा बना सको।
+- **हर example कहाँ से आया, ये record करो**: इंसान ने लिखा, model ने draft किया, या असली use से लिया।
+- **Production से set बढ़ाओ।** Reviewers के corrections और users का feedback आपके सबसे अच्छे नए examples हैं।
+- **Product बदलने पर guide फिर check करो**, ताकि पुराने labels पुराने rules न सिखाएँ।
+- **Deletion का रास्ता रखो।** अगर कोई अपना data हटाने को कहे, तो आप उसे ढूँढकर हटा सको और दोबारा train कर सको।
+
+## Practice करो
+
+1. कोई task चुनो जो आपको आता हो। पाँच मुश्किल cases के साथ एक पन्ने की labelling guide लिखो।
+2. किसी दोस्त से कहो कि आपकी guide से 20 items label करे, और आप भी वही करो। सहमति नापो और guide ठीक करो।
+3. एक coverage plan लिखो: आपके inputs जिन पाँच तरीकों से अलग होते हैं, और हर एक के कितने examples आप पहले जमा करोगे।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 8 data curation, quality, coverage और quantity cover करता है।
+
+**आपका काम पूरा जब:** आप एक अच्छे example के छह signs बता सको, समझा सको कि labelling pilot पहले क्यों आता है, और learning curve से तय कर सको कि और data जमा करना चाहिए या नहीं।
