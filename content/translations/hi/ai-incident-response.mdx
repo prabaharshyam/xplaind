@@ -1,0 +1,199 @@
+---
+id: ai-incident-response
+lang: hi
+title: "AI के लिए incident response"
+outcome: "Production में AI failures को पकड़ना, रोकना, ठीक करना और उनसे सीखना, outages और cost spikes से लेकर हानिकारक या गलत outputs तक, roles, runbooks और blameless reviews के साथ।"
+answer: "AI incident response का मतलब है failure को जल्दी पकड़ना, उसे रोकना (अक्सर kill switch से), कारण ठीक करना, प्रभावित लोगों को बताना और एक blameless review लिखना।"
+why_it_matters: "AI systems नए तरीकों से fail होते हैं: model update से behaviour बदल जाता है, एक injection से assistant data leak कर देता है, कोई पुराना document बड़े पैमाने पर पूरे confidence से गलत जवाब देता है। जो teams जल्दी response देती हैं और खुलकर सीखती हैं, वो clients का भरोसा रखती हैं; जो improvise करती हैं, वो खो देती हैं।"
+flashcards:
+  - q: "AI systems किस नए तरह के incidents जोड़ते हैं?"
+    a: "Cost spikes, quality में अचानक गिरावट, हानिकारक या असुरक्षित outputs, prompt injection, data leakage, बिना अनुमति के actions और अनुचित patterns।"
+  - q: "Incident response के stages कौन-से हैं?"
+    a: "Detect, severity assess करना, contain, investigate, communicate और learn।"
+  - q: "Investigate करने से पहले contain क्यों करें?"
+    a: "पहले नुकसान रोकना है; कारण तब ढूँढा जा सकता है जब users पर असर खत्म हो जाए।"
+  - q: "AI systems के लिए चार containment actions बताओ।"
+    a: "Kill switch पलटना, पिछले release पर rollback, index से कोई document हटाना, इंसानों को route करना।"
+  - q: "Incident commander क्या करता है?"
+    a: "Response coordinate करता है और फ़ैसले लेता है, जबकि बाकी लोग ठीक करते हैं और बातचीत संभालते हैं।"
+  - q: "Severity levels पहले से क्यों तय करें?"
+    a: "वो तय करते हैं कि किसे जगाना है और कितनी जल्दी, ताकि incidents को एक जैसा और अनुपात में सही response मिले।"
+  - q: "Blameless review क्या है?"
+    a: "Timeline, impact, कारणों और actions की review जो system पर ध्यान देती है, ताकि लोग गलतियाँ खुलकर बताएँ।"
+  - q: "हर AI incident के बाद क्या होना चाहिए?"
+    a: "Incident शुरू करने वाले cases eval suite और monitoring में जुड़ें, और actions के owners और तारीखें तय हों।"
+  - q: "ये कैसे गिनें कि किसी खराब document से कौन प्रभावित हुआ?"
+    a: "Incident के समय में उस document को retrieve या cite करने वाले हर answer के लिए traces query करो, और अलग-अलग users और conversations की list बनाओ।"
+  - q: "India में cyber incident पर कौन-सी reporting duty लागू हो सकती है?"
+    a: "CERT-In के 2022 directions कुछ cyber security incidents को 6 घंटे के भीतर report करना ज़रूरी करते हैं, DPDP की breach duties के साथ। मौजूदा नियम check करो।"
+exercise:
+  title: "Response चलाओ"
+  setup: "मंगलवार दोपहर 3 बजे: Bengaluru के एक bank का assistant customers को बताने लगता है कि उनकी personal loan की EMI असल से कम होगी। Call centre के ज़रिए शिकायतें आती हैं। Traces दिखाते हैं कि जवाब 1 बजे upload हुए एक नए rate card से आ रहे हैं, जिसमें interest rate में typo था। Team के पास loans topic के लिए kill switch है और index से documents हटाने का तरीका भी।"
+  questions:
+    - q: "आप कौन-सी severity घोषित करोगे, और क्यों?"
+      a: "High, जैसे severity 2: गलत financial जानकारी कई customers तक पहुँच रही है और नुकसान कर सकती है।"
+    - q: "Containment के पहले steps क्या हैं?"
+      a: "गलत rate card को index से हटाओ, और loan EMI के जवाबों को एक fixed सुरक्षित message या इंसान के route पर switch करो।"
+    - q: "किसे बताना है, और कब?"
+      a: "Call-centre leads को तुरंत, business owner और compliance को जल्दी, और प्रभावित customers को तब जब conversations पहचान लिए जाएँ।"
+    - q: "Review से क्या निकलना चाहिए?"
+      a: "कारण जैसे indexing से पहले review नहीं और rate values पर checks नहीं, और actions: एक review step, value checks और EMI golden-set सवाल।"
+ask:
+  - "AI incident किसे कहते हैं?"
+  - "Blameless postmortem कैसे लिखूँ?"
+  - "AI incident runbook में क्या होना चाहिए?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Incident** कोई भी ऐसी घटना है जो users या business को नुकसान पहुँचाए और जिस पर तुरंत response चाहिए। आम outages के अलावा AI systems नए तरह के incidents जोड़ते हैं:
+
+- **Availability**: provider का outage, rate limits, टूटी हुई pipeline।
+- **Cost**: बेकाबू agents या traffic spikes का budget जलाना।
+- **Quality**: model, prompt या document बदलने के बाद जवाब अचानक गलत हो जाना।
+- **Safety और security**: हानिकारक content, prompt injection, data leakage, बिना अनुमति के actions।
+- **Fairness और compliance**: अनुचित outputs का कोई pattern, या personal data का गलत use।
+
+**Incident response** इन्हें संभालने का योजना-बद्ध तरीका है: detect, assess, contain, fix, communicate और learn।
+
+```flow
+dir: LR
+Detect | alerts, शिकायतें -> Assess | severity 1, 2 या 3; roles तय
+Assess -> Contain | kill switch, rollback, document हटाना, इंसान संभालें
+Contain -> Investigate | traces, logs, release ids
+Investigate -> Communicate | client, users, ज़रूरत हो तो regulators
+Communicate -> Learn | blameless review, owners के साथ actions, नए eval cases
+Learn -[monitoring बेहतर हुई]-> Detect
+```
+
+इस lesson में हम Chennai की एक e-commerce company के Saturday के incident के साथ चलेंगे, जहाँ support assistant ने returns की गलत अवधि का वादा कर दिया।
+
+## ये काम कैसे करता है
+
+**Detect।** Errors, latency, cost, guardrail triggers, refusal rates, negative feedback और online eval scores पर alerts। User और staff की reports के लिए साफ़ channel। कई AI incidents पहले कुछ शिकायतों के रूप में दिखते हैं; उन्हें गंभीरता से लो।
+
+**Severity assess करो।** Levels पहले से तय करो। जैसे: data leakage, customers को हानिकारक output या बिना अनुमति के actions के लिए severity 1; व्यापक गलत जवाबों या पूरे outage के लिए severity 2; किसी एक area में घटी quality के लिए severity 3। Severity तय करती है कि किसे जगाना है और कितनी जल्दी।
+
+**Roles।** एक incident commander जो coordinate करे और फ़ैसले ले, कोई जो हाथ से ठीक करे, और कोई जो stakeholders से बात करे। छोटी team में एक इंसान कई roles निभा सकता है, पर commander का role साफ़ होना चाहिए।
+
+**पहले contain करो।** कारण ढूँढने से पहले नुकसान रोको: किसी tool या feature का kill switch पलटो, पिछले release पर rollback करो, index से कोई document disable करो, इंसानों को route करो। Containment के विकल्प ज़रूरत पड़ने से पहले मौजूद और test किए हुए होने चाहिए।
+
+**Records से investigate करो।** Traces, audit logs और release identifiers दिखाते हैं कि क्या हुआ। उन्हें सुरक्षित रखो।
+
+**Communicate।** Clients और users को समय पर, ईमानदार updates चाहिए। Regulated clients की notification duties हो सकती हैं, जैसे DPDP Act के तहत personal data breach की reporting; उनकी privacy और legal teams को तुरंत शामिल करो।
+
+**Learn।** एक blameless post-incident review: timeline, impact, root causes (आम तौर पर कई), क्या अच्छा रहा, क्या बदलना है, owners और तारीखों के साथ। Incident शुरू करने वाले cases को eval suite और monitoring में जोड़ो।
+
+**Severity levels और responses:**
+
+| Level | Examples | Response |
+| --- | --- | --- |
+| 1 | Data leakage, customers को हानिकारक output, बिना अनुमति के actions | On-call और leads को तुरंत page करो; मिनटों में contain |
+| 2 | व्यापक गलत जवाब, पूरा outage | On-call 15 मिनट में; client को घंटों में सूचना |
+| 3 | किसी एक area में घटी quality | अगला working day; बंद होने तक track |
+
+**हर incident type के लिए एक runbook पन्ना।** हर तरह के incident के लिए एक पन्ना लिखो: कैसे detect होता है, पहली तीन containment actions switches के links के साथ, किसे बताना है, और संबंधित traces व logs कहाँ हैं। उसे इतना छोटा रखो कि दबाव में पढ़ा जा सके। Tabletop exercise में पन्ने को ठीक वैसा ही follow करो और नोट करो कि कहाँ वो अस्पष्ट या पुराना था, फिर उसी हफ़्ते ठीक करो।
+
+**Incident के दौरान client को लिखना।** तय अंतराल पर छोटे, तथ्य वाले updates भेजो: क्या हो रहा है, users ने क्या देखा होगा, क्या किया गया है, और अगला update कब आएगा। शुरुआती updates में कारणों का अंदाज़ा मत लगाओ। "हमने गलत जवाब रोक दिए हैं और पक्का कर रहे हैं कि कितने customers प्रभावित हुए" कहना उस आत्मविश्वासी explanation से ज़्यादा भरोसा बनाता है जो बाद में गलत निकले।
+
+**सिर्फ़ hard limits नहीं, normal से drift पकड़ो।** कई AI incidents किसी rate के चुपचाप बदलने जैसे होते हैं। पिछले घंटे की तुलना हाल के दिनों के उसी घंटे से करो:
+
+```python
+from statistics import mean, pstdev
+
+def anomalous(current, history, min_sigma=3.0, min_abs=0.02):
+    """current: rate this hour; history: same-hour rates from the last 14 days."""
+    mu, sd = mean(history), pstdev(history) or 0.005
+    return (current - mu) / sd > min_sigma and current - mu > min_abs
+
+# e.g. refusal rate, guardrail triggers, thumbs-down rate, judge failure rate
+if anomalous(0.11, [0.03, 0.04, 0.03, 0.05, 0.04, 0.03, 0.04]):
+    page_on_call("Refusal rate 11% vs about 4% normal for this hour")
+```
+
+**एक step में खराब document को contain करो।** "Assistant गलत price बता रहा है" का सबसे तेज़ fix अक्सर एक source हटाना होता है:
+
+```python
+def quarantine_document(doc_id, index, cache, audit, reason, who):
+    index.set_flag(doc_id, quarantined=True)        # every search filters quarantined docs
+    purged = cache.delete_where(source_doc=doc_id)  # cached answers built from it
+    audit.write(actor=who, action="quarantine", target=doc_id, detail={"reason": reason, "cache_purged": purged})
+```
+
+इसे admin button बनाओ, launch से पहले test करो, और runbook में शामिल करो।
+
+**Traces से impact नापो।** Customers और regulators पूछते हैं "कितने लोगों ने देखा?"। अगर traces में retrieved document ids record हैं, तो जवाब एक query है:
+
+```sql
+SELECT count(DISTINCT user_id) AS users, count(*) AS answers,
+       min(created_at) AS first_seen, max(created_at) AS last_seen
+FROM traces
+WHERE 'pricing-2026-11' = ANY(retrieved_doc_ids)
+  AND created_at BETWEEN '2026-11-06 09:00+05:30' AND '2026-11-07 14:30+05:30';
+```
+
+Trace data के बिना ये दिनों का अंदाज़ा बन जाता है, जो पहले दिन से retrieved ids log करने के पक्ष में अच्छा तर्क है।
+
+**India में reporting duties।** Personal data breach से DPDP Act और उसके Rules के तहत Data Protection Board और प्रभावित लोगों को notice देने की duty बन सकती है। इसके अलावा, CERT-In के 2022 directions कई तरह के cyber security incidents को 6 घंटे के भीतर report करना ज़रूरी करते हैं। पहले से तय रखो कि incident reportable है या नहीं, ये कौन तय करेगा (आम तौर पर client का legal या privacy lead), और उनका contact runbook में रखो।
+
+**Practice करो।** हर तिमाही अलग scenario के साथ tabletop exercise चलाओ: leak हुआ document, social media पर jailbreak का screenshot, provider का outage, model update जो formatting तोड़ दे। Detection और containment का समय नापो, और जो चीज़ धीमा कर रही थी उसे ठीक करो।
+
+## एक worked example
+
+Saturday, सुबह 11:40। Chennai की एक e-commerce company का support assistant customers को बताने लगता है कि ₹5,000 से ऊपर के orders पर 60 दिन के भीतर free returns मिलेंगे। Policy में 15 दिन हैं।
+
+11:55: returns के सवालों पर negative feedback तीन गुना हो जाता है; एक alert बजता है। On-call engineer incident commander बनता है और severity 2 घोषित करता है।
+
+12:05: traces दिखाते हैं कि जवाब "Diwali returns campaign" नाम के उस page से आ रहे हैं जो marketing ने उसी सुबह publish किया था, जिसमें सिर्फ़ एक product category के लिए 60 दिन लिखा था। Containment: page को index से हटाया जाता है और assistant के returns के जवाब एक fixed, approved policy message पर switch कर दिए जाते हैं।
+
+12:20: customer support leads को बताया जाता है; वो प्रभावित customers के लिए 60 दिन का वादा निभाने की तैयारी करते हैं। Audit logs 312 conversations पहचानते हैं; company तय करती है कि उन orders के लिए वो बात निभाएगी।
+
+Monday की blameless review तीन कारण पाती है: indexing से पहले marketing pages की कोई review नहीं, campaign pages पर effective-date और scope metadata नहीं, और returns पर golden-set सवाल नहीं। Actions: marketing pages अलग index में review step के साथ जाएँगे, scope metadata जुड़ेगा, golden set में 20 returns सवाल जुड़ेंगे, और policy से जुड़े जवाबों में अचानक बदलाव पर alert लगेगा।
+
+| समय | घटना |
+| --- | --- |
+| 11:40 | Assistant 60-दिन के returns का वादा करने लगता है |
+| 11:55 | Feedback alert; severity 2 घोषित |
+| 12:05 | Campaign page index से हटा; fixed policy message चालू |
+| 12:20 | Support leads को बताया; 312 conversations पहचाने और निभाए गए |
+| Monday | Blameless review: तीन कारण, owners के साथ चार actions |
+
+## आम गलतियाँ
+
+- **Contain करने से पहले investigate करना।** पहले नुकसान रोको।
+- **बिना test किए kill switches और rollbacks।** उनकी practice करो।
+- **Severity levels नहीं।** हर incident या तो घबराहट बन जाता है या नज़रअंदाज़ हो जाता है।
+- **Client के प्रति चुप्पी।** बुरी ख़बर वैसे भी पहुँच जाती है; उन्हें जल्दी और ईमानदारी से बताओ।
+- **दोष ढूँढने वाली reviews।** लोग गलतियाँ छिपाते हैं, और system बेहतर नहीं होता।
+- **Traces में retrieved ids नहीं**, इसलिए impact नापा नहीं जा सकता।
+- **Containment के tools जो सिर्फ़ कागज़ पर हैं।** Launch से पहले हर switch और quarantine test करो।
+- **Client को बताने से पहले root cause का इंतज़ार करना।** जो तथ्य हैं, वो भेजो।
+
+## जब हल्की process काफ़ी है
+
+- **Internal prototypes** जिनके कुछ ही users हैं: named owner, kill switch और एक chat channel काफ़ी हो सकते हैं।
+- **Public data पर read-only tools**, जहाँ सबसे बुरा नतीजा गलत जवाब है जिसे लोग check कर सकते हैं।
+
+पूरे severity levels, on-call rotas, runbooks और drills तब ज़रूरी हैं जब customers, personal data, पैसे या regulated फ़ैसले शामिल हों।
+
+## Demo से production तक
+
+- **Rate changes पर alert दो**: refusals, guardrail triggers, feedback और judge failures पर, सिर्फ़ errors पर नहीं।
+- **Containment को एक click दूर रखो**: kill switches, rollback और document quarantine, सब test किए हुए।
+- **Retrieved ids, versions और users log करो** ताकि impact जल्दी नापा जा सके।
+- **Runbook में DPDP और CERT-In duties के reporting फ़ैसले वाले का नाम लिखो।**
+- **हर तिमाही drill करो** और हर बार सबसे धीमा step ठीक करो।
+
+## Practice करो
+
+Incidents को manage करने पर Google SRE का chapter और postmortem culture पर उसकी workbook का chapter पढ़ो। AI Incident Database के incidents देखो।
+
+1. अपने बनाए किसी AI system के लिए severity levels और roles तय करो, और हर तरह के incident के लिए उपलब्ध containment actions की list बनाओ।
+2. एक tabletop exercise चलाओ: "assistant गलत price बता रहा है", और detection, containment, communication और investigation से गुज़रो।
+3. उस exercise की कम से कम तीन actions वाली blameless review लिखो।
+4. अपने traces के लिए impact query लिखो और पिछले हफ़्ते के एक document पर चलाओ।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 तेज़ detection और response के लिए monitoring को cover करता है, और chapter 5 उन attacks को जो कई incidents के पीछे होते हैं।
+
+**आपका काम पूरा जब** आप अपने containment विकल्प काम करते दिखा सको (एक rollback और एक kill switch), और एक review template जो आपकी team सच में use करेगी।

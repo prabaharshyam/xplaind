@@ -1,0 +1,221 @@
+---
+id: agent-sdks-subagents
+lang: hi
+title: "Agent SDKs और sub-agents"
+outcome: "जानो कि vendor के agent SDKs क्या देते हैं, कब अपना loop या graph framework छोड़कर SDK लेना ठीक है, और काम को sub-agents में बाँटना कब फ़ायदेमंद होता है।"
+answer: "Model vendors के agent SDKs tool loop, tracing और hand-offs बना-बनाया देते हैं। Sub-agents तभी लगाओ जब task साफ़ तरीके से independent हिस्सों में बँट सके।"
+why_it_matters: "Clients का अक्सर कोई पसंदीदा model vendor होता है, और उसका agent SDK working pilot तक पहुँचने का सबसे तेज़ रास्ता हो सकता है। जब पता हो कि SDK क्या संभालता है, और कब कई agents मदद करते हैं या बस cost बढ़ाते हैं, तो आप जल्दी चुन सकते हो और अपनी पसंद का बचाव भी कर सकते हो।"
+flashcards:
+  - q: "Agent SDK क्या है?"
+    a: "एक library, आम तौर पर model provider की, जो agent loop के साथ tracing, guardrails, sessions और hand-offs देती है।"
+  - q: "SDK बुनियादी loop के अलावा क्या देता है?"
+    a: "Retries, streaming, parallel tool calls, step tracing, guardrails, hand-offs, sessions, और कभी-कभी permissions वाले built-in tools।"
+  - q: "Sub-agent क्या है?"
+    a: "ऐसा agent जिसे कोई दूसरा agent task का एक हिस्सा करने के लिए शुरू करता है, अपने नए context में, और वो सिर्फ़ summary लौटाता है।"
+  - q: "Sub-agents का मुख्य फ़ायदा क्या है?"
+    a: "Context isolation: हर एक पूरी context window के साथ काम करता है, और lead को सिर्फ़ summaries मिलती हैं। वो parallel भी चल सकते हैं।"
+  - q: "Sub-agents की cost क्या है?"
+    a: "Token use कई गुना बढ़ जाता है, अक्सर एक अकेले agent से कई गुना, और coordination duplication या छूटी details से fail हो सकता है।"
+  - q: "कौन-से tasks multi-agent designs के लिए ठीक हैं?"
+    a: "चौड़े, parallel, पढ़ाई-भारी tasks जैसे research; वो tightly coupled tasks नहीं जिनमें हर step पिछले पर टिका हो।"
+  - q: "Sub-agent को काम कैसे सौंपना चाहिए?"
+    a: "सटीक scope, output format और length limit के साथ, और सिर्फ़ वही tools देकर जो उस हिस्से को चाहिए।"
+  - q: "Vendor SDK चुनने से पहले क्या check करना चाहिए?"
+    a: "एक vendor के models से lock-in कितना है, sessions कैसे store होते हैं, और क्या traces client के observability tools में export हो सकते हैं।"
+  - q: "हर sub-agent को अपना budget क्यों दें?"
+    a: "वरना एक अटका हुआ sub-agent पूरे task के tokens और समय खा सकता है। अलग caps से lead कमी बताकर बाकी काम खत्म कर सकता है।"
+  - q: "एक sub-agent fail हो जाए तो lead agent को क्या करना चाहिए?"
+    a: "बाकियों को जो मिला उससे काम पूरा करे, साफ़ बताए कि कौन-सा हिस्सा क्यों छूटा, और उसे दोबारा करने का offer दे, पूरा task fail करने की जगह।"
+exercise:
+  title: "Single agent या sub-agents?"
+  setup: "Gurugram की एक consultancy में तीन proposals हैं: (A) 12 Indian states की solar policies की तुलना, हर एक के लंबे सरकारी documents पढ़कर; (B) एक uploaded PDF से client onboarding का 40-field form भरना; (C) एक 3,000-line Python module का refactor। (A) का single-agent prototype पाँच states के बाद context खत्म कर देता है। Client enterprise contract पर एक model vendor use करता है और चाहता है कि हर step उसके observability tool में दिखे।"
+  questions:
+    - q: "किस proposal को sub-agents से फ़ायदा होता है, और कैसे?"
+      a: "(A): हर state के लिए एक sub-agent parallel में, हर एक sources के साथ लगभग 300 words का fixed-format summary लौटाए, और lead उन्हें merge करे।"
+    - q: "(B) और (C) के लिए sub-agents क्यों नहीं?"
+      a: "दोनों tightly coupled हैं: हर step बाकियों पर टिका है, इसलिए बाँटने से बिना फ़ायदे के cost और coordination की गलतियाँ बढ़ती हैं।"
+    - q: "(A) के लिए team को क्या measure करना चाहिए?"
+      a: "हर brief का समय, tokens और quality, single-agent बनाम sub-agents।"
+    - q: "SDK की पसंद कौन तय करता है?"
+      a: "Vendor SDK मौजूदा contract में फिट बैठता है, अगर उसके traces client के observability tool में export हो सकें और lock-in मंज़ूर हो।"
+ask:
+  - "Sub-agents कब use करूँ?"
+  - "Agent SDK और LangGraph में क्या फ़र्क है?"
+  - "Multi-agent systems कितने महँगे पड़ते हैं?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Agent SDK** एक library है, आम तौर पर model provider की, जो आपको तैयार agent loop देती है: messages भेजो, model जो tools माँगे उन्हें चलाओ, results वापस दो, दोहराओ। ज़्यादातर में tracing, guardrails, session storage और एक agent का काम दूसरे को सौंपने के तरीके भी होते हैं। उदाहरण हैं OpenAI का Agents SDK और Anthropic का Claude Agent SDK; Google और दूसरे भी ऐसे kits देते हैं।
+
+**Sub-agent** ऐसा agent है जिसे कोई दूसरा agent task का एक हिस्सा करने के लिए अपने नए context में शुरू करता है, और वो सिर्फ़ summary लौटाता है। **Multi-agent system** कोई भी ऐसा design है जिसमें कई agents मिलकर काम करें: lead agent workers को काम सौंपे, agents आपस में बातचीत आगे बढ़ाएँ, या specialists एक-दूसरे के काम की review करें।
+
+```flow
+Lead agent | 5 research areas का plan बनाता है -> Financials | filings tool
+Lead agent -> Legal | court search
+Lead agent -> Management | news search
+Lead agent -> Market | reports tool
+Lead agent -> ESG | news search
+Financials -[summary, ज़्यादा से ज़्यादा 400 words, sources के साथ]-> Lead merge करता है, conflicts पकड़ता है, एक follow-up पूछता है
+Legal -> Lead merge करता है, conflicts पकड़ता है, एक follow-up पूछता है
+Management -> Lead merge करता है, conflicts पकड़ता है, एक follow-up पूछता है
+Market -> Lead merge करता है, conflicts पकड़ता है, एक follow-up पूछता है
+ESG -> Lead merge करता है, conflicts पकड़ता है, एक follow-up पूछता है
+Lead merge करता है, conflicts पकड़ता है, एक follow-up पूछता है -> Brief
+```
+
+हर sub-agent अपने नए context के साथ parallel में चलता है।
+
+इस lesson में हम Hyderabad की एक consulting firm के साथ चलेंगे, जो मध्यम आकार की manufacturers पर due-diligence briefs बनाती है।
+
+## ये काम कैसे करता है
+
+**SDKs आपका क्या बचाते हैं।** Loop खुद बीस lines का है; असली value उसके आसपास की हर चीज़ में है: retries, streaming, parallel tool calls, हर step की tracing, input और output पर guardrails, hand-offs, sessions। कुछ SDKs built-in tools भी देते हैं, जैसे file editing, shell commands या web search, permission system के साथ।
+
+**चुनना।** तीन आम रास्ते:
+
+- *अपना loop* जब task छोटा और साफ़ हो, आप पूरा control चाहते हों और dependencies कम चाहते हों।
+- *Vendor SDK* जब client उस vendor से बँधा हो और जल्दी pilot चाहता हो, ख़ासकर अगर उसके built-in tools फिट बैठें।
+- *Graph framework* (जैसे LangGraph) जब आपको साफ़ control flow, approval के लिए टिकाऊ pauses और model-vendor से आज़ादी चाहिए।
+
+Check करो कि SDK एक vendor के models से कितना बँधा है, sessions कैसे store करता है, और क्या उसके traces client के observability tools में export होते हैं।
+
+**Sub-agents।** इनका असली फ़ायदा context isolation है। किसी market की research करने वाला lead agent पाँच sub-agents शुरू कर सकता है, हर एक अपनी पूरी context window के साथ एक competitor को खोजे, और lead को पाँच एक-पन्ने की summaries मिलें। Lead को वो सैकड़ों पन्ने कभी दिखते ही नहीं जो पढ़े गए, इसलिए उसका अपना context साफ़ रहता है। Sub-agents parallel भी चल सकते हैं, जिससे घड़ी का समय घटता है।
+
+**Cost।** हर sub-agent का अपना prompt, tools और history होता है, इसलिए token use कई गुना बढ़ जाता है, अक्सर एक अकेले agent से कई गुना। Coordination भी fail हो सकता है: दो workers एक ही काम दोहरा दें या कोई summary ज़रूरी detail छोड़ दे। Multi-agent designs चौड़े, parallel, पढ़ाई-भारी tasks जैसे research में फ़ायदा देते हैं; tightly coupled tasks में शायद ही, जैसे एक codebase edit करना या एक form भरना, जहाँ हर step पिछले पर टिका है।
+
+**तीन रास्तों की तुलना:**
+
+| Route | कब सबसे अच्छा | किससे सावधान रहो |
+| --- | --- | --- |
+| अपना loop | छोटा task, पूरा control, कम dependencies | Tracing, retries और sessions आपको खुद बनाने पड़ते हैं |
+| Vendor SDK | एक vendor से बँधे हों, तेज़ pilot, built-in tools फिट हों | Lock-in; trace export check करो |
+| Graph framework | साफ़ control flow, टिकाऊ approval pauses, vendor से आज़ादी | सीखने के लिए ज़्यादा concepts |
+
+**Delegation brief लिखना।** हर sub-agent के instructions में लिखा हो: area और उसकी सीमाएँ ("2020 के बाद Indian courts के legal cases; regulatory filings नहीं, जो दूसरा agent देखता है"), उसके पास कौन-से tools हैं, headings के साथ output format, word limit, और हर claim के लिए source link देने का नियम। अंत में एक छोटी "open questions" list माँगो, ताकि lead जान सके कि क्या अनिश्चित है। साफ़ briefs दो सबसे आम गलतियों से बचाते हैं: दोहराया हुआ काम और ऐसी summaries जो वही एक detail छोड़ दें जो ज़रूरी थी।
+
+**ये नापना कि बाँटना फ़ायदेमंद रहा या नहीं।** वही दस requests दोनों तरीकों से चलाओ। Wall-clock समय, कुल tokens, cost, और fixed rubric वाले reviewer का quality score record करो। जो बँटवारा तेज़ और बेहतर है पर चार गुना महँगा, वो फिर भी सही हो सकता है, जैसे यहाँ, जब हर brief analyst के दिनों का समय बचाती है। फ़ैसला numbers के साथ लिखित में होना चाहिए।
+
+**Plain code में एक lead और sub-agents।** Pattern देखने के लिए framework नहीं चाहिए। Lead briefs लिखता है, sub-agents अपने नए context के साथ parallel चलते हैं, और lead सिर्फ़ उनकी छोटी reports देखता है:
+
+```python
+import asyncio
+import anthropic
+
+client = anthropic.AsyncAnthropic()
+LEAD, WORKER = "claude-opus-5-5", "claude-sonnet-5-5"     # check the docs for current names
+
+async def sub_agent(brief, max_tokens=1200):
+    try:
+        r = await asyncio.wait_for(client.messages.create(
+            model=WORKER, max_tokens=max_tokens,
+            system="You research one narrow area. Report in at most 200 words with a source link per claim, "
+                   "then list open questions.",
+            messages=[{"role": "user", "content": brief}]), timeout=120)
+        return "".join(b.text for b in r.content if b.type == "text")
+    except Exception as err:
+        return f"FAILED: {type(err).__name__}"
+
+async def research(question, areas):
+    briefs = [f"Question: {question}\nYour area: {a}. Stay inside it; other agents cover the rest."
+              for a in areas]
+    reports = await asyncio.gather(*(sub_agent(b) for b in briefs))
+    joined = "\n\n".join(f"## {a}\n{r}" for a, r in zip(areas, reports))
+    final = await client.messages.create(
+        model=LEAD, max_tokens=1500,
+        messages=[{"role": "user", "content": f"Write a brief answering: {question}\n"
+                   "Use only these reports. Say plainly if any area FAILED.\n\n" + joined}])
+    return "".join(b.text for b in final.content if b.type == "text")
+
+# asyncio.run(research("EV subsidy policies", ["Maharashtra", "Karnataka", "Tamil Nadu"]))
+```
+
+असली system में हर sub-agent एक अकेली call की जगह अपना tool loop चलाएगा (search, fetch, read), पर shape वही रहता है: briefs बाहर, छोटी reports वापस, और lead का context छोटा रहता है।
+
+**Token का बिल।** हर sub-agent अपने instructions, tool definitions और पढ़ाई साथ रखता है। Anthropic ने बताया था कि उसके multi-agent research system ने एक आम chat से लगभग 15 गुना tokens use किए। ऐसा research brief जो analyst के दो दिन बचाए, उसके लिए ये ठीक हो सकता है; support के जवाब के लिए शायद ही।
+
+**SDK चुनना, ठोस तरीके से।** Vendor SDKs (OpenAI का Agents SDK, Anthropic का Claude Agent SDK, Google का Agent Development Kit और दूसरे) मुख्य रूप से चार जगह अलग होते हैं। तय करने से पहले हर एक को एक दिन के spike से जाँचो:
+
+| सवाल | क्यों मायने रखता है |
+| --- | --- |
+| क्या ये दूसरे vendors के models use कर सकता है? | बाद में rewrite के बिना बदलना |
+| Sessions और state कहाँ रहते हैं? | Data residency और restarts |
+| क्या traces OpenTelemetry या आपके tracing tool में export होते हैं? | सभी systems का एक ही view |
+| Built-in tools के लिए permissions और approvals कैसे set होते हैं? | Production में safety |
+
+**Context isolation दोनों तरफ़ काम करता है।** Sub-agent सिर्फ़ अपना brief देखता है, इसलिए वो दूसरे sub-agent की पाई चीज़ तब तक use नहीं कर सकता जब तक lead उसे आगे न दे। जब एक area का काम दूसरे पर टिका हो, तो उन steps को क्रम से चलाओ, या lead को दूसरा round दो जिसमें वो follow-up briefs भेजे।
+
+**अपने browser में try करो।** Sub-agents parallel चलते हैं, इसलिए कुल समय सबसे धीमे का होता है, जोड़ का नहीं। Delays बदलकर देखो।
+
+```python
+import asyncio, time
+
+async def sub_agent(area, seconds):
+    await asyncio.sleep(seconds)              # pretend research
+    return f"{area}: 3 findings"
+
+async def lead():
+    t0 = time.perf_counter()
+    reports = await asyncio.gather(sub_agent("Maharashtra", 0.3), sub_agent("Karnataka", 0.5), sub_agent("Tamil Nadu", 0.2))
+    print(reports)
+    print(f"took {time.perf_counter() - t0:.1f} s, not {0.3 + 0.5 + 0.2:.1f} s")
+
+await lead()
+```
+
+## एक worked example
+
+Hyderabad की एक consulting firm मध्यम आकार की Indian manufacturers पर due-diligence briefs चाहती है: financials, legal cases, management, market और ESG news।
+
+एक अकेले agent को 40 मिनट लगे और legal research के बीच में अक्सर context खत्म हो जाता था, जिससे पहले के financial notes खो जाते थे। आप redesign करते हो:
+
+- **Lead agent** request पढ़ता है, पाँच research areas का plan लिखता है और हर area के लिए एक **sub-agent** parallel में शुरू करता है।
+- हर sub-agent के पास सिर्फ़ वही tools हैं जो उसे चाहिए: legal वाले के पास court-records search, financial वाले के पास filings tool। हर एक source links के साथ ज़्यादा से ज़्यादा 400 words की summary लौटाता है।
+- Lead summaries को merge करता है, conflicts पकड़ता है (दो sources revenue पर असहमत हैं) और financial sub-agent से एक follow-up सवाल पूछता है।
+
+Wall-clock समय 9 मिनट पर आ जाता है और coverage बेहतर होता है। Token use 3.5 गुना बढ़ता है, जिसे firm मान लेती है क्योंकि हर brief दो दिन का analyst काम बचाती है। आप vendor का SDK use करते हो क्योंकि firm का उस provider के साथ पहले से enterprise contract है और उसकी tracing हर sub-agent के steps दिखाती है, जो उनकी quality team को चाहिए।
+
+| Measure | Single agent | Lead और पाँच sub-agents |
+| --- | --- | --- |
+| हर brief का समय | लगभग 40 मिनट | लगभग 9 मिनट |
+| Context overflow | अक्सर, legal research के दौरान | कभी नहीं |
+| Token use | Baseline | लगभग 3.5 गुना |
+| पाँचों areas का coverage | असमान | पूरा |
+
+## आम गलतियाँ
+
+- **Default में multi-agent।** एक agent से शुरू करो। तभी बाँटो जब context overflow या parallelism नापी गई समस्या हो।
+- **धुंधला delegation।** "Legal side की research करो" से काम दोहराया जाता है। हर sub-agent को सटीक scope, output format और length limit दो।
+- **Token cost को अनदेखा करना।** पहले और बाद में हर task की cost नापो; multi-agent उसे कई गुना कर सकता है।
+- **बिना पता चले lock-in हो जाना।** अगर client model vendor बदल सकता है, तो check करो कि आपका कितना code एक SDK पर टिका है।
+- **Agents के बीच traces नहीं।** जवाब गलत हो तो दिखना चाहिए कि कौन-सा sub-agent कौन-सा claim लाया।
+- **हर sub-agent पर limits नहीं।** एक अटका हुआ worker पूरा budget खा जाता है।
+- **एक हिस्सा fail होने पर पूरा task fail कर देना।** कमी बताओ और बाकी पहुँचाओ।
+
+## जब एक agent बेहतर है
+
+- **Tightly coupled काम**, जैसे एक codebase edit करना या एक form भरना, जहाँ हर step पिछले पर टिका है।
+- **छोटे tasks** जिन्हें एक agent कुछ steps में खत्म कर दे।
+- **तंग budgets**: कई agents token cost कई गुना कर देते हैं।
+- **सख़्त latency की ज़रूरत** जहाँ parallel करने को कुछ ज़्यादा नहीं।
+
+## Demo से production तक
+
+- **Lead और हर sub-agent को trace करो**, एक ही run id के तहत।
+- **हर agent और पूरे task के budgets रखो**: tokens, समय और पैसे के लिए।
+- **Briefs को versioned templates की तरह रखो**, और prompts की तरह test करो।
+- **Single-agent baseline से तुलना करो**, बदलावों से पहले और बाद, cost और quality पर।
+- **Partial failure की योजना रखो**: जब कोई area cover न हो सके तो user को साफ़ message दो।
+
+## Practice करो
+
+Anthropic का अपने multi-agent research system पर लिखा article पढ़ो, और किसी एक agent SDK के docs देखो।
+
+1. किसी research task का single-agent version बनाओ (जैसे, "EV subsidies पर तीन Indian states की policies का summary बनाओ"), vendor SDK या अपने loop से।
+2. उसे lead agent और हर state के लिए एक sub-agent के साथ दोबारा बनाओ, हर एक sources के साथ ज़्यादा से ज़्यादा 200 words लौटाए।
+3. समय, tokens और quality compare करो, और तीन वाक्यों में लिखो कि बँटवारा फ़ायदेमंद रहा या नहीं।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 agents, कई components के साथ planning और अतिरिक्त model calls की cost को cover करता है।
+
+**आपका काम पूरा जब** आप समझा सको कि sub-agents कब मदद करते हैं, उनकी cost क्या है, और SDK बुनियादी loop के अलावा क्या देता है।

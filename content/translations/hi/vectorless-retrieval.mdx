@@ -1,0 +1,222 @@
+---
+id: vectorless-retrieval
+lang: hi
+title: "बिना vectors के लंबे documents से जवाब निकालना"
+outcome: "लंबे, structured documents से retrieve करना सीखो: model उनकी table of contents में घूमता है। और ये भी कि ये vector search से कब बेहतर पड़ता है।"
+answer: "लंबे और अच्छे structure वाले documents में model table of contents पढ़कर सही sections खुद खोल सकता है। Contracts और manuals पर ये vector search से बेहतर चल सकता है।"
+why_it_matters: "Annual reports, regulations और contracts लंबे होते हैं, structured होते हैं और एक-दूसरे का reference देते हैं। Chunk-and-embed में ये structure खो जाता है, और \"note 14\" के बारे में गलत जवाब आए तो client तुरंत पकड़ लेता है। Tree-based, reasoning वाला retrieval एक नया तरीका है जिसे जानना चाहिए, और उसकी cost जानना भी उतना ही ज़रूरी है।"
+flashcards:
+  - q: "Vectorless retrieval क्या है?"
+    a: "लंबे document का structure sections के tree की तरह रखना, हर section के summary के साथ, और model को उस tree में नीचे उतरकर सही pages तक पहुँचने देना।"
+  - q: "Chunk-and-embed RAG कब अटकता है?"
+    a: "जब एक ही लंबा structured document हो, जिसमें जगह मायने रखती है, cross-references दूर-दूर हैं और कई passages एक जैसे दिखते हैं।"
+  - q: "Tree कैसे बनता है?"
+    a: "Headings से। हर node में उसका title, page range और छोटा summary होता है, जिसे अक्सर indexing के वक़्त एक model लिखता है।"
+  - q: "हर सवाल पर model tree में कैसे चलता है?"
+    a: "वो top-level titles और summaries पढ़ता है, कौन-से nodes खोलने हैं ये चुनता है, leaf sections तक यही दोहराता है, फिर उनके पूरे text से जवाब देता है।"
+  - q: "Tree navigation वो क्या कर सकता है जो vectors नहीं कर सकते?"
+    a: "'see note 14' जैसे references को follow करना, यानी उस node को खोलना।"
+  - q: "Tree navigation की cost क्या है?"
+    a: "हर सवाल पर एक के बाद एक कई model calls होती हैं, इसलिए ये vector lookup से धीमा और महँगा है।"
+  - q: "ये कब सही बैठता है और कब नहीं?"
+    a: "कुछ लंबे, ज़्यादा value वाले documents जहाँ precision चाहिए, वहाँ सही। छोटे documents के बड़े collections में नहीं, वहाँ hybrid search जीतता है।"
+  - q: "Production systems अक्सर दोनों तरीकों को कैसे मिलाते हैं?"
+    a: "पहले search से चुनते हैं कि कौन-से documents मायने रखते हैं, फिर हर लंबे document के अंदर tree navigation करते हैं।"
+  - q: "Headings parse किए बिना document का tree कहाँ से आ सकता है?"
+    a: "कई PDFs में built-in table of contents (bookmarks) होती है, जिसे PyMuPDF जैसी libraries levels, titles और page numbers की तरह पढ़ लेती हैं।"
+  - q: "हर सवाल पर node खोलने की गिनती पर cap क्यों लगाते हैं?"
+    a: "हर बार खोलना एक model call है, और वो एक के बाद एक चलती हैं। Cap लगाने से latency और cost काबू में रहती है, और model भटकने की जगह साफ़ 'not found' बोलता है।"
+exercise:
+  title: "सही retrieval चुनो"
+  setup: "Chennai की एक legal team एक port project के 450 पन्नों के concession agreement पर सवाल पूछती है। Definitions Schedule A में हैं, कई clauses में लिखा है 'subject to clause 18.3', और हर साल के tariffs के लिए अलग annexures हैं। इसके अलावा firm की knowledge team 30,000 छोटे internal notes पर search चाहती है। पहले prototype में दोनों के लिए vector RAG लगाया गया है।"
+  questions:
+    - q: "Concession agreement पर vector RAG क्यों अटकता है?"
+      a: "जवाब दूर-दूर के cross-references और definitions पर टिके हैं, और हर साल के tariff annexures एक जैसे दिखते हैं, इसलिए similarity उन्हें अलग नहीं कर पाती।"
+    - q: "Tree navigation 'year 5 का tariff cap क्या है और कौन-सी conditions लगती हैं' का जवाब कैसे देगा?"
+      a: "Annexures खोलेगा, फिर year 5 का tariff node, उसके reference से conditions वाला clause खोलेगा, और दोनों को pages के साथ cite करेगा।"
+    - q: "30,000 notes के लिए कौन-सा तरीका ठीक है?"
+      a: "Reranking के साथ hybrid search। छोटे notes पर tree navigation धीमा और महँगा होगा, फ़ायदा कुछ नहीं।"
+    - q: "Navigation loop पर कौन-सी limit होनी चाहिए?"
+      a: "हर सवाल पर खोले जाने वाले nodes की cap, जैसे छह, ताकि cost और latency काबू में रहें।"
+ask:
+  - "PageIndex क्या है और कैसे काम करता है?"
+  - "Vector search की जगह tree search कब use करूँ?"
+  - "PDF से table-of-contents tree कैसे बनाऊँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Standard RAG documents को chunks में काटता है, उन्हें embed करता है और similarity से retrieve करता है। बहुत सारे छोटे documents के लिए ये बढ़िया चलता है। पर एक लंबे, structured document पर कम चलता है, जैसे 300 पन्नों की annual report, कोई insurance regulation या master services agreement, जहाँ:
+
+- जवाब इस पर टिका होता है कि passage कहाँ बैठा है ("consolidated statements के notes में, standalone वाले में नहीं");
+- text में लिखा होता है "as defined in section 2.4" और definition बहुत दूर होती है;
+- कई passages एक जैसे दिखते हैं (हर साल की revenue table), इसलिए similarity उन्हें अलग नहीं कर पाती।
+
+**Vectorless retrieval** document का structure बनाए रखता है। आप table of contents से एक tree बनाते हो (chapters, sections, sub-sections, हर एक का छोटा summary) और model को सोचते-सोचते नीचे उतरने देते हो: top level पढ़ो, सबसे likely section चुनो, उसे खोलो, फिर चुनो, और आख़िर में सही pages पढ़ो। PageIndex जैसे open-source projects इसी idea को package करते हैं।
+
+```flow
+title: Annual report FY2026, 320 pages: model सिर्फ़ वही branches खोलता है जो चाहिए
+Annual report -> Corporate overview | strategy, products
+Annual report -> Directors' report | performance, risks
+Annual report -> Standalone statements | सिर्फ़ parent company
+Annual report -[खोला: analysts का मतलब consolidated होता है]-> Consolidated statements
+Consolidated statements -> Balance sheet, P&L, cash flow
+Consolidated statements -[खोला]-> Notes
+Notes -[खोला]-> Note 38 Contingent liabilities | p.241, Note 41 का reference
+Note 38 Contingent liabilities -[खोला]-> Note 41 Disputed tax matters | p.247
+Note 41 Disputed tax matters -> जवाब में Note 38 और Note 41 cite
+```
+
+इस lesson में हम Mumbai की एक equity research team के साथ चलेंगे, जो एक company की annual report के बारे में एकदम सटीक सवाल पूछ रही है।
+
+## ये काम कैसे करता है
+
+**Tree एक बार बनाओ।** Document के headings को hierarchy में parse करो। हर node के लिए title, page range और कुछ lines का summary रखो, जिसे indexing के वक़्त एक model लिख सकता है। Scanned या खराब format वाले documents को पहले साफ़ करना पड़ता है; ये तरीका उतना ही अच्छा है जितना structure उसे मिलता है।
+
+**हर सवाल पर navigate करो।** Model को सवाल और top-level nodes दो (सिर्फ़ titles और summaries, जो सस्ता है)। उससे पूछो कि कौन-से nodes खोलने हैं और क्यों। उन्हें expand करो, leaf sections तक यही दोहराओ, फिर उनका पूरा text prompt में डालकर जवाब दो, sections और pages cite करते हुए।
+
+**References follow करो।** जब किसी section में लिखा हो "see note 14", model उस node को माँग सकता है। Vectors ये नहीं कर सकते।
+
+**Cost।** हर सवाल पर एक के बाद एक कई model calls लगती हैं, इसलिए ये एक vector lookup से धीमा और महँगा है। ये कम संख्या के लंबे, ज़्यादा value वाले documents और ऐसे सवालों के लिए ठीक है जहाँ precision मायने रखती है, जैसे कोई analyst एक company की filings के बारे में पूछे। 50,000 support articles में search के लिए ये ठीक नहीं; वहाँ hybrid search जीतता है।
+
+कई production systems दोनों को मिलाते हैं: vector या keyword search से चुनो कि कौन-से documents मायने रखते हैं, फिर हर लंबे document के अंदर tree navigation करो।
+
+**Vector RAG बनाम tree navigation:**
+
+| Factor | Vector RAG | Tree navigation |
+| --- | --- | --- |
+| सबसे अच्छे documents | बहुत सारे छोटे | कुछ लंबे, structured |
+| Cross-references | छूट जाते हैं | Follow होते हैं |
+| एक जैसे दिखने वाले passages | अक्सर confuse होते हैं | Tree में position से अलग रहते हैं |
+| हर सवाल पर calls | एक search, एक answer | कई, एक के बाद एक |
+| Latency | आम तौर पर तेज़: एक lookup | धीमी: हर call के साथ बढ़ती है |
+| Setup | Chunk और embed | Headings parse करो, node summaries लिखो |
+
+**Tree को check करना।** इस तरीके पर भरोसा करने से पहले हर document का tree print करो और उसे असली table of contents से मिलाओ। देखो कि कहीं tree flat तो नहीं (headings detect ही नहीं हुए), कहीं sections की page ranges overlap तो नहीं करतीं, और summaries धुंधली तो नहीं। कुछ ज़रूरी documents का tree हाथ से ठीक करना अक्सर फ़ायदे का सौदा है, क्योंकि उन्हीं documents पर बार-बार सवाल पूछे जाएँगे।
+
+**Node summaries लिखना।** अच्छा summary बताता है कि section में क्या है, ये नहीं कि वो क्या argue करता है: "Contingent liabilities by type, both years, with references to tax notes" model को चुनने में मदद करता है; "Discusses the company's risks" नहीं करता। उसमें वो key terms रखो जिनके बारे में users पूछते हैं, जैसे taxes, schemes या contract parties के नाम।
+
+**PDF के bookmarks से tree बनाओ।** कई लंबे PDFs में table of contents होती है जिसे PyMuPDF पढ़ सकता है:
+
+```python
+import fitz
+
+def build_tree(pdf_path):
+    doc = fitz.open(pdf_path)
+    toc = doc.get_toc()                         # [[level, title, page], ...]
+    nodes = []
+    for i, (level, title, page) in enumerate(toc):
+        end = next((p - 1 for l, _, p in toc[i + 1:] if l <= level), doc.page_count)
+        nodes.append({"id": f"n{i}", "level": level, "title": title.strip(),
+                      "pages": (page, max(page, end)), "summary": None})
+    return doc, nodes
+
+def text_of(doc, node):
+    a, b = node["pages"]
+    return "\n".join(doc[p - 1].get_text() for p in range(a, b + 1))
+```
+
+अगर `get_toc()` खाली आए, तो font size से headings detect करो, या ज़रूरी documents के लिए top दो levels हाथ से लिख दो। हर node का `summary` एक model indexing के वक़्त एक बार भर देता है।
+
+**Navigation loop।** Titles और summaries दिखाओ, model को nodes चुनने दो, उन्हें खोलो, और cap पर रुक जाओ:
+
+```python
+import json
+
+def children(nodes, parent):
+    if parent is None:
+        return [n for n in nodes if n["level"] == 1]
+    i = nodes.index(parent)
+    out = []
+    for n in nodes[i + 1:]:
+        if n["level"] <= parent["level"]:
+            break
+        if n["level"] == parent["level"] + 1:
+            out.append(n)
+    return out
+
+def navigate(question, doc, nodes, choose, answer, max_open=6):
+    """choose(question, options) -> {"open": [ids], "done": bool}, as structured output."""
+    frontier, gathered, opened = children(nodes, None), [], 0
+    while frontier and opened < max_open:
+        menu = [{"id": n["id"], "title": n["title"], "pages": n["pages"], "summary": n["summary"]} for n in frontier]
+        pick = choose(question, json.dumps(menu, ensure_ascii=False))
+        chosen = [n for n in frontier if n["id"] in pick["open"]][: max_open - opened]
+        if not chosen:
+            break
+        next_frontier = []
+        for n in chosen:
+            opened += 1
+            kids = children(nodes, n)
+            if kids:
+                next_frontier += kids
+            else:
+                gathered.append((n["title"], n["pages"], text_of(doc, n)))
+        if pick.get("done"):
+            break
+        frontier = next_frontier
+    if not gathered:
+        return "I could not find a section that answers this.", []
+    return answer(question, gathered), [(t, p) for t, p, _ in gathered]
+```
+
+हर दिखाया गया menu और हर किया गया choice log करो। जब कोई जवाब गलत आए, तो log साफ़ दिखा देता है कि model ने कहाँ गलत मोड़ लिया।
+
+**References follow करना।** जब gathered text में "see Note 14" हो, तो उस node को अगले menu में जोड़ दो, भले वो child न हो। Gathered text पर "Note \d+", "Section \d+(\.\d+)*" या "Schedule [IVX]+" जैसा एक simple regex ज़्यादातर annual reports और circulars के लिए काफ़ी है।
+
+**Search के साथ मिलाओ।** लंबे documents की library में document titles और node summaries पर keyword या vector search चलाओ, ताकि document और एक starting node चुना जाए, फिर उसके अंदर navigate करो।
+
+## एक worked example
+
+Mumbai की एक equity research team पूछती है: "FY2026 के अंत में disputed GST demands के लिए contingent liability कितनी थी, और क्या वो बढ़ी है?"
+
+Annual report 320 पन्नों की है। Plain vector search पाँच chunks लौटाता है जिनमें GST और contingent liabilities का ज़िक्र है, standalone statements से, consolidated statements से, directors' report से और पिछले साल की comparison column से। Model standalone और consolidated आँकड़े मिला देता है और गलत जवाब देता है।
+
+Tree navigation के साथ:
+
+1. Model को top level दिखता है: Corporate overview, Directors' report, Standalone financial statements, Consolidated financial statements। Analysts जब तक न कहें, उनका मतलब consolidated होता है, इसलिए वो वही खोलता है।
+2. अंदर: Balance sheet, Profit and loss, Cash flow, Notes। वो Notes खोलता है, फिर "Note 38: Contingent liabilities and commitments"।
+3. उस note में दोनों सालों की table है और disputed tax details के लिए Note 41 का reference है। Model Note 41 भी खोल लेता है।
+
+जवाब में Note 38 (page 241) और Note 41 (page 247) cite होते हैं, और दोनों साल एक ही table से आते हैं। इसमें पाँच model calls और लगभग नौ seconds लगे, जबकि vector RAG में दो seconds से कम। Team सही जवाब के लिए खुशी से इंतज़ार कर लेती है, क्योंकि उसे page से मिलाकर check किया जा सकता है।
+
+| तरीका | सही? | Calls | समय |
+| --- | --- | --- | --- |
+| Vector RAG | नहीं: standalone और consolidated आँकड़े मिल गए | 2 | 2 s से कम |
+| Tree navigation | हाँ, दोनों सालों और page citations के साथ | 5 | लगभग 9 s |
+
+## आम गलतियाँ
+
+- **हर चीज़ के लिए इसे use करना।** बहुत सारे छोटे documents पर tree search धीमा और महँगा होता है, और फ़ायदा कुछ नहीं।
+- **टूटी हुई table of contents पर भरोसा करना।** Scanned या खराब tagged PDFs से flat या गलत tree बनता है। भरोसा करने से पहले tree check करो।
+- **Model को भटकने देना।** हर सवाल पर खोले जा सकने वाले nodes की cap लगाओ, वरना cost और latency बेकाबू बढ़ती हैं।
+- **Evaluation छोड़ देना।** उसी golden set पर अपने hybrid RAG से compare करो; कोई तरीका सिर्फ़ इसलिए मत अपनाओ कि वो ज़्यादा smart सुनाई देता है।
+- **Page numbers खो देना।** Page और section की citations ही इसका मुख्य फ़ायदा हैं; हर step में उन्हें बचाकर रखो।
+- **Node खोलने पर cap न होना**, जिससे मुश्किल सवालों पर model भटकता है और cost बढ़ती जाती है।
+- **ऐसे tree पर भरोसा करना जिसे print करके असली table of contents से मिलाया नहीं।**
+
+## Vectors कब बेहतर हैं
+
+- **बहुत सारे छोटे documents**, जैसे FAQs या support articles: hybrid search तेज़ और सस्ता है।
+- **जिन documents में असली structure नहीं है**, जैसे chat logs या emails।
+- **कड़ा latency budget**, जहाँ एक के बाद एक कई calls बहुत धीमी पड़ती हैं।
+
+## Demo से production तक
+
+- **Ingestion के बाद हर document का tree check करो** और ज़रूरी documents को हाथ से ठीक करो।
+- **हर सवाल पर openings और समय की cap लगाओ**, और साफ़ "not found" जवाब दो।
+- **Menus और choices log करो**, हर सवाल के लिए।
+- **Answers cache करो**, उन सवालों के लिए जो एक ही document version पर दोहराए जाते हैं।
+- **Trees और summaries दोबारा बनाओ**, जब document का नया version आए।
+
+## Practice करो
+
+PageIndex का introduction पढ़ो और उसके docs में देखो कि tree कैसे बनता है।
+
+1. कोई एक लंबा public document लो, जैसे किसी listed company की annual report या किसी regulator का master circular। Headings का tree page ranges के साथ बनाओ, ज़रूरत हो तो top दो levels हाथ से।
+2. दस सवाल लिखो जिनके लिए सही section चाहिए, जिनमें दो ऐसे हों जिन्हें cross-reference चाहिए।
+3. उनका जवाब अपने hybrid RAG से दो और एक simple navigate-the-tree loop से भी (ज़्यादा से ज़्यादा छह node openings)। Correctness, latency और cost compare करो।
+4. अपने document का tree print करो, उसे छपी हुई table of contents से मिलाओ, और जो पहले तीन फ़र्क दिखें उन्हें ठीक करो।
+
+**आपका काम पूरा जब** आप बता सको कि आपके test में किस तरह के सवाल और document पर tree navigation जीता, और उसकी cost क्या रही।

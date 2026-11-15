@@ -1,0 +1,220 @@
+---
+id: context-engineering
+lang: hi
+title: "Context engineering"
+outcome: "हर turn पर model के context में क्या जाए, ये तय करना: instructions, tools, examples, retrieved data, memory और tool results, और लंबे tasks को budget के अंदर कैसे रखें।"
+answer: "Context engineering तय करता है कि model हर turn पर क्या देखे, instructions और tools से लेकर retrieved data, memory और tool results तक, और उसे छोटा और काम का रखना।"
+why_it_matters: "जैसे-जैसे agents ज़्यादा देर चलते हैं, quality चालाक prompts पर कम और इस पर ज़्यादा टिकती है कि model हर step पर क्या देखता है। फूला हुआ, पुराना, या वो एक ज़रूरी fact खोया हुआ context, ज़्यादातर agent failures की वजह है। अब ये senior AI engineering roles में एक नामित skill है।"
+flashcards:
+  - q: "Context engineering क्या है?"
+    a: "ये तय करना कि model हर call पर सब कुछ क्या देखे: system prompt, tools, examples, retrieved documents, memory, history और tool results।"
+  - q: "Context को budget की तरह क्यों देखें?"
+    a: "जब window बेकार material से भरती है तो models का काम बिगड़ता है: वो details चूकते हैं, goal भूल जाते हैं और हर step की cost बढ़ती है।"
+  - q: "System prompt के लिए सही altitude क्या है?"
+    a: "साफ़ principles, मुख्य steps और headings के नीचे कुछ examples: न अस्पष्ट, न पन्नों भर के कड़े rules।"
+  - q: "Just-in-time retrieval क्या है?"
+    a: "Context में file paths या ids जैसे हल्के references रखना और agent को content तब लाने देना जब उसे ज़रूरत हो।"
+  - q: "पुराने tool results क्यों clear करें?"
+    a: "कई steps पहले use हुआ बड़ा result बेकार बोझ है; उसकी जगह एक लाइन का note रखो कि क्या मिला था।"
+  - q: "Compaction क्या है?"
+    a: "जब context अपनी सीमा के करीब हो, तो history को goal, decisions, open questions और key facts में summarise करना, और वहीं से आगे बढ़ना।"
+  - q: "Structured notes को context के बाहर क्यों रखें?"
+    a: "Notes file या to-do list से लंबे tasks में compaction के बाद भी progress बचा रहता है।"
+  - q: "Fail होते agent step को debug करने का पहला कदम क्या है?"
+    a: "Model को मिला exact context log करो और पढ़ो; वजह अक्सर वहीं दिख जाती है।"
+  - q: "Context rot क्या है?"
+    a: "Context बढ़ने पर models की accuracy अक्सर घटती है, आसान tasks पर भी, इसलिए ज़्यादा context हमेशा बेहतर नहीं होता। सिर्फ़ वही रखो जो काम आए।"
+  - q: "Agent के notes को context के बाहर क्यों रखें?"
+    a: "Notes file या to-do list compaction और restarts से बच जाती है, इसलिए पुरानी history summarise होने पर progress और decisions नहीं खोते।"
+exercise:
+  title: "Context को छाँटो"
+  setup: "Mumbai का एक legal-tech agent किसी company के 400 vendor contracts को renewal dates और penalty clauses के लिए review करता है। अभी हर step पर ये भेजा जाता है: if-then rules वाला 6,000-token का system prompt, 18 tool definitions, अब तक पढ़ा हर contract पूरा, और हर search result। करीब 25 contracts के बाद वो बहुत धीमा हो जाता है, vendors को आपस में मिलाने लगता है, और फिर context limit पर पहुँच जाता है।"
+  questions:
+    - q: "System prompt में क्या बदलोगे?"
+      a: "उसे साफ़ principles, review के steps और एक worked example में दोबारा लिखो, rule list से काफ़ी छोटा।"
+    - q: "Contracts model तक कैसे पहुँचें?"
+      a: "एक-एक करके, id से ज़रूरत पर लाए गए, और context में सिर्फ़ उस contract के काम के sections।"
+    - q: "पुराने results का क्या होगा?"
+      a: "हर contract के बाद findings का एक लाइन का note एक notes file में लिखो और contract का text और search results clear कर दो।"
+    - q: "400 contracts के दौरान task को पटरी पर क्या रखता है?"
+      a: "Totals और open items में समय-समय पर compaction, और वो notes file जिसे agent दोबारा पढ़ता है, ताकि goal और progress बचे रहें।"
+ask:
+  - "Prompt engineering और context engineering में क्या फ़र्क है?"
+  - "अपने agent के context को बहुत बड़ा होने से कैसे रोकूँ?"
+  - "Compaction summary में क्या रखना चाहिए?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Prompt engineering अच्छा instruction लिखने के बारे में है। **Context engineering** उस सबके बारे में है जो model किसी call पर देखता है: system prompt, tool definitions, examples, retrieved documents, memory, अब तक की बातचीत और पहले के tool calls के results। एक बार के सवाल में ये सब छोटे होते हैं। पचास steps चलते agent में ये जमा होते जाते हैं, और सवाल बन जाता है: अभी window में क्या होना चाहिए, और क्या नहीं?
+
+Context एक budget है। बहुत लंबी windows वाले models भी तब बुरा करते हैं जब window बेकार material से भरती है: वो details चूकते हैं, goal का सिरा खो देते हैं और हर step पर ज़्यादा cost लेते हैं।
+
+| Step 37 पर context | पहले | बाद में |
+|---|---|---|
+| System prompt | Rules, 6k tokens | Principles, 1.5k tokens |
+| Tools | 12 definitions | 4 definitions |
+| Data | पूरा purchase register और supplier filings | Notes: pages 1-2 हल हुए, INV-7781 और INV-7790 खुले हैं; 20 mismatches का मौजूदा page |
+| Tool results | 36 पुराने, जब तक window भर न जाए | 2 ताज़े |
+| नतीजा | Suppliers गड़बड़ाए, limit पर पहुँचा | एक run में 3,000 mismatches |
+
+```flow
+dir: LR
+title: हर step पर context छोटा रखना
+पुराने tool results -[notes में summarise करो]-> Notes
+Notes -> अगला model call
+मौजूदा page + 2 ताज़े results -> अगला model call
+```
+
+ये lesson Chennai की एक consultancy के GST reconciliation agent के साथ चलता है।
+
+## ये काम कैसे करता है
+
+**सही altitude पर system prompt।** बहुत अस्पष्ट ("be helpful") कोई दिशा नहीं देता; बहुत कड़ा (पन्नों भर if-then rules) उन cases पर टूटता है जिनका आपने अंदाज़ा नहीं लगाया था। साफ़ principles, मुख्य steps और headings के नीचे कुछ examples रखो।
+
+**हल्के tools।** हर tool definition हर call पर tokens खाती है और हर overlapping tool accuracy घटाता है। सिर्फ़ वही tools दो जो मौजूदा task को चाहिए।
+
+**Just-in-time retrieval।** हर document पहले से load करने की जगह, agent को चीज़ें ढूँढने के तरीके दो (search, file खोलना, record पढ़ना) और उसे वो तब खींचने दो जब ज़रूरत हो। File paths या record ids जैसे हल्के references को context में रखो, और content ज़रूरत पर लाओ।
+
+**पुराने tool results clear करो।** तीन steps पहले use हुआ 5,000-token का search result बेकार बोझ है। Results को use होने के बाद हटा दो या छोटा कर दो, और ये एक लाइन का note रखो कि क्या मिला था।
+
+**Compaction।** जब context अपनी सीमा के करीब हो, तो history को एक छोटी state में summarise करो: goal, लिए गए decisions, open questions, key facts। उसी summary के साथ नए सिरे से शुरू करो।
+
+**Structured notes।** लंबे tasks के लिए, agent से context के बाहर एक notes file या to-do list रखवाओ और उसे दोबारा पढ़वाओ, ताकि compaction के बाद भी progress बचे।
+
+**Sub-agents।** किसी sub-task को ऐसे sub-agent को दो जिसका अपना साफ़ context हो, और बस उसकी summary वापस लो।
+
+**Tokens कहाँ जाते हैं:**
+
+| हिस्सा | आम समस्या | Fix |
+| --- | --- | --- |
+| System prompt | Rare cases के लिए पन्नों भर rules | Principles, steps, एक-दो examples |
+| Tool definitions | कई overlapping tools | सिर्फ़ इस task के tools |
+| Retrieved documents | सब कुछ पहले से load | id से ज़रूरत पर लाओ |
+| Tool results | हमेशा के लिए रखे | Use के बाद clear करो, एक लाइन का note रखो |
+| History | हर turn बढ़ती है | State summary में compact करो |
+
+**अच्छी compaction summary लिखना।** Summary अपने से पहले की हर चीज़ की जगह लेती है, इसलिए उसमें वो होना चाहिए जो agent को आगे बढ़ने के लिए चाहिए: असली task और constraints पूरे, लिए गए decisions और क्यों, अब तक के results totals में, open items उनके ids के साथ, और अगला step। हर step कैसे किया गया, उसकी कहानी छोड़ दो। Compaction को ऐसे test करो: task को compaction के साथ और बिना चलाओ और देखो कि final results मेल खाते हैं; अगर compacted run कोई constraint भूल जाए, तो summary prompt में कोई section छूट गया है।
+
+**असर नापना।** कुछ tasks के लिए, हर बदलाव से पहले और बाद, हर step पर हिस्सों के हिसाब से token counts log करो। तीन numbers देखो: हर task के tokens, हर task की cost और task की success। जो बदलाव tokens घटाए पर success गिराए, उसने कुछ ऐसा हटा दिया जो model को चाहिए था।
+
+**Code में पुराने tool results clear करना।** ताज़ा कुछ results पूरे रखो और पुराने वालों को एक लाइन के note से बदल दो:
+
+```python
+def clear_old_results(messages, keep_last=3, max_chars=400):
+    """Anthropic-style messages: tool results are blocks of type 'tool_result' in user turns."""
+    seen = 0
+    for msg in reversed(messages):
+        if msg["role"] != "user" or not isinstance(msg["content"], list):
+            continue
+        for block in msg["content"]:
+            if block.get("type") != "tool_result":
+                continue
+            seen += 1
+            text = str(block.get("content", ""))
+            if seen > keep_last and len(text) > max_chars:
+                block["content"] = f"[cleared: {len(text)} chars; first line: {text.splitlines()[0][:120]}]"
+    return messages
+```
+
+Model को फिर भी दिखता है कि call हुई थी और मोटे तौर पर उसने क्या लौटाया, पर उसके 5,000 tokens नहीं। अगर उसे details फिर चाहिए, तो वो tool दोबारा बुला सकता है।
+
+**Fixed sections वाला compaction prompt।** खुला "इसे summarise करो" constraints खो देता है। वो हिस्से माँगो जो agent को आगे बढ़ने के लिए चाहिए:
+
+```python
+COMPACT_PROMPT = """Summarise this work so another assistant can continue it with no other context.
+Use exactly these headings:
+TASK: the original request and every constraint, word for word where possible
+DECISIONS: what was decided and why, one line each
+RESULTS SO FAR: totals and key facts, with ids
+OPEN ITEMS: what remains, with ids
+NEXT STEP: the single next action
+Leave out how each step was done."""
+```
+
+जब context किसी threshold को पार करे तो इसे चलाओ, system prompt और summary के साथ नई बातचीत शुरू करो, और दोनों token counts log करो।
+
+**Context के बाहर notes।** लंबे tasks के लिए, agent को दो छोटे tools दो और कहो कि हर milestone के बाद अपने notes update करे:
+
+```python
+from pathlib import Path
+
+NOTES = Path("runs/notes-{run_id}.md")
+
+def read_notes(run_id):
+    p = Path(str(NOTES).format(run_id=run_id))
+    return p.read_text() if p.exists() else "(no notes yet)"
+
+def write_notes(run_id, text):
+    p = Path(str(NOTES).format(run_id=run_id))
+    p.parent.mkdir(exist_ok=True)
+    p.write_text(text[:4000])                    # keep notes short
+    return "saved"
+```
+
+Compaction या restart के बाद, agent पहले अपने notes पढ़ता है और आगे बढ़ता है।
+
+**ज़्यादा context का मतलब बुरे जवाब हो सकता है।** लंबे inputs पर studies पाती हैं कि context बढ़ने पर accuracy गिरती है, सरल lookups पर भी, और लंबे inputs के बीच के facts कम भरोसे से use होते हैं। Context engineering का मतलब है model को tokens का सबसे छोटा वो set देना जिससे वो task अच्छे से कर सके, window भरना नहीं।
+
+**क्रम मायने रखता है।** स्थिर content (system prompt, tool definitions) सबसे पहले रखो ताकि वो cache हो सके, काम का material बीच में, और मौजूदा सवाल और ताज़े results आख़िर में, जहाँ models सबसे अच्छे से ध्यान देते हैं।
+
+## एक example से समझो
+
+Chennai की एक GST consultancy का agent किसी client के purchase register को supplier filings से मिलाता है: हज़ारों invoices, समझाने वाले mismatches और एक final report।
+
+पहला version पूरा register, पूरा filing data और बारह tools context में load करता था। वो चालीस invoices के बाद window की limit पर पहुँच गया, और उससे पहले भी वो मिलते-जुलते नामों वाले suppliers को गड़बड़ा देता था।
+
+नया design:
+
+- System prompt reconciliation के rules और report का format एक worked mismatch के साथ समझाता है।
+- सिर्फ़ चार tools: `list_mismatches(page)`, `get_invoice(id)`, `get_supplier_filing(gstin, period)` और `write_note(text)`।
+- Agent एक बार में 20 mismatches का एक page संभालता है। हर के बाद वो एक note लिखता है ("Page 3: 14 timing differences के रूप में हल, 4 में supplier ने file नहीं किया, 2 को client का input चाहिए: INV-7781, INV-7790") और पुराने tool results clear हो जाते हैं।
+- हर 100 mismatches पर, history को totals और open items की summary में compact किया जाता है।
+
+अब agent एक run में 3,000 mismatches संभालता है। हर invoice की cost 70% घटती है, और supplier matching की error rate गिरती है क्योंकि model बस उसी case के records देखता है जो हाथ में है।
+
+| माप | पहला version | नया design |
+| --- | --- | --- |
+| हर run में संभाले mismatches | करीब 40, फिर window भर गई | 3,000 |
+| हर invoice की cost | Baseline | 70% कम |
+| Supplier matching की errors | मिलते-जुलते नामों में बार-बार गड़बड़ | कम ही |
+
+## आम गलतियाँ
+
+- **"कहीं ज़रूरत पड़े" सोचकर सब load कर देना।** ज़्यादा context बेहतर context नहीं है। ज़रूरत पर retrieve करो।
+- **हर tool result हमेशा रखना।** Results को use होने के बाद clear या summarise करो।
+- **Compaction में goal ही हटा देना।** Summary में task, constraints और open items रहने चाहिए, सिर्फ़ हाल की घटनाएँ नहीं।
+- **पाँच-tool के task के लिए बीस tools।** हर एक tokens खाता है और गलत चुनाव को न्योता देता है।
+- **असली context कभी न देखना।** Fail होते steps पर model को मिला हुआ log करो और पढ़ो; वजह अक्सर दिख जाती है।
+- **Free-form compaction summaries** जो constraints गिरा देती हैं। Fixed headings use करो।
+- **Note के बिना results clear करना**, जिससे model वही call दोहराता है।
+- **Calls के बीच tool order बदलना**, जो prompt caching तोड़ देता है।
+
+## जब context engineering इंतज़ार कर सकता है
+
+- **छोटे tasks** जो window के अंदर कुछ steps में ख़त्म हो जाएँ।
+- **Single calls** जिनमें fixed prompt और एक input हो।
+- **कम volume**, जहाँ अतिरिक्त tokens की cost कम है और quality पहले से ठीक है।
+
+ये सबसे ज़्यादा मायने रखता है लंबे agent runs, लंबी chats, बड़े documents और हर उस चीज़ में जहाँ context बढ़ने पर cost या accuracy बिगड़ती है।
+
+## Demo से production तक
+
+- **हर step पर हिस्सों के हिसाब से tokens log करो**: system, tools, history, results।
+- **Clearing और compaction के लिए thresholds तय करो**, और log करो कि हर एक कब चला।
+- **Compaction को test करो**, उन्हीं tasks पर उसके साथ और बिना results compare करके।
+- **हर run के notes storage में रखो**, trace से जोड़कर।
+- **Caching के लिए context का क्रम रखो**, और बदलावों के बाद cache hit rates check करो।
+
+## Practice करो
+
+Anthropic का agents के लिए context engineering वाला article और context windows वाला page पढ़ो।
+
+1. अपना बनाया कोई भी agent लो और उसके आख़िरी step पर भेजा गया पूरा context log करो। हिस्सों के हिसाब से tokens गिनो: system prompt, tools, history, tool results।
+2. पुराने tool results का clearing जोड़ो, और एक compaction step भी जो तब चले जब context आपके चुने threshold को पार करे।
+3. वही पाँच tasks पहले और बाद में चलाओ और हर task के tokens और task की success compare करो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 5 context length और ये कवर करता है कि models context में कहाँ सबसे अच्छे से ध्यान देते हैं, और chapter 6 agents की memory कवर करता है।
+
+**आपका काम पूरा जब:** आप दिखा सको कि आपके agent के tokens कहाँ जाते हैं, और एक ऐसा बदलाव जिसने results बिगाड़े बिना उन्हें घटाया।

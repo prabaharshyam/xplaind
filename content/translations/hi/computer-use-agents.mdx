@@ -1,0 +1,211 @@
+---
+id: computer-use-agents
+lang: hi
+title: "Browser और computer-use agents"
+outcome: "तय कर पाओगे कि agent को कब browser या desktop इंसान की तरह चलाना चाहिए, उसे सुरक्षित तरीके से कैसे बनाएँ (पहले scripted tools, screen control आख़िर में), और जोखिम कैसे रोकें।"
+answer: "Computer-use agents screen देखकर और click करके browser या desktop चलाते हैं। इन्हें सिर्फ़ तब use करो जब कोई API न हो, और contained environment में चलाओ।"
+why_it_matters: "कई Indian businesses ऐसे portals और पुराने desktop software पर चलते हैं जिनमें API नहीं है: सरकारी sites, insurer portals, legacy ERPs। जो agents इन्हें चला सकते हैं, वो ऐसा automation खोलते हैं जो पहले नामुमकिन था, और नए risks लाते हैं जिनके बारे में clients पूछेंगे।"
+flashcards:
+  - q: "Computer-use agent क्या है?"
+    a: "ऐसा agent जो screen के ज़रिए काम करता है: उसे screenshots मिलते हैं, वो तय करता है कि कहाँ click करना है और क्या type करना है, और ये दोहराता है।"
+  - q: "Computer-use agents कब काम के हैं?"
+    a: "जब किसी system में API न हो, जैसे कई सरकारी portals, पुराने bank और insurer portals और legacy desktop apps।"
+  - q: "Options की सीढ़ी क्या है, सबसे भरोसेमंद से सबसे कम तक?"
+    a: "API, scripted browser automation, agent-driven browsing, फिर screenshots से full computer use।"
+  - q: "Scripted automation को tool की तरह क्यों expose करें?"
+    a: "जाने-पहचाने steps तेज़, सस्ते और predictable चलते हैं, और agent को बस ये तय करना होता है कि tool कब बुलाना है।"
+  - q: "Computer-use agent कहाँ चलाना चाहिए?"
+    a: "एक isolated virtual machine या container में, जिसमें सिर्फ़ ज़रूरी apps हों, एक dedicated least-permission account हो और websites restricted हों।"
+  - q: "Screen के text को untrusted क्यों मानें?"
+    a: "Web pages में agents को निशाना बनाकर लिखे instructions हो सकते हैं, जो prompt injection का एक रूप है।"
+  - q: "किन actions के लिए human approval चाहिए?"
+    a: "Forms submit करना, payment करना, messages भेजना और files delete या overwrite करना।"
+  - q: "Captchas और one-time passwords कैसे handle करें?"
+    a: "Design से ही किसी इंसान को सौंप दो। इन्हें हराने की कोशिश कभी मत करो।"
+  - q: "Browser agent को approved sites तक कैसे सीमित रखें?"
+    a: "Browser में हर request को intercept करो और allow list में न होने वाले हर host को block करो, container पर network rules के अलावा।"
+  - q: "Scripted browser tool को agent को देना सुरक्षित क्या बनाता है?"
+    a: "आपके लिखे fixed steps, narrow input, हर ज़रूरी step के बाद success check, और page उम्मीद जैसा न हो तो साफ़ error।"
+exercise:
+  title: "सही सीढ़ी चुनो"
+  setup: "Coimbatore का एक textile exporter ये automate करना चाहता है: (A) रोज़ के exchange rates लाना, जिन्हें एक bank API से publish करता है; (B) सरकारी portal से shipping bills download करना, जिसमें pages stable हैं और login पर OTP आता है; (C) 15 साल पुराने desktop ERP में invoice data डालना, जिसमें API नहीं है; (D) तीन buyer portals check करना जिनके layouts अक्सर बदलते हैं।"
+  questions:
+    - q: "(A) और (B) के लिए कौन-सी सीढ़ी ठीक है?"
+      a: "(A) के लिए API। (B) के लिए stable pages पर scripted Playwright tool, और OTP किसी इंसान को सौंपा जाए।"
+    - q: "(C) के लिए कौन-सी सीढ़ी ठीक है?"
+      a: "Isolated Windows VM में full computer use, ERP के dedicated account के साथ, और entries save करने से पहले approval।"
+    - q: "(D) के लिए कौन-सी सीढ़ी ठीक है?"
+      a: "Agent-driven browsing जो page की structure पढ़े, क्योंकि layouts बदलते रहते हैं, restricted sites और record किए गए screenshots के साथ।"
+    - q: "जब उम्मीद की हुई confirmation न दिखे तो क्या होना चाहिए?"
+      a: "उसे detect करो, रुक जाओ, और आख़िरी screenshot के साथ task इंसान को वापस सौंप दो।"
+ask:
+  - "Computer-use agent क्या है?"
+  - "AI agent की जगह Playwright कब use करूँ?"
+  - "Browser agent को सुरक्षित तरीके से कैसे चलाऊँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Computer-use agent** software के साथ उसकी screen के ज़रिए काम करता है: उसे screenshots मिलते हैं, वो तय करता है कि कहाँ click करना है और क्या type करना है, और ये दोहराता है। **Browser agent** यही web browser के अंदर करता है, कभी-कभी page की तस्वीर के साथ उसकी structure भी पढ़ता है।
+
+ये एक असली कमी भरते हैं। जब किसी system में API हो, तो API बुलाओ। जब न हो, जैसे कई सरकारी portals, insurer और bank portals, और पुरानी desktop applications, तब बिना इंसान के automate करने का screen control ही अकेला तरीका हो सकता है।
+
+```flow
+title: सीढ़ी: जो सबसे ऊँची काम करे वही use करो
+1. API | सबसे तेज़, सस्ता, सबसे भरोसेमंद -[API नहीं है?]-> 2. Scripted browser tool | Playwright, fixed steps, एक tool की तरह expose
+2. Scripted browser tool -[steps बदलते हैं?]-> 3. Agent-driven browsing | page की structure पढ़ता है, actions तय करता है
+3. Agent-driven browsing -[page की काम की structure नहीं?]-> 4. Full computer use | screenshot, तय करो, click या type, screenshot: सबसे धीमा, सबसे कम भरोसेमंद
+```
+
+Rung 3 और 4 के लिए एक safety box लगाओ: isolated VM, dedicated account, sites की allow-list, submit, pay या delete से पहले approval, record किए गए screenshots, और captchas और OTPs किसी इंसान को।
+
+ये lesson Pune की एक chartered accountancy firm के साथ चलता है, जो हर महीने clients के tax documents हाथ से download करने में घंटे लगाती थी।
+
+## ये काम कैसे करता है
+
+**Options की सीढ़ी, सबसे भरोसेमंद से सबसे कम तक:**
+
+1. **एक API**, अगर है या माँगी जा सकती है।
+2. **Scripted browser automation**, Playwright जैसी library से: आपके लिखे fixed steps, agent को एक tool की तरह दिए हुए ("download_gst_return(gstin, period)")। तेज़, सस्ता और predictable।
+3. **Agent-driven browsing**: agent page की structure पढ़ता है और actions तय करता है, उन sites के लिए जो बदलती रहती हैं।
+4. **Screenshots से full computer use**, desktop apps और सबसे मुश्किल cases के लिए। सबसे धीमा, सबसे महँगा और सबसे कम भरोसेमंद।
+
+जो सबसे ऊँची सीढ़ी काम करे वही use करो, और उन्हें मिलाओ: जाने-पहचाने steps के लिए scripted tools, agent का control सिर्फ़ वहाँ जहाँ pages का अंदाज़ा नहीं लगता।
+
+**Loop।** Screenshot, action तय करो (किसी point पर click, type, scroll, कोई key दबाना), करो, फिर screenshot। हर step एक image के साथ model call है, इसलिए लंबे tasks में मिनट लगते हैं और असली पैसे खर्च होते हैं।
+
+**Safety।**
+
+- एक isolated virtual machine या container में चलाओ, जिसमें सिर्फ़ ज़रूरी apps और accounts हों।
+- सीमित करो कि कौन-सी websites तक पहुँचा जा सकता है।
+- इसे कभी general credentials मत दो; सबसे कम permission वाला dedicated account use करो।
+- Screen पर जो भी है उसे untrusted मानो: web pages में agents को निशाना बनाकर लिखे instructions हो सकते हैं।
+- Forms submit करने, payment, भेजने या delete करने से पहले human approval ज़रूरी करो।
+- Audit के लिए हर session के screenshots या video record करो।
+
+**Reliability।** Pages बदलते हैं, pop-ups आते हैं, sessions expire होते हैं, captchas bots को रोकते हैं। Failures की उम्मीद रखो, उन्हें detect करो (उम्मीद की हुई confirmation नहीं दिखी) और इंसान को वापस सौंप दो।
+
+**सीढ़ियों की तुलना:**
+
+| Rung | हर action की speed | Cost | कब टूटता है | किसके लिए best |
+| --- | --- | --- | --- | --- |
+| API | Milliseconds | सबसे कम | API बदले, कभी-कभार | जिसमें API हो वो सब |
+| Scripted tool | एक second से कम | कम | Page layout बदले; ज़ोर से fail होता है | Stable portals |
+| Agent browsing | Seconds | Medium | अजीब pages, pop-ups | बदलती sites |
+| Computer use | दसियों seconds | सबसे ज़्यादा | कई चीज़ों पर | Desktop apps, आख़िरी रास्ता |
+
+**Failure को पहचानना।** हर automated step को पता होना चाहिए कि success कैसा दिखता है: एक confirmation message, उम्मीद के size की downloaded file, list में नई row। हर ज़रूरी action के बाद उसे check करो। जब वो न दिखे, तो अंदाज़ा लगाने की जगह रुक जाओ, आख़िरी screenshot और अब तक के steps save करो, और साफ़ note के साथ task इंसान को सौंप दो। Tax या banking portal में चुपचाप हुई गलत action, रुके हुए task से कहीं महँगी पड़ती है।
+
+**Value नापना।** बचे हुए घंटे, हर step की success rate, हर action का औसत समय और hand-backs की संख्या track करो। Hand-backs project की failure नहीं हैं; वो system का design के मुताबिक काम करना है। अगर वो एक ही page पर जमा हों, तो वो page scripted tool का candidate है।
+
+**Success check वाला scripted browser tool।** ये Playwright की Python API use करता है। Agent को बस एक tool दिखता है, `download_notice`, एक argument के साथ:
+
+```python
+from pathlib import Path
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+
+ALLOWED = {"www.example-gov.in"}                       # the only site this tool may reach
+
+def download_notice(notice_id: str) -> str:
+    if not notice_id.isdigit():
+        return "notice_id must be digits only."
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(accept_downloads=True)
+        page.route("**/*", lambda route: route.continue_()
+                   if route.request.url.split("/")[2] in ALLOWED else route.abort())
+        try:
+            page.goto("https://www.example-gov.in/notices", timeout=20_000)
+            page.get_by_label("Notice number").fill(notice_id)
+            page.get_by_role("button", name="Search").click()
+            with page.expect_download(timeout=20_000) as dl:
+                page.get_by_role("link", name="Download PDF").click()
+            path = Path("downloads") / f"notice-{notice_id}.pdf"
+            dl.value.save_as(path)
+            if path.stat().st_size < 1_000:                 # success check: a real PDF, not an error page
+                return "Download looked empty; a person should check this notice."
+            return f"Saved {path}"
+        except PWTimeout:
+            page.screenshot(path=f"downloads/failed-{notice_id}.png")
+            return "The site did not respond as expected; screenshot saved for a person."
+        finally:
+            browser.close()
+```
+
+Labels और roles (`get_by_label`, `get_by_role`) CSS paths से बेहतर तरीके से layout बदलावों में टिकते हैं। हर exit एक ऐसा वाक्य लौटाता है जिसे agent आगे बता सके।
+
+**Screenshot loop, एक झलक।** Computer-use models एक loop में काम करते हैं जिसे आपका code चलाता है:
+
+```python
+for step in range(MAX_STEPS):
+    shot = take_screenshot()
+    action = model_decide(goal, history, shot)        # e.g. {"type": "click", "x": 412, "y": 300}
+    if action["type"] == "done":
+        break
+    if is_risky(action, current_url()):               # submit, pay, send, delete
+        if not ask_person(action, shot):
+            break
+    perform(action)
+    history.append(action)
+```
+
+Providers अपने action formats के साथ computer-use tools देते हैं; ऊपर वाला ढाँचा वही रहता है। `is_risky` check आपका अपना code है, जो page का address और click के नीचे का element देखता है, model की राय नहीं।
+
+**Practice में isolation।** Browser को ऐसे container में चलाओ जिसकी आपके internal network तक पहुँच न हो, outbound allow list हो, हर task के लिए नई profile हो और एक dedicated low-permission account हो। हर task के बाद container delete कर दो ताकि cookies और downloads एक run से दूसरे में leak न हों।
+
+**ये कितने अच्छे हैं?** Web और desktop tasks के public benchmarks लगातार प्रगति दिखाते हैं, पर agents अब भी कई रोज़ के tasks में fail होते हैं जिन्हें लोग आराम से पूरा कर लेते हैं, खासकर लंबे tasks जिनमें pop-ups, logins या अजीब layouts हों। कुछ भी वादा करने से पहले अपने tasks पर नापो।
+
+## एक example से समझो
+
+Pune की एक chartered accountancy firm हर महीने सरकारी portal और एक पुरानी accounting desktop app से, जिसमें API नहीं है, clients के tax documents download करने में घंटे लगाती है।
+
+Design:
+
+- Portal के लिए, एक scripted Playwright tool vault से client-authorised credentials लेकर login करता है, जाने-पहचाने pages पर जाता है और files download करता है। Agent tool को बुलाता है; वो खुली browsing नहीं करता। जब portal का layout बदलता है, तो script ज़ोर से fail होती है और एक engineer उसे ठीक करता है।
+- Desktop accounting app के लिए, एक computer-use agent Windows virtual machine में चलता है जिसमें file share के अलावा internet नहीं है। वो app के menus follow करके ledgers export करता है। किसी भी file के ऊपर save करने से पहले वो एक staff member से approval माँगता है।
+- Captchas और one-time passwords design से इंसान के पास जाते हैं।
+
+Results: 120 clients का महीने का download काम करीब 60 staff घंटों से घटकर 12 रह जाता है, ज़्यादातर approvals और exceptions। Computer-use steps औसतन हर action पर 40 seconds लेते हैं और 91% बार सफल होते हैं; failures आख़िरी screenshot के साथ वापस सौंप दी जाती हैं।
+
+| माप | पहले | बाद में |
+| --- | --- | --- |
+| हर महीने staff घंटे, 120 clients | करीब 60 | करीब 12, ज़्यादातर approvals और exceptions |
+| हर action पर computer-use का समय | लागू नहीं | करीब 40 seconds |
+| Computer-use की success rate | लागू नहीं | 91%, failures screenshot के साथ वापस सौंपी गईं |
+
+## आम गलतियाँ
+
+- **जहाँ API या script काफ़ी होती, वहाँ screen control।** ये धीमा, महँगा और कम भरोसेमंद है।
+- **असली desktop पर असली logins के साथ चलाना।** Isolated machine और dedicated account use करो।
+- **Screen के text पर भरोसा करना।** Pages में injected instructions हो सकते हैं।
+- **वापस न होने वाली actions से पहले इंसान न होना।** Submissions और payments के लिए approval चाहिए।
+- **Captchas को हराने की कोशिश।** उनका सम्मान करो; वो step इंसान को सौंपो।
+- **Tasks के बीच browser profile दोबारा use करना।** Cookies और sessions एक job से अगली में leak हो जाते हैं।
+- **Scripted tools में CSS-path selectors।** वो छोटे layout बदलावों पर टूट जाते हैं; labels और roles को चुनो।
+
+## Computer-use agent कब use न करें
+
+- **API या export मौजूद है**, या vendor से माँगा जा सकता है।
+- **Steps fixed हैं**: scripted Playwright tool तेज़, सस्ता और ज़्यादा भरोसेमंद है।
+- **Site अपनी terms में automation मना करती है**, या उसे रोकने के लिए captchas लगाती है।
+- **गलतियाँ महँगी हैं और पकड़ना मुश्किल**, जैसे tax filings, जब तक कोई इंसान हर submission न देखे।
+
+## Demo से production तक
+
+- **हर session को isolate करो**, allow list और dedicated account वाले नए container में।
+- **हर run के screenshots या video record करो**, जितने समय audits को चाहिए उतने समय तक रखो।
+- **Approval ज़रूरी करो**, किसी भी submit, pay, send या delete से पहले।
+- **हर step की success और hand-back rate track करो**, और जो pages सबसे ज़्यादा fail हों उन्हें script करो।
+- **Site के बदलावों पर नज़र रखो**: हर portal पर रोज़ की एक scripted check, users से पहले layout बदलाव पकड़ लेती है।
+
+## Practice करो
+
+Computer-use tool के docs और Playwright का getting-started page पढ़ो।
+
+1. किसी public site पर Playwright से एक browser task script करो (जैसे किसी सरकारी website से latest notices लाना) और उसे एक agent को एक tool की तरह दो।
+2. किसी हानिरहित task पर एक browser या computer-use agent को container में चलाओ, हर step के screenshots save करके।
+3. किसी भी form submission से पहले एक approval step जोड़ो, और एक छिपे instruction वाले page से test करो।
+4. अपने scripted tool में allow-list route जोड़ो, फिर उसे ऐसे page पर चलाओ जो किसी दूसरी site से script load करता हो, और पक्का करो कि request block हो जाती है।
+
+**आपका काम पूरा जब:** आप समझा सको कि हर step के लिए आपने सीढ़ी का कौन-सा rung use किया और क्यों।

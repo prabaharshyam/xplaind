@@ -1,0 +1,259 @@
+---
+id: kubernetes-helm-basics
+lang: hi
+title: "Kubernetes और Helm की basics"
+outcome: "Client की platform team जिस Kubernetes set-up पर आपकी service चलाती है, उसे पढ़ और बदल पाओगे: deployments, services, config, scaling और Helm charts।"
+answer: "Kubernetes containers को कई servers पर चलाता है: Deployment आपके app की copies चलती रखता है, Service उन्हें एक address देती है, और Helm set-up को दोबारा इस्तेमाल होने वाले chart में package करता है।"
+why_it_matters: "ज़्यादातर बड़े भारतीय enterprises और उनके cloud partners services Kubernetes पर चलाते हैं। आप आमतौर पर cluster नहीं बनाओगे, पर उस पर deploy करना, उसके errors पढ़ना और उसके मालिकों से उनकी भाषा में बात करना आना चाहिए।"
+flashcards:
+  - q: "Kubernetes क्या करता है?"
+    a: "Cluster पर containers चलाता है और असलियत को आपके description से मिलाए रखता है: उन्हें start करना, restart करना, move करना और load-balance करना।"
+  - q: "Helm क्या है?"
+    a: "एक package manager जो app की Kubernetes files को एक chart में बाँधता है, जिसमें हर environment के लिए बदली जा सकने वाली values होती हैं।"
+  - q: "Pod और Deployment में क्या फ़र्क है?"
+    a: "Pod चलते containers का एक disposable set है; Deployment बताता है कि किस image के कितने pods चलाने हैं और updates कैसे roll out करने हैं।"
+  - q: "Service क्या करती है?"
+    a: "एक स्थिर नाम और address देती है जो traffic को जो भी pods healthy हों उन तक भेजता है।"
+  - q: "Resource requests और limits क्या हैं?"
+    a: "Requests वो हैं जो container को पक्का मिलता है; limits वो सबसे ज़्यादा हैं जो वो use कर सकता है। Memory limit पार करने पर वो OOMKilled होकर मर जाता है।"
+  - q: "Liveness और readiness probes क्या करते हैं?"
+    a: "Liveness Kubernetes को बताता है कि pod ज़िंदा है; readiness बताता है कि pod traffic ले सकता है।"
+  - q: "Helm release को rollback कैसे करते हैं?"
+    a: "helm rollback से, जो पिछली release की settings और image पर लौटा देता है।"
+  - q: "'latest' image tag से क्यों बचें?"
+    a: "आप बता नहीं सकते कि कौन-सा version चल रहा है, इसलिए rollbacks और audits अंदाज़ा बन जाते हैं।"
+  - q: "PodDisruptionBudget किसे बचाता है?"
+    a: "ये node maintenance के दौरान एक साथ कितने pods बंद हो सकते हैं उसे सीमित करता है, ताकि service के पास काफ़ी replicas चलते रहें।"
+  - q: "Pods GPU कैसे माँगते हैं?"
+    a: "Container के resources में nvidia.com/gpu पर limit set करके, ऐसे cluster पर जिसमें NVIDIA device plugin हो; GPU nodes को आमतौर पर मेल खाता toleration भी चाहिए।"
+exercise:
+  title: "Cluster को पढ़ो"
+  setup: "आपने Gurugram के एक insurer के Kubernetes cluster पर Helm से एक document-classification API deploy की। एक upgrade के बाद: हर deploy के करीब एक मिनट बाद तक users को errors मिलते हैं; एक pod CrashLoopBackOff दिखाता है; chart में image tag 'latest' है; और एक colleague ने पिछले हफ़्ते kubectl edit से एक environment variable ठीक किया था, जो आज के upgrade के बाद गायब हो गया।"
+  questions:
+    - q: "हर deploy के बाद errors की संभावित वजह क्या है?"
+      a: "Readiness probe का न होना: model load होना ख़त्म करने से पहले ही traffic नए pods तक पहुँच जाता है। /ready पर एक probe जोड़ो।"
+    - q: "CrashLoopBackOff वाले pod की जाँच कैसे करोगे?"
+      a: "आख़िरी state और events के लिए kubectl describe pod, और crashed container के output के लिए --previous के साथ kubectl logs।"
+    - q: "'latest' tag की जगह क्या होना चाहिए?"
+      a: "एक specific version tag जैसे classify-api:1.4.2, ताकि rollbacks और audits को ठीक-ठीक पता हो कि क्या चल रहा है।"
+    - q: "kubectl edit वाला fix गायब क्यों हुआ, और सही तरीका क्या है?"
+      a: "Helm upgrade ने chart को दोबारा लागू कर दिया। बदलाव को chart की values में डालो और upgrade करो।"
+ask:
+  - "Pod, Deployment और Service में क्या फ़र्क है?"
+  - "बार-बार restart होने वाले pod को debug कैसे करूँ?"
+  - "Helm chart क्या है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Kubernetes** machines के एक group (cluster) पर containers चलाता है। तुम बताते हो कि क्या चाहिए, जैसे "इस image की तीन copies, हर एक में 1 CPU और 2 GB memory, इस नाम पर पहुँचने लायक", और Kubernetes असलियत को उस description से मिलाए रखता है: वो containers start करता है, crash हुए containers restart करता है, उन्हें खराब हुई machines से हटाकर कहीं और ले जाता है और traffic बाँटता है।
+
+**Helm** किसी app की सारी Kubernetes files को एक **chart** में package करता है, जिसमें बदली जा सकने वाली values होती हैं, ताकि वही chart staging और production में अलग settings के साथ install हो सके।
+
+FDE के तौर पर तुम ज़्यादातर Kubernetes के किनारे पर काम करते हो: तुम एक image और एक chart या कुछ YAML files ship करते हो, और client की platform team cluster चलाती है।
+
+```flow
+बाहर का traffic, HTTPS -> Ingress | contracts.bank.example
+Ingress -> Service: contracts-api | एक स्थिर नाम; सिर्फ़ ready pods को भेजता है
+Service: contracts-api -> Pod 1
+Service: contracts-api -> Pod 2
+Service: contracts-api -> Pod 3
+Deployment | contracts-api:2.3.1 की 3 replicas; हर pod 500m CPU और 1Gi माँगता है, limits 1 CPU और 2Gi; probes /health और /ready -> Pod 1
+ConfigMap और Secret | settings, और model key जो platform team बनाती है -> Pod 2
+Helm chart + values-staging.yaml या values-prod.yaml -[helm upgrade, helm rollback]-> Deployment
+```
+
+ये lesson Mumbai के एक bank के Kubernetes platform पर deploy हुई contract-analysis API के साथ चलता है।
+
+## ये काम कैसे करता है
+
+मुख्य objects:
+
+- **Pod**: एक या ज़्यादा containers जो साथ चलते हैं। Pods disposable होते हैं; Kubernetes उन्हें आराम से बदलता रहता है।
+- **Deployment**: बताता है कि किस image के कितने pods चलाने हैं और नया version कैसे roll out करना है (धीरे-धीरे, एक बार में कुछ को बदलते हुए)।
+- **Service**: एक स्थिर नाम और address जो traffic को उन pods तक भेजता है जो अभी healthy हैं।
+- **Ingress**: बाहर के HTTP traffic को services तक route करता है, आमतौर पर HTTPS के साथ।
+- **ConfigMap** और **Secret**: settings और संवेदनशील values जो pods को environment variables या files की तरह दी जाती हैं।
+- **HorizontalPodAutoscaler**: CPU, memory या custom metrics के आधार पर pods जोड़ता या हटाता है।
+
+हर container **requests** (जो उसे पक्का मिलता है) और **limits** (जितना वो ज़्यादा से ज़्यादा use कर सकता है) declare करता है। जो container अपनी memory limit पार करता है उसे मार दिया जाता है, जो `OOMKilled` की तरह दिखता है। **Probes** Kubernetes को बताते हैं कि pod कब ज़िंदा है (liveness) और traffic के लिए तैयार है (readiness); ये serving वाले lesson के `/health` और `/ready` endpoints से जुड़ते हैं।
+
+तुम `kubectl` से काम करते हो: `get pods`, `describe pod`, `logs`, `rollout status`, `rollout undo`। Helm के साथ: `helm install`, `helm upgrade --values prod.yaml`, `helm rollback`।
+
+**आम pod states और क्या करें:**
+
+| State | आमतौर पर मतलब | पहला command |
+| --- | --- | --- |
+| Pending | किसी machine के पास requests के लिए जगह नहीं | Scheduling events के लिए `kubectl describe pod` |
+| ImagePullBackOff | Image का नाम, tag या registry access गलत | Tag और registry secret check करो |
+| CrashLoopBackOff | App शुरू होते ही बंद हो जाता है | `kubectl logs --previous` |
+| OOMKilled | Memory limit पार हो गई | Peak memory नापो; limit बढ़ाओ या use घटाओ |
+| Running पर ready नहीं | Readiness probe fail हो रहा है | `/ready` endpoint और उसकी dependencies check करो |
+
+**Requests और limits चुनना।** तय करने से पहले नापो। असली inputs के साथ load test चलाओ, जिनमें users के भेजे सबसे बड़े documents भी हों, और हर pod की memory और CPU देखो। Requests सामान्य use के पास रखो और memory limits को देखे गए peak से आराम से ऊपर। बहुत कम requests cluster को pods बहुत ठूँसकर रखने देते हैं; बहुत कम limits बड़े inputs पर pods को मार देती हैं। Numbers platform team से तय करो, क्योंकि machines का पैसा वो देते हैं।
+
+**Platform team के साथ काम करना।** जल्दी पूछो कि वो क्या देते हैं: namespace, ingress set-up, Secrets कैसे बनते हैं, कौन-सी registries allowed हैं, monitoring और log collection। कई platform teams के पास standard chart या policies होती हैं, जैसे ज़रूरी labels और resource limits, और जो deploy उन्हें नज़रअंदाज़ करे वो reject हो जाता है।
+
+**AI API के लिए बना Deployment।** Probes, resources, एक सुरक्षित rollout और streams के लिए grace period:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: claims-api}
+spec:
+  replicas: 3
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}        # never drop below 3 during a rollout
+  selector: {matchLabels: {app: claims-api}}
+  template:
+    metadata: {labels: {app: claims-api}}
+    spec:
+      terminationGracePeriodSeconds: 120                    # longer than the longest streamed answer
+      containers:
+        - name: api
+          image: registry.example.in/claims-api:3f9c2e1
+          ports: [{containerPort: 8000}]
+          envFrom: [{secretRef: {name: claims-api-secrets}}]
+          resources:
+            requests: {cpu: "500m", memory: "768Mi"}
+            limits: {memory: "1536Mi"}
+          readinessProbe:
+            httpGet: {path: /ready, port: 8000}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: claims-api}
+spec:
+  minAvailable: 2
+  selector: {matchLabels: {app: claims-api}}
+```
+
+**Autoscaling।** शुरू में CPU पर scale करो; जो AI APIs ज़्यादातर model calls का इंतज़ार करती हैं, उनके लिए प्रति pod in-flight requests जैसा custom metric load को बेहतर पकड़ता है:
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: claims-api}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: claims-api}
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 65}}
+```
+
+**GPU workloads।** Model server का pod GPUs साफ़ तौर पर माँगता है और उसे GPU nodes पर आने की इजाज़त होती है:
+
+```yaml
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.10.1
+          resources: {limits: {nvidia.com/gpu: 1}}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+```
+
+Model weights को persistent volume या पहले से गर्म किए cache पर होना चाहिए, हर pod start पर download नहीं, वरना scale up में कई मिनट लगते हैं।
+
+**हर environment के लिए Helm values।** Templates एक बार रखो और फ़र्क छोटे रखो:
+
+```yaml
+# values-prod.yaml
+replicas: 3
+image: {tag: 3f9c2e1}
+resources: {requests: {cpu: 500m, memory: 768Mi}, limits: {memory: 1536Mi}}
+hpa: {min: 3, max: 12}
+```
+
+`helm upgrade --install claims-api ./chart -f values-prod.yaml --atomic --timeout 10m` अपने आप rollback कर देता है अगर नए pods कभी ready न हों।
+
+**अपने browser में try करो।** Apply करने से पहले किसी Deployment में गायब probes और limits check करो। YAML बदलकर देखो।
+
+```python
+import yaml
+
+deployment = yaml.safe_load("""
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: api
+          image: registry.example.in/claims-api:latest
+          resources: {requests: {cpu: 500m}}
+""")
+spec = deployment["spec"]
+if spec.get("replicas", 1) < 2:
+    print("fewer than 2 replicas: one restart takes the service down")
+for c in spec["template"]["spec"]["containers"]:
+    if c["image"].endswith(":latest"): print(f"{c['name']}: pin the image tag")
+    if "readinessProbe" not in c: print(f"{c['name']}: add a readiness probe")
+    if "limits" not in c.get("resources", {}): print(f"{c['name']}: set a memory limit")
+```
+
+## एक example से समझो
+
+आप Mumbai के एक bank के Kubernetes platform पर एक contract-analysis API deploy करते हो। Platform team आपको एक namespace देती है और Helm chart माँगती है।
+
+आपके chart का `values-prod.yaml` 3 replicas, 500m CPU और 1Gi memory के requests, 1 CPU और 2Gi की limits, image tag `contracts-api:2.3.1`, ingress host और model key वाले Secret का reference set करता है (Secret platform team बनाती है; आपके chart में उसकी value कभी नहीं होती)।
+
+`helm upgrade` के बाद, तीन में से दो pods बार-बार restart हो रहे हैं। आप check करते हो:
+
+```bash
+kubectl get pods -n contracts
+kubectl describe pod contracts-api-7d9c-xk2lp -n contracts   # Last State: OOMKilled
+kubectl logs contracts-api-7d9c-xk2lp -n contracts --previous
+```
+
+`OOMKilled`: नया version एक बड़ा tokenizer और एक PDF library load करता है जो बड़े contracts पर 2.4 GB पर peak करती हैं। आप `helm rollback contracts-api` से rollback करते हो ताकि users पर असर न पड़े, platform team से सहमति के बाद limit 3Gi करते हो, और CI में 300-page वाले contract का एक test जोड़ते हो ताकि अगली memory की छलांग deploy से पहले पकड़ी जाए।
+
+| Step | Command या बदलाव |
+| --- | --- |
+| Restarts पकड़ो | `kubectl get pods -n contracts` |
+| वजह ढूँढो | `kubectl describe pod ...` ने OOMKilled दिखाया |
+| Users को बचाओ | `helm rollback contracts-api` |
+| Fix | Memory limit 3Gi की गई, platform team से सहमति के साथ |
+| आगे रोकथाम | CI में 300-page contract का test जोड़ा |
+
+## आम गलतियाँ
+
+- **Resource requests या limits नहीं।** Pods दब जाते हैं या दूसरों को दबा देते हैं। हमेशा दोनों set करो, नाप से।
+- **Readiness probe गायब।** Traffic ऐसे pods तक पहुँचता है जो अभी models load कर रहे हैं और हर deploy के बाद users को errors दिखते हैं।
+- **Chart में Secrets।** Values files Git में पहुँच जाती हैं। Platform के managed Secrets का reference दो।
+- **Image tag के तौर पर `latest` use करना।** Rollbacks और audits अंदाज़ा बन जाते हैं।
+- **Production में kubectl edit से चीज़ें ठीक करना।** अगला Helm upgrade उसे वापस पलट देता है। Chart बदलो।
+- **कम replicas के साथ maxUnavailable शून्य से ऊपर**, जिससे rollout capacity घटा देता है।
+- **छोटी termination grace period**, जो हर deploy पर streamed answers काट देती है।
+- **Pod start पर model weights download करना**, जिससे scale-up धीमा हो जाता है।
+
+## कब Kubernetes की ज़रूरत नहीं
+
+- **थोड़े traffic वाली कुछ services**: serverless containers (Cloud Run, Container Apps, Fargate पर ECS) ज़्यादा simple हैं।
+- **बिना platform engineers की छोटी team**, जहाँ cluster ही मुख्य काम बन जाता है।
+- **Prototypes और pilots**, जब तक client की platform team पहले से आपके लिए cluster न चला रही हो।
+
+## Demo से production तक
+
+- **Requests और limits load tests से set करो**, और OOMKilled pods पर alert लगाओ।
+- **ऐसे readiness और liveness probes use करो** जो वही check करते हों जो वो कहते हैं।
+- **Capacity बचाओ** maxUnavailable 0 और PodDisruptionBudget से।
+- **`helm upgrade --atomic` से deploy करो** और rollback को एक command दूर रखो।
+- **GPU workloads के लिए model weights** को volumes पर cache करो।
+
+## Practice करो
+
+Kubernetes basics tutorial और Helm का quickstart करो। एक free local cluster (kind, minikube या Docker Desktop का) काफ़ी है।
+
+1. अपने containerised FastAPI app को Deployment, Service और `/ready` और `/health` पर readiness और liveness probes के साथ deploy करो।
+2. उसे Helm chart की तरह package करो, "staging" (1 replica) और "prod" (3 replicas) की अलग values के साथ।
+3. जान-बूझकर memory limit बहुत कम रखो, pod को `OOMKilled` होते देखो, `kubectl describe` से वजह पढ़ो, फिर ठीक करके दोबारा roll out करो।
+4. maxUnavailable 0 और PodDisruptionBudget के साथ deploy करो, rollout के दौरान load test चलाओ, और पक्का करो कि कोई request fail नहीं हुई।
+
+**आपका काम पूरा जब:** आप Helm से अपना app deploy, upgrade और rollback कर सको और `kubectl describe` से समझा सको कि कोई pod क्यों नहीं चल रहा।

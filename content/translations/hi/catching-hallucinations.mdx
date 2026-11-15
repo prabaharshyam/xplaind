@@ -1,0 +1,166 @@
+---
+id: catching-hallucinations
+lang: hi
+title: "Hallucination पकड़ना: model बातें क्यों गढ़ते हैं और इसे कैसे detect करें"
+outcome: "समझा पाओगे कि models hallucinate क्यों करते हैं, अपने model के गलत होने वाले सवाल ढूँढ पाओगे, और judge checks, claim-by-claim verification, entailment models और self-consistency से unsupported claims अपने आप detect कर पाओगे।"
+answer: "Model तब बातें गढ़ता है जब वो अपने ही अंदाज़ों पर आगे बनाता है या जितना जानता है उससे आगे जवाब देता है। इसे पकड़ने के लिए हर claim को source से मिलाओ, judge या entailment model से, या दोबारा sample करके।"
+why_it_matters: "एक confident, गढ़ा हुआ fact एक client, एक court case या एक patient का भरोसा खो सकता है। जो teams हर सवाल के type पर hallucination नापती हैं और उसे अपने आप पकड़ती हैं, वो गंभीर काम में AI ship कर सकती हैं; जो बस उम्मीद करती हैं, वो नहीं कर सकतीं।"
+flashcards:
+  - q: "Hallucination क्या है?"
+    a: "ऐसा confident जवाब, या उसका कोई हिस्सा, जिसे facts या model को दिए गए source का सहारा नहीं है।"
+  - q: "Hallucination में 'snowballing' क्या है?"
+    a: "Model अपने ही पहले के गलत बयान को fact मान लेता है और उस पर आगे बनाता चला जाता है, पहली गलती सही ठहराने के लिए और errors जोड़ते हुए।"
+  - q: "Hallucination कराने वाले दो तरह के सवाल बताओ।"
+    a: "Niche topics जो model ने कम देखे, और ऐसी चीज़ों के बारे में सवाल जो हैं ही नहीं, जैसे किसी ने ऐसे विषय पर क्या कहा जिस पर उसने कुछ कहा ही नहीं।"
+  - q: "Local और global factual consistency में क्या फ़र्क है?"
+    a: "Local: जवाब किसी दिए गए source से मेल खाता है, जैसे document या policy। Global: वो आम तौर पर माने जाने वाले facts से मेल खाता है।"
+  - q: "Claim-by-claim checking कैसे काम करती है?"
+    a: "जवाब को अलग-अलग claims में तोड़ो, हर एक को अपने आप में पूरा बनाओ, हर एक के लिए evidence ढूँढो, और हर claim को supported या not supported judge करो।"
+  - q: "Entailment (NLI) model क्या करता है?"
+    a: "एक source और एक claim देने पर वो claim को supported, contradicted या दोनों नहीं, ऐसा label करता है। ये factual consistency का छोटा, सस्ता checker है।"
+  - q: "SelfCheckGPT का idea क्या है?"
+    a: "Model से कई बार और sample करो। अगर नए जवाब original से मेल नहीं खाते, तो original शायद गढ़ा हुआ है।"
+  - q: "Detect करने की ज़रूरत पड़ने से पहले hallucination कैसे कम करें?"
+    a: "Model को facts दो (retrieval), कहो कि सिर्फ़ उन्हीं से जवाब दे और न पता हो तो बोले, और citations ज़रूरी करो।"
+exercise:
+  title: "Indian freelancers के लिए tax-help assistant"
+  setup: "Bengaluru की एक fintech एक assistant चलाती है जो Income Tax Act के retrieved sections और CBDT circulars से freelancers के income tax सवालों के जवाब देता है। 100 जवाब review करने वाले एक lawyer को 9 में unsupported claim मिला, ज़्यादातर rare deductions और ऐसे circulars के बारे में जो हैं ही नहीं।"
+  questions:
+    - q: "उन्हें सबसे पहले क्या नापना चाहिए?"
+      a: "सवाल के type के हिसाब से hallucination rate। Review पहले ही rare deductions और non-existent circulars वाले सवालों की तरफ़ इशारा करता है, इसलिए उनके अपने test cases चाहिए।"
+    - q: "Unsupported claims अपने आप कैसे detect करें?"
+      a: "हर जवाब को claims में बाँटो और हर एक को retrieved sections से मिलाओ, judge model या entailment model से। जिस claim का कोई support न हो, उसे flag करो।"
+    - q: "जब sources सवाल का जवाब न दें तो assistant को क्या करना चाहिए?"
+      a: "साफ़ बोले कि जवाब नहीं है और chartered accountant की तरफ़ भेजे, general knowledge से जवाब देने की जगह।"
+    - q: "क्या जवाब को पाँच बार sample करके compare करना यहाँ रोज़ का अच्छा check है?"
+      a: "Spot checks के लिए काम का है, पर हर जवाब के लिए बहुत महँगा। Claims को retrieved sources से मिलाना सस्ता और ज़्यादा सीधा है।"
+ask:
+  - "Language models hallucinate क्यों करते हैं?"
+  - "Hallucinations अपने आप कैसे detect करूँ?"
+  - "RAG app में hallucinations कैसे कम करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Hallucination** एक confident जवाब है, या उसका कोई हिस्सा, जिसे facts या model को दिए गए source का सहारा नहीं है। 2023 में एक law firm पर जुर्माना लगा, क्योंकि उसने court filings में ऐसे cases दे दिए जो एक chatbot ने गढ़े थे। खतरा ये नहीं कि model को पक्का नहीं पता; खतरा ये है कि वो पक्का लगता है।
+
+सही होने की दो काम की किस्में हैं:
+
+- **Local factual consistency**: क्या जवाब किसी दिए गए source से मेल खाता है, जैसे retrieved document, company policy या data? Summaries, support assistants और RAG apps में ये मायने रखता है।
+- **Global factual consistency**: क्या वो आम तौर पर माने जाने वाले facts से मेल खाता है? Open chat, research और fact-checking में ये मायने रखता है।
+
+Local consistency check करना बहुत आसान है, क्योंकि source आपके हाथ में है। Models को retrieval से facts देने की ये एक और वजह है।
+
+**ऐसा क्यों होता है।** दो explanations ज़्यादा चर्चा में हैं:
+
+1. **Self-delusion, या snowballing।** Model को नहीं पता चलता कि जो text उसे दिया गया और जो उसने खुद लिखा, उनमें क्या फ़र्क है। अगर शुरू का कोई वाक्य थोड़ा गलत है, तो बाद के वाक्य उसे fact मानकर उस पर बनाते जाते हैं।
+2. **Model के ज्ञान से आगे सिखाना।** Training में models उन लोगों के लिखे जवाब copy करते हैं जो वो बातें जानते थे जो model नहीं जानता। इससे वो ज्ञान के बिना भी confident जवाब बनाना सीख जाते हैं।
+
+Practice में hallucinations दो जगह जमा होते हैं: **niche topics** जो model ने कम देखे, और **ऐसी चीज़ों के बारे में सवाल जो हैं ही नहीं** ("X पर RBI ने क्या कहा?" जबकि उसने कुछ कहा ही नहीं)।
+
+```flow
+title: जवाब में unsupported claims की जाँच
+जवाब -> अलग-अलग claims में बाँटो
+अलग-अलग claims में बाँटो -> हर claim को अपने आप में पूरा बनाओ | "वो" की जगह विषय का नाम रखो
+हर claim को अपने आप में पूरा बनाओ -> Evidence ढूँढो | retrieved source या search
+Evidence ढूँढो -> हर claim को judge करो | supported, contradicted, पता नहीं
+हर claim को judge करो -> कोई unsupported है?
+कोई unsupported है? -[नहीं]-> जवाब दिखाओ
+कोई unsupported है? -[हाँ]-> हटाओ, दोबारा लिखो या मना करो | और review के लिए log करो
+```
+
+## ये काम कैसे करता है
+
+**पहले रोको।** Detection उसे पकड़ता है जो बच निकला; रोकथाम से कुल मात्रा घटती है।
+
+- Model को facts दो: documents के लिए retrieval, live data के लिए tools।
+- कहो कि सिर्फ़ दिए गए sources से जवाब दे, और वरना "मुझे नहीं पता" या "documents में ये नहीं है" बोले।
+- हर claim के लिए source passage की citation माँगो, और check करो कि cited passage सच में है।
+- Factual tasks में temperature कम रखो, और लंबे tasks को छोटे steps में तोड़ो ताकि errors snowball न हों।
+
+**ढूँढो कि आपका model कहाँ hallucinate करता है।** Detectors बनाने से पहले, गलत जवाब पढ़ो और उन्हें group करो। कमज़ोर जगहों को निशाना बनाने वाले test cases बनाओ: rare topics, गलत premise वाले सवाल, ऐसे सवाल जिनका जवाब sources में नहीं है। इनके बिना बना test set एक तसल्ली देने वाला number बताएगा जो असली users को नहीं दिखेगा।
+
+**Judge से detect करो।** Judge model को source और जवाब दो, और पूछो कि जवाब में कुछ ऐसा है क्या जिसे source support नहीं करता। Strong models ये अच्छे से करते हैं, खासकर छोटे जवाबों पर। भरोसा करने से पहले, एक sample पर judge को human labels से मिलाकर देखो।
+
+**Claim by claim detect करो।** लंबे जवाबों में सच और झूठ मिले होते हैं, इसलिए एक verdict समस्याएँ छिपा देता है। Google DeepMind की SAFE method ये pattern दिखाती है: जवाब को अलग-अलग claims में तोड़ो, हर एक को अपने आप में पूरा करके दोबारा लिखो, evidence के लिए search करो, फिर हर claim को judge करो। RAG apps में "search" वाला step बस retrieved passages हैं।
+
+**Entailment model से detect करो।** Natural language inference (NLI) models एक premise (source) और एक hypothesis (claim) लेते हैं और बताते हैं: **entailment** (supported), **contradiction** या **neutral** (पता नहीं चल सकता)। इसी के लिए train हुए छोटे, open models हर claim पर तेज़ी से और सस्ते में चलते हैं।
+
+**दोबारा sampling से detect करो।** SelfCheckGPT उसी सवाल के कई नए जवाब sample करता है। अगर वो original जवाब के claims से मेल नहीं खाते, तो वो claims शायद गढ़े हुए हैं, क्योंकि model जो सच में जानता है वो दोहराता है और जो गढ़ता है उसमें बदलाव करता है। इसे source नहीं चाहिए, पर cost कई गुना हो जाती है, इसलिए spot checks या high-stakes जवाबों के लिए use करो।
+
+Entailment model वाला एक simple claim checker:
+
+```python
+def unsupported_claims(answer, sources, split_claims, entails):
+    """split_claims(text) -> list of standalone claims.
+    entails(premise, claim) -> 'entailment' | 'contradiction' | 'neutral'."""
+    flagged = []
+    for claim in split_claims(answer):
+        verdicts = [entails(src, claim) for src in sources]
+        if "entailment" not in verdicts:
+            flagged.append({"claim": claim, "contradicted": "contradiction" in verdicts})
+    return flagged
+
+# for item in unsupported_claims(reply, retrieved_passages, split_claims, nli):
+#     log_for_review(item)
+```
+
+| Method | Source चाहिए? | हर जवाब की cost | किसके लिए best |
+| --- | --- | --- | --- |
+| पूरे जवाब पर judge model | हाँ, या search | Medium | छोटे जवाब, जल्दी checks |
+| Judge के साथ claim-by-claim | हाँ, या search | ज़्यादा | कई facts वाले लंबे जवाब |
+| हर claim पर entailment (NLI) model | हाँ | कम | RAG app का हर जवाब |
+| दोबारा sampling (self-consistency) | नहीं | ज़्यादा | Spot checks, open सवाल |
+| Citation check | हाँ | बहुत कम | कोई भी app जो sources दिखाता है |
+
+## एक example से समझो
+
+Bengaluru की एक fintech एक assistant चलाती है जो Income Tax Act के retrieved sections और CBDT circulars से freelancers के income tax सवालों के जवाब देता है। एक tax lawyer 100 जवाब review करता है और 9 में unsupported claim पाता है। छह rare deductions के बारे में हैं, और तीन ऐसे circulars बताते हैं जो हैं ही नहीं।
+
+उनके steps:
+
+1. **Targeted test set।** 150 सवाल: आम सवाल, rare deductions, और गलत premise वाले 30 सवाल ("Section 44ADA के तहत freelancer GST पर 2025 का circular क्या कहता है?")।
+2. **रोकथाम।** अब prompt कहता है कि सिर्फ़ passages से जवाब दो, जब वो सवाल cover न करें तो साफ़ बोलो, और हर claim के लिए section cite करो।
+3. **हर जवाब पर detection।** एक entailment model हर claim को retrieved passages से मिलाता है। Unsupported claims हटा दिए जाते हैं, और अगर मुख्य जवाब उन पर टिका है, तो assistant कहता है कि वो जवाब नहीं दे सकता और chartered accountant से पूछने को कहता है।
+4. **हफ़्ते का review।** एक judge model एक sample को score करता है, और lawyer वो सब देखता है जो checks ने flag किया।
+
+| 150-सवालों वाले set पर माप | पहले | बाद में |
+| --- | --- | --- |
+| किसी unsupported claim वाले जवाब | 11% | 2% |
+| गलत premise वाले सवाल जिनका जवाब ऐसे दिया गया जैसे वो सच हो | 60% | 7% |
+| ऐसे जवाब जो बिना ज़रूरत मना कर देते हैं | 1% | 4% |
+
+ये numbers सिर्फ़ समझाने के लिए हैं। आख़िरी row का trade-off देखो: सख़्त checks से assistant थोड़ा ज़्यादा बार मना करता है। Team दोनों numbers track करती है, क्योंकि जो assistant हर चीज़ पर मना कर दे, वो भी fail है।
+
+## आम गलतियाँ
+
+- **सिर्फ़ वही सवाल test करना जो model को अच्छे से आते हैं।** Rare topics और गलत premise वाले सवाल जोड़ो, वरना आपका score आपको झूठी तसल्ली देगा।
+- **लंबे जवाब पर एक ही verdict।** Claims को एक-एक करके check करो; नौ सच्चे वाक्यों में एक गढ़ा हुआ figure छिप सकता है।
+- **Citations को बिना check किए मान लेना।** पक्का करो कि cited passage है और claim को support करता है।
+- **Source होते हुए general knowledge से check करना।** RAG app में retrieved passages के खिलाफ़ judge करो।
+- **सिर्फ़ hallucinations गिनना।** Refusals भी track करो, ताकि fixes से assistant बेकार न हो जाए।
+- **ये मान लेना कि बड़ा model इसे ठीक कर देगा।** बड़े models आम facts पर कम hallucinate करते हैं, पर niche और गलत premise वाले सवालों पर अब भी गढ़ते हैं।
+
+## जब detection काफ़ी नहीं
+
+- **High-stakes जवाब**, जैसे legal, medical या financial सलाह, में किसी qualified इंसान को loop में रखना होगा।
+- **कोई भरोसेमंद source नहीं है।** अगर आप ये नहीं बता सकते कि facts क्या हैं, तो कोई checker नहीं बता सकता।
+- **Real-time voice** में claim checks के लिए समय न मिले; इसकी जगह उसे सुरक्षित, scripted topics तक सीमित रखो।
+
+## Demo से production तक
+
+- **सस्ते checks हर जवाब पर चलाओ** (citations, entailment) और महँगे checks एक sample पर।
+- **हर flagged claim को source के साथ log करो**, ताकि reviewers retrieval या documents ठीक कर सकें।
+- **Topic के हिसाब से hallucination और refusal rates track करो**, और model या prompt update के बाद अचानक बदलाव पर alert लगाओ।
+- **पक्की हुई failures को test set में डालो**, ताकि वो चुपचाप वापस न आएँ।
+
+## Practice करो
+
+1. किसी भी chat assistant से ऐसी चीज़ के बारे में तीन सवाल पूछो जो है ही नहीं, जैसे कोई मनगढ़ंत सरकारी scheme। वो कितनी बार उसमें साथ देता है?
+2. एक लंबा जवाब लो, उसे हाथ से claims में बाँटो, और हर एक को source से supported या not supported mark करो।
+3. एक prompt rule और एक output check लिखो जो आपको मिले सबसे बुरे claim को रोक देता।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) के chapters 2 और 4 बताते हैं कि hallucinations क्यों होते हैं और factual consistency कैसे नापें।
+
+**आपका काम पूरा जब:** आप बता सको कि models hallucinate क्यों करते हैं (दो explanations), इसे ट्रिगर करने वाले दो तरह के सवाल गिना सको, और इसे detect करने के तीन तरीके समझा सको।
