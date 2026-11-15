@@ -1,0 +1,217 @@
+---
+id: regression-models
+lang: hi
+title: "Regression"
+outcome: "ऐसे regression models बनाना और परखना जो numbers predict करते हैं: linear regression, coefficients का मतलब, MAE और RMSE जैसे error metrics, और outliers, non-linearity और extrapolation के जाल।"
+answer: "Regression model एक number predict करता है, जैसे price या demand। Linear regression baseline है, जिसे उस data पर MAE या RMSE से परखा जाता है जो model ने देखा नहीं।"
+why_it_matters: "कोई number predict करना (delivery का समय, price, अगले हफ़्ते की demand, loan की रकम) business में ML के सबसे आम कामों में से एक है। Linear regression ये सीखने का भी सबसे साफ़ तरीका है कि models कैसे fit होते हैं, कैसे फ़ेल होते हैं और उन्हें कैसे समझाया जाता है।"
+flashcards:
+  - q: "Regression क्या predict करता है?"
+    a: "एक number, जैसे delivery के minutes, price या demand का forecast, features से।"
+  - q: "Linear regression के coefficients का क्या मतलब है?"
+    a: "बाकी features को fixed रखकर, किसी feature की एक unit बढ़ने पर prediction कितना बदलता है। ये association बताते हैं, कारण नहीं।"
+  - q: "Linear regression आमतौर पर कौन-सा loss minimise करता है?"
+    a: "Mean squared error: predicted और असली values के फ़र्क के squares का average, जो बड़ी errors को कड़ी सज़ा देता है।"
+  - q: "MAE क्या है और businesses को क्यों पसंद है?"
+    a: "Mean absolute error: errors का average size, original units में, जैसे 'औसतन 3.2 minutes की गलती', जिसे समझाना आसान है।"
+  - q: "Baseline से तुलना क्यों करें?"
+    a: "अगर model हर बार median predict करने से मुश्किल से बेहतर है, तो वो ज़्यादा कुछ नहीं जोड़ रहा। Baseline दिखाता है कि 'बेहतर' का मतलब क्या है।"
+  - q: "Prices का log क्यों predict करें?"
+    a: "Prices skewed होती हैं। Log पर modelling करने से सस्ती और महँगी चीज़ों में errors ज़्यादा बराबर हो जाती हैं और accuracy अक्सर बढ़ती है।"
+  - q: "Extrapolations risky क्यों हैं?"
+    a: "Training में देखी range के बाहर, जैसे 40 km की delivery जबकि training में ज़्यादा से ज़्यादा 12 km थी, model अंदाज़ा लगा रहा होता है।"
+  - q: "Ridge और lasso क्या करते हैं?"
+    a: "जब features बहुत हों तो ये coefficients को सिकोड़कर overfitting घटाते हैं; lasso कुछ को ठीक शून्य कर सकता है।"
+  - q: "Prices के लिए target का log क्यों लें?"
+    a: "Price की errors आमतौर पर अनुपात में होती हैं: ₹3 लाख की car पर ₹50,000 की गलती ₹30 लाख की car से ज़्यादा मायने रखती है। Log target अनुपात वाली errors को ठीक से fit करता है और predictions को positive रखता है।"
+  - q: "Regression model एक number की जगह range कैसे दे सकता है?"
+    a: "Quantile models train करो, जैसे 10वें और 90वें percentile के लिए, और उनके बीच का band report करो।"
+exercise:
+  title: "Model को पढ़ो"
+  setup: "हैदराबाद का एक delivery model ये है: minutes = 6 + 2.1 × distance_km + 0.4 × items + 3 × rain (बारिश हो तो 1, नहीं तो 0)। Test month में इसका MAE 4.5 minutes है; हर बार 18 minutes का median predict करने पर MAE 7.8 minutes आता है। Training data में distances 0.5 से 12 km तक थीं।"
+  questions:
+    - q: "बारिश में 5 km और 10 items के order के लिए model क्या predict करेगा?"
+      a: "6 + 2.1 × 5 + 0.4 × 10 + 3 × 1 = 6 + 10.5 + 4 + 3 = 23.5 minutes।"
+    - q: "क्या baseline के मुकाबले model काम का है?"
+      a: "हाँ। ये average error को 7.8 से घटाकर 4.5 minutes कर देता है, यानी हर बार median predict करने से लगभग 42% बेहतर।"
+    - q: "क्या company को 30 km के order की prediction पर भरोसा करना चाहिए?"
+      a: "नहीं। ये 0.5 से 12 km की training range से बहुत बाहर है, इसलिए सीधी line यहाँ extrapolation है।"
+    - q: "क्या 2.1 coefficient साबित करता है कि हर km 2.1 minutes की देरी करवाता है?"
+      a: "नहीं। ये इस model के तहत एक association है; distance traffic और route type जैसी दूसरी बातों से जुड़ी होती है।"
+ask:
+  - "MAE और RMSE में क्या फ़र्क है?"
+  - "कैसे पता चले कि मेरा regression model अच्छा है?"
+  - "Linear regression की जगह gradient boosting कब use करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Regression** features से एक number predict करता है। **Linear regression** मानता है कि prediction, features का weighted sum और एक constant है:
+
+predicted delivery minutes = 6 + 2.1 × km में distance + 0.4 × items + 3 × (बारिश? 1 या 0)
+
+Weights (coefficients) बताते हैं कि बाकी को fixed रखकर, हर feature की एक unit बढ़ने पर prediction कितना बदलता है। Training वो weights ढूँढती है जिनसे पुराने data पर predictions असली values के सबसे पास आएँ।
+
+दूसरे regression models (decision trees, gradient boosting, neural networks) curves और interactions पकड़ सकते हैं, पर linear regression वो baseline है जिसे हराना होता है और जिसे समझाना सबसे आसान है।
+
+```text
+  price
+   |                                  *
+   |                          *   *
+   |                 *    * /        <- fitted line: price = a + b x feature
+   |          *    *   /  *
+   |     *      /  *
+   |   *    /                  residual = actual - predicted
+   |    /  *                   (vertical gap from point to line)
+   +-------------------------------- car age, km, ...
+```
+
+इस lesson में हम चेन्नई के एक used-car marketplace को देखेंगे, जो sellers के लिए suggested-price feature बना रहा है।
+
+## ये काम कैसे करता है
+
+**Fitting।** आम loss mean squared error है: predicted और असली values के फ़र्क के squares का average। Square करने से बड़ी errors को कड़ी सज़ा मिलती है। scikit-learn जैसी libraries इसे एक call में fit कर देती हैं।
+
+**Evaluate करना।** हमेशा उस data पर जिस पर model ने train नहीं किया।
+
+- **MAE** (mean absolute error): errors का average size, original units में ("औसतन 3.2 minutes की गलती")। समझाना आसान।
+- **RMSE** (root mean squared error): MAE जैसा, पर बड़ी errors को ज़्यादा सज़ा देता है।
+- **R²**: कितनी variation समझाई गई, 0 (average predict करने से बेहतर नहीं) से 1 तक। काम का है पर business users के लिए सहज नहीं।
+
+किसी simple baseline से तुलना करो, जैसे हर बार median predict करना। अगर आपका model उसे मुश्किल से हराता है, तो वो ज़्यादा कुछ नहीं जोड़ रहा।
+
+**Coefficients पढ़ना।** Coefficients units और दूसरे features पर निर्भर करते हैं। आपस में जुड़े features (distance और travel time) coefficients को अस्थिर बना देते हैं। उन्हें कारण की तरह मत पढ़ो।
+
+**Non-linearity।** असली रिश्ते मुड़ते हैं: delivery time 5 km तक धीरे बढ़ सकता है, फिर अचानक कूद सकता है। Transformed features जोड़ो (distance का square, buckets), या tree-based models use करो।
+
+**Outliers।** Squared error की वजह से कुछ extreme values fit को खींच लेती हैं। उन्हें जाँचो; data की गलतियों को cap करो या हटाओ; MAE-based या robust तरीकों पर विचार करो।
+
+**Extrapolation।** Linear models खुशी-खुशी उस range के बाहर भी predict कर देते हैं जो उन्होंने देखी (40 km की deliveries जबकि training में ज़्यादा से ज़्यादा 12 थी)। ऐसी predictions भरोसे लायक नहीं होतीं।
+
+**Regularisation।** जब features बहुत हों तो Ridge और lasso regression coefficients को सिकोड़कर overfitting घटाते हैं; lasso कुछ को शून्य कर सकता है।
+
+**Error measure चुनना:**
+
+| Measure | कैसे पढ़ें | कब use करें |
+| --- | --- | --- |
+| MAE | "औसतन ₹29,000 की गलती" | जब आपको ऐसा number चाहिए जो business users समझें |
+| RMSE | MAE जैसा, पर बड़ी गलतियाँ ज़्यादा गिनी जाती हैं | जब बड़ी errors खास तौर पर महँगी हों |
+| MAPE | "औसतन 6% की गलती" | जब values कभी शून्य के पास न हों |
+| R² | कितनी variation समझाई गई | एक ही data पर models की तुलना करते समय |
+
+**Residuals पढ़ना।** हर feature के सामने errors को plot करो। बिखरे हुए बादल का मतलब है कि model ने pattern पकड़ लिया। कोई curve, funnel या cluster बताता है कि कुछ छूट गया: कोई non-linear असर, कोई group जिसके साथ model बुरा है, या data की समस्या।
+
+**Linear regression से आगे कब जाएँ।** Linear regression तेज़ है, समझाने लायक है और मज़बूत baseline है। Gradient boosting जैसे tree-based models पर तब जाओ जब residual plots में ऐसे curves या interactions दिखें जो line नहीं पकड़ सकती, जब आपके पास अलग-अलग types के बहुत features हों, या जब accuracy का फ़ायदा अतिरिक्त जटिलता के लायक हो। फिर भी linear model को अपने evaluation में चलाते रहो: अगर जटिल model उसे थोड़े से ही हराता है, तो product के लिए सरल वाला बेहतर choice हो सकता है।
+
+**Baseline, linear, log target और boosting, आमने-सामने।** Curve वाले age effect के साथ synthetic used-car prices:
+
+```python
+import numpy as np, pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.dummy import DummyRegressor
+from sklearn.linear_model import Ridge
+from sklearn.compose import TransformedTargetRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+rng = np.random.default_rng(5)
+n = 6000
+df = pd.DataFrame({"age": rng.uniform(0, 12, n), "km": rng.uniform(5_000, 150_000, n),
+                   "engine_cc": rng.choice([1000, 1200, 1500, 2000], n), "city_metro": rng.integers(0, 2, n)})
+price = 900_000 * np.exp(-0.12 * df.age) * (df.engine_cc / 1200) * (1 - df.km / 600_000) * (1 + 0.05 * df.city_metro)
+y = price * rng.lognormal(0, 0.12, n)
+X_tr, X_te, y_tr, y_te = train_test_split(df, y, test_size=0.25, random_state=5)
+
+models = {
+    "median baseline": DummyRegressor(strategy="median"),
+    "ridge": Ridge(alpha=1.0),
+    "ridge, log target": TransformedTargetRegressor(Ridge(alpha=1.0), func=np.log, inverse_func=np.exp),
+    "boosting": HistGradientBoostingRegressor(max_iter=300, random_state=5),
+}
+for name, m in models.items():
+    pred = m.fit(X_tr, y_tr).predict(X_te)
+    print(f"{name:<18} MAE ₹{mean_absolute_error(y_te, pred):>9,.0f}   RMSE ₹{mean_squared_error(y_te, pred) ** 0.5:>9,.0f}")
+```
+
+Table दिखाती है कि हर step की क्या value है: model "हमेशा median predict करो" से कितना बेहतर है, और log target या tree model curve को बेहतर पकड़ता है या नहीं।
+
+**Group के हिसाब से errors।** एक average किसी ऐसे segment को छिपा सकता है जिसमें model गलत है:
+
+```python
+best = models["boosting"]
+err = pd.DataFrame({"abs_err": np.abs(best.predict(X_te) - y_te), "age_band": pd.cut(X_te.age, [0, 3, 6, 9, 12])})
+print(err.groupby("age_band", observed=True)["abs_err"].mean().round(-2))
+```
+
+**Point की जगह price range।** Buyers और sellers band पर ज़्यादा भरोसा करते हैं:
+
+```python
+lo = HistGradientBoostingRegressor(loss="quantile", quantile=0.1, max_iter=300).fit(X_tr, y_tr)
+hi = HistGradientBoostingRegressor(loss="quantile", quantile=0.9, max_iter=300).fit(X_tr, y_tr)
+inside = ((y_te >= lo.predict(X_te)) & (y_te <= hi.predict(X_te))).mean()
+print(f"share of real prices inside the 10–90% band: {inside:.0%}")      # should be near 80%
+```
+
+अगर असली prices में से 80% से बहुत कम band के अंदर आती हैं, तो intervals भरोसे लायक होने के लिए बहुत संकरे हैं।
+
+**Edges की रक्षा करो।** Training data में हर feature की range record करो, और उसके बाहर की requests (25 साल पुरानी car, 400,000 km) को confident price लौटाने की जगह flag करो।
+
+## एक example से समझो
+
+चेन्नई का एक used-car marketplace listing prices सुझाना चाहता है।
+
+Data: 18,000 पुरानी sales, car की उम्र, चली हुई kilometres, brand, model, fuel type, city और owners की संख्या के साथ।
+
+1. Baseline: model और साल के लिए median price predict करो। MAE ₹68,000।
+2. Features पर linear regression (brand और model one-hot encoded, और target के रूप में price का log, क्योंकि prices skewed हैं)। MAE ₹41,000।
+3. Error analysis: errors premium cars और 12 साल से पुरानी cars में सबसे ज़्यादा हैं। उम्र के सामने residuals का plot एक curve दिखाता है।
+4. उन्हीं features पर gradient-boosted trees। MAE ₹29,000।
+
+Team prices के लिए boosted model ship करती है, पर sellers को दिखाई जाने वाली व्याख्या ("इस model के लिए हर अतिरिक्त साल से price लगभग 9% घटती है") के लिए linear model के coefficients रखती है, और उसे साफ़ तौर पर अनुमानित बताती है।
+
+| Model | MAE | नोट |
+| --- | --- | --- |
+| Model और साल की median price | ₹68,000 | Baseline |
+| Linear regression, log price | ₹41,000 | समझाने लायक coefficients |
+| Gradient-boosted trees | ₹29,000 | पुरानी और premium cars के curves पकड़ता है |
+
+दो कामों के लिए दो models ship करना आम है: number के लिए सबसे accurate वाला, और ईमानदार, अनुमानित व्याख्या के लिए एक सरल वाला।
+
+## आम गलतियाँ
+
+- **कोई baseline नहीं।** उसके बिना आप model को परख नहीं सकते।
+- **Training data पर evaluate करना।** Errors असलियत से बहुत छोटी दिखती हैं।
+- **Coefficients को कारण मानना।** वो model की मान्यताओं के तहत association बताते हैं।
+- **Skewed targets को नज़रअंदाज़ करना।** Prices का log predict करना अक्सर बेहतर चलता है।
+- **Extrapolations पर भरोसा करना।** Training range के बाहर की predictions अंदाज़े हैं।
+
+- **सिर्फ़ R² बताना।** Business users "औसतन ₹29,000 की गलती" को "R² 0.87" से कहीं बेहतर समझते हैं। साथ में rupees या minutes में MAE बताओ।
+- **Median baseline से कभी तुलना न करना।** आप बता नहीं सकते कि model कुछ जोड़ रहा है या नहीं।
+- **सिर्फ़ overall MAE बताना**, जो बड़ी errors वाले segment को छिपा देता है।
+- **ऐसे फ़ैसलों के लिए point predictions, जिन्हें range चाहिए**, जैसे price की सलाह।
+
+## जब regression model की ज़रूरत नहीं
+
+- **पहले से कोई simple formula मौजूद है**, जैसे tariff table या published rate card।
+- **सीखने के लिए data बहुत कम है**: domain experts का कोई thumb rule ज़्यादा भरोसेमंद हो सकता है।
+- **सवाल number का नहीं, category का है**, जैसे "ये इस हफ़्ते बिकेगा क्या": classification use करो।
+
+## Demo से production तक
+
+- **हर report में baseline रखो।**
+- **हर retrain पर segment और feature range के हिसाब से errors जाँचो।**
+- **Range के बाहर के inputs को predict करने की जगह flag करो।**
+- **जहाँ फ़ैसले अनिश्चितता पर निर्भर हों वहाँ ranges दो**, और उनकी coverage जाँचो।
+- **असली नतीजे आने पर errors को monitor करो।**
+
+## Practice करो
+
+Google का linear regression module और Kaggle का Intro to ML करो।
+
+1. किसी public housing या used-car dataset पर linear regression fit करो; held-out test set पर MAE और RMSE बताओ और median baseline से तुलना करो।
+2. दो features के सामने residuals plot करो और एक ऐसा pattern ढूँढो जो model से छूट गया।
+3. Log-transformed target और एक tree-based model try करो, और चारों नतीजे एक table में compare करो।
+4. Comparison table चलाओ, फिर band check जोड़ो और बताओ कि हर age band के लिए असली prices का कितना हिस्सा उसके अंदर आया।
+
+**आपका काम पूरा जब** आप अपने सबसे अच्छे model की error को business की भाषा में समझा सको, और ये भी कि linear model कहाँ कमज़ोर पड़ा।

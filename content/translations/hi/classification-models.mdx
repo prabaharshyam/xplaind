@@ -1,0 +1,190 @@
+---
+id: classification-models
+lang: hi
+title: "Classification"
+outcome: "ऐसे classifiers बनाओ जो categories predict करें, logistic regression से trees तक; business costs से decision threshold चुनो; और fraud जैसे imbalanced classes को संभालो।"
+answer: "Classification model एक category predict करता है, जैसे fraud है या नहीं। Logistic regression और decision trees आम हैं, और decision threshold business costs के हिसाब से होना चाहिए।"
+why_it_matters: "Fraud alerts, loan approvals, churn prediction, spam filters, बीमारी की screening और lead scoring, सब classification हैं। Algorithm चुनने से ज़्यादा ज़रूरी है threshold और class imbalance को सही करना, और कई teams यहीं गलती करती हैं।"
+flashcards:
+  - q: "Classifier क्या predict करता है?"
+    a: "एक category, जैसे fraud या genuine, आम तौर पर एक probability या score देकर, जिसे threshold एक फ़ैसले में बदल देता है।"
+  - q: "Logistic regression क्या है?"
+    a: "एक linear model जिसके weighted sum को 0 और 1 के बीच की probability में दबा दिया जाता है। इसके coefficients दिखाते हैं कि कौन-से features किस class की तरफ़ धकेलते हैं।"
+  - q: "Confusion matrix में कौन-सी चार counts होती हैं?"
+    a: "True positives, false positives, false negatives और true negatives, एक चुने हुए threshold के लिए।"
+  - q: "Threshold घटाने पर precision और recall का क्या होता है?"
+    a: "Recall बढ़ता है क्योंकि ज़्यादा positives flag होते हैं, और precision आम तौर पर घटती है क्योंकि ज़्यादा false alarms भी flag होते हैं।"
+  - q: "Threshold कैसे चुनते हैं?"
+    a: "हर गलती की rupee cost और team की review करने की capacity से, default 0.5 से नहीं।"
+  - q: "Class weights क्या हैं?"
+    a: "ऐसी settings जो training में rare class की गलतियों को ज़्यादा गिनती हैं, ताकि model rare positives को नज़रअंदाज़ न करे।"
+  - q: "Time वाले data के लिए बाद की period पर test क्यों करें?"
+    a: "क्योंकि असल use में model भविष्य predict करता है। Random splits भविष्य के patterns को training में लीक कर देते हैं और performance बढ़ा-चढ़ाकर दिखाते हैं।"
+  - q: "Fraud के लिए दो thresholds क्यों use करें?"
+    a: "कम वाला cases को review के लिए भेजता है, और बहुत ऊँचा वाला तभी अपने आप block करता है जब precision बहुत ज़्यादा हो।"
+  - q: "Fraud या churn models के लिए time से split क्यों करें?"
+    a: "Production में model भविष्य को score करता है। Random split में वो पुराने cases के बारे में बाद के data से सीख लेता है, इसलिए results असल से बेहतर दिखते हैं।"
+  - q: "CalibratedClassifierCV क्या करता है?"
+    a: "ये held-out folds पर model के raw scores से probabilities तक का mapping दोबारा fit करता है, ताकि 0.3 का score लगभग 30% chance का मतलब रखे।"
+exercise:
+  title: "Threshold चुनो"
+  setup: "Kolkata की एक telecom company predict करती है कि कौन-से prepaid customers अगले महीने छोड़ जाएँगे। एक retention call की cost ₹40 है और वो 25% बार जाने वाले customer को रोक लेती है; रोका हुआ customer ₹1,200 का है। Call centre महीने में 2,000 calls कर सकता है। Threshold A 2,000 customers flag करता है, जिनमें से 900 छोड़ने वाले हैं। Threshold B 5,000 flag करता है, जिनमें से 1,600 छोड़ने वाले हैं।"
+  questions:
+    - q: "Threshold A की precision क्या है?"
+      a: "900 ÷ 2,000 = 45%।"
+    - q: "Threshold A की calls की expected value क्या है?"
+      a: "रोके गए customers: 900 × 25% = 225, जिनकी value 225 × ₹1,200 = ₹2,70,000। Calls की cost: 2,000 × ₹40 = ₹80,000। Net लगभग ₹1,90,000।"
+    - q: "Company सीधे threshold B क्यों नहीं use कर सकती?"
+      a: "वो 5,000 customers flag करता है पर call centre सिर्फ़ 2,000 calls कर सकता है, इसलिए capacity threshold को सीमित करती है।"
+    - q: "Business को threshold A के बारे में क्या बताओगे?"
+      a: "Confusion matrix आसान शब्दों में: 2,000 calls, जिनमें 900 छोड़ने वाले customers को, लगभग 225 रुक गए, net value लगभग ₹1.9 लाख महीना।"
+ask:
+  - "Logistic regression कैसे काम करता है?"
+  - "Imbalanced classes को कैसे संभालूँ?"
+  - "Classifier के लिए अच्छा threshold क्या है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Classification** एक category predict करता है: fraud या genuine, churn करेगा या रुकेगा, पाँच तरह की complaints में से कौन-सी। ज़्यादातर classifiers एक **probability** या score देते हैं; **threshold** उसे फ़ैसले में बदलता है ("probability 0.3 से ऊपर हो तो fraud flag करो")।
+
+आम models: **logistic regression** (एक linear model जो probabilities देता है, समझाना आसान), decision trees, random forests, gradient boosting और neural networks।
+
+```flow
+Features | amount, merchant, time, device -> Classifier -> 0.0 से 1.0 का score
+0.0 से 1.0 का score -[0.3 से नीचे, review threshold]-> Allow करो
+0.0 से 1.0 का score -[0.3 और 0.9 के बीच]-> Analyst review करता है
+0.0 से 1.0 का score -[0.9 से ऊपर, block threshold]-> Block करो, तेज़ appeal के साथ
+```
+
+इस lesson में हम Pune की एक payments company के साथ चलेंगे, जो अपने fraud rules की जगह एक classifier लगा रही है।
+
+## ये कैसे काम करता है
+
+**Logistic regression।** Linear regression जैसा ही, पर weighted sum एक ऐसे function से गुज़रता है जो उसे 0 और 1 के बीच की probability में दबा देता है। Coefficients दिखाते हैं कि कौन-से features किस class की तरफ़ धकेलते हैं।
+
+**Confusion matrix।** एक चुने हुए threshold के लिए गिनो: true positives (fraud flag हुआ), false positives (genuine flag हुआ), false negatives (fraud छूट गया) और true negatives। हर metric इन्हीं चार numbers से निकलता है।
+
+**Precision और recall।** Precision: जो cases flag हुए, उनमें कितने सच में positive थे। Recall: सारे असली positives में से कितने flag हुए। Threshold घटाने से recall बढ़ता है और precision घटती है; बढ़ाने से उल्टा होता है।
+
+**Threshold चुनना।** गलतियों पर rupee की value लगाओ। अगर एक छूटे fraud की औसत cost ₹15,000 है और false alarm की जाँच में analyst के ₹200 का समय लगता है, तो ज़्यादा fraud पकड़ने के लिए आपको बहुत से false alarms मंज़ूर करने चाहिए। Capacity भी देखो: अगर analysts रोज़ 500 cases review कर सकते हैं, तो threshold ऐसा रखा जा सकता है कि लगभग 500 flag हों।
+
+**Imbalanced classes।** जब positives rare हों (0.5% fraud), तो accuracy बेकार है: "कभी fraud नहीं" predict करने पर भी 99.5% मिलता है। Precision, recall, precision-recall curve और ROC AUC use करो। Techniques: class weights जो rare class की गलतियों को ज़्यादा गिनते हैं, sampling methods, और training के लिए काफ़ी positive examples।
+
+**Calibration।** अगर model 0.3 कहता है, तो क्या उस score पर लगभग 30% बार fraud होता है? अच्छी तरह calibrated probabilities thresholds और business rules को भरोसेमंद बनाती हैं।
+
+**Multi-class।** दो से ज़्यादा categories हों तो confusion matrix देखो कि कौन-सी classes किससे गड़बड़ा रही हैं।
+
+**आम classifiers की तुलना:**
+
+| Model | ताकत | कमज़ोरी | पहला अच्छा choice कब |
+| --- | --- | --- | --- |
+| Logistic regression | तेज़, समझाने लायक, लगभग calibrated probabilities | जटिल interactions miss करता है | जब फ़ैसले समझाने हों, जैसे credit |
+| Decision tree | बनाना और समझाना आसान | Overfit होता है, unstable | सिखाने या सादे rules के लिए |
+| Random forest | मज़बूत, कम tuning | बड़ा, धीमा | Tables पर एक अच्छा baseline |
+| Gradient boosting | Tables पर आम तौर पर सबसे accurate | Tuning चाहिए, कम explainable | Tabular data पर fraud, churn, risk |
+| Neural network | Text, images, बहुत बड़ा data | बहुत data चाहिए, समझाना मुश्किल | Unstructured inputs |
+
+**एक ठीक-ठाक workflow।** एक सादे baseline से शुरू करो, जैसे मौजूदा rules या logistic regression, ताकि पता रहे "बेहतर" का मतलब क्या है। Data को time से split करो। Class weights के साथ मज़बूत model train करो। Accuracy की जगह precision, recall और PR AUC पर compare करो। Costs और capacity से threshold चुनो। Calibration check करो। फिर नतीजा rupees में और operational शब्दों में बताओ, जैसे रोज़ के alerts।
+
+**Model की गलतियाँ पढ़ना।** Threshold चुनने के बाद 50 false positives और 50 false negatives हाथ से पढ़ो। Patterns जल्दी दिख जाते हैं: त्योहारों के मौसम की असली उछाल जो fraud flag हो गई, या कोई नया fraud pattern जो training data में था ही नहीं। हर pattern से एक fix सूझता है: "Diwali में कितने दिन बाकी" जैसा feature, नया training data, या किसी खास case के लिए एक rule। Metrics बताते हैं कि model कितनी बार गलत है; cases पढ़ने से पता चलता है क्यों।
+
+**एक baseline और एक मज़बूत model, ठीक से compare किए हुए।** 1% fraud वाले synthetic transactions, time से split (पहले 80% training के लिए):
+
+```python
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.metrics import average_precision_score, confusion_matrix
+
+X, y = make_classification(n_samples=30_000, n_features=15, n_informative=8,
+                           weights=[0.99], class_sep=1.0, random_state=3)
+cut = int(0.8 * len(y))                                   # pretend rows are in time order
+X_tr, X_te, y_tr, y_te = X[:cut], X[cut:], y[:cut], y[cut:]
+
+logit = make_pipeline(StandardScaler(), LogisticRegression(class_weight="balanced", max_iter=2000))
+gbm = HistGradientBoostingClassifier(class_weight="balanced", max_iter=300, learning_rate=0.05, random_state=3)
+for name, model in [("logistic", logit), ("boosting", gbm)]:
+    model.fit(X_tr, y_tr)
+    print(name, "PR AUC", round(average_precision_score(y_te, model.predict_proba(X_te)[:, 1]), 3))
+```
+
+`class_weight="balanced"` training के दौरान हर fraud case को बहुत सारे genuine cases जितना गिनता है, ताकि model बस "कभी fraud नहीं" न सीख ले।
+
+**Calibrate करो, फिर rupees में threshold चुनो।** Class weights probabilities को बिगाड़ देते हैं; calibration उन्हें ठीक करता है:
+
+```python
+from sklearn.calibration import CalibratedClassifierCV
+
+cal = CalibratedClassifierCV(HistGradientBoostingClassifier(max_iter=300, learning_rate=0.05, random_state=3),
+                             method="isotonic", cv=3).fit(X_tr, y_tr)
+p = cal.predict_proba(X_te)[:, 1]
+
+COST_FN, COST_FP = 15_000, 200            # missed fraud, analyst review
+t = COST_FP / (COST_FP + COST_FN)         # flag when expected loss from missing exceeds review cost
+tn, fp, fn, tp = confusion_matrix(y_te, p >= t).ravel()
+print(f"threshold {t:.3f}: caught {tp}, missed {fn}, false alarms {fp}")
+print(f"cost of errors ₹{fn * COST_FN + fp * COST_FP:,}")
+```
+
+Calibrated probabilities हों तो best threshold सीधे costs से निकल आता है: जब किसी case के fraud होने की chance गुणा ₹15,000, ₹200 से ज़्यादा हो, तब flag करो।
+
+**Capacity की सीमा से rule बदल जाता है।** अगर analysts रोज़ सिर्फ़ 300 cases review कर सकते हैं, तो score से sort करके ऊपर के 300 लो; threshold की जगह उस budget पर recall नापो।
+
+**अलग-अलग फ़ैसले समझाना।** Logistic model में हर feature का योगदान उसका coefficient गुणा उसकी (scaled) value है। Boosted trees के लिए permutation importance दिखाता है कि कुल मिलाकर कौन-से features मायने रखते हैं, और SHAP जैसे tools अकेली predictions समझाते हैं। Credit और insurance के फ़ैसलों में customers और regulators के लिए अक्सर ऐसी explanations चाहिए होती हैं।
+
+## एक example से समझो
+
+Pune की एक payments company के पास महीने में 20 लाख UPI merchant transactions हैं, जिनमें से लगभग 0.3% बाद में fraud confirm होते हैं।
+
+1. Baseline: उनके rules 6,000 alerts महीने में 40% fraud पकड़ते हैं।
+2. Class weights वाला एक gradient-boosted classifier, छह महीने के data पर train और अगले महीने पर test।
+3. जिस threshold पर महीने में 6,000 alerts बनते हैं (analysts की capacity), वहाँ वो 68% fraud पकड़ता है।
+4. महीने का fraud लगभग 6,000 cases है (20 लाख का 0.3%)। 68% पकड़ने का मतलब है 6,000 alerts में से लगभग 4,080 असली fraud: precision लगभग 68%, जबकि rules की 40% थी।
+5. Business की नज़र से: हर महीने लगभग 1,680 ज़्यादा fraud पकड़े गए; औसत ₹9,000 के नुकसान पर, उसी analyst team के साथ हर महीने करीब ₹1.5 करोड़ की बचत।
+
+उन्होंने एक दूसरा, ऊँचा threshold भी रखा जो transactions को अपने आप तभी block करता है जब score बहुत ऊँचा हो और precision 98% से ऊपर हो, और merchants के लिए तेज़ appeal का रास्ता भी।
+
+**Risk committee को समझाना।** Committee ने gradient boosting के बारे में नहीं पूछा। उन्होंने तीन सवाल पूछे: क्या analysts पर बोझ बढ़ेगा, क्या असली merchants को नुकसान होगा, और कितनी बचत होगी? Team ने जवाब दिया: alerts की संख्या आज जितनी ही, precision 40% की जगह लगभग 68% ताकि analysts का बहुत कम समय बर्बाद हो, automatic block सिर्फ़ उस score के ऊपर जहाँ precision 98% से ज़्यादा हो और appeals का जवाब चार घंटे में, और rules जो fraud miss करते थे उनमें से हर महीने लगभग ₹1.5 करोड़ का fraud पकड़ा गया। उन्होंने merchant category और शहर के हिसाब से model की performance भी दिखाई, क्योंकि जो model average में अच्छा हो पर छोटे kirana merchants के लिए खराब, वो fairness और business दोनों की problem होता। नए merchants के लिए जिनकी history कम थी, model थोड़ा कमज़ोर निकला, इसलिए पहले महीने में नए merchants को automatic blocking की जगह review में भेजा गया।
+
+## आम गलतियाँ
+
+- **Imbalanced data पर accuracy report करना।** Precision, recall और PR curves use करो।
+- **Default 0.5 threshold use करना।** Costs और capacity से चुनो।
+- **Time वाले data की random rows पर test करना।** असल use की तरह बाद की period पर test करो।
+- **Calibration को नज़रअंदाज़ करना।** फ़ैसलों में use होने वाले scores का मतलब वही होना चाहिए जो वो कहते हैं।
+- **सारे actions के लिए एक ही threshold।** Review और automatic blocking के लिए अलग precision चाहिए।
+
+- **Baseline न होना।** मौजूदा rules या किसी सादे model से तुलना के बिना आप नहीं दिखा सकते कि नया model फ़ायदेमंद है।
+- **Time के क्रम वाले data पर random splits**, जो भविष्य लीक कर देते हैं।
+- **Class-weighted probabilities को बिना calibrate किए असली probabilities मानना।**
+- **Review capacity को नज़रअंदाज़ करना**: तीन लोगों की team के लिए रोज़ 5,000 cases flag करने वाला threshold कोई solution नहीं है।
+
+## कब सादा rule model से बेहतर है
+
+- **बहुत कम positive examples**, जिनसे सीखा न जा सके: expert rules से शुरू करो और labels इकट्ठा करो।
+- **कोई साफ़ rule पहले से काम कर रहा है**, जैसे चोरी की report हुए cards को block करना।
+- **फ़ैसला एक वाक्य में समझाना ज़रूरी है** और एक छोटा scorecard वो bar पूरा करता है।
+
+## Demo से production तक
+
+- **Time से split करो** और सबसे हाल की period पर test करो।
+- **Costs से thresholds तय करने से पहले calibrate करो।**
+- **Thresholds को costs या capacity से तय करो**, business के साथ सहमति से, और उन्हें दोबारा देखते रहो।
+- **Labels आने पर precision और recall monitor करो**, segment के हिसाब से।
+- **हर फ़ैसले की explanations उपलब्ध रखो**, जहाँ customers या regulators पूछ सकते हैं।
+
+## Practice करो
+
+Google का classification module करके देखो।
+
+1. किसी public imbalanced dataset (credit card fraud या churn) पर logistic regression और एक tree-based model train करो, held-out data पर test करते हुए।
+2. Threshold के सामने precision और recall plot करो, और अपनी मानी हुई costs से एक threshold चुनो।
+3. अपने threshold पर confusion matrix report करो और उसे rupees में समझाओ।
+4. COST_FN को ₹5,000 और ₹50,000 करके दोबारा चलाओ, और लिखो कि threshold और false alarms की संख्या कैसे बदलती है।
+
+**आपका काम पूरा जब:** आप costs और capacity से एक threshold को सही ठहरा सको, और समझा सको कि rare events पर accuracy भ्रामक क्यों होती है।

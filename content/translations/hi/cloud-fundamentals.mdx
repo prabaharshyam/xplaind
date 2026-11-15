@@ -1,0 +1,218 @@
+---
+id: cloud-fundamentals
+lang: hi
+title: "एक cloud को गहराई से"
+outcome: "एक बड़े cloud में अपना रास्ता बनाना सीखो: regions, compute के choices, storage, networking, identity और managed AI services, और अंदाज़ा लगाओ कि एक deployment की cost कितनी होगी।"
+answer: "एक cloud सीखने का मतलब है उसके regions, compute options (VMs, containers, serverless), storage, networking, identity और access, और managed AI services को जानना, और cost का अंदाज़ा लगाना।"
+why_it_matters: "हर client AWS, Azure या Google Cloud पर चलता है, अक्सर company policy की वजह से। आप उनके account में, उनके rules के तहत deploy करोगे, और उनकी cloud team आपको इस पर परखेगी कि आप वही भाषा बोलते हो या नहीं। एक cloud अच्छे से सीखो; बाकी उससे काफ़ी मिलते-जुलते हैं।"
+flashcards:
+  - q: "AI deployment आम तौर पर किन छह तरह की cloud services का use करता है?"
+    a: "Compute, storage, databases, networking, identity और access, और managed AI model services।"
+  - q: "Region और zone में क्या फ़र्क है?"
+    a: "Region एक भौगोलिक जगह है, जैसे Mumbai। Zone उसके अंदर एक अलग data centre है; zones में फैलाने से resilience बढ़ती है।"
+  - q: "Region कैसे चुनते हैं?"
+    a: "Data residency rules, वहाँ कौन-से models मिलते हैं, और users तक latency, ज़्यादातर clients के लिए इसी क्रम में अहमियत के हिसाब से।"
+  - q: "ज़्यादातर AI APIs के लिए सबसे तेज़ और सुरक्षित compute choice क्या है?"
+    a: "Serverless containers, जैसे Cloud Run, Azure Container Apps या Fargate पर AWS ECS Express Mode: आप image देते हो और URL मिल जाता है।"
+  - q: "Database का कोई public address क्यों नहीं होना चाहिए?"
+    a: "ताकि वो सिर्फ़ app के private network से पहुँचा जा सके। Public databases सबसे आम गंभीर cloud गलती हैं।"
+  - q: "IAM क्या है?"
+    a: "Identity and access management: कौन और क्या, किन resources पर कौन-से actions कर सकता है।"
+  - q: "Access keys की जगह services को अपनी identities क्यों दें?"
+    a: "Service identities को अपने आप short-lived credentials मिलते हैं, सिर्फ़ ज़रूरी permissions के साथ, इसलिए leak होने के लिए कोई लंबे समय वाली keys नहीं होतीं।"
+  - q: "Clients अक्सर cloud के managed models क्यों पसंद करते हैं?"
+    a: "Data उनके मौजूदा cloud contract, region और security controls के तहत रहता है।"
+  - q: "India में कौन-से cloud regions हैं?"
+    a: "AWS के Mumbai और Hyderabad; Azure के Central India (Pune), South India (Chennai) और West India (Mumbai); Google Cloud के Mumbai और Delhi। हर service की region के हिसाब से availability check करो।"
+  - q: "Models को अपने cloud provider की model service से क्यों call करें?"
+    a: "Data client के मौजूदा cloud contract, region और identity controls के तहत रहता है, और billing उनके सामान्य account पर होती है, जिससे अक्सर approval जल्दी मिलता है।"
+exercise:
+  title: "एक cloud design को review करो"
+  setup: "AWS पर Mumbai की एक NBFC के loan-document assistant के लिए एक teammate का design: Singapore region में एक virtual machine क्योंकि वो सस्ता था; public IP वाला PostgreSQL और code में password; app admin की personal access key use करता है; कोई budget alert नहीं; documents एक S3 bucket में, जो 'ताकि app पढ़ सके' इसलिए public रखा गया है।"
+  questions:
+    - q: "Singapore region में क्या गलत है?"
+      a: "Data residency: financial clients को अक्सर data India में रखना होता है, और RBI-regulated firms के सख़्त rules हैं। Model availability check करके कोई Indian region use करो।"
+    - q: "Database को इसकी जगह कैसे set करना चाहिए?"
+      a: "कोई public address नहीं, private subnet में, सिर्फ़ app से पहुँचने लायक, और उसका password code में नहीं बल्कि secret manager में।"
+    - q: "Admin की personal access key की जगह क्या होना चाहिए?"
+      a: "App के लिए एक IAM role, सिर्फ़ ज़रूरी permissions के साथ, जैसे एक bucket पढ़ना, और कोई stored keys नहीं।"
+    - q: "Public bucket के बिना app documents कैसे पढ़े?"
+      a: "Bucket को private रखो और app के role को उसका read access दो। Public buckets customer documents सबके सामने खोल देते हैं।"
+ask:
+  - "पहले कौन-सा cloud सीखूँ?"
+  - "Data residency क्या है और India में ये क्यों मायने रखती है?"
+  - "AI app के लिए cloud costs का अंदाज़ा कैसे लगाऊँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Public cloud आपको computers, storage, networks और बने-बनाए services घंटे या use के हिसाब से किराये पर देता है। तीन बड़े providers, AWS, Microsoft Azure और Google Cloud, लगभग एक जैसे building blocks अलग-अलग नामों से देते हैं। भारतीय enterprises अक्सर पूरे group का एक ही choice follow करते हैं; banks और सरकार से जुड़े clients Indian regions या किसी खास provider का sovereign offering भी माँग सकते हैं।
+
+आपको हर service की ज़रूरत नहीं है। एक AI deployment लगभग छह तरह की चीज़ें use करता है:
+
+- **Compute**: जहाँ आपका code चलता है।
+- **Storage**: files और documents।
+- **Databases**: structured data, अक्सर pgvector वाला PostgreSQL।
+- **Networking**: private networks, load balancers, DNS।
+- **Identity और access**: कौन क्या कर सकता है।
+- **Managed AI**: cloud से hosted model APIs, जो data agreements के लिए मायने रख सकती हैं।
+
+```flow
+title: एक Indian region में app, जैसे Mumbai, एक virtual network के अंदर
+Users | company SSO -> Load balancer | HTTPS, public subnet में
+Load balancer -> Serverless containers | app, private subnet में, least-privilege role के साथ
+Serverless containers -> Managed PostgreSQL
+Serverless containers -> Object storage
+Serverless containers -> Managed model API
+```
+
+इस lesson में हम Hyderabad की एक pharma company के साथ चलेंगे, जिसका document assistant आप Azure पर design करोगे।
+
+## ये कैसे काम करता है
+
+**Regions और zones।** हर region (India में provider के हिसाब से Mumbai, Hyderabad, Pune, Delhi और कुछ और) में कई zones होते हैं, यानी अलग-अलग data centres। Resilience के लिए instances को zones में फैलाओ। Region चुनो users तक latency, data residency rules और वहाँ कौन-से models मिलते हैं, इनके हिसाब से।
+
+**Compute के choices**, सबसे ज़्यादा managed से सबसे कम तक: serverless containers (Cloud Run, Azure Container Apps, या Fargate पर AWS ECS, जिसमें ECS Express Mode भी है; AWS App Runner नए customers के लिए बंद है) जहाँ आप image देते हो और URL मिलता है; managed Kubernetes (EKS, AKS, GKE) जब client की platform team एक चलाती हो; virtual machines जब GPUs या पूरा control चाहिए। ज़्यादातर AI APIs के लिए serverless containers सबसे तेज़ और सुरक्षित शुरुआत हैं।
+
+**Storage और databases।** Documents के लिए object storage (S3, Blob Storage, Cloud Storage)। Relational data और vectors के लिए managed PostgreSQL। Managed services use करो: backups, patches और failover पहले से मिलते हैं।
+
+**Networking।** Resources एक virtual network में private subnets के अंदर रहते हैं। Databases का कोई public address नहीं होना चाहिए; आपका app उन तक private तरीके से पहुँचता है। बाहर का traffic HTTPS के साथ एक load balancer से आता है।
+
+**Identity।** हर service को उसकी अपनी identity दो (एक role या managed identity), सिर्फ़ ज़रूरी permissions के साथ, लंबे समय वाली access keys रखने की जगह। लोग company के single sign-on से sign in करते हैं।
+
+**Managed models।** हर cloud बड़े models resell करता है (Amazon Bedrock, Azure OpenAI के साथ Microsoft Foundry, Google Vertex AI)। Clients अक्सर इन्हें पसंद करते हैं क्योंकि data उनके मौजूदा cloud contract और region के तहत रहता है।
+
+**Cost।** ज़्यादातर bill compute, managed databases, cloud से बाहर जाने वाले data transfer और model tokens से बनता है। बनाने से पहले provider का pricing calculator use करो, और पहले दिन ही budget alert लगाओ।
+
+**वही building blocks, तीन नाम:**
+
+| Building block | AWS | Azure | Google Cloud |
+| --- | --- | --- | --- |
+| Serverless containers | ECS on Fargate (Express Mode) | Container Apps | Cloud Run |
+| Managed Kubernetes | EKS | AKS | GKE |
+| Object storage | S3 | Blob Storage | Cloud Storage |
+| Managed PostgreSQL | RDS, Aurora | Azure Database for PostgreSQL | Cloud SQL, AlloyDB |
+| Service identity | IAM role | Managed identity | Service account |
+| Secrets | Secrets Manager | Key Vault | Secret Manager |
+| Managed models | Bedrock | Microsoft Foundry (Azure OpenAI) | Vertex AI |
+
+एक cloud ठीक से सीखो, फिर ऐसी table से बाकी में translate करो।
+
+**Indian region में एक container deploy करो।** Google Cloud पर एक command ऐसी private service deploy करती है जिसकी अपनी identity होती है और secrets Secret Manager से आते हैं:
+
+```bash
+gcloud run deploy claims-api \
+  --image asia-south1-docker.pkg.dev/my-project/apps/claims-api:3f9c2e1 \
+  --region asia-south1 \
+  --service-account claims-api@my-project.iam.gserviceaccount.com \
+  --no-allow-unauthenticated \
+  --set-secrets MODEL_API_KEY=model-api-key:latest,DATABASE_URL=db-url:latest \
+  --min-instances 1 --max-instances 10 --cpu 1 --memory 1Gi
+```
+
+`--no-allow-unauthenticated` का मतलब है कि सिर्फ़ permission वाले callers (एक load balancer, एक gateway, या उसके ज़रिए sign in किए हुए users) इस तक पहुँच सकते हैं। `--max-instances` traffic अचानक बढ़ने पर cost को सीमित करता है। AWS (ECS on Fargate) और Azure (Container Apps) यही ideas अलग syntax में लेते हैं: एक image, एक region, एक identity, reference से secrets, और scaling limits।
+
+**पहले दिन से budget alert।**
+
+```bash
+gcloud billing budgets create --billing-account=XXXXXX-XXXXXX-XXXXXX \
+  --display-name="claims-pilot" --budget-amount=20000INR \
+  --threshold-rule=percent=0.5 --threshold-rule=percent=0.9 --threshold-rule=percent=1.0
+```
+
+हर cloud में इसके बराबर कुछ होता है। Alerts किसी एक व्यक्ति के inbox की जगह किसी shared channel में भेजो।
+
+**अपने cloud से models।** Client के cloud से model call करने पर traffic उनके contract और identity controls के तहत रहता है। Anthropic के SDK के साथ, Bedrock client वही message shape use करता है:
+
+```python
+from anthropic import AnthropicBedrock
+
+client = AnthropicBedrock(aws_region="ap-south-1")      # uses the service's IAM role, not a key
+reply = client.messages.create(
+    model="<the model id shown in your Bedrock console>", max_tokens=300,
+    messages=[{"role": "user", "content": "Summarise this claim note: ..."}])
+```
+
+Data residency का वादा करने से पहले check करो कि हर Indian region में कौन-से models और features मिलते हैं; कुछ Indian regions में बाकियों से देर से आते हैं।
+
+**पैसा कहाँ जाता है।** एक आम AI app में model tokens और managed databases सबसे ज़्यादा लेते हैं, फिर compute, फिर cloud से बाहर data transfer। हर resource पर project और environment का tag लगाओ ताकि bill बाँटा जा सके, और पहले महीने में cost का breakdown हर हफ़्ते देखो।
+
+**Default में private।** Databases और vector stores को बिना public address के private networks पर रखो, जहाँ मिले वहाँ model services तक private endpoints से पहुँचो, और internet के लिए सिर्फ़ load balancer या gateway खोलो।
+
+**अपने browser में try करो।** बनाने से पहले एक महीने के cloud bill का अंदाज़ा लगाओ। Inputs को अपने हिसाब से बदलो।
+
+```python
+requests_per_day = 20_000
+instance_rupees_per_hour = 6        # one small container instance; check current prices
+instances = 2
+db_rupees_per_month = 4_000
+egress_gb, egress_rupees_per_gb = 50, 8
+
+compute = instance_rupees_per_hour * 24 * 30 * instances
+total = compute + db_rupees_per_month + egress_gb * egress_rupees_per_gb
+print(f"compute ₹{compute:,}, total ₹{total:,} a month")
+print(f"about ₹{total / (requests_per_day * 30):.3f} per request before model costs")
+```
+
+## एक example से समझो
+
+Azure पर Hyderabad की एक pharma company अपनी regulatory team के लिए document assistant चाहती है। ज़रूरतें: data India में रहे, कोई public database नहीं, company accounts से sign-in।
+
+आपका design:
+
+- **Region**: सब कुछ Central India में, ये check करने के बाद कि company के Azure AI agreement से ज़रूरी model वहाँ मिलता है।
+- **Compute**: Azure Container Apps पर आपकी FastAPI image, 1 से 5 instances तक scale होती हुई।
+- **Storage**: source PDFs के लिए Blob Storage; chunks के लिए pgvector वाला Azure Database for PostgreSQL, जो सिर्फ़ app के private network से पहुँच में है।
+- **Identity**: app एक managed identity use करता है जिसे एक storage container और database का read access है, और कोई stored keys नहीं। Users Microsoft Entra ID से sign in करते हैं।
+- **Cost**: calculator model tokens से पहले लगभग ₹55,000 महीना बताता है, और tokens का अंदाज़ा अलग से अपेक्षित use से लगता है। Budget alert 80% पर लगा है।
+
+Client की cloud team एक ही review में approve कर देती है, ज़्यादातर इसलिए कि हर choice उनके मौजूदा patterns से मेल खाता है।
+
+| महीने के अंदाज़े की लाइन | किससे तय होती है | कैसे घटाएँ |
+| --- | --- | --- |
+| Container Apps | Instances और चलने के घंटे | रात में एक instance तक scale down करो |
+| PostgreSQL | Instance का size, storage | छोटे से शुरू करो; नापे हुए load के साथ बढ़ाओ |
+| Blob Storage | Store किए गए gigabytes | पुराने versions archive करो |
+| Data transfer | Cloud से बाहर जाता data | Traffic को region के अंदर रखो |
+| Model tokens | Requests × tokens | छोटे prompts, caching, आसान सवाल छोटे model को भेजना |
+
+**Review आसानी से क्यों निकला।** Client की cloud team ज़्यादातर बाहरी designs को इन्हीं तीन बातों पर reject करती है: public endpoints, stored keys और India के बाहर के regions। आपके design ने तीनों से बचा, उन services का use किया जो उनकी team पहले से चलाती थी, और हर network boundary दिखाने वाले एक diagram के साथ आया। उनका एकमात्र बदलाव resources के naming convention में था।
+
+## आम गलतियाँ
+
+- **तीन clouds को ऊपर-ऊपर सीखना।** एक को ठीक से सीखो; नामों को दूसरे में translate करने में एक दिन लगता है।
+- **Public databases।** Public address वाला database सबसे आम गंभीर cloud गलती है।
+- **Code में लंबे समय वाली access keys।** Service identities और short-lived credentials use करो।
+- **Data transfer और model costs को नज़रअंदाज़ करना।** ये compute से ज़्यादा हो सकती हैं। इनका अंदाज़ा लगाओ।
+- **सिर्फ़ latency देखकर region चुनना।** पहले residency rules और model availability check करो।
+
+- **Budget alert न होना।** भूली हुई GPU machine या बेकाबू loop weekend में लाखों का bill बना सकता है। पहले दिन ही alerts लगाओ।
+- **ऐसी services जो public रह गईं** जबकि उन्हें gateway या load balancer के पीछे होना चाहिए।
+- **Instances की कोई maximum संख्या नहीं**, इसलिए traffic की उछाल या कोई bug bill को बिना सीमा बढ़ा देता है।
+- **बिना tag वाले resources**, इसलिए कोई नहीं बता सकता कि कौन-सा project कितना खर्च कर रहा है।
+
+## कब कम cloud से काम चल जाता है
+
+- **Prototype या demo**: Vercel, Render या Railway जैसा platform और एक hosted database तेज़ है।
+- **Client सब कुछ on-premises चलाता है**: उनका platform सीखो।
+- **एक अकेली static site जिसमें server function पर API key है**: पूरा virtual network ज़रूरत से ज़्यादा है।
+
+## Demo से production तक
+
+- **Regions चुनो** users, data residency और model availability के लिए, और कारण लिख लो।
+- **Service identities और secret references use करो**, stored keys कभी नहीं।
+- **Data services को private रखो**, सिर्फ़ gateway public हो।
+- **पहले दिन से budgets और maximum instances लगाओ।**
+- **Resources को tag करो** project और environment से, और शुरू में हर हफ़्ते costs देखो।
+
+## Practice करो
+
+Microsoft Learn के cloud concepts modules पूरे करो, फिर Azure के लिए architecture और services वाला path, या अगर Google Cloud पसंद है तो Google का getting-started path।
+
+1. Free account पर अपनी containerised API को किसी Indian region की serverless container service पर deploy करो।
+2. Object storage और एक managed PostgreSQL जोड़ो जो सिर्फ़ private तरीके से पहुँच में हो, और app को keys की जगह एक service identity दो।
+3. Provider के calculator से महीने में 50,000 requests के लिए इस set-up की price निकालो और budget alert लगाओ।
+4. Maximum instance count और budget alert के साथ deploy करो, फिर एक दिन के test traffic के बाद cost breakdown देखो।
+
+**आपका काम पूरा जब:** आप अपना deployment region, network boundaries और identities के साथ बना सको, और उसके अंदाज़ित महीने के bill की हर लाइन समझा सको।

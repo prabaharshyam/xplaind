@@ -1,0 +1,235 @@
+---
+id: structured-output
+lang: hi
+title: "Structured JSON output पाना"
+outcome: "Model से ऐसा JSON return करवाना जो schema से match करे, और अपने code में use करने से पहले उसे validate करना।"
+answer: "Structured output पाने के लिए, API के structured output या tool feature से model को JSON schema दो, फिर अपने code में use करने से पहले reply को Pydantic से validate करो।"
+why_it_matters: "Programs एक दोस्ताना paragraph नहीं पढ़ सकते। Model से भरोसेमंद JSON निकलवाना ही chat को feature में बदलता है: form filler, classifier, data extractor।"
+flashcards:
+  - q: "Structured output क्या है?"
+    a: "Model का reply ऐसे JSON में, जो तय shape (schema) से match करता हो, ताकि code fields को भरोसे से पढ़ सके।"
+  - q: "Structured output पाने के तीन तरीके कौन-से हैं?"
+    a: "Provider का structured-output feature schema के साथ, tool calling जिसमें schema ही tool का input हो, या fallback के तौर पर साफ़ instructions के साथ ठीक JSON का एक example।"
+  - q: "Structured output के साथ भी validate क्यों करें?"
+    a: "Schemas shape और types लागू करते हैं, पर values फिर भी गलत या range से बाहर हो सकती हैं, और fallbacks पर तो कोई पाबंदी होती ही नहीं।"
+  - q: "Validation error आने पर क्या होना चाहिए?"
+    a: "Error message के साथ एक बार retry करो ताकि model उसे ठीक कर सके; फिर भी fail हो तो item को किसी इंसान के पास भेजो। Invalid data कभी store मत करो।"
+  - q: "कुछ fields में null क्यों allow करें?"
+    a: "अगर input में वो जानकारी न हो, तो required field model को value गढ़ने पर मजबूर करता है।"
+  - q: "Categories के लिए enums क्यों use करें?"
+    a: "Allowed values की fixed list filters, reports और analysis के लिए categories को एक जैसा रखती है।"
+  - q: "Pydantic का model_validate_json क्या करता है?"
+    a: "JSON text को parse करता है और model के सामने check करता है, और ऐसा ValidationError उठाता है जो हर failing field का नाम बताता है।"
+  - q: "JSON schema क्या है?"
+    a: "JSON की shape का वर्णन: fields, types, required fields और allowed values, जिन्हें providers output को बाँधने के लिए use करते हैं।"
+  - q: "Constrained decoding क्या है?"
+    a: "हर step पर model सिर्फ़ वही tokens चुन सकता है जो grammar या schema के हिसाब से output को valid रखें, इसलिए shape की गारंटी रहती है।"
+  - q: "Valid-JSON वाला output भी parse क्यों नहीं हो सकता?"
+    a: "अगर reply max_tokens की limit पर पहुँच जाए, तो JSON बीच में कट जाता है। Parse करने से पहले stop reason check करो।"
+exercise:
+  title: "Schema design करो"
+  setup: "नोएडा का एक recruitment startup WhatsApp messages से job postings निकालता है, जैसे: 'Hiring 3 delivery executives in Gurgaon, 18k-22k pm + incentives, bike must, call 98xxxxxx10'। कुछ posts में salary नहीं होती, कुछ में range होती है, कुछ में दो roles होते हैं। Site city, role type (full-time, part-time, contract) और minimum salary से filter करती है।"
+  questions:
+    - q: "Salary को कैसे represent करना चाहिए?"
+      a: "दो optional integer fields, salary_min_inr और salary_max_inr, महीने के हिसाब से, और जब न दी हो तो null। '18k-22k' बन जाता है 18000 और 22000।"
+    - q: "Role type को कैसे represent करें, और क्यों?"
+      a: "full-time, part-time और contract का एक enum, और साफ़ न हो तो null, ताकि site का filter एक जैसा काम करे।"
+    - q: "दो roles वाले posts को कैसे handle करें?"
+      a: "Top level को postings की list बनाओ, ताकि एक message से दो records बन सकें, या ऐसे messages को moderator के पास भेज दो।"
+    - q: "अगर किसी message के लिए validation दो बार fail हो जाए तो क्या होना चाहिए?"
+      a: "वो original message के साथ moderator queue में जाता है, और कुछ भी invalid save नहीं होता।"
+ask:
+  - "Structured output और tool calling में क्या फ़र्क है?"
+  - "Pydantic से AI output को validate कैसे करूँ?"
+  - "मेरा model missing fields के लिए values क्यों गढ़ देता है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Applications को data चाहिए, गद्य नहीं। अगर आपके code को model के reply से कोई price, category या items की list पढ़नी है, तो **structured output** माँगो: ऐसा JSON जो तय shape (एक **schema**) से match करे। फिर code में use करने से पहले उसे validate करो।
+
+ज़्यादातर providers अब ऐसे features देते हैं जो model को schema से match करता valid JSON बनाने पर बाँध देते हैं, या यही काम करने के लिए tool definitions use करते हैं।
+
+```flow
+बिखरा हुआ text | "Selling my Samsung Galaxy S21, 2 yrs old, minor scratches, 18k negotiable, pickup Malviya Nagar" -> Model
+Schema | product: str, price_inr: int, 0 से ऊपर, condition: enum, city: str या null -> Model
+Model -> JSON -> Validate
+Validate -[ok]-> Save | product "Samsung Galaxy S21", price_inr 18000, condition "used", city "Jaipur"
+Validate -[fail]-> Error के साथ एक बार retry
+Error के साथ एक बार retry -[फिर fail]-> Moderator
+```
+
+इस lesson में हम जयपुर के एक online marketplace को देखेंगे, जो sellers की free-text listings को searchable records में बदल रहा है।
+
+## ये काम कैसे करता है
+
+**Shape तय करो।** Fields, उनके types और कौन-से required हैं, ये तय करो। Python में Pydantic model इसका आसान तरीका है:
+
+```python
+from typing import Literal
+from pydantic import BaseModel, Field
+
+class Listing(BaseModel):
+    product: str
+    price_inr: int = Field(gt=0)
+    condition: Literal["new", "used", "refurbished"]
+    city: str | None = None
+```
+
+**इसे माँगो।** या तो provider का structured-output feature schema के साथ use करो, या tool calling जिसमें schema ही tool का input हो, या fallback के तौर पर साफ़ instructions और ठीक JSON का एक example।
+
+**Validate करो।** Reply को parse करो और schema के सामने validate करो:
+
+```python
+from pydantic import ValidationError
+
+try:
+    item = Listing.model_validate_json(reply_text)
+except ValidationError as err:
+    # log err, retry once with the error message, or send to a person
+    ...
+```
+
+Validation गलत types (price की जगह "about 500" जैसा text), missing fields और range से बाहर की values पकड़ लेती है।
+
+**Failures को संभालो।** Validation error आने पर: एक बार retry करो, model को बताते हुए कि क्या गलत था; फिर भी fail हो तो item को human review के लिए mark करो। Invalid data को अपने database में कभी मत आने दो।
+
+**"पता नहीं" की जगह रखो।** जहाँ input में वो जानकारी न हो सकती हो, वहाँ fields को optional रखो या null allow करो, और instructions में ये बता दो। वरना model shape भरने के लिए कोई value गढ़ सकता है।
+
+**Categories के लिए enums use करो।** Allowed values की fixed list ("new", "used", "refurbished") बाद के analysis के लिए categories को एक जैसा रखती है।
+
+**Schema design के फ़ैसले:**
+
+| Field का प्रकार | अच्छा design | क्या न करें |
+| --- | --- | --- |
+| Money | Range check के साथ integer rupees, जैसे `price_inr: int > 0` | "18k" जैसा text |
+| Category | Allowed values का enum | बदलता रहने वाला free text |
+| जो जानकारी गायब हो सकती है | Optional, null allowed, और instructions में बता दो | Required fields जो गढ़ने पर मजबूर करें |
+| बार-बार आने वाले items | Objects की list | item1, item2 जैसे numbered fields |
+| Dates | ISO dates, validated | मिले-जुले formats वाली free-form dates |
+
+**आँख बंद करके नहीं, error के साथ retry करो।** Validation fail होने पर model को उसका पिछला reply और ठीक validation message भेजो, जैसे "price_inr: input should be a valid integer, got '18k'"। ज़्यादातर errors एक retry में ठीक हो जाती हैं। Error बताए बिना retry करने पर आमतौर पर वही गलती दोहराई जाती है।
+
+**हल्के से भारी तक पाँच layers।** आप model को सही shape की तरफ़ कई जगहों पर धकेल सकते हो:
+
+| Layer | कैसे काम करता है | Reliability | Cost |
+| --- | --- | --- | --- |
+| Prompting | Instructions और एक सटीक example | मज़बूत models पर अच्छा, गारंटी कभी नहीं | मुफ़्त |
+| Post-processing | Code आम चूकों को ठीक करता है, जैसे बंद होने वाला bracket छूटना या JSON के चारों तरफ़ code fence | जब गलतियाँ छोटी और दोहराई हुई हों तब काम करता है | सस्ता |
+| Retry | Validation error के साथ फिर से पूछो, जब तक fit न हो | ज़्यादा, पर हर retry एक call की cost लेती है | अतिरिक्त calls और देरी |
+| Constrained decoding | Provider या library model को सिर्फ़ वही tokens चुनने देती है जो output को valid रखें | Shape की गारंटी | थोड़ा धीमा; सिर्फ़ supported formats |
+| Fine-tuning | आपके format के कई examples पर train करना | एक fixed format के लिए ज़्यादा | Data और training की मेहनत |
+
+पहली तीन, उस model के लिए पट्टियाँ हैं जो लगभग सही है। Constrained decoding वही है जो providers के structured-output features और Outlines, guidance और llama.cpp grammars जैसी open-source libraries use करती हैं: जब model अपना अगला token चुनने वाला होता है, तो हर वो token जो grammar तोड़ दे, विकल्पों से हटा दिया जाता है। Models वही कुछ गलतियाँ बार-बार करते हैं, इसलिए post-processing बहुत आगे तक ले जा सकता है: LinkedIn ने बताया कि एक उदार parser ने सही format वाले YAML को 90% से 99.99% तक पहुँचा दिया।
+
+**Valid JSON का मतलब सही JSON नहीं।** पुराने "JSON mode" features सिर्फ़ ये वादा करते हैं कि reply parse होगा, ये नहीं कि उसमें आपके fields होंगे। Schema-constrained output में भी गलत value हो सकती है। और कोई भी JSON कट सकता है अगर reply `max_tokens` तक पहुँच जाए, इसलिए पहले stop reason check करो।
+
+**सिर्फ़ types नहीं, values भी check करो।** Schema confirm कर सकता है कि `price_inr` एक positive integer है, पर ये नहीं कि दो साल पुराने phone के लिए ₹18,000 ठीक है। Validation के बाद business checks जोड़ो: category के हिसाब से prices समझदार range में, cities किसी जानी-पहचानी list से, dates future में नहीं। जो values schema पास कर लें पर business check में fail हों, वो भी invalid वालों की तरह review में जाती हैं। ये दो-layer तरीका, पहले schema और फिर business rules, invoice extraction और लगभग हर structured-output pipeline में यही pattern है।
+
+**पूरी pipeline code में।** पक्की shape पाने का एक आम तरीका ये है कि model को एक ही tool दो जिसका input आपका schema हो, और उसे वही tool use करने के लिए बाध्य करो। ये Anthropic के Python SDK से चलता है; दूसरे providers के equivalents हैं:
+
+```python
+import anthropic
+from pydantic import ValidationError
+
+client = anthropic.Anthropic()
+TOOL = {"name": "save_listing", "description": "Save one product listing.",
+        "input_schema": Listing.model_json_schema()}
+CITIES = {"Jaipur", "Ajmer", "Udaipur", "Jodhpur"}
+
+def business_errors(item):
+    errors = []
+    if not 100 <= item.price_inr <= 500_000:
+        errors.append(f"price_inr {item.price_inr} is outside 100 to 500000")
+    if item.city and item.city not in CITIES:
+        errors.append(f"city {item.city!r} is not a city we serve")
+    return errors
+
+def extract(text, max_attempts=2):
+    messages = [{"role": "user", "content": "Extract the listing. Use null for anything not stated.\n\n" + text}]
+    for _ in range(max_attempts):
+        reply = client.messages.create(
+            model="claude-sonnet-5-5", max_tokens=500, messages=messages,   # check the docs for current names
+            tools=[TOOL], tool_choice={"type": "tool", "name": "save_listing"},
+        )
+        if reply.stop_reason == "max_tokens":
+            return None, "cut off: raise max_tokens"
+        call = next(b for b in reply.content if b.type == "tool_use")
+        try:
+            item = Listing.model_validate(call.input)
+            problems = business_errors(item)
+        except ValidationError as err:
+            item, problems = None, [str(err)]
+        if not problems:
+            return item, "ok"
+        # Send the exact error back so the model can fix it.
+        messages += [{"role": "assistant", "content": reply.content},
+                     {"role": "user", "content": [{"type": "tool_result", "tool_use_id": call.id,
+                                                   "is_error": True, "content": "; ".join(problems)}]}]
+    return None, "to moderator: " + "; ".join(problems)
+```
+
+हर नतीजा या तो valid `Listing` होता है या एक साफ़ वजह, जिससे moderator queue ठीक-ठीक दिखा पाती है कि क्या गलत हुआ। हर नतीजे को रोज़ गिनो; किसी एक तरह की error का बढ़ना अक्सर पहला संकेत होता है कि inputs बदल गए हैं।
+
+## एक example से समझो
+
+जयपुर के एक online marketplace को sellers की listings free text में मिलती हैं: "Selling my Samsung Galaxy S21, 2 yrs old, minor scratches, 18k negotiable, pickup Malviya Nagar"।
+
+Pipeline provider के structured output feature से model से product, price, condition और city वाला `Listing` माँगती है। हर reply पर validation चलती है।
+
+500 listings के नतीजे:
+
+- 471 पहली बार में valid।
+- 18 में prices "18k" या "around 20,000" की तरह लिखी थीं; schema text को reject करता है, code validation error के साथ एक बार retry करता है, और 15 integers की तरह लौट आते हैं (18000, 20000)।
+- 11 बाकी पूरी तरह fail होती हैं (listing में कोई price ही नहीं, या एक post में दो products)। Retry के बाद भी fail होने वाली 3 को मिलाकर, 14 moderator queue में जाती हैं।
+
+क्योंकि कुछ भी invalid database तक नहीं पहुँचता, site के price filters और city search चलते रहते हैं।
+
+| Step | Listings | हिस्सा |
+| --- | --- | --- |
+| पहली बार में valid | 471 | 94% |
+| Error के साथ एक retry से ठीक हुईं | 15 | 3% |
+| Moderators को भेजी गईं | 14 | 3% |
+| Database में invalid records | 0 | 0% |
+
+**Moderators को ये क्यों पसंद आया।** जो 14 listings moderators तक पहुँचीं, वो original text, model की कोशिश और ठीक validation error के साथ आईं, इसलिए हर एक को ठीक करने में सेकंड लगे। Pipeline से पहले, moderators रोज़ सैकड़ों listings हाथ से ठीक करते थे।
+
+## आम गलतियाँ
+
+- **String tricks से free text को parse करना।** JSON माँगो और validate करो।
+- **"ये आमतौर पर सही होता है" सोचकर validation छोड़ देना।**
+- **हर field को ज़बरदस्ती भरवाना।** जो जानकारी गायब हो सकती है उसके लिए null allow करो।
+- **Free-text categories।** Fixed list use करो।
+- **हमेशा retry करते रहना।** Error के साथ एक बार retry करो, फिर किसी इंसान को भेजो।
+
+- **Tests अपडेट किए बिना schema बदलना।** Expected outputs के साथ sample inputs का एक set रखो और schema बदलने पर हर बार उसे दोबारा चलाओ।
+- **Stop reason को नज़रअंदाज़ करना।** `max_tokens` पर कटा हुआ reply, model कितना भी अच्छा हो, टूटा हुआ JSON है।
+- **विशाल, गहरे nested schemas।** हर अतिरिक्त field गलत होने का एक और मौका है। सिर्फ़ वही माँगो जो आपका code use करता है, और बहुत बड़े extractions को steps में बाँटो।
+
+## जब schema की ज़रूरत नहीं
+
+- **Reply सीधे किसी इंसान को जाता है**, जैसे chat का जवाब या email का draft। Plain text ठीक है।
+- **छोटी list में से एक label**, जहाँ सख़्त prompt और ये check कि reply allowed शब्दों में से एक है, काफ़ी है।
+- **Notebook में जल्दी की खोजबीन**, जब तक आपको पता न हो कि कौन-से fields मायने रखते हैं।
+
+## Demo से production तक
+
+- **Schema को API की तरह version करो**, और जब तक उनके साथ लिखे records मौजूद हैं, पुराने versions को readable रखो।
+- **असली गड़बड़ inputs का test set रखो** expected outputs के साथ, और हर schema, prompt या model बदलने पर उसे चलाओ।
+- **हर नतीजा log करो**: पहली बार valid, retry से ठीक हुआ, कट गया, review को भेजा गया। दिन के हिसाब से rates देखो।
+- **Reviewers को context दो**: original text, model की कोशिश और ठीक error।
+- **Cost का ध्यान रखो**: retries और लंबे schemas tokens बढ़ाते हैं, इसलिए tokens per call नहीं, tokens per valid record ट्रैक करो।
+
+## Practice करो
+
+नीचे link की structured outputs guide पढ़ो।
+
+1. किसी invoice, job posting या product listing के लिए Pydantic model define करो।
+2. Structured output से दस गड़बड़ असली texts से उसे निकालो, और हर एक को validate करो।
+3. Validation error के साथ एक retry और बाकी के लिए review list जोड़ो; बताओ कि हर step पर कितने pass हुए।
+4. ऊपर वाले `extract` function को अपने दस texts पर `max_tokens` को 30 रखकर चलाओ, और देखो कि कट जाने वाला case कैसे handle होता है।
+
+ज़्यादा गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 2 structured outputs के लिए prompting, post-processing, constrained sampling और fine-tuning कवर करता है।
+
+**आपका काम पूरा जब** आप समझा सको कि structured output के साथ भी validation क्यों चाहिए, और अपने pass rates दिखा सको।

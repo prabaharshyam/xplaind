@@ -1,0 +1,229 @@
+---
+id: ml-feature-engineering
+lang: hi
+title: "Feature engineering"
+outcome: "Raw records को ऐसे features में बदलना जो models की मदद करें: समय के aggregates, ratios, date parts, categories, text और location के encodings, और साथ में leakage से बचना और training व serving को एक जैसा रखना।"
+answer: "Feature engineering raw records को ऐसे inputs में बदलती है जिनसे model सीख सके, जैसे पिछले 30 दिनों की counts, ratios, date parts और encoded categories, बिना future data use किए।"
+why_it_matters: "Tabular ML में बेहतर features, fancy models से ज़्यादा काम करते हैं। अनुभवी ML engineers अपना ज़्यादातर modelling time यहीं लगाते हैं। Future की जानकारी लीक किए बिना features बनाना और production में उन्हें वैसे ही compute करना, यही notebook के नतीजों और असली दुनिया के नतीजों में फ़र्क करता है।"
+flashcards:
+  - q: "Feature engineering क्या है?"
+    a: "Raw data से model के inputs बनाना, जैसे transactions table से 'पिछले 30 दिनों में orders', यानी वो चीज़ें पकड़ना जो कोई domain expert देखता।"
+  - q: "समय-window वाले तीन तरह के features बताओ।"
+    a: "Windows पर aggregates (7, 30, 90 दिन की counts, sums, averages), trends (इस महीने बनाम पिछले महीने), और recency (आख़िरी event के बाद कितने दिन)।"
+  - q: "भारतीय calendar features क्यों मायने रखते हैं?"
+    a: "Demand और payments त्योहारों जैसे Diwali, Onam, Eid और Pongal के हिसाब से चलते हैं, और महीने की शुरुआत की salary days के हिसाब से भी।"
+  - q: "Target encoding क्या है, और इसका risk क्या है?"
+    a: "किसी category की जगह उसका average outcome डाल देना। अगर पूरे data पर compute करो तो target leak हो जाता है; इसे सिर्फ़ training folds के अंदर compute करो।"
+  - q: "Features का सबसे बड़ा नियम क्या है?"
+    a: "Feature सिर्फ़ वही जानकारी use कर सकता है जो prediction के पल पर उपलब्ध हो। हर aggregate को prediction time के हिसाब से compute करो।"
+  - q: "Training-serving skew क्या है?"
+    a: "जब features training और production में अलग तरह से compute हों, जैसे timezone का mismatch, और live model चुपचाप बुरा चलने लगे।"
+  - q: "Training-serving skew से कैसे बचें?"
+    a: "Feature code एक बार लिखो और दोनों जगह वही use करो, या feature store use करो।"
+  - q: "Validation score ज़रूरत से ज़्यादा अच्छा आए तो क्या करना चाहिए?"
+    a: "जश्न मनाने से पहले leakage की जाँच करो, ख़ासकर हाल में जोड़े गए features और joins की।"
+  - q: "Feature के लिए 'as of' का क्या मतलब है?"
+    a: "वो value जो सिर्फ़ prediction time से पहले के events से बनी हो, जैसे scoring date से पहले के 30 दिनों के orders, उसके बाद के कभी नहीं।"
+  - q: "Feature code को ColumnTransformer या shared module में क्यों रखें?"
+    a: "ताकि training और serving में बिल्कुल वही transformations चलें और training-serving mismatch न हो, जो चुपचाप accuracy गिरा देता है।"
+exercise:
+  title: "किसी date के हिसाब से features बनाओ"
+  setup: "कोच्चि का एक grocery app 1 नवंबर 2026 को predict करता है कि हर customer अगले 14 दिनों में order करेगा या नहीं। आपके पास एक orders table (customer, date, amount, delivered_late) और एक support table (customer, ticket_date) है। Candidate features: (A) अक्टूबर 2026 के orders, (B) 1 नवंबर से पहले के आख़िरी order के बाद के दिन, (C) 1 से 14 नवंबर के बीच के support tickets की संख्या, (D) अक्टूबर के उन orders का हिस्सा जो late delivered हुए, (E) नवंबर में कुल खर्च की गई रकम।"
+  questions:
+    - q: "कौन-से features use करना सुरक्षित है?"
+      a: "(A), (B) और (D)। ये सिर्फ़ 1 नवंबर से पहले की जानकारी use करते हैं।"
+    - q: "(C) और (E) leak क्यों हैं?"
+      a: "ये prediction date के बाद का data use करते हैं, जो असली इस्तेमाल में model के पास होता ही नहीं।"
+    - q: "इस prediction के लिए एक काम का seasonal feature बताओ।"
+      a: "अगले 14 दिनों में Diwali जैसा कोई त्योहार आता है या नहीं, या महीने की शुरुआत वाला salary week है या नहीं।"
+    - q: "आप कैसे पक्का करोगे कि production में (D) बिल्कुल training जैसा ही compute हो?"
+      a: "दोनों जगह वही feature function use करो, उसी 'as of' date logic और timezone के साथ, या shared feature store।"
+ask:
+  - "Machine learning model के लिए अच्छा feature कैसा होता है?"
+  - "Training-serving skew क्या है?"
+  - "बहुत सारी values वाली categories को encode कैसे करें?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Feature engineering** में raw data से model के inputs बनाए जाते हैं। एक transactions table अपने आप churn model को ज़्यादा कुछ नहीं बताती; पर "पिछले 30 दिनों में orders", "पिछली quarter के मुकाबले महीने के खर्च में बदलाव" और "आख़िरी order के बाद के दिन" जैसे features बताते हैं।
+
+अच्छे features वो पकड़ते हैं जो कोई domain expert देखता।
+
+```flow
+dir: LR
+title: Prediction की date: 1 Nov
+बीता हुआ समय, allowed | orders, sessions, tickets -> 1 Nov के "as of" features | counts, trends, recency
+1 Nov के "as of" features -[predict]-> आने वाला समय, features में कभी नहीं | अगले orders: यही label है
+```
+
+इस lesson में हम Bengaluru की एक food-delivery company को देखेंगे, जो predict करती है कि कौन-से customers 14 दिनों के अंदर फिर order करेंगे।
+
+## ये काम कैसे करता है
+
+**Time windows पर aggregates।** पिछले 7, 30 या 90 दिनों की counts, sums, averages, maximums। Trends: इस महीने बनाम पिछला महीना। Recency: आख़िरी event के बाद कितने दिन हुए।
+
+**Ratios और differences।** EMI और income का ratio, हर visit पर खर्च, हर order पर returns, category के average के मुकाबले price।
+
+**Date और time के parts।** हफ़्ते का दिन, घंटा, महीना, त्योहारों का समय (Diwali, Onam, Eid, Pongal), महीने की शुरुआत वाले salary days। भारत में demand और payment patterns पर season का बहुत असर होता है।
+
+**Categories।** कम values हों तो one-hot encoding; ज़्यादा हों तो frequency या target encoding (target encoding सिर्फ़ training folds पर compute करो ताकि leakage न हो); और rare categories को "other" में डाल दो।
+
+**Text।** आसान: length, keyword flags। बेहतर: language model से मिले embeddings को features की तरह use करना।
+
+**Location।** किसी store या hub से दूरी, PIN code की खासियतें, city tier।
+
+**Leakage।** सबसे बड़ा नियम: feature सिर्फ़ वही जानकारी use करे जो prediction के पल पर उपलब्ध हो। हर aggregate को prediction time के "as of" compute करो। जिन features में चुपचाप future data आ जाता है (जैसे जिस order को आप score कर रहे हो, उसके बाद दर्ज हुआ refund), वो testing में model को कमाल का दिखाते हैं और production में फ़ेल हो जाते हैं।
+
+**Training-serving consistency।** Features को training और serving, दोनों में एक ही तरह से compute करना चाहिए। Feature code एक बार लिखो और दोबारा use करो, या feature store use करो। Mismatch (timezone का फ़र्क, "active" की अलग definition) production models को चुपचाप बिगाड़ देते हैं।
+
+**Selection।** ज़्यादा features हमेशा बेहतर नहीं होते। बेकार या दोहराए हुए features हटाओ; importance और समय के साथ stability check करो।
+
+**Data type के हिसाब से feature ideas:**
+
+| Raw data | Feature के example |
+| --- | --- |
+| Transactions | पिछले 7, 30, 90 दिनों के orders; average value; पिछले 30 दिनों के मुकाबले बदलाव; आख़िरी order के बाद के दिन |
+| Ratings और support | आख़िरी rating; पिछले 30 दिनों के tickets; late deliveries का हिस्सा |
+| Dates | हफ़्ते का दिन, घंटा, महीना, त्योहार की window, salary week |
+| Categories | कम values के लिए one-hot; ज़्यादा के लिए frequency या fold-safe target encoding; rare values "other" में |
+| Text | Length, keyword flags, embeddings |
+| Location | Store या hub से दूरी, city tier |
+
+**Experts से शुरू करो।** सबसे अच्छे features अक्सर उन लोगों से पूछने पर मिलते हैं जो business जानते हैं: "आपको कब लगता है कि कोई customer जाने वाला है?" Delivery managers ने late-delivery share बताया; finance ने payday का timing बताया। दोनों ऐसे features बने जिन्होंने किसी भी automatic तरीके को हरा दिया।
+
+**pandas में point-in-time features।** सब कुछ एक cutoff date के "as of" compute करो, सिर्फ़ उससे पहले के events से:
+
+```python
+import numpy as np, pandas as pd
+
+rng = np.random.default_rng(2)
+events = pd.DataFrame({
+    "customer": rng.integers(1, 301, 6000),
+    "ts": pd.Timestamp("2026-01-01") + pd.to_timedelta(rng.integers(0, 300, 6000), unit="D"),
+    "amount": rng.gamma(2, 400, 6000).round(),
+    "late": rng.random(6000) < 0.1,
+})
+
+def features_as_of(events, cutoff):
+    past = events[events.ts < cutoff]
+    out = {}
+    for days in (7, 30, 90):
+        w = past[past.ts >= cutoff - pd.Timedelta(days=days)]
+        g = w.groupby("customer")
+        out[f"orders_{days}d"] = g.size()
+        out[f"spend_{days}d"] = g.amount.sum()
+    g = past.groupby("customer")
+    out["days_since_last"] = (cutoff - g.ts.max()).dt.days
+    out["late_share"] = g.late.mean()
+    f = pd.DataFrame(out).fillna(0)
+    f["spend_trend"] = f.spend_30d / (f.spend_90d / 3 + 1)          # last month vs monthly average
+    return f
+
+cut = pd.Timestamp("2026-09-01")
+X = features_as_of(events, cut)
+print(X.describe().T[["mean", "max"]].round(1).head(8))
+```
+
+Training के लिए कई cutoffs पर (हर महीने एक) features बनाओ, और हर cutoff के साथ उसके बाद के labels जोड़ो। इससे examples ज़्यादा मिलते हैं और समय के साथ stability भी परखी जाती है।
+
+**त्योहार और salary-cycle के features।**
+
+```python
+FESTIVALS = pd.to_datetime(["2026-03-04", "2026-08-28", "2026-10-20", "2026-11-08"])   # check the year's dates
+
+def calendar_features(dates):
+    d = pd.Series(pd.to_datetime(dates))
+    days_to_fest = d.apply(lambda x: min(((f - x).days for f in FESTIVALS if f >= x), default=365))
+    return pd.DataFrame({"dow": d.dt.dayofweek, "month": d.dt.month,
+                         "salary_week": (d.dt.day <= 7).astype(int),
+                         "days_to_festival": days_to_fest.clip(upper=60)})
+```
+
+त्योहारों की dates हर साल बदलती हैं और region के हिसाब से अलग होती हैं, इसलिए उन्हें code में नहीं, dated table में रखो।
+
+**Pipeline के अंदर encoding।** Categories की handling model के साथ ही रखो, ताकि serving, training जैसी ही रहे:
+
+```python
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, TargetEncoder
+from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import HistGradientBoostingClassifier
+
+prep = ColumnTransformer([
+    ("few", OneHotEncoder(handle_unknown="infrequent_if_exist", min_frequency=20), ["city_tier", "channel"]),
+    ("many", TargetEncoder(), ["pin_code"]),           # fitted with internal cross-fitting to limit leakage
+], remainder="passthrough")
+model = make_pipeline(prep, HistGradientBoostingClassifier())
+```
+
+scikit-learn का `TargetEncoder`, `fit_transform` के दौरान cross-fitting करता है, जिससे naive target encoding वाला leakage कम हो जाता है।
+
+**हर feature group की value नापो।** एक ही time split पर हर group (recency, spend, delivery, calendar) के साथ और उसके बिना train करो, और वही groups रखो जो साफ़ तौर पर मदद करते हैं। जो features सिर्फ़ एक cutoff महीने में काम करते हैं, वो शायद noise हैं।
+
+## एक example से समझो
+
+Bengaluru की एक food-delivery company predict करती है कि कोई customer 14 दिनों के अंदर फिर order करेगा या नहीं।
+
+Raw data: orders, ratings, app sessions, support tickets और promotions।
+
+हर prediction date के "as of" बनाए गए features:
+
+- पिछले 7, 30 और 90 दिनों के orders; आख़िरी order के बाद के दिन;
+- average order value और पिछले 30 दिनों के मुकाबले उसमें बदलाव;
+- पिछले 30 दिनों में उन orders का हिस्सा जिनमें 15 मिनट से ज़्यादा की देरी हुई;
+- आख़िरी दी गई rating; पिछले 30 दिनों के support tickets;
+- weekend के orders का हिस्सा; customer आमतौर पर payday वाले हफ़्ते में order करता है या नहीं;
+- city tier और सबसे पास के cloud kitchen cluster से दूरी।
+
+नतीजे: सिर्फ़ order counts वाली baseline का AUC 0.72 रहा; engineered features के साथ 0.81। सबसे कीमती नए features थे delay share और order value में बदलाव।
+
+Leakage का एक डर: एक शुरुआती draft में गलत जुड़े join की वजह से "customer ने अगले 7 दिनों में support से संपर्क किया" feature आ गया था। ये इसलिए पकड़ में आया क्योंकि validation score 0.95 पर पहुँच गया, जो सच होने के लिए बहुत अच्छा था।
+
+| Model | AUC |
+| --- | --- |
+| Baseline: सिर्फ़ order counts | 0.72 |
+| Engineered features के साथ | 0.81 |
+| गलती से आए leaky feature के साथ | 0.95 (सच होने के लिए बहुत अच्छा) |
+| Leak हटाने के बाद | 0.81 |
+
+**कौन-से features क्यों मायने रखते थे।** Delay share ने वो पकड़ा जिसका business को पहले से शक था: customer एक late delivery माफ़ कर देते हैं, पर एक महीने में दो हों तो वो competitor try करने लगते हैं। Order value में बदलाव ने उन customers को पकड़ा जो धीरे-धीरे दूर जा रहे थे, यानी बंद करने से पहले छोटे baskets मँगाते थे। इनमें से कोई भी raw order counts में नहीं दिखता। दोनों operations team से बात करके निकले, और दोनों company के पास पहले से मौजूद data से सस्ते में compute हो गए। Team ने ये भी सीखा कि क्या काम नहीं आया: order recency जोड़ने के बाद app session counts ने लगभग कुछ नहीं जोड़ा, तो उन्हें हटा दिया और एक महँगी daily data pipeline बचा ली।
+
+## आम गलतियाँ
+
+- **Features में future की जानकारी।** सब कुछ prediction time के "as of" compute करो।
+- **Training और serving के लिए अलग code।** Feature code share करो या feature store use करो।
+- **पूरे data पर target encoding।** इसे सिर्फ़ training folds के अंदर compute करो।
+- **भारतीय calendar के असर को नज़रअंदाज़ करना।** त्योहार और salary cycles मायने रखते हैं।
+- **सच होने के लिए बहुत अच्छे scores।** इनमें leakage ढूँढो।
+
+- **एक साथ सैकड़ों features बनाना।** Features छोटे groups में जोड़ो और हर group का gain नापो, ताकि पता रहे कि कौन अपनी जगह और maintenance cost के लायक है।
+- **ऐसे aggregates जिनमें prediction का दिन या उसके बाद का data आ जाए।**
+- **त्योहारों की dates एक बार hard-code कर देना**, जो अगले साल गलत हो जाती हैं।
+- **Feature code share करने की जगह training और serving के बीच copy करना।**
+
+## जब heavy feature engineering की ज़रूरत नहीं होती
+
+- **Unstructured data** जैसे images, audio या लंबा text, जहाँ neural networks अपने features खुद सीख लेते हैं।
+- **कोई मज़बूत pretrained model या embeddings** पहले से वो पकड़ लेते हैं जो आपको चाहिए।
+- **बहुत छोटा data**, जहाँ कुछ expert features और एक simple model, सौ engineered features से बेहतर चलते हैं।
+
+## Demo से production तक
+
+- **Features को prediction time के "as of" compute करो**, ऐसे tests के साथ जो future data आने पर fail हों।
+- **Feature code share करो** training और serving के बीच, या feature store use करो।
+- **Calendars को data tables में रखो**, हर साल और region की dates के साथ।
+- **Feature distributions पर नज़र रखो** drift के लिए, और हर source का missing rate भी।
+- **हर retrain पर feature group के हिसाब से value नापो**, और जो काम करना बंद कर दे उसे हटा दो।
+
+## Practice करो
+
+Kaggle का Feature Engineering course पूरा करो और Google के Rules of ML का feature engineering वाला हिस्सा पढ़ो।
+
+1. किसी transactions dataset से, चुनी हुई date के "as of" compute किए हुए दस time-windowed features बनाओ, बिना future data के।
+2. अपने features से model में एक simple baseline के मुकाबले कितना सुधार हुआ, ये नापो।
+3. जानबूझकर एक leaky feature जोड़ो, score को उछलते देखो, और एक ऐसा test लिखो जो इसे पकड़ ले।
+4. तीन monthly cutoffs पर features बनाओ, पहले दो पर train करो और तीसरे पर test करो, और सिर्फ़ days_since_last वाले model से compare करो।
+
+**आपका काम पूरा जब** आप समझा सको कि हर feature prediction time के "as of" कैसे compute होता है, और training व serving उसे बिल्कुल एक जैसा कैसे compute करते हैं।

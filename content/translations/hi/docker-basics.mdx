@@ -1,0 +1,264 @@
+---
+id: docker-basics
+lang: hi
+title: "Docker और Compose"
+outcome: "AI service को container image में package कर पाओगे, सही settings के साथ चला पाओगे, और Docker Compose से कई services का local stack शुरू कर पाओगे।"
+answer: "Docker किसी app और उसकी हर ज़रूरत को एक image में package कर देता है, जो कहीं भी एक जैसी चलती है। Docker Compose ऐसे कई containers को एक file से एक साथ शुरू करता है।"
+why_it_matters: "Containers की वजह से AI services आपके laptop से client के servers या cloud तक बिना \"मेरी machine पर तो चल रहा था\" वाली problem के पहुँचती हैं। लगभग हर FDE और platform job description में Docker माँगा जाता है, और इसके बाद का हर deployment lesson इसे मानकर चलता है।"
+flashcards:
+  - q: "Container क्या है?"
+    a: "एक चलता हुआ program जो अपनी हर ज़रूरत के साथ package है, जैसे Python version, libraries, code और start command, ताकि वो कहीं भी एक जैसा चले।"
+  - q: "Image और container में क्या फ़र्क है?"
+    a: "Image package की हुई recipe का नतीजा है, जिसे store और share किया जाता है। Container उस image का चलता हुआ instance है।"
+  - q: "Dockerfile क्या है?"
+    a: "Steps की छोटी recipe, जिसका हर step एक layer जोड़ता है, और जिससे image build होती है।"
+  - q: "Dockerfile में code से पहले dependency files क्यों copy करते हैं?"
+    a: "Docker layers को cache करता है। इससे code बदलने पर हर package दोबारा install नहीं होता, तो rebuild सेकंडों में हो जाता है।"
+  - q: "Volume क्या है?"
+    a: "ऐसी storage जो container हटाने पर भी बची रहती है, जैसे database files या caches के लिए।"
+  - q: "Docker Compose क्या करता है?"
+    a: "एक file से कई containers को एक साथ शुरू करता है, जो नाम से आपस में जुड़े होते हैं, जैसे एक API और उसका database।"
+  - q: "Production में latest tag क्यों नहीं use करना चाहिए?"
+    a: "तब पता नहीं चलता कि क्या चल रहा है और rollback भी नहीं हो सकता। Images को versions या commit hashes से tag करो।"
+  - q: "Containers non-root user से क्यों चलाएँ?"
+    a: "इससे container compromise होने पर नुकसान सीमित रहता है, और कई client security reviews में ये ज़रूरी होता है।"
+  - q: "Multi-stage build क्या करता है?"
+    a: "एक stage में सारे tools के साथ build या compile करता है, फिर सिर्फ़ results को एक छोटी final image में copy करता है, जो ship करने में तेज़ होती है और जिस पर attack की गुंजाइश कम होती है।"
+  - q: ".dockerignore file क्यों जोड़ें?"
+    a: "ये .env files, Git history, data folders और caches को build से बाहर रखती है, ताकि secrets images में copy न हों और builds तेज़ रहें।"
+exercise:
+  title: "इस Dockerfile को review करो"
+  setup: "एक teammate की AI API के लिए Dockerfile: FROM python:3.12 (पूरी image); पहला step COPY . . ; RUN pip install -r requirements.txt; ENV ANTHROPIC_API_KEY=sk-ant-...; CMD python main.py। वो इसे myapi:latest के नाम से deploy करते हैं। compose.yaml में PostgreSQL container पर कोई volume नहीं है।"
+  questions:
+    - q: "सबसे गंभीर problem क्या है?"
+      a: "API key image के अंदर ही बंद है। जिसके पास image है वो उसे पढ़ सकता है। उसे हटाओ, key rotate करो, और run time पर पास करो।"
+    - q: "Rebuilds धीमे क्यों हैं, और कैसे ठीक करोगे?"
+      a: "COPY . . पहले होने से code का कोई भी बदलाव install वाली layer को invalidate कर देता है। पहले requirements.txt copy करो, install करो, फिर code copy करो। एक .dockerignore भी जोड़ो।"
+    - q: "अगले deploy पर database का data का क्या होगा?"
+      a: "खो जाएगा, क्योंकि वो container के अंदर रहता है। Database के data folder के लिए एक named volume जोड़ो।"
+    - q: "दो और improvements बताओ।"
+      a: "बहुत छोटी image के लिए python:3.12-slim use करो, एक non-root USER जोड़ो, और images को latest की जगह versions से tag करो।"
+ask:
+  - "Docker और virtual machine में क्या फ़र्क है?"
+  - "अपनी Docker image छोटी कैसे करूँ?"
+  - "Docker Compose में containers आपस में कैसे बात करते हैं?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Container** एक चलता हुआ program है जो अपनी हर ज़रूरत के साथ package है: Python version, libraries, आपका code और उसका start command। ये आपके laptop, किसी साथी की machine, client के server या cloud service पर एक जैसा चलता है।
+
+Container एक **image** से बनता है, और image एक **Dockerfile** से बनती है, जो steps की छोटी recipe होती है। **Docker Compose** कई containers को एक file से एक साथ शुरू करता है, जैसे आपकी API, pgvector वाला PostgreSQL database और एक Redis cache, ठीक वैसे जुड़े हुए जैसे वो production में होंगे।
+
+Containers virtual machines नहीं हैं। ये host का Linux kernel share करते हैं, इसलिए सेकंडों में शुरू हो जाते हैं और memory कम लेते हैं।
+
+```flow
+dir: LR
+Dockerfile -[docker build]-> Image | tagged claims-api:1.4.0
+Image -[docker push]-> Registry | Docker Hub, GHCR, a cloud registry
+Image -[docker run, compose up]-> Containers | running on a laptop, a server or the cloud
+```
+
+| | Virtual machine | Container |
+|---|---|---|
+| हर app साथ क्या रखता है | App, उसकी libraries और पूरा guest OS, एक hypervisor पर | App और उसकी libraries, एक container runtime पर जो host kernel share करता है |
+| Start होने का समय | Minutes | Seconds |
+| Memory | Gigabytes | Megabytes |
+
+ये lesson Jaipur के एक bank की IT team को document-search API सौंपने की कहानी के साथ चलता है, जो सब कुछ अपने servers पर चलाती है।
+
+## ये काम कैसे करता है
+
+**Dockerfile।** हर line एक layer जोड़ती है:
+
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv sync --frozen --no-dev --no-install-project
+COPY src ./src
+USER 1000
+CMD [".venv/bin/uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Docker layers को cache करता है। Code से पहले dependency files copy करने का मतलब है कि code बदलने पर हर package दोबारा install नहीं होता, तो rebuild सेकंडों में हो जाते हैं।
+
+**Build और run।** `docker build -t claims-api:1.4.0 .` एक image बनाकर tag करता है। `docker run -p 8000:8000 --env-file .env claims-api:1.4.0` उसे चलाता है, container का port आपके port से जोड़ता है और settings को environment variables की तरह पास करता है। `docker ps`, `docker logs` और `docker exec -it name bash` से आप अंदर झाँक सकते हो।
+
+**Data।** Container की अपनी filesystem उसके हटते ही गायब हो जाती है। जो data बचना चाहिए, जैसे database की files या model cache, वो एक **volume** में रखो।
+
+**Compose।** `compose.yaml` में services की list होती है: उनकी images या build folders, ports, environment, volumes और कौन किस पर depend करता है। `docker compose up` सबको शुरू कर देता है; services एक-दूसरे को नाम से पहुँचती हैं, इसलिए आपकी API `postgres:5432` से connect होती है।
+
+**Registries।** Images को registry में push किया जाता है (Docker Hub, GitHub Container Registry, या client की cloud registry), और servers वहीं से pull करते हैं। हर image को सिर्फ़ `latest` नहीं, एक version से tag करो, ताकि पता रहे कि ठीक क्या चल रहा है और rollback हो सके।
+
+**रोज़ के commands:**
+
+| Command | क्या करता है |
+| --- | --- |
+| `docker build -t name:tag .` | यहाँ की Dockerfile से image बनाता है |
+| `docker run -p 8000:8000 name:tag` | उसे चलाता है, एक port map करके |
+| `docker ps` | चलते हुए containers की list |
+| `docker logs -f name` | Container के logs लगातार देखता है |
+| `docker exec -it name bash` | चलते हुए container के अंदर shell खोलता है |
+| `docker images` | Images और उनके sizes की list |
+| `docker compose up -d` | compose.yaml की हर service को background में शुरू करता है |
+| `docker compose down` | उन्हें रोककर हटा देता है (volumes बचे रहते हैं) |
+
+**जो container start नहीं हो रहा उसे debug करना।** सबसे पहले उस पर `docker logs` चलाओ: ज़्यादातर failures में कोई environment variable गायब होता है, start command गलत होता है या port पहले से use में होता है। अगर वो तुरंत exit हो जाए, तो normal command की जगह shell के साथ चलाकर आसपास देखो। अगर वो start होता है पर database तक नहीं पहुँचता, तो याद रखो कि Compose के अंदर database अपने service name पर होता है, जैसे `db`, `localhost` पर नहीं, क्योंकि हर container का अपना network address होता है।
+
+**AI apps की images।** AI images जल्दी बहुत बड़ी हो जाती हैं: machine learning libraries, model files और system packages मिलकर बढ़ते जाते हैं। जहाँ हो सके model weights को image से बाहर रखो और start-up पर किसी volume में download करो, या hosted model call करो। जब compilers सिर्फ़ packages install करने के लिए चाहिए, तब multi-stage builds use करो: एक stage में build करो, results को slim final stage में copy करो। छोटी images जल्दी pull होती हैं, जल्दी start होती हैं और security scanners को शिकायत करने के लिए कम चीज़ें मिलती हैं।
+
+**Production जैसी Dockerfile।** दो stages, एक health check और image में कोई secret नहीं:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS build
+WORKDIR /app
+RUN pip install --no-cache-dir uv
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+COPY src ./src
+
+FROM python:3.12-slim
+WORKDIR /app
+COPY --from=build /app/.venv ./.venv
+COPY --from=build /app/src ./src
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+RUN useradd --uid 1000 --create-home app
+USER app
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
+CMD ["uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+और उसके बगल में एक `.dockerignore`:
+
+```text
+.env
+.git
+__pycache__/
+data/
+models/
+*.ipynb
+```
+
+**Database का इंतज़ार करने वाला Compose।** अकेला `depends_on` सिर्फ़ container के start होने का इंतज़ार करता है, इसका नहीं कि Postgres connections लेने लगा या नहीं:
+
+```yaml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+  db:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_PASSWORD: devonly, POSTGRES_DB: app}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:
+```
+
+`devonly` password सिर्फ़ local machine के लिए है; असली environments में credentials secret store से आते हैं।
+
+**Containers में GPUs।** Host पर NVIDIA का container toolkit install हो, तो `docker run --gpus all ...` container को GPUs दे देता है। Compose में उन्हें `deploy.resources.reservations.devices` के नीचे माँगो। Host driver से मैच करने वाली CUDA base image use करो, और model weights को mounted volume में रखो ताकि image छोटी रहे।
+
+**Scan और pin।** CI में Trivy या Docker Scout जैसे tool से images को known vulnerabilities के लिए scan करो, और गंभीर findings पर fail करो। Base images को एक version (या digest) पर pin करो, ताकि अगले महीने का rebuild चुपचाप Python या system libraries न बदल दे।
+
+**AI apps के लिए size मायने रखता है।** हर बदलाव के बाद `docker images` देखो। Hosted model वाला Python app कुछ सौ megabytes का होना चाहिए; PyTorch और CUDA वाला कई gigabytes का हो सकता है, जो हर deploy और autoscale को धीमा करता है। भारी model serving को अपनी अलग image में रखो ताकि API image छोटी रहे।
+
+**Browser में try करो।** एक छोटा Dockerfile linter: ये तीन आम गलतियाँ पकड़ता है। Dockerfile text बदलकर चलाओ।
+
+```python
+dockerfile = """FROM python:latest
+COPY . /app
+RUN pip install -r /app/requirements.txt
+CMD ["python", "/app/main.py"]"""
+
+lines = [l.strip() for l in dockerfile.splitlines() if l.strip()]
+if any(l.startswith("FROM") and (":latest" in l or ":" not in l) for l in lines):
+    print("Pin the base image version instead of latest.")
+if not any(l.startswith("USER") for l in lines):
+    print("Add a USER line so the app does not run as root.")
+if lines.index(next(l for l in lines if l.startswith("COPY"))) < lines.index(next(l for l in lines if l.startswith("RUN pip"))):
+    print("Copy requirements first and install before copying the code, so builds reuse the cache.")
+```
+
+## एक example से समझो
+
+आप Jaipur के एक bank की IT team को document-search API सौंप रहे हो, जो सब कुछ अपने servers पर चलाती है। उन्हें इसे try करने के लिए बस एक command चाहिए।
+
+```yaml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on: [db]
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+volumes:
+  pgdata:
+```
+
+वो `.env.example` को `.env` में copy करते हैं, model key और database password भरते हैं, `docker compose up -d` चलाते हैं, और `localhost:8000/docs` खोलते हैं। API database तक `db:5432` पर पहुँचती है। Machine restart करने पर भी documents indexed रहते हैं, क्योंकि database `pgdata` volume में रहता है।
+
+उनकी security team image को scan करती है और बताती है कि वो root की तरह चलती है। `USER 1000` वाली line इसे ठीक कर देती है। वो image का size भी पूछते हैं: `python:3.12-slim` से ये लगभग 250 MB रहता है, पूरी Python image के साथ 1 GB से ऊपर।
+
+| Bank का review point | पहले | बाद में |
+| --- | --- | --- |
+| Root की तरह चलता है | हाँ | नहीं: `USER 1000` |
+| Image size | पूरी Python image के साथ 1 GB से ऊपर | `python:3.12-slim` के साथ लगभग 250 MB |
+| Image में secrets | कोई नहीं, run time पर `.env` से पास होते हैं | उनके scanner ने confirm किया |
+| Restart के बाद data | बचा रहा, `pgdata` volume में | बचा रहा |
+| कौन-सा version चल रहा है | `1.4.0` से tagged | `1.3.2` पर rollback test किया गया |
+
+## आम गलतियाँ
+
+- **Secrets को image में डाल देना।** जिसके पास image है वो उन्हें पढ़ सकता है। Secrets run time पर पास करो।
+- **Production में `latest` use करना।** पता नहीं चलता कि क्या चल रहा है और rollback नहीं हो पाता। Versions से tag करो।
+- **Data को container के अंदर रखना।** अगले deploy पर वो गायब हो जाता है। Volumes या managed database use करो।
+- **Root की तरह चलाना।** कई client security reviews इसे reject कर देते हैं। Non-root user जोड़ो।
+- **पूरा folder पहले copy करना।** तब हर code बदलाव पर सारे packages दोबारा install होते हैं। Dependency files copy करो, install करो, फिर code copy करो। `.git`, `.env` और data folders के लिए `.dockerignore` जोड़ो।
+
+- **सब कुछ के लिए एक विशाल container।** API, database और cache को अलग services रखो, ताकि हर एक को अलग से restart, scale और upgrade किया जा सके।
+- **.dockerignore न होना**, जिससे .env files और data folders images के अंदर पहुँच जाते हैं।
+- **Model weights को image में डाल देना**, जिससे वो gigabytes की हो जाती है और deploy धीमा होता है।
+- **Health condition के बिना depends_on**, जिससे app database के तैयार होने से पहले शुरू हो जाता है।
+
+## Docker शायद कब ज़रूरी नहीं
+
+- **Serverless platforms** जो सीधे आपके code से build करते हैं, जैसे Next.js app के लिए Vercel।
+- **Notebooks और one-off scripts** जो आप खुद चलाते हो।
+- **Managed AI platforms** जहाँ आप सिर्फ़ configuration और prompts देते हो।
+
+Containers तब काम के बनते हैं जब कई लोगों या servers को एक ही चीज़ एक ही तरीके से चलानी हो।
+
+## Demo से production तक
+
+- **Images को commit hash से tag करो**, सिर्फ़ `latest` से कभी नहीं।
+- **CI में images scan करो** और गंभीर vulnerabilities पर fail करो।
+- **Non-root user की तरह चलाओ**, health check के साथ।
+- **Secrets को images से बाहर रखो**; run time पर inject करो।
+- **Image size पर नज़र रखो**, और भारी model serving को अपनी अलग image में रखो।
+
+## Practice करो
+
+Docker की Get started guide और Compose quickstart करो।
+
+1. REST API वाले lesson की FastAPI app के लिए एक Dockerfile लिखो, slim base image और non-root user के साथ। `docker images` से image का size देखो।
+2. अपनी API और volume वाले PostgreSQL के साथ एक `compose.yaml` जोड़ो। सब कुछ restart करो और confirm करो कि data बचा रहा।
+3. Code की एक line बदलो, rebuild करो, और confirm करो कि dependency layer cache से आई।
+4. अपनी image में multi-stage build और .dockerignore जोड़ो, और पहले-बाद का size compare करो।
+
+**आपका काम पूरा जब:** आप image और container का फ़र्क समझा सको, और किसी नई machine पर अपनी API और उसका database एक command से शुरू कर सको।
