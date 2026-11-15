@@ -1,0 +1,169 @@
+---
+id: fastapi-rest-apis
+lang: hi
+title: "FastAPI से REST APIs"
+outcome: "FastAPI से एक छोटी typed REST API बना पाओगे: endpoints, request और response models, status codes, errors और tests।"
+answer: "FastAPI typed functions से Python में REST APIs बनाता है: हर endpoint अपने request और response models बताता है, और FastAPI data validate करता है और API docs खुद लिख देता है।"
+why_it_matters: "Client के लिए आप जो भी AI system deploy करते हो, उस तक उनका app, उनका workflow tool या कोई और service API के ज़रिए पहुँचती है। Python teams में API बनाने का सबसे आम तरीका FastAPI है, और उसके typed models गलत requests मुफ़्त में पकड़ लेते हैं।"
+flashcards:
+  - q: "Endpoint क्या है?"
+    a: "एक URL और एक HTTP method, जैसे ticket बनाने के लिए POST /tickets या एक ticket पढ़ने के लिए GET /tickets/42।"
+  - q: "GET, POST, PUT, PATCH और DELETE का मतलब क्या है?"
+    a: "GET बिना कुछ बदले पढ़ता है, POST बनाता है या काम शुरू करता है, PUT पूरा replace करता है, PATCH थोड़ा सा update करता है, DELETE हटाता है।"
+  - q: "401 और 403 में क्या फ़र्क है?"
+    a: "401 का मतलब है कि caller sign in नहीं है। 403 का मतलब है कि वो sign in है पर उसे ये करने की इजाज़त नहीं है।"
+  - q: "FastAPI 422 कब लौटाता है?"
+    a: "जब request body Pydantic model के सामने validation में fail हो, और साथ में ठीक उन fields की list दे जो fail हुए।"
+  - q: "आपकी API को 503 कब लौटाना चाहिए?"
+    a: "जब कोई dependency, जैसे model provider, down हो, ताकि callers को पता चले कि वो बाद में retry कर सकते हैं।"
+  - q: "response_model क्या करता है?"
+    a: "तय करता है कि caller को क्या वापस जाएगा, ताकि cost figures जैसे internal fields गलती से बाहर न निकल जाएँ।"
+  - q: "Depends किसलिए use होता है?"
+    a: "Database session, current user या model client जैसी shared चीज़ें endpoints में inject करने के लिए, और tests में उन्हें fakes से बदलने के लिए।"
+  - q: "Text inputs पर maximum length क्यों लगाएँ?"
+    a: "इसके बिना कोई बहुत बड़ा document भेज सकता है और आपका token bill उछल जाता है, या request timeout हो जाती है।"
+exercise:
+  title: "Status code चुनो"
+  setup: "Hyderabad के एक hospital के लिए आपकी FastAPI service discharge notes का summary बनाती है। पाँच calls आती हैं: (1) बिना sign-in token की एक request; (2) एक signed-in nurse अपने ward के बाहर के मरीज़ का summary माँगती है, जो rules में मना है; (3) एक body जिसमें 'notes' सिर्फ़ 5 characters का है, यानी 20 characters के minimum से कम; (4) GET /summaries/99999, जो मौजूद नहीं है; (5) एक valid request, जबकि model provider down है।"
+  questions:
+    - q: "(1) और (2) के लिए कौन-से codes?"
+      a: "(1) 401, sign in नहीं है। (2) 403, sign in है पर इजाज़त नहीं।"
+    - q: "(3) के लिए कौन-सा code, और उसे कौन बनाता है?"
+      a: "422, जो FastAPI खुद Pydantic model से बनाता है, 'notes' field का नाम बताते हुए, आपका function चलने से पहले।"
+    - q: "(4) और (5) के लिए कौन-से codes?"
+      a: "(4) 404, not found। (5) 503, एक dependency उपलब्ध नहीं है, ताकि caller बाद में retry कर सके।"
+    - q: "इनके लिए 'error: true' के साथ 200 क्यों नहीं लौटाते?"
+      a: "Retry logic, monitoring और callers status codes पर निर्भर करते हैं। 200 उन्हें बताता है कि सब ठीक चला, तो errors किसी को दिखती ही नहीं।"
+ask:
+  - "400 और 422 error में क्या फ़र्क है?"
+  - "FastAPI app को test कैसे करूँ?"
+  - "क्या मेरे FastAPI endpoints async होने चाहिए?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+REST API दूसरे programs को आपका system HTTP पर use करने देती है। हर **endpoint** एक URL और एक method होता है: `POST /tickets` ticket बनाता है, `GET /tickets/42` एक पढ़ता है। Caller JSON भेजता है और JSON वापस पाता है, साथ में एक **status code** जो बताता है कि क्या हुआ।
+
+FastAPI ऐसी APIs बनाने वाला Python framework है। आप type hints और Pydantic models के साथ आम functions लिखते हो; FastAPI उन्हें ऐसे endpoints में बदल देता है जो input validate करते हैं, output को JSON में बदलते हैं और `/docs` पर interactive documentation publish करते हैं। ये async code भी natively चलाता है, जो model APIs का इंतज़ार करने वाली services के लिए ठीक है।
+
+```flow
+Caller | another team's app: POST /claims/triage -> FastAPI validates the body with Pydantic
+FastAPI validates the body with Pydantic -[fails]-> 422 | a list of bad fields
+FastAPI validates the body with Pydantic -[ok]-> Inject the model client | Depends
+Inject the model client -> Your function calls the model API
+Your function calls the model API -[model down]-> 503 | "try again shortly"
+Your function calls the model API -[ok]-> response_model filters the output
+response_model filters the output -> 200 | category: "motor", summary: "Rear bumper damage"
+```
+
+ये lesson Kochi के एक insurance broker के साथ चलता है, जो चाहता है कि दूसरी teams एक claims-triage service call कर सकें।
+
+## ये काम कैसे करता है
+
+**Methods।** GET पढ़ता है और कुछ बदलना नहीं चाहिए। POST बनाता है या काम शुरू करता है। PUT replace करता है, PATCH थोड़ा update करता है, DELETE हटाता है। इन मतलबों पर टिके रहने से caches, retries और दूसरे engineers सही अंदाज़ा लगा पाते हैं।
+
+**Status codes।** सफलता के लिए 200 OK और 201 Created। गलत बनी request के लिए 400, caller sign in न हो तो 401, sign in हो पर ये करने की इजाज़त न हो तो 403, चीज़ मौजूद न हो तो 404, body validation में fail हो तो 422 (FastAPI का default), और बहुत ज़्यादा भेजने पर 429। 500 का मतलब है कि आपका code टूटा, और 503 का मतलब है कि कोई dependency, जैसे model provider, down है।
+
+**Models।** Request body पर Pydantic model होने का मतलब है कि FastAPI गलत input को 422 से reject कर देता है, साथ में ठीक उन fields की list जो fail हुए, आपका function चलने से पहले। `response_model` तय करता है कि वापस क्या जाएगा, ताकि cost figure जैसा internal field गलती से बाहर न निकले।
+
+**Dependencies।** FastAPI का `Depends` database session, current user या model client जैसी shared चीज़ें हर endpoint में inject करता है। Tests में आप उन्हें fakes से बदल देते हो।
+
+**Testing।** `TestClient` आपके app को memory में call करता है, बिना server के, इसलिए endpoint tests मिलीसेकंडों में चलते हैं।
+
+**वो status codes जिन पर callers निर्भर करते हैं:**
+
+| Code | मतलब | Caller की आम प्रतिक्रिया |
+| --- | --- | --- |
+| 200, 201 | Success, या बन गया | Result use करो |
+| 400 | गलत बनी request | Request ठीक करो; retry मत करो |
+| 401 | Sign in नहीं है | Sign in करो, फिर retry करो |
+| 403 | इजाज़त नहीं | रुको; access माँगो |
+| 404 | मिला नहीं | Id check करो |
+| 422 | Body validation में fail | बताए गए fields ठीक करो |
+| 429 | बहुत ज़्यादा requests | रुको, फिर retry करो |
+| 500 | आपका code टूटा | Report करो |
+| 503 | कोई dependency down है | Backoff के साथ बाद में retry करो |
+
+**ऐसे endpoints design करना जो समय के साथ भी चलें।** Resources के लिए nouns (`/claims`, `/claims/{id}`) और actions के लिए methods use करो। Path या header में version रखो (`/v1/claims`) ताकि बाद में callers को तोड़े बिना API बदल सको। हर जगह एक ही error shape लौटाओ, जैसे `{"detail": "..."}`, ताकि callers errors एक ही जगह संभाल सकें। और code में हर endpoint का summary और examples लिखो; FastAPI उन्हें `/docs` पर अपने आप दिखाता है, और अक्सर यही एकमात्र documentation होती है जो दूसरी teams पढ़ेंगी।
+
+**Browser में try करो।** Request validation अच्छी API का दिल है। Dictionary बदलकर गलत body भेजकर देखो।
+
+```python
+from pydantic import BaseModel, Field, ValidationError
+
+class NewOrder(BaseModel):
+    item_id: str = Field(pattern=r"^SKU-\d{4}$")
+    quantity: int = Field(gt=0, le=20)
+    pin_code: str = Field(pattern=r"^[1-9]\d{5}$")
+
+body = {"item_id": "SKU-0042", "quantity": 0, "pin_code": "56001"}
+try:
+    print(NewOrder.model_validate(body))
+except ValidationError as err:
+    for e in err.errors():
+        print("422:", e["loc"][0], "-", e["msg"])
+```
+
+## एक example से समझो
+
+Kochi का एक insurance broker चाहता है कि दूसरी teams claim descriptions भेजें और बदले में category और summary पाएँ।
+
+```python
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Claims triage")
+
+class ClaimIn(BaseModel):
+    policy_no: str = Field(pattern=r"^[A-Z]{3}\d{7}$")
+    description: str = Field(min_length=20, max_length=5000)
+
+class ClaimOut(BaseModel):
+    category: str
+    summary: str
+
+@app.post("/claims/triage", response_model=ClaimOut, status_code=200)
+async def triage(claim: ClaimIn, llm=Depends(get_llm)):
+    try:
+        result = await llm.classify(claim.description)
+    except ProviderDown:
+        raise HTTPException(503, "Triage is unavailable; try again shortly")
+    return ClaimOut(category=result.category, summary=result.summary)
+```
+
+Policy number "abc123" वाली request कभी model तक पहुँचती ही नहीं: FastAPI field का नाम बताकर 422 लौटा देता है। अगर model provider down है, तो callers को 503 मिलता है जिसे वो retry कर सकते हैं, उलझाने वाला 500 नहीं।
+
+Test model को fake कर देता है:
+
+```python
+from fastapi.testclient import TestClient
+
+def test_triage_returns_category():
+    app.dependency_overrides[get_llm] = lambda: FakeLLM("motor", "Rear bumper damage")
+    r = TestClient(app).post("/claims/triage",
+        json={"policy_no": "MOT1234567", "description": "Car was hit from behind at a signal"})
+    assert r.status_code == 200 and r.json()["category"] == "motor"
+```
+
+`/docs` खोलो और broker की दूसरी teams endpoint को browser में try कर सकती हैं, request schema पहले से लिखा हुआ मिलता है।
+
+**दूसरी teams ने सबसे पहले क्या नोटिस किया।** Broker की mobile team ने एक दिन में integrate कर लिया, ज़्यादातर इसलिए कि `/docs` ने हर field, उसके rules और एक example दिखाया, और गलत requests पर 422 ने ठीक उस field का नाम बताया। जब model provider में थोड़ी देर का outage हुआ, तो उनका app crash होने की जगह 503 पर "Triage busy है, एक मिनट बाद फिर कोशिश करें" दिखा रहा था, क्योंकि status code ने बता दिया था कि किस तरह की failure है।
+
+## आम गलतियाँ
+
+- **Errors के लिए 200 लौटाना।** Status 200 के साथ `"error": true` वाली body हर retry और monitoring tool को तोड़ देती है। सही code use करो।
+- **Database rows को सीधे लौटाना।** Internal fields बाहर निकल जाते हैं। हमेशा response model लगाओ।
+- **Async endpoints में blocking calls।** `async def` के अंदर synchronous model client server को जमा देता है। Async client use करो, या endpoint को सादे `def` से बनाओ ताकि FastAPI उसे thread pool में चलाए।
+- **Model call पर timeout न होना।** एक अटकी request एक worker को हमेशा के लिए बाँध देती है। Timeouts लगाओ और 503 या 504 लौटाओ।
+- **Input limits छोड़ देना।** Maximum length के बिना कोई 300 पन्नों का document paste कर देता है और आपका token bill उछल जाता है।
+
+## Practice करो
+
+FastAPI tutorial "Handling Errors" और "Testing" तक करो, और MDN का HTTP overview देख लो।
+
+1. `POST /summaries` बनाओ जो text (20 से 5,000 characters) ले और किसी भी model API या fake से summary लौटाए।
+2. `GET /summaries/{id}` जोड़ो जो अनजान id पर 404 लौटाए।
+3. `TestClient` से तीन tests लिखो: एक success, छोटे text के लिए एक 422 और एक 404।
+
+**आपका काम पूरा जब:** आप किसी teammate को 401, 403, 422 और 503 का फ़र्क समझा सको, और अपनी API का `/docs` page दिखा सको।

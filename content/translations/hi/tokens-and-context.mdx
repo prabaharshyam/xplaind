@@ -1,0 +1,218 @@
+---
+id: tokens-and-context
+lang: hi
+title: "Tokens और context window"
+outcome: "समझाना कि tokens क्या होते हैं, किसी request की cost का अंदाज़ा लगाना, और inputs को context window के अंदर रखना।"
+answer: "Tokens text के वो टुकड़े हैं जो model पढ़ता है, हर एक लगभग एक शब्द का तीन-चौथाई। Context window वो सबसे ज़्यादा tokens हैं जो एक request में आ सकते हैं, और cost हर token पर लगती है।"
+why_it_matters: "Cost, speed और limits, सब tokens में नापे जाते हैं। Interviewers context windows के बारे में अक्सर पूछते हैं, और production में apps तब टूटते हैं जब inputs चुपचाप बहुत बड़े हो जाते हैं।"
+flashcards:
+  - q: "Token क्या है?"
+    a: "Model की vocabulary से text का एक छोटा टुकड़ा: अक्सर कोई आम शब्द, कभी शब्द का हिस्सा, कोई number या punctuation।"
+  - q: "लगभग कितने English शब्द 100 tokens के बराबर होते हैं?"
+    a: "लगभग 75 शब्द। Hindi या Tamil जैसी भारतीय scripts को उसी मतलब के लिए अक्सर ज़्यादा tokens चाहिए होते हैं।"
+  - q: "Context window क्या है?"
+    a: "एक call में tokens की अधिकतम संख्या, जिसमें भेजी गई हर चीज़ और reply, दोनों गिने जाते हैं।"
+  - q: "Chat app में context window को क्या भरता है?"
+    a: "System prompt, अब तक की पूरी बातचीत, documents या retrieved passages, tool definitions और results, और max_tokens तक का reply।"
+  - q: "लंबी chats हर turn पर महँगी क्यों होती जाती हैं?"
+    a: "API की कोई memory नहीं होती, इसलिए हर turn पूरी history को input tokens की तरह दोबारा भेजता है।"
+  - q: "किसी call की cost का अंदाज़ा कैसे लगाते हैं?"
+    a: "Input tokens × input price, जमा output tokens × output price। Output tokens आमतौर पर कई गुना महँगे होते हैं।"
+  - q: "Context window के अंदर रहने के तीन तरीके बताओ।"
+    a: "पुराने turns को summarise या trim करो, सिर्फ़ काम के passages retrieve करो, max_tokens set करो, और बहुत बड़े inputs को warning के साथ truncate करो।"
+  - q: "Prompt caching क्या करती है?"
+    a: "Prompt की बार-बार आने वाली एक जैसी शुरुआत, जैसे लंबा system prompt, को बाद की calls में बहुत सस्ता और तेज़ बना देती है।"
+  - q: "लंबे context में model facts क्यों चूक सकता है?"
+    a: "Models लंबे input की शुरुआत और अंत की जानकारी को बीच वाली से बेहतर use करते हैं, इसलिए बीच में दबा कोई detail नज़रअंदाज़ हो सकता है।"
+  - q: "Context budget क्या है?"
+    a: "इसकी योजना कि input के हर हिस्से को कितने tokens मिल सकते हैं: system prompt, history, retrieved text, tool results और reply के लिए जगह।"
+exercise:
+  title: "बातचीत की cost का अंदाज़ा लगाओ"
+  setup: "एक chatbot का system prompt 1,000 tokens का है। हर user सवाल लगभग 100 tokens का और हर जवाब लगभग 200 tokens का है। History हर turn में दोबारा भेजी जाती है। मान लो हर input token ₹0.0003 का और हर output token ₹0.0015 का है।"
+  questions:
+    - q: "Turn 1 कितने input tokens भेजता है?"
+      a: "1,000 system + 100 सवाल = 1,100 input tokens।"
+    - q: "Turn 5 कितने input tokens भेजता है?"
+      a: "1,000 system + 4 पिछले turns × 300 (सवाल और जवाब) + 100 नया सवाल = 2,300 input tokens।"
+    - q: "Turn 5 की cost क्या है?"
+      a: "Input 2,300 × ₹0.0003 = ₹0.69; output 200 × ₹0.0015 = ₹0.30; कुल लगभग ₹0.99।"
+    - q: "लंबी chats की cost घटाने वाले दो बदलाव बताओ।"
+      a: "System prompt को cache करो, और कुछ turns के बाद history को summarise करो ताकि हर turn हर message की जगह एक छोटा summary दोबारा भेजे।"
+ask:
+  - "Hindi messages में ज़्यादा tokens क्यों लगते हैं?"
+  - "जब बातचीत context window से बड़ी हो जाए तो क्या होता है?"
+  - "Prompt caching से पैसे कैसे बचते हैं?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Language models **tokens** पढ़ते और लिखते हैं, जो text के छोटे टुकड़े होते हैं: अक्सर कोई पूरा आम शब्द, कभी शब्द का हिस्सा, कोई number या punctuation। Models के इस्तेमाल की हर चीज़ tokens में नापी जाती है:
+
+- **Price**: providers हर दस लाख input tokens और हर दस लाख output tokens पर charge करते हैं; output tokens आमतौर पर कई गुना महँगे होते हैं।
+- **Limits**: **context window** एक call में tokens की अधिकतम संख्या है, जिसमें भेजी गई हर चीज़ और reply गिने जाते हैं।
+- **Speed**: ज़्यादा output tokens बनाने में ज़्यादा समय लगता है।
+
+| एक API call की context window का हिस्सा | Tokens | नोट |
+|---|---|---|
+| System prompt | 1,200 | हर call में वही |
+| बातचीत की history | 3,000 | हर turn बढ़ती है |
+| Retrieved passages | 800 | |
+| नया user message | 150 | Tamil text में ज़्यादा tokens लगते हैं |
+| Reply, max_tokens तक | 300 | |
+
+हर call पर सब कुछ गिना जाता है, और पूरे input के पैसे लगते हैं।
+
+```flow
+dir: LR
+title: एक call, शुरू से अंत तक
+System prompt + history + passages + नया message -[input tokens, हर call में पैसे लगते हैं]-> Model
+Model -[output tokens, max_tokens तक]-> Reply
+```
+
+इस lesson में हम चेन्नई की एक e-learning company को देखेंगे, जो Tamil और English में doubt-solving chatbot बना रही है।
+
+## ये काम कैसे करता है
+
+**Token क्या है।** Tokenizer text को एक fixed vocabulary के टुकड़ों में बाँटता है। English में 100 tokens लगभग 75 शब्दों के बराबर होते हैं। Hindi, Tamil और दूसरी भारतीय scripts को उसी मतलब के लिए अक्सर ज़्यादा tokens चाहिए होते हैं, इसलिए वही message महँगा पड़ सकता है और window का ज़्यादा हिस्सा ले सकता है। Numbers और code भी कई tokens में टूटते हैं।
+
+**गिनती।** Provider dashboards और replies हर call का token usage बताते हैं, और providers भेजने से पहले गिनने के लिए token-counting endpoints या libraries देते हैं।
+
+**Context window को क्या भरता है।** Chat app में हर call पर भेजी गई हर चीज़ गिनी जाती है:
+
+- system prompt;
+- अब तक की पूरी बातचीत (API की कोई memory नहीं होती; आप उसे दोबारा भेजते हो);
+- कोई भी documents या retrieved passages;
+- tool definitions और tool results;
+- और reply, `max_tokens` तक।
+
+बातचीत बढ़ने पर हर turn ज़्यादा history दोबारा भेजता है, इसलिए हर turn की cost बढ़ती जाती है।
+
+**Cost का अंदाज़ा।** Cost = input tokens × input price + output tokens × output price। Example: 2,000 input tokens और 500 output tokens, जहाँ output की per token price input से पाँच गुना है। Input 2,000 units गिना जाता है; output 500 × 5 = 2,500 units। Output की length एक-चौथाई होने के बाद भी उसकी cost ज़्यादा है।
+
+**Window के अंदर रहना।** पुराने conversation turns को trim या summarise करो; पूरे documents की जगह सिर्फ़ काम के passages retrieve करो; सही-सा `max_tokens` set करो; बहुत बड़े inputs को warning के साथ truncate करो। बहुत लंबे contexts में बीच में दबे details के लिए answer की quality भी अक्सर गिरती है।
+
+**Caching।** अगर कई calls की शुरुआत एक जैसी और लंबी है (बड़ा system prompt या कोई document), तो prompt caching दोहराए गए input को बहुत सस्ता और तेज़ बना सकती है। आगे के एक lesson में ये आएगा।
+
+**बातचीत की length के साथ cost कैसे बढ़ती है** (1,200-token का system prompt, 100-token के सवाल, 250-token के जवाब, history दोबारा भेजी गई):
+
+| Turn | भेजे गए input tokens | जिसमें history |
+| --- | --- | --- |
+| 1 | 1,300 | 0 |
+| 3 | 2,000 | 700 |
+| 6 | 3,050 | 1,750 |
+| 10 | 4,450 | 3,150 |
+
+Turn 10 तक, आप जिसके पैसे दे रहे हो उसका ज़्यादातर हिस्सा history है। पुराने turns को एक छोटे paragraph में summarise करने से input लगभग बराबर रहता है, और system prompt को cache करने से उसके 1,200 tokens पहली call के बाद हर call में बहुत सस्ते हो जाते हैं।
+
+**भेजने से पहले गिनो।** जो भी चीज़ user paste कर सकता है, जैसे कोई document या लंबा message, model को call करने से पहले उसके tokens गिनो। अगर वो बहुत लंबा है, तो या सिर्फ़ काम के हिस्से retrieve करो, या पहले summarise करो, या user को साफ़ बता दो कि ये बहुत लंबा है। साफ़ message के साथ fail होना, चुपचाप कट जाने या अचानक आए bill से कहीं बेहतर है।
+
+**Code में tokens गिनो।** जो भी चीज़ user बड़ी बना सकता है, उसे भेजने से पहले गिनो। Anthropic के SDK से गिनती वही tokenizer करता है जो model करेगा:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+MODEL = "claude-sonnet-5-5"                  # check the docs for current names
+
+def count(system, messages):
+    return client.messages.count_tokens(model=MODEL, system=system, messages=messages).input_tokens
+
+english = [{"role": "user", "content": "Please send the electricity bill for October."}]
+hindi = [{"role": "user", "content": "कृपया अक्टूबर का बिजली का बिल भेजें।"}]
+print(count("Be brief.", english), count("Be brief.", hindi))   # the Hindi line usually costs more
+```
+
+Open models के लिए, Hugging Face का model का अपना tokenizer (`AutoTokenizer.from_pretrained(...)`) offline सटीक गिनती देता है। "4 characters per token" जैसे मोटे नियम सिर्फ़ English के लिए सही हैं।
+
+**Context budget।** पहले से तय कर लो कि window कैसे बँटेगी, ताकि कोई एक हिस्सा बाकियों को दबा न दे:
+
+| हिस्सा | Budget (example, 16,000-token target) | Budget से ऊपर जाने पर |
+| --- | --- | --- |
+| System prompt और tools | 2,000 | छोटा करो; कम काम आने वाले rules को retrieval में ले जाओ |
+| बातचीत की history | 4,000 | पुराने turns को summarise करो |
+| Retrieved passages | 6,000 | कम, पर बेहतर chunks |
+| Tool results | 2,000 | सिर्फ़ ज़रूरी fields लौटाओ |
+| Reply (`max_tokens`) | 2,000 | छोटे जवाब माँगो |
+
+Target आमतौर पर model के maximum से बहुत नीचे होता है, क्योंकि हर token के साथ cost और देरी बढ़ती है, और quality अक्सर limit से पहले ही गिरने लगती है।
+
+**History को budget में रखना।** हाल के turns शब्दशः रखो और पुराने वालों को एक चलते हुए summary में मिला दो:
+
+```python
+def fit_history(history, summary, budget_tokens, count_fn, keep_last=6):
+    """history: list of {"role", "content"} turns, oldest first."""
+    recent = history[-keep_last:]
+    older = history[:-keep_last]
+    if older:
+        summary = summarise(summary, older)       # one cheap model call, done rarely
+    prefix = [{"role": "user", "content": f"Summary of the earlier conversation: {summary}"},
+              {"role": "assistant", "content": "Understood."}] if summary else []
+    msgs = prefix + recent
+    while count_fn(msgs) > budget_tokens and len(recent) > 2:
+        recent = recent[2:]                       # drop the oldest user-assistant pair
+        msgs = prefix + recent
+    return msgs, summary
+```
+
+`summarise` आपका अपना function है: एक छोटी model call जो पुराने summary को मिलाए जा रहे turns के साथ merge करती है। Summarise तभी करो जब history budget पार करे, हर turn पर नहीं।
+
+**Long context में attention मुफ़्त नहीं है।** Models लंबे input के हर हिस्से को बराबर अच्छे से use नहीं करते। जिन tests में लंबे document में एक fact छिपाया जाता है (जिन्हें अक्सर "needle in a haystack" कहते हैं), उनसे दिखता है कि बीच के facts, शुरुआत या अंत के पास वालों से कम भरोसे से मिलते हैं। सबसे ज़रूरी instructions शुरुआत में रखो, सवाल अंत में, और retrieved passages को relevance के क्रम में दो।
+
+**Maximum और effective context।** कोई model 200,000 tokens या उससे ज़्यादा ले सकता है, पर वो उन्हें कितना अच्छा use करता है ये task के हिसाब से बदलता है। अपना case खुद test करो: किसी असली जैसे document में एक जाना हुआ fact अलग-अलग positions पर छिपाओ और देखो कि answers सही रहते हैं या नहीं।
+
+## एक example से समझो
+
+चेन्नई की एक e-learning company Class 10 के students के लिए Tamil और English में doubt-solving chatbot बनाती है।
+
+एक हफ़्ते की testing के measurements:
+
+- Syllabus guidance के साथ system prompt: 1,200 tokens।
+- एक आम सवाल: English में 60 tokens, Tamil में लगभग 150।
+- एक आम जवाब: 250 tokens।
+- दस turns के बाद, history हर call में लगभग 3,000 tokens जोड़ती है।
+
+उनके model की prices पर, दस turns वाली chat की cost दो turns वाली chat से लगभग चार गुना थी, ज़्यादातर दोबारा भेजी गई history की वजह से। वो तीन चीज़ें बदलते हैं: छह turns के बाद history summarise करना, system prompt को cache करना, और जवाबों को 300 tokens पर सीमित करना। हर conversation की average cost 55% घट जाती है, और Tamil users लंबे sessions में app की per-call input cap तक नहीं पहुँचते।
+
+**Tamil users सबसे पहले limit तक क्यों पहुँचे।** वही सवाल Tamil में English से लगभग ढाई गुना tokens लेता था, और Tamil के जवाब भी tokens में लंबे थे। Cost काबू में रखने के लिए team ने हर call को 16,000 input tokens पर cap किया था। लंबे revision sessions में Tamil conversations लगभग 30 turns के बाद उस cap तक पहुँच गईं, जबकि English वाली शायद ही कभी पहुँचीं। छह turns के बाद history summarise करने से दोनों के लिए ये ठीक हो गया, और bot जवाब भी तेज़ देने लगा, क्योंकि छोटे inputs जल्दी process होते हैं। अब team हर prompt बदलाव को Tamil और English, दोनों conversations से test करती है, और हर भाषा की cost per conversation अलग से बताती है, ताकि जो बदलाव English में सस्ता हो पर Tamil में महँगा, वो ship होने से पहले पकड़ा जाए।
+
+## आम गलतियाँ
+
+- **Tokens की जगह शब्द गिनना।** Prices और limits tokens में हैं, और भारतीय भाषाओं में ज़्यादा लगते हैं।
+- **ये भूल जाना कि history दोबारा भेजी जाती है।** लंबी chats महँगी हो जाती हैं।
+- **Output की price को नज़रअंदाज़ करना।** Output tokens आमतौर पर महँगे होते हैं।
+- **`max_tokens` न रखना।** Replies लंबे और महँगे हो सकते हैं।
+- **पूरे documents ठूँस देना।** जो काम का है वही retrieve करो।
+
+- **ये मान लेना कि बड़ी context window सब हल कर देती है।** बहुत लंबे inputs महँगे होते हैं, धीमे होते हैं, और बीच के details अक्सर छूट जाते हैं। जो काम का है वो भेजो, जो भी आपके पास है वो नहीं।
+- **भारतीय भाषाओं के tokens का अंदाज़ा English के नियमों से लगाना।** असली tokenizer से गिनो।
+- **Window को इसलिए भरना क्योंकि वो है।** हर अतिरिक्त token cost और देरी बढ़ाता है और accuracy घटा सकता है।
+
+## जब context को बारीकी से संभालने की ज़रूरत नहीं
+
+- **छोटी, single-turn calls**, जैसे किसी message को classify करना: design करते समय एक बार गिनो और आगे बढ़ो।
+- **कम volume वाले internal tools**, जहाँ बड़ा bill, engineering के समय से सस्ता है।
+- **छोटे records पर batch jobs**, जहाँ हर input लगभग एक size का है।
+
+लंबी chats, paste किए documents, कई tool results वाले agents और बड़े पैमाने पर भारतीय भाषाओं वाली किसी भी चीज़ के लिए context को बारीकी से संभालो।
+
+## Demo से production तक
+
+- **हर call के input और output tokens log करो**, जहाँ हो सके हिस्सों के हिसाब से बाँटकर: system, history, retrieved, tools।
+- **Budgets को code में लागू करो**, सिर्फ़ prompt में नहीं।
+- **User input की length को साफ़ message के साथ cap करो**, और भेजने से पहले गिनो।
+- **Token बढ़ने पर alert लगाओ**: average input size का बढ़ना अक्सर बताता है कि history या retrieval trim नहीं हो रहे।
+- **Models बदलने पर budgets दोबारा जाँचो**, क्योंकि tokenizers और prices अलग होते हैं।
+
+## Practice करो
+
+नीचे link की context windows guide और token-counting वाला page पढ़ो।
+
+1. एक ही 100-word के paragraph के tokens English में और किसी भारतीय भाषा में गिनो जो आप जानते हो।
+2. अपने app की 10-turn बातचीत की cost मौजूदा prices पर निकालो, फिर पाँच turns के बाद history summarise करके।
+3. अपने किसी app में `max_tokens` cap और बहुत बड़े inputs के लिए warning जोड़ो।
+4. 30 pages के document की शुरुआत, बीच और अंत में एक fact छिपाओ, हर बार उसके बारे में पूछो, और नोट करो कि model कहाँ चूकता है।
+
+ज़्यादा गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 2 tokens और tokenization कवर करता है, और chapter 5 context length और ये कि models लंबे inputs को कितना अच्छा use करते हैं।
+
+**आपका काम पूरा जब** आप token counts से किसी request की cost का अंदाज़ा लगा सको और वो सब कुछ गिना सको जो context window में गिना जाता है।

@@ -1,0 +1,212 @@
+---
+id: document-extraction-automation
+lang: hi
+title: "Documents से data निकालना"
+outcome: "ऐसी automation बना पाओगे जो AI step से invoices, forms और emails में से structured fields निकाले, उन्हें validate करे, और जिन cases में शक हो उन्हें किसी इंसान के पास भेजे।"
+answer: "Document extraction एक AI step से documents में से invoice number और amount जैसे fields निकालता है, उन्हें rules से validate करता है, और जिन पर भरोसा न हो उन्हें इंसान के पास भेजता है।"
+why_it_matters: "Documents को data की rows में बदलना भारतीय businesses में सबसे आम और सबसे काम की AI automation है: invoices, purchase orders, KYC forms, claim forms, bank statements। ठीक से हो तो रोज़ के घंटों बचते हैं; लापरवाही से हो तो systems में गलत numbers भर जाते हैं।"
+flashcards:
+  - q: "Document extraction क्या है?"
+    a: "किसी unstructured document, जैसे invoice PDF, को structured fields में बदलना: vendor, GSTIN, number, date, lines, tax और total।"
+  - q: "Extraction automation के छह steps कौन-से हैं?"
+    a: "Receive, content निकालना, schema के साथ extract, rules से validate, automatic या human review में route, और audit के लिए record।"
+  - q: "Schema के साथ extract क्यों करें?"
+    a: "ताकि हर result में वही fields सही types के साथ आएँ, और जो field नहीं है वो अंदाज़े की जगह null आए।"
+  - q: "तीन तरह के validation rule बताओ।"
+    a: "Formats, जैसे GSTIN pattern और dates; arithmetic, जैसे lines का जोड़ total से मिलना; और business rules, जैसे vendor का master list में होना।"
+  - q: "Straight-through rate क्या है?"
+    a: "वो हिस्सा जिन documents पर किसी इंसान ने हाथ नहीं लगाया। Extraction automation को नापने का सबसे मुख्य पैमाना यही है।"
+  - q: "Check fail हो जाए तो क्या होना चाहिए?"
+    a: "Document को इंसान के पास भेजो, image fields के बगल में दिखे और fail हुआ check highlight हो। उनका सुधार ही final record बनता है।"
+  - q: "Original document को record से क्यों जोड़े रखें?"
+    a: "Checking, audit और debugging के लिए: कोई भी देख सकता है कि extraction ठीक किस पर आधारित थी।"
+  - q: "इंसानों के सुधार system को बेहतर कैसे बनाते हैं?"
+    a: "वो test cases बन जाते हैं और दिखाते हैं कि कौन-से fields, suppliers या photo types सबसे ज़्यादा fail होते हैं, जिससे prompt और process ठीक करने में मदद मिलती है।"
+  - q: "GSTIN का आख़िरी character क्या करता है?"
+    a: "वो पहले 14 characters से निकाला गया check digit है, इसलिए कोई character गलत पढ़ा जाए तो check अक्सर fail हो जाता है।"
+  - q: "पैसे को paise में या Decimal से क्यों compare करें?"
+    a: "Floating-point जोड़ में पैसे के अंश का फ़र्क आ सकता है, जिससे सही totals भी गलत दिखते हैं। Integers या Decimal exact compare करते हैं।"
+exercise:
+  title: "इस invoice को validate करो"
+  setup: "AI एक supplier invoice में से ये निकालता है: GSTIN '24ABCDE1234F1Z' (14 characters), invoice number 'TX-4471', date '31/02/2026', दो lines ₹12,000 और ₹8,500, subtotal ₹20,500, CGST ₹1,845, SGST ₹1,845, total ₹24,190। Supplier master में इस supplier का GSTIN अलग है, और उनसे TX-4471 वाली invoice पिछले हफ़्ते ही record हो चुकी है।"
+  questions:
+    - q: "कौन-से format checks fail होते हैं?"
+      a: "GSTIN में 15 की जगह 14 characters हैं, और 31 February valid date नहीं है।"
+    - q: "क्या arithmetic सही बैठता है?"
+      a: "Lines: 12,000 + 8,500 = 20,500, जो मिलता है। और 20,500 + 1,845 + 1,845 = 24,190 भी मिलता है। Arithmetic pass हो जाता है।"
+    - q: "कौन-से business-rule checks fail होते हैं?"
+      a: "GSTIN supplier master से नहीं मिलता, और TX-4471 पहले से record हो चुकी invoice की duplicate है।"
+    - q: "Automation को इस invoice का क्या करना चाहिए?"
+      a: "इसे post नहीं करना चाहिए। Accounts assistant के पास भेजो, image और चारों fail हुए checks highlight के साथ, खासकर duplicate payment की संभावना।"
+ask:
+  - "AI से invoices में से data कैसे निकालूँ?"
+  - "Document extraction में कौन-से validation checks जोड़ूँ?"
+  - "धुंधले या हाथ से लिखे documents कैसे संभालूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Document extraction** एक unstructured document को structured fields में बदलता है: invoice PDF से vendor name, GSTIN, invoice number, date, line items, tax amounts और total। Automation आने वाले हर document के लिए ये करती है, फिर result check करती है और उसे sheet, accounting system या approval step तक पहुँचा देती है।
+
+आज के AI models अलग-अलग layouts को पुराने template-based tools से कहीं बेहतर संभालते हैं, जिन्हें हर supplier के लिए एक template चाहिए होता था।
+
+```flow
+Email, WhatsApp or a folder -> 1 Receive, store the original -> 2 Get the content | text, OCR, or the image to a vision model
+2 Get the content -> 3 Extract with a schema | supplier, GSTIN, number, date, lines, CGST, SGST, total
+3 Extract with a schema -> 4 Validate | formats, arithmetic, business rules
+4 Validate -> All pass?
+All pass? -[yes]-> 5 Post to accounting -> 6 Record and audit trail
+All pass? -[no]-> 5 Review screen | the image beside the fields, failed checks in red
+5 Review screen -[a person corrects]-> Final record and a new test case
+```
+
+ये lesson Surat के एक textile trader के साथ चलता है, जो महीने में लगभग 900 supplier invoices process करता है।
+
+## ये काम कैसे करता है
+
+**1. Receive।** Documents email attachment, upload form, shared folder या WhatsApp से आते हैं। Trigger उन्हें उठाता है और original को store कर देता है।
+
+**2. Content निकालना।** Digital PDFs: text निकालो। Scans और phone photos: OCR करो, या image सीधे vision-capable model को भेजो। Page reference रखो।
+
+**3. Schema के साथ extract।** Content को model को भेजो, साफ़ instruction और fixed output shape के साथ (field names, types, कौन-से required हैं)। Tool का structured-output feature या JSON schema use करो, ताकि हर बार ठीक वही fields मिलें। जो field मौजूद नहीं है उसके लिए अंदाज़े की जगह null माँगो।
+
+**4. Rules से validate।** Extraction पर आँख बंद करके भरोसा मत करो। ये check करो:
+
+- formats: GSTIN सही pattern में 15 characters का होता है; dates valid हों; PIN codes में छह digits हों;
+- arithmetic: line totals का जोड़ subtotal के बराबर हो; subtotal plus tax बराबर हो total के;
+- business rules: vendor आपकी master list में हो; PO number किसी open order से मिले; amount expected range में हो।
+
+**5. Route।** अगर हर check pass हो जाए, तो अपने आप आगे बढ़ो। अगर कुछ भी fail हो या कोई required field गायब हो, तो उसे document और fail हुए check को highlight करके किसी इंसान के पास भेजो। उनका सुधार final record बनता है और एक काम का test case भी।
+
+**6. Record।** Audit के लिए extracted data, checks और approve किसने किया, ये सब रखो।
+
+**नापो।** Straight-through rate (जिन पर इंसान ने हाथ नहीं लगाया उनका हिस्सा), इंसानों से जाँचे गए sample पर field accuracy, और बचा हुआ समय track करो।
+
+**भारतीय invoices के लिए validation rules:**
+
+| Field | Check | क्या पकड़ता है |
+| --- | --- | --- |
+| GSTIN | 15 characters, सही pattern, state code address से मिले, supplier master में हो | गलत पढ़े characters, गलत supplier |
+| Invoice date | Valid date, future की नहीं, accounting period के अंदर | 31 February, typos |
+| Line items | Quantity × rate = amount; lines का जोड़ subtotal के बराबर | छूटी या मिल गई lines |
+| Tax | Intra-state में CGST और SGST बराबर; inter-state में IGST; amounts rates से मिलें | गलत tax type, गलत पढ़े amounts |
+| Total | Subtotal + taxes = total | कोई भी गलत पढ़ा गया arithmetic |
+| Invoice number | इस supplier के लिए पहले से record न हो | Duplicate payments |
+
+**Model चुनने से ज़्यादा rules क्यों मायने रखते हैं।** बहुत काबिल model भी कभी-कभी धुंधला digit गलत पढ़ लेता है। Arithmetic और format checks ऐसी ज़्यादातर गलतियाँ बिना किसी खर्च के पकड़ लेते हैं, क्योंकि गलत पढ़ा digit totals को शायद ही consistent रहने देता है। Model पढ़ता है; rules तय करते हैं कि जो पढ़ा उस पर भरोसा करना है या नहीं।
+
+**Confidence और review queues।** Reviewers को हर field दोबारा नहीं जाँचना पड़ना चाहिए। पहले वो fields दिखाओ जो किसी rule पर fail हुए, फिर वो जिन्हें model ने uncertain माना या null छोड़ा, और बाकी को reviewer एक action से approve कर दे। Reviews में कितना समय लगता है ये track करो; अगर reviewer को एक document पर मिनट से ज़्यादा लगता है, तो screen पर काम चाहिए, reviewer पर नहीं।
+
+**Code में validation rules।** ये checks extraction के बाद चलते हैं और तय करते हैं कि document सीधा निकल जाएगा या नहीं:
+
+```python
+import re
+from datetime import date
+from decimal import Decimal
+
+GSTIN_RE = re.compile(r"^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
+CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+def gstin_ok(g):
+    if not GSTIN_RE.match(g or ""):
+        return False
+    total = 0
+    for i, ch in enumerate(g[:14]):
+        p = CHARS.index(ch) * (1 if i % 2 == 0 else 2)
+        total += p // 36 + p % 36
+    return CHARS[(36 - total % 36) % 36] == g[14]
+
+def check_invoice(inv, supplier_state, our_state, seen_numbers):
+    problems = []
+    if not gstin_ok(inv["supplier_gstin"]):
+        problems.append("supplier GSTIN fails format or check digit")
+    elif inv["supplier_gstin"][:2] != supplier_state:
+        problems.append("GSTIN state code does not match the supplier's state")
+    if inv["invoice_date"] > date.today():
+        problems.append("invoice date is in the future")
+    lines = [Decimal(l["qty"]) * Decimal(l["rate"]) for l in inv["lines"]]
+    if any(abs(c - Decimal(l["amount"])) > Decimal("0.01") for c, l in zip(lines, inv["lines"])):
+        problems.append("a line amount is not quantity × rate")
+    subtotal = sum(lines)
+    if abs(subtotal - Decimal(inv["subtotal"])) > Decimal("0.01"):
+        problems.append("lines do not add up to the subtotal")
+    tax = Decimal(inv.get("cgst") or 0) + Decimal(inv.get("sgst") or 0) + Decimal(inv.get("igst") or 0)
+    if supplier_state == our_state and inv.get("igst"):
+        problems.append("IGST charged on an intra-state supply")
+    if supplier_state != our_state and (inv.get("cgst") or inv.get("sgst")):
+        problems.append("CGST/SGST charged on an inter-state supply")
+    if abs(subtotal + tax - Decimal(inv["total"])) > Decimal("1.00"):      # allow rupee rounding
+        problems.append("subtotal plus tax does not equal the total")
+    if (inv["supplier_gstin"], inv["invoice_number"]) in seen_numbers:
+        problems.append("duplicate invoice number for this supplier")
+    return problems
+```
+
+Empty list का मतलब है सीधा निकल गया; कुछ भी और हो तो वो problems की list पहले दिखाकर review में जाता है। Money को `Decimal` से संभाला जाता है, floats से कभी नहीं।
+
+**Field accuracy ठीक से नापो।** 50 से 100 documents इंसानों से हाथ से भरवाओ, ये आपका gold set है। हर field के लिए, normalise करने के बाद (dates एक format में, amounts दो decimals में) extraction और gold value के exact matches गिनो। Per field बताओ, एक कुल number नहीं: 98% का कुल score invoice dates पर 80% को छिपा सकता है।
+
+**Straight-through rate बनाम error rate।** Rules ढीले करने से ज़्यादा documents सीधे निकलते हैं, पर ज़्यादा errors books में भी घुसती हैं। दोनों track करो। अच्छा target finance team के साथ तय होता है: जैसे कम से कम 70% straight through, और 500 में 1 से कम गलत fields ledger तक पहुँचें।
+
+**सुधारों को वापस खिलाओ।** Reviewer का हर सुधार एक labelled example है। मुश्किल वाले अपने test set में जोड़ो, और जब किसी supplier का layout बार-बार गलतियाँ कराए, तो prompt में उस supplier का एक छोटा hint या एक अलग rule जोड़ो।
+
+## एक example से समझो
+
+Surat के एक textile trader के पास महीने में लगभग 900 supplier invoices आती हैं, PDFs और WhatsApp व email पर phone photos की शक्ल में।
+
+Automation ये करती है:
+
+- एक अलग email address और एक WhatsApp Business number से attachments इकट्ठा करती है।
+- हर page को एक vision-capable model को भेजती है, इस schema के साथ: supplier name, supplier GSTIN, invoice number, invoice date, line items (description, HSN code, quantity, rate, amount), CGST, SGST, IGST, total।
+- Validate करती है: GSTIN pattern और supplier master से मिलान; lines का जोड़ सही; tax amounts rates से मेल खाएँ; उस supplier के लिए invoice number पहले से record न हो।
+- पास हुई invoices को accounting import sheet में लिखती है; fail हुई invoices को review screen पर accounts assistant के पास भेजती है, image fields के बगल में।
+
+पहला महीना: 71% straight through; ज़्यादातर failures धुंधली photos और हाथ से लिखे सुधारों की वजह से थे। अक्सर आने वाले suppliers से PDFs email करने को कहने और photo prompt सुधारने के बाद, straight-through 84% पर पहुँच जाता है। Invoice entry पर accounts staff का समय महीने में लगभग 60 घंटे से घटकर 15 रह जाता है, और duplicate-invoice check ₹2.3 lakh की चार duplicate payments पकड़ लेता है।
+
+| नाप | महीना 1 | महीना 3 |
+| --- | --- | --- |
+| Straight-through rate | 71% | 84% |
+| Failure की मुख्य वजह | धुंधली photos, हाथ से लिखे सुधार | हाथ से लिखे सुधार |
+| Invoice entry पर staff का समय | महीने में लगभग 60 घंटे | महीने में लगभग 15 घंटे |
+| पकड़ी गई duplicate payments | 4, कुल ₹2.3 lakh की | जारी |
+
+सबसे बड़ा सुधार technical नहीं था: सबसे ज़्यादा आने वाले 30 suppliers से phone photos की जगह PDFs email करने को कहना।
+
+## आम गलतियाँ
+
+- **Free-form output।** Schema use करो ताकि fields हमेशा मौजूद और typed हों।
+- **Validation rules न होना।** Arithmetic और format checks ज़्यादातर extraction errors पकड़ लेते हैं।
+- **Model को गायब fields का अंदाज़ा लगाने देना।** Null माँगो और इंसान को route करो।
+- **Original document खो देना।** Checking और audit के लिए उसे record से जोड़े रखो।
+- **कुछ भी न नापना।** Straight-through rate और sample accuracy track करो।
+
+- **हर page सबसे महँगे model को भेजना।** Digital PDFs के लिए text extraction use करो और vision models scans और photos के लिए रखो; इससे खर्च काफ़ी कम होता है।
+- **Money पर float arithmetic।** Paise को integers की तरह या `Decimal` use करो।
+- **सभी fields के लिए एक accuracy number।** हर field को अलग से नापो।
+- **Duplicates न जाँचना।** दोबारा भेजी गई invoice दो बार pay हो जाती है।
+
+## Extraction automation कब काम की नहीं
+
+- **महीने में कुछ ही documents**: उन्हें हाथ से भर देना pipeline बनाने और जाँचने से सस्ता पड़ता है।
+- **Structured data पहले से मौजूद है**: e-invoices, bank statement exports या supplier की API, PDFs पढ़ने से बेहतर हैं।
+- **हर document को वैसे भी expert के judgement की ज़रूरत है**, जैसे legal contracts जो clause-by-clause review होते हैं।
+
+## Demo से production तक
+
+- **Hand-keyed documents का एक gold set रखो** और हर बदलाव पर per-field accuracy नापो।
+- **Original, extraction, checks और approver को store करो**, audit के लिए।
+- **Straight-through rate गिरे तो alert लगाओ**, जिसका मतलब अक्सर होता है कि किसी supplier ने layout बदला।
+- **Personal और bank details को mask करो** logs और review screens में, जहाँ ज़रूरी न हों।
+- **हर quarter finance के साथ rules review करो**, खासकर GST बदलावों के बाद tax rules।
+
+## Practice करो
+
+n8n की AI integration docs और किसी model provider की structured outputs guide पढ़ो।
+
+1. दस invoices या receipts इकट्ठा करो (आपके अपने bills भी चलेंगे) और जिन fields की ज़रूरत है उनका schema लिखो।
+2. एक n8n workflow बनाओ जो AI step से fields निकाले और arithmetic व एक format rule validate करे।
+3. Failures को review sheet में route करो और नापो कि दस में से कितने सीधे निकले और कितने fields सही थे।
+4. अपने दस documents पर check_invoice चलाओ, और GSTIN में एक गलत digit और एक line amount में एक गलत digit डालकर confirm करो कि दोनों पकड़े जाते हैं।
+
+**आपका काम पूरा जब:** आप अपना straight-through rate, अपनी field accuracy और अपनी validation से पकड़ी गई एक error दिखा सको।

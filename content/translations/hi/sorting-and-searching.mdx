@@ -1,0 +1,147 @@
+---
+id: sorting-and-searching
+lang: hi
+title: "Sorting, binary search और two pointers"
+outcome: "समझाना कि मुख्य sorting algorithms कैसे काम करते हैं और उनकी cost क्या है, sorted data और answers पर binary search use करना, और two pointers से pair और window वाले problems हल करना।"
+answer: "अच्छे sorts O(n log n) में चलते हैं। Binary search sorted data में चीज़ें O(log n) में ढूँढता है, और two pointers pair और range वाले problems एक ही pass में हल करते हैं।"
+why_it_matters: "पहले sort करके फिर समझदारी से search करने पर कई धीमे problems तेज़ बन जाते हैं। Binary search और two pointers coding interview के बहुत सारे सवालों में आते हैं, और databases व search features इन्हीं से तेज़ रहते हैं।"
+flashcards:
+  - q: "Comparison sort की सबसे अच्छी संभव average complexity क्या है?"
+    a: "O(n log n)। Merge sort, heap sort और Python का Timsort यहाँ तक पहुँचते हैं।"
+  - q: "Bubble sort कम क्यों use होता है?"
+    a: "ये O(n²) है: ये पड़ोसियों को बार-बार swap करता है। ये सिर्फ़ छोटी या लगभग sorted lists के लिए ठीक है।"
+  - q: "Binary search use करने से पहले क्या सच होना चाहिए?"
+    a: "Data sorted होना चाहिए, या सवाल monotonic होना चाहिए: एक बार जवाब true हो गया तो true ही रहता है।"
+  - q: "10 लाख items के लिए binary search को कितने steps चाहिए?"
+    a: "लगभग 20, क्योंकि हर step range को आधा कर देता है और 2²⁰ लगभग 10 लाख है।"
+  - q: "Binary search में आम bug क्या है?"
+    a: "Bounds में off-by-one errors, जिनसे infinite loops बनते हैं या items छूट जाते हैं। इसमें एक जैसे रहो कि hi inclusive है या नहीं।"
+  - q: "Sorted list में दिए गए sum वाला pair two-pointer method कैसे ढूँढता है?"
+    a: "दोनों सिरों पर एक-एक pointer रखो। Sum बहुत छोटा हो तो बायाँ pointer दाईं तरफ़ बढ़ाओ; बहुत बड़ा हो तो दायाँ pointer बाईं तरफ़ बढ़ाओ।"
+  - q: "Sliding window क्या है?"
+    a: "दो pointers जो एक range को चिह्नित करते हैं, जो दाईं तरफ़ बढ़ती है और बाईं तरफ़ सिकुड़ती है, ताकि सबसे अच्छा लगातार हिस्सा एक ही pass में मिल जाए।"
+exercise:
+  title: "सही technique चुनो"
+  setup: "Zerodha के एक engineer के पास समय के हिसाब से sorted 1 crore trades की list है, हर trade में timestamp और price है।"
+  questions:
+    - q: "10:15:00 पर या उसके बाद की पहली trade ढूँढो। कौन-सी technique और कितनी cost?"
+      a: "Timestamps पर binary search: O(log n), 1 crore trades के लिए लगभग 24 steps।"
+    - q: "Sorted price list में कोई भी दो trades ढूँढो जिनकी prices जोड़कर ठीक ₹5,000 हों।"
+      a: "Sorted prices के दोनों सिरों से two pointers: O(n)।"
+    - q: "Trades की संख्या के हिसाब से सबसे busy 60 सेकंड का हिस्सा ढूँढो।"
+      a: "Timestamps पर sliding window: दायाँ किनारा आगे बढ़ाओ, और जब तक window 60 सेकंड से लंबी हो, बायाँ किनारा बढ़ाओ। O(n)।"
+    - q: "Trades unsorted आती हैं। क्या 1,000 lookups से पहले sort करना सही है?"
+      a: "हाँ: एक बार sort करने की cost O(n log n) है, फिर हर lookup O(log n), जो O(n) वाले 1,000 linear scans से बहुत कम है।"
+ask:
+  - "Python कौन-सा sorting algorithm use करता है और क्यों?"
+  - "Binary search में off-by-one errors से कैसे बचूँ?"
+  - "Binary search on the answer क्या है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Sorting** चीज़ों को क्रम में रखती है। Data sorted हो जाए तो कई सवाल आसान हो जाते हैं: duplicates एक-दूसरे के बगल में होते हैं, सबसे छोटा और सबसे बड़ा सिरों पर होते हैं, और कुछ भी जल्दी ढूँढा जा सकता है।
+
+**Binary search** sorted data में कोई चीज़ ऐसे ढूँढता है कि बीच वाली चीज़ देखता है और उस आधे हिस्से को फेंक देता है जिसमें वो हो ही नहीं सकती। हर step बचे हुए को आधा कर देता है, इसलिए इसे लगभग log₂ n steps चाहिए: 10 लाख items के लिए 20।
+
+**Two pointers** एक array में दो positions पर चलते हैं, अक्सर दोनों सिरों से या एक के पीछे दूसरा, ताकि pair और range वाले problems nested loops की जगह एक ही pass में हल हो जाएँ। **Sliding window**, सबसे अच्छा लगातार हिस्सा ढूँढने के लिए two-pointer का ही pattern है।
+
+```flow
+dir: LR
+title: [3 8 15 21 27 33 42 50 61 77] में 42 के लिए binary search
+बीच वाला 27 है -[27, 42 से छोटा है: दायाँ आधा हिस्सा search करो]-> [33 42 50 61 77] का बीच वाला 42 है -> 2 steps में मिल गया
+```
+
+```flow
+title: Two pointers: sorted [5 12 18 25 30 38 45] में 50 का sum देने वाला pair
+L, 5 पर और R, 45 पर -> Sum = 50 है?
+Sum = 50 है? -[बहुत छोटा]-> L को दाईं तरफ़ बढ़ाओ
+Sum = 50 है? -[बहुत बड़ा]-> R को बाईं तरफ़ बढ़ाओ
+Sum = 50 है? -[हाँ: 5 + 45]-> मिल गया
+L को दाईं तरफ़ बढ़ाओ -> Sum = 50 है?
+R को बाईं तरफ़ बढ़ाओ -> Sum = 50 है?
+```
+
+## ये काम कैसे करता है
+
+**Sorting algorithms** speed और behaviour में अलग होते हैं:
+
+| Algorithm | Average time | Extra space | नोट |
+|---|---|---|---|
+| Bubble / insertion sort | O(n²) | O(1) | आसान; insertion sort लगभग sorted data पर तेज़ है |
+| Merge sort | O(n log n) | O(n) | आधे-आधे में बाँटता है, sorted हिस्सों को merge करता है; stable |
+| Quicksort | O(n log n), worst O(n²) | O(log n) | pivot चुनकर partition करता है; practice में तेज़ |
+| Heap sort | O(n log n) | O(1) | heap use करता है; stable नहीं |
+| Timsort (Python का `sorted`) | O(n log n) | O(n) | merge sort और insertion sort का मेल; असली data पर बहुत तेज़ |
+
+Practice में आप built-in sort ही call करते हो। फिर भी ये पता होना चाहिए कि comparison sorting average में O(n log n) से बेहतर नहीं हो सकती, और interview में merge sort या quicksort समझा पाना चाहिए।
+
+**Binary search** एक range `lo` से `hi` रखता है। वो बीच वाली चीज़ देखता है; target बड़ा हो तो `lo` को बीच के आगे ले जाता है; छोटा हो तो `hi` को उसके पहले ले आता है। जब target मिल जाए या range खाली हो जाए, रुक जाता है। यही idea किसी भी **monotonic** हाँ/ना सवाल पर चलता है, जैसे "क्या दिन d तक cumulative sales target तक पहुँच गई?", जिसे **binary search on the answer** कहते हैं।
+
+**Two pointers** sorted क्रम का फ़ायदा उठाते हैं। Target के sum वाला pair ढूँढने के लिए दोनों सिरों से शुरू करो: sum बहुत छोटा हो तो उसे बढ़ाने के लिए बायाँ pointer दाईं तरफ़ बढ़ाओ; बहुत बड़ा हो तो दायाँ pointer बाईं तरफ़ बढ़ाओ। हर move एक साथ कई pairs को बाहर कर देता है, इसलिए ये O(n) है।
+
+**Sliding window** में एक बायाँ और एक दायाँ किनारा होता है। Window बढ़ाने के लिए दायाँ किनारा आगे बढ़ाओ; जब वो कोई rule तोड़े, जैसे budget से ऊपर चली जाए, तो उसे सिकोड़ने के लिए बायाँ किनारा आगे बढ़ाओ। चलते-चलते सबसे अच्छी window का हिसाब रखो।
+
+**Interviews में** इशारों को सुनो। "Sorted array", "पहली या आख़िरी position ढूँढो", या "सबसे छोटी value जो चले" binary search की तरफ़ इशारा करते हैं। Sorted data में "pair", "triplet" या "sum वाला subarray" two pointers की तरफ़। "सबसे लंबा या सबसे छोटा लगातार हिस्सा" sliding window की तरफ़। Code लिखने से पहले pattern ज़ोर से बोलो; इससे interviewer को पता चलता है कि आप कैसे सोचते हो।
+
+## एक example से समझो
+
+Sneha हैदराबाद के एक online coaching platform का analytics संभालती हैं। उनके पास साल भर का ads पर रोज़ का खर्च है और महीने के budget का एक सवाल है: लगातार दिनों की सबसे लंबी वो run कौन-सी है जिसमें कुल ad खर्च ₹1 लाख के अंदर रहा?
+
+हर start और end दिन आज़माना O(n²) है। Sliding window इसे एक pass में कर देती है:
+
+```python
+def longest_within(spend, budget):
+    best = total = left = 0
+    for right, amount in enumerate(spend):
+        total += amount                   # grow the window
+        while total > budget:             # shrink until within budget
+            total -= spend[left]
+            left += 1
+        best = max(best, right - left + 1)
+    return best
+```
+
+हर दिन window में एक बार आता है और ज़्यादा से ज़्यादा एक बार निकलता है, इसलिए ये O(n) है।
+
+फिर finance पूछता है: किस दिन cumulative sign-ups पहली बार 50,000 तक पहुँचे? Cumulative totals सिर्फ़ बढ़ते हैं, इसलिए सवाल "दिन d तक पहुँचे?" का जवाब false, false, ..., फिर हर बाद के दिन के लिए true होता है। ये monotonic है, इसलिए वो answer पर binary search करती हैं:
+
+```python
+from itertools import accumulate
+
+def first_day_reaching(daily, target):
+    totals = list(accumulate(daily))
+    lo, hi = 0, len(totals) - 1
+    answer = -1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if totals[mid] >= target:
+            answer, hi = mid, mid - 1     # works; look for an earlier day
+        else:
+            lo = mid + 1
+    return answer
+```
+
+साल भर के data के लिए ये लगभग 9 checks हैं, 365 तक की जगह। 10 साल के hourly data पर लगभग 17 checks, लगभग 90,000 की जगह। Python का `bisect` module यही काम एक call में करता है: `bisect.bisect_left(totals, target)`।
+
+## आम गलतियाँ
+
+**Unsorted data पर binary search।** ये चुपचाप गलत जवाब देता है। पहले sort करो, या पक्का करो कि हाँ/ना सवाल monotonic है।
+
+**Off-by-one bounds।** Inclusive और exclusive `hi` को मिला देना, या `mid + 1` की जगह `lo = mid` लिखना, infinite loops बनाता है। एक convention चुनो और 0, 1 और 2 length की lists से test करो।
+
+**असली काम के लिए अपना sort लिखना।** Built-in sorts अच्छे से test किए हुए और तेज़ हैं। अपना सिर्फ़ सीखने के लिए लिखो, या interview में जब कहा जाए।
+
+**Loop के अंदर दोबारा sort करना।** Loop के बाहर एक बार sort करो। अंदर sort करने से O(n log n) का काम n बार होता है।
+
+**Pair sums के लिए unsorted data पर two pointers।** ये तरीका क्रम पर निर्भर है। Sort किए बिना hash map use करो।
+
+**Window को while की जगह if से सिकोड़ना।** Rule में वापस आने के लिए एक step काफ़ी नहीं हो सकता। जब तक rule टूटा है, सिकोड़ते रहो।
+
+## Practice करो
+
+1. Watch & learn panel के video lessons देखो, जो sorting और binary search को visually दिखाते हैं।
+2. ऊपर वाला exercise करो।
+3. Project check करो: binary search, binary search on the answer, और एक sliding window, हर एक के साथ edge cases के tests, जैसे खाली list।
+4. Merge sort को दो मिनट से कम में ज़ोर से समझाओ, जैसे interview में समझाते।

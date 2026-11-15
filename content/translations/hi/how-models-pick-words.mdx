@@ -1,0 +1,207 @@
+---
+id: how-models-pick-words
+lang: hi
+title: "Model अगला शब्द कैसे चुनता है: temperature, top-p और top-k"
+outcome: "समझा पाओगे कि language model हर अगला token कैसे चुनता है, अनुमान लगा पाओगे कि temperature, top-p और top-k क्या करते हैं, और किसी काम के लिए उन्हें समझदारी से set कर पाओगे।"
+answer: "Model हर संभावित अगले शब्द को score देता है, scores को chances में बदलता है और एक शब्द चुनता है। Temperature, top-p और top-k तय करते हैं कि ये चुनाव कितना जोखिम भरा हो, इसीलिए एक ही prompt अलग-अलग answers दे सकता है।"
+why_it_matters: "हर LLM call पर आपके हाथ में यही सबसे मुख्य dial होता है। गलत set करो तो facts में भटकाव आता है या copy रोबोट जैसी लगती है, और interviewers अक्सर पूछते हैं कि एक ही prompt अलग answers क्यों देता है।"
+flashcards:
+  - q: "Language model एक वाक्य कैसे बनाता है?"
+    a: "एक बार में एक token। हर step पर वो हर संभावित अगले token को score देता है, एक चुना जाता है, और अगला step शुरू होने से पहले वो text में जुड़ जाता है।"
+  - q: "Logits क्या हैं?"
+    a: "वो कच्चे scores जो model हर संभावित अगले token को देता है। ज़्यादा का मतलब ज़्यादा संभावना। इन्हें softmax से chances में बदला जाता है।"
+  - q: "Temperature क्या करता है?"
+    a: "Logits chances बनने से पहले उन्हें divide करता है। कम temperature में सबसे ऊपर वाला choice हावी हो जाता है और answers स्थिर रहते हैं। ज़्यादा temperature chances को चपटा कर देता है और answers में ज़्यादा variety आती है।"
+  - q: "Practice में temperature 0 का क्या मतलब है?"
+    a: "हमेशा सबसे ज़्यादा score वाला token लेना (greedy)। ये सबसे स्थिर setting है, पर एक जैसे outputs या सही outputs की गारंटी नहीं।"
+  - q: "Top-k और top-p में क्या फ़र्क है?"
+    a: "Top-k options की एक fixed संख्या रखता है। Top-p उतने options रखता है जितने उनके कुल chance को p तक पहुँचाने के लिए लगें, इसलिए model को भरोसा हो तो group छोटा हो जाता है।"
+  - q: "क्या temperature और top-p साथ में बदलने चाहिए?"
+    a: "आमतौर पर नहीं। दोनों एक ही चुनाव को नया आकार देते हैं, इसलिए दोनों बदलने से नतीजे का अंदाज़ा लगाना मुश्किल हो जाता है। कई providers एक ही बदलने की सलाह देते हैं।"
+  - q: "क्या कम temperature hallucinations रोक देता है?"
+    a: "नहीं। Model हर बार पूरे भरोसे से गलत answer चुन सकता है। Facts को retrieval, citations और checks से ठीक करो, temperature से नहीं।"
+  - q: "कम temperature के लिए एक काम और ज़्यादा के लिए एक काम बताओ।"
+    a: "कम: extraction, classification, documents से answers, code। ज़्यादा: नाम, slogans, कहानी के ideas पर brainstorming।"
+exercise:
+  title: "तीन features के लिए dials set करो"
+  setup: "Bengaluru की एक fintech तीन LLM features जोड़ रही है: (1) bank SMS से amount, date और merchant निकालकर JSON में डालना, (2) सिर्फ़ help-centre articles से customer सवालों के जवाब देना, (3) एक नए savings account के लिए दस मज़ेदार नाम सुझाना। एक developer हर जगह temperature 1.0 रखना चाहता है क्योंकि वही default है।"
+  questions:
+    - q: "Feature 1 के लिए कौन-सी settings ठीक हैं, और क्यों?"
+      a: "Temperature 0 के पास और default top-p। Extraction का एक ही सही answer होता है, इसलिए स्थिर output चाहिए। उसे structured output के साथ जोड़ो ताकि JSON हमेशा valid रहे।"
+    - q: "Feature 2 कभी-कभी refund का कोई rule गढ़ लेता है। क्या temperature कम करने से ठीक होगा?"
+      a: "अकेले नहीं। Model किसी भी temperature पर पूरे भरोसे से गलत हो सकता है। Answers को retrieved articles पर टिकाओ, citations ज़रूरी करो और एक check जोड़ो।"
+    - q: "Feature 3 के लिए क्या use करोगे?"
+      a: "ज़्यादा temperature, लगभग 0.8 से 1.0, क्योंकि variety ही मकसद है। ज़रूरत से ज़्यादा नाम बनवाओ, फिर किसी इंसान को चुनने दो।"
+    - q: "एक tester कहता है कि temperature 0 पर feature 1 ने दो अलग outputs दिए। क्या ये bug है?"
+      a: "ज़रूरी नहीं। Temperature 0 पर भी runs के बीच outputs थोड़े अलग हो सकते हैं। Settings log करो और कई runs test करो, और बिल्कुल वही output आने की उम्मीद मत रखो।"
+ask:
+  - "Top-p और top-k में क्या फ़र्क है?"
+  - "एक ही prompt अलग answers क्यों देता है?"
+  - "RAG chatbot के लिए कौन-सा temperature रखूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Language model पूरा answer एक बार में नहीं लिखता। वो एक बार में एक **token** लिखता है (token एक शब्द या शब्द का एक टुकड़ा होता है)। हर token चुनने के लिए, वो अपने जाने हुए हर token को एक score देता है, application उन scores को chances में बदलती है, और एक token चुना जाता है। चुना हुआ token text में जुड़ जाता है, और answer खत्म होने तक यही पूरी प्रक्रिया अगले token के लिए दोहराई जाती है।
+
+इस चुनने वाले step को **sampling** कहते हैं। इसे बदलने के लिए model बदलना ज़रूरी नहीं। API call की कुछ settings तय करती हैं कि चुनाव कितना जोखिम भरा हो: **temperature**, **top-p** और **top-k**। ये वो settings हैं जिन्हें आप लगभग हर LLM call पर छुओगे।
+
+इसीलिए एक ही prompt दो अलग answers भी दे सकता है। Model कोई एक रखा हुआ reply नहीं ढूँढ रहा। हर step पर उसके पास कई ठीक-ठाक अगले tokens होते हैं, और sampling उनमें से चुनता है।
+
+```flow
+dir: LR
+title: Reply लिखने का एक step
+अब तक का prompt और text -> Model हर token को score देता है | the logits
+Model हर token को score देता है -> Temperature scores को नया आकार देता है
+Temperature scores को नया आकार देता है -> Chances जुड़कर 100 percent होते हैं | softmax
+Chances जुड़कर 100 percent होते हैं -> Top-k और top-p कम संभावना वाले tokens हटाते हैं
+Top-k और top-p कम संभावना वाले tokens हटाते हैं -> Chance के हिसाब से random एक चुनो
+Chance के हिसाब से random एक चुनो -> उसे text में जोड़ो
+उसे text में जोड़ो -> अब तक का prompt और text
+```
+
+ये lesson Bengaluru की एक fintech team के साथ चलता है, जो तीन LLM features जोड़ रही है और हर एक के लिए settings चुननी हैं।
+
+## ये काम कैसे करता है
+
+1. **Model हर संभावित अगले token को score देता है।** इन कच्चे scores को **logits** कहते हैं। बड़ा number मतलब model को लगता है कि वो token यहाँ ज़्यादा फिट होता है। Vocabulary में दसों हज़ार tokens होते हैं, इसलिए हर step पर दसों हज़ार scores होते हैं।
+2. **Softmax scores को chances में बदलता है।** हर score 0 और 1 के बीच का number बन जाता है, और सारे numbers का जोड़ 1 होता है। सबसे ज़्यादा score वाले token को सबसे ज़्यादा chance मिलता है, पर पूरा नहीं।
+3. **Temperature पहले scores को नया आकार देता है।** Softmax से पहले, हर logit को temperature से divide किया जाता है। **कम** temperature (मान लो 0.2) फ़ासले बढ़ा देता है, तो सबसे ऊपर वाला token लगभग सारा chance ले लेता है। **ज़्यादा** temperature (मान लो 1.5) फ़ासले घटा देता है, तो दुर्लभ tokens को भी असली chance मिलता है। ठीक 1 पर कुछ नहीं बदलता। 0 पर model हमेशा सबसे ऊपर वाला token लेता है, जिसे **greedy** decoding कहते हैं।
+4. **Top-k और top-p list को काटते हैं।** **Top-k** सिर्फ़ k सबसे अच्छे tokens रखता है, जैसे 40। **Top-p** (जिसे nucleus sampling भी कहते हैं) tokens का सबसे छोटा वो group रखता है जिनके chances जुड़कर p हो जाएँ, जैसे 0.9। बचे हुए tokens के chances फिर से scale होकर 1 के बराबर हो जाते हैं।
+5. **उसके chance के हिसाब से, random तरीके से एक token चुना जाता है।** 60% वाला token दस में से लगभग छह बार चुना जाता है। फिर loop दोबारा शुरू होता है।
+6. **ये रुकता है** जब model end token लिखे, maximum length पर पहुँचे, या आपके चुने **stop sequence** पर आए।
+
+**हर setting क्या करती है:**
+
+| Setting | क्या control करती है | कम value | ज़्यादा value |
+| --- | --- | --- | --- |
+| Temperature | Chances कितने चपटे हैं | ज़्यादा स्थिर, सबसे सुरक्षित wording दोहराता है | ज़्यादा variety, ज़्यादा अनोखा, बकवास का ज़्यादा risk |
+| Top-p | संभावित हिस्से में से कितना रखना है | कम options, ज़्यादा सुरक्षित | ज़्यादा options, ज़्यादा variety |
+| Top-k | कितने tokens रखने हैं | कम options, ज़्यादा सुरक्षित | ज़्यादा options, ज़्यादा variety |
+| Max tokens | सबसे लंबा reply जो allowed है | सस्ता, कट सकता है | लंबा, ज़्यादा खर्च |
+| Stop sequences | वो text जो reply रोक दे | ज़रूरत नहीं | बेकाबू output रोकता है और खर्च बचाता है |
+
+जब model को बहुत भरोसा हो, तब top-k और top-p अलग तरह से behave करते हैं। अगर एक token के पास 95% chance है, तो top-p 0.9 शायद सिर्फ़ वही एक token रखे, जबकि top-k 40 फिर भी 40 रखता है। इसीलिए top-p इस हिसाब से बदलता है कि model को कितना भरोसा है, और top-k नहीं बदलता।
+
+Defaults provider और model के हिसाब से अलग होते हैं, और कुछ नए models इनमें से कुछ settings को fix कर देते हैं या ignore करते हैं। जो model आप use कर रहे हो, उसके लिए provider का documentation देखो।
+
+## एक example से समझो
+
+Prompt लो "My favourite Indian city to visit is" और मान लो model पाँच अगले tokens को ये scores देता है। Numbers गणित को आसान रखने के लिए बनाए गए हैं।
+
+| Token | Score (logit) |
+| --- | --- |
+| Mumbai | 3.0 |
+| Delhi | 2.5 |
+| Chennai | 1.5 |
+| Jaipur | 0.5 |
+| Pune | -0.5 |
+
+चार temperatures पर chances ये हैं:
+
+| Temperature | Mumbai | Delhi | Chennai | Jaipur | Pune |
+| --- | --- | --- | --- | --- | --- |
+| 0.2 | 92.4% | 7.6% | 0.1% | 0.0% | 0.0% |
+| 0.5 | 70.2% | 25.8% | 3.5% | 0.5% | 0.1% |
+| 1.0 | 51.5% | 31.2% | 11.5% | 4.2% | 1.6% |
+| 2.0 | 36.9% | 28.7% | 17.4% | 10.6% | 6.4% |
+
+0.2 पर model लगभग हर बार "Mumbai" कहता है। 2.0 पर वो सोलह कोशिशों में लगभग एक बार Pune का नाम लेता है।
+
+अब temperature 1.0 पर list काटो। ऊपर से chances जोड़ो: Mumbai 51.5%, फिर Delhi 82.7%, फिर Chennai 94.2%। **Top-p 0.9** के साथ, 90% तक पहुँचने वाला सबसे छोटा group यही तीन हैं। **Top-k 3** के साथ भी group यही तीन हैं। उनके chances scale होकर 100% बनते हैं: Mumbai 54.7%, Delhi 33.1%, Chennai 12.2%। Jaipur और Pune अब चुने नहीं जा सकते।
+
+इस गणित को आप Python की कुछ lines में check कर सकते हो:
+
+```python
+import numpy as np
+
+tokens = ["Mumbai", "Delhi", "Chennai", "Jaipur", "Pune"]
+logits = np.array([3.0, 2.5, 1.5, 0.5, -0.5])
+
+def chances(logits, temperature=1.0):
+    scaled = logits / temperature
+    e = np.exp(scaled - scaled.max())      # subtract the max for numeric safety
+    return e / e.sum()
+
+for t in (0.2, 0.5, 1.0, 2.0):
+    print(t, np.round(chances(logits, t) * 100, 1))
+
+def top_p(probs, p=0.9):
+    order = np.argsort(-probs)
+    keep, total = [], 0.0
+    for i in order:
+        keep.append(i)
+        total += probs[i]
+        if total >= p:
+            break
+    out = np.zeros_like(probs)
+    out[keep] = probs[keep]
+    return out / out.sum()
+
+print(np.round(top_p(chances(logits)) * 100, 1))   # [54.7 33.1 12.2  0.   0. ]
+rng = np.random.default_rng(0)
+print(tokens[rng.choice(5, p=top_p(chances(logits)))])
+```
+
+असली call में आप यही dials नाम से set करते हो। सटीक नाम provider पर निर्भर करते हैं, पर वो ऐसे दिखते हैं:
+
+```python
+reply = client.messages.create(
+    model=MODEL_NAME,            # whichever model you use
+    max_tokens=200,
+    temperature=0.2,             # steady
+    messages=[{"role": "user", "content": "Pull the amount and merchant from this SMS: ..."}],
+)
+```
+
+**Team ने क्या चुना।** SMS extractor के लिए उन्होंने temperature 0 और structured output लिया, ताकि JSON हमेशा valid रहे और fields इधर-उधर न भटकें। Help-centre answers के लिए उन्होंने 0.2 का कम temperature और citations के साथ retrieval लिया। Account के नामों के लिए उन्होंने 0.9 रखा, बीस नाम बनवाए और product manager को चुनने दिया।
+
+## आम कामों के लिए शुरुआती बिंदु
+
+ये शुरुआती बिंदु हैं, rules नहीं। इन्हें अपने examples पर test करो।
+
+| काम | कौन-सा temperature try करें | क्यों |
+| --- | --- | --- |
+| Extraction, classification, routing | 0 से 0.2 | एक ही सही answer है, इसलिए स्थिर होना सबसे अच्छा |
+| Documents से answers (RAG) | 0 से 0.3 | Sources के पास रहो |
+| Code लिखना या ठीक करना | 0 से 0.3 | छोटे बदलाव भी code तोड़ सकते हैं |
+| Summaries और emails | 0.3 से 0.7 | थोड़ी स्वाभाविक wording, कम भटकाव |
+| Brainstorming, नाम, slogans | 0.7 से 1.0 | आपको variety चाहिए |
+
+## जब ये settings गलत lever हैं
+
+- **Hallucinations रोकने के लिए।** कम temperature model से हर बार उसका सबसे ऊपर वाला choice चुनवाता है, पर वो choice गलत हो सकता है। Model को facts दो (retrieval), sources माँगो, और answer check करो। Grounding और citations वाला lesson देखो।
+- **Valid JSON पाने के लिए।** ये उम्मीद मत करो कि कम temperature साफ़ JSON दे देगा। Structured output use करो, जो model को आपके format में बाँध देता है। Structured output वाला lesson देखो।
+- **नतीजों को बिल्कुल दोहराने लायक बनाने के लिए।** Temperature 0 पर भी runs के बीच outputs थोड़े अलग हो सकते हैं, क्योंकि servers requests को कैसे batch करते हैं और arithmetic कैसे करते हैं। अगर audit trail चाहिए, तो input, settings और output log करो।
+- **अस्पष्ट prompt ठीक करने के लिए।** अगर instruction धुंधला होने से answers बदल रहे हैं, तो prompt कसना किसी भी setting से ज़्यादा काम आता है।
+
+## Playground से production तक
+
+- **Settings एक ही जगह रखो।** Temperature और बाकी settings को हर task के config में रखो, code में इधर-उधर बिखेरकर नहीं, और हर call के साथ उन्हें log करो ताकि बुरा answer दोबारा बना सको।
+- **एक से ज़्यादा बार test करो।** हर test सवाल को तीन से पाँच बार चलाओ। अगर runs के बीच scores बहुत हिलते हैं, तो feature काफ़ी स्थिर नहीं है, चाहे एक run कुछ भी दिखाए।
+- **कई answers sample करना एक tool है, default नहीं।** आप कई answers बनवाकर वो चुन सकते हो जिस पर ज़्यादातर सहमत हों, या जो कोई judge पसंद करे। ये अक्सर मुश्किल reasoning सवालों को बेहतर करता है, पर कई गुना महँगा है और देरी जोड़ता है। वहीं use करो जहाँ दाँव इसे सही ठहराए।
+- **Cost पर cap लगाओ।** Max tokens set करो, और अगर reply का साफ़ अंत होता है तो stop sequence जोड़ो, ताकि एक अजीब reply बहता न रहे और आपका पैसा न खाए।
+- **Retry तभी काम करता है जब randomness हो।** Temperature 0 पर वही call दोबारा चलाने से आमतौर पर वही गलत answer मिलता है।
+
+## आम गलतियाँ
+
+- **हर जगह default temperature रखना।** Extraction और brainstorming को बहुत अलग settings चाहिए।
+- **Temperature और top-p साथ में बदलना।** दोनों एक ही चुनाव को नया आकार देते हैं। एक बदलो, test करो, फिर तय करो कि दूसरा छूना है या नहीं।
+- **ये मानना कि temperature 0 का मतलब सही है।** इसका मतलब स्थिर है, और स्थिर गलत answer भी गलत ही रहता है।
+- **Factual tasks में "ज़्यादा creative" answers के लिए ज़्यादा temperature रखना।** Variety भी ज़्यादा मिलती है और गलतियाँ भी।
+- **एक run से setting को परखना।** एक भाग्यशाली या दुर्भाग्यशाली sample कम बताता है। उसे कई बार चलाओ।
+- **Stop sequence या max tokens भूल जाना।** जो reply कभी खत्म नहीं होता, उसमें पैसे लगते हैं।
+
+## Practice करो
+
+जो playground या API आप use करते हो उसे खोलो और ये experiment चलाओ।
+
+1. एक factual सवाल और एक creative request चुनो, जैसे "चाय की दुकान के लिए पाँच नाम सुझाओ"।
+2. हर एक को temperature 0, 0.7 और 1.2 पर पाँच-पाँच बार चलाओ। लिखो कि कितने अलग answers मिले।
+3. Temperature 1.0 पर top-p 0.5 जोड़ो और तुलना करो।
+4. दो lines लिखो कि हर task के लिए कौन-सी setting use करोगे और क्यों।
+
+इस topic को और गहराई से पढ़ना हो तो, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 2 sampling और test-time compute को कवर करता है।
+
+**आपका काम पूरा जब:** आप किसी दोस्त को समझा सको कि एक ही prompt अलग answers क्यों देता है, और बता सको कि extraction task और naming task के लिए आप सबसे पहले कौन-सी setting बदलोगे।

@@ -1,0 +1,224 @@
+---
+id: cross-validation-leakage
+lang: hi
+title: "Cross-validation और leakage"
+outcome: "Model की performance का ईमानदार अंदाज़ा लगाओ: train, validation और test splits, k-fold और time-based cross-validation, grouped splits, और pipelines से data leakage कैसे ढूँढें और रोकें।"
+answer: "Cross-validation model को ऐसे data पर test करता है जिस पर उसने train नहीं किया, अक्सर k folds में। Leakage तब होती है जब भविष्य या target की जानकारी training में घुस जाती है, जिससे scores झूठे ही अच्छे दिखते हैं।"
+why_it_matters: "Production में ML models के निराश करने की सबसे आम वजह ये है कि उन्हें बेईमानी से evaluate किया गया था। जो model notebook में 0.95 और असल दुनिया में 0.70 लाता है, उसमें लगभग हमेशा गलत split या leakage होती है। इसे सही करना ML engineering का एक बुनियादी हुनर है और interviews में बार-बार पूछा जाता है।"
+flashcards:
+  - q: "Test set को आखिर तक छुए बिना क्यों रखें?"
+    a: "ताकि आखिरी score ऐसे data पर एक ईमानदार अंदाज़ा हो जो training या किसी choice में कभी use नहीं हुआ। उसे बार-बार देखने से वो validation set बन जाता है।"
+  - q: "k-fold cross-validation क्या है?"
+    a: "Data को k folds में बाँटो, k में से एक कम पर train करो और बचे हुए एक पर validate करो, k बार दोहराओ और scores का औसत लो।"
+  - q: "Stratified folds क्या हैं?"
+    a: "ऐसे folds जिनमें class के अनुपात पूरे dataset जैसे ही रहते हैं, जब कोई class rare हो तब ये ज़रूरी है।"
+  - q: "Time-based split कब use करना ही पड़ता है?"
+    a: "जब data में time का क्रम हो, जैसे transactions या demand। पहले की periods पर train करो और बाद की periods पर validate करो।"
+  - q: "Grouped split क्या है?"
+    a: "एक ही customer, patient या store की सारी rows को एक ही fold में रखना, ताकि model individuals को रट न सके।"
+  - q: "Data leakage क्या है?"
+    a: "Validation, test या भविष्य की जानकारी का training तक पहुँच जाना, जिससे results असल use से बेहतर दिखते हैं।"
+  - q: "Cross-validation में scikit-learn pipelines क्यों use करें?"
+    a: "वो scaling और imputation जैसी preprocessing को हर split के अंदर सिर्फ़ training fold पर fit करते हैं, जिससे leakage रुकती है।"
+  - q: "Leakage के तीन warning signs बताओ।"
+    a: "हैरान करने वाले ऊँचे scores, एक feature की भारी importance, और किसी बिल्कुल नई period पर score करने पर बड़ी गिरावट।"
+  - q: "Nested cross-validation किसलिए है?"
+    a: "Settings को inner loop में tune करना और outer loop में score करना, ताकि report किया गया score इस वजह से न फूले कि settings उन्हीं folds पर चुनी गई थीं।"
+  - q: "Feature selection से leakage कैसे दिखा सकते हैं?"
+    a: "सारे labels use करके random noise में से 'सबसे अच्छे' features चुनो, फिर cross-validate करो: score अच्छा दिखता है। Pipeline के अंदर चुनने पर वो chance के स्तर पर गिर जाता है।"
+exercise:
+  title: "Leaks ढूँढो"
+  setup: "Bengaluru का एक lender predict करता है कि कोई loan 12 महीनों में default होगा या नहीं। Notebook में: (1) 200,000 loans को random तरीके से train और test में बाँटा गया; (2) कई customers के कई loans हैं; (3) split से पहले पूरे dataset के mean से missing income भरी गई; (4) feature 'collection calls की संख्या' शामिल है, जो payment छूटने के बाद record होता है; (5) 40 model settings आज़माकर सबसे अच्छे test score वाली चुनी गई। Report किया गया AUC: 0.94।"
+  questions:
+    - q: "(1) की जगह कौन-सा split होना चाहिए, और क्यों?"
+      a: "Time-based split: पुराने loans पर train करो, नए loans पर test करो, क्योंकि असल use में model भविष्य के loans predict करता है।"
+    - q: "(2) के लिए क्या ज़रूरी है?"
+      a: "Customer के हिसाब से grouped splits, ताकि एक ही customer के loans training और testing दोनों में न हों।"
+    - q: "(3) और (4) leaks क्यों हैं?"
+      a: "(3) में training में test rows के statistics use हुए; imputation को pipeline में सिर्फ़ training data पर fit करो। (4) default का नतीजा है, prediction के समय पता नहीं होता।"
+    - q: "(5) में क्या गलत है, और कैसे ठीक करें?"
+      a: "Test score से चुनने पर test आशावादी बन जाता है। Training data पर cross-validation से tune करो, और test score आखिर में सिर्फ़ एक बार report करो।"
+ask:
+  - "Machine learning में data leakage क्या है?"
+  - "Time-based cross-validation कब use करूँ?"
+  - "मेरा model production में testing से बुरा क्यों चला?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+ये जानने के लिए कि model नए data पर कैसा चलेगा, आपको उसे ऐसे data पर test करना होगा जिससे उसने कभी नहीं सीखा, असल use जैसी हालत में।
+
+- **Train, validation, test**: एक हिस्से पर train करो, validation वाले हिस्से पर अपने choices tune करो, और आखिरी performance एक ही बार test वाले हिस्से पर report करो, जिसे आखिर तक छुआ न गया हो।
+- **Cross-validation**: कई अलग splits (folds) पर training और validation दोहराओ और औसत लो, जब data कम हो तब ज़्यादा स्थिर अंदाज़े के लिए।
+- **Data leakage**: कोई भी तरीका जिससे validation या test data की, या भविष्य की जानकारी training तक पहुँच जाए, जिससे results असल से बेहतर दिखें।
+
+| Split का तरीका | कैसे काम करता है | कब use करें |
+|---|---|---|
+| Random k-fold | Fold 1 part 1 पर validate होता है और बाकी पर train, fold 2 part 2 पर, वग़ैरह; 5 scores का औसत लो | Rows एक-दूसरे से independent हों |
+| Time-based | Jan-Jun पर train, Jul पर validate; Jan-Jul पर train, Aug पर validate; Jan-Aug पर train, Sep पर validate | Rows time के क्रम में हों: भविष्य पर कभी train मत करो |
+| Grouped | Patient A की सारी 4 admissions fold 2 में, patient B की सारी 2 fold 5 में | एक ही इंसान या चीज़ कई rows में आती हो |
+
+```flow
+dir: LR
+title: Time-based splits कभी भविष्य पर train नहीं करते
+Train: Jan-Jun -> Validate: Jul
+Train: Jan-Jul -> Validate: Aug
+Train: Jan-Aug -> Validate: Sep
+```
+
+इस lesson में हम Chennai के एक hospital network के साथ चलेंगे, जिसका readmission model तब तक शानदार दिख रहा था जब तक leaks नहीं मिल गईं।
+
+## ये कैसे काम करता है
+
+**k-fold cross-validation।** Data को k folds में बाँटो (अक्सर 5)। k में से एक कम पर train करो, बचे हुए एक पर validate करो; k बार दोहराओ। Classification के लिए stratified folds class के अनुपात बराबर रखते हैं।
+
+**Time-based splits।** जब data में time का क्रम हो (transactions, demand, churn), तो random splits भविष्य को training में लीक कर देते हैं। पहले की periods पर train करो और बाद की periods पर validate करो; time-series cross-validation इस window को आगे खिसकाता जाता है।
+
+**Grouped splits।** अगर एक ही customer, patient या store कई rows में आता है, तो उसकी सारी rows एक ही fold में रखो। वरना model individuals को रट लेता है और नए लोगों पर असल से बेहतर दिखता है।
+
+**Leakage के आम स्रोत।**
+
+- *सारे data पर preprocessing*: split से पहले निकाली गई scaling, imputing या target encoding validation rows की जानकारी use करती है। Preprocessing को सिर्फ़ training fold पर fit करो; scikit-learn **pipelines** cross-validation के अंदर ये अपने आप करते हैं।
+- *भविष्य वाले features*: ऐसे features जो prediction के समय के बाद की जानकारी से निकले हों।
+- *Target के proxies*: ऐसे columns जो नतीजे का परिणाम हों (churn predict करते समय "closed reason" वाला field)।
+- *Duplicates*: एक ही record का train और test दोनों में आना।
+- *Test set पर tuning*: test score से models चुनने पर वो validation set बन जाता है; आखिरी results आशावादी हो जाते हैं।
+
+**Leakage के संकेत।** हैरान करने वाले ऊँचे validation scores; एक अकेले feature की भारी importance; किसी बिल्कुल नई period पर score करने पर बड़ी गिरावट।
+
+**आखिरी check।** Launch से पहले, model को सबसे हाल की उस period पर score करो जो उसने कभी नहीं देखी, और बेहतर होगा कि ठीक वैसे ही जैसे वो production में चलेगा।
+
+**कौन-सा split किस problem से मेल खाता है:**
+
+| Data | कौन-सा split | क्यों |
+| --- | --- | --- |
+| Independent rows, time का क्रम नहीं | Stratified k-fold | स्थिर अंदाज़ा, class balance बना रहता है |
+| Transactions, demand, churn | Time-based, आगे खिसकता हुआ | Model हमेशा भविष्य predict करता है |
+| हर customer या patient की कई rows | Grouped k-fold | Model को नए customers ही मिलेंगे |
+| Time का क्रम और groups दोनों | Time-based, groups boundary पार न करें | दोनों risks साथ में |
+
+**हर split के पीछे का नियम:** validation data वैसा दिखना चाहिए जैसा data model को असल use में मिलेगा, और training में सिर्फ़ वही जानकारी use होनी चाहिए जो prediction के समय उपलब्ध हो। अगर आप समझा सकते हो कि आपका split production की नकल कैसे करता है, तो शायद आपने ठीक चुना है।
+
+**Score पर भरोसा करने से पहले leakage की checklist।** हर feature के लिए पूछो "क्या prediction के समय मुझे ये value पता होगी?" हर preprocessing step को pipeline के अंदर fit करो। Splits के बीच exact duplicates हटाओ। Feature importance देखो और जो ज़रूरत से ज़्यादा अच्छा लगे उस पर सवाल उठाओ। और सबसे हाल की अनछुई period पर score सबसे आखिर में करो।
+
+**Feature engineering से leakage।** बहुत-सी leaks event logs से बने features से आती हैं: "support calls की संख्या", "आखिरी status", "आखिरी payment के बाद के दिन"। हर एक सिर्फ़ prediction के पल से पहले के events से निकलना चाहिए। एक सुरक्षित आदत है हर row के लिए एक "prediction time" column तय करना और features बनाते समय हर source table को उससे पहले के events तक filter करना।
+
+**Leakage जिसे आप होते हुए देख सकते हो।** Pure noise में कोई signal नहीं होता, इसलिए ईमानदार score लगभग 0.5 होना चाहिए। पहले सारे data पर features चुनने से noise भी predictive दिखने लगता है:
+
+```python
+import numpy as np
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.pipeline import make_pipeline
+
+rng = np.random.default_rng(0)
+X = rng.normal(size=(200, 5000))                  # 5,000 random features
+y = rng.integers(0, 2, 200)                       # random labels
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+
+X_leaky = SelectKBest(f_classif, k=20).fit_transform(X, y)          # chose features using every label
+print("leaky:", cross_val_score(LogisticRegression(max_iter=1000), X_leaky, y, cv=cv).mean().round(2))
+
+honest = make_pipeline(SelectKBest(f_classif, k=20), LogisticRegression(max_iter=1000))
+print("honest:", cross_val_score(honest, X, y, cv=cv).mean().round(2))
+```
+
+Leaky version random data पर भी 0.5 से बहुत ऊपर score करता है; pipeline version, जो हर training fold के अंदर features चुनता है, वापस chance पर आ जाता है। यही बात scaling, imputing और target encoding पर भी लागू होती है।
+
+**Code में grouped और time splits।**
+
+```python
+from sklearn.model_selection import GroupKFold, TimeSeriesSplit
+
+def grouped_score(model, X, y, customer_ids):
+    return cross_val_score(model, X, y, cv=GroupKFold(n_splits=5), groups=customer_ids).mean()
+
+def time_score(model, X_sorted, y_sorted, gap=0):
+    """Rows must be sorted by time. gap leaves rows out between train and test."""
+    return cross_val_score(model, X_sorted, y_sorted, cv=TimeSeriesSplit(n_splits=5, gap=gap)).mean()
+```
+
+`gap` तब मायने रखता है जब labels देर से आते हों: अगर churn 30 दिन बाद तय होता है, तो 30 दिन का gap छोड़ो ताकि training labels कभी test period से overlap न करें।
+
+**खुद को धोखा दिए बिना tuning।** Cross-validation score से settings चुनकर वही score report करना आशावादी है। Nested cross-validation अंदर tune करता है और बाहर score करता है:
+
+```python
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.datasets import make_classification
+
+Xc, yc = make_classification(n_samples=2000, n_features=20, random_state=1)
+inner = GridSearchCV(HistGradientBoostingClassifier(random_state=1),
+                     {"max_depth": [3, 6], "learning_rate": [0.05, 0.1]}, cv=3, scoring="roc_auc")
+outer = cross_val_score(inner, Xc, yc, cv=5, scoring="roc_auc")
+print("nested ROC AUC:", outer.mean().round(3), "±", outer.std().round(3))
+```
+
+जब data काफ़ी हो, तो एक आसान रास्ता है अलग से एक test period रखना जिसे आप आखिर में सिर्फ़ एक बार score करो।
+
+**Leaks पकड़ने वाला एक test।** हर feature के लिए एक-feature वाला model train करो; कोई भी अकेला feature जो लगभग पूरी accuracy दे रहा हो, उसे गौर से देखने लायक है। इस check को अपनी training pipeline में जोड़ो और ऊपर के पाँच print करो।
+
+## एक example से समझो
+
+Chennai का एक hospital network discharge records से 30 दिन में दोबारा भर्ती होने (readmission) को predict करता है।
+
+पहले notebook ने random 5-fold cross-validation के साथ AUC 0.91 बताया। चिंताएँ:
+
+1. कई patients की कई admissions हैं। Random folds में वही patient training और validation दोनों में आ गया। **Patient के हिसाब से grouped folds**: AUC 0.83।
+2. Missing lab values को split से पहले पूरे dataset के mean से भरा गया था। Imputation को pipeline में डालने पर: AUC 0.82।
+3. एक feature "follow-up appointment cancelled" कभी-कभी readmission के बाद record होता था। उसे हटाने पर: AUC 0.78।
+4. 2023 से 2025 की admissions पर train करके और 2026 की पहली छमाही पर test करने पर: AUC 0.77।
+
+ईमानदार number, 0.77, ही वो है जिसके हिसाब से clinical team ने योजना बनाई। छह महीने के pilot में live AUC 0.76 रहा।
+
+| Fix | Fix के बाद AUC |
+| --- | --- |
+| Random 5-fold (शुरुआत) | 0.91 |
+| Patient के हिसाब से grouped folds | 0.83 |
+| Pipeline के अंदर imputation | 0.82 |
+| Readmission के बाद वाला feature हटाया | 0.78 |
+| 2023-2025 पर train, 2026 की शुरुआत पर test | 0.77 |
+| छह महीने के pilot में live | 0.76 |
+
+0.91 से 0.77 तक की गिरावट model के बिगड़ने से नहीं थी। वो नापने का ईमानदार होना था, और इसी वजह से pilot में कोई चौंकाने वाली बात नहीं हुई।
+
+## आम गलतियाँ
+
+- **Time के क्रम वाले data पर random splits।**
+- **एक ही entity का train और test दोनों में होना।** Customer, patient या store से group करो।
+- **Split से पहले preprocessing।** Pipelines use करो।
+- **Test set को बार-बार देखना।** उसे आखिरी report के लिए रखो।
+- **शक पैदा करने वाले अच्छे scores को नज़रअंदाज़ करना।** जश्न मनाने से पहले जाँच करो।
+
+- **Cross-validation से tune करके उसी cross-validation score को आखिरी बताना।** कई बार tuning के बाद cross-validation score भी आशावादी होता है। एक अलग आखिरी test set रखो।
+- **ये मानना कि leakage कम होती है।** Launch के बाद models के फेल होने की ये सबसे आम वजहों में से एक है। हर बार check करो, खासकर logs या event tables से बने features के साथ।
+- **Cross-validate करने से पहले सारे data पर features चुनना या tuning करना।**
+- **Labels देर से आने पर भी training और test periods के बीच gap न होना।**
+- **सबसे अच्छे tuned score को ऐसे report करना जैसे वो अनछुआ अंदाज़ा हो।**
+
+## कब सादे splits काफ़ी हैं
+
+- **बहुत सारी independent rows**, time का क्रम नहीं और entities दोहराई नहीं गईं: एक random hold-out set काफ़ी हो सकता है।
+- **शुरू में जल्दी तुलना**, जहाँ एक validation split दिशा दे देता है।
+- **Pretrained models जैसे हैं वैसे use करना**, जहाँ आपको सिर्फ़ एक साफ़ test set चाहिए, cross-validation नहीं।
+
+## Demo से production तक
+
+- **हर preprocessing step को pipeline में डालो**, जो सिर्फ़ training folds पर fit हो।
+- **Split को production से मिलाओ**: time, groups या दोनों, देर से आने वाले labels के लिए gaps के साथ।
+- **एक आखिरी test period रखो** और हर model version के लिए उसे एक ही बार score करो।
+- **Training pipeline में एक-feature वाले leak checks चलाओ।**
+- **Offline scores की तुलना production के पहले हफ़्तों से करो**; बड़ी गिरावट leakage की तरफ़ इशारा करती है।
+
+## Practice करो
+
+scikit-learn की cross-validation guide और common pitfalls वाला page पढ़ो, और Kaggle के Intermediate ML में cross-validation और leakage वाले lessons करो।
+
+1. ऐसे dataset पर जिसमें entities दोहराई गई हों या time का क्रम हो, random k-fold की तुलना grouped या time-based splits से करो।
+2. सारे data पर scaler fit करने से leakage दिखाओ, फिर pipeline से उसे ठीक करो।
+3. एक आखिरी test set अलग रखो, सिर्फ़ cross-validation पर tune करो, और test score एक ही बार report करो।
+4. Noise वाला experiment खुद चलाओ, फिर feature selection की जगह StandardScaler के साथ दोहराओ और note करो कि leak कितनी छोटी है।
+
+**आपका काम पूरा जब:** आप समझा सको कि आपके use case से कौन-सा split मेल खाता है, और एक ऐसा score दिखा सको जो leak हटाने पर गिर गया।
