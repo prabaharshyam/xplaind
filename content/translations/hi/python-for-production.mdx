@@ -1,0 +1,205 @@
+---
+id: python-for-production
+lang: hi
+title: "Production के लिए Python"
+outcome: "ऐसी Python लिखो जिस पर दूसरे engineers भरोसा कर सकें: type hints, dataclasses, बाहर के data के लिए Pydantic models, और network calls के लिए async code।"
+answer: "Production Python में type hints, dataclasses, बाहर के data को validate करने के लिए Pydantic और network calls के लिए async code होता है, ताकि दूसरे engineers उस पर भरोसा और उसे maintain कर सकें।"
+why_it_matters: "Client projects सालों चलते हैं और कई हाथों से गुज़रते हैं। Typed और validated code खराब data को दरवाज़े पर ही पकड़ लेता है और एक service को एक साथ कई requests संभालने देता है। AI engineering roles के interviewers इसकी उम्मीद रखते हैं।"
+flashcards:
+  - q: "Type hints क्या हैं?"
+    a: "Annotations जो बताते हैं कि function क्या लेता है और क्या लौटाता है, जैसे def score(t: Ticket) -> float। Python run time पर इन्हें ignore करता है; tools इनसे गलतियाँ पकड़ते हैं।"
+  - q: "पूरे project में type hints कौन check करता है?"
+    a: "mypy या pyright जैसे type checkers, जो आमतौर पर CI में चलते हैं, और आपका editor जब आप type करते हो।"
+  - q: "Dataclass क्या है?"
+    a: "@dataclass से mark की हुई class जो मुख्य रूप से data रखती है; Python उसका constructor, equality और printing आपके लिए लिख देता है।"
+  - q: "Pydantic model, dataclass से कैसे अलग है?"
+    a: "ये validate करता है। जो सुरक्षित रूप से convert हो सकता है उसे convert करता है, जो नहीं हो सकता उसे reject करता है, और ठीक-ठीक बताता है कि कौन-सा field fail हुआ।"
+  - q: "Pydantic validation कहाँ होना चाहिए?"
+    a: "हर उस boundary पर जहाँ data अंदर आता है: API requests, config files, CSV rows और ख़ासकर LLM output।"
+  - q: "async और await किसमें मदद करते हैं?"
+    a: "एक ही process में कई धीमे network calls का एक साथ इंतज़ार करने में, जैसे कई model API calls। ये भारी computation को तेज़ नहीं करते।"
+  - q: "Async code के अंदर requests.get या time.sleep call करने पर क्या होता है?"
+    a: "पूरा event loop block हो जाता है, इसलिए और कुछ नहीं चलता। httpx और asyncio.sleep जैसी async libraries use करो।"
+  - q: "Semaphore से concurrency पर cap क्यों लगाएँ?"
+    a: "हज़ारों requests एक साथ भेजने से rate limits टूटती हैं और आप block हो सकते हो। Semaphore सीमित करता है कि एक समय में कितनी requests चल रही हों।"
+exercise:
+  title: "Model के reply को validate करो"
+  setup: "एक Pydantic model Order के fields हैं: order_id (str), qty (int, 0 से बड़ा), price_inr (float, 0 से बड़ा) और pin (str, ठीक 6 characters)। WhatsApp messages से orders निकालने वाला एक LLM चार replies लौटाता है: (1) order_id 'A12', qty '3', price_inr 499, pin '411001'; (2) order_id 'A13', qty 'two', price_inr 250, pin '560001'; (3) order_id 'A14', qty 1, price_inr 120, pin 41100; (4) order_id 'A15', qty 2, price_inr 80, pin field ही नहीं।"
+  questions:
+    - q: "कौन-सा reply pass होता है, और Pydantic उसके साथ क्या करता है?"
+      a: "Reply 1 pass होता है। Pydantic text '3' को integer 3 में convert कर देता है।"
+    - q: "Reply 2 क्यों fail होता है?"
+      a: "'two' को integer में convert नहीं किया जा सकता, इसलिए qty उस field का नाम बताते हुए error के साथ validation में fail होता है।"
+    - q: "Reply 3 में कौन-सी दो problems हैं?"
+      a: "PIN text नहीं, number है, और उसमें सिर्फ़ 5 digits हैं। Settings के हिसाब से वो type check में fail होता है, और 6-character वाले rule में तो हर हाल में fail होता है।"
+    - q: "Fail हुए replies के साथ code को क्या करना चाहिए?"
+      a: "Validation errors log करे और ज़्यादा सख़्त prompt के साथ retry करे, या message किसी इंसान को भेज दे, खराब data store करने की जगह।"
+ask:
+  - "Pydantic क्या है और AI apps इसे क्यों use करते हैं?"
+  - "Python में async कब use करना चाहिए?"
+  - "क्या type hints से Python तेज़ हो जाती है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Script वाली Python और production वाली Python दिखने में एक जैसी हैं, पर दबाव में बहुत अलग behave करती हैं। Script एक बार चलती है, आपके laptop पर, उस data पर जो आपने देखा है। Production code दिन में हज़ारों बार चलता है, उस data पर जो आपने कभी देखा नहीं, और आपके जाने के बाद दूसरे लोग उसे बदलते हैं।
+
+चार आदतें ज़्यादातर फ़र्क मिटा देती हैं:
+
+| आदत | क्या करती है | सबसे ज़्यादा कहाँ काम की |
+| --- | --- | --- |
+| **Type hints** | बताते हैं कि हर function क्या लेता और लौटाता है, ताकि editors और checkers code चलने से पहले गलतियाँ पकड़ लें | आपका लिखा हर function |
+| **Dataclasses** | सादे records को बिना boilerplate के साफ़ shape देते हैं | आपका अपना internal data |
+| **Pydantic models** | बाहर से आए data को check करते हैं और गलत हो तो साफ़ error के साथ मना कर देते हैं | API requests, files, LLM replies |
+| **async और await** | एक process को एक साथ कई धीमे network calls का इंतज़ार करने देते हैं | जो services model APIs को call करती हैं |
+
+```flow
+dir: LR
+title: बाहर गंदा, भरोसे के नाकाबिल input; अंदर साफ़, अनुमान लगाने लायक code
+API requests -[Pydantic से validate करो]-> Typed, checked objects
+CSV rows -[Pydantic से validate करो]-> Typed, checked objects
+LLM JSON reply -[Pydantic से validate करो]-> Typed, checked objects
+Typed, checked objects -> आपका system | अंदर dataclasses, हर function पर type hints
+```
+
+इस lesson में हम Bengaluru के एक lending startup के साथ चलेंगे, जो LLM से loan enquiry emails के fields निकालता है, और फिर 200 emails को जल्दी process करना चाहता है। अंत तक आप बाहर के data को ठीक से validate कर पाओगे और जानोगे कि async कब मदद करता है।
+
+## ये काम कैसे करता है
+
+### Type hints
+
+```python
+def emi(principal: float, annual_rate: float, months: int) -> float:
+    ...
+```
+
+Python run time पर hints को ignore करती है; string pass करने से अपने आप कोई error नहीं आता। इनकी value tools से आती है: जहाँ number चाहिए वहाँ string देने पर आपका editor warning देता है, और **mypy** या **pyright** जैसे type checkers CI में पूरे project को check करते हैं। Hints documentation का भी काम करते हैं: `def score(ticket: Ticket) -> float` अगले engineer को किसी comment से ज़्यादा बताता है।
+
+### Dataclasses
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class LineItem:
+    sku: str
+    qty: int
+    price: float
+```
+
+`@dataclass` उस class का constructor, equality और printing लिख देता है जो मुख्य रूप से data रखती है। इन्हें अपने internal records के लिए use करो, जहाँ आप तय करते हो कि अंदर क्या जाएगा।
+
+### Pydantic: boundary पर validation
+
+**Pydantic** model dataclass जैसा दिखता है पर **validate** करता है। इसे dictionary या JSON दो और ये:
+
+- जो सुरक्षित रूप से convert हो सकता है उसे convert करता है, जैसे "42" को 42;
+- जो नहीं हो सकता उसे reject करता है, जैसे number की जगह "five lakh";
+- ठीक-ठीक बताता है कि कौन-सा field क्यों fail हुआ।
+
+| `amount_inr: int` के लिए input | Result |
+| --- | --- |
+| `500000` | Accept |
+| `"500000"` | 500000 में convert |
+| `"5,00,000"` | Reject (commas की वजह से), जब तक आप cleaning step न जोड़ो |
+| `"five lakh"` | साफ़ error के साथ reject |
+| गायब | Reject, जब तक field का default न हो |
+
+हर उस boundary पर Pydantic use करो जहाँ data अंदर आता है: request bodies, config files, CSV rows, और **ख़ासकर LLM output**, जो अक्सर लगभग सही होता है। Edge पर validate करने का मतलब है कि खराब data आपके बाकी code तक पहुँचता ही नहीं, जहाँ वो तीन functions बाद उलझाने वाले errors पैदा करता।
+
+### async और await
+
+एक normal function **block** करता है: जब वो model के reply का दो second इंतज़ार करता है, उस process में और कुछ नहीं होता। `async def` function reply का `await` कर सकता है और तब तक **event loop** को दूसरा काम चलाने देता है।
+
+```flow
+dir: LR
+title: एक-एक करके, blocking: लगभग 6 s
+Call 1, 2 s -> Call 2, 2 s -> Call 3, 2 s -> 6 s बाद पूरा
+```
+
+```flow
+dir: LR
+title: async के साथ एक साथ: लगभग 2 s
+शुरू -> Call 1, 2 s
+शुरू -> Call 2, 2 s
+शुरू -> Call 3, 2 s
+Call 1, 2 s -> लगभग 2 s बाद पूरा
+Call 2, 2 s -> लगभग 2 s बाद पूरा
+Call 3, 2 s -> लगभग 2 s बाद पूरा
+```
+
+ये सिर्फ़ **इंतज़ार** में मदद करता है, network या disk का, न कि images resize करने जैसे भारी computation में। और chain की हर library का async-aware होना ज़रूरी है: `requests` की जगह `httpx`, `time.sleep` की जगह `asyncio.sleep`।
+
+## एक example से समझो
+
+Bengaluru का एक lending startup LLM से loan enquiry emails के fields निकलवाना चाहता है। Model JSON लौटाता है। वो ज़्यादातर सही होता है, पर कभी कोई field गायब होता है, या amount में number की जगह "five lakh" लिखा होता है।
+
+**Reply को validate करना:**
+
+```python
+import logging
+from pydantic import BaseModel, Field, ValidationError
+
+log = logging.getLogger(__name__)
+
+class Enquiry(BaseModel):
+    name: str
+    city: str
+    amount_inr: int = Field(gt=0, le=10_000_000)
+    purpose: str | None = None
+
+def parse(reply: str) -> Enquiry | None:
+    try:
+        return Enquiry.model_validate_json(reply)
+    except ValidationError as e:
+        log.warning("bad model reply: %s", e.errors())
+        return None
+```
+
+`parse('{"name": "Divya", "city": "Pune", "amount_inr": "500000"}')` एक valid `Enquiry` लौटाता है, amount को integer में convert करके। `"amount_inr": "five lakh"` वाला reply field का नाम बताते हुए error के साथ fail होता है, इसलिए code कचरा store करने की जगह ज़्यादा सख़्त prompt से retry कर सकता है।
+
+**200 emails को process करना।** Model को एक-एक करके call करने में latency का 200 गुना समय लगता है: हर एक पर 2 seconds के हिसाब से लगभग 7 मिनट। `httpx.AsyncClient` और `asyncio.gather` के साथ emails एक साथ भेजे जाते हैं, और एक **semaphore** सीमित करता है कि एक समय में कितने चल रहे हों, ताकि startup provider की rate limit के नीचे रहे:
+
+```python
+import asyncio
+import httpx
+
+sem = asyncio.Semaphore(10)
+
+async def extract(client, email):
+    async with sem:
+        reply = await call_model(client, email)   # your async model call
+        return parse(reply)
+
+async def main(emails):
+    async with httpx.AsyncClient(timeout=30) as client:
+        return await asyncio.gather(*(extract(client, e) for e in emails))
+
+results = asyncio.run(main(emails))
+```
+
+| तरीका | 200 emails का समय | Rate-limit का risk |
+| --- | --- | --- |
+| एक-एक करके | लगभग 7 मिनट | कोई नहीं |
+| सारे 200 एक साथ | seconds, फिर बहुत सारे 429 errors | ज़्यादा |
+| 10 की limit के साथ async | लगभग 40 seconds | कम |
+
+## आम गलतियाँ
+
+- **Hints को checks समझना।** `amount: int` run time पर string को नहीं रोकता। बाहर के data को Pydantic से validate करो; hints अपने code के लिए use करो।
+- **बहुत देर से validate करना।** जो खराब data boundary से निकल जाता है वो तीन functions बाद उलझाने वाले error की तरह दिखता है। अंदर आते ही validate करो।
+- **Async code के अंदर block करना।** `async def` के अंदर `requests.get` या `time.sleep` call करने से पूरा event loop जम जाता है।
+- **Concurrency की कोई limit न रखना।** एक साथ 5,000 requests भेजने से rate limits टूटती हैं और आप block हो सकते हो। Cap लगाओ।
+- **हर जगह dictionaries।** Functions के बीच raw dicts भेजने से `"ammount"` जैसी typos छिप जाती हैं। अपने data को एक model दो।
+- **CPU वाले भारी काम के लिए async use करना।** इससे image processing या model training तेज़ नहीं होगी।
+
+## Practice करो
+
+नीचे link किया FastAPI का Python types का introduction पढ़ो, फिर Pydantic models वाला page।
+
+1. **एक model।** Invoice के लिए एक Pydantic model लिखो: number, date, vendor, 15 characters का GSTIN, line items और total।
+2. **उसे तोड़ो।** उसे पाँच JSON strings दो, जिनमें दो टूटी हुई हों, और errors print करो।
+3. **Async।** एक async function लिखो जो 50 invoices को "process" करे, model call की जगह `asyncio.sleep(1)` के साथ, पहले एक-एक करके, फिर `asyncio.gather` और 10 की limit के साथ। समय compare करो।
+
+**आपका काम पूरा जब:** आप समझा सको कि Pydantic किसी system के edge पर क्यों होना चाहिए, और async उस service की मदद क्यों करता है जो model API को call करती है पर उसकी नहीं जो images resize करती है।

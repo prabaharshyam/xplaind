@@ -1,0 +1,160 @@
+---
+id: writing-tests
+lang: hi
+title: "pytest से tests लिखना"
+outcome: "pytest से unit tests लिख पाओगे, fixtures और parametrised tests use करना, धीमे या बाहरी हिस्सों को fake करना, और ये जानना कि पहले क्या test करना है।"
+answer: "Test वो code है जो आपके code को जाने-पहचाने input के साथ चलाकर output check करता है। pytest test_ नाम वाले functions ढूँढता है और बताता है कि कौन pass हुए, ताकि आप code बदलते हुए जानो कि कुछ टूटा नहीं।"
+why_it_matters: "Tests से आप बिना डर के code बदल सकते हो, users से पहले bugs पकड़ सकते हो, और reviewers को दिखा सकते हो कि आपका change काम करता है। Interviewers पूछते हैं कि आप test कैसे करते हो, और AI teams अपने code और prompts, दोनों को test करती हैं।"
+flashcards:
+  - q: "pytest tests कैसे ढूँढता है?"
+    a: "वो test_*.py नाम की files में उन functions को ढूँढता है जिनके नाम test_ से शुरू होते हैं, हर एक चलाता है और passes और failures बताता है।"
+  - q: "अच्छा unit test कैसा होता है?"
+    a: "तेज़, दूसरे tests से स्वतंत्र, एक ही behaviour test करने वाला, साफ़ नाम वाला, और ऐसे message के साथ fail होने वाला जो दिखाए कि क्या गलत हुआ।"
+  - q: "Arrange, act, assert pattern क्या है?"
+    a: "Inputs तैयार करो, code को एक बार call करो, फिर result check करो। इससे हर test छोटा और पढ़ने लायक रहता है।"
+  - q: "pytest में fixture क्या है?"
+    a: "@pytest.fixture से marked function जो ऐसी चीज़ तैयार करता है जो tests share करते हैं, जैसे sample data। Test उसे parameter के रूप में नाम लेकर पाता है।"
+  - q: "@pytest.mark.parametrize क्या करता है?"
+    a: "एक ही test को inputs और expected outputs के कई sets के साथ चलाता है, हर एक अलग test की तरह report होता है।"
+  - q: "ये कैसे test करें कि code error उठाता है?"
+    a: "with pytest.raises(ValueError): call_the_code()। Test तभी pass होता है जब वही error उठे।"
+  - q: "Unit test में API या model call को fake क्यों करें?"
+    a: "असली calls धीमे होते हैं, पैसे लगते हैं और हर बार अलग जवाब देते हैं, इसलिए tests flaky हो जाते हैं। Fake एक तय जवाब लौटाता है।"
+exercise:
+  title: "कौन-सा test छूट गया?"
+  setup: "ये function GST निकालता है: def gst(amount: float, rate: float = 0.18) -> float। इसे 2 decimals तक round करना चाहिए और negative amounts मना करने चाहिए।"
+  questions:
+    - q: "आपके पास एक test है: gst(100) == 18.0। कौन-सा ज़रूरी case cover नहीं हुआ?"
+      a: "Negative amount पर error उठना चाहिए, और rounding (जैसे gst(10.555) दो decimals तक) check नहीं हुई है।"
+    - q: "चार लगभग एक जैसे functions के बिना 5%, 12%, 18% और 28% कैसे test करोगे?"
+      a: "एक test @pytest.mark.parametrize के साथ, हर rate के लिए (amount, rate, expected) list करके।"
+    - q: "Invoice module एक currency API call करता है। उसे offline कैसे test करोगे?"
+      a: "एक fake client pass करो, या patch करो, जो तय exchange rate लौटाए, ताकि test तेज़ हो और हर run में एक जैसा रहे।"
+ask:
+  - "बिना tests वाले मौजूदा project में पहले क्या test करूँ?"
+  - "LLM को call करने वाले code को कैसे test करूँ?"
+  - "Test coverage क्या है और क्या 100% पाना सही है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Test** code का एक छोटा टुकड़ा है जो आपके code को आपके चुने input के साथ चलाता है और check करता है कि result वही है जो आप उम्मीद करते हो। **Unit test** एक छोटे हिस्से को, आमतौर पर एक function को, अकेले check करता है। Result गलत हो तो test fail होता है और बताता है कि कहाँ।
+
+Tests आज लिखे जा रहे code से कम, उसके बाद के हर change के लिए ज़्यादा मायने रखते हैं। छह महीने बाद आप या आपका कोई teammate एक function बदलेगा। Tests के बिना ये जानने का एक ही तरीका है कि app में click करके देखो और उम्मीद करो। Tests के साथ, आप एक command चलाते हो और seconds में पता चल जाता है।
+
+**pytest** Python का standard testing tool है। आप ऐसे सादे functions लिखते हो जिनके नाम `test_` से शुरू होते हैं, सादे `assert` statements use करते हो, और pytest उन्हें ढूँढकर चलाता है, और fail होने पर ठीक दिखाता है कि कौन-सी values अलग थीं।
+
+## ये काम कैसे करता है
+
+Test तीन steps में चलता है, जिन्हें अक्सर **arrange, act, assert** कहते हैं: inputs तैयार करो, code को एक बार call करो, result check करो।
+
+```python
+# gst.py
+def gst(amount: float, rate: float = 0.18) -> float:
+    if amount < 0:
+        raise ValueError("amount must not be negative")
+    return round(amount * rate, 2)
+```
+
+```python
+# test_gst.py
+import pytest
+from gst import gst
+
+def test_default_rate_is_18_percent():
+    assert gst(100) == 18.0
+
+def test_rounds_to_two_decimals():
+    assert gst(10.555) == 1.9
+
+def test_negative_amount_is_refused():
+    with pytest.raises(ValueError):
+        gst(-1)
+```
+
+Project folder में `pytest` चलाओ और वो कुछ ऐसा report करेगा: `3 passed in 0.02s`।
+
+वो loop जिसमें आप काम करते हो:
+
+```flow
+dir: LR
+Code लिखो या बदलो -> pytest चलाओ
+pytest चलाओ -[कोई test fail]-> Failure पढ़ो | कौन-सी values अलग थीं
+Failure पढ़ो -> Code लिखो या बदलो
+pytest चलाओ -[सब pass]-> Commit
+```
+
+तीन tools ज़्यादातर असली tests संभाल लेते हैं:
+
+| Tool | क्या करता है | Example use |
+| --- | --- | --- |
+| `@pytest.mark.parametrize` | एक test को कई inputs पर चलाता है | हर GST rate: 5%, 12%, 18%, 28% |
+| `@pytest.fixture` | Shared setup जिसे test नाम लेकर माँगता है | एक sample invoice, एक temporary folder |
+| Fakes और mocks | धीमे या बाहरी हिस्सों की जगह लेते हैं | एक model client जो तय reply लौटाए |
+| `pytest.raises` | Check करता है कि error उठता है | Negative amounts मना हैं |
+| `tmp_path` | हर test के लिए एक नया temporary folder | Files लिखने वाला code |
+
+Tests copy करने की जगह **parametrise** करो:
+
+```python
+@pytest.mark.parametrize("amount, rate, expected", [
+    (100, 0.05, 5.0),
+    (100, 0.12, 12.0),
+    (100, 0.28, 28.0),
+])
+def test_rates(amount, rate, expected):
+    assert gst(amount, rate) == expected
+```
+
+**Fixtures** shared setup रखते हैं:
+
+```python
+@pytest.fixture
+def invoice():
+    return {"items": [("Charger", 999.0), ("Cable", 299.0)], "rate": 0.18}
+
+def test_invoice_total(invoice):
+    assert invoice_total(invoice) == 1531.64
+```
+
+**Fakes** tests को तेज़ और दोहराने लायक रखते हैं। अगर कोई function model client को parameter के रूप में ले (इसे **dependency injection** कहते हैं), तो test एक fake client pass कर सकता है:
+
+```python
+class FakeClient:
+    def complete(self, prompt):
+        return '{"category": "refund"}'
+
+def test_classify_reads_category():
+    assert classify("Money not returned", client=FakeClient()) == "refund"
+```
+
+**पहले क्या test करें।** बिना tests वाले project में वहाँ से शुरू करो जहाँ bug की कीमत सबसे ज़्यादा होगी: पैसों की calculations, वो data जिसे दूसरे systems पढ़ते हैं, और वो code जिसे आप बदलने वाले हो। फिर हर bug के लिए जो आप ठीक करो, एक test जोड़ो। AI projects में दो तरह के tests अलग रखो: आपके अपने parsing, validation और scoring logic के तेज़ unit tests, जो हर commit पर चलते हैं, और असली model पर golden set के साथ धीमे evaluation runs, जो schedule पर चलते हैं। इन्हें मिलाने से रोज़ के tests धीमे और flaky हो जाते हैं।
+
+## एक example से समझो
+
+Sneha, Chennai की एक logistics company में invoice-extraction service संभालती है। एक customer report करता है कि ₹0.50 के rounding फ़र्क वाला invoice reject हो गया। वो बाकी कुछ तोड़े बिना इसे ठीक करना चाहती है।
+
+**पहले, एक failing test।** Code को छूने से पहले, वो एक test लिखती है जो bug को दोहराए: एक invoice जिसकी lines का जोड़ ₹1,180.00 है पर printed total ₹1,180.50 है। Test उम्मीद करता है कि वो accept हो, क्योंकि business ₹1 तक का rounding allow करता है। वो pytest चलाती है: नया test fail होता है, जो साबित करता है कि वो bug को पकड़ रहा है।
+
+**फिर fix।** `validate_total` में check था `lines_total == printed_total`। वो उसे `abs(lines_total - printed_total) <= 1.0` कर देती है। नया test pass हो जाता है।
+
+**फिर edges।** ₹1 की tolerance नए सवाल खड़े करती है, इसलिए वो parametrise करती है: ठीक ₹1 का फ़र्क accept हो, ₹1.01 reject हो, negative फ़र्क को positive जैसा ही माना जाए। एक case fail होता है: उसके check ने floating-point error की वजह से ₹1.01 का फ़र्क accept कर लिया। वो amounts को `Decimal` में बदल देती है, और सारे cases pass हो जाते हैं।
+
+**आखिर में, पूरा suite।** वो सारे 214 tests चलाती है। एक असंबंधित test fail होता है: वो एक forged invoice को reject करने के लिए पुराने exact-match behaviour पर टिका था। वो team से बात करती है, सब मानते हैं कि forgery check को अलग rule use करना चाहिए, और वो दोनों update करती है। Tests के बिना वो forgery check production में चुपचाप काम करना बंद कर देता।
+
+## आम गलतियाँ
+
+- **सिर्फ़ happy path test करना।** Bugs किनारों पर रहते हैं: zero, खाली lists, negatives, बहुत बड़ी values, गायब fields।
+- **एक test जो दस चीज़ें check करे।** Fail होने पर पता नहीं चलता कौन-सी। हर test में एक behaviour, ऐसे नाम के साथ जो बताए क्या।
+- **ऐसे tests जो एक-दूसरे पर या क्रम पर निर्भर हों।** हर test अपनी ज़रूरत का setup खुद करे और अकेले pass हो।
+- **Unit tests में असली network या model calls।** वो धीमे होते हैं, पैसे लगते हैं और tests को flaky बनाते हैं। उन्हें fake करो; असली service को अलग से और कम बार test करो।
+- **Bug ठीक होने के बाद tests लिखना।** Failing test पहले लिखो, ताकि पता हो कि वो सच में bug पकड़ता है।
+- **100% coverage के पीछे भागना।** Coverage दिखाती है कि क्या चला, ये नहीं कि क्या check हुआ। उस behaviour को test करो जो मायने रखता है।
+
+## Practice करो
+
+1. `gst` function copy करो, ऊपर के तीन tests लिखो और pytest चलाओ। फिर function को जानबूझकर तोड़ो और failures देखो।
+2. हर GST slab के लिए एक parametrised test जोड़ो, और rounding के लिए एक।
+3. ऐसा function लिखो जो fake model client को call करे, और उसे fixture के साथ test करो।
+4. Interview में एक मिनट में समझाओ कि बिना tests वाले project में tests कैसे जोड़ोगे।

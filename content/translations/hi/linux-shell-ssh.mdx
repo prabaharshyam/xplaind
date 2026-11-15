@@ -1,0 +1,174 @@
+---
+id: linux-shell-ssh
+lang: hi
+title: "Linux, shell और SSH"
+outcome: "Remote Linux server पर भरोसे से काम करो: घूमना-फिरना, logs पढ़ना, processes और disk देखना, छोटी shell script लिखना और SSH keys से connect करना।"
+answer: "Linux shell से आप server पर commands चला सकते हो: घूमने के लिए ls और cd, logs पढ़ने के लिए tail, processes और disk देखने के लिए ps और df, और सुरक्षित connect करने के लिए keys के साथ ssh।"
+why_it_matters: "Client के systems Linux servers पर चलते हैं, अक्सर ऐसे जिन पर आप tools install नहीं कर सकते। जब शाम 7 बजे AI service जवाब देना बंद कर दे, तो आप SSH करके अंदर जाओगे, logs पढ़ोगे और कारण ढूँढोगे। Shell में सहज होना संकट को दस मिनट के fix में बदल देता है।"
+flashcards:
+  - q: "AI engineers को Linux shell की ज़रूरत क्यों पड़ती है?"
+    a: "जिन servers पर AI system चलता है, उनमें लगभग सब Linux हैं, जिन तक SSH के ज़रिए text shell से पहुँचते हैं, कोई desktop नहीं होता।"
+  - q: "df -h और du -sh क्या दिखाते हैं?"
+    a: "df -h दिखाता है कि हर disk कितनी भरी है; du -sh दिखाता है कि folders कितनी जगह ले रहे हैं। भरी हुई disks रहस्यमयी outages का आम कारण हैं।"
+  - q: "बढ़ते हुए log को कैसे follow करें?"
+    a: "File के लिए tail -f app.log, systemd services के लिए journalctl -u service-name -f, और containers के लिए docker logs -f।"
+  - q: "Shell में pipe क्या करता है?"
+    a: "एक command का output अगले में भेजता है, ताकि छोटे tools मिल सकें, जैसे grep ERROR app.log | sort | uniq -c।"
+  - q: "Environment variable क्या है?"
+    a: "एक नाम वाली setting जो कोई program अपने environment से पढ़ता है, जैसे DATABASE_URL या API key, जिसे export NAME=value से set करते हैं।"
+  - q: "Scripts को set -euo pipefail से क्यों शुरू करें?"
+    a: "ताकि script पहली error, unset variable या pipe के किसी failed step पर रुक जाए, आधा-अधूरा काम करते हुए आगे न बढ़े।"
+  - q: "SSH keys कैसे काम करती हैं?"
+    a: "ssh-keygen एक key pair बनाता है। Server को आपकी public key मिलती है; private key आपकी machine से बाहर कभी नहीं जाती और यही साबित करती है कि आप कौन हो।"
+  - q: "Jump host या bastion क्या है?"
+    a: "वो server जिससे होकर आप private servers तक पहुँचते हो, जैसे ssh -J bastion app-server।"
+exercise:
+  title: "Outage को पढ़ो"
+  setup: "11:40 पर Hyderabad के एक client की document-search API errors लौटाने लगती है। आप SSH करके अंदर जाते हो। systemctl status दिखाता है कि service हर कुछ seconds में restart हो रही है। journalctl हर restart से ठीक पहले 'MemoryError' दिखाता है। free -h दिखाता है कि 8 GB में से 7.8 GB memory भरी है। Memory के हिसाब से sort किया ps aux 'reindex.py' नाम का एक process दिखाता है जो 6.5 GB ले रहा है, जिसे 11:30 पर एक cron job ने शुरू किया। df -h disk को 41% दिखाता है।"
+  questions:
+    - q: "क्या disk problem है?"
+      a: "नहीं। Disk सिर्फ़ 41% भरी है। Errors MemoryError हैं, और memory लगभग भरी है।"
+    - q: "Memory कौन खा रहा है, और उसे किसने शुरू किया?"
+      a: "reindex.py, जो 6.5 GB ले रहा है, जिसे 11:30 पर एक cron job ने शुरू किया, errors शुरू होने से दस मिनट पहले।"
+    - q: "Service को वापस चालू करने का सबसे तेज़ safe fix क्या है?"
+      a: "Reindex job को रोको या pause करो, API service को normal restart होने दो, और confirm करो कि वो जवाब दे रही है।"
+    - q: "दोबारा होने से रोकने के लिए कौन-से दो follow-ups होंगे?"
+      a: "Reindex को शांत समय पर या अलग machine पर चलाओ, या उसकी memory सीमित करो, और लगभग 85% से ऊपर memory use पर alert लगाओ।"
+ask:
+  - "हर AI engineer को कौन-से Linux commands आने चाहिए?"
+  - "SSH keys कैसे set up करूँ?"
+  - "Server की disk क्या भर रहा है, ये कैसे ढूँढूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+आपकी AI application आपके laptop पर चलती है। फिर वो server पर जाती है, और एक शाम client का फ़ोन आता है: "Assistant ने जवाब देना बंद कर दिया।" जिन servers पर आपका AI system चलता है, उनमें लगभग सब **Linux** हैं, और आप उन तक एक text **shell** से पहुँचते हो, आमतौर पर Bash, **SSH** के ज़रिए। कोई desktop नहीं, कोई mouse नहीं और कोई File Explorer नहीं।
+
+आपको Linux का expert होने की ज़रूरत नहीं है। आपको skills का एक छोटा, भरोसेमंद set चाहिए:
+
+| Skill | Commands |
+| --- | --- |
+| घूमना-फिरना और files पढ़ना | `pwd`, `ls -la`, `cd`, `cat`, `less`, `head`, `tail`, `grep` |
+| क्या चल रहा है और वो कितना use कर रहा है | `ps aux`, `top` या `htop`, `df -h`, `du -sh`, `free -h` |
+| Logs को आते हुए पढ़ना | `tail -f`, `journalctl -u name -f`, `docker logs -f` |
+| Settings और scripts | `export`, `env`, `chmod +x`, `set -euo pipefail` |
+| सुरक्षित connect करना | `ssh-keygen`, `ssh`, `~/.ssh/config`, `ssh -J` |
+
+```flow
+dir: LR
+आपका laptop | private key यहीं रहती है -[SSH key]-> Bastion, jump host | आपकी public key check करता है
+Bastion, jump host -[SSH]-> App server | ai-assistant service, logs, disk, memory
+```
+
+इस lesson में हम आपके साथ Pune के एक logistics client के असली outage से गुज़रेंगे: connect करने से, कारण ढूँढने तक, उसे ठीक करने और लिख डालने तक। Lesson के अंत तक आप भरी हुई disk diagnose कर पाओगे और SSH keys से भरोसे के साथ connect कर पाओगे।
+
+## ये काम कैसे करता है
+
+### Navigation और files
+
+`pwd` दिखाता है कि आप कहाँ हो। `ls -la` files की list देता है, hidden वाली भी। `cd` घुमाता है। `cat` छोटी file print करता है; `less` से आप लंबी file scroll कर सकते हो; `head` और `tail` शुरू और अंत दिखाते हैं।
+
+`grep -i "timeout" app.log` case की परवाह किए बिना मेल खाती lines ढूँढता है; `grep -c` उन्हें गिनता है।
+
+**Pipes** (`|`) छोटे tools को जोड़कर ताकतवर बना देते हैं:
+
+```bash
+grep ERROR app.log | sort | uniq -c | sort -rn | head
+```
+
+ये error वाली lines ढूँढता है, एक जैसी को group करता है, हर एक को गिनता है, count से sort करता है और ऊपर के दस दिखाता है: सबसे आम errors एक line में।
+
+### Processes और resources
+
+| सवाल | Command |
+| --- | --- |
+| क्या मेरी service चल रही है? | `ps aux \| grep uvicorn` या `systemctl status ai-assistant` |
+| अभी CPU और memory कौन use कर रहा है? | `top` या `htop` |
+| Disks कितनी भरी हैं? | `df -h` |
+| कौन-से folders बड़े हैं? | `du -sh *` या `sudo du -sh /var/* \| sort -h` |
+| कितनी memory खाली है? | `free -h` |
+
+भरी हुई disk रहस्यमयी outages का आम कारण है: logs, temporary files और model downloads चुपचाप उसे भर देते हैं जब तक service कुछ लिख ही न सके।
+
+### Logs
+
+- `tail -f app.log` बढ़ते हुए log file को follow करता है।
+- **systemd** से चलने वाली services journal में log करती हैं: `journalctl -u ai-assistant --since "1 hour ago"`।
+- Containers: `docker logs -f container-name`।
+
+### Environment variables
+
+Programs `DATABASE_URL` और API keys जैसी settings **environment** से पढ़ते हैं। `export NAME=value` आपके session के लिए एक set करता है; `env` उनकी list देता है। Secrets को environment या secret manager में रखो, कभी code या shell history में नहीं।
+
+### Scripts
+
+Shell script commands की एक file है। हर script को इससे शुरू करो:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+```
+
+`set -euo pipefail` script को पहले failed command पर, किसी भी unset variable पर और pipe के किसी भी failed step पर रुकवा देता है, आधा-अधूरा काम करते हुए आगे बढ़ने की जगह। `chmod +x script.sh` से इसे executable बनाओ।
+
+### SSH और keys
+
+1. `ssh-keygen -t ed25519` आपकी machine पर एक key pair बनाता है।
+2. आप server को अपनी **public** key देते हो। **Private** key आपकी machine से बाहर कभी नहीं जाती।
+3. `ssh deploy@10.0.4.12` आपको बिना password के login करा देता है।
+
+`~/.ssh/config` में एक entry servers को छोटे नाम दे देती है। कई companies SSH को **jump host** या **bastion** से गुज़ारती हैं: `ssh -J bastion app-server` उसके ज़रिए hop करता है।
+
+### Permissions
+
+हर file की owner, group और बाकी सबके लिए permissions होती हैं: read, write और execute। Private key को `chmod 600` चाहिए, वरना SSH उसे use करने से मना कर देता है। `sudo` सिर्फ़ उन अकेले commands के लिए use करो जिन्हें उसकी ज़रूरत है, और `rm -rf` के बाद Enter दबाने से पहले दो बार सोचो।
+
+## एक example से समझो
+
+Pune का एक logistics client बताता है कि उनका delivery-query assistant 19:05 पर जवाब देना बंद कर गया। आप उनके bastion से होकर connect करते हो:
+
+```bash
+ssh -J bastion.client.in deploy@assistant-01
+systemctl status ai-assistant        # active, but restarting every 30 seconds
+journalctl -u ai-assistant --since "19:00" | tail -50
+```
+
+Log में `OSError: [Errno 28] No space left on device` दिखता है। आप disk check करते हो:
+
+```bash
+df -h /                                # 100% used
+sudo du -sh /var/* | sort -h | tail -3
+```
+
+`/var/log/ai-assistant` में 38 GB है। दो हफ़्ते पहले एक test के बाद debug logging चालू छोड़ दी गई थी, और logs कभी rotate नहीं हुए।
+
+| समय | Step | क्या मिला |
+| --- | --- | --- |
+| 19:08 | `systemctl status` | Service हर 30 seconds में restart हो रही है |
+| 19:09 | `journalctl` | "No space left on device" |
+| 19:10 | `df -h` | Disk 100% भरी |
+| 19:11 | `du -sh` | 38 GB debug logs |
+| 19:15 | पुराने logs compress करके हटाओ, level को INFO करो, logrotate rule जोड़ो, restart करो | Disk 34% पर |
+| 19:20 | एक query test करो | Assistant फिर जवाब दे रहा है |
+
+अपने incident note में आप कारण, fix और दो follow-ups लिखते हो: 80% पर disk-space alert, और CI में एक check कि production में log level DEBUG न हो।
+
+## आम गलतियाँ
+
+- **आदत से root के रूप में काम करना।** गलतियाँ आफ़त बन जाती हैं। Normal user और अकेले commands के लिए `sudo` use करो।
+- **Secrets को command line पर paste करना।** वो shell history में चले जाते हैं। Restricted permissions वाली environment files या client का secret manager use करो।
+- **Production को हाथ से edit करना और किसी को बताना नहीं।** अगला deploy आपका fix मिटा देगा। Change को code या config में डालो और लिख दो।
+- **`set -euo pipefail` के बिना scripts।** Failed step पर किसी का ध्यान नहीं जाता और बाद के steps data बिगाड़ देते हैं।
+- **Private keys share करना।** हर इंसान और हर machine की अपनी key हो, ताकि access साफ़-सुथरे ढंग से हटाया जा सके।
+- **जगह बनाने के लिए वो files delete करना जो समझ नहीं आतीं।** पहले ढूँढो कि क्या बड़ा है और क्यों।
+
+## Practice करो
+
+नीचे link किए Missing Semester के shell और command-line environment वाले lectures देखो या पढ़ो।
+
+1. **Top errors।** किसी भी Linux machine पर, जैसे free cloud VM, Windows पर WSL या Docker container, कुछ ERROR lines वाला 500 lines का नकली log बनाओ, और एक pipeline से सबसे ऊपर के तीन error messages list करो।
+2. **Keys।** एक SSH key बनाओ, उसे किसी server या GitHub में जोड़ो, और बिना password के connect करो।
+3. **एक script।** `set -euo pipefail` वाली script लिखो जो disk usage check करे और 80% से ऊपर warning print करे।
+
+**आपका काम पूरा जब:** आप ढूँढ सको कि कौन-सा process या folder disk भर रहा है, और समझा सको कि private key आपकी machine से बाहर क्यों नहीं जाती।

@@ -1,0 +1,218 @@
+---
+id: pandas-tables
+lang: hi
+title: "pandas से tables संभालना"
+outcome: "CSV को pandas में load करो, फिर data को select, filter, group और sort करो।"
+answer: "pandas CSV जैसी tables को DataFrame में load करता है, जहाँ आप कुछ ही lines की Python में columns चुनते हो, rows filter करते हो, group करके summary निकालते हो और data sort करते हो।"
+why_it_matters: "ज़्यादातर AI projects का आधा काम data का होता है: dataset साफ़ करना, results check करना, test set बनाना। लगभग हर team इसके लिए pandas ही use करती है।"
+flashcards:
+  - q: "DataFrame क्या है?"
+    a: "pandas का table object: rows और नाम वाले columns, जैसे एक spreadsheet जिसे आप code से control करते हो।"
+  - q: "head, info और describe क्या दिखाते हैं?"
+    a: "head पहली rows दिखाता है, info columns, types और missing values दिखाता है, और describe number columns के quick statistics देता है।"
+  - q: "दो conditions पर rows कैसे filter करें?"
+    a: "हर condition के चारों ओर brackets के साथ & या | use करो, जैसे df[(df['city'] == 'Pune') & (df['sales'] > 5000)]।"
+  - q: "NaN क्या है?"
+    a: "'Not a number': pandas missing या न पढ़ी जा सकने वाली value को ऐसे mark करता है। इन्हें df.isna().sum() से ढूँढो।"
+  - q: "Sales column का sum क्यों fail हो सकता है?"
+    a: "वो text की तरह पढ़ा गया था, जैसे '1,250' जैसे commas की वजह से। Commas हटाओ और pd.to_numeric से convert करो।"
+  - q: "groupby क्या करता है?"
+    a: "Rows को एक या ज़्यादा columns के हिसाब से groups में बाँटता है, फिर हर group का summary निकालता है, जैसे हर city की total sales।"
+  - q: "Left merge क्या रखता है?"
+    a: "Left table की हर row, उसमें right से मिलते-जुलते columns जोड़ता है, और जहाँ match नहीं मिलता वहाँ खाली छोड़ता है।"
+  - q: "05/11/2026 जैसी भारतीय dates कैसे पढ़ें?"
+    a: "dayfirst=True या साफ़ format के साथ, ताकि इसका मतलब 5 November हो, 11 May नहीं।"
+exercise:
+  title: "Owner के सवालों के जवाब दो"
+  setup: "Kolkata में चार bakeries की एक chain, October की sales को sales.csv में export करती है, जिसमें columns हैं: date (जैसे 05/10/2026), store, item, category, qty और amount (text जैसे '1,250')। Owner पूछता है: (1) हर store की total sales, (2) 'Cakes' category में amount के हिसाब से top 3 items, (3) कितनी rows में amount पढ़ा नहीं जा सकता, (4) Park Street store के रोज़ के totals।"
+  questions:
+    - q: "कोई भी total निकालने से पहले amount column का क्या करना होगा?"
+      a: "df['amount'] = pd.to_numeric(df['amount'].str.replace(',', ''), errors='coerce'), ताकि text numbers बन जाए और खराब values NaN हो जाएँ।"
+    - q: "सवाल (1) के लिए code लिखो।"
+      a: "df.groupby('store')['amount'].sum().sort_values(ascending=False)"
+    - q: "सवाल (3) के लिए code लिखो।"
+      a: "df['amount'].isna().sum(), errors='coerce' के साथ convert करने के बाद।"
+    - q: "सवाल (4) के लिए date column का क्या करना होगा?"
+      a: "उसे pd.to_datetime(df['date'], dayfirst=True) से convert करो, Park Street तक filter करो, फिर date से group करके amount का sum लो।"
+ask:
+  - "pandas से गंदी CSV कैसे साफ़ करूँ?"
+  - "merge और concat में क्या फ़र्क है?"
+  - "pandas में महीने के हिसाब से group कैसे करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Business का ज़्यादातर data tables में रहता है: sales exports, customer lists, attendance sheets, survey results। **pandas** Python की वो library है जो tables के साथ काम करती है। इसका मुख्य object, **DataFrame**, rows और नाम वाले columns रखता है, जैसे एक spreadsheet जिसे आप code से control करते हो।
+
+**DataFrame: df।** Columns के नाम होते हैं; rows का एक index होता है।
+
+| index | date | store | item | amount |
+|---|---|---|---|---|
+| 0 | 2026-10-01 | RS Puram | Glucometer | 1250.0 |
+| 1 | 2026-10-01 | Gandhipuram | Paracetamol | 40.0 |
+| 2 | 2026-10-02 | RS Puram | Insulin pen | 2100.0 |
+
+कुछ lines में आप CSV या Excel file load कर सकते हो, उसे साफ़ कर सकते हो, rows filter कर सकते हो, group करके summary निकाल सकते हो, tables जोड़ सकते हो और result save कर सकते हो। Spreadsheet से फ़र्क ये है कि steps लिखे हुए होते हैं, इसलिए अगले महीने का report एक command है, पूरा दिन clicking नहीं।
+
+AI के काम में pandas से ही आप training data तैयार करते हो, model outputs देखते हो और evaluation reports बनाते हो।
+
+इस lesson में हम Lakshmi के साथ चलेंगे, जो Coimbatore में पाँच pharmacies संभालती हैं, और महीने के 40,000 rows वाले export को seconds में जवाबों में बदलती हैं। अंत तक आप एक गंदी CSV load करके साफ़ कर पाओगे और एक grouped summary बना पाओगे जिसे दोबारा चलाया जा सके।
+
+## ये काम कैसे करता है
+
+### Load करो और देखो
+
+```python
+import pandas as pd
+
+df = pd.read_csv("sales.csv")
+df.head()           # first five rows
+df.info()           # columns, types, missing values
+df.describe()       # quick statistics for number columns
+```
+
+Calculate करने से पहले हमेशा देख लो। `info()` बता देता है कि जो column आप numbers समझ रहे थे वो कहीं text की तरह तो नहीं पढ़ा गया।
+
+### Columns चुनो और rows filter करो
+
+```python
+df["city"]                                        # one column
+df[["city", "sales"]]                             # several columns
+df[df["age"] > 30]                                # rows where age is above 30
+df[(df["city"] == "Pune") & (df["sales"] > 5000)] # two conditions
+```
+
+"और" के लिए `&` और "या" के लिए `|` use करो, हर condition के चारों ओर brackets के साथ। यहाँ सीधे `and` और `or` काम नहीं करते।
+
+### Missing values
+
+खाली या न पढ़े जा सकने वाले cells **NaN** ("not a number") की तरह दिखते हैं। उन्हें `df.isna().sum()` से ढूँढो। फिर सोच-समझकर तय करो: `fillna` से भरो, `dropna` से वो rows हटा दो, या किसी के check करने के लिए flag कर दो।
+
+### Types ठीक करो
+
+| Problem | Fix |
+| --- | --- |
+| "1,250" जैसे amounts text की तरह पढ़े गए | `pd.to_numeric(df["amount"].str.replace(",", ""), errors="coerce")` |
+| 05/11/2026 जैसी dates | `pd.to_datetime(df["date"], dayfirst=True)` |
+| Item codes के आगे के zeros गायब | `pd.read_csv(..., dtype={"item_code": str})` |
+
+`errors="coerce"` जो भी पढ़ा न जा सके उसे crash होने की जगह NaN बना देता है, ताकि आप खराब rows गिन और report कर सको।
+
+### नए columns
+
+```python
+df["gst"] = df["sales"] * 0.18
+df["month"] = pd.to_datetime(df["date"], dayfirst=True).dt.month
+```
+
+### Group करो और summary निकालो
+
+```python
+df.groupby("city")["sales"].sum()                                # total per city
+df.groupby(["city", "month"])["sales"].agg(["sum", "mean", "count"])
+```
+
+```flow
+सारी rows -[city से बाँटो]-> Pune की rows
+सारी rows -[city से बाँटो]-> Nagpur की rows
+सारी rows -[city से बाँटो]-> Nashik की rows
+Pune की rows -[sum()]-> Pune: 4.2 लाख
+Nagpur की rows -[sum()]-> Nagpur: 3.1 लाख
+Nashik की rows -[sum()]-> Nashik: 2.7 लाख
+```
+
+### Sort करो और save करो
+
+```python
+df.sort_values("sales", ascending=False).head(10)
+df.to_csv("clean_sales.csv", index=False)
+```
+
+### Pivot tables से reshape करो
+
+Spreadsheet वाले pivot tables पसंद करते हैं, और pandas में भी ये हैं:
+
+```python
+df.pivot_table(index="store", columns="month", values="amount", aggfunc="sum")
+```
+
+इससे हर store की एक row और हर महीने का एक column मिलता है, हर cell में total के साथ। किसी manager को trend दिखाने का ये अक्सर सबसे साफ़ तरीका होता है। Row और column totals के लिए `margins=True` जोड़ो।
+
+### Dates के साथ काम करो
+
+जब कोई column असली date बन जाता है, तो pandas उसके साथ बहुत कुछ कर सकता है:
+
+```python
+df["date"] = pd.to_datetime(df["date"], dayfirst=True)
+df["weekday"] = df["date"].dt.day_name()             # Monday, Tuesday...
+weekly = df.set_index("date").resample("W")["amount"].sum()
+```
+
+`resample("W")` sales को हफ़्ते-दर-हफ़्ते जोड़ता है; calendar months के लिए `"MS"` use करो। इसी से पता चलता है कि Sunday की sales हमेशा कम रहती है, या Diwali से पहले वाला हफ़्ता साल का सबसे ऊँचा होता है।
+
+### Tables जोड़ो
+
+```python
+pd.merge(orders, customers, on="customer_id", how="left")
+```
+
+| `how=` | क्या रखता है |
+| --- | --- |
+| `"inner"` | सिर्फ़ वो rows जो दोनों tables में मिलती हैं |
+| `"left"` | Left table की हर row, जहाँ match नहीं वहाँ खाली |
+| `"outer"` | दोनों tables की हर row |
+
+Inner joins चुपचाप rows गिरा सकते हैं। Merge से पहले और बाद में rows की गिनती check करो।
+
+## एक example से समझो
+
+Lakshmi Coimbatore में पाँच pharmacies की एक chain संभालती हैं। हर महीने उन्हें लगभग 40,000 rows का sales export मिलता है, और वो उसका summary spreadsheet में बनाने में पूरा दिन लगाती थीं।
+
+```python
+df = pd.read_csv("sales_oct.csv")
+df["amount"] = pd.to_numeric(df["amount"].str.replace(",", ""), errors="coerce")
+print(df["amount"].isna().sum(), "rows with unreadable amounts")
+
+by_store = df.groupby("store")["amount"].sum().sort_values(ascending=False)
+print(by_store)
+
+top_items = (df[df["category"] == "Diabetes care"]
+             .groupby("item")["amount"].sum()
+             .sort_values(ascending=False).head(5))
+print(top_items)
+```
+
+**उन्हें क्या पता चलता है:**
+
+| सवाल | जवाब |
+| --- | --- |
+| जिन rows में amount पढ़ा नहीं जा सकता | 37, सब "NA", एक till की गड़बड़ी से; उस store को report किया |
+| सबसे ज़्यादा बिक्री वाला store | RS Puram |
+| RS Puram में diabetes-care की sales बाकियों के मुकाबले | लगभग 40% ज़्यादा |
+| Diabetes-care का top item | Glucometer strips |
+
+40% के इस फ़र्क से वो diabetes-care products का stock stores के बीच इधर-उधर करती हैं, ताकि बाकी branches में चीज़ें ख़त्म होना बंद हो और RS Puram में ज़रूरत से ज़्यादा stock न रहे। जिस analysis में उनका पूरा दिन लगता था, वो अब हर महीने seconds में चलता है, और steps code में हैं इसलिए November का report वही script है, बस file का नया नाम।
+
+### अपना काम check करो
+
+किसी को भी numbers भेजने से पहले उन्हें check करो। Grand total को source system के total से मिलाओ। हर filter और merge से पहले और बाद में rows गिनो, और जो भी बदलाव हो उसे समझाओ। सबसे बड़ी पाँच और सबसे छोटी पाँच values में गलतियाँ ढूँढो, जैसे कोई price रुपये की जगह paise में भरी हुई। और कोई एक number हाथ से दोबारा निकालो। इन checks में कुछ मिनट लगते हैं, और ये आपको गलत report owner तक पहुँचने की शर्मिंदगी से बचाते हैं।
+
+## आम गलतियाँ
+
+- **Types check न करना।** Commas की वजह से text की तरह पढ़े गए numbers का sum नहीं हो सकता। उन्हें convert करो।
+- **Missing values को ignore करना।** तय करो कि भरना है, हटाना है या flag करना है, और बताओ कि क्या किया।
+- **Dates का गलत order।** भारतीय dates में पहले दिन आता है; `dayfirst=True` या साफ़ format use करो।
+- **Filters में `&` की जगह `and` use करना।** Brackets के साथ `&` और `|` use करो।
+- **Inner joins जो चुपचाप rows गिरा देते हैं।** Merge से पहले और बाद में rows की गिनती check करो।
+- **Original file को edit करना।** साफ़ किया हुआ data नई file में save करो और raw export को वैसा ही रहने दो।
+
+## Practice करो
+
+नीचे link किया Kaggle का free pandas course पूरा करो।
+
+1. **साफ़ करो।** कोई public CSV load करो, जैसे भारत सरकार की कोई open data file, types और missing values check करो, और दो problems ठीक करो।
+2. **Group करो।** `groupby` से तीन सवालों के जवाब निकालो, जैसे state के हिसाब से totals, top पाँच categories और महीने का trend।
+3. **Merge करो।** इसे किसी दूसरी table से merge करो और confirm करो कि rows की गिनती वही है जो आप सोच रहे थे।
+
+**आपका काम पूरा जब:** आप एक गंदी CSV load करके साफ़ कर सको, और ऐसे code से grouped summary बना सको जिसे आप अगले महीने दोबारा चला सको।

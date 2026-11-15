@@ -1,0 +1,177 @@
+---
+id: git-with-a-team
+lang: hi
+title: "Team के साथ Git"
+outcome: "Shared repository पर वैसे काम करो जैसे teams करती हैं: branches, छोटे commits, pull requests, reviews और merge conflict सुलझाना।"
+answer: "Teams Git ऐसे use करती हैं: branches पर काम करना, छोटे commits बनाना, review के लिए pull requests खोलना और main branch में merge करने से पहले merge conflicts सुलझाना।"
+why_it_matters: "Client के यहाँ आप उनकी repository में, उनके नियमों के तहत, उनके engineers की नज़र में commit करते हो। साफ़ branches और पढ़ने लायक pull requests दिखाते हैं कि आपके साथ काम करना safe है। उनकी main branch पर force-push engagement ख़त्म करवा सकता है।"
+flashcards:
+  - q: "Shared code बदलने के लिए Git की team routine क्या है?"
+    a: "Branch बनाओ, छोटे commits करो, push करके pull request खोलो, review और passing checks पाओ, जो flag हो उसे ठीक करो, फिर merge करो।"
+  - q: "Branch क्या है?"
+    a: "किसी commit की तरफ़ इशारा करने वाला सस्ता label, जिससे आप shared main branch को छुए बिना एक change पर काम करते हो।"
+  - q: "अच्छा commit message कैसा होता है?"
+    a: "वो एक line में बताता है कि क्या बदला और क्यों, अक्सर ticket id के साथ, जैसे 'MD-214: retry market data calls on 429 and 503'।"
+  - q: "Pull request के description में क्या होना चाहिए?"
+    a: "क्या बदला, क्यों बदला, कैसे test किया, और कोई risky बात, साथ में ticket का link और दिखने वाले changes के लिए screenshots।"
+  - q: "Pull requests छोटे क्यों रखें?"
+    a: "Reviewers छोटे changes ध्यान से पढ़ते हैं। बहुत बड़े वाले बस सरसरी नज़र से देखे जाते हैं, और bugs निकल जाते हैं।"
+  - q: "Merge conflict क्या है?"
+    a: "जब दो branches एक ही lines बदलती हैं, तो Git नतीजा नहीं चुन पाता और file में दोनों versions पर निशान लगा देता है ताकि कोई इंसान तय करे।"
+  - q: "Merge conflict कैसे सुलझाएँ?"
+    a: "दोनों तरफ़ का इस्तेमाल करके file को सही final version में edit करो, conflict markers हटाओ, tests चलाओ, फिर add और commit करो।"
+  - q: "Shared branch को force-push कभी क्यों नहीं करते?"
+    a: "ये वो history दोबारा लिख देता है जो teammates के पास पहले से है, जिससे उनका काम खो सकता है और उनकी copies टूट सकती हैं।"
+exercise:
+  title: "ये conflict सुलझाओ"
+  setup: "आपने और Priya ने Kochi के एक logistics client के project में config.py बदली। आपकी branch ने retry setting 'RETRIES = 3' से 'RETRIES = 5' की। Priya का change, जो पहले ही main में merge हो चुका है, उसी line का नाम बदलकर 'MAX_RETRIES = 3' कर गया और उसके हर use को update कर गया। जब आप main को अपनी branch में merge करते हो, तो Git conflict markers दिखाता है जिसमें HEAD में 'RETRIES = 5' है और main में 'MAX_RETRIES = 3'।"
+  questions:
+    - q: "कौन-सा side आपका काम है और कौन-सा Priya का?"
+      a: "HEAD आपकी branch है, जिसमें RETRIES = 5 है। main वाला side Priya का merge हुआ change है, जिसमें MAX_RETRIES = 3 है।"
+    - q: "Final line क्या होनी चाहिए?"
+      a: "MAX_RETRIES = 5। उसका नया नाम रखो, जो अब बाकी सब जगह use हो रहा है, और अपनी नई value।"
+    - q: "अगर आप बस अपना side रख लेते तो क्या गलत होता?"
+      a: "Code RETRIES define करता जबकि बाकी सब MAX_RETRIES use कर रहा है, तो वो टूट जाता या चुपचाप गलत value use करता। उसका rename भी undo हो जाता।"
+    - q: "File edit करने के बाद आपको क्या करना है?"
+      a: "Conflict markers हटाओ, tests चलाओ, फिर git add config.py करो, merge को commit करो और push करो।"
+ask:
+  - "Merge और rebase में क्या फ़र्क है?"
+  - "अच्छी pull request कैसे लिखूँ?"
+  - "अगर मैंने Git में secret commit कर दिया तो क्या करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Git किसी codebase के हर change को रिकॉर्ड करता है। अकेले आप ज़्यादातर commit और push करते हो। Team में **main** branch shared होती है और उसे हमेशा चालू रहना चाहिए, क्योंकि दूसरे लोग, और अक्सर एक live product, उस पर निर्भर होते हैं। इसलिए teams एक routine follow करती हैं:
+
+```flow
+dir: LR
+main | हमेशा चालू -> आपकी branch | छोटे commits
+आपकी branch -[push]-> Pull request | review और automated checks
+Pull request -> Teammates comment करते हैं, आप ठीक करते हो -> Pull request
+Pull request -[merge]-> main, updated
+```
+
+1. काम के एक हिस्से के लिए **branch** बनाओ।
+2. साफ़ messages के साथ छोटे **commits** करो।
+3. Push करो और **pull request** (PR) खोलो।
+4. Teammates **review** करते हैं; automated checks चलते हैं।
+5. जो flag हो उसे ठीक करो, फिर **merge** करो।
+
+जब दो लोग एक ही lines बदलते हैं, तो Git **merge conflict** उठाता है, और नतीजा कोई इंसान तय करता है।
+
+इस lesson में हम आपके साथ चलेंगे, Mumbai की एक brokerage के project के तीसरे हफ़्ते में, जब आप एक market-data client में retries जोड़ते हो, review करवाते हो और एक teammate के change से conflict सुलझाते हो। Lesson के अंत तक आप हर step में सहज हो जाओगे।
+
+## ये काम कैसे करता है
+
+### Branches
+
+Branches किसी commit की तरफ़ इशारा करने वाले सस्ते labels हैं। `git switch -c fix/gst-rounding` एक बनाता है और आपको उस पर ले जाता है। Branches के नाम इस हिसाब से रखो कि वो क्या करती हैं:
+
+| Prefix | किसके लिए | Example |
+| --- | --- | --- |
+| `feat/` | नया feature | `feat/retry-market-data` |
+| `fix/` | Bug fix | `fix/gst-rounding` |
+| `docs/` | Documentation | `docs/setup-guide` |
+| `chore/` | Tooling, dependencies | `chore/update-pandas` |
+
+अपनी पहली branch से पहले client की naming convention देख लो।
+
+### Commits
+
+हर commit एक काम करे और बताए कि क्यों:
+
+| कमज़ोर | मज़बूत |
+| --- | --- |
+| "fix" | "Fix GST rounding to two decimals for invoices over ₹1 lakh" |
+| "wip" | "Add retry wrapper for market data client (no callers yet)" |
+| "changes" | "MD-214: retry market data calls with backoff on 429 and 503" |
+
+कई teams messages के आगे ticket id लगाती हैं। छह महीने बाद, साफ़ history से ही कोई भी, आप भी, समझ पाता है कि code ऐसा क्यों दिखता है।
+
+### Pull requests
+
+PR में वो context होता है जो reviewer को चाहिए:
+
+- **क्या** बदला और **क्यों**।
+- आपने इसे **कैसे test किया**।
+- **कोई risky बात**: performance, security, behaviour में बदलाव।
+- Ticket का link, और जो कुछ दिखता है उसके लिए screenshots।
+
+PRs छोटे रखो। 200 lines की PR को ध्यान से review मिलता है; 3,000 lines वाली पर बस मुहर लग जाती है और bugs छिप जाते हैं।
+
+### Review दोनों तरफ़ चलता है
+
+जब आप **review कर रहे हो**, तो style से पहले behaviour और risk देखो: क्या ये सही काम करता है, क्या टूट सकता है, क्या test हुआ है? जब **आपका review हो रहा हो**, तो हर comment का जवाब दो, या तो code बदलकर या ये समझाकर कि क्यों नहीं, और इसे कभी personally मत लो। Review code के बारे में है, आपके बारे में नहीं।
+
+### ताज़ा रहना और conflicts सुलझाना
+
+जब तक आपकी PR इंतज़ार करती है, main आगे बढ़ जाता है। नए main को अपनी branch में `git merge main` से लाओ, या अगर team rebase पसंद करती है तो `git rebase main` से। अगर दोनों तरफ़ वही lines बदली हैं, तो Git file में conflict पर निशान लगा देता है:
+
+```text
+<<<<<<< HEAD
+TAX_RATE = 0.18
+=======
+TAX_RATE = Decimal("0.18")
+>>>>>>> main
+```
+
+ऊपर वाला हिस्सा आपकी branch का है; नीचे वाला main का। (Rebase के दौरान sides उलट जाते हैं: HEAD main है और नीचे वाला आपका commit।) आप file को सही **final** version में edit करते हो, जो अक्सर दोनों को मिलाता है, markers हटाते हो, tests चलाते हो, फिर `git add` और commit करते हो।
+
+### Protected branches और history
+
+Clients अक्सर main को **protect** करते हैं: सीधे push नहीं, review और passing checks ज़रूरी। इसे कभी बायपास मत करो। और जिस branch को कोई और use कर रहा हो, उसे कभी **force-push** मत करो: ये उनके पैरों तले history दोबारा लिख देता है और उनका काम खो सकता है।
+
+### Secrets
+
+Git में commit हुई API key file delete करने के बाद भी history में रहती है। Secrets को environment variables में रखो, secret files को `.gitignore` में डालो, और अगर कभी कोई key leak हो जाए तो उसे **तुरंत rotate** करो, फिर सफ़ाई करो।
+
+## एक example से समझो
+
+आप Mumbai की एक brokerage के साथ project के तीसरे हफ़्ते में हो। आपका ticket, MD-214: market-data client में retries जोड़ना, जो market खुलते वक़्त कभी-कभी rate-limited हो जाता है।
+
+```text
+git switch main && git pull
+git switch -c feat/retry-market-data
+# edit, test
+git add src/marketdata/client.py tests/test_client.py
+git commit -m "MD-214: retry market data calls with backoff on 429 and 503"
+git push -u origin feat/retry-market-data
+```
+
+**PR।** आपके description में लिखा है कि क्या बदला, कि आपने एक fake server से test किया जो दो बार 429 लौटाता है, और एक risk flag किया है: सबसे बुरी हालत में retries मिलाकर 7 seconds जोड़ देते हैं, और dashboard 10 seconds पर time out होता है।
+
+**Review।** Reviewer Farhan कहता है कि कुल retry time 3 seconds पर cap कर दो। आप बदल देते हो, cap के लिए एक test जोड़ते हो, "Done, capped at 3s total, test added" लिखकर जवाब देते हो, और push करते हो।
+
+**Conflict।** इस बीच Priya ने उसी client में एक change merge किया जिसने configurable timeout जोड़ा। अब आपकी branch conflict कर रही है। आप main को merge करते हो, दोनों तरफ़ पढ़ते हो, उसका नया timeout setting **और** अपना retry wrapper दोनों रखते हो, tests चलाते हो, और push करते हो।
+
+| Step | Command या action | नतीजा |
+| --- | --- | --- |
+| शुरुआत | `git switch -c feat/retry-market-data` | आपकी अपनी branch |
+| काम save करना | `git commit -m "MD-214: ..."` | एक साफ़ commit |
+| Share करना | `git push -u origin ...` और PR खोलना | Review और checks शुरू |
+| Review का fix | Retries को 3 s पर cap करने वाला नया commit | Farhan का comment सुलझा |
+| Conflict | `git merge main`, edit, test, commit | दोनों changes रखे गए |
+| ख़त्म करना | Checks green, approval, merge, branch delete | main में आपका feature है |
+
+Checks green हो जाते हैं, Farhan approve करता है, आप merge करते हो और branch delete कर देते हो।
+
+## आम गलतियाँ
+
+- **विशाल pull requests।** काम बाँटो; लंबे diffs में reviewers bugs चूक जाते हैं।
+- **"wip" और "changes" जैसे commit messages।** बाद में कोई नहीं जानेगा कि क्यों।
+- **Secrets commit करना।** Environment variables और `.gitignore` use करो; leak हुई हर key तुरंत rotate करो।
+- **Conflicts आँख बंद करके सुलझाना।** हर conflict में "mine" चुनने से teammate का fix गिर जाता है। दोनों तरफ़ पढ़ो।
+- **Shared branches को force-push करना।** History सिर्फ़ उन branches पर दोबारा लिखो जिन्हें कोई और use नहीं करता।
+- **Branch को हफ़्तों पुरानी होने देना।** main को नियमित रूप से merge करते रहो ताकि conflicts छोटे रहें।
+
+## Practice करो
+
+नीचे link किया GitHub flow पढ़ो, और Pro Git का basic branching और merging वाला chapter भी।
+
+1. **एक असली PR।** अपनी किसी repository में branch बनाओ, दो छोटे commits करो और ठीक description के साथ pull request खोलो।
+2. **एक conflict।** जानबूझकर बनाओ: main पर और अपनी branch पर एक ही line बदलो, फिर merge करके उसे सुलझाओ।
+3. **Review।** किसी दोस्त की PR, या किसी open-source की, review करो और दो काम के comments छोड़ो।
+
+**आपका काम पूरा जब:** आप बिना डरे merge conflict सुलझा सको और ऐसा PR description लिख सको जिसे कोई अजनबी review कर सके।

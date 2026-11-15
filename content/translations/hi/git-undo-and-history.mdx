@@ -1,0 +1,127 @@
+---
+id: git-undo-and-history
+lang: hi
+title: "Git में चीज़ें undo करना: restore, reset, revert और reflog"
+outcome: "किसी भी stage पर change undo कर पाओगे, बिना save किए edit से लेकर push हो चुके commit तक, reset और revert में से सही चुन पाओगे, और reflog से खोया हुआ काम वापस पा सकोगे।"
+answer: "बिना commit किए edits के लिए restore, अपने unpushed commits के लिए reset, push हो चुके commits के लिए revert, और जो काम खो गया लगे उसे ढूँढने के लिए reflog use करो।"
+why_it_matters: "देर-सबेर हर कोई गलत चीज़ commit कर देता है। हर situation का safe undo पता हो, तो आप उसे एक मिनट में ठीक कर लेते हो, main तोड़े बिना और दिन भर का काम खोए बिना।"
+flashcards:
+  - q: "जो edit stage नहीं किया, उसे कैसे फेंकें?"
+    a: "git restore file.py। File अपने आखिरी committed version पर लौट जाती है। Edit हमेशा के लिए चला जाता है।"
+  - q: "File को unstage करना है पर edits रखने हैं, कैसे?"
+    a: "git restore --staged file.py।"
+  - q: "reset --soft, --mixed और --hard आपके changes के साथ क्या करते हैं?"
+    a: "तीनों branch को पीछे ले जाते हैं। Soft changes को staged रखता है, mixed (default) unstaged रखता है, hard उन्हें delete कर देता है।"
+  - q: "main पर reset की जगह revert क्यों use करें?"
+    a: "Revert एक नया commit जोड़ता है जो पुराने को undo करता है, इसलिए history सिर्फ़ बढ़ती है और teammates की copies मेल खाती रहती हैं। Reset history को दोबारा लिख देता है।"
+  - q: "अपने आखिरी, unpushed commit का message ठीक करना हो या कोई file भूल गए हों, तो?"
+    a: "Fix को stage करो और git commit --amend चलाओ। ये आखिरी commit को बदल देता है। जिस commit को shared branch पर push कर चुके हो, उसे कभी amend मत करो।"
+  - q: "Reflog क्या है?"
+    a: "एक local log जो बताता है कि आपकी branch की नोक कहाँ-कहाँ रही है। इससे आप गलत हुए reset या rebase के बाद commits ढूँढकर वापस ला सकते हो।"
+exercise:
+  title: "सही undo चुनो"
+  setup: "हर situation के लिए बताओ कि आप कौन-सा command use करोगे और वो safe क्यों है।"
+  questions:
+    - q: "आपने utils.py edit की, उसे stage नहीं किया, और original वापस चाहिए।"
+      a: "git restore utils.py। कुछ commit नहीं हुआ था, इसलिए बाकी कुछ प्रभावित नहीं होता।"
+    - q: "आपके आखिरी commit में, जो push नहीं हुआ, एक secret वाली .env file चली गई।"
+      a: "git reset --soft HEAD~1, .env हटाओ, उसे .gitignore में डालो, फिर दोबारा commit करो। चूँकि वो कभी push नहीं हुआ, उसे दोबारा लिखना safe है। शक हो तो secret फिर भी rotate कर दो।"
+    - q: "कल main में merge हुए एक commit ने checkout तोड़ दिया। बाकी लोग उसे pull कर चुके हैं।"
+      a: "git revert <commit>, फिर push करो। ये एक नए commit से change को undo करता है, shared history को दोबारा लिखे बिना।"
+    - q: "आपने git reset --hard HEAD~3 चला दिया और जो तीन commits चाहिए थे वो खो गए।"
+      a: "git reflog से reset से पहले वाला commit id ढूँढो, फिर git reset --hard <वो id> या git branch rescue <वो id> चलाओ।"
+ask:
+  - "मैंने GitHub पर secret push कर दिया। क्या revert काफ़ी है?"
+  - "Merge commit को undo कैसे करूँ?"
+  - "restore और checkout में क्या फ़र्क है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Git आपका काम तीन जगह रखता है, और हर जगह का अपना undo है:
+
+- **Working folder**: वो files जिन्हें आप अभी edit कर रहे हो।
+- **Staging area**: जिसे आपने `git add` से अगले commit के लिए चुन लिया है।
+- **History**: खुद commits, पहले सिर्फ़ आपके laptop पर, फिर push करने के बाद shared server पर।
+
+सही undo इस पर टिका है कि गलती कहाँ है और, सबसे ज़्यादा, इस पर कि क्या किसी और के पास वो पहले से है। जो नियम लगभग सब कुछ तय कर देता है: **जिस history को किसी और ने नहीं लिया, उसे आप दोबारा लिख सकते हो; जिसे दूसरे pull कर चुके हैं, उसे दोबारा नहीं लिखना है।**
+
+## ये काम कैसे करता है
+
+```flow
+title: गलती कहाँ है?
+गलती -> कहाँ है?
+कहाँ है? -[edited, not staged]-> git restore file | edit को फेंक दो
+कहाँ है? -[staged, not committed]-> git restore --staged file | edit रखो, unstage कर दो
+कहाँ है? -[committed, not pushed]-> git reset or git commit --amend | अपनी history दोबारा लिखो
+कहाँ है? -[pushed to a shared branch]-> git revert commit | ऐसा commit जोड़ो जो उसे undo करे
+git reset or git commit --amend -[went wrong]-> git reflog | पुराना commit ढूँढो और वापस जाओ
+```
+
+**Restore** files पर काम करता है। `git restore app.py` unstaged edits फेंक देता है और आखिरी committed version वापस ले आता है। `git restore --staged app.py` file को staging area से निकाल देता है पर आपके edits रखता है।
+
+**Reset** आपकी branch के label को पहले के किसी commit पर वापस ले जाता है। जिन commits को आपने लाँघा, उनके changes का क्या होगा, ये mode पर निर्भर है:
+
+| Command | Branch पीछे जाती है | उन commits के changes | कब use करें |
+| --- | --- | --- | --- |
+| `git reset --soft HEAD~1` | हाँ | रखे जाते हैं, और staged रहते हैं | आखिरी commit अलग ढंग से दोबारा बनाना हो |
+| `git reset HEAD~1` (mixed) | हाँ | रखे जाते हैं, unstaged | Commit में क्या जाए, उसे बाँटना या दोबारा चुनना हो |
+| `git reset --hard HEAD~1` | हाँ | आपकी files से delete हो जाते हैं | काम पूरी तरह हटाना हो (पक्का कर लेना) |
+| `git revert <id>` | नहीं | एक नया commit उन्हें undo करता है | Commit पहले से shared हो |
+
+`HEAD~1` का मतलब है "मैं जहाँ हूँ उससे एक commit पहले"। `HEAD~3` का मतलब तीन।
+
+**Amend** आखिरी commit के लिए एक छोटा reset है: fix को stage करो और `git commit --amend` चलाओ, तो आखिरी commit की जगह सुधरा हुआ commit आ जाता है। Message में typo या भूली हुई file के लिए ये एकदम सही है, push करने से पहले।
+
+**Revert** कभी कुछ दोबारा नहीं लिखता। `git revert a1b2c3d` देखता है कि उस commit ने क्या बदला था और एक नया commit बनाता है जो उसे वापस बदल दे। History बढ़ती है; सबकी copy फिर भी मेल खाती है। main पर आपको यही undo चाहिए।
+
+**Stash** काम को commit किए बिना एक तरफ़ रख देता है। `git stash` आपके अधूरे edits save करके आपको साफ़ folder दे देता है, जैसे किसी दूसरी branch पर urgent bug ठीक करने के लिए; `git stash pop` edits वापस ले आता है। जो भी command uncommitted changes फेंक सकता है, उससे पहले ये safe कदम है, क्योंकि edits stash हो गए तो अगला step बिगड़ने पर भी वो वापस मिल सकते हैं।
+
+**Reflog** आपका safety net है। जब भी आपकी branch की नोक हिलती है, चाहे commit से, reset से, rebase से या checkout से, Git लगभग 90 दिन तक उसे reflog में नोट करता है। `git reflog` उन जगहों की list देता है, और आप किसी पर भी वापस कूद सकते हो।
+
+## एक example से समझो
+
+Rahul हैदराबाद की एक e-commerce company के लिए recommendation API पर काम कर रहा है। शुक्रवार की शाम है।
+
+**पहली गलती: एक debug print।** `ranker.py` में जगह-जगह `print(user)` पड़े हैं और उसने उन्हें stage नहीं किया। `git restore ranker.py` तुरंत सब साफ़ कर देता है।
+
+**दूसरी गलती: commit में secret।** उसके आखिरी commit में, जो अभी push नहीं हुआ, API key वाली `.env` चली गई है। वो चलाता है:
+
+```bash
+git reset --soft HEAD~1
+git restore --staged .env
+echo ".env" >> .gitignore
+git add .gitignore ranker.py
+git commit -m "Add category boost to ranker"
+```
+
+Commit secret के बिना दोबारा बन जाता है। क्योंकि वो कभी push नहीं हुआ था, उसे दोबारा लिखना safe है। वो फिर भी key rotate करता है, क्योंकि सावधानी का अंदाज़ा यही है कि history में disk पर पड़ा secret leak हो सकता है।
+
+**तीसरी गलती: main पर गलत change।** सोमवार को एक teammate का merge हुआ commit ranker को नए users के लिए खाली lists लौटाने पर मजबूर कर देता है। वो एक दिन से main पर है और सबने उसे pull कर लिया है। main को reset करने से हर copy टूट जाएगी। इसकी जगह:
+
+```bash
+git switch main
+git pull
+git revert 7f3e9c1
+git push
+```
+
+"Revert 'Boost recent items'" नाम का नया commit normal pull request और pipeline से निकलता है। Bug चला जाता है, history सलामत रहती है, और team बाद में असली change को ठीक से सुधार लेती है।
+
+**चौथी गलती: खोई हुई दोपहर।** अपनी branch साफ़ करते हुए Rahul `git reset --hard HEAD~3` चला देता है और समझता है कि उन तीन में से एक commit वो test था जो उसे चाहिए था। वो `git reflog` चलाता है, `e41d2aa HEAD@{1}: commit: Add tests for cold-start users` देखता है, और `git cherry-pick e41d2aa` से उसे वापस ले आता है। जो चीज़ कभी commit हुई, वो सच में खोती नहीं।
+
+## आम गलतियाँ
+
+- **Shared branch को reset करना।** main पर `git reset` और force push सबकी history दोबारा लिख देता है। जो भी shared हो, उस पर `git revert` use करो।
+- **ये सोचना कि revert secret हटा देता है।** Revert secret को history में छोड़ देता है। Key rotate करो; इसे history से हटाने के लिए खास tools और मिलकर किया गया rewrite चाहिए।
+- **--hard बिना जाँचे चलाना।** पहले `git status` और `git stash`। `--hard` से delete हुए uncommitted edits reflog में नहीं होते।
+- **Push हो चुके commit को amend करना।** ये commit को नए से बदल देता है, इसलिए जिन teammates ने पुराना pull किया, वो diverge हो जाते हैं।
+- **ये भूल जाना कि reflog है।** "मेरा काम खो गया" वाली ज़्यादातर घबराहट `git reflog` पर ख़त्म होती है।
+
+## Practice करो
+
+1. एक practice repository में तीन commits बनाओ। हर reset mode बारी-बारी से use करो और हर बार `git status` देखो।
+2. एक commit revert करो और `git show` से नए commit का diff पढ़ो।
+3. `git reset --hard HEAD~2` चलाओ, फिर `git reflog` से खोए हुए commits वापस लाओ।
+4. अपने भविष्य के लिए एक line का नियम लिखो: unshared काम के लिए कौन-सा undo, और shared काम के लिए कौन-सा।

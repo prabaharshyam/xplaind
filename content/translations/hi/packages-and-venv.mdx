@@ -1,0 +1,199 @@
+---
+id: packages-and-venv
+lang: hi
+title: "Packages और virtual environments"
+outcome: "Virtual environment के अंदर pip से libraries install करो और उन्हें requirements.txt में record करो।"
+answer: "Virtual environment एक project के Python packages को अलग रखता है। `python -m venv .venv` से बनाओ, pip से install करो और versions requirements.txt में record करो।"
+why_it_matters: "AI projects कई libraries पर टिके होते हैं, और projects के बीच versions टकराते हैं। हर project के लिए एक virtual environment \"मेरी machine पर तो चल रहा है\" वाली दिक्कतें शुरू होने से पहले ही रोक देता है।"
+flashcards:
+  - q: "Python में package क्या है?"
+    a: "दूसरे लोगों का लिखा और publish किया हुआ reusable code, जैसे web APIs के लिए requests या tables के लिए pandas, जिसे pip से install करते हैं।"
+  - q: "pip क्या है?"
+    a: "Python का package installer। pip install requests एक package download करके active environment में install कर देता है।"
+  - q: "Virtual environment क्या है?"
+    a: "एक project के installed packages का private folder, ताकि एक project के लिए install या upgrade करने से दूसरा project न टूटे।"
+  - q: "Virtual environment कैसे बनाते और activate करते हैं?"
+    a: "python -m venv .venv, फिर Windows पर .venv\\Scripts\\activate या Mac और Linux पर source .venv/bin/activate।"
+  - q: "requirements.txt क्या करता है?"
+    a: "Project को चाहिए वो packages और उनके exact versions list करता है, ताकि कोई भी pip install -r requirements.txt से वही environment दोबारा बना सके।"
+  - q: "pip freeze क्या करता है?"
+    a: "हर installed package को उसके exact version के साथ print करता है, जैसे pandas==2.3.1। इसे requirements.txt में redirect कर दो।"
+  - q: "क्या .venv को Git में डालना चाहिए?"
+    a: "नहीं। ये बड़ा होता है और एक machine से बँधा होता है। .venv/ को .gitignore में डालो और requirements.txt commit करो।"
+  - q: "uv और Poetry जैसे tools क्या जोड़ते हैं?"
+    a: "वही ideas, ज़्यादा तेज़ी से, और lock files के साथ जो हर sub-dependency को भी pin करती हैं।"
+exercise:
+  title: "टूटे हुए setups ठीक करो"
+  setup: "Delhi के एक startup के AI project पर चार teammates को दिक्कतें आती हैं। (A) Ritu python app.py चलाती है और उसे 'ModuleNotFoundError: No module named anthropic' मिलता है, जबकि उसने कल ही install किया था। (B) Karan का project पिछले महीने चल रहा था पर अब fail हो रहा है, क्योंकि उसने किसी दूसरे project के लिए pandas upgrade किया। (C) Repository 400 MB की है क्योंकि किसी ने .venv commit कर दिया। (D) Sameer का code उसके laptop पर चलता है पर server पर किसी library के अलग version की वजह से fail होता है।"
+  questions:
+    - q: "(A) का सबसे likely कारण क्या है?"
+      a: "इस terminal में उसका virtual environment activate नहीं है, इसलिए Python किसी और जगह देख रहा है। .venv activate करो और फिर चलाओ।"
+    - q: "(B) को क्या रोक सकता था?"
+      a: "हर project के लिए अलग virtual environment, ताकि एक project के लिए pandas upgrade करने से दूसरा न बदले।"
+    - q: "(C) को कैसे ठीक करें?"
+      a: ".venv को repository से हटाओ, .venv/ को .gitignore में डालो, और requirements.txt commit करो ताकि बाकी लोग उसे दोबारा बना सकें।"
+    - q: "(D) को होने से कैसे रोकें?"
+      a: "pip freeze > requirements.txt से या lock file से exact versions pin करो, और server पर उसी से install करो।"
+ask:
+  - "मुझे virtual environment क्यों चाहिए?"
+  - "pip और uv में क्या फ़र्क है?"
+  - "ModuleNotFoundError कैसे ठीक करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+ज़्यादातर काम की Python खुद Python से नहीं आती। वो **packages** से आती है जो दूसरे लोगों ने लिखे हैं: web APIs के लिए `requests`, tables के लिए `pandas`, arrays के लिए `numpy`, और AI model providers के official SDKs। इन्हें आप **pip** से install करते हो, जो Python का package installer है।
+
+इससे एक problem खड़ी होती है। Project A को pandas version 2.1 चाहिए; project B को 2.3। अगर दोनों एक ही जगह install हों तो एक टूट जाएगा। इसका हल है **virtual environment**: एक project के installed packages का private folder।
+
+```flow
+title: Environments के बिना
+System Python | project B के लिए pandas 2.3 upgrade हुआ -> Project A टूट गया
+```
+
+```flow
+title: Environments के साथ: हर project का अपना, कुछ नहीं टकराता
+project-a/.venv | pandas 2.1, requests 2.32 -> Project A चलता है
+project-b/.venv | pandas 2.3, anthropic SDK -> Project B चलता है
+```
+
+**requirements.txt** file में project को चाहिए वो packages और versions लिखे होते हैं, ताकि कोई भी, किसी भी machine पर, वही environment दोबारा बना सके।
+
+इस lesson में हम Pune के एक student Nikhil के साथ चलेंगे, जो अपने classmate का project चलाता है और अपने खुद के projects को एक-दूसरे को तोड़ने से रोकता है। अंत तक आप किसी भी project का fresh environment उसकी requirements file से दो मिनट से कम में बना पाओगे।
+
+## ये काम कैसे करता है
+
+### Environment बनाओ और activate करो
+
+अपने project folder के अंदर:
+
+```bash
+python -m venv .venv
+```
+
+फिर उसे activate करो:
+
+| System | Command |
+| --- | --- |
+| Windows (Command Prompt या PowerShell) | `.venv\Scripts\activate` |
+| Mac या Linux | `source .venv/bin/activate` |
+
+अब आपका terminal prompt `(.venv)` से शुरू होता है। जो भी install करोगे, सिर्फ़ इसी project में जाएगा। इससे बाहर निकलने के लिए `deactivate` type करो।
+
+### Packages install करो
+
+```bash
+pip install requests pandas
+pip list                       # what is installed in this environment
+pip show pandas                # details and version of one package
+```
+
+### जो install किया उसे record करो
+
+```bash
+pip freeze > requirements.txt
+```
+
+`pip freeze` हर package को उसके **exact** version के साथ print करता है, जैसे `pandas==2.3.1`, ताकि दूसरे भी वही install करें। Requirements file ऐसी दिखती है:
+
+```text
+# shortened: pip freeze also lists every sub-dependency
+certifi==2025.8.3
+numpy==2.3.2
+pandas==2.3.1
+requests==2.32.5
+```
+
+### दूसरी machine पर दोबारा बनाओ
+
+कोई project clone करने के बाद, एक fresh environment बनाओ और activate करो, फिर:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Version specifiers
+
+Requirements file में exact pin कर सकते हो या range की छूट दे सकते हो:
+
+| Line | मतलब |
+| --- | --- |
+| `pandas==2.3.1` | ठीक यही version: सबसे ज़्यादा reproducible |
+| `pandas>=2.2` | ये version या नया: नया major version आने पर टूट सकता है |
+| `pandas>=2.2,<3` | 2.2 से ऊपर कोई भी 2.x: libraries के लिए आम समझौता |
+| `pandas` | आज जो भी सबसे नया है: जिन projects को दूसरे चलाएँगे उनमें इससे बचो |
+
+जिस application को आप deploy करोगे उसमें exact versions pin करो, ताकि server को वही मिले जो आपने test किया था। जिस library को दूसरे लोग install करेंगे उसमें समझदार ranges दो, ताकि वो उनके दूसरे packages से न टकराए। Upgrade करो तो सोच-समझकर: version बदलो, tests चलाओ, फिर नई file commit करो।
+
+### AI के काम के लिए packages
+
+AI projects में कुछ और आदतें जुड़ती हैं। Model providers के SDKs, जैसे official Anthropic या OpenAI Python packages, जल्दी-जल्दी बदलते हैं, इसलिए उन्हें pin करो और upgrade से पहले release notes पढ़ो। ये SDKs आपकी API key को किसी environment variable से पढ़ते हैं, जैसे `ANTHROPIC_API_KEY`; इसे अपने shell में या ऐसी `.env` file में set करो जो `.gitignore` में listed हो, code में कभी नहीं। PyTorch जैसे बड़े packages सैकड़ों megabytes के हो सकते हैं और आपके computer के graphics card पर निर्भर करते हैं, इसलिए उनके लिए plain `pip install` की जगह project के अपने install instructions follow करो।
+
+### इसे Git से बाहर रखो
+
+`.venv/` को `.gitignore` में डालो और उसकी जगह `requirements.txt` commit करो। Environments बड़े होते हैं, सैकड़ों megabytes के, और एक machine के operating system से बँधे होते हैं।
+
+### अपने editor का interpreter चुनो
+
+VS Code में `.venv` वाला Python interpreter चुनो (Command Palette, "Python: Select Interpreter")। नहीं तो editor आपके terminal से अलग Python use कर सकता है और packages को missing बता सकता है।
+
+### नए tools
+
+| Tool | क्या जोड़ता है |
+| --- | --- |
+| `pip` और `venv` | Built in; शुरू करने के लिए काफ़ी |
+| `uv` | कहीं तेज़ installs और environment बनाना, lock file के साथ |
+| Poetry | Lock file के साथ dependency management और packaging |
+
+**Lock files** सिर्फ़ आपके बताए packages ही नहीं, हर sub-dependency को भी pin करती हैं। Ideas वही रहते हैं: हर project के लिए एक environment, versions एक file में record।
+
+## एक example से समझो
+
+Pune का student Nikhil अपने classmate का एक project clone करता है, जो weather API call करके भारतीय शहरों के temperatures plot करता है। वो उसे चलाता है:
+
+```text
+$ python main.py
+ModuleNotFoundError: No module named 'requests'
+```
+
+Project को ऐसे packages चाहिए जो उसके पास नहीं हैं। वो एक environment बनाता है और project की file से install करता है:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+चल गया, और Chennai, Delhi और Shimla के temperatures का chart दिख जाता है।
+
+बाद में वो एक feature जोड़ता है जिसे `matplotlib` चाहिए। वो उसे install करता है, `pip freeze > requirements.txt` चलाता है, और अपडेट की हुई file commit करता है। उसका classmate pull करता है, `pip install -r requirements.txt` चलाता है, और उसे बिल्कुल वही version मिलता है।
+
+| पहले | बाद में |
+| --- | --- |
+| सब कुछ system Python में install होता था | हर project के लिए एक `.venv` |
+| एक assignment के लिए pandas upgrade करने से दूसरा टूट गया | Projects एक-दूसरे पर असर नहीं डाल सकते |
+| "मेरी machine पर तो चलता है" | `requirements.txt` कहीं भी वही setup दोबारा बना देती है |
+| `.venv` commit होने पर 400 MB की repositories | `.gitignore` में `.venv/`; सिर्फ़ छोटी text file share होती है |
+
+एक महीने पहले Nikhil ने सब कुछ अपने system Python में install किया था, और एक assignment के लिए pandas upgrade करने से दूसरा टूट गया था। अलग environments ने ये problem हमेशा के लिए खत्म कर दी।
+
+## आम गलतियाँ
+
+- **System Python में install करना।** तब projects एक-दूसरे में दख़ल देते हैं।
+- **Environment activate करना भूल जाना।** Packages गलत जगह चले जाते हैं, या "missing" दिखते हैं। अपने prompt में `(.venv)` देखो।
+- **`.venv` को Git में commit करना।** उसकी जगह `requirements.txt` commit करो।
+- **Version pins न लगाना।** आगे कोई release आपका code तोड़ सकता है; `pip freeze` exact versions record करता है।
+- **Editor का अलग interpreter use करना।** अपने editor में project का `.venv` चुनो।
+- **`pip` और `python` को अलग-अलग जगह से चलाना।** पक्का करने के लिए `python -m pip install ...` use करो ताकि दोनों मेल खाएँ।
+
+## Practice करो
+
+नीचे link किया Python Packaging User Guide का pip और virtual environments वाला page पढ़ो।
+
+1. **बनाओ।** अपने virtual environment के साथ एक project folder बनाओ और उसमें `requests` install करो।
+2. **दोबारा बनाओ।** `requirements.txt` save करो, environment delete करो, उसे दोबारा बनाओ और file से reinstall करो।
+3. **Share करो।** `.venv/` को `.gitignore` में डालो और project को उसके बिना GitHub पर push करो।
+
+**आपका काम पूरा जब:** आप किसी भी project का fresh environment उसकी requirements file से दो मिनट से कम में बना सको।

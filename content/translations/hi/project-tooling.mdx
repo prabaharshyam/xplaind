@@ -1,0 +1,189 @@
+---
+id: project-tooling
+lang: hi
+title: "Project tooling: environments, tests और logs"
+outcome: "Python project को वैसे set up करो जैसा team उम्मीद करती है: isolated environment, pyproject.toml, src layout, pytest tests और काम के logs।"
+answer: "Team-ready Python project में अपना virtual environment, एक pyproject.toml, src folder में code, pytest tests और print statements की जगह logging होती है।"
+why_it_matters: "आपके handover के बाद client के engineers आपका code clone करके चलाएँगे और बदलेंगे। अगर setup में पूरा दिन लग जाए, tests न हों और logs कुछ न बताएँ, तो वो system पर भरोसा करना छोड़ देते हैं। अच्छी tooling भरोसे का सबसे सस्ता तरीका है।"
+flashcards:
+  - q: "Project tooling के सबसे ज़रूरी चार हिस्से कौन-से हैं?"
+    a: "Isolated environment, समझदार layout वाली pyproject.toml, pytest से tests, और logging।"
+  - q: "pyproject.toml क्या है?"
+    a: "वो file जो Python project को describe करती है: उसका नाम, version, dependencies और tool settings, ताकि वो हर जगह एक ही तरह से install हो।"
+  - q: "src layout क्यों use करें?"
+    a: "Package को src/ में रखने से tests गलती से ऐसा code import नहीं करते जो सिर्फ़ आपके अपने folder से चलता है।"
+  - q: "Lock file क्या करती है?"
+    a: "हर package का exact version record करती है, sub-dependencies समेत, ताकि दूसरी machine पर वही set install हो।"
+  - q: "pytest fixture क्या है?"
+    a: "Shared setup जिसे test नाम से माँगता है, जैसे एक sample PDF, एक temporary folder या एक fake model client।"
+  - q: "जो code LLM को call करता है, उसके unit tests कैसे करें?"
+    a: "अपने logic को test करने के लिए ऐसा fake client use करो जो fixed reply लौटाए। असली model calls को अलग, धीमे evaluation suite के लिए रखो।"
+  - q: "Production में print की जगह logging क्यों?"
+    a: "Log messages में level, time और source होता है, और वो वहाँ जाते हैं जहाँ platform logs इकट्ठा करता है। Print का output अक्सर खो जाता है।"
+  - q: "Logs में क्या कभी नहीं आना चाहिए?"
+    a: "API keys, passwords, पूरे documents और phone numbers जैसा personal data। उनकी जगह ids, sizes और timings log करो।"
+exercise:
+  title: "Teammate के project को review करो"
+  setup: "Gurugram के एक AI startup में आपका teammate आपको resume-screening helper का project सौंपता है। आपको मिलता है: सारा code एक file main.py में; कोई tests नहीं; dependencies system Python में install हैं, कोई requirements या lock file नहीं; debugging के लिए print('done') और print(api_key) जैसे print statements; और एक README जिसमें बस 'run main.py' लिखा है।"
+  questions:
+    - q: "सबसे ज़रूरी problem कौन-सी है जिसे ठीक करना है?"
+      a: "print(api_key): secret शायद पहले ही logs या terminal history में जा चुका है। उसे हटाओ और key rotate करो, और फिर कभी secrets log मत करो।"
+    - q: "System-Python install की जगह क्या होना चाहिए?"
+      a: "Project का virtual environment, dependencies pyproject.toml में listed, और एक lock file या pinned requirements commit की हुई।"
+    - q: "सबसे पहले कौन-से दो तरह के tests जोड़ोगे?"
+      a: "Parsing और scoring logic के unit tests, fake model client के साथ, और एक test कि खराब format वाला resume साफ़ error raise करे।"
+    - q: "README में क्या लिखा होना चाहिए?"
+      a: "Environment set up करने, API key को environment variable की तरह set करने, tests चलाने और tool चलाने के exact commands।"
+ask:
+  - "requirements.txt और pyproject.toml में क्या फ़र्क है?"
+  - "LLM को call करने वाले code को test कैसे करूँ?"
+  - "Production AI app में क्या log करना चाहिए?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+जो code आपके laptop पर चल जाए, वो शुरुआत है, मंज़िल नहीं। **Project tooling** आपके code के आसपास की वो सब चीज़ें हैं जिनसे कोई और उसे चला सके, सुरक्षित तरीके से बदल सके और रात 2 बजे debug कर सके। चार हिस्से सबसे ज़्यादा मायने रखते हैं:
+
+| हिस्सा | आपको क्या देता है | इसके बिना |
+| --- | --- | --- |
+| **Isolated environment** | Project के packages किसी और चीज़ से नहीं टकराते | "मेरी machine पर तो चलता है" |
+| **pyproject.toml और समझदार layout** | Project हर जगह एक ही तरह से install होता है | किसी को पता नहीं कि set up कैसे करें |
+| **pytest से tests** | कुछ तोड़ने वाला बदलाव ship होने से पहले ज़ोर से fail होता है | Bugs users पकड़ते हैं |
+| **Logging** | Production में कुछ गड़बड़ हो तो आप देख सकते हो कि क्या हुआ | अंदाज़ा लगाना |
+
+इनमें से कुछ भी glamorous नहीं है। पर जब ये नहीं होता तो सबको दिखता है, आमतौर पर handover के अगले हफ़्ते client के engineer को।
+
+इस lesson में हम उस invoice extractor के साथ चलेंगे जो आपने Coimbatore के एक textile exporter के लिए बनाया था, जब उनका engineer Karthik उसे संभालता है। अंत तक आपके projects ऐसे होंगे जिन्हें कोई अजनबी सिर्फ़ README से set up, test और debug कर सके।
+
+## ये काम कैसे करता है
+
+### Environments और lock files
+
+हर project का अपना virtual environment होता है। `venv` के साथ `pip`, या ज़्यादा तेज़ `uv` जैसे tools एक बना देते हैं और आपके pin किए exact versions install करते हैं। **Lock file**, जैसे `uv.lock` या पूरी तरह pinned `requirements.txt`, हर package का exact version record करती है, उन packages समेत जिन पर आपके packages निर्भर हैं, ताकि दूसरी machine को बिल्कुल वही set मिले।
+
+### Layout
+
+Python project की एक आम, सुरक्षित shape:
+
+```text
+invoice-extractor/
+  pyproject.toml           # name, version, dependencies, tool settings
+  uv.lock                  # exact versions of everything
+  README.md                # how to set up, test and run
+  src/invoice_extractor/   # your package
+      __init__.py
+      extract.py
+      models.py
+  tests/                   # pytest tests
+      conftest.py          # shared fixtures
+      test_extract.py
+      fixtures/sample_invoice.txt
+```
+
+`src` folder tests को गलती से ऐसा code import करने से रोकता है जो सिर्फ़ आपके अपने folder से चलता है। `pyproject.toml` `setup.py` जैसी पुरानी files के ढेर की जगह लेती है और pytest और linters जैसे tools की settings एक ही जगह रखती है।
+
+### pytest
+
+Test एक function होता है जिसका नाम `test_` से शुरू होता है, और जो सीधा `assert` use करता है। pytest उन सबको ढूँढकर चलाता है:
+
+```python
+def test_total_matches_line_items(sample_invoice):
+    inv = parse_invoice(sample_invoice)
+    assert inv.total == sum(i.amount for i in inv.items)
+```
+
+**Fixtures** shared setup देते हैं जिसे tests नाम से माँगते हैं: एक sample PDF, एक temporary folder, एक fake model client। ये `tests/conftest.py` में रहते हैं।
+
+### Model को call करने वाले code की testing
+
+Unit tests में असली model calls धीमे होते हैं, पैसे लगाते हैं और हर बार थोड़ा अलग जवाब देते हैं, इसलिए tests बेतरतीब fail होते हैं। इसकी जगह:
+
+| | Unit tests | Evaluation suite |
+|---|---|---|
+| कब | तेज़, हर commit पर | धीमा, schedule पर |
+| क्या check करते हैं | आपका parsing, validation और scoring logic | असली model, 50-200 examples के golden set पर |
+| Model | Fake client fixed reply लौटाता है | असली model; quality score करता है और समय के साथ track करता है |
+
+अपने logic को fake client से test करो; model की quality अलग से नापो।
+
+### Logging
+
+`print` का output production में गायब हो जाता है। `logging` module हर message को एक **level**, एक time और वो module देता है जहाँ से वो आया, और उसे वहाँ भेजता है जहाँ platform logs इकट्ठा करता है।
+
+| Level | किसके लिए |
+| --- | --- |
+| DEBUG | Developers के लिए detail, production में बंद |
+| INFO | Normal events: एक request handle हुई, एक file process हुई |
+| WARNING | कुछ अजीब पर संभाला गया: एक retry, एक खराब input छोड़ दिया |
+| ERROR | कुछ fail हुआ और ध्यान चाहिए |
+
+हर module के लिए एक logger use करो, `log = logging.getLogger(__name__)`, output को start-up पर एक बार configure करो, और ऐसे facts log करो जो किसी अजनबी की मदद करें: कौन-सी request, कौन-सा document, कितना समय लगा, क्या fail हुआ।
+
+### README
+
+अच्छी README किसी अजनबी को clone से लेकर passing tests तक पहुँचा देती है, आपसे कुछ पूछे बिना। उसमें exact commands क्रम से होते हैं: environment set up करो, कोई भी environment variables set करो (असली secret values के बिना), tests चलाओ, tool चलाओ। इसे लिखो, फिर एक fresh folder में खुद test करो; ज़्यादातर READMEs दूसरी ही line पर टूट जाती हैं।
+
+## एक example से समझो
+
+आपने Coimbatore के एक textile exporter के लिए invoice extractor बनाया। अगले महीने उनके engineer Karthik को इसे आपके बिना चलाना और maintain करना है।
+
+**पहला दिन।** वो repository clone करता है और README follow करता है:
+
+```text
+uv sync            # installs the exact locked versions
+uv run pytest      # 12 passed
+```
+
+Lock file वही versions install करती है जो आपने test किए थे। बारह में से दो tests:
+
+```python
+import pytest
+
+from invoice_extractor.extract import parse_invoice
+from invoice_extractor.models import Invoice
+
+def test_total_matches_line_items(sample_invoice):
+    inv = parse_invoice(sample_invoice)
+    assert inv.total == sum(i.amount for i in inv.items)
+
+def test_rejects_gstin_with_wrong_length():
+    with pytest.raises(ValueError):
+        Invoice(gstin="33ABCDE1234", total=100, items=[])
+```
+
+`sample_invoice` `tests/conftest.py` में एक fixture है जो एक छोटी text file load करता है, इसलिए असली model call की ज़रूरत नहीं।
+
+**एक महीने बाद।** Production में एक invoice fail होता है। Log line ऐसी है:
+
+```text
+2026-11-20 10:14:03 WARNING invoice_extractor.extract invoice=INV-8812 pages=3 field=total model_value="12,40,000.00" error="not a number"
+```
+
+Karthik को तुरंत दिख जाता है कि भारतीय digit grouping ने number parser तोड़ दिया। वो "12,40,000.00" के लिए एक test जोड़ता है, parser ठीक करता है, देखता है कि सारे 13 tests pass हैं और ship कर देता है।
+
+| Tooling के बिना | Tooling के साथ |
+| --- | --- |
+| किसी user से "कभी-कभी fail होता है" | एक log line जो invoice, field और value का नाम बताती है |
+| Fix check करने का कोई तरीका नहीं | एक नया test जो fix से पहले fail और बाद में pass होता है |
+| Server पर packages के अलग versions | हर जगह वही locked versions |
+| Karthik आपको WhatsApp करता है | Karthik अकेले 20 मिनट में ठीक कर देता है |
+
+## आम गलतियाँ
+
+- **System Python में install करना।** आपके laptop पर चलता है, और कहीं नहीं। हमेशा project environment use करो।
+- **Unpinned versions।** कोई library breaking change release करती है और fresh install fail हो जाता है। Lock file commit करो।
+- **ऐसे tests जो असली model को call करते हैं।** वो धीमे हैं, पैसे लगाते हैं और बेतरतीब fail होते हैं। Unit tests में client को fake करो।
+- **Secrets या personal data log करना।** API keys, पूरे documents या customers के phone numbers कभी log मत करो। उनकी जगह ids और sizes log करो।
+- **"run main.py" वाली README।** Set up, test और run के exact commands लिखो, और उन्हें खुद test करो।
+- **Production में DEBUG logging चालू छोड़ देना।** ये disks भर देता है और data leak कर सकता है।
+
+## Practice करो
+
+नीचे link किया pytest का Get Started page पूरा करो, फिर Python के logging tutorial का basic section।
+
+1. **Restructure करो।** अपनी लिखी कोई भी script को `pyproject.toml`, `src` layout और `tests` folder वाले project में बदलो।
+2. **Test करो।** पाँच tests लिखो, जिनमें एक fixture use करे और एक check करे कि error raise होता है।
+3. **Log करो।** हर `print` को सही level के logger call से बदलो, और एक ऐसी log line जोड़ो जो किसी failure को debug करने में मदद करे।
+
+**आपका काम पूरा जब:** आप repository किसी दोस्त को दे सको, वो README के दो commands से tests चला सके, और सारे pass हो जाएँ।
