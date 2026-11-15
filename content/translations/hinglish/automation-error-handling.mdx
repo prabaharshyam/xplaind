@@ -1,0 +1,164 @@
+---
+id: automation-error-handling
+lang: hinglish
+title: "Error handling aur retries"
+outcome: "Automations ko safely fail karwana seekho: temporary errors ko backoff ke saath retry karo, permanent errors par ruk jao, sahi insaan ko kaam ki details ke saath alert bhejo, rerun par duplicates se bacho aur record rakho ki kya hua."
+answer: "Achhi automations temporary errors ko badhte waits ke saath retry karti hain, permanent errors par rukti hain, kaam ki details ke saath kisi insaan ko alert karti hain, aur ek hi item ko do baar process nahi karti."
+why_it_matters: "Har automation kabhi na kabhi fail hoti hai: API down ho jaati hai, password expire ho jaata hai, file ka format ajeeb hota hai. Bharose waali automation aur chhod di gayi automation mein farak ye hai ki failures pakde jaate hain, samjhaaye jaate hain aur recover hote hain, bina double payment ya lost order ke."
+flashcards:
+  - q: "Achhi error handling kaunse paanch kaam karti hai?"
+    a: "Temporary errors retry karti hai, permanent errors par rukti hai, details ke saath kisi insaan ko alert karti hai, duplicates ke bina recover karti hai, aur record rakhti hai ki kya hua."
+  - q: "Teen temporary errors batao."
+    a: "Network ke blips aur timeouts, rate limits (HTTP 429), aur server errors (HTTP 500 se 504). Ye aksar retry par chal jaate hain."
+  - q: "Teen permanent errors batao."
+    a: "Galat ya expired credentials (401, 403), kharab input (400) aur gayab record (404). Retry karne se ye theek nahi honge."
+  - q: "Retry with backoff kya hai?"
+    a: "Kuch baar badhte waits ke saath retry karna, jaise 5 second, 30 second, phir 2 minute, aur koi Retry-After header ho toh uska maan rakhna."
+  - q: "Idempotency duplicates ko kaise rokti hai?"
+    a: "Kuch banane se pehle workflow ek unique key, jaise order id, check karta hai. Woh pehle se hai toh kuch nahi karta, isliye rerun safe hote hain."
+  - q: "Dead-letter queue kya hai?"
+    a: "\"Dhyaan chahiye\" waali list, jismein woh records reason ke saath jaate hain jo permanently fail hue, taaki unhe theek karke dobara process kiya ja sake aur woh kho na jaayein."
+  - q: "Kaam ke alert mein kya hona chahiye?"
+    a: "Workflow, step, record, error message, run ka link, aur ho sake toh ye ki aage kya karna hai."
+  - q: "Sirf errors nahi, item counts bhi monitor kyun karein?"
+    a: "Jo workflow chupchaap zero items process karta hai, usmein koi error nahi dikhta. \"Items bahut kam\" waala check use pakad leta hai."
+exercise:
+  title: "Failures ko classify karo"
+  setup: "Coimbatore ki ek automation billing system se WhatsApp par payment reminders bhejti hai, roz lagbhag 1,500. Pichhle hafte ka run log kehta hai: (1) shaam 7 baje 40 calls par 429 Too Many Requests aaya, (2) ek din har call par 401 Unauthorized aaya, (3) 12 customers ke phone numbers '12345' jaise the aur API ne 400 Bad Request diya, (4) rerun ke baad 300 customers ko wahi reminder do baar mila, (5) Sunday ko run bina kisi error ke khatam hua par 0 messages gaye, kyunki billing export khaali tha."
+  questions:
+    - q: "Kaunse failures retry hone chahiye, aur kaise?"
+      a: "Sirf (1), yaani 429s. Backoff ke saath retry karo aur Retry-After header ka maan rakho, kuch attempts ke cap ke saath."
+    - q: "(2) par workflow ko kya karna chahiye?"
+      a: "Bina retry kiye turant ruk jaye aur owner ko alert kare ki WhatsApp token expire ho gaya hai ya revoke ho gaya hai, saath mein ye ki use kahan renew karna hai."
+    - q: "(3) ke 12 records kahan jaane chahiye?"
+      a: "\"Needs attention\" list mein, reason \"invalid phone number\" ke saath, jabki baaki reminders chalte rahein."
+    - q: "Kaunse do checks (4) aur (5) ko pakad lete?"
+      a: "(4) ke liye invoice id plus reminder date jaisi key par idempotency check, aur (5) ke liye roz ka \"expected se kam messages\" alert."
+ask:
+  - "Automation ko kaunse errors retry karne chahiye?"
+  - "Workflow rerun hone par duplicate actions kaise rokun?"
+  - "n8n mein alerts kaise set up karun?"
+translated_on: 2026-11-14
+---
+
+## Ye kya hai
+
+Har automation kabhi na kabhi fail hoti hai. API down ho jaati hai, token expire ho jaata hai, customer apna phone number galat likh deta hai, provider limit laga deta hai ki aap kitni tez bhej sakte ho. Sawaal ye nahi ki fail hogi **ya nahi**, sawaal hai **kaise**. Achhi bani automation safely fail hoti hai: kuch khota nahi, kuch do baar nahi hota, aur sahi insaan ko pata hota hai ki kya karna hai.
+
+**Error handling** woh sab hai jo automation tab karti hai jab koi step fail ho:
+
+| Kaam | Matlab |
+| --- | --- |
+| **Retry** | Jo errors shayad temporary hain, unhe dobara try karo |
+| **Stop** | Jo errors apne aap theek nahi honge, unhe record karo aur try karte mat raho |
+| **Alert** | Kisi insaan ko batao, itni details ke saath ki woh kuch kar sake |
+| **Recover** | Wajah theek hone ke baad safely dobara process karo, actions duplicate kiye bina |
+| **Record** | Baad mein review ke liye history rakho ki kya hua |
+
+Ye lesson Bengaluru ke ek logistics startup ke saath chalta hai, jiski delivery-update automation ne duplicate messages bheje, rate limits maare aur ek baar poore din kuch nahi kiya. Lesson ke end tak aap apni automations ko safely fail karwa paoge.
+
+## Ye kaam kaise karta hai
+
+### Errors ki kismein pehchaano
+
+```flow
+Error aaya -> Shayad temporary hai? | timeout, 429, 500-504
+Shayad temporary hai? -[haan]-> Backoff ke saath retry | phir bhi fail ho toh alert
+Shayad temporary hai? -[nahi]-> Ek kharab record ki baat hai? | 400, 404, invalid data
+Ek kharab record ki baat hai? -[haan]-> Record ko "needs attention" mein daalo | baaki ka kaam chalne do
+Ek kharab record ki baat hai? -[nahi]-> Poore workflow ki baat hai? | 401, 403, expired token
+Poore workflow ki baat hai? -[haan]-> Abhi ruk jao | owner ko fix ke saath alert karo
+```
+
+| Kism | Examples | Kya karna hai |
+| --- | --- | --- |
+| **Temporary** | Network blips, timeouts, rate limits (HTTP 429), server errors (500 se 504) | Backoff ke saath retry |
+| **Permanent** | Galat credentials (401, 403), kharab input (400), gayab record (404), invalid data | Ruko, record karo, wajah theek karo |
+| **Logic** | Automation chali par galat kaam kiya, jaise koi field galat map ho gayi | Sirf checks aur monitoring inhe pakadte hain |
+
+### Backoff ke saath retry
+
+Temporary errors ko kuch baar retry karo, har baar zyada der ruk kar, taaki struggle kar rahi service par hathoda na maaro:
+
+```flow
+dir: LR
+Attempt 1 -[fail]-> 5 s ruko -> Attempt 2 -[fail]-> 30 s ruko -> Attempt 3 -[fail]-> 2 min ruko -> Attempt 4 -[fail]-> Kisi insaan ko alert
+```
+
+Service agar **Retry-After** header bheje toh uska maan rakho: wahi batata hai ki kitni der rukna hai. Retries ki ginti par hamesha cap lagao.
+
+### Idempotency: do baar chalao toh bhi safe
+
+Retries aur haath se kiye rerun actions ko repeat kar sakte hain. Kuch banane se pehle, jaise invoice, payment ya message, check karo ki woh pehle se hai ya nahi, order id plus status jaisi unique key se. Hai toh skip karo. Phir retries aur reruns kabhi duplicates nahi banate.
+
+### Kaam ke alerts
+
+| Kamzor alert | Kaam ka alert |
+| --- | --- |
+| "Workflow failed." | "Delivery SMS workflow, step 'Send SMS', order ORD-4471: 401 Unauthorized. SMS provider ka token expire ho gaya hai. Settings, Credentials, SMS provider mein renew karo. Run link: ..." |
+
+Alerts aise channel par bhejo jise owner sach mein dekhta ho, jaise email, Slack, Teams ya WhatsApp. Repeated alerts ko group karo, taaki ek outage par ek message jaye, 500 nahi.
+
+### Dead-letter queue
+
+Jo records permanently fail hue, woh reason ke saath ek **"needs attention"** list mein jaate hain, jise kabhi-kabhi dead-letter queue kehte hain. Koi unhe theek karke baad mein dobara process karta hai. Kuch chupchaap nahi khota.
+
+### Partial failures
+
+300 items process karte waqt ek kharab item ko baaki 299 nahi rokne chahiye. Items ko alag-alag process karo, failures jama karo, aur end mein report karo.
+
+### Monitoring
+
+Roz ke runs, failures aur process hue items track karo. Jo workflow achanak **zero** items process karne lage, woh aksar kharab hota hai, chahe koi error na ho, jaise export khaali aaya ho.
+
+### Ownership aur runbook
+
+Har automation ka ek naam wala owner aur ek chhota runbook hota hai: woh kya karti hai, common failures kaunse hain aur har ek kaise theek karna hai.
+
+## Ek example se samjho
+
+Bengaluru ka ek logistics startup ek automation chalata hai jo customers ko SMS se delivery updates bhejti hai aur order system update karti hai: roz lagbhag 8,000 messages.
+
+**Pehla mahina kharab gaya:**
+
+| Problem | Wajah |
+| --- | --- |
+| Shaam ke peak mein messages fail hue | SMS provider ne workflow ko rate-limit kar diya (HTTP 429) |
+| Kuch customers ko do messages mile | Fail hue run ko haath se dobara chalaya gaya, aur pehle ke messages phir se chale gaye |
+| Ek din kuch bhi nahi gaya, aur koi error bhi nahi | Login token expire ho gaya tha; step ne zor se fail hone ki jagah khaali result de diya |
+
+**Fixes:**
+
+1. SMS provider ke 429 aur 5xx responses par **backoff ke saath retries**, uske Retry-After header ka maan rakhte hue, adhiktam chaar attempts.
+2. Har message ke liye **ek unique key**, order id plus status, bhejne se pehle check hoti hai, taaki rerun kabhi duplicates na bheje.
+3. **Expired ya invalid credentials par run turant rukta hai** aur owner ko alert jaata hai "SMS provider ka token expire ho gaya, Settings, Credentials mein renew karo", retry karne ki jagah.
+4. **Failed records ek "needs attention" sheet mein jaate hain** reason ke saath; theek karne ke baad ek button unhe dobara process karta hai.
+5. **Ek daily check** alert deta hai agar shaam 8 baje tak 1,000 se kam messages gaye hon.
+
+**Agla mahina:**
+
+| Measure | Mahina 1 | Mahina 2 |
+| --- | --- | --- |
+| Duplicate messages | Lagbhag 900 | 0 |
+| Rate limits mein kho gaye messages | Lagbhag 1,200 | 0 (sab retry hue) |
+| Agla token expiry theek karne ka time | Lagbhag 9 ghante (customer ki shikayat se pata chala) | 20 minute (alert ne bata diya kya karna hai) |
+| Dhyaan chahiye waale records | Pata nahi | 35, sabka reason, sab ek din mein theek |
+
+## Aam galtiyaan
+
+- **Sab kuch retry karna.** Permanent errors ko theek karna padta hai, retry nahi.
+- **Duplicate se bachaav nahi.** Retries aur reruns double actions bana dete hain.
+- **Bina details ke alerts.** "Workflow failed" par koi action nahi ho sakta.
+- **Ek kharab item poore batch ko rok deta hai.** Items ko alag-alag handle karo.
+- **Sirf errors par nazar rakhna.** Kuch na karne waali workflow bhi theek dikh sakti hai.
+- **Bina cap aur waits ke retry.** Outage aur bigad jaata hai aur aap block bhi ho sakte ho.
+
+## Practice karo
+
+n8n ki error handling guide padho (neeche link hai), aur N8N102 course ka error-handling hissa dobara dekho.
+
+1. **Retries.** Kisi workflow ke ek API step mein backoff ke saath retries lagao, aur jaanbujhkar fail hone waale endpoint se test karo.
+2. **Duplicates aur dead letters.** Idempotency check lagao aur permanent failures ke liye ek "needs attention" list banao.
+3. **Alerts.** Ek alert banao jismein workflow, step, record aur error ka naam ho, aur roz ka "items bahut kam" check.
+
+**Aapka kaam poora jab:** aap apne workflow ko teen tareeke se tod sako, temporary error, permanent error aur kharab item se, aur har ek ke liye sahi behaviour dikha sako.

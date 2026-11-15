@@ -1,0 +1,119 @@
+---
+id: debugging-systematically
+lang: hi
+title: "Debugging को तरीके से करना"
+outcome: "Bug का कारण कदम-दर-कदम ढूँढ पाओगे: उसे reproduce करना, traceback पढ़ना, दायरा छोटा करना, debugger से state देखना, fix करना और test से fix को साबित करना।"
+answer: "Debugging का मतलब है ये ढूँढना कि code गलत क्यों चल रहा है। Bug reproduce करो, error पढ़ो, ढूँढो कि वो कहाँ से शुरू होता है, वहाँ की values देखो, कारण ठीक करो और एक test जोड़ो।"
+why_it_matters: "Developer का ज़्यादातर समय ये समझने में जाता है कि कुछ चल क्यों नहीं रहा। अंदाज़ों से तरीका बेहतर है, और interviewers अक्सर पूछते हैं कि आप किसी bug को कैसे ढूँढोगे, ज़ोर से बोलकर समझाओ।"
+flashcards:
+  - q: "Debugging का पहला step क्या है?"
+    a: "Bug को भरोसे से reproduce करो, उस सबसे छोटे input के साथ जो उसे चलाता है। अगर आप उसे जब चाहो तब नहीं करा सकते, तो आप नहीं जान सकते कि आपने उसे ठीक किया।"
+  - q: "Python traceback कैसे पढ़ें?"
+    a: "नीचे से ऊपर। आखिरी line error और message बताती है; उसके ऊपर की lines call का रास्ता दिखाती हैं, और आपके अपने code की line आम तौर पर नीचे के पास होती है।"
+  - q: "Python में breakpoint() क्या करता है?"
+    a: "वो program को उस line पर रोक देता है और debugger खोल देता है, जहाँ आप variables print कर सकते हो, अगली line पर जा सकते हो और आगे चला सकते हो।"
+  - q: "मुख्य pdb commands कौन-से हैं?"
+    a: "p name किसी value को print करता है, n अगली line चलाता है, s किसी function के अंदर जाता है, c आगे चलाता है, q बाहर निकलता है।"
+  - q: "Binary search debugging क्या है?"
+    a: "Search का दायरा आधा करना: steps के बीच की जगह check करो, या git bisect से बीच का commit, और देखो कि bug किस आधे हिस्से में है, फिर दोहराओ।"
+  - q: "Bug ठीक करने के बाद test क्यों जोड़ें?"
+    a: "ताकि वही bug बाद में चुपचाप वापस न आ जाए। अगर कोई उसे दोबारा ले आए, तो test fail हो जाएगा।"
+exercise:
+  title: "Clue पढ़ो"
+  setup: "Orders का total निकालने वाली एक script इस error से crash होती है: TypeError: unsupported operand type(s) for +: 'int' and 'str', line total = total + row['amount'] पर।"
+  questions:
+    - q: "Error आपको क्या बताता है?"
+      a: "total एक number है पर row['amount'] एक string है। कुछ rows में amount text की तरह रखा है, शायद सीधे CSV से।"
+    - q: "आप कैसे confirm करोगे कि कौन-सी row?"
+      a: "उस line से पहले breakpoint() लगाओ, या जब type number न हो तब repr(row) print करो, और उसी file पर चलाओ।"
+    - q: "अच्छा fix क्या है, और कौन-सा test जोड़ोगे?"
+      a: "Decimal(row['amount']) से convert करो और खराब values को साफ़ तरीके से handle करो। एक test text में दिए amount के साथ और एक invalid value के साथ जोड़ो।"
+ask:
+  - "जो code सिर्फ़ production में fail होता है उसे debug कैसे करूँ?"
+  - "git bisect क्या है और इसे कब use करना चाहिए?"
+  - "जो LLM app गलत जवाब देता है उसे debug कैसे करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Debugging** का मतलब है ये पता लगाना कि program आपकी उम्मीद से अलग कुछ क्यों कर रहा है, और कारण को ठीक करना। Bug program को crash कर सकता है, गलत number दे सकता है, या आपके laptop पर चलकर server पर fail हो सकता है।
+
+Beginners अक्सर अंदाज़े से debug करते हैं: एक line बदली, फिर चलाया, फिर दूसरी बदली। छोटे bugs पर ये चल जाता है और असली bugs पर घंटे खा जाता है। अनुभवी engineers एक तरीके से चलते हैं। आसान bugs पर ये तेज़ नहीं है, पर ये हमेशा खत्म होता है, और जब interviewers पूछते हैं कि आप किसी चीज़ को कैसे ढूँढोगे, तो वो यही सुनना चाहते हैं।
+
+## ये काम कैसे करता है
+
+```flow
+title: Debugging का loop
+Bug दोबारा चलाओ | सबसे छोटा input जो हर बार fail हो -> Error पढ़ो | traceback नीचे से ऊपर
+Error पढ़ो -> अंदाज़ा लगाओ | ये होने के लिए क्या सच होना चाहिए?
+अंदाज़ा लगाओ -> दायरा छोटा करो | print, breakpoint, search आधा करो
+दायरा छोटा करो -[अंदाज़ा गलत]-> अंदाज़ा लगाओ
+दायरा छोटा करो -[कारण मिल गया]-> कारण ठीक करो, symptom नहीं
+कारण ठीक करो, symptom नहीं -> ऐसा test जोड़ो जो fix के बिना fail हो
+```
+
+**Reproduce करो।** वो सबसे छोटा input ढूँढो जो bug को हर बार चलाए। "कभी-कभी fail होता है" बदलकर "जब CSV में amount खाली हो तब fail होता है" बन जाता है। भरोसेमंद reproduction आधा काम है।
+
+**Error पढ़ो।** Python traceback नीचे से ऊपर पढ़ा जाता है:
+
+```text
+Traceback (most recent call last):
+  File "report.py", line 31, in <module>
+    print(monthly_total(rows))
+  File "report.py", line 12, in monthly_total
+    total = total + row["amount"]
+TypeError: unsupported operand type(s) for +: 'int' and 'str'
+```
+
+आखिरी line error है: आपने एक number और एक string जोड़ने की कोशिश की। उसके ऊपर की line वो जगह है जहाँ ये हुआ। उसके भी ऊपर की lines दिखाती हैं कि program वहाँ तक कैसे पहुँचा।
+
+**दायरा छोटा करो।** पूछो कि ये error होने के लिए क्या सच होना चाहिए, फिर उसे check करो। तीन tools, जल्दी वाले से गहरे वाले तक:
+
+| Tool | कैसे | किसके लिए अच्छा |
+| --- | --- | --- |
+| `print(repr(x))` | खास जगहों पर values print करो | Quick checks; `repr` quotes और types दिखाता है |
+| `breakpoint()` | रुककर debugger में देखो | जिस पल गड़बड़ हो, सारे variables देखना |
+| Editor debugger | Click करके breakpoints लगाओ, step करो, values देखो | लंबी जाँच |
+| Logging | context के साथ `logging.debug(...)` | जो bugs सिर्फ़ server पर दिखते हैं |
+| `git bisect` | Commits में binary search | "पिछले हफ़्ते तक चल रहा था" |
+
+**Debugger।** किसी line पर `breakpoint()` लगाओ और program चलाओ। वो वहाँ रुक जाता है, और आप `p row` से variable print कर सकते हो, `n` से अगली line चला सकते हो, `s` से किसी function के अंदर जा सकते हो, और `c` से आगे बढ़ा सकते हो। आप अंदाज़ा लगाने की जगह उस पल की असली state देखते हो जब वो मायने रखती है।
+
+**Search आधा करो।** अगर 200 lines की pipeline गलत total देती है, तो बीच में value check करो। वहाँ सही है? Bug दूसरे आधे में है। गलत है? पहले आधे में। कुछ ही checks में line मिल जाती है। `git bisect` यही commits में करता है: एक अच्छा commit और एक खराब commit mark करो, और Git आपको उस बदलाव तक ले जाता है जिसने सब तोड़ा।
+
+**कारण ठीक करो।** फेल होने वाली line को `try/except` में लपेटना symptom छुपाता है; खराब data अभी भी वहीं है। वहाँ ठीक करो जहाँ से गलत value आ रही है।
+
+**साबित करो।** ऐसा test लिखो जो आपके fix के बिना fail हो और उसके साथ pass हो।
+
+**AI apps में bugs।** जब कोई LLM feature गलत जवाब देता है, वही तरीका लागू होता है, traceback की जगह trace के साथ। उस request का trace खोलो और हर step क्रम से check करो: क्या सवाल सही तरीके से दोबारा लिखा गया, क्या retrieval को सही passage मिला, क्या prompt में वो शामिल था, और क्या model ने उसे use किया? जो पहला step गलत दिखे, वहीं खोदना है।
+
+## एक example से समझो
+
+Pune में pharmacies की एक chain की Imran की monthly sales report एक store के लिए ₹0 दिखाती है, जबकि dashboard ₹4.2 लाख दिखा रहा है।
+
+**Reproduce।** वो अपने laptop पर उसी export file के साथ October की report चलाता है। वही नतीजा: Kothrud store के लिए ₹0। Reproducible है।
+
+**Read।** कोई error है ही नहीं, जो अपने आप में एक clue है: code चलता है पर data को skip या zero कर देता है।
+
+**अंदाज़ा और दायरा छोटा करना।** Total zero होने के लिए क्या सच होना चाहिए? या तो store से कोई row match नहीं करती, या हर amount zero है। वो loop के अंदर `breakpoint()` लगाता है और पहली कुछ rows के लिए `row["store"]` print करता है: `'Kothrud '`, पीछे एक space के साथ। उसका filter `'Kothrud'` से तुलना करता है। कोई row match नहीं होती।
+
+**कारण ठीक करो।** वो अपने filter में space जोड़ सकता था, पर असली problem export का बेतरतीब data है। वो file पढ़ते समय ही store names से whitespace हटा देता है, ताकि बाद का हर step साफ़ values पाए।
+
+**साबित करो।** वो एक ऐसे store name के साथ test जोड़ता है जिसमें पीछे space है और check करता है कि वो गिना गया। वो एक check भी जोड़ता है जो चेतावनी दे जब master list के किसी store की कोई row न हो, ताकि अगली बार ऐसा mismatch चुपचाप ₹0 दिखाने की जगह ज़ोर से सामने आए।
+
+## आम गलतियाँ
+
+- **Bug reproduce करने से पहले code बदलना।** आप नहीं जान सकते कि आपका fix चला या नहीं।
+- **Traceback को ऊपर से पढ़ना।** Error और जिस line पर फेल हुआ वो नीचे हैं।
+- **Symptom ठीक करना।** जो `try/except` error को निगल जाता है, वो अगले bug को ढूँढना और मुश्किल कर देता है।
+- **एक साथ कई चीज़ें बदलना।** अगर वो चलने लगे, तो आपको पता नहीं चलेगा कि कौन-सा बदलाव काम आया।
+- **Debug prints और breakpoints छोड़ देना।** Commit करने से पहले `breakpoint(` और बचे हुए prints search करो।
+- **Test न जोड़ना।** उसके बिना, अगली बार कोई उस code को छुए तो bug लौट सकता है।
+
+## Practice करो
+
+1. किसी छोटी script में bug डालो (string वाला amount, range में off-by-one) और उसे `breakpoint()` से ढूँढो।
+2. अपनी पुरानी errors के तीन tracebacks पढ़ो और आखिरी line से बताओ कि क्या गलत हुआ।
+3. किसी practice repository में दस commits में से किसी एक में कुछ तोड़ो और उसे `git bisect` से ढूँढो।
+4. अपना debugging तरीका एक मिनट में ज़ोर से समझाओ, जैसे आप interview में करोगे।
