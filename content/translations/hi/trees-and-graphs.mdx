@@ -1,0 +1,157 @@
+---
+id: trees-and-graphs
+lang: hi
+title: "Trees और graphs"
+outcome: "Trees और graphs को code में represent कर पाओगे, breadth-first और depth-first search से traverse कर पाओगे, और shortest path, connected groups और cycles ढूँढने के लिए सही search चुन पाओगे।"
+answer: "Graph यानी nodes जो edges से जुड़े हों; tree वो graph है जिसमें cycle नहीं होता। Breadth-first search सबसे कम hops वाला path ढूँढता है, और depth-first search वो सब explore करता है जहाँ तक पहुँचा जा सकता है।"
+why_it_matters: "Road maps, social networks, file systems, org charts और RAG के knowledge graphs, सब trees या graphs हैं। Graph traversal interview का एक बहुत common topic है, और routing और recommendation features भी इसी से चलते हैं।"
+flashcards:
+  - q: "Tree और graph में क्या फ़र्क है?"
+    a: "Tree ऐसा connected graph है जिसमें कोई cycle नहीं होता और किन्हीं भी दो nodes के बीच सिर्फ़ एक path होता है। Graph में cycles और कई paths हो सकते हैं।"
+  - q: "Adjacency list क्या है?"
+    a: "एक dict जो हर node को उन nodes की list से जोड़ता है जिनसे वो connected है। Code में graph store करने का यही usual तरीका है।"
+  - q: "BFS कौन-सा structure use करता है, और क्या guarantee देता है?"
+    a: "Queue। Unweighted graph पर ये सबसे कम edges वाला path ढूँढ लेता है।"
+  - q: "DFS कौन-सा structure use करता है?"
+    a: "Stack, या recursion के ज़रिए call stack।"
+  - q: "Graph search में visited set रखना क्यों ज़रूरी है?"
+    a: "Graphs में cycles हो सकते हैं। Visited set के बिना search हमेशा घूमता रहेगा या वही काम बार-बार करेगा।"
+  - q: "Binary search tree में search तेज़ क्यों होता है?"
+    a: "छोटी values बाईं तरफ़ और बड़ी values दाईं तरफ़ जाती हैं, इसलिए tree balanced हो तो हर step पर आधा tree हट जाता है।"
+  - q: "Graph पर BFS या DFS की time complexity क्या है?"
+    a: "O(V + E): हर vertex और हर edge को एक बार handle किया जाता है।"
+exercise:
+  title: "BFS या DFS?"
+  setup: "हर काम के लिए एक traversal चुनो।"
+  questions:
+    - q: "Kochi से Srinagar तक सबसे कम flight changes, जहाँ हर flight बराबर गिनी जाती है।"
+      a: "BFS: ये hops के हिसाब से explore करता है, इसलिए जब वो पहली बार Srinagar पहुँचता है, वही सबसे कम changes वाला रास्ता है।"
+    - q: "किसी project folder और उसके सारे sub-folders की हर file की list बनाओ।"
+      a: "DFS, आमतौर पर recursive: अगले folder से पहले हर folder में गहराई तक जाओ। BFS भी चलेगा; यहाँ order मायने नहीं रखता।"
+    - q: "एक social app पर पता करो कि users के कौन-से groups आपस में जुड़े हुए हैं।"
+      a: "हर unvisited user से DFS (या BFS) चलाओ; हर run एक connected group को mark कर देता है।"
+    - q: "सबसे सस्ता train route ढूँढो, जहाँ tickets के दाम अलग-अलग हैं।"
+      a: "सादा BFS या DFS नहीं: edges पर weights हैं, इसलिए Dijkstra's algorithm use करो, जो priority queue वाला BFS जैसा search है।"
+ask:
+  - "BFS की जगह DFS कब use करूँ?"
+  - "Python में graph कैसे store करूँ?"
+  - "Dijkstra's algorithm BFS से कैसे अलग है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Graph** यानी **nodes** का एक set, जो **edges** से जुड़े होते हैं। Tracks से जुड़े metro stations, दोस्ती से जुड़े लोग और links से जुड़े web pages, सब graphs हैं। Edges की एक direction हो सकती है (one-way street) और एक weight भी (distance या price)।
+
+**Tree** एक special graph है: connected, और बिना cycles के, इसलिए किन्हीं भी दो nodes के बीच बिल्कुल एक ही path होता है। इसमें आमतौर पर ऊपर एक **root** होता है और नीचे **children**। आपके laptop के folders, company का org chart और web page का HTML, ये सब trees हैं। **Binary tree** में हर node के ज़्यादा से ज़्यादा दो children होते हैं; **binary search tree** में छोटी values बाईं तरफ़ और बड़ी values दाईं तरफ़ रहती हैं।
+
+```flow
+title: Tree: कोई cycle नहीं, किन्हीं दो nodes के बीच एक ही path
+CEO -> CTO
+CEO -> CFO
+CTO -> Dev1
+CTO -> Dev2
+CFO -> Fin1
+```
+
+```flow
+dir: LR
+title: Graph: cycles हो सकते हैं, कई paths होते हैं, इसलिए "visited" का track रखो
+Rajiv Chowk -> Kashmere Gate -> Civil Lines -> Vishwavidyalaya
+Rajiv Chowk -> Mandi House -> ITO -> Central Secretariat
+Rajiv Chowk -> Central Secretariat
+```
+
+इन्हें explore करने के दो तरीके बार-बार सामने आते हैं: **breadth-first search** (BFS) और **depth-first search** (DFS)।
+
+## ये काम कैसे करता है
+
+Code में graph आमतौर पर **adjacency list** होता है: एक dict, जिसमें हर node के सामने उसके पड़ोसी (neighbours) होते हैं।
+
+```python
+metro = {
+    "Rajiv Chowk": ["Kashmere Gate", "Mandi House", "Central Secretariat"],
+    "Kashmere Gate": ["Rajiv Chowk", "Civil Lines"],
+    "Mandi House": ["Rajiv Chowk", "ITO"],
+    "Central Secretariat": ["Rajiv Chowk", "ITO"],
+    "ITO": ["Mandi House", "Central Secretariat"],
+    "Civil Lines": ["Kashmere Gate", "Vishwavidyalaya"],
+    "Vishwavidyalaya": ["Civil Lines"],
+}
+```
+
+**BFS** छल्लों (rings) में explore करता है। ये एक node से शुरू होता है, उसके सारे neighbours देखता है, फिर उनके सारे neighbours, और ऐसे ही आगे। इसमें **queue** use होती है ताकि nodes उसी order में handle हों जिसमें मिले थे। चूँकि ये एक बार में एक edge बाहर की तरफ़ बढ़ता है, BFS जब पहली बार किसी node तक पहुँचता है, वो सबसे कम edges वाले रास्ते से होता है। इसीलिए "सबसे कम stops" या "degrees of separation" के लिए ये सही tool है।
+
+**DFS** एक path पर जितना गहरा जा सकता है जाता है, फिर पीछे लौटकर अगली branch try करता है। ये **stack** use करता है, अक्सर recursion के ज़रिए call stack। DFS उन कामों के लिए natural है जहाँ सब कुछ explore करना हो जहाँ तक पहुँचा जा सकता है, cycles detect करनी हों, या trees को किसी खास order में चलना हो।
+
+Graphs पर दोनों को **visited** set चाहिए, वरना cycles की वजह से वो हमेशा गोल-गोल घूमते रहेंगे। दोनों का time O(V + E) है, जहाँ V nodes की संख्या है और E edges की।
+
+| सवाल | क्या use करें | क्यों |
+|---|---|---|
+| दो nodes के बीच सबसे कम hops, unweighted | BFS | edges की distance के हिसाब से explore करता है |
+| किसी node से जहाँ तक पहुँच सकें, सब कुछ | DFS या BFS | दोनों सब visit करते हैं; DFS लिखने में छोटा है |
+| Cycle detect करना, या dependencies वाले tasks को order करना | DFS | इसकी back-tracking से cycles पता चलते हैं; topological order भी मिलता है |
+| Network में connected groups | हर unvisited node से DFS या BFS | हर run एक group को mark करता है |
+| Weighted edges के साथ सबसे सस्ता path | Dijkstra's algorithm | BFS weights को ignore करता है |
+| Sorted tree में कोई value ढूँढना | binary search tree walk | हर step पर search आधा हो जाता है |
+
+## एक example से समझो
+
+Kabir, Delhi के commuters के लिए एक route helper बना रहा है। User दो stations चुनता है और app सबसे कम stops वाला route दिखाता है। पास-पास के stations के बीच हर hop बराबर गिना जाता है, इसलिए BFS सही बैठता है।
+
+```python
+from collections import deque
+
+def fewest_stops(graph, start, goal):
+    queue = deque([[start]])          # each item is a path so far
+    visited = {start}
+    while queue:
+        path = queue.popleft()
+        station = path[-1]
+        if station == goal:
+            return path
+        for nxt in graph[station]:
+            if nxt not in visited:
+                visited.add(nxt)
+                queue.append(path + [nxt])
+    return None
+```
+
+"Mandi House" से "Civil Lines" तक, BFS पहले Rajiv Chowk और ITO ढूँढता है (एक stop दूर), फिर Kashmere Gate और Central Secretariat (दो stops दूर), फिर Civil Lines (तीन stops दूर)। ये `Mandi House → Rajiv Chowk → Kashmere Gate → Civil Lines` return करता है, और इससे छोटा कोई route है ही नहीं, क्योंकि BFS ने पहले हर दो-stop वाला route check कर लिया था।
+
+App को ये भी बताना है जब maintenance के दौरान कोई station कट जाए। Kabir बंद station को graph से हटाता है और किसी बड़े interchange से DFS चलाकर वो सारे stations list करता है जहाँ अब भी पहुँचा जा सकता है:
+
+```python
+def reachable(graph, start, seen=None):
+    seen = seen if seen is not None else set()
+    seen.add(start)
+    for nxt in graph[start]:
+        if nxt not in seen:
+            reachable(graph, nxt, seen)
+    return seen
+```
+
+जो भी station result में नहीं है, वहाँ पहुँचा नहीं जा सकता, और उस पर warning banner लग जाता है।
+
+बाद में जब team fares जोड़ती है, तो सबसे कम stops वाला route हमेशा सबसे सस्ता नहीं होता। ये weighted graph है, और Kabir Dijkstra's algorithm पर switch कर लेता है, जो एक BFS ही है पर priority queue के साथ, जो total cost के हिसाब से order होती है।
+
+## आम गलतियाँ
+
+**Visited set न रखना।** Cycles वाले graph पर BFS और DFS हमेशा के लिए loop में फँस जाते हैं। Node को visited तब mark करो जब उसे queue में डालो, तब नहीं जब queue से निकालो, वरना वही node कई बार add हो जाएगा।
+
+**Shortest path के लिए DFS use करना।** DFS एक path ढूँढता है, सबसे छोटा नहीं। सबसे कम edges चाहिए तो BFS use करो।
+
+**Weighted graphs पर BFS use करना।** BFS edges गिनता है, cost नहीं। Edges के weights अलग-अलग हों तो Dijkstra's algorithm use करो।
+
+**Deep recursion की limit।** लंबी chain पर recursive DFS, Python की लगभग 1,000 की recursion limit पार कर सकता है। बहुत गहरे graphs के लिए explicit stack use करो।
+
+**ये मान लेना कि हर tree balanced है।** पहले से sorted data से बना binary search tree एक लंबी chain बन जाता है, और search O(n) पर आ जाता है। असली systems में self-balancing trees use होते हैं।
+
+**Edge की direction भूल जाना।** Instagram पर follow करना one-way होता है। Directed edges उसी direction में store करो जिसमें वो जाती हैं।
+
+## Practice करो
+
+1. Watch & learn panel में video lessons देखो; Abdul Bari ने एक ही graph पर BFS और DFS जिस तरह समझाया है, वो खास तौर पर साफ़ है।
+2. ऊपर वाला exercise करो।
+3. Delhi Metro के एक हिस्से से, या अपने शहर के metro या bus routes से, project check करो।
+4. Stretch: BFS को ऐसे बदलो कि वो हर pair of stations के बीच stops की संख्या return करे, और वो दो stations ढूँढो जो एक-दूसरे से सबसे दूर हैं।

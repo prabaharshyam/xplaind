@@ -1,0 +1,205 @@
+---
+id: grounding-citations
+lang: hi
+title: "Grounding, citations और अंदाज़े से जवाब देने से मना करना"
+outcome: "RAG system को ऐसा बनाओ कि वो सिर्फ़ अपने sources से जवाब दे, हर दावे के पीछे का passage cite करे, और जब sources में जवाब न हो तो साफ़ कह दे।"
+answer: "Grounding RAG system को सिर्फ़ retrieve किए sources से जवाब देने, हर दावे के पीछे का passage cite करने, और sources में जवाब न होने पर साफ़ कहने के लिए बाँधती है।"
+why_it_matters: "Client के deployment में policy या price के बारे में एक भी confident गलत जवाब पूरे system पर से भरोसा ख़त्म कर सकता है। Citations वाले grounded जवाब users को check करने देते हैं, और साफ़ refusal अंदाज़े से कहीं बेहतर है। Clients पहले ही demo में इसके बारे में पूछते हैं।"
+flashcards:
+  - q: "RAG में grounding क्या है?"
+    a: "वो techniques जो model के जवाब को retrieve किए passages से बाँधे रखती हैं: सटीक instructions, citations, refusal का रास्ता और faithfulness checks।"
+  - q: "Prompt में हर passage को id और origin क्यों दें?"
+    a: "Ids से citations बन पाती हैं, और origin (जैसे document, section और page) से users और engineers उन्हें check कर सकते हैं।"
+  - q: "API से मिली citations bracket वाले numbers से ज़्यादा भरोसेमंद क्यों हैं?"
+    a: "API exact quoted हिस्सा और उसका source लौटाती है, और गारंटी देती है कि वो quote document में सचमुच है।"
+  - q: "Generation के बाद के तीन checks बताओ, सस्ते से गहरे तक।"
+    a: "Cited ids भेजे गए passages में हैं; quoted हिस्से source में मिलते हैं; और faithfulness score जो हर दावे को passages से मिलाकर देखता है।"
+  - q: "Refusal को काम का क्या बनाता है?"
+    a: "वो बताता है कि documents क्या cover करते हैं और क्या नहीं, और अगला कदम बताता है, जैसे कोई team, इंसान या form।"
+  - q: "मुश्किल golden set पर refusal rate लगभग शून्य होने का क्या मतलब है?"
+    a: "Model उन सवालों पर अंदाज़ा लगा रहा है जिनका जवाब documents में नहीं है।"
+  - q: "Golden set का कितना हिस्सा unanswerable होना चाहिए?"
+    a: "कोई तय standard नहीं है। एक काम का अंदाज़ा: कम से कम पाँचवाँ हिस्सा, ताकि अंदाज़े से जवाब देना नापा जा सके।"
+  - q: "Faithfulness क्या है?"
+    a: "जवाब का हर दावा दिए गए passages से समर्थित है या नहीं, चाहे वो दुनिया में सच हो या न हो।"
+  - q: "API की citations feature क्या लौटाती है?"
+    a: "जवाब के हर वाक्य के साथ structured citations: कौन-सा document, और उससे लिया गया exact text, ताकि आप brackets parse किए बिना source दिखा और check कर सको।"
+  - q: "मुश्किल golden set पर refusal rate क्यों track करें?"
+    a: "बहुत ज़्यादा हो तो retrieval फेल हो रहा है; जिन सवालों का documents जवाब नहीं दे सकते उन पर लगभग शून्य हो तो model अंदाज़ा लगा रहा है।"
+exercise:
+  title: "जवाब को ground करो"
+  setup: "Delhi की एक telecom का support assistant tariff documents से plan के सवालों के जवाब देता है। पूछा गया 'क्या ₹599 plan में international roaming शामिल है?', तो उसने ₹599 plan के data और calls के तीन passages निकाले, जिनमें से कोई roaming के बारे में नहीं था, और जवाब दिया: 'हाँ, चुनिंदा देशों में international roaming शामिल है।' जवाब में 'Tariff Guide.pdf' cite किया गया है।"
+  questions:
+    - q: "क्या गलत हुआ?"
+      a: "Model ने खाली जगह general knowledge से भर दी। किसी भी passage में इस दावे का समर्थन नहीं है, इसलिए जवाब unfaithful है।"
+    - q: "Citation में क्या कमज़ोरी है?"
+      a: "उसमें सिर्फ़ file का नाम है। उसमें passage, section और page होना चाहिए ताकि दावा check हो सके।"
+    - q: "यहाँ अच्छा जवाब क्या कहता?"
+      a: "कि ₹599 plan के documents data और calls cover करते हैं पर roaming के बारे में कुछ नहीं कहते, और कहाँ check करना है, जैसे roaming page या support।"
+    - q: "कौन-सा automatic check इसे पकड़ लेता?"
+      a: "Faithfulness check, जो पाता कि roaming वाले दावे के लिए कोई supporting passage नहीं है, या ऐसा rule जो बिना citation वाले वाक्य reject करे।"
+ask:
+  - "मेरा RAG app बातें गढ़ना कैसे बंद करे?"
+  - "Faithfulness कैसे नापूँ?"
+  - "Chatbot को कैसे बताना चाहिए कि उसे नहीं पता?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+RAG system passages retrieve करता है और model से कहता है कि उन्हीं से जवाब दे। पर model को उन passages के अंदर रहने पर मजबूर करने वाली कोई चीज़ नहीं है। वो training में सीखा हुआ कुछ मिला सकता है, खाली जगहें सुनने में ठीक लगने वाले details से भर सकता है, या ऐसे सवाल का जवाब दे सकता है जिसे documents कभी cover ही नहीं करते। **Grounding** वो techniques का set है जो जवाब को sources से बाँधे रखता है:
+
+- ऐसे instructions जो कहें कि सिर्फ़ दिए गए passages use करो;
+- **citations** जो हर दावे को उसका समर्थन करने वाले passage से जोड़ें;
+- जब passages में जवाब न हो तब साफ़ **refusal** का रास्ता;
+- एक check, automatic या इंसानी, कि जवाब अपने sources के प्रति **faithful** है।
+
+```flow
+Question -> Retrieve passages | [1] Leave Policy v4, 3.2, p.6; [2] Leave Policy v4, 3.4, p.7; [3] Travel Policy v2, 1.1, p.2
+Retrieve passages -> Prompt | सिर्फ़ यही use करो, ids cite करो, अगला कदम बताकर refuse करो
+Prompt -> Answer | "Earned leave 45 दिन तक carry forward होती है [1]। Policies में sick leave के carry-forward का ज़िक्र नहीं है; hr-help से पूछो।"
+Answer -> Checks | ids मौजूद हैं? quotes मिलते हैं? हर दावा समर्थित है?
+```
+
+इस lesson में हम Bengaluru की एक IT services firm के HR assistant pilot को देखेंगे।
+
+## ये काम कैसे करता है
+
+**Sources पर निशान लगाओ।** हर retrieve किए passage को prompt में id और उसके origin के साथ डालो, जैसे `[3] Leave Policy v4, section 2.1, page 6`। Ids से citations बन पाती हैं और debugging आसान होती है।
+
+**सटीक instructions दो।** Model को बताओ: सिर्फ़ passages से जवाब दो; जो वाक्य किसी passage का use करे उसके बाद उसका id cite करो; अगर passages सवाल का जवाब नहीं देते तो ये कह दो और बताओ किससे पूछना है। Cited जवाब का एक छोटा example और refusal का एक example दिखाओ। Models rules से ज़्यादा examples को follow करते हैं।
+
+**जहाँ मिले वहाँ built-in citations use करो।** कई model APIs citations को structured data के रूप में लौटा सकती हैं: exact quoted हिस्सा और वो किस document से आया। ये text में bracket वाले numbers माँगने से ज़्यादा भरोसेमंद है, क्योंकि API गारंटी देती है कि quote source में सचमुच है।
+
+**Generation के बाद check करो।** तीन व्यावहारिक checks, सस्ते से गहरे तक:
+
+1. हर cited id भेजे गए passages में मौजूद है। अगर सिर्फ़ पाँच passages भेजे गए और जवाब `[7]` cite करता है, तो उसे हटाओ या flag करो।
+2. Quoted हिस्से source text में सचमुच दिखते हैं (string match)।
+3. एक faithfulness score: कोई दूसरा model, या RAGAS जैसी eval library, जवाब को दावों में बाँटती है और हर दावे को passages से मिलाकर देखती है। इसे अपने golden set पर offline चलाओ, और live traffic के एक sample पर भी।
+
+**Refusal को design करो।** "HR policies में मुझे ये नहीं मिला। Leave encashment के सवालों के लिए hr-help@... से संपर्क करें" काम का है। अकेला "मुझे नहीं पता" काम का नहीं है। Refusal rate को track करो: बहुत ज़्यादा हो तो retrieval फेल हो रहा है; मुश्किल golden set पर लगभग शून्य हो तो model अंदाज़ा लगा रहा है।
+
+**Checks और वो क्या पकड़ते हैं:**
+
+| Check | Cost | क्या पकड़ता है |
+| --- | --- | --- |
+| Cited ids मौजूद हैं | Free, सिर्फ़ code | गढ़े हुए citation numbers |
+| Quotes source में दिखते हैं | Free, string match | गढ़े या बदले हुए quotes |
+| हर वाक्य में citation है | Free, सिर्फ़ code | बिना समर्थन वाले वाक्य |
+| दूसरे model से faithfulness score | एक extra call | वो दावे जिनका citation असल में समर्थन नहीं करता |
+| Sample की इंसानी review | Staff का समय | बारीक गलतियाँ और tone की दिक्कतें |
+
+**Users को sources दिखाना।** Citation को उस वाक्य के बगल में रखो जिसका वो समर्थन करती है, और उसे ऐसा बनाओ कि खुलने पर quoted passage section और page के साथ दिखे। तब users उन जवाबों को check करते हैं जो उनके लिए मायने रखते हैं, जैसे लंबी छुट्टी से पहले leave के rules, और mismatch report करते हैं, जो golden set में वापस जाते हैं।
+
+**Code में built-in citations।** Anthropic की API दिए गए documents को सीधे cite कर सकती है। हर passage को citations चालू करके एक document की तरह भेजो:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+def cited_answer(question, passages):
+    docs = [{"type": "document",
+             "source": {"type": "text", "media_type": "text/plain", "data": p["text"]},
+             "title": f"{p['title']}, section {p['section']}, page {p['page']}",
+             "citations": {"enabled": True}} for p in passages]
+    reply = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=600,          # check the docs for current names
+        system="Answer only from the documents. If they do not answer the question, say so "
+               "and suggest who to contact.",
+        messages=[{"role": "user", "content": docs + [{"type": "text", "text": question}]}])
+    parts = []
+    for block in reply.content:
+        if block.type != "text":
+            continue
+        cites = [f'{passages[c.document_index]["title"]}: "{c.cited_text}"' for c in (block.citations or [])]
+        parts.append({"text": block.text, "sources": cites})
+    return parts
+```
+
+जवाब का हर टुकड़ा उस exact text के साथ आता है जिस पर वो टिका था, जो वाक्य के बगल में दिखाने के लिए तैयार है। जिन टुकड़ों में citations नहीं हैं, उन्हीं को देखना है: या तो वो general wording हैं या बिना समर्थन के दावे।
+
+**Bracket-style citations के checks।** जब आप plain text में `[n]` markers माँगते हो, तो उन्हें code में check करो:
+
+```python
+import re
+
+def check_citations(answer, n_passages, passages_text):
+    problems = []
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+", answer.strip()) if s]
+    for s in sentences:
+        ids = [int(x) for x in re.findall(r"\[(\d+)\]", s)]
+        if not ids and len(s.split()) > 5:
+            problems.append(f"no citation: {s[:60]}")
+        for i in ids:
+            if not 1 <= i <= n_passages:
+                problems.append(f"cites [{i}] but only {n_passages} passages were sent")
+    for quote in re.findall(r'"([^"]{12,})"', answer):
+        if not any(quote in p for p in passages_text):
+            problems.append(f"quote not in any passage: {quote[:40]}")
+    return problems
+```
+
+जिन जवाबों में problems हों, उन्हें stakes के हिसाब से एक बार दोबारा generate किया जा सकता है, warning के साथ दिखाया जा सकता है, या review में भेजा जा सकता है।
+
+**Grounding का मतलब सच नहीं है।** एकदम सही cite किया हुआ जवाब भी गलत हो सकता है अगर source पुराना या गलत हो। Retrieval के वक्त superseded documents filter करो, हर citation के साथ document की date दिखाओ, और users को गलत source report करने दो।
+
+**बड़े पैमाने पर faithfulness।** Golden set और live traffic के sample के लिए, हर जवाब को दावों में बाँटो और judge model से हर दावे को cited passages से मिलवाओ। बिना समर्थन वाले दावों का हिस्सा समय के साथ, topic के हिसाब से track करो।
+
+## एक example से समझो
+
+Bengaluru की एक IT services firm अपनी leave, travel और reimbursement policies पर HR assistant चाहती है। Pilot में एक employee पूछता है: "क्या मैं बची हुई sick leave carry forward कर सकता हूँ?"
+
+Retrieve किए passages earned leave के carry-forward (45 दिन तक) के बारे में हैं पर sick leave के बारे में कुछ नहीं कहते। पहले version ने जवाब दिया: "हाँ, आप 45 दिन तक की leave carry forward कर सकते हो।" Sick leave के लिए ये गलत है, और तथ्य की तरह बताया गया है।
+
+आप तीन चीज़ें बदलते हो। Prompt अब हर वाक्य पर citation माँगता है और उसमें refusal का एक example है। आप API की citation feature पर आ जाते हो, ताकि हर दावा quoted हिस्से के साथ आए। और एक check जोड़ते हो जो उन जवाबों को flag करे जिनके दावों में citation नहीं है।
+
+नया जवाब: "मेरे पास जो policies हैं वो earned leave के carry-forward को cover करती हैं: 45 दिन तक [Leave Policy v4, 3.2]। उनमें ये नहीं लिखा कि sick leave carry forward हो सकती है या नहीं। कृपया HR से hr-help पर पूछ लें।" Employee citation पर click करके वो clause पढ़ सकता है।
+
+80 सवालों के golden set पर faithfulness 0.81 से बढ़कर 0.96 हो जाती है, और जिन unanswerable सवालों पर refusal मिला उनका हिस्सा 30% से 85% हो जाता है। Answerable सवालों के सही जवाब लगभग वैसे ही रहते हैं। आप तीनों numbers client को बताते हो।
+
+| 80 सवालों पर measure | पहले | बाद में |
+| --- | --- | --- |
+| Faithfulness | 0.81 | 0.96 |
+| Unanswerable सवाल जिन पर refuse हुआ | 30% | 85% |
+| Answerable सवाल जिनके सही जवाब मिले | 88% | 87% |
+
+## आम गलतियाँ
+
+- **Passage की जगह document को cite करना।** "Source: HR Policies.pdf" check नहीं हो सकता। Section और page cite करो।
+- **Golden set में unanswerable सवाल नहीं।** तब आप अंदाज़े से जवाब देना कभी नापते ही नहीं। Set का कम से कम पाँचवाँ हिस्सा ऐसा रखो जिसका जवाब documents से न मिले।
+- **Model के लिखे citation numbers पर भरोसा।** Models कभी-कभी ऐसा passage cite कर देते हैं जो दावे का समर्थन नहीं करता। Citations को automatically check करो।
+- **बिना अगले कदम वाले refusals।** Users को किसी इंसान, team या form की तरफ़ भेजो।
+- **Users से sources छुपाना।** Quoted passage दिखाने से भरोसा बनता है और users वो गलतियाँ पकड़ लेते हैं जो system से छूट गईं।
+- **बिना checks के citations parse करना।** Verify करो कि ids मौजूद हैं और quotes मिलते हैं।
+- **बिना citation वाले वाक्य छुपाना।** उनके बिना समर्थन के होने की संभावना सबसे ज़्यादा है।
+- **पुराने documents cite करना।** Dates दिखाओ और superseded versions filter करो।
+
+## कब citations कम मायने रखती हैं
+
+- **Creative या drafting के काम**, जहाँ model documents के facts नहीं बता रहा।
+- **Database या tool से आए जवाब**, जैसे order status, जहाँ tool का result ही source है।
+- **Internal brainstorming**, जहाँ लोग output को facts नहीं, ideas मानते हैं।
+
+जब भी users facts पर action लेते हैं, तब citations ज़रूरी हैं: policies, prices, eligibility, health, legal और financial जानकारी।
+
+## Demo से production तक
+
+- **Built-in citations use करो**, जहाँ आपका provider देता हो, और उन्हें log करो।
+- **हर जवाब पर citation checks चलाओ**, और sample पर faithfulness checks।
+- **हर वाक्य के बगल में sources दिखाओ, dates के साथ।**
+- **Topic के हिसाब से refusal और unsupported-claim rates track करो।**
+- **Users को गलत sources report करने दो** और reports document owners तक पहुँचाओ।
+
+## Practice करो
+
+नीचे link की citations guide और faithfulness पर RAGAS page पढ़ो।
+
+1. अपना RAG app जो भी passage भेजता है उस हर एक में ids और source labels जोड़ो, और हर वाक्य पर citation माँगो।
+2. अपने golden set में दस unanswerable सवाल जोड़ो। Prompt में refusal का example जोड़ने से पहले और बाद, नापो कि आपका app कितनों पर refuse करता है।
+3. एक check लिखो जो ऐसे हर जवाब को reject करे जो उस passage id को cite करे जो भेजा ही नहीं गया।
+4. अपने app को built-in citations API पर ले जाओ और पहले-बाद की तुलना करो कि कितने जवाबों में बिना समर्थन वाला वाक्य है।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 RAG cover करता है, और chapter 4 sources के सामने factual consistency check करना।
+
+**आपका काम पूरा जब** आप ऐसा जवाब दिखा सको जिसका हर वाक्य किसी असली passage से जुड़ा हो, और ऐसा refusal जो users को बताए कि आगे कहाँ जाना है।

@@ -1,0 +1,225 @@
+---
+id: cnns-images
+lang: hi
+title: "Images के लिए CNNs"
+outcome: "Image tasks के लिए convolutional neural networks use कर पाओगे: convolution patterns कैसे पकड़ता है, pre-trained model से transfer learning default क्यों है, data augmentation, और image models को सही तरीके से कैसे evaluate करें।"
+answer: "Convolutional neural networks छोटे sliding filters से images में edges और shapes जैसे patterns पकड़ते हैं। ज़्यादातर projects में scratch से train करने की जगह pre-trained model को fine-tune किया जाता है।"
+why_it_matters: "भारत में image models factories में defects check करते हैं, documents पढ़ते हैं, फ़सल grade करते हैं, KYC photos जाँचते हैं और medical imaging में मदद करते हैं। लगभग हर practical image काम pre-trained model से शुरू होता है, इसलिए उसे अपने काम के हिसाब से ढालना सबसे ज़रूरी skill है।"
+flashcards:
+  - q: "Convolutional neural network क्या है?"
+    a: "ऐसा network जो images को छोटे learned filters से process करता है, जो picture पर सरकते हैं; शुरू की layers edges और textures पकड़ती हैं, बाद की layers shapes और objects।"
+  - q: "CNNs images के लिए efficient क्यों हैं?"
+    a: "Image में हर जगह वही filter use होता है, तो network एक pattern एक बार सीखता है और वो जहाँ भी दिखे, पहचान लेता है।"
+  - q: "Transfer learning क्या है?"
+    a: "ऐसे model से शुरू करना जो पहले से लाखों general images पर train हो चुका है, और उसे अपने task के लिए ढालना। इसमें data और समय बहुत कम लगता है।"
+  - q: "Transfer learning के steps क्या हैं?"
+    a: "Pre-trained model load करो, आख़िरी layer को अपनी classes वाली layer से बदलो, पहले की layers को freeze करके train करो, फिर चाहो तो छोटे learning rate से और layers fine-tune करो।"
+  - q: "Data augmentation क्या है?"
+    a: "Random flips, crops, rotations और brightness बदलकर training images के अलग-अलग versions बनाना, ताकि overfitting कम हो।"
+  - q: "Augmentations कैसे चुनने चाहिए?"
+    a: "असलियत से मेल खाते हुए: पत्तों की photos rotate कर सकते हो, पर text documents या ऐसी images को flip मत करो जहाँ दिशा मायने रखती है।"
+  - q: "Image models को evaluate कैसे करना चाहिए?"
+    a: "ऐसी images पर जो training से अलग दिन, devices या जगहों की हों, confusion matrix के साथ, और गलत classify हुई images को देखकर।"
+  - q: "Classification, detection और segmentation में क्या फ़र्क है?"
+    a: "Classification बताती है image में क्या है, detection boxes से बताती है चीज़ें कहाँ हैं, और segmentation बताती है कौन-से pixels किसके हैं।"
+  - q: "Pretrained model की अपनी preprocessing क्यों use करें?"
+    a: "Network ने inputs को एक खास तरीके से resize और normalise होते देखकर सीखा है। अलग normalisation हर pixel value खिसका देता है और चुपचाप accuracy गिरा देता है।"
+  - q: "नए head को backbone से ज़्यादा learning rate क्यों दें?"
+    a: "Head random weights से शुरू होता है और उसे तेज़ी से सीखना है; backbone पहले से अच्छा है और उसे बस थोड़ा बदलना चाहिए।"
+exercise:
+  title: "एक image classifier की planning करो"
+  setup: "नासिक का एक agri-tech startup किसानों की phone photos से अंगूर के पत्तों की बीमारियों को चार classes में बाँटना चाहता है। उसके पास 2,000 photos हैं, सब एक ही agronomist ने एक ही phone से अच्छी धूप में खींची हैं। किसान अलग-अलग समय पर, सस्ते phones से photos लेंगे, अक्सर frame में मिट्टी और हाथ भी होंगे।"
+  questions:
+    - q: "क्या team को CNN scratch से train करना चाहिए?"
+      a: "नहीं। 2,000 images के साथ pre-trained model से transfer learning तेज़ भी होगा और ज़्यादा accurate भी।"
+    - q: "सबसे बड़ा data risk क्या है?"
+      a: "Training photos असली किसानों की photos जैसी नहीं दिखतीं। किसानों के phones से अलग-अलग रोशनी और backgrounds में photos इकट्ठा करो।"
+    - q: "कौन-से augmentations सही रहेंगे?"
+      a: "Rotations, flips, crops, brightness और colour changes, और थोड़ा blur, क्योंकि पत्ते किसी भी angle पर दिख सकते हैं और रोशनी बदलती रहती है।"
+    - q: "Launch से पहले उन्हें कैसे test करना चाहिए?"
+      a: "उन किसानों और phones की photos पर जो training में नहीं थे, गलत classify हुई photos पढ़कर, और कम confidence वाली predictions agronomist को भेजकर।"
+ask:
+  - "Convolution कैसे काम करता है?"
+  - "Transfer learning के लिए कितना data चाहिए?"
+  - "CNN use करूँ या vision transformer?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Convolutional neural network (CNN)** images को छोटे learned filters से process करता है जो picture पर सरकते हैं। शुरू की layers edges और textures सीखती हैं; बाद की layers उन्हें जोड़कर shapes और objects बनाती हैं। क्योंकि image में हर जगह वही filter use होता है, CNNs कुशलता से सीखते हैं और pattern जहाँ भी हो, पहचान लेते हैं।
+
+**Transfer learning** ऐसे CNN (या vision transformer) से शुरू करती है जो पहले से लाखों general images पर train हो चुका है, और उसे आपके task के लिए ढालती है। इसमें scratch से train करने से बहुत कम data और समय लगता है, और नतीजे आम तौर पर बेहतर मिलते हैं।
+
+```flow
+dir: LR
+Image, 224x224 -> Conv: edges | कई छोटे maps, 3x3 filters -> Conv: textures | pooling maps को छोटा करती है
+Conv: textures -> Conv: parts | बड़े regions -> Classifier | "slub defect" 0.91
+```
+
+```flow
+dir: LR
+title: Transfer learning
+Pre-trained layers, frozen -> नई आख़िरी layer, trained -[optionally]-> आख़िरी blocks को छोटे learning rate से unfreeze करो
+```
+
+इस lesson में हम पुणे की एक textile factory के fabric-defect project को देखेंगे।
+
+## ये काम कैसे करता है
+
+**Convolution और pooling।** एक filter (जैसे 3 × 3 pixels) अपने नीचे के pixels को multiply और sum करता है, और एक map बनाता है जो दिखाता है कि उसका pattern कहाँ-कहाँ है। हर layer में कई filters होते हैं, तो कई patterns पकड़े जाते हैं। Pooling या strided convolutions maps को छोटा करते हैं, इसलिए गहरी layers बड़े regions देखती हैं।
+
+**Classic architectures।** ResNet, EfficientNet और दूसरे अच्छे से परखे हुए हैं और pre-trained मिलते हैं। Vision transformers एक नया विकल्प हैं; practice में दोनों use होते हैं।
+
+**Transfer learning के steps।**
+
+1. एक pre-trained model load करो।
+2. उसकी आख़िरी layer को अपनी classes से मेल खाती layer से बदलो।
+3. पहले नई layer को train करो, पहले की layers को frozen रखकर; फिर चाहो तो कुछ या सारी layers unfreeze करके छोटे learning rate से train करो (fine-tuning)।
+
+**Data augmentation।** Random flips, crops, rotations, brightness और colour changes training images के अलग-अलग versions बनाते हैं, जिससे overfitting कम होता है। ऐसे augmentations चुनो जो असलियत से मेल खाएँ: पत्तों की photos rotate कर सकते हो, पर text documents flip मत करो।
+
+**Image data की quality।** असली images में रोशनी, angle, background और camera अलग-अलग होते हैं। ऐसी training images इकट्ठा करो जो production की images जैसी दिखें (दुकान में phone से ली photos studio photos जैसी नहीं होतीं)। Labels check करो; गलत labels वाली images सोच से ज़्यादा नुकसान करती हैं।
+
+**Evaluation।** Generalisation test करने के लिए अलग दिनों, devices या जगहों की images अलग रखो। Confusion matrix और गलत classify हुई images देखो; इनसे अक्सर label की गलतियाँ या छूटी हुई conditions (रात, बारिश, blur) पता चलती हैं।
+
+**Classification के आगे।** Object detection (चीज़ें कहाँ हैं), segmentation (कौन-से pixels किसके हैं) और OCR भी मिलती-जुलती architectures use करते हैं, और आम तौर पर pre-trained models से ही fine-tune होते हैं।
+
+**Scratch से train बनाम transfer learning:**
+
+| तरीका | कितना data चाहिए | समय | छोटे datasets पर आम नतीजा |
+| --- | --- | --- | --- |
+| Scratch से train | दसियों हज़ार images या ज़्यादा | लंबा | कमज़ोर |
+| Transfer learning, frozen backbone | सैकड़ों से कुछ हज़ार | छोटा | अच्छा |
+| आख़िरी blocks को fine-tune करना | कुछ हज़ार | मध्यम | अक्सर सबसे अच्छा |
+
+**एक filter क्या compute करता है।** 3 × 3 filter में नौ learned weights होते हैं। हर position पर वो इन्हें नीचे के नौ pixels से multiply करता है और नतीजों को जोड़कर एक number बनाता है। उसे पूरी image पर सरकाने से एक map मिलता है जो वहाँ चमकता है जहाँ filter का pattern है, जैसे vertical edge। 64 filters वाली layer 64 ऐसे maps बनाती है, और अगली layer उन्हें जोड़कर और जटिल patterns बनाती है।
+
+**Confusion matrix पढ़ना।** अकेली accuracy छिपा देती है कि कौन-सी classes आपस में confuse हो रही हैं। Confusion matrix हर असली class के लिए दिखाता है कि model ने कितनी बार कौन-सी class predict की। Fabric project में दिखा कि "slub" और "thick place" defects अक्सर आपस में बदल जाते थे, जबकि "hole" लगभग कभी miss नहीं हुआ। इससे team को पता चला कि कहाँ और examples इकट्ठा करने हैं और inspector की दूसरी नज़र कहाँ सबसे ज़रूरी है। Confidence के हिसाब से sort की हुई बीस गलत images आँख से देखना आम तौर पर किसी भी एक number से ज़्यादा सिखाता है।
+
+**torchvision से transfer learning।** Pretrained network load करो, आख़िरी layer बदलो, और दो phases में train करो:
+
+```python
+import torch
+from torch import nn
+from torchvision import models, transforms
+
+weights = models.ResNet18_Weights.DEFAULT
+model = models.resnet18(weights=weights)              # downloads pretrained weights once
+for p in model.parameters():
+    p.requires_grad = False                           # phase 1: freeze the backbone
+model.fc = nn.Linear(model.fc.in_features, 6)         # six defect classes
+
+train_tf = transforms.Compose([
+    transforms.RandomResizedCrop(224, scale=(0.7, 1.0)),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(brightness=0.3, contrast=0.3),      # shop lighting varies
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+eval_tf = weights.transforms()                        # the exact resize and normalisation used in pretraining
+
+opt = torch.optim.AdamW(model.fc.parameters(), lr=1e-3)
+# ... train a few epochs on the head only ...
+
+# Phase 2: unfreeze the last block and fine-tune gently
+for p in model.layer4.parameters():
+    p.requires_grad = True
+opt = torch.optim.AdamW([
+    {"params": model.layer4.parameters(), "lr": 1e-4},
+    {"params": model.fc.parameters(), "lr": 1e-3},
+], weight_decay=1e-4)
+```
+
+ऐसे augmentations चुनो जो असलियत से मेल खाएँ: पत्तों और fabric के लिए flips ठीक हैं, पर labels पर लिखे text या बाएँ-बनाम-दाएँ वाले defects के लिए गलत।
+
+**Training से पहले shapes और counts check करो।**
+
+```python
+x = torch.randn(4, 3, 224, 224)
+print(model(x).shape)                                           # torch.Size([4, 6])
+trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"trainable parameters: {trainable:,}")
+```
+
+**Class-wise results और सबसे बुरी गलतियाँ।**
+
+```python
+from sklearn.metrics import classification_report, confusion_matrix
+
+def evaluate(model, loader, class_names):
+    model.eval(); ys, ps, losses = [], [], []
+    with torch.no_grad():
+        for xb, yb in loader:
+            out = model(xb)
+            ys += yb.tolist(); ps += out.argmax(1).tolist()
+            losses += nn.functional.cross_entropy(out, yb, reduction="none").tolist()
+    print(classification_report(ys, ps, target_names=class_names, digits=3))
+    print(confusion_matrix(ys, ps))
+    return sorted(range(len(losses)), key=lambda i: -losses[i])[:30]   # indices of the most confident mistakes
+```
+
+सबसे ज़्यादा loss वाली 30 images पहले देखो: ये अक्सर गलत label वाली, blurry या किसी अजीब camera की होती हैं, और इन्हें ठीक करना tuning से ज़्यादा मदद करता है।
+
+**सिर्फ़ random नहीं, source के हिसाब से split करो।** अगर photos कई दुकानों या phones से आई हैं, तो हर दुकान की images एक ही split में रखो। वरना model defect की जगह दुकान का background और रोशनी सीख सकता है।
+
+**Model क्या देख रहा है, ये देखना।** Grad-CAM image के उन हिस्सों को highlight करता है जिनसे prediction बनी। अगर highlight watermark या table के किनारे पर है, तो model ने shortcut सीख लिया है।
+
+## एक example से समझो
+
+पुणे के fabric-defect project को आगे बढ़ाते हैं: दो factory lines की छह defect types वाली 4,800 labelled images।
+
+- Scratch से train किया छोटा CNN: 71% validation accuracy।
+- Pre-trained ResNet-50, नई आख़िरी layer, frozen backbone, 5 epochs: 86%।
+- आख़िरी दो blocks को दस गुना छोटे learning rate के साथ unfreeze किया, और augmentations (flips, छोटे rotations, brightness changes) जोड़े: 93%।
+
+Validation के लिए training से अलग हफ़्ते की images use हुईं। Confusion matrix में ज़्यादातर गलतियाँ "slub" और "thick place" defects के बीच दिखीं; 60 गलत classify हुई images देखने पर 14 गलत label वाली निकलीं। Labels ठीक करके दोबारा train करने पर 94.5%।
+
+Deployment से पहले team ने दूसरी factory line की 300 images पर test किया, जहाँ रोशनी अलग थी: 88%। उन्होंने उस line की 400 images training में जोड़ीं, और वहाँ भी 93% पहुँचे, और एक confidence threshold रखा जिसके नीचे की images human inspector के पास जाती हैं।
+
+| Step | Validation accuracy |
+| --- | --- |
+| Scratch से छोटा CNN | 71% |
+| Pre-trained ResNet-50, frozen, नई आख़िरी layer | 86% |
+| आख़िरी दो blocks fine-tune, augmentation के साथ | 93% |
+| 14 गलत labels ठीक करने के बाद | 94.5% |
+| दूसरी factory line, उसकी images जोड़ने से पहले | 88% |
+| दूसरी line, उसकी 400 images जोड़ने के बाद | 93% |
+
+Labels और दूसरी line की रोशनी भी उतनी ही मायने रखी जितनी architecture।
+
+## आम गलतियाँ
+
+- **कम data के साथ scratch से train करना।** Transfer learning use करो।
+- **गैर-असली augmentations।** उन तरीकों से augment करो जिनमें असली images बदलती हैं, जैसे रोशनी, angle और blur, उन तरीकों से नहीं जिनमें वो कभी नहीं बदलतीं।
+- **Training images की लगभग-नकल पर validate करना।** दिन, device या जगह के हिसाब से split करो।
+- **गलत classify हुई images को नज़रअंदाज़ करना।** इनसे label की गलतियाँ और छूटी conditions पता चलती हैं।
+- **Production में confidence threshold न रखना।** अनिश्चित images को अंदाज़ा लगवाने की जगह inspector के पास भेजो।
+- **Serving में pretrained model से अलग preprocessing।**
+- **ऐसे augmentations जो label बदल देते हैं**, जैसे बाएँ-दाएँ वाले defects को flip करना।
+- **दुकानों या devices के पार random splits**, जिनसे scores फूल जाते हैं।
+
+## जब CNN जवाब नहीं है
+
+- **Vision-language model वही काम prompt से कर देता है**, जैसे रसीद पढ़ना या नुकसान describe करना, आपके volume और cost पर।
+- **Labelled images बहुत कम हैं** और और मिल नहीं सकतीं: few-shot vision model या rules से शुरू करो।
+- **Signal metadata में है**, जैसे sensor readings या time stamps, pixels में नहीं।
+
+## Demo से production तक
+
+- **Training और serving में वही preprocessing use करो**, model के साथ saved।
+- **हर class और हर source (दुकान, device, दिन) के हिसाब से evaluate करो।**
+- **High-loss images देखो** और tuning से पहले labels ठीक करो।
+- **Production में image quality monitor करो**: blur, brightness, resolution।
+- **कम confidence वाली predictions के लिए human check रखो।**
+
+## Practice करो
+
+Stanford CS231n के convolutional networks वाले notes पढ़ो और fast.ai के course के पहले lessons करो।
+
+1. किसी छोटे public dataset (जैसे plant disease या Indian food images) पर transfer learning से एक pre-trained image model को fine-tune करो।
+2. Frozen-backbone training और partial fine-tuning की तुलना करो, augmentation के साथ और बिना।
+3. 30 गलत classify हुई images देखो और वजहों की categories बनाओ।
+4. एक बार random split से और एक बार source के हिसाब से split करके train करो, और बताओ accuracy कितनी बदली।
+
+**आपका काम पूरा जब:** आप transfer learning और augmentation का असर एक table में दिखा सको, और अपने validation split की वजह समझा सको।

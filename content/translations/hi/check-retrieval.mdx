@@ -1,0 +1,203 @@
+---
+id: check-retrieval
+lang: hi
+title: "Retrieval सही चल रहा है या नहीं, कैसे check करें"
+outcome: "एक छोटे test set और recall at k, context precision जैसे metrics से retrieval को नाप पाओगे।"
+answer: "Retrieval check करने के लिए सवालों और उनके जवाब वाले passages का एक छोटा test set बनाओ, फिर recall at k नापो: यानी top k results में सही passage कितनी बार आता है।"
+why_it_matters: "RAG का जवाब गलत हो, तो ज़्यादातर वजह retrieval होती है, model नहीं। Test set बताता है कि गड़बड़ कहाँ है, और सुधार को अंदाज़े की जगह सबूत के साथ दिखाने देता है।"
+flashcards:
+  - q: "Retrieval को जवाबों से अलग क्यों check करें?"
+    a: "RAG के ज़्यादातर गलत जवाब retrieval से शुरू होते हैं: सही passage आया ही नहीं, तो prompt कितना भी अच्छा हो, model उसे use नहीं कर सकता।"
+  - q: "Retrieval test set में क्या होता है?"
+    a: "30 से 100 असली जैसे सवाल, हर एक के साथ वो passage या passages जिनमें जवाब है। आसान, मुश्किल, धुंधले और ऐसे सवाल भी जिनका जवाब documents में है ही नहीं।"
+  - q: "Recall at k क्या है?"
+    a: "कितने सवालों में top k results के अंदर कम से कम एक सही passage आया।"
+  - q: "Context precision क्या है?"
+    a: "जो passages निकले, उनमें से कितने काम के थे। Precision कम हो तो prompt में फ़ालतू text भर जाता है।"
+  - q: "MRR क्या है?"
+    a: "Mean reciprocal rank: ये देखता है कि सही passage ऊपर के पास आया या नहीं। पहली जगह पर 1, दूसरी पर 0.5, और इसी तरह आगे।"
+  - q: "Faithfulness क्या है?"
+    a: "जवाब की बातें निकाले गए passages से सपोर्ट होती हैं या नहीं।"
+  - q: "सही passage मिल गया पर जवाब गलत है, तो क्या ठीक करें?"
+    a: "Generation: prompt, grounding instructions या model। Retrieval नहीं।"
+  - q: "Test set को fixed क्यों रखें?"
+    a: "ताकि बदलावों की सही तुलना हो सके। एक बदलाव कुछ सवालों में मदद और कुछ में नुकसान कर सकता है; fixed set ही असली नतीजा दिखाता है।"
+  - q: "nDCG वो क्या देखता है जो recall नहीं देखता?"
+    a: "सबसे काम के passages ठीक सबसे ऊपर आए या नहीं, graded relevance के साथ। Recall बस इतना देखता है कि top k में कहीं एक सही मिला।"
+  - q: "क्या model retrieval के test सवाल लिख सकता है?"
+    a: "वो passages से draft बनाकर समय बचा सकता है, पर हर सवाल कोई इंसान check और edit करे, और set का बड़ा हिस्सा असली users के सवाल हों।"
+exercise:
+  title: "Numbers से गड़बड़ पहचानो"
+  setup: "Chennai की एक IT company का HR assistant 50 सवालों पर test हुआ। Version A: recall at 5 है 92%, faithfulness 0.71, correctness 64%। Prompt बदलने के बाद Version B: recall at 5 अब भी 92%, faithfulness 0.94, correctness 85%। बड़े chunks पर जाने के बाद Version C: recall at 5 गिरकर 78%, correctness 74%।"
+  questions:
+    - q: "Version A में मुख्य दिक्कत retrieval की है या generation की?"
+      a: "Generation की। Recall ज़्यादा है, यानी सही passages आ रहे हैं, पर faithfulness कम है, यानी model उन पर टिका नहीं रहता।"
+    - q: "B में prompt बदलाव से क्या ठीक हुआ?"
+      a: "Grounding: model अब निकाले गए passages से जवाब देता है, इसलिए faithfulness और correctness बढ़े जबकि retrieval वैसा ही रहा।"
+    - q: "क्या team को Version C के बड़े chunks रखने चाहिए?"
+      a: "नहीं। Recall 92% से 78% पर गिरा और correctness भी गिरी, यानी बदलाव ने retrieval बिगाड़ा।"
+    - q: "हर बार वही 50 सवाल use करना ज़रूरी क्यों था?"
+      a: "ताकि फ़र्क बदलावों की वजह से दिखे, अलग सवालों की वजह से नहीं।"
+ask:
+  - "RAG retrieval की quality कैसे नापें?"
+  - "RAG के लिए अच्छा recall at 5 कितना होता है?"
+  - "RAG के लिए test set कैसे बनाऊँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+RAG system के ज़्यादातर गलत जवाब retrieval से शुरू होते हैं: सही passage मिला ही नहीं, इसलिए model उसे use नहीं कर पाया। **Retrieval check करने** का मतलब है test सवालों के एक fixed set से नापना कि सही passages वापस आ रहे हैं या नहीं, और ये final जवाब की quality से अलग देखना।
+
+```flow
+गलत जवाब -> क्या सही passage top k में था?
+क्या सही passage top k में था? -[नहीं]-> Retrieval की दिक्कत | chunking, embeddings, hybrid search, query rewriting, filters
+क्या सही passage top k में था? -[हाँ]-> Generation की दिक्कत | prompt, grounding rules, citations, model का चुनाव
+```
+
+इस lesson में हम कोच्चि के एक bank को देखेंगे, जिसका staff assistant अपने circulars के बारे में बहुत गलत जवाब दे रहा था।
+
+## ये काम कैसे करता है
+
+**Test set बनाओ।** 30 से 100 असली जैसे सवाल इकट्ठा करो, और हर एक के साथ वो passage या passages जिनमें जवाब है। जहाँ हो सके असली users के सवाल लो, और आसान, मुश्किल, धुंधले और ऐसे सवाल भी रखो जिनका जवाब है ही नहीं। Set को fixed रखो, ताकि बदलावों की सही तुलना हो सके।
+
+**Retrieval metrics।**
+
+- **Recall at k**: कितने सवालों में top k results के अंदर कम से कम एक सही passage आता है? Recall at 5 अक्सर मुख्य number होता है। सख़्ती से देखें तो ये "कम से कम एक" वाला version hit rate भी कहलाता है; जब किसी सवाल के कई सही passages हों, तो कुछ tools recall at k को ऐसे परिभाषित करते हैं कि उनमें से कितने मिले।
+- **Precision at k** या **context precision**: निकाले गए k passages में से कितने सच में काम के हैं? RAGAS का context precision ये भी देखता है कि काम वाले ऊपर रैंक हुए या नहीं। Precision कम हो तो prompts में फ़ालतू text भर जाता है।
+- **MRR** (mean reciprocal rank): सही passage को ऊपर के पास रखने पर reward देता है।
+
+**Answer metrics**, अलग से नापे जाते हैं:
+
+- **Faithfulness**: जवाब की बातें निकाले गए passages से सपोर्ट होती हैं क्या?
+- **Answer correctness**: क्या जवाब expected जवाब से मिलता है?
+
+RAGAS जैसे tools ये निकाल देते हैं, अक्सर model को judge बनाकर; एक sample हाथ से ज़रूर check करो।
+
+**Split से गड़बड़ पकड़ो।** अगर जवाब गलत है:
+
+- सही passage निकला *ही नहीं* → retrieval ठीक करो (chunking, embeddings, hybrid search, query rewriting, filters);
+- सही passage निकला पर जवाब गलत → generation ठीक करो (prompt, grounding, model)।
+
+**हर बदलाव के बाद चलाओ।** Chunk size, embedding model या top-k बदलने से कुछ सवालों में फ़ायदा और कुछ में नुकसान हो सकता है। Fixed set असली नतीजा दिखाता है।
+
+**Metrics का एक छोटा example।** चार test सवाल, हर एक के top 5 results; पहला सही passage किस position पर था, ये दिखाया है:
+
+| सवाल | पहला सही passage कहाँ | Top 5 में? | Reciprocal rank |
+| --- | --- | --- | --- |
+| Q1 | 1 | हाँ | 1.0 |
+| Q2 | 3 | हाँ | 0.33 |
+| Q3 | मिला ही नहीं | नहीं | 0 |
+| Q4 | 2 | हाँ | 0.5 |
+
+Recall at 5 = 4 में से 3 = 75%। MRR = (1.0 + 0.33 + 0 + 0.5) ÷ 4, लगभग 0.46।
+
+**Test set जल्दी कैसे बनाएँ।** Support tickets, search logs या chats के असली सवालों से शुरू करो। हर सवाल के लिए documents जानने वाला कोई इंसान जवाब वाला passage ढूँढे और उसका document और section लिख ले। 30 सवाल एक दोपहर में हो जाते हैं। ऐसे सवाल भी रखो जिनका जवाब documents में नहीं है, expected passage में "none" लिखकर, ताकि पता चले कि system "मुझे नहीं पता" बोलता है या नहीं। जब भी कोई user गलत जवाब report करे, एक नया सवाल जोड़ दो।
+
+**Model को judge की तरह use करना।** RAGAS जैसे tools faithfulness और relevance बड़े पैमाने पर score करने के लिए model use करते हैं। ये काम के हैं पर परफ़ेक्ट नहीं। 20 का एक sample हाथ से score करके मिलाओ; अगर judge अक्सर इंसानों से असहमत हो, तो उसके numbers पर भरोसा करने से पहले उसकी instructions ठीक करो।
+
+**Metrics code में।** हर test case में उन passages के ids होते हैं जो जवाब देते हैं; retriever ranked ids लौटाता है:
+
+```python
+import math
+
+def metrics(cases, retrieve, k=5):
+    """cases: list of (question, set_of_relevant_ids). Empty set = unanswerable."""
+    recall = precision = mrr = ndcg = 0.0
+    answerable = [c for c in cases if c[1]]
+    for q, relevant in answerable:
+        ranked = retrieve(q)[:k]
+        hits = [1 if r in relevant else 0 for r in ranked]
+        recall += any(hits)
+        precision += sum(hits) / k
+        mrr += next((1 / (i + 1) for i, h in enumerate(hits) if h), 0)
+        dcg = sum(h / math.log2(i + 2) for i, h in enumerate(hits))
+        ideal = sum(1 / math.log2(i + 2) for i in range(min(len(relevant), k)))
+        ndcg += dcg / ideal
+    n = len(answerable)
+    return {"recall@k": recall / n, "precision@k": precision / n, "mrr": mrr / n, "ndcg@k": ndcg / n}
+```
+
+जिन सवालों का जवाब है ही नहीं, उन्हें इन numbers से जानबूझकर बाहर रखा है; उन्हें अलग से check करो, ये देखकर कि final जवाब में "मुझे नहीं पता" आया या नहीं।
+
+**Results को बाँटकर देखो।** एक overall recall समस्याएँ छिपा देता है। हर सवाल को tag करो (exact code, धुंधला, Hindi, कई हिस्सों वाला, हाल की policy) और हर tag का recall अलग बताओ। Ingestion बदलने के बाद "हाल की policy" वाले सवालों में गिरावट आए, तो आम तौर पर मतलब होता है कि नए documents index ही नहीं हुए।
+
+```python
+from collections import defaultdict
+
+def by_tag(cases_with_tags, retrieve, k=5):
+    groups = defaultdict(list)
+    for q, rel, tag in cases_with_tags:
+        groups[tag].append((q, rel))
+    return {tag: metrics(cs, retrieve, k)["recall@k"] for tag, cs in groups.items()}
+```
+
+**छोटे sets में noise होता है।** 30 सवालों में एक सवाल 3 points से ज़्यादा है। 3 points के बदलाव पर न खुश हो, न घबराओ; देखो कि कौन-से सवाल पलटे और क्यों। Set को समय के साथ बढ़ाओ, खासकर उन tags में जो सबसे ज़रूरी हैं।
+
+**Model से सवाल draft करवाना।** जल्दी शुरू करने के लिए model को एक passage दो और कहो कि ऐसे दो सवाल लिखे जिनका जवाब उसमें हो, user की भाषा में। फिर कोई इंसान हर सवाल edit करे या हटाए, और passage को expected जवाब की तरह लिख दे। इन्हें synthetic mark करो और logs से असली सवाल जोड़ते रहो: models अक्सर passage के अपने ही शब्द दोहरा देते हैं, जिससे retrieval असल से आसान दिखता है।
+
+**Retrieval और जवाब साथ में।** हर case के लिए निकाले गए ids, जवाब और verdicts store करो। फिर कोई भी गलत जवाब एक नज़र में दो में से एक bucket में आ जाता है: सही passage था ही नहीं (retrieval की दिक्कत) या था (generation की दिक्कत)।
+
+## एक example से समझो
+
+कोच्चि के एक bank का internal assistant 900 circulars से staff के सवालों के जवाब देता है। Staff की शिकायत है कि जवाब अक्सर गलत होते हैं।
+
+Team 60 सवाल लिखती है, हर एक के साथ वो circular और paragraph जो जवाब देता है। Results:
+
+- recall at 5: 63%;
+- जवाबों की faithfulness: 0.92;
+- correctness: 58%.
+
+Faithfulness ज़्यादा है, यानी model ज़्यादातर वही कहता है जो निकले हुए passages में है। Recall कम है: सही passages अक्सर आते ही नहीं। चूके हुए सवाल देखे, तो ज़्यादातर में circular numbers हैं ("as per RBI/2026-27/41") और हाल में बदले गए circulars, जिनमें पुराने versions नए से ऊपर रैंक हो रहे थे।
+
+बदलाव: circular numbers के लिए keyword matching वाला hybrid search, और superseded circulars हटाने वाला एक filter। Recall at 5 बढ़कर 87% और correctness 81% हो गई, उन्हीं 60 सवालों पर नापकर।
+
+| Measure | पहले | Hybrid search और superseded filter के बाद |
+| --- | --- | --- |
+| Recall at 5 | 63% | 87% |
+| Faithfulness | 0.92 | 0.93 |
+| Correctness | 58% | 81% |
+
+Model कभी दिक्कत थी ही नहीं; वो तो गलत circulars से ही वफ़ादारी से जवाब दे रहा था।
+
+**चूके हुए सवाल पढ़ना।** Team सिर्फ़ numbers पर नहीं रुकी। उन्होंने वो सारे 22 सवाल पढ़े जिनमें सही passage top पाँच में नहीं था, और वजहों के हिसाब से बाँटा: 9 में circular numbers थे जिन्हें embedding search exactly match नहीं कर पा रहा था, 7 में superseded circular मौजूदा circular से ऊपर आ गया, 4 धुंधले सवाल थे, और 2 में test set में ही expected passage गलत लिखा था। हर वजह का इलाज अलग था, और test set की अपनी गलतियाँ ठीक करना इस काम का आम हिस्सा है।
+
+## आम गलतियाँ
+
+- **सिर्फ़ final जवाब देखना।** पता ही नहीं चलता कि retrieval फ़ेल हुआ या generation।
+- **Runs के बीच test set बदलना।** तुलना के लिए उसे fixed रखो।
+- **बिना जवाब वाले सवाल न रखना।** Refusals test करने के लिए ये चाहिए।
+- **Automatic judges पर आँख बंद करके भरोसा।** एक sample check करो।
+- **Recall बढ़ाते-बढ़ाते precision गिरा देना।** दोनों track करो।
+- **सिर्फ़ आसान सवालों वाले test sets।** धुंधले, कई हिस्सों वाले और बिना जवाब वाले सवाल रखो, जैसे असली users पूछते हैं।
+- **दोबारा test करने से पहले कई चीज़ें बदल देना।** एक setting बदलो, set चलाओ, numbers लिखो, फिर अगली बदलो।
+- **सिर्फ़ synthetic सवाल**, जो documents के अपने शब्द use करते हैं और retrieval को बेहतर दिखाते हैं।
+- **सिर्फ़ एक overall number।** Recall को सवाल के type के हिसाब से बाँटो।
+- **बिना जवाब वाले सवालों को recall में मिला देना**, जिससे दोनों numbers छिप जाते हैं।
+
+## जब हल्का check काफ़ी है
+
+- **छोटा prototype**: हाथ से check किए दस सवाल बता देते हैं कि retrieval मोटे तौर पर चल रहा है या नहीं।
+- **ऐसा collection जो कम बदलता है**, जहाँ launch पर एक ध्यान से किया test और बीच-बीच में spot checks काफ़ी हो सकते हैं।
+- **ऐसे जवाब जिन्हें लोग use करने से पहले हमेशा source से verify करते हैं।**
+
+## Demo से production तक
+
+- **Test set को repository में रखो**, सवाल के type से tag करके, और हर retrieval बदलाव पर चलाओ।
+- **Recall, precision, MRR और nDCG** को settings और index version के साथ record करो।
+- **हर report हुआ गलत जवाब** एक नए सवाल की तरह जोड़ो।
+- **Model-judged scores को हर महीने हाथ से spot-check करो।**
+- **किसी भी ज़रूरी tag पर recall गिरे तो alert** भेजो।
+
+## Practice करो
+
+नीचे link किया RAGAS metrics page पढ़ो।
+
+1. अपने RAG app के लिए 30 सवाल लिखो, हर एक के साथ सही passage।
+2. Recall at 5 और precision at 5 निकालो, और जो चूके उनकी list बनाओ।
+3. Retrieval में एक बदलाव करो और उसी set पर दोबारा चलाओ।
+4. अपने 30 सवालों को type से tag करो और retrieval बदलाव से पहले और बाद में हर tag का recall at 5 बताओ।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 context precision और recall के साथ retrieval evaluate करना सिखाता है, और chapter 4 evaluation sets बनाना।
+
+**आपका काम पूरा जब:** आप समझा सको कि recall at 5 क्या नापता है, सही chunk न मिलने पर सबसे पहले कहाँ देखना है, और before-and-after numbers दिखा सको।
