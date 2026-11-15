@@ -1,0 +1,123 @@
+---
+id: system-design-basics
+lang: hi
+title: "System design को कैसे approach करें"
+outcome: "System design की बातचीत को साफ़ steps में चलाना सीखोगे: requirements पक्की करना, load और storage का अंदाज़ा लगाना, main components का sketch बनाना, फिर ज़रूरी हिस्सों में गहराई से जाना और trade-offs बताना।"
+answer: "System design को पाँच steps में approach करो: requirements साफ़ करो, load और storage का अंदाज़ा लगाओ, main components का sketch बनाओ, सबसे मुश्किल हिस्सों में गहराई से जाओ, और trade-offs बताओ।"
+why_it_matters: "हर senior engineering और AI engineering interview में एक design round होता है, और असली AI products खराब models से ज़्यादा खराब system design की वजह से fail होते हैं। एक दोहराने लायक approach आपको शांत रखता है और वो सब cover करता है जो interviewers देखते हैं।"
+flashcards:
+  - q: "System design के जवाब के आम steps कौन-से हैं?"
+    a: "Requirements साफ़ करो, scale का अंदाज़ा लगाओ, high-level design का sketch बनाओ, key हिस्सों में गहराई से जाओ, और trade-offs और failures पर बात करो।"
+  - q: "Functional और non-functional requirements में क्या फ़र्क है?"
+    a: "Functional: system क्या करता है, जैसे 'seat book करो'। Non-functional: कितना अच्छा करता है, जैसे latency, availability, scale और cost।"
+  - q: "अंदाज़े के लिए एक दिन में लगभग कितने seconds होते हैं?"
+    a: "लगभग 1 लाख (86,400)। यानी रोज़ 1 करोड़ requests का औसत लगभग 100 से 120 per second है।"
+  - q: "Average load की जगह peak load की planning क्यों करें?"
+    a: "Traffic बराबर नहीं होता। Tatkal का समय या कोई sale औसत से 10 गुना या ज़्यादा ला सकती है, और systems तभी fail होते हैं।"
+  - q: "'99.9% availability' कितना downtime allow करती है?"
+    a: "महीने में लगभग 43 मिनट।"
+  - q: "System design में trade-off क्या होता है?"
+    a: "एक quality को दूसरी की कीमत पर चुनना, जैसे cache से तेज़ reads, पर इस कीमत पर कि data पुराना हो सकता है।"
+  - q: "Boxes बनाने से पहले सवाल क्यों पूछें?"
+    a: "सही design scale, latency और consistency की ज़रूरतों पर निर्भर करता है। इनके बिना आप गलत system को अच्छे से design कर सकते हो।"
+exercise:
+  title: "अंदाज़ा लगाओ"
+  setup: "भारत की एक ed-tech app के 50 लाख daily active learners हैं। हर learner दिन में लगभग 8 lessons खोलता है और हर lesson page 3 API calls करता है। हर learner रोज़ 200 KB की एक answer image भी upload करता है।"
+  questions:
+    - q: "दिन में लगभग कितने API calls, और औसतन per second कितने?"
+      a: "50 लाख × 8 × 3 = रोज़ 12 करोड़ calls। लगभग 1 लाख seconds से भाग दो: औसतन लगभग 1,200 से 1,400 per second।"
+    - q: "अगर शाम का peak औसत का 5 गुना है, तो system को कितना संभालना चाहिए?"
+      a: "लगभग 6,000 से 7,000 requests per second।"
+    - q: "रोज़ और साल भर में नई images का कितना storage लगेगा?"
+      a: "50 लाख × 200 KB = रोज़ लगभग 1 TB, यानी compression या deletion से पहले साल में लगभग 365 TB।"
+    - q: "ये storage का आँकड़ा बताता है कि images कहाँ रखनी चाहिए?"
+      a: "Object storage में, जैसे Amazon S3 या Google Cloud Storage, CDN के ज़रिए serve करके, main database में नहीं।"
+ask:
+  - "System design interview में सबसे पहले क्या पूछना चाहिए?"
+  - "Back-of-the-envelope estimate कैसे लगाऊँ?"
+  - "AI system को design करना आम web system से कैसे अलग है?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**System design** ये तय करना है कि software system के हिस्से आपस में कैसे जुड़ें, ताकि वो वही करे जो users को चाहिए, उस scale पर जिसका उसे सामना करना है, और अपने budget में। इसमें components (apps, services, databases, caches, queues), उनके बीच data का बहाव, और कुछ fail होने पर क्या होता है, ये सब आता है।
+
+सही जवाब शायद ही कभी एक होता है। अच्छा design वो है जिसके चुनाव requirements से मेल खाते हों और जिसके trade-offs खुलकर बताए गए हों। Interviewers भी यही देखते हैं: एक साफ़ process, समझदार numbers और ईमानदार trade-offs, किसी perfect diagram से ज़्यादा।
+
+```flow
+dir: LR
+1. Requirements | इसे क्या करना है? कितना तेज़, कितना बड़ा, कितना भरोसेमंद? -> 2. Estimates | users, requests per second, storage, bandwidth, औसत और peak पर
+2. Estimates -> 3. High-level design | clients, load balancer, app servers, cache, database, queue, workers
+3. High-level design -> 4. Deep dive | data model, hot paths, scaling
+4. Deep dive -> 5. Trade-offs और failures | क्या टूटता है, आपने क्या चुना और क्यों
+```
+
+## ये काम कैसे करता है
+
+**1. Requirements साफ़ करो.** उन्हें **functional** requirements (system क्या करता है, जैसे "users seat book कर सकते हैं" या "users को order status दिखता है") और **non-functional** requirements (कितना अच्छा करता है: latency, availability, consistency, scale, cost, security) में बाँटो। पूछो कि users कौन हैं, कितने हैं, और कौन-से features scope में हैं। जवाब लिख लो।
+
+**2. अंदाज़ा लगाओ.** **Back-of-the-envelope estimate** users को load में बदलता है। काम की बातें: एक दिन में लगभग 1 लाख seconds होते हैं (86,400), इसलिए रोज़ 1 करोड़ requests लगभग 115 per second बनती हैं; औसत के कई गुना peaks की planning करो। हर item का storage, गुणा रोज़ के items, गुणा रखे जाने वाले दिन, इसका अंदाज़ा लगाओ। इन्हीं numbers से तय होता है कि एक database काफ़ी है या कई चाहिए।
+
+**3. High-level design का sketch बनाओ.** Main boxes और arrows बनाओ: clients, load balancer, stateless app servers, cache, database, files के लिए object storage, और धीमे jobs के लिए background workers वाली queue। एक request को शुरू से अंत तक इसमें से गुज़ारकर दिखाओ।
+
+**4. Deep dive.** इस system के लिए जो हिस्से सबसे ज़्यादा मायने रखते हैं उनमें गहराई से जाओ: data model और उसके indexes, सबसे busy path को कैसे scale करें, data को consistent कैसे रखें, या अचानक आए spike को कैसे संभालें।
+
+**5. Trade-offs और failures.** बताओ कि हर चुनाव की कीमत क्या है। Cache reads को तेज़ करता है पर पुराना data दे सकता है; queue spikes को सँभालती है पर देरी जोड़ती है; ज़्यादा replicas availability बढ़ाते हैं पर महँगे पड़ते हैं। हर component के लिए पूछो "अगर ये box fail हो जाए तो?"
+
+| Non-functional ज़रूरत | आम numbers | Design के levers |
+|---|---|---|
+| Latency | page के लिए p95 200 ms से कम | caches, CDNs, कम hops, indexes |
+| Throughput | हज़ारों requests per second | ज़्यादा app servers, load balancing, async काम |
+| Availability | 99.9% = महीने में लगभग 43 मिनट down | replicas, health checks, कोई single point of failure नहीं |
+| Consistency | payments के लिए strong, likes के लिए eventual | transactions, सिर्फ़ primary से reads, idempotency |
+| Cost | हर लाख requests पर रुपये | सही size की machines, caching, सस्ते storage tiers |
+
+**Browser में try करो।** Back-of-envelope numbers से ज़्यादातर designs तय होते हैं। Inputs बदलो और चलाओ।
+
+```python
+daily_users = 200_000
+requests_per_user = 15
+peak_factor = 3
+bytes_per_record = 2_000
+
+per_second = daily_users * requests_per_user / 86_400
+print(f"average {per_second:,.0f} requests/s, peak about {per_second * peak_factor:,.0f}/s")
+storage_gb_year = daily_users * requests_per_user * bytes_per_record * 365 / 1e9
+print(f"about {storage_gb_year:,.0f} GB of records a year")
+```
+
+## एक example से समझो
+
+Meera से एक interview में कहा जाता है कि बेंगलुरु की एक food delivery app के order-status page को design करो: order करने के बाद customers को "Preparing", "Picked up" और "Arriving" दिखता है, साथ में rider की location।
+
+**Requirements.** वो पूछती हैं और पक्का करती हैं: active orders के लिए status और rider location दिखाओ; updates लगभग 5 seconds के अंदर; रोज़ 20 लाख orders, डिनर के समय peak के साथ; history scope से बाहर है। Availability, perfect freshness से ज़्यादा मायने रखती है: कुछ seconds पुरानी location दिखाना ठीक है।
+
+**Estimates.** रोज़ 20 लाख orders, हर एक लगभग 40 मिनट active रहता है। Riders हर 5 seconds में location भेजते हैं, इसलिए हर order लगभग 480 updates बनाता है। यानी रोज़ लगभग 96 करोड़ updates: औसतन लगभग 11,000 per second और डिनर के peak पर शायद 40,000। Customers page को बार-बार refresh करते हैं, इसलिए reads और भी ज़्यादा हैं। हर location update बहुत छोटा है, लगभग 100 bytes, पर delivery के बाद उन्हें रखने की ज़रूरत नहीं।
+
+**High-level design.** Rider apps locations को load balancer के पीछे एक ingestion service को भेजते हैं। हर order की ताज़ा location Redis जैसे in-memory store में जाती है, order ID को key बनाकर, छोटे expiry के साथ। Order status के बदलाव main database में लिखे जाते हैं और साथ ही एक queue में publish होते हैं। Customer apps एक notification service से WebSocket connection खुला रखते हैं, जो status और location के बदलाव push करती है। अगर connection टूट जाए, तो app एक read API को poll करने पर लौट आता है, जो Redis से पढ़ती है।
+
+**Deep dive और trade-offs.** वो समझाती हैं कि ज़्यादा volume वाली location stream main SQL database में क्यों नहीं जाती: वो उस database को उस data का bottleneck बना देगी जो कल किसी को नहीं चाहिए। Status, जो refunds और support के लिए मायने रखता है, database में जाता है। वो trade-off का नाम लेती हैं: अगर कोई node fail हो तो Redis आखिरी कुछ seconds की locations खो सकता है, जो यहाँ चलेगा, जबकि order status durable है। वो failure cases पर बात खत्म करती हैं: अगर notification service बंद हो, तो polling फिर भी चलती है; अगर Redis बंद हो, तो page map के बिना status दिखाता है।
+
+Interviewer ने बाद में बताया कि जो सबसे अलग दिखा वो boxes नहीं थे, बल्कि ये कि हर चुनाव किसी number या requirement से जुड़ा था।
+
+## आम गलतियाँ
+
+**पूछने से पहले बनाना।** Requirements के बिना diagram पर कूद जाने से आप गलत problem के लिए पूरे confidence से design बना देते हो। पहले कुछ मिनट सवालों पर लगाओ।
+
+**Numbers छोड़ देना।** Estimate के बिना आप ये नहीं कह सकते कि एक database काफ़ी है या नहीं। मोटे numbers भी, साफ़ बताए हुए, कुछ न होने से बेहतर हैं।
+
+**Average के लिए design करना, peak के लिए नहीं।** Sales, results का दिन और Tatkal का समय normal traffic के कई गुना लाते हैं। Peak के हिसाब से size करो और बताओ कि spikes को कैसे सँभालोगे।
+
+**हर जानी-पहचानी चीज़ जोड़ देना।** हर जगह microservices, Kafka और Kubernetes design को चलाना मुश्किल बना देते हैं। Component तभी जोड़ो जब कोई requirement उसे माँगे।
+
+**Trade-offs छिपाना।** हर चुनाव की एक कीमत होती है। उसे ज़ोर से कहना आपकी समझ दिखाता है।
+
+**Failure को भूल जाना।** पूछो कि हर box बंद हो जाए तो क्या होगा। Single points of failure वो पहली चीज़ है जो reviewers ढूँढते हैं।
+
+## Practice करो
+
+1. Core building blocks का tour पाने के लिए Watch & learn panel के video lessons देखो।
+2. ऊपर वाला estimation exercise करो, फिर उसे किसी ऐसे app के लिए दोबारा करो जो आप रोज़ use करते हो।
+3. Project check करो: किसी जानी-पहचानी भारतीय app feature के लिए एक पन्ने का design।
+4. पाँचों steps को एक मिनट से कम में ज़ोर से बोलने की practice करो, ताकि interview में वो अपने-आप आएँ।

@@ -1,0 +1,215 @@
+---
+id: human-approval
+lang: hi
+title: "Human approval steps"
+outcome: "तय करना सीखो कि agent के कौन-से actions के लिए किसी इंसान की मंज़ूरी चाहिए, pause, approval screen और resume बनाओ, और approvals को आँख बंद करके ठप्पा लगाने जैसा मत बनने दो।"
+answer: "Agent के risky या वापस न होने वाले actions से पहले, जैसे payments या customers को emails, human approval लगाओ: agent को pause करो, साफ़ summary दिखाओ, और yes मिलने पर resume करो।"
+why_it_matters: "Clients पहले ही दिन agent को बिना निगरानी के पैसा हिलाने, customers को email करने या records बदलने नहीं देंगे। अच्छे से बना approval step ही agent को production में पहुँचाता है, और approval data बताता है कि control कब ढीला करना सुरक्षित है।"
+flashcards:
+  - q: "Human approval step क्या है?"
+    a: "Agent के action के असर में आने से पहले एक pause, जो इंसान को दिखाता है कि क्या और क्यों, और तभी आगे बढ़ता है जब वो approve, edit या reject कर दे।"
+  - q: "किन actions के लिए approval चाहिए?"
+    a: "महँगे, वापस न होने वाले, बाहर वालों तक पहुँचने वाले या regulated actions: payments, refunds, customer messages, record changes, deletions, legal या medical फ़ैसले।"
+  - q: "Approval के rules कैसे तय करते हैं?"
+    a: "हर tool को read-only, reversible या irreversible और external में rate करो; आखिरी के लिए हमेशा approval, बीच वाले के लिए thresholds, और reads के लिए कभी नहीं।"
+  - q: "Durably pause करने का मतलब क्या है?"
+    a: "Agent की state save करना और run को interrupted के रूप में खत्म करना, ताकि कोई process खुला रखे बिना कुछ घंटों बाद भी resume हो सके।"
+  - q: "Approval screen पर क्या दिखना चाहिए?"
+    a: "Action सीधे शब्दों में, agent की वजह, इस्तेमाल किया गया evidence, और एक click में approve, edit और reject।"
+  - q: "Approvers को edit क्यों करने दें?"
+    a: "Edits से action बिना दोबारा शुरू किए ठीक हो जाता है, और ये इस बात का सबसे अच्छा data हैं कि agent कहाँ गलत है।"
+  - q: "Rubber-stamping के संकेत क्या हैं?"
+    a: "Decision का समय घटता जाए और कोई edit या rejection न हो, अक्सर उन screens पर जिनमें काफ़ी evidence नहीं होता।"
+  - q: "अगर approval पर कोई जवाब न दे तो क्या होना चाहिए?"
+    a: "Reminder भेजो, escalate करो या सुरक्षित तरीके से cancel कर दो। Default में कभी approve मत करो।"
+  - q: "Approval policy को pure function क्यों लिखें?"
+    a: "उसे हर tool और amount के साथ unit-test किया जा सकता है, non-engineers उसे table की तरह review कर सकते हैं, और agent के prompt को छुए बिना बदला जा सकता है।"
+  - q: "Rubber-stamping क्या है, और उसे कैसे पकड़ें?"
+    a: "Approvers का बिना पढ़े approve दबा देना। संकेत: एक-दो seconds में decisions, लगभग शून्य edits और rejections, और जानबूझकर डाली गई गलत requests का approve हो जाना।"
+exercise:
+  title: "Approval rules लिखो"
+  setup: "हैदराबाद की एक property-management company का agent tenants की requests संभालता है। उसके tools: read_lease, read_payment_history, schedule_plumber (मुफ़्त में reschedule हो सकता है), waive_late_fee (amount), send_notice_to_tenant, और terminate_lease। Managers अक्सर site visits पर होते हैं और दो से छह घंटे में जवाब देते हैं।"
+  questions:
+    - q: "किन tools को approval नहीं चाहिए?"
+      a: "read_lease और read_payment_history, जो सिर्फ़ पढ़ते हैं, और schedule_plumber, जो बिना खर्च के reversible है।"
+    - q: "waive_late_fee को कैसे संभालें?"
+      a: "एक threshold से नीचे के छोटे waivers अपने-आप approve कर दो, जैसे पहली देर वाली payment के लिए ₹500, और बड़े वाले approval के लिए भेजो।"
+    - q: "send_notice_to_tenant और terminate_lease को कैसे संभालें?"
+      a: "हमेशा approval: notices बाहर वालों तक जाते हैं और औपचारिक होते हैं; termination वापस नहीं होता और legal होता है, और शायद पूरी तरह किसी इंसान को ही दे देना बेहतर है।"
+    - q: "Managers के जवाब देने के समय को देखते हुए system में क्या support होना चाहिए?"
+      a: "घंटों तक चलने वाले durable pauses, reminders, तय समय के बाद दूसरे manager को escalation, और सुरक्षित cancellation। Default approval कभी नहीं।"
+ask:
+  - "AI agent को इंसान से approval कब माँगना चाहिए?"
+  - "Agent को pause और resume कैसे करूँ?"
+  - "अच्छा approval screen कैसे डिज़ाइन करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+**Human approval step** agent के action के असर में आने से पहले उसे pause कर देता है, किसी इंसान को दिखाता है कि agent क्या करना चाहता है और क्यों, और तभी आगे बढ़ता है जब वो approve, edit या reject कर दे। Production agents में human-in-the-loop का ये सबसे आम रूप है।
+
+Approval उन actions के लिए है जो महँगे, वापस न होने वाले, बाहर वालों तक पहुँचने वाले या regulated हों: refunds और payments, customers को emails और messages, records में बदलाव, कुछ भी delete करना, और legal या medical फ़ैसलों से जुड़ा कुछ भी। Data पढ़ने के लिए आम तौर पर approval नहीं चाहिए।
+
+```flow
+Agent proposes: refund ₹2,499 for order 7781 -> Risk rules
+Risk rules -[a read, or small and reversible]-> Run it
+Risk rules -[a refund over the limit]-> Pause | state को checkpoint में save करो; run "interrupted" पर खत्म होता है
+Pause -> Approval card | action, वजह, evidence: Approve, Edit amount, Reject with a reason
+Approval card -[no reply in 4 h]-> Remind, then escalate
+Approval card -[decision]-> Resume from the checkpoint -> Act -> Tell the customer
+Tell the customer -> Log | decision, edit, वजह, फ़ैसले में लगे seconds
+```
+
+इस lesson में हम जयपुर की एक e-commerce company के returns और refunds agent के साथ चलेंगे।
+
+## ये काम कैसे करता है
+
+**Actions को risk से बाँटो।** हर tool की list बनाओ और उसे rate करो: read-only, reversible internal change, या irreversible या external। एक simple rule set तय करता है कि किसे approval चाहिए: irreversible या external actions के लिए हमेशा; बाकियों के लिए threshold से ऊपर (जैसे ₹1,000 से ऊपर के refunds); और reads के लिए कभी नहीं।
+
+**Durably pause करो।** Agent को रुककर इंतज़ार करना है, शायद घंटों, बिना कोई server process खुला रखे। Checkpoints वाले frameworks ये करते हैं: state save होती है, run "interrupted" state में खत्म होता है, और बाद की एक call उसी जगह से इंसान के फ़ैसले के साथ resume कर देती है।
+
+**सही जानकारी दिखाओ।** Approval screen पर proposed action सीधे शब्दों में दिखना चाहिए ("order 7781 के लिए UPI ID ...@okaxis पर ₹4,500 refund करें"), agent की वजह, उसका इस्तेमाल किया गया evidence (order, policy की clause), और एक click में approve, edit और reject। अगर approver को फ़ैसले के लिए तीन और systems खोलने पड़ें, तो वो आँख बंद करके approve करने लगेगा।
+
+**Edit और feedback।** Approver को parameters बदलने दो (₹4,500 से ₹3,000) और एक note जोड़ने दो। दोनों agent की state में वापस जाते हैं ताकि वो customer को बदलाव समझा सके, और आपके logs में भी, training और eval data के रूप में।
+
+**Measure करो।** Approval rate, edit rate, rejection की वजहें और फ़ैसले में लगा समय track करो। महीनों तक rejection rate शून्य के पास रहे, तो हो सकता है कम risk वाले cases के लिए ये step ढीला किया जा सके। अगर फ़ैसले का समय घटता जाए और कोई edit न हो, तो ये rubber-stamping हो सकती है।
+
+**Timeouts और escalation।** तय करो कि कोई जवाब न दे तो क्या होगा: reminder, किसी दूसरे approver को escalate, या सुरक्षित cancel। Default में "approve" कभी नहीं।
+
+**एक agent के लिए risk table:**
+
+| Tool | Type | Rule |
+| --- | --- | --- |
+| `read_order` | Read-only | कभी approval नहीं चाहिए |
+| `issue_return_label` | Reversible | अपने-आप approve |
+| `refund` ₹1,000 तक, order 30 दिन से कम पुराना | पैसा, छोटा | अपने-आप approve |
+| `refund`, बाकी हर case | पैसा | Support lead approve करता है |
+| कोई भी message जिसमें legal action का ज़िक्र हो | Legal risk | पूरी तरह किसी इंसान को सौंपा जाता है |
+
+**Card डिज़ाइन करना।** फ़ैसला सबसे ऊपर रखो, एक वाक्य में, amount और पाने वाले के साथ। उसके नीचे agent की दी हुई वजह और evidence दो, जैसे customer की photo और policy की clause उसके नंबर के साथ। Buttons बड़े रखो और उन पर नतीजे लिखो। "Reject" पर एक छोटी list से वजह और साथ में free text माँगो, क्योंकि बाद में यही वजहें आप analyse करोगे। Card को असली approvers के साथ test करो: अगर वो फ़ैसले के लिए कोई दूसरा system खोलते हैं, तो card में कुछ कम है।
+
+**Evidence के साथ ढील देना।** Approval हमेशा के लिए नहीं होता। एक-दो महीने का data आने के बाद, हर rule की approval, edit और rejection rates देखो। जहाँ लोग लगभग सब कुछ बिना edit के approve कर देते हैं, वहाँ threshold थोड़ा बढ़ाओ और complaints पर नज़र रखो। जहाँ वो अक्सर edit करते हैं, वहाँ पहले agent के examples सुधारो।
+
+**Policy एक pure function की तरह।** Rules को prompt से बाहर, ऐसे code में रखो जिसे test किया जा सके:
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Decision:
+    route: str            # "auto", "approve" or "handover"
+    approver: str | None = None
+    reason: str = ""
+
+def policy(tool, args, context):
+    if tool in {"read_order", "track_shipment"}:
+        return Decision("auto", reason="read-only")
+    if tool == "issue_return_label":
+        return Decision("auto", reason="reversible")
+    if tool == "refund":
+        amount, age = args["amount_inr"], context["order_age_days"]
+        if amount <= 1000 and age <= 30:
+            return Decision("auto", reason="small refund within 30 days")
+        if amount <= 25000:
+            return Decision("approve", "support_lead", "refund above auto limit")
+        return Decision("approve", "finance_manager", "large refund")
+    if context.get("mentions_legal_action"):
+        return Decision("handover", reason="legal risk")
+    return Decision("approve", "support_lead", "unknown tool: default to a person")
+
+assert policy("refund", {"amount_inr": 800}, {"order_age_days": 12}).route == "auto"
+assert policy("refund", {"amount_inr": 40000}, {"order_age_days": 3}).approver == "finance_manager"
+```
+
+अनजान tools का default इंसान होता है, "auto" कभी नहीं। Agent loop कोई भी tool चलाने से पहले `policy` को call करता है; "approve" का मतलब है pending action save करो और run को pause करो।
+
+**एक durable pending action।** हर request को वो सब कुछ देकर store करो जो approver को चाहिए, साथ में एक idempotency key, ताकि double click या retry उसे दो बार न चला सके:
+
+```python
+import sqlite3, time, uuid
+
+db = sqlite3.connect("approvals.db")
+db.execute("""CREATE TABLE IF NOT EXISTS pending (
+    id TEXT PRIMARY KEY, run_id TEXT, tool TEXT, args TEXT, summary TEXT,
+    approver TEXT, status TEXT DEFAULT 'waiting', decided_by TEXT, note TEXT,
+    created REAL, decided REAL)""")
+
+def request(run_id, tool, args_json, summary, approver):
+    pid = uuid.uuid4().hex
+    db.execute("INSERT INTO pending (id, run_id, tool, args, summary, approver, created) VALUES (?,?,?,?,?,?,?)",
+               (pid, run_id, tool, args_json, summary, approver, time.time()))
+    db.commit()
+    return pid
+
+def decide(pid, user, approve, note="", new_args_json=None):
+    cur = db.execute("""UPDATE pending SET status=?, decided_by=?, note=?, decided=?, args=COALESCE(?, args)
+                        WHERE id=? AND status='waiting'""",
+                     ("approved" if approve else "rejected", user, note, time.time(), new_args_json, pid))
+    db.commit()
+    return cur.rowcount == 1        # False if already decided: the second click does nothing
+```
+
+जब `decide` सफल हो जाए, तो आपका code paused run को उस फ़ैसले के साथ resume करता है। `decide` में check करो कि `user` के पास वही approver role है जो request में लिखा है; जिसने agent से कहा, उसे अपना ही बड़ा refund approve नहीं करना चाहिए।
+
+**Timeouts एक scheduled job की तरह।** हर कुछ मिनट में उन waiting requests को ढूँढो जो limit से पुरानी हैं: 30 मिनट पर reminder, 2 घंटे पर अगले approver को escalate, और 24 घंटे पर customer को message के साथ सुरक्षित cancel। Cancel करना ही default आखिरी state है, approve करना कभी नहीं।
+
+**Approvers को भी test करो।** बीच-बीच में queue में जानबूझकर एक गलत request डालो, जैसे ऐसे order का refund जो उस customer तक कभी पहुँचा ही नहीं। अगर वो approve हो जाए, तो cards को बेहतर evidence चाहिए, या queue इतनी लंबी है कि ध्यान से review नहीं हो सकता।
+
+## एक example से समझो
+
+जयपुर की एक e-commerce company return और refund requests संभालने के लिए एक agent deploy करती है।
+
+Risk rules: orders पढ़ने के लिए approval नहीं चाहिए; return label जारी करना reversible है और अपने-आप approve होता है; 30 दिन से कम पुराने orders के ₹1,000 से कम के refunds अपने-आप approve होते हैं; बाकी हर refund के लिए support lead की मंज़ूरी चाहिए; और legal action का ज़िक्र करने वाला कोई भी message पूरी तरह किसी इंसान के पास जाता है।
+
+Approval card में लिखा है: "Order 7781 (नीला kurta, size M) के लिए ₹2,499 refund। Customer का कहना है कि वो फटा हुआ पहुँचा; photo लगी है। Policy 4.2 के हिसाब से 7 दिन के अंदर बताए गए नुकसान पर पूरा refund मिलता है; नुकसान दिन 3 पर बताया गया।" Approve, Edit amount, Reject with reason।
+
+पहले महीने में leads 91% approve करते हैं, 6% edit करते हैं (ज़्यादातर partial refunds, जहाँ set की सिर्फ़ एक चीज़ खराब थी) और 3% reject करते हैं (photos में कोई नुकसान नहीं दिखता)। फ़ैसले का median समय 40 seconds है। आप edit वाले cases को agent के examples में जोड़ते हो, जिसके बाद edits घटकर 2% रह जाते हैं। इस evidence के साथ client auto-approve threshold को ₹1,500 कर देता है, जिससे approvals का एक तिहाई हिस्सा हट जाता है और complaints नहीं बढ़तीं।
+
+| Measure, पहला महीना | Value | क्या किया गया |
+| --- | --- | --- |
+| जैसा proposed था वैसा approve हुआ | 91% | कुछ नहीं |
+| Edit हुआ | 6%, ज़्यादातर partial refunds | Edit वाले cases examples में जोड़े; edits घटकर 2% हुए |
+| Reject हुआ | 3%, photos में नुकसान नहीं दिखता | वजहें हर हफ़्ते review होती हैं |
+| फ़ैसले का median समय | 40 seconds | Card काफ़ी साफ़ माना गया |
+| Auto-approve threshold | ₹1,000 से बढ़ाकर ₹1,500 | Approvals एक तिहाई कम, complaints में कोई बढ़ोतरी नहीं |
+
+## आम गलतियाँ
+
+- **सब कुछ approve करवाना या कुछ भी नहीं।** हर read पर approval लोगों का समय बर्बाद करता है; payments पर कोई approval न होना लापरवाही है। Actions को risk के हिसाब से rate करो।
+- **इंतज़ार करते हुए process खुला रखना।** Approvals में घंटे लग सकते हैं। State save करो और बाद में resume करो।
+- **बिना evidence वाली approval screens।** लोग फ़ैसला नहीं कर पाते, तो बस approve दबा देते हैं।
+- **Timeout पर default approve।** चुप्पी सहमति नहीं है। Escalate करो या cancel करो।
+- **Edits से न सीखना।** Edits और rejections इस बात का सबसे अच्छा data हैं कि agent कहाँ गलत है।
+- **Approval rules सिर्फ़ prompt में लिखना।** Model उन्हें छोड़ सकता है; code नहीं छोड़ सकता।
+- **माँगने वाले को ही approve करने देना।** पैसे और data बदलने के लिए, किसने माँगा और कौन approve करेगा, इन्हें अलग रखो।
+- **Approvals पर idempotency न होना।** Double click से action दो बार चल जाता है।
+
+## जब approval steps की ज़रूरत नहीं
+
+- **Read-only agents** जो सिर्फ़ चीज़ें देखते हैं और जवाब देते हैं।
+- **पूरी तरह reversible, कम कीमत वाले actions** जिन्हें undo किया जा सके, जैसे note या tag जोड़ना।
+- **वो actions जो code में पहले से कसी हुई limits के अंदर हैं**, जैसे हर customer के लिए हर महीने एक छोटी सीमा तक के refunds, जहाँ गलतियों की कीमत review से कम है।
+
+Approvals की कीमत देरी और staff के समय में लगती है। उन्हें वहाँ लगाओ जहाँ गलती महँगी हो, वापस न हो सके या company के बाहर के लोगों को दिखे।
+
+## Demo से production तक
+
+- **Policy को tests के साथ code में रखो**, और business owners के साथ उसे table की तरह review करो।
+- **हर request और फ़ैसला store करो**: किसने, कब, क्या बदला और क्यों।
+- **Queue की उम्र पर alert लगाओ** और हर agent की requests में उछाल पर भी।
+- **हर महीने rates review करो**, rule के हिसाब से: approval, edit, rejection, फ़ैसले का समय।
+- **बीच-बीच में test requests डालो** ये देखने के लिए कि approvers पढ़ रहे हैं या नहीं।
+
+## Practice करो
+
+LangGraph की interrupts guide पढ़ो, या agents-in-LangGraph course का approval वाला section।
+
+1. अपने बनाए किसी agent के tools की list बनाओ और हर एक को read-only, reversible या irreversible rate करो। Approval rules लिखो।
+2. किसी एक risky tool से पहले durable pause जोड़ो, और एक छोटी script या page बनाओ जो proposed action को उसकी वजह के साथ दिखाए और आपको approve, edit या reject करने दे।
+3. हर फ़ैसले को उसमें लगे समय के साथ log करो, और वो query लिखो जो approval, edit और rejection rates दिखाए।
+4. अपने policy function के लिए unit tests लिखो जिनमें हर tool, threshold amount के दोनों तरफ़ की values, और एक अनजान tool शामिल हो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 write actions के risks और इस बात पर बात करता है कि autonomy से पहले trust क्यों ज़रूरी है।
+
+**आपका काम पूरा जब:** आप अपने agent को pause कर सको, program बंद कर सको, अगले दिन उसे दोबारा चलाओ और approval से resume कर सको।

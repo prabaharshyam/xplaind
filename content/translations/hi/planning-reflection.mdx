@@ -1,0 +1,217 @@
+---
+id: planning-reflection
+lang: hi
+title: "Planning और reflection"
+outcome: "किसी agent task के लिए ReAct, plan-then-execute और reflection में से चुनना सीखो, और जानो कि हर एक की calls, latency और reliability में क्या कीमत लगती है।"
+answer: "Planning में agent कुछ करने से पहले steps लिखता है; reflection में वो अपने ही काम को review करके दोबारा कोशिश करता है। दोनों multi-step tasks में मदद करते हैं पर model calls, cost और देरी बढ़ाते हैं।"
+why_it_matters: "जो agents बिना plan के एक-एक step चलते हैं वो भटक जाते हैं, और जो अपना काम कभी check नहीं करते वो गलतियाँ ship कर देते हैं। कब plan या self-check अपनी कीमत वसूलता है, यही एक reliable agent को demo से अलग करता है। ये हर agent design interview में आता है।"
+flashcards:
+  - q: "ReAct क्या है?"
+    a: "Reason और act: agent थोड़ा सोचता है, tool call करता है, result पढ़ता है और फिर सोचता है, एक-एक step करके।"
+  - q: "ReAct की मुख्य कमज़ोरी क्या है?"
+    a: "लंबे tasks में भटकना: कई steps के बाद वो लक्ष्य भूल सकता है, खुद को दोहरा सकता है या task के कुछ हिस्से छोड़ सकता है।"
+  - q: "Plan-then-execute क्या है?"
+    a: "Agent पहले पूरा plan लिखता है, फिर हर step करता है, और कुछ अनपेक्षित होने पर ही दोबारा plan बनाता है।"
+  - q: "Plan के फ़ायदे क्या हैं?"
+    a: "लंबे tasks predictable बन जाते हैं, plan users को दिखाया जा सकता है, और steps सस्ते models या code से चल सकते हैं।"
+  - q: "Reflection क्या है?"
+    a: "एक pass जो नतीजे को लक्ष्य या checklist से मिलाकर उसकी आलोचना करता है और जो कमी हो उसे ठीक करता है।"
+  - q: "कौन-से reflection checks सबसे सस्ते और भरोसेमंद हैं?"
+    a: "Deterministic वाले: tests pass हों, totals जुड़ें, JSON validate हो। Model critique तब use करो जब rules से judge न हो सके।"
+  - q: "Reflection rounds पर cap क्यों लगाएँ?"
+    a: "वरना agent ऐसी requirement पर हमेशा घूमता रह सकता है जो वो पूरी नहीं कर सकता। आम तौर पर एक या दो rounds काफ़ी हैं।"
+  - q: "Planning कब बेकार है?"
+    a: "छोटे tasks में, जैसे दो steps का lookup, जहाँ plan सिर्फ़ एक call और जोड़ देता है।"
+  - q: "Plan को चलाने से पहले code में check क्यों करें?"
+    a: "Plan में ही अनजान tool, छूटा हुआ step या बजट से ज़्यादा खर्च पकड़ लेना, आधे रास्ते actions को undo करने से कहीं सस्ता है।"
+  - q: "Reflexion, reflection में क्या जोड़ता है?"
+    a: "नाकाम कोशिश के बाद agent लिखता है कि वो क्यों नाकाम हुई, और वो note अगली कोशिश को दिया जाता है, इसलिए वो task के अंदर ही सीखता है।"
+exercise:
+  title: "Pattern चुनो"
+  setup: "चंडीगढ़ की एक consultancy को तीन agents चाहिए: (A) rate table से 'X पर GST rate क्या है?' का जवाब देना; (B) किसी शहर पर 10 sections की market-entry report तैयार करना, web search, सरकारी data और internal notes से; (C) analysts के सवालों के लिए SQL लिखना और results लौटाना। Tests में report drafts अक्सर sections छोड़ देते हैं, और SQL कभी-कभी चलती ही नहीं या ऐसे totals देती है जो किसी जाने-पहचाने dashboard से नहीं मिलते।"
+  questions:
+    - q: "(A) के लिए कौन-सा pattern ठीक है?"
+      a: "सादा ReAct, या एक lookup tool के साथ बस एक call। Plan या reflection की ज़रूरत नहीं।"
+    - q: "(B) को कैसे structure करना चाहिए?"
+      a: "Plan-then-execute, हर section के लिए एक plan step और हर step पर tool calls की सीमा के साथ, ताकि हर section पूरा हो।"
+    - q: "(B) के लिए कौन-सा reflection ठीक है?"
+      a: "एक checklist: हर section भरा हो, हर दावे का source हो। Code check करता है कि sections मौजूद हैं; model देखता है कि कौन-से दावे बिना source के हैं।"
+    - q: "(C) के लिए कौन-सा reflection ठीक है?"
+      a: "Deterministic checks: query चलाओ, और मुख्य totals को dashboard से मिलाओ, और अगर न मिलें तो एक revision करो।"
+ask:
+  - "Agents के लिए ReAct pattern क्या है?"
+  - "Agent को पहले plan कब बनाना चाहिए?"
+  - "Self-reflection से agent के results बेहतर कैसे होते हैं?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+Agent loop एक बार में एक step तय करता है। तीन patterns तय करते हैं कि ये फ़ैसले कैसे लिए जाएँ:
+
+- **ReAct** (reason, act): थोड़ा सोचो, tool call करो, result पढ़ो, फिर सोचो। Flexible और सादा; ज़्यादातर frameworks में default।
+- **Plan-then-execute**: पहले steps का पूरा plan लिखो, फिर उन्हें करो, और plan को तभी बदलो जब कुछ अनपेक्षित हो।
+- **Reflection**: नतीजा बनाने के बाद (या बीच-बीच में), agent उसे लक्ष्य या checklist से मिलाकर परखता है और जो कमी हो उसे ठीक करता है।
+
+ये मिल सकते हैं: एक plan, जो ReAct-style steps से चले, और आखिरी जवाब से पहले एक reflection pass।
+
+```flow
+dir: LR
+title: ReAct: जल्दी ढल जाता है, पर भटक सकता है
+Think -> Act -> Observe -> Think
+```
+
+```flow
+title: Plan-then-execute, reflection के साथ
+Planner, a strong model | 1 website, 2 funding, 3 founders, 4 competitors, 5 red flags, 6 write -> Each step: a short ReAct loop | at most 5 tool calls, a small model
+Each step: a short ReAct loop -> Draft -> Checks | code: totals जुड़ते हैं; model: हर दावे का source है
+Checks -[fail]-> One revision -> Final
+Checks -[pass]-> Final
+```
+
+इस lesson में हम बेंगलुरु के एक venture fund के साथ चलेंगे जो एक ऐसा agent बना रहा है जो startups के एक-page briefs लिखता है।
+
+## ये काम कैसे करता है
+
+**ReAct।** हर turn में model एक छोटा thought लिखता है ("जवाब देने से पहले मुझे order status चाहिए"), फिर एक tool call, फिर observation देखता है। वो जो पाता है उसके हिसाब से जल्दी ढल जाता है। उसकी कमज़ोरी लंबे tasks में भटकना है: पंद्रह steps के बाद वो असली लक्ष्य भूल सकता है या खुद को दोहरा सकता है।
+
+**Plan-then-execute।** Model, अक्सर कोई ज़्यादा ताकतवर, एक बार numbered plan लिखता है। कोई सस्ता model या सादा code हर step चलाता है। Plans लंबे tasks को ज़्यादा predictable बनाते हैं, किसी user या approver को दिखाना आसान होता है ("मैं ये करूँगा"), और cost घटाते हैं क्योंकि महँगा model बस एक बार चलता है। कमज़ोरी है कड़ापन: जब step 3 कुछ नया दिखाए, तो agent को उसे notice करके दोबारा plan बनाना होगा, आँख बंद करके आगे नहीं बढ़ना।
+
+**Reflection।** दूसरा pass पूछता है: क्या ये नतीजा requirements पूरी करता है? क्या numbers आपस में मेल खाते हैं? क्या मैंने हर हिस्से का जवाब दिया? ये वही model हो सकता है critique prompt के साथ, कोई दूसरा model, या deterministic checks (tests pass हों, totals जुड़ें, JSON validate हो)। Deterministic checks सबसे सस्ते और भरोसेमंद हैं; model critique तभी use करो जब rules से judge न हो सके।
+
+**Cost और limits।** हर pattern calls बढ़ाता है। Reflection loops पर cap चाहिए (मान लो दो revision rounds), वरना वो ऐसी requirement पर हमेशा घूम सकते हैं जो model पूरी नहीं कर सकता।
+
+**Patterns की तुलना:**
+
+| Pattern | ताकत | कमज़ोरी | किसके लिए बेहतर |
+| --- | --- | --- | --- |
+| ReAct | सादा, हर result के हिसाब से ढलता है | लंबे tasks में भटकता है | छोटे tasks, कुछ tool calls |
+| Plan-then-execute | हर हिस्सा कवर होता है, steps सस्ते, plan दिखता है | दोबारा plan न बने तो कड़ा | जाने-पहचाने हिस्सों वाले लंबे tasks |
+| Reflection | users से पहले गलतियाँ पकड़ता है | ज़्यादा calls; घूम सकता है | जिन outputs की requirements जाँची जा सकती हैं |
+
+**दोबारा plan कब बनाएँ।** Rule को executor में लिख दो: अगर किसी step का result plan की किसी मान्यता का खंडन करे, तो रुको और planner से उस जगह से नया plan माँगो। मिसाल के लिए, अगर step 2 में पता चले कि startup पिछले साल acquire हो चुका है, तो brief का आकार अलग चाहिए, और पुराना plan जारी रखने से steps बर्बाद होंगे और भ्रामक document बनेगा। हर re-plan को log करो, क्योंकि बार-बार re-plan होने का मतलब है कि planner के पहले plans कमज़ोर हैं।
+
+**Reflection को काम का बनाना।** "इसे बेहतर करो" जैसा धुंधला critique prompt धुंधले बदलाव देता है। Critic को एक खास checklist दो और हर item के लिए pass या fail और उसकी वजह माँगो। सिर्फ़ fail हुए items को revision के लिए वापस भेजो। इससे revisions केंद्रित रहते हैं और ये मापना आसान होता है कि कौन-से checks सबसे ज़्यादा fail होते हैं, जो बताता है कि main prompt में क्या सुधारना है।
+
+**जाँचे हुए plan के साथ plan-then-execute।** Plan को structured data के रूप में माँगो, code में check करो, और तभी चलाओ:
+
+```python
+from pydantic import BaseModel, Field
+
+TOOLS = {"web_search", "fetch_page", "compare_table"}
+MAX_STEPS, MAX_SEARCHES = 8, 5
+
+class Step(BaseModel):
+    tool: str
+    purpose: str
+    inputs: dict
+
+class Plan(BaseModel):
+    goal: str
+    steps: list[Step] = Field(min_length=1)
+
+def check_plan(plan: Plan):
+    problems = []
+    if len(plan.steps) > MAX_STEPS:
+        problems.append(f"{len(plan.steps)} steps; the limit is {MAX_STEPS}")
+    unknown = {s.tool for s in plan.steps} - TOOLS
+    if unknown:
+        problems.append(f"unknown tools: {sorted(unknown)}")
+    if sum(s.tool == "web_search" for s in plan.steps) > MAX_SEARCHES:
+        problems.append("too many searches")
+    if plan.steps[-1].tool != "compare_table":
+        problems.append("the plan must end by building the comparison table")
+    return problems
+```
+
+Model से plan को structured output के रूप में लो (structured-output lesson में दिखाया है), `check_plan` चलाओ, और जो भी समस्याएँ मिलें उन्हें एक revision के लिए वापस भेजो। फिर भी fail हो तो रुको और किसी इंसान से पूछो। चलाने से पहले user को checked plan दिखाने से भरोसा भी बनता है: "मैं तीन makers को search करूँगा, उनके spec pages पढ़ूँगा और एक table बनाऊँगा। आगे बढ़ूँ?"
+
+**Planning natural language में या calls में।** Plan में exact function calls लिखे जा सकते हैं (`web_search(query="Ather 450X range")`) या steps शब्दों में ("हर maker की असली range ढूँढो"), जिन्हें दूसरा step calls में बदलता है। Exact calls को check करना आसान है; शब्दों वाले plans tool names बदलने पर भी टिके रहते हैं और लोगों के लिए पढ़ना आसान है। कई teams plan के लिए शब्द और execution के लिए exact calls use करती हैं।
+
+**Checklist के साथ reflection।** Critic से हर item का verdict माँगो, rewrite नहीं:
+
+```python
+CHECKLIST = [
+    "Every maker has price, range and service network filled in",
+    "Every number has a source link",
+    "Prices are in rupees and say ex-showroom or on-road",
+    "No maker is missing from the final table",
+]
+
+CRITIC_PROMPT = (
+    "Check the draft against each item. Reply as JSON: "
+    '[{"item": ..., "pass": true or false, "reason": ...}]. Do not rewrite the draft.\n\n'
+    "Checklist:\n" + "\n".join(f"- {c}" for c in CHECKLIST)
+)
+```
+
+सिर्फ़ fail हुए items writer को वापस भेजो, एक या दो revision rounds की इजाज़त दो, और log करो कि कौन-से items सबसे ज़्यादा fail होते हैं। जहाँ किसी rule को code में check किया जा सकता है (हर row में तीन numbers हैं, हर number पर link है), वहाँ उसे code में check करो और उस item के लिए model critic छोड़ दो।
+
+**नाकाम कोशिश से सीखना।** Reflexion approach में, जब कोई कोशिश किसी check में fail हो, तो agent एक छोटा note लिखता है कि क्यों ("मैंने launch prices use किए; brief में मौजूदा on-road prices माँगे थे") और अगली कोशिश उसी note से शुरू होती है। इसे जोड़ना सस्ता है और ये उन tasks में सबसे ज़्यादा मदद करता है जिनमें साफ़ pass या fail होता है, जैसे वो code जिसे tests pass करने हैं।
+
+**ज़ोर से सोचने की कीमत।** Thoughts, plans और critiques सब tokens हैं। Prompt में format के examples और जोड़ते हैं। हर जोड़ के साथ और उसके बिना हर task के tokens और समय मापो, और सिर्फ़ वही रखो जो results इतने सुधारे कि अपनी कीमत वसूल ले।
+
+## एक example से समझो
+
+बेंगलुरु का एक venture fund ऐसा agent चाहता है जो public sources से किसी startup का एक-page brief तैयार करे: funding history, founders, product, competitors और red flags।
+
+*Version 1, सिर्फ़ ReAct।* वो search करता है, पढ़ता है, फिर search करता है। आधी companies पर वो funding news में 25 steps लगा देता है और competitors तक पहुँचता ही नहीं। Briefs असमान आते हैं।
+
+*Version 2, plan-then-execute।* एक planning call ये देती है:
+
+```text
+1. Find the company's website and product description.
+2. Find funding rounds (amount, date, lead investor) from news and filings.
+3. Identify founders and their backgrounds.
+4. List three to five competitors.
+5. Look for red flags: lawsuits, layoffs, regulatory action.
+6. Write the brief in the template.
+```
+
+हर step पाँच tool calls की सीमा के साथ एक छोटा ReAct loop चलाता है। अब हर section कवर होता है और औसत cost एक तिहाई घट जाती है, क्योंकि steps में छोटा model लगता है।
+
+*Version 3, reflection जोड़ना।* Analysts को ऐसे funding totals मिलते हैं जो listed rounds से नहीं मिलते। Reflection step draft को एक checklist से मिलाता है: totals rounds के जोड़ के बराबर हों, हर दावे पर source link हो, हर section भरा हो। Code arithmetic check करता है; model बिना source के दावे ढूँढता है। जो fail हों वो एक revision के लिए लौटते हैं। बिना source वाले दावे sentences के 11% से घटकर 2% रह जाते हैं।
+
+| Version | कवर हुए sections | बिना source के दावे | सापेक्ष cost |
+| --- | --- | --- | --- |
+| 1: सिर्फ़ ReAct | असमान; competitors अक्सर गायब | sentences का 11% | 1.0 |
+| 2: Plan-then-execute | सभी छह | लगभग 11% | लगभग 0.67 |
+| 3: साथ में reflection, एक revision | सभी छह | 2% | लगभग 0.75 |
+
+## आम गलतियाँ
+
+- **छोटे tasks के लिए planning।** दो steps के lookup को plan नहीं चाहिए; वो बस एक call और जोड़ता है।
+- **Plans जो कभी नहीं बदलते।** जब किसी step का result plan का खंडन करे, तो agent को दोबारा plan बनाना चाहिए, आँख बंद करके आगे नहीं बढ़ना चाहिए।
+- **कभी न खत्म होने वाली self-critique।** Reflection rounds पर cap लगाओ, और जब critique खुद को दोहराने लगे तो रुक जाओ।
+- **जहाँ code काफ़ी हो वहाँ model critique।** अगर कोई rule check कर सकता है (sums, schemas, tests), तो rule use करो।
+- **Plan को छिपाना।** Users को plan दिखाने से भरोसा बनता है और वो शुरू में ही दिशा सुधार सकते हैं।
+- **ऐसे plans जिन्हें कोई check नहीं करता।** बिना check वाला plan ऐसे tools का नाम ले सकता है जो हैं ही नहीं या बजट उड़ा सकता है।
+- **Critics जो rewrite करते हैं।** हर item पर pass या fail माँगो; rewrite करने से छिप जाता है कि गलत क्या था।
+
+## Planning और reflection कब छोड़ें
+
+- **एक या दो tool calls वाले छोटे tasks**: सादा ReAct काफ़ी है।
+- **कसे हुए latency budgets**: हर planning और critique call में seconds लगते हैं।
+- **वो outputs जिन्हें कोई इंसान इस्तेमाल से पहले हमेशा review करता है**, जहाँ critic ज़्यादा कुछ नहीं जोड़ता।
+- **जिन tasks में जाँचने लायक requirements नहीं हैं**, जहाँ critic के पास judge करने को कुछ ठोस नहीं है।
+
+## Demo से production तक
+
+- **हर plan, re-plan और critique को** run trace में store करो।
+- **Re-plan rate और critique failure rate को item के हिसाब से track करो**; दोनों prompt fixes की तरफ़ इशारा करते हैं।
+- **Revision rounds पर cap code में लगाओ**, और cap पूरा होने पर handover करो।
+- **लंबे या महँगे tasks के लिए users को plans दिखाओ**, और उन्हें edit या cancel करने दो।
+- **हर pattern को रखने से पहले** उसके साथ और उसके बिना प्रति task cost मापो।
+
+## Practice करो
+
+Lilian Weng की post के planning और reflection वाले sections और ReAct पर Hugging Face की unit पढ़ो।
+
+1. एक छोटा research agent बनाओ जो सादे ReAct से "तीन भारतीय EV two-wheeler makers की price, range और service network पर तुलना करो" का जवाब दे। Steps log करो।
+2. एक planning call और हर step की limits जोड़ो। पाँच runs में coverage, steps और cost की तुलना करो।
+3. आखिरी जवाब से पहले एक deterministic check और एक model critique जोड़ो, ज़्यादा से ज़्यादा एक revision के साथ।
+4. अपने research agent में check_plan जोड़ो, log करो कि पहला plan कितनी बार उसमें fail होता है, और सबसे आम समस्या की list बनाओ।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 plan generation, ReAct, Reflexion और reflection की cost के बारे में है।
+
+**आपका काम पूरा जब:** आप तीनों versions के step counts, costs और quality साथ-साथ दिखा सको और बता सको कि आप किसे ship करोगे और क्यों।

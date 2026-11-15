@@ -1,0 +1,226 @@
+---
+id: agent-logs
+lang: hi
+title: "Agents के लिए logs और traces"
+outcome: "Agent की हर model call और tool call record करना सीखोगे, ताकि दिख सके कि उसने जो किया वो क्यों किया।"
+answer: "Agent logs हर model call और tool call को inputs, outputs और timing के साथ record करते हैं, ताकि आप एक run को replay करके ठीक-ठीक देख सको कि agent ने वैसा क्यों किया।"
+why_it_matters: "जो agent बिना trace के fail होता है, उसे ठीक नहीं किया जा सकता। Logs \"इसने कुछ अजीब किया\" को एक ऐसे specific step में बदल देते हैं जिसे आप बदल सकते हो।"
+flashcards:
+  - q: "Agent logs, या traces, क्या record करते हैं?"
+    a: "Run की हर model call और tool call, inputs, outputs, errors, times, tokens और cost के साथ, और साथ में outcome, user और versions।"
+  - q: "Print statements की जगह structured data क्यों log करें?"
+    a: "Structured records को search, filter और measure किया जा सकता है; बिखरे prints को नहीं।"
+  - q: "एक simple step record में कौन-से fields होते हैं?"
+    a: "Run id, step number, type, inputs, outputs, start और end time, tokens और cost।"
+  - q: "Run id को दूसरे systems को क्यों पास करें?"
+    a: "ताकि एक request को हर system के tool logs और application logs में follow किया जा सके।"
+  - q: "Failed run को कैसे पढ़ें?"
+    a: "गलत outcome से शुरू करो और पीछे चलो: गलत tool result, result गलत पढ़ा गया, गलत tool चुना गया, या जानकारी थी ही नहीं।"
+  - q: "किसी दिलचस्प failure का क्या करना चाहिए?"
+    a: "उसका input एक test case की तरह save करो और हर बदलाव के बाद उसे दोबारा चलाओ।"
+  - q: "Agent logs के लिए privacy के कौन-से कदम चाहिए?"
+    a: "Personal data mask करो, access सीमित रखो और retention periods तय करो।"
+  - q: "Logs से आप क्या measure कर सकते हो?"
+    a: "Success rate, हर task के steps, हर task का cost, सबसे धीमे steps और सबसे आम errors।"
+  - q: "Debugging में metrics, logs और traces साथ कैसे काम करते हैं?"
+    a: "Metric दिखाता है कि कुछ गलत हुआ, logs दिखाते हैं कि क्या हुआ, और trace एक run के steps को जोड़ता है ताकि पता चले कि कौन-सा step fail हुआ।"
+  - q: "Inputs और outputs के अलावा और क्या log करना चाहिए?"
+    a: "Model का नाम और version, sampling settings, prompt version, tool versions, timings, tokens, cost और final outcome।"
+exercise:
+  title: "Log से debug करो"
+  setup: "Chennai के एक bank के card-services agent ने एक customer को कहा 'आपका card block कर दिया गया है'। एक घंटे बाद customer के card का fraud में इस्तेमाल हुआ। Log में दिखता है: step 1 model get_cards(customer 4471) call करता है; step 2 tool 1123 और 8890 पर खत्म होने वाले दो cards लौटाता है; step 3 model block_card('1123') call करता है; step 4 tool success लौटाता है; step 5 model जवाब देता है 'आपका card block कर दिया गया है'। Customer ने 8890 पर खत्म होने वाला card block करने को कहा था।"
+  questions:
+    - q: "ये किस step पर गलत हुआ?"
+      a: "Step 3 पर: tool result में दोनों cards दिख रहे थे और customer ने 8890 बताया था, फिर भी model ने गलत card चुन लिया।"
+    - q: "Log किस चीज़ को खारिज करता है?"
+      a: "Tool failure को: get_cards ने दोनों cards लौटाए और block_card ने काम किया। गलती model के चुनाव की थी।"
+    - q: "आप कौन-से fixes करोगे?"
+      a: "Card के आखिरी चार digits customer से confirm कराना ज़रूरी करो, और final message में block हुए card का नाम बताओ।"
+    - q: "Team को इस run का क्या करना चाहिए?"
+      a: "इसे दो cards और एक बताए हुए card वाले test case की तरह save करो, और fix के बाद check करो कि agent सही card block करता है।"
+ask:
+  - "हर agent step के लिए मुझे क्या log करना चाहिए?"
+  - "Agents की tracing के लिए कौन-से tools अच्छे हैं?"
+  - "Agent failures को tests में कैसे बदलूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+जब agent कुछ गलत करता है, तो आपको जानना होता है कि क्यों: कौन-सा step भटका, model ने क्या देखा, किस tool ने क्या लौटाया। **Agent logs** (जिन्हें अक्सर traces कहते हैं) हर run का हर step record करते हैं:
+
+- हर model call: input messages, reply, tokens, time;
+- हर tool call: tool, arguments, result या error, time;
+- final outcome, user और prompt और model के versions।
+
+| Step | Type | Input | Output | Time |
+|---|---|---|---|---|
+| 1 | model | सवाल + tools | get_tracking call करता है | 1.1 s |
+| 2 | tool | get_tracking(SHP-77812) | "Nagpur hub, 3 Nov" | 0.4 s |
+| 3 | model | ... + tracking result | get_eta call करता है | 0.9 s |
+| 4 | tool | get_eta(SHP-77812) | **ERROR: timeout** | 5.0 s |
+| 5 | model | ... + error | **"5 November को पहुँचेगा"**: गढ़ा हुआ | 0.8 s |
+
+Run 9c1f, user cust-2231, prompt v6, model chat-default।
+
+इस lesson में हम Hyderabad की एक logistics company को follow करेंगे, जिसका shipment agent कभी-कभी customers को delivery की गलत dates बता देता था।
+
+## ये काम कैसे करता है
+
+**हर step को structured data की तरह record करो**, बिखरे print statements की तरह नहीं। एक simple shape: run id, step number, type (model या tool), inputs, outputs, start और end time, tokens और cost। Runs को JSON lines में या किसी tracing tool में store करो।
+
+**हो सके तो tracing tool use करो।** LLM apps के लिए बने tools (Langfuse, Arize Phoenix, LangSmith और दूसरे, कई OpenTelemetry पर) हर run को steps के tree की तरह दिखाते हैं जिसे आप खोल सकते हो, timings और costs के साथ।
+
+**सब कुछ जोड़ो।** हर run को एक id दो, और उसे tool logs और application logs को पास करो, ताकि एक request को हर system में follow कर सको।
+
+**Failed runs पढ़ो।** आखिर से शुरू करो (क्या गलत हुआ) और पीछे चलो: क्या tool का result गलत था? क्या model ने उसे गलत पढ़ा? क्या उसने पहले कोई गलत tool चुना था? क्या जानकारी कभी उपलब्ध ही नहीं थी?
+
+**Failures को tests में बदलो।** हर दिलचस्प failure का input test case की तरह save करो और बदलावों के बाद उसे दोबारा चलाओ।
+
+**Privacy का ध्यान रखो।** Logs में user messages और tool data होते हैं। Personal data mask करो, access सीमित रखो और retention periods तय करो।
+
+**Measure करो।** Logs से आपको success rates, हर task के steps, हर task का cost, सबसे धीमे steps और सबसे आम errors मिलते हैं।
+
+**JSON lines में एक step record:**
+
+```text
+{"run":"9c1f","step":4,"type":"tool","name":"get_eta","args":{"id":"SHP-77812"},
+ "error":"timeout after 5 s","start":"2026-11-03T21:52:10+05:30","ms":5004}
+```
+
+**Logs को किन सवालों के जवाब जल्दी देने चाहिए:**
+
+| सवाल | ज़रूरी fields |
+| --- | --- |
+| ये जवाब गलत क्यों हुआ? | हर step के inputs और outputs, क्रम से |
+| कौन-सा tool सबसे ज़्यादा fail होता है? | हर step पर tool का नाम और error |
+| एक task का cost कितना है? | हर model call के tokens और cost, हर run पर जोड़े हुए |
+| क्या नए prompt से मदद मिली? | हर run पर prompt version, और outcome |
+| किस user को problem आई? | Pseudonymous user id और run id |
+
+**नियमित review की आदत।** हफ़्ते में एक बार दस runs पढ़ो: पाँच जो fail हुए या जिन पर खराब feedback मिला, और पाँच random चुने हुए। Random runs मायने रखते हैं, क्योंकि वो ऐसी problems दिखाते हैं जिनकी अभी तक किसी ने शिकायत नहीं की, जैसे agent का आठ steps लेना जहाँ तीन काफ़ी होते। हर run पर एक line लिखो कि क्या सही रहा या गलत। एक महीने में ये notes किसी भी dashboard से बेहतर बताते हैं कि अगला fix क्या करना है।
+
+**Volume बढ़ने पर logs को काम का रखना।** हर वो run store करो जिसमें error, refusal या negative feedback हो, और बाकी का एक sample। उन्हें इतने समय तक रखो कि आपका release cycle कवर हो, ताकि किसी बदलाव के पहले और बाद की तुलना कर सको।
+
+**एक छोटा tracer जो आप खुद लिख सकते हो।** कोई tool अपनाने से पहले, कुछ lines हर step को run id, timing और structured record दे देती हैं:
+
+```python
+import json, time, uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
+
+RUN_ID = ContextVar("run_id", default=None)
+STEP = ContextVar("step", default=0)
+
+def start_run(user, prompt_version, model):
+    rid = uuid.uuid4().hex[:8]
+    RUN_ID.set(rid); STEP.set(0)
+    write({"run": rid, "type": "run_start", "user": user, "prompt": prompt_version, "model": model})
+    return rid
+
+def write(record):
+    record["at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    with open("traces.jsonl", "a") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+@contextmanager
+def step(kind, name, **inputs):
+    STEP.set(STEP.get() + 1)
+    rec = {"run": RUN_ID.get(), "step": STEP.get(), "type": kind, "name": name, "inputs": inputs}
+    t0 = time.monotonic()
+    try:
+        yield rec                           # the caller sets rec["output"], tokens, cost
+    except Exception as err:
+        rec["error"] = f"{type(err).__name__}: {err}"
+        raise
+    finally:
+        rec["ms"] = round((time.monotonic() - t0) * 1000)
+        write(rec)
+
+# Use it around every model and tool call:
+start_run("cust-2231", "v6", "chat-default")
+with step("tool", "get_tracking", id="SHP-77812") as rec:
+    rec["output"] = "Nagpur hub, 3 Nov 21:40"
+```
+
+**Run को वापस पढ़ना।** वही file जवाब देती है "run 9c1f में क्या हुआ?":
+
+```python
+def show(run_id, path="traces.jsonl"):
+    rows = [json.loads(l) for l in open(path) if json.loads(l)["run"] == run_id]
+    for r in sorted(rows, key=lambda r: r.get("step", 0)):
+        what = r.get("error") or str(r.get("output", ""))[:60]
+        print(f'{r.get("step", "-"):>2} {r["type"]:<9} {r.get("name", ""):<14} {r.get("ms", ""):>6} ms  {what}')
+```
+
+जब किसी tracing tool पर जाओ, तो वही fields रखो। ज़्यादातर tools OpenTelemetry spans लेते हैं, इसलिए ये बदलाव ज़्यादातर बस इतना है कि records कहाँ भेजे जाएँ।
+
+**वो सब कुछ log करो जो behaviour बदलता है।** Model का नाम और version, sampling settings, prompt template का version, असल में भेजा गया final prompt, tool versions और retrieval settings। जब हफ़्तों बाद कोई bug दिखे, तो सवाल हमेशा यही होता है "इस run में क्या अलग था?", और उसका जवाब सिर्फ़ logged settings दे सकती हैं।
+
+**Data देखने से सोच बदलती है।** जो teams नियमित रूप से असली runs पढ़ती हैं, उनकी "अच्छे जवाब" की समझ बदल जाती है: उन्हें ऐसे failure types दिखते हैं जिनकी उन्होंने कल्पना नहीं की थी और ऐसी requirements जो किसी ने लिखी नहीं थीं। इन्हें prompt में और eval set में डालो।
+
+**Traces से agent metrics।** Run के हिसाब से group करो और निकालो: success rate, हर run के steps, हर run का cost, tool error वाले runs का हिस्सा, और वो tools जिनके बाद अक्सर failure आती है। हर run के steps का बढ़ता हुआ number अक्सर पहला संकेत होता है कि किसी prompt या tool change ने agent को उलझा दिया।
+
+## एक example से समझो
+
+Hyderabad की एक logistics company का agent "मेरा shipment कहाँ है?" का जवाब tracking, delay-reason और ETA tools call करके देता है। Customers कभी-कभी गलत delivery dates की शिकायत करते हैं।
+
+Team एक reported run का trace खोलती है:
+
+```text
+run 9c1f  user=cust-2231  prompt=v6  model=chat-default  5 steps  6.2 s  Rs 0.38
+ 1 model      -> calls get_tracking("SHP-77812")
+ 2 tool       get_tracking: last scan "Nagpur hub, 3 Nov 21:40"
+ 3 model      -> calls get_eta("SHP-77812")
+ 4 tool       get_eta: ERROR timeout after 5 s
+ 5 model      -> "Your shipment will arrive on 5 November."
+```
+
+ETA tool time out हो गया, और model ने ये कहने की जगह कि उसे नहीं पता, एक date गढ़ दी। Fixes: tool अब एक साफ़ error message लौटाता है ("ETA unavailable right now"); prompt कहता है कि `get_eta` ने जब तक date न लौटाई हो, कभी date मत बताओ; और एक check final जवाब में dates को block करता है जब run में कोई ETA result है ही नहीं। Trace एक test case बन जाता है।
+
+| Fix | असर |
+| --- | --- |
+| ETA tool "ETA unavailable right now" लौटाता है | Model को चुप्पी की जगह साफ़ error दिखता है |
+| Prompt: get_eta ने date न लौटाई हो तो कभी date मत बताओ | गढ़ी हुई dates कम |
+| ETA result न होने पर check जवाबों में dates block करता है | गढ़ी हुई dates customers के देखने से पहले पकड़ी जाती हैं |
+| Run को test case की तरह save किया | हर बदलाव के बाद case दोबारा test होता है |
+
+**Trace ने ये काम जल्दी क्यों किया।** Step logs के बिना team को सिर्फ़ final message दिखता, "Your shipment will arrive on 5 November", और वो ETA service या model में से किसी को भी बिना वजह दोष दे सकती थी। Trace ने दोनों एक साथ दिखा दिए: tool time out हुआ, और model ने चुप्पी को भर दिया। हर fix इन दो वजहों में से एक पर था, और save किया गया test साबित करता है कि दोनों ठीक रहें।
+
+## आम गलतियाँ
+
+- **सिर्फ़ final answers log करना।**
+- **Unstructured print statements।** Search और analyse करना मुश्किल।
+- **Run ids न होना।** आप systems के बीच steps को जोड़ नहीं सकते।
+- **Personal data को बिना mask किए log करना।**
+- **शिकायतों के बाद ही logs देखना।** नियमित रूप से एक sample review करो।
+
+- **Runs पर versions न होना।** Prompt और model versions के बिना आप नहीं बता सकते कि बदलाव से चीज़ें बेहतर हुईं या बदतर।
+- **देर से आने वाले logs।** अगर traces घटना के 15 मिनट बाद दिखते हैं, तो live debugging को उनका इंतज़ार करना पड़ता है।
+- **Prompt template log करना पर final prompt नहीं।** Bugs अक्सर इसी में छिपे होते हैं कि क्या भरा गया।
+
+## जब simple logging काफ़ी हो
+
+- **बिना tools की एक model call**: हर request पर tokens, time और outcome वाली एक log line काफ़ी है।
+- **एक prototype जो आप खुद चलाते हो**: हर step को console पर print करना तब तक चलता है जब तक दूसरे लोग उसे use नहीं करते।
+- **दो-तीन steps वाले fixed workflows**: shared request id वाले आम application logs काम चला सकते हैं।
+
+पूरे traces पर तब जाओ जब runs में कई steps हों, tools ऐसे तरीकों से fail हों जो मायने रखते हैं, या कई लोगों को एक ही system debug करना हो।
+
+## Demo से production तक
+
+- **हर run को trace करो**, सारे failures और negative-feedback वाले runs store करो, और बाकी का sample लो।
+- **लिखने से पहले personal data mask करो**, access सीमित रखो, और retention इतना रखो कि आपका release cycle कवर हो।
+- **Support ticket से एक run खोलना आसान बनाओ**: run id को user को दिखने वाले error message में डालो।
+- **Trace metrics पर alert लगाओ**: tool error rate, हर run के steps और हर run का cost।
+- **दिलचस्प runs को test cases में बदलो** एक click या एक command से।
+
+## Practice करो
+
+नीचे link किया DeepLearning.AI का agents को evaluate करने वाला course करो; उसके tracing वाले हिस्से सीधे काम के हैं।
+
+इस lesson का check एक project है: अपने agent को step-by-step logs के साथ push करो, और एक failed run पर एक छोटा write-up लिखो: logs ने क्या दिखाया और आपने क्या बदला। Repository का link submit करो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 metrics, logs और traces पर है, और chapter 6 agent failure modes पर।
+
+**आपका काम पूरा जब:** आप कोई भी run खोलकर ठीक-ठीक बता सको कि वो कहाँ और क्यों गलत हुआ।

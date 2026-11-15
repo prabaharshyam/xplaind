@@ -1,0 +1,221 @@
+---
+id: versioning-prompts-models
+lang: hi
+title: "Prompts और models की versioning"
+outcome: "Prompts, model choices और उनकी settings को versioned, reviewed releases की तरह संभालना सीखोगे, ताकि हमेशा पता रहे कि किस चीज़ ने कौन-सा जवाब बनाया और ज़रूरत पड़ने पर rollback हो सके।"
+answer: "Prompts, model choices और settings को code की तरह version करो: हर बदलाव review और test करो, record रखो कि कौन-सा version किस जवाब का कारण बना, और rollback का रास्ता तैयार रखो।"
+why_it_matters: "\"पिछले मंगलवार को कौन-सा prompt live था?\" ये ऐसा सवाल है जिसका जवाब हर AI team कभी न कभी नहीं दे पाती, आम तौर पर किसी incident या audit के दौरान। Prompts और models को code की तरह version करने से बदलाव testable, traceable और reversible बन जाते हैं।"
+flashcards:
+  - q: "Code के अलावा AI system के behaviour को और क्या तय करता है?"
+    a: "Prompts, model और उसका snapshot, temperature जैसी settings, tool definitions और retrieval configuration।"
+  - q: "Prompts कहाँ रहने चाहिए?"
+    a: "Version control या prompt registry में, जहाँ बदलाव review और test होते हैं; यहाँ-वहाँ बिखरी strings या dashboard edits में नहीं।"
+  - q: "Prompt registry का alias क्या करता है?"
+    a: "App prompt को alias से माँगता है, जैसे 'production'; alias को खिसकाने से बिना code release के deploy या rollback हो जाता है।"
+  - q: "Model snapshots को pin क्यों करें?"
+    a: "Floating aliases का behaviour तब बदल सकता है जब provider model को update करे, और आपकी तरफ़ कुछ बदला ही नहीं होता।"
+  - q: "Release identifier क्या होता है?"
+    a: "एक id जो prompt versions, model, settings और index version को एक साथ बाँधती है, और हर trace और audit event में record होती है।"
+  - q: "हर prompt change को कौन-सा gate पार करना चाहिए?"
+    a: "CI में golden set, जिसकी तुलना मौजूदा release से quality, cost और latency पर होती है।"
+  - q: "Provider deprecations को कैसे संभालें?"
+    a: "Retirement dates track करो, replacement को जल्दी test करो, और switch को एक normal tested release की तरह ship करो।"
+  - q: "अच्छा rollback कैसा दिखता है?"
+    a: "एक ही action, जैसे alias को खिसकाना या पिछला tag redeploy करना, जो मिनटों में हो जाए।"
+  - q: "Release file में क्या pin होना चाहिए?"
+    a: "Prompt versions, exact model snapshot, generation settings, tool definitions का version और index version, ताकि एक id पूरे behaviour को describe करे।"
+  - q: "CI आने वाले model retirement को कैसे पकड़ सकता है?"
+    a: "इस्तेमाल हो रहे models की एक file रखो, उनकी announced retirement dates के साथ, और जब कोई date, मान लो, 60 दिन से कम दूर हो तो fail करो या warn करो।"
+exercise:
+  title: "पता लगाओ क्या बदला"
+  setup: "Kochi की एक travel company के booking assistant ने मंगलवार से गलत refund rules recommend करना शुरू कर दिया। सोमवार से: marketing team ने admin panel में system prompt edit किया; gateway alias 'chat-default' एक नए model की तरफ़ point करने लगा; और index एक नए chunk size से दोबारा बना। Traces में सिर्फ़ model alias record होता है।"
+  questions:
+    - q: "Team ये क्यों नहीं बता पा रही कि problem किस बदलाव से आई?"
+      a: "तीन चीज़ें बिना versions के बदलीं, और traces सिर्फ़ एक floating alias record करते हैं, इसलिए जवाबों को किसी खास combination से जोड़ने का कुछ नहीं है।"
+    - q: "Service वापस लाने का सबसे तेज़ तरीका क्या है?"
+      a: "आखिरी जाने-पहचाने अच्छे combination को restore करो: पिछला prompt, पिछला model snapshot और पिछला index, फिर बदलावों को एक-एक करके test करो।"
+    - q: "अब से हर trace में क्या record होना चाहिए?"
+      a: "एक release id, जिसमें prompt versions, model snapshot, settings और index version आएँ।"
+    - q: "बिना review के prompt edits कैसे रोकोगे?"
+      a: "Prompts को repository या ऐसी registry में ले जाओ जिसमें owners हों, और promotion से पहले golden-set checks ज़रूरी करो।"
+ask:
+  - "Prompts को version कैसे करूँ?"
+  - "Prompt registry क्या है?"
+  - "Model deprecation की तैयारी कैसे करूँ?"
+translated_on: 2026-11-14
+---
+
+## ये क्या है
+
+AI system का behaviour सिर्फ़ code पर नहीं टिका होता:
+
+- **prompts** (system prompts, templates, few-shot examples);
+- **model** (provider, model का नाम और snapshot या version);
+- **settings** जैसे temperature और maximum tokens;
+- **tool definitions** जो model को दिखती हैं;
+- **retrieval configuration** (index version, chunking, top-k, reranker)।
+
+Versioning का मतलब है कि इनमें से हर एक की एक identifier हो, बदलाव review और tests से गुज़रें, live combination हर request के साथ record हो, और कोई भी पिछला combination वापस लाया जा सके।
+
+```flow
+Release assistant-2026.11.3 | prompts support-system v12 और refund-rules v4; एक pinned, dated model snapshot; temperature 0.2; tools lookup_order v3, create_ticket v2; index 2026-11-01 -[हर trace और audit event में record]-> एक बदलाव
+एक बदलाव -> CI में Golden set -> Staging -> Production alias
+Production alias -[rollback: alias को वापस खिसकाओ]-> पिछला release
+```
+
+Release का हर हिस्सा अपना version रखता है, इसलिए किसी भी जवाब को ठीक उसी चीज़ तक वापस trace किया जा सकता है जिसने उसे बनाया।
+
+इस lesson में हम Gurugram की एक fintech के support assistant को follow करेंगे, जहाँ तीन teams सीधे production में prompts edit करती थीं।
+
+## ये काम कैसे करता है
+
+**Prompts version control में।** Prompts को repository में files की तरह (या prompt registry में) रखो, code में बिखरी strings की तरह या dashboard में edit होने वाली चीज़ की तरह नहीं। बदलाव pull requests से जाएँ और CI में evals चलें।
+
+**Prompt registries।** MLflow की prompt registry, Langfuse और दूसरे tools नाम वाले, numbered prompt versions aliases ("production", "staging") के साथ store करते हैं। Application prompt को alias से माँगता है; alias खिसकाने से बिना code release के deploy या rollback हो जाता है। ये तब काम आता है जब non-engineers prompts edit करते हैं, बशर्ते बदलाव फिर भी evals पास करें।
+
+**Models को pin करो।** जहाँ providers dated model snapshots देते हैं, वहाँ वही use करो, उन aliases की जगह जो चुपचाप बदल जाते हैं। अगर आप अपने gateway के aliases ("chat-default") use करते हो, तो gateway की configuration भी versioned और reviewed होनी चाहिए।
+
+**एक release identifier।** Prompt version, model, settings और index version को एक release में बाँधो (जैसे "assistant-2026.11.3"), जो हर trace और audit event में record हो।
+
+**Promote करने से पहले test करो।** हर बदलाव golden set चलाता है। मौजूदा release से quality, cost और latency पर तुलना करो। Staging से होकर production तक promote करो।
+
+**Provider deprecations।** Providers announced dates पर models retire करते हैं। एक calendar रखो, replacement को जल्दी test करो, और switch को एक release की तरह plan करो।
+
+**Rollback।** पिछला release तैयार रखो। Rollback एक ही action होना चाहिए: alias खिसकाओ या पिछला tag redeploy करो।
+
+**क्या version करना है और कैसे:**
+
+| हिस्सा | कैसे version करें | आम बदलाव |
+| --- | --- | --- |
+| Prompts | Git में files या numbered versions वाली registry | Wording, examples, rules |
+| Model | Pinned dated snapshot, या reviewed gateway alias | नए model पर upgrade |
+| Settings | Git में config file | Temperature, max tokens |
+| Tool definitions | Git में code | नया parameter या tool |
+| Retrieval | Git में index version और config | Chunk size, top-k, reranker |
+
+**एक बार में एक ही चीज़ बदलो।** जब कोई release prompt, model और index एक साथ बदलता है और quality गिरती है, तो कोई नहीं कह सकता कि किस बदलाव ने किया। जहाँ हो सके उन्हें अलग-अलग releases में ship करो, हर एक golden set से गुज़रे। जब कई चीज़ें साथ ship करनी ही पड़ें, जैसे model switch जिसके लिए prompt में बदलाव चाहिए, तो staging में हर step पर golden set चलाओ, ताकि production से पहले हर हिस्से का असर पता हो।
+
+**Model switches।** नए model को release candidate की तरह लो: पूरा golden set चलाओ, cost और latency की तुलना करो, हर उस भाषा में जो आप serve करते हो sample conversations पर refusals और tone देखो, और धीरे-धीरे roll out करो। एक model के लिए tune किए prompts को अगले के लिए अक्सर छोटे बदलाव चाहिए होते हैं।
+
+**Prompts files की तरह, releases एक manifest की तरह।**
+
+```text
+prompts/
+  answer.v13.md
+  answer.v14.md
+  rewrite.v4.md
+release.yaml
+```
+
+```yaml
+# release.yaml
+release: assistant-2026.11.3
+model: claude-sonnet-5-5-YYYYMMDD     # a dated snapshot where the provider offers one
+settings: {max_tokens: 600}
+prompts: {answer: v14, rewrite: v4}
+index: policies-2026-11-01
+tools: tools-v7
+```
+
+```python
+import hashlib, json, yaml
+from pathlib import Path
+
+def load_release(path="release.yaml"):
+    rel = yaml.safe_load(open(path))
+    rel["prompt_text"] = {name: Path(f"prompts/{name}.{ver}.md").read_text()
+                          for name, ver in rel["prompts"].items()}
+    blob = json.dumps({k: rel[k] for k in ("model", "settings", "prompts", "index", "tools")}, sort_keys=True)
+    rel["fingerprint"] = hashlib.sha256(blob.encode()).hexdigest()[:10]
+    return rel
+
+RELEASE = load_release()     # log RELEASE["release"] and RELEASE["fingerprint"] on every trace
+```
+
+अगर कोई release का नाम बदले बिना उसे edit कर दे तो fingerprint बदल जाता है, जिससे "छोटे" untracked बदलाव पकड़ में आ जाते हैं।
+
+**CI में checks।** अगर release किसी missing या risky चीज़ की तरफ़ point करे तो build fail करो:
+
+```python
+import re
+from datetime import date
+
+RETIREMENTS = yaml.safe_load(open("model-retirements.yaml"))     # {model_id: "YYYY-MM-DD"}
+
+def check_release(rel):
+    problems = []
+    for name, ver in rel["prompts"].items():
+        if not Path(f"prompts/{name}.{ver}.md").exists():
+            problems.append(f"missing prompt file {name}.{ver}")
+    if not re.search(r"\d{8}$", rel["model"]):
+        problems.append("model is not pinned to a dated snapshot")
+    retire = RETIREMENTS.get(rel["model"])
+    if retire and (date.fromisoformat(retire) - date.today()).days < 60:
+        problems.append(f"{rel['model']} retires on {retire}; plan the switch")
+    return problems
+```
+
+जहाँ provider dated names नहीं देता, वहाँ जो हो सके वो pin करो (अपने gateway का alias, reviewed) और चुपचाप होने वाले बदलाव पकड़ने के लिए golden set को schedule पर चलाओ।
+
+**Promotion और rollback।** Production deployed commit से `release.yaml` पढ़ता है, इसलिए promote करना एक pull request merge करना है और rollback पिछला commit redeploy करना। अगर आप इसकी जगह prompt registry use करते हो, तो वही नियम लागू है: app एक alias पढ़ता है, और golden set पास होने के बाद promotion alias को खिसकाता है।
+
+**इंसानों के पढ़ने वाला changelog।** `release.yaml` के बगल में एक छोटा `CHANGELOG.md` रखो: release id, date, क्या बदला, पिछले release से तुलना में eval results, और किसने approve किया। Clients के reviewers अक्सर ठीक यही माँगते हैं।
+
+## एक example से समझो
+
+Gurugram की एक fintech के support assistant के prompts तीन teams admin panel में सीधे edit करती थीं। एक Friday को complaints का volume दोगुना हो गया। कोई नहीं बता सका कि क्या बदला था; traces में सिर्फ़ model का नाम दिखता था।
+
+Fix:
+
+- Prompts repository में files की तरह चले गए, हर prompt का एक owner।
+- एक prompt registry published versions रखती है; production alias `support-prod` use करता है।
+- हर trace release record करता है: prompt versions, model snapshot, temperature, index version।
+- CI हर prompt change पर 120 सवालों का golden set चलाता है और एक point से ज़्यादा गिरावट block कर देता है।
+- Gateway के model aliases सिर्फ़ pull request से बदलते हैं।
+
+दो महीने बाद एक नया prompt version evals पास कर लेता है, पर Hindi conversations में customer feedback गिरने लगता है। Traces दिखाते हैं कि गिरावट release 2026.12.2 से शुरू हुई। Team एक मिनट में alias वापस 2026.12.1 पर ले जाती है, फिर golden set में 25 Hindi cases जोड़ती है, जो problem उजागर कर देते हैं। Fix वाला version अगले दिन ship होता है।
+
+| घटना | Versioning से पहले | Versioning के बाद |
+| --- | --- | --- |
+| Complaints में उछाल | किसी को नहीं पता क्या बदला | Traces ने release 2026.12.2 की तरफ़ इशारा किया |
+| Rollback | घंटों का अंदाज़ा | Alias एक मिनट में वापस |
+| Root cause | अज्ञात | 25 नए Hindi golden cases ने पकड़ा |
+| Fix ship हुआ | साफ़ नहीं | अगले दिन, CI से होकर |
+
+## आम गलतियाँ
+
+- **Production dashboards में बिना review के prompts edit करना।** बदलाव अदृश्य हो जाते हैं।
+- **Floating model aliases।** Provider model update करता है और आपका behaviour बिना खबर बदल जाता है।
+- **Traces में versions न होना।** आप quality के बदलाव को किसी release से जोड़ नहीं सकते।
+- **Golden-set gate न होना।** Prompt changes भी code changes हैं; उन्हें test करो।
+- **Deprecation dates को ignore करना।** आखिरी वक्त पर मजबूरी का switch एक risky release होता है।
+- **एक release में कई हिस्से बदलना।** Quality गिरने पर पता नहीं चलता कि किस हिस्से ने किया।
+- **हर prompt का owner न होना।** किसी को हर बदलाव approve करना होता है और उसके असर का जवाब देना होता है।
+- **Prompt file को वहीं का वहीं edit करना**, नया version जोड़ने की जगह।
+- **Model aliases जो एक fixed नाम के नीचे चुपचाप बदल जाते हैं।**
+- **Retirement calendar न होना**, इसलिए deprecation emergency बन जाती है।
+
+## जब हल्की versioning भी चलेगी
+
+- **एक prompt वाला prototype**: उसे Git में रखो और note करो कि कौन-सा model use किया।
+- **Personal tools** जहाँ किसी और को consistent behaviour की ज़रूरत नहीं।
+- **एक बार चलने वाले fixed batch jobs**, जहाँ output में prompt और model record कर देना काफ़ी है।
+
+## Demo से production तक
+
+- **हर हिस्सा एक release file में pin करो**, और हर trace पर release id और fingerprint log करो।
+- **CI में हर release change पर golden set चलाओ।**
+- **Model retirement dates track करो** और replacements को जल्दी test करो।
+- **Eval results और approvals के साथ changelog रखो।**
+- **पिछला release redeploy करके rollback करो।**
+
+## Practice करो
+
+MLflow के prompt registry के docs पढ़ो।
+
+1. अपने app के prompts को versioned files या aliases वाली registry में ले जाओ।
+2. हर trace में एक release identifier (prompt versions, model snapshot, settings, index version) record करो।
+3. एक prompt बदलो, CI में अपना golden set चलाओ, उसे promote करो, फिर एक ही action से rollback करो।
+4. CI में check_release जोड़ो, फिर release.yaml को ऐसे prompt version की तरफ़ point करो जो मौजूद नहीं है और confirm करो कि build fail होता है।
+
+**आपका काम पूरा जब:** आप किसी भी पुरानी request के लिए बता सको कि "इस जवाब को ठीक-ठीक किसने बनाया?", और पाँच मिनट से कम में rollback कर सको।
