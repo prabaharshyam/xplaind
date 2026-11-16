@@ -2,7 +2,7 @@
 // receipts. Payment gateways (Cashfree) check these against the merchant application.
 export const BUSINESS = {
   brand: "Xplaind",
-  legalName: "ZEREH Venture",
+  legalName: "ZEREH Ventures",
   gstin: "33GDZPS4274J1ZK",
   /** NEXT_PUBLIC_CONTACT_EMAIL can override it, for example while a mailbox is being set up. */
   email: process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || "hello@xplaind.in",

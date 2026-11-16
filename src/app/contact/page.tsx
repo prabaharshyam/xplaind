@@ -9,7 +9,7 @@ import { siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = pageMeta({
   title: "Contact Xplaind",
-  description: "Contact Xplaind, a brand of ZEREH Venture: email and phone for questions, payments, refunds and account help.",
+  description: "Contact Xplaind, a brand of ZEREH Ventures: email and phone for questions, payments, refunds and account help.",
   path: "/contact",
 });
 

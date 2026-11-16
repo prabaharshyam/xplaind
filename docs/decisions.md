@@ -499,7 +499,7 @@ The owner asked for a focus review and chose four of its recommendations.
 
 ## 2026-11-13: ready for Cashfree onboarding (BIZ-1)
 
-Cashfree's checklist for a new merchant site: published privacy, terms and refund pages, a contact page with email and phone, the parent business named on the site, pricing and what is sold clearly visible, and the site public. The policies already existed (PAY-6); this adds /contact, the "brand of ZEREH Venture" footer line with the GSTIN, "Who we are" in privacy and terms, a Delivery section in refunds, and a pricing page that always shows the passes and their prices. The owner chose: prices include GST; show the GSTIN; no registered address on the site for now. Receipts keep "not a tax invoice" until GST invoices are built. The Pricing link is now always in the menu and footer (PAY-5 amended), because reviewers and visitors must find it before payments open.
+Cashfree's checklist for a new merchant site: published privacy, terms and refund pages, a contact page with email and phone, the parent business named on the site, pricing and what is sold clearly visible, and the site public. The policies already existed (PAY-6); this adds /contact, the "brand of ZEREH Ventures" footer line with the GSTIN, "Who we are" in privacy and terms, a Delivery section in refunds, and a pricing page that always shows the passes and their prices. The owner chose: prices include GST; show the GSTIN; no registered address on the site for now. Receipts keep "not a tax invoice" until GST invoices are built. The Pricing link is now always in the menu and footer (PAY-5 amended), because reviewers and visitors must find it before payments open.
 
 ## 2026-11-13: Razorpay Standard Checkout beside Cashfree (RZ-1)
 

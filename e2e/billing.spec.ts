@@ -30,7 +30,7 @@ test("the pricing page leads with value, shows honest savings, a free-vs-Pro tab
   // BIZ-1: what is sold, by whom and how it is delivered stays on the page, at the end. Pro is closed in
   // this build (no PAYMENTS_MODE): prices stay visible, with a clear notice and no buy buttons.
   await expect(page.getByRole("heading", { name: "What you can buy" })).toBeVisible();
-  await expect(page.getByText(/Sold by ZEREH Venture \(GSTIN 33GDZPS4274J1ZK\)/)).toBeVisible();
+  await expect(page.getByText(/Sold by ZEREH Ventures \(GSTIN 33GDZPS4274J1ZK\)/)).toBeVisible();
   await expect(page.getByText(/Online payment for passes opens shortly/)).toBeVisible();
   await expect(page.getByRole("button", { name: /^Buy for/ })).toHaveCount(0);
   expect(await overflow(page)).toBe(false);
@@ -72,7 +72,7 @@ test("the contact page, the footer and the policies name the business and how to
   expect((await wcag(page)).violations).toEqual([]);
 
   const footer = page.getByRole("contentinfo");
-  await expect(footer.getByText(/Xplaind is a brand of ZEREH Venture/)).toBeVisible();
+  await expect(footer.getByText(/Xplaind is a brand of ZEREH Ventures/)).toBeVisible();
   for (const [name, href] of [["Privacy", "/privacy"], ["Terms", "/terms"], ["Refunds and cancellations", "/refunds"], ["Pricing", "/pricing"], ["Contact", "/contact"]] as const) {
     await expect(footer.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
   }
