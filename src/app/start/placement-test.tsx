@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { track } from "@/lib/browser/analytics";
 import { announceNavigation } from "@/lib/nav-feedback";
 import {
   clearTest,
@@ -46,6 +47,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
   function begin(length: number) {
     saveTest({ goal: goal.id, weeklyHours, state: startTest(bank, Math.random, length) });
     setSelected(null);
+    track("quiz_started", { goal: goal.id, weekly_hours: weeklyHours, quick: length < TEST_LENGTH }); // AN-2
   }
 
   function next() {
@@ -62,6 +64,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
         ...(lengthOf(state) < TEST_LENGTH ? { quick: true } : {}),
       });
       clearTest();
+      track("quiz_completed", { goal: test.goal, questions: state.answers.length, quick: lengthOf(state) < TEST_LENGTH }); // AN-2
       setPath(test.goal);
       announceNavigation(); // UX-7
       router.push("/result");

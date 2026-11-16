@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { track } from "@/lib/browser/analytics";
 import { useState } from "react";
 import { Celebrate } from "@/components/celebrate";
 import { McqQuiz, type McqQuestion } from "@/components/mcq-quiz";
@@ -38,6 +39,7 @@ export function StopProgressPanel({ stopId, title, check }: { stopId: string; ti
       setParty(message);
       // AN-1: the very first lesson a learner finishes on this device, counted without an identifier.
       if (!Object.values(progress.stops).some((s) => s?.status === "done")) sendFunnel("first_lesson");
+      track("stop_done", { stop_id: stopId }); // AN-2
     }
   };
 

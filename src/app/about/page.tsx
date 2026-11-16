@@ -20,7 +20,7 @@ const BELIEFS = [
   { icon: "map" as const, title: "Order beats volume", text: "Every roadmap puts topics in the order you need them, so you always know what to learn next." },
   { icon: "chat" as const, title: "Plain English first", text: "Each lesson opens with a one-line answer, then builds the idea step by step." },
   { icon: "scale" as const, title: "Picks are earned", text: "No one can pay to be listed or ranked. The code that orders courses never reads commissions." },
-  { icon: "shield" as const, title: "Open and private", text: "Every lesson is open to everyone. No ads, no tracking scripts, and you can delete your account anytime." },
+  { icon: "shield" as const, title: "Open and private", text: "Every lesson is open to everyone. No ads, no tracking cookies, and you can delete your account anytime." },
 ] as const;
 
 /** The founder's story up to AI (TR-2). The ending, with its emphasis, is written out in the page. */
