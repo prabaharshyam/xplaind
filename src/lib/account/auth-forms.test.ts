@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adultConfirmedAt, parseGoogleIdForm, signUpHitExistingAccount, parseNewPassword, parseOAuthForm, parsePasswordForm } from "./auth-forms";
+import { adultConfirmedAt, encodeGoogleState, parseGoogleIdForm, parseGoogleRedirectForm, signUpHitExistingAccount, parseNewPassword, parseOAuthForm, parsePasswordForm } from "./auth-forms";
 
 const form = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null });
 
@@ -60,5 +60,27 @@ describe("signUpHitExistingAccount (AC-1)", () => {
     expect(signUpHitExistingAccount({ identities: [{ provider: "email" }] })).toBe(false);
     expect(signUpHitExistingAccount({})).toBe(false);
     expect(signUpHitExistingAccount(null)).toBe(false);
+  });
+});
+
+describe("parseGoogleRedirectForm (AC-1b, Google in the same tab on phones)", () => {
+  const jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl";
+  const nonce = "b".repeat(64);
+  const state = encodeGoogleState(nonce, "/ai/book?x=1");
+
+  it("takes the token from Google's post and the nonce and return page from the cookie; continuing is the 18+ confirmation", () => {
+    expect(parseGoogleRedirectForm(form({ credential: jwt, g_csrf_token: "c1" }), { state, csrf: "c1" })).toEqual({ ok: true, credential: jwt, nonce, next: "/ai/book?x=1" });
+  });
+  it("works when Google's CSRF cookie did not come along, since the nonce cookie already binds the token to this browser", () => {
+    expect(parseGoogleRedirectForm(form({ credential: jwt, g_csrf_token: "c1" }), { state })).toMatchObject({ ok: true, nonce });
+  });
+  it("refuses a CSRF mismatch, a missing CSRF field, or a missing nonce cookie", () => {
+    expect(parseGoogleRedirectForm(form({ credential: jwt, g_csrf_token: "c1" }), { state, csrf: "other" })).toEqual({ ok: false, error: "provider" });
+    expect(parseGoogleRedirectForm(form({ credential: jwt }), { state, csrf: "c1" })).toEqual({ ok: false, error: "provider" });
+    expect(parseGoogleRedirectForm(form({ credential: jwt, g_csrf_token: "c1" }), {})).toEqual({ ok: false, error: "provider" });
+  });
+  it("ignores a next or nonce posted in the form; only the cookie counts", () => {
+    const r = parseGoogleRedirectForm(form({ credential: jwt, g_csrf_token: "c1", nonce: "c".repeat(64), next: "/evil" }), { state });
+    expect(r).toMatchObject({ ok: true, nonce, next: "/ai/book?x=1" });
   });
 });
