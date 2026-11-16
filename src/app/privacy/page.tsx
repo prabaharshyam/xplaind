@@ -1,3 +1,4 @@
+import { analyticsKey } from "@/lib/browser/analytics";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
@@ -7,11 +8,11 @@ import { pageMeta } from "@/lib/seo";
 
 export const metadata: Metadata = pageMeta({
   title: "Privacy policy",
-  description: "What Xplaind stores, why, who processes it, how long it is kept and how to delete it. No ads and no tracking scripts.",
+  description: "What Xplaind stores, why, who processes it, how long it is kept and how to delete it. No ads and no tracking cookies.",
   path: "/privacy",
 });
 
-const UPDATED = "14 November 2026";
+const UPDATED = "16 November 2026";
 
 const contact: string = BUSINESS.email;
 
@@ -82,6 +83,9 @@ const PROCESSORS: [string, string][] = [
   ],
   ["Anthropic", "Writes AI answers. It receives only the text of that request, such as your question, your code and its error, or your resume text, when you press the button. If you are a Pro learner and choose to have the picture pages of your notes read, those pages, drawn as small images, are sent to it too, and only those pages."],
   ["YouTube", "Plays videos inside lessons from its privacy-enhanced (no-cookie) player, and only after you press play."],
+  ...(analyticsKey()
+    ? ([["PostHog", "Counts page visits and a few steps, such as starting the placement test, without cookies and without anything that identifies you or your device (AN-2)."]] as [string, string][])
+    : []),
   ["jsDelivr", "Delivers the Python engine for the code playground the first time you press Run. Your code runs in your browser and is not sent anywhere."],
 ];
 
@@ -95,7 +99,7 @@ export default function PrivacyPage() {
         icon="shield"
         eyebrow="Privacy"
         title="Privacy policy"
-        lead="The short version: no ads, no tracking scripts, nothing sold. Without an account, your progress never leaves your device."
+        lead="The short version: no ads, no tracking cookies, nothing sold. Without an account, your progress never leaves your device."
       >
         <p className="text-sm text-zinc-700 dark:text-zinc-300">Last updated {UPDATED}.</p>
       </PageHero>
@@ -140,7 +144,11 @@ export default function PrivacyPage() {
 
         <h2 className={H2}>Cookies and analytics</h2>
         <p className={P}>
-          We use no advertising or tracking cookies and no analytics scripts. If you make an account, a sign-in cookie keeps you signed in. Your
+          We use no advertising or tracking cookies.{" "}
+          {analyticsKey()
+            ? "We use PostHog in its cookie-free mode to count visits: which pages are read, which site sent you there, your country and the kind of device. It stores nothing in your browser, gets no name, account or device identifier, and keeps only the page address without anything after the question mark. "
+            : "We use no analytics scripts. "}
+          If you make an account, a sign-in cookie keeps you signed in. Your
           progress and settings without an account live in your browser&apos;s own storage, which only this site can read. If you open a
           friend&apos;s invite link, a cookie remembers their code for 30 days so your first pass gets the friend discount.
         </p>
