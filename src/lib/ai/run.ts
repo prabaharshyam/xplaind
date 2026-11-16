@@ -37,6 +37,8 @@ export type AiRequest<S extends z.ZodType> = {
   effort: "low" | "medium" | "high";
   /** Calls allowed per minute for this learner across every tool. Default 6; reading picture pages (MB-12) needs more. */
   burst?: number;
+  /** Which model to use, when a feature needs both (VI-3). Default: by kind, see modelFor. */
+  model?: "fast" | "main";
 };
 
 /** Runs one guarded call. Returns the checked output, or a Response to send back as is. */
@@ -90,7 +92,7 @@ export async function runAi<S extends z.ZodType>(
     return problem(429, LIMIT_MESSAGE[verdict as "day" | "month"]);
   // AN-1: a free account using one of its trial turns, counted without identifying anyone.
   if (onTrial(who)) await bump(admin, "ai_trial_used");
-  const model = modelFor(req.kind, settings.model, settings.fastModel);
+  const model = modelFor(req.kind, settings.model, settings.fastModel, req.model);
 
   const client = new Anthropic({
     apiKey: settings.apiKey,

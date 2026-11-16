@@ -26,6 +26,7 @@ const ORDER: AiKind[] = [
   "book",
   "notes",
   "scan",
+  "voice",
 ];
 
 

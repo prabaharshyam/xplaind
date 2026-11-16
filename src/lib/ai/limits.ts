@@ -1,7 +1,7 @@
 // CO-1: what AI calls may cost. Pure: no network, no database. The owner set a
 // US$20 monthly cap; per-learner daily caps keep one account from using it up.
 
-export const AI_KINDS = ["tutor", "grade", "interview", "book", "resume", "notes", "scan"] as const;
+export const AI_KINDS = ["tutor", "grade", "interview", "book", "resume", "notes", "scan", "voice"] as const;
 export type AiKind = (typeof AI_KINDS)[number];
 
 /** Calls one learner may make per India day, per feature. Grades follow the PRD's 5 (CO-1). */
@@ -19,6 +19,12 @@ export const DAILY_LIMIT: Record<AiKind, number> = {
   notes: 30,
   /** MB-12: one batch of up to 4 picture pages read into text, on the fast model. Pro only (the tiers in plans.ts give guests and free accounts none). */
   scan: 20,
+  /**
+   * VI-3: the AI voice interviewer. Each follow-up question is one call (fast model) and the scored report is
+   * one more (main model), so a 5-question interview is at most 11 calls. Pro only (the tiers in plans.ts
+   * give guests and free accounts none, and the route checks Pro before anything is read).
+   */
+  voice: 40,
 };
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
@@ -29,8 +35,12 @@ export const DEFAULT_MODEL = "claude-opus-5-5";
 export const DEFAULT_FAST_MODEL = "claude-haiku-5-5";
 export const FAST_KINDS: readonly AiKind[] = ["tutor", "notes", "scan"];
 
-/** The model for one feature: the fast model for FAST_KINDS, otherwise the main model. */
-export function modelFor(kind: AiKind, main: string, fast: string): string {
+/**
+ * The model for one call: the fast model for FAST_KINDS, otherwise the main model. A route can ask for
+ * either one explicitly (VI-3: the voice interviewer's follow-ups use the fast model, its report the main one).
+ */
+export function modelFor(kind: AiKind, main: string, fast: string, choice?: "fast" | "main"): string {
+  if (choice) return choice === "fast" ? fast : main;
   return FAST_KINDS.includes(kind) ? fast : main;
 }
 

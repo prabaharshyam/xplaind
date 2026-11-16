@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { needAccount } from "@/lib/browser/account-sync";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { abortRecognition, joinText, useDictation, useSpeechSupported } from "@/components/interview/speech";
 import { useAiAccess } from "@/components/ai/ai-gate";
 import { AnswerReviewBlock, InterviewReviewPanel, useInterviewReview } from "@/components/ai/ai-interview-review";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
+import { VOICE_QUESTION_COUNTS } from "@/lib/ai/voice-interview";
+import { VoiceInterviewer } from "./voice-interviewer";
 import { recordInterview } from "@/lib/browser/activity-store";
 import { todayInIST } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
@@ -20,47 +23,7 @@ import {
   sessionReport,
 } from "@/lib/interview/analyse";
 
-// ---- browser speech recognition (Chrome, Edge, Safari; not Firefox) ---------
-
-type RecognitionResultList = ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
-type RecognitionEvent = { resultIndex: number; results: RecognitionResultList };
-type Recognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onresult: ((e: RecognitionEvent) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  onaudiostart?: (() => void) | null;
-};
-type RecognitionCtor = new () => Recognition;
-
-/**
- * VS-1: one recogniser for the whole interview. iPhone browsers all use Safari's speech engine, which
- * runs one recognition at a time and silently gives a new one no audio while the last is still
- * shutting down, so a fresh recogniser per question went deaf from question 2 on. `active` is true
- * from start() until the browser reports the end.
- */
-let shared: { r: Recognition; active: boolean } | null = null;
-function sharedRecognizer(Ctor: RecognitionCtor) {
-  if (!shared) shared = { r: new Ctor(), active: false };
-  return shared;
-}
-
-/** How long to wait for sound after the microphone starts before telling the learner it is not working. */
-const HEAR_TIMEOUT_MS = 5000;
-
-const recognitionCtor = (): RecognitionCtor | null => {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-};
-
 const noop = () => () => {};
-const useSpeechSupported = () => useSyncExternalStore(noop, () => recognitionCtor() !== null, () => false);
 const useSearch = () => useSyncExternalStore(noop, () => window.location.search, () => "");
 
 // ---- helpers --------------------------------------------------------------
@@ -70,9 +33,8 @@ const COUNTS = [3, 5, 10] as const;
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, Math.floor(s % 60))).padStart(2, "0")}`;
 const minutes = (s: number) => (s % 60 === 0 ? `${s / 60} min` : `${Math.floor(s / 60)}.5 min`);
-const joinText = (a: string, b: string) => (a && b ? `${a.replace(/\s+$/, "")} ${b.trim()}` : a || b.trim());
 
-type Stage = { kind: "setup" } | { kind: "question"; index: number } | { kind: "report" };
+type Stage = { kind: "setup" } | { kind: "question"; index: number } | { kind: "report" } | { kind: "voice" };
 type Answer = { text: string; seconds: number };
 
 // ---- component ------------------------------------------------------------
@@ -96,6 +58,18 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
   const [stage, setStage] = useState<Stage>({ kind: "setup" });
   const [session, setSession] = useState<SimQuestion[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [voiceCount, setVoiceCount] = useState<number>(3);
+
+  /** VI-1: the AI voice interviewer (Pro) uses the same role and question bank. */
+  const startVoice = () => {
+    if (!needAccount("interview")) return; // SU-1, and PV-2: accounts are for adults only
+    const picked = fixedQuestion
+      ? [fixedQuestion]
+      : pickQuestions(questions, { pathId: pathId || null, count: voiceCount, seed: Math.floor(Math.random() * 2 ** 31) });
+    setSession(picked);
+    setStage({ kind: "voice" });
+    window.scrollTo({ top: 0 });
+  };
 
   const start = (useVoice: boolean) => {
     if (!needAccount("interview")) return; // SU-1: the mock interview needs a free account
@@ -129,6 +103,10 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
         onSubmit={submit}
       />
     );
+  }
+
+  if (stage.kind === "voice") {
+    return <VoiceInterviewer questions={session} pathId={pathId || null} onExit={() => setStage({ kind: "setup" })} />;
   }
 
   if (stage.kind === "report") {
@@ -235,6 +213,37 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
           </>
         )}
       </div>
+
+      <section aria-labelledby="ai-interviewer-heading" className="rounded-2xl border border-brand-200 bg-brand-50 p-4 leading-7 md:p-5 dark:border-brand-900 dark:bg-brand-950">
+        <h2 id="ai-interviewer-heading" className="flex flex-wrap items-center gap-2 font-semibold">
+          AI interviewer
+          <span className="rounded-full bg-brand-700 px-2 py-0.5 text-xs font-medium text-white">Pro</span>
+        </h2>
+        <p className="mt-1">
+          A real back-and-forth: the interviewer reads each question aloud, listens to your answer, then asks 1 or 2
+          follow-up questions about what you actually said. You get a scored report on the key points, depth and how
+          you communicate.
+        </p>
+        {!fixedQuestion && (
+          <label className="mt-3 flex max-w-xs flex-col gap-1">
+            <span className="text-sm font-medium">Questions with the AI interviewer</span>
+            <select
+              value={voiceCount}
+              onChange={(e) => setVoiceCount(Number(e.target.value))}
+              className="min-h-12 w-full rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+            >
+              {VOICE_QUESTION_COUNTS.map((n) => (
+                <option key={n} value={n}>
+                  {n} questions
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <button type="button" onClick={startVoice} className={`${primaryButton} mt-4`}>
+          Start the AI interviewer
+        </button>
+      </section>
     </div>
   );
 }
@@ -256,142 +265,30 @@ function QuestionScreen({
   onVoiceFailed: () => void;
   onSubmit: (a: Answer) => void;
 }) {
-  const [text, setText] = useState("");
-  const [interim, setInterim] = useState("");
-  const [listening, setListening] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(0);
   const [shownAt] = useState(() => Date.now());
-  const [notice, setNotice] = useState<string | null>(null);
-  const wantListening = useRef(false);
   const submitted = useRef(false);
   const micButton = useRef<HTMLButtonElement>(null);
-  const heardTimer = useRef<number | null>(null);
 
   const elapsed = startedAt === null ? 0 : Math.max(0, (now - startedAt) / 1000);
   const left = Math.max(0, q.answer_seconds - elapsed);
   const thinkingLeft = Math.max(0, THINKING_SECONDS - (now - shownAt) / 1000);
 
-  const stopListening = useCallback(() => {
-    wantListening.current = false;
-    if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
-    heardTimer.current = null;
-    shared?.r.stop();
-    setListening(false);
-    setInterim("");
-  }, []);
+  const beginClock = useCallback(() => setStartedAt((s) => s ?? Date.now()), []);
+  const dictation = useDictation({ onStart: beginClock, onBlocked: onVoiceFailed });
+  const { text, setText, interim, listening, notice, toggle: toggleMic, abort } = dictation;
 
   const finish = useCallback(
     (override?: string) => {
       if (submitted.current) return;
       submitted.current = true;
-      stopListening();
-      shared?.r.abort();
+      abort();
       const seconds = startedAt === null ? 0 : Math.min(q.answer_seconds, (Date.now() - startedAt) / 1000);
       onSubmit({ text: (override ?? joinText(text, interim)).trim(), seconds });
     },
-    [onSubmit, q.answer_seconds, startedAt, stopListening, text, interim],
+    [abort, onSubmit, q.answer_seconds, startedAt, text, interim],
   );
-
-  const beginClock = useCallback(() => setStartedAt((s) => s ?? Date.now()), []);
-
-  const startListening = useCallback(() => {
-    const Ctor = recognitionCtor();
-    if (!Ctor) return;
-    beginClock();
-    const s = sharedRecognizer(Ctor);
-    const r = s.r;
-    const clearHeardTimer = () => {
-      if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
-      heardTimer.current = null;
-    };
-    // If no sound reaches us soon after a start, say so plainly instead of showing "Listening…" forever.
-    const expectSound = (message: string) => {
-      clearHeardTimer();
-      heardTimer.current = window.setTimeout(() => {
-        heardTimer.current = null;
-        wantListening.current = false;
-        r.abort();
-        setListening(false);
-        setInterim("");
-        setNotice(message);
-      }, HEAR_TIMEOUT_MS);
-    };
-    const heard = () => clearHeardTimer();
-    r.lang = "en-IN";
-    r.continuous = true;
-    r.interimResults = true;
-    r.onaudiostart = heard;
-    r.onresult = (e) => {
-      heard();
-      let finalText = "";
-      let interimText = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const res = e.results[i];
-        if (res.isFinal) finalText += res[0].transcript;
-        else interimText += res[0].transcript;
-      }
-      if (finalText) setText((t) => joinText(t, finalText));
-      setInterim(interimText);
-    };
-    r.onerror = (e) => {
-      if (e.error === "no-speech" || e.error === "aborted") return;
-      clearHeardTimer();
-      wantListening.current = false;
-      setListening(false);
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        setNotice("The microphone is blocked, so type your answer. You can allow it in the browser's site settings.");
-        onVoiceFailed();
-      } else {
-        setNotice("Speech-to-text stopped working. Type the rest of your answer, or press the microphone again.");
-      }
-    };
-    // Browsers end recognition after a pause; carry on while the learner still wants it. Phones may
-    // refuse a restart that no tap started, so the sound check turns the microphone off if it stays quiet.
-    r.onend = () => {
-      s.active = false;
-      if (!wantListening.current) {
-        clearHeardTimer();
-        setListening(false);
-        return;
-      }
-      try {
-        r.start();
-        s.active = true;
-        expectSound("The microphone paused. Tap “Speak more” to carry on, or type the rest of your answer.");
-      } catch {
-        setListening(false);
-      }
-    };
-    wantListening.current = true;
-    const begin = () => {
-      r.start();
-      s.active = true;
-      setListening(true);
-      setNotice(null);
-      expectSound("The microphone isn't picking up any sound. Tap “Start speaking” to try again, or type your answer.");
-    };
-    try {
-      if (s.active) r.abort(); // a recognition from the last question is still closing
-      begin();
-    } catch {
-      // Still closing: start as soon as the browser says it has ended.
-      r.onend = () => {
-        s.active = false;
-        try {
-          begin();
-        } catch {
-          setListening(false);
-          setNotice("The microphone couldn't start. Tap “Start speaking” again, or type your answer.");
-        }
-      };
-    }
-  }, [beginClock, onVoiceFailed]);
-
-  const toggleMic = useCallback(() => {
-    if (wantListening.current) stopListening();
-    else startListening();
-  }, [startListening, stopListening]);
 
   // The clock ticks four times a second. It starts when the learner starts, or after the thinking time.
   useEffect(() => {
@@ -426,11 +323,7 @@ function QuestionScreen({
 
   useEffect(() => {
     micButton.current?.focus();
-    return () => {
-      wantListening.current = false;
-      if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
-      shared?.r.abort();
-    };
+    return () => abortRecognition();
   }, []);
 
   const lowTime = startedAt !== null && left <= 15;
@@ -485,7 +378,7 @@ function QuestionScreen({
         >
           <span
             aria-hidden="true"
-            className={`inline-block size-3 rounded-full ${listening ? "animate-pulse bg-white" : "bg-white"}`}
+            className={`inline-block size-3 rounded-full ${listening ? "motion-safe:animate-pulse bg-white" : "bg-white"}`}
           />
           {listening ? "Stop the microphone" : text ? "Speak more" : "Start speaking"}
           <span className="text-sm font-normal opacity-80">(Space)</span>
