@@ -36,6 +36,8 @@ test("roadmap, topic and project cards carry a line graphic, not just a small ic
   await page.goto("/paths");
   await expect(page.locator(scene)).toHaveCount(9);
   await page.goto("/library?view=topics");
+  // The By topic view appears once the page has read its address, so wait for a card before counting.
+  await expect(page.getByRole("link", { name: /^Agents/ }).first()).toBeVisible();
   expect(await page.locator(scene).count()).toBeGreaterThanOrEqual(20);
   await page.goto("/projects");
   expect(await page.locator(scene).count()).toBeGreaterThanOrEqual(20);

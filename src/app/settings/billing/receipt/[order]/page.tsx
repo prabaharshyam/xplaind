@@ -2,6 +2,7 @@ import { BUSINESS } from "@/lib/business";
 import { providerName } from "@/lib/billing/config";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { PLANS, isPlanId, rupees } from "@/lib/billing/plans";
 import { currentUser, userClient } from "@/lib/supabase/server";
@@ -13,6 +14,7 @@ const istDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day
 
 async function Receipt({ params }: { params: PageProps<"/settings/billing/receipt/[order]">["params"] }) {
   const { order } = await params;
+  await connection(); // QA-4: see the dashboard page
   const client = await userClient();
   const user = client ? await currentUser(client) : null;
   if (!user) redirect(`/signin?next=/settings/billing/receipt/${encodeURIComponent(order)}`);
