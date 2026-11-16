@@ -1,6 +1,8 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-16, after PR 99** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+
+**Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
 If you are that Claude: read this file first, then `CLAUDE.md`, `AGENTS.md`, and the requirement rows in `docs/PRD.md` for whatever you are about to change. The rest of `docs/` is background; section 14 says what each file is.
 
@@ -13,12 +15,12 @@ This document holds no secrets and must never hold any. Keys live in Vercel and 
 1. Read `CLAUDE.md` (the project rules, short) and `AGENTS.md` (Next.js 16 is not the Next.js you know; read `node_modules/next/dist/docs/` before writing framework code).
 2. Run `npm install`, then `npm run check` (lint, typecheck, unit tests, content validation). Everything should pass.
 3. Run `npm run dev` and open the home page, a roadmap (`/roadmap/ai-engineer`), a lesson (`/stop/rag-app`), `/videos`, `/interview`. Look at it in light and dark, at 360 px wide and at desktop width. Most owner feedback is about how pages look and read.
-4. Skim `docs/PRD.md` headings and the newest rows (FOCUS-2, MB-8 to MB-10, PAY-1 to PAY-6, LQ-1 to LQ-7, VD-1, VD-2, BR-4, CS-3, FOCUS-1, CM-90, IP-1 to IP-3, SE-1). Requirement IDs such as `RM-2` are the spec and go at the start of every commit message.
-5. Read section 3 (the owner) and section 12 (what is pending) before proposing anything.
+4. Skim `docs/PRD.md` headings and the newest rows (NV-8, IP-4, LY-1, LY-2, UX-7, LT-1, LT-2, BR-10, PAY-7 to PAY-11, CG-1, RZ-1, BIZ-1, IR-1, PR-1, CT-1, IL-1, PP-1, then FOCUS-2, MB-8 to MB-10, LQ-1 to LQ-7). Requirement IDs such as `RM-2` are the spec and go at the start of every commit message. IDs must be unique: search the PRD before inventing one (on 16 Nov `LB-1` and `LB-2` turned out to be taken by the papers library).
+5. Read section 3 (the owner) and section 12 (what is pending) before proposing anything. Read the "Migrations not run in production" warning at the top of section 9 first: several shipped features need database tables that did not exist on 16 Nov.
 
 Starter prompt you can paste into a new Claude session:
 
-> You are taking over the Xplaind repository from a previous Claude account. Read `docs/HANDOVER.md` fully, then `CLAUDE.md`, `AGENTS.md` and the newest rows of `docs/PRD.md`. Run `npm run check` to confirm the baseline. Then tell me in a few plain sentences what the product is, what is pending, and what you would do next. Do not change anything until I confirm. Merge only when I say "merge it".
+> You are taking over the Xplaind repository from a previous Claude account. Read `docs/HANDOVER.md` fully, then `CLAUDE.md`, `AGENTS.md` and the newest rows of `docs/PRD.md`. Run `npm run check` to confirm the baseline. Then tell me in a few plain sentences what the product is, what is pending, and what you would do next. Do not change anything until I confirm. Merge only when I say "merge it" (or "open PR and merge it").
 
 ---
 
@@ -29,13 +31,17 @@ Starter prompt you can paste into a new Claude session:
 What a learner gets:
 
 - **Nine role roadmaps** (AI Engineer, Generative AI and LLM Engineer, Forward Deployed Engineer, AI Product Manager, Agentic AI Engineer, AI Automation Specialist, AI Governance and Compliance Specialist, Machine Learning Engineer, MLOps Engineer). Each is an ordered route through one shared library of lessons.
-- **About 198 lessons**, each in one format: a one-sentence answer, what it is, how it works, a worked example, common mistakes, practice, key terms, a best course, videos, a quick check, and an AI tutor. Most are "deep lessons" with a diagram, a table, flashcards and an exercise.
-- **Learning tools**: a topic library, a glossary of 315 terms, 23 guided projects, 361 videos filterable by topic, papers and free books, a Python playground that runs in the browser, a weekly study plan, and a placement test.
-- **Interview practice**: a question bank (175 questions with rubrics), flashcards, a timed mock interview with browser speech-to-text and a report, 28 interview patterns, and 10 worked system design answers.
-- **AI tools** (need Claude API keys on the server): an AI tutor (which also points learners around the site), "study from my notes and books" (turn a PDF into a test and flashcards), a resume review, answer grading, and the X Bot mascot.
+- **206 lessons**, each in one format: a one-sentence answer, what it is, how it works, a worked example, common mistakes, practice, key terms, a best course, videos, a quick check, and an AI tutor. Most are "deep lessons" with a diagram, a table, flashcards and an exercise.
+- **Every lesson in four more languages (LT-1, 15 to 16 Nov)**: everyday spoken Tamil (தமிழ்) and Hindi (हिन्दी) in their own scripts, and Tanglish and Hinglish (the same Tamil and Hindi written in English letters). Each has its own page at `/stop/<id>/<lang>` with `hreflang` links and a "Read in" switch. Videos, courses and the quick check stay in English. The drafts are AI-written and wait for a native-speaker review (see 12).
+- **Learning tools**: one Library page (lessons, 373 video lessons and 348 skills, searchable, plus a "By topic" view), a glossary of 352 terms, 23 guided projects, videos filterable by topic, papers and free books, a Python playground that runs in the browser, a weekly study plan, and a placement test (with a 2-minute quick version).
+- **Interview practice**: a question bank (205 questions with rubrics), flashcards, a timed mock interview with browser speech-to-text and a report, 28 interview patterns, and 10 worked system design answers.
+- **AI tools** (need Claude API keys on the server, and are part of the paid Pro passes, PAY-10): an AI tutor that can explain in ten Indian languages (IL-1), "study from my notes and books" (turn a PDF into a test and flashcards), a resume review with job match (JM-1), answer grading, and AI review of guided projects (PR-1).
+- **Outcomes** (14 Nov, behind Pro or an account): an interview readiness score (IR-1), a verified certificate per role (CT-1), a public learner profile (PF-1, opt-in), progress nudges (NG-1), a plan that fills the weeks before an interview date (PP-1), learner outcome stories (OS-1) and a colleges and batches page (CB-1).
+- **Money**: Pro passes (7 days ₹99, 30 days ₹249, 6 months ₹999, 12 months ₹1,499) through Cashfree or Razorpay (one live at a time), promo codes, referrals, and a pricing page that sells on outcomes. The business is ZEREH Ventures (BIZ-1). Learning content is free with a free account; AI tools are Pro (CG-1, PAY-10).
 - **Career**: jobs and salaries by role, live openings.
-- **Accounts** (Supabase, currently held back by a switch, see 6): progress saved to the account, roadmap PDF downloads, weekly email plan.
-- Trust rules: no ads, no sponsored placement, no paid ranking, affiliate links (books only) are labelled and never change order, prices always show the date they were checked.
+- **Accounts** (Supabase): sign-ups are open (since 10 Nov). Progress saved to the account, roadmap PDF downloads, weekly email plan. A signed-in learner is signed out after 7 days idle or 30 days in all (AC-13).
+- Trust rules: no ads, no sponsored placement, no paid ranking, affiliate links (books only) are labelled and never change order, prices always show the date they were checked. Xplaind itself is never called "free" in titles, headings or buttons (SE-8); "free" stays only as a fact about an outside course or book.
+- **Look**: deep teal with a brass accent (BR-10, 14 Nov), calm-authority voice. A loading screen with the animated Xplaind X shows on every page load, page change and language switch (UX-7).
 
 Who it is for: learners in India, from freshers and career-switchers with no coding background to working engineers. Tone: plain English, short sentences, Indian examples (Chennai, Pune, Bengaluru, rupees, UPI).
 
@@ -54,7 +60,9 @@ Scope decisions to respect:
 
 How he works with Claude:
 
-- He gives numbered lists of changes, often with screenshots of the live site. Do the list, show the result, then wait. He says **"merge it"** when he wants a pull request merged. **Do not merge without those words.**
+- He gives numbered lists of changes, often with screenshots of the live site. Do the list, show the result, then wait. He says **"merge it"** or **"open PR and merge it"** when he wants a pull request merged. **Do not open or merge a PR without those words.** Push the branch, say what is on it, and ask.
+- He moved the build to a second Claude account on 16 Nov because the first one hit its weekly limit; he is on a Max plan, so he is happy for big jobs to run as large parallel batches ("increase the batch size and finish it quickly"). He asked to use a separate chat per task and a smaller model (Sonnet) for high-volume work such as translations, and the stronger model for building features.
+- He has external accounts that Claude cannot reach (Vercel, Supabase dashboard, Cashfree, Razorpay, Resend, GoDaddy, Google Search Console). When a fix needs one, say exactly what to click or run.
 - He answers questions briefly. Prefer one clear recommendation over a menu. Ask only when the answer changes what you do.
 - He often reads or listens on a phone or while driving: plain sentences, short paragraphs, no heavy formatting in chat replies.
 - He wants minimal, clean UI, in the spirit of DataCamp (the reference he named), with fewer badges and less text. Keep the home page road and the particle headers; the rest is plain white or dark pages with flat cards.
@@ -85,8 +93,9 @@ Review sign-off: AI-drafted content carries `drafted_with_ai: true` and `reviewe
 | Thing | Where | Notes |
 | --- | --- | --- |
 | Code | GitHub `prabaharshyam/xplaind`, default branch `main` | Squash-merge pull requests. CI in `.github/workflows/ci.yml` |
-| Hosting | Vercel, team `zaiphr`, project `xplaind` | Production at https://xplaind.in. Every push to a branch gets a preview at `xplaind-git-<branch>-zaiphr.vercel.app`. The Vercel bot comments on each PR when the preview is ready |
-| Database and sign-in | Supabase project (reference `blgqdjtbzhrtiohepmvn` in `docs/supabase-setup.md`), Mumbai region | Postgres with row-level security, auth with Google, GitHub, email and password, email link. Set-up steps in `docs/supabase-setup.md` |
+| Hosting | Vercel, team `zaiphr`, project `xplaind` | Production at https://xplaind.in (and `www`, which redirects with a 308). Every push to a branch gets a preview at `xplaind-git-<branch>-zaiphr.vercel.app`. The Vercel bot comments on each PR when the preview is ready. The same team hosts two other projects (`zaiphr`, `zohrae`); do not touch them |
+| DNS and certificates | Domain DNS at GoDaddy (nameservers `ns13`/`ns14.domaincontrol.com`) | Checked 16 Nov: `xplaind.in` has one A record, `216.198.79.1`, no AAAA, no CAA; `www` is a CNAME to Vercel. Vercel certificates for both names auto-renew and run to Jan 2027. If a visitor sees `ERR_CERT_AUTHORITY_INVALID`, the site side was fine; ask which network they were on (see 11) |
+| Database and sign-in | Supabase project named `Xplaind` (reference `blgqdjtbzhrtiohepmvn`), the older one called `Zaiphr Website` is a different site | Postgres with row-level security, auth with Google, GitHub, email and password, email link. Set-up steps in `docs/supabase-setup.md` |
 | Email | Resend | Used for the weekly "Commit to 90 days" emails (`/api/cron/weekly`). Needs a verified sending domain |
 | AI | Anthropic API | Server-side only. Monthly spend cap and kill switch in settings. Default model is set in `src/lib/ai` and the `AI_MODEL` variable |
 | Domain | `xplaind.in` | Older docs say `xplaind.ai`; the live domain is `.in` |
@@ -106,7 +115,9 @@ Review sign-off: AI-drafted content carries `drafted_with_ai: true` and `reviewe
 | `ANTHROPIC_API_KEY` | **Secret.** AI features |
 | `AI_MONTHLY_CAP_USD`, `AI_KILL_SWITCH`, `AI_MODEL`, `AI_FAST_MODEL` | Spend cap, instant off switch, optional model overrides (main model and the fast model for the tutor and Ask your notes) |
 | `PAYMENTS_MODE` | `sandbox` or `production` turns Pro passes on (PAY-1). Empty keeps Pro closed |
+| `PAYMENTS_PROVIDER` | `razorpay` or `cashfree`. Unset: Razorpay when its keys exist (RZ-1). Only one gateway is live |
 | `CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY` | **Secret.** Cashfree Payment Gateway keys; sandbox and live keys differ |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | **Secret.** Razorpay keys (`rzp_test_` or `rzp_live_` must match `PAYMENTS_MODE`) and the webhook secret |
 | `RESEND_API_KEY` | **Secret.** Weekly emails |
 | `CRON_SECRET` | **Secret.** Protects `/api/cron/weekly`; Vercel sends it as a bearer token |
 | `COMMIT_EMAIL_FROM` | Optional sender, default `Xplaind <hello@xplaind.in>` |
@@ -154,7 +165,9 @@ Vercel cron: `vercel.json` runs `/api/cron/weekly` every Monday 03:00 UTC (08:30
 
 Scripts (`package.json`): `dev`, `build`, `start`, `lint`, `typecheck`, `test`, `test:e2e`, `test:db`, `check` (lint, typecheck, unit tests, content validate), `content:validate`, `check:traces`, `videos:views`.
 
-Navigation lives in `src/lib/nav.ts` (groups: Learn, Practice, Interview, Career, AI tools). A test (`nav.test.ts`) and the sitemap test (`src/app/sitemap.test.ts`) fail if a public route is added without being listed or if a private one leaks into the sitemap.
+Navigation lives in `src/lib/nav.ts` (groups: Learn, Practice, Interview, Career, AI Studio, and the standalone "Pricing" link, `PRO_LINK`). Library and Topics are one menu item (LY-2); practice cards are only under Practice; interview patterns and system design answers are last in Interview (IP-4). A test (`nav.test.ts`) and the sitemap test (`src/app/sitemap.test.ts`) fail if a public route is added without being listed or if a private one leaks into the sitemap; a page that only redirects (such as `/topics`) goes in that test's `REDIRECTS` list.
+
+Other places worth knowing: `src/lib/nav-feedback.ts` (which clicks start a page change, shared by the top bar and the loading screen), `src/components/page-loader*.tsx` (the loading screen, UX-7), `src/lib/library-order.ts` (the Library's order, LY-1), `src/lib/business.ts` (legal name, GSTIN, contact), `src/lib/billing` (passes, promo codes, referrals, gateways), `src/lib/seo.ts` (titles and descriptions).
 
 ---
 
@@ -162,7 +175,7 @@ Navigation lives in `src/lib/nav.ts` (groups: Learn, Practice, Interview, Career
 
 Editorial content is files, never database rows. Run `npm run content:validate` after every content change; add `-- --launch` (or `CONTENT_LAUNCH=1`) for the strict launch mode, where every missing human sign-off becomes an error. In development mode the same gaps are a to-do list (about 430 items at the time of writing).
 
-Snapshot (2026-11-08): 198 lessons, 603 resources, 54 placement questions, 459 check questions, 175 interview questions, 34 books, 315 glossary terms, 9 paths, 23 guided projects, 28 interview patterns, 10 system design answers, 6 blog posts, 15 featured channels, 5 testimonials, 12 cheatsheets (paused), 361 videos in the library.
+Snapshot (2026-11-16): 206 lessons, 774 resources, 54 placement questions, 504 check questions, 205 interview questions, 34 books, 352 glossary terms, 9 paths, 23 guided projects, 28 interview patterns, 10 system design answers, 15 featured channels, 12 cheatsheets (paused), 373 video lessons and 348 skills in the Library (927 items in all). Each of the 206 lessons also has four translations (824 files). Counts come from `npm run content:validate`, which prints them; refresh this line when they change.
 
 | Folder | What | Notes |
 | --- | --- | --- |
@@ -180,10 +193,13 @@ Snapshot (2026-11-08): 198 lessons, 603 resources, 54 placement questions, 459 c
 | `content/testimonials/testimonials.yaml` | Real user words | See below |
 | `content/video-views.yaml` | Public YouTube view counts by video id | Written by `npm run videos:views`. Do not edit by hand |
 | `content/cheatsheets/*.yaml` | Paused feature's data | Kept so it can come back |
+| `content/translations/<lang>/<id>.mdx` | A lesson in another language. `<lang>` is `ta`, `hi`, `tanglish` or `hinglish` | One file per lesson per language, 206 each. See "Translations" below |
 
 **Deep lesson rules** (the validator enforces them): 1000 to 3000 words; `answer` at most 200 characters; at least one diagram written in a `flow` code block and at least one table; 6 to 10 flashcards; an exercise with answers; at least 2 `key_terms` that exist in the glossary; the required `##` headings in order (What it is, How it works, A worked example, Common mistakes, Practice); extra `##` sections may sit between them (for example "When not to use it", "From demo to production"); every referenced resource must exist; headings start at `##`. A lesson's `check` is either three multiple-choice question ids (files in `content/questions/checks/`, `stop_id` must match) or a project brief.
 
 **Flow diagram DSL** (parsed by `src/lib/diagram/flow.ts`): `A -> B`, `A -[label]-> B`, `Name | note` for a second line, names ending in `?` are decisions, `title:` and `dir: LR` lines. Avoid `|` and `->` inside text.
+
+**Translations (LT-1).** A translation's front matter holds `id`, `lang`, `title`, `outcome`, `answer`, `why_it_matters`, `flashcards`, `exercise`, `ask`, `translated_on` and (once a native speaker checks it) `reviewed_by`; the body has the same `##` sections as the English lesson, in the same order. Style: everyday spoken language the way people talk at work, English kept for technical terms, product names, code and numbers; Tanglish and Hinglish are the same wording in English letters. `content:validate` fails a translation whose number of parts, flashcards or exercise questions differs from the English, or whose lesson does not exist. Quote YAML strings and avoid unescaped inner double quotes (the usual cause of a failed file). A language's "Read in" link shows only if that language has the lesson. To add translations for a new lesson: write the four files, run `content:validate`, and use `/stop/<id>/<lang>` to check. The last 45 Tamil and Hindi lessons and the last 165 Tanglish and Hinglish lessons (16 Nov) were drafted by parallel sub-agents; many of the Tanglish and Hinglish ones were written from the English lesson alone, without reading the Tamil or Hindi version, so the same idea can be worded differently across the four versions of a lesson. That is a known thing for the reviewer to even out. How the earlier batches were drafted is not recorded.
 
 **Testimonials** are the owner's real users' words. Never invent or reword. A card shows an `excerpt` made only of the person's own words with `…` where text is skipped, and `content:validate` fails if any excerpt piece is not word for word in `quote`.
 
@@ -203,29 +219,39 @@ PRD IDs in brackets.
 - Roadmaps `/paths`, `/roadmap/<path>`, one shared map design with a topic drawer, Learning / Done / Skip status, filters, a Projects tab, PDF checklist download (RM, RD).
 - Lesson pages `/stop/<id>`: "On this page" list on the left (RM-15), a Watch and learn panel, flashcards, exercise, quick check, AI tutor.
 - Placement test `/start`, `/result` (PL).
-- Library, topics, videos by topic with view counts (VD-1), glossary, papers and free books, guided projects, code playground (Pyodide in a web worker), weekly plan (`/plan`).
+- **Library** `/library` (LY-1, LY-2): one page with two views, "All lessons, videos and skills" (search, filters) and "By topic" (cards). It opens on "What automation is" and the technical lessons; the Beginner 1 awareness lessons (AI rules in India and abroad, bias and fairness, your company's AI policy and the like) are last. `/topics` redirects to `/library?view=topics`; each topic keeps `/topics/<topic>`.
+- Videos by topic with view counts (VD-1), glossary, papers and free books, guided projects, code playground (Pyodide in a web worker), weekly plan (`/plan`).
+- **Languages** (LT-1, LT-2): `/stop/<id>/<lang>` for Tamil, Hindi, Tanglish and Hinglish, a "Read in" switch on every lesson, and a home page section that promotes it with real samples.
 - Topic tracks added late: DSA, system design (basics), software engineering and Git (SE-1), AI tools guides (the Rust track was dropped on 12 Nov, FOCUS-2) (vibe coding, n8n, Vapi voice agents, animation video, Google Veo and Flow video).
 
 **Interview and practice**
 - Question bank `/interview`, Q&A by role, Top 25 sets, flashcards at `/practice` (IQ, PR).
 - Mock interview `/interview/simulator`, browser speech-to-text, typed fallback, a report on key points with no model call; a signed-in learner can add one AI review (VS, IQ-7a).
-- Interview patterns `/interview/patterns` and worked designs `/interview/design` (IP-1 to IP-3).
+- Interview patterns `/interview/patterns` and worked designs `/interview/design` (IP-1 to IP-3). On the Interview page and in its menu they come last (IP-4). Practice cards (`/practice`) live under the Practice menu only, and the Practice page has no glossary block.
 
 **AI tools (need server keys, behind caps)** `/ai`: tutor, "study from my notes and books" (PDF to test and flashcards, read in the browser), resume review, answer grading, plus guides to AI at work. Open to guests with a lower daily limit; see AC and SU rows.
 
 **Career** `/jobs` salaries and openings (JB), resume review, weekly plan, and "Commit to 90 days" (CM-90): an opt-in weekly email for 13 weeks with one-click unsubscribe, stored in `public.commitments`.
 
+**Pro and payments** (PAY-1 to PAY-11, RZ-1, BIZ-1, CG-1, RF-1, AN-1): `/pricing` (menu link "Pricing", NV-8), passes of 7 days, 30 days, 6 months and 12 months, Razorpay or Cashfree checkout, promo codes (rows in `promo_codes`, never in the repo), referrals (`/r/<code>`), billing and receipts in Settings, a refund policy and terms, a one-time AI trial for free accounts, funnel counts without user ids. The learning content is free with a free account (an open preview for visitors and search engines); the AI tools are Pro.
+
+**Outcomes and community of learners (14 Nov)** interview readiness score (IR-1), AI project review (PR-1), resume-to-job match (JM-1), public profile `/u/<handle>` (PF-1), verified certificate `/certificate/<id>` (CT-1), tutor in Indian languages (IL-1), interview-date plan (PP-1), 2-minute level check (QS-1), progress nudges (NG-1), colleges page `/colleges` (CB-1), outcome stories `/stories` (OS-1). Several need the unrun migrations in 9.
+
+**Loading and look** a full-screen loading screen with the animated X on every load, page change and language switch (UX-7), a thin top bar (UX-2), Deep Teal and Brass brand (BR-10), typographic blog covers (BL-2), a menu with icons (UX-3) and a numbered phone menu (NV-5, NV-6).
+
 **Social proof and trust** testimonials carousel on the home page (SO-1), About and founder story (TR-2), How we rank, disclosure, privacy and terms pages.
 
 **Accounts** Google, GitHub, email and password, email link; account wall for the PDF, mock interview and saved progress; data export and delete (AC, SU, PV). Held behind `NEXT_PUBLIC_SIGNUPS_OPEN` (see 4).
 
-**Design system** (`docs/brand.md`, BR-1 to BR-4): violet is the one action colour; buttons are pills in three sizes from `src/components/ui.ts`; only three corner sizes (use `rounded-2xl` and `rounded-full`; the brand test fails on `rounded-md`, `-lg`, `-xl`); flat cards with a thin grey border and no shadow; one-line facts instead of badges; line-art covers; light and dark mode with a toggle at the top right.
+**Design system** (`docs/brand.md`, BR-1 to BR-4, then BR-10 on 14 Nov moved the brand from violet to deep teal `#0E4A50` with sea glass `#7FD1C7` on dark and brass `#D9B26A` only for what a learner earns; older text below still says violet, read it as the brand colour): the brand colour is the one action colour; buttons are pills in three sizes from `src/components/ui.ts`; only three corner sizes (use `rounded-2xl` and `rounded-full`; the brand test fails on `rounded-md`, `-lg`, `-xl`); flat cards with a thin grey border and no shadow; one-line facts instead of badges; line-art covers; light and dark mode with a toggle at the top right.
 
 ---
 
 ## 9. Data model
 
 Migrations in `supabase/migrations`, applied in order. Run them in the Supabase SQL editor (or with the CLI). **Which ones are applied in production is not recorded in the repo; check.**
+
+> **Migrations not run in production (checked 16 Nov 2026).** The `Xplaind` Supabase project has the tables up to the promo codes migration (`payments`, `entitlements`, `promo_codes`, `promo_redemptions` and the earlier ones) but **none** of these: `commitments` (`20261107000000`), `referral_codes`, `referrals`, `funnel_daily` (`20261114000000`), `interview_readiness` (`20261114010000`), `project_reviews` (`20261114020000`), `public_profiles`, `certificates` (`20261114030000`), `batch_enquiries` (`20261114040000`). The code for the weekly emails, referrals, funnel counts, readiness score, project review, public profiles, certificates and the colleges form is live, so those features will fail or show nothing until the owner runs the migrations in order in the Supabase SQL editor. Re-check with `select table_name from information_schema.tables where table_schema = 'public'` and update this note.
 
 | Migration | Adds |
 | --- | --- |
@@ -235,7 +261,15 @@ Migrations in `supabase/migrations`, applied in order. Run them in the Supabase 
 | `20261028000000_roadmap_downloads.sql` | Roadmap PDF download records |
 | `20261031000000_last_lesson.sql` | Last lesson for "continue where you left off" |
 | `20261102000000_ai_guests.sql` | Guest AI usage limits |
-| `20261107000000_commitments.sql` | Weekly email commitments (opt-in, token for one-click unsubscribe) |
+| `20261107000000_commitments.sql` | Weekly email commitments (opt-in, token for one-click unsubscribe). **Not run in production** |
+| `20261108000000_payments.sql` | `payments` and `entitlements` for Pro passes (run) |
+| `20261109000000_ai_guest_sample.sql` | Guest AI sample limits (no new table) |
+| `20261113000000_promo_codes.sql` | `promo_codes`, `promo_redemptions` (run; four codes exist, `xp100` expires 30 Nov 2026) |
+| `20261114000000_week_pass_referrals_funnel.sql` | 7-day pass, `referral_codes`, `referrals`, `funnel_daily`. **Not run** |
+| `20261114010000_interview_readiness.sql` | `interview_readiness`. **Not run** |
+| `20261114020000_project_reviews.sql` | `project_reviews`. **Not run** |
+| `20261114030000_profiles_certificates.sql` | `public_profiles`, `certificates`. **Not run** |
+| `20261114040000_batch_enquiries.sql` | `batch_enquiries`. **Not run** |
 
 Tests: `npm run test:db` runs the row-level security tests against a real Postgres 16 with a small Supabase shim (`TEST_DATABASE_URL`, for example `postgresql://postgres@localhost:5432/postgres`). CI does the same in a service container. Every new table needs a policy and a test for it.
 
@@ -250,13 +284,16 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 2. Free port 3000 if an old server is running (`fuser -k 3000/tcp`), or the run stops with "port already used".
 3. Run `CI=1 npx playwright test --retries=0`. If a browser is pre-installed, set `PW_CHROMIUM_PATH` to its executable. The full suite takes about 10 minutes (128 tests at the time of writing); run it in the background and read the log.
 4. After editing content files while `next dev` is running, restart the dev server: it reads content once per process.
+5. **Quick local runs (16 Nov):** without `CI=1` Playwright starts `npm run dev`, so no build is needed. Run only the specs your change touches (`PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npx playwright test e2e/<file> --trace off -g "<name>"`); a big batch of specs can exceed a 10-minute command limit. The first visit to each page compiles it, which can take longer than the default 5 s wait: a test that fails on its first assertion after a click is probably a cold compile, so rerun it alone before suspecting the code. Give a click-then-new-page assertion a 30 s timeout. If the dev server serves old CSS or markup after a branch switch, stop it and delete `.next/dev` (see 11).
 
 **Git and pull requests:**
 - Work on a feature branch, open a pull request to `main`, **squash merge** only when the owner says "merge it". Use the full 40-character head commit id as `expectedHeadSha` when merging through the API.
 - Every commit message starts with the requirement ID (`BR-4: ...`). Add the footer lines your tooling requires.
 - After a squash merge, if you keep using the same branch name, reset it: `git fetch origin main && git checkout -B <branch> origin/main`, then record the old history without force pushing: `git fetch origin <branch> && git merge -s ours --no-edit origin/<branch>`, then push. Force push is blocked in the cloud environment, which is why this is needed.
 - This repo has no pull request template. Write the description with: what changed, why (quote the owner's request), the checks run, and anything left undone. Be honest about gaps.
-- Open PRs one at a time and wait for "merge it". Watch the PR for CI and review comments until it is merged.
+- Wait for "merge it" or "open PR and merge it" before opening or merging a PR (16 Nov: the owner now often says the second form after reading the summary). Then open the PR, squash merge it with the GitHub tools, and re-run lint, typecheck and the unit tests on the merged `main` when two PRs land close together. Vercel deploys `main` on its own; check the live site, because a merged PR is not proof the deploy worked.
+- Start every task from fresh `main` on a new branch (`git checkout main && git pull origin main && git checkout -b claude/<topic>`). A session may be given its own branch name by the tooling; use it.
+- **Big content jobs** (translations, deepening lessons) run well as parallel sub-agents on a smaller model, each given a small group of lessons, a style reference file, the exact output paths and "do not touch git". Check the validator afterwards yourself: sub-agents see each other's half-written files and report errors that are not theirs. Commit once, at the end.
 
 **Content work:**
 - Add or change a lesson: edit the `.mdx`, add missing glossary terms, quiz questions and resources, list the lesson in the right paths in `content/goals/*.yaml` at its level, run `content:validate`, run the lesson's page in the browser at 360 px.
@@ -279,14 +316,26 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 - **Commit trailers and PR footers** are added by the Claude tooling. Do not copy model names into repo files.
 - **A dashboard crash on Vercel (2026-11-03)** came from content files missing from the serverless bundle. `next.config.ts` ships `content/**` with every route (`outputFileTracingIncludes`). Keep it.
 - **The first placement test can end before 12 questions** if the question bank runs out at the learner's level. That is intended (see `docs/decisions.md`, slice S2).
-- **Auto-mode safety classifier.** In the cloud environment some commands (for example scraping around a rate limit) are refused. Do not look for workarounds; report it to the owner.
+- **Auto-mode safety classifier.** In the cloud environment some commands (for example scraping around a rate limit) are refused. Do not look for workarounds; report it to the owner. It can also fail for a while with "no verdict": short read-only commands still work and git commands return after a few minutes. Retry; do not route around it (for example by pushing files through the GitHub API instead of git).
+- **A stale Turbopack cache (16 Nov).** After switching branches the dev server kept serving an old stylesheet and a new component rendered unstyled. Stop the server and delete `.next/dev`, then restart; no code was wrong.
+- **After a client-side navigation both pages' `<main>` exist** for a moment in the browser tests (Cache Components keeps the old page). Use `page.getByRole("main")` (the visible one) instead of `page.locator("main")`. For the same reason scope a `role="status"` lookup to `main`, since the loading screen has a hidden status line too.
+- **Do not add a root `loading.tsx`** (UX-2): it delayed hydration and lost early taps. Loading feedback is a client overlay (`PageLoader`) driven by click and navigation events, and server-rendered so it shows on the first paint.
+- **Moving a page needs five edits**, not one: the route, the menu (`nav.ts`), the footer, the sitemap (and its test if it now redirects), the redirects in `next.config.ts`, and every internal link (grep for the old path in `src` and `e2e`). The Topics to Library merge (16 Nov) is the worked example.
+- **Visitors can see `ERR_CERT_AUTHORITY_INVALID` while the site is healthy (16 Nov).** DNS, Vercel certificates and the redirects were all correct; the cause was on the visitors' side (a network that rewrites HTTPS, a captive portal, or a wrong phone date). Ask for the network and carrier before changing anything. The same advice covers "HSTS" messages: Vercel adds the header itself, the repo does not.
+- **Sub-agent drafts of translations can break YAML** with unescaped inner double quotes, and one run mangled code-fence handling. The validator catches both; run it on the whole tree before committing.
+- **The business name is "ZEREH Ventures"** (with an s; corrected 16 Nov). It lives only in `src/lib/business.ts`; the footer, policies and receipts read it from there. The payment gateway applications and GST records are outside the repo and may still hold the old spelling.
 
 ---
 
 ## 12. What is pending
 
 **Owner actions (Claude cannot do these):**
-1. Turn on the weekly "Commit to 90 days" emails if not done: run `supabase/migrations/20261107000000_commitments.sql`, set `RESEND_API_KEY` and `CRON_SECRET` in Vercel, verify the sending domain in Resend, optionally set `COMMIT_EMAIL_FROM`.
+0. **Run the missing Supabase migrations** (see the warning in 9): `20261107000000_commitments.sql`, then `20261114000000`, `20261114010000`, `20261114020000`, `20261114030000`, `20261114040000`, in that order, in the Supabase SQL editor of the `Xplaind` project. Until then the weekly emails, referrals, funnel counts, readiness score, project review, public profile, certificate and colleges form have no tables. Claude can run them through the Supabase tools if the owner says so.
+0b. **Native-speaker review of the translations (LT-1).** All 824 translation files are AI drafts. Read at least the Tamil and Hindi ones, then the Tanglish and Hinglish ones, and even out wording between the four versions of a lesson; record who reviewed with `reviewed_by` and the date in each file's front matter. The drafts most likely to need a proofread: the Tanglish of `regression-tests`, `scoring-open-ended-answers`, `security-questionnaires`, `synthetic-data-distillation`, `ai-app-in-layers`, `ai-cost-of-ownership` and `batching-model-tiering` (a drafting note said they got only a quick clean-up).
+0c. **Promo codes (16 Nov):** the four codes are live in the database (`xp100` 100% off, `xp50off`, `xp25pro`, `xp10new`, all for the 30-day pass). `xp100` was given an expiry of 30 Nov 2026, 23:59:59 India time. Set `expires_at` on the others if wanted.
+0d. **Name correction outside the repo:** the business is "ZEREH Ventures". If the old spelling "ZEREH Venture" is on the Cashfree or Razorpay application, GST records or any listing, correct it there.
+0e. **Visitors with a certificate warning (16 Nov):** the site and DNS are fine; find out which networks they were on. If a network is the cause there is nothing to fix on the site.
+1. Turn on the weekly "Commit to 90 days" emails if not done: run `supabase/migrations/20261107000000_commitments.sql` (see 0), set `RESEND_API_KEY` and `CRON_SECRET` in Vercel, verify the sending domain in Resend, optionally set `COMMIT_EMAIL_FROM`.
 2. Confirm sign-in is fully set up (Google, GitHub, email) and decide when to open sign-ups (`NEXT_PUBLIC_SIGNUPS_OPEN=true`). Sign-ups are open (10 Nov), which switches on AG-1 (no AI without an account) and RG-1 (roadmaps show a preview, then ask for an account). Setting the variable back to false lifts both.
 3. Set `ANTHROPIC_API_KEY`, `AI_MONTHLY_CAP_USD` and a matching spend limit in the Anthropic Console if AI tools should run in production.
 4. Pro passes (PAY-1 to PAY-6): run `supabase/migrations/20261108000000_payments.sql`; create the Cashfree account and finish KYC; in the Cashfree dashboard set the payment webhook to `https://xplaind.in/api/billing/webhook`; set `PAYMENTS_MODE=sandbox` plus the sandbox keys on a Preview deployment to test, then the live keys and `PAYMENTS_MODE=production` to launch. Decide GST with a CA (receipts say "not a tax invoice" until then). Approve the refund policy wording at /refunds. Contact details are in `src/lib/business.ts` (BIZ-1: hello@xplaind.in, +91 8608761359, ZEREH Ventures, GSTIN); make sure the hello@xplaind.in mailbox receives mail. `NEXT_PUBLIC_CONTACT_EMAIL` can still override the email. Raise `AI_MONTHLY_CAP_USD` as passes sell: Pro calls skip the cap but still count towards it. Promo codes (PAY-9): run `supabase/migrations/20261113000000_promo_codes.sql`, then add codes in the SQL editor, never in the repository (it is public): `insert into public.promo_codes (code, percent_off, plan_ids) values ('code', 50, array['pass_month']);` (lower case). Switch one off with `update public.promo_codes set active = false where code = 'code';`, or set `expires_at`.
@@ -301,6 +350,10 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 - The book-informed series is complete (LQ-1 to LQ-6, 18 lessons, 36 interview questions): sampling, how fine-tuning works, LoRA and memory maths; how chat models are made, choosing a model, synthetic data and distillation; reasoning models, inside LLM inference, building a training dataset; scoring open-ended answers, AI app in layers, catching hallucinations; AI in Indian languages, model size and scaling, perplexity and cross-entropy; fine-tuning in practice, model merging, running models on many GPUs. The book (Chip Huyen, *AI Engineering*, O'Reilly 2025) is cited as further reading, never copied, and the PDF is not in the repo.
 - Bring cheatsheets back, redesigned (the infographic layout from PR 42 is in git history; ask the owner what was unclear about the old one).
 - Collect more real testimonials as beta testers use the site (SO-1).
+- After the native-speaker review: add `reviewed_by` to the reviewed translations, and consider showing a small "reviewed" mark on a translated lesson (not built).
+- Translations of new lessons: every new lesson needs four translation files, or its "Read in" switch just shows fewer languages. Tanglish and Hinglish for new lessons can be derived from the finished Tamil and Hindi versions, which keeps the four consistent.
+- **Gap found on 16 Nov: translated lesson pages (`/stop/<id>/<lang>`, 824 of them) are not in the sitemap.** Their `hreflang` alternates are in the page metadata, but `src/app/sitemap.ts` only lists `/stop/<id>`. Adding them (and an entry in `llms.txt` if wanted) would help search engines find the Tamil and Hindi pages; the sitemap test will need no change. Not done yet; ask the owner or just do it as part of SEO work.
+- A native-language search and a language preference that remembers the learner's choice are not built; ask first.
 - PRD reviewed against the build on 9 Nov: see "Status review, 2026-11-09" at the top of docs/PRD.md for what is superseded and what is not built yet (PL-7, part of PL-8, IQ-10, ED-5, ED-7, AC-9).
 
 - The notes tool's study loop (MB-8 to MB-10) is built. Next candidates from docs/notes-tool-ideas.md: Indian exam formats (idea 4), chapter summaries (5), read-aloud recaps (6) and a match game (7). Open question for the owner: keep the book's text on the device so a retest needs no re-upload (see decisions, 12 Nov).
@@ -309,7 +362,7 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 
 **Open owner decision (older, still unanswered in the repo):** whether the placement test must always ask 12 questions (needs about 10 questions at B1) or may end early when the bank runs out.
 
-**Ideas from `docs/product-plan.md` that were never built or approved:** bookmarks, curated AI news, Tamil, adaptive tutoring, portfolios, premium interview prep, college and company programmes, community contributions. Treat them as ideas, and check them against FOCUS-1 before proposing.
+**Ideas from `docs/product-plan.md` that were never built or approved:** bookmarks, curated AI news, adaptive tutoring (Tamil and Hindi lessons were built on 15 to 16 Nov, LT-1), portfolios, premium interview prep, college and company programmes, community contributions. Treat them as ideas, and check them against FOCUS-1 before proposing.
 
 ---
 
@@ -321,6 +374,11 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **26 Oct:** AI features with guards and caps; topic tracking and one roadmap design; guided projects; X Bot; Top 25 interview sets; content review pass.
 - **27 to 31 Oct:** video lessons, labels and launch sign-off; videos everywhere, library, tracks, pastel 3D look.
 - **1 to 3 Nov:** search and AI visibility; books with affiliate links; sign-up gates; papers library; Rust and AI-tool guides; the home road flight (MO-6 to MO-8); sign-ups put on hold (SU-4); AI tools open to guests (SU-5); brand system (BR-1 to BR-4 original set); About and founder story; accessibility fixes; two Vercel crashes fixed.
+- **9 to 11 Nov:** one free AI try, then sign in (AG-1), roadmaps and AI tools need an account (AG-1, RG-1, PR 58 to 60); search-led titles, brand structured data and keyword guides (SE-8, PR 61); menu icons, the feature deck, friendly errors and loading feedback (UX-1 to UX-4, PR 62 and 63); only "Sign up" and "Sign in" wording (AC-12); doc review and PRD status review (DOC-2, PR 57).
+- **12 to 13 Nov (PR 65 to 76):** sign-in timeout (AC-13); the study loop for notes and books (MB-8 to MB-10, PR 68); a narrower product (FOCUS-2, PR 69); business details for the payment gateway (BIZ-1, PR 70); Razorpay beside Cashfree (RZ-1, PR 71); a one-time AI trial and a pricing page that sells on value (PAY-7, PAY-8, PR 72); promo codes (PAY-9, PR 73 and 74); the unslop passes (UX-5, UX-6, PR 75); learning free with an account, AI for Pro (CG-1, PAY-10, PR 76).
+- **14 Nov (PR 77 to 85):** a folded and then numbered phone menu (NV-5, NV-6); Pro on its own in the menu and "AI Studio" (NV-7); the 7-day pass, referrals and funnel counts (PAY-11, RF-1, AN-1); readiness score, project review, job match, profile and certificates (IR-1, PR-1, JM-1, PF-1, CT-1); tutor in Indian languages, interview-date plan, 2-minute check and nudges (IL-1, PP-1, QS-1, NG-1); colleges page, outcome stories and pricing around outcomes (CB-1, OS-1, OP-1); the Deep Teal and Brass rebrand (BR-10); typographic blog covers (BL-2).
+- **15 to 16 Nov (PR 86 to 95):** every lesson translated into Tamil, Hindi, Tanglish and Hinglish (LT-1): the pilot (PR 86), eight batches of Tamil and Hindi (PR 87 to 93, 161 lessons), the last 45 Tamil and Hindi lessons (PR 94) and the remaining 165 Tanglish and Hinglish lessons (PR 95). The build moved to a second Claude account partway through (16 Nov), and the last two passes ran as parallel Sonnet sub-agents.
+- **16 Nov (PR 96 to 99):** the home page promotes lessons in your own language (LT-2, PR 96); the loading screen with the animated Xplaind X, and a steadier home search test (UX-7, PR 97); the business name corrected to ZEREH Ventures (BIZ-1, PR 98); the Library opens on technical lessons, Library and Topics merged, patterns and system design last in Interview, practice cards in one place, no glossary on Practice, and "Pricing" instead of "Pro" in the menu (LY-1, LY-2, IP-4, NV-8, PR 99). Also that day, outside the repo: `xp100` given an expiry of 30 Nov, and a read-only check of DNS, certificates and the Supabase tables (the migrations warning in 9).
 - **12 Nov:** the notes tool's study loop (MB-8 to MB-10, PR 68); a narrower product (FOCUS-2): the AI roadmap generator, X Bot and the Rust track removed, and the weekly plan and Monday emails merged as "Stay on track".
 - **2 Nov (also):** fewer AI tools. The AI roadmap editor and AI course generator were removed and the AI coach was merged into the tutor; the roadmap generator, tutor, notes-to-test tool and resume review stay.
 - **4 to 6 Nov:** many owner-list rounds (roadmap drawer, lesson layout, topic tracks, "Commit to 90 days", a DataCamp-style minimal direction). XP and badges were removed, and month-based durations were removed from the site.
@@ -328,7 +386,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **8 Nov (later):** PR 44: this handover. PR 45 and 48 to 51: book-informed lessons batches 2 to 6 (LQ-2 to LQ-6). PR 46: every DeepLearning.AI course and Andrew Ng's courses as video courses (VD-2). PR 47: Pro passes with Cashfree in test mode, tiered AI limits, pricing, billing and refund pages (PAY-1 to PAY-6). PR 52 to 54: deepening older lessons, three batches of three (LQ-7). PR 55: the remaining 74 AI-engineering lessons deepened in one pass (LQ-7). PR 56: the 11 classic ML lessons (LQ-7).
 - **7 to 8 Nov:** PR 40: three book-informed lessons (LQ-1). PR 41: videos page by topic with filters and view counts (VD-1). PR 42: sideways testimonials with excerpts, example-week card, line-art covers, infographic cheatsheets (BR-4). PR 43: cheatsheets paused, reviewed marks, product focus recorded (CS-3, FOCUS-1).
 
-`docs/decisions.md` is up to date to 9 November. Add new decisions there as you make them.
+`docs/decisions.md` is up to date to 16 November (it has entries for LT-1, LT-2, UX-7 and the Library and menu restructure). Add new decisions there as you make them.
 
 ---
 
@@ -339,7 +397,10 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 | `CLAUDE.md` | Project rules for Claude Code. Short. Read every session |
 | `AGENTS.md` | Warning that Next.js 16 differs from older versions |
 | `docs/PRD.md` | The spec. Requirement rows by ID. The live source of truth |
-| `docs/decisions.md` | Why choices were made, slice by slice, to 3 Nov |
+| `docs/decisions.md` | Why choices were made, slice by slice, to 16 Nov. Read the newest entries first |
+| `docs/seo-keywords.md` | The keyword map and Search Console steps (SE-8) |
+| `docs/notes-tool-ideas.md` | Ideas for the study-from-notes tool (Indian exam formats, chapter summaries and more) |
+| `.claude/skills/README.md` | Which design, 3D and motion skills are in the repo (about 127) and where they came from; they load in every session, nothing to install |
 | `docs/brand.md` | Logo, colour, type, buttons, corners |
 | `docs/product-plan.md` | Nine paths and the feature phases |
 | `docs/supabase-setup.md` | Step-by-step account set-up for the owner |
@@ -351,7 +412,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 
 ## 15. Appendix: PRD requirement families
 
-`AC` accounts · `AI` AI tools · `A11Y` accessibility · `BK` books and affiliate · `BL` blog · `BR` brand and look · `CM` commitments and reminders · `CO` spend caps · `CS` cheatsheets (paused) · `ED` editorial rules · `FOCUS` product focus · `GP` guided projects · `IP` interview patterns · `IQ` interview questions and mock review · `JB` jobs and salaries · `LB` papers and free books · `LQ` book-informed lessons · `MB` study from notes and books · `MO` motion and 3D · `NV` navigation · `PG` code playground · `PL` placement test · `PR` practice · `PV` privacy · `QA` quality and performance · `RD` roadmap PDF · `RM` roadmaps and lessons · `RV` resume review · `SC` security · `SE` search and AI answer visibility · `SO` social proof · `SU` sign-up gates · `TR` trust and founder story · `VD` videos page · `VS` voice and mock interview · `WP` weekly plan · `XB` X Bot.
+`AC` accounts · `AG` AI needs an account · `AI` AI tools · `AN` funnel counts · `A11Y` accessibility · `BIZ` business details · `BK` books and affiliate · `BL` blog · `BR` brand and look · `CB` colleges and batches · `CG` content gates · `CM` commitments and reminders · `CO` spend caps · `CS` cheatsheets (paused) · `CT` certificates · `DOC` documentation · `ED` editorial rules · `FOCUS` product focus · `GP` guided projects · `IL` tutor in Indian languages · `IP` interview patterns and interview page · `IQ` interview questions and mock review · `IR` interview readiness · `JB` jobs and salaries · `JM` resume to job match · `LB` papers and free books · `LQ` book-informed lessons · `LT` lesson translations and promoting them · `LY` Library · `MB` study from notes and books · `MO` motion and 3D · `NG` nudges · `NV` navigation · `OP` pricing around outcomes · `OS` outcome stories · `PAY` Pro passes and payments · `PF` public profile · `PG` code playground · `PL` placement test · `PP` interview-date plan · `PR` practice and project review · `PV` privacy · `QA` quality and performance · `QS` 2-minute check · `RD` roadmap PDF · `RF` referrals · `RG` roadmap gates · `RM` roadmaps and lessons · `RV` resume review · `RZ` Razorpay · `SC` security · `SE` search and AI answer visibility · `SO` social proof · `SU` sign-up gates · `SWE` software engineering track · `TR` trust and founder story · `UX` look and feel details · `VD` videos page · `VS` voice and mock interview · `WP` weekly plan · `XB` X Bot (removed).
 
 ## Restore points
 
@@ -359,4 +420,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
   - revert it: `git revert 22e21a4` on a branch, then merge that PR; or
   - in Vercel, open Deployments, find the production deployment of `1b76ae7` and choose "Instant Rollback" (fastest, no code change; the next merge to main deploys again).
   Keep the backup branch; do not delete it.
+
+- **Before the Library, menu and loading-screen changes, 16 Nov 2026.** The last `main` commit before the Library and menu restructure is `41b5510` (PR 98). The restructure (LY-1, LY-2, IP-4, NV-8) is one squash commit, `8f85bcc` (PR 99): `git revert 8f85bcc` on a branch undoes it (old `/topics` links keep working either way). The loading screen (UX-7) is `3a2a8d8` (PR 97). In Vercel, "Instant Rollback" to the production deployment of `41b5510` is the no-code way back.
+- **Database changes made outside the repo:** the `xp100` promo code's `expires_at` was set to 2026-11-30 23:59:59+05:30. To lift it: `update public.promo_codes set expires_at = null where code = 'xp100';`.
 
