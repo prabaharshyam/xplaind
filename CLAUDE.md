@@ -20,6 +20,7 @@ Next.js App Router, TypeScript strict, Tailwind, Supabase (Postgres, auth with G
 - Weeks and dates use Asia/Kolkata.
 - Commit messages start with the requirement ID.
 - Before finishing a slice run lint, typecheck, tests and content:validate.
+- Keep docs/HANDOVER.md current (owner request, 2026-11-16): at the end of every slice update its "Last updated" line and the built (8), pending (12) and timeline (13) sections, and add a gotcha (11) when you learn one the hard way. Add the PRD row and a docs/decisions.md note too.
 - If the PRD is ambiguous or two requirements conflict, stop and ask. Do not guess.
 
 ## Next.js version note
