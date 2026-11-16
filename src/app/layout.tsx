@@ -6,6 +6,8 @@ import { MotionEffects, PageEnter } from "@/components/motion/motion-effects";
 import { SiteMotion } from "@/components/motion/site-motion";
 import { SiteFooter } from "@/components/site-footer";
 import { NavProgress } from "@/components/nav-progress";
+import { PageLoader } from "@/components/page-loader";
+import { PageLoaderControl } from "@/components/page-loader-control";
 import { SiteHeader } from "@/components/site-header";
 import { allowIndexing } from "@/lib/indexing";
 import { siteUrl } from "@/lib/site";
@@ -59,6 +61,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
+        {/* UX-7: on screen from the first paint; PageLoaderControl hides and brings it back. */}
+        <PageLoader />
         <SiteHeader />
         <div id="page" className="flex-1">
           {children}
@@ -71,6 +75,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* UX-2: its own boundary, because it reads the query string. */}
         <Suspense fallback={null}>
           <NavProgress />
+          <PageLoaderControl />
         </Suspense>
         <Suspense fallback={null}>
           <PageEnter />
