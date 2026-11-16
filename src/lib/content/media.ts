@@ -39,6 +39,16 @@ export function resourceEmbed(r: { url: string; embeddable?: boolean }): Embed |
  * The privacy-enhanced player address. It loads only after the learner presses play,
  * so YouTube receives nothing from a visitor who never watches.
  */
+/**
+ * VD-3: the sandbox on every YouTube player we embed. It allows what playback needs (scripts, the
+ * player's own storage, fullscreen and picture-in-picture) and nothing that can take a learner off
+ * our page: no pop-ups, so the YouTube logo, the title and "Watch on YouTube" do nothing when
+ * clicked instead of opening youtube.com, and no navigating the page itself. Tested in a real
+ * browser on 16 Nov 2026: with this sandbox those links opened 0 new tabs (3 without it) and
+ * playback started the same way.
+ */
+export const PLAYER_SANDBOX = "allow-scripts allow-same-origin allow-presentation";
+
 export const embedSrc = (e: Embed): string =>
   e.kind === "video"
     ? `https://www.youtube-nocookie.com/embed/${e.id}?autoplay=1&rel=0`

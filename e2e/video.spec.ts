@@ -21,6 +21,11 @@ test("a lesson shows its video lessons near the top and plays YouTube on the pag
   const player = page.getByRole("dialog", { name: /^Video lesson:/ });
   await expect(player).toBeVisible();
   await expect(player.locator("iframe")).toHaveAttribute("src", /^https:\/\/www\.youtube-nocookie\.com\/embed\//);
+  // VD-3: playback is allowed, but the YouTube logo and title links cannot open pop-ups or leave the page.
+  const sandbox = (await player.locator("iframe").getAttribute("sandbox")) ?? "";
+  expect(sandbox.split(" ")).toEqual(expect.arrayContaining(["allow-scripts", "allow-same-origin", "allow-presentation"]));
+  expect(sandbox).not.toContain("allow-popups");
+  expect(sandbox).not.toContain("allow-top-navigation");
   await page.keyboard.press("Escape");
   await expect(player).toBeHidden();
   await expect(player.locator("iframe")).toHaveCount(0); // closing removes the player, so the video stops

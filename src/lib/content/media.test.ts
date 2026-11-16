@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { embedSrc, kindLabel, openLabel, resourceEmbed, youtubeEmbed } from "./media";
+import { PLAYER_SANDBOX, embedSrc, kindLabel, openLabel, resourceEmbed, youtubeEmbed } from "./media";
 
 describe("resource media and labels (RM-4)", () => {
   it("finds YouTube videos and playlists that can play on the page", () => {
@@ -17,6 +17,12 @@ describe("resource media and labels (RM-4)", () => {
 
   it("plays through the privacy-enhanced domain", () => {
     expect(embedSrc({ kind: "video", id: "abcdef" })).toBe("https://www.youtube-nocookie.com/embed/abcdef?autoplay=1&rel=0");
+    // VD-3: the player keeps what playback needs and cannot take the learner off our page.
+    const allowed = PLAYER_SANDBOX.split(" ");
+    expect(allowed).toEqual(expect.arrayContaining(["allow-scripts", "allow-same-origin", "allow-presentation"]));
+    for (const leaves of ["allow-popups", "allow-popups-to-escape-sandbox", "allow-top-navigation", "allow-top-navigation-by-user-activation", "allow-forms", "allow-modals"]) {
+      expect(allowed).not.toContain(leaves);
+    }
     expect(embedSrc({ kind: "playlist", id: "PLabc123" })).toContain("youtube-nocookie.com/embed/videoseries?list=PLabc123");
   });
 
