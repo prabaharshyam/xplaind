@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/art/icons";
 import { secondaryButton } from "@/components/ui";
-import { type Embed, embedSrc } from "@/lib/content/media";
+import { type Embed, PLAYER_SANDBOX, embedSrc } from "@/lib/content/media";
 
 /**
  * RM-4: plays a YouTube video lesson in a window on our page, so the learner never leaves
@@ -72,6 +72,8 @@ export function WatchButton({ embed, title, className = "", onWatch }: { embed: 
               src={embedSrc(embed)}
               title={`Video lesson: ${title}`}
               className="size-full"
+              // VD-3: the YouTube logo and title links cannot open youtube.com from here.
+              sandbox={PLAYER_SANDBOX}
               allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
               allowFullScreen
               referrerPolicy="strict-origin-when-cross-origin"
