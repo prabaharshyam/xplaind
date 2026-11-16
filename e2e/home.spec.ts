@@ -139,3 +139,23 @@ test("the road keeps the screen's size after navigating back home (MO-6)", async
     )
     .toBe(true);
 });
+
+test("LT-2: the home page offers lessons in Tamil, Hindi, Tanglish and Hinglish", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("Lessons in Tamil and Hindi")).toBeVisible();
+  const section = page.locator("#languages");
+  await expect(section.getByRole("heading", { level: 2 })).toContainText("Learn AI in the language you think in");
+  await expect(section.getByRole("link")).toHaveCount(4);
+  await expect(section.locator("[lang=ta]").first()).toBeVisible();
+  await expect(section.locator("[lang=hi]").first()).toBeVisible();
+  await expect(section.locator("[lang=ta-Latn]").first()).toBeVisible();
+  await expect(section.locator("[lang=hi-Latn]").first()).toBeVisible();
+  await expect(page.locator(".home-hero, #languages").getByText(/\bfree\b/i)).toHaveCount(0);
+  await section.getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/stop\/what-is-ai\/ta$/, { timeout: 30_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("மூணும்", { timeout: 30_000 });
+  await expect(page.getByRole("main")).toHaveAttribute("lang", "ta");
+  await page.goto("/");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+});
