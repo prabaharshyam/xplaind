@@ -2,6 +2,7 @@
 
 import Script from "next/script";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { GOOGLE_STATE_COOKIE, encodeGoogleState } from "@/lib/account/auth-forms";
 import { makeGoogleNonce } from "@/lib/account/google-nonce";
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || null;
@@ -21,6 +22,11 @@ declare global {
  * window says "Sign in to xplaind.in" (or the app name) instead of the Supabase address.
  * Until Google's script has loaded, or when no client id is set, the plain redirect button
  * (children) stays, so sign-in always works, with JavaScript off too.
+ *
+ * AC-1b: on phones and tablets Google's pop-up opens as a second tab that iPhone Safari and in-app
+ * browsers leave open and blank after sign-in, so there Google runs in the same tab (redirect mode)
+ * and posts the token to /auth/google itself. The raw nonce and the return page wait in a
+ * short-lived cookie; SameSite=None so it still arrives with Google's cross-site post.
  */
 export function GoogleButton({ next, children }: { next: string; children: ReactNode }) {
   const slot = useRef<HTMLDivElement>(null);
@@ -34,16 +40,24 @@ export function GoogleButton({ next, children }: { next: string; children: React
     let live = true;
     void makeGoogleNonce().then(({ raw, hashed }) => {
       if (!live) return;
+      const sameTab = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+      if (sameTab) {
+        document.cookie = `${GOOGLE_STATE_COOKIE}=${encodeGoogleState(raw, next)}; Path=/auth/google; Max-Age=900; Secure; SameSite=None`;
+      }
       gis.initialize({
         client_id: CLIENT_ID,
         nonce: hashed,
-        ux_mode: "popup",
         auto_select: false,
         context: "signin",
-        callback: ({ credential }: { credential?: string }) => {
-          // PV-2: continuing is the 18+ confirmation, as the line under the buttons says.
-          if (credential) post({ credential, nonce: raw, next, adult: "yes" });
-        },
+        ...(sameTab
+          ? { ux_mode: "redirect", login_uri: `${window.location.origin}/auth/google` }
+          : {
+              ux_mode: "popup",
+              callback: ({ credential }: { credential?: string }) => {
+                // PV-2: continuing is the 18+ confirmation, as the line under the buttons says.
+                if (credential) post({ credential, nonce: raw, next, adult: "yes" });
+              },
+            }),
       });
       gis.renderButton(el, {
         type: "standard",
