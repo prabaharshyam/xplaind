@@ -42,6 +42,35 @@ export function parseGoogleIdForm(form: FormLike): { ok: true; credential: strin
   return { ok: true, credential: credential.data, nonce: nonce.data, next: str(form, "next")?.slice(0, 200) };
 }
 
+/**
+ * AC-1b: Google's same-tab sign-in (redirect mode, used on phones). Google posts `credential` and
+ * `g_csrf_token` to /auth/google; the raw nonce and the page to return to come from the cookie the
+ * button set just before (Google cannot carry them). Continuing with Google is the 18+ confirmation,
+ * as the line under the buttons says, so it counts as the tick.
+ */
+export const GOOGLE_STATE_COOKIE = "xp_gstate";
+
+export function encodeGoogleState(nonce: string, next: string): string {
+  return `${nonce}.${encodeURIComponent(next.slice(0, 200))}`;
+}
+
+export function parseGoogleRedirectForm(
+  form: FormLike,
+  cookies: { state?: string; csrf?: string },
+): { ok: true; credential: string; nonce: string; next?: string } | { ok: false; error: FormError } {
+  const csrf = str(form, "g_csrf_token");
+  // Google's double-submit check: when its cookie came along, it must match the posted value.
+  if (!csrf || (cookies.csrf !== undefined && cookies.csrf !== csrf)) return { ok: false, error: "provider" };
+  const [nonce, rawNext] = (cookies.state ?? "").split(".", 2);
+  let next: string | undefined;
+  try {
+    next = rawNext ? decodeURIComponent(rawNext) : undefined;
+  } catch {
+    next = undefined;
+  }
+  return parseGoogleIdForm({ get: (k) => (k === "nonce" ? (nonce ?? null) : k === "adult" ? "yes" : k === "next" ? (next ?? null) : form.get(k)) });
+}
+
 const Email = z.email().max(254);
 const Password = z.string().min(PASSWORD_MIN).max(72); // 72: the bcrypt limit Supabase uses
 
