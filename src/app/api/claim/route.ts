@@ -1,7 +1,7 @@
 // AC-2: attach the device's test result, progress and practice ratings to the
 // account, and send back the merged state so every device ends up the same.
 // The server re-scores the test from the raw choices (PRD: Architecture).
-import { answersToRow, rowToAnswers, type AttemptAnswerRow } from "@/lib/account/attempts";
+import { answersContainsFilter, answersToRow, rowToAnswers, type AttemptAnswerRow } from "@/lib/account/attempts";
 import { ClaimBody, InvalidClaimError, activityDays, mergeProgress, mergeRatings, rescoreAttempt } from "@/lib/account/claim";
 import { json, problem, rateLimit, readJson, requireSession } from "@/lib/account/http";
 import { QUIZ_VERSION, loadState, recordActivity, refreshBadges, saveProgress, saveRatings } from "@/lib/account/repo";
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       .select("id")
       .eq("user_id", user.id)
       .eq("finished_at", finishedAt)
-      .contains("answers", row)
+      .contains("answers", answersContainsFilter(row)) // QA-5: a string, not a list of objects
       .limit(1);
     if (!same?.length) {
       const { error } = await admin.from("quiz_attempts").insert({

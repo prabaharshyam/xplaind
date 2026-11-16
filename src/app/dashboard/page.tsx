@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { ContinueCard } from "@/components/continue-card";
 import { getContent, getPaths, getStops } from "@/lib/content";
@@ -17,6 +18,9 @@ import { Skeleton } from "@/components/skeleton";
 export const metadata: Metadata = { title: "Your dashboard", robots: { index: false } };
 
 async function SignedIn() {
+  // QA-4: wait for a real request before any login work. Supabase's session check reads the clock, which Next.js
+  // refuses while it prepares a page ahead of time for a signed-in visitor (it logged this error on every visit).
+  await connection();
   const client = await userClient();
   const user = client ? await currentUser(client) : null;
   if (!user) redirect("/signin?next=/dashboard");

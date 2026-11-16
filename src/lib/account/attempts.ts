@@ -7,6 +7,14 @@ export type AttemptAnswerRow = { question_id: string; level: string; chosen: str
 export const answersToRow = (answers: readonly Answer[]): AttemptAnswerRow[] =>
   answers.map((a) => ({ question_id: a.questionId, level: a.level, chosen: a.choice, correct: a.correct }));
 
+/**
+ * QA-5: the value to hand to PostgREST's "contains" filter on the jsonb `answers` column. Given a list of objects
+ * directly, the database library writes "[object Object]" into the address, the server answers 400, and the
+ * "already saved?" check silently never matched: every sign-in saved the same test attempt again (73 duplicates
+ * in production by 16 Nov). A JSON string is sent as it is.
+ */
+export const answersContainsFilter = (rows: readonly AttemptAnswerRow[]): string => JSON.stringify(rows);
+
 /** Rebuilds answers for the result page. Questions no longer in the bank are dropped. */
 export function rowToAnswers(rows: readonly AttemptAnswerRow[], bank: readonly BankQuestion[]): Answer[] {
   const byId = new Map(bank.map((q) => [q.id, q]));

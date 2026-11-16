@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { accountsEnabled } from "@/lib/supabase/config";
 import { currentUser, userClient } from "@/lib/supabase/server";
@@ -9,6 +10,7 @@ import { Skeleton } from "@/components/skeleton";
 export const metadata: Metadata = { title: "Settings", robots: { index: false } };
 
 async function SignedIn() {
+  await connection(); // QA-4: see the dashboard page; keeps Supabase's clock read out of the ahead-of-time render
   const client = await userClient();
   const user = client ? await currentUser(client) : null;
   if (!user) redirect("/signin?next=/settings");

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { InviteFriends } from "@/components/billing/invite-friends";
 import { Skeleton } from "@/components/skeleton";
@@ -20,6 +21,7 @@ const istDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day
 const STATUS: Record<string, string> = { paid: "Paid", created: "Not completed", failed: "Failed" };
 
 async function Billing() {
+  await connection(); // QA-4: see the dashboard page
   const client = await userClient();
   const user = client ? await currentUser(client) : null;
   if (!user) redirect("/signin?next=/settings/billing");

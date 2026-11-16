@@ -151,13 +151,13 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
           <span className="font-medium">One question:</span> {fixedQuestion.question}
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-1">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
+          <label className="flex min-w-0 flex-col gap-1">
             <span className="text-sm font-medium">Role</span>
             <select
               value={pathId}
               onChange={(e) => setPathChoice(e.target.value)}
-              className="min-h-12 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+              className="min-h-12 w-full min-w-0 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
             >
               <option value="">Any AI role</option>
               {paths.map((p) => (
@@ -167,7 +167,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
               ))}
             </select>
           </label>
-          <fieldset className="flex flex-col gap-1">
+          <fieldset className="flex min-w-0 flex-col gap-1">
             <legend className="text-sm font-medium">Questions</legend>
             <div className="flex gap-2">
               {COUNTS.map((n) => (
