@@ -1,0 +1,243 @@
+---
+id: llm-gateways
+lang: hinglish
+title: "LLM gateways"
+outcome: "Model providers ke aage ek gateway lagao jo requests route kare, ek fail ho toh fallback kare, har team ke liye rate limits aur budgets enforce kare, aur cost ek hi jagah track kare."
+answer: "LLM gateway model providers ke aage baithta hai: requests route karta hai, ek fail ho toh backup par switch karta hai, har team ke limits aur budgets enforce karta hai, aur cost ek hi jagah track karta hai."
+why_it_matters: "Jab client ke paas kai AI features aur teams hon, jo alag-alag providers ko apni keys se call karein, toh kisi ko total kharcha nahi pata aur ek provider outage sab kuch tod deta hai. Gateway dono ko theek karta hai, aur platform roles mein ye seedha poocha jata hai."
+flashcards:
+  - q: "LLM gateway kya hai?"
+    a: "Applications aur model providers ke beech ki service jo routing, fallbacks, keys, budgets, logging aur caching ek hi jagah sambhaalti hai."
+  - q: "Model aliases kyun use karein?"
+    a: "Apps chat-default jaise naam call karti hain; gateway use ek specific model se map karta hai, isliye upgrades code badle bina central tareeke se ho jaate hain."
+  - q: "Fallback chain kya hai?"
+    a: "Errors ya timeouts par try karne ke liye alternatives ki ordered list, jaise wahi model dusre region mein, phir ek approved doosra provider."
+  - q: "Fallback model ko kya satisfy karna chahiye?"
+    a: "Woh task ke liye kaafi achha ho aur data rules ke under allowed ho, region samet."
+  - q: "Gateways key security kaise behtar karte hain?"
+    a: "Teams ko gateway keys milti hain; asli provider keys sirf gateway ke secret store mein rehti hain aur central tareeke se rotate ho sakti hain."
+  - q: "Per-feature budgets se kya milta hai?"
+    a: "Har team ya feature par caps aur alerts, aur cost reports jo dikhate hain ki kya theek karna hai."
+  - q: "Gateway ka mukhya risk kya hai?"
+    a: "Ye har AI feature ke liye single point of failure ban jata hai, isliye health checks aur monitoring ke saath kai instances chalao."
+  - q: "Gateway logs mein prompts ko mask kyun karein?"
+    a: "Gateway har request dekhta hai, isliye unmasked logs use aapka sabse bada sensitive data store bana dete hain."
+  - q: "Gateway mein virtual key kya hai?"
+    a: "Ek key jo gateway ek team ya feature ko deta hai, jo asli provider keys se map hoti hai (jo team kabhi nahi dekhti), aur jiske apne allowed models, budget aur logs hote hain."
+  - q: "Fallback model ko apne evals par test kyun karna chahiye?"
+    a: "Alag model format, tone ya accuracy badal sakta hai. Agar fallback aapke output parser ya quality bar ko tod de, toh outage chupe hue errors mein badal jata hai."
+exercise:
+  title: "Gateway ka plan banao"
+  setup: "Pune ki ek healthtech ke teen AI features hain: India ke patients ke liye symptom-intake chatbot, engineers ke liye coding assistant, aur doctor notes summarise karne wala raat ka job. Har team providers ko apni keys se seedha call karti hai. Patient data India ke andar hi rehna chahiye. Pichhle mahine ek provider ki rate limit ne chatbot ko 30 minute ke liye down kar diya, aur kisi ko nahi pata ki mahine ka ₹9 lakh ka bill kaunsa feature chala raha hai."
+  questions:
+    - q: "Gateway ko provider keys ke saath kya karna chahiye?"
+      a: "Unhe apne secret store mein rakhe, rotate kare, aur har feature ko team aur feature ke tag ke saath uski apni gateway key de."
+    - q: "Patient chatbot ke liye kaunsa fallback theek rahega?"
+      a: "Dusre Indian region mein wahi model, phir India mein host kiya gaya ek approved comparable model, India ke bahar ka koi region kabhi nahi."
+    - q: "Gateway bill ke sawaal ka jawab kaise deta hai?"
+      a: "Har key aur feature ke tokens aur cost log karke, ek monthly report deta hai jo har feature ka hissa dikhata hai."
+    - q: "Gateway ko khud kaise chalana chahiye?"
+      a: "Load balancer ke peeche kam se kam do instances, health checks, apni monitoring aur masked logs ke saath."
+ask:
+  - "LLM gateway kya hai aur kya mujhe iski zaroorat hai?"
+  - "Model fallbacks kaise set up karun?"
+  - "AI costs ko team ke hisaab se kaise track karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**LLM gateway** ek service hai jo aapki applications aur model providers ke beech baithti hai. Applications gateway ko ek hi API format mein call karti hain; gateway har request ko sahi provider aur model tak forward karta hai, aur cross-cutting concerns ek hi baar sambhaalta hai:
+
+- **Routing**: kaunsa model aur provider is request ko serve kare.
+- **Fallbacks**: provider error de, timeout ho ya rate-limit lage toh kya try karna hai.
+- **Keys aur access**: teams ko gateway keys milti hain; asli provider keys sirf gateway mein rehti hain.
+- **Limits aur budgets**: per team, per key, per user.
+- **Logging aur cost**: har request, uske tokens aur uski cost, ek hi jagah.
+- **Caching**: ek jaisi requests ka optional reuse.
+
+LiteLLM jaise open-source options, commercial gateways, aur cloud providers ki API management services, sab ye role nibhate hain.
+
+```flow
+Chatbot -[key A]-> Gateway, 2 instances
+Extraction -[key B]-> Gateway, 2 instances
+Summariser -[key C]-> Gateway, 2 instances
+Search -[key D]-> Gateway, 2 instances
+Gateway, 2 instances -[alias chat-default]-> Model X, Mumbai
+Model X, Mumbai -[fails]-> Fallback 1: model X, second region
+Fallback 1: model X, second region -[fails]-> Fallback 2: approved model Y, provider 2
+```
+
+Gateway har key ke budgets 75% par alerts ke saath, retries aur timeouts, aur masked logs (team, feature, model, tokens, cost, latency) jodta hai. Provider keys sirf yahin, ek secret store mein rehti hain aur rotate hoti hain.
+
+Ye lesson Bengaluru ki ek fintech ko follow karta hai jahan chaar teams ke paanch AI features har ek seedha providers ko call kar raha tha.
+
+## Ye kaam kaise karta hai
+
+**Ek hi interface.** Zyadatar gateways OpenAI-compatible ya milta-julta request format lete hain aur har provider ke liye translate karte hain, isliye kisi feature ko ek model se dusre par le jaana configuration change hai, code change nahi.
+
+**Routing rules.** Model alias se route karo (`summariser-default` ek specific model ki taraf point karta hai jise aap central tareeke se badal sakte ho), team se, region se (Indian user data sirf Indian-region endpoints par bhejo) ya request features se. Smarter routers aasaan requests ko sasti models par bhejte hain; agla lesson isko cover karta hai.
+
+**Fallbacks.** Ek chain jaise: Mumbai region mein primary model; timeout ya 5xx par, dusre region mein wahi model; phir fail hone par, kisi aur provider ka comparable model. Fallbacks mein dhyaan chahiye: fallback model task ke liye kaafi achha hona chahiye aur data rules ke under allowed hona chahiye.
+
+**Retries aur timeouts.** Gateway 429s aur transient errors par backoff ke saath retry karta hai, aur timeouts enforce karta hai, taaki har application ise dobara na banaye.
+
+**Budgets.** Har key par monthly ya daily budget hota hai; uske paar jaane wali requests refuse ya downgrade ho jaati hain. Thresholds par alerts bajte hain.
+
+**Gateway ki cost.** Ye chalane, secure karne aur available rakhne ke liye ek aur service hai; agar ye down hua toh har AI feature down ho jata hai. Ise kam se kam do instances, health checks aur apni monitoring ke saath chalao.
+
+**Gateway features aur woh kaunsi problems solve karte hain:**
+
+| Feature | Kaunsi problem solve karta hai |
+| --- | --- |
+| Ek request format | Har team ka har provider ke liye alag code likhna |
+| Model aliases | Kai apps mein hard-code kiye model names |
+| Fallbacks | Ek provider outage se ek feature ka down hona |
+| Central keys | Teams aur laptops mein bikhri provider keys |
+| Budgets per key | Ek feature ka chupke se zyadatar kharcha kha jaana |
+| Unified logs | Features ke beech cost, latency ya errors ka koi view na hona |
+| Caching | Ek jaisi requests ke liye dobara paise dena |
+
+**Fallbacks ko test karna.** Jo fallback kabhi fire nahi hua, woh shaayad kaam na kare. Staging mein jaan-boojh kar primary tod do, galat key ya block kiye hue endpoint se, aur check karo ki requests agle option se success ho rahi hain, latency acceptable hai, aur logs record kar rahe hain ki har request actually kis model ne serve ki. Chain mein har badlaav ke baad dohrao. Har fallback model par feature ke evals bhi chalao, taaki pata ho outage ke dauran users ko kaisi quality milti hai.
+
+**Gateway roll out karna.** Pehle ek low-risk feature ko le jao, uske errors, latency aur cost ko pehle se compare karo, phir baaki ko ek-ek karke migrate karo. Har team ki purani direct keys thodi der overlap ke liye chalti rehne do, phir revoke kar do, taaki providers tak jaane ka ekmaatra raasta gateway ho.
+
+**Ek gateway configuration.** LiteLLM ka proxy ek common open-source choice hai; baaki gateways bhi yahi ideas follow karte hain. Ek file aliases, asli models, fallbacks aur admin key define karti hai:
+
+```yaml
+# litellm-config.yaml
+model_list:
+  - model_name: chat-default                 # the alias apps use
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5     # check the docs for current names
+      api_key: os.environ/ANTHROPIC_API_KEY
+      timeout: 30
+  - model_name: chat-backup
+    litellm_params:
+      model: bedrock/<model id from your Bedrock console>
+      aws_region_name: ap-south-1
+  - model_name: fast
+    litellm_params:
+      model: anthropic/claude-haiku-5-5
+
+litellm_settings:
+  num_retries: 2
+  fallbacks: [{"chat-default": ["chat-backup"]}]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/GATEWAY_DB_URL     # stores keys, budgets and spend
+```
+
+Ise load balancer ke peeche do ya zyada instances ke saath chalao: `litellm --config litellm-config.yaml --port 4000`.
+
+**Apps alias call karti hain, provider nahi.** Koi bhi OpenAI-compatible client chalta hai:
+
+```python
+import os
+from openai import OpenAI
+
+client = OpenAI(base_url="https://gateway.internal.example.in", api_key=os.environ["TEAM_CLAIMS_KEY"])
+reply = client.chat.completions.create(model="chat-default",
+                                       messages=[{"role": "user", "content": "Summarise this claim: ..."}])
+```
+
+Ab har app ko naye model par le jaana gateway config mein ek line hai, jise code ki tarah review kiya jata hai aur pehle golden set par test kiya jata hai.
+
+**Har team ke liye budgets waali keys.** Admin har feature ke liye ek virtual key banata hai:
+
+```bash
+curl -s https://gateway.internal.example.in/key/generate \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H "Content-Type: application/json" \
+  -d '{"models": ["chat-default", "fast"], "max_budget": 50, "budget_duration": "30d",
+       "metadata": {"team": "claims", "owner": "platform-lead"}}'
+```
+
+Team ko provider keys kabhi nahi dikhti; unki virtual key revoke karne se baaki kuch rotate kiye bina woh cut off ho jaate hain. Budgets gateway ki currency setting mein hote hain (aksar US dollars), isliye convert karo aur rate note karo.
+
+**Region-aware routing.** Indian personal data ke liye, un features ke aliases ko sirf Indian-region endpoints par point karo, aur jin features ko doosre regions use karne ki ijaazat hai unke liye alag alias rakho. Har call ka region log karo, taaki audit confirm kar sake ki rule bana raha.
+
+**Gateway critical infrastructure hai.** Uski apni latency (ye sirf milliseconds jodni chahiye), error rate aur database health monitor karo, ise apni apps ke paas rakho, aur ek documented emergency path rakho, jaise ek feature flag jo ek critical feature ko seedha uske provider ko bhej de.
+
+**Browser mein try karo.** Gateway ki fallback chain ka simulation: primary fail ho toh agla model jawab deta hai.
+
+```python
+import random
+
+random.seed(5)
+def call(model):
+    if model == "primary" and random.random() < 0.3:
+        raise TimeoutError("primary timed out")
+    return f"answer from {model}"
+
+def gateway(chain=("primary", "backup")):
+    for model in chain:
+        try:
+            return call(model)
+        except TimeoutError as err:
+            print("  fell back:", err)
+    return "all models failed"
+
+for i in range(5):
+    print(i, gateway())
+```
+
+## Ek example se samjho
+
+Bengaluru ki ek fintech ke paanch AI features chaar teams ne banaye hain. Har team ki apni provider keys hain; finance ko ek bada monthly bill dikhta hai. Pichhle mahine ek provider outage ne customer chatbot ko 50 minute ke liye down kar diya.
+
+Aap unke Kubernetes cluster par do instances ke saath ek gateway deploy karte ho:
+
+- Har team ko team aur feature ke tag ke saath gateway key milti hai; provider keys gateway ke secret store mein chali jaati hain aur rotate hoti hain.
+- Model aliases: `chat-default`, `extract-default`, `embed-default`, har ek ek specific model ko point karta hai, taaki evals pass hone ke baad upgrades central tareeke se hon.
+- `chat-default` ke fallbacks: dusre region mein wahi model, phir compliance team ke approve kiye doosre provider ka comparable model.
+- Budgets: har feature ka monthly cap aur 75% par alert.
+- Logs: team, feature, model, tokens, cost aur latency ke saath har request unke analytics store mein jaati hai.
+
+Agli provider incident mein 50 minute ke errors ki jagah sirf 90 second ke dheeme responses hote hain jab fallback sambhaalta hai. Finance ko pehli baar feature ke hisaab se monthly cost report milti hai, aur woh dikhati hai ki ek internal summarisation job kharche ka 40% use karta hai. Wo team use batch job aur sasti model par le jaati hai.
+
+| Measure | Gateway se pehle | Baad mein |
+| --- | --- | --- |
+| Provider incident ka asar | 50 minute chatbot errors | 90 second dheeme responses |
+| Provider keys | Chaar teams ke paas | Sirf gateway mein, rotate hoti hain |
+| Cost visibility | Ek monthly bill | Team aur feature ke hisaab se report |
+| Sabse badi khoj | Pata nahi tha | Ek summary job 40% kharcha kha raha tha, batch aur sasti model par shift kiya |
+
+## Aam galtiyaan
+
+- **Sirf ek gateway instance.** Aapne ek naya single point of failure bana diya. Kai chalao.
+- **Unapproved models ya regions par fallbacks.** Outage ko chupke se data aisi jagah nahi bhejna chahiye jahan jaane ki ijaazat nahi hai.
+- **Apps mein hard-code kiye model names.** Aliases use karo taaki upgrades aur swaps central rahein.
+- **Per-feature attribution na hona.** Sirf provider ke hisaab se cost reports nahi batate ki kya theek karna hai.
+- **Bina masking ke full prompts waale gateway logs.** Gateway aapka sabse bada sensitive data store ban jata hai.
+- **Sirf ek gateway instance** jo fail hone par har AI feature ko down kar deta hai.
+- **Bina test kiye fallbacks**, jo pehli baar fire hone par output formats ya quality tod dete hain.
+- **Gateway aliases ki jagah application code mein model names.**
+
+## Jab gateway zaroorat se zyada ho
+
+- **Ek app aur ek provider**: retries aur budget alert ke saath provider SDK kaafi hai.
+- **Chhoti team** jo gateway chalane mein jitna time lagayegi, usse zyada bachayegi nahi.
+- **Managed platform** jo pehle se keys, budgets aur routing deta hai.
+
+Gateway tab kaam aata hai jab kai teams ya apps providers, keys aur budgets share karein.
+
+## Demo se production tak
+
+- **Kam se kam do instances chalao** health checks aur apni monitoring ke saath.
+- **Config ko Git mein rakho**, review karo, aur model changes ke liye golden set par test karo.
+- **Har team ko virtual keys do** budgets aur owners ke saath.
+- **Personal data sirf approved regions mein route karo**, aur regions log karo.
+- **Fallbacks ka drill karo**, staging mein primary tod kar.
+
+## Practice karo
+
+LiteLLM gateway docs aur RouteLLM post padho.
+
+1. Docker mein ek open-source gateway locally chalao, ek alias ke peeche do model providers (ya ek provider ke do models) ke saath.
+2. Ek fallback configure karo, phir primary tod do (galat key) aur dikhao ki requests phir bhi success hoti hain.
+3. Alag budgets waali do keys banao aur dikhao ki doosri ka budget khatam hone ke baad woh refuse hoti hai.
+
+Aur gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 10 AI architecture mein routers aur gateways cover karta hai.
+
+**Aapka kaam poora jab:** aap kisi feature ka model uska code badle bina badal sako, aur key ke hisaab se cost report dikha sako.

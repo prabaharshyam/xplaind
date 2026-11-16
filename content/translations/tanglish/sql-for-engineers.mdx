@@ -1,0 +1,183 @@
+---
+id: sql-for-engineers
+lang: tanglish
+title: "Engineers-kkaana SQL"
+outcome: "Joins, GROUP BY, window functions, indexes vechu real business kelvigalukku SQL-la badhil solla mudiyum, slow query-yoda plan-aiyum padikka mudiyum."
+answer: "Engineers SQL-la tables-a join panraanga, GROUP BY-la group panni count panraanga, window functions-la rows-a rank panraanga, sariyaana indexes vechu slow queries-a vegamaakkuraanga."
+why_it_matters: "Ovvoru client-um thannoda unmaiyaana data-va oru database-la vechirukkaanga. AI velai edhukkum munnaadi data-va edukkanum, check pannanum, baseline alakkanum. Window function ezhudha therinju, missing index-a kandupidikkira engineers mudhal vaaraththulaeyae nambikkai sambaadhippaanga."
+flashcards:
+  - q: "Inner join-kkum left join-kkum enna vithiyaasam?"
+    a: "Inner join rendu pakkamum match aagura rows-a mattum vechukkum. Left join idadhu table-la irukkura ellaa rows-aiyum vechukkum, valadhu pakkam match illanna blank vidum."
+  - q: "Idhuvarai oru order kooda podaadha customers-a eppadi kandupidikkiradhu?"
+    a: "customers-a orders-oda LEFT JOIN panni, WHERE orders.id IS NULL irukkura rows-a vechukkanum."
+  - q: "WHERE-kkum HAVING-kkum enna vithiyaasam?"
+    a: "WHERE grouping-kku munnaadi rows-a filter pannum. HAVING, GROUP BY-kku appuram groups-a filter pannum, udhaaranam: HAVING COUNT(*) > 5."
+  - q: "GROUP BY-kkum window function-kkum enna vithiyaasam?"
+    a: "GROUP BY rows-a oru group-kku oru row-aa surukkidum. Window function thodarbulla rows muzhukka calculate pannum, aana ellaa rows-aiyum vechirukkum."
+  - q: "ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at) enna pannum?"
+    a: "Ovvoru customer-oda rows-aiyum nera varisaiyila 1-la irundhu number pannum. Adhanaala ovvoru customer-oda mudhal row-a edukkalaam."
+  - q: "LAG enna pannum?"
+    a: "Window-la mundhina row-oda value-va tharum, udhaaranam: mundhina order date. Adhanaala row-kku row compare pannalaam."
+  - q: "Index-na enna?"
+    a: "Ovvoru row-aiyum padikkaama, match aagura rows-kku database neraa poga udhavura structure. Reads vegamaagum, writes konjam medhuvaagum."
+  - q: "EXPLAIN ANALYZE enna kaattum?"
+    a: "Database oru query-a unmaiyila eppadi run pannuchu-nu: index use pannuchaa, muzhu table-aiyum scan pannuchaa, ovvoru step-kkum evvalavu neram aachu-nu."
+exercise:
+  title: "Ovvoru query-layum bug-a kandupidinga"
+  setup: "Chennai-la oru grocery app-kku customers(id, city), orders(id, customer_id, total, created_at), order_items(id, order_id, sku, qty) tables irukku. Oru pudhu analyst ezhudhina naalu queries: (A) orders-a order_items-oda join panni, city vaariyaa group panni SUM(o.total). (B) customers-la irundhu orders-kku inner join vechu, customer-kku ethanai orders-nu oru report; zero orders irukkura customers-um idhula varanum. (C) SELECT city, COUNT(*) FROM ... WHERE COUNT(*) > 100 GROUP BY city. (D) 4 kodi rows-la created_at-aala orders-a filter panra, 50 vinaadi edukkura oru query."
+  questions:
+    - q: "(A)-la mottha sales yen romba adhigamaa varudhu?"
+      a: "Join-kku appuram ovvoru order-um ovvoru item-kkum oru thadava repeat aagudhu. Adhanaala adhoda total pala thadava koodudhu. Totals-a orders-la irundhu mattum sum pannunga, illanna join panradhukku munnaadi items-a aggregate pannunga."
+    - q: "(B)-la enna thappu?"
+      a: "Inner join orders illaadha customers-a drop panniduum. LEFT JOIN-um COUNT(o.id)-um use pannunga; avangalukku adhu zero-nu ennum."
+    - q: "(C)-a eppadi sari panradhu?"
+      a: "Condition-a GROUP BY city-kku appuram HAVING COUNT(*) > 100-aa maathunga. WHERE-la aggregates use panna mudiyaadhu."
+    - q: "(D)-a eppadi investigate panni vegamaakkuradhu?"
+      a: "EXPLAIN ANALYZE run panni full table scan-a urudhi pannunga, apparam orders(created_at)-la oru index potu, plan-aiyum neraththaiyum marubadiyum check pannunga."
+ask:
+  - "GROUP BY-kkum window function-kkum enna vithiyaasam?"
+  - "Database-la eppo index podanum?"
+  - "SQL-la duplicate rows-a eppadi kandupidikkiradhu?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Neenga velai seiyappora kittathatta ellaa company-yum thannoda customers, orders, tickets, payments-a PostgreSQL, MySQL, SQL Server maadhiri oru relational database-la vechirukkum. Andha databases-kitta kelvi kekkura mozhi thaan **SQL**. Oru AI engineer-kku SQL optional illai. Idhukkaaga use pannuveenga:
+
+- AI system-kku thevaiyaana **data-va edukka**, udhaaranam: resolutions-oda pazhaya tickets;
+- Build pannradhukku munnaadi **baseline alakka**: "Innaikku refunds-kku evvalavu neram aagudhu?";
+- System ship aanadhukku appuram **adhu udhavuchaa-nu check panna**.
+
+Naalu idea indha velaiyila perumbagaththai cover pannum:
+
+| Idea | Enna pannum | Vazhakkamaana use |
+| --- | --- | --- |
+| **Joins** | Match aagura column-la tables-a serkkum | Orders-a avanga customers-oda cities-oda serkka |
+| **GROUP BY** | Oru group-kku oru row, totals illa averages-oda | City vaariyaa refunds |
+| **Window functions** | Ellaa rows-aiyum vechukittu, thodarbulla rows muzhukka calculate pannum | Ovvoru customer-oda mudhal ticket; moving averages |
+| **Indexes** | Lookups-a vegamaakkum | 40 vinaadi query-a 2 vinaadiyaa maatha |
+
+```flow
+dir: LR
+title: "city vaariyaa refunds" badhil solla, poruntthum ids-la join pannadhu
+refunds | id, order_id, created_at -[order_id = orders.id]-> orders | id, customer_id
+orders -[customer_id = customers.id]-> customers | id, city
+```
+
+Oru AI assistant build pannradhukku munnaadi, Hyderabad-la oru food delivery company-yoda refund baseline-a alakkirappo indha lesson avangalai follow pannum. Lesson mudiyumbodhu joins, grouping, window functions vechu business kelvigalukku badhil sollavum, oru slow query-a vegamaakkavum mudiyum.
+
+## Idhu eppadi work aagudhu
+
+### Joins
+
+Join, match aagura oru column-la tables-a serkkum.
+
+| Join | Edhai vechukkum | Edhukku use panradhu |
+| --- | --- | --- |
+| `JOIN` (inner) | Rendu pakkamum match aagura rows mattum | Customer irukkura orders |
+| `LEFT JOIN` | Idadhu table-la irukkura ellaa rows; valadhu pakkam match illanna blank | Orders illaadha customers; reply illaadha tickets |
+
+```sql
+-- customers who have never ordered
+SELECT c.id, c.city
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE o.id IS NULL;
+```
+
+### GROUP BY
+
+`GROUP BY` rows-a oru group-kku oru row-aa surukki aggregates calculate pannum: `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`. Grouping-kku **munnaadi** rows-a `WHERE`-la filter pannunga; **appuram** groups-a `HAVING`-la filter pannunga:
+
+```sql
+SELECT city, COUNT(*) AS refunds
+FROM refunds r JOIN orders o ON o.id = r.order_id
+JOIN customers c ON c.id = o.customer_id
+WHERE r.created_at >= DATE '2026-07-01'
+GROUP BY city
+HAVING COUNT(*) > 100;
+```
+
+### Window functions
+
+Window functions thodarbulla rows muzhukka calculate pannum, aana rows-a surukkaadhu:
+
+| Function | Example | Enna tharum |
+| --- | --- | --- |
+| `ROW_NUMBER()` | `OVER (PARTITION BY customer_id ORDER BY created_at)` | Ovvoru customer-oda rows-kkum nera varisaiyila 1, 2, 3 |
+| `LAG(col)` | `OVER (PARTITION BY customer_id ORDER BY created_at)` | Mundhina row-oda value, row-kku row compare panna |
+| `SUM(col)` | `OVER (ORDER BY day)` | Odikkittirukkura total |
+| `AVG(col)` | `OVER (ORDER BY day ROWS 6 PRECEDING)` | Yezhu naal moving average |
+
+`PARTITION BY`, `GROUP BY` maadhiriyae rows-a groups-aa pirikkum, aana ovvoru row-um result-la irukkum.
+
+### Indexes-um query plans-um
+
+Index illanna, match-a kandupidikka database ovvoru row-aiyum padikkum: idhu **sequential scan**. `refunds(created_at)`-la oru index irundhaa, adhu neraa sariyaana rows-kku poidum.
+
+```flow
+dir: LR
+title: 3 kodi rows-la July refunds-a kandupidikkiradhu
+Index illai -> 30,000,000 rows-aiyum padichu, 2,000,000-a vechukkum -> 40 s
+created_at-la Index -> 1 July-kku neraa poi, munnokki padikkum -> 2 s
+```
+
+Indexes reads-a vegamaakkum, writes-a konjam medhuvaakkum. Adhanaala neenga adhigamaa filter, join panra columns-kku mattum podunga. Oru query-kku munnaadi `EXPLAIN ANALYZE` potu run pannaa, database index use pannuchaa, muzhu table-aiyum scan pannuchaa, ovvoru step-kkum evvalavu neram aachu-nu paarkkalaam.
+
+## Oru worked example
+
+Hyderabad-la oru food delivery company refund requests-kku oru AI assistant venum-nu ninaikkudhu. Edhaiyum build pannradhukku munnaadi baseline thevai: innaikku oru refund-kku evvalavu neram aagudhu, city vaariyaa?
+
+```sql
+SELECT c.city,
+       COUNT(*) AS refunds,
+       ROUND(AVG(EXTRACT(EPOCH FROM r.resolved_at - r.created_at) / 3600), 1) AS avg_hours
+FROM refunds r
+JOIN orders o    ON o.id = r.order_id
+JOIN customers c ON c.id = o.customer_id
+WHERE r.created_at >= DATE '2026-07-01'
+GROUP BY c.city
+ORDER BY avg_hours DESC;
+```
+
+Adutha, assistant-oda training examples-kku, thirumba thirumba complain panravanga dominate pannaama irukka, ovvoru customer-oda **mudhal** refund request-a mattum edukkanum:
+
+```sql
+SELECT *
+FROM (
+  SELECT r.*,
+         ROW_NUMBER() OVER (PARTITION BY o.customer_id ORDER BY r.created_at) AS n
+  FROM refunds r JOIN orders o ON o.id = r.order_id
+) t
+WHERE n = 1;
+```
+
+**Slow query.** Baseline query 3 kodi rows-la 40 vinaadi edukkudhu. `EXPLAIN ANALYZE` date filter-kku `refunds`-la sequential scan nadakkuradhai kaattudhu. Client-oda data team-kitta kekkureenga; avanga amaidhiyaana neraththula primary database-la `CREATE INDEX CONCURRENTLY ON refunds (created_at)` run panraanga; andha index neenga query panra read replica-kkum varudhu. Ippo query rendu vinaadikku keezha mudiyudhu.
+
+| City | July-la irundhu refunds | Resolve aaga sarasari mani neram |
+| --- | --- | --- |
+| Hyderabad | 48,200 | 31.4 |
+| Vijayawada | 9,800 | 27.9 |
+| Warangal | 4,100 | 22.6 |
+
+Numbers-aiyum query nerangalaiyum unga notes-la ezhudhikkureenga. Indha table thaan unga assistant mundha vendiya baseline; andha index oru quick win, client-oda data team-kitta nalla peyarum vaangith tharum.
+
+## Podhuvaa panra thappugal
+
+- **Join panni perukkiduradhu.** Orders-a order items-oda join panni, apparam order totals-a sum pannaa, ovvoru order-um ovvoru item-kkum oru thadava ennappadum. Join panradhukku munnaadi sariyaana level-la aggregate pannunga.
+- **Left join vendiya idaththula inner join poduradhu.** Orders illaadha customers report-la irundhu saththamillaama maraindhu povaanga.
+- **Aggregates-a WHERE-la filter panradhu.** `WHERE COUNT(*) > 5` fail aagum; `HAVING` use pannunga.
+- **Production database-la heavy queries run panradhu.** Read replica illa export kelunga. Client-oda live app-a medhuvaakkuradhu mudhal vaaraththukku nalladhu illai.
+- **Ellaaththukkum index poduradhu.** Ovvoru index-um storage-aiyum write speed-aiyum saappidum. Real-aana slow queries-kku mattum podunga, `EXPLAIN ANALYZE`-la urudhi pannunga.
+- **Dates-a text-oda compare panradhu.** Sariyaana date types-aiyum `DATE '2026-07-01'` maadhiri literals-aiyum use pannunga.
+
+## Practice pannunga
+
+Keezha link pannirukkura SQLBolt lessons 1 mudhal 12 varai browser-layae pannunga, apparam window functions pathina PostgreSQL page-a paadinga.
+
+1. **Set up.** Edhaavadhu oru free PostgreSQL-la, udhaaranam: local Docker container, `customers`, `orders`, `refunds` tables uruvaakki, sila nooru rows made-up data insert pannunga.
+2. **Baseline.** Mela irukkura baseline query-a ezhudhunga, koodavae idhuvarai order podaadha customers-a list panra oru query-yaiyum ezhudhunga.
+3. **Window.** Ovvoru refund-kkum, andha customer-oda mundhina refund-la irundhu ethanai naal aachu-nu kaatta `LAG` use pannunga.
+
+**Mudinjadhu-nu eppo sollalaam:** GROUP BY-kkum window function-kkum irukkura vithiyaasaththai orae vaakkiyaththula explain panna mudiyum, index serththadhukku appuram vegamaana oru query-yai kaatta mudiyum.

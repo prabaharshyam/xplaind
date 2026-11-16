@@ -1,0 +1,217 @@
+---
+id: quality-cost-speed
+lang: hinglish
+title: "Quality, cost aur speed ke trade-offs"
+outcome: "Samjha sakte ho ki quality, cost aur speed ko ek-doosre ke against trade karne par kya chhodna padta hai aur kya milta hai."
+answer: "Har AI system quality, cost aur speed ko ek-doosre ke against trade karta hai: bada model behtar hota hai par slow aur mehnga, isliye woh sabse sasta option chuno jo aapka quality bar poora kare."
+why_it_matters: "Har real design trade-offs ka set hota hai. Interviewers dekhte hain ki aap unhe zor se bolte ho ya nahi aur numbers se support karte ho ya nahi."
+flashcards:
+  - q: "Har LLM app kaunsi teen cheezon ko trade karta hai?"
+    a: "Quality, cost aur speed."
+  - q: "Har option ke liye kya measure karna chahiye?"
+    a: "Evals se category ke hisaab se quality, per request cost, aur median aur 95th percentile par latency, saath mein time to first token."
+  - q: "Options ko table mein kyun rakhein?"
+    a: "Ye trade-offs ko product owner ke saath ek business conversation bana deta hai, har choice ke numbers ke saath."
+  - q: "Quality ko kaise judge karna chahiye?"
+    a: "Category ke hisaab se aur galtiyon ke nateeje ke hisaab se, sirf overall accuracy se nahi."
+  - q: "Teen free wins batao."
+    a: "Streaming, prompt caching, aur chhote prompts aur outputs; saath mein steps ko parallel chalana aur gair-zaroori steps hatana."
+  - q: "Difficulty ke hisaab se routing kya hai?"
+    a: "Simple requests ko fast, sasta model ko aur mushkil requests ko strong model ko bhejna, aur router ki galtiyan measure karte rehna."
+  - q: "Kaunse budgets tay karne chahiye?"
+    a: "Ek latency budget aur ek cost-per-request ceiling, phir unke andar quality maximise karo."
+  - q: "Decision ko dobara kyun dekhein?"
+    a: "Prices girte hain, models behtar hote hain aur usage badhta hai, isliye best trade-off har kuch mahine mein badalta hai."
+  - q: "Options ka Pareto frontier kya hai?"
+    a: "Woh options jinhe koi aur option saare measures par ek saath nahi harata. Frontier se bahar ka koi bhi option quality, cost aur speed teeno par kisi option se bura hai, aur use hata sakte hain."
+  - q: "Average ki jagah p95 latency kyun report karein?"
+    a: "Averages slow tail ko chhupa dete hain. Bees mein se ek user ka chhe second intezaar karna hi log yaad rakhte hain, aur p95 use dikhata hai."
+exercise:
+  title: "Faisla karo"
+  setup: "Delhi ki ek travel company ka booking assistant 200 test questions par options compare karta hai. Small model: 79% accuracy, ₹0.05 per request, 1.4 s p95. Large model: 88%, ₹0.50, 4.2 s. Router: 86%, ₹0.18, 2.5 s. Refund rules par galat jawab mehnge disputes khade karte hain; general travel tips utne zaroori nahi. Tay kiya gaya latency budget: p95 par pehle shabd 1.5 s ke andar."
+  questions:
+    - q: "Cost aur latency ki tasveer ke hisaab se overall kaunsa option sabse achha fit hai?"
+      a: "Router: bade model ki accuracy ke kareeb, lagbhag ek-tihaai cost par aur bahut kam latency ke saath."
+    - q: "Refund questions ko kaise handle karna chahiye?"
+      a: "Unhe large model ko route karo, aur us category ke liye reranker ka bhi socho, kyunki wahan galtiyan mehngi hain."
+    - q: "1.5 s ka pehle-shabd budget kaise poora ho sakta hai?"
+      a: "Jawab stream karo taaki pehle shabd jaldi dikhein, aur prompts chhote rakho."
+    - q: "Team ko choice dobara kab dekhni chahiye?"
+      a: "Har kuch mahine mein, ya jab prices, models ya traffic mein kaafi badlaav ho."
+ask:
+  - "LLM app mein quality, cost aur latency ka balance kaise banaun?"
+  - "Model routing kya hai?"
+  - "Product manager ko AI trade-offs kaise samjhaun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Har LLM app teen cheezon ko ek-doosre ke against trade karta hai:
+
+- **Quality**: jawab kitni baar sahi, poore aur safe hote hain.
+- **Cost**: per request aur per month paisa.
+- **Speed**: users ko kitna intezaar karna padta hai.
+
+Bade models, zyada retrieve kiya gaya context, rerankers, reflection steps aur agent loops aam taur par quality badhate hain, aur cost aur latency bhi badhate hain. Achhi engineering in trade-offs ko dikhati hai aur product ke maalikon ke saath soch-samajh kar tay karti hai.
+
+```flow
+dir: LR
+title: Chuna gaya: exclusions aur claims ke liye router + reranker: 88%, ₹0.30, 3.1 s p95
+Question -> Router
+Router -[easy]-> Small model | 76%, ₹0.08, 1.6 s
+Router -[hard: exclusions, claims]-> Large model + reranker | 89%, ₹0.64, 4.3 s
+```
+
+Streaming pehle shabd ek second ke andar le aati hai.
+
+Is lesson mein hum Hyderabad ki ek health-insurance company ke saath chalenge, jiske call-centre agents live calls ke dauraan ek assistant use karte hain.
+
+## Ye kaam kaise karta hai
+
+**Teeno ko ek hi test set par measure karo.** Har option ke liye record karo:
+
+- aapke eval se quality (category ke hisaab se, sirf overall nahi);
+- cost per request (tokens times prices);
+- median aur 95th percentile par latency, aur time to first token.
+
+**Options ko table mein rakho.** Jaise: small model, large model, large model plus reranker. Phir trade-off ek business conversation ban jaata hai: "reranker accuracy 85% se 89% kar deta hai aur p95 par har request mein 400 ms jodta hai; worth it?"
+
+**Poochho ki kaunsi quality matter karti hai.** Casual chat ke liye 85% theek ho sakta hai; medical ya financial jawabon mein quality aur safety sabse upar hain. Galtiyon ko unke nateejon ke hisaab se weight do.
+
+**Pehle free wins dhoondho.** Kuch changes quality ko nuksaan pahunchaye bina speed ya cost behtar karte hain:
+
+- streaming (mehsoos hone waali speed);
+- prompt caching (baar-baar aane waale prefixes ke liye cost aur speed);
+- chhote outputs aur prompts;
+- independent steps ko parallel chalana;
+- gair-zaroori steps hatana.
+
+**Difficulty ke hisaab se route karo.** Simple requests ko fast, sasta model ko aur mushkil requests ko strong model ko bhejo. Measure karo ki router kitni baar galti karta hai.
+
+**Budgets set karo.** Ek latency budget (jaise p95 par first token 1.5 s ke andar) aur ek cost per request ceiling tay karo, phir unke andar quality maximise karo.
+
+**Dobara dekho.** Prices girte hain, models behtar hote hain aur usage badhta hai; best trade-off badalta hai. Har kuch mahine mein table dobara chalao.
+
+**Levers aur unke asar:**
+
+| Lever | Quality | Cost | Speed |
+| --- | --- | --- | --- |
+| Bada model | Upar | Upar | Slow |
+| Reranker | Upar | Thoda upar | Thoda slow |
+| Zyada retrieved context | Aksar upar, phir neeche | Upar | Slow first token |
+| Router | Bade model ke kareeb | Neeche | Average mein tez |
+| Streaming | Same | Same | Bahut tez lagta hai |
+| Prompt caching | Same | Neeche | Tez first token |
+| Chhote outputs | Same ya behtar | Neeche | Tez |
+
+**Nateeje ke hisaab se weight dena.** Test set ko categories mein baanto aur har ek ko business se ek weight do: yahan galat jawab kitna mehnga padta hai? Insurer ke liye exclusions aur claims ka weight sabse zyada tha, general questions ka sabse kam. Weighted score options ko plain accuracy se alag rank kar sakta hai, aur choice ki wajah sabke liye saaf kar deta hai.
+
+**Recommendation likhna.** Product owner ke liye ek paragraph: jin options par socha gaya, chuna gaya option, uski quality, cost aur latency, sabse accurate option ke muqable woh kya chhodta hai, aur dobara kab dekhna hai. Jaise: "Hum exclusions aur claims par reranker ke saath router recommend karte hain: 88% accuracy, lagbhag ₹0.30 per request aur p95 par 3.1 s. Har jagah reranker ke saath large model 1 point behtar hai par cost do guna aur live calls par slow."
+
+**Router ko measure karna.** Router tabhi paisa bachata hai jab woh sahi requests ko sahi model ko bheje. Test questions ke ek sample ko easy ya hard label karo, router chalao, aur do tarah ki galtiyan gino: hard questions jo small model ko gaye, jo quality ko nuksaan pahunchate hain, aur easy jo large model ko gaye, jo paisa waste karte hain. Pehli tarah zyada matter karti hai. Agar high-risk category mein ye aam hai, to poori category ko strong model ko route karo, jaise insurer ne exclusions aur claims ke saath kiya.
+
+**Code mein weighted comparison.** Har option ko business weights ke saath category ke hisaab se score karo, phir uske bagal mein cost aur latency dikhao:
+
+```python
+WEIGHTS = {"exclusions": 3.0, "claims": 3.0, "premiums": 2.0, "general": 1.0}
+
+def weighted_quality(results):
+    """results: list of (category, correct_bool)."""
+    num = sum(WEIGHTS[c] * ok for c, ok in results)
+    den = sum(WEIGHTS[c] for c, _ in results)
+    return num / den
+
+def p95(values):
+    v = sorted(values)
+    return v[int(0.95 * (len(v) - 1))]
+
+def summarise(option_runs):
+    """option_runs: name -> list of dicts with category, correct, cost_inr, ms."""
+    table = []
+    for name, runs in option_runs.items():
+        table.append({"option": name,
+                      "quality": round(weighted_quality([(r["category"], r["correct"]) for r in runs]), 3),
+                      "cost_inr": round(sum(r["cost_inr"] for r in runs) / len(runs), 3),
+                      "p95_ms": p95([r["ms"] for r in runs])})
+    return table
+```
+
+**Woh options hatao jo koi nahi chunega.** Ek option dominated hai agar koi aur option quality, cost aur speed par kam se kam utna achha ho, aur ek par behtar ho:
+
+```python
+def frontier(table):
+    def dominates(a, b):
+        better_or_equal = a["quality"] >= b["quality"] and a["cost_inr"] <= b["cost_inr"] and a["p95_ms"] <= b["p95_ms"]
+        strictly = a["quality"] > b["quality"] or a["cost_inr"] < b["cost_inr"] or a["p95_ms"] < b["p95_ms"]
+        return better_or_equal and strictly
+    return [o for o in table if not any(dominates(other, o) for other in table if other is not o)]
+```
+
+Jo bachta hai woh asli choice hai, aur woh ek business choice hai: kitni quality kitne rupees aur milliseconds ke laayak hai.
+
+**Pehle budgets, phir quality maximise karo.** Product owner ke saath per request cost ki ceiling aur p95 latency target tay karo, frontier ko un options tak filter karo jo dono ke andar hon, aur unmein se best quality chuno. Ye ek dhundhli behes ko chhoti meeting bana deta hai.
+
+**Prices aur models badalte rehte hain.** Comparison ko date aur use ki gayi prices ke saath store karo. Jab koi provider prices kam kare ya naya model laye, wahi test set dobara chalao aur table update karo; best choice aksar mahino mein badal jaati hai.
+
+**Per rupee quality poori kahani nahi hai.** Safety-critical categories ke liye ek minimum quality set karo jisse neeche koi bachat nahi kharid sakti, aur un categories ko cost ki parwah kiye bina strong model ko route karo.
+
+## Ek worked example
+
+Hyderabad ki ek health-insurance company ka assistant apne call-centre agents ke liye policy questions ke jawab deta hai.
+
+Team 150 test questions par chaar options compare karti hai:
+
+| Option | Accuracy | Per request cost | p95 latency |
+|---|---|---|---|
+| Small model | 76% | ₹0.08 | 1.6 s |
+| Large model | 85% | ₹0.60 | 3.9 s |
+| Large model + reranker | 89% | ₹0.64 | 4.3 s |
+| Router (small; hard ones to large) | 86% | ₹0.24 | 2.8 s |
+
+Product owner ka nazariya: agents live calls par hain, isliye latency bahut matter karti hai; galat coverage jawab complaints aur refunds laate hain, isliye accuracy usse bhi zyada matter karti hai. Woh exclusions aur claims (sabse risky categories) ke sawaalon ke liye router plus reranker chunte hain, overall 88%, lagbhag ₹0.30 per request aur p95 par 3.1 s tak pahunchte hain. Streaming pehle shabd ek second ke andar dikhata hai.
+
+| Decision factor | Isne choice ko kaise shape kiya |
+| --- | --- |
+| Agents live calls par | Latency matter karti hai, isliye streaming aur router |
+| Galat coverage jawab complaints aur refunds laate hain | Exclusions aur claims ke liye reranker |
+| Call-centre volume par cost | Router zyadatar traffic small model par rakhta hai |
+
+## Common galtiyan
+
+- **Chupke se ek hi dimension optimise karna.** Teeno dikhao.
+- **Sirf overall accuracy.** Galtiyon ke nateejon aur categories ke hisaab se weight do.
+- **Tail latency ko ignore karna.** Users slow requests yaad rakhte hain.
+- **Free wins miss karna.** Pehle streaming aur caching.
+- **Decision ko kabhi dobara na dekhna.**
+- **Product owner ke bina choose karna.** Trade-off ek business decision hai; table dikhao aur unhe weigh karne do.
+- **Unweighted accuracy** jab kuch galtiyan baaki se kahin zyada mehngi hon.
+- **Dominated options ko** discussion mein rakhna.
+- **Bina date ya prices record kiye comparison**, jo chupke se purana ho jaata hai.
+
+## Jab poori trade-off study ki zaroorat nahi
+
+- **Low volume**: din ke kuch rupees mein sabse strong model theek hai; optimise baad mein karo.
+- **Ek option har target ko** bachi hui gunjaish ke saath poora karta hai.
+- **Early prototypes**, jahan pehle ye seekhna zaroori hai ki task kaam karta bhi hai ya nahi.
+
+## Demo se production tak
+
+- **Comparison table ko** dates, prices aur test set version ke saath rakho.
+- **Production mein quality, per request cost aur p95 latency** ko feature ke hisaab se track karo.
+- **High-risk categories ke liye minimum quality** set karo jisse neeche routing nahi ja sakti.
+- **Prices badalne, naye models aane aur bade traffic changes par** comparison dobara chalao.
+- **Router ki galtiyan** har mahine category ke hisaab se measure karo.
+
+## Practice
+
+Neeche link kiya hua Chip Huyen ka production article dobara padho, cost aur latency par dhyaan dete hue.
+
+1. Apne app ke do ya teen options ke liye quality, per request cost aur p95 latency ka table banao.
+2. Product owner ke liye ek paragraph ki recommendation likho, trade-off saaf shabdon mein bata kar.
+3. Ek aisa change lagao jo quality ko nuksaan pahunchaye bina speed behtar kare, aur use measure karo.
+4. Apna option table frontier function ko do aur har dropped option ke dominated hone ki wajah ek vaakya mein likho.
+
+Aur depth ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 4 cost aur latency ke against models chunne ke baare mein hai, aur chapter 9 latency aur cost metrics ke baare mein.
+
+**Aap tab done ho jab** ek trade-off table present kar sako aur ek choice ko aise shabdon mein justify kar sako jo non-engineer samajh sake.

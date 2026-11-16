@@ -1,0 +1,205 @@
+---
+id: grounding-citations
+lang: hinglish
+title: "Grounding, citations aur andaaza na lagana"
+outcome: "RAG system ko sirf apne sources se jawab dene wala banao, har claim ke peeche ka passage cite karwao, aur jab sources mein jawab na ho toh saaf-saaf kehna sikhao."
+answer: "Grounding RAG system ko sirf retrieve hue sources se jawab dene, har claim ke peeche ka passage cite karne, aur jab sources mein jawab na ho toh saaf kehne par majboor karta hai."
+why_it_matters: "Client deployment mein kisi policy ya price ke baare mein ek confident galat jawab poore system par se bharosa khatam kar sakta hai. Citations ke saath grounded answers users ko check karne dete hain, aur andaaza lagane se ek saaf refusal kahin behtar hai. Clients pehle demo mein hi iske baare mein poochhte hain."
+flashcards:
+  - q: "RAG mein grounding kya hai?"
+    a: "Woh techniques jo model ke jawab ko retrieve hue passages se jod kar rakhti hain: sateek instructions, citations, refusal path aur faithfulness checks."
+  - q: "Prompt mein har passage ko id aur origin kyun dete hain?"
+    a: "Ids se citations mumkin hote hain, aur origin, jaise document, section aur page, users aur engineers ko unhein check karne deta hai."
+  - q: "API se mile citations bracketed numbers se zyada bharosemand kyun hote hain?"
+    a: "API exact quoted span aur uska source return karti hai, aur guarantee deti hai ki woh quote document mein maujood hai."
+  - q: "Sasti se sabse gehri tak, teen post-generation checks batao."
+    a: "Cite kiye gaye ids bheje gaye passages mein hon; quoted spans source mein dikhein; ek faithfulness score jo har claim ko passages se check kare."
+  - q: "Refusal ko kaam ka kya banata hai?"
+    a: "Woh batata hai ki documents kya cover karte hain aur kya nahi, aur agla kadam dikhata hai, jaise koi team, insaan ya form."
+  - q: "Mushkil golden set par refusal rate lagbhag zero hone ka kya matlab ho sakta hai?"
+    a: "Model un sawaalon par andaaza laga raha hai jinka jawab documents mein nahi hai."
+  - q: "Golden set ka kitna hissa unanswerable hona chahiye?"
+    a: "Koi fixed standard nahi hai. Ek kaam ka rule of thumb hai kam se kam paanchva hissa, taaki andaaza lagana measure ho."
+  - q: "Faithfulness kya hai?"
+    a: "Kya jawab ka har claim diye gaye passages se support hota hai, chaahe duniya mein woh sach ho ya nahi."
+  - q: "API citations feature kya return karta hai?"
+    a: "Har answer sentence ke saath structured citations: kaunsa document, aur usmein se quote kiya gaya exact text, taaki aap brackets parse kiye bina source dikha aur check kar sako."
+  - q: "Mushkil golden set par refusal rate kyun track karte hain?"
+    a: "Bahut zyada ho toh retrieval fail ho rahi hai; jin sawaalon ka documents jawab nahi de sakte unpar lagbhag zero ho toh model andaaza laga raha hai."
+exercise:
+  title: "Jawab ko ground karo"
+  setup: "Delhi ki ek telecom ka support assistant tariff documents se plan ke sawaalon ka jawab deta hai. 'Does the ₹599 plan include international roaming?' poochhne par woh ₹599 plan ke data aur calls ke baare mein teen passages retrieve karta hai, ek bhi roaming ke baare mein nahi, aur jawab deta hai: 'Yes, international roaming is included in select countries.' Jawab 'Tariff Guide.pdf' ko cite karta hai."
+  questions:
+    - q: "Kya galat hua?"
+      a: "Model ne gap ko general knowledge se bhar diya. Koi bhi passage claim ko support nahi karta, isliye jawab unfaithful hai."
+    - q: "Citation mein kya kamzori hai?"
+      a: "Woh sirf file ka naam batati hai. Use section aur page ke saath passage ka naam batana chahiye, taaki claim check ho sake."
+    - q: "Yahan ek achhe jawab mein kya kehna chahiye?"
+      a: "Ki ₹599 plan ke documents data aur calls cover karte hain par roaming ke baare mein kuch nahi kehte, aur kahan check karein, jaise roaming page ya support."
+    - q: "Kaunsa automatic check ise pakadta?"
+      a: "Ek faithfulness check jo dekhe ki roaming claim ko support karne waala koi passage nahi hai, ya aisa rule jo bina citation waale sentences reject kare."
+ask:
+  - "Apne RAG app ko cheezein banane se kaise rokun?"
+  - "Faithfulness kaise measure karun?"
+  - "Chatbot ko 'mujhe nahi pata' kaise kehna chahiye?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+RAG system passages retrieve karta hai aur model se unse jawab dene ko kehta hai. Kuch bhi model ko un passages ke andar rehne par majboor nahi karta. Woh training mein seekhi cheezein mila sakta hai, gaps ko sahi lagne waale detail se bhar sakta hai, ya aisa sawaal ka jawab de sakta hai jise documents kabhi cover hi nahi karte. **Grounding** un techniques ka set hai jo jawab ko sources se bandhe rakhti hain:
+
+- instructions jo kehti hain ki sirf diye gaye passages use karo;
+- **citations** jo har claim ko use support karne waale passage se jodti hain;
+- jab passages mein jawab na ho toh ek saaf **refusal** path;
+- ek check, automatic ya insaani, ki jawab apne sources ke liye **faithful** hai.
+
+```flow
+Question -> Retrieve passages | [1] Leave Policy v4, 3.2, p.6; [2] Leave Policy v4, 3.4, p.7; [3] Travel Policy v2, 1.1, p.2
+Retrieve passages -> Prompt | use only these, cite ids, refuse with a next step
+Prompt -> Answer | "Earned leave carries forward up to 45 days [1]. The policies do not cover sick leave carry-forward; ask hr-help."
+Answer -> Checks | ids exist? quotes match? every claim supported?
+```
+
+Is lesson mein hum Bengaluru ki ek IT services firm ke HR assistant pilot ke saath chalenge.
+
+## Ye kaam kaise karta hai
+
+**Sources ko mark karo.** Har retrieve kiye passage ko prompt mein ek id aur uske origin ke saath daalo, jaise `[3] Leave Policy v4, section 2.1, page 6`. Ids citations ko mumkin aur debugging ko aasaan banate hain.
+
+**Sateek instruction do.** Model ko batao: sirf passages se jawab do; jis sentence mein passage use ho, uske baad id cite karo; agar passages sawaal ka jawab nahi dete toh yahi kaho aur batao ki kisse poochha ja sakta hai. Cited jawab ka ek chhota example aur refusal ka ek example dikhao. Models rules se behtar examples follow karte hain.
+
+**Jahan ho wahan built-in citations use karo.** Kai model APIs citations ko structured data ki tarah return kar sakti hain: exact quoted span aur ye ki woh kis document se aaya. Ye text mein bracketed numbers maangne se zyada bharosemand hai, kyunki API guarantee deti hai ki woh quote source mein maujood hai.
+
+**Generation ke baad check karo.** Sasti se sabse gehri tak teen practical checks:
+
+1. Har cited id bheje gaye passages mein maujood ho. Jo jawab `[7]` cite kare jabki sirf paanch passages bheje gaye the, use drop ya flag karo.
+2. Quoted spans source text mein sach mein dikhein (string match).
+3. Ek faithfulness score: doosra model, ya RAGAS jaisi eval library, jawab ko claims mein todti hai aur har ek ko passages se check karti hai. Ise apne golden set par offline, aur live traffic ke ek sample par chalao.
+
+**Refusal design karo.** "I could not find this in the HR policies. For leave encashment questions, contact hr-help@..." kaam ka hai. Akela "I don't know" nahi. Refusal rate track karo: bahut zyada ho toh retrieval fail ho rahi hai; mushkil golden set par lagbhag zero ho toh model andaaza laga raha hai.
+
+**Checks aur woh kya pakadte hain:**
+
+| Check | Cost | Kya pakadta hai |
+| --- | --- | --- |
+| Cited ids maujood hain | Free, sirf code | Banaye hue citation numbers |
+| Quotes source mein dikhte hain | Free, string match | Gadhe ya badle hue quotes |
+| Har sentence mein citation hai | Free, sirf code | Bina support waale sentences |
+| Doosre model ka faithfulness score | Ek extra call | Woh claims jinhein citation asal mein support nahi karti |
+| Sample ka human review | Staff ka time | Baareek galtiyaan aur tone problems |
+
+**Users ko sources dikhana.** Citation ko us sentence ke paas rakho jise woh support karti hai, aur use click karne par quoted passage section aur page ke saath khule. Tab users un jawabon ko check karte hain jo unke liye maayne rakhte hain, jaise lambi chhutti se pehle leave rules, aur mismatches report karte hain, jo wapas golden set mein jaate hain.
+
+**Code mein built-in citations.** Anthropic ki API diye gaye documents ko seedhe cite kar sakti hai. Har passage ko citations on karke ek document ki tarah bhejo:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+def cited_answer(question, passages):
+    docs = [{"type": "document",
+             "source": {"type": "text", "media_type": "text/plain", "data": p["text"]},
+             "title": f"{p['title']}, section {p['section']}, page {p['page']}",
+             "citations": {"enabled": True}} for p in passages]
+    reply = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=600,          # check the docs for current names
+        system="Answer only from the documents. If they do not answer the question, say so "
+               "and suggest who to contact.",
+        messages=[{"role": "user", "content": docs + [{"type": "text", "text": question}]}])
+    parts = []
+    for block in reply.content:
+        if block.type != "text":
+            continue
+        cites = [f'{passages[c.document_index]["title"]}: "{c.cited_text}"' for c in (block.citations or [])]
+        parts.append({"text": block.text, "sources": cites})
+    return parts
+```
+
+Jawab ka har tukda us exact text ke saath aata hai jis par woh tika tha, sentence ke paas dikhane ke liye taiyaar. Jin tukdon mein citations nahi hain, unhein dekhna chahiye: ya toh general wording hai ya support-rahit claim.
+
+**Bracket-style citations ke checks.** Jab aap plain text mein `[n]` markers maangte ho, toh unhein code mein check karo:
+
+```python
+import re
+
+def check_citations(answer, n_passages, passages_text):
+    problems = []
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+", answer.strip()) if s]
+    for s in sentences:
+        ids = [int(x) for x in re.findall(r"\[(\d+)\]", s)]
+        if not ids and len(s.split()) > 5:
+            problems.append(f"no citation: {s[:60]}")
+        for i in ids:
+            if not 1 <= i <= n_passages:
+                problems.append(f"cites [{i}] but only {n_passages} passages were sent")
+    for quote in re.findall(r'"([^"]{12,})"', answer):
+        if not any(quote in p for p in passages_text):
+            problems.append(f"quote not in any passage: {quote[:40]}")
+    return problems
+```
+
+Problems waale jawabon ko dobara generate kiya ja sakta hai, warning ke saath dikhaya ja sakta hai, ya review ke liye bheja ja sakta hai, stakes ke hisaab se.
+
+**Grounding sach nahi hai.** Ek bilkul sahi cite kiya hua jawab bhi galat ho sakta hai agar source purana ya galat ho. Retrieval mein replace ho chuke documents filter karo, har citation ke saath document ki date dikhao, aur users ko galat source report karne do.
+
+**Scale par faithfulness.** Golden set aur live traffic ke ek sample ke liye, har jawab ko claims mein todo aur har ek ko cited passages se judge model ke saath check karo. Support-rahit claims ka hissa samay ke saath, topic ke hisaab se track karo.
+
+## Ek example se samjho
+
+Bengaluru ki ek IT services firm apni leave, travel aur reimbursement policies par ek HR assistant chahti hai. Pilot mein ek employee poochhta hai: "Can I carry forward unused sick leave?"
+
+Retrieve hue passages earned leave carry-forward (45 din tak) cover karte hain par sick leave ke baare mein kuch nahi kehte. Pehle version ne jawab diya: "Yes, you can carry forward up to 45 days of leave." Sick leave ke liye ye galat hai, aur fact ki tarah bola gaya hai.
+
+Aap teen cheezein badalte ho. Prompt ab har sentence ke liye citation maangta hai aur usmein ek refusal example hai. Aap API ke citation feature par switch karte ho taaki har claim ek quoted span ke saath aaye. Aur ek check jodte ho jo un jawabon ko flag kare jinke claims mein citation nahi hai.
+
+Naya jawab: "The policies I have cover carry-forward of earned leave: up to 45 days [Leave Policy v4, 3.2]. They do not say whether sick leave can be carried forward. Please check with HR at hr-help." Employee citation par click karke clause padh sakta hai.
+
+80-question golden set par, faithfulness 0.81 se 0.96 ho jaati hai aur unanswerable sawaalon mein se refusal ke saath jawab diye gaye ka hissa 30% se 85% ho jaata hai. Jinka jawab milta hai unke sahi jawab lagbhag waise hi rehte hain. Aap teeno numbers client ko report karte ho.
+
+| 80 sawaalon par measure | Pehle | Baad mein |
+| --- | --- | --- |
+| Faithfulness | 0.81 | 0.96 |
+| Unanswerable sawaal jinhein refuse kiya | 30% | 85% |
+| Answerable sawaal jinka sahi jawab mila | 88% | 87% |
+
+## Aam galtiyaan
+
+- **Passage ki jagah document cite karna.** "Source: HR Policies.pdf" check nahi ho sakta. Section aur page cite karo.
+- **Golden set mein unanswerable sawaal na hona.** Tab andaaza lagana kabhi measure nahi hota. Set ka kam se kam paanchva hissa aisa rakho jiska jawab documents se na mile.
+- **Model ke likhe citation numbers par bharosa karna.** Models kabhi-kabhi aisa passage cite karte hain jo claim ko support nahi karta. Citations ko automatically check karo.
+- **Bina agle kadam waale refusals.** User ko kisi insaan, team ya form ki taraf bhejo.
+- **Users se sources chhupana.** Quoted passage dikhane se bharosa banta hai aur users woh galtiyaan pakad lete hain jo system se chhoot gayi.
+- **Bina checks ke citations parse karna.** Verify karo ki ids maujood hain aur quotes match karte hain.
+- **Bina citation waale sentences chhupana.** Unmein se support-rahit hone ki sambhaavna sabse zyada hai.
+- **Purane documents cite karna.** Dates dikhao aur replace ho chuke versions filter karo.
+
+## Jab citations kam maayne rakhti hain
+
+- **Creative ya drafting tasks** jahan model documents se facts nahi bata raha.
+- **Database ya tool se aaye jawab**, jaise order status, jahan tool ka result hi source hai.
+- **Internal brainstorming**, jahan log output ko facts nahi, ideas maante hain.
+
+Jab bhi users facts par amal karte hain, citations zaroori hain: policies, prices, eligibility, health, legal aur financial information.
+
+## Demo se production tak
+
+- **Built-in citations use karo** jahan aapka provider deta hai, aur unhein log karo.
+- **Har jawab par citation checks chalao,** aur ek sample par faithfulness checks.
+- **Har sentence ke paas dates ke saath sources dikhao.**
+- **Refusal aur unsupported-claim rates ko topic ke hisaab se track karo.**
+- **Users ko galat sources report karne do** aur reports document owners tak pahunchao.
+
+## Practice karo
+
+Neeche link ki gayi citations guide aur faithfulness par RAGAS ka page padho.
+
+1. Apna RAG app jo bhi passage bhejta hai, uske liye ids aur source labels jodo, aur har sentence ke liye citation maango.
+2. Apne golden set mein das unanswerable sawaal jodo. Measure karo ki prompt mein refusal example jodne se pehle aur baad mein aapka app kitne refuse karta hai.
+3. Ek check likho jo aisa koi bhi jawab reject kare jo ek aisi passage id cite kare jo bheji hi nahi gayi.
+4. Apne app ko built-in citations API par switch karo aur compare karo ki pehle aur baad mein kitne jawabon mein support-rahit sentence hai.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 RAG cover karta hai, aur chapter 4 sources ke khilaaf factual consistency check karna cover karta hai.
+
+**Aapka kaam poora jab:** aap ek aisa jawab dikha sako jahan har sentence ek asli passage se jude, aur ek aisa refusal jo user ko bataye ki aage kahan jaana hai.

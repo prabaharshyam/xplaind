@@ -1,0 +1,211 @@
+---
+id: agent-tool-design
+lang: hinglish
+title: "Agents ke liye tools design karna"
+outcome: "Aise tools design kar paoge jo model sahi use kare: kam aur maksad waale, saaf naam aur description waale, tight parameters ke saath, kaam ke results ke saath, aur aise errors ke saath jin par model act kar sake."
+answer: "Achhe agent tools kam hote hain, saaf naam aur description waale, tight typed parameters lete hain, chhote useful results lautate hain, aur aise error messages dete hain jin par model act kar sake."
+why_it_matters: "Agent utna hi achha hota hai jitne uske tools. Client pilots ke zyadatar agent failures vague tool names, overlap karte tools ya aise results se aate hain jo model ko data mein dubo dete hain. Tool design sahi karna sasta hai aur galat karna mehnga."
+flashcards:
+  - q: "Model ko tool ka kya dikhta hai?"
+    a: "Sirf uska naam, description aur parameter schema. Unhi se use tool choose karna hai, arguments bharne hain aur result padhna hai."
+  - q: "Achhe agent tools ke paanch gun kaunse hain?"
+    a: "Kam tools, har ek ka ek saaf kaam, aise naam aur descriptions jo bataein kab use karna hai, tight parameter types, aur chhote actionable results aur errors."
+  - q: "Tools ko API endpoint ke hisaab se nahi, task ke hisaab se design kyun karte hain?"
+    a: "Models bahut saare fine-grained calls ko chain karne mein struggle karte hain. Ek task-shaped tool ka matlab galti ke kam mauke."
+  - q: "Parameters ko constrain kaise karte hain?"
+    a: "Fixed choices ke liye enums, ids ke liye patterns, sensible defaults aur limits, taaki model values gadh na sake."
+  - q: "Tool result mein kya hona chahiye?"
+    a: "Task ke liye zaroori kuch fields, padhne layak form mein, agle tool ke liye ids ke saath; bade results paginate karke, ye batate hue."
+  - q: "Achha tool error kya banata hai?"
+    a: "Wo batata hai ki kya galat hua aur aage kya karna hai, jaise expected id format aur user se check karne ko kehna."
+  - q: "Read tools ko write tools se alag kyun rakhte hain?"
+    a: "Taaki refunds aur deletions jaise risky actions par approval aur alag logging ho sake, aur reads befikr chalein."
+  - q: "Galat tool choices aksar kis wajah se hote hain?"
+    a: "Overlap karte tools ya unclear descriptions."
+  - q: "Jin tools ki agent ko zaroorat nahi, unhein kaise dhoondhte hain?"
+    a: "Ek baar mein ek tool hatao aur apna task set dobara chalao. Agar results nahi girte, toh us tool ko hamesha ke liye hata do."
+  - q: "Tool descriptions ki cost kyun hoti hai?"
+    a: "Har tool ka naam, description aur schema har call mein bheja jaata hai, tokens kharch karta hai aur baaki sab ke liye kam jagah chhodta hai."
+exercise:
+  title: "Tool set dobara design karo"
+  setup: "Chennai ke ek hospital ke appointment assistant ke paas ye tools hain: get_patient, get_patient_v2, list_doctors, list_slots, list_departments, book (jo cancel=true dene par cancel bhi karta hai), aur run_query(sql). Results 60 fields waali poori database rows hain. Jab slot le liya gaya ho, book 'Error 409' lautata hai. Tests mein model paanch mein se ek task mein galat tool chunta hai."
+  questions:
+    - q: "Kaun se tools merge ya remove karne chahiye?"
+      a: "get_patient aur get_patient_v2 ko merge karo, doctor aur slot listing ko ek find_slots tool mein milao, aur run_query hata do."
+    - q: "Book ka booking aur cancelling dono karne mein kya galat hai?"
+      a: "Do alag actions ek tool share karte hain, isliye approval aur logging sirf cancellations ko target nahi kar sakte. book_slot aur cancel_appointment mein baanto."
+    - q: "Results kaise badalne chahiye?"
+      a: "Sirf wahi lautao jo task ko chahiye, jaise doctor, department, date, time aur slot id, 60 raw fields nahi."
+    - q: "'Error 409' ki jagah kya aana chahiye?"
+      a: "Aisa message jaise 'That slot was just taken. The next free slots with Dr Rao are 11:30 and 12:15; ask the patient which suits.'"
+ask:
+  - "AI agent ke liye achha tool description kaise likhun?"
+  - "Ek agent ke paas kitne tools hone chahiye?"
+  - "Kya apne agent ko SQL tool dena chahiye?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Jab aap model ko tools dete ho, toh wo sirf unke naam, descriptions aur parameter schemas dekhta hai. Sirf usi se use decide karna hota hai ki kaunsa tool fit hai, kaunse arguments dene hain aur result kaise padhna hai. Ek human developer ke liye design kiya gaya tool, jaise kisi internal API ke har endpoint par patla wrapper, aksar model ko confuse karta hai.
+
+Achhe agent tools mein paanch baatein common hoti hain: wo **kam** hote hain, har ek ek **saaf kaam** karta hai, naam aur descriptions batate hain ki **kab** use karna hai, parameters **tight typed** hote hain, aur results aur errors **chhote aur actionable** hote hain.
+
+| | API-shaped: 14 tools | Task-shaped: 3 tools |
+|---|---|---|
+| Tools | get_booking, get_booking_v2, list_segments, get_pnr_status, get_fare_rules, get_passengers, create_refund_request, ... | get_trip(booking_ref) padhne ke liye; get_cancellation_quote(ref) padhne ke liye; cancel_trip(quote_id) act karne ke liye, approval ke saath |
+| Galat tool chuna gaya | 22% | 3% |
+| Ek task ke calls | 4.1 | 2.3 |
+
+```flow
+dir: LR
+title: Task-shaped tools
+get_trip(booking_ref) | read -> get_cancellation_quote(ref) | read
+get_cancellation_quote(ref) -> cancel_trip(quote_id) | acts: needs approval
+```
+
+Ye lesson Gurugram ki ek travel company ke support agent ko follow karta hai jiske tools booking API ke har endpoint ko mirror karte the.
+
+## Ye kaam kaise karta hai
+
+**Tools task ke hisaab se chuno, API ke hisaab se nahi.** Agar agents hamesha pehle customer ko look up karte hain aur phir unke open orders, toh ek `get_customer_with_open_orders` tool us se behtar hai jahan model ko do calls chain karni padein. Kam, high-level tools ka matlab galti ke kam mauke.
+
+**Model ke liye naam aur describe karo.** `search_policies` ke saath description "Search current HR policies by keywords. Use for questions about leave, travel, reimbursements or conduct. Returns up to 5 passages with policy name and section." model ko batata hai ki ise kab call karna hai aur kya wapas aayega. Ye bhi batao ki tool kya nahi karta.
+
+**Parameters ko constrain karo.** Fixed choices ke liye enums (`status: "open" | "closed"`), ids ke liye formats (`pattern: ^ORD-\d{8}$`), sensible defaults aur limits use karo. Har loose string model ke liye value gadhne ka ek mauka hai.
+
+**Wahi lautao jo model ko chahiye.** 200 fields ka raw JSON mat pheko. Wo kuch fields lautao jo matter karte hain, padhne layak form mein, un ids ke saath jo model agle tool ko pass kar sake. Bade results ko paginate ya truncate karo aur ye batao ("showing 10 of 312; refine the search").
+
+**Errors ko instructions ki tarah likho.** "Error 400" kuch nahi sikhata. "No order found with id ORD-2026117. Order ids have 8 digits after ORD-; ask the user to check the id." model ko recover karne deta hai.
+
+**Padhne ko karne se alag rakho.** Jo tools cheezein badalte hain (refund, send, delete) unhein padhne waale tools se alag rakho, taaki unpar approval maang sako aur alag se log kar sako.
+
+**Tool use ko test karo.** 20 realistic tasks likho aur check karo ki model kaunse tools kin arguments ke saath call karta hai. Galat tool choices aksar overlap karte tools ya unclear descriptions ki taraf ishara karte hain.
+
+**Tool description ki checklist:**
+
+| Hissa | Weak | Strong |
+| --- | --- | --- |
+| Name | `get_data` | `get_trip` |
+| Kab use karein | Missing | "Ek trip ke baare mein kisi bhi sawaal ke liye pehle ise use karo" |
+| Kya lautata hai | Missing | "Flights, passengers, status, kya online cancel ho sakta hai" |
+| Kya nahi karta | Missing | "Cancel nahi karta; quote ke baad cancel_trip use karo" |
+| Parameter | `id: string` | 6-character pattern ke saath `booking_ref` |
+| Error | "Error 400" | "No trip for ABC12; references are 6 letters or digits" |
+
+**Ek tool ko doosre par depend karwana.** `cancel_trip` mein quote id ko zaroori banana ek chhota design trick hai jiska bada asar hota hai. Model bina pehle quote fetch kiye cancel nahi kar sakta, isliye kuch hone se pehle customer ko refund amount aur fees sunai dete hain, aur approval screen quote dikha sakti hai. Yahi idea wahan lagao jahan action ko kisi check ke baad aana chahiye: ek payment jise verified invoice id chahiye, ya ek email jise user ka dekha hua draft id chahiye.
+
+**Tool set ko test karna.** Naam, descriptions ya schemas mein har badlaav ke baad wahi 20 tasks chalao, aur teen numbers ginno: galat tool chuna gaya, invalid arguments, aur ek task ke calls. Chhote wording changes in numbers ko logon ki umeed se zyada hilaate hain.
+
+**Code mein ek achhe shape ka tool.** Arguments ko Pydantic se define karo, usse schema generate karo, aur result ko model ke liye shape karo:
+
+```python
+from typing import Literal
+from pydantic import BaseModel, Field, ValidationError
+
+class SearchTrips(BaseModel):
+    """Find a customer's trips. Use when they ask about a booking but give no reference.
+    Returns at most 5 trips, newest first. Does not change or cancel anything."""
+    status: Literal["upcoming", "past", "cancelled"] = "upcoming"
+    city: str | None = Field(default=None, description="Destination city, e.g. Kochi")
+
+TOOL = {"name": "search_trips", "description": SearchTrips.__doc__.strip(),
+        "input_schema": SearchTrips.model_json_schema()}
+
+def search_trips(customer_id, raw_args, db):
+    try:
+        args = SearchTrips.model_validate(raw_args)
+    except ValidationError as err:
+        field = err.errors()[0]["loc"][0]
+        return f"Invalid {field}. Status must be upcoming, past or cancelled."
+    trips = db.find_trips(customer_id, args.status, args.city)       # customer_id from the session
+    if not trips:
+        where = f" to {args.city}" if args.city else ""
+        return f"No {args.status} trips{where}. Ask the customer for the booking reference."
+    lines = [f"{t.ref}: {t.city}, {t.date:%d %b %Y}, {t.status}" for t in trips[:5]]
+    more = f" (showing 5 of {len(trips)}; ask for a city or date to narrow)" if len(trips) > 5 else ""
+    return "\n".join(lines) + more
+```
+
+Description batata hai ki tool kab use karna hai, kya lautata hai aur kya nahi karta. Result kuch padhne layak lines hain, un ids ke saath jo agle tool ko chahiye, raw database rows nahi. Har failure path batata hai ki aage kya karna hai.
+
+**Aise tools dhoondho jo apni jagah kamate hain.** Zyada tools zyada abilities dete hain par galat chunne ke zyada mauke bhi, aur har description har call mein bheji jaati hai. Do simple experiments:
+
+- **Ek-ek karke hatao.** Har tool ke bina apna task set chalao. Agar success nahi girti, toh tool ja sakta hai.
+- **Calls ko plot karo.** Ek hafte ke traces mein har tool ke calls ginno, aur note karo ki aam taur par kaunsa tool kiske baad aata hai. Jo tool kabhi call nahi hota uska description kharab ho sakta hai; do tools jo lagbhag hamesha ek ke baad ek call hote hain, merge ke candidates hain.
+
+```python
+from collections import Counter
+
+def tool_usage(runs):
+    """runs: list of lists of tool names, in order, one list per run."""
+    calls, pairs = Counter(), Counter()
+    for names in runs:
+        calls.update(names)
+        pairs.update(zip(names, names[1:]))
+    return calls.most_common(), pairs.most_common(5)
+```
+
+**Tools ko APIs ki tarah version karo.** Kisi parameter ka naam badalna ya tool kya lautata hai ye badalna agent ke behaviour ko chupke se tod sakta hai. Tool definitions ko prompt ke bagal mein code mein rakho, badlaav saath mein review karo, aur har badlaav par tool-choice tests dobara chalao.
+
+**Ek server, kai agents.** Agar kai apps ko wahi tools chahiye, toh unhein Model Context Protocol (MCP) ke through ek baar expose karo taaki har app unhein dobara implement na kare. Design rules wahi rehte hain: narrow tools, saaf descriptions, madadgaar errors, tool ke andar permission checks.
+
+## Ek example se samjho
+
+Gurugram ki ek travel company ke support agent ke paas pehle 14 tools the jo booking API ko mirror karte the: `get_booking`, `get_booking_v2`, `list_segments`, `get_pnr_status`, `get_fare_rules`, `create_refund_request`, aur bhi. Tests mein model 22% tasks mein galat tool chunta tha aur aksar `get_booking` aur `get_booking_v2` dono call kar deta tha, jisse cost double ho jaati thi.
+
+Aap support team ke asli tasks ke hisaab se redesign karte ho:
+
+```python
+{
+  "name": "get_trip",
+  "description": "Get a customer's trip by booking reference: flights, passengers, status, "
+                 "and whether it can be cancelled online. Use first for any question about one trip.",
+  "input_schema": {
+    "type": "object",
+    "properties": {"booking_ref": {"type": "string", "pattern": "^[A-Z0-9]{6}$"}},
+    "required": ["booking_ref"]
+  }
+}
+```
+
+Baaki tools `get_cancellation_quote` (read-only: refund amount aur fees) aur `cancel_trip` (acting: quote id chahiye, isliye model ko cancel karne se pehle quote dena padta hai) ban jaate hain. Results chhote summaries hain, raw API objects nahi. Anjaana reference lautata hai "No trip found for ABC12. References are 6 letters or digits; ask the customer to read it from their e-ticket."
+
+Galat tool choices 3% par aa jaate hain, ek task ke average tool calls 4.1 se 2.3 par gir jaate hain, aur `cancel_trip` ab human approval step ke peeche baith sakta hai.
+
+## Aam galtiyaan
+
+- **Har API endpoint ke liye ek tool.** Models bahut saare fine-grained tools chain karne mein struggle karte hain. Tasks ke liye banao.
+- **Overlap karte tools.** Do tools jo dono ek sawaal ka jawab de sakte hain, choice ko sikke ka toss bana dete hain.
+- **Raw, bade results.** Wo tokens barbaad karte hain aur relevant field chhupa dete hain. Wahi lautao jo task ko chahiye.
+- **Silent failures.** Error par empty list lautana model ko guess karne par chhod deta hai. Batao kya galat hua aur kya karna hai.
+- **Read aur write mix karna.** Agar ek tool dono karta hai toh aap sirf risky actions par approval nahi laga sakte.
+- **Tool results ke roop mein raw API responses.** Saikdon fields tokens barbaad karte hain aur model ko confuse karte hain.
+- **Tool tests dobara chalaye bina tool badalna.** Chhote wording changes badal dete hain ki model kaunsa tool chunta hai.
+
+## Jab tool design kam matter karta hai
+
+- **Ek ya do tools** jinke kaam saaf alag hain: plain description aur schema aksar kaafi hote hain.
+- **Fixed workflows** jahan model nahi, aapka code decide karta hai ki kaunsa function chalega.
+- **Prototypes** jo test kar rahe hain ki idea kaam karta bhi hai ya nahi: task saabit hone ke baad tools polish karo.
+
+## Demo se production tak
+
+- **Tool-choice test set rakho** (task, expected tool, expected arguments) aur har badlaav par chalao.
+- **Traces se har tool ke error rates aur ek task ke calls track karo.**
+- **Har tool ke andar timeouts aur result-size limits lagao.**
+- **Tool ke andar permissions check karo**, session ke user id se.
+- **Har quarter tool list review karo**: jo use nahi hote unhein hatao, jo chain hote hain unhein merge karo.
+
+## Practice karo
+
+Agents ke liye tools likhne par Anthropic ka article aur docs ka tool-use overview padho.
+
+1. Ek chhota domain chuno (library, clinic ke appointments, college ke fee records) aur ek assistant ke liye teen se paanch tools full schemas ke saath design karo.
+2. 15 realistic user tasks likho aur unhein apne tools ke saath ek model par chalao, har call aur argument log karte hue.
+3. Sabse common galti theek karne ke liye ek description badlo ya do tools merge karo, aur dobara chalao.
+4. Apne har tool ko baari-baari hatao, 15 tasks dobara chalao, aur jis tool ke hatne se nuksaan na ho use drop kar do.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 tool selection, tools ki value test karne ke liye unhein hatana, aur ye dekhna ki kaunse tools saath mein use hote hain, ye cover karta hai.
+
+**Aapka kaam poora jab:** aap apna tool set, galat tool calls ki pehle aur baad ki rate, aur wo error message dikha sako jisne model ko recover karne mein madad ki.

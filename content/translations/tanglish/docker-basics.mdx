@@ -1,0 +1,264 @@
+---
+id: docker-basics
+lang: tanglish
+title: "Docker-um Compose-um"
+outcome: "Oru AI service-a container image-la package pannalaam, sariyaana settings-oda run pannalaam, Docker Compose vachu pala services-oda oru local stack-a start pannalaam."
+answer: "Docker oru app-a, adhukku thevaiyaana ellaathaiyum serthu, edhulayum orae maadhiri odura image-aa package panudhu. Docker Compose ippadi pala containers-a oru file-la irundhu serthu start panudhu."
+why_it_matters: "\"En machine-la work aagudhu\" problem illaama, AI services unga laptop-la irundhu client-oda servers-ku illa cloud-ku poga containers thaan vazhi. Innaiku ella FDE, platform job descriptions-layum Docker kekkuraanga, idhukku appuram varra ovvoru deployment lesson-um idha ethirpaarkkum."
+flashcards:
+  - q: "Container-na enna?"
+    a: "Oru odum program, adhukku thevaiyaana ellaathaiyum, example Python version, libraries, code, start command, serthu package pannina oru vishayam. Adhanaala edhulayum orae maadhiri odum."
+  - q: "Image-kum container-kum enna difference?"
+    a: "Image-na package panna recipe-oda result, store panni share pannalaam. Container-na oru image-oda odikittu irukkura instance."
+  - q: "Dockerfile-na enna?"
+    a: "Image build panna use panra, oru chinna steps recipe. Ovvoru step-um oru layer-a serkkum."
+  - q: "Dockerfile-la code-ku munnaadi dependency files-a yen copy panradhu?"
+    a: "Docker layers-a cache pannum. Appo oru code change-ku ellaa packages-aiyum marubadiyum install panna vendaam, rebuilds seconds-la mudiyum."
+  - q: "Volume-na enna?"
+    a: "Container remove aanaalum azhiyaama irukkura storage, database files, caches-ku use pannuvaanga."
+  - q: "Docker Compose enna seiyum?"
+    a: "Oru file-la irundhu pala containers-a serthu start pannum, peru vachu wire pannum, example oru API-um adhoda database-um."
+  - q: "Production-la latest tag-a yen use pannakoodadhu?"
+    a: "Edhu odikittu irukkunnu theriyaadhu, rollback-um panna mudiyaadhu. Images-a versions illa commit hashes-oda tag pannunga."
+  - q: "Containers-a non-root user-aa yen odanum?"
+    a: "Container compromise aanaa, damage kammiyaa irukkum, neraya client security reviews-um idha kekkum."
+  - q: "Multi-stage build enna seiyum?"
+    a: "Oru stage-la ella tools-oda build illa compile pannum, apram results-a mattum oru sinna final image-ku copy pannum. Adhu ship panna vegam, attack panna kammiyaa irukkum."
+  - q: "Yen .dockerignore file serkkanum?"
+    a: ".env files, Git history, data folders, caches-a build-la irundhu veliyila vaikkum, adhanaala secrets images-ku copy aagaadhu, builds-um vegamaa irukkum."
+exercise:
+  title: "Indha Dockerfile-a review pannunga"
+  setup: "Oru teammate-oda AI API-ku Dockerfile: FROM python:3.12 (full image); mudhal step-aa COPY . .; RUN pip install -r requirements.txt; ENV ANTHROPIC_API_KEY=sk-ant-...; CMD python main.py. Avanga idha myapi:latest-nu deploy panraanga. compose.yaml-la irukkura PostgreSQL container-ku volume illa."
+  questions:
+    - q: "Romba serious-aana problem edhu?"
+      a: "API key image-kulla serthu vechirukkaanga. Image irukkura yaaraiyum adha padikkalaam. Adha remove pannunga, key-a rotate pannunga, run time-la pass pannunga."
+    - q: "Rebuilds yen mella irukku, eppadi fix panradhu?"
+      a: "Mudhalla COPY . . irundha, evvalavu code change-um install layer-a invalidate pannum. requirements.txt-a copy panni install pannunga, apram code-a copy pannunga. .dockerignore serkkunga."
+    - q: "Adutha deploy-la database data-ku enna aagum?"
+      a: "Container-kulla irukkradhaala adhu poidum. Database-oda data folder-ku oru named volume serkkunga."
+    - q: "Vera rendu improvements sollunga."
+      a: "Romba sinna image-ku python:3.12-slim use pannunga, oru non-root USER serkkunga, images-a latest-ku badhil versions-oda tag pannunga."
+ask:
+  - "Docker-kum virtual machine-kum enna difference?"
+  - "En Docker image-a eppadi sinnadhaa aakkalaam?"
+  - "Docker Compose-la containers eppadi onnoda onnu pesum?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Container**-na, adhukku thevaiyaana ellaathaiyum serthu package panna oru odum program: Python version, libraries, unga code, adhoda start command. Idhu unga laptop-la, oru colleague-oda machine-la, oru client-oda server-la, illa oru cloud service-la orae maadhiri odum.
+
+Neenga oru **image**-la irundhu container-a build pannuveenga, oru **Dockerfile**-la irundhu image-a build pannuveenga, adhu steps-oda oru chinna recipe. **Docker Compose** oru file-la irundhu pala containers-a serthu start pannum, example unga API, pgvector-oda PostgreSQL database, Redis cache, production-la irukkura maadhiri wire panni.
+
+Containers virtual machines illa. Avanga host-oda Linux kernel-a share pannuvaanga, adhanaala seconds-la start aagi, konjam memory thaan use pannuvaanga.
+
+```flow
+dir: LR
+Dockerfile -[docker build]-> Image | claims-api:1.4.0-nu tag panniyathu
+Image -[docker push]-> Registry | Docker Hub, GHCR, oru cloud registry
+Image -[docker run, compose up]-> Containers | laptop, server, cloud-la odudhu
+```
+
+| | Virtual machine | Container |
+|---|---|---|
+| Ovvoru app-um enna sumandhu varum | App, adhoda libraries, oru hypervisor-la muzhu guest OS | App, adhoda libraries, host kernel-a share panra container runtime-la |
+| Start aagura neram | Nimishangal | Seconds |
+| Memory | Gigabytes | Megabytes |
+
+Indha lesson, Jaipur-la oru bank-oda IT team-ku oru document-search API-a handover panradhu, avanga ellaathaiyum avangaloda own servers-la run pannuvaanga.
+
+## Idhu eppadi work aagudhu
+
+**Dockerfile.** Ovvoru line-um oru layer-a serkkum:
+
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv sync --frozen --no-dev --no-install-project
+COPY src ./src
+USER 1000
+CMD [".venv/bin/uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Docker layers-a cache pannum. Code-ku munnaadi dependency files-a copy panna, oru code change-ku ellaa packages-aiyum marubadiyum install panna vendaam, adhanaala rebuilds seconds-la mudiyum.
+
+**Build-um run-um.** `docker build -t claims-api:1.4.0 .` oru image-a build panni tag pannum. `docker run -p 8000:8000 --env-file .env claims-api:1.4.0` adha run pannum, container-oda port-a ungaloda port-ku map panni, settings-a environment variables-aa pass pannum. `docker ps`, `docker logs`, `docker exec -it name bash` ullae paaka help pannum.
+
+**Data.** Oru container-oda own filesystem, adha remove panna poidum. Database-oda files, model cache maadhiri azhiyaama irukkanum-nu irukkura data, oru **volume**-la poga vendum.
+
+**Compose.** Oru `compose.yaml` services, avanga images illa build folders, ports, environment, volumes, edhu edhai depend aagudhu-nu list pannum. `docker compose up` ellaathaiyum start pannum; services onnoda onnu peru vachu pesum, adhanaala unga API `postgres:5432`-a connect aagum.
+
+**Registries.** Images oru registry-ku (Docker Hub, GitHub Container Registry, illa client-oda cloud registry) push aagum, servers angirundhu pull pannum. Ovvoru image-aiyum `latest` mattum illaama oru version-oda tag pannunga, apothaan edhu odudhunnu theriyum, rollback-um pannalaam.
+
+**Dhinam use panra commands:**
+
+| Command | Enna seiyum |
+| --- | --- |
+| `docker build -t name:tag .` | Inga irukkura Dockerfile-la irundhu oru image build panradhu |
+| `docker run -p 8000:8000 name:tag` | Oru port-a map panni run panradhu |
+| `docker ps` | Odikittu irukkura containers-a list panradhu |
+| `docker logs -f name` | Oru container-oda logs-a follow panradhu |
+| `docker exec -it name bash` | Odikittu irukkura container-kulla oru shell open panradhu |
+| `docker images` | Images-um adhoda sizes-um list panradhu |
+| `docker compose up -d` | compose.yaml-la irukkura ella services-aiyum background-la start panradhu |
+| `docker compose down` | Avangala stop panni remove panradhu (volumes irukkum) |
+
+**Start aagaadha container-a debug panradhu.** Mudhalla adhoda `docker logs` paarunga: perumbaalum failures-ku kaaranam, oru environment variable illaama irukkradhu, thappaana start command, illa oru port ippo-vae use-la irukkradhu. Udane exit aana, normal command-ku badhil oru shell-oda run panni suththi paarunga. Start aagi, aana database-a reach panna mudiyalana, Compose-kulla database adhoda service name-la irukkum, example `db`, `localhost` illa, yenna ovvoru container-kum thani network address irukku.
+
+**AI apps-ku images.** AI images vegamaa periya aagum: machine learning libraries, model files, system packages serndhu serum. Mudinja, model weights-a image-kku veliyila vachu, start-up-la oru volume-ku download pannunga, illa oru hosted model-a call pannunga. Packages install panna mattum compilers thevai-na, multi-stage builds use pannunga: oru stage-la build panni, results-a oru slim final stage-ku copy pannunga. Sinna images vegamaa pull aagum, vegamaa start aagum, security scanners-ku complain panna kammiyaa irukkum.
+
+**Production-ku suit aana Dockerfile.** Rendu stages, oru health check, image-la secrets illa:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS build
+WORKDIR /app
+RUN pip install --no-cache-dir uv
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+COPY src ./src
+
+FROM python:3.12-slim
+WORKDIR /app
+COPY --from=build /app/.venv ./.venv
+COPY --from=build /app/src ./src
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+RUN useradd --uid 1000 --create-home app
+USER app
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
+CMD ["uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Adhukku pakkathula oru `.dockerignore`:
+
+```text
+.env
+.git
+__pycache__/
+data/
+models/
+*.ipynb
+```
+
+**Database-kku kaathirukkura Compose.** `depends_on` mattum container start aagura varaikkum thaan kaaththirukkum, Postgres connections-a edukkura varaikkum illa:
+
+```yaml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+  db:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_PASSWORD: devonly, POSTGRES_DB: app}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:
+```
+
+`devonly` password oru local machine-ku mattum thaan; unmaiyaana environments credentials-a oru secret store-la irundhu edukkum.
+
+**Containers-la GPUs.** Host-la NVIDIA-oda container toolkit install aagi irundha, `docker run --gpus all ...` oru container-ku GPUs-a tharum. Compose-la, `deploy.resources.reservations.devices`-la kekkalaam. Host driver-ku porundhura CUDA base image-a use pannunga, image sinnadhaa irukka model weights-a oru mounted volume-la vachukkunga.
+
+**Scan-um pin-um.** CI-la, Trivy illa Docker Scout maadhiri tool vachu images-la theriyura vulnerabilities-a scan pannunga, serious findings irundha fail pannunga. Base images-a oru version-ku (illa digest-ku) pin pannunga, adhanaala adutha maadham rebuild panna, Python-a illa system libraries-a oru therinjikaama maathaadhu.
+
+**AI apps-ku size mukkiyam.** Ovvoru change-ku appuramum `docker images` paarunga. Oru hosted model irukkura Python app konjam nooru megabytes irukkanum; PyTorch-um CUDA-vum irukkuradhu pala gigabytes irukkalaam, adhu ovvoru deploy-aiyum autoscale-aiyum mella aakkum. Periya model serving-a adhoda own image-la pirichunga, API image sinnadhaa irukkum.
+
+**Browser-laye try pannunga.** Oru sinna Dockerfile linter: moonu common mistakes-a flag pannum. Dockerfile text-a edit panni run pannunga.
+
+```python
+dockerfile = """FROM python:latest
+COPY . /app
+RUN pip install -r /app/requirements.txt
+CMD ["python", "/app/main.py"]"""
+
+lines = [l.strip() for l in dockerfile.splitlines() if l.strip()]
+if any(l.startswith("FROM") and (":latest" in l or ":" not in l) for l in lines):
+    print("Pin the base image version instead of latest.")
+if not any(l.startswith("USER") for l in lines):
+    print("Add a USER line so the app does not run as root.")
+if lines.index(next(l for l in lines if l.startswith("COPY"))) < lines.index(next(l for l in lines if l.startswith("RUN pip"))):
+    print("Copy requirements first and install before copying the code, so builds reuse the cache.")
+```
+
+## Oru worked example
+
+Neenga Jaipur bank-oda IT team-ku oru document-search API-a handover panreenga, avanga ellaathaiyum avangaloda own servers-la run pannuvaanga. Avangalukku try panna oru command venum.
+
+```yaml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on: [db]
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+volumes:
+  pgdata:
+```
+
+Avanga `.env.example`-a `.env`-ku copy panni, model key-yum database password-um fill panni, `docker compose up -d` run panni, `localhost:8000/docs`-a open pannuraanga. API database-a `db:5432`-la reach pannum. Machine-a restart pannum podhu, documents innum indexed-aa irukkum, yenna database `pgdata` volume-la irukku.
+
+Avanga security team image-a scan panni, adhu root-aa odudhu-nu flag panraanga. `USER 1000` line adha fix pannum. Image size-um kekkuraanga: `python:3.12-slim` adha full Python image-la 1 GB-ku mela irukkradhukku badhil 250 MB pakkathula vaikkum.
+
+| Bank-oda review point | Munnaadi | Pinnaadi |
+| --- | --- | --- |
+| Root-aa odudhu | Aam | Illa: `USER 1000` |
+| Image size | Full Python image-la 1 GB-ku mela | `python:3.12-slim`-la 250 MB around |
+| Image-la secrets | Illa, run time-la `.env` vazhiya pass aagudhu | Avanga scanner confirm pannudhu |
+| Restart-ku appuram data | Irukku, `pgdata` volume-la | Irukku |
+| Edhu version odudhu | `1.4.0`-nu tag panniyathu | `1.3.2`-ku rollback test panniyaachu |
+
+## Podhuvaa panra thappugal
+
+- **Secrets-a image-kulla serthu vaikkiradhu.** Image irukkura yaarum adha padikkalaam. Secrets-a run time-la pass pannunga.
+- **Production-la `latest` use panradhu.** Edhu odudhu-nu theriyaadhu, rollback-um panna mudiyaadhu. Versions-a tag pannunga.
+- **Data-va container-kulla store panradhu.** Adutha deploy-la adhu poidum. Volumes illa managed database use pannunga.
+- **Root-aa odradhu.** Neraya client security reviews idha reject pannum. Oru non-root user serkkunga.
+- **Mudhalla muzhu folder-a copy panradhu.** Appuram ovvoru code change-um ella packages-aiyum marubadiyum install pannum. Dependency files-a copy panni install pannunga, apram code-a copy pannunga. `.git`, `.env`, data folders-ku `.dockerignore` serkkunga.
+
+- **Ellaathukkum oru periya container.** API, database, cache-a thani services-aa vachukkunga, appo ovvonnaiyum thaniyaa restart, scale, upgrade pannalaam.
+- **.dockerignore illaama irukkradhu**, adhanaala .env files-um data folders-um images-kulla poidum.
+- **Model weights-a image-kulla serthu vaikkiradhu**, adhu gigabytes aagi deploy mella aagum.
+- **Health condition illaama depends_on**, adhanaala database ready aagaradhukku munnaadi app start aagidum.
+
+## Docker thevai illaama irukkalaam eppo
+
+- **Serverless platforms**, unga code-la irundhu directly build pannum, example Next.js app-ku Vercel.
+- **Notebooks-um one-off scripts-um**, neengalae run panradhu.
+- **Managed AI platforms**, neenga configuration-um prompts-um mattum tharuveenga.
+
+Pala per illa servers orae vishayatha orae maadhiri run panna vendiya podhu thaan containers value aagum.
+
+## Demo-la irundhu production-ku
+
+- **Images-a commit hash-oda tag pannunga**, `latest` mattum illa.
+- **CI-la images-a scan pannunga**, serious vulnerabilities irundha fail pannunga.
+- **Non-root user-aa run pannunga**, oru health check-oda.
+- **Secrets-a images-kku veliyila vainga**; run time-la inject pannunga.
+- **Image size-a paathukkunga**, periya model serving-a adhoda own image-la pirichunga.
+
+## Practice pannunga
+
+Docker-oda Get started guide-yum Compose quickstart-yum pannunga.
+
+1. REST API lesson-la irundha FastAPI app-ku, oru slim base image-yum non-root user-um use panni oru Dockerfile ezhudhunga. `docker images` vachu image size-a check pannunga.
+2. Unga API-yum PostgreSQL-um oru volume-oda oru `compose.yaml` serkkunga. Ellaathaiyum restart panni data irukkudhaa-nu confirm pannunga.
+3. Oru line code-a maathi, rebuild panni, dependency layer cache-la irundhu vandhudhaa-nu confirm pannunga.
+4. Unga image-ku multi-stage build-um .dockerignore-um serthu, munnaadi pinnaadi size-a compare pannunga.
+
+**Ippo mudinjadhu-nu sollalaam, neenga:** image-kum container-kum difference-a explain panna mudinja, oru pudhu machine-la oru command-la unga API-yum database-aiyum start panna mudinja.

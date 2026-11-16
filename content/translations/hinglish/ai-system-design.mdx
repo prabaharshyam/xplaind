@@ -1,0 +1,205 @@
+---
+id: ai-system-design
+lang: hinglish
+title: "AI system design"
+outcome: "Ek AI product ko paper par design karo: users, success metric, components, request flow, failure modes, evaluation aur operations."
+answer: "AI system design ka matlab hai users aur success metric se shuru karke components, request flow, failure modes, evaluation aur operations tak ek chhote document mein likhna, taaki team aur client agree karein aur phir build ho."
+why_it_matters: "Do page ka design document woh galtiyan hafta ek mein pakad leta hai jo build ke ek mahine baad dikhti. Compliance, cost aur latency ke sawaalon ke jawab pehle se maujood hote hain."
+flashcards:
+  - q: "AI system design kya hai?"
+    a: "Ek AI product ko paper par plan karna: users, success metric, components, request flow, failure modes, evaluation aur operations."
+  - q: "Design document kitna lamba hona chahiye?"
+    a: "Do se chaar saaf pages jo team aur client sach mein padhein."
+  - q: "Goal section mein kya hona chahiye?"
+    a: "Kaun use karta hai, kis task ke liye, aur baseline ke saath ek success metric, jaise 6 minute se 2 se kam."
+  - q: "Kaunse constraints AI design ko shape karte hain?"
+    a: "Volume aur peaks, latency budget, cost per request, languages, data residency, privacy rules aur access rights."
+  - q: "Request flow ko step by step kyun describe karein?"
+    a: "Isse dikhta hai ki kaunsa data kahan jaata hai, jisse privacy, latency aur failure ke issues jaldi saamne aate hain."
+  - q: "Failure-mode table kya hai?"
+    a: "Har component ke liye kya galat ho sakta hai aur use pakadne wala guard, jaise outages ke liye fallback model."
+  - q: "Launch bar kya hai?"
+    a: "Test set par tay thresholds jo launch se pehle poore karne hain, jaise citations ke saath 85% correct."
+  - q: "Open questions kyun shaamil karein?"
+    a: "Jo trade-offs tay nahi hue unhe options ke saath likhne se team imaandaar rehti hai aur client ke decisions par focus milta hai."
+  - q: "Daily requests ko peak load estimate mein kaise badlein?"
+    a: "Daily requests ko un busy hours se baanto jinmein woh aate hain, peak factor (aksar 2 se 3) se guna karo, aur requests aur tokens per minute mein badlo taaki rate limits se compare kar sako."
+  - q: "Latency budget kya hai?"
+    a: "Total response time ka ek target, jo har step (retrieval, reranking, model first token, tools) ke allowance mein baanta ho, taaki har hisse ke paas poora karne ke liye ek number ho."
+exercise:
+  title: "Design ka sketch banao"
+  setup: "Bhopal ka ek state health department 5,000 field health workers ke liye ek assistant chahta hai jo Hindi aur English ke 300 guideline PDFs se vaccination schedules aur scheme rules ke sawaalon ke jawab de. Workers basic Android phones par patchy mobile data par use karte hain. Guidelines saal mein kuch baar badalte hain. Data India mein hi rehna chahiye."
+  questions:
+    - q: "Kaunsa success metric aur baseline propose karoge?"
+      a: "Jaise, jawab milne ka time, supervisor ko call karne se lagbhag 20 minute se 1 minute se kam, test set par citations ke saath 90% correct."
+    - q: "Kaunse constraints design ko sabse zyada shape karte hain?"
+      a: "Patchy data aur basic phones, isliye chhote streamed jawab aur halka interface; Hindi aur English; Indian hosting; aur guideline versions."
+    - q: "Do failure modes aur unke guards batao."
+      a: "Superseded guidelines, jo effective-date filters se sambhalte hain; aur provider outage, jo fallback model aur supervisor ko call karne ke saaf message se sambhalta hai."
+    - q: "Evaluation plan mein kya hoga?"
+      a: "Dono languages mein real workers ke sawaalon ka test set, jinke jawab nahi diye ja sakte woh bhi, recall aur correctness metrics aur ek launch bar ke saath."
+ask:
+  - "AI system design document mein kya hona chahiye?"
+  - "AI system design interview ki taiyaari kaise karun?"
+  - "AI system ke failure modes ki list kaise banaun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**AI system design** build se pehle ya build karte hue ek AI product ko paper par plan karna hai. Isme shaamil hai ki woh kiski seva karta hai aur success kaise measure hoti hai, uske components aur request unmein se kaise guzarti hai, kahan fail ho sakta hai, aur production mein use kaise evaluate aur chalaya jaata hai. Ek chhota design document team ko decisions par agree karne, risks jaldi pakadne aur clients aur reviewers ko system samjhane mein madad karta hai.
+
+```flow
+User, an underwriter -> Web app -> API service -> Input guardrails
+Input guardrails -> Hybrid search | department filter + effective date
+Hybrid search -> Reranker -[top 5]-> Model in the insurer's cloud region
+Model in the insurer's cloud region -[outage]-> Fallback model
+Model in the insurer's cloud region -> Output guardrails -> Answer with citation links
+Fallback model -> Output guardrails
+```
+
+Iske aas-paas: masked tracing, CI mein evals, aur latency, cost, feedback aur refusals ke dashboards.
+
+Ye lesson Mumbai ke ek general insurer ke internal underwriting assistant ke design ko follow karta hai.
+
+## Ye kaam kaise karta hai
+
+Ek practical design document, do se chaar pages, ye cover karta hai:
+
+**1. Users aur goals.** Kaun use karta hai, kis task ke liye, aur baseline ke saath success metric (jaise, "policy questions ka median answer time 6 minute se 2 se kam karna").
+
+**2. Requirements aur constraints.** Volume aur peak load, latency budget, cost per request, languages, data residency, privacy aur compliance rules, kaun kaunsa data dekh sakta hai.
+
+**3. Components.** Interface; API service; retrieval (document ingestion, parsing, chunking, embeddings, index, hybrid search, reranking); prompt aur model choices (aur ek fallback model); tools; guardrails; human review points; logging, tracing aur evaluation.
+
+**4. Request flow.** Ek request ke saath kya hota hai, step by step, har step par pass hone wale data ke saath. Ek simple diagram madad karta hai.
+
+**5. Failure modes aur guards.** Har component ke liye kya galat ho sakta hai aur use kya pakadta hai:
+
+- retrieval misses → hybrid search, metadata filters, recall ka evaluation;
+- hallucination → grounding, citations, sources chup hon toh refusal;
+- injection → least privilege, data marking, approvals;
+- provider outage → retries, fallback model, graceful error;
+- runaway cost → caps, budgets, alerts;
+- stale data → re-indexing pipeline, freshness alerts.
+
+**6. Evaluation.** Test set (size, sources, categories), retrieval aur answers ke metrics, launch bar, aur regressions CI mein kaise pakde jaate hain.
+
+**7. Operations.** Deployment, monitoring signals, alerts, on-call, release process aur data retention.
+
+**8. Open questions aur trade-offs.** Jo abhi tay nahi hua aur uske options.
+
+Agar aap interview nahi de rahe, build kar rahe ho, toh pehle din har box banane ki jagah system ko ek-ek layer karke badhao. AI app ko layers (context, guardrails, router aur gateway, caches, agents) mein badhane waala lesson us order ko cover karta hai.
+
+**Ek failure-mode table:**
+
+| Component | Kya galat ho sakta hai | Guard |
+| --- | --- | --- |
+| Parsing | Scanned tables ulajh jaati hain | Table extraction; flagged pages ka review |
+| Retrieval | Superseded circulars pehle rank hote hain | Effective-date filter |
+| Retrieval | Sahi passage chhoot jaata hai | Hybrid search, reranker, recall track |
+| Generation | Bina support ke claims | Citations zaroori; sources chup hon toh refusal |
+| Documents | Upload ki gayi files mein injection | Koi write tools nahi; content ko data maana jaata hai |
+| Provider | Outage ya rate limits | Retries, fallback model, saaf message |
+| Cost | Be-lagaam usage | Per-user caps, daily budget alert |
+
+**Design ka review.** Ek request ko user ke tap se jawab tak walk through karo. Har box par teen sawaal poochho: yahan kaunsa data hai, kaun dekh sakta hai, aur agar ye hissa fail ho ya slow ho toh kya hota hai. Security ya compliance reviewer ko walk-through mein jaldi bulao. "Ye data kahan store hota hai?" jaise sawaal hafta ek mein sasta, aur hafta das mein mehnga hote hain.
+
+**Use current rakhna.** Document ko jeeta-jaagta maano. Jab koi decision badle, page update karo aur end mein ek chhote decision log mein date aur wajah note karo. Naye team members aur client reviewers chat threads se history jodne ki jagah ek sahi page padhte hain.
+
+**Code mein back-of-envelope numbers.** Capacity, rate limits aur cost kai design choices tay karte hain; boxes banane se pehle unhe nikaalo:
+
+```python
+def estimate(daily_requests, busy_hours=8, peak_factor=2.5,
+             in_tokens=3_500, out_tokens=350, price_in=3, price_out=15, usd_to_inr=84,
+             tpm_limit=400_000):
+    """Prices in USD per million tokens; check current prices and note the date."""
+    peak_per_min = daily_requests / (busy_hours * 60) * peak_factor
+    tokens_per_min = peak_per_min * (in_tokens + out_tokens)
+    cost_day = daily_requests * (in_tokens * price_in + out_tokens * price_out) / 1e6 * usd_to_inr
+    return {
+        "peak requests per minute": round(peak_per_min, 1),
+        "peak tokens per minute": round(tokens_per_min),
+        "within rate limit": tokens_per_min < tpm_limit,
+        "cost per day ₹": round(cost_day),
+        "cost per month ₹": round(cost_day * 30),
+    }
+
+print(estimate(daily_requests=20_000))
+```
+
+Agar peak tokens per minute provider ki limit se zyada hain, toh design ko higher tier, caching, kuch steps ke liye chhota model ya ek queue chahiye. Agar monthly cost client ko chaunka de, toh abhi pata karo, launch ke baad nahi.
+
+**Latency budget, step by step.** Ek target aur har step ka allowance likho, phir usi ke against measure karo:
+
+| Step | Allowance (p95) |
+| --- | --- |
+| Auth, request parse karna | 50 ms |
+| Query rewrite (chhota model) | 400 ms |
+| Hybrid search | 150 ms |
+| 30 candidates ki reranking | 250 ms |
+| Model, first token tak ka time | 1,200 ms |
+| First token tak total | lagbhag 2 s |
+
+Ab har component owner ke paas ek number hai. Jab total phisalta hai, trace dikhata hai ki kaunsa step apna allowance tod gaya.
+
+**Layers mein architecture.** Parts jodne ka ek useful order, zaroori se optional tak: achhe context ke saath model call (retrieval, tools); inputs aur outputs par guardrails; router aur gateway (kai models, fallbacks, keys, budgets); caching; aur aakhir mein write actions ke saath agent patterns. Har layer capability aur naye failure modes laati hai, isliye ek layer tab jodo jab measured need dikhe.
+
+**Design decisions records ke roop mein.** Document mein ek chhota decision log rakho: date, decision, dekhe gaye options, wajah, kisne agree kiya. Jaise: "2026-11-02: reranker ke saath hybrid search; vector-only ne policy codes miss kiye (recall 71% vs 89%); client IT ke saath agree." Baad ke reviewers aur naye team members sirf kya nahi, kyun bhi dekhte hain.
+
+**Shuru karne ke liye ek template.** Design document ko repository mein Markdown ki tarah store karo, is lesson ke aath headings, estimate output, latency budget, failure-mode table aur decision log ke saath. Use pull requests mein code ki tarah review karo.
+
+## Ek example se samjho
+
+Mumbai ke ek general insurer ke internal assistant ka design summary, jo 2,000 policy wordings, circulars aur underwriting guidelines se underwriters ke sawaalon ke jawab deta hai:
+
+- *Goal*: underwriters ka lookup time 6 minute se 2; 120-question test set par citations ke saath 85% correct launch bar, "documents mein nahi hai" waale sawaalon par 100% refusal.
+- *Constraints*: 300 users, peak par 40 requests per minute, first token 2 s se kam, data India mein, department ke hisaab se access.
+- *Components*: purane circulars ke liye OCR ke saath layout-aware parsing; section paths ke saath 400-token chunks; department filters ke saath hybrid search aur reranker; insurer ke cloud region ke zariye mid-sized model aur ek fallback; links ki tarah render hote citations; masked logs ke saath tracing.
+- *Failure modes*: superseded circulars (effective-date filter), scanned tables (table extraction, flagged pages), uploaded documents se injection (koi write tools nahi), outage (fallback, phir ek saaf message).
+- *Evaluation*: recall at 5, calibrated judge se answer correctness aur mahine mein 30 answers ka underwriter review; CI mein fast checks.
+- *Operations*: container service, latency, cost, feedback aur refusal rate ke dashboards, nightly re-indexing.
+
+Document mein do din lage aur jab compliance team ne hafta ek mein data residency ke baare mein poochha toh ek mahine ka rework bach gaya.
+
+| Design element | Decision |
+| --- | --- |
+| Goal | Lookup time 6 minute se 2 |
+| Launch bar | 120 questions par citations ke saath 85% correct; out-of-scope par 100% refusal |
+| Constraints | 300 users, peak par 40 requests per minute, first token 2 s se kam, data India mein |
+| Payoff | Compliance ke hafta-ek residency sawaal ka jawab document se, ek mahine ka rework bacha |
+
+## Aam galtiyaan
+
+- **User aur metric ki jagah model se shuru karna.**
+- **Failure analysis na karna.** Har component kisi na kisi tarah fail hota hai.
+- **Evaluation plan na hona.** "Dekhte hain kaisa chalta hai" plan nahi hai.
+- **Constraints ko ignore karna.** Latency, cost aur data rules design ko shape karte hain.
+- **Lambe documents jo koi nahi padhta.** Do se chaar saaf pages.
+- **Capacity aur cost estimate chhod dena**, phir launch ke baad rate limits ya bill ka pata chalna.
+- **Poore system ke liye ek hi latency target**, har step ke allowance ke bina.
+- **Bina wajah record kiye design decisions**, jinpar har mahine dobara behas hoti hai.
+
+## Jab poora design document zaroorat se zyada ho
+
+- **Ek idea test karne ka ek hafte ka prototype**: goal, data aur success measure ke saath aadha page note kaafi hai.
+- **Chhota internal tool** jisme kam users hon aur sensitive data na ho.
+- **Maujooda system ke andar ek badlaav**, jise naye document ki nahi, uske design document ke update ki zaroorat hai.
+
+## Demo se production tak
+
+- **Design document ko repository mein rakho**, har bade badlaav ke saath update karo.
+- **Capacity aur cost estimate dobara chalao** jab traffic, models ya prices badlein.
+- **Har step ko uske latency allowance ke against measure karo** traces se.
+- **Decision log banaye rakho** dates aur wajah ke saath.
+- **Har incident ke baad failure modes review karo** aur naye rows jodo.
+
+## Practice karo
+
+Neeche link ki hui Eugene Yan ki LLM-based systems banane ki patterns padho.
+
+Is lesson ka check ek project hai: ek AI product ke liye do se chaar page ka design document likho, jisme users aur success metrics, components, request flow, failure modes aur guards, evaluation aur operations ho.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 10 AI application architecture ko layer by layer cover karta hai, aur chapter 9 latency aur cost ko.
+
+**Aapka kaam poora jab:** aap kisi ko apna design das minute mein walk through kara sako aur har component ke liye "ye hissa fail ho toh kya hota hai?" ka jawab de sako.

@@ -1,0 +1,234 @@
+---
+id: retrieval-metadata
+lang: hinglish
+title: "Metadata jo retrieval mein madad kare"
+outcome: "Wo metadata store karo jo retrieval ko precise banata hai (source, section path, dates, type, owner, language, access), aur jahan kaam aaye wahan summaries aur likely questions jaisa generated metadata jodo."
+answer: "Source, section, date, type, owner aur access level jaisa metadata retrieval ko precise banata hai, kyunki aap uske hisaab se filter kar sakte ho aur dikha sakte ho ki jawab kahan se aaya."
+why_it_matters: "Metadata chunks ke dher ko searchable library bana deta hai: ye filters, citations, freshness, permissions aur behtar matching ko power karta hai. Ingestion ke waqt ise collect karna sasta hai aur baad mein jodna dardnaak, isliye experienced RAG engineers ise pehle design karte hain."
+flashcards:
+  - q: "RAG mein metadata kya hai?"
+    a: "Chunk ke baare mein information, uske text ke bajaay, jaise document, section, page, dates, type, language aur access groups."
+  - q: "Metadata kaunse paanch kaam karta hai?"
+    a: "Filters, citations, freshness, permissions, aur wo context jodkar behtar matching jo chunk text mein nahi hota."
+  - q: "Chunk ke liye contextual text kya hai?"
+    a: "Embed karne se pehle chunk ke aage jodi gayi title aur section path, ya model ka likha ek-vaakya ka context."
+  - q: "Metadata ke liye fixed vocabularies kyun use karein?"
+    a: "Taaki filters match karein: 'HR', 'Human Resources' aur 'hr dept' jaise free text filtering tod dete hain."
+  - q: "Superseded documents ko kaise sambhaalein?"
+    a: "Effective dates aur 'superseded by' link store karo, aur jab tak user history na poochhe, superseded versions ko default mein filter kar do."
+  - q: "Filters kahan se aa sakte hain?"
+    a: "User ke context se, jaise unka state ya access groups, ya ek chhote model se sawaal se infer karke."
+  - q: "Filters ko conservatively kyun infer karein?"
+    a: "Galat filter sahi jawab ko poori tarah chhupa deta hai. User context ko tarjeeh do aur pata na ho toh poochho."
+  - q: "Generated metadata kya hai, aur uska cost kya hai?"
+    a: "Har chunk ke liye model ke likhe summaries, keywords ya likely questions; ingestion mein har chunk par ek model call lagti hai, isliye gain naapo."
+  - q: "Query filters ko conservatively kyun infer karein?"
+    a: "Galat state ya saal jaisa galat filter chupchaap sahi jawab ko chhupa deta hai. Pata na ho toh filter ke bina search karo."
+  - q: "Ingestion mein invalid metadata wale chunk ka kya hona chahiye?"
+    a: "Use quarantine karo aur report karo, galat values ke saath index mat karo, warna wo filtered searches se gayab ho jaata hai."
+exercise:
+  title: "Metadata design karo"
+  setup: "Bhopal ka ek state-government department 2015 se jaari hue 6,000 government orders aur circulars par, Hindi aur English mein, assistant banata hai. Kai orders pehle ke orders ko amend ya cancel karte hain. Kuch files sirf internal use ke liye marked hain. Officers aise sawaal poochhte hain: 'district officers ke liye abhi ke TA rates' aur '2019 ke transfers wale order mein kya tha?'"
+  questions:
+    - q: "Yahan kaunse metadata fields sabse zyada matter karte hain?"
+      a: "Order number, issue date, effective dates, amends ya supersedes links, subject, department, language, section aur page, aur access level."
+    - q: "'Abhi ke TA rates' wala sawaal kaise sambhaalein?"
+      a: "Filhaal lagoo orders tak filter karo aur superseded ko bahar rakho, phir latest order ko uske number aur date ke saath cite karo."
+    - q: "'2019 ka order' wala sawaal kaise sambhaalein?"
+      a: "Yahan user history ke baare mein pooch raha hai, isliye superseded orders bhi shaamil karo aur issue year 2019 se filter karo."
+    - q: "Internal-only files ke saath kya hona chahiye?"
+      a: "Har chunk ke saath ek access level store karo aur search ke andar officer ke clearance se filter karo."
+ask:
+  - "Har chunk ke saath kaunsa metadata store karun?"
+  - "RAG mein document versions kaise sambhaalun?"
+  - "Kya har chunk ke liye questions generate karne chahiye?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Metadata** chunk ke baare mein information hai, uske text ke bajaay. RAG mein ye paanch kaam karta hai:
+
+- **Filters**: product, region, document type, language ya date se searches ko restrict karna.
+- **Citations**: bilkul bataana ki jawab kahan se aaya (document, section, page, link).
+- **Freshness**: current versions ko tarjeeh dena ya zaroori karna, superseded ko hata dena.
+- **Permissions**: tay karna ki chunk kaun dekh sakta hai.
+- **Behtar matching**: wo context jodna jo chunk text mein nahi hota, jaise document title ya section path.
+
+```flow
+Chunk text | "This limit is 45 days." Hard to find on its own -> Stored with metadata | doc: Leave Policy 2026 (v4), section: Earned leave > Carry forward, page 4, state KA, access: all-employees
+Stored with metadata -> Embedded text | "Leave Policy 2026 > Earned leave > Carry forward: This limit is 45 days."
+Stored with metadata -> Query filter | the user's state, not superseded, access in the user's groups
+```
+
+Is lesson mein hum Bengaluru ki ek IT company ke HR assistant ko follow karenge jo paanch states ke employees ko serve karta hai.
+
+## Ye kaam kaise karta hai
+
+**Ingestion par collect karo.** Har chunk ke liye kam se kam ye store karo:
+
+- document id, title, source system aur link;
+- section path ("Leave Policy > Earned leave > Carry forward") aur page;
+- document type (policy, circular, FAQ, contract);
+- dates: published, effective from, effective to, last modified;
+- language;
+- owner ya department;
+- access groups.
+
+**Contextual text.** "This limit is 45 days" jaisa chunk retrieve karna mushkil hai. Jo text embed hota hai uske aage title aur section path jodo ("Leave Policy v4 > Earned leave > Carry forward: This limit is 45 days"), ya har chunk ke liye model se ek-vaakya ka context likhwao. Is tarah ka contextual enrichment retrieval failures ko dhyaan dene laayak kam kar sakta hai.
+
+**Generated metadata.** Model ek chhota summary, keywords ya wo questions jod sakta hai jinka jawab har chunk deta hai. Jab users documents se bahut alag tarah baat karte hain, tab likely questions embed karne se madad milti hai. Ingestion mein har chunk par ek model call lagti hai, isliye pehle apne golden set par gain naapo.
+
+**Query se filters.** Kuch filters user ke context se aate hain (unka region, unke access groups). Doosre ek chhote model se sawaal se infer kiye ja sakte hain ("2026 se Karnataka ke leave rules" ka matlab region = KA, effective after 2026-01-01). Conservatively infer karo: galat filter sahi jawab chhupa deta hai.
+
+**Freshness rules.** Effective dates aur "superseded by" link store karo. Jab tak user history na poochhe, superseded documents ko default mein filter kar do.
+
+**Consistency.** Fixed vocabularies (department names, document types, region codes) use karo taaki filters match karein. Metadata ko ingestion par kisi bhi aur data ki tarah validate karo.
+
+**Practice mein ek chunk record:**
+
+| Field | Example | Kis liye use hota hai |
+| --- | --- | --- |
+| `doc_id`, `title`, `url` | `HR-LP-2026`, Leave Policy 2026 | Citations aur links |
+| `section_path`, `page` | Earned leave, Carry forward; page 4 | Precise citations, contextual text |
+| `doc_type` | `policy` | Filters |
+| `state` | `KA` | User profile se filters |
+| `effective_from`, `effective_to` | 2026-01-01, open | Freshness |
+| `superseded_by` | none | Purane versions hatana |
+| `language` | `en` | Filters, analysers chunna |
+| `access_groups` | `all-employees` | Permissions |
+
+**Metadata validate karna.** Metadata ko kisi bhi aur data ki tarah treat karo. Ingestion par check karo ki zaroori fields maujood hain, values fixed lists se aati hain, aur effective dates sahi hain, jaise end date start date ke baad. Jo chunks fail hon unhe reject ya quarantine karo, aur har run ke counts report karo. "KA" ki jagah "Karnatka" tag hua ek akela document har Karnataka employee ki search se chupchaap gayab ho jaata hai.
+
+**Code mein metadata validate karo.** Fixed vocabularies aur date rules, kuch bhi index hone se pehle check hote hain:
+
+```python
+from datetime import date
+from typing import Literal
+from pydantic import BaseModel, field_validator, model_validator
+
+State = Literal["KA", "TN", "MH", "DL", "ALL"]
+DocType = Literal["policy", "circular", "faq", "contract"]
+
+class ChunkMeta(BaseModel):
+    doc_id: str
+    title: str
+    section_path: str
+    page: int
+    doc_type: DocType
+    state: State
+    language: Literal["en", "hi", "ta", "kn", "mr"]
+    effective_from: date
+    effective_to: date | None = None
+    superseded_by: str | None = None
+    access_groups: list[str]
+
+    @field_validator("access_groups")
+    @classmethod
+    def not_empty(cls, v):
+        if not v:
+            raise ValueError("every chunk needs at least one access group")
+        return v
+
+    @model_validator(mode="after")
+    def dates_in_order(self):
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValueError("effective_to is before effective_from")
+        return self
+```
+
+Har chunk ko `ChunkMeta.model_validate` se guzaaro, jo pass hon unhe index karo, aur failures ko error ke saath quarantine table mein likho. "Karnatka" ab gayab hone ki jagah zor se fail hota hai.
+
+**Sawaal se filters infer karo, surakshit tareeke se.** Ek chhote model se filters structured output mein, ek confidence ke saath maango, aur tabhi lagao jab sawaal mein saaf bataye gaye hon:
+
+```python
+class Filters(BaseModel):
+    state: State | None = None
+    year_from: int | None = None
+    doc_type: DocType | None = None
+    explicit: bool        # true only if the user named these in the question
+
+def apply_filters(f: Filters, user_state):
+    filters = {"state": [user_state, "ALL"], "current": True}    # from the profile, always safe
+    if f.explicit:
+        if f.state:
+            filters["state"] = [f.state, "ALL"]
+        if f.year_from:
+            filters["effective_from_gte"] = date(f.year_from, 1, 1)
+        if f.doc_type:
+            filters["doc_type"] = f.doc_type
+    return filters
+```
+
+Agar filtered search kuch na lautaye, toh infer kiye filters ke bina ek baar dobara try karo aur logs mein ye likh do.
+
+**Ek document ko supersede karna.** Jab naya version aaye, purane ko usi transaction mein mark karo:
+
+```sql
+BEGIN;
+UPDATE chunks SET superseded_by = 'HR-LP-2026', effective_to = '2025-12-31' WHERE doc_id = 'HR-LP-2025';
+INSERT INTO chunks (...) VALUES (...);   -- the new version's chunks
+COMMIT;
+```
+
+Default searches `superseded_by IS NULL` filter karti hain; history wale sawaal ("2024 mein rule kya tha?") wo filter hatate hain aur dates use karte hain.
+
+**Fayda check karo.** Metadata ke har hisse (contextual text, generated questions, inferred filters) ke saath aur uske bina apne golden set par recall at 5 naapo, aur sirf wahi rakho jo madad kare.
+
+## Ek example se samjho
+
+Bengaluru ki ek IT company ka HR assistant paanch states ke employees ko serve karta hai. Leave aur holiday rules state ke hisaab se alag hain, aur policies har saal revise hoti hain.
+
+Pehle: chunks mein sirf file name tha. Assistant Karnataka aur Maharashtra ki holiday lists mila deta tha aur kabhi-kabhi pichhle saal ki policy quote kar deta tha.
+
+Re-ingestion ke baad, har chunk mein state, policy type, effective dates, version, section path aur access groups hain. Employee ka state unke sign-on profile se aata hai aur filter ki tarah lagta hai, jab tak wo kisi aur state ke baare mein na poochhein. Superseded versions default mein bahar hain. Embed hone wala text title aur section path se shuru hota hai.
+
+100-sawaal ke golden set par sahi jawab 71% se 90% ho jaate hain. Citations ab aise padhte hain: "Leave Policy 2026, Karnataka, section 3.2, page 4", aur HR staff unhe seconds mein check kar sakta hai.
+
+| 100 sawaalon par measure | Pehle | Baad mein |
+| --- | --- | --- |
+| Sahi jawab | 71% | 90% |
+| Galat state quote karne wale jawab | 9 | 0 |
+| Pichhle saal ki policy quote karne wale jawab | 7 | 1 |
+| Citation format | Sirf file name | Document, state, section, page |
+
+**Filter ka faisla kaise hota hai.** Jab Bengaluru ka ek employee poochhta hai "October mein kitni holidays?", toh assistant unke sign-on profile se `state = KA` lagata hai. Jab wo poochhte hain "Pune office mein October ki holidays", toh ek chhota model alag state pakad leta hai, aur assistant filter karne se pehle poochhta hai "Kya aap Maharashtra ki holiday list ki baat kar rahe ho?" Poochhne mein ek tap lagta hai; chupchaap galat filter ek galat jawab dilaata.
+
+## Aam galtiyaan
+
+- **Sirf file name.** Aap filter nahi kar sakte, theek se cite nahi kar sakte, versions nahi sambhaal sakte.
+- **Free-text metadata values.** "HR", "Human Resources" aur "hr dept" filters tod dete hain. Fixed lists use karo.
+- **Effective dates nahi.** Purane versions jeette rehte hain.
+- **Aggressive inferred filters.** Galat infer kiya filter sahi jawab chhupa deta hai; user context ko tarjeeh do aur pata na ho toh poochho.
+- **Bina naape metadata generate karna.** Ingestion par isme paisa lagta hai; saabit karo ki madad karta hai.
+- **Free-text metadata values.** Fixed lists use karo aur validate karo.
+- **Bina fallback ke inferred filters lagana.** Results khaali aayein toh unke bina dobara try karo.
+
+## Jab kam metadata kaafi ho
+
+- **Ek chhota, ek-topic ka collection** jisme har document ka ek hi version ho.
+- **Sabko sab kuch dekhne ki ijaazat hai**, aur kuch bhi purana nahi hota.
+- **Ek prototype** jo test kar raha hai ki retrieval madad karta bhi hai ya nahi.
+
+Jab bahut saare document types, versions, regions ya permission groups hon, tab rich metadata ka fayda milta hai.
+
+## Demo se production tak
+
+- Ingestion par **har chunk ka metadata validate karo** aur har run ke quarantine counts report karo.
+- **Transactions mein supersede karo**, aur superseded documents ko default mein filter karo.
+- Har search par **lage hue filters log karo**, infer kiye hue bhi.
+- Content owners ke saath **vocabularies (states, document types, departments) review karo**.
+- Golden set par har metadata feature ki **value naapo**.
+
+## Practice karo
+
+LlamaIndex ka metadata extraction wala page aur Microsoft ka security filter pattern padho.
+
+1. Apne RAG documents ko dobara ingest karo, har chunk par title, section path, type, dates aur language ke saath.
+2. Embed hone wale text ke aage title aur section path jodo aur pehle aur baad mein recall at 5 compare karo.
+3. Ek document ke purane version par "superseded" flag lagao aur dikhao ki filtering use jawabon se hata deti hai.
+4. Jaanboojhkar kharab metadata wale paanch chunks ChunkMeta se guzaaro aur confirm karo ki har ek saaf error ke saath quarantine mein jaata hai.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 metadata filtering aur chunks mein context jodna cover karta hai.
+
+**Aapka kaam poora jab:** aap precise citation wala ek jawab aur ek aisa sawaal dikha sako jahan ek metadata filter ne galat jawab theek kiya.

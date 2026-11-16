@@ -1,0 +1,133 @@
+---
+id: queues-async-work
+lang: hinglish
+title: "Message queues aur background kaam"
+outcome: "Dheemay ya bharosa na karne laayak kaam ko message queues aur workers ke saath request path se hatao, consumers ko retry ke liye safe banao, aur ek simple queue aur Kafka jaise event stream mein se chuno."
+answer: "Message queue background workers ke liye kaam rok kar rakhti hai, isliye app jaldi reply deta hai aur emails ya LLM calls jaise dheere jobs baad mein chalte hain. Workers retry ke liye safe hone chahiye."
+why_it_matters: "SMS bhejna, PDFs generate karna, LLMs call karna aur payments process karna aise kaam hain jo user ke intezaar mein karne ke liye bahut dheemay ya bharosemand nahi. Queues apps ko tez rakhti hain aur spikes sambhaalti hain, aur lagbhag har asli system design mein aati hain."
+flashcards:
+  - q: "Message queue kya hai?"
+    a: "Ek service jo producers ke messages tab tak rokti hai jab tak consumers unhe process karne ke liye ready na ho, aur dono ko alag rakhti hai."
+  - q: "Kaam ko request path se kyun hatate hain?"
+    a: "Taaki user ko tez response mile aur SMS bhejna ya LLM call karna jaise dheemay ya bharosa na karne laayak kaam background mein ho."
+  - q: "At-least-once delivery ka kya matlab hai?"
+    a: "Har message deliver hota hai, par kuch ek se zyada baar deliver ho sakte hain, isliye consumers ko duplicates sambhaalne padte hain."
+  - q: "Consumer ko idempotent kya banata hai?"
+    a: "Wahi message do baar process karne ka asar ek baar jaisa hi hona, jaise processed message IDs record karke."
+  - q: "Dead-letter queue kya hai?"
+    a: "Un messages ke liye alag queue jo kai retries ke baad bhi fail hote rehte hain, taaki doosron ko roke bina unhe inspect kiya ja sake."
+  - q: "Kafka simple task queue se kaise alag hai?"
+    a: "Kafka ek ordered log rakhta hai jise kai consumer groups padh aur replay kar sakte hain; task queue aam taur par har job ko tab delete kar deti hai jab ek worker use sambhaal le."
+  - q: "Queues traffic spikes mein kaise madad karti hain?"
+    a: "Woh bursts ko buffer karti hain, isliye workers ek steady rate se process karte hain aur database par ek saath maar nahi padti."
+exercise:
+  title: "Background kaam design karo"
+  setup: "Jab Indian ed-tech app par koi learner course khatam karta hai, toh app ko completion save karna hai, PDF certificate generate karna hai, use email karna hai, ek WhatsApp message bhejna hai aur ek leaderboard update karna hai."
+  questions:
+    - q: "Kaunsa step response se pehle hona chahiye, aur kaunsa queue ho sakta hai?"
+      a: "Jawab dene se pehle completion ko database mein save karo. PDF, email, WhatsApp message aur leaderboard update ko queue karo."
+    - q: "WhatsApp provider time out ho jaata hai aur job retry hota hai, isliye kuch learners ko do messages mil jaate hain. Kya fix?"
+      a: "Consumer ko idempotent banao: completion ID ke hisaab se ek sent flag store karo aur pehle se bheja ho toh skip karo."
+    - q: "Ek bug ki wajah se ek course ke liye PDF generation har baar fail hota hai. Use queue ko block karne se kya rokta hai?"
+      a: "Backoff ke saath kuch baar retry karo, phir job ko dead-letter queue mein daalo aur kisi ko alert karo."
+    - q: "Analytics, leaderboard aur fraud check teeno completions ke baare mein jaanna chahte hain. Queue ya event stream?"
+      a: "Kafka jaisa event stream: ek 'course completed' event publish karo aur har consumer group ko use alag se padhne do."
+ask:
+  - "RabbitMQ ya SQS ki jagah Kafka kab use karna chahiye?"
+  - "Background job ko idempotent kaise banaun?"
+  - "Dheemay ya rate limited LLM calls ko queue kaise karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Kuch kaam user ke intezaar mein karne ke liye bahut dheemay, bahut unreliable ya bahut bursty hote hain: emails aur SMS bhejna, PDFs generate karna, images resize karna, LLM call karna, kisi partner ke API se sync karna. **Message queue** system ke ek hisse, **producer**, ko ek message chhodne deti hai ki "ye karna hai", aur doosra hissa, ek **worker** ya **consumer**, use uthakar baad mein kar leta hai.
+
+User ko tez response milta hai, dheemay kaam phir bhi hota hai, aur agar koi downstream service thodi der ke liye down ho, toh messages khone ki jagah intezaar karte hain.
+
+```flow
+User -> API | 1. save the order in the DB
+API -[fast]-> "Order placed!"
+API -[2. publish "order placed"]-> Queue
+Queue -> Worker: send SMS
+Queue -> Worker: update stock
+Queue -> Worker: email the invoice
+Queue -[after N failed retries with backoff]-> Dead-letter queue
+```
+
+Common tools RabbitMQ, Amazon SQS, Google Pub/Sub, Celery aur RQ jaisi Redis-based job queues, aur high-volume event streams ke liye Apache Kafka hain.
+
+## Ye kaam kaise karta hai
+
+**Producers aur consumers alag rehte hain.** API ko pata hone ki zaroorat nahi ki kitne workers hain ya woh busy hain ya nahi. Queue badhe toh workers jodo, khaali ho toh ghatao. Orders ka spike queue bhar deta hai; workers use steady speed se khaali karte hain, jisse database aur third-party APIs bachte hain.
+
+**Delivery aur retries.** Zyadatar queues **at-least-once delivery** deti hain: message queue mein tab tak rehta hai jab tak worker confirm na kare ki kaam ho gaya. Agar worker confirm karne se pehle crash ho jaye, toh message dobara deliver hota hai. Matlab wahi message do baar process ho sakta hai, isliye consumers **idempotent** hone chahiye: kaam do baar karne ka asar ek baar jaisa hi ho. Typical tareeke: kaam karne se pehle ek unique job ID check karna, ya insert ki jagah "upsert".
+
+Fail hue jobs ko **exponential backoff** ke saath retry karo (1 second ruko, phir 2, 4, 8...), kyunki zyadatar failures temporary hote hain. Kuch attempts ke baad message ko **dead-letter queue** mein daalo taaki ek kharab message baaki ko na roke, aur kisi ko alert karo.
+
+**Task queues aur event streams.** SQS ya RabbitMQ jaisi task queue har job ek worker ko deti hai aur kaam hone par delete kar deti hai. Kafka jaisa **event stream** events ka ek ordered, durable log rakhta hai. Kai independent **consumer groups**, jaise analytics, notifications aur fraud checks, har ek poora stream apni raftaar se padhta hai, aur purane events replay bhi kar sakta hai. Kafka bahut high throughput sambhaalta hai, lekin operational complexity zyada hoti hai.
+
+| Zaroorat | Achha fit | Kyun |
+|---|---|---|
+| Background jobs chalane hain (emails, PDFs, LLM calls) | Redis par Celery/RQ, SQS, RabbitMQ | simple, ek job par ek worker, retries built in |
+| Kai services ek hi event par react karein | Kafka, Pub/Sub | har consumer group alag se padhta hai |
+| Data dobara banane ke liye history replay karna | Kafka | events ek tay period tak rakhe jaate hain |
+| Har key par strict order | key ke hisaab se Kafka partitions, SQS FIFO | ek key ke andar order bana rehta hai |
+| Bahut kam volume, ek server | Python queue + worker thread | extra infrastructure nahi |
+
+**Interviews mein**, jab "send a notification", "process an upload", "call a slow third-party API" ya "handle a spike" sunao, toh queue ki baat karo. Phir wo teen follow-ups batao jinka interviewers intezaar karte hain: fail hone par kya hota hai (retries, backoff, dead-letter queue), duplicates par kya hota hai (idempotent consumers), aur backlog ka pata kaise chalega (queue length aur job age alerts).
+
+**Browser mein try karo.** Retries aur dead-letter list ke saath ek queue worker. Failure rate badlo aur chalao.
+
+```python
+import random
+from collections import deque
+
+random.seed(3)
+queue = deque({"id": i, "tries": 0} for i in range(10))
+done, dead = [], []
+while queue:
+    job = queue.popleft()
+    job["tries"] += 1
+    if random.random() < 0.3:                 # 30% of attempts fail
+        (dead if job["tries"] >= 3 else queue).append(job)
+    else:
+        done.append(job["id"])
+print("done:", done)
+print("dead letters after 3 tries:", [j["id"] for j in dead])
+```
+
+## Ek example se samjho
+
+Isha Pune ki ek learning app ke liye AI study-notes feature bana rahi hai. Students ek chapter PDF upload karte hain aur AI-generated summary notes paate hain. Uske pehle version ne upload request ke andar hi LLM call kiya. Isme 40 se 90 seconds lagte the, phones time out ho jaate the, aur exam season mein jab LLM provider ne rate-limit kiya, toh uploads seedhe fail ho gaye.
+
+Usne ise queue ke aas-paas redesign kiya:
+
+1. Upload endpoint PDF ko object storage mein store karta hai, `queued` status ke saath ek `notes_job` row banata hai, job ID ke saath ek message publish karta hai, aur ek second ke andar return karta hai. App dikhata hai "Your notes are being prepared".
+2. Workers queue se jobs uthate hain, text extract karte hain, LLM call karte hain, notes save karte hain aur status `done` set karte hain. App ek status endpoint poll karta hai ya push notification paata hai.
+3. Jo LLM calls rate limit se takrati hain unhe exponential backoff aur jitter ke saath retry kiya jaata hai. Worker concurrency cap ki gayi hai, taaki team apna provider quota kabhi paar na kare.
+4. Workers idempotent hain: LLM call karne se pehle, worker check karta hai ki job ke notes pehle se hain ya nahi. Save hone ke baad par message confirm hone se pehle crash ab doosri, paise waali LLM call nahi karwata.
+5. Jo jobs paanch baar fail hote hain, jaise bina text waale scanned PDFs, dead-letter queue mein jaate hain, aur student ko ek saaf message dikhta hai ki text-based PDF upload karo.
+
+Agli exam rush mein uploads normal se das guna ho gaye. Queue kuch hazaar jobs tak badhi aur bees minute mein khaali ho gayi; koi request time out nahi hui, aur concurrency cap hone ki wajah se monthly LLM bill budget ke andar raha.
+
+## Aam galtiyaan
+
+**Request ke andar dheemay kaam karna.** Users intezaar karte hain, requests time out hoti hain, aur betaab users ke retries load double kar dete hain. Queue karo aur jaldi respond karo.
+
+**Exactly-once processing maan lena.** Zyadatar queues kam se kam ek baar deliver karti hain. Idempotent consumers ke bina aap duplicate SMS, emails ya charges bhejoge.
+
+**Bina backoff ke hamesha retry karna.** Turant, khatam na hone waale retries ek jujhti service par hathode ki tarah padte hain. Exponential backoff, retry limit aur dead-letter queue use karo.
+
+**Visibility na hona.** Chupchaap badhti queue ka matlab hai users chupchaap intezaar kar rahe hain. Queue length aur job age monitor karo, aur unpar alert lagao.
+
+**Chand jobs ke liye Kafka use karna.** Ye powerful hai par chalana bhaari. Zyadatar background kaam ke liye managed task queue kaafi hai.
+
+**Bahut jaldi acknowledge karke kaam kho dena.** Message tabhi confirm karo jab kaam surakshit ho chuka ho, warna crash use kho deta hai.
+
+## Practice karo
+
+1. Watch & learn panel mein Kafka fundamentals aur getting started ke video lessons dekho.
+2. Upar ka exercise karo.
+3. Project check karo: status endpoint aur idempotent worker ke saath ek queued certificate generator.
+4. Aap jo apps use karte ho unmein do aise features dhoondho jo saaf taur par background mein chalte hain, aur unke peeche ki queue ka sketch banao.

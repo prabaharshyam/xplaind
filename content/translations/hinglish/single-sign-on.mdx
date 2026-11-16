@@ -1,0 +1,234 @@
+---
+id: single-sign-on
+lang: hinglish
+title: "Single sign-on"
+outcome: "AI app ko company ke login se jodna seekhoge, OpenID Connect ya SAML ke zariye, tokens se user ki identity aur groups padhna, aur us identity ko downstream systems tak safely pahunchana."
+answer: "Single sign-on se staff apne company account se OpenID Connect ya SAML ke zariye AI app mein login kar paata hai. App login token se identity aur groups padhta hai."
+why_it_matters: "Koi bhi enterprise aapke AI app ke liye alag passwords nahi banayega. Lagbhag har client deployment mein Single sign-on zaroori shart hoti hai, aur sign-on se mili user ki identity hi aage tay karti hai ki woh kaunse documents dekh sakta hai."
+flashcards:
+  - q: "Single sign-on kya hai?"
+    a: "Identity provider ke zariye company account se ek baar sign in karke har approved app tak pahunchna, naye passwords ke bina."
+  - q: "OAuth 2.0 aur OpenID Connect mein kya farak hai?"
+    a: "OAuth 2.0 access tokens se seemit permission deta hai. OIDC usmein sign-in jodta hai, ek ID token ke saath jo batata hai ki user kaun hai."
+  - q: "SAML 2.0 kya hai?"
+    a: "Ek purana XML-based SSO standard, jo kai bade enterprises aur sarkaari sansthaayein ab bhi use karti hain."
+  - q: "Web apps ke liye kaunsa OIDC flow recommended hai?"
+    a: "PKCE ke saath authorisation code flow: provider par redirect karo, ek code pao, aur server par use tokens se badlo."
+  - q: "ID token validate karte samay kya check karna zaroori hai?"
+    a: "Signature, issuer, audience aur expiry, har baar, kisi maintained library se."
+  - q: "Group claims kis kaam aate hain?"
+    a: "Ye tay karne mein ki user aapke app mein kya kar sakta hai aur kaunse documents retrieve kar sakta hai."
+  - q: "On-behalf-of flow kya hai?"
+    a: "User ke token ko kisi downstream system ke liye scoped token se badalna, taaki woh system user ki apni permissions lagaye."
+  - q: "App registration ki request jaldi kyun karein?"
+    a: "Badi companies ki identity teams ke paas queues aur approvals hote hain; registration mein din ya hafte lag sakte hain."
+  - q: "Microsoft Entra ID mein groups overage problem kya hai?"
+    a: "Jab user bahut saare groups mein ho, toh token mein groups ki list ki jagah ek pointer aata hai, aur aapke app ko groups Microsoft Graph se laane padte hain."
+  - q: "SCIM, single sign-on mein kya jodta hai?"
+    a: "Identity provider se user accounts ka apne-aap banna, update hona aur hatna, taaki jo log company chhodein unka access aapke app mein session ke expire hone ka intezaar kiye bina khatam ho jaye."
+exercise:
+  title: "Sign-in ki planning karo"
+  setup: "Aap Mumbai ke ek conglomerate ke liye contracts assistant deploy kar rahe ho, jo Okta use karta hai. Ise legal team aur kuch finance staff ko use karna hai, ise Box se contracts har user ki apni permissions ke saath padhne hain, aur client ki security team ne kaha hai ki app koi bhi password store nahi karega. Aapke pehle build mein ek shared Box service account aur email-and-password login hai."
+  questions:
+    - q: "Email-and-password login ki jagah kya aana chahiye?"
+      a: "Okta se OIDC sign-in, code flow aur PKCE ke saath, kisi maintained library se, taaki app kabhi passwords ko chhue hi nahi."
+    - q: "App registration ki request mein kya hona chahiye?"
+      a: "Staging aur production ke redirect URLs, allowed groups jaise legal aur finance-contracts, zaroori claims, aur Box access."
+    - q: "Shared Box service account mein kya galat hai?"
+      a: "Ye user permissions ko bypass kar deta hai, isliye finance ka koi user woh contracts dekh sakta hai jo sirf legal ke liye hain. Iski jagah user-delegated access use karo."
+    - q: "Assistant ko sirf legal aur finance staff tak kaise seemit karoge?"
+      a: "Okta mein sirf wahi groups assign karo aur app mein group claim check karo, jo users unke bahar hon unhe reject kar do."
+ask:
+  - "OAuth aur OpenID Connect mein kya farak hai?"
+  - "PKCE ke saath OIDC code flow kaise kaam karta hai?"
+  - "Mujhe SAML use karna chahiye ya OIDC?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Single sign-on (SSO)** se employees apne company account se ek baar sign in karte hain aur naye passwords ke bina har approved app tak pahunch jaate hain. Ye company ke identity provider ke zariye chalta hai, jaise Microsoft Entra ID, Okta, Google Workspace ya Ping. Jab koi company chhodta hai, toh IT ek account disable karta hai aur har cheez tak uska access ruk jaata hai.
+
+Teen standards maayne rakhte hain:
+
+- **OAuth 2.0**: kisi app ko user ki taraf se, seemit aur wapas li ja sakne wali permission ke saath kaam karne deta hai, access tokens ke zariye. Apne aap mein ye permission ke baare mein hai, identity ke baare mein nahi.
+- **OpenID Connect (OIDC)**: OAuth 2.0 ke upar ek sign-in layer. App ko ek **ID token** milta hai jo batata hai ki user kaun hai, email, name aur group memberships jaise claims ke saath. Zyadatar naye apps OIDC use karte hain.
+- **SAML 2.0**: ek purana, XML-based SSO standard. Kai bade Indian enterprises aur sarkaari sansthaayein ab bhi internal apps ke liye ise use karti hain.
+
+```flow
+User app kholta hai -> Aapka app sign in ke liye redirect karta hai -> Identity provider | Entra ID, Okta
+Identity provider -[password + MFA, sirf provider ko dikhte hain]-> Chhoti umr wale code ke saath wapas redirect
+Chhoti umr wale code ke saath wapas redirect -> Aapka app code ko tokens se badalta hai
+Aapka app code ko tokens se badalta hai -> ID token (kaun) + access token (kya)
+ID token (kaun) + access token (kya) -> Signature, issuer, audience, expiry verify karo -> Session banao | user id, email, groups
+```
+
+Is lesson mein hum Chennai ki ek automobile-parts manufacturer ke plant staff ke liye roll out kiye gaye quality-documents assistant ke saath chalenge.
+
+## Ye kaam kaise karta hai
+
+**OIDC sign-in flow** (PKCE ke saath authorisation code flow, jo recommended hai):
+
+1. User aapka app kholta hai; woh unhe identity provider par redirect karta hai.
+2. Woh wahan sign in karte hain, aksar multi-factor authentication ke saath. Aapka app unka password kabhi nahi dekhta.
+3. Provider ek chhoti umr wale code ke saath wapas redirect karta hai.
+4. Aapka server us code ko ID token aur access token se badalta hai.
+5. Aapka server token ka signature, issuer, audience aur expiry verify karta hai, phir apna session banata hai.
+
+**Claims aur groups.** ID token mein user ke groups ya roles ho sakte hain ("claims-officers-south", "hr-admins"). Client ki identity team se kaho ki aapke app ko jitne groups chahiye woh shaamil kare. Ye tay karte hain ki user aapke app mein kya kar sakta hai aur, aage chalkar, kaunse documents retrieve kar sakta hai.
+
+**User ki tarah downstream systems ko call karna.** Aapke AI app ko kisi doosre system se data chahiye ho sakta hai, jaise SharePoint ya koi internal API. Sabse achha pattern ye hai ki user ke token ko us system ke liye scoped token se badal do (yaani "on-behalf-of" flow), taaki woh system user ki apni permissions lagaye. Shared service account un permissions ko bypass kar deta hai.
+
+**App register karwana.** Client ki identity team aapka app provider ke saath register karti hai: uske redirect URLs, kaunse users ya groups ise use kar sakte hain aur kaunse claims bhejne hain. Badi companies mein ismein minutes nahi, din lagte hain. Request pehle hafte mein hi shuru karo.
+
+**Library use karo.** Token validation kabhi khud mat likho. Provider ka SDK ya apne framework ki koi jaani-maani library use karo.
+
+**Kaunsa standard milega:**
+
+| Situation | Sambhaavit standard | Notes |
+| --- | --- | --- |
+| Naya web app, modern provider | OIDC | Sabse simple, JSON tokens, achhi libraries |
+| Bada enterprise, purane internal apps | SAML 2.0 | XML assertions; library ya gateway use karo |
+| App user ke liye API call karta hai | OAuth 2.0 access tokens | Unhe narrow scope do |
+| AI app SharePoint ya Box padhta hai | OIDC sign-in plus on-behalf-of | Downstream system user permissions lagata hai |
+
+**Registration request.** Ek page ki request se din bhar ka aana-jaana bach jaata hai. Usmein app ka naam aur purpose, har environment ke redirect URLs, jo groups ise use kar sakte hain, zaroori claims (email, name, groups), kya app user ki taraf se doosre systems call karta hai aur kin scopes ke saath, aur ek technical contact likho. Identity team se poochho ki kaunse groups pehle se hain, naye mat banao, kyunki groups banana aur bharna aksar sabse dheema step hota hai.
+
+**Sign-in ke baad sessions.** Tokens verify hone ke baad, ek server-side session rakho jiski lifetime samajhdaar ho, jaise plant shifts ke liye aath ghante, aur session renew hote samay group membership dobara check karo. Jab IT account disable karta hai, agla renewal fail ho jaata hai aur access khatam.
+
+**FastAPI aur Authlib ke saath OIDC sign-in.** Library redirects, PKCE, code exchange aur token checks sambhaal leti hai:
+
+```python
+import os
+from authlib.integrations.starlette_client import OAuth
+from fastapi import FastAPI, Request, HTTPException, Depends
+from starlette.middleware.sessions import SessionMiddleware
+
+app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key=os.environ["SESSION_SECRET"], https_only=True,
+                   max_age=8 * 3600)
+
+oauth = OAuth()
+oauth.register(
+    name="corp",
+    server_metadata_url=os.environ["OIDC_DISCOVERY_URL"],   # e.g. .../v2.0/.well-known/openid-configuration
+    client_id=os.environ["OIDC_CLIENT_ID"],
+    client_secret=os.environ["OIDC_CLIENT_SECRET"],
+    client_kwargs={"scope": "openid email profile", "code_challenge_method": "S256"},
+)
+
+@app.get("/login")
+async def login(request: Request):
+    return await oauth.corp.authorize_redirect(request, request.url_for("callback"))
+
+@app.get("/auth/callback")
+async def callback(request: Request):
+    token = await oauth.corp.authorize_access_token(request)    # verifies the ID token
+    claims = token["userinfo"]
+    request.session["user"] = {"id": claims["sub"], "email": claims.get("email"),
+                               "groups": claims.get("groups", [])}
+    return {"signed_in": claims.get("email")}
+
+def require_group(group):
+    def check(request: Request):
+        user = request.session.get("user")
+        if not user or group not in user["groups"]:
+            raise HTTPException(status_code=403)
+        return user
+    return check
+
+@app.get("/admin/reports")
+def reports(user=Depends(require_group("claims-officers-south"))):
+    return {"ok": True, "for": user["email"]}
+```
+
+Session mein verified subject id aur groups store hote hain, browser ne jo bheja woh kabhi nahi. User ki key ke roop mein `sub` claim (ya provider ki object id) use karo, email nahi, kyunki email badal sakti hai.
+
+**API ko bheje gaye tokens verify karna.** Agar front end aapki API ko bearer tokens bhejta hai, toh har request par unhe check karo:
+
+```python
+import jwt
+
+jwks = jwt.PyJWKClient(os.environ["OIDC_JWKS_URL"])
+
+def verify(bearer):
+    key = jwks.get_signing_key_from_jwt(bearer)
+    return jwt.decode(bearer, key.key, algorithms=["RS256"],
+                      audience=os.environ["API_AUDIENCE"], issuer=os.environ["OIDC_ISSUER"])
+```
+
+Signature, audience, issuer aur expiry sab `jwt.decode` check karta hai; inmein se kisi ko bhi skip mat karo.
+
+**Badi group lists.** Kuch providers token mein groups list karna band kar dete hain jab user ke bahut zyada groups ho jaate hain (Microsoft Entra ID ek "overage" pointer par switch kar jaata hai). Ya toh identity team se kaho ki sirf app ke groups bheje (app roles ek saaf tareeka hain), ya sign-in par provider ki API se groups le aao.
+
+**Leavers aur SCIM.** Identity provider par user ko disable karne se naye sign-ins ruk jaate hain, par ek khula session ghanton chal sakta hai. Sessions chhote rakho, renewal par dobara check karo, aur jahan client support kare wahan SCIM provisioning accept karo, taaki unki directory mein user hatane par woh aapke app mein turant deactivate ho jaye.
+
+**SAML bina SAML likhe.** Agar client sirf SAML deta hai, toh aage ek gateway ya identity broker laga do (kai managed auth services SAML ko OIDC mein badal deti hain), taaki aapka app ek hi standard bole.
+
+**Browser mein try karo.** ID token teen base64 hisson ka hota hai. Beech wale ko decode karke claims dekho, yahi woh cheez hai jo aapki library verify karti hai.
+
+```python
+import base64, json
+
+token = ("eyJhbGciOiJSUzI1NiJ9."
+         "eyJzdWIiOiJ1LTQ0MSIsImVtYWlsIjoicHJpeWFAZXhhbXBsZS5pbiIsImdyb3VwcyI6WyJjbGFpbXMtc291dGgiXSwiZXhwIjoxOTAwMDAwMDAwfQ."
+         "signature")
+header, payload, signature = token.split(".")
+claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+print(claims)
+print("never trust these until the signature, issuer, audience and expiry are checked")
+```
+
+## Ek example se samjho
+
+Microsoft Entra ID par chalne wali Chennai ki ek automobile-parts manufacturer chahti hai ki aapka quality-documents assistant 1,200 plant staff ke liye available ho.
+
+Pehla hafta: aap identity team ko ek page ki request bhejte ho: app ka naam, staging aur production ke redirect URLs, shaamil karne wale groups (`quality-engineers`, `plant-chennai`, `plant-pune`, `contractors`) aur kya app ko user ki taraf se SharePoint call karna hai (haan, read-only).
+
+Aapka FastAPI backend ek maintained OIDC library use karta hai. Sign-in ke baad, woh ID token verify karta hai aur user ki id, email aur groups ek session mein store karta hai. SharePoint ki requests on-behalf-of token use karti hain, isliye Pune ka ek engineer sirf wahi documents retrieve kar sakta hai jo uski apni SharePoint permissions allow karti hain.
+
+Go-live par contractors shikayat karte hain ki woh sign in nahi kar paa rahe. Provider ka sign-in error kehta hai ki woh app ko assign nahi hain: identity team ne sirf employee groups assign kiye the, `contractors` nahi. Provider ke assignment mein ek badlaav isse theek kar deta hai. Agle mahine jab ek quality engineer company chhodta hai, toh IT uska account disable karta hai aur assistant tak uska access aapke kuch kiye bina khatam ho jaata hai.
+
+| Event | Kya hua | Kisne theek kiya |
+| --- | --- | --- |
+| Pehla hafta | Registration request bheji gayi | Aapne, identity team ko |
+| Go-live | Contractors sign in nahi kar paaye | Identity team ne group assignment joda |
+| Ek mahine baad | Ek engineer ne company chhodi | IT ne ek account disable kiya; access apne-aap khatam |
+
+## Aam galtiyaan
+
+- **Apna login khud banana.** Clients ise mana kar denge, aur ye unke security controls ko buri tarah duplicate karta hai.
+- **Token validation ke steps skip karna.** Signature, issuer, audience aur expiry har baar check karo, library se.
+- **OAuth access tokens ko identity ka saboot maanna.** User kaun hai iske liye OIDC ID token use karo.
+- **Saari downstream calls ke liye ek service account.** Phir users woh bhi dekh lete hain jo unki apni permissions mana karti hain.
+- **App registration late maangna.** Identity teams ke paas queues aur approvals hote hain. Pehle din hi maango.
+- **Users ko email se key karna.** Emails badalti hain; stable subject ya object id use karo.
+- **Lambe sessions bina renewal check ke**, jisse jaane waale logon ka access bana rehta hai.
+- **Bearer tokens par audience ya issuer checks skip karna.**
+
+## Jab aapko single sign-on ki zaroorat nahi
+
+- **Consumer apps**, jahan Google, GitHub ya email sign-in hi users ki umeed hoti hai.
+- **Ek team ka prototype**, jahan managed auth service ka email login pilot approve hone tak kaafi hai.
+- **Machine-to-machine calls** jismein koi user nahi, jo client credentials ya API keys use karti hain.
+
+Enterprise clients lagbhag hamesha production se pehle SSO maangte hain; pehle hafte se hi iski planning karo.
+
+## Demo se production tak
+
+- **Registration request pehle hafte mein bhejo**, har environment ke redirect URLs ke saath.
+- **Maintained libraries use karo** OIDC aur token checks ke liye.
+- **Sessions chhote rakho** aur renewal par groups dobara check karo.
+- **SCIM ya deprovisioning hook support karo** jahan client de.
+- **Sign-ins, failures aur group changes ko** audit log mein daalo.
+
+## Practice karo
+
+Okta ki OAuth aur OIDC ki illustrated guide padho, phir Auth0 ke OIDC aur SAML ke pages.
+
+1. Kisi identity provider ke saath free developer account banao aur ek redirect URL ke saath app register karo.
+2. Apne FastAPI app mein maintained library se OIDC sign-in jodo; sign-in ke baad verified claims print karo.
+3. Ek group claim jodo aur ek aisa endpoint dikhao jise sirf chune hue group ke members call kar sakein.
+4. Ek test user se sign in karo, provider par use group se hatao, aur naapo ki protected endpoint 403 dene mein kitna time lagta hai.
+
+**Aapka kaam poora jab:** aap OIDC code flow ka har step samjha sako aur apna app allowed group ke bahar ke user ko reject karta dikha sako.

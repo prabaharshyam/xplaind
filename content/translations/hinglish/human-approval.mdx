@@ -1,0 +1,215 @@
+---
+id: human-approval
+lang: hinglish
+title: "Human approval steps"
+outcome: "Tay kar paoge ki kaun se agent actions ko insaan ki approval chahiye, pause, approval screen aur resume bana paoge, aur approvals ko rubber stamp banne se rok paoge."
+answer: "Risky ya irreversible agent actions se pehle human approval jodo, jaise payments ya customers ko emails: agent ko pause karo, ek saaf summary dikhao, aur haan milne par resume karo."
+why_it_matters: "Clients pehle din se agent ko bina nigrani ke paisa hilaane, customers ko email karne ya records badalne nahi denge. Achhe se design kiya gaya approval step hi agent ko production tak pahunchata hai, aur approval data dikhata hai ki control kab dheela karna safe hai."
+flashcards:
+  - q: "Human approval step kya hai?"
+    a: "Agent ke action ke asar mein aane se pehle ek pause, jo kisi insaan ko dikhata hai kya aur kyun, aur tabhi aage badhta hai jab wo approve, edit ya reject kare."
+  - q: "Kin actions ko approval chahiye?"
+    a: "Mehnge, irreversible, external ya regulated actions: payments, refunds, customer messages, record changes, deletions, legal ya medical decisions."
+  - q: "Approval rules kaise tay karte ho?"
+    a: "Har tool ko read-only, reversible ya irreversible aur external rate karo; aakhri ke liye hamesha approve, beech waalon ke liye thresholds, reads ke liye kabhi nahi."
+  - q: "Durably pause karne ka kya matlab hai?"
+    a: "Agent ki state save karke run ko interrupted ki tarah khatam karna, taaki process khula rakhe bina ghanton baad resume ho sake."
+  - q: "Approval screen par kya dikhna chahiye?"
+    a: "Action saadi bhasha mein, agent ka reason, kaunsa evidence use hua, aur ek-click approve, edit aur reject."
+  - q: "Approvers ko edit kyun karne dete hain?"
+    a: "Edits action ko bina shuru se kiye theek kar dete hain, aur ye is baare mein sabse achha data hain ki agent kahaan galat hai."
+  - q: "Rubber-stamping ka sanket kya hai?"
+    a: "Bina edits ya rejections ke girte hue decision times, aksar un screens par jinpar kaafi evidence nahi hota."
+  - q: "Agar approval par koi jawab na de toh kya hona chahiye?"
+    a: "Yaad dilao, escalate karo ya safe tareeke se cancel karo. Default se kabhi approve mat karo."
+  - q: "Approval policy ko pure function kyun likhte hain?"
+    a: "Use har tool aur amount ke saath unit-test kar sakte hain, non-engineers use table ki tarah review kar sakte hain, aur agent ke prompt ko chhue bina badal sakte hain."
+  - q: "Rubber-stamping kya hai, aur use kaise pakadte ho?"
+    a: "Approvers bina padhe approve click kar dete hain. Sanket: ek-do second mein decisions, lagbhag zero edits aur rejections, aur plant kiye gaye kharab requests ka approve ho jaana."
+exercise:
+  title: "Approval rules likho"
+  setup: "Hyderabad ki ek property-management company ka agent tenant requests sambhalta hai. Uske tools: read_lease, read_payment_history, schedule_plumber (free reschedule ho sakta hai), waive_late_fee (amount), send_notice_to_tenant, aur terminate_lease. Managers aksar site visits par hote hain aur do se chhe ghante mein jawab dete hain."
+  questions:
+    - q: "Kaun se tools ko approval nahi chahiye?"
+      a: "read_lease aur read_payment_history, jo sirf padhte hain, aur schedule_plumber, jo bina cost ke reversible hai."
+    - q: "waive_late_fee ko kaise sambhalna chahiye?"
+      a: "Ek threshold se neeche ke chhote waivers auto-approve karo, jaise pehli late payment par ₹500, aur bade waale approval ke liye bhejo."
+    - q: "send_notice_to_tenant aur terminate_lease ko kaise sambhalna chahiye?"
+      a: "Hamesha approval: notices external aur formal hote hain; termination irreversible aur legal hai, aur shayad poora kisi insaan ko dena hi behtar ho."
+    - q: "Managers ke jawab dene ke time ko dekhte hue, system ko kya support karna chahiye?"
+      a: "Ghanton ke durable pauses, reminders, tay time ke baad doosre manager ko escalation, aur safe cancellation, kabhi default approval nahi."
+ask:
+  - "AI agent ko insaan se approval kab maangni chahiye?"
+  - "Agent ko pause aur resume kaise karun?"
+  - "Achhi approval screen kaise design karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Human approval step** kisi action ke asar mein aane se pehle agent ko pause karta hai, kisi insaan ko dikhata hai ki agent kya karna chahta hai aur kyun, aur tabhi aage badhta hai jab wo approve, edit ya reject kare. Production agents mein human-in-the-loop ka ye sabse aam roop hai.
+
+Approval un actions ke liye hai jo mehnge, irreversible, external ya regulated hain: refunds aur payments, customers ko emails aur messages, records mein badlaav, kuch bhi delete karna, aur legal ya medical decisions ko chhune waali koi bhi cheez. Data padhne ko aksar approval nahi chahiye.
+
+```flow
+Agent propose karta hai: order 7781 ke liye ₹2,499 refund -> Risk rules
+Risk rules -[read, ya chhota aur reversible]-> Chalao
+Risk rules -[limit se upar refund]-> Pause | state ko checkpoint ki tarah save karo; run "interrupted" ki tarah khatam
+Pause -> Approval card | action, reason, evidence: Approve, Edit amount, Reject with a reason
+Approval card -[4 ghante mein reply nahi]-> Yaad dilao, phir escalate karo
+Approval card -[decision]-> Checkpoint se resume karo -> Act karo -> Customer ko batao
+Customer ko batao -> Log | decision, edit, reason, decide karne mein lage seconds
+```
+
+Ye lesson Jaipur ki ek e-commerce company ke returns aur refunds agent ko follow karta hai.
+
+## Ye kaam kaise karta hai
+
+**Actions ko risk se classify karo.** Har tool ki list banao aur rate karo: read-only, reversible internal badlaav, irreversible ya external. Ek simple rule set tay karta hai ki kise approval chahiye: irreversible ya external actions ke liye hamesha; baaki ke liye ek threshold se upar (jaise ₹1,000 se upar ke refunds); reads ke liye kabhi nahi.
+
+**Durably pause karo.** Agent ko ruk kar intezaar karna hai, shayad ghanton, bina server process khula rakhe. Checkpoints waale frameworks ye karte hain: state save hoti hai, run "interrupted" state mein khatam hota hai, aur baad ka call usi jagah se us insaan ke decision ke saath resume karta hai.
+
+**Sahi information dikhao.** Approval screen par proposed action saadi bhasha mein dikhni chahiye ("Refund ₹4,500 to UPI ID ...@okaxis for order 7781"), agent ka reason, usne jo evidence use kiya (order, policy clause), aur ek-click approve, edit aur reject. Agar approver ko decide karne ke liye teen aur systems kholne padein, toh wo aankhein band karke approve karna shuru kar denge.
+
+**Edit aur feedback.** Approver ko parameters badalne do (₹4,500 se ₹3,000) aur ek note jodne do. Dono agent ki state mein wapas jaate hain taaki wo customer ko badlaav samjha sake, aur aapke logs mein training aur eval data ki tarah.
+
+**Measure karo.** Approval rate, edit rate, rejection reasons aur decide karne mein lagne waala time track karo. Mahino tak rejection rate lagbhag zero ho toh iska matlab ho sakta hai ki low-risk cases ke liye step dheela kiya ja sakta hai. Bina edits ke girta time-to-decide rubber-stamping ka sanket ho sakta hai.
+
+**Timeouts aur escalation.** Tay karo ki agar koi jawab na de toh kya hoga: yaad dilao, doosre approver ko escalate karo, ya safe tareeke se cancel karo. Kabhi "approve" par default mat karo.
+
+**Ek agent ke liye risk table:**
+
+| Tool | Type | Rule |
+| --- | --- | --- |
+| `read_order` | Read-only | Approval kabhi nahi chahiye |
+| `issue_return_label` | Reversible | Auto-approved |
+| `refund` ₹1,000 tak, 30 din se kam purana order | Paisa, chhota | Auto-approved |
+| `refund`, koi bhi aur case | Paisa | Support lead approve karta hai |
+| Legal action ka zikr karne waala koi bhi message | Legal risk | Poora kisi insaan ko diya jaata hai |
+
+**Card design karna.** Decision sabse pehle rakho, ek vaakya mein amount aur recipient ke saath. Uske neeche agent ka diya reason aur evidence do, jaise customer ki photo aur policy clause apne number ke saath. Buttons bade rakho aur outcomes ke naam se label karo. "Reject" par ek chhoti list se reason plus free text poochho, kyunki wahi reasons aap baad mein analyse karoge. Card ko asli approvers ke saath test karo: agar wo decide karne ke liye koi aur system kholte hain, toh card mein kuch kam hai.
+
+**Evidence ke saath dheela karna.** Approval permanent nahi hai. Ek-do mahine ke data ke baad, har rule ke approval, edit aur rejection rates dekho. Jahan log lagbhag sab kuch bina edits ke approve karte hain, wahan threshold thoda badhao aur complaints dekho. Jahan wo aksar edit karte hain, pehle agent ke examples behtar karo.
+
+**Policy ek pure function ki tarah.** Rules ko prompt se bahar, test kiye ja sakne waale code mein rakho:
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Decision:
+    route: str            # "auto", "approve" or "handover"
+    approver: str | None = None
+    reason: str = ""
+
+def policy(tool, args, context):
+    if tool in {"read_order", "track_shipment"}:
+        return Decision("auto", reason="read-only")
+    if tool == "issue_return_label":
+        return Decision("auto", reason="reversible")
+    if tool == "refund":
+        amount, age = args["amount_inr"], context["order_age_days"]
+        if amount <= 1000 and age <= 30:
+            return Decision("auto", reason="small refund within 30 days")
+        if amount <= 25000:
+            return Decision("approve", "support_lead", "refund above auto limit")
+        return Decision("approve", "finance_manager", "large refund")
+    if context.get("mentions_legal_action"):
+        return Decision("handover", reason="legal risk")
+    return Decision("approve", "support_lead", "unknown tool: default to a person")
+
+assert policy("refund", {"amount_inr": 800}, {"order_age_days": 12}).route == "auto"
+assert policy("refund", {"amount_inr": 40000}, {"order_age_days": 3}).approver == "finance_manager"
+```
+
+Anjaane tools hamesha kisi insaan ke paas jaate hain, kabhi "auto" nahi. Agent loop koi bhi tool chalane se pehle `policy` call karta hai; "approve" ek pending action save karta hai aur run ko pause karta hai.
+
+**Ek durable pending action.** Har request ko wo sab kuch jo approver ko chahiye aur ek idempotency key ke saath store karo, taaki double click ya retry use do baar na chala sake:
+
+```python
+import sqlite3, time, uuid
+
+db = sqlite3.connect("approvals.db")
+db.execute("""CREATE TABLE IF NOT EXISTS pending (
+    id TEXT PRIMARY KEY, run_id TEXT, tool TEXT, args TEXT, summary TEXT,
+    approver TEXT, status TEXT DEFAULT 'waiting', decided_by TEXT, note TEXT,
+    created REAL, decided REAL)""")
+
+def request(run_id, tool, args_json, summary, approver):
+    pid = uuid.uuid4().hex
+    db.execute("INSERT INTO pending (id, run_id, tool, args, summary, approver, created) VALUES (?,?,?,?,?,?,?)",
+               (pid, run_id, tool, args_json, summary, approver, time.time()))
+    db.commit()
+    return pid
+
+def decide(pid, user, approve, note="", new_args_json=None):
+    cur = db.execute("""UPDATE pending SET status=?, decided_by=?, note=?, decided=?, args=COALESCE(?, args)
+                        WHERE id=? AND status='waiting'""",
+                     ("approved" if approve else "rejected", user, note, time.time(), new_args_json, pid))
+    db.commit()
+    return cur.rowcount == 1        # False if already decided: the second click does nothing
+```
+
+Jab `decide` safal hota hai, aapka code rukhe hue run ko us decision ke saath resume karta hai. `decide` mein check karo ki `user` ke paas wo approver role hai jo request par likha hai; jisne agent se kaam maanga, wo apna hi bada refund approve na kare.
+
+**Timeouts ek scheduled job ki tarah.** Har kuch minute mein, limit se purani waiting requests dhoondo: 30 minute par yaad dilao, 2 ghante par agle approver ko escalate karo, aur 24 ghante par customer ko message ke saath safe tareeke se cancel karo. Cancel karna default end state hai, approve karna kabhi nahi.
+
+**Approvers ko bhi test karo.** Kabhi-kabhi queue mein jaanbujhkar ek galat request daalo, jaise us customer ko kabhi deliver na hue order ka refund. Agar wo approve ho jaata hai, toh cards ko behtar evidence chahiye, ya queue itni lambi hai ki dhyaan se review nahi ho sakta.
+
+## Ek example se samjho
+
+Jaipur ki ek e-commerce company return aur refund requests sambhalne ke liye ek agent deploy karti hai.
+
+Risk rules: orders padhne ko approval nahi chahiye; return label dena reversible hai aur auto-approved; 30 din se kam purane orders ke ₹1,000 se neeche ke refunds auto-approve hote hain; baaki sab refunds ko support lead ki approval chahiye; legal action ka zikr karne waala koi bhi message poora kisi insaan ko jaata hai.
+
+Approval card aise padhta hai: "Refund ₹2,499 for order 7781 (blue kurta, size M). Customer says it arrived torn; photo attached. Policy 4.2 allows full refund for damage reported within 7 days; reported on day 3." Approve, Edit amount, Reject with reason.
+
+Pehle mahine mein leads 91% approve karte hain, 6% edit karte hain (zyadatar partial refunds jahan ek set ka sirf ek item kharab tha) aur 3% reject karte hain (aisi photos jinmein koi damage nahi dikhta). Median decision time 40 seconds hai. Aap edit cases ko agent ke examples mein jodte ho, jiske baad edits 2% par aa jaate hain. Us evidence ke saath client auto-approve threshold ₹1,500 kar deta hai, jisse complaints badhe bina ek tihaai approvals hat jaate hain.
+
+| Measure, pehla mahina | Value | Kiya gaya action |
+| --- | --- | --- |
+| Jaisa propose kiya waisa approve | 91% | Kuch nahi |
+| Edit hua | 6%, zyadatar partial refunds | Edit cases examples mein jode gaye; edits 2% par aaye |
+| Reject hua | 3%, bina damage waali photos | Reasons har hafte review hote hain |
+| Median time to decide | 40 seconds | Card kaafi saaf maana gaya |
+| Auto-approve threshold | ₹1,000 se ₹1,500 kiya gaya | Ek tihaai kam approvals, complaints mein badhot nahi |
+
+## Aam galtiyaan
+
+- **Sab kuch ya kuch bhi approve karna.** Har read par approval logon ka time barbaad karti hai; payments par na hona laparwahi hai. Actions ko risk se rate karo.
+- **Intezaar karte waqt process khula rakhna.** Approvals mein ghante lag sakte hain. State save karo aur baad mein resume karo.
+- **Bina evidence ki approval screens.** Log judge nahi kar sakte, isliye approve click kar dete hain.
+- **Timeout par approve ko default karna.** Chuppi sahmati nahi hai. Escalate ya cancel karo.
+- **Edits se na seekhna.** Agent kahaan galat hai, is baare mein edits aur rejections aapke paas sabse achha data hain.
+- **Approval rules sirf prompt mein likhna.** Model unhein chhod sakta hai; code nahi.
+- **Maangne waale ko approve karne dena.** Paisa aur data changes ke liye maangne waale aur approve karne waale ko alag rakho.
+- **Approvals par idempotency nahi.** Ek double click action ko do baar chalata hai.
+
+## Jab approval steps ki zaroorat nahi
+
+- **Read-only agents** jo sirf cheezein dekhte aur jawab dete hain.
+- **Poori tarah reversible, kam cost waale actions** jinka undo ho, jaise note ya tag jodna.
+- **Wo actions jo code mein pehle se tight limits ke andar hain**, jaise har customer ke liye mahine ki ek chhoti cap ke andar refunds, jahan galtiyon ki cost review se kam hai.
+
+Approvals ki cost deri aur staff time mein hoti hai. Unhein wahan use karo jahan galti mehngi, irreversible ya company ke bahar ke logon ko dikhne waali ho.
+
+## Demo se production tak
+
+- **Policy ko tests ke saath code mein rakho**, aur business owners ke saath table ki tarah review karo.
+- **Har request aur decision store karo**, kisne, kab, kya badla aur kyun.
+- **Queue ki umar par alert lagao**, aur ek agent ke liye requests ke spike par.
+- **Har mahine rates review karo**, har rule ke hisaab se: approval, edit, rejection, time to decide.
+- **Kabhi-kabhi test requests plant karo**, ye check karne ke liye ki approvers padh rahe hain.
+
+## Practice karo
+
+LangGraph ki interrupts guide padho, ya agents-in-LangGraph course ka approval section.
+
+1. Apne banaye kisi agent ke tools ki list banao aur har ek ko read-only, reversible ya irreversible rate karo. Approval rules likho.
+2. Ek risky tool se pehle durable pause jodo, plus ek chhoti script ya page jo proposed action ko uske reason ke saath dikhaye aur aapko approve, edit ya reject karne de.
+3. Har decision ko laga hua time ke saath log karo, aur wo query likho jo approval, edit aur rejection rates dikhaye.
+4. Apne policy function ke liye unit tests likho jo har tool, threshold amounts ke dono taraf, aur ek anjaana tool cover karein.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 write actions ke risks aur ye batata hai ki autonomy se pehle bharosa kyun aana chahiye.
+
+**Aapka kaam poora jab:** aap apna agent pause kar sako, program band karke agle din restart karo aur approval se resume kar sako.

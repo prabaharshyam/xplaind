@@ -1,0 +1,217 @@
+---
+id: chunking
+lang: hinglish
+title: "Retrieval ke liye documents ko chunk karo"
+outcome: "Documents ko aise chunks mein todo jinhe retrieval dhoondh sake, aur kisi task ke liye chunk size choose karo."
+answer: "Chunking documents ko aise pieces mein todta hai jinhe retrieval dhoondh sake, aam taur par kuch sau tokens, thode overlap ke saath, headings ya paragraphs par kaat kar, sentence ke beech mein nahi."
+why_it_matters: "Kharab chunking RAG app ke galat answers dene ki sabse common wajahon mein se ek hai. Model wahi use kar sakta hai jo retrieval use deta hai."
+flashcards:
+  - q: "Chunking kya hai?"
+    a: "Documents ko itne chhote passages mein todna ki unhe embed, retrieve aur prompt mein fit kiya ja sake. Ye tay karta hai ki retrieval kya dhoondh sakta hai."
+  - q: "Bahut bade chunks mein kya galat hota hai?"
+    a: "Embedding kai topics ko milakar blur ho jaata hai, isliye kisi sawaal se achha match nahi karta, aur har retrieved chunk prompt ko irrelevant text se bhar deta hai."
+  - q: "Bahut chhote chunks mein kya galat hota hai?"
+    a: "Context kho jaata hai: 'This limit is 45 days' bina bataye retrieve hota hai ki kaunsi limit, isliye answers vague ya galat ho jaate hain."
+  - q: "Prose ke liye common starting chunk size kya hai?"
+    a: "300 se 800 tokens. FAQs jaise precise lookups ke liye chhote chunks, explanations ke liye bade."
+  - q: "Chunk overlap kya karta hai?"
+    a: "Paas ke chunks ke beech thoda text repeat karta hai, aksar 10 se 20%, taaki boundary par kata hua idea unmein se ek mein poora dikhe."
+  - q: "Recursive splitting kya hai?"
+    a: "Pehle headings par, phir paragraphs par, phir sentences par todna, taaki chunks document ke structure ko follow karein."
+  - q: "Title aur section heading pehle kyun jodte hain?"
+    a: "Taaki chunk apna context embedding mein le jaaye, jaise 'Leave Policy > Earned leave: This limit is 45 days'."
+  - q: "Chunk size kaise choose karein?"
+    a: "Real sawaalon par do-teen sizes test karo aur measure karo ki sahi passages retrieve hote hain ya nahi. Andaaza mat lagao."
+  - q: "Small-to-big retrieval kya hai?"
+    a: "Chhote, precise chunks par search karo, par model ko woh bada parent section do jisse har match aaya, taaki accuracy aur context dono mile."
+  - q: "Chunking se pehle repeated headers aur footers kyun hatayein?"
+    a: "'Company Confidential — Page 12' jaisi lines har chunk mein aati hain, unke embeddings ko ek-doosre ki taraf kheenchti hain aur tokens waste karti hain."
+exercise:
+  title: "Chunks ko fix karo"
+  setup: "Jaipur ki ek university ka admissions assistant apne 60-page prospectus ko har 1,500 characters par bina overlap ke chunk karta hai. Problems: alag courses ki fee table do chunks mein bant gayi hai; ek chunk sirf 'The deadline for this is 15 June' padhta hai, kisi course ka naam nahi; FAQ pages jawab ke beech mein kat gaye hain; aur hostel fees ke answers mein scholarship rules bhi aa jaate hain."
+  questions:
+    - q: "Fee table ko kaise handle karna chahiye?"
+      a: "Characters se kaatne ki jagah tables ko section heading ke saath ek poore chunk mein rakho."
+    - q: "'Deadline for this' wale chunk ko kaise fix karein?"
+      a: "Headings ke hisaab se todo aur section path pehle jodo, taaki ye 'B.Tech admissions > Application: The deadline for this is 15 June' jaisa padhe. Overlap bhi madad karta hai."
+    - q: "FAQ pages ko kaise chunk karna chahiye?"
+      a: "Har chunk mein ek question-and-answer pair."
+    - q: "Hostel answers mein scholarship rules kyun aate hain, aur kya madad karega?"
+      a: "Bade character-based chunks topics ko mila dete hain. Chhote, heading-based chunks hostel fees aur scholarships ko alag chunks mein rakhte hain."
+ask:
+  - "RAG ke liye kitna chunk size use karun?"
+  - "Chunks mein kitna overlap hona chahiye?"
+  - "Tables aur PDFs ko kaise chunk karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+RAG ke liye documents ko search karne se pehle unhe **chunks** mein todte hain: aise passages jo itne chhote hon ki embed, retrieve aur prompt mein fit ho sakein. Chunking tay karta hai ki retrieval kya dhoondh sakta hai. Agar chunk bahut bada hai, toh uska embedding kai topics ko milakar blur kar deta hai; agar bahut chhota hai, toh use samajhne ke liye zaroori context kho deta hai.
+
+```flow
+title: Fixed-size chunks, har 2,000 characters par: table aadhi kat gayi, topics mix ho gaye
+HR policy -> Chunk 1 | leave policy ... earned leave table, shuru ki rows
+HR policy -> Chunk 2 | table ka baaki ... notice period ... probation
+```
+
+```flow
+title: Structure-aware chunks: headings, phir paragraphs, lagbhag 400 tokens, overlap ke saath
+HR policy, headings ke hisaab se -> Leave > Earned leave | poori table
+HR policy, headings ke hisaab se -> Leave > Sick leave
+HR policy, headings ke hisaab se -> Exit > Notice period
+HR policy, headings ke hisaab se -> Exit > Probation
+```
+
+Har structure-aware chunk ek topic hai, uske aage uska title path laga hua.
+
+Ye lesson Pune ki ek manufacturing company ke HR assistant ko follow karta hai, jo 120-page ke employee handbook se sawaalon ke jawab deta hai.
+
+## Ye kaam kaise karta hai
+
+**Size.** Chunk size tokens ya characters mein naapte hain. Prose ke liye common starting points 300 se 800 tokens hain. Chhote chunks (100 se 300) FAQs jaise precise fact lookup ke liye theek hain; bade chunks un sawaalon ke liye jinhe explanation chahiye.
+
+- *Bahut bade chunks*: embedding kai ideas ka average ban jaata hai, isliye kisi ek sawaal se achha match nahi karta; aur har retrieved chunk prompt ko irrelevant text se bhar deta hai, tokens kharch karwata hai aur model ko bhatkata hai.
+- *Bahut chhote chunks*: "This limit is 45 days" jaisa sentence bina bataye retrieve hota hai ki kaunsi limit; answers galat ya vague ho jaate hain.
+
+**Overlap.** Paas ke chunks ke beech thoda text (jaise 10 se 20%) repeat karne se boundary par kata hua sentence ya idea unmein se kisi ek mein poora dikhta hai.
+
+**Structure ke hisaab se todo.** Har N characters par kaatne se behtar:
+
+- pehle headings aur sections par todo, phir paragraphs, phir sentences (recursive splitting);
+- tables, lists aur code blocks ko poora rakho;
+- FAQs ke liye har chunk mein ek question-and-answer pair.
+
+**Context jodo.** Har chunk ke saath document title aur section heading store karo, aur aksar embed hone wale text ke aage bhi jodo, taaki "This limit is 45 days" ban jaaye "Leave Policy > Earned leave: This limit is 45 days".
+
+**Metadata.** Citations aur filters ke liye document id, page aur section rakho.
+
+**Test karo.** Chunking andaaze se lene wala nahi, evaluate karne wala choice hai. Real sawaalon ke set par do-teen sizes try karo aur measure karo ki sahi passages retrieve hote hain ya nahi.
+
+**Document type ke hisaab se chunking:**
+
+| Document type | Strategy | Typical size |
+| --- | --- | --- |
+| Policies aur manuals | Headings se todo, phir paragraphs; section path pehle jodo | 300 se 600 tokens |
+| FAQs | Har chunk mein ek question-and-answer pair | Jitna har pair ko chahiye |
+| Tables, price lists | Har table ko poora rakho; heading jodo | Ek table |
+| Contracts | Clause ke hisaab se todo; clause numbers rakho | Ek clause ya sub-clause |
+| Chat transcripts, tickets | Ek ticket ya conversation, ya turns ki ek window | 200 se 500 tokens |
+| Code | Function ya class ke hisaab se | Ek function |
+
+**Chunk metadata.** Har chunk ke saath hona chahiye: document id, title, section path, page, version ya date, aur koi access group. Ye metadata citations ko possible banata hai ("Handbook, section 4.2, page 37"), filters deta hai ("sirf current version", "sirf wahi documents jo ye user dekh sakta hai"), aur jab ek document badle toh sab kuch re-index karne ki jagah sirf uske chunks dobara banane deta hai.
+
+**Re-chunking normal hai.** Jab koi test behtar strategy dikhaye, re-chunk aur re-embed karo. Chunking code ko versioned rakho aur settings index ke saath record karo, taaki hamesha pata rahe ki maujooda results kaunsi strategy se bane.
+
+**PDFs aur scanned documents ko chunk karna.** Extract kiye PDF text mein aksar har page par page headers, footers aur page numbers hote hain. Chunking se pehle woh lines hata do jo zyadatar pages par repeat hoti hain, warna woh har chunk aur uske embedding ko gandi kar deti hain. Scans ke liye pehle OCR chalao aur ek sample check karo, kyunki headings mein OCR errors structure-aware splitting ko tod dete hain. Aur har chunk ke shuru ka page number rakho, taaki chunk page break paar kare tab bhi citations sahi page par point karein.
+
+**Code mein structure-aware splitter.** Ye Markdown ya headings wale text par kaam karta hai, section path rakhta hai aur overlap jodta hai. Saralta ke liye sizes words mein hain; exact limits ke liye embedding model ke tokenizer par jao:
+
+```python
+import re
+
+def split_by_headings(text, max_words=350, overlap_words=50, title=""):
+    chunks, path, buf = [], [], []
+
+    def flush():
+        words = " ".join(buf).split()
+        start = 0
+        while start < len(words):
+            piece = words[start:start + max_words]
+            header = " > ".join([title] + path)
+            chunks.append({"section": header, "text": f"{header}: " + " ".join(piece)})
+            if start + max_words >= len(words):
+                break
+            start += max_words - overlap_words
+        buf.clear()
+
+    for line in text.splitlines():
+        m = re.match(r"^(#{1,4})\s+(.*)", line)
+        if m:
+            flush()
+            level = len(m.group(1))
+            path[:] = path[:level - 1] + [m.group(2).strip()]
+        elif line.strip():
+            buf.append(line.strip())
+    flush()
+    return chunks
+```
+
+Har chunk apne section path se shuru hota hai, jaise "Leave Policy > Earned leave: ...", isliye ek chhota sentence bhi batata hai ki woh kis baare mein hai.
+
+**PDFs se repeated lines hatao.** Extract kiye PDF text ko chunk karne se pehle woh lines hata do jo zyadatar pages par aati hain:
+
+```python
+from collections import Counter
+
+def strip_repeats(pages, share=0.6):
+    """pages: list of page texts."""
+    counts = Counter(l.strip() for p in pages for l in set(p.splitlines()) if l.strip())
+    repeated = {l for l, n in counts.items() if n >= share * len(pages)}
+    return ["\n".join(l for l in p.splitlines() if l.strip() not in repeated) for p in pages]
+```
+
+**Small to big.** Precise retrieval ko chhote chunks chahiye; achhe answers ko context. Dono karo: chhote chunks (ek ya do paragraphs) index karo, store karo ki har ek kis section se aaya, aur jab koi chhota chunk match kare toh model ko poora parent section (ya chunk aur uske padosi) do. Ye aksar kisi bhi ek chunk size se behtar hota hai.
+
+**Model se likhwaya hua context.** Jin documents mein headings kamzor hain, wahan ek sasta model har chunk ke liye ek sentence likh sakta hai jo batata hai ki woh kahan baitha hai ("2026 leave policy se, earned leave carry forward karne wala section"). Embed karne se pehle use aage jodo. Ye ingestion time par har chunk ke liye ek call, ek hi baar ka kharcha hai, aur vague chunks par retrieval ko madad karta hai. Poore document ko prompt caching karne se ye kaafi sasta ho jaata hai.
+
+**Pehle measure karo, phir choose karo.** Practice wala 20-sawaal ka test rakho, aur har strategy aur size ke liye recall at 5 ek chhoti table mein record karo. Numbers se choose karo, aur table ko index settings ke saath rakho.
+
+## Ek example se samjho
+
+Pune ki ek manufacturing company ka HR assistant 120-page ke employee handbook se sawaalon ke jawab deta hai.
+
+Pehli koshish: fixed 2,000-character chunks, bina overlap ke. 40 real employee sawaalon par test karne par sahi passage top five results mein sirf 55% mein hai. Failures: leave section ki table do chunks mein bant gayi; "notice period" ke answers ne aise chunks retrieve kiye jinme notice period, probation aur resignation mile hue the.
+
+Doosri koshish: headings se todo, phir paragraphs, lagbhag 400 tokens tak, 60-token overlap ke saath; tables poori; title aur section path pehle jode. Ab sahi passage 85% sawaalon mein top five mein hai.
+
+Teesri koshish, 200-token chunks: 82%, zyada answers mein context missing. Woh 400-token version rakhte hain.
+
+| Koshish | Strategy | Top 5 mein sahi passage |
+| --- | --- | --- |
+| 1 | Fixed 2,000 characters, no overlap | 55% |
+| 2 | Headings phir paragraphs, ~400 tokens, 60-token overlap, tables poori, title path pehle | 85% |
+| 3 | Wahi, par ~200 tokens | 82%, zyada answers mein context missing |
+
+Sabse bada single gain leave table ko poora rakhne se aaya: koshish 1 ke 18 failures mein se aath leave entitlements ke sawaal the.
+
+**Employees ne kya notice kiya.** Change ke baad sabse common shikayat, "it gives me half the answer", lagbhag khatam ho gayi. Leave ke sawaal, jo saare sawaalon ka ek tihai the, ab poori table retrieve karte hain, isliye assistant "teesre saal mein mujhe kitni earned leaves milengi?" ka sahi jawab de sakta hai, sirf shuru ki rows quote karne ke bajaay.
+
+## Aam galtiyaan
+
+- **Fixed-size cuts jo tables aur sentences ke beech se kaat dete hain.**
+- **Overlap nahi.** Boundaries par kate ideas kho jaate hain.
+- **"Context rakhne" ke naam par bahut bade chunks.** Retrieval kharab hota hai aur prompts mehnge.
+- **Headings aur page numbers kho dena.**
+- **Kabhi measure na karna.** Real sawaalon par sizes test karo.
+- **Ek baar chunk karke dobara test na karna.** Jab documents ya sawaal badlein, apne test set se retrieval dobara check karo.
+- **Repeated page headers aur footers har chunk mein chhod dena.**
+- **Har document type ke liye ek hi chunk size chunna.** Policies, FAQs, tables aur tickets ko alag strategies chahiye.
+- **Retrieval test dobara chalaye bina chunking badalna.**
+
+## Jab chunking se zyada farak nahi padta
+
+- **Chhote documents**, jaise ek-page ke notices, jo poore ek chunk mein aa jaate hain.
+- **Pehle se structured items**, jaise har record mein ek FAQ pair, ek product ya ek ticket.
+- **Chhote collections jo context mein fit ho jaate hain**, jahan retrieval ko poori tarah skip kiya ja sakta hai.
+
+## Demo se production tak
+
+- **Chunking code aur settings ko version karo**, aur index ke saath record karo.
+- **Badlaav par ek baar mein ek document re-chunk karo**, chunk ids mein document ids use karke.
+- **Retrieval test rakho** aur har chunking change par dobara chalao.
+- **Har ingestion ke baad chunks ka ek sample aankh se dekho**: tooti hui tables aur faltu headers turant dikh jaate hain.
+- **Har document ke chunk counts aur sizes track karo**, taaki parsing failures pakde jaayein, jaise 200-page ka manual sirf teen chunks de.
+
+## Practice karo
+
+Neeche linked Pinecone ki chunking strategies guide padho.
+
+1. Ek lambe document ko teen tareeke se chunk karo: fixed size, structure ke hisaab se recursive, aur overlap aur headings ke saath structure ke hisaab se.
+2. 20 sawaal likho, har ek ke saath woh passage jisme jawab hai.
+3. Har method ke liye measure karo ki sahi passage kitni baar top five mein aata hai.
+4. Apne best method mein small-to-big retrieval jodo aur measure karo ki wahi 20 sawaalon par answer quality badalti hai ya nahi.
+
+Aur gehrai mein jaane ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 chunking strategies, chunk size aur overlap, aur chunks mein context jodna cover karta hai.
+
+**Aap tab done ho jab aap** samjha sako ki bahut bade aur bahut chhote chunks mein kya galat hota hai, aur dikha sako ki aapke test mein kaunsa method jeeta.

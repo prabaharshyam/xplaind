@@ -1,0 +1,238 @@
+---
+id: agent-loop
+lang: hinglish
+title: "Agent loop"
+outcome: "Ek aisa loop bana paoge jisme model plan karta hai, tools call karta hai, results padhta hai aur task poora hone tak repeat karta hai."
+answer: "Agent loop task ko model ko bhejta hai, model jo tool maange use chalata hai, result wapas deta hai aur tab tak repeat karta hai jab tak model final answer na de ya step limit na aa jaye."
+why_it_matters: "GenAI ke kaam mein agents sabse tezi se badhta area hai. Har framework ke neeche jo plain loop hai, use jaan lene se aap agent bana, debug aur explain kar paoge."
+flashcards:
+  - q: "Agent kya hai?"
+    a: "Tools ke saath loop mein chalne waala model: wo agla step khud decide karta hai, tool call karta hai, result padhta hai aur phir decide karta hai, jab tak kaam poora na ho ya use roka na jaye."
+  - q: "Workflow aur agent mein kya farak hai?"
+    a: "Workflow mein steps aapka code decide karta hai; agent mein steps aur unki ginti model decide karta hai."
+  - q: "Workflow kab use karna chahiye?"
+    a: "Jab steps pehle se pata hon. Workflows zyada predictable hote hain aur test karna aasaan hota hai."
+  - q: "Agent loop kaise khatam hota hai?"
+    a: "Jab model bina tool maange answer de, ya jab step limit aa jaye aur agent saaf tareeke se hand over kar de."
+  - q: "Step limit kyun zaroori hai?"
+    a: "Warna confused agent hamesha loop mein rehkar paisa jalata hai aur actions repeat karta hai."
+  - q: "System prompt mein agent ko kya batana chahiye?"
+    a: "Uska goal, har tool kis liye hai, kaise pata chale ki kaam khatam hua, aur confirmation ke bina use kya kabhi nahi karna."
+  - q: "Clever prompts se zyada achhe tools kyun matter karte hain?"
+    a: "Saaf, achhe se describe kiye gaye tools aur madad karne waale errors se model sahi choose karta hai aur recover kar leta hai, guess ya loop nahi karta."
+  - q: "Agent banane se pehle sabse pehle kya try karna chahiye?"
+    a: "Retrieval ke saath ek single model call, ya ek chhota fixed workflow. Loop tabhi jodo jab steps sach mein badalte hon."
+  - q: "Lambe agent runs zyada fail kyun hote hain?"
+    a: "Errors jud jaate hain. Har step par 95% ho toh das steps sab sahi hone ki sambhaavna sirf 60% hai, isliye plans chhote rakho aur progress check karo."
+  - q: "Agent mein reflection kya hai?"
+    a: "Apna kaam khud check karna: kya request mumkin hai, plan theek hai, ek step chala, aur task sach mein poora hua."
+exercise:
+  title: "Workflow ya agent?"
+  setup: "Pune ke ek insurance broker ke paas teen tasks hain: (A) har aane waali email classify hoti hai, policy look up hoti hai, aur staff ke liye reply draft hota hai; (B) ek customer poochhta hai 'mere parents ke liye, jo 64 aur 67 saal ke hain, diabetes ke liye bina waiting period ka sabse sasta health cover dhoondo', jisme kai searches aur comparisons lag sakte hain; (C) ek nightly job har policy ki agle 30 din mein renewal date check karti hai aur reminders bhejti hai."
+  questions:
+    - q: "Kaun se tasks fixed workflow ke liye theek hain?"
+      a: "(A) aur (C). Unke steps pata hain aur har baar wahi rehte hain."
+    - q: "Kaunsa task agent ke liye theek hai, aur kyun?"
+      a: "(B). Searches aur comparisons ki ginti aur order is par depend karta hai ki har search kya return karti hai."
+    - q: "(B) ke liye aap kaunsi step limit aur stop behaviour set karoge?"
+      a: "Lagbhag 10 se 15 steps; limit aane par ab tak mile best options dikhao aur advisor ke saath call offer karo."
+    - q: "(B) ke liye kaunsa tool improvement sabse zyada madad karega?"
+      a: "Aise search tools jo saaf results aur madadgaar messages dein, jaise 'diabetes waiting period ke bina koi plan nahi; sabse chhota 1 saal hai'."
+ask:
+  - "AI agent aur workflow mein kya farak hai?"
+  - "Ek agent ko kitne steps ki ijaazat deni chahiye?"
+  - "Agent ke liye system prompt kaise likhun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Agent** tools ke saath loop mein chalne waala model hai: wo decide karta hai ki aage kya karna hai, tool call karta hai, result padhta hai aur phir decide karta hai, jab tak task poora na ho ya use rukna pade. Loop likhna chhota kaam hai; use reliable banana mushkil hai.
+
+Do designs mein farak karna madad karta hai, jaise Anthropic ka "Building effective agents" article karta hai:
+
+- **Workflow**: steps aapka code decide karta hai (pehle classify, phir retrieve, phir draft). Model har step bharta hai. Predictable aur test karna aasaan.
+- **Agent**: steps aur unki ginti model decide karta hai, aur aage badhte hue tools chunta hai. Open-ended tasks ke liye flexible, predict karna mushkil.
+
+Steps pata hon toh workflow use karo; na pata hon toh agent.
+
+```flow
+Model | task + history + tool list -> Tool chahiye?
+Tool chahiye? -[nahi]-> Final answer, ruko
+Tool chahiye? -[haan]-> Aapka code tool chalata hai -> Step count limit se upar?
+Step count limit se upar? -[nahi: result jodo]-> Model
+Step count limit se upar? -[haan]-> Saaf tareeke se ruko, kisi insaan ko hand over karo
+```
+
+Ye lesson Bengaluru ke ek travel startup ko follow karta hai jo weekend trips plan karne waala assistant bana raha hai.
+
+## Ye kaam kaise karta hai
+
+**Core loop.**
+
+```python
+messages = [{"role": "user", "content": task}]
+for step in range(MAX_STEPS):
+    reply = call_model(messages, tools=TOOLS)
+    messages.append({"role": "assistant", "content": reply.content})
+    if not reply.tool_calls:                 # the model is done
+        return reply.text
+    results = [run_tool(c.name, c.args) for c in reply.tool_calls]
+    messages.append({"role": "user", "content": results})
+raise RuntimeError("Step limit reached; hand over to a person")
+```
+
+Har round mein: model task, ab tak ka sab kuch aur tool list dekhta hai; wo ya toh answer deta hai ya tools maangta hai; aapka code unhein chalata hai aur results jodta hai.
+
+**Rukna.** Loop tab khatam hota hai jab model bina tools maange answer deta hai. Hamesha ek **maximum steps** lagao taaki confused agent hamesha loop mein rehkar paisa na jalaye aur actions repeat na kare; limit aane par saaf tareeke se ruko aur hand over karo.
+
+**Achhe tools achhe agents banate hain.** Kam, saaf describe kiye hue tools jo madadgaar errors dein, clever prompting se zyada matter karte hain.
+
+**System prompt** agent ko uska goal, tools ka maksad, kaise decide karna hai ki kaam ho gaya, aur confirmation ke bina use kya kabhi nahi karna, ye batata hai.
+
+**Simple se shuru karo.** Kai tasks ek single model call plus retrieval ya chhote workflow se chal jaate hain. Agent loops tab jodo jab steps ki ginti aur order sach mein badalte hon.
+
+**Workflow versus agent:**
+
+| Pehlu | Workflow | Agent |
+| --- | --- | --- |
+| Steps kaun decide karta hai | Aapka code | Model |
+| Predictability | Zyada | Kam |
+| Testing | Har step test karo | Kai runs mein outcomes test karo |
+| Ek task ki cost | Fixed, andaaza aasaan | Steps ki ginti ke saath badalti hai |
+| Kis ke liye best | Jaane-pehchaane, repeatable processes | Open-ended tasks jinke steps badalte hain |
+
+**Reliability mushkil kyun hai.** Errors jud jaate hain. Agar har step 95% baar sahi jaata hai, toh das-step task ke saare das steps sahi jaane ki sambhaavna lagbhag 60% hai (0.95 ki power 10). Isiliye chhote plans, achhe tools aur beech mein checks itne matter karte hain, aur isiliye teen fixed steps waala workflow aksar free agent ko haraa deta hai.
+
+**Planning.** Do aam styles:
+
+- **Baari-baari sochna aur karna** (ReAct pattern): har step par model thoda sochta hai, ek action leta hai, result padhta hai aur phir decide karta hai. Upar ka loop yahi karta hai, aur zyadatar agents yahi use karte hain.
+- **Pehle plan, phir execute**: model poora plan likhta hai, aapka code use check karta hai (kya tools asli hain, arguments theek hain, budget ke andar hai), aur tabhi chalata hai. Act karne se pehle plan check karna actions undo karne se sasta hai, aur high-stakes tasks ke liye ek insaan plan approve kar sakta hai.
+
+**Reflection.** Agent tab behtar karta hai jab wo sahi waqt par apna kaam check kare: kya request mumkin hai bhi, kya plan theek hai, kya ye step chala, aur kya task sach mein poora hua. Check usi model ko ek prompt ho sakta hai, reviewer ki tarah doosra model, ya plain code jaise generated code par tests chalana. Reflection mein extra tokens aur time lagte hain, isliye use wahan jodo jahan galtiyaan mehngi hain.
+
+**Chalne waala loop.** Ye version Anthropic ke Python SDK ka use karta hai, tool errors ko crash karne ki jagah model ko wapas deta hai, step limit, budget ya ek jaise repeated calls par rukta hai, aur har step log karta hai:
+
+```python
+import json
+import anthropic
+
+client = anthropic.Anthropic()
+MODEL = "claude-sonnet-5-5"          # check the docs for current model names
+MAX_STEPS, MAX_TOKENS_TOTAL = 10, 60_000
+
+def run_agent(task, tools, handlers, system):
+    messages = [{"role": "user", "content": task}]
+    seen, used = {}, 0
+    for step in range(1, MAX_STEPS + 1):
+        reply = client.messages.create(model=MODEL, max_tokens=1000, system=system,
+                                       tools=tools, messages=messages)
+        used += reply.usage.input_tokens + reply.usage.output_tokens
+        messages.append({"role": "assistant", "content": reply.content})
+        calls = [b for b in reply.content if b.type == "tool_use"]
+        if not calls:
+            return "".join(b.text for b in reply.content if b.type == "text"), step
+        results = []
+        for call in calls:
+            key = call.name + json.dumps(call.input, sort_keys=True)
+            seen[key] = seen.get(key, 0) + 1
+            try:
+                if seen[key] > 2:
+                    raise RuntimeError("Same call made twice already; try something different or stop.")
+                if call.name not in handlers:
+                    raise RuntimeError(f"No tool named {call.name}; use one of {sorted(handlers)}.")
+                output, is_error = handlers[call.name](**call.input), False
+            except Exception as err:                        # unknown tool, bad arguments, tool failure
+                output, is_error = f"Error: {err}", True
+            print(f"step {step}: {call.name}({call.input}) -> {str(output)[:80]}")
+            results.append({"type": "tool_result", "tool_use_id": call.id,
+                            "content": str(output), "is_error": is_error})
+        messages.append({"role": "user", "content": results})
+        if used > MAX_TOKENS_TOTAL:
+            break
+    return None, step                                       # hand over to a person
+```
+
+`handlers` har tool name ko ek Python function se map karta hai. Anjaana tool name, galat arguments ya fail hota tool, sab run ko crash karne ki jagah saaf error ke roop mein model ko wapas jaate hain, taaki wo khud ko theek kar sake. Tools ko khud kaise define karte hain, ye tool-calling lesson dikhata hai.
+
+**Agents kaise fail hote hain, aur ise kaise measure karein.** Aam galat answers ke upar agents ke apne failure modes hote hain. Unka naam rakho, phir test tasks ke ek set par ginno ki har ek kitni baar hota hai:
+
+| Failure | Example | Kaise pakdein |
+| --- | --- | --- |
+| Invalid tool | `book_hotel` call karta hai, jo hai hi nahi | Logs mein anjaane tool names ginno |
+| Invalid arguments | Zaroori `dates` chhod deta hai | Har tool ke validation errors |
+| Galat argument values | Coorg ke liye galat weekend search karta hai | Test tasks mein expected values se compare karo |
+| Goal failure | ₹25,000 ke budget par ₹31,000 ka plan | Run ke baad code mein constraints check karo |
+| Jhootha "done" | Kehta hai saare 12 guests book ho gaye jabki sirf 9 hue | Final state check karo, agent ka claim nahi |
+| Tool failure | Stays API purane prices deta hai | Har tool ko alag se test karo |
+| Inefficiency | Jahan 5 steps kaafi the wahan 14 | Ek task ke steps, tokens, time aur cost |
+
+20 se 50 realistic test tasks rakho, har ek ke liye ye likha ho ki success ka matlab kya hai, unhein har prompt, tool ya model change ke baad chalao, aur success rate, average steps aur ek task ki cost track karo.
+
+**Har step ke saath context badhta hai.** Har tool result conversation mein rehta hai, isliye lambe runs slow aur mehnge ho jaate hain, aur model track kho sakta hai. Chhote, relevant tool results lautao (top paanch stays, paanch sau nahi), aur lambe runs mein purane results ka summary banao ya hata do.
+
+**Aam workflow shapes.** Agent ki taraf jaane se pehle dekho ki inmein se koi fit hota hai ya nahi. **Chain** fixed steps ko order mein chalata hai, jaise extract, phir check, phir draft. **Router** request ko classify karke kai specialised prompts mein se ek ko bhejta hai. **Parallel** calls task ko independent parts mein baant kar results merge karte hain. **Evaluator loop** mein ek call draft karta hai aur doosra criteria ke khilaaf check karta hai, ek fixed ginti tak repeat hota hai. Agent kahe jaane waale kai products asal mein inhi shapes mein se ek hote hain, aur unhein test karna aasaan hota hai.
+
+**Shuruaati runs mein kya dekhna hai.** Bees real tasks ke liye har step ka tool aur arguments print karo. Chhote badlaavon ke saath repeated calls, aise tools jo model kabhi use nahi karta, aur aise steps jahan wo result galat padhta hai, inhein dekho. Har pattern kisi tool ke description, uske error messages ya system prompt ki stop condition mein ek fix ki taraf ishara karta hai.
+
+## Ek example se samjho
+
+Bengaluru ka ek travel startup chahta hai ki uska assistant "Bengaluru se do logon ke liye Coorg mein 3-din ka weekend plan karo, ₹25,000 ke andar" ka jawab de.
+
+Tools: `search_stays(location, dates, budget)`, `get_travel_options(from, to, date)`, `get_weather(location, dates)`.
+
+Ek run:
+
+1. Model un dates ke liye Coorg ka `get_weather` call karta hai: halki baarish ki umeed.
+2. Wo `get_travel_options` call karta hai: 6 ghante ki drive ya bus.
+3. Wo do raaton ke liye ₹14,000 ke budget ke saath `search_stays` call karta hai: teen homestays mile.
+4. Wo ek plan ke saath jawab deta hai: drive, baarish ko dekhte hue covered sit-out waala homestay, do indoor-friendly activities, aur lagbhag ₹22,000 ka cost breakdown.
+
+Chaar model calls, teen tool calls. 10 steps ke cap ke saath, ek run ek baar `search_stays` par thode badle hue budgets ke saath loop mein phans gaya jab kuch match nahi hua; wo cap par ruk gaya aur app ne dikhaya "We couldn't find stays in that budget; try other dates". Team ne phir tool ko behtar kiya ki wo "no stays under ₹X; cheapest is ₹Y" lautaye, aur loop banna band ho gaya.
+
+| Run | Steps | Outcome | Kya badla |
+| --- | --- | --- | --- |
+| Typical | 4 model calls, 3 tool calls | Lagbhag ₹22,000 ka plan | Kuch nahi |
+| Budget mein stays nahi | 10-step cap par pahunch gaya | User ko saaf message | Tool ab "cheapest is ₹Y" kehta hai |
+| Wahi case, badlaav ke baad | 5 steps | Doosri dates suggest ki | Loop khatam |
+
+## Aam galtiyaan
+
+- **Workflow kaafi ho tab bhi agent use karna.**
+- **Step limit nahi.**
+- **Vague tools aur errors.** Tab agent guess karta hai ya loop mein phansta hai.
+- **Instructions mein stop condition nahi.**
+- **Har step ka log nahi.** Jo dikhta nahi use debug nahi kar sakte.
+
+- **Fail hue tool ko hamesha retry karna.** Error ko saaf message ke saath model ko lautao, aur ek jaise do-teen failures ke baad ruk jao.
+- **Agent ke "done" par bharosa karna.** Jahan ho sake result code mein check karo.
+- **Agent ko apne saare tools de dena.** Zyada tools ka matlab zyada galat choices aur lambe prompts.
+- **Do happy-path tasks par test karna.** Agents ko alag-alag tasks ka set chahiye, jise ek se zyada baar chalaya jaye, kyunki results har run mein badalte hain.
+
+## Agent kab nahi banana chahiye
+
+- **Steps pata hain**: fixed workflow sasta, tez aur test karne mein aasaan hai.
+- **Galtiyaan mehngi aur undo karne mein mushkil hain**, jaise payments ya customers ko messages, jab tak ek insaan har action approve na kare.
+- **Latency matter karti hai**: do second se kam mein chahiye reply mein kai model calls ke liye shayad hi jagah ho.
+- **Retrieval ke saath ek achha call pehle se kaam karta hai**: pehle us baseline ko measure karo.
+
+## Demo se production tak
+
+- **Limits code mein lagao**: har task ke liye steps, tokens, time aur paisa, aur koi bhi hit ho toh saaf handover.
+- **Har run trace karo**: har step ka tool, arguments, result, tokens aur time.
+- **Tasks ka ek test set rakho** aur waqt ke saath success rate, steps aur ek task ki cost track karo.
+- **Write actions ko gate karo**: read-only tools befikr chalein; jo data badle ya logon se contact kare use approval ya tight rules chahiye.
+- **Pehle narrow ship karo**: ek task type, kuch tools, ek saaf stop rule, phir numbers ke hisaab se chaudha karo.
+
+## Practice karo
+
+Neeche link kiya hua Anthropic ka "Building effective agents" padho.
+
+1. Upar waala agent loop do simple tools aur ek step limit ke saath likho.
+2. Paanch alag tasks chalao aur har step (tool aur arguments) print karo taaki dikhe ki agent kaise decide karta hai.
+3. Ek task ko fixed workflow ki tarah dobara likho aur reliability aur cost compare karo.
+4. Das test tasks likho, har ek ke liye success ka matlab ke saath, unhein chalne waale loop ke saath teen baar chalao, aur table ka har failure type ginno.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 agents, planning, reflection, tool selection aur agent failure modes cover karta hai.
+
+**Aapka kaam poora jab:** aap agent loop, workflow aur agent ka farak, aur step limit kyun matter karti hai, ye samjha sako.

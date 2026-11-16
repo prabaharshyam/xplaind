@@ -1,0 +1,133 @@
+---
+id: queues-async-work
+lang: tanglish
+title: "Message queues-um background velaiyum"
+outcome: "Methuvaana illa nambikkai illaadha velaiya message queues, workers vechu request path-la irundhu edukkalaam, consumers-a retry panna safe-aa aakkalaam, oru simple queue-kum Kafka maadhiri event stream-kum idaila choose pannalaam."
+answer: "Message queue background workers-kaaga velaiya pidichu vachirukkum, adhanaala app vegamaa badhil solum, emails illa LLM calls maadhiri methuvaana jobs apram odum. Workers retry panna safe-aa irukkanum."
+why_it_matters: "SMS anuppradhu, PDFs generate panradhu, LLMs call panradhu, payments process panradhu, user kaathirukkum podhu panna romba methuvaanadhu illa nambikkai illaadhadhu. Queues apps-a vegamaa vachirukkum, spikes-a thaanguvum, nijamaana ella system designs-layum varum."
+flashcards:
+  - q: "Message queue-na enna?"
+    a: "Producers anuppura messages-a, consumers process panna ready aagura varaikkum pidichu vachirukkura oru service; rendaiyum pirichu vaikkum."
+  - q: "Velaiya request path-la irundhu yen edukkanum?"
+    a: "User-ku vegamaana response kidaikkum, SMS anuppradhu, LLM call panradhu maadhiri methuvaana illa nambikkai illaadha velai background-la nadakkum."
+  - q: "At-least-once delivery-na enna?"
+    a: "Ovvoru message-um deliver aagum, aana sila oru thadavaikku mela deliver aagalaam, adhanaala consumers duplicates-a handle pannanum."
+  - q: "Oru consumer-a idempotent-aa aakkaradhu enna?"
+    a: "Adhe message-a rendu thadava process pannaalum oru thadava panna maadhiri adhe effect; example processed message IDs-a record panradhu."
+  - q: "Dead-letter queue-na enna?"
+    a: "Pala retries-ku aprom-um fail aagittae irukkura messages-kaaga thaniyaa oru queue, adhanaala matha-vatrai block pannaama adha inspect pannalaam."
+  - q: "Kafka, simple task queue-la irundhu eppadi vera?"
+    a: "Kafka pala consumer groups padikka, replay panna mudiyura oru ordered log-a vachirukkum; task queue perumbaalum oru worker handle pannina aprom ovvoru job-aiyum delete pannum."
+  - q: "Traffic spikes-ku queues eppadi help pannum?"
+    a: "Bursts-a buffer pannum, adhanaala database-a ore nerathula adikka maattaanga, workers oru steady rate-la process pannuvaanga."
+exercise:
+  title: "Background velaiya design pannunga"
+  setup: "Oru Indian ed-tech app-la oru learner oru course mudikkum podhu, app completion-a save pannanum, PDF certificate-a generate pannanum, adha email pannanum, oru WhatsApp message anuppanum, oru leaderboard-a update pannanum."
+  questions:
+    - q: "Entha step response-kku munnaadi nadakkanum, edha queue panna mudiyum?"
+      a: "Respond panna munnaadi completion-a database-la save pannunga. PDF, email, WhatsApp message, leaderboard update-a queue pannunga."
+    - q: "WhatsApp provider time out aagi job retry aagudhu, adhanaala sila learners-ku rendu messages varudhu. Enna fix?"
+      a: "Consumer-a idempotent aakkunga: completion ID-pada oru sent flag store pannunga, already anuppiyirundhaa skip pannunga."
+    - q: "Oru bug-aala oru course-ku PDF generation ovvoru thadavayum fail aagudhu. Adhu queue-a block pannaama enna thadukkum?"
+      a: "Backoff-oda konjam thadava retry pannunga, apram job-a dead-letter queue-ku maathunga, yaaraiyaavadhu alert pannunga."
+    - q: "Analytics, leaderboard, fraud check moonum completions pathi therinjukka virumbudhu. Queue-aa, event stream-aa?"
+      a: "Kafka maadhiri oru event stream: oru 'course completed' event-a publish pannunga, ovvoru consumer group-um adha thaniyaa padikkattum."
+ask:
+  - "RabbitMQ illa SQS-a vida Kafka-va eppo use pannanum?"
+  - "Oru background job-a idempotent-aa eppadi aakkalaam?"
+  - "Methuvaana illa rate limit-aana LLM calls-a eppadi queue pannanum?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Sila velai user kaathirukkum podhu seiya romba methuvaanadhu, nambikkai illaadhadhu illa bursty: emails-um SMS-um anuppradhu, PDFs generate panradhu, images resize panradhu, oru LLM-a call panradhu, oru partner-oda API-oda sync panradhu. Oru **message queue** system-oda oru pagudhi, **producer**, "idhu seiyanum"-nu oru message-a poda vidum, vera oru pagudhi, oru **worker** illa **consumer**, adha eduthu apram seiyum.
+
+User-ku vegamaana response kidaikkum, methuvaana velai appavum nadakkum, oru downstream service konjam neram down-aa irundhaa, messages kaanaama pogaama kaathirukkum.
+
+```flow
+User -> API | 1. save the order in the DB
+API -[fast]-> "Order placed!"
+API -[2. publish "order placed"]-> Queue
+Queue -> Worker: send SMS
+Queue -> Worker: update stock
+Queue -> Worker: email the invoice
+Queue -[after N failed retries with backoff]-> Dead-letter queue
+```
+
+Common tools RabbitMQ, Amazon SQS, Google Pub/Sub, Celery, RQ maadhiri Redis-based job queues, adhigamaana volume event streams-ku Apache Kafka.
+
+## Idhu eppadi work aagudhu
+
+**Producers-um consumers-um pirichu irukkum.** API-ku evvalavu workers irukku, avanga busy-aa-nu theriya thevai illa. Queue valarum podhu workers-a serkkalaam, kaaliyaa irukkum podhu kuraikkalaam. Orders-oda spike queue-a nirappum; workers adha oru steady pace-la kaali pannuvaanga, database-aiyum third-party APIs-aiyum paadhukaakkum.
+
+**Delivery-um retries-um.** Perumbaalaana queues **at-least-once delivery** tharum: oru worker mudinjuduchu-nu confirm pannura varaikkum message queue-la irukkum. Confirm panna munnaadi worker crash aanaa, message thirumba deliver aagum. Adhaavadhu adhe message rendu thadava process aagalaam, adhanaala consumers **idempotent**-aa irukkanum: velaiya rendu thadava seiyaradhu oru thadava seiyara maadhiri adhe effect. Typical vazhigal: act panna munnaadi check panra oru unique job ID, illa insert-ku badhila oru "upsert".
+
+Fail aana jobs-a **exponential backoff**-oda retry pannanum (1 second kaathirunga, apram 2, 4, 8...), yenna perumbaalaana failures thaarkaaligam. Konjam attempts-ku aprom, message-a oru **dead-letter queue**-ku maathunga, adhanaala oru mosamaana message matha-vatrai block pannaadhu, apram yaaraiyaavadhu alert pannunga.
+
+**Task queues vs event streams.** SQS illa RabbitMQ maadhiri oru task queue ovvoru job-aiyum oru worker-kku kudukkum, mudinjadhum delete pannum. Kafka maadhiri oru **event stream** events-oda oru ordered, durable log-a vachirukkum. Pala independent **consumer groups**, example analytics, notifications, fraud checks, ovvondrum muzhu stream-aiyum thanoda sondha pace-la padikkum, pazhaya events-a replay-um pannalaam. Kafka romba adhiga throughput-a handle pannum, aana operational complexity adhigam.
+
+| Thevai | Nalla fit | Yen |
+|---|---|---|
+| Background jobs odanum (emails, PDFs, LLM calls) | Redis-la Celery/RQ, SQS, RabbitMQ | simple, oru job-ku oru worker, retries built in |
+| Pala services adhe event-ku react pannanum | Kafka, Pub/Sub | ovvoru consumer group-um thaniyaa padikkum |
+| Data-va thirumba build panna history-a replay panradhu | Kafka | events oru set period-ku vachirukkum |
+| Ovvoru key-kum strict order | key-pada Kafka partitions, SQS FIFO | oru key-kulla order irukkum |
+| Romba kammi volume, oru server | Python queue + worker thread | extra infrastructure thevai illa |
+
+**Interviews-la**, "send a notification", "process an upload", "call a slow third-party API", "handle a spike"-nu ketta queue-a ezhuththunga. Apram interviewers kaathirukkura moonu follow-ups-a sollunga: fail aanaa enna nadakkum (retries, backoff, dead-letter queue), duplicates-la enna nadakkum (idempotent consumers), oru backlog-a eppadi kandupidippeenga (queue length-um job age alerts-um).
+
+**Browser-la try pannunga.** Retries-um dead-letter list-um irukkura oru queue worker. Failure rate-a maathi odunga.
+
+```python
+import random
+from collections import deque
+
+random.seed(3)
+queue = deque({"id": i, "tries": 0} for i in range(10))
+done, dead = [], []
+while queue:
+    job = queue.popleft()
+    job["tries"] += 1
+    if random.random() < 0.3:                 # 30% of attempts fail
+        (dead if job["tries"] >= 3 else queue).append(job)
+    else:
+        done.append(job["id"])
+print("done:", done)
+print("dead letters after 3 tries:", [j["id"] for j in dead])
+```
+
+## Oru worked example
+
+Isha Pune-la oru learning app-ku oru AI study-notes feature build panraanga. Students oru chapter PDF-a upload panni AI-generated summary notes vaangaranga. Avanga mudhal version upload request-kulla LLM-a call pannichu. Adhu 40-la irundhu 90 seconds edutthudhu, phones time out aachu, exam season-la LLM provider rate-limit pannappo uploads fail aayiduchu.
+
+Avanga adha oru queue-a sutthi maathi design pannaanga:
+
+1. Upload endpoint PDF-a object storage-la store pannum, `queued` status-oda oru `notes_job` row-a create pannum, job ID-oda oru message-a publish pannum, oru second-kulla return pannum. App "Your notes are being prepared"-nu kaattum.
+2. Workers queue-la irundhu jobs-a edukkum, text-a extract pannum, LLM-a call pannum, notes-a save pannum, status-a `done`-nu set pannum. App oru status endpoint-a poll pannum illa push notification vaangum.
+3. Rate limit-a thotta LLM calls exponential backoff-um jitter-um-oda retry aagum. Worker concurrency-a cap pannirukkaanga, adhanaala team thanga provider quota-va thaandaadhu.
+4. Workers idempotent: LLM-a call panna munnaadi, andha job-ku already notes irukka-nu worker check pannum. Save panna aprom, message-a confirm panna munnaadi crash aanaalum, ippo rendaavadhu, kaasu selavaana LLM call varaadhu.
+5. Aindhu thadava fail aana jobs, example text illaadha scanned PDFs, dead-letter queue-ku pogum, student-ku text-based PDF upload pannunga-nu oru clear message theriyum.
+
+Adutha exam rush-la uploads, normal-a vida paththu mada spike aachu. Queue konjam aayiram jobs-a valarndhu irubadhu nimishathula kaaliyaachu; entha request-um time out aagala, concurrency cap aanadhaala maasaandhira LLM bill budget-kulla irundhudhu.
+
+## Podhuvaa panra thappugal
+
+**Request-la methuvaana velai seiyradhu.** Users kaathirukkaanga, requests time out aagum, poruma illaadha users-oda retries load-a rendu madangaakkum. Queue pannunga, vegamaa respond pannunga.
+
+**Exactly-once processing-nu nenaikkradhu.** Perumbaalaana queues at least once deliver pannum. Idempotent consumers illaama, duplicate SMS, emails, charges anuppuveenga.
+
+**Backoff illaama eppavum retry panradhu.** Udanadiyaa mudiyaadha retries thinarikkittu irukkura service-a adikkum. Exponential backoff, oru retry limit, oru dead-letter queue use pannunga.
+
+**Visibility illaama irukkradhu.** Amaidhiyaa valara queue-na users amaidhiyaa kaathirukkaanga-nu artham. Queue length-aiyum job age-aiyum monitor pannunga, adhukku alert vainga.
+
+**Konjam jobs-ku Kafka use panradhu.** Adhu powerful, aana odatha periya sumai. Perumbaalaana background velaikku oru managed task queue pothum.
+
+**Romba mundhiye acknowledge panni velaiya izhakkradhu.** Velai paadhukaappaa mudinja aprom mattum message-a confirm pannunga, illaina oru crash adha izhakkum.
+
+## Practice pannunga
+
+1. Watch & learn panel-la Kafka fundamentals, getting started pathi video lessons-a paarunga.
+2. Mela irukkura exercise-a pannunga.
+3. Project check pannunga: oru status endpoint-oda, idempotent worker-oda oru queued certificate generator.
+4. Neenga use panra apps-la kandippaa background-la odura rendu features-a kandupidichu, adhoda pinnaadi irukkura queue-va sketch pannunga.

@@ -1,0 +1,278 @@
+---
+id: cicd-github-actions
+lang: hinglish
+title: "GitHub Actions ke saath CI/CD"
+outcome: "Ek aisi pipeline set up kar paoge jo har pull request ko test kare, merge par image build karke push kare, staging mein apne aap deploy kare aur approval ke baad production mein deploy kare, roll back karne ke tareeke ke saath."
+answer: "GitHub Actions ke saath CI/CD har pull request par aapke tests chalata hai, code merge hone par image build karta hai, staging mein apne aap deploy karta hai aur approval ke baad production mein deploy karta hai."
+why_it_matters: "Client ke yahan manual deploys sabse bure waqt par bigadte hain aur koi record nahi chhodte. Ek pipeline har change ko tested, traceable aur reversible banati hai, aur ye pehli cheez hai jo client ka engineering lead dekhta hai jab wo tay karta hai ki aapka system sambhaale ya nahi."
+flashcards:
+  - q: "Continuous integration (CI) kya hai?"
+    a: "Har change par lint, type checks, unit tests aur ek chhote eval jaise checks chalana, taaki fail hone waala change merge na ho sake."
+  - q: "Continuous delivery (CD) kya hai?"
+    a: "Merge hue change ko apne aap environments se guzaarna: image build karo, staging mein deploy karo, smoke test karo, phir production, aksar approval ke baad."
+  - q: "GitHub Actions workflows kahan rehte hain?"
+    a: ".github/workflows/ mein YAML files ke roop mein, jo pull request ya main par push jaise events par chalti hain."
+  - q: "AI app ke CI mein ek chhota eval kyun jodte hain?"
+    a: "Prompt aur retrieval ke changes bhi code changes hain. Golden questions par ek tez eval merge se pehle quality girna pakad leta hai."
+  - q: "GitHub Actions mein deployment environment kya hai?"
+    a: "Staging ya production jaisa ek named target, jiske apne secrets aur rules hote hain, jaise deploy se pehle required reviewers."
+  - q: "Ek image build karke use promote kyun karte hain?"
+    a: "Taaki production wahi chalaye jo staging mein test hua tha. Har environment ke liye dobara build karne se farak aa sakte hain."
+  - q: "CI mein OpenID Connect kis kaam aata hai?"
+    a: "Lambe samay ki keys ko secrets ki tarah store karne ki jagah, runner ko chhoti umr waale credentials ke saath cloud mein sign in karne dena."
+  - q: "Images ko commit hash se tag karna rollback mein kaise madad karta hai?"
+    a: "Roll back karna bas pichhle commit ki image dobara deploy karna hai, jo ek button ya ek command ho sakta hai."
+  - q: "GitHub Actions aur cloud ke beech OIDC kya hai?"
+    a: "Workflow ko GitHub se ek chhoti umr ka token milta hai jise cloud ek named repository aur branch ke liye maanta hai, isliye lambe samay ki cloud keys secrets mein store nahi karni padti."
+  - q: "Smoke eval sirf tab kyun chalate hain jab prompts ya retrieval badlein?"
+    a: "Ye model call karta hai aur paise aur time lagta hai. Ek paths filter ise un pull requests par chalata hai jo AI behaviour badal sakti hain, aur baaki chhod deta hai."
+exercise:
+  title: "Is pipeline ke gaps dhundho"
+  setup: "Gurugram ke ek startup ki pipeline: CI sirf main par pushes par chalta hai, pull requests par nahi. Tests chalte hain, par koi eval nahi hai. AWS access key workflow file mein paste ki hui hai. Deploy job staging aur production ke liye Docker image alag-alag dobara build karta hai. Kisi ne kabhi roll back nahi kiya."
+  questions:
+    - q: "CI ko sirf main par chalane mein kya risk hai?"
+      a: "Toote hue changes merge hone ke baad pakde jaate hain. Pull requests par CI chalao taaki failures merge ko rokein."
+    - q: "Paste ki hui AWS key ki jagah kya aana chahiye?"
+      a: "Ise abhi hatao aur rotate karo, phir chhoti umr ke credentials ke liye OpenID Connect use karo, ya kam se kam CI system ke encrypted secrets."
+    - q: "Har environment ke liye image dobara build karna problem kyun hai?"
+      a: "Production ko staging mein test hui image se alag image mil sakti hai. Ek baar build karo, commit se tag karo, wahi image promote karo."
+    - q: "Yahan AI app ke liye kaunse do jod sabse zyada matter karte hain?"
+      a: "CI mein ek chhota eval jo threshold se neeche fail kare, aur pichhli image par ek practiced rollback."
+ask:
+  - "CI aur CD mein kya farak hai?"
+  - "CI mein prompt changes ko kaise test karun?"
+  - "GitHub Actions mein secrets safely kaise store karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Continuous integration (CI)** har change par checks chalata hai: lint, type checks, unit tests, aur AI systems ke liye ek chhota eval suite. Jo change fail ho, wo merge nahi hota.
+
+**Continuous delivery (CD)** merge hue change ko apne aap environments se guzaarta hai: image build karo, staging mein deploy karo, smoke tests chalao, phir production mein deploy karo, aksar kisi insaan ke approve karne ke baad.
+
+GitHub Actions dono ka ek common tareeka hai. Workflows `.github/workflows/` mein YAML files hoti hain jo pull request ya main par push jaise events par chalti hain. GitLab CI, Azure DevOps aur Jenkins bhi isi tarah kaam karte hain; clients ki apni choice hogi.
+
+```flow
+Pull request -> CI: lint, types, tests, smoke eval -> Pass?
+Pass? -[nahi]-> Block ho gaya
+Pass? -[haan]-> Merge ho sakta hai -> Main mein merge
+Main mein merge -> Image build karo | tag = commit hash
+Image build karo -> Staging mein deploy -> Smoke tests -> Named reviewer ka approval -> Wahi image production mein deploy -> Problem?
+Problem? -[haan]-> Pichhla tag dobara deploy karo
+```
+
+Ye lesson Kochi ke ek insurer ki engineering team ko claims assistant ke handover ke saath chalta hai.
+
+## Ye kaam kaise karta hai
+
+**Triggers aur jobs.** Ek workflow events par chalta hai (`pull_request`, main par `push`, ek tag, ek manual dispatch). Isme jobs hote hain; har job ek nayi machine par steps chalata hai, jise runner kehte hain.
+
+**CI job** code checkout karta hai, dependencies install karta hai (caching ke saath), lint, types aur tests chalata hai. AI app ke liye, ek chhota, tez eval jodo: ek fixed retrieval index par 20 golden questions, aur accuracy threshold se neeche gire toh build fail kar do. Slow, mehnge evals ko nightly job ke liye rakho.
+
+**Build job** Docker image build karta hai, use commit hash se tag karta hai aur client ke registry mein push karta hai.
+
+**Deploy jobs** **environments** use karte hain. `staging` environment apne aap deploy hota hai; `production` environment ke liye ek named reviewer ka approval chahiye aur uske apne secrets hote hain. Secrets CI system mein store hote hain ya run time par cloud se liye jaate hain; repository mein kabhi nahi. Aur behtar, stored keys ki jagah runner ko OpenID Connect ke zariye chhoti umr ke credentials se cloud mein sign in karne do.
+
+**Rollback.** Kyunki har deploy commit se tag ki hui image use karta hai, roll back karne ka matlab pichhla tag dobara deploy karna hai. Ise ek button ya command banao aur practice karo.
+
+**Kya kahan chalta hai, aur kitni baar:**
+
+| Check | Kab | Typical time | Build fail karta hai? |
+| --- | --- | --- | --- |
+| Lint aur format | Har PR | Seconds | Haan |
+| Type checks | Har PR | Ek minute se kam | Haan |
+| Fake model ke saath unit tests | Har PR | 1 se 3 minute | Haan |
+| Smoke eval, 20 golden questions | Har PR jo prompts ya retrieval ko chhuti hai | 1 se 2 minute | Haan, threshold se neeche |
+| Full eval, sainkdon cases | Nightly | 10 se 60 minute | Team ko alert |
+| Load test | Bade releases se pehle | Alag-alag | Bahut slow ho toh release rokta hai |
+
+**Caching.** Har run par dependencies install karna slow hai. Unhe cache karo, lock file par key karke, taaki CI dus minute ki jagah kuch minute le. Tez CI use hota hai; slow CI ko log bypass kar dete hain.
+
+**Branch protection.** Repository settings mein, main mein merge karne se pehle CI job pass hona aur kam se kam ek review zaroori karo. Iske bina CI sirf salaah hai.
+
+**Practice mein secrets.** Workflow ko kuch secrets chahiye: smoke eval ke liye ek model API key, images push karne ke credentials, deploy karne ke credentials. Unhe repository ya environment ki secret settings mein store karo, jahan wo encrypted hote hain aur logs mein chhupe rehte hain. Har environment ko apne secrets do, taaki staging key kabhi production ko chhoo na sake. Cloud access ke liye OpenID Connect ko tarjeeh do: cloud us khaas repository aur branch par bharosa karta hai, aur ek aisa credential deta hai jo thodi der baad expire ho jaata hai, aksar ek ghante mein. Phir leak hone ke liye koi lambe samay ki key hi nahi hoti.
+
+**Ek poora workflow.** Har pull request par CI, sirf jab AI files badlein tab smoke eval, aur main par build plus deploy:
+
+```yaml
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: {enable-cache: true}
+      - run: uv sync --frozen
+      - run: uv run ruff check . && uv run mypy src && uv run pytest -q
+
+  smoke-eval:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changed
+        with:
+          filters: |
+            ai: ['prompts/**', 'src/retrieval/**', 'evals/**']
+      - uses: astral-sh/setup-uv@v5
+        if: steps.changed.outputs.ai == 'true'
+      - if: steps.changed.outputs.ai == 'true'
+        run: uv sync --frozen && uv run python evals/smoke.py --min-accuracy 0.85
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.EVAL_API_KEY }}
+
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: {contents: read, packages: write}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
+      - uses: docker/build-push-action@v6
+        with: {push: true, tags: "ghcr.io/${{ github.repository }}:${{ github.sha }}"}
+
+  deploy-production:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production                    # requires a reviewer's approval
+    permissions: {id-token: write, contents: read}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: {role-to-assume: "${{ vars.DEPLOY_ROLE_ARN }}", aws-region: ap-south-1}
+      - run: ./scripts/deploy.sh ghcr.io/${{ github.repository }}:${{ github.sha }}
+```
+
+Production job ko cloud access OIDC se milta hai (`id-token: write` aur ek role jis par cloud bharosa karta hai), isliye GitHub mein koi lambe samay ki cloud keys nahi rehti. Azure aur Google Cloud ke paas bhi aise hi login actions hain.
+
+**Smoke eval script apne exit code se decide karta hai.** Koi bhi non-zero exit job ko fail karta hai:
+
+```python
+import argparse, json, sys
+from app.answer import answer                 # your pipeline
+
+p = argparse.ArgumentParser(); p.add_argument("--min-accuracy", type=float, default=0.85)
+args = p.parse_args()
+cases = [json.loads(l) for l in open("evals/smoke.jsonl")]
+correct = sum(c["expected"].lower() in answer(c["question"]).lower() for c in cases)
+acc = correct / len(cases)
+print(f"smoke accuracy {acc:.0%} on {len(cases)} cases")
+sys.exit(0 if acc >= args.min_accuracy else 1)
+```
+
+**Actions ko pin karo.** Third-party actions aapki repository ke access ke saath chalte hain. Unhe ek version par (ya zyada sakht setups mein poore commit hash par) pin karo aur updates review karo, taaki koi compromised action aapki pipeline mein na ghus sake.
+
+**Purane runs cancel karo.** `concurrency` block usi branch par dobara push karne par purana run cancel kar deta hai, jisse runner minutes aur model calls bachte hain.
+
+**Apne browser mein try karo.** Ek workflow mein unpinned actions aur missing timeouts check karo. YAML badlo aur chalao.
+
+```python
+import yaml
+
+workflow = yaml.safe_load("""
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: some-org/setup-thing@main
+      - run: pytest -q
+""")
+for name, job in workflow["jobs"].items():
+    if "timeout-minutes" not in job:
+        print(f"{name}: add timeout-minutes so a stuck job cannot run for hours")
+    for step in job["steps"]:
+        ref = step.get("uses", "")
+        if ref and ref.split("@")[-1] in ("main", "master"):
+            print(f"{name}: pin {ref} to a version, not a branch")
+```
+
+## Ek example se samjho
+
+Aap ek claims-assistant Kochi ke ek insurer ki engineering team ko handover karte ho. Unki lead Anjali chahti hai ki har change tested ho aur unki team ke sign-off ke bina production mein kuch na jaaye.
+
+```yaml
+name: ci-cd
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check . && uv run mypy src && uv run pytest -q
+      - run: uv run python evals/smoke.py --min-accuracy 0.85
+  deploy-staging:
+    if: github.event_name == 'push'
+    needs: test
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./scripts/build_push_deploy.sh staging ${{ github.sha }}
+  deploy-production:
+    needs: deploy-staging
+    environment: production        # requires approval from the insurer's leads
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./scripts/deploy.sh production ${{ github.sha }}   # same image, no rebuild
+```
+
+Ek hafte baad ek teammate prompt badalta hai aur smoke eval 0.89 se 0.78 par gir jaata hai; CI fail hota hai aur PR merge nahi ho sakta. Baad mein ek production deploy se responses slow ho jaate hain; Anjali workflow page se pichhle commit ki image do minute mein dobara deploy kar deti hai, zyadatar users ke notice karne se pehle.
+
+**Insurer ki team ke liye kya badla.** Pipeline se pehle, deploys tab hote the jab kisi ko yaad aata tha, laptop se, aur kisi ko pakka nahi pata tha ki kaunsa version live hai. Uske baad, har production version ek commit hash hai jo workflow page par dikhta hai, har deploy ka ek named approver hai, aur smoke eval ne do mahine mein teen prompt changes roke hain jo har ek answer quality ghatata. Anjali kehti hain sabse kaam ki cheez speed nahi, yakeen hai: jab koi claims manager kharab answer report karta hai, team bilkul bata sakti hai ki kaunse code aur prompt ne use banaya.
+
+## Aam galtiyaan
+
+- **Sirf main par tests.** Problems merge ke baad pakdi jaati hain. Pull requests par CI chalao.
+- **Prompt changes ke liye CI mein eval nahi.** Prompt edits code changes hain; unhe test karo.
+- **Workflow files mein secrets.** CI system ke secrets ya chhoti umr ke cloud credentials use karo.
+- **Har environment ke liye alag images build karna.** Ek baar build karo, wahi image staging se production tak promote karo.
+- **Ek rollback jo kisi ne try nahi kiya.** Zaroorat padne se pehle practice karo.
+
+- **Flaky tests ko chhod dena.** Ek test jo random fail hota hai, logon ko sikhata hai ki CI tab tak dobara chalao jab tak pass na ho, aur phir asli failures bhi ignore ho jaati hain. Flaky tests ko jaldi fix ya remove karo.
+- **Bina budget ke har PR par live model call karne waale evals.** PR eval ko chhota aur sasta rakho, jo ho sake cache karo, aur poora suite schedule par chalao.
+- **Jab OIDC available hai tab lambe samay ki cloud keys secrets mein store karna.**
+- **Har push par paid evals chalana**, sirf relevant changes par nahi.
+- **Unpinned third-party actions.**
+
+## Jab halki pipeline kaafi hai
+
+- **Ek personal project**: push par lint aur tests kaafi hain.
+- **Built-in deploys waale platforms**, jaise Vercel previews, jahan CI ko sirf checks chahiye.
+- **Notebooks aur research code** jo kabhi deploy nahi hote.
+
+## Demo se production tak
+
+- **Main mein merge se pehle CI aur review zaroori karo.**
+- **Environments use karo** approvals ke saath aur production ke liye alag secrets ke saath.
+- **OIDC se deploy karo**, stored cloud keys se nahi.
+- **AI changes ko** smoke eval se gate karo aur poora eval nightly chalao.
+- **Pichhle image tag par rollback ki practice karo.**
+
+## Practice karo
+
+GitHub ka Actions quickstart aur deployment environments ka page follow karo.
+
+1. Apni kisi repository mein ek workflow jodo jo har pull request par lint aur tests chalaye.
+2. Ek job jodo jo main par merges par aapki Docker image build karke commit hash se tag karke push kare.
+3. Staging aur production environments banao, production ke liye apna approval zaroori karo, aur pichhli image par rollback ki practice karo.
+4. Paths filter jodo taaki aapka smoke eval sirf tab chale jab prompts ya retrieval code badle, aur do pull requests kholo jo ek baar chalta aur ek baar skip hota dikhayein.
+
+**Aapka kaam poora jab:** aap CI se block hui ek failing PR, production se pehle ek approval gate, aur aapka kiya hua ek rollback dikha sako.

@@ -1,0 +1,174 @@
+---
+id: linux-shell-ssh
+lang: hinglish
+title: "Linux, shell aur SSH"
+outcome: "Remote Linux server par bharose ke saath kaam karo: ghoomo, logs padho, processes aur disk check karo, ek chhoti shell script likho aur SSH keys se connect karo."
+answer: "Linux shell se aap server par commands chalate ho: ghoomne ke liye ls aur cd, logs padhne ke liye tail, processes aur disk check karne ke liye ps aur df, aur surakshit connect karne ke liye keys ke saath ssh."
+why_it_matters: "Client systems Linux servers par chalte hain, aksar aise jin par aap tools install nahi kar sakte. Jab shaam 7 baje AI service jawab dena band kar de, toh aap SSH karke logs padhoge aur wajah dhoondhoge. Shell mein comfortable hona crisis ko das minute ke fix mein badal deta hai."
+flashcards:
+  - q: "AI engineers ko Linux shell kyun chahiye?"
+    a: "Jis server par AI system chalta hai, lagbhag har ek Linux hai, jise SSH par text shell se pahunchte hain, desktop ke bina."
+  - q: "df -h aur du -sh kya dikhate hain?"
+    a: "df -h dikhata hai ki har disk kitni bhari hai; du -sh dikhata hai ki folders kitni jagah le rahe hain. Bhari hui disks rahasyamayi outages ka common kaaran hain."
+  - q: "Badhte hue log ko follow kaise karein?"
+    a: "File ke liye tail -f app.log, systemd services ke liye journalctl -u service-name -f, aur containers ke liye docker logs -f."
+  - q: "Shell mein pipe kya karta hai?"
+    a: "Ek command ka output agle ko bhejta hai, isliye chhote tools mil jaate hain, jaise grep ERROR app.log | sort | uniq -c."
+  - q: "Environment variable kya hai?"
+    a: "Ek named setting jo program apne environment se padhta hai, jaise DATABASE_URL ya API key, jo export NAME=value se set hoti hai."
+  - q: "Scripts ko set -euo pipefail se kyun shuru karein?"
+    a: "Taaki script pehli error, unset variable ya fail hue pipe step par ruk jaaye, adhoore kaam ke saath aage na badhe."
+  - q: "SSH keys kaise kaam karti hain?"
+    a: "ssh-keygen ek key pair banata hai. Server ko aapki public key milti hai; private key aapki machine se kabhi bahar nahi jaati aur saabit karti hai ki aap kaun ho."
+  - q: "Jump host ya bastion kya hai?"
+    a: "Ek server jiske through connect karke aap private servers tak pahunchte ho, jaise ssh -J bastion app-server."
+exercise:
+  title: "Outage padho"
+  setup: "11:40 par Hyderabad ke ek client ki document-search API errors dene lagti hai. Aap SSH karte ho. systemctl status dikhata hai ki service har kuch seconds mein restart ho rahi hai. journalctl har restart se pehle 'MemoryError' dikhata hai. free -h dikhata hai ki 8 GB mein se 7.8 GB memory use ho rahi hai. Memory se sort kiya ps aux 'reindex.py' naam ka process dikhata hai jo 6.5 GB use kar raha hai, aur jo 11:30 par ek cron job ne shuru kiya tha. df -h disk ko 41% par dikhata hai."
+  questions:
+    - q: "Kya disk problem hai?"
+      a: "Nahi. Disk sirf 41% bhari hai. Errors MemoryError hain, aur memory lagbhag poori bhari hai."
+    - q: "Memory kaun use kar raha hai, aur use kisne shuru kiya?"
+      a: "reindex.py, 6.5 GB use karte hue, jise 11:30 par ek cron job ne shuru kiya, errors shuru hone se das minute pehle."
+    - q: "Service wapas laane ka sabse tez safe fix kya hai?"
+      a: "Reindex job ko roko ya pause karo, API service ko normal restart hone do, aur confirm karo ki woh jawab deti hai."
+    - q: "Dobara hone se rokne ke liye do follow-ups kaunse hain?"
+      a: "Reindex ko shaant waqt ya alag machine par le jao, ya uski memory limit karo, aur lagbhag 85% se upar memory use par alert jodo."
+ask:
+  - "Har AI engineer ko kaunse Linux commands aane chahiye?"
+  - "SSH keys kaise set up karun?"
+  - "Server ki disk kya bhar raha hai ye kaise dhoondhun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Aapka AI application aapke laptop par chalta hai. Phir woh server par jaata hai, aur ek shaam client phone karta hai: "Assistant ne jawab dena band kar diya." Jis server par aapka AI system chalta hai, lagbhag har ek **Linux** hai, aur aap use ek text **shell**, aam taur par Bash, se **SSH** par pahunchte ho. Na desktop, na mouse, na File Explorer.
+
+Aapko Linux expert hone ki zaroorat nahi. Aapko chhote, bharosemand skills ka set chahiye:
+
+| Skill | Commands |
+| --- | --- |
+| Ghoomna aur files padhna | `pwd`, `ls -la`, `cd`, `cat`, `less`, `head`, `tail`, `grep` |
+| Dekhna ki kya chal raha hai aur kya use kar raha hai | `ps aux`, `top` ya `htop`, `df -h`, `du -sh`, `free -h` |
+| Aate hue logs padhna | `tail -f`, `journalctl -u name -f`, `docker logs -f` |
+| Settings aur scripts | `export`, `env`, `chmod +x`, `set -euo pipefail` |
+| Surakshit connect karna | `ssh-keygen`, `ssh`, `~/.ssh/config`, `ssh -J` |
+
+```flow
+dir: LR
+Your laptop | the private key stays here -[SSH key]-> Bastion, the jump host | checks your public key
+Bastion, the jump host -[SSH]-> App server | the ai-assistant service, logs, disk, memory
+```
+
+Ye lesson Pune ke ek logistics client ke asli outage mein aapke saath chalta hai: connect karne se lekar wajah dhoondhne, fix karne aur likhne tak. End tak aap bhari hui disk ka diagnosis kar paoge aur SSH keys se bharose ke saath connect kar paoge.
+
+## Ye kaam kaise karta hai
+
+### Navigation aur files
+
+`pwd` dikhata hai ki aap kahan ho. `ls -la` hidden files samet files ki list deta hai. `cd` jaata hai. `cat` chhoti file print karta hai; `less` lambi file ko scroll karne deta hai; `head` aur `tail` shuruaat aur ant dikhate hain.
+
+`grep -i "timeout" app.log` case ignore karke matching lines dhoondhta hai; `grep -c` unhe gintta hai.
+
+**Pipes** (`|`) chhote tools ko jodkar powerful bana dete hain:
+
+```bash
+grep ERROR app.log | sort | uniq -c | sort -rn | head
+```
+
+Ye error lines dhoondhta hai, ek jaisi ko group karta hai, har ek ko ginta hai, count se sort karta hai aur top das dikhata hai: sabse common errors ek line mein.
+
+### Processes aur resources
+
+| Sawaal | Command |
+| --- | --- |
+| Kya meri service chal rahi hai? | `ps aux \| grep uvicorn` ya `systemctl status ai-assistant` |
+| Abhi CPU aur memory kaun use kar raha hai? | `top` ya `htop` |
+| Disks kitni bhari hain? | `df -h` |
+| Kaunse folders bade hain? | `du -sh *` ya `sudo du -sh /var/* \| sort -h` |
+| Kitni memory free hai? | `free -h` |
+
+Bhari hui disk rahasyamayi outages ka common kaaran hai: logs, temporary files aur model downloads chupchaap use bhar dete hain, jab tak service kuch likh nahi paati.
+
+### Logs
+
+- `tail -f app.log` badhte hue log file ko follow karta hai.
+- **systemd** se chalne waali services journal mein log karti hain: `journalctl -u ai-assistant --since "1 hour ago"`.
+- Containers: `docker logs -f container-name`.
+
+### Environment variables
+
+Programs `DATABASE_URL` aur API keys jaisi settings **environment** se padhte hain. `export NAME=value` aapke session ke liye ek set karta hai; `env` unki list deta hai. Secrets ko environment ya secret manager mein rakho, kabhi code ya shell history mein nahi.
+
+### Scripts
+
+Shell script commands ki ek file hoti hai. Har script ko iske saath shuru karo:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+```
+
+`set -euo pipefail` script ko pehle fail hue command par, kisi bhi unset variable par aur pipe ke kisi bhi fail hue step par rokta hai, adhoore kaam ke saath aage badhne ki jagah. Ise `chmod +x script.sh` se executable banao.
+
+### SSH aur keys
+
+1. `ssh-keygen -t ed25519` aapki machine par ek key pair banata hai.
+2. Aap server ko apni **public** key dete ho. **Private** key aapki machine se kabhi bahar nahi jaati.
+3. `ssh deploy@10.0.4.12` aapko bina password ke login karata hai.
+
+`~/.ssh/config` mein ek entry servers ko chhote naam deti hai. Kai companies SSH ko ek **jump host** ya **bastion** se route karti hain: `ssh -J bastion app-server` uske through hop karta hai.
+
+### Permissions
+
+Har file ki owner, group aur baaki sabke liye permissions hoti hain: read, write aur execute. Private key ko `chmod 600` chahiye, warna SSH use karne se mana kar deta hai. `sudo` sirf un single commands ke liye use karo jinhe uski zaroorat hai, aur `rm -rf` ke baad Enter dabane se pehle do baar socho.
+
+## Ek worked example
+
+Pune ka ek logistics client batata hai ki unka delivery-query assistant 19:05 par jawab dena band kar gaya. Aap unke bastion se connect karte ho:
+
+```bash
+ssh -J bastion.client.in deploy@assistant-01
+systemctl status ai-assistant        # active, but restarting every 30 seconds
+journalctl -u ai-assistant --since "19:00" | tail -50
+```
+
+Log `OSError: [Errno 28] No space left on device` dikhata hai. Aap disk check karte ho:
+
+```bash
+df -h /                                # 100% used
+sudo du -sh /var/* | sort -h | tail -3
+```
+
+`/var/log/ai-assistant` mein 38 GB hai. Do hafte pehle ek test ke baad debug logging on chhod di gayi thi, aur logs kabhi rotate nahi hue.
+
+| Time | Step | Kya mila |
+| --- | --- | --- |
+| 19:08 | `systemctl status` | Service har 30 seconds mein restart ho rahi hai |
+| 19:09 | `journalctl` | "No space left on device" |
+| 19:10 | `df -h` | Disk 100% bhari |
+| 19:11 | `du -sh` | 38 GB debug logs |
+| 19:15 | Purane logs compress karke hatao, level INFO karo, logrotate rule jodo, restart | Disk 34% par |
+| 19:20 | Ek query test karo | Assistant phir se jawab de raha hai |
+
+Apne incident note mein aap wajah, fix aur do follow-ups likhte ho: 80% par disk-space alert, aur CI mein ek check ki production mein log level DEBUG na ho.
+
+## Aam galtiyaan
+
+- **Aadat se root ban kar kaam karna.** Galtiyan aafat ban jaati hain. Normal user aur single commands ke liye `sudo` use karo.
+- **Command line par secrets paste karna.** Woh shell history mein pahunch jaate hain. Restricted permissions waali environment files ya client ka secret manager use karo.
+- **Production ko haath se edit karke kisi ko na batana.** Agla deploy aapka fix overwrite kar dega. Change ko code ya config mein daalo aur likh do.
+- **`set -euo pipefail` ke bina scripts.** Fail hua step dhyaan mein nahi aata aur baad ke steps data kharaab kar dete hain.
+- **Private keys share karna.** Har insaan aur har machine ki apni key ho, taaki access saaf tareeke se hataya ja sake.
+- **Jagah khaali karne ke liye jo files samajh nahi aati unhe delete karna.** Pehle dhoondho ki kya bada hai aur kyun.
+
+## Practice karo
+
+Neeche link kiye Missing Semester ke shell aur command-line environment ke lectures dekho ya padho.
+
+1. **Top errors.** Kisi bhi Linux machine par, jaise free cloud VM, Windows par WSL ya Docker container, kuch ERROR lines ke saath 500 lines ka fake log banao, aur ek pipeline se top teen error messages list karo.
+2. **Keys.** Ek SSH key generate karo, use kisi server ya GitHub mein jodo, aur bina password ke connect karo.
+3. **Ek script.** `set -euo pipefail` ke saath ek script likho jo disk usage check kare aur 80% se upar warning print kare.
+
+**Aapka kaam poora jab:** aap dhoondh sako ki kaunsa process ya folder disk bhar raha hai, aur samjha sako ki private key aapki machine se kabhi bahar kyun nahi jaati.

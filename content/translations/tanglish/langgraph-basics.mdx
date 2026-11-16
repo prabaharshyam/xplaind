@@ -1,0 +1,233 @@
+---
+id: langgraph-basics
+lang: tanglish
+title: "LangGraph: agents-a graphs-aa build panradhu"
+outcome: "LangGraph-la explicit state, nodes, edges, pause panni resume panna checkpoints, conditional routing-oda oru agent build pannalaam."
+answer: "LangGraph agents-a graphs-aa build pannum: nodes velai seiyum, edges adutha edhu run aagum-nu decide pannum, shared state data-va eduthutu pogum, checkpoints oru aal-ukkaaga agent-a pause panni apram resume panna vidum."
+why_it_matters: "LangGraph India-layum ulagathulayum job listings-la romba adhigam varra agent frameworks-la onnu. Adhoda graph model agent nadandhukkura vidhatha paarkka, test panna vaikkum; adhoda checkpoints thaan human approval serkkavum, crash-la irundhu recover aagavum vazhi."
+flashcards:
+  - q: "LangGraph-na enna?"
+    a: "State, nodes, edges-oda graphs-aa agents-um multi-step AI workflows-um build panna oru open-source framework."
+  - q: "LangGraph graph-la state-na enna?"
+    a: "Messages, ippo irukkura ticket, oru draft reply maadhiri oru typed object. Adhu graph muzhukka pogum, nodes adha update pannum."
+  - q: "Node-na enna?"
+    a: "State-a eduthukittu updates-a return panra oru function; adhu model-a call pannalaam, tool-a call pannalaam, illa saadhaa code run pannalaam."
+  - q: "Conditional edge-na enna?"
+    a: "State-a paathu adutha node-a choose panra edge, example model oru tool kettaa tool node-ku pogum."
+  - q: "Checkpointer enna seiyum?"
+    a: "Ovvoru step-kum aprom, thread id-ku state-a save pannum, adhanaala runs pause aagalaam, resume aagalaam, inspect panna, replay panna mudiyum."
+  - q: "Interrupt-na enna?"
+    a: "Oru node-kku munnaadi illa ulla irundhu pause panni, veliyila irundhu varra input-kkaaga kaathirukkum; human approval-oda adippadai idhu thaan."
+  - q: "Production-la yen database checkpointer use pannanum?"
+    a: "In-memory checkpointer-la server restart aanaa pause aagi irundha ella runs-um poidum."
+  - q: "LangGraph eppo thevai illa?"
+    a: "Saadhaa functions-a handle pannura oru fixed, short pipeline-ku; framework thevai illaama sumai-a serkkum."
+  - q: "Approval-kaaga LangGraph run-a eppadi pause pannalaam?"
+    a: "Node-kulla interrupt()-a, kaattanum-nu irukkura data-oda call pannunga. Run nikkum, state save aagum; adhe thread_id-la Command(resume=...)-vaala resume pannunga."
+  - q: "recursion_limit enna seiyum?"
+    a: "Oru run evvalavu steps edukkalaam-nu cap pannum; adhanaala nodes-kku idaila loop aagura graph eppavum odaama, error-oda nikkum."
+exercise:
+  title: "Graph-a varainga"
+  setup: "Lucknow-la oru university student requests-kku oru assistant venum-nu virumbudhu. Requests moonu vagai: fee kelvigal (fee-records tool thevai), exam schedule kelvigal (timetable tool thevai), fee extension kekkura requests (extension record aaga munnaadi finance officer approve pannanum). Students pala naal kazhichu adhe conversation-a continue panraanga."
+  questions:
+    - q: "Graph-la enna nodes irukkum?"
+      a: "classify, fee_agent, timetable_agent, propose_extension, approve_extension (interrupt), record_extension, reply."
+    - q: "Conditional edges enga pogum?"
+      a: "classify-kku aprom request type-pada route panna, apram ovvoru agent-oda tool loop-kulla, tool call pannalaama mudikkalaama-nu decide panna."
+    - q: "Students pala naal kazhichu eppadi continue pannuvaanga?"
+      a: "Ovvoru conversation-kum oru thread id, adutha message-la database-backed checkpointer adhoda state-a thirumba load pannum."
+    - q: "Model calls illaama routing-a eppadi test pannuveenga?"
+      a: "Ovvoru category-kum kaiyaala senja states-oda route function-a call panni, adhu return panra node-a check pannunga."
+ask:
+  - "LangChain-kum LangGraph-kum enna difference?"
+  - "LangGraph checkpointer eppadi work aagudhu?"
+  - "LangGraph agent-ku human approval eppadi serkkalaam?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+LangGraph oru open-source Python-um JavaScript-um framework. Idhula agents-um multi-step AI workflows-um **graphs**-aa build pannalaam:
+
+- **State**: messages, ippo irukkura ticket, oru draft reply-oda dictionary maadhiri oru typed object. Adhu graph muzhukka pogum.
+- **Nodes**: State-a eduthukittu updates-a return panra functions. Oru node model-a call pannalaam, tool-a call pannalaam, illa saadhaa code run pannalaam.
+- **Edges**: Adutha edhu run aagum-nu solradhu. Conditional edges state-a paathu choose pannum, example "model oru tool kettaa tool node-ku po; illaina mudi".
+- **Checkpointer**: Ovvoru step-kum aprom state-a save pannum, adhanaala run pause aagalaam, resume aagalaam, inspect panna, replay panna mudiyum.
+
+Agent loop-na onnum illa, chinna graph: model node, tool node, rendukkum idaila loop aagura conditional edge. Workflow-na fixed edges irukkura graph. LangGraph rendaiyum oru system-la mix panna vidum.
+
+```flow
+title: Ovvoru node-kum aprom state save aagum, thread_id-ku ovvondrukkum (checkpointer)
+START -> classify
+classify -[billing]-> billing_agent | a tool loop
+classify -[outage]-> outage_agent | a tool loop
+billing_agent -[proposes a credit]-> approve_credit | INTERRUPT: a supervisor decides
+billing_agent -[no credit]-> reply
+approve_credit -> apply_credit -> reply
+outage_agent -> reply
+reply -> END
+```
+
+Indha lesson-la Chennai-la oru broadband provider, credits-ku approval-oda oru support-ticket assistant build panradha follow pannuvom.
+
+## Idhu eppadi work aagudhu
+
+State type-a define pannunga, nodes-a serunga, edges-a connect pannunga, compile pannunga:
+
+```python
+from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langgraph.checkpoint.memory import MemorySaver
+
+class State(TypedDict):
+    messages: Annotated[list, add_messages]   # new messages are appended, not replaced
+    category: str | None
+
+def classify(state: State) -> dict:
+    label = llm_classify(state["messages"][-1].content)
+    return {"category": label}
+
+def route(state: State) -> str:
+    return "billing" if state["category"] == "billing" else "general"
+
+g = StateGraph(State)
+g.add_node("classify", classify)
+g.add_node("billing", billing_agent)
+g.add_node("general", general_agent)
+g.add_edge(START, "classify")
+g.add_conditional_edges("classify", route, ["billing", "general"])
+g.add_edge("billing", END)
+g.add_edge("general", END)
+app = g.compile(checkpointer=MemorySaver())
+```
+
+Ovvoru invocation-um oru `thread_id` anuppum; checkpointer thread-ku state-a store pannum, adhanaala adhe thread-la adutha message, vittu pona idathula irundhu continue aagum. Production-la `MemorySaver`-a PostgreSQL maadhiri database-backed checkpointer-a maathikkunga.
+
+**Interrupts** oru node-kku munnaadi illa ulla run-a pause panni, veliyila irundhu varra input-kkaaga kaathirukkum; human approval-oda adippadai idhu thaan. **Streaming** node-by-node updates-a UI-ku anuppum. **Sub-graphs** oru node-a muzhu graph-aave aakkum, periya flow-kulla oru specialist agent-ku useful.
+
+**LangGraph pieces-um, adhu tharra payan-um:**
+
+| Piece | Adhu enna | Unga-ku enna tharum |
+| --- | --- | --- |
+| State | Oru typed dictionary | Run-ku theriyura ellathaiyum paarkka oru idam |
+| Node | Updates return panra function | Chinna, test panna easy-aana steps |
+| Edge | Fixed adutha step | Predict panna mudiyura workflows |
+| Conditional edge | Adutha node-a choose panra function | Routing, tool loops |
+| Checkpointer | Thread-ku save panna state | Memory, pause and resume, replay |
+| Interrupt | Veliyila irundhu input-kkaaga pause | Human approval |
+| Sub-graph | Node-aa use panra graph | Periya flow-kulla specialist agents |
+
+**State updates eppadi work aagudhu.** Oru node maathura fields-a mattum return pannum, LangGraph adha state-la merge pannum. Perumbaalaana fields-la pudhu value pazhaya value-a replace pannum. `add_messages` maadhiri reducer irukkura fields-la, message list maadhiri, pudhu values append aagum. Adhanaala thaan tool node pudhu tool message-a mattum return pannaalum, history appadiyae irukkum. Reducer-a marandhuduradhu oru classic bug: appo ovvoru node-um conversation-a oru message-aala overwrite pannum.
+
+**Checkpoints-oda debug panradhu.** Ovvoru step-um save aagradhaala, oru thread-oda checkpoints-a list pannalaam, ovvonnula state-a padikkalaam, even mundhaiya checkpoint-la irundhu maathina state-oda resume panni, enna nadandhirukkum-nu paarkkalaam. Oru reply thappaa pona, print statements serkkaama, thirumba run pannaama, edhu node enna change panniduchu-nu idhu kaattum.
+
+**Graphs-um saadhaa code-um serndhu.** Ovvoru step-kum model thevai illa. Validation, database writes, formatting ellaam model call illaadha saadhaa nodes; adhanaala adhu vegamaa, selavu kammiyaa, test panna easy-aa irukkum.
+
+**Interrupt, resume-oda approval.** Oru node-kulla `interrupt` run-a pause pannum, resume aagum podhu aal anuppura edhaiyum return pannum:
+
+```python
+from langgraph.types import interrupt, Command
+
+def refund_node(state: State) -> dict:
+    proposal = {"action": "refund", "amount_inr": state["amount"], "order": state["order_id"]}
+    decision = interrupt(proposal)                 # the run stops here and state is saved
+    if not decision.get("approved"):
+        return {"messages": [("assistant", "A team member will contact you about the refund.")]}
+    amount = decision.get("amount_inr", state["amount"])   # the approver may edit it
+    issue_refund(state["order_id"], amount)
+    return {"messages": [("assistant", f"Refund of ₹{amount} started.")]}
+
+config = {"configurable": {"thread_id": "order-7781"}, "recursion_limit": 25}
+result = app.invoke({"messages": [("user", "Refund my damaged kurta, order 7781")]}, config)
+# result["__interrupt__"] holds the proposal; show it on the approval screen.
+
+# Later, possibly hours later, from the approval page's handler:
+app.invoke(Command(resume={"approved": True, "amount_inr": 3000}), config)
+```
+
+Resume aagum podhu node adhoda aarambathula irundhu thirumba run aagum, adhanaala side effects-a `interrupt` call-kku aprom vainga, inga irukkura maadhiri, apram avatrai idempotent-aa aakkunga.
+
+**Database checkpointer.** `MemorySaver` restart aanaa ellathaiyum izhakkum. Nijamaana use-ku checkpoints-a Postgres-la store pannunga:
+
+```python
+from langgraph.checkpoint.postgres import PostgresSaver
+
+with PostgresSaver.from_conn_string("postgresql://app:***@db:5432/agents") as saver:
+    saver.setup()                                  # creates the checkpoint tables once
+    app = g.compile(checkpointer=saver)
+    app.invoke({"messages": [("user", "Hi")]}, {"configurable": {"thread_id": "t-42"}})
+```
+
+Connection string-a code-la illa, environment variable-la irundhu padinga.
+
+**Progress-a stream panradhu.** `app.stream(inputs, config, stream_mode="updates")` ovvoru node mudiyum podhum adhoda update-a tharum, adhanaala UI neenda amaidhikku badhila "Checking your order…", apram "Looking up the refund policy…"-nu kaattalaam.
+
+**Nodes-a thaniyaa test panradhu.** Nodes state-la irundhu updates-ku pogura saadhaa functions, adhanaala model illaama unit-test panna mudiyum:
+
+```python
+def test_route_billing():
+    assert route({"messages": [], "category": "billing"}) == "billing"
+
+def test_route_unknown_goes_general():
+    assert route({"messages": [], "category": None}) == "general"
+```
+
+Model-a call panra nodes-ku, tests-la fixed replies tharra fake model-a kudunga. Apram konjam saved conversations-oda muzhu graph-a test pannunga.
+
+**Prebuilt agent.** Saadhaa tool-using loop-ku, `langgraph.prebuilt.create_react_agent(model, tools)` model-and-tools graph-a ungalukkaaga build pannidum. Adhula aarambinga, routing, approvals, pala specialist nodes thevaippattaa unga sondha graph-a ezhudhunga.
+
+**Ovvoru run-aiyum limit pannunga.** Config-la `recursion_limit` set pannunga. Oru conditional edge run-a adhe node-kku thirumba thirumba anuppina, adhu ungalaala catch panni clean handover-aa maatha mudiyura error-oda nikkum.
+
+## Oru worked example
+
+Chennai-la oru broadband provider support tickets-kku oru assistant venum-nu virumbudhu. Requirements: ovvoru ticket-aiyum classify pannanum, billing kelvigala account tools-oda handle pannanum, outage kelvigala status tool-oda handle pannanum, entha credit-um apply aaga munnaadi supervisor approval vaanganum.
+
+Graph: `classify` `billing_agent`-ku illa `outage_agent`-ku route pannum, rendumae chinna tool loops. Billing agent oru credit propose pannaa, graph `approve_credit`-ku route aagum, adhu interrupt pannum. Supervisor ticket-a, propose panna ₹300 credit-a, agent-oda reason-a adhoda dashboard-la paarkkuraanga, approve illa edit panraanga, run checkpoint-la irundhu `apply_credit`-kum `reply`-kum resume aagum.
+
+Ovvoru node-kum aprom state checkpoint aagradhaala, ticket nadu-la server restart aanaalum onnum poga maattaadhu. Oru customer oru reply pathi complain panna, thread-oda checkpoints-a load panni, edhu node entha state-oda enna senjuchu-nu correct-aa paakkalaam. Tests individual nodes-a kaiyaala senja state-oda call pannum, adhanaala routing logic model calls illaama unit-test aagum.
+
+| Situation | Graph enna senjudhu |
+| --- | --- |
+| Billing question | classify, billing_agent, reply |
+| Propose panna ₹300 credit | approve_credit-la interrupt aachu; supervisor approve pannina aprom resume aachu |
+| Ticket nadu-la server restart | Last checkpoint-la irundhu resume aachu, onnum poga illa |
+| Customer complaint | Thread-oda checkpoints edhu node entha state-la irundhu reply ezhudhuchu-nu kaattichu |
+
+## Podhuvaa panra thappugal
+
+- **Ellathaiyum oru periya node-kulla podradhu.** Graph-oda mukkiya payan-aana visibility-yum testability-yum poiduchu.
+- **Limit illaama valara state.** Ovvoru tool result-aiyum eppavum append panna prompts perusaagum. Oru node-la trim illa summarise pannunga.
+- **Production-la in-memory checkpoints.** Restart aanaa pause aagi irundha ella runs-um poidum. Persistent checkpointer use pannunga.
+- **Function pothum-nu irukkura idathula graph use panradhu.** Fixed moonu-step pipeline-ku framework thevai illa.
+- **Versions-a ignore panradhu.** Library vegamaa maarudhu; pin pannunga, upgrade panna munnaadi changelog-a padinga.
+- **`interrupt`-kku munnaadi side effects.** Resume-la node aarambathula irundhu thirumba odum, adhanaala action rendu thadava nadakkum.
+- **Production-la `MemorySaver`.** Ovvoru restart, deploy-layum state maraiyum.
+- **`recursion_limit` illaama irukkradhu.** Loop aagura graph vera edhaavadhu nirutha vara cost-a yethikkittae irukkum.
+
+## LangGraph eppo thevai illa
+
+- **Saadhaa tool loop**: agent-loop lesson-la paatha irubadhu-line loop, illa oru provider-oda agent SDK pothum.
+- **Pause, branching illaadha fixed pipeline**: order-la call panra saadhaa functions padikka easy-aa irukkum.
+- **Vera framework-la already irukkura teams**, state-um pauses-um tracing-um adhulayae cover aagudhu-naa.
+
+Oru conversation-ku saved state, aal-ukkaaga pauses, branching, run-a replay panra vasadhi thevaippattaa LangGraph adhoda idathai sampaadhikkum.
+
+## Demo-la irundhu production-ku
+
+- **Database checkpointer use pannunga**, matha production data maadhiri adha backup pannunga.
+- **Ovvoru run-kum recursion limits-um timeouts-um set pannunga.**
+- **Ovvoru node-aiyum thread id-oda trace pannunga**, adhanaala oru support ticket neraa run-ku kootitu pogum.
+- **Graph-a version pannunga**: nodes maarum podhu, pazhaya version-la pause aagi irukkura threads-ku enna aagum-nu mudivu pannunga.
+- **CI-la fake models-oda nodes, routes, konjam muzhu conversations-a test pannunga.**
+
+## Practice pannunga
+
+LangChain Academy-oda free Introduction to LangGraph-a edunga, kammi-yaa mudhal moonu modules.
+
+1. Mela irukkura classify-pinnaadi-route graph-a, neenga virumbura rendu categories-kku build pannunga, tests-ku fake model-oda.
+2. Oru checkpointer serthu, adhe thread-la rendaavadhu message mudhal message-a paakkudhu-nu kaattunga.
+3. Risky node-kku munnaadi oru interrupt serunga, oru script-la irundhu approve panni resume pannunga.
+4. Interrupt-oda oru run-a pause pannunga, unga Python process-a restart pannunga, Postgres checkpointer-la irundhu resume panni pause thaanga-nu nirubinga.
+
+**Mudinjadhu-nu eppo sollalaam:** Unga graph-a varaiya mudiyum, state enga save aagudhu-nu kaatta mudiyum, program-a restart panna aprom pause aagi irukkura run-a resume panna mudiyum.

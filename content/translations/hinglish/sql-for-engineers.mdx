@@ -1,0 +1,183 @@
+---
+id: sql-for-engineers
+lang: hinglish
+title: "Engineers ke liye SQL"
+outcome: "Joins, GROUP BY, window functions aur indexes se asli business sawaalon ke jawab SQL mein nikaal paoge, aur slow query ka plan padh paoge."
+answer: "Engineers SQL se tables join karte hain, GROUP BY se group aur count karte hain, window functions se rows ko rank karte hain, aur sahi indexes se slow queries tez karte hain."
+why_it_matters: "Har client ki asli jaankari kisi database mein rehti hai. AI ka koi bhi kaam shuru karne se pehle aapko data nikaalna, use check karna aur baseline naapna hoga. Jo engineer window function likh sake aur missing index pakad sake, us par pehle hafte mein hi bharosa ban jaata hai."
+flashcards:
+  - q: "Inner join aur left join mein kya farak hai?"
+    a: "Inner join sirf woh rows rakhta hai jo dono taraf match karein. Left join left table ki har row rakhta hai aur jahan right mein match na ho wahan khaali chhod deta hai."
+  - q: "Aise customers kaise dhoondhein jinhone kabhi order nahi kiya?"
+    a: "customers ko orders se LEFT JOIN karo, phir woh rows rakho jahan WHERE orders.id IS NULL ho."
+  - q: "WHERE aur HAVING mein kya farak hai?"
+    a: "WHERE grouping se pehle rows filter karta hai. HAVING GROUP BY ke baad groups filter karta hai, jaise HAVING COUNT(*) > 5."
+  - q: "GROUP BY aur window function mein kya farak hai?"
+    a: "GROUP BY rows ko har group ki ek row mein samet deta hai. Window function related rows par calculate karta hai, par har row bani rehti hai."
+  - q: "ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at) kya karta hai?"
+    a: "Har customer ki rows ko time ke kram mein 1 se number deta hai, taaki aap har customer ki pehli row chun sako."
+  - q: "LAG kya karta hai?"
+    a: "Window mein pichhli row ki value lautaata hai, jaise pichhle order ki date, taaki aap row se row compare kar sako."
+  - q: "Index kya hai?"
+    a: "Ek structure jisse database har row padhne ki jagah seedhe matching rows par pahunch jaata hai. Reads tez hote hain aur writes thode dheemay."
+  - q: "EXPLAIN ANALYZE kya dikhata hai?"
+    a: "Database ne query asal mein kaise chalayi: index use hua ya poora table scan hua, aur har step mein kitna samay laga."
+exercise:
+  title: "Har query ka bug pakdo"
+  setup: "Chennai ke ek grocery app mein tables hain customers(id, city), orders(id, customer_id, total, created_at) aur order_items(id, order_id, sku, qty). Ek naye analyst ki chaar queries: (A) orders ko order_items se join karke SUM(o.total), city ke hisaab se group kiya. (B) har customer ke order count ki report, customers se orders tak inner join se, jisme zero orders wale customers bhi chahiye the. (C) SELECT city, COUNT(*) FROM ... WHERE COUNT(*) > 100 GROUP BY city. (D) created_at se orders filter karne wali ek query jo 4 crore rows par 50 seconds leti hai."
+  questions:
+    - q: "(A) mein total sales zaroorat se zyada kyun aa rahi hai?"
+      a: "Join ke baad har order apne items ki ginti ke barabar baar dohraya jaata hai, isliye uska total kai baar judta hai. Totals sirf orders se sum karo, ya join se pehle items ko aggregate karo."
+    - q: "(B) mein kya galat hai?"
+      a: "Inner join bina orders wale customers ko hata deta hai. LEFT JOIN aur COUNT(o.id) use karo, jo unke liye zero ginta hai."
+    - q: "(C) ko kaise theek karoge?"
+      a: "Shart ko GROUP BY city ke baad HAVING COUNT(*) > 100 mein le jao. WHERE mein aggregates nahi chalte."
+    - q: "(D) ki jaanch aur speed-up kaise karoge?"
+      a: "EXPLAIN ANALYZE chalakar confirm karo ki full table scan ho raha hai, phir orders(created_at) par index banao aur plan aur time dobara dekho."
+ask:
+  - "GROUP BY aur window function mein kya farak hai?"
+  - "Database mein index kab jodna chahiye?"
+  - "SQL mein duplicate rows kaise dhoondhun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Jin bhi companies ke saath aap kaam karoge, lagbhag sab apne customers, orders, tickets aur payments kisi relational database mein rakhti hain, jaise PostgreSQL, MySQL ya SQL Server. **SQL** woh bhasha hai jisse in databases se sawaal puchhe jaate hain. AI engineer ke liye SQL optional nahi hai. Aap ise in kaamon mein use karte ho:
+
+- AI system ko chahiye woh **data nikaalna**, jaise purane tickets aur unke resolutions;
+- Kuch banane se pehle **baseline naapna**: "Aaj refunds mein kitna samay lagta hai?";
+- System chalu hone ke baad **check karna ki usse fayda hua ya nahi**.
+
+Is kaam ka zyadatar hissa chaar ideas se nikal jaata hai:
+
+| Idea | Kya karta hai | Aam use |
+| --- | --- | --- |
+| **Joins** | Tables ko matching column par jodte hain | Orders aur unke customers ke cities |
+| **GROUP BY** | Har group ki ek row, totals ya averages ke saath | Har city mein refunds |
+| **Window functions** | Related rows par calculate karte hain, har row bani rehti hai | Har customer ka pehla ticket; moving averages |
+| **Indexes** | Lookups tez karte hain | 40 seconds ki query ko 2 seconds ka banana |
+
+```flow
+dir: LR
+title: Matching ids par join karke "har city mein refunds" ka jawab
+refunds | id, order_id, created_at -[order_id = orders.id]-> orders | id, customer_id
+orders -[customer_id = customers.id]-> customers | id, city
+```
+
+Is lesson mein hum Hyderabad ki ek food delivery company ke saath chalenge, jab aap AI assistant banane se pehle uska refund baseline naapte ho. Lesson ke end tak aap joins, grouping aur window functions se business sawaalon ke jawab nikaal paoge, aur slow query ko tez kar paoge.
+
+## Ye kaam kaise karta hai
+
+### Joins
+
+Join tables ko ek matching column par jodta hai.
+
+| Join | Kya rakhta hai | Kab use karein |
+| --- | --- | --- |
+| `JOIN` (inner) | Sirf woh rows jo dono taraf match karein | Jin orders ka customer hai |
+| `LEFT JOIN` | Left table ki har row; jahan right mein match na ho wahan khaali | Bina orders wale customers; bina reply wale tickets |
+
+```sql
+-- customers who have never ordered
+SELECT c.id, c.city
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE o.id IS NULL;
+```
+
+### GROUP BY
+
+`GROUP BY` rows ko har group ki ek row mein samet deta hai aur aggregates nikaalta hai: `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`. Rows ko grouping se **pehle** `WHERE` se filter karo; groups ko **baad** mein `HAVING` se:
+
+```sql
+SELECT city, COUNT(*) AS refunds
+FROM refunds r JOIN orders o ON o.id = r.order_id
+JOIN customers c ON c.id = o.customer_id
+WHERE r.created_at >= DATE '2026-07-01'
+GROUP BY city
+HAVING COUNT(*) > 100;
+```
+
+### Window functions
+
+Window functions related rows par calculate karte hain, unhe samete **bina**:
+
+| Function | Example | Kya deta hai |
+| --- | --- | --- |
+| `ROW_NUMBER()` | `OVER (PARTITION BY customer_id ORDER BY created_at)` | Har customer ki rows ko time ke kram mein 1, 2, 3 |
+| `LAG(col)` | `OVER (PARTITION BY customer_id ORDER BY created_at)` | Pichhli row ki value, row-to-row comparison ke liye |
+| `SUM(col)` | `OVER (ORDER BY day)` | Running total |
+| `AVG(col)` | `OVER (ORDER BY day ROWS 6 PRECEDING)` | Saat din ka moving average |
+
+`PARTITION BY` rows ko `GROUP BY` ki tarah groups mein baantta hai, par har row result mein bani rehti hai.
+
+### Indexes aur query plans
+
+Index ke bina database matches dhoondhne ke liye har row padhta hai: ise **sequential scan** kehte hain. `refunds(created_at)` par index ho, toh woh seedhe sahi rows par pahunch jaata hai.
+
+```flow
+dir: LR
+title: 3 crore rows mein se July ke refunds dhoondhna
+Index nahi -> saari 30,000,000 rows padho, 2,000,000 rakho -> 40 s
+created_at par index -> 1 July par jao, aage padhte jao -> 2 s
+```
+
+Indexes reads tez karte hain aur writes ko thoda dheema, isliye unn columns par lagao jin par aap sabse zyada filter aur join karte ho. Kisi query ke aage `EXPLAIN ANALYZE` lagao, jo use chalata bhi hai, taaki dikhe ki database ne index use kiya ya poora table scan kiya, aur har step mein kitna samay laga.
+
+## Ek example se samjho
+
+Hyderabad ki ek food delivery company refund requests ke liye AI assistant chahti hai. Kuch bhi banane se pehle aapko baseline chahiye: aaj refund mein kitna samay lagta hai, city ke hisaab se?
+
+```sql
+SELECT c.city,
+       COUNT(*) AS refunds,
+       ROUND(AVG(EXTRACT(EPOCH FROM r.resolved_at - r.created_at) / 3600), 1) AS avg_hours
+FROM refunds r
+JOIN orders o    ON o.id = r.order_id
+JOIN customers c ON c.id = o.customer_id
+WHERE r.created_at >= DATE '2026-07-01'
+GROUP BY c.city
+ORDER BY avg_hours DESC;
+```
+
+Ab assistant ke training examples ke liye aapko har customer ki sirf **pehli** refund request chahiye, taaki baar-baar shikayat karne wale haavi na ho jaayein:
+
+```sql
+SELECT *
+FROM (
+  SELECT r.*,
+         ROW_NUMBER() OVER (PARTITION BY o.customer_id ORDER BY r.created_at) AS n
+  FROM refunds r JOIN orders o ON o.id = r.order_id
+) t
+WHERE n = 1;
+```
+
+**Slow query.** Baseline query 3 crore rows par 40 seconds leti hai. `EXPLAIN ANALYZE` mein date filter ke liye `refunds` par sequential scan dikhta hai. Aap client ki data team se kehte ho, jo kisi shaant samay par primary database par `CREATE INDEX CONCURRENTLY ON refunds (created_at)` chalati hai; phir woh index us read replica tak pahunchta hai jis par aap query karte ho. Ab query do seconds se kam mein chalti hai.
+
+| City | July se refunds | Resolve hone ke ausat ghante |
+| --- | --- | --- |
+| Hyderabad | 48,200 | 31.4 |
+| Vijayawada | 9,800 | 27.9 |
+| Warangal | 4,100 | 22.6 |
+
+Aap numbers aur query times apne notes mein likh lete ho. Ye table woh baseline hai jise aapke assistant ko haraana hai, aur index ek quick win hai jisse client ki data team ke saath achha rishta banta hai.
+
+## Aam galtiyaan
+
+- **Join karke multiply kar dena.** Orders ko order items se join karke order totals ka sum lene par har order apne items ki ginti ke barabar baar gina jaata hai. Join se pehle sahi level par aggregate karo.
+- **Jahan left join chahiye tha wahan inner join.** Bina orders wale customers report se chupchaap gaayab ho jaate hain.
+- **WHERE mein aggregates filter karna.** `WHERE COUNT(*) > 5` fail hota hai; `HAVING` use karo.
+- **Production database par bhaari queries chalana.** Read replica ya export maango. Client ka live app dheema kar dena pehle hafte ki buri shuruaat hai.
+- **Har cheez par index lagana.** Har index storage aur write speed ka kharcha leta hai. Asli slow queries ke liye lagao, aur `EXPLAIN ANALYZE` se confirm karo.
+- **Dates ki tulna text se karna.** Sahi date types aur `DATE '2026-07-01'` jaise literals use karo.
+
+## Practice karo
+
+Neeche link kiye SQLBolt ke lessons 1 se 12 browser mein karo, phir window functions par PostgreSQL ka page padho.
+
+1. **Set up.** Kisi bhi free PostgreSQL mein, jaise local Docker container mein, `customers`, `orders` aur `refunds` tables banao aur kuch sau rows ka banawati data daalo.
+2. **Baseline.** Upar wali baseline query likho, aur aisi query bhi jo un customers ko list kare jinhone kabhi order nahi kiya.
+3. **Window.** `LAG` se dikhao ki har refund ke liye us customer ke pichhle refund se kitne din guzre.
+
+**Aapka kaam poora jab:** aap GROUP BY aur window function ka farak ek vaakya mein samjha sako, aur aisi query dikha sako jo index jodne ke baad tez hui.

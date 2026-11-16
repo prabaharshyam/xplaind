@@ -1,0 +1,143 @@
+---
+id: scaling-load-balancing
+lang: tanglish
+title: "Scaling-um load balancing-um"
+outcome: "Vertical scaling-um horizontal scaling-um explain pannalaam, app servers-a stateless-aa vechu scale out pannalaam, load balancers-um health checks-um vachu traffic-a pirichu, server failures-la thappikkalaam."
+answer: "Vertical scaling oru server-a periyadhaakkum; horizontal scaling neraya servers-a serkkum. Load balancer requests-a avatrukkulla pirichu kudukkum, adhu servers state vechukkaama irundhaa mattum work aagum."
+why_it_matters: "India-la traffic spikes-aa varum: exam results, IPL finals, festive sales. Load balancer-kku pinnaadi scale out aagura systems nikkum; oru periya server-oda kattapatta systems vizhum. Idhu oru core interview topic-um kooda."
+flashcards:
+  - q: "Vertical scaling-na enna?"
+    a: "Oru machine-a periyadhaakkuradhu, adhigam CPU, memory, disk-oda. Simple, aana oru ceiling irukku, oru single point of failure-um."
+  - q: "Horizontal scaling-na enna?"
+    a: "Load-a pirichukkura neraya machines-a serkkuradhu. Load balancer-um stateless servers-um thevai, aana romba thooram valarum."
+  - q: "Oru app server stateless-nu enna artham?"
+    a: "Requests-kku idaiyila user data-va thanoda memory-la vechukkaadhu, adhanaala entha server-um entha request-aiyum kaiyaalum."
+  - q: "Scale out panna system-la session data enga pogum?"
+    a: "Redis illa database maadhiri shared store-la, illa ovvoru request-oda client anuppura signed token-la."
+  - q: "Health check-na enna?"
+    a: "Load balancer ovvoru server-kum regular-aa anuppura request; fail aagura servers recover aagura varaikkum traffic vaangaadhu."
+  - q: "Round robin-na enna?"
+    a: "Ovvoru pudhu request-aiyum adutha server-ku, murai-padi anuppura load-balancing rule."
+  - q: "Autoscaling-na enna?"
+    a: "CPU use illa requests per second maadhiri load-padi servers-a automatic-aa serkkuradhu illa kuraikkuradhu."
+exercise:
+  title: "Scale pannunga"
+  setup: "Oru state board-oda results website normal naala 2 lakh students-ku serve pannudhu. Result naala mudhal oru manineram-la 40 lakh students try pannuraanga. Oru app server sumaar 500 requests per second kaiyaaludhu."
+  questions:
+    - q: "Andha manineram-la ovvoru student-um 5 requests panninaa, average load requests per second-la evvalavu?"
+      a: "40 lakh × 5 = 2 crore requests, 3,600 seconds-la: sumaar 5,500 per second."
+    - q: "Andha average-ku evvalavu app servers thevai, yen innum adhigam plan pannanum?"
+      a: "Sumaar 11. Adhai vida 2 mudhal 3 madangu plan pannunga, yen-naa mudhal sila nimishangal, manineram-oda average-a vida romba busy-aa irukkum, oru server fail aanaalum thaanga."
+    - q: "Ippo irukkura app ovvoru student-oda login session-aiyum server memory-la store pannudhu. Servers-a serkkum podhu enna udaiyum?"
+      a: "Oru student-oda adutha request, session theriyaadha vera server-ku pogalaam, adhanaala avanga logout aaiduvaanga. Sessions-a Redis-ku maathunga illa tokens use pannunga."
+    - q: "Results onnu publish aanadhum maaradhu. Vera enna load-a kuraikkum?"
+      a: "Ovvoru result-aiyum cache panni, static pages-a CDN-la irundhu serve pannunga, adhanaala perumbaalaana requests app servers-ku varavae maattaanga."
+ask:
+  - "Eppo vertical scaling nalla choice?"
+  - "Sticky sessions eppadi work aagudhu, yen avoid pannanum?"
+  - "Layer 4-kum layer 7 load balancer-kum enna difference?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Scaling**-na oru system adhigam velaiya eppadi kaiyaaludhu-nu. Rendu vazhigal.
+
+**Vertical scaling** (scaling up) oru machine-a periyadhaakkum: adhigam CPU cores, adhigam memory, vegamaana disks. Code maatram thevai illa, adhanaala pala neram mudhal step idhu thaan. Aana oru machine evvalavu periyadhaa aagalaam-nu oru ceiling irukku, ucchi pakkam vilai romba ezhumbum, andha oru machine fail aanaa, ellaam nindrudum.
+
+**Horizontal scaling** (scaling out) velaiya pirichukkura neraya machines-a serkkum. Romba thooram valarum, entha oru machine-a izhandhaalum thaangum. Idhukku rendu thevai: requests-a pirichu kudukka munnaadi oru **load balancer**, entha server-um entha request-aiyum kaiyaala **stateless**-aa irukkura app servers.
+
+```flow
+title: Vertical: oru periya server, oru ceiling-um oru single point of failure-um
+Users -> One big server | more CPU, more RAM
+```
+
+```flow
+title: Horizontal: load balancer-kku pinnaadi stateless app servers
+Users -> Load balancer | health checks
+Load balancer -> app1
+Load balancer -> app2
+Load balancer -> app3
+app1 -> Shared state | database, Redis
+app2 -> Shared state
+app3 -> Shared state
+```
+
+## Idhu eppadi work aagudhu
+
+**Statelessness.** App server 1 oru user-oda shopping cart-a thanoda memory-la vechukkittaa, andha user-oda adutha request server 1-ku thirumba pogum. Adhu users-a servers-oda kattippodum, oru server restart aanaa carts-um pogum. Adhukku badhila, shared state-a app servers-ku veliya vainga. Carts-um sessions-um Redis illa database-la, files-a object storage-la podunga. Identity-a, client ovvoru thadavaiyum anuppura JWT maadhiri signed token-la kondu ponga. Appo servers ovvonnum onnukku onnu maaththi payanpaduththalaam.
+
+**Load balancers** varra ella traffic-aiyum eduthu, ovvoru request-aiyum healthy-aana server-ku anuppum. Common rules:
+
+| Rule | Eppadi choose pannum | Eppo nallaa irukkum |
+|---|---|---|
+| Round robin | adutha server, murai-padi | servers onnu pola irundhu, requests orey maadhiri irukkum podhu |
+| Least connections | kammi open requests irukkura server | file uploads maadhiri sila requests mella irukkum podhu |
+| Weighted | periya servers-ku adhigam traffic | servers size-la vera vera-aa irukkum podhu |
+| User illa IP-oda hash | adhe user-ku adhe server | cache locality thevai-na; state-ku oru oonrukol-aa use pannaadheenga |
+
+Load balancers **health checks** anuppum, ovvoru sila seconds-kum `/health`-ku oru request maadhiri. Fail aagura server, recover aagura varaikkum rotation-la irundhu eduthudum, adhanaala oru crash outage-aa maaradhu. **Layer 4** balancer network address-um port-um vachu route pannum, romba vegam. **Layer 7** balancer HTTP-a purinjukkum, adhanaala `/api`-yum `/images`-aiyum vera vera services-ku route pannalaam, HTTPS-a kaiyaalalaam. Cloud-la neenga perumbaalum managed balancer use pannuveenga, AWS Application Load Balancer illa Google Cloud Load Balancing maadhiri; nginx-um HAProxy-um neengalae odura options-la popular.
+
+**Autoscaling**, CPU 60%-ku mela irukkura maadhiri oru metric, illa requests per second adhigamaa nikkum podhu servers-a serkkum, kurainjaa neekkum. Amaidhiyaana naatkalla selavu micham pannum, busy-aana naatkalla pathukaakkum. Aana pudhu servers start aaga oru nimisham, rendu nimisham aagum, adhanaala sale nadu raathiri maadhiri therinja spikes-ku, munnaadiyae scale up pannunga.
+
+Gnaabagam vainga, app servers-a scale panradhu, avai share panra edhuvum pakkam pressure-a nagarthum. Oru database-a paththu app servers adichaa adhu thaangaadhu; adhukku adutha lessons-la caches, replicas, sharding paarpom.
+
+**Interviews-la**, scaling kelvigal perumbaalum "traffic paththu madangu aanaa enna aagum?"-nu thodangum. Nalla badhil mudhalla bottleneck-a solli, apram fix-a solludhu: load balancer-kku pinnaadi stateless app servers, headroom-oda autoscaling, apram database, cache maadhiri shared tiers. Health checks-a, oru server saagumbodhu enna nadakkum-nu solli mudinga; neenga valarchi mattum illa, failure pathiyum yosikkureenga-nu adhu kaattum.
+
+**Unga browser-la try pannunga.** Sila requests mella irukkum podhu round robin-a least connections-oda compare pannunga.
+
+```python
+import random
+
+def simulate(policy, servers=3, n=3000, seed=4):
+    rng = random.Random(seed)
+    busy = [0.0] * servers
+    worst, rr = 0.0, 0
+    for _ in range(n):
+        busy = [max(0.0, b - 1.0) for b in busy]                  # each tick, servers finish some work
+        i = rr % servers if policy == "round robin" else busy.index(min(busy))
+        rr += 1
+        busy[i] += rng.choice([0.5] * 9 + [12.0])                 # 1 in 10 requests is slow
+        worst = max(worst, busy[i])
+    return worst
+
+for p in ("round robin", "least connections"):
+    print(f"{p:<18} worst queue: {simulate(p):.1f}")
+```
+
+## Oru worked example
+
+Vikram oru cricket fantasy app-oda engineering-a nadathuraanga. Normal naatkalla traffic steady-aa irukkum, aana oru IPL match lock aagura kadaisi paththu nimishangala, users avanga teams-a edit panna odi varuvaanga, traffic sumaar irubathu madangu thaavum.
+
+App oru periya server-la aarambichadhu, ovvoru season-um vertical-aa scale pannanga. Oru final-la adhu 100% CPU-va thotadhu, requests queue aagi, neraya users avanga teams-a save panna mudiyala. Periya server option irattippu cost, adhu innum podhaadhu.
+
+Avanga team moonu steps-la horizontal scaling-ku maarinaanga:
+
+1. **App-a stateless aakkinanga.** Sessions server memory-la irundhu Redis-ku maarichu, upload panna profile photos object storage-ku poyichu. Entha server-um ippo entha user-kum serve pannalaam.
+2. **Munnaadi oru managed layer 7 load balancer vechaanga**, `/health` endpoint-oda, adhu app Redis-aiyum database-aiyum reach panna mudiyudha-nu check pannum. Check fail aagura servers thaanaa vilagum.
+3. **Autoscaling-a requests per second-la set pannanga**, adhoda ovvoru match lock-kum 30 nimishathukku munnaadi servers-a serkkura scheduled rule-um, yen-naa pudhu servers ready aaga sumaar 90 seconds aachu.
+
+Adutha final-la, traffic sumaar 2,000-la irundhu 40,000 requests per second-ku ezhundhadhu. Group 4-la irundhu 60 servers-aa valarndhu, lock-kku aprom thirumba kuraindhadhu. Peak-la rendu servers crash aanaa, health checks avatra seconds-la neekkidhu, users kavanikkavae illa.
+
+Pudhu bottleneck database, adhu ovvoru team edit-aiyum paarthadhu. Adhu thaan Vikram-oda team-ai cache-um read replicas-um serkka vechadhu, adutha lessons-oda subject.
+
+## Podhuvaa panra thappugal
+
+**App servers-la state vechukkradhu.** In-memory sessions-um local file uploads-um rendavadhu server serkkura udane udaiyum. Mudhalla state-a veliya nagarthunga.
+
+**Sticky sessions-a nambradhu.** Users-a servers-oda pin panradhu state problem-a maraichi, load-a samaa illaama pirikkum. Konja neram patch-aa mattum use pannunga.
+
+**Health checks illaama, illa aazhama illaadha checks.** "OK" nu mattum thirumbura check, server adhoda database-a reach panna mudiyaadha podhum pass aagum. Mukkiyamaana dependencies-a check pannunga, aana checks-a vegamaa vainga.
+
+**Romba late-aa autoscale panradhu.** Servers start aaga rendu nimisham aanaa, oru nimishathula peak aagura spike, udhavi varra munnaadi mudinjirum. Therinja events-ku munnaadiyae scale pannunga.
+
+**Load balancer-um fail aagalaam-nu marakkradhu.** Managed, redundant balancer use pannunga, illa onnukku mela odunga.
+
+**Thappaana tier-a scale panradhu.** Database bottleneck-na app servers-a serkkirathu help pannaadhu. Mudhalla alandhu paarunga.
+
+## Practice pannunga
+
+1. Watch & learn panel-la irukkura horizontal vs vertical scaling, load balancers pathi video lessons-a paarunga.
+2. Mela irukkura exercise-a pannunga.
+3. Project check-a pannunga: oru balancer-kku pinnaadi rendu app copies, apram onna nirutthi traffic shift aagurathai paarunga.
+4. Results day maadhiri spike-la neenga use panra oru app-a paarthu, adha eppadi scale pannuveenga-nu varainga.

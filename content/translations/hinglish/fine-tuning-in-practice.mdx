@@ -1,0 +1,169 @@
+---
+id: fine-tuning-in-practice
+lang: hinglish
+title: "Fine-tuning practice mein: tools, settings aur loss curve padhna"
+outcome: "Fine-tune ko samajhdaari se chalao: base model, method aur tool chuno, learning rate, batch size aur epochs set karo, loss curves padho, aur jo run seekh nahi raha use debug karo."
+answer: "Pipeline ko pehle chhote model par saabit karo, LoRA se shuru karo, phir training aur validation loss dekhkar learning rate, batch size aur epochs tune karo. Zyadatar failed runs data ya settings ki wajah se hote hain, model ki wajah se nahi."
+why_it_matters: "Fine-tune kyun karna hai ye jaanna aadha kaam hai; baaki aadha ek aisa run hai jo sach mein chale. Teams un runs par din gawa deti hain jo diverge karte hain, overfit karte hain ya chupchaap kuch seekhte hi nahi. Kuch practical habits fine-tuning ko predictable aur sasta bana deti hain."
+flashcards:
+  - q: "Har fine-tune kin teen choices se shuru hota hai?"
+    a: "Ek base model, ek method (jaise LoRA ya full fine-tuning) aur use chalane ke liye ek tool ya framework."
+  - q: "Sabse sasta model pehle kyun test karein?"
+    a: "Jis model ki aapko parwah hai us par paise lagane se pehle ye saabit karne ke liye ki code, data format aur saving sab kaam karte hain."
+  - q: "Learning rate kya control karta hai?"
+    a: "Weights ke har update ka size kitna bada ho. Bahut zyada ho toh loss kudta hai ya phat jaata hai; bahut kam ho toh mushkil se girta hai."
+  - q: "Gradient accumulation kis liye hai?"
+    a: "Jab memory sirf chhote batches deti hai, toh ye har update se pehle kai chhote batches jodta hai, taaki training bade batch jaisi stable rahe."
+  - q: "Kitne epochs use karne chahiye?"
+    a: "Data size par depend karta hai: bahut bade sets ke liye ek ya do passes, chhote sets ke liye kai. Jab validation loss girna band ho jaye tab ruk jao."
+  - q: "Training loss gir raha hai par validation loss badh raha hai, iska kya matlab hai?"
+    a: "Overfitting: model training examples ko ratt raha hai. Kam epochs, zyada data ya kam learning rate use karo."
+  - q: "Prompt loss weight kya hai?"
+    a: "Loss mein prompt tokens response ke muqable kitna count karte hain. Aam taur par chhota ya zero, taaki model responses likhna seekhe, prompts nahi."
+  - q: "Lambe run se pehle ek quick sanity check kya hai?"
+    a: "Kuch examples par train karo aur dekho model unhe yaad kar paata hai ya nahi. Wahan bhi loss na gire, toh pipeline toota hua hai."
+exercise:
+  title: "Ek short-answer grader jo seekh nahi raha"
+  setup: "Chennai ki ek ed-tech company ek open 8B model ko LoRA se fine-tune kar rahi hai taaki woh students ke English aur Tamil short answers ko correct, partly correct ya wrong grade kare, ek line ki wajah ke saath. Unke paas 2,400 graded examples hain. Run 1 mein learning rate 2e-3 aur 3 epochs the: loss kudta raha aur model ke outputs bakwaas ho gaye. Run 2 mein 1e-6 aur 3 epochs the: loss mushkil se hila aur outputs base model jaise dikhe."
+  questions:
+    - q: "Run 1 mein kya galat hua?"
+      a: "Learning rate bahut zyada tha, isliye updates aage nikal gaye aur training diverge ho gayi. Use lagbhag das guna kam karo."
+    - q: "Run 2 mein kya galat hua?"
+      a: "Learning rate bahut kam tha, isliye weights mushkil se badle. Badhao; LoRA runs aam taur par 1e-4 se 2e-4 ke aas-paas rehte hain."
+    - q: "Run 3 mein 2e-4 hai. Training loss steadily gir raha hai, aur validation loss epoch 2 tak girta hai, phir badhta hai. Kya karna chahiye?"
+      a: "Epoch 2 ke end wala checkpoint rakho. Uske baad model training set ko ratta lagana shuru kar deta hai."
+    - q: "Result ko kaise judge karein?"
+      a: "Asli answers ke ek untouched test set par, dono languages mein, sabse achhe prompt-only baseline ke saamne, aur language-wise accuracy bhi check karke."
+ask:
+  - "LoRA fine-tuning ke liye kaunsa learning rate use karun?"
+  - "Kitne epochs fine-tune karun?"
+  - "Mera fine-tuned model base model se kharab kyun hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Fine-tuning ke lessons batate hain ki fine-tuning kya badalti hai aur LoRA memory kaise bachata hai. Ye lesson ek run ko achhe se chalane ke baare mein hai: shuru mein kaun se choices lete ho, kaun si kuch settings sabse zyada matter karti hain, aur loss curves se kaise pata chale ki cheez kaam kar rahi hai.
+
+Har fine-tune teen choices se shuru hota hai:
+
+1. **Ek base model.** Pehle ye dekhne ke liye ki task ho sakta hai ya nahi, sabse strong model use karo jo aap afford kar sako: agar woh task nahi seekh sakta, toh kamzor models bhi nahi seekhenge. Phir cost kam karne ke liye chhote models try karo.
+2. **Ek method.** **LoRA** ya kisi aur halke method se shuru karo. Ise kam memory aur kam data chahiye, aur serve karte waqt kai adapters ek base model share kar sakte hain. Full fine-tuning baad mein try karo, agar aapke paas hazaaron examples ya usse zyada hain aur LoRA kam padta hai.
+3. **Ek tool.** Sabse aasan provider ki fine-tuning service hai: data upload karo, model wapas pao, par kam settings ke saath aur sirf unke models. Hugging Face TRL aur PEFT, Unsloth, Axolotl, LLaMA-Factory aur LitGPT jaise open-source frameworks aapke apne GPUs par chalte hain aur har setting dete hain.
+
+Do aam development paths:
+
+- **Progression path.** Code ko sabse sasta model par test karo, data ko beech ke model par test karo, quality ko sabse achhe model se badhao, phir kai sizes compare karke best price aur performance dhoondho.
+- **Distillation path.** Ek strong model ko ek chhote, shaandaar dataset par fine-tune karo, use aur training data banane mein lagao, phir ek sasta model us par train karo.
+
+```flow
+title: Ek fine-tuning run jis par bharosa ho sake
+Clean data aur locked test set -> Sabse chhote model par smoke test | kya code shuru se end tak chalta hai?
+Sabse chhote model par smoke test -> 20 examples ko overfit karo | kya loss gir bhi sakta hai?
+20 examples ko overfit karo -> LoRA ke saath asli run | training aur validation loss dekho
+LoRA ke saath asli run -> Loss healthy hai?
+Loss healthy hai? -[kudta hai ya phat jaata hai]-> Learning rate kam karo
+Loss healthy hai? -[mushkil se hilta hai]-> Learning rate badhao ya data check karo
+Loss healthy hai? -[validation badhta hai]-> Kam epochs, best checkpoint rakho
+Loss healthy hai? -[haan]-> Prompt baseline ke saamne test set par evaluate karo
+Learning rate kam karo -> LoRA ke saath asli run
+Learning rate badhao ya data check karo -> LoRA ke saath asli run
+Kam epochs, best checkpoint rakho -> Prompt baseline ke saamne test set par evaluate karo
+```
+
+## Ye kaam kaise karta hai
+
+**Learning rate** weights update karte waqt har step ka size hai. Ek run ko bana ya bigaad dene waali sabse badi setting yahi hai.
+
+- Bahut zyada: loss kudta hai ya upar chadh jaata hai, aur outputs bakwaas ban sakte hain.
+- Bahut kam: loss mushkil se girta hai aur model lagbhag badalta hi nahi.
+- Kaam ki values bahut chaudi range mein hoti hain, lagbhag 1e-7 se 1e-3 tak. LoRA runs aam taur par 1e-4 se 2e-4 ke aas-paas shuru hote hain; full fine-tuning bahut chhoti values use karta hai, aksar pre-training ke end mein use hui rate ka dasvaan hissa ya usse kam.
+- Ek **schedule** aksar thodi der warm up karta hai, phir end ki taraf rate kam karta hai.
+
+**Batch size** ye hai ki har update kitne examples se seekhta hai. Bahut chhote batches (lagbhag 8 se kam) training ko unstable bana sakte hain; bade batches zyada steady updates dete hain par zyada memory maangte hain. Jab memory tang ho, **gradient accumulation** har update se pehle kai chhote batches jodta hai, jisse memory ke bina bade batch ki stability milti hai.
+
+**Epochs** training data par poore passes hain. Bahut bade datasets ko sirf ek ya do chahiye ho sakte hain; kuch hazaar examples kai epochs tak behtar hote reh sakte hain. Validation loss ko decide karne do: jab tak woh gir raha hai training chalao, jab badhne lage tab roko.
+
+**Prompt loss weight** control karta hai ki har example ka prompt wala hissa kitna count hota hai. Inference par user prompt likhta hai aur model response, isliye zyadatar setups response ko poora count karte hain aur prompt ko kam ya bilkul nahi (kai tools default mein prompt ko mask karte hain; kuch lagbhag 10% use karte hain).
+
+**Curves padhna.** Har kuch darjan steps ke baad training loss aur validation loss ko plot karo.
+
+| Aap kya dekhte ho | Sambhaavit wajah | Kya karna hai |
+| --- | --- | --- |
+| Loss spike karta hai ya NaN ho jaata hai | Learning rate bahut zyada, ya kharab data | Rate kam karo; khaali ya bahut bade examples check karo |
+| Shuru se loss flat hai | Rate bahut kam, galat labels, ya galat tokens par loss | Rate badhao; data format aur masking check karo |
+| Training gir raha hai, validation badh raha hai | Overfitting | Kam epochs, zyada data, pehle wala checkpoint rakho |
+| End mein dono ab bhi gir rahe hain | Undertrained | Zyada epochs ya zyada data |
+| Loss theek hai, outputs kharab | Data galat cheez sikhata hai, ya inference par prompt format alag hai | Examples padho; training aur use dono mein wahi chat template use karo |
+
+**Aadatein jo din bacha deti hain.**
+
+- Poori pipeline ka **smoke test** ek chhote model aur kuch examples par karo: load, train, save, reload, generate.
+- **Jaanbujhkar overfit karo**: 20 examples par tab tak train karo jab tak model unhe doharaye nahi. Agar na dohara paye, toh kuch toota hua hai.
+- **Checkpoints ko** aise folder mein save karo jo maujood ho, itni baar ki crash par ghante nahi, kuch minute lagein.
+- Training aur use dono mein **wahi chat template** use karo. Mismatch chupchaap results kharab kar deta hai.
+- Har run ke saath **har setting** aur data version **log karo**.
+
+Apne loss logs padhne ke liye ek chhota helper:
+
+```python
+def diagnose(train_loss, val_loss):
+    """Lists of loss values measured at the same steps."""
+    if any(x != x or x > 10 * train_loss[0] for x in train_loss):   # NaN or blow-up
+        return "Unstable: lower the learning rate and check for bad examples."
+    if train_loss[-1] > 0.95 * train_loss[0]:
+        return "Not learning: raise the learning rate or check data and masking."
+    best = val_loss.index(min(val_loss))
+    if best < len(val_loss) - 1:
+        return f"Overfitting after step {best}: keep that checkpoint or use fewer epochs."
+    return "Both still falling: more epochs or more data may help."
+
+print(diagnose([2.1, 1.6, 1.2, 0.9, 0.7], [2.0, 1.6, 1.4, 1.5, 1.7]))
+```
+
+## Ek example se samjho
+
+Chennai ki ek ed-tech company ek open 8B model ko LoRA se fine-tune kar rahi hai taaki woh English aur Tamil short answers ko correct, partly correct ya wrong grade kare, ek line ki wajah ke saath. Unke paas 2,400 graded answers hain, 300 ko locked test set aur 200 ko validation ke liye rakhte hain.
+
+Pehle, 0.5B model par 20 examples ke saath smoke test: run, saving aur reloading sab kaam karte hain, aur model 20 examples yaad kar leta hai. Phir asli runs:
+
+| Run | Learning rate | Epochs | Curves ne kya dikhaya | Test accuracy |
+| --- | --- | --- | --- | --- |
+| 1 | 2e-3 | 3 | Loss kuda, phir phat gaya; outputs bakwaas | Use ke laayak nahi |
+| 2 | 1e-6 | 3 | Loss mushkil se hila; outputs base model jaise | 61% |
+| 3 | 2e-4 | 3 | Epoch 2 ke end par validation best, phir badha | 84% (epoch-2 checkpoint) |
+| Prompt-only baseline | n/a | n/a | n/a | 72% |
+
+Numbers sirf illustration ke liye hain. Run 3 ka epoch-2 checkpoint prompt baseline ko 12 points se haraata hai. Tamil accuracy English se 6 points neeche hai, isliye agla kadam aur Tamil examples hain, aur tuning nahi.
+
+## Aam galtiyaan
+
+- **Bahut bade model par full fine-tune se shuru karna.** Pehle LoRA se task saabit karo.
+- **Smoke test chhod dena.** Save path mein ek typo ek raat ki training barbaad kar sakta hai.
+- **Sirf training loss se judge karna.** Sirf validation aur test results asli seekhna dikhate hain.
+- **Saare epochs ko andhe hokar use karna.** Wahi checkpoint rakho jahan validation best tha.
+- **Ek saath kai settings badalna.** Ek badlo, compare karo, phir agli.
+- **Production mein alag prompt format.** Model ne ek template seekha; use wahi do.
+
+## Settings tune karna kab band karein
+
+- **Samajhdaar settings par validation results stable hain.** Aage ke gains data se aayenge, knobs se nahi.
+- **Ek segment peeche hai**, jaise koi language ya question type: uske liye examples jodo.
+- **Prompt baseline kareeb hai.** Agar fine-tuning sirf ek-do points se jeetti hai, toh upkeep shaayad kaam ka na ho.
+
+## Demo se production tak
+
+- **Har run record karo**: data version, base model, method, har setting, curves aur test scores.
+- **Best checkpoint aur uska exact template rakho**, aur deployed model ko usi test set par test karo.
+- **Base model ya data badalne par recipe dobara chalao**; record ki hui recipe ise routine bana deti hai.
+- **Launch ke baad monitor karo**, kyunki asli inputs training data se door hote jaate hain.
+
+## Practice karo
+
+1. Kisi bhi task ke 50 examples par ek chhote open model ko free notebook mein fine-tune karo. Teen learning rates try karo aur loss curves plot karo.
+2. 20 examples ko jaanbujhkar overfit karo, aur confirm karo ki model unhe doharata hai.
+3. Apne curves par diagnose helper chalao aur likho ki kaun sa checkpoint rakhoge aur kyun.
+
+Aur gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 7 fine-tuning methods, frameworks aur hyperparameters cover karta hai.
+
+**Aapka kaam poora jab:** aap ek fine-tuning project ka safe order bata sako, ek starting learning rate, batch size aur epochs set kar sako, aur ek run ko uske loss curves se diagnose kar sako.

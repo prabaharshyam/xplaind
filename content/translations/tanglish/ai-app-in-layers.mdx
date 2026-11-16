@@ -1,0 +1,176 @@
+---
+id: ai-app-in-layers
+lang: tanglish
+title: "Oru AI app-a layers-la valarkkradhu: context, guardrails, routing, caching, agents"
+outcome: "Oru AI product-a oru single model call-la aarambichu, unmaiyaana thevai vara podhu mattum context, guardrails, router-um gateway-um, caches, agent steps-a serunga; monitoring mudhal naal-la irundhae irukkanum."
+answer: "Oru model call-la aarambinga, thevai varum podhu mattum parts-a serunga: context, guardrails, router-um gateway-um, caches, apram agent loops-um actions-um. Ovvoru layer-yum mudhal naal-la irundhu gavanichukkunga."
+why_it_matters: "Teams, oru santhoshamaana user kooda illaama oru complex AI platform-a build pannuvaanga, apram edhu udanjudhu-nu solla mudiyaama thavippaanga. System-a oru layer oru layer-aa valarkkradhu adha simple-aa, cheap-aa, debug panna easy-aa vechirukkum, interviewers edhirpaakkura architecture kadhai-yum idhu thaan."
+flashcards:
+  - q: "Romba simple AI app architecture edhu?"
+    a: "App, user-oda query-a oru model-kitta anuppi, answer-a thirumba tharudhu. Context illa, guardrails illa, caching illa."
+  - q: "Oru app valarum podhu perumbaalum mudhalla enna varum?"
+    a: "Nalla context: documents illa data-la irundhu retrieval, vishayangala thedi paakka tools, appo model sariyaana facts-la irundhu badhil solum."
+  - q: "Input guardrails edhaiyellaam thadukkum?"
+    a: "Velila services-ku private data leak aagradhu, kedutha illa inject pannina instructions model-ku pogradhu."
+  - q: "Output guardrails enna pidikkum?"
+    a: "User paakkradhukku munnaadi thappaana format, support illaadha illa unsafe content, leak aana personal data. Apram retry pannum, fall back aagum, illa oru aal-kitta kudukkum."
+  - q: "Model router enna pannum?"
+    a: "Ovvoru request-um enga pogum-nu mudivu pannum: oru cheap illa strong model, oru specialist, oru stock reply, illa oru aal; perumbaalum oru sirusaana, vegamaana classifier-vechu."
+  - q: "Gateway enna serkkum?"
+    a: "Ellaa model calls-kum oru idam: keys, access control, cost limits, logging, retries-um providers-ku idaiyila fallbacks-um."
+  - q: "Semantic cache yen risky?"
+    a: "Adhu oru answer-a, paakka mattum orae maadhiri irukkura oru question-ku thirumba use pannum. Loose match thappaana answer tharum, adhanaala threshold-a kavanamaa set pannunga, alandhu paarunga."
+  - q: "Agent loops-um write actions-um eppo serkkanum?"
+    a: "Kadaisiyaa, tasks-ku unmaiyaavae pala steps illa edhaavadhu maatha thevaippadum podhu mattum, agent enna seiyalaam-nu approvals-oda limits-oda."
+exercise:
+  title: "Pune-la oru clinic-booking assistant"
+  setup: "Pune-la 40 clinics irukkura oru chain, oru neelamaana prompt-oda, oru single model call-aana WhatsApp assistant-a launch pannuchu. Adhu timings-yum fees-yum pathi kelvikku badhil sollum, aana patients thangaloda lab reports pathiyum kekkuraanga, appointments book panna try pannuraanga, sila neram Aadhaar-yum phone numbers-yum share pannuraanga. Selavu yeruthu, adhe paththu questions traffic-la 40%."
+  questions:
+    - q: "Avanga mudhalla enna serkkanum, yen?"
+      a: "Context: ippo irukkura timings, fees, doctor schedules-a avanga system-la irundhu retrieve pannunga; appo answers neelamaana prompt-la irundhu oohikkaama sariyaa irukkum."
+    - q: "Indha assistant-ku edhu guardrails thevai?"
+      a: "Input: model-a call panradhukku munnaadi Aadhaar-yum phone numbers-yum mask pannunga. Output: policy-ku mela medical advice-a block pannunga, sollra fees source-oda match aagudhaa-nu check pannunga."
+    - q: "Thirumba thirumba varra questions-ku selavu-a safe-aa eppadi kuraikkalaam?"
+      a: "Top FAQs-a stock answers-ku illa, normalise pannina question-la key pannina exact cache-ku route pannunga. Semantic cache-a, adhoda matches sandhegamae illaama adhe question-nu test pannina aprom mattum use pannunga."
+    - q: "Assistant thaanaave appointments book pannalaamaa?"
+      a: "Meedhi ellaam work aana aprom thaan: oru tool-aa, patient-oda confirmation-oda, enna maatha mudiyum-nu limits-oda, ovvoru booking-yum logging-oda."
+ask:
+  - "Oru production LLM app-ku enna components thevai?"
+  - "Model router-kum gateway-kum enna difference?"
+  - "Semantic cache eppo nalla idea?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Ovvoru AI product-um orae maadhiri thaan aarambikkum: unga app oru model-ku oru kelvi-a anuppi answer-a kaattum. Idhu oru muzhumaiyaana, work aagura architecture. Perumbaalaana unmaiyaana products idhula irundhu parts-a serthu valarum, order mukkiyam.
+
+Neraya teams valarum oru podhuvaana order:
+
+1. **Context-a better pannunga.** Model-ku sariyaana information-a kudunga: documents-la irundhu retrieval, data lookups, tools.
+2. **Guardrails podunga.** Model-ku ulla pogradhaiyum veliya varradhaiyum check pannunga.
+3. **Router-um gateway-um serunga.** Ovvoru request-yum sariyaana idathuku anuppunga, ellaa model calls-yum oru idathula manage pannunga.
+4. **Caches serunga.** Adhe velaiku rendu dhadava selavu pannaadheenga.
+5. **Agent patterns serunga.** Loops, pala steps, ulagathula edhaavadhu maatha actions.
+
+Idhu ellaathoda sernthu, mudhal naal-la irundhu: **monitoring**, appo ovvoru part-um enna pannudhu-nu paakkalaam.
+
+Idhu oru kattayamaana recipe illa. Unmaiyaana oru problem kekkum podhu mattum oru layer-a serkkanum-nu thaan point, appo system, product anumadhikkara alavukku simple-aa irukkum.
+
+```flow
+title: Valarndha oru AI app-vazhiyaa oru request
+User question -> Input guardrails | personal data mask, injection block
+Input guardrails -> Router | intent: FAQ, account, scope-ku velila
+Router -[FAQ]-> Cache | exact illa semantic
+Cache -[miss]-> Retrieve context | documents, data, tools
+Router -[account]-> Retrieve context
+Router -[scope-ku velila]-> Stock reply
+Retrieve context -> Gateway | keys, limits, retries, fallback
+Gateway -> Model
+Model -> Output guardrails | format, facts, safety
+Output guardrails -[fail]-> Retry illa oru aal-kitta kudukkum
+Output guardrails -[pass]-> Answer, trace-a log pannu
+```
+
+## Idhu eppadi work aagudhu
+
+**Step 1: context-a mempadutthunga.** Oru model-ku adhoda training data-vum prompt-la neenga vekkradhum mattum thaan theriyum. Perumbaalaana aarambha quality problems missing illa pazhasaana facts, adhanaala mudhal addition perumbaalum retrieval (documents, oru database, oru search index) illa tools (oru order lookup, oru calculator). RAG-um tool-calling-um lessons idhai aazhamaa cover pannum.
+
+**Step 2: guardrails.** Rendu vagai.
+
+- **Input guardrails**, private data velila services-ku leak aagaama thadukkum, example model call-ku munnaadi Aadhaar numbers, phone numbers, names-a mask panradhu, kedutha illa inject pannina instructions-a pidikkum.
+- **Output guardrails**, user paakkradhukku munnaadi answer-a check pannum: valid format, support illaadha claims illa, personal data illa, unga policy-ku edhiraa edhuvum illa. Oru check fail aanaa, retry pannalaam, vera model-ku fall back pannalaam, oru safe message tharalaam, illa oru aal-kitta kudukkalaam.
+
+Guardrails latency-a serkkum, kuripaa stream aagura answers-la, adhula text-a kaattradhukku munnaadiyaa, kaattum podhaa check pannanum-nu mudivu pannanum. Vegamaana checks-a inline-aa vechukkunga, mella-aanavai-a oru sample-la.
+
+**Step 3: router-um gateway-um.**
+
+- Oru **router**, oru request enga pogum-nu mudivu pannum, perumbaalum oru sirusaana, vegamaana intent classifier-vechu. Easy questions-a oru cheap model-ku, kashtamaanavai-a oru strong model-ku anuppalaam, billing disputes-a oru aal-ku anuppalaam, scope-ku velila irukkura questions-ku model-a call pannaamalae oru polite stock reply tharalaam, illa oru message kuzhappamaa irundhaa clarification kekkalaam ("Freeze my account, or the weather?").
+- Oru **gateway**, ellaa model calls-um pogura oru idam. API keys-a vechirukkum, appo avai services-la sidharaama irukkaadhu; yaaru entha model use pannalaam-nu control pannum, spend limits-a amulpadutthum, ovvoru call-yum log pannum, oru provider down-aa irundhaa retry pannum illa vera provider-ku fall back aagum.
+
+**Step 4: caches.**
+
+- **Exact cache:** adhe normalise pannina question, template version, model onnu-na, adhe store pannina answer varum. Safe-um simple-um.
+- **Semantic cache:** oru pudhu question, oru pazhaya question-oda **artham** onnu-na, oru answer-a thirumba use panradhu, embeddings-vum oru similarity threshold-vum vechu match pannuvaanga. Questions thirumba thirumba varra podhu neraya save pannum, aana oru loose match thappaana answer tharum ("refund for order 1" -um "refund for order 2" -um close). Hit rate adhigamaa irukkum podhum, adhoda thappugala alandhirukkum podhum mattum serunga.
+
+Thirumba use panna safe-aana exact cache key-la, answer-a maathura ellaathaiyum serkkanum:
+
+```python
+import hashlib, re
+
+def cache_key(question, template_version, model, day):
+    """Same key only when the answer would be the same: same words, prompt, model and day."""
+    normalised = re.sub(r"\s+", " ", question.strip().lower())
+    raw = f"{normalised}|{template_version}|{model}|{day}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+# cache_key("What are Dr Mehta's timings?", "v7", "fast-model", "2026-11-08")
+```
+
+- **Prompt caching**-um **KV cache**-um model provider illa server-la nadakkum; avai work aaga, unga prompt-oda maaraadha pagudhi-a mudhalla vechukkunga.
+
+**Step 5: agent patterns.** Ippo varaikkum ovvoru request-um oru pakkamaa pogum. Agent patterns loops (mudhal answer muzhumaiyillana thirumba retrieve pannu), pala steps, email anuppradhu illa oru appointment book panradhu maadhiri **write actions**-a serkkum. Avai system-a romba capable-aa aakkum, romba risky-aavum aakkum. Kadaisiyaa serunga, data-va maathura edhukkum approvals-oda, tools enna seiyalaam-nu limits-oda, steps-kum spend-kum budgets-oda.
+
+**Mudhal naal-la irundhu monitoring.** Ovvoru request-yum oru trace-aa log pannunga: input, retrieved context, model, prompt version, output, guardrail results, latency, cost, personal data mask aagi. Oru dashboard-la konjam signals-a track pannunga: error-um refusal rates-um, guardrail triggers, ovvoru request-ku cost, latency, user feedback. System valarum podhu, edhu layer fail aachu-nu kandupidikka traces thaan vazhi.
+
+| Layer | Eppo serkkanum | Saadhaarana tools | Adhu konduvara pudhu risk |
+| --- | --- | --- | --- |
+| Context | Answers facts-a miss pannum illa kandupidikkum | Vector search, SQL, APIs | Thappaana illa pazhasaana documents |
+| Guardrails | Unmaiyaana users-um unmaiyaana data-vum varum | PII masking, validators, judge checks | Latency, thappaana blocks |
+| Router | Requests difficulty illa type-la maarum | Sirusaana classifier, rules | Thappaa route aana requests |
+| Gateway | Oru model, service illa team-a vida adhigam | LiteLLM, cloud gateways | Oru single point of failure |
+| Cache | Neraya thirumba thirumba varra questions | Redis, vector index | Pazhasaana illa thappaana thirumba use |
+| Agents-um actions-um | Tasks-ku pala steps illa maatrangal thevai | Agent SDKs, LangGraph | Control illaadha loops, harmful actions |
+
+## Oru worked example
+
+Pune-la 40 clinics irukkura oru chain, oru WhatsApp assistant nadathudhu. Adhu timings-yum fees-yum list panra oru neelamaana prompt-oda oru model call-aa aarambichudhu. Aaru maadham aprom, naalu problems: sollra fees sila neram pazhasaa irukkum, patients messages-la Aadhaar-yum phone numbers-yum share pannuraanga, adhe paththu questions traffic-la 40%, patients appointments book panna kettute irukkaanga.
+
+Order-la valarkkuraanga:
+
+1. **Context.** Timings, fees, doctor schedules ippo question vara neraththula clinic system-la irundhu varudhu. Pazhaya fees maraiyudhu.
+2. **Guardrails.** Entha model call-ku munnaadiyum Aadhaar-yum phone numbers-yum mask aagudhu. Oru output check, diagnosis maadhiri padikkura edhaiyum block pannum, fees clinic system-oda match aagudhaa-nu confirm pannum.
+3. **Router.** Oru sirusaana classifier, top FAQs-a fixed answers-ku, lab-report questions-a oru secure link-ku, urgent edhaiyum oru phone number-ku anuppudhu, model call illaama.
+4. **Exact cache**, meedhi thirumba thirumba varra questions-ku, normalise pannina question-oda date-oda key pannina, yen-na schedules thinam maarum.
+5. **Booking oru tool-aa**, kadaisiyaa: assistant oru slot-a propose pannum, patient oru button-la confirm pannuvaanga, ovvoru booking-yum log aagum.
+
+| Measure | Munnaadi | Aprom |
+| --- | --- | --- |
+| 1,000 messages-ku model calls | 1,000 | 520 |
+| Thappaana fee illa timing answers (vaaraanthira sample) | 6% | 1%-ku kammi |
+| Aadhaar numbers-oda model-ku anuppina messages | Dhinam sila | Onnum illa |
+| Chat-la mudinja bookings | 0 | Booking requests-la 22% |
+
+Numbers example-kaaga thaan. Avanga semantic cache-a serkkala: oru test, adhu "Dr Mehta's timings"-a "Dr Mehra's timings"-oda match pannadhai kaattuchu.
+
+## Podhuvaa panra thappugal
+
+- **Muzhu platform-a mudhalla build panradhu.** Paththu users-ku munnaadi aindhu layers-na, debug panna aindhu idam, kathukkitta edhuvum illa.
+- **Context work aagradhukku munnaadi agents-a serkkradhu.** Thappaana facts-la seiyra agent innum adhigam, innum vegamaa nashtam kudukkum.
+- **Log mattum panra guardrails.** Block pannaadha, retry pannaadha, escalate pannaadha oru check edhaiyum paadhugaakkaadhu.
+- **Details irukkura questions-la semantic cache.** Order numbers, names, dates, orae maadhiri theriyura questions-a vera artham-aakkidum.
+- **Traces illaama irukkradhu.** Oru request-ku oru trace illaama, retrieval-aa, router-aa, model-aa fail aachu-nu solla mudiyaadhu.
+- **Keys-um limits-um services-la sidharaama irukkradhu.** Oru gateway, simple-aa irundhaalum, spend-yum access-yum oru idathula vechirukkum.
+
+## Simple-aa vechukka vendiya idangal
+
+- **Konjam peroda internal tools-ku** router, gateway, cache eppavum thevaippadaama pogalam.
+- **Kammi volume** caching-um routing-um savings-a gavanikka mudiyaadha alavukku sirusaakkum.
+- **Read-only answers-ku** agent loops-um write actions-um thevai illa.
+
+## Demo-la irundhu production-ku
+
+- **Ovvoru layer-um yen irukkunu ezhudhi vechukkunga**, adhu theertha problem-um, alandha effect-um-oda.
+- **Layers-a thaniyaa test pannunga**: retrieval recall, router accuracy, guardrail false-block rate, cache error rate.
+- **Ellaathaiyum serthu version pannunga**: prompts, router model, guardrail rules, cache keys; appo oru release-a oru ottaiyaa rollback pannalaam.
+- **Safe-aa fail aagunga**: oru layer down-aa irundhaa, request oru error page-ku illa, oru simple-aana path-ku fall back aaganum.
+
+## Practice pannunga
+
+1. Neenga therinjukitta oru AI feature-oda architecture-a ippo irukkura madhiri varainga. Aindhu layers-la edhu irukku?
+2. Illaadha ovvoru layer-kum, adha serkkalaam-nu justify panra problem-a, adha eppadi alappeenga-nu ezhudhunga.
+3. Thirumba thirumba varra oru question type-a pick pannunga, mudivu pannunga: stock answer, exact cache, semantic cache illa onnum illa. Yen-nu vilakkunga.
+
+Innum aazhama padikka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025) puthagathoda 10-aam chapter-um, adhoda free article "Building a generative AI platform"-um indha architecture-a padi padiyaa kaattum.
+
+**Mudinjadhu-nu eppo sollalaam:** aindhu layers-a order-la varaiyalaam, router-kum gateway-kum difference-a explain pannalaam, oru semantic cache eppo safe-nu sollalaam.

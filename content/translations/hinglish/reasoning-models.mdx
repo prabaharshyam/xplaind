@@ -1,0 +1,156 @@
+---
+id: reasoning-models
+lang: hinglish
+title: "Reasoning models aur test-time compute: model ko kab zyada sochne dein"
+outcome: "Chain of thought, best-of-N aur reasoning models samjhao, mushkil answer sahi karwane ka sabse sasta tareeka chuno, aur extra cost aur intezaar ko control mein rakho."
+answer: "Test-time compute ka matlab hai behtar answer ke liye answer dene ke time zyada kharch karna: step by step reason karna, kai answers sample karke sabse achha rakhna, ya aise model ka use karna jo pehle sochne ke liye train hua ho."
+why_it_matters: "Reasoning models aur 'think step by step' galat answer ko sahi bana sakte hain, par woh cost aur intezaar ka time kai guna bhi badha sakte hain. Ye jaanna ki zyada sochna kab fayda deta hai aur kab nahi, ab ek core design decision hai aur interview mein aksar poochha jaane waala topic bhi."
+flashcards:
+  - q: "Test-time compute kya hai?"
+    a: "Train karte time nahi, answer dete time zyada computing kharch karna: lamba reasoning, ya kai answers jinme se sabse achha rakha jaaye."
+  - q: "Chain-of-thought prompting kya hai?"
+    a: "Answer dene se pehle model se problem ko step by step solve karne ko kehna. Maths, logic aur multi-step sawaalon mein sabse zyada madad karta hai."
+  - q: "Best-of-N kya hai?"
+    a: "N answers generate karna aur sabse achha rakhna, jise checker, scoring model ya majority vote chunta hai. Lagbhag N guna kharch aata hai."
+  - q: "Verifier kya hai?"
+    a: "Woh jo answer ko check ya score kare: code ke liye tests, ek SQL run, ek rule check, ya reward model. Achhe verifiers best-of-N ko worth-it banate hain."
+  - q: "Majority vote (self-consistency) kab achha kaam karta hai?"
+    a: "Jab answers exact aur compare karne mein aasaan hon, jaise ek number, ek class label ya multiple-choice ka letter."
+  - q: "Reasoning model kya hai?"
+    a: "Aisa model jo answer dene se pehle lambe samay tak sochne ke liye train hua ho, aksar hidden thinking tokens ke saath aur ek setting ke saath ki kitna effort lagana hai."
+  - q: "Reasoning user experience ko kaise bigaad sakta hai?"
+    a: "Sochna reply se pehle hota hai, isliye user ko pehla dikhne waala shabd ke liye zyada intezaar karna padta hai aur extra tokens ka paisa bhi dena padta hai."
+  - q: "Mushkil task par sabse sasta pehla kadam kya hai?"
+    a: "Test set par plain answer napo, phir step-by-step prompting try karo. Sampling ya reasoning model par tabhi jao jab numbers kahein."
+exercise:
+  title: "JEE-style maths answers grade karna"
+  setup: "Kota ki ek coaching company chahti hai ki AI roz 300 JEE-style maths problems ke students ke final answers check kare aur galtiyaan samjhaye. Known answers waali 200 problems par ek mid-size model par plain prompt 71% checks sahi karta hai. Har problem ka ek numeric answer hai. Ek reasoning model 90% score karta hai par har problem par 6 guna kharch aata hai aur 20 second lagte hain."
+  questions:
+    - q: "Reasoning model se pehle unhe kya try karna chahiye?"
+      a: "Wahi model par step-by-step prompting, phir 5 samples par majority vote. Har answer ek number hai, isliye vote gino aasaan hai."
+    - q: "Yahan majority vote achha fit kyun hai?"
+      a: "Answer exact hai. Agar 5 mein se 4 samples 12.5 dein, toh woh agreement strong evidence hai, aur disagreement un problems ko flag karti hai jinhe zyada dhyaan se check karna hai."
+    - q: "Reasoning model rakhte hue cost kaise control kar sakte hain?"
+      a: "Sirf un problems ko reasoning model ke paas route karo jahan sasti samples disagree karti hain. Zyadatar aasaan problems wahan tak pahunchti hi nahi."
+    - q: "Students ek check ke liye 20 second intezaar karte hain. Kya madad karega?"
+      a: "Sochte time progress dikhao, checks background mein chalao aur khatam hone par notify karo, ya pehle fast answer dikhao aur careful check alag aaye toh update karo."
+ask:
+  - "Normal model ki jagah reasoning model kab use karun?"
+  - "Chain of thought aur best-of-N mein kya farak hai?"
+  - "Reasoning ko mere app ko dheema aur mehnga banane se kaise rokun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+AI mein zyadatar paisa model dekhne se pehle hi kharch ho jaata hai: use train karne mein. **Test-time compute** uska doosra pehlu hai. Iska matlab hai answer dene ke waqt zyada computing kharch karna, taaki answer sahi hone ki sambhaavna badhe. "Test time" research mein inference ka shabd hai, jab model use hota hai.
+
+Ise karne ke teen common tareeke hain.
+
+1. **Use step by step sochne ko kaho.** Ye **chain-of-thought** (CoT) prompting hai: model answer se pehle apna reasoning likhta hai. Uska kareebi rishtedaar **self-critique** hai, jahan model khatam karne se pehle apna draft khud check karta hai.
+2. **Kai answers generate karo aur sabse achha rakho.** Ye **best-of-N** hai. Aap winner ko **verifier** (test, rule check ya scoring model) se chunte ho, ya jab answers exact hon tab majority vote se.
+3. **Reasoning model use karo.** Ye models answer dene se pehle lambe samay tak sochne ke liye train hote hain. Zyadatar aapko set karne dete hain ki kitna effort lagana hai, aur kuch sochna chhupa kar sirf result dikhate hain.
+
+Teeno accuracy ke liye paisa aur intezaar ka time dete hain. Hunar ye jaanne mein hai ki sauda kab worth-it hai.
+
+```flow
+title: Kitna sochna chahiye, ye chunna
+Naya sawaal -> Plain model ke liye mushkil? | apna test set check karo
+Plain model ke liye mushkil? -[nahi]-> Plain answer | tez aur sasta
+Plain model ke liye mushkil? -[haan]-> Step-by-step prompt | ise pehle try karo
+Step-by-step prompt -> Kaafi achha hai?
+Kaafi achha hai? -[haan]-> Ship karo
+Kaafi achha hai? -[nahi]-> Kya answers check ho sakte hain? | tests, rules, exact values
+Kya answers check ho sakte hain? -[haan]-> N sample karo aur verify karo | best-of-N ya vote
+Kya answers check ho sakte hain? -[nahi]-> Reasoning model | effort budget set karo
+```
+
+## Ye kaam kaise karta hai
+
+**Chain of thought.** Sabse simple version ek line jodta hai: "Think step by step before you answer," ya "Explain your reasoning, then give the final answer on the last line." Aap jo steps chahte ho unki list bhi de sakte ho, ya ek worked example dikha sakte ho. 2022 ka jo paper is method ka naam rakha, usne maths word problems par bade gains dikhaye, aur baad ke kaam ne paya ki ye gadhe hue facts kam kar sakta hai. Pench length ka hai: reasoned answer mein kaafi zyada tokens hote hain, aur sab ka paisa aur time lagta hai.
+
+**Best-of-N.** Kai answers maango, thodi variety ke saath (zyada temperature ya thode alag prompts), phir ek chuno.
+
+- **Verifier ke saath.** Generated code ko tests ke saath chalao, generated SQL chalao aur check karo ki rows aati hain, ya check karo ki extract ki gayi date asli date hai. OpenAI ne paya ki maths ke liye achhe verifier waala ek chhota model, bina verifier ke lagbhag 30 guna bade model ke barabar aaya.
+- **Majority vote se**, jise self-consistency bhi kehte hain. Wahi maths sawaal paanch baar poochho aur sabse common final number lo. Ye tab kaam karta hai jab answers exact hon: ek number, ek label, ek choice.
+- **Scoring model se.** Ek reward model ya LLM judge har answer ko rate karta hai. Ye open-ended text ke liye kaam karta hai par utna hi achha hai jitna judge.
+
+N answers sample karne mein lagbhag N guna kharch aata hai, isliye N aam taur par chhota hota hai: real products mein 3 se 8. Sainkdon ya hazaaron samples waale research runs dikhate hain ki gains aate rehte hain, par koi product har request par uska paisa nahi de sakta.
+
+**Reasoning models.** Inhe aksar aisi problems par reinforcement learning se train kiya jaata hai jinke answers check ho sakte hain, taaki woh reply se pehle ek lamba internal chain of thought banayein. Aap ise aam taur par effort ya budget setting se control karte ho. Ye maths, code, planning aur multi-step analysis mein chamakte hain. Simple sawaalon mein ye zyadatar cost aur delay hi badhate hain.
+
+Majority voting ke liye ek chhota helper:
+
+```python
+from collections import Counter
+
+def majority_answer(ask, question, n=5):
+    """ask(question) returns the model's final answer as a short string."""
+    answers = [ask(question).strip().lower() for _ in range(n)]
+    best, votes = Counter(answers).most_common(1)[0]
+    agreement = votes / n
+    # Low agreement is a signal: send it to a stronger model or a person.
+    return best, agreement
+
+# answer, agreement = majority_answer(ask, "If 3x + 7 = 25, what is x?")
+# if agreement < 0.6: escalate(question)
+```
+
+| Method | Extra cost | Extra intezaar | Kab sabse achha kaam karta hai | Kis baat se savdhaan rahein |
+| --- | --- | --- | --- | --- |
+| Step-by-step prompt | Output tokens ka 2 se 5 guna | Seconds | Multi-step problems | Lambe answers jinhe users ko scroll karke paar karna padta hai |
+| 5 ka majority vote | Lagbhag 5 guna | Parallel chalane par kam | Exact answers: numbers, labels | Free-form text ke liye bekaar |
+| Verifier ke saath best-of-N | Lagbhag N guna plus checks | Parallel ho toh kam | Code, SQL, jo formats test ho sakein | Weak verifier bure answers chunta hai |
+| Reasoning model | Aksar 3 se 10 guna | Seconds se minutes | Mushkil maths, code, planning | Aasaan sawaalon par sochne ka paisa dena |
+
+Ye multipliers options compare karne ke rough patterns hain, prices nahi. Apne hi sawaalon par napo.
+
+## Ek example se samjho
+
+Kota ki ek coaching company chahti hai ki AI JEE-style maths problems par students ke answers check kare aur galtiyaan samjhaye, roz lagbhag 300 problems. Woh known answers waali 200 problems ka ek test set banate hain aur options compare karte hain.
+
+| Option | Sahi checks | 100 problems ki cost | Typical intezaar |
+| --- | --- | --- | --- |
+| Mid-size model, plain prompt | 71% | ₹20 | 3 s |
+| Wahi model, step-by-step prompt | 81% | ₹55 | 8 s |
+| Step-by-step, 5 ka majority | 88% | ₹275 | 9 s (parallel) |
+| Reasoning model, medium effort | 90% | ₹120 | 20 s |
+| Route: 5 ka majority, reasoning model sirf jab votes disagree karein | 91% | ₹140 | Zyadatar ke liye 9 s, kuch ke liye 25 s |
+
+Numbers sirf ye dikhane ke liye hain ki compare kaise karte hain. Do baatein alag dikhti hain. Step-by-step prompt ek bada, sasta fayda tha. Aur routing ne har single option ko haraya: jab paanch mein se chaar ya paanch samples agree karte hain toh answer lagbhag hamesha sahi hota hai, isliye sirf vivaadit problems (lagbhag chhe mein se ek) reasoning model ke paas jaati hain.
+
+Woh progress bar ke saath "Checking your working…" dikhate hain, kyunki students chhota intezaar maan lete hain jab unhe dikhta hai ki kuch ho raha hai.
+
+## Aam galtiyaan
+
+- **Sab kuch ke liye reasoning model use karna.** Simple lookups, greetings aur formatting ko iski zaroorat nahi. Aap aisi sochne ke liye pay karte ho jo kuch nahi jodta.
+- **Sasta kadam skip kar dena.** Ek step-by-step prompt aksar gap ka bahut sa hissa cost ke ek hisse mein bhar deta hai.
+- **Free-form text par vote karna.** Do achhe paragraphs kabhi identical nahi hote, isliye vote kuch nahi dhoondhta. Uski jagah verifier ya judge use karo.
+- **Weak verifier par bharosa.** Agar checker ko bewakoof banana aasaan hai, toh best-of-N woh answer chunta hai jo use sabse achhe se bewakoof banaye.
+- **Users ko raw reasoning dikhana.** Woh lamba hota hai, confusing ho sakta hai aur usme galat modh ho sakte hain. Answer aur ek chhoti explanation dikhao.
+- **Intezaar bhool jaana.** Sochna khatam hone tak user ko kuch nahi dikhta. "User ko dikhne waale pehle shabd tak ka time" napo, model ka pehla token nahi.
+
+## Jab zyada sochna galat tool hai
+
+- **Model ke paas facts nahi hain.** Zyada der sochne se knowledge nahi judta. Retrieval use karo.
+- **Task simple ya creative hai.** Chhoti replies, summaries aur tone changes shaayad hi behtar hote hain.
+- **Chhote gain se zyada latency matter karti hai.** Voice agent ya autocomplete das second intezaar nahi kar sakte.
+- **Aap gain nahi napp sakte.** Test set ke bina aap zyada paisa denge aur pata nahi chalega ki madad mili ya nahi.
+
+## Demo se production tak
+
+- **Mushkil ke hisaab se route karo.** Aasaan sawaal fast model ko bhejo aur tabhi escalate karo jab koi check fail ho ya samples disagree karein.
+- **Budget cap karo.** Effort ya thinking limits aur ek maximum output length set karo, aur har request ki cost track karo.
+- **Samples parallel mein chalao.** Paanch answers ek saath lagbhag ek jitna hi time lete hain.
+- **Progress dikhao.** Dikhta hua step ya progress message intezaar ko chhota mehsoos karwata hai.
+- **Disagreements log karo.** Jin sawaalon par samples disagree karte hain wahi aapke sabse achhe test cases aur training examples hain.
+
+## Practice karo
+
+1. Known answers waale das maths ya logic sawaal lo. Kisi bhi chat model par ek plain prompt score karo, phir ek step-by-step prompt.
+2. Jin sawaalon ko usne galat kiya, har ek ke liye paanch answers sample karo aur majority lo. Vote ne kitne theek kiye?
+3. Har method ki cost aur intezaar likho, aur decide karo ki student app ke liye aap kaunsa ship karoge.
+
+Aur gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ke chapters 2 aur 5 test-time compute aur chain-of-thought prompting cover karte hain.
+
+**Aapka kaam poora jab:** aap test-time compute kharch karne ke teen tareeke samjha sako, bata sako ki majority vote kab kaam karta hai, aur reasoning costs ko control mein rakhne ke do tareeke bata sako.

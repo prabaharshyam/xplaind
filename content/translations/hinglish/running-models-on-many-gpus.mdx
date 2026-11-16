@@ -1,0 +1,166 @@
+---
+id: running-models-on-many-gpus
+lang: hinglish
+title: "Kai GPUs par models chalana: replicas, tensor aur pipeline parallelism"
+outcome: "Samjhao ki model GPUs mein kaise failaya jaata hai, serving ya training ke liye use copy karne (replicas) aur split karne (tensor ya pipeline parallelism) mein se chuno, aur ek deployment ka size nikaalo."
+answer: "Agar model ek GPU par fit ho jaaye, toh zyada users serve karne ke liye uski copies chalao. Agar fit na ho, toh split karo: har layer ko GPUs mein (tensor) ya layers ke groups ko GPUs mein (pipeline)."
+why_it_matters: "70B parameters aur usse bade open models ek GPU par fit nahi hote, aur real traffic ko ek se zyada copy chahiye. Model ko kaise failana hai ye chunna cost, speed aur reliability tay karta hai, aur ye ML platform interviews ka ek standard sawaal hai."
+flashcards:
+  - q: "Replica (data) parallelism kya hai?"
+    a: "Kai GPUs par model ki poori copies chalana. Serving ke liye har copy alag requests handle karti hai; training ke liye har ek alag batches."
+  - q: "Tensor parallelism kya hai?"
+    a: "Har layer ka matrix kaam kai GPUs mein baantna jo ek hi samay par compute karte hain. Ye bahut bade model ko chalne deta hai aur latency kam kar sakta hai."
+  - q: "Pipeline parallelism kya hai?"
+    a: "Layers ke alag groups ko alag GPUs par rakhna, taaki data ek se agle tak jaaye. Training throughput ke liye achha; single requests mein delay jodta hai."
+  - q: "Tensor parallelism ko GPUs ke beech tez links kyun chahiye?"
+    a: "GPUs har layer ke andar partial results exchange karte hain. Slow connections par, communication speed-up ko cancel kar sakta hai."
+  - q: "Low-latency serving ke liye aam taur par kaunsi parallelism se bacha jaata hai?"
+    a: "Pipeline parallelism, kyunki har request ko har stage se baari-baari guzarna padta hai."
+  - q: "Deployment ka size tay karte waqt pehla sawaal kya hai?"
+    a: "Kya model ki ek copy, uske KV cache ke saath, ek GPU par fit hoti hai? Haan toh replicas use karo; nahi toh split karo."
+  - q: "Context aur sequence parallelism kis cheez mein madad karte hain?"
+    a: "Bahut lambe inputs mein, sequence ya us par hone waale operations ko GPUs mein baantkar."
+  - q: "Weights ke alawa training ko aur kitni memory chahiye?"
+    a: "Gradients aur optimiser states, aksar weights se kai guna, isliye training in ko GPUs mein shard karne jaise tricks use karti hai."
+exercise:
+  title: "Hyderabad ke insurer ke liye 70B model serve karna"
+  setup: "Hyderabad ka ek insurer 2,000 staff ke use waale internal assistant ke liye 70-billion-parameter open model khud host karna chahta hai, jisme p95 first-token time 2 seconds se kam ho. Unke paas 80 GB ke 8 GPUs waale servers hain, jo har server ke andar tez links se jude hain."
+  questions:
+    - q: "Kya model 16-bit precision par ek GPU mein fit hota hai?"
+      a: "Nahi. 70 billion parameters 2 bytes par lagbhag 140 GB hain, jo ek 80 GB GPU se zyada hai, KV cache se pehle hi."
+    - q: "Use ek server ke andar kaise split karna chahiye?"
+      a: "4 GPUs par tensor parallelism (ya 8-bit precision par 2), server ke andar ke tez links use karke, jo KV cache ke liye jagah chhodta hai."
+    - q: "Woh zyada users ko kaise serve karenge?"
+      a: "8 GPUs par do copies chalao (4-4 ke do groups), aur traffic badhne par load balancer ke peeche zyada copies waale servers jodo."
+    - q: "Do servers ke beech pipeline parallelism kyun nahi?"
+      a: "Har request ek slow network par baari-baari dono servers se guzregi, delay jodegi, aur jab model ek server ke andar fit hota ho toh iski zaroorat nahi."
+ask:
+  - "Jo model ek GPU par fit nahi hota use kaise chalate hain?"
+  - "Tensor aur pipeline parallelism mein kya farak hai?"
+  - "70B model serve karne ke liye mujhe kitne GPUs chahiye?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Ek GPU ke paas ek fixed matra mein memory aur speed hoti hai. Do alag problems aapko kai GPUs use karne ki taraf dhakelti hain:
+
+1. **Model ek GPU ke liye bahut bada hai.** 16-bit precision par 70B model ke sirf weights ko lagbhag 140 GB chahiye, jo ek 80 GB GPU se zyada hai.
+2. **Ek copy aapke saare users ko serve nahi kar sakti.** Model fit hone par bhi, traffic ko kai copies chahiye ho sakti hain.
+
+Do basic jawab hain: model ko **copy** karo, ya **split** karo.
+
+- **Replica parallelism** (training mein **data parallelism** kehte hain): kai GPUs par poori copies chalao. Har copy alag requests serve karti hai, ya alag batches par train hoti hai.
+- **Model parallelism**: ek model ko GPUs mein split karo. Do mukhya tareeke hain **tensor parallelism** (har layer ke andar ka kaam baanto) aur **pipeline parallelism** (layers ko groups mein baanto).
+
+Real systems aksar dono ko milate hain: ek model 4 GPUs mein split, aur aise kai groups replicas ke roop mein.
+
+```flow
+title: Model ko kaise failana hai, ye chunna
+Model aur expected traffic -> KV cache ki jagah ke saath ek GPU par fit hota hai?
+KV cache ki jagah ke saath ek GPU par fit hota hai? -[haan]-> Replicas | har GPU par ek copy
+KV cache ki jagah ke saath ek GPU par fit hota hai? -[nahi]-> Ek server ke andar fit hota hai?
+Ek server ke andar fit hota hai? -[haan]-> Uske GPUs mein tensor parallelism
+Ek server ke andar fit hota hai? -[nahi]-> Servers ke andar tensor, servers ke beech pipeline
+Replicas -> Zyada traffic ke liye copies jodo | load balancer ke peeche
+Uske GPUs mein tensor parallelism -> Zyada traffic ke liye copies jodo | load balancer ke peeche
+Servers ke andar tensor, servers ke beech pipeline -> Zyada traffic ke liye copies jodo | load balancer ke peeche
+```
+
+## Ye kaam kaise karta hai
+
+**Replicas.** Sabse simple aur sabse robust option: har GPU (ya GPUs ka group) ek poora model rakhta hai aur apni requests handle karta hai. Zyada replicas ka matlab zyada throughput, aur ek fail ho toh baaki serve karte rehte hain. Alag size ke models aur alag memory ke GPUs hone par, kya kahan rakhna hai ye tay karna ek packing puzzle ban jaata hai: ek 40 GB GPU par teen 13B models, ya ek 34B model?
+
+**Tensor parallelism.** Ek layer zyadatar matrix multiplication hoti hai. Matrices ko, maan lo, 4 GPUs mein baanto: har ek apna slice ek hi samay par compute karta hai, phir woh results exchange karte hain. Ye bahut bade model ko fit karwa deta hai, aur latency kam kar sakta hai kyunki kaam baanta gaya. Dikkat communication ki hai: GPUs har layer ke andar baat karte hain, isliye unhe bahut tez links chahiye, jaise ek server ke andar GPUs ke beech ke high-speed connections. Slow networks par, tensor parallelism aam taur par fayda dena band kar deti hai.
+
+**Pipeline parallelism.** Layers 1 se 20 GPU 1 par, 21 se 40 GPU 2 par, aur aise hi aage. Ek request har stage se baari-baari guzarti hai. Batches ko chhote "micro-batches" mein todne se saare stages busy rehte hain, jo training throughput mein madad karta hai. Serving ke liye, har request har stage aur unke beech ke network hops ka intezaar karti hai, isliye jab latency matter karti hai toh pipeline parallelism se bacha jaata hai. Ye zyadatar tab servers ko jodne ke liye use hoti hai jab model ek server ke liye bahut bada ho.
+
+**Lambe inputs.** **Context parallelism** bahut lambe input ko GPUs mein baantti hai, aur **sequence parallelism** us par hone waale operations ko. Ye mukhya roop se bahut lambe context windows ke liye matter karti hain.
+
+**Training ko zyada chahiye.** Weights ke alawa, training gradients aur optimiser states rakhti hai, aksar weights ke size se kai guna. **Sharding** ke saath data parallelism (un states ko GPUs mein failana, jaise ZeRO ya FSDP mein) plus tensor aur pipeline parallelism bade teams ko bahut bade models train karne dete hain. Fine-tuning ke liye, LoRA aur quantisation aam taur par is mein se zyadatar ki zaroorat hata dete hain.
+
+Serving engines details sambhaal lete hain. vLLM ke saath, model ko 4 GPUs mein split karna ek setting hai:
+
+```python
+from vllm import LLM, SamplingParams
+
+# Split each layer across 4 GPUs in this server (tensor parallelism).
+llm = LLM(model="your-org/your-70b-model", tensor_parallel_size=4)
+out = llm.generate(["Summarise this claim note: ..."], SamplingParams(max_tokens=200))
+print(out[0].outputs[0].text)
+
+# More users? Run more copies (replicas) on other GPU groups or servers
+# behind a load balancer. Spanning servers adds pipeline_parallel_size.
+```
+
+| Approach | Kya split karta hai | Kis ke liye best | Mukhya cost |
+| --- | --- | --- | --- |
+| Replicas (data parallelism) | Kuch nahi; poori copies | Zyada users, reliability | Har copy ke liye model fit hona chahiye |
+| Tensor parallelism | Har layer ke andar ka kaam | Bahut bade models, kam latency | GPUs ke beech bahut tez links chahiye |
+| Pipeline parallelism | Layers ke groups | Servers ke beech bahut bade models; training | Har request mein delay jodta hai |
+| Context ya sequence parallelism | Input sequence | Bahut lambe contexts | Complexity |
+| Sharded data parallelism (training) | Gradients aur optimiser states | Bade models train karna | Communication overhead |
+
+**Apne browser mein try karo.** Ek model ko kitne GPUs chahiye? Size, precision aur GPU memory badlo.
+
+```python
+import math
+
+def gpus_needed(params_billion, bytes_per_param, gpu_gb, kv_cache_gb, headroom=0.9):
+    need = params_billion * bytes_per_param + kv_cache_gb
+    return need, math.ceil(need / (gpu_gb * headroom))
+
+for params, bpp in [(8, 2), (70, 2), (70, 1)]:
+    need, n = gpus_needed(params, bpp, gpu_gb=80, kv_cache_gb=20)
+    print(f"{params}B at {bpp} bytes: {need:.0f} GB -> {n} GPU(s) of 80 GB")
+```
+
+## Ek example se samjho
+
+Hyderabad ka ek insurer 2,000 staff ke liye 70B open model khud host karna chahta hai, p95 first-token time 2 seconds se kam ke saath. Har server mein 80 GB ke 8 GPUs hain, server ke andar tez links ke saath.
+
+1. **Kya ek GPU par fit hota hai?** 70 billion × 2 bytes ≈ 16-bit par 140 GB. Nahi.
+2. **Ek server ke andar?** Haan. 4 GPUs par tensor parallelism 320 GB deti hai, jo kai concurrent chats ke KV cache ke liye kaafi jagah chhodti hai. 8-bit precision par, 2 GPUs bhi use rakh sakte hain agar quality unke test set par confirm ho jaaye.
+3. **Zyada users.** Har server do copies (4 GPUs ke do groups) rakhta hai. Load tests dikhate hain ki ek copy unke busy-hour traffic ko latency budget ke andar aaram se handle karti hai, isliye ek server mein do copies headroom deti hain aur ek GPU fail hone par bhi bach jaati hain.
+
+| Set-up | Use hue GPUs | Busy-hour p95 first token | Notes |
+| --- | --- | --- | --- |
+| Tensor 4, ek copy | 4 | 1.4 s | GPU fail hone par spare nahi |
+| Tensor 4, do copies | 8 | 0.9 s | Chuna gaya: headroom aur failover |
+| 8-bit par Tensor 2, chaar copies | 8 | 0.8 s | Quantise karne ke baad quality check chahiye |
+| Do servers ke beech pipeline | 16 | 2.6 s | Slow aur mehenga; zaroorat nahi |
+
+Numbers illustration ke liye hain. Woh 8-bit option ko bhi test karne ka plan karte hain, jo quality bani rahe toh usi hardware par capacity double kar sakta hai.
+
+## Aam galtiyaan
+
+- **Aise model ko split karna jo ek GPU par fit ho jaata hai.** Replicas simple aur aam taur par tez hoti hain.
+- **Slow networks par tensor parallelism.** Use tez links waale ek server ke andar rakho.
+- **Model fit hota hai ya nahi, ye check karte waqt KV cache bhool jaana.**
+- **Chat serving ke liye pipeline parallelism.** Ye har request mein delay jodti hai.
+- **Headroom nahi.** Ek copy ka koi failover nahi; ek GPU fault service ko down kar deta hai.
+- **Average traffic se size nikaalna.** Busy hour ke liye size karo, real prompt lengths wale load tests ke saath.
+
+## Jab aapko in mein se kuch nahi chahiye
+
+- **Hosted APIs**: provider sambhaal leta hai.
+- **Chhote models** jo ek GPU par kaafi jagah chhodkar fit ho jaate hain: zaroorat padne par bas replicas jodo.
+- **LoRA aur quantisation ke saath fine-tuning**, jo aksar ek hi GPU par fit ho jaati hai.
+
+## Demo se production tak
+
+- **GPUs kharidne se pehle har copy ki memory naapo** (weights plus aapke context length aur concurrency par KV cache).
+- **Har layout ko real prompt aur reply lengths ke saath load-test karo.**
+- **Jis service par log depend karte hain, uske liye kam se kam do copies rakho.**
+- **Har replica ko monitor karo**: utilisation, queue length, latency aur errors.
+- **Model badalne ke baad dobara plan karo**, kyunki size aur context length layout badal dete hain.
+
+## Practice karo
+
+1. Ek 7B, ek 34B aur ek 70B model ke liye 16-bit aur 8-bit par, nikaalo ki weights ke liye har ek ko kitne 24 GB, 48 GB aur 80 GB GPUs chahiye.
+2. 500 users ke liye failover ke saath 70B model serve karne ka layout banao, aur batao ki har hissa kaunsi parallelism use karta hai.
+3. Ek dost ko samjhao ki tensor parallelism ko GPUs ke beech tez links kyun chahiye aur pipeline parallelism ko kyun nahi.
+
+Zyada gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 9 replica, tensor, pipeline, context aur sequence parallelism cover karta hai.
+
+**Aapka kaam poora jab:** aap diye gaye model aur GPU ke liye replicas aur splitting mein se chun sako, tensor aur pipeline parallelism ka farak samjha sako, aur ek simple serving layout ka size nikaal sako.

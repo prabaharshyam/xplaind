@@ -1,0 +1,174 @@
+---
+id: linux-shell-ssh
+lang: tanglish
+title: "Linux, shell, SSH"
+outcome: "Oru remote Linux server-la nambikkaiyoda velai seiyalaam: suththi varalaam, logs padikkalaam, processes, disk check pannalaam, oru sinna shell script ezhudhalaam, SSH keys vechu connect pannalaam."
+answer: "Linux shell-la server-la commands odalaam: suththi vara ls, cd, logs padikka tail, processes, disk check panna ps, df, paadhukaappaa connect panna keys-oda ssh."
+why_it_matters: "Client systems Linux servers-la odum, perumbaalum neenga tools install panna mudiyaadha servers. Maalai 7 manikku AI service badhil sollaama ninnaa, neenga SSH panni logs padichu yen-nu kandupidippeenga. Shell-la comfort-aa irukkuradhu oru crisis-a pathu nimisha fix-aa maathidum."
+flashcards:
+  - q: "AI engineers-ku Linux shell yen thevai?"
+    a: "Oru AI system odura kittathatta ella server-um Linux, SSH vazhiyaa oru text shell moolam thaan adha adaiyaranum, desktop illa."
+  - q: "df -h, du -sh enna kaattum?"
+    a: "df -h ovvoru disk-um evvalavu nirambi irukku-nu kaattum; du -sh folders evvalavu idam use panraanga-nu kaattum. Nirambina disks puriyaadha outages-ku oru common kaaranam."
+  - q: "Oru log valarum podhu adha eppadi follow panradhu?"
+    a: "Oru file-ku tail -f app.log, systemd services-ku journalctl -u service-name -f, containers-ku docker logs -f."
+  - q: "Shell-la pipe enna pannum?"
+    a: "Oru command-oda output-a adutha command-ku anuppum, adhanaala sinna tools serndhu velai seiyum, example grep ERROR app.log | sort | uniq -c."
+  - q: "Environment variable-na enna?"
+    a: "Oru program thanoda environment-la irundhu padikkura peyar potta setting, DATABASE_URL, API key maadhiri, export NAME=value vachu set panradhu."
+  - q: "Scripts-a yen set -euo pipefail-la aarambikkanum?"
+    a: "Script mudhal error-la, set aagaadha variable-la, illa fail aana pipe step-la nikkanum, paadhi mudinja velaiyoda thodaraama."
+  - q: "SSH keys eppadi work aagum?"
+    a: "ssh-keygen oru key pair uruvaakkum. Server-ku unga public key kidaikkum; private key unga machine-a vittu orupodhum pogaadhu, neenga yaar-nu adhu nirubikkum."
+  - q: "Jump host illa bastion-na enna?"
+    a: "Private servers-a adaiya neenga connect panra oru server, example ssh -J bastion app-server."
+exercise:
+  title: "Outage-a padinga"
+  setup: "11:40-ku Hyderabad client-oda document-search API errors tharuradhu. Neenga SSH panreenga. systemctl status service ovvoru sila seconds-kum restart aagudhu-nu kaattudhu. journalctl ovvoru restart-ku munnaadiyum 'MemoryError'-a kaattudhu. free -h 8 GB-la 7.8 GB memory use aagudhu-nu kaattudhu. Memory-padi sort panna ps aux, 11:30-ku oru cron job-aala aarambichadha, 'reindex.py'-nu oru process 6.5 GB use panradha kaattudhu. df -h disk 41%-nu kaattudhu."
+  questions:
+    - q: "Disk thaan problem-aa?"
+      a: "Illa. Disk 41% thaan nirambi irukku. Errors MemoryError, memory kittathatta nirambi irukku."
+    - q: "Edhu memory-a use panradhu, edhu adha aarambichudhu?"
+      a: "reindex.py, 6.5 GB use panni, 11:30-ku oru cron job-aala aarambichadhu, errors aarambikkura pathu nimisham munnaadi."
+    - q: "Service-a meetkka vegamaana safe fix enna?"
+      a: "Reindex job-a niruthunga illa pause pannunga, API service normal-aa restart aagattum, adhu badhil solludhaa-nu confirm pannunga."
+    - q: "Thirumba nadakkaama irukka rendu follow-ups enna?"
+      a: "Reindex-a amaidhiyaana neraththukku illa thani machine-ku maathunga, illa adhoda memory-a limit pannunga, memory use sumaar 85%-ku mela pona alert serkkunga."
+ask:
+  - "Ovvoru AI engineer-um therinjukka vendiya Linux commands enna?"
+  - "SSH keys-a eppadi set up panradhu?"
+  - "Oru server-oda disk-a edhu nirappudhu-nu eppadi kandupidikkalaam?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Unga AI application unga laptop-la work aagudhu. Appuram adhu oru server-ku pogudhu, oru maalai client phone panraanga: "Assistant badhil solradhu nindru pochu." Unga AI system odura kittathatta ella server-um **Linux**, adha neenga oru text **shell**, perumbaalum Bash, **SSH** vazhiyaa adaiveenga. Desktop illa, mouse illa, File Explorer illa.
+
+Neenga Linux expert-aa irukka thevai illa. Sinna, nambikkaiyaana skills set thevai:
+
+| Skill | Commands |
+| --- | --- |
+| Suththi varradhu, files padikkradhu | `pwd`, `ls -la`, `cd`, `cat`, `less`, `head`, `tail`, `grep` |
+| Enna odudhu, enna use panradhu-nu paakkuradhu | `ps aux`, `top` illa `htop`, `df -h`, `du -sh`, `free -h` |
+| Logs varum podhae padikkradhu | `tail -f`, `journalctl -u name -f`, `docker logs -f` |
+| Settings, scripts | `export`, `env`, `chmod +x`, `set -euo pipefail` |
+| Paadhukaappaa connect panradhu | `ssh-keygen`, `ssh`, `~/.ssh/config`, `ssh -J` |
+
+```flow
+dir: LR
+Your laptop | the private key stays here -[SSH key]-> Bastion, the jump host | checks your public key
+Bastion, the jump host -[SSH]-> App server | the ai-assistant service, logs, disk, memory
+```
+
+Indha lesson-la Pune-la oru logistics client-ku nadandha oru unmaiyaana outage-la ungala follow pannuvom: connect panradhula irundhu, kaaranatha kandupidichu, fix panni, ezhudhuradhu varaikkum. Mudiyum podhu, oru nirambina disk-a diagnose panni, SSH keys vechu nambikkaiyoda connect pannalaam.
+
+## Idhu eppadi work aagudhu
+
+### Navigation, files
+
+`pwd` neenga engae irukkeenga-nu kaattum. `ls -la` files-a, hidden-aiyum serthu list pannum. `cd` nagarum. `cat` oru sinna file-a print pannum; `less` oru neelamaana onnu-la scroll panna vidum; `head`, `tail` aarambam, mudivu kaattum.
+
+`grep -i "timeout" app.log` case-a ignore panni poruthamaana lines-a kandupidikkum; `grep -c` avatha ennum.
+
+**Pipes** (`|`) sinna tools-a serthu sakthi vaayndha onnaa maathum:
+
+```bash
+grep ERROR app.log | sort | uniq -c | sort -rn | head
+```
+
+Idhu error lines-a kandupidichu, ore maadhiri irukkuradhai group panni, ovvonnayum ennum, count padi sort panni mela pathu-a kaattum: romba common errors oru line-la.
+
+### Processes, resources
+
+| Kelvi | Command |
+| --- | --- |
+| En service odudhaa? | `ps aux \| grep uvicorn` illa `systemctl status ai-assistant` |
+| Ippo enna CPU, memory use panradhu? | `top` illa `htop` |
+| Disks evvalavu nirambi irukku? | `df -h` |
+| Edhu folders perusa irukku? | `du -sh *` illa `sudo du -sh /var/* \| sort -h` |
+| Evvalavu memory free? | `free -h` |
+
+Nirambina disk puriyaadha outages-ku oru common kaaranam: logs, temporary files, model downloads silent-aa adha nirappum, service edhaiyum ezhudha mudiyaadha varaikkum.
+
+### Logs
+
+- `tail -f app.log` oru log file valarum podhu follow pannum.
+- **systemd** odura services journal-la log pannum: `journalctl -u ai-assistant --since "1 hour ago"`.
+- Containers: `docker logs -f container-name`.
+
+### Environment variables
+
+Programs `DATABASE_URL`, API keys maadhiri settings-a **environment**-la irundhu padikkum. `export NAME=value` unga session-ku onnu set pannum; `env` avatha list pannum. Secrets-a environment-la illa secret manager-la vainga, code-la illa shell history-la orupodhum vaikkaadheenga.
+
+### Scripts
+
+Oru shell script-na commands-oda oru file. Ovvoru script-aiyum ippadi aarambinga:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+```
+
+`set -euo pipefail` script-a mudhal fail aana command-la, set aagaadha edhaavadhu variable-la, pipe-la fail aana edhaavadhu step-la nikka vaikkum, paadhi mudinja velaiyoda thodaraama. `chmod +x script.sh` vechu adha executable aakkunga.
+
+### SSH, keys
+
+1. `ssh-keygen -t ed25519` unga machine-la oru key pair uruvaakkum.
+2. Server-ku unga **public** key-a tharuveenga. **Private** key unga machine-a vittu orupodhum pogaadhu.
+3. `ssh deploy@10.0.4.12` password illaama ungala login pannum.
+
+`~/.ssh/config` entry servers-ku sinna peyar tharum. Neraya companies SSH-a oru **jump host** illa **bastion** vazhiyaa route pannuvaanga: `ssh -J bastion app-server` adhu vazhiyaa thaavum.
+
+### Permissions
+
+Ovvoru file-kum owner, group, matravanga-ku permissions irukku: read, write, execute. Oru private key-ku `chmod 600` thevai, illannaa SSH adha use panna maruppum. `sudo`-va thevaiyaana thani commands-ku mattum use pannunga, `rm -rf`-ku appuram Enter amukkuradhukku munnaadi rendu thadavai yosinga.
+
+## Oru worked example
+
+Pune-la oru logistics client, avanga delivery-query assistant 19:05-ku badhil solradhai nirutthitu-nu solraanga. Neenga avanga bastion vazhiyaa connect pannureenga:
+
+```bash
+ssh -J bastion.client.in deploy@assistant-01
+systemctl status ai-assistant        # active, but restarting every 30 seconds
+journalctl -u ai-assistant --since "19:00" | tail -50
+```
+
+Log `OSError: [Errno 28] No space left on device`-nu kaattudhu. Disk-a check pannureenga:
+
+```bash
+df -h /                                # 100% used
+sudo du -sh /var/* | sort -h | tail -3
+```
+
+`/var/log/ai-assistant`-la 38 GB irukku. Rendu vaaram munnaadi oru test-ku appuram debug logging on-lae vittutaanga, logs orupodhum rotate aagala.
+
+| Neram | Step | Kandupidichadhu |
+| --- | --- | --- |
+| 19:08 | `systemctl status` | Service ovvoru 30 seconds-kum restart aagudhu |
+| 19:09 | `journalctl` | "No space left on device" |
+| 19:10 | `df -h` | Disk 100% nirambi irukku |
+| 19:11 | `du -sh` | 38 GB debug logs |
+| 19:15 | Pazhaya logs-a compress panni neekki, level-a INFO-ku set panni, logrotate rule serthu, restart | Disk 34% |
+| 19:20 | Oru query test pannunga | Assistant thirumba badhil solludhu |
+
+Unga incident note-la kaaranam, fix, rendu follow-ups ezhudhureenga: 80%-la oru disk-space alert, production-la log level DEBUG illa-nu CI-la oru check.
+
+## Podhuvaa panra thappugal
+
+- **Pazhakkathula root-aa velai seiyradhu.** Thappugal aabathaa maarum. Normal user-um thani commands-ku `sudo`-vum use pannunga.
+- **Secrets-a command line-la paste panradhu.** Avai shell history-la poidum. Restricted permissions-oda environment files, illa client-oda secret manager use pannunga.
+- **Production-a kaiyaala edit panni yaarukkum sollaama irukkradhu.** Adutha deploy unga fix-a overwrite pannidum. Change-a code illa config-la vachu, ezhudhi vainga.
+- **`set -euo pipefail` illaadha scripts.** Fail aana step kavanikkapadaama poidum, apram varra steps data-va paadhikkum.
+- **Private keys-a share panradhu.** Ovvoru aalukkum, ovvoru machine-kum thani key, adhanaala access-a clean-aa eduthudalaam.
+- **Puriyaadha files-a delete panni idam kaali panradhu.** Edhu perusu, yen-nu mudhalla kandupidinga.
+
+## Practice pannunga
+
+Keezha link panni irukkura Missing Semester-oda shell, command-line environment lectures-a paarunga illa padinga.
+
+1. **Top errors.** Edhaavadhu oru Linux machine-la, oru free cloud VM, Windows-la WSL, illa oru Docker container-la, sila ERROR lines-oda 500-line fake log uruvaakki, oru pipeline-la top moonu error messages-a list pannunga.
+2. **Keys.** Oru SSH key generate panni, oru server-la illa GitHub-la serthu, password illaama connect pannunga.
+3. **Oru script.** `set -euo pipefail`-oda oru script ezhudhunga, adhu disk usage-a check panni 80%-ku mela warning print pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Edhu process illa folder oru disk-a nirappudhu-nu kandupidikka mudiyum, private key yen unga machine-a vittu orupodhum pogaadhu-nu explain panna mudiyum.

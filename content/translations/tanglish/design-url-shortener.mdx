@@ -1,0 +1,144 @@
+---
+id: design-url-shortener
+lang: tanglish
+title: "Design walkthrough: oru URL shortener"
+outcome: "System design track-la kathukitta ellaathaiyum use panni, oru URL shortener-a mudhalla irundhu kadaisi varai design panna mudiyum: requirements, estimates-la irundhu short-code generation, storage, vegamaana redirects-ku caching, click analytics varaikkum."
+answer: "Oru URL shortener, short codes-a neelamaana links-oda map panudhu. Unique codes-a generate panni, code-a key-aa vechu store panni, vegamaana redirects-ku hot codes-a cache panni, clicks-a background-la ennunga."
+why_it_matters: "URL shortener thaan mudhal system design interview kelvigalla romba common-aanadhu, yenna ovvoru building block-aiyum oru chinna idathula thodudhu. Oru design-a muzhusaa velai seiyradhu, entha system-kum neenga thirumba use panna pora rhythm-a kathukkodukkum."
+flashcards:
+  - q: "Oru URL shortener-oda core functional requirements enna?"
+    a: "Oru neelamaana URL-ku short code uruvaakkuradhu, oru short code-a adhoda neelamaana URL-ku redirect panradhu, virumbinaa clicks, expiry-a track panradhu."
+  - q: "URL shortener yen read-heavy?"
+    a: "Ovvoru link-um oru thadavai uruvaagum, aana pala thadavai click aagum, perumbaalum oru write-ku 100 illa adhukku mela reads."
+  - q: "7 base62 characters ethanai codes-a allow pannum?"
+    a: "62⁷, sumaar 3.5 lakh crore, pala varushathukku thevaippadradha vida romba adhigam."
+  - q: "Short codes generate panna rendu vazhigal enna?"
+    a: "Oru unique counter ID-a base62-la encode panradhu, illa URL-a hash panni sila characters-a edukkuradhu, collisions-a handle panni."
+  - q: "Redirects 301-aa 302-aa irukkanum?"
+    a: "Ovvoru click-aiyum ennanum-naa 302, yenna browsers oru 301-a cache panni unga server-a skip pannalaam."
+  - q: "Click counting-a yen oru queue-la podanum?"
+    a: "Redirects vegamaa irukkanum-nu; click event background-la record aagi, aprom aggregate aagum."
+  - q: "Links table-ku iyalbaana shard key edhu?"
+    a: "Short code, yenna ovvoru redirect-um sariyaa oru code-a mattum thedum."
+exercise:
+  title: "Size pannunga"
+  setup: "Unga shortener oru naalaikku 1 crore pudhu links uruvaakkum, ovvoru link-ukkum adhoda life-la average-aa 100 redirects serve pannum, ovvoru link row-um sumaar 500 bytes. Links 5 varusham vaikkapadum."
+  questions:
+    - q: "Average-aa second-ku evvalavu pudhu links?"
+      a: "1 crore ÷ sumaar 1 lakh seconds ≈ second-ku 115."
+    - q: "Average-aa second-ku evvalavu redirects, adhu enna suggest panudhu?"
+      a: "Writes-oda 100 madangu: sumaar second-ku 11,500. Reads dhaan adhigam, adhanaala database munnaadi oru cache romba mukkiyam."
+    - q: "5 varusha links-ku evvalavu storage?"
+      a: "1 crore × 365 × 5 ≈ 1,825 crore links × 500 bytes ≈ 9 TB, indexes, replicas illaama."
+    - q: "5 varushathukku 6 base62 characters podhumaa?"
+      a: "62⁶ sumaar 5,700 crore, 1,825 crore links-ku podhum, aana growth-ku headroom kammi; 7 characters-la growth-ku romba idam irukku."
+ask:
+  - "Short codes-ku URL-a hash pannanuma, illa counter use pannanuma?"
+  - "URL shortener-a spam-ku misuse panradha eppadi thadukkalaam?"
+  - "100 madangu traffic-ku indha design eppadi maarum?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+bit.ly maadhiri, illa banks, delivery apps anuppura SMS-la varra short links maadhiri, oru **URL shortener** oru neelamaana address-a `xpl.in/aZ3k9Qb` maadhiri chinna address-aa maathudhu. Andha short link-a open panna, original page-ku redirect aagum, service perumbaalum clicks-a ennum.
+
+Idhu simple-aa theriyudhu, adhanaala thaan interviewers idha virumbuvaanga: oru chinna problem, aana requirements, estimates, ID generation, database design, caching, sharding, background work, abuse prevention ellaathaiyum thodudhu. Indha lesson track-oda mudhal lesson-la irundha aindhu steps-oda idha walk through pannum.
+
+```flow
+title: Create
+Client -[neelamaana URL-a POST pannu]-> API | pudhu ID 125, base62 "aZ3k9Qb" tharudhu
+API -> Links DB | code vechu shard panradhu
+```
+
+```flow
+title: Redirect: hot path
+Client -[GET /aZ3k9Qb]-> Load balancer -> API
+API -> Redis cache
+Redis cache -[hit]-> 302 redirect
+Redis cache -[miss]-> Links DB -> 302 redirect
+API -[click event]-> Queue -> Analytics workers
+```
+
+## Idhu eppadi work aagudhu
+
+**1. Requirements.** Functional: oru neelamaana URL-ku short code uruvaakkuradhu; oru code-a adhoda URL-ku redirect panradhu; virumbinaa custom codes, expiry dates, click stats. Non-functional: redirects romba vegamaa (100 ms-ku romba kammi), highly available-aa irukkanum, yenna campaign SMS-la oru short link udainjaa romba theriyum. Codes unique-aa irukkanum, sequence-la guess panna kashtamaa irukkanum. Service spam, phishing abuse-ayum thaanga vendum.
+
+**2. Estimates.** Oru naalaikku 1 crore pudhu links-nu vechukkalaam, sumaar second-ku 115 writes, average-aa ovvoru link-ukkum 100 redirects, sumaar second-ku 11,500 reads, peaks-la pala madangu adhigam. 5 varushathula sumaar 1,825 crore links; ovvonnum sumaar 500 bytes-na, sumaar 9 TB. Idhu oru **read-heavy** system, adhanaala redirect path thaan romba mukkiyam.
+
+**3. Short codes.** Rendu mukkiya approaches:
+
+| Approach | Eppadi work aagum | Pros | Cons |
+|---|---|---|---|
+| Counter + base62 | ovvoru link-ukkum oru unique number, 0-9, a-z, A-Z digits-la ezhudhi | collisions illa, short codes | sequential codes guess panna mudiyum; distributed counter thevai |
+| URL-oda hash | example: hash-oda mudhal 7 characters | adhe URL-ku adhe code | collisions-a kandupidichu retry pannanum |
+| Random code | 7 random base62 characters | guess panna mudiyaadhu | insert-la collisions check pannanum |
+
+Common-aa edukkura choice, ovvoru app server-kum ID ranges kodukkura oru counter service; adhanaala servers ovvoru request-kum coordinate pannaadhu. Base62 encode panradhukku munnaadi number-a shuffle pannuvaanga, adhanaala codes paarkka sequential-aa theriyaadhu. Ezhu base62 characters sumaar 3.5 lakh crore codes-a allow pannum.
+
+**4. Storage, caching, scaling.** Core table simple: `code` (primary key), `long_url`, `created_at`, `expires_at`, `owner_id`. Ovvoru redirect-um code vechu oru lookup, adhu key-value store-ku illa code-a primary key-aa vecha relational table-ku set aagum. Oru database podhaadhunaa code vechu shard pannunga; appo ovvoru request-um sariyaa oru shard-a mattum thodum.
+
+Reads adhigam, links aprom rombavae maaraadhu-nu irukkradhaala, munnaadi Redis maadhiri oru cache podunga: perumbaalaana redirects database-a thodavae thodaadhu. Popular links cache-la hot-aa irukkum. Redirects-ku, ovvoru click-aiyum ennanum-naa **302** return pannunga; 301-a browsers cache pannum, appo avanga unga server-a skip pannuvaanga.
+
+**5. Analytics, abuse.** Clicks-a synchronous-aa ennaa redirects mella aagum. Adhukku badhila redirect handler oru chinna click event-a queue-ku publish panni udanae return aagum; workers ovvoru link-kum ovvoru manikkum clicks-a aggregate panni analytics store-la podum. Abuse-ku, pudhu URLs-a malware, phishing lists-oda check pannunga, user, IP vaarikku link creation-a rate-limit pannunga, reports vandhaa oru code-a seekiramaa disable panna vidunga.
+
+**Browser-la try pannunga.** Short codes-nu sollradhu 62 base-la ezhudhina numbers dhaan. Sila ids try pannunga.
+
+```python
+ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+def encode(n):
+    s = ""
+    while True:
+        n, r = divmod(n, 62)
+        s = ALPHABET[r] + s
+        if n == 0:
+            return s
+
+def decode(s):
+    n = 0
+    for ch in s:
+        n = n * 62 + ALPHABET.index(ch)
+    return n
+
+for i in (1, 61, 62, 125_000_000):
+    print(i, "->", encode(i), "->", decode(encode(i)))
+print("7 characters hold", f"{62 ** 7:,}", "codes")
+```
+
+## Oru worked example
+
+Karthik-ku Bengaluru-la oru product company interview-la indha kelvi kekkuraanga. Mudhal naalu nimisham requirements-ku selavu pannuraanga. Interviewer-kitta confirm panraanga: oru naalaikku 1 crore links, p95-la 50 ms-ku kezha redirects, daily click counts podhum, custom codes stretch goal.
+
+Estimates-a board-la ezhudhi, appuram mukkiya insight-a sollraanga: "Oru write-ku sumaar nooru reads, adhanaala design redirect path-a suththi thaan."
+
+Codes-ku oru counter propose panraanga. Oru chinna ID service ovvoru app server-kum oru thadavaikku 10,000 IDs block kodukkum, adhanaala servers adhoda rombavae pesa vendiyadhu illa. ID-a oru reversible shuffle-la anuppi, base62-la ezhu characters-aa encode pannuvaanga, adhanaala codes sequential-aa theriyaadhu. ID service down-aanaa enna aagum-nu interviewer kekkuraanga. Servers-kitta already IDs blocks irukku, konjam neram links create panni kittae irukkalaam, ID service-ae oru standby-oda odum-nu solraanga.
+
+Redirect path-ku: load balancer, stateless API servers, code-a key-aa vecha Redis cache, normal links-ku oru naal TTL, code vechu shard panna, replicas irukkura links database. 90% cache hit rate-la, peak-la database-ku sumaar 1,000 mudhal 2,000 reads thaan varum-nu estimate panraanga.
+
+Analytics-ku, ovvoru redirect-um `{code, time, country}`-a oru queue-ku push pannum. Workers adha hourly counts-aa roll up pannum. Trade-off-a sollraanga: click counts oru nimisham late aagalaam, idhu "per day podhum" requirement-ku sariyaa irukku.
+
+Appuram oru cricket match ad-la oru link viral aagudhu. Adhu map aagura Redis node-la cache-la irukkum, CDN illa load balancer adutha spikes-a absorb pannum-nu explain panraanga. Failure cases-yum abuse controls-yum solli mudikkuraanga.
+
+Aprom kidaicha feedback: ovvoru decision-aiyum oru number-oda illa requirement-oda kattinaanga, idhu thaan indha track valarkkura habit.
+
+## Podhuvaa panra thappugal
+
+**Read-to-write ratio-a ignore panradhu.** Write path-a detail-aa design panni, redirects-a pinnaadi yosikkiradhu point-a miss pannum. Hot path-oda aarambinga.
+
+**Guess panna easy-aana codes.** Simple sequential codes, private links ullatha, yaarum ella links-aiyum walk through panna vidum. IDs-a shuffle pannunga illa random codes use pannunga.
+
+**Collision handling illaama irukkradhu.** Hash, random codes clash aagalaam. Unique constraint podunga, pudhu code-oda retry pannunga.
+
+**Redirect path-la clicks-a ennuradhu.** Ovvoru click-kum analytics database-la ezhudhinaa redirects mella aagum, analytics-oda couple aagum. Click events-a queue pannunga.
+
+**Counts vennumbodhu 301 use panradhu.** Browsers permanent redirects-a cache panni, unga server-a keka maatanga.
+
+**Abuse-a marakkuradhu.** Shorteners spammers-kum phishers-kum romba pidikkum. Rate limits, URL scanning, seekiram takedown design-oda pagudhi.
+
+## Practice pannunga
+
+1. Watch & learn panel-la irukkura video lessons-a paarunga, indha kelvikku oru muzhu mock interview-um serthu.
+2. Mela irukkura sizing exercise-a pannunga.
+3. Project check pannunga: oru cache-um background click counting-um irukkura mini shortener build panni, scaling note ezhudhunga.
+4. Oru friend-oda indha kelvikku 35 nimisha mock interview pannunga, aindhu steps-a use panni, appuram roles-a maathunga.

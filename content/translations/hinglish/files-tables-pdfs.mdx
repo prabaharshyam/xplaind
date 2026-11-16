@@ -1,0 +1,159 @@
+---
+id: files-tables-pdfs
+lang: hinglish
+title: "Files, tables aur PDFs"
+outcome: "Clients jo messy files bhejte hain unhe padhna seekho: ajeeb encodings waali CSV aur Excel, nested JSON, aur text, tables ya scans waale PDFs."
+answer: "Real-world files messy hoti hain: CSV aur Excel ko pandas se sahi encoding ke saath padho, nested JSON ko dhyaan se parse karo, aur PDF ka text aur tables pdfplumber ya OCR jaise tools se nikalo."
+why_it_matters: "AI projects ek shared drive se shuru hote hain jo files se bhara hota hai. Agar text aur numbers bharosemand tareeke se nahi nikal sakte, toh aage kuch kaam nahi karta, aur client AI ko dosh deta hai. File handling glamorous nahi hai, par yahi decide karta hai ki project ship hoga ya nahi."
+flashcards:
+  - q: "Document parsing kya hai?"
+    a: "CSV, Excel, JSON aur PDFs jaisi real files se bharosemand text aur numbers nikalna. Zyadatar AI projects ka pehla asli kaam yahi hota hai."
+  - q: "CSV mein Tamil ya Hindi names garble kyun ho jaate hain?"
+    a: "File ko galat encoding se padha gaya, aam taur par UTF-8 text ko cp1252 ya Latin-1 maan kar decode kiya gaya. utf-8 se padho, ya agar file Excel byte-order mark se shuru hoti hai toh utf-8-sig se. cp1252 mein Indian scripts nahi aati."
+  - q: "Branch codes aur item codes ke leading zeros kaise bachayein?"
+    a: "Un columns ko text ki tarah padho, jaise pandas mein dtype=str, pandas ko unhe numbers mein badalne mat do."
+  - q: "05/11/2026 jaisi Indian dates ko sahi se kaise padhein?"
+    a: "dayfirst=True ke saath parse karo, taaki iska matlab 5 November ho, 11 May nahi."
+  - q: "pd.json_normalize kya karta hai?"
+    a: "Nested JSON records ki list ko ek table mein flatten karta hai, nested fields ke liye dotted column names ke saath."
+  - q: "Ek PDF se bilkul text kyun nahi aata?"
+    a: "Shaayad woh scan hai: pages images hain, text nahi. Padhne ke liye OCR chahiye."
+  - q: "OCR kya hai?"
+    a: "Optical character recognition: text ki images ko asli text mein badalna, Tesseract ya cloud document service jaise tools se."
+  - q: "Nikaale hue har text ke saath page number kyun record karein?"
+    a: "Taaki answers apna source cite kar sakein, aur baad mein galat answer ko dhoondh kar debug kar sako."
+exercise:
+  title: "Client ke folder ka diagnosis karo"
+  setup: "Thrissur ka ek cooperative bank assistant project ke liye ek folder bhejta hai: (1) members.csv, jisme Malayalam names 'à´°à´¾à´®àµ' jaise dikhte hain, (2) usi file mein '0042' jaise branch codes 42 dikhte hain, (3) loans.xlsx, jisme header ke upar do banner rows hain aur '2,50,000' jaise amounts, (4) 60 circular PDFs, jinme se 9 se lagbhag koi text nahi aata, (5) ek rates PDF, jisme interest table ek lambi uljhi hui line ban kar aata hai."
+  questions:
+    - q: "(1) mein kya galat hai, aur pehla fix kya try karein?"
+      a: "Encoding. Woh characters UTF-8 bytes hain jinhe cp1252 maan kar decode kiya gaya. File ko encoding='utf-8' se padho, ya 'utf-8-sig' se agar woh Excel byte-order mark se shuru hoti hai."
+    - q: "(2) aur (3) ko kaise fix karein?"
+      a: "Branch codes ko dtype ke saath text ki tarah padho. Excel file ke liye do banner rows skip karo aur numbers mein badalne se pehle amounts se commas hata do."
+    - q: "(4) ke 9 PDFs kya hain, aur kya karein?"
+      a: "Shaayad scanned circulars. Unhe characters per page se pehchaano, Malayalam language pack ke saath OCR chalao, aur images se spot-check karo."
+    - q: "(5) ki table ko kaise handle karein?"
+      a: "pdfplumber ya Camelot jaisa table-aware tool, ya vision-capable model use karo, phir kuch rows PDF se check karo."
+ask:
+  - "CSV mein encoding errors kaise fix karun?"
+  - "PDF se tables kaise extract karun?"
+  - "OCR ki zaroorat kab padti hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Clients shaayad hi kabhi clean database dete hain. Woh ek shared folder bhejte hain: merged headers waali Excel sheets, purane billing system se export hui CSVs, vendor ki API se JSON, aur saikdon PDFs, kuch digital aur kuch scanned. In files se bharosemand text aur numbers nikalne ko **document parsing** kehte hain, aur zyadatar AI projects ka pehla asli kaam yahi hota hai. Agar ye step galat hua, toh uspar bana har answer bhi galat hoga.
+
+Kaam file type ke hisaab se baantta hai:
+
+| File type | Aam taur par kya galat hota hai | Main tool |
+| --- | --- | --- |
+| **CSV aur Excel** | Encodings, leading zeros ka ud jaana, Indian number aur date formats, banner rows | pandas |
+| **JSON** | Gehri nesting, records ke andar lists | `json`, `pd.json_normalize` |
+| **Digital PDF** | Columns mix ho jaate hain, headers aur footers repeat hote hain, words toot jaate hain | pypdf, pdfplumber |
+| **Scanned PDF** | Text bilkul nahi, sirf images | OCR, jaise Tesseract ya cloud service |
+| **PDF tables** | Table ek uljhi hui line ban kar aati hai | pdfplumber, Camelot, ya vision-capable model |
+
+```flow
+Client folder -[.csv or .xlsx]-> pandas with explicit options -> A clean table
+Client folder -[.json]-> json + json_normalize -> A flat table
+Client folder -[.pdf]-> Extract text per page
+Extract text per page -[enough text]-> Keep it, with page numbers
+Extract text per page -[almost none]-> OCR -> Spot-check
+Extract text per page -[has tables]-> A table tool -> Check the rows
+```
+
+Is lesson mein hum Madurai ke ek hospital chain ke saath chalenge, jinki policies aur pharmacy price list ek assistant ko feed karni hain. End tak aap messy tables ko sahi load kar paoge aur pehchaan paoge ki kaunse PDFs ko OCR chahiye.
+
+## Ye kaam kaise karta hai
+
+### CSV aur Excel
+
+`pd.read_csv` aur `pd.read_excel` zyadatar kaam kar dete hain, par unke defaults maante hain ki data tidy hai. Real files ko options chahiye:
+
+| Problem | Option |
+| --- | --- |
+| Tamil ya Hindi names garble ho rahe hain | `encoding="utf-8"`, ya Excel byte-order mark ke liye `"utf-8-sig"`. Garble ka matlab aam taur par UTF-8 ko `cp1252` se padha gaya, jisme Indian scripts nahi aati |
+| Item codes, branch codes aur landline numbers ke leading zeros chale jaate hain | id jaise columns ke liye `dtype={"item_code": str}` |
+| 05/11/2026 jaisi dates | `parse_dates` ke saath `dayfirst=True` |
+| Header ke upar banner rows | `skiprows` |
+| Toote hue rows load crash kar dete hain | Unhe dekhne ke liye `on_bad_lines="warn"` |
+
+"1,25,000" jaise Indian number formats ko numbers mein badalne se pehle commas hataane padte hain.
+
+### Excel ki quirks
+
+Excel files apni surprises laati hain. Ek workbook mein kai sheets ho sakti hain: ek sheet `sheet_name="Rates"` se padho, ya sab `sheet_name=None` se, jo tables ka dictionary deta hai. Merged header cells ek bhara hua cell aur kai khaali cells ban kar aate hain, isliye header haath se rebuild karo, ya do header rows ke liye `header=[0, 1]` use karo. Hidden rows aur columns bhi padhe jaate hain, aur formulas apni last saved values ke roop mein aate hain, formulas ke roop mein nahi. Shak ho toh code likhne se pehle file kholkar dekh lo.
+
+### JSON
+
+`json.load` nested dictionaries aur lists deta hai. `pd.json_normalize` records ki list ko table mein flatten karta hai, nested fields ke liye `customer.city` jaise dotted column names ke saath.
+
+### PDFs
+
+PDF paragraphs waala document nahi, drawing instructions ka set hota hai. pypdf ya pdfplumber jaisi libraries digital PDFs se text nikaal leti hain, par columns mix ho sakte hain, headers aur footers har page par repeat hote hain, aur words ajeeb tareeke se toot sakte hain.
+
+Jis PDF se **bilkul text nahi** aata, woh shaayad scan hai: usme sirf images hain, isliye **OCR** (optical character recognition) chahiye. Indian languages ke liye sahi OCR language pack install karo. Tables ke liye table-aware tool ya vision-capable model chahiye.
+
+Har text ke saath hamesha **page number** record karo. Baad mein citations aur debugging usi par depend karte hain.
+
+### Checks
+
+Har extraction ke baad gino aur compare karo: rows in vs rows out, bina text waale pages, woh totals jo match hone chahiye. Phir paanch random samples print karo aur padho. Paanch minute ka padhna woh problems pakadta hai jo koi count nahi pakad sakta.
+
+## Ek worked example
+
+Madurai ki ek hospital chain apni policies aur pharmacy price list par ek assistant chahti hai. Woh ek ZIP file bhejte hain.
+
+**Price list CSV.** Tamil drug names garble ho rahe hain, kyunki purane loading script ne `encoding="cp1252"` set kiya tha. File asal mein Excel ke jode hue byte-order mark ke saath UTF-8 hai, isliye `encoding="utf-8-sig"` theek kar deta hai. "000412" jaise item codes ne zeros kho diye; `dtype={"item_code": str}` unhe bachata hai. "1,250.00" jaise prices commas hataane ke baad numbers ban jaate hain.
+
+**Policy PDFs.** 140 PDFs mein se pypdf 122 se text nikaalta hai. Ek quick check un 18 ko flag karta hai jinse lagbhag kuch nahi aata:
+
+```python
+from pathlib import Path
+from pypdf import PdfReader
+
+pdfs = sorted(Path("policies").glob("*.pdf"))
+needs_ocr, records = [], []
+
+for path in pdfs:
+    reader = PdfReader(path)
+    pages = [p.extract_text() or "" for p in reader.pages]
+    chars = sum(len(p) for p in pages)
+    if chars < 200 * len(pages):
+        needs_ocr.append(path)       # probably scanned
+    else:
+        for n, text in enumerate(pages, 1):
+            records.append({"file": path.name, "page": n, "text": text})
+```
+
+Woh 18 scanned circulars hain. OCR unhe padhta hai, aur teen ka images se spot-check karne par pata chalta hai ki Tamil headers tab tak galat hain jab tak Tamil OCR language pack nahi jodte.
+
+| Item | Count | Problem | Fix |
+| --- | --- | --- | --- |
+| Price list rows | 4,812 | Garbled names, ude zeros, text prices | `utf-8-sig`, `dtype=str`, commas hatao |
+| Digital PDFs | 122 | Repeat hote headers aur footers | Jo lines zyadatar pages par repeat hon unhe strip karo |
+| Scanned PDFs | 18 | Text nahi | English aur Tamil packs ke saath OCR |
+| Phir bhi fail hue pages | 6 | Dhundhli photocopies | Client ko dobara bhejne ke liye list karo |
+
+Client ke liye notes mein exactly likha hota hai ki kin files ko OCR chahiye tha aur kaunse pages fail hue, taaki kisi dhundhle circular ke baare mein answer thoda kamzor ho toh kisi ko hairaani na ho.
+
+## Aam galtiyaan
+
+- **Defaults par bharosa karna.** pandas types guess karta hai aur 000412 jaise item codes ko numbers bana deta hai, leading zeros gira deta hai. Id jaise columns ke types set karo.
+- **Encodings ko ignore karna.** Indian scripts ke garbled names ka matlab lagbhag hamesha galat encoding hota hai, toota hua file nahi.
+- **Maan lena ki har PDF mein text hai.** Scans chupchaap empty strings dete hain. Characters per page naapo.
+- **Page number kho dena.** Uske bina aap source cite nahi kar sakte ya galat answer debug nahi kar sakte.
+- **Dates ko month-first padhna.** India mein 05/11/2026 matlab 5 November; `dayfirst=True` set karo.
+- **Output kabhi nahi padhna.** Counts woh problems miss kar dete hain jo paanch random samples dikha dete hain.
+
+## Practice karo
+
+Neeche link kiye pandas IO page ke CSV aur Excel sections padho, aur pypdf ka text extraction page.
+
+1. **Ek messy CSV.** Khud ek banao: ek banner row, Indian-format numbers, 05/11/2026 jaisi dates, leading zeros waala item-code column, aur byte-order mark ke saath save kiya hua Tamil ya Hindi name column. Use sahi load karo.
+2. **Teen PDFs.** Ek digital government circular, ek scanned aur ek table waala download karo. Page numbers ke saath text nikaalo, aur scanned waale ko automatically detect karo.
+3. **Ek report.** Ek chhoti report likho: files, pages, bina text waale pages, aur har ek ke liye aap kya karoge.
+
+**Aapka kaam poora jab:** aap bata sako ki ek PDF empty text kyun de sakta hai, aur aisi CSV load kar sako jo leading zeros bachaye aur Indian dates sahi order mein padhe.

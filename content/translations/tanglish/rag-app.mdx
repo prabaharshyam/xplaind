@@ -1,0 +1,235 @@
+---
+id: rag-app
+lang: tanglish
+title: "Oru RAG app build pannunga"
+outcome: "Unga sondha documents mela question answering build pannunga, mudhalla retrieve panni, apram sources-oda badhil sollum."
+answer: "RAG app unga documents-la irundhu kelvikku badhil solludhu: ovvoru kelvikkum romba relevant-aana passages-a retrieve panni, model-a andha passages-a mattum vechu, sources-oda answer panna solludhu."
+why_it_matters: "Companies ship panra GenAI features-la RAG romba common-aana onnu. Idha mudhal mudhal vara build panni, enga fail aagudhu-nu solla theriyradhu, interview-la oru nalla story."
+flashcards:
+  - q: "RAG-oda moonu steps edhu?"
+    a: "Relevant passages-a retrieve pannunga, prompt-a avatrodu augment pannunga, andha passages-a mattum use panni cite panra answer-a generate pannunga."
+  - q: "Model-a train panradha vida companies yen RAG choose pannuvaanga?"
+    a: "Training thevai illa, documents maarumbodhu current-aa irukkum; retrain pannama re-index panna podhum."
+  - q: "Ingestion-la enna nadakkum?"
+    a: "Documents-a load panni, clean text eduthu, titles-um pages-um serthu chunk panni, ovvoru chunk-aiyum embed panni metadata-oda store pannum."
+  - q: "Contextual retrieval-na enna?"
+    a: "Embed panra munnaadi, oru chunk andha document-la enga irukku-nu oru sinna description serthu, keyword search-oda serthu, retrieval failures-a kuraikkum."
+  - q: "RAG app yen mukkiyam maruthu solla theriyanum?"
+    a: "Documents amaidhiyaa irukkum podhu, refusal path illaadha model oohikkum, users-ku adhu theriyaadhu."
+  - q: "RAG app-a eppadi evaluate pannanum?"
+    a: "Expected sources-um answers-um irukkura oru fixed question set-oda, retrieval-a (recall at k) answers-a (correctness, faithfulness) thani thaniyaa alanthu."
+  - q: "Perumbaalaana RAG failures enga irundhu varum?"
+    a: "Retrieval-la irundhu: sariyaana passage kandupidikkavae padala, perumbaalum parsing, chunking illa keyword search illaama."
+  - q: "RAG app-a eppadi current-aavum safe-aavum vechukkalaam?"
+    a: "Maarina documents-a re-index pannunga, superseded-a irukkuradha filter pannunga, ovvoru user-oda permissions-padi retrieval-a filter pannunga."
+  - q: "Reciprocal rank fusion-na enna?"
+    a: "Keyword results-aiyum vector results-aiyum merge panra simple vazhi: ovvoru document-kum ovvoru list-layum 1/(k + rank) score kidaikkum, scores-a serkkanum, adhigam vandha jeikkum."
+  - q: "Retrieval-ku munnaadi follow-up kelvigala yen rewrite pannanum?"
+    a: "'ITI students-ku enna?' thaniyaa paartha artham illa. Chat history-oda serthu muzhu kelvi-aa rewrite panna, search sariyaana passages-a kandupidikkum."
+exercise:
+  title: "RAG app-a plan pannunga"
+  setup: "Visakhapatnam port authority 120 documents mela staff assistant vennum-nu kekkuraanga: tariff schedules (tables), standard operating procedures, scan panna pazhaya circulars, matha maadha notice-a replace panra monthly notice. Staff-ku vera vera clearance levels. Mudhal prototype demo-la nalla badhil solludhu, aana yaarum adha alandhu paakkala."
+  questions:
+    - q: "Ingestion edhai special-aa kaiyaalanum?"
+      a: "Tariff schedules-la irukkura tables, scan panna circulars-ku OCR, citations-ku headings-um page numbers-um vechukkradhu."
+    - q: "Monthly notice-a eppadi kaiyaaludhu?"
+      a: "Effective dates-a store panni, munnaadi notice-a superseded-nu mark panni, superseded documents-a default-aa filter pannu."
+    - q: "Clearance levels retrieval-a eppadi baadhikkum?"
+      a: "Ovvoru chunk-oda access groups-a store panni, user-oda groups-padi retrieval-a filter pannunga, appo restricted passages prompt-ku ponadhae illa."
+    - q: "Mudhal test set-la enna irukkanum?"
+      a: "Expected sources-um answers-um irukkura sumaar 50 real staff kelvigal, kuraindha pakshama paththu badhil solla mudiyaadha kelvigal."
+ask:
+  - "En mudhal RAG app-a eppadi build panradhu?"
+  - "RAG-ku entha vector database use pannalaam?"
+  - "RAG system-a eppadi evaluate panradhu?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**RAG app** (retrieval-augmented generation) unga sondha documents-la irundhu kelvikku badhil solludhu. Ovvoru kelvikkum:
+
+1. Unga documents-oda index-la irundhu romba relevant-aana passages-a **retrieve** pannum;
+2. Prompt-a andha passages-oda **augment** pannum;
+3. Andha passages-a mattum use panni, avatra cite panra answer-a **generate** pannum.
+
+Companies language models-a thanga sondha data-la use panra romba common vazhi idhu, yen-naa model training thevai illa, documents maarumbodhu current-aa irukkum.
+
+```flow
+title: Ingestion: oru thadavai, apram updates-ku
+PDFs -> Extract text, OCR -> Chunk by heading | about 400 tokens, with title and section
+Chunk by heading -> Embed -> Index (pgvector) | metadata: doc, page, section, dates
+```
+
+```flow
+title: Query neram
+Question -> Hybrid search | vectors + keywords -[top 20]-> Rerank
+Rerank -[top 5]-> Prompt | instructions + passages [1] to [5] with sources + question
+Prompt -> Model -> Answer with citations [2][4] | or "I could not find this..."
+```
+
+Indha lesson-la Coimbatore-la oru college, regulations, fees, exams, scholarships pathi students-oda kelvigalukku assistant build panradha follow pannuvom.
+
+## Idhu eppadi work aagudhu
+
+**Ingestion (oru thadavai, apram updates-ku).** Documents-a load panni, clean text eduthu, titles-um page numbers-um serthu chunks-aa pirichu, ovvoru chunk-aiyum embed panni, adhoda metadata-oda oru index-la store pannunga.
+
+**Query neram.**
+
+- Kelvi-a embed pannunga; top candidates-a retrieve pannunga (vector search, mudinjaa keyword search-oda hybrid); venumna rerank panni best aindhu-a vechukkonga.
+- Prompt build pannunga: instructions, ovvoru passage-um oru id-oda source-oda label panni, apram kelvi.
+- Model-a instruct pannunga: passages-la irundhu mattum badhil sollu; passage ids-a cite pannu; passages-la answer illaina, appadi sollu.
+- Answer-a adhoda citations-oda, source documents-ku link panni thirumbi kudunga.
+
+**Contextual retrieval.** Chunks-la pala neram context irukkaadhu ("limit 45 days"). Chunk andha document-la enga irukku-nu oru sinna description-a mudhalla serthu, embeddings-a keyword search-oda serthaa, retrieval failures alandhu paartha alavukku kuraiyum.
+
+**"Theriyala"-nu solradhu.** Nambikkai-aana RAG app, documents amaidhiyaa irukkum podhu maruthu solum. Unga tests-la badhil solla mudiyaadha kelvigalaiyum serunga.
+
+**Evaluation.** Expected sources-um answers-um irukkura oru fixed kelvi set-a vechukkonga. Retrieval-a (recall at k) answers-a (correctness, faithfulness) thani thaniyaa alandhu, ovvoru maatraththukkum aprom thirumba odunga.
+
+**Freshness-um access-um.** Maarina documents-a re-index pannunga; superseded-a irukkuradha filter pannunga; users-ku vera vera permissions irundhaa, ovvoru user paakkalaam-nu irukkuradhu-padi retrieval-a filter pannunga.
+
+**Oru minimal query function:**
+
+```python
+def answer(question, user):
+    hits = hybrid_search(question, k=20, filters={"access": user.groups})
+    top = rerank(question, hits)[:5]
+    passages = "\n\n".join(
+        f"[{i+1}] {h.title}, section {h.section}, page {h.page}\n{h.text}"
+        for i, h in enumerate(top)
+    )
+    prompt = (
+        "Answer using only the passages. Cite like [2] after each sentence. "
+        "If the passages do not answer the question, say so and name the office to contact.\n\n"
+        f"Passages:\n{passages}\n\nQuestion: {question}"
+    )
+    return call_model(prompt), top
+```
+
+Answer-oda `top`-aiyum thirumbi kuduthaa, interface ovvoru citation-aiyum adhoda document-kum page-kum link pannalaam, answer thappaa pogum podhu enna retrieve aachu-nu unga logs-la paakkalaam.
+
+**Mudhalla enna alakkanum:**
+
+| Alavu | Edhukku badhil solludhu | Edhai target pannanum |
+| --- | --- | --- |
+| Recall at 5 | Sariyaana passage retrieve aagudha? | Golden set-la 85%-kku mela |
+| Correctness | Answer sariyaa? | Client-oda ottukkonda alavu |
+| Faithfulness | Ovvoru claim-um oru passage-aala support aagudha? | 0.9-kku mela |
+| Badhil solla mudiyaadha kelvigalla refusal rate | Documents amaidhiyaa irukkum podhu othukkumaa? | 75%-kku mela |
+| Latency | Vegamaa irukkaa? | Mudhal vaarthaigal 2 seconds-kulla |
+
+**Thappaana answer-a debug panradhu.** Mudhalla retrieve aana passages-a paarunga. Sariyaana passage illaina, problem ingestion illa retrieval-la: parsing, chunking, filters, search. Adhu irundhu answer innum thappaa irundhaa, problem prompt-la illa model-la. Indha oru check neraya oohikkura velaiya micham pannum.
+
+**Neenga odakkoodiya sinna RAG app.** Idhu open embedding model, keywords-ku BM25, rendaiyum merge panna reciprocal rank fusion, citations-oda answer panna Anthropic-oda API use pannudhu. `sentence-transformers rank_bm25 anthropic`-a install pannunga:
+
+```python
+import numpy as np
+from rank_bm25 import BM25Okapi
+from sentence_transformers import SentenceTransformer
+import anthropic
+
+embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")   # small, English
+client = anthropic.Anthropic()
+
+def ingest(chunks):
+    """chunks: list of {"id", "title", "page", "text"}."""
+    texts = [f"{c['title']}. {c['text']}" for c in chunks]
+    vectors = embedder.encode(texts, normalize_embeddings=True)
+    bm25 = BM25Okapi([t.lower().split() for t in texts])
+    return {"chunks": chunks, "vectors": vectors, "bm25": bm25}
+
+def search(index, question, k=5, pool=20):
+    q = embedder.encode([question], normalize_embeddings=True)[0]
+    by_vector = np.argsort(-(index["vectors"] @ q))[:pool]
+    by_keyword = np.argsort(-index["bm25"].get_scores(question.lower().split()))[:pool]
+    fused = {}
+    for ranking in (by_vector, by_keyword):
+        for rank, i in enumerate(ranking):
+            fused[int(i)] = fused.get(int(i), 0) + 1 / (60 + rank)      # reciprocal rank fusion
+    best = sorted(fused, key=fused.get, reverse=True)[:k]
+    return [index["chunks"][i] for i in best]
+
+def answer(index, question):
+    hits = search(index, question)
+    passages = "\n\n".join(f"[{n}] {h['title']}, page {h['page']}\n{h['text']}" for n, h in enumerate(hits, 1))
+    reply = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=500,          # check the docs for current names
+        system="Answer only from the passages. Cite like [2] after each sentence. "
+               "If they do not contain the answer, say so and suggest who to ask.",
+        messages=[{"role": "user", "content": f"Passages:\n{passages}\n\nQuestion: {question}"}])
+    return "".join(b.text for b in reply.content if b.type == "text"), hits
+```
+
+Sila aayiram chunks-la idhu laptop-la memory-laye odum. Adhukku mela, vectors-a oru vector database-ku illa pgvector-ku maathitu, adhe functions-a vechukkonga.
+
+**Search panra munnaadi follow-ups-a rewrite pannunga.** Chat-la "ITI students-ku enna?"-nu kettaa paiyanulla edhuvum retrieve aagaadhu. Retrieval-ku munnaadi, oru sinna, vegamaana model-a, kadaisi sila turns-a vechu latest message-a thaniyaa nikkura kelvi-aa ("ITI students-ku fee waiver limit enna?") rewrite panna sollunga, adhai vechu search pannunga. Rendu versions-aiyum log pannunga.
+
+**Konjam lines-la retrieval-a alandhu paarunga.** Ovvoru golden kelvikkum, entha chunk ids kidaikkanum-nu record pannunga:
+
+```python
+def recall_at_k(index, golden, k=5):
+    """golden: list of (question, set_of_correct_chunk_ids)."""
+    hits = 0
+    for q, correct in golden:
+        found = {h["id"] for h in search(index, q, k=k)}
+        hits += bool(found & correct)
+    return hits / len(golden)
+```
+
+Chunking, embedding model, filters, fusion settings edhai maathunaalum munnaadiyum pinnaadiyum idha odunga. Neenga kaiyaala try panna moonu kelvigalla answers nallaa aagi, recall 88%-la irundhu 79%-ku vizhundhaa, adhu pinnaadi poradhu.
+
+**Rendu vagai retrieval quality.** **Context recall**: thevaiyaanadhu passages-la irundhucha? **Context precision**: retrieve aanadhula evvalavu unmaiyaalumae relevant? Recall kammi-na thappaa illa "theriyala" answers; precision kammi-na tokens waste aagi, model-a distract pannum.
+
+## Oru worked example
+
+Coimbatore-la oru college, 25 PDFs-la irundhu academic regulations, fees, exams, scholarships pathi students-oda kelvigalukku assistant build panraanga.
+
+- Ingestion: page numbers-oda text eduthu, headings-padi sumaar 400-token chunks-aa pirichu, document title-um section-um mudhalla serthu, embed panni pgvector-la store pannanga.
+- Retrieval: hybrid search (vectors-um keywords-um), top 20-a 5-aa rerank pannanga.
+- Prompt: "Passages-a mattum vechu badhil sollu. [2] maadhiri cite pannu. Badhil passages-la illaina, 'Idha college regulations-la kandupidikka mudiyala'-nu sollu, contact panna vendiya office-a suggest pannu."
+- Interface: answer-la citations kaattum, adhu click panna sariyaana page-la PDF thirakkum.
+
+50 kelvi-oda test (badhil solla mudiyaadha ettu kooda): badhil solla mudiyira 42 kelvigalla 40 sariyaana citations-oda sariyaa irundhuchu, badhil solla mudiyaadha 8-la 6 sariyaa maruthuchu. Rendu failures scan panna image-aa irundha oru fee circular-la irundhu vandhuchu; OCR-kku aprom rendum sariyaachu. Students ippo office-la queue nikkaradhukku munnaadi assistant-a kekkuraanga, staff thirumba thirumba varra kelvigalukku kammiyaa badhil solraanga.
+
+| 50 kelvi test set | Result |
+| --- | --- |
+| Sariyaana citations-oda sariyaa badhil sonna answerable kelvigal | OCR fix-ku aprom 42-la 42 |
+| Sariyaa maruthadha, badhil solla mudiyaadha kelvigal | 8-la 6 |
+| Scan panna fee circular-aala vandha failures | 2, OCR-aala fix aachu |
+
+**College enna kathukkittadhu.** Mudhal periya gain model-la irundhu varala, parsing-la irundhu vandhadhu: scan panna fee circular padikka mudinjadhum, rendu thappaana answers sariyaachu. Sariyaana page-la PDF-a thirakkura citations, office staff students-a assistant pakkam anuppura alavukku nambikkai-a kuduthadhu, adhu thaan usage valara kaaranam.
+
+## Podhuvaa panra thappugal
+
+- **Citations illaama.** Users check panna mudiyaadhu, thappugal kavanikkaama pogum.
+- **Refusal path illaama.** Documents amaidhiyaa irukkum podhu model oohikkum.
+- **Retrieval evaluation-a thavira vidradhu.** Perumbaalaana failures retrieval failures.
+- **Scan panna documents-aiyum tables-aiyum ignore panradhu.** Avaiku OCR-um table-aware parsing-um thevai.
+- **Oru thadavai index panni marakkradhu.** Documents maarum; re-index pannunga.
+- **Follow-up message-a appadiyae vechu search panradhu.** Mudhalla thaniyaa nikkura kelvi-aa rewrite pannunga.
+- **Neraya retrieval settings-a oru neraththula maathuradhu.** Onna maathi, recall-a thirumba odunga.
+
+## RAG thevai illaadha idangal
+
+- **Documents context-kulla poiduchu**, adhikkadi maaradhu: adha prompt-la potu, cache pannunga.
+- **Badhil oru database-la irukku**, order status illa kattina fees maadhiri: text search illa, oru tool illa query use pannunga.
+- **Muzhu collection mela reasoning thevaippadura kelvigal**, "entha policies onnukku onnu ethirkkudhu?" maadhiri: RAG thundugala kandupidikkum, overview-va illa.
+
+## Demo-la irundhu production-ku
+
+- Expected chunks-um answers-um irukkura **golden set vechukkonga**, ovvoru maatraththukkum recall-um answer checks-um odunga.
+- Ovvoru answer-oda **rewrite panna query-yum, retrieve aana ids-um, scores-um log pannunga**.
+- Document maarum podhu **re-index pannunga**, superseded versions-a neekkunga.
+- Ranking-ku **munnaadi permissions-padi filter pannunga**, model text paartha aprom illa.
+- Topic-padi **"theriyala" rate-a track pannunga**, adhu missing documents-a kaattum.
+
+## Practice pannunga
+
+Keezha link panni irukkura Anthropic-oda contextual retrieval article-a padinga.
+
+Indha lesson-oda check oru project: 20 illa adhukku mela documents mela, sources-oda badhil sollura, theriyaadhappo theriyala-nu sollura RAG app-a push pannunga. Aindhu example kelvigal, adhu kuduththa answers, ovvonnum entha source-la irundhu vandhadhu-nu README-la serunga. Neenga kandupidichu fix panna oru failure-a serthaa adhu innum strong-aa irukkum.
+
+Innum aazhama padikka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-la chapter 6 RAG architecture, term-based-um embedding retrieval-um, avatra serkkradhu, query rewriting, retrieval-a evaluate panradhu-nu cover pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Citations-oda answers-a, oru sariyaana refusal-a, retrieval-a eppadi alandheenga-nu kaattalaam.

@@ -1,0 +1,223 @@
+---
+id: data-versioning
+lang: hinglish
+title: "Data versioning"
+outcome: "Datasets aur data pipelines ko code ki tarah version karo, taaki har model ko us exact data tak trace kiya ja sake jis par woh train hua, aur koi bhi training run dobara reproduce ho sake."
+answer: "Data versioning DVC jaise tools se datasets ko code ki tarah track karta hai, taaki har model ko us exact data tak trace kiya ja sake jis par woh train hua aur koi bhi run dobara chalaya ja sake."
+why_it_matters: "Retrain ke baad model kharab ho gaya, iska jawab nahi diya ja sakta agar aap bata hi nahi sakte ki data mein kya badla. Data versioning data ke badlaavon ko dikhne wala, review hone wala aur wapas palatne wala banata hai, aur regulated industries mein audits ke liye aksar zaroori hota hai."
+flashcards:
+  - q: "Data versioning kya hai?"
+    a: "Datasets ke versions aur unhe banane wale steps ko track karna, jaise Git code ko karta hai, taaki models reproduce aur compare ho sakein."
+  - q: "Bade data files seedhe Git mein kyun nahi daalte?"
+    a: "Git bade binary files ko kharab tareeke se handle karta hai. DVC jaise tools data ko cloud storage mein rakhte hain aur Git mein chhoti pointer files."
+  - q: "Dataset ke liye 'immutable snapshot' ka kya matlab hai?"
+    a: "Ek baar bannne ke baad dataset version kabhi usi jagah badla nahi jaata. Badlaav naye id ke saath naya version banate hain."
+  - q: "Lineage kya hai?"
+    a: "Woh chain jo ek production prediction ko uske model, training run, data version aur pipeline code se jodti hai."
+  - q: "Do data versions ke beech kya compare karna chahiye?"
+    a: "Row counts, label balance, feature distributions, schema changes aur sample diffs."
+  - q: "Labels ko bhi version kyun karein?"
+    a: "Corrections, nayi guidelines aur der se aane wale outcomes se labels badalte hain, aur ye badlaav model ke seekhne ko badal dete hain."
+  - q: "Erasure requests versioned data ko kaise affect karti hain?"
+    a: "Purane versions mein ab bhi personal data hota hai, isliye deletion aage tak pahunchni chahiye, jaise affected versions ko un records ke bina dobara build karke."
+  - q: "Chhoti team ke liye kya kaafi hai?"
+    a: "Cloud storage mein dated folders aur ek manifest (row counts, hash, source query, pipeline commit), aur har training run mein path log karna."
+  - q: "Delta Lake ya Iceberg ka time travel kya karne deta hai?"
+    a: "Table ko waise query karna jaisi woh pehle ke kisi version ya date par thi, taaki training run bata sake ki usne exactly kaunsa snapshot use kiya."
+  - q: "Erasure request purane dataset versions ko kaise affect kare?"
+    a: "Affected versions ko us insaan ke records ke bina dobara build karo, rebuild ko manifest mein record karo, aur ya toh retrain karo ya document karo ki maujooda models kyun rakhe gaye."
+exercise:
+  title: "Regression ko trace karo"
+  setup: "Mumbai ke ek OTT platform ke churn model ka pichhle mahine recall 0.68 tha. Naye data par retrain karne ke baad recall 0.54 hai. Version manifests dikhate hain: pichhle mahine ke dataset mein 12 lakh rows aur 9% churners the; is mahine ke mein 11 lakh rows aur 4% churners hain. Teen hafte pehle ek merge mein pipeline code badla jisne subscription status join ko 'tidied up' kiya."
+  questions:
+    - q: "Manifests mein sabse bada warning sign kaunsa number hai?"
+      a: "Churn share 9% se 4% par gira. Ek mahine mein itni badi asli giraavat mushkil hai; label ya join problem zyada sambhaavit hai."
+    - q: "Aap sabse pehle kahan dekhoge?"
+      a: "Subscription status join ke pipeline change par, users ke ek sample par dono versions mein churners kaise label hue, ye compare karke."
+    - q: "Investigate karte waqt achha model kaise wapas laayein?"
+      a: "Pichhle mahine ka model rakho ya usi par rollback karo, jo pichhle mahine ke data version se linked hai, jab tak pipeline theek nahi hoti."
+    - q: "Agli baar kaunsa check ise automatically pakad lega?"
+      a: "Ek data check jo fail ho jaaye agar versions ke beech label share tay hui had se zyada badle aur koi explanation na ho."
+ask:
+  - "DVC kya hai aur kya mujhe iski zaroorat hai?"
+  - "Purane machine learning model ko kaise reproduce karun?"
+  - "Versioned datasets ke saath data deletion requests kaise handle karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Data versioning** datasets ke versions (aur unhe banane wale steps) ko waise track karta hai jaise Git code ko. Har training run record karta hai ki usne kaunsa data version use kiya, jisse aap:
+
+- kisi bhi purane model ko exactly reproduce kar sakte ho;
+- dekh sakte ho ki do dataset versions ke beech kya badla;
+- naya dataset toota ho toh pichhle par rollback kar sakte ho;
+- auditors ko kisi decision ke peechhe ka data dikha sakte ho.
+
+Bade files seedhe Git mein nahi rakhte. DVC jaise tools data ko cloud storage mein rakhte hain aur Git mein chhoti pointer files. Data lakes aur warehouses bhi table versioning ("time travel") dete hain.
+
+```flow
+Sources se raw data -> Dataset banao
+Pipeline code | Git commit a1b2c3 -> Dataset banao
+Dataset banao -> Data v2026-10-01 | manifest: rows, hash, query, commit
+Data v2026-10-01 -> Training run 412 | data aur code versions log karta hai
+Training run 412 -> Model registry: fraud-model v7 -> Production predictions
+```
+
+Lineage ulti taraf chalti hai: koi bhi prediction → model v7 → run 412 → data v2026-10-01 → commit a1b2c3.
+
+Ye lesson Chennai ki ek health-insurance company ko follow karta hai, jiska fraud model retrain ke baad kharab ho gaya.
+
+## Ye kaam kaise karta hai
+
+**Inputs ka snapshot lo.** Training datasets ko id ke saath immutable snapshots maano: content hash, date-stamped path ya tool-managed version. Kisi dataset ko kabhi usi jagah overwrite mat karo.
+
+**Pipeline ko bhi version karo.** Jo code raw data ko training data banata hai (filters, joins, labels, feature computation) woh Git mein versioned hota hai. Ek data version kisi khaas raw data par chale ek khaas pipeline version ka output hai.
+
+**Lineage record karo.** Har training run data version id log karta hai; registry ka har model apne run se linked hota hai. Production prediction se aap exact data tak peechhe ja sakte ho.
+
+**Versions compare karo.** Versions ke beech row counts, label balance, feature distributions, schema changes aur sample diffs. Bade badlaavon ko code changes ki tarah review karo.
+
+**Labels bhi badalte hain.** Sudhre hue labels, nayi labelling guidelines aur der se aane wale outcomes datasets badalte hain. Unhe version karo aur likho ki kyun.
+
+**Privacy aur deletion.** Versioned data mein ab bhi personal data hota hai. DPDP Act ke under retention rules aur erasure requests purane versions par bhi lagu hote hain; plan karo ki deletion kaise aage jaaye, jaise affected versions ko deleted records ke bina dobara build karke aur ise document karke.
+
+**Practical rakho.** Chhoti teams ke liye cloud storage mein dated folders aur ek manifest (row counts, hash, source query, pipeline commit), saath mein har run mein path log karna kaafi ho sakta hai. Volume aur team size badhne par tool apnao.
+
+**Har dataset version ke liye ek manifest:**
+
+| Field | Example |
+| --- | --- |
+| Version id | `claims-train-2026-10-01` |
+| Content hash | `sha256:9f2c...` |
+| Rows | 812,440 |
+| Positive label share | 2.3% |
+| Source query ya tables | `claims_v3 joined with investigations` |
+| Pipeline commit | `a1b2c3d` |
+| Kisne banaya aur kab | `pipeline-bot, 2026-10-01` |
+| Notes | "Relabelled 1,200 claims after the audit of July" |
+
+Dataset banne par manifest automatically likho, use data ke paas store karo, aur build trigger karne wale pull request mein pichhle manifest se comparison print karo. "positive label share: 2.3% to 1.1%" dekhne wala reviewer training shuru hone se pehle sahi sawaal poochhta hai.
+
+**Tool choose karna.** Do ya teen logon ki team ke liye dated folders aur ek manifest kaafi hain. DVC Git mein pointer files aur data pull aur push karne ke commands jodta hai, jo tab madad karta hai jab kai log models train karte hain. Delta Lake aur Apache Iceberg jaise lakehouse table formats "time travel" jodte hain, jisse aap table ko kisi di hui date par jaisa tha waisa query kar sakte ho, aur ye un teams ke liye theek hai jinka training data pehle se warehouse mein hai. Jo bhi choose karo, rule wahi hai: training run ko exactly record karna chahiye ki usne kaunsa data version use kiya, aur woh version baad mein kabhi nahi badalna chahiye.
+
+**Manifest automatically likho.** Dataset build ke ant mein kuch lines:
+
+```python
+import hashlib, json, subprocess
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from pathlib import Path
+
+def file_hash(path, chunk=1 << 20):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while block := f.read(chunk):
+            h.update(block)
+    return "sha256:" + h.hexdigest()
+
+def write_manifest(data_path, df, label_col, notes=""):
+    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
+    manifest = {
+        "version": Path(data_path).stem,
+        "hash": file_hash(data_path),
+        "rows": int(len(df)),
+        "positive_share": round(float(df[label_col].mean()), 4),
+        "columns": list(df.columns),
+        "pipeline_commit": commit,
+        "created": datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(timespec="seconds"),
+        "notes": notes,
+    }
+    Path(data_path).with_suffix(".manifest.json").write_text(json.dumps(manifest, indent=2))
+    return manifest
+```
+
+**Pichhle version se compare karo, aur surprises par fail karo.**
+
+```python
+def compare(old, new, max_share_change=0.3, max_row_change=0.2):
+    problems = []
+    if set(old["columns"]) != set(new["columns"]):
+        problems.append(f"columns changed: {set(old['columns']) ^ set(new['columns'])}")
+    if abs(new["rows"] - old["rows"]) / old["rows"] > max_row_change:
+        problems.append(f"rows {old['rows']} -> {new['rows']}")
+    rel = abs(new["positive_share"] - old["positive_share"]) / max(old["positive_share"], 1e-9)
+    if rel > max_share_change:
+        problems.append(f"positive share {old['positive_share']:.2%} -> {new['positive_share']:.2%}")
+    return problems
+```
+
+Data banane wale pull request mein comparison print karo. Failure hamesha galat nahi hoti, par training se pehle koi use notes mein explain kare.
+
+**DVC chaar commands mein.** Data cloud storage mein rehta hai; Git chhoti pointer files track karta hai:
+
+```bash
+dvc init
+dvc remote add -d store s3://my-bucket/dvc       # or Azure, GCS, a shared drive
+dvc add data/claims-train-2026-10-01.parquet     # writes a .dvc pointer file
+git add data/*.dvc .gitignore && git commit -m "Training data 2026-10-01" && dvc push
+```
+
+Uske baad koi bhi ek commit `git checkout` karke `dvc pull` kare toh use exactly wahi data mil jaata hai.
+
+**Lakehouse mein time travel.** Agar training data Delta Lake tables mein hai, toh har run ke saath table version record karo aur use exactly waisa hi wapas padho:
+
+```sql
+SELECT * FROM claims_train VERSION AS OF 42;
+SELECT * FROM claims_train TIMESTAMP AS OF '2026-10-01T00:00:00+05:30';
+```
+
+Purane versions retention period ke baad cleanup jobs hata deti hain, isliye us period ko models reproduce karne ki zaroorat se lamba rakho, ya zaroori snapshots export kar lo.
+
+**Versions ke across erasure.** Jab koi insaan erasure maange, toh har dataset version dhoondho jisme unke records hain (har version ke record ids ka index rakho), un versions ko unke bina dobara build karo, aur har manifest mein note karo. Privacy lead ke saath tay karo ki purane versions par train hue models retrain karne hain ya nahi.
+
+## Ek example se samjho
+
+Chennai ki ek health-insurance company apna claim-fraud model retrain karti hai aur dekhti hai ki recall 0.72 se girkar 0.61 ho gaya.
+
+Kyunki data DVC se versioned hai, team naye dataset ko pichhle se compare karti hai:
+
+- 14% kam positive labels, jabki fraud cases kam nahi hue the;
+- label query badal gayi thi: pipeline ke ek refactor ne ab jaanch mein chal rahe claims ko bahar kar diya, jo haal ke fraud ka bada hissa the.
+
+Woh pipeline fix karte hain, dataset ko naye version ki tarah rebuild karte hain, retrain karte hain aur recall 0.73 wapas pa lete hain. Original refactor ka pull request ek data check ke saath update hota hai jo fail ho jaata hai agar versions ke beech positive label share 20% se zyada badle aur koi explanation na ho.
+
+Baad mein ek customer ki erasure request ke liye unke records delete karne padte hain. Team affected training versions ko unke bina rebuild karti hai, badlaav record karti hai, aur confirm karti hai ki rebuilt model ke metrics nahi badle.
+
+**Team ke paas kya tha.** Fix mein ek din laga kyunki saboot pehle se maujood tha: do manifests ek saath rakhne par label share ka badlaav dikha, aur har manifest ka pipeline commit seedha refactor ki taraf point karta tha. Versioning ke bina yahi investigation aksar hafton ke andaaze mein jaati hai, ya hoti hi nahi, aur kamzor model chupke se ship ho jaata hai.
+
+## Aam galtiyaan
+
+- **Datasets ko usi jagah overwrite karna.** Compare aur reproduce karne ki kshamta chali jaati hai. Ek row ke fix ke liye bhi hamesha naye id ke saath naya version likho.
+- **Data version karna par pipeline nahi.** Aap explain nahi kar paoge ki data kaise bana.
+- **Model se data tak link nahi.** Har run mein data version log karo.
+- **Label changes ko ignore karna.** Woh model ko utna hi badalte hain jitna feature changes.
+- **Purane versions mein privacy bhool jaana.** Retention aur erasure har copy par lagu hote hain.
+- **Haath se likhe manifests**, jo asli data se door hote jaate hain.
+- **Versions ke beech label share ya row counts par koi check nahi.**
+- **Erasure requests mein purane versions bhool jaana.**
+
+## Jab versioning simple rah sakti hai
+
+- **Prompt-only AI apps jinme training data nahi hai**: iski jagah prompts, test sets aur indexes ko version karo.
+- **Ek insaan, ek chhota dataset**: manifest ke saath ek dated folder kaafi hai.
+- **Aisa data jo kabhi nahi badalta**, jaise ek fixed public benchmark: uska naam aur hash ek baar record kar lo.
+
+## Demo se production tak
+
+- **Dataset versions ko immutable banao** aur har training run ke saath version log karo.
+- **CI mein manifests automatically likho aur compare karo.**
+- **Model registry mein models ko data versions se link karo.**
+- **Har version ke record ids ka index rakho** taaki erasure requests poori ki ja sakein.
+- **Purane versions ki retention** apni reproducibility zarooraton se lambi rakho.
+
+## Practice karo
+
+DVC ki get-started guide aur Made With ML ka data versioning lesson follow karo.
+
+1. Ek dataset ko DVC se (ya hashed, dated folders aur manifest se) version control mein rakho aur use ek training run se link karo.
+2. Data badlo (rows jodo, labels theek karo), naya version banao, aur versions ke beech ek comparison report likho.
+3. Ek data check jodo jo label share kisi threshold se zyada badalne par fail ho.
+4. Apne dataset ke do versions banao, ek mein relabelled slice ho, aur compare function ko label-share badlaav par fail karwao.
+
+**Aap tab done ho jab aap** kisi purane model ko uske record kiye code aur data versions se reproduce kar sako, aur do dataset versions ke beech ka farak samjha sako.

@@ -1,0 +1,236 @@
+---
+id: vector-search
+lang: hinglish
+title: "Vector search"
+outcome: "Embeddings ko ek index mein store karna aur kisi sawaal ke liye sabse paas ke chunks retrieve karna seekhoge."
+answer: "Vector search embeddings ko ek index mein store karta hai aur sawaal ke embedding ke sabse paas wale lauta deta hai, yaani passages ko exact words ki jagah matlab se dhundhta hai."
+why_it_matters: "Vector search RAG ka R hai. Ye jaanna ki index padosiyon ko kaise dhundhta hai aur top-k ka kya matlab hai, aapko retrieval ko andaaze se nahi, samajh kar debug karne deta hai."
+flashcards:
+  - q: "Vector search kya hai?"
+    a: "Un chunks ko dhundhna jinke embeddings sawaal ke embedding ke sabse paas hon; zyadatar RAG systems mein retrieval ka step."
+  - q: "Top-k kya hai?"
+    a: "Lautaye gaye sabse paas ke results ki sankhya. Bahut kam hone par sahi chunk chhoot sakta hai; bahut zyada hone par prompt mein shor bhar jaata hai."
+  - q: "Exact aur approximate search mein kya farak hai?"
+    a: "Exact har vector se compare karta hai aur scale par dheema hai; HNSW jaise approximate indexes lagbhag wahi results bahut tez dhundh lete hain."
+  - q: "Vectors store karne ki teen jagahein batao."
+    a: "FAISS jaisi library, pgvector jaisa database extension, ya Qdrant, Weaviate ya Pinecone jaisa vector database."
+  - q: "Vector search kahan struggle karta hai?"
+    a: "Exact identifiers aur rare terms par: error codes, policy numbers, SKUs aur anjaane naam."
+  - q: "Reranker kya jodta hai?"
+    a: "Woh sawaal aur har candidate ko saath padhta hai aur embedding similarity se zyada accurate tareeke se unhe dobara order karta hai."
+  - q: "Search ke andar hi filter kyun karein?"
+    a: "Taaki sirf eligible chunks, jaise sahi product, maujooda versions ya permitted documents, top-k ke liye muqabla karein."
+  - q: "Embedding models badalne par kya karna padta hai?"
+    a: "Poora index dobara banao, kyunki alag models ke vectors ko compare nahi kiya ja sakta."
+  - q: "Filtered vector search maange gaye se kam results kyun de sakta hai?"
+    a: "Approximate indexes pehle nearest neighbours dhundhte hain, phir filters kuch ko hata dete hain. Strict filter ke saath un neighbours mein se kam bachte hain."
+  - q: "Cross-encoder reranker embeddings se alag kya karta hai?"
+    a: "Woh sawaal aur ek passage ko saath padhkar us pair ko score karta hai, jo do alag vectors compare karne se dheema par bahut zyada accurate hai."
+exercise:
+  title: "Retrieval ko tune karo"
+  setup: "Coimbatore ki ek pump manufacturer ka service assistant pgvector mein 1,800 manuals index karta hai. Problems: (1) 'fault code P-27 on model KX-5' general troubleshooting pages lautata hai; (2) answers kabhi-kabhi doosre pump models ke manuals se aate hain; (3) top-k 2 hone par sahi chunk aksar missing hota hai; model ko 20 bhejne par answers bhatak jaate hain; (4) pichhle hafte team ne embedding models badle, uske baad results bahut kharab ho gaye."
+  questions:
+    - q: "(1) ko kaise theek karoge?"
+      a: "Codes aur model numbers ke liye keyword search jodo aur use vector search ke saath merge karo."
+    - q: "(2) ko kaise theek karoge?"
+      a: "Pump model ko metadata ki tarah store karo aur search ke andar usse filter karo."
+    - q: "(3) ko kaise suljhaoge?"
+      a: "20 se 30 candidates retrieve karo, unhe rerank karo, aur sabse achhe paanch model ko bhejo; test set par recall check karo."
+    - q: "(4) ki shaayad kya wajah thi?"
+      a: "Purane chunks pichhle model se embed hue the aur queries naye model se. Naye model ke saath index dobara banao."
+ask:
+  - "HNSW kya hai aur kaise kaam karta hai?"
+  - "Mujhe pgvector use karna chahiye ya dedicated vector database?"
+  - "Top-k kaise chunun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Vector search** un chunks ko dhundhta hai jinke embeddings kisi sawaal ke embedding ke sabse paas hon. Ye zyadatar RAG systems mein retrieval ka step hai:
+
+1. Har chunk ko ek baar embed karo aur vectors ko ek **index** mein store karo.
+2. Sawaal ke samay, sawaal ko usi model se embed karo.
+3. Sabse milte-julte **top-k** chunks lautao (jaise sabse paas ke paanch).
+
+Store aapke program mein FAISS jaisi library ho sakta hai, PostgreSQL mein pgvector jaisa database extension, ya Qdrant, Weaviate ya Pinecone jaisa dedicated vector database.
+
+```flow
+title: Index, ek baar
+Chunks 1 se N -[embed]-> Vectors + metadata | product, type, page
+```
+
+```flow
+title: Query, har sawaal par
+"Washing machine E-4012 won't drain" -[usi model se embed]-> Query vector
+Query vector -> Nearest neighbours | product model se filter hue
+Nearest neighbours -[top 30]-> Rerank -[top 5]-> Prompt
+```
+
+Is lesson mein hum Hyderabad ke ek electronics retailer ke support assistant ke saath chalenge, jo product manuals aur help articles par bana hai.
+
+## Ye kaam kaise karta hai
+
+**Similarity.** Zyadatar systems normalised vectors par cosine similarity ya dot product use karte hain: zyada ka matlab matlab mein zyada milta-julta.
+
+**Exact versus approximate search.** Sawaal ko har vector se compare karna exact hai par laakhon chunks ke liye dheema. Approximate nearest neighbour indexes (jaise HNSW graphs) lagbhag wahi results bahut tez dhundh lete hain. Kuch hazaar chunks ke liye exact search theek hai.
+
+**Top-k.** Aap chunte ho ki kitne results lautane hain. Bahut kam hon toh sahi chunk chhoot sakta hai; bahut zyada hon toh prompt mein shor bhar jaata hai. Paanch se das ek aam shuruaat hai; apne sawaalon par naapo.
+
+**Metadata aur filters.** Har vector ke saath document id, title, section, page, date aur access groups store karo. Search ke andar filter karo (sirf ye product, sirf maujooda versions, sirf wahi jo ye user dekh sakta hai).
+
+**Vector search kahan struggle karta hai.** Exact identifiers aur rare terms par: "E-4012" jaise error codes, policy numbers, product SKUs, anjaane naam. Embeddings matlab pakadte hain, exact strings nahi. **Hybrid search** vector search ko keyword search (BM25) ke saath milata hai taaki ye pakde jaayein.
+
+**Reranking.** **Reranker** ek dheema, zyada accurate model hai jo sawaal aur har candidate chunk ko saath padhta hai aur relevance ke hisaab se unhe dobara order karta hai. Vector ya hybrid search se 20 se 50 candidates retrieve karo, rerank karo, aur prompt ke liye sabse achhe paanch rakho.
+
+**Index ko sync mein rakhna.** Jab documents badlein, unke purane vectors delete karo aur naye jodo; agar embedding model badlo, toh sab kuch dobara banao.
+
+**Store chunna:**
+
+| Store | Kiske liye sabse achha | Trade-offs |
+| --- | --- | --- |
+| Aapke program mein FAISS | Experiments, offline jobs | Database features nahi; persistence aap sambhaalte ho |
+| PostgreSQL mein pgvector | Postgres par pehle se chalte apps, laakhon chunks tak | Data, metadata aur vectors ke liye ek system |
+| Dedicated vector database | Bahut bade indexes, bhaari traffic | Ek aur system chalana aur secure karna |
+
+**Approximate index kaise kaam karta hai.** HNSW ek graph banata hai jahan har vector apne kuch paas ke padosiyon se juda hota hai, moti se baareek layers mein. Search sabse upar ki layer se shuru hoti hai, query ke paas wale vectors ki taraf koodti hai, aur neeche ki layers mein refine karti hai. Ye vectors ke ek chhote hisse ko check karta hai phir bhi aam taur par lagbhag saare asli nearest ones dhundh leta hai. Settings speed aur is baat ke beech trade karti hain ki kitne asli neighbours milte hain, isliye unhe badalte samay recall naapo.
+
+**Saboot ke saath top-k chunna.** Sawaalon ka ek test set banao, us chunk ke saath jo milna chahiye. 1, 5, 10 aur 30 par recall naapo. Agar 30 par recall 5 se bahut zyada hai, toh zyada retrieve karo aur ek reranker jodo. Agar 30 par bhi kam hai, toh problem pehle ki hai: parsing, chunking ya embedding model.
+
+**Index ko sync mein rakhna, practice mein.** Har chunk ko document id aur position se bani ek id do, jaise `manual-KX5-p12-c3`. Jab document badle, us document id ke saare chunks delete karo aur naye ek hi transaction mein daalo, taaki searches kabhi aadha update na dekhein. Har vector ke saath embedding model ka naam record karo. Ek raat ka check jo har model ke vectors gine, is lesson ke exercise wali galti pakad leta hai, jahan purane aur naye embeddings ek hi index mein mix ho gaye the.
+
+**Practice mein pgvector.** Agar aapka app pehle se Postgres use karta hai, toh vectors data ke bagal mein rah sakte hain:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE chunks (
+  id text PRIMARY KEY,                 -- e.g. manual-KX5-p12-c3
+  doc_id text NOT NULL,
+  section text, page int, version text,
+  access_group text NOT NULL,
+  embed_model text NOT NULL,
+  body text NOT NULL,
+  embedding vector(384) NOT NULL
+);
+CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX ON chunks (doc_id);
+
+-- Top 20 for one user's groups, current version only:
+SELECT id, section, page, body, 1 - (embedding <=> $1) AS similarity
+FROM chunks
+WHERE access_group = ANY($2) AND version = 'current'
+ORDER BY embedding <=> $1
+LIMIT 20;
+```
+
+`<=>` cosine distance hai, isliye chhota matlab zyada paas. `SET hnsw.ef_search = 100;` graph ka zyada hissa search karta hai, behtar recall ke liye, speed mein thodi keemat par. Strict filters ke saath, approximate index limit se kam rows lauta sakta hai; haal ke pgvector versions tab tak scan karte rah sakte hain jab tak kaafi rows pass na ho jaayein (iterative index scans), ya aap group ke hisaab se partition kar sakte ho.
+
+**Naapo ki index aapko kitna padta hai.** Apni queries par approximate results ko exact se compare karo:
+
+```python
+import numpy as np, faiss
+
+def ann_recall(vectors, queries, k=10, m=32, ef=64):
+    d = vectors.shape[1]
+    exact = faiss.IndexFlatIP(d); exact.add(vectors)
+    approx = faiss.IndexHNSWFlat(d, m, faiss.METRIC_INNER_PRODUCT)
+    approx.hnsw.efSearch = ef
+    approx.add(vectors)
+    _, truth = exact.search(queries, k)
+    _, found = approx.search(queries, k)
+    return np.mean([len(set(t) & set(f)) / k for t, f in zip(truth, found)])
+```
+
+Inner product ke cosine ke barabar hone ke liye vectors normalised hone chahiye. Agar recall lagbhag 0.95 se neeche hai, toh `ef` ya `m` badhao aur speed dobara naapo.
+
+**Code mein reranking.**
+
+```python
+from sentence_transformers import CrossEncoder
+
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+def rerank(question, candidates, keep=5):
+    scores = reranker.predict([(question, c["body"]) for c in candidates])
+    order = sorted(range(len(candidates)), key=lambda i: scores[i], reverse=True)
+    return [candidates[i] for i in order[:keep]]
+```
+
+20 se 50 candidates rerank karne mein das se sau milliseconds lagte hain; apne hardware par naapo. Indian-language text ke liye, ek multilingual reranker chuno aur use apni queries par test karo.
+
+**Aadhe-adhoore states ke bina updates.** Badle hue document ke chunks ko `doc_id` se key karke ek hi transaction mein delete aur insert karo, taaki searches kabhi aadha update na dekhein. Har raat `embed_model` ke hisaab se rows gino; ek se zyada value ka matlab mixed index.
+
+**Browser mein try karo.** NumPy ki kuch lines mein exact nearest-neighbour search. Query vector badlo.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+docs = rng.normal(size=(1000, 64))
+docs /= np.linalg.norm(docs, axis=1, keepdims=True)          # normalise, so dot product = cosine
+query = docs[42] + 0.1 * rng.normal(size=64)
+query /= np.linalg.norm(query)
+
+scores = docs @ query
+top = np.argsort(-scores)[:5]
+print("top 5:", top.tolist())
+print("scores:", scores[top].round(3).tolist())
+```
+
+## Ek example se samjho
+
+Hyderabad ka ek electronics retailer 3,000 product manuals aur help articles par ek support assistant banata hai.
+
+- Chunks ko ek open embedding model se embed kiya jaata hai aur PostgreSQL mein pgvector ke saath store kiya jaata hai, product model aur document type metadata ki tarah.
+- "my washing machine shows error E-4012 and won't drain" ke liye, plain vector search general draining articles lautata hai par woh page chhod deta hai jo E-4012 list karta hai, kyunki code ek rare token hai.
+- Woh keyword search jodte hain aur dono result lists ko merge karte hain; error-code wala page ab pehle aata hai.
+- Woh top 30 par ek reranker jodte hain; 60 sawaalon ke test par, sahi chunk top paanch mein 91% baar aata hai, akele vector search ke 72% ke mukable.
+- Customer ke product model par ek filter doosre models ke manuals hata deta hai.
+
+| 60 sawaalon par set-up | Top paanch mein sahi chunk |
+| --- | --- |
+| Akela vector search | 72% |
+| Plus keyword search, merged | Error-code sawaal theek hue |
+| Plus top 30 par reranker | 91% |
+| Plus product-model filter | Galat-model manuals hat gaye |
+
+**Retailer ne kya rakha.** Team ab chunking, embeddings, top-k ya reranker mein har badlaav ke baad apna 60-sawaal ka test chalati hai, aur nateeje repository mein ek table mein rakhti hai, taaki kisi ko yaad na rakhna pade ki koi setting kyun chuni gayi thi.
+
+## Aam galtiyaan
+
+- **Queries aur chunks ko alag models se embed karna.**
+- **Codes aur IDs ke liye vectors par nirbhar rehna.** Keyword search jodo.
+- **Bina test kiye top-k chunna.**
+- **Retrieval ke baad filter karna.** Search ke andar filter karo.
+- **Index ko update ya rebuild karna bhool jaana.**
+- **Search ke baad application code mein filter karna.** Permission filters query mein hone chahiye.
+- **Approximate index ka recall kabhi na naapna.** Defaults aapki soch se zyada chhod sakte hain.
+- **Inner product ke saath unnormalised vectors**, jo phir cosine similarity nahi rehti.
+
+## Jab vector index ki zaroorat nahi
+
+- **Kuch hazaar chunks**: NumPy se exact search kaafi tez hai aur perfect recall deta hai.
+- **Exact-match lookups**: IDs, codes aur naam keyword search ya database index mein aate hain.
+- **Filters zyadatar kaam kar dein**, jaise "is customer ke teen contracts": unhe seedhe fetch karo.
+
+## Demo se production tak
+
+- **Permission aur version filters ko search query ke andar rakho.**
+- **ANN recall aur latency naapo** jab bhi index settings ya data size badle.
+- **Documents ko transactions mein update karo**, aur har raat mixed embedding models check karo.
+- **Retrieved ids aur scores log karo**, har answer ke saath.
+- **Reranker ki latency ko apne asli candidate counts par benchmark karo.**
+
+## Practice karo
+
+Neeche link kiya hua Hugging Face semantic search lesson karo.
+
+1. Ek document set ke 200 chunks ko FAISS ya pgvector se index karo aur das sawaalon ke liye top-5 retrieve karo.
+2. Codes ya names wale sawaalon ke liye keyword search jodo, results merge karo, aur compare karo.
+3. Top 20 par ek reranker jodo aur apne das sawaalon par badlaav naapo.
+4. Apne index par ann_recall do efSearch settings par chalao aur har ek ke liye recall aur query time record karo.
+
+Aur gehrayi ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 embedding-based retrieval, approximate nearest neighbour search aur reranking cover karta hai.
+
+**Aapka kaam poora jab:** aap top-k samjha sako, bata sako ki vector search kab fail hota hai, aur reranker kya jodta hai.

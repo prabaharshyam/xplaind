@@ -1,0 +1,235 @@
+---
+id: structured-output
+lang: tanglish
+title: "Structured JSON output-a vaangunga"
+outcome: "Oru model-a schema-ku match aagura JSON-a return panna vechchu, unga code use panradhukku munnaadi adha validate pannalaam."
+answer: "Structured output vaanga, API-oda structured output illa tool feature vazhiya model-ku oru JSON schema kudunga, apram unga code use panradhukku munnaadi reply-a Pydantic-la validate pannunga."
+why_it_matters: "Programs-aala oru friendly paragraph-a padikka mudiyaadhu. Model-la irundhu nambikkaiyaana JSON-a vaangradhu thaan oru chat-a oru feature-aa maathum: form filler, classifier, data extractor."
+flashcards:
+  - q: "Structured output-na enna?"
+    a: "Model, schema-nu solra define pannina shape-ku match aagura JSON-la reply pannum, adhanaala code fields-a nambikkaiyaa padikkalaam."
+  - q: "Structured output vaanga moonu vazhigal enna?"
+    a: "Provider-oda structured-output feature schema-oda, tool calling schema-va tool-oda input-aa vechchu, illa fallback-aa clear instructions-um exact JSON example-um."
+  - q: "Structured output use pannaalum yen validate pannanum?"
+    a: "Schemas shape-aiyum types-aiyum force pannum, aanaa values innum thappaa irukkalaam illa range-ku veliya irukkalaam, fallbacks-ku entha constraint-um irukkaadhu."
+  - q: "Validation error vandhaa enna nadakkanum?"
+    a: "Error message-oda oru thadava retry pannunga, model sari panna; thirumba fail aanaa item-a oru aal-kitta anuppunga. Invalid data-va eppavum store pannaadheenga."
+  - q: "Sila fields-ku yen null allow pannanum?"
+    a: "Input-la andha information illaama irukkalaam-naa, required field model-a oru value-va kattuvikkum."
+  - q: "Categories-ku yen enums use pannanum?"
+    a: "Allowed values-oda fixed list filters, reports, analysis-ku categories-a consistent-aa vechchirukkum."
+  - q: "Pydantic-oda model_validate_json enna pannum?"
+    a: "JSON text-a parse panni model-oda check pannum, ovvoru fail aagura field-aiyum peru solra ValidationError-a raise pannum."
+  - q: "JSON schema-na enna?"
+    a: "Oru JSON shape-oda description: fields, types, required fields, allowed values; providers output-a constrain panna use pannuvaanga."
+  - q: "Constrained decoding-na enna?"
+    a: "Ovvoru step-layum, grammar illa schema-padi output valid-aa irukkura tokens-a mattum model pick pannalaam, adhanaala shape guaranteed."
+  - q: "Valid-JSON output-um yen parse aagaama pogalaam?"
+    a: "Reply max_tokens limit-a thottaa, JSON nadula vettappadum. Parse panradhukku munnaadi stop reason-a check pannunga."
+exercise:
+  title: "Schema-va design pannunga"
+  setup: "Noida-la oru recruitment startup WhatsApp messages-la irundhu job postings-a extract pannudhu: 'Hiring 3 delivery executives in Gurgaon, 18k-22k pm + incentives, bike must, call 98xxxxxx10'. Sila posts-la salary illa, sila range kudukkum, sila rendu roles list pannum. Site city, role type (full-time, part-time, contract), minimum salary padi filter pannum."
+  questions:
+    - q: "Salary-a eppadi represent pannanum?"
+      a: "Rendu optional integer fields, salary_min_inr, salary_max_inr, monthly, kudukkalainaa null. '18k-22k' 18000, 22000 aagum."
+    - q: "Role type-a eppadi represent pannanum, yen?"
+      a: "Full-time, part-time, contract enum, theliva illainaa null, appo site filter consistent-aa work aagum."
+    - q: "Rendu roles list panra posts-a eppadi handle pannanum?"
+      a: "Top level-a postings-oda list aakkunga, appo oru message rendu records kudukkum; illa andha maadhiri messages-a moderator-kitta route pannunga."
+    - q: "Oru message-ku rendu thadava validation fail aanaa enna nadakkanum?"
+      a: "Adhu original message-oda moderator queue-ku pogum, invalid edhuvum save aagaadhu."
+ask:
+  - "Structured output-kum tool calling-kum enna difference?"
+  - "AI output-a Pydantic-la eppadi validate pannalaam?"
+  - "En model illaadha fields-ku values-a yen kattukkudhu?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Applications-ku data thevai, prose illa. Unga code model-oda reply-la irundhu oru price, oru category, oru items list-a padikkanum-naa, **structured output** kelunga: define pannina oru shape-ku (**schema**) match aagura JSON. Apram unga code use panradhukku munnaadi adha validate pannunga.
+
+Perumbaalaana providers ippo schema-ku match aagura valid JSON-a model produce panna constrain panra features-a kudukkaanga, illa adhae-ku tool definitions use pannuraanga.
+
+```flow
+Messy text | "Selling my Samsung Galaxy S21, 2 yrs old, minor scratches, 18k negotiable, pickup Malviya Nagar" -> Model
+Schema | product: str, price_inr: int above 0, condition: enum, city: str or null -> Model
+Model -> JSON -> Validate
+Validate -[ok]-> Save | product "Samsung Galaxy S21", price_inr 18000, condition "used", city "Jaipur"
+Validate -[fails]-> Error-oda oru thadava retry
+Error-oda oru thadava retry -[thirumba fail]-> Moderator
+```
+
+Indha lesson Jaipur-la oru online marketplace, free-text seller listings-a searchable records-aa maathura vidhathai follow pannum.
+
+## Idhu eppadi work aagudhu
+
+**Shape-a define pannunga.** Fields, avatrin types, edhu required-nu decide pannunga. Python-la Pydantic model oru convenient vazhi:
+
+```python
+from typing import Literal
+from pydantic import BaseModel, Field
+
+class Listing(BaseModel):
+    product: str
+    price_inr: int = Field(gt=0)
+    condition: Literal["new", "used", "refurbished"]
+    city: str | None = None
+```
+
+**Adha kelunga.** Illa provider-oda structured-output feature-a schema-oda use pannunga, illa tool calling schema-va tool-oda input-aa vechchu, illa fallback-aa clear instructions-um exact JSON-oda oru example-um.
+
+**Validate pannunga.** Reply-a parse panni schema-ku ethiraa validate pannunga:
+
+```python
+from pydantic import ValidationError
+
+try:
+    item = Listing.model_validate_json(reply_text)
+except ValidationError as err:
+    # log err, retry once with the error message, or send to a person
+    ...
+```
+
+Validation thappaana types-a (price "about 500"-nu text-aa), missing fields-a, range-ku veliya irukkura values-a pidikkum.
+
+**Failures-a handle pannunga.** Validation error vandhaa: oru thadava retry pannunga, model-ku enna thappu-nu solli; thirumba fail aanaa item-a human review-ku mark pannunga. Invalid data-va unga database-kulla vara vidaadheenga.
+
+**"Theriyaadhu"-a allow pannunga.** Input-la andha information irukkaama irukkalaam-naa, fields-a optional aakkunga illa null allow pannunga, instructions-layum solunga. Illaina shape-a nirappa model oru value-va kattalaam.
+
+**Categories-ku enums use pannunga.** Allowed values-oda fixed list ("new", "used", "refurbished") pinnaadi analysis-ku categories-a consistent-aa vechchirukkum.
+
+**Schema design choices:**
+
+| Field vagai | Nalla design | Thavirkka |
+| --- | --- | --- |
+| Money | Range check-oda integer rupees, `price_inr: int > 0` maadhiri | "18k" maadhiri text |
+| Category | Allowed values-oda enum | Maarikitte irukkura free text |
+| Illaama irukkalaam-nu information | Optional, null allow, instructions-la solunga | Kattuka vaikkum required fields |
+| Repeat aagura items | Objects-oda list | item1, item2 maadhiri numbered fields |
+| Dates | Validate pannina ISO dates | Kalandha formats-la free-form dates |
+
+**Blind-aa illa, error-oda retry pannunga.** Validation fail aanaa, model-ku adhoda munnaadi reply-yum exact validation message-yum anuppunga, "price_inr: input should be a valid integer, got '18k'" maadhiri. Perumbaalaana errors oru retry-la sari aagidum. Error illaama retry pannaa perumbaalum adhae thappu thirumba nadakkum.
+
+**Aindhu layers, light-la irundhu heavy varaikkum.** Pala idangalla model-a sariyaana shape pakkam thallalaam:
+
+| Layer | Eppadi work aagum | Reliability | Cost |
+| --- | --- | --- | --- |
+| Prompting | Instructions plus exact example | Strong models-la nallaa, guarantee illa | Free |
+| Post-processing | Code common slips-a sari pannum, missing closing bracket illa JSON-ai suthi code fence maadhiri | Thappugal chinnadhaa, thirumba nadandhaa work aagum | Cheap |
+| Retry | Validation error-oda, fit aagura varaikkum thirumba kelunga | High, aanaa ovvoru retry-um oru call cost | Extra calls, delay |
+| Constrained decoding | Provider illa library, output valid-aa irukkura tokens-a mattum model pick panna vidum | Shape guaranteed | Konjam mella; supported formats mattum |
+| Fine-tuning | Unga format-la neraya examples-la train pannunga | Oru fixed format-ku high | Data, training effort |
+
+Mudhal moonu, kitta-thatta sari-aana model-ku bandages. Constrained decoding thaan providers-oda structured-output features-um Outlines, guidance, llama.cpp grammars maadhiri open-source libraries-um use pannradhu: model adutha token-a choose panna pora neram, grammar-a udaikkura ovvoru token-um choices-la irundhu neekkappadum. Models orey sila thappugala thirumba thirumba pannum, adhanaala post-processing romba dhooram pogum: LinkedIn, forgiving parser correctly formatted YAML-a 90%-la irundhu 99.99%-ku uyarthinadhaa sonnaanga.
+
+**Valid JSON correct JSON illa.** Pazhaya "JSON mode" features reply parse aagum-nu mattum promise pannum, unga fields irukkum-nu illa. Schema-constrained output-layum oru thappaana value irukkalaam. Reply `max_tokens`-a thottaa edhu JSON-um vettappadalaam, adhanaala mudhalla stop reason-a check pannunga.
+
+**Types mattum illa, values-aiyum check pannunga.** `price_inr` oru positive integer-nu schema confirm pannum, aanaa rendu varusha pazhaya phone-ku ₹18,000 sariyaa-nu confirm pannaadhu. Validation-ku apram business checks serunga: category-ku podhumaana range-la prices, theriyuradha list-la irundhu cities, future-la illaadha dates. Schema-va paasaagi business check-la fail aagura values invalid maadhiriye review-ku pogum. Indha rendu-layer approach, schema mudhalla business rules rendavadhu, invoice extraction-ku-um kittathatta ella structured-output pipeline-kum use aagura adhe pattern.
+
+**Muzhu pipeline code-la.** Guaranteed shape vaanga oru common vazhi, model-ku unga schema-vai input-aa kondha oru tool-a kudutthu, andha tool-a use pannanum-nu kattaayappaduthuradhu. Idhu Anthropic-oda Python SDK-la odum; matha providers-ku equivalents irukku:
+
+```python
+import anthropic
+from pydantic import ValidationError
+
+client = anthropic.Anthropic()
+TOOL = {"name": "save_listing", "description": "Save one product listing.",
+        "input_schema": Listing.model_json_schema()}
+CITIES = {"Jaipur", "Ajmer", "Udaipur", "Jodhpur"}
+
+def business_errors(item):
+    errors = []
+    if not 100 <= item.price_inr <= 500_000:
+        errors.append(f"price_inr {item.price_inr} is outside 100 to 500000")
+    if item.city and item.city not in CITIES:
+        errors.append(f"city {item.city!r} is not a city we serve")
+    return errors
+
+def extract(text, max_attempts=2):
+    messages = [{"role": "user", "content": "Extract the listing. Use null for anything not stated.\n\n" + text}]
+    for _ in range(max_attempts):
+        reply = client.messages.create(
+            model="claude-sonnet-5-5", max_tokens=500, messages=messages,   # check the docs for current names
+            tools=[TOOL], tool_choice={"type": "tool", "name": "save_listing"},
+        )
+        if reply.stop_reason == "max_tokens":
+            return None, "cut off: raise max_tokens"
+        call = next(b for b in reply.content if b.type == "tool_use")
+        try:
+            item = Listing.model_validate(call.input)
+            problems = business_errors(item)
+        except ValidationError as err:
+            item, problems = None, [str(err)]
+        if not problems:
+            return item, "ok"
+        # Send the exact error back so the model can fix it.
+        messages += [{"role": "assistant", "content": reply.content},
+                     {"role": "user", "content": [{"type": "tool_result", "tool_use_id": call.id,
+                                                   "is_error": True, "content": "; ".join(problems)}]}]
+    return None, "to moderator: " + "; ".join(problems)
+```
+
+Ovvoru outcome-um oru valid `Listing` illa oru clear reason, adhanaala thaan moderator queue enna thappu aachu-nu exact-aa kaattum. Ovvoru outcome-vaiyum naal-padi count pannunga; oru vagai error adhigamaanaa, inputs maariduchu-nu kaattura mudhal sign-aa irukkum.
+
+## Oru worked example
+
+Jaipur-la oru online marketplace free text-la seller listings vaangudhu: "Selling my Samsung Galaxy S21, 2 yrs old, minor scratches, 18k negotiable, pickup Malviya Nagar".
+
+Pipeline provider-oda structured output feature-a vachchu model-kitta product, price, condition, city-oda oru `Listing` kekkudhu. Ovvoru reply-layum validation odum.
+
+500 listings-la results:
+
+- 471 mudhal thadavaiyae valid.
+- 18-la prices "18k" illa "around 20,000"-nu ezhudhirundhaanga; schema text-a reject pannum, code validation error-oda oru thadava retry pannum, 15 integers-aa (18000, 20000) thirumbi varum.
+- Matha 11 poorvaiyaa fail (listing-la price-e illa, illa oru post-la rendu products). Retry-ku apram innum fail aagura 3-oda serthu, 14 moderator queue-ku pogum.
+
+Entha invalid-um database-ku varaadhaala, site-la price filters-um city search-um work aagitte irukkum.
+
+| Step | Listings | Share |
+| --- | --- | --- |
+| Mudhal thadavaiyae valid | 471 | 94% |
+| Error-oda oru retry-la sari aachu | 15 | 3% |
+| Moderators-ku anuppinaanga | 14 | 3% |
+| Database-la invalid records | 0 | 0% |
+
+**Moderators-ku yen pidichadhu.** Moderators-ku vandha 14 listings original text-oda, model-oda try-oda, exact validation error-oda vandhadhu, adhanaala ovvonnum sila nimishathula sari aachu. Pipeline-ku munnaadi, moderators naalukku nooru kanakkaana listings-a kaiyaala sari pannitu irundhaanga.
+
+## Podhuvaa panra thappugal
+
+- **Free text-a string tricks-aala parse panradhu.** JSON kelunga, validate pannunga.
+- **"Adhu perumbaalum sariyaa irukkum"-nu validation-a skip panradhu.**
+- **Ellaa fields-aiyum force panradhu.** Illaama irukkalaam-nu information-ku null allow pannunga.
+- **Free-text categories.** Fixed list use pannunga.
+- **Endrum retry panradhu.** Error-oda oru thadava retry pannunga, apram oru aal-kitta anuppunga.
+
+- **Tests-a update pannaama schema-va maathradhu.** Expected outputs-oda sample inputs set vechchirukkunga, schema maarum podhellaam thirumba odunga.
+- **Stop reason-a ignore panradhu.** `max_tokens`-la vettappatta reply, model evvalavu nalladhaa irundhaalum, udaindha JSON.
+- **Periya, aazhamaana nested schemas.** Ovvoru extra field-um thappaagura innoru vaaippu. Unga code use panradhu mattum kelunga, romba periya extractions-a steps-aa piringa.
+
+## Schema thevai illaadha idangal
+
+- **Reply nerra oru aal-kitta pogum**, chat answer illa email draft maadhiri. Plain text okay.
+- **Chinna list-la irundhu oru label**, strict prompt plus reply allowed words-la onnu-nu check pannaa podhum.
+- **Notebook-la quick exploration**, edhu fields mukkiyam-nu theriyaradhukku munnaadi.
+
+## Demo-la irundhu production-ku
+
+- **Schema-va API maadhiri version pannunga**, adhoda ezhudhina records irukkura varaikkum pazhaya versions-a padikka mudiyura maadhiri vechchirukkunga.
+- **Expected outputs-oda real messy inputs-oda test set vechchirukkunga**, ovvoru schema, prompt, model maatraththukkum odunga.
+- **Ovvoru outcome-vaiyum log pannunga**: mudhal thadavaiyae valid, retry-la sari, vettappattadhu, review-ku anuppinadhu. Rates-a naal-padi paarunga.
+- **Reviewers-ku context kudunga**: original text, model-oda try, exact error.
+- **Cost-a kavanichukkunga**: retries-um neenda schemas-um tokens-a serkkum, adhanaala oru call-ku illa, oru valid record-ku tokens-a track pannunga.
+
+## Practice pannunga
+
+Keezha link panni irukkura structured outputs guide-a padinga.
+
+1. Oru invoice, job posting, illa product listing-ku Pydantic model define pannunga.
+2. Pathu messy real-world texts-la irundhu structured output vachchu extract pannunga, ovvonnayum validate pannunga.
+3. Validation error-oda oru retry-yum, meedhi-kku oru review list-yum serunga; ovvoru step-layum evvalavu pass aachu-nu report pannunga.
+4. Mela irukkura `extract` function-a unga pathu texts-la `max_tokens` 30-nu set pannitu odunga, cut-off case eppadi handle aagudhu-nu paarunga.
+
+Innum aazhama padikka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-la chapter 2, structured outputs-ku prompting, post-processing, constrained sampling, fine-tuning pathi pesum.
+
+**Mudinjadhu-nu eppo sollalaam:** Structured output irundhaalum validation yen thevai-nu explain panna mudiyum, unga pass rates-a kaattalaam.

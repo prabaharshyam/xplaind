@@ -1,0 +1,211 @@
+---
+id: agent-tool-design
+lang: tanglish
+title: "Agents-ku tools design pannradhu"
+outcome: "Model sariyaa use panra tools-a design pannalaam: konjam, nokkam irukkura, clear-aa peru vachu describe panna, tight parameters-oda, useful results-oda, model act panna koodiya errors-oda."
+answer: "Nalla agent tools konjamaa irukkum, clear-aa peru vachu describe pannirukkum, tight typed parameters edukkum, short useful results tharum, model act panna koodiya error messages tharum."
+why_it_matters: "Agent adhoda tools-a vida nallaa irukkaadhu. Client pilots-la neraya agent failures, vague tool names, overlap aagura tools, illa model-a data-la mulgadikkura results-la irundhu thaan varum. Tool design sariyaa panna cheap, thappaa panna expensive."
+flashcards:
+  - q: "Oru tool-la model enna paakkum?"
+    a: "Adhoda name, description, parameter schema mattum. Adhulairundhu thaan tool-a choose pannanum, arguments-a nirappanum, result-a padikkanum."
+  - q: "Nalla agent tools-oda aindhu gunangal enna?"
+    a: "Konjam tools, ovvonnukkum oru clear velai, eppo use pannanum-nu sollra names-um descriptions-um, tight parameter types, short actionable results-um errors-um."
+  - q: "API endpoint-a vida task-vaaripaa tools-a yen design pannanum?"
+    a: "Models neraya fine-grained calls-a chain panna thinnaaduvaanga. Oru task-shaped tool-na thappaagura chance kammi."
+  - q: "Parameters-a eppadi constrain pannradhu?"
+    a: "Fixed choices-ku enums, ids-ku patterns, sensible defaults, limits use pannunga, appo model values-a kattu kadhai pannaadhu."
+  - q: "Oru tool result-la enna irukkanum?"
+    a: "Task-ku thevaiyaana konjam fields, padikka easy-aa, adutha tool-ku ids-oda; perusaana results paginate panni, adha solli."
+  - q: "Nalla tool error-na enna?"
+    a: "Enna thappaachu, adutha enna seiyyanum-nu solludhu, example expected id format, user-a check panna solla."
+  - q: "Read tools-a write tools-la irundhu yen pirikkanum?"
+    a: "Appo refunds, deletions maadhiri risky actions-ku approval-um thaniya logging-um vaikkalaam, reads thaarumaaraa run aagum."
+  - q: "Thappaana tool choices-ku periya kaaranam enna?"
+    a: "Overlap aagura tools illa clear-aa illaadha descriptions."
+  - q: "Agent-ku thevai illaadha tools-a eppadi kandupidikkalaam?"
+    a: "Oru thadavaikku oru tool-a eduthuttu ungaloda task set-a thirumba run pannunga. Results kurayalannaa, andha tool-a muzhusaa eduthudunga."
+  - q: "Tool descriptions-ku yen oru cost irukku?"
+    a: "Ovvoru tool-oda name, description, schema ovvoru call-layum anuppappadum, tokens-a use pannum, matha ellaathukkum idam kammi aagum."
+exercise:
+  title: "Tool set-a redesign pannunga"
+  setup: "Chennai-la oru hospital-oda appointment assistant-ku indha tools irukku: get_patient, get_patient_v2, list_doctors, list_slots, list_departments, book (cancel=true kuduthaa cancel-um pannum), run_query(sql). Results 60 fields-oda muzhu database rows. Oru slot eduthirundhaa, book 'Error 409'-nu tharum. Tests-la model aindhula oru tasks-la thappaana tool-a select pannudhu."
+  questions:
+    - q: "Entha tools-a merge pannanum illa remove pannanum?"
+      a: "get_patient-yum get_patient_v2-yum merge pannunga, doctor, slot listing-a oru find_slots tool-aa serunga, run_query-a eduthudunga."
+    - q: "Book-a booking, cancelling rendaiyum pannradhula enna thappu?"
+      a: "Rendu vera vera actions oru tool-a share pannudhu, adhanaala approval-um logging-um cancellations-ku mattum target panna mudiyaadhu. Book_slot, cancel_appointment-nu pirunga."
+    - q: "Results eppadi maaranum?"
+      a: "Task-ku thevaiyaanadha mattum thaarunga, example doctor, department, date, time, slot id, 60 raw fields illa."
+    - q: "'Error 409'-ku badhila enna irukkanum?"
+      a: "'That slot was just taken. The next free slots with Dr Rao are 11:30 and 12:15; ask the patient which suits.' maadhiri oru message."
+ask:
+  - "AI agent-ku nalla tool description eppadi ezhudhuradhu?"
+  - "Oru agent-ku ethanai tools irukkanum?"
+  - "En agent-ku SQL tool kudukkalaamaa?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Oru model-ku tools kudukkum podhu, adhu avatoda names, descriptions, parameter schemas-a mattum thaan paakkum. Adha vachae entha tool set aagum, entha arguments pass pannanum, result-a eppadi padikkanum-nu mudivu pannanum. Oru human developer-kaaga design panna tool, example oru internal API-oda ovvoru endpoint-kum oru sirya wrapper, model-a kuzhappidum.
+
+Nalla agent tools-ku aindhu gunangal irukkum: avai **konjam**, ovvonnum oru **clear velai** seiyum, names-um descriptions-um **eppo** use pannanum-nu solludhu, parameters **tight-aa typed** irukkum, results-um errors-um **short-aavum actionable-aavum** irukkum.
+
+| | API-shaped: 14 tools | Task-shaped: 3 tools |
+|---|---|---|
+| Tools | get_booking, get_booking_v2, list_segments, get_pnr_status, get_fare_rules, get_passengers, create_refund_request, ... | get_trip(booking_ref) padikka; get_cancellation_quote(ref) padikka; cancel_trip(quote_id) act panna, approval-oda |
+| Thappaana tool select aagudhu | 22% | 3% |
+| Oru task-ku calls | 4.1 | 2.3 |
+
+```flow
+dir: LR
+title: Task-shaped tools
+get_trip(booking_ref) | read -> get_cancellation_quote(ref) | read
+get_cancellation_quote(ref) -> cancel_trip(quote_id) | acts: needs approval
+```
+
+Indha lesson Gurugram-la oru travel company-oda support agent-a follow pannum. Avanga tools booking API-oda ovvoru endpoint-aiyum appadiyae mirror pannichu.
+
+## Idhu eppadi work aagudhu
+
+**Tools-a task-vaaripaa select pannunga, API-vaaripaa illa.** Agents eppovum oru customer-a look up panni, apram avanga open orders-a paatha, rendu calls-a model chain pannanum-nu irukkradhai vida oru `get_customer_with_open_orders` tool nalladhu. Kammiyaana, high-level tools-na thappaagura chance kammi.
+
+**Model-kaaga peru vechchu describe pannunga.** `search_policies`-ku "Search current HR policies by keywords. Use for questions about leave, travel, reimbursements or conduct. Returns up to 5 passages with policy name and section." nu description irundhaa, edhukku adha call pannanum, enna thirumbi varum-nu model-ku theriyum. Tool enna seiyaadhu-nu kooda sollunga.
+
+**Parameters-a constrain pannunga.** Fixed choices-ku enums (`status: "open" | "closed"`), ids-ku formats (`pattern: ^ORD-\d{8}$`), sensible defaults, limits use pannunga. Ovvoru loose string-um model oru value-a kattu kadhai pannura chance.
+
+**Model-ku thevaiyaanadha thaarunga.** 200 fields-oda raw JSON-a kottaadheenga. Mukkiyamaana konjam fields-a, padikka easy-aa, adutha tool-ku pass panna koodiya ids-oda thaarunga. Perusaana results-a paginate illa truncate panni, adha solunga ("showing 10 of 312; refine the search").
+
+**Errors-a instructions maadhiri ezhudhunga.** "Error 400" edhum kathukkodukkaadhu. "No order found with id ORD-2026117. Order ids have 8 digits after ORD-; ask the user to check the id." model-a recover aaga vidum.
+
+**Reading-a acting-la irundhu pirunga.** Edhaavadhu maathura tools-a (refund, send, delete) read panra tools-la irundhu thaniya vainga, appo avatrukku approval-a vaikkalaam, thaniya log pannalaam.
+
+**Tool use-a test pannunga.** 20 realistic tasks ezhudhi, model entha tools-a entha arguments-oda call pannudhu-nu check pannunga. Thappaana tool choices perumbaalum overlap aagura tools illa clear-aa illaadha descriptions-nu artham.
+
+**Oru tool description checklist:**
+
+| Paguthi | Weak | Strong |
+| --- | --- | --- |
+| Name | `get_data` | `get_trip` |
+| Eppo use pannanum | Illa | "Oru trip pathi entha kelvikkum mudhalla idha use pannunga" |
+| Enna thirumbi varum | Illa | "Flights, passengers, status, online-la cancel panna mudiyumaa" |
+| Enna seiyyaadhu | Illa | "Cancel pannaadhu; quote-ku apram cancel_trip use pannunga" |
+| Parameter | `id: string` | 6-character pattern-oda `booking_ref` |
+| Error | "Error 400" | "No trip for ABC12; references are 6 letters or digits" |
+
+**Oru tool-a innoru tool-a sarndhirukka vaikkradhu.** `cancel_trip`-la quote id-a vendum-nu aakkuradhu, sirya design trick, periya effect. Model mudhalla quote-a fetch pannaama cancel pannamudiyaadhu, adhanaala edhuvum nadakkradhukku munnadi customer-ku refund amount-um fees-um theriyum, approval screen-la quote-a kaattalaam. Oru action oru check-ku apram varanum-nu irukkura engayum idhe idea-a use pannunga: verified invoice id thevaippadura payment, user paatha draft id thevaippadura email.
+
+**Oru tool set-a test panradhu.** Names, descriptions, schemas maatrina ovvoru thadavayum adhe 20 tasks-a run panni, moonu numbers-a count pannunga: thappaana tool select aanadhu, invalid arguments, oru task-ku calls. Sirya wording maatrangal makkal ethirpaarpadhai vida adhigamaa indha numbers-a maathum.
+
+**Code-la oru nalla shape aana tool.** Arguments-a Pydantic-la define pannunga, adhulairundhu schema-va generate pannunga, result-a model-ku ethaarpol shape pannunga:
+
+```python
+from typing import Literal
+from pydantic import BaseModel, Field, ValidationError
+
+class SearchTrips(BaseModel):
+    """Find a customer's trips. Use when they ask about a booking but give no reference.
+    Returns at most 5 trips, newest first. Does not change or cancel anything."""
+    status: Literal["upcoming", "past", "cancelled"] = "upcoming"
+    city: str | None = Field(default=None, description="Destination city, e.g. Kochi")
+
+TOOL = {"name": "search_trips", "description": SearchTrips.__doc__.strip(),
+        "input_schema": SearchTrips.model_json_schema()}
+
+def search_trips(customer_id, raw_args, db):
+    try:
+        args = SearchTrips.model_validate(raw_args)
+    except ValidationError as err:
+        field = err.errors()[0]["loc"][0]
+        return f"Invalid {field}. Status must be upcoming, past or cancelled."
+    trips = db.find_trips(customer_id, args.status, args.city)       # customer_id from the session
+    if not trips:
+        where = f" to {args.city}" if args.city else ""
+        return f"No {args.status} trips{where}. Ask the customer for the booking reference."
+    lines = [f"{t.ref}: {t.city}, {t.date:%d %b %Y}, {t.status}" for t in trips[:5]]
+    more = f" (showing 5 of {len(trips)}; ask for a city or date to narrow)" if len(trips) > 5 else ""
+    return "\n".join(lines) + more
+```
+
+Description eppo tool-a use pannanum, enna thirumbi varum, enna seiyyaadhu-nu solludhu. Result adutha tool-ku thevaiyaana ids-oda konjam padikka koodiya lines, raw database rows illa. Ovvoru failure path-um adutha enna seiyyanum-nu solludhu.
+
+**Thangaloda idatha sambaadhikkura tools-a kandupidinga.** Adhigam tools-na adhigam abilities, aana thappaa select panna adhigam chance-um, ovvoru description-um ovvoru call-layum anuppappadum. Rendu simple experiments:
+
+- **Oru thadavaikku onna remove pannunga.** Ovvoru tool-um illaama ungaloda task set-a run pannunga. Success kuraiyalannaa, andha tool pogalaam.
+- **Calls-a plot pannunga.** Oru vaaraththula traces-la ovvoru tool-ku calls-a count pannunga, entha tool-ukku apram entha tool varum-nu note pannunga. Eppovume call aagaadha tool-oda description mosamaa irukkalaam; eppovum pinnaadi pinnaadi call aagura rendu tools merge-ku candidates.
+
+```python
+from collections import Counter
+
+def tool_usage(runs):
+    """runs: list of lists of tool names, in order, one list per run."""
+    calls, pairs = Counter(), Counter()
+    for names in runs:
+        calls.update(names)
+        pairs.update(zip(names, names[1:]))
+    return calls.most_common(), pairs.most_common(5)
+```
+
+**Tools-a APIs maadhiri version pannunga.** Oru parameter-a rename panradhu, oru tool enna tharudhu-nu maathuradhu, agent behaviour-a mella udaikkalaam. Tool definitions-a prompt-ku pakkathula code-la vainga, maatrangala serndhu review pannunga, ovvoru maatramum tool-choice tests-a thirumba run pannunga.
+
+**Oru server, pala agents.** Pala apps-ku adhe tools vendumna, Model Context Protocol (MCP) vazhiya oru thadava expose pannunga, appo ovvoru app-um avatha thirumba implement pannathu. Design rules appadiyae: narrow tools, clear descriptions, helpful errors, tool-kulla permission checks.
+
+## Oru worked example
+
+Gurugram-la oru travel company-oda support agent-ku mudhalla 14 tools irundhudhu, booking API-a mirror pannina: `get_booking`, `get_booking_v2`, `list_segments`, `get_pnr_status`, `get_fare_rules`, `create_refund_request`, innum neraya. Tests-la, model 22% tasks-la thappaana onna select pannichu, `get_booking`-yum `get_booking_v2`-yum rendaiyum call pannichu, cost rendu madangu aachu.
+
+Support team-oda unmaiyaana tasks-a vachu redesign pannureenga:
+
+```python
+{
+  "name": "get_trip",
+  "description": "Get a customer's trip by booking reference: flights, passengers, status, "
+                 "and whether it can be cancelled online. Use first for any question about one trip.",
+  "input_schema": {
+    "type": "object",
+    "properties": {"booking_ref": {"type": "string", "pattern": "^[A-Z0-9]{6}$"}},
+    "required": ["booking_ref"]
+  }
+}
+```
+
+Matha tools `get_cancellation_quote` (read-only: refund amount-um fees-um), `cancel_trip` (acting: quote id vendum, appo model cancel pannradhukku munnadi quote panniyae aaganum) aagudhu. Results short summaries, raw API objects illa. Theriyaadha reference "No trip found for ABC12. References are 6 letters or digits; ask the customer to read it from their e-ticket."-nu tharum.
+
+Thappaana tool choices 3%-ku varudhu, oru task-ku average tool calls 4.1-la irundhu 2.3-ku kuraiyudhu, `cancel_trip` ippo oru human approval step-ku pinnaadi irukkalaam.
+
+## Podhuvaa panra thappugal
+
+- **Ovvoru API endpoint-kum oru tool.** Models neraya fine-grained tools-a chain panna thinnaaduvaanga. Tasks-kaaga build pannunga.
+- **Overlap aagura tools.** Rendu tools rendume oru kelvikku badhil sollalaam-na, choice oru coin toss.
+- **Raw, perusaana results.** Tokens-a veenaakkum, relevant field-a maraikkum. Task-ku thevaiyaanadha thaarunga.
+- **Silent failures.** Oru error-ku empty list thandhaa model guess pannum. Enna thappaachu, enna seiyyanum-nu solunga.
+- **Read, write-a kalakkradhu.** Oru tool rendaiyum panna, risky actions-ku mattum approval vaikka mudiyaadhu.
+- **Raw API responses-a tool results-aa.** Nooru kanakkaana fields tokens-a veenaakkum, model-a kuzhappum.
+- **Tool tests-a thirumba run pannaama oru tool-a maathuradhu.** Sirya wording maatrangal model entha tool-a select pannudhu-nu maathidum.
+
+## Tool design kammi mukkiyam-nu eppo
+
+- **Onnu illa rendu tools**, clear-aa vera vera velaigalodu: oru plain description-um schema-vum perumbaalum podhum.
+- **Fixed workflows**, model illa, ungaloda code entha function run aagum-nu mudivu pannum.
+- **Prototypes**, oru idea work aaguthaa-nu test panradhu: task nirubikkappatta appuram tools-a polish pannunga.
+
+## Demo-la irundhu production-ku
+
+- **Oru tool-choice test set vachukkunga** (task, expected tool, expected arguments), ovvoru maatramum run pannunga.
+- **Traces-la irundhu ovvoru tool-oda error rates-aiyum, oru task-ku calls-aiyum track pannunga.**
+- **Ovvoru tool-kullayum timeouts-um result-size limits-um vainga.**
+- **Tool-kulla permissions-a check pannunga**, session-oda user id-a vachu.
+- **Kaal aandukku oru thadava tool list-a review pannunga**: use aagaadha tools-a remove pannunga, chain aagura-vatra merge pannunga.
+
+## Practice pannunga
+
+Agents-ku tools ezhudhuradhu pathi Anthropic-oda article-a, docs-la irukkura tool-use overview-vai padinga.
+
+1. Oru sirya domain-a edunga (oru library, oru clinic-oda appointments, oru college-oda fee records), oru assistant-ku moonu la irundhu aindhu tools-a full schemas-oda design pannunga.
+2. 15 realistic user tasks ezhudhi, ungaloda tools-oda oru model-oda run pannunga, ovvoru call-aiyum argument-aiyum log pannunga.
+3. Romba common-aana thappa sari panna oru description-a maathunga illa rendu tools-a merge pannunga, thirumba run pannunga.
+4. Ungaloda tools-a oru thadavaikku onnaa remove panni, 15 tasks-a thirumba run pannunga, remove panna kashtam illaadha tool-a drop pannunga.
+
+Innum aazhama paarkka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025) book-oda chapter 6 tool selection, tools-oda value-va test panna avatha remove panradhu, entha tools serndhu use aagudhu-nu padikkiradhu-nu solludhu.
+
+**Mudinjadhu-nu eppo sollalaam:** Ungaloda tool set-a, thappaana tool calls-oda munnaadi, pinnaadi rate-a, model recover aaga help panna error message-a kaatta mudiyum.

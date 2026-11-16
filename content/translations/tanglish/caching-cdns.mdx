@@ -1,0 +1,139 @@
+---
+id: caching-cdns
+lang: tanglish
+title: "Caching, CDNs"
+outcome: "Edha cache pannanum, enga cache pannanum-nu mudivu pannalaam, sariyaana expiry-oda cache-aside use pannalaam, cache pannina data-va podhumaana alavukku fresh-aa vechukkalaam, static files-aiyum media-vaiyum users-ku pakkathula irukkura CDN-la irundhu serve pannalaam."
+answer: "Cache data-va vegamaana oru idathula oru copy vechirukkum, adhanaala thirumba varra requests mella irukkura velaiya skip pannum. CDN files-a users-ku pakkathula irukkura servers-la vechirukkum. Kashtamaana pagudhi pazhaya copies-a expire panradhu."
+why_it_matters: "Oru system-a vegamaa aakkavum adhigam traffic-a handle panna vaikkavum caching thaan romba sillaravaana vazhi, India muzhukka videos-um images-um vegamaa load aagura kaaranam CDNs thaan. Invalidation thappaa pona users-ku thappaana prices illa pazhaya results theriyum, adhanaala idhu interview-la favourite topic."
+flashcards:
+  - q: "Cache hit-um cache miss-um na enna?"
+    a: "Data ippavae cache-la irundha adhu hit. Illa-na miss, adhanaala mella irukkura source-la irundhu eduthukkanum."
+  - q: "Cache-aside pattern eppadi work aagum?"
+    a: "App mudhalla cache-a check pannum; miss-na database-la padikkum, result-a expiry-oda cache-la store pannum, apram thirumba tharum."
+  - q: "TTL-na enna artham?"
+    a: "Time to live: oru cached item expire aagi thirumba edukkaradhukku munnaadi evvalavu neram irukkum."
+  - q: "CDN enna pannum?"
+    a: "Neraya cities-la irukkura servers-la files-oda copies-a vechirukkum, adhanaala users unga origin-la illa, pakkathula irukkura server-la irundhu download pannuvaanga."
+  - q: "Cache invalidation-na enna?"
+    a: "Original maarum podhu cached data-va remove illa refresh pannuradhu, adhanaala users pazhaya values-a paakkaama irukkaanga."
+  - q: "Cache stampede-na enna?"
+    a: "Oru popular item expire aagum podhu, neraya requests ore neraththula miss aagi, ellaam serndhu database-a thaakkuradhu."
+  - q: "Edhu rombavum illa konjam neram mattum cache pannanum?"
+    a: "Ippavae exact-aa irukkanum-nu data, account balances, checkout-la seat availability, illa users-kku idaiyila share aagura edhaavadhu private data."
+exercise:
+  title: "Cache pannanuma, vendaama?"
+  setup: "Oru festive sale nadakkum podhu oru shopping app-la ovvoru item-kum mudivu pannunga."
+  questions:
+    - q: "Product images-um app-oda JavaScript files-um."
+      a: "Neenda expiry-oda CDN-la cache pannunga; file maarum podhu file name-a maathunga."
+    - q: "Oru popular phone-ku product page text-um price-um."
+      a: "30 mudhal 60 seconds maadhiri short TTL-oda cache pannunga, price update aagum podhu adha clear pannunga."
+    - q: "Checkout-la kaattura, evvalavu units meedhi irukku."
+      a: "Checkout-la source of truth-la irundhu live-aa padinga; browse pages-la romba short cache mattum."
+    - q: "Oru user-oda sonda cart."
+      a: "User vaariyaa key panna oru vegamaana store-la vainga, aana oru shared page cache-la eppavum vaikkaadheenga, adhanaala oru user-oda cart innoruthar-ku kaattaadhu."
+ask:
+  - "Redis-kum CDN-kum enna difference?"
+  - "Cache stampede-a eppadi thadukkalaam?"
+  - "Expire aagura varaikkum kaathirukkaama, eppo cache-a clear pannanum?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Cache** data-va, adhu saadharanamaa irukkura idathula irundhu vegamaana illa pakkathula irukkura oru idathula oru copy vechirukkum, adhanaala thirumba varra requests velaiya thirumba pannaama vegamaa badhil kidaikkum. Memory-la irundhu padikka microseconds aagum; oru database query milliseconds aagalaam; ulagathoda adutha pakkam poga oru request-ku nooraikkanakkaana milliseconds aagum.
+
+Caches pala layers-la irukku:
+
+- **browser** munnaadiyae download panna images-um scripts-um vechukkum;
+- oru **CDN** (content delivery network) neraya cities-la irukkura servers-la files vechukkum;
+- Redis maadhiri oru **application cache** costly queries illa API calls-oda results-a vechukkum;
+- **database** hot pages-a adhoda sonda memory-la vechukkum.
+
+```flow
+User in Patna -[1. an image]-> CDN edge in Kolkata
+CDN edge in Kolkata -[hit]-> Served in about 20 ms
+CDN edge in Kolkata -[miss]-> Origin storage
+User in Patna -[2. product API]-> App server -> Redis cache
+Redis cache -[hit]-> About 1 ms
+Redis cache -[miss]-> Database | the result is stored in Redis with a TTL
+```
+
+## Idhu eppadi work aagudhu
+
+**Cache-aside** application caches-ku romba common-aana pattern. Ovvoru read-layum app mudhalla cache-a check pannum. Hit-na cached value-a tharum. Miss-na database-la padichu, result-a expiry-oda cache-la store panni, tharum. Writes database-ku pogum, apram app cached copy-a delete illa update pannum.
+
+Ovvoru cached item-kum oru **TTL** (time to live) thevai. Short TTLs data-va innum fresh-aa vechirukkum, aana adhigam misses varum; long TTLs vegamaa irukkum, aana pazhaya data-va tharura risk. Data evvalavu aduthadi maarudhu, pazhaya data-vaala evvalavu selavu-nu paarthu, data vagai-vaariyaa choose pannunga.
+
+**Cache invalidation**, source maariya apram cached data-va sariyaa vechukkuradhu, kashtamaana pagudhi. Options: items-a avai-oda TTL-la expire aaga vidunga; data ezhudhapadum podhellaam key-a delete pannunga; illa `price:v42` maadhiri keys-a version pannunga, adhanaala pudhu data pudhu key use pannum. CDN-la irukkura files-ku, `app.3f9a1c.js` maadhiri file name-la oru content hash vaikkuradhu thaan vazhakkamaana trick, adhanaala maariya file oru pudhu URL, pazhaya copies-a clear panna thevai illa.
+
+Oru romba popular key expire aagum podhu, aayirakkanakkaana requests ore neraththula miss aagi, ellaam database-a thaakkalaam: oru **cache stampede**. Fixes-la, oru request mattum key-a refresh panna, matha-vanga kaathirukka illa pazhaya value-a vaanga vidradhu, TTLs-la chinna random jitter serkkuradhu, hot keys-a expire aaga munnaadiyae refresh panradhu.
+
+Cloudflare, Akamai, Amazon CloudFront, Google Cloud CDN maadhiri **CDNs**-ku India-vilum ulagam muzhukkavum servers irukku. Avai images, video, scripts, kooda muzhu cache panna mudiyura pages-a kooda user-ku pakkathula irundhu serve pannum, adhanaala load time kuraiyum, unga origin servers-oda sumai kuraiyum. Video platforms avai-a muzhusaa nambirukkum.
+
+| Edha | Enga cache pannanum | Usual TTL | Kavanikka vendiyadhu |
+|---|---|---|---|
+| Images, video, JS, CSS | CDN, browser | naatkal-la irundhu oru varusham varaikkum, hashed names-oda | name maaraadha pazhaya files |
+| Published results maadhiri public pages | CDN | nimishangal | updates-ku clear panradhu |
+| Costly query results | Redis | seconds-la irundhu nimishangal | pazhaya values, stampedes |
+| User sessions | Redis | manineram | security; users-kku idaiyila eppavum share pannaadheenga |
+| Balances, checkout-la live inventory | cache pannaadheenga, illa romba koncham neram | adhigam pona seconds thaan | thappaana numbers panam selavu aakkum |
+
+**Unga browser-la try pannunga.** Oru chinna cache-a simulate panni, adhoda size-oda hit rate eppadi maarudhu-nu paarunga.
+
+```python
+from collections import OrderedDict
+import random
+
+def hit_rate(capacity, requests):
+    cache, hits = OrderedDict(), 0
+    for key in requests:
+        if key in cache:
+            hits += 1; cache.move_to_end(key)
+        else:
+            cache[key] = True
+            if len(cache) > capacity: cache.popitem(last=False)   # evict the least recently used
+    return hits / len(requests)
+
+random.seed(1)
+popular = [f"page-{int(random.paretovariate(1.2))}" for _ in range(5000)]   # a few pages get most traffic
+for size in (5, 20, 100):
+    print(f"cache of {size:>3}: {hit_rate(size, popular):.0%} hits")
+```
+
+## Oru worked example
+
+Rohan Delhi-la oru online test-prep company-la velai seiyraanga. JEE answer key release aagum podhu, laksha kanakkaana students oru nimishathukkulla ore pages-a thiranthuvaanga, site oorndhu pogum.
+
+Avanga mudhalla alandhaanga. Answer-key PDF-um images-um thaan perumbaalaana bytes; "my score" API thaan perumbaalaana database queries-a pannichu.
+
+**Static files CDN-ku.** PDF, images, front-end files-a content-hashed names-oda, oru varusha browser cache-oda, oru CDN-ku pinnaadi irukkura object storage-ku maathinaanga. Guwahati-yilum Kochi-yilum irukkura students ippo pakkathula irukkura edge servers-la irundhu download pannaanga. Origin bandwidth 90%-ku mela kuraijudhu.
+
+**Hot queries Redis-ku.** Ellaa questions-aiyum sariyaana options-oda kaattura page ovvoru student-kum ore maadhiri. Adha cache-aside use panni 5 nimisha TTL-oda Redis-la cache pannaanga. Board oru dispute aana answer-a correct pannum podhu, oru admin action key-a delete pannichu, adhanaala fix 5 nimishathula illa, udanae theriyuthu.
+
+**Stampede protection.** Sariyaa 10 a.m.-ku cached list expire aachu, 20,000 students refresh pannaanga, database spike aachu. Rohan oru lock serthaanga, adhanaala oru request key-a thirumba build pannum, matha requests oru, rendu seconds munnaadi irundha value-a vaangum, plus TTLs-la random jitter.
+
+**Avanga cache pannaadhadhu.** Ovvoru student-oda calculate panna score avanga sonda responses-la irundhu compute aagi, user vaariyaa store aachu; adha oru shared page cache-la eppavum podala, adhanaala yaarum innoruthar-oda score-a paarkka mudiyaadhu.
+
+Adutha release naal, peak-la kooda page loads oru second-ku kammiyaa irundhudhu, database adhoda capacity-la paadhi-ku mela pogala.
+
+## Podhuvaa panra thappugal
+
+**TTL illaama cache panradhu.** Maatram-ku apram data eppavum thappaa irukkum. Eppavum oru expiry vainga, neenda-dhaa irundhaalum.
+
+**Shared cache-la private data-va cache panradhu.** Login pannina oru user-ku cache pannina page innoru user-ku serve aagalaam. Personal data-va shared caches-la irundhu veliya vainga, illa user vaariyaa key pannunga.
+
+**Writes-la invalidation-a marakkuradhu.** Database-a update panni, cache-a update pannaama irundha, expiry varaikkum pazhaya value theriyum. Freshness mukkiyam-aana data-ku, write-la key-a delete pannunga.
+
+**Exact-aa irukkanum-nu data-va cache panradhu.** Checkout-la seat counts, balances, stock levels, adhu mukkiyam-aana neraththula source of truth-la irundhu varanum.
+
+**Stampedes-a ignore panradhu.** Load-la oru hot key expire aanaa database-a veezhthidum. Locks, early refresh, illa jittered TTLs use pannunga.
+
+**Alakkaama cache panradhu.** Mella irukkuradhaiyum aduthadi padikkaradhaiyum cache pannunga. Arithu use aagura data-va cache panna complexity mattum thaan serum.
+
+## Practice pannunga
+
+1. CDNs eppadi work aagudhu, interviews-la caching eppadi varum-nu Watch & learn panel-la irukkura video lessons-a paarunga.
+2. Mela irukkura exercise-a pannunga.
+3. Project check pannunga: oru mella irukkura function-ku munnaadi cache-aside, hit, miss logs-oda, timings-oda.
+4. Oru periya site-la unga browser-oda developer tools-a thiranthu, cached responses-aiyum CDN headers-aiyum thedunga.

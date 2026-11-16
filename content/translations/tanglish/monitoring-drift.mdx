@@ -1,0 +1,216 @@
+---
+id: monitoring-drift
+lang: tanglish
+title: "Monitoring-um drift-um"
+outcome: "Production-la oru model-a monitor pannunga: service health, input data drift, prediction drift, late-aa varra ground truth, segment-wise performance, alerts-um retraining policy-yum-oda."
+answer: "Production-la oru model-a service health-kaagavum, input data, predictions-la drift-kaagavum, unmaiyaana outcomes vandha aprom segment-wise nijamaana accuracy-kaagavum monitor pannunga, ovvonnukkum alerts-oda."
+why_it_matters: "Models amaidhiyaa mosamaagum: customers maaruvaanga, fraudsters adapt aaguvaanga, oru partner data format-a maathuvaanga, economy maarum. Monitoring illaama, yaarum kavaniklaadha varaikkum oru model maadha kanakka thappaa irukkalaam. Deploy panna model-a nambikkaiya vechirukkardhu monitoring thaan."
+flashcards:
+  - q: "Model monitoring entha naalu layers-a paarkkudhu?"
+    a: "Service health, data quality, input drift, prediction drift, unmaiyaana outcomes vandha aprom performance."
+  - q: "Data drift-kum concept drift-kum enna difference?"
+    a: "Data drift-na inputs maaritchu; concept drift-na inputs-kum outcomes-kum idaiyila irukkura relationship maaritchu."
+  - q: "Monitoring baseline-na enna?"
+    a: "Live data-va compare panna, training, validation data-oda saved statistics, example feature, score distributions."
+  - q: "Prediction rates-a yen dhinamum paakkanum?"
+    a: "Approvals illa positive predictions-la oru thidir jump, outcomes varradhukku romba munnaadiyae oru upstream bug-a veliyae kaattum."
+  - q: "Labels late-aa varumbodhu eppadi monitor pannuvinga?"
+    a: "Labels varra maadhiri performance-a track pannunga, adhukulla complaints, overrides, early behaviour maadhiri proxies use pannunga."
+  - q: "Segment-wise yen monitor pannanum?"
+    a: "Drift perumbaalum oru region, channel, illa partner-la thaan aarambikkum, mothama numbers-la maraindhu irukkum."
+  - q: "Monitoring-la feedback loop-na enna?"
+    a: "Model pinnaadi kathukkura data-va maathidum, example block panna transactions-ku outcomes-a eppavume paakkaama irukkardhu."
+  - q: "Feedback loops irundhaalum unbiased labels-a eppadi vechukkuvinga?"
+    a: "Model-oda decision-a thavirkkura oru sinna random holdout illa human-review sample vechukkunga."
+  - q: "PSI-ku common rules of thumb enna?"
+    a: "Sumaar 0.1-ku keezha konjam maatram, 0.1 la irundhu 0.25 naduthara shift paarkka vendiyadhu, 0.25-ku mela periya shift investigate pannanum. Unga limits-a neengalae agree pannunga."
+  - q: "Model-oda decisions-la oru sinna random holdout yen vachukkanum?"
+    a: "Model measure panna unbiased outcomes kidaikkum, ennanna model block panna decisions-ku enna nadandhirukkum-nu eppavume theriyaadhu."
+exercise:
+  title: "Dashboard-a padinga"
+  setup: "Hyderabad insurer-oda claim-fraud model dhinamum sumaar 4% claims-a flag pannudhu. Thingal kizhamai, oru hospital network-oda claims-ku flags 15%-ku jump aagudhu, matha ella sources-um 4% pakkamae irukku. Drift reports andha network-ku 'admission-ukkum claim-kum idaiyila naal' feature ippo eppavume 0-nu kaattudhu. Thaniyaa, aaru maadhathula, flag panna claims-la fraud-nu aprom confirm aanadhoda share mella 40%-la irundhu 28%-ku kuraindhirukku."
+  questions:
+    - q: "Thingal kizhamai jump-ku probably enna reason?"
+      a: "Oru upstream data change: andha network-oda feed admission dates-a sariyaa anuppaama pochu, adhanaala feature 0-nu padikkudhu."
+    - q: "Udane seiyya vendiya sariyaana response enna?"
+      a: "Contain pannunga: andha network-oda claims-a fallback model-ku illa feature illaama rules-ku route pannunga, network illa data team-a feed-a fix panna sollunga."
+    - q: "40%-la irundhu 28%-ku mella kuraiyradhu enna solludhu?"
+      a: "Concept drift illa maarura fraud patterns: model-oda flags kammiyaa precise-aa irukku. Investigate panni retrain panna oru trigger."
+    - q: "Retrain panna model production-ku eppadi varanum?"
+      a: "Ade evaluation, promotion checks vazhiyaa, ippo irukkura model-oda compare panni, apram shadow, canary stages."
+ask:
+  - "Data drift-kum concept drift-kum enna difference?"
+  - "Population stability index-na enna?"
+  - "Oru model-a evvalavu adikkadi retrain pannanum?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Model monitoring naalu layers-a paakkudhu:
+
+- **Service health**: model odudhaa? Latency, errors, throughput.
+- **Data quality, input drift**: inputs innum valid-aa, training data maadhiri irukkaa? Missing values, pudhu categories, shift aana distributions.
+- **Prediction drift**: scores illa predicted classes-oda distribution maaritchaa?
+- **Performance**: unmaiyaana outcomes varumbodhu, accuracy munnaadi irundha idathula irukkaa, overall-aavum segment-wise-um?
+
+**Data drift**-na inputs maaritchu; **concept drift**-na inputs-kum outcomes-kum idaiyila irukkura relationship maaritchu (ade features ippo vera maadhiri predict pannum, fraud patterns maarura maadhiri).
+
+| Layer | Enna check aagudhu | Enna pidikkum |
+|---|---|---|
+| Service health | Latency, errors, ovvoru nimishamum | Outages |
+| Inputs | Schema, missing rates, baseline-oda compare panna ovvoru feature-oda drift, dhinamum | Upstream bugs, pudhu data shapes |
+| Predictions | Partner-wise, city-wise approval rate, dhinamum | Behaviour-la oru thidir maatram |
+| Performance | Labels varumbodhu, maadha-wise, segment-wise default rate | Mella decay, concept drift |
+
+```flow
+dir: LR
+Alert -> Owner -> Runbook
+Runbook -> Investigate
+Runbook -> Fallback
+Runbook -> Roll back
+Runbook -> Retrain
+```
+
+Indha lesson, Bengaluru-la oru buy-now-pay-later company-a follow pannum, avanga credit model checkout-la sinna loans-a approve pannudhu.
+
+## Idhu eppadi work aagudhu
+
+**Baselines.** Training, validation data-oda summary statistics-a save pannunga (ovvoru feature-oda distributions, score distributions, segment shares). Monitoring live data-va idhoda compare pannum.
+
+**Data checks.** Schema checks (types, allowed values), missing-value rates, ovvoru feature-kum drift scores, population stability index illa statistical distance measures maadhiri. Oru threshold-a thaandi distribution naghurndha features-a flag pannunga.
+
+**Prediction checks.** Ovvoru predicted class-oda share, average score, action threshold-ku mela irukkura share. Oru thidir jump, entha outcome-um varradhukku munnaadiyae oru upstream bug-a kaattum.
+
+**Late-aa varra ground truth.** Outcomes perumbaalum late-aa varum: loan default 90 naal aprom, churn oru maadham aprom. Labels varumbodhu performance-a track pannunga, adhukulla proxies (complaints, overrides, early repayment behaviour) use pannunga.
+
+**Segments.** Region, channel, product, customer type-wise track pannunga; drift perumbaalum oru segment-la thaan aarambikkum.
+
+**Alerts, response.** Ovvoru drift-kum action thevai illa. Severity-oda thresholds define pannunga: investigate, retrain, roll back, illa fallback-ku maarunga. Alerts-a runbook-oda oru owner-ku route pannunga.
+
+**Retraining policy.** Oru schedule-la (maadhaantheerum), oru trigger-la (drift illa performance drop), illa rendum. Retrain panna ovvoru model-um mudhal model maadhiriyae ade evaluation, promotion checks-la pogum, ippo production-la irukkura model-oda comparison-um serthu.
+
+**Feedback loops.** Models pinnaadi kathukkura data-va maathalaam: transactions-a block panra fraud model-na, avai fraud-aa-nu eppavume theriyaadhu. Unbiased labels-ku oru sinna random holdout illa human review sample vainga.
+
+**Severities-oda alert thresholds:**
+
+| Signal | Threshold | Severity | Response |
+| --- | --- | --- | --- |
+| Error rate | 5 nimishathukku 1%-ku mela | High | On-call-a page pannunga; service-a check pannunga |
+| Feature missing rate | Baseline-oda compare panna rendu madangu | Medium | Source-a investigate pannunga |
+| Partner-wise approval rate | Oru naal-la 10 points-ku mela maatram | High | Inputs-a check pannunga; thevai-na fallback model |
+| Oru key feature-la drift score | Moonu naal-ku agreed limit-ku mela | Medium | Review pannunga; retrain panna yosinga |
+| Segment-wise default rate | Rendu maadham plan-a vida mela | Medium | Recent data-la retrain pannunga |
+
+**Drift score-a padikkradhu.** Population stability index, oru feature-oda values training data-la vs live data-la buckets-la eppadi vizhudhu-nu compare pannum. Sinna values konjam maatram; periya values nijamaana shift. Idha oru pointer-aa edunga, verdict-aa illa: model romba use pannaadha oru feature-la shift matter aagaama irukkalaam, adhoda mukkiyamaana feature-la oru sinna shift matter aagalaam. Action edukkradhukku munnaadi, drift-oda sernthu feature importance-aiyum check pannunga.
+
+**Runbook ezhudhuradhu.** Ovvoru alert-kum, yaar owner, mudhal moonu check panna vendiyadhu, fallback-ku eppadi maaradhu, eppo roll back pannanum-nu ezhudhunga. Fallback-a ready-aa, test panni vainga, example prachanai tharra feature illaama oru simple model illa rules policy, adhanaala containment nimishangalla mudiyum.
+
+**Code-la population stability index.** Training data-la oru feature-a buckets-aa pirichunga, apram ade buckets-la live data-va compare pannunga:
+
+```python
+import numpy as np
+
+def psi(expected, actual, buckets=10):
+    edges = np.unique(np.quantile(expected, np.linspace(0, 1, buckets + 1)))
+    edges[0], edges[-1] = -np.inf, np.inf
+    e = np.histogram(expected, edges)[0] / len(expected)
+    a = np.histogram(actual, edges)[0] / len(actual)
+    e, a = np.clip(e, 1e-6, None), np.clip(a, 1e-6, None)
+    return float(np.sum((a - e) * np.log(a / e)))
+
+def drift_report(train_df, live_df, features, warn=0.1, alert=0.25):
+    rows = []
+    for f in features:
+        value = psi(train_df[f].dropna(), live_df[f].dropna())
+        missing_change = live_df[f].isna().mean() - train_df[f].isna().mean()
+        level = "alert" if value > alert else "warn" if value > warn else "ok"
+        rows.append((f, round(value, 3), f"{missing_change:+.1%}", level))
+    return sorted(rows, key=lambda r: -r[1])
+```
+
+Common rules of thumb PSI 0.1-ku keezha stable-nu, 0.25-ku mela periya shift-nu edukkum, aana model owner-oda thresholds-a agree pannunga, kadandha maadhangal-oda check pannunga. Evidently maadhiri libraries charts-oda ithe maadhiri reports tharum.
+
+**Segment-wise prediction rates.** Upstream bugs perumbaalum oru partner illa region-ku positive predictions-oda share-la oru jump-aa mudhalla theriyum:
+
+```python
+def rate_alerts(today, history, min_change=0.10):
+    """today/history: dict segment -> approval rate; history holds the 30-day average."""
+    return {s: (history[s], r) for s, r in today.items()
+            if s in history and abs(r - history[s]) > min_change}
+```
+
+**Nermaiyaana outcomes-ku oru holdout.** Model oru transaction-a block panna, adhu fraud-aa-nu theriyaadhu. Oru sinna random share-a (business, risk teams-oda agree panna, perumbaalum 1%-ku romba kammi) model-oda decision-a thavirkka vittu, normal handling illa human review-ku poga vittu, outcome-a record pannunga:
+
+```python
+import random
+
+def decide(txn, model_score, threshold=0.8, holdout_rate=0.005):
+    if random.random() < holdout_rate:
+        return {"action": "review", "holdout": True}       # outcome measured without the model's influence
+    return {"action": "block" if model_score > threshold else "allow", "holdout": False}
+```
+
+Ulagam maarum podhu model nijamaa eppadi seiyudhu-nu paarkka, holdout-la precision-um recall-um measure pannunga.
+
+**LLM apps-ku drift.** Ade ideas inputs-ku (question length, language mix, topics), outputs-kum (refusal rate, answer length, citation rate, judge scores) porundhum. Hindi questions-oda share adhigamaaradhu, illa pudhu topic cluster, retraining illa, pudhu documents illa prompt changes thevai padura drift.
+
+## Oru worked example
+
+Bengaluru BNPL (buy now, pay later) company-oda credit model checkout-la sinna loans-a approve pannudhu.
+
+Monitoring dashboard-um alerts-um:
+
+- Service: p95 latency, error rate.
+- Inputs: training baseline-oda 40 features-ku dhinamum drift scores; ovvoru partner-oda payloads-ku schema checks.
+- Predictions: partner-wise, city-wise approval rate.
+- Performance: outcomes varumbodhu, approval maadha-wise, segment-wise 60-naal default rate.
+
+March-la, oru periya e-commerce partner-oda approval rate oru raathiri-la 61%-la irundhu 79%-ku jump aagudhu. Input drift andha partner-ku "device age" feature zero-ku vizhundhadha kaattudhu: avanga app update adhai anuppurathai nirutthichu, model zero-va "brand-new device"-nu padichchu, adhu oru low-risk signal. Team rendu manineraththula andha partner-a feature illaadha fallback model-ku maathuraanga, partner avanga payload-a fix pannuraanga.
+
+Thaniyaa, naalu maadhathula tier-3 cities-la first-time borrowers-ku defaults mella ezhumbaradhu, recent data-oda, munnaadi sinna loans-la repayment behaviour-ku oru pudhu feature-oda retraining-a trigger pannudhu. Retrain panna model promotion checks-a pass aagi, shadow, canary stages vazhiyaa roll out aagudhu.
+
+Borderline applicants-la 2% random sample score-a pathi kavalai paddaama approve aagudhu, adhanaala model illaina reject pannura applicants pathi company thodarndhu kathukkum.
+
+| Event | Edhaala kandupidichaanga | Response | Neram |
+| --- | --- | --- | --- |
+| Partner approvals 61%-la irundhu 79%-ku jump | Approval-rate alert, apram input drift | Andha partner-ku fallback model | Rendu manineram |
+| Tier-3 first-time borrowers adhiga default | Naalu maadham segment-wise performance | Pudhu feature-oda retrain, shadow, apram canary | Vaarangal |
+
+## Podhuvaa panra thappugal
+
+- **Uptime-a mattum monitor panradhu.** Odikkittu irukkura model romba thappaa irukkalaam.
+- **Baselines illaama.** Drift-ku compare panna edhaavadhu thevai.
+- **Ovvoru sinna drift-kum alert panradhu.** Thresholds-um severities-um set pannunga, illana alerts-a ignore pannuvaanga.
+- **Problems-a kandupidikka labels-kku kaathirukkradhu.** Inputs-aiyum predictions-aiyum dhinamum paarunga.
+- **Feedback loops-a ignore panradhu.** Learning-ku unbiased samples vainga.
+- **Ovvoru PSI wobble-kum alert panradhu**, adhu makkal alerts-a ignore panna kathukkudum.
+- **Holdout illaama**, adhanaala model allow panna cases-ku mattum outcomes irukkum.
+- **Inputs-a mattum monitor panradhu**, segment-wise prediction rates-a illa.
+
+## Lighter monitoring pothum-ngra neram
+
+- **Oru one-off analysis-ku oru thadavai use panna model.**
+- **Makkal eppavum decide panra, errors-ku selavu kammi-yaana low-impact recommendations.**
+- **Stable inputs**, example controlled process-la oru fixed sensor, anga error, range checks perumbaalaana problems-a pidikkum.
+
+## Demo-la irundhu production-ku
+
+- **Ovvoru model version-kooda baselines-a save pannunga.**
+- **Drift, segment reports-a dhinamum odunga**, agreed thresholds, owners-oda.
+- **Oru random holdout vainga**, decisions outcomes-a maraikkura idathula, business-oda agree panni.
+- **Labels varumbodhu performance-a track pannunga**, segment-wise.
+- **Ovvoru alert-kum fallback, rollback steps-oda runbooks ezhudhunga.**
+
+## Practice pannunga
+
+Evidently-oda introduction-um, Made With ML-la irukkura monitoring lessons-um, Google-oda Rules of ML-um padinga.
+
+1. Oru training set-la irundhu baseline statistics-a save pannunga, apram oru pudhu batch-la drift simulate pannunga (oru feature-a shift pannunga, innoru onna udaiyunga), rendaiyum drift report-la kandupidinga.
+2. Simulated naal-la, segment-wise approval illa positive-prediction rate-oda oru sinna dashboard build pannunga.
+3. Oru page monitoring, retraining policy ezhudhunga: enna check aagudhu, thresholds, yaarukku alert pogum, avanga enna pannuvaanga.
+4. Unga baseline-layum simulated batch-layum drift_report-a odunga, shift panna feature flag aagudhaa, stable-aanavai aagalaiyaa-nu check pannunga.
+
+Innum aazhathukku, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025) chapter 10 AI applications-ku monitoring, drift, metrics-a cover pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Oru simulated upstream bug-naala vandha alert-a kaattalaam, runbook response-a explain panna mudiyum.

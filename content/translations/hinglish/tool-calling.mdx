@@ -1,0 +1,245 @@
+---
+id: tool-calling
+lang: hinglish
+title: "Tool calling"
+outcome: "Model ko ek tool do, woh jo call maange use chalao, aur result wapas bhejo taaki woh jawab de sake."
+answer: "Tool calling model ko aapke code se ek function chalwane deta hai, jaise order check karna. Aapka code use chalata hai, result wapas bhejta hai, aur model use jawab dene mein use karta hai."
+why_it_matters: "Model cheezein lookup karne, maths bharosemand tareeke se karne aur actions lene ke liye tool calling use karta hai. Ye har agent ka building block hai."
+flashcards:
+  - q: "Tool calling kya hai?"
+    a: "Model ko ye maangne dena ki aapka code ek describe kiya hua function specific arguments ke saath chalaye, phir result se jawab dena."
+  - q: "Kya model tool khud chalata hai?"
+    a: "Nahi. Model sirf maangta hai; aapka code validate karta hai, tool chalata hai aur result wapas bhejta hai, isliye control aapke paas rehta hai."
+  - q: "Tool ko describe karne ke teen hisse kaunse hain?"
+    a: "Ek naam, ek description aur ek input schema."
+  - q: "Tool kab call karna hai, ye model mukhya roop se kis par decide karta hai?"
+    a: "Uske naam aur description par, isliye ye saaf aur specific hone chahiye."
+  - q: "Tool round trip ke steps kya hain?"
+    a: "Message aur tools bhejo; model call maangta hai; aapka code validate karke chalata hai; result wapas bhejo; model jawab deta hai ya phir call karta hai."
+  - q: "Tool fail ho toh wapas kya bhejna chahiye?"
+    a: "Tool result ki tarah ek saaf error message, jaise kya nahi mila aur user se kya poochhna hai, taaki model recover kar sake."
+  - q: "Tool calling ko safe kaise rakhte hain?"
+    a: "Arguments validate karo, read-only aur acting tools alag rakho, risky actions ke liye confirmation maango, aur results ko data samjho."
+  - q: "Server-side tools kya hain?"
+    a: "Aise tools jo model provider khud chalata hai, jaise web search. Aapke apne systems ke tools aapki taraf chalte hain."
+  - q: "tool_choice kya control karta hai?"
+    a: "Model khud decide kar sakta hai (auto), koi na koi tool use karna hoga (any), ek naam wala tool use karna hoga, ya tools use nahi karne (none)."
+  - q: "Model ko aapke paas jitne tools hain sab kyun nahi dene chahiye?"
+    a: "Zyada tools matlab lambe prompts aur zyada galat choices. Wahi tools rakho jo naap kar madad karte hain, aur jo hamesha saath chalte hain unhe merge karo."
+exercise:
+  title: "Round trip ko trace karo"
+  setup: "Bhopal ki ek electricity distributor apne WhatsApp assistant mein tools jodti hai: get_bill(consumer_no), get_outage_status(area) aur register_complaint(consumer_no, issue). Ek consumer likhta hai: 'Arera Colony mein subah se bijli nahi hai aur mera bill 4471283 bahut zyada lag raha hai.' Consumer numbers 7 digits ke hote hain. Outage service dheemi hai aur kabhi-kabhi time out ho jaati hai."
+  questions:
+    - q: "Model ko kaunse tools, kin arguments ke saath call karne chahiye?"
+      a: "area 'Arera Colony' ke saath get_outage_status, aur consumer number 4471283 ke saath get_bill."
+    - q: "get_bill chalane se pehle code ko kya karna chahiye?"
+      a: "Argument validate karo: 7 digits, aur ye WhatsApp number us consumer se linked hai."
+    - q: "get_outage_status time out ho toh kya return karna chahiye?"
+      a: "'Outage status abhi nahi mil raha; aap complaint register kar sakte hain' jaisa saaf message, khaali result nahi."
+    - q: "Kya model ko seedhe register_complaint call kar dena chahiye?"
+      a: "Sirf consumer ke confirm karne ke baad, kyunki ye ek record banata hai; model ko pehle offer karke poochhna chahiye."
+ask:
+  - "LLMs mein function calling kya hai?"
+  - "Model kaise decide karta hai ki kaunsa tool call karna hai?"
+  - "Tool ko model ko errors kaise return karne chahiye?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Tool calling** (ise function calling bhi kehte hain) model ko aapka code use karne deta hai. Aap model ko tools describe karte ho: unke naam, woh kya karte hain aur kaunse inputs lete hain. Jab kisi sawaal ko tool chahiye hota hai, toh model specific arguments ke saath use call karne ki request ke saath jawab deta hai. Aapka code tool chalata hai, result wapas bhejta hai, aur model use jawab dene mein use karta hai.
+
+Model khud kuch nahi chalata. Aapka code control mein rehta hai.
+
+```flow
+title: The model never runs anything itself: your code stays in control
+1. Your app sends the user message + tool list -> 2. The model asks: tool_use get_order_status | order_id
+2. The model asks: tool_use get_order_status -> 3. Your app validates the arguments and runs the real function
+3. Your app validates the arguments and runs the real function -> 4. tool_result | "Shipped 3 Nov, out for delivery"
+4. tool_result -> 5. The model gives a final answer, or another tool_use
+```
+
+Ye lesson Gurugram ki ek fashion e-commerce site ko follow karta hai jo apni support chat mein order tools jod rahi hai.
+
+## Ye kaam kaise karta hai
+
+**Tool ko describe karo.** Har tool ka ek naam, ek description aur ek input schema hota hai:
+
+```python
+tools = [{
+    "name": "get_order_status",
+    "description": "Look up an order's status and expected delivery date by order id. "
+                   "Use when the customer asks where their order is.",
+    "input_schema": {
+        "type": "object",
+        "properties": {"order_id": {"type": "string", "description": "Like ORD-12345678"}},
+        "required": ["order_id"],
+    },
+}]
+```
+
+Model tool kab call karna hai, ye mukhya roop se uske **naam aur description** se decide karta hai, aur schema se arguments bharta hai. Saaf, specific descriptions sabse zyada maayne rakhte hain.
+
+**Round trip.**
+
+1. User ka message aur tool list bhejo.
+2. Model tool-use request ke saath jawab deta hai, jaise `{"order_id": "ORD-48213907"}` ke saath `get_order_status`.
+3. Aapka code arguments validate karta hai, asli function chalata hai aur result paata hai.
+4. Result ko us request se juda hua tool-result message mein wapas bhejo.
+5. Model final answer likhta hai, ya ek aur tool maangta hai.
+
+**Errors bhi results hain.** Agar order maujood nahi hai ya koi service down hai, toh tool result ki tarah ek saaf error message bhejo ("ORD-48213907 id ka koi order nahi mila; customer se id check karne ko kaho"). Tab model andaaza lagane ki jagah recover kar sakta hai, user se poochh sakta hai ya maafi maang sakta hai.
+
+**Safety.** Kuch bhi chalane se pehle arguments validate karo. Read-only tools ko un tools se alag rakho jo cheezein badalte hain, aur risky actions ke liye confirmation maango. Tool results ko data samjho, instructions nahi.
+
+**Server-side tools.** Kuch providers aise tools bhi dete hain jo woh khud chalate hain (jaise web search). Apne systems ke liye tools aap apni taraf chalate ho.
+
+**Achhi aur kamzor tool definitions:**
+
+| Hissa | Kamzor | Mazboot |
+| --- | --- | --- |
+| Name | `order` | `get_order_status` |
+| Description | "Order API" | "Look up an order's status and delivery date by order id. Use when the customer asks where their order is." |
+| Parameter | `id: string` | `order_id`, jise "Like ORD-12345678" ki tarah describe kiya |
+| Error result | Khaali | "No order found with id ...; ask the customer to check the id" |
+
+**Arguments validate karna.** Model ke arguments ko web form ke input ki tarah samjho. Schema ke against types aur formats check karo, check karo ki user ko us record par kaam karne ki ijaazat hai, aur baaki sab ko madadgaar error result ke saath reject karo. Model ek sahi format ka id bana sakta hai jo kisi aur customer ka ho, isliye ownership checks aapke code mein hone chahiye, prompt mein nahi.
+
+**Ek reply mein kai tool calls.** Jab calls ek-doosre par depend nahi karti, jaise order status aur return policy, toh model ek saath ek se zyada tools maang sakta hai. Unhe chalao, chaho toh parallel mein, aur har request ke liye ek result bhejo, jo us request id se juda ho. Jab ek call doosre ke result par depend kare, toh model unhe alag turns mein maangta hai.
+
+**Tools mein se chunna.** Jab aap doosra ya teesra tool jodo, toh kuch realistic sawaalon par test karo ki model kaunsa chunta hai. Agar galat chune, toh fix lagbhag hamesha descriptions mein hota hai: saaf bolo ki har tool kab lagu hota hai aur kab nahi.
+
+**Teen tarah ke tools, teen level ka risk.**
+
+| Kism | Examples | Risk | Rule |
+| --- | --- | --- | --- |
+| Read: jaankari lana | Order status, product search, policy lookup | Kam se medium: data expose kar sakta hai | Check karo ki user ko dekhne ki ijaazat hai; sirf zaroori fields return karo |
+| Compute: kshamta badhana | Calculator, date maths, sandbox mein code chalana | Kam, agar sandboxed ho | Paise aur dates ke liye model arithmetic se tools ko prefer karo |
+| Write: duniya badalna | Return start karna, email bhejna, record update karna, payment karna | Zyada | Confirmation, limits, audit log; kabhi sirf untrusted text se nahi |
+
+**Tool use ko steer karna.** Default mein model decide karta hai ki tool call karna hai ya nahi (`auto`). Aap koi tool zaroori bhi kar sakte ho (`any`), ek naam wala tool zaroori kar sakte ho (structured output ke liye kaam ka), ya ek turn ke liye tools band kar sakte ho (`none`). Fixed workflows mein tools force karna handy hai; open chat mein saaf descriptions ke saath `auto` aam taur par sabse achha chalta hai.
+
+**Code mein poora round trip.** Ye Anthropic ka Python SDK use karta hai; baaki providers wahi pattern follow karte hain. Arguments Pydantic se validate hote hain, ownership code mein check hoti hai, aur write tool ko customer ka confirmation chahiye:
+
+```python
+import anthropic
+from pydantic import BaseModel, Field, ValidationError
+
+client = anthropic.Anthropic()
+MODEL = "claude-sonnet-5-5"            # check the docs for current model names
+
+class OrderArgs(BaseModel):
+    order_id: str = Field(pattern=r"^ORD-\d{8}$")
+
+ORDERS = {"ORD-48213907": {"customer": "c_101", "status": "Out for delivery today"}}
+
+def get_order_status(customer_id, order_id):
+    order = ORDERS.get(order_id)
+    if not order or order["customer"] != customer_id:          # ownership check in code
+        return f"No order {order_id} on this account; ask the customer to check the id."
+    return order["status"]
+
+def start_return(customer_id, order_id, confirmed=False):
+    if not confirmed:
+        return "Not started: ask the customer to confirm the return first."
+    return f"Return started for {order_id}; pickup in 2 days."
+
+TOOLS = [
+    {"name": "get_order_status", "description": "Look up an order's status by order id. Use when the customer asks where an order is.",
+     "input_schema": OrderArgs.model_json_schema()},
+    {"name": "start_return", "description": "Start a return. Only after the customer has clearly confirmed in this chat.",
+     "input_schema": OrderArgs.model_json_schema()},
+]
+HANDLERS = {"get_order_status": get_order_status, "start_return": start_return}
+
+def chat_turn(customer_id, messages, confirmed=False):
+    while True:
+        reply = client.messages.create(model=MODEL, max_tokens=600, tools=TOOLS, messages=messages)
+        messages.append({"role": "assistant", "content": reply.content})
+        calls = [b for b in reply.content if b.type == "tool_use"]
+        if not calls:
+            return "".join(b.text for b in reply.content if b.type == "text")
+        results = []
+        for call in calls:                                   # one result per request, matched by id
+            try:
+                args = OrderArgs.model_validate(call.input)
+                fn = HANDLERS[call.name]
+                extra = {"confirmed": confirmed} if call.name == "start_return" else {}
+                out, err = fn(customer_id, args.order_id, **extra), False
+            except ValidationError:
+                out, err = "Order ids look like ORD-12345678. Ask the customer for theirs.", True
+            results.append({"type": "tool_result", "tool_use_id": call.id, "content": out, "is_error": err})
+        messages.append({"role": "user", "content": results})
+
+msgs = [{"role": "user", "content": "Where is ORD-48213907?"}]
+print(chat_turn("c_101", msgs))
+```
+
+Teen baatein dhyaan do. Customer id aapke session se aata hai, model se kabhi nahi. Confirmation flag aapke apne interface se set hota hai ("Yes, start the return" button), model ke ye kehne se nahi ki customer maan gaya. Aur galat ya kisi aur ka order id wahi vinamr message deta hai, isliye bot kabhi confirm nahi karta ki kisi aur ka order hai. Asli app mein `while` loop ko step limit se cap karo, jaisa agent-loop lesson dikhata hai.
+
+**Tool set chunna.** Zyada tools zyada kshamta dete hain par chunna mushkil karte hain aur context ko descriptions se bhar dete hain. Kuch aadatein:
+
+- **Kam tools se shuru karo** aur ek tabhi jodo jab kisi test question ko uski zaroorat ho.
+- **Jo tools madad nahi karte unhe hatao**: agar kisi tool ke bina success nahi girti, toh use hata do.
+- **Usage dekho**: har tool ki calls gino. Jo tool kabhi call nahi hota woh shayad kharab describe hai; jo tool aksar galat call hota hai usse simple design chahiye ho sakta hai.
+- **Jo tools hamesha saath chalte hain unhe merge karo**, jaise "find customer" phir "get orders", ek mein.
+
+**MCP ke saath tools share karna.** Model Context Protocol AI apps ko tools aur data expose karne ka ek open standard hai. Ek tool ko ek baar MCP server ki tarah likho, aur MCP support karne waala koi bhi app ya agent use use kar sakta hai. Wahi rules lagte hain: inputs validate karo, permissions check karo, aur write actions mein savdhaan raho.
+
+**Tool use ko test karna.** Realistic sawaalon ki ek list rakho, us tool aur arguments ke saath jo aap expect karte ho, un sawaalon ko bhi milakar jinhe tool nahi chahiye. Tools, descriptions ya model mein har badlaav ke baad ise chalao, aur galat tool, galat arguments aur chhuti hui calls gino. Berkeley Function Calling Leaderboard jaise public benchmarks models ko isi par compare karte hain, par aapke apne sawaal zyada maayne rakhte hain.
+
+## Ek example se samjho
+
+Gurugram ki ek fashion e-commerce site apni support chat mein order tools jodti hai: `get_order_status`, `get_return_policy` aur `start_return` (jisme customer ko confirm karna hota hai).
+
+Ek customer likhta hai: "Where is my kurta order ORD-48213907? If it's late I want to return it."
+
+1. Model id ke saath `get_order_status` call karta hai.
+2. Code return karta hai: "Shipped 3 Nov, out for delivery today, Gurugram hub."
+3. Model jawab deta hai ki order aaj aa raha hai, aur `get_return_policy` call karke 15-din ki return window samjhata hai.
+4. Woh `start_return` call nahi karta, kyunki order late nahi hai; agar customer zid kare, toh woh pehle confirmation maangta hai.
+
+Jab koi customer galat id type karta hai, toh tool "not found" message return karta hai aur model unhe confirmation SMS check karne ko kehta hai.
+
+| Customer message | Call hue tools | Result |
+| --- | --- | --- |
+| "Where is ORD-48213907? Return if late" | get_order_status, get_return_policy | Aaj aa raha hai; 15-din ki return window samjhayi |
+| Return karne par adda hai | Confirm hone tak koi nahi | start_return se pehle confirmation maangta hai |
+| Galat order id | get_order_status "not found" return karta hai | Unhe confirmation SMS check karne ko kehta hai |
+
+## Aam galtiyaan
+
+- **Vague tool descriptions.** Tab model galat tool call karta hai ya koi nahi.
+- **Arguments validate kiye bina tools chalana.**
+- **Errors ko nigal jaana.** Unhe saaf tool results ki tarah return karo.
+- **Bina confirmation ke risky actions.**
+- **Tool result wapas bhejna bhool jaana.** Uske bina model jawab nahi de sakta.
+- **Model par identity ya consent ke liye bharosa karna.** User id aur "customer maan gaya" aapke app se aane chahiye, tool arguments se nahi.
+- **Bade results return karna.** Sirf woh kuch fields return karo jo model ko chahiye; bade results tokens kharch karte hain aur use confuse karte hain.
+- **Model mein sums karna.** Totals, discounts aur dates ek tool se calculate karwao.
+
+## Jab tools ki zaroorat nahi
+
+- **Jawab prompt mein ya pehle se retrieve kiye documents mein hai.**
+- **Ek fixed step hamesha chalta hai**: bas apne code mein function call karo aur uska result prompt mein daalo.
+- **Aapko sirf ek JSON shape chahiye**: structured output simple ho sakta hai, haalaanki ek forced single tool bhi use paane ka ek tareeka hai.
+
+## Demo se production tak
+
+- **Tool definitions ko prompt ke saath version karo**, aur har badlaav par tool choice test karo.
+- **Har call log karo**: tool, arguments, result size, time, errors aur kiske liye chala.
+- **Har tool par timeouts lagao** aur jab ek dheema ho toh saaf message return karo.
+- **Read aur write tools ko code aur permissions mein alag rakho**, writes ke liye audit log ke saath.
+- **Write actions ko per user aur per din rate-limit karo.**
+
+## Practice karo
+
+Neeche link kiya gaya tool-use overview padho.
+
+1. Model ko ek read-only tool do (jaise weather lookup ya ek chhoti product table) aur code mein poora round trip complete karo.
+2. Tool ko anjaan inputs par error return karwao aur dikhao ki model use kaise sambhaalta hai.
+3. Doosra tool jodo aur paanch alag sawaalon par test karo ki model kaunsa chunta hai.
+
+Aur gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 tool types, write actions, function calling aur tool set chunne ko cover karta hai.
+
+**Aapka kaam poora jab:** aap samjha sako ki tool kaun chalata hai, model use kab call karna hai ye decide karne ke liye kya use karta hai, aur fail hone par kya wapas bhejna hai.

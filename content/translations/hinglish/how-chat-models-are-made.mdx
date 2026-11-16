@@ -1,0 +1,167 @@
+---
+id: how-chat-models-are-made
+lang: hinglish
+title: "Chat model kaise banta hai: pre-training, SFT aur preference tuning"
+outcome: "Chat model ke peeche ke teen training stages samjhao, batao ki har ek kya jodta hai aur kya cost karta hai, aur model chunte waqt base model aur instruct model mein farak pehchano."
+answer: "Chat model ek base model hota hai, jise bade text par words predict karne ke liye pre-train kiya gaya, phir example answers se instructions follow karna sikhaya gaya (SFT), phir un answers ki taraf tune kiya gaya jo log pasand karte hain (RLHF ya DPO)."
+why_it_matters: "Stages samajhne se roz ka bahut saara behaviour samajh aata hai: base models bhatakte kyun hain, chat models polite hote hue bhi kabhi-kabhi mana kyun karte hain, aur apna model fine-tune karna isi process ka chhota version kyun hai. Ye interview ka bhi aam sawaal hai."
+flashcards:
+  - q: "Chat model banane waale teen stages kaunse hain?"
+    a: "Bade text par pre-training, prompt aur ideal-answer pairs par supervised fine-tuning (SFT), phir RLHF ya DPO se preference tuning."
+  - q: "Base model sawaal ke saath kya karta hai?"
+    a: "Text ko sabse sambhaavit tareeke se aage badhata hai. Woh jawab de sakta hai, par aur sawaal bhi jod sakta hai ya bhatak sakta hai, kyunki use sirf agla token predict karne ke liye train kiya gaya tha."
+  - q: "Kaunsa stage sabse zyada compute use karta hai?"
+    a: "Pre-training, kaafi aage. Baad ke stages compute ka chhota hissa use karte hain par behaviour bahut badalte hain."
+  - q: "SFT example mein kya hota hai?"
+    a: "Ek prompt aur ideal answer, aam taur par trained logon ka likha hua, taaki model achhe reply ka shape seekhe."
+  - q: "Preference example mein kya hota hai?"
+    a: "Ek prompt, ek pasandida answer aur ek rejected answer. Logon ke liye ek perfect answer likhne se do answers compare karna aasaan hai."
+  - q: "RLHF mein reward model kya karta hai?"
+    a: "Woh comparisons se seekhta hai ki kisi bhi answer ko score de ki log use kitna pasand karenge. Phir chat model ko high scores kamaane ke liye train kiya jaata hai."
+  - q: "DPO RLHF se kaise alag hai?"
+    a: "DPO wahi preference pairs se seekhta hai par model ko unpar seedhe train karta hai, bina alag reward model ke. Chalaana simple aur zyada stable hai."
+  - q: "Chat model kisi harmless request ko mana kyun kar sakta hai?"
+    a: "Preference tuning safe answers ko reward deti hai. Agar rewards bahut zyada savdhaani ki taraf jhuk jayein, toh model un cheezon ko mana karna seekh leta hai jinmein use madad karni chahiye."
+exercise:
+  title: "Hindi support bot ke liye base ya instruct?"
+  setup: "Jaipur ke ek e-commerce startup ko ek bot chahiye jo Hindi aur English mein delivery aur refund ke sawaalon ke jawab de. Ek open-weight model family do downloads deti hai: same size ka ek base model aur ek instruct (chat) version. Team ke paas support agents ke 600 achhe purane replies hain aur 2,000 pairs hain jahan ek senior agent ne do draft replies mein se behtar chuna."
+  questions:
+    - q: "Unhein kaunsa download pehle lena chahiye, aur kyun?"
+      a: "Instruct version. Woh pehle se instructions follow karta hai aur conversation sambhaalta hai. Base model ko assistant ki tarah behave karne se pehle apni SFT chahiye hogi."
+    - q: "600 achhe replies ka kya use ho sakta hai?"
+      a: "SFT data, agar woh chahte hain ki model prompt se zyada achhe se unki tone aur policies se mile. Kuch ko test set ke roop mein alag bhi rakhna chahiye."
+    - q: "2,000 chune hue pairs kis tarah ki training mein jaa sakte hain?"
+      a: "Preference tuning, jaise DPO. Har pair ek prompt, ek behtar reply aur ek kharab reply hai, jo bilkul DPO ka format hai."
+    - q: "Kisi bhi training se pehle unhein kya try karna chahiye?"
+      a: "Instruct model par kuch example replies ke saath ek achha prompt, test set par score kiya hua. Training tabhi worth hai jab woh ise saaf taur par haraye."
+ask:
+  - "Base model jawab dene ki jagah bhatakta kyun hai?"
+  - "RLHF aur DPO mein kya farak hai?"
+  - "Chat models kabhi-kabhi harmless requests ko mana kyun kar dete hain?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Jin chat assistants ko aap roz use karte ho, woh ek baar mein train nahi hue. Woh stages mein bante hain, aur har stage kuch alag jodta hai.
+
+1. **Pre-training.** Model bahut saara text (web pages, books, code) padhta hai aur agla token predict karna seekhta hai. Isme zyadatar paisa aur compute lagta hai. Result ek **base model** hota hai. Use language aur duniya ke baare mein bahut kuch pata hota hai, par woh sirf text ko aage badhata hai.
+2. **Supervised fine-tuning (SFT).** Base model ko prompt aur ideal answer ke examples par train kiya jaata hai, jo logon ne likhe ya check kiye. Woh instructions follow karna aur assistant ki tarah reply karna seekhta hai. Ise instruction tuning bhi kehte hain.
+3. **Preference tuning.** Log ek hi prompt ke do answers compare karte hain aur behtar chunte hain. Phir model ko aise tune kiya jaata hai ki pasandida answers zyada sambhaavit ho jayein. Do aam methods hain **RLHF** (reinforcement learning from human feedback) aur **DPO** (direct preference optimisation).
+
+Stage 2 aur 3 milkar aksar **post-training** kehlate hain. Ye total compute ka chhota hissa lete hain par model ke behaviour ko bahut badal dete hain. Jab koi provider kisi model ka "base" aur "instruct" ya "chat" dono version release karta hai, toh farak post-training ka hota hai.
+
+```flow
+title: Raw text se chat model tak
+dir: LR
+Huge text collection | web, books, code
+Huge text collection -> Pre-training | predict the next token
+Pre-training -> Base model | continues text
+Base model -> Supervised fine-tuning | prompt and ideal answer
+Supervised fine-tuning -> Instruct model | follows instructions
+Instruct model -> Preference tuning | RLHF or DPO
+Preference tuning -> Chat model | helpful, polite, safer
+```
+
+Ek kaam ki tasveer: pre-training model ko knowledge deti hai, SFT use helpful hone ka format sikhati hai, aur preference tuning is par uska judgement banati hai ki kai mumkin answers mein se log asal mein kaunsa chahte hain.
+
+## Ye kaam kaise karta hai
+
+**Stage 1: pre-training.** Training text ko tokens mein kaata jaata hai. Har position ke liye model agla token guess karta hai, apne guess ko asli token se compare karta hai, aur apne weights ko bahut thoda adjust karta hai. Trillions of tokens par dohrane se ye grammar, facts, reasoning patterns aur code sikhata hai. Model kya seekhta hai ye bahut kuch is par depend karta hai ki woh kya padhta hai. Agar koi language, jaise Odia ya Assamese, training text mein kam ho, toh model usmein kamzor hoga.
+
+Base model ko "How do I reset my UPI PIN?" prompt do toh woh jawab de sakta hai, ya sawaalon ki ek aur list bana sakta hai, kyunki web par sawaalon se bhare pages aam hain. Woh jaanbujhkar unhelpful nahi hai. Woh sambhaavit text predict kar raha hai.
+
+**Stage 2: supervised fine-tuning.** Trained log hazaaron prompts ke saath high-quality answers likhte hain: explanations, summaries, code, polite refusals. OpenAI ka InstructGPT kaam, ek shuruaati public example, aise lagbhag 13,000 demonstration examples use karta tha. Inhein likhna slow aur mehnga hai, kyunki ek mushkil sawaal ka achha jawab likhne mein kisi skilled insaan ko lamba samay lag sakta hai. SFT ke baad model sawaalon ko aage badhane ki jagah unka jawab deta hai.
+
+Ek SFT example ek chhoti chat jaisa dikhta hai:
+
+```json
+{"messages": [
+  {"role": "user", "content": "How do I reset my UPI PIN?"},
+  {"role": "assistant", "content": "Open your UPI app, go to the bank account, choose Reset UPI PIN, and verify with your debit card details and the OTP sent to your phone."}
+]}
+```
+
+**Stage 3: preference tuning.** Kisi bhi prompt ke kai acceptable answers hote hain, aur kuch doosron se behtar. Ek sabse achha answer likhna mushkil hai, par do answers compare karna aasaan. Isliye logon ko ek prompt aur model ke do answers dikhaye jaate hain aur poochha jaata hai ki kaunsa behtar hai. Har judgement ek **preference pair** ban jaata hai:
+
+```json
+{"prompt": "My order is late. What can I do?",
+ "chosen": "Sorry about the delay. You can track it under My Orders. If it is more than 3 days late, you can ask for a refund there.",
+ "rejected": "Orders are sometimes late. Please wait."}
+```
+
+In pairs se seekhne ke do mukhya tareeke hain.
+
+- **RLHF.** Pehle pairs par ek alag **reward model** train karo, taaki woh kisi bhi answer ko score de sake ki log use kitna pasand karenge. Phir chat model ko reinforcement learning se aise answers dene ke liye train karo jo high scores kamayein, saath hi SFT model ke kareeb rehkar, taaki woh ajeeb text mein na bahe jo score achha le leta ho.
+- **DPO.** Reward model chhod do. Chat model ko seedhe pairs par train karo, chosen answer ko zyada aur rejected ko kam sambhaavit banao, jahan se shuru kiya tha usse relative. Ye aam training code use karta hai, sasta hai aur chalaane mein zyada stable hai. Kai open model families DPO ya aise methods par aa gayi hain.
+
+Ek teesra variant, **RLAIF**, kaunsa answer behtar hai ye judge karne ke liye logon ki jagah ek strong model use karta hai. Ye sasta hai par judge model ke blind spots virasat mein le leta hai.
+
+| Stage | Training data | Kya jodta hai | Andaaza cost |
+| --- | --- | --- | --- |
+| Pre-training | Trillions of tokens raw text | Language, facts aur code ki knowledge | Zyadatar compute; sirf bade labs karte hain |
+| Supervised fine-tuning | Hazaaron se das hazaar prompt aur ideal-answer pairs | Instructions follow karna, assistant ki tarah reply | Chhota compute; mehnga expert writing |
+| Preference tuning (RLHF ya DPO) | Das hazaar se zyada chosen aur rejected pairs | Behtar judgement, tone aur safety | Chhota compute; sasti human comparisons |
+
+Ye aankde mote patterns hain, exact numbers nahi. Har lab ki recipe alag hai aur samay ke saath badalti hai.
+
+**Browser mein try karo.** Ek reward model preferences ko scores mein badalta hai. Dekho ki ek pairwise preference kaise probability ban jaati hai.
+
+```python
+import math
+
+def prefer_probability(score_a, score_b):
+    return 1 / (1 + math.exp(-(score_a - score_b)))      # the Bradley-Terry form used in reward modelling
+
+pairs = [("helpful, cites the policy", 2.1, "vague answer", 0.4),
+         ("polite refusal", 0.2, "unsafe instructions", -1.5),
+         ("short and right", 1.0, "long and right", 0.9)]
+for a, sa, b, sb in pairs:
+    print(f"P({a!r} preferred over {b!r}) = {prefer_probability(sa, sb):.2f}")
+```
+
+## Ek example se samjho
+
+Hyderabad ki ek team chhote dukaandaaron ko Telugu aur English mein bank statements samjhane waala bot bana rahi hai. Har stage kya jodta hai ye dekhne ke liye, woh ek hi open-weight model family ke teen versions ko ek prompt par compare karte hain, "Explain this ₹2,350 debit marked NACH".
+
+| Version | Prompt ke saath kya kiya | Kyun |
+| --- | --- | --- |
+| Base model | Forum post jaisi teen aur lines likhi, phir ek alag sawaal | Woh sirf text aage badhata hai; forum posts aam hain |
+| SFT ke baad | Samjhaya ki NACH ek automatic debit hai, aam taur par loan EMI ya subscription, ek lambe, formal paragraph mein | Usne helpful answer ka format seekha |
+| Preference tuning ke baad | Wahi explanation teen chhoti lines mein di, bank app mein mandate list check karne ka suggestion diya, aur ek aur entry samjhane ka offer kiya | Logon ne agle kadam ke saath chhote, practical answers ko pasand kiya tha |
+
+Team chat version ko apna starting point chunti hai. Phir unhein dikhta hai ki uske Telugu replies akade hue hain aur kabhi-kabhi English mein badal jaate hain. Ye gap pre-training se aata hai, jahan Telugu text kam tha. Kitni bhi prompting pre-training ke gap ko poori tarah theek nahi karti, isliye woh 200 real sawaalon par do options test karte hain: Telugu examples ke saath ek dhyaan se likha prompt, aur unke Telugu bolne waale support staff ke likhe 1,500 replies par ek chhoti SFT run. Jo unke apne test par behtar score kare, woh rakhte hain, public leaderboard par nahi.
+
+## Aam galtiyaan
+
+- **Base model ko chatbot ki tarah use karna.** Woh jawab dene ki jagah text aage badhata hai. Instruct ya chat version download karo, jab tak aap apni SFT plan nahi kar rahe.
+- **Ye sochna ki post-training knowledge jodti hai.** Ye zyadatar behaviour badalti hai. Facts pre-training se ya run time par retrieval se aate hain.
+- **Ye maan lena ki RLHF model ko sachcha banata hai.** Ye un answers ko reward deti hai jo log pasand karte hain, aur log confident, fluent par galat text bhi pasand kar sakte hain.
+- **Refusals ko apne prompt ka bug samajhna.** Zyada savdhaani waale refusals aksar preference tuning se aate hain. Saaf prompt madad karta hai, par kuch behaviour andar hi baked hai.
+- **Interview mein DPO aur RLHF ko mix karna.** Dono preference pairs se seekhte hain. RLHF pehle reward model train karta hai; DPO nahi.
+
+## Chat models aisa behave kyun karte hain
+
+Roz ki kai quirks inhi stages se judi hain.
+
+- **Sycophancy.** Models aapse sehmat hone ki taraf jhukte hain, kyunki preference tuning ke dauran sehmat hone waale answers aksar pasand kiye gaye.
+- **Lambe, bhare hue answers.** Agar reviewers ne thorough answers ko reward diya, toh model seekh leta hai ki lamba behtar dikhta hai.
+- **Languages mein asamanta.** Hindi ya Tamil ki quality is par depend karti hai ki us language ka kitna hissa pre-training aur SFT examples mein tha.
+- **Knowledge cut-off.** Model ko pre-training data collect hone ke baad ki koi cheez nahi pata, jab tak aap use taaza information na do.
+
+## Demo se production tak
+
+- **Model card padho.** Ye aam taur par batata hai ki model kin stages se guzra, kaunsa data use hua aur kaunsi languages cover hui.
+- **Sahi version chuno.** Applications ke liye instruct ya chat versions use karo. Base model sirf tab jab aap apni SFT karoge, ya plain text completion ke liye.
+- **Apni languages mein test karo.** Model ko apne users ki likhi har language mein real sawaalon par score karo, mixed Hinglish ya Tanglish samet.
+- **Apne pairs sambhaal kar rakho.** Jab reviewers koi reply theek karein ya do drafts mein se chunein, use store karo. Ye baad mein SFT aur preference data ban jaate hain.
+
+## Practice karo
+
+1. Kisi bhi chat assistant se ek simple sawaal poochho, phir wahi sawaal aage "Continue this text:" lagakar poochho. Note karo ki jawab kaise badalta hai. Aap use aanshik roop se base-model behaviour ki taraf dhakel rahe ho.
+2. Apne kaam ke kisi task ke liye do SFT examples aur do preference pairs likho. Rejected answers ko realistic rakho, saaf-saaf kharab nahi.
+3. RLHF aur DPO ko ek dost ko ek minute mein samjhao, "preference pair" aur "reward model" shabdon ka use karke.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 2 post-training aur preference tuning cover karta hai.
+
+**Aapka kaam poora jab:** aap teen stages ke naam bata sako, ye bata sako ki har ek kaunsa data use karta hai aur kya jodta hai, aur RLHF aur DPO ka farak samjha sako.

@@ -1,0 +1,236 @@
+---
+id: vector-search
+lang: tanglish
+title: "Vector search"
+outcome: "Embeddings-a oru index-la store panni, oru kelvikku romba pakkathula irukkura chunks-a retrieve panna kathukkalaam."
+answer: "Vector search embeddings-a oru index-la store panni, kelvi-oda embedding-kku romba pakkathula irukkuradha thirumba tharum, adhavadhu passages-a exact words-a vida artham vachu kandupidikkum."
+why_it_matters: "Vector search thaan RAG-la irukkura R. Oru index neighbours-a eppadi kandupidikkudhu, top-k-na enna-nu theriyum-na, retrieval-a ooghikkaama debug pannalaam."
+flashcards:
+  - q: "Vector search-na enna?"
+    a: "Embeddings kelvi-oda embedding-kku romba pakkathula irukkura chunks-a kandupidikkradhu; perumbaalaana RAG systems-la retrieval step."
+  - q: "Top-k-na enna?"
+    a: "Thirumba tharura romba pakkathula irukkura results-oda ennikkai. Romba kammi-na sariyaana chunk miss aagum; romba adhigam-na prompt-la sathama niraiyum."
+  - q: "Exact-kum approximate search-kum enna difference?"
+    a: "Exact ovvoru vector-oda-yum compare pannum, scale-la mella; HNSW maadhiri approximate indexes kittathatta adhe results-a romba vegamaa kandupidikkum."
+  - q: "Vectors-a store panna moonu idangal sollunga."
+    a: "FAISS maadhiri library, pgvector maadhiri database extension, illa Qdrant, Weaviate, Pinecone maadhiri vector database."
+  - q: "Vector search enga struggle pannum?"
+    a: "Exact identifiers-layum rare terms-layum: error codes, policy numbers, SKUs, vazhakkathukku maaraana peru."
+  - q: "Reranker enna serkkudhu?"
+    a: "Adhu kelvi-yum ovvoru candidate-aiyum serthu padichu, embedding similarity-a vida accurate-aa maathi order pannum."
+  - q: "Search-kullayae yen filter pannanum?"
+    a: "Adhanaala sariyaana product, ippo irukkura versions, permit panna documents maadhiri eligible chunks mattum top-k-kaaga potti podum."
+  - q: "Embedding models-a maatharappo enna aaganum?"
+    a: "Muzhu index-aiyum thirumba build pannanum, yen-na veraveraya models-oda vectors-a compare panna mudiyaadhu."
+  - q: "Filter panna vector search kettadha vida kammiyaana results yen tharalaam?"
+    a: "Approximate indexes mudhalla nearest neighbours-a kandupidichu, apram filters sila-vatrai neekkum. Strict filter-oda, andha neighbours-la konjam thaan meedhi irukkum."
+  - q: "Cross-encoder reranker embeddings-a vida enna vera maadhiri pannudhu?"
+    a: "Adhu kelvi-yum oru passage-aiyum serthu padichu andha pair-a score pannum, rendu thaniyaana vectors-a compare panradhai vida mella aana romba accurate."
+exercise:
+  title: "Retrieval-a tune pannunga"
+  setup: "Coimbatore-la oru pump manufacturer-oda service assistant pgvector-la 1,800 manuals-a index pannudhu. Problems: (1) 'fault code P-27 on model KX-5' podhuvaana troubleshooting pages-a thirumba tharudhu; (2) answers sila samayam vera pump models-oda manuals-la irundhu varudhu; (3) top-k 2-na sariyaana chunk adikkadi missing, model-ku 20 anuppina answers alaiyudhu; (4) kadandha vaaram team embedding models-a maathinadhukku aprom, results romba mosamaachu."
+  questions:
+    - q: "(1)-a eppadi fix pannuveenga?"
+      a: "Codes-ku, model numbers-ku keyword search serthu, adha vector search-oda merge pannunga."
+    - q: "(2)-a eppadi fix pannuveenga?"
+      a: "Pump model-a metadata-vaa store panni, search-kulla adhoda filter pannunga."
+    - q: "(3)-a eppadi resolve pannuveenga?"
+      a: "20 mudhal 30 candidates retrieve panni, rerank panni, nalla anju-a model-ku anuppunga; test set-la recall check pannunga."
+    - q: "(4)-ku enna kaaranam irukkalaam?"
+      a: "Pazhaya chunks munnaadi irundha model-la embed aagirukkum, queries pudhu model-la. Pudhu model-oda index-a thirumba build pannunga."
+ask:
+  - "HNSW-na enna, eppadi work aagudhu?"
+  - "Naan pgvector use pannanuma, dedicated vector database use pannanuma?"
+  - "Top-k-a eppadi choose pannuradhu?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Vector search** oru kelvi-oda embedding-kku romba pakkathula irukkura embeddings-oda chunks-a kandupidikkum. Perumbaalaana RAG systems-la idhu thaan retrieval step:
+
+1. Ovvoru chunk-aiyum oru thadavai embed panni, vectors-a oru **index**-la store pannunga.
+2. Kelvi vara podhu, kelvi-a adhe model-la embed pannunga.
+3. Romba onnu pola irukkura **top-k** chunks-a thirumba kodunga (example romba pakkathula irukkura anju).
+
+Store ungaloda program-la FAISS maadhiri library-aa irukkalaam, PostgreSQL-la pgvector maadhiri database extension-aa irukkalaam, illa Qdrant, Weaviate, Pinecone maadhiri dedicated vector database-aa irukkalaam.
+
+```flow
+title: Index, oru thadavai
+Chunks 1 mudhal N varaikkum -[embed]-> Vectors + metadata | product, type, page
+```
+
+```flow
+title: Query, ovvoru kelvikkum
+"Washing machine E-4012 won't drain" -[adhe model-la embed]-> Query vector
+Query vector -> Nearest neighbours | product model vachu filter panna
+Nearest neighbours -[top 30]-> Rerank -[top 5]-> Prompt
+```
+
+Indha lesson-la Hyderabad-la oru electronics retailer-oda support assistant-a follow pannuvom, adhu product manuals-aiyum help articles-aiyum mela build aanadhu.
+
+## Idhu eppadi work aagudhu
+
+**Similarity.** Perumbaalaana systems normalise panna vectors-la cosine similarity illa dot product use pannum: adhigam-na artham-la adhigam onnu pola irukku-nu artham.
+
+**Exact versus approximate search.** Kelvi-a ovvoru vector-oda-yum compare panradhu exact, aana latchakkanakkana chunks-ku mella. Approximate nearest neighbour indexes (HNSW graphs maadhiri) kittathatta adhe results-a romba vegamaa kandupidikkum. Konja aayiram chunks-ku exact search paravaayilla.
+
+**Top-k.** Evvalavu results thirumba thara vendum-nu neenga choose pannuveenga. Romba kammi-na sariyaana chunk miss aagalaam; romba adhigam-na prompt-la sathama niraiyum. Anju mudhal pathu varaikkum oru common aarambam; ungaloda kelvigalla alandhu paarunga.
+
+**Metadata-vum filters-um.** Ovvoru vector-oda document id, title, section, page, date, access groups-um store pannunga. Search-kulla filter pannunga (indha product mattum, ippo irukkura versions mattum, indha user paarkka mudiyuradhu mattum).
+
+**Vector search enga struggle pannum.** Exact identifiers-layum rare terms-layum: "E-4012" maadhiri error codes, policy numbers, product SKUs, vazhakkathukku maaraana peru. Embeddings artham-a pidikkum, exact strings-a illa. **Hybrid search** vector search-a keyword search (BM25)-oda serkkum, adhanaala idhu pidipadum.
+
+**Reranking.** **Reranker** oru mella aana, adhigam accurate-aana model, adhu kelvi-yum ovvoru candidate chunk-aiyum serthu padichu relevance padi thirumba order pannum. Vector illa hybrid search-la 20 mudhal 50 candidates retrieve panni, rerank panni, prompt-ku nalla anju-a vechukkunga.
+
+**Index-a sync-la vechukkradhu.** Documents maarum podhu, avanga pazhaya vectors-a delete panni, pudhusa serunga; embedding model-a maathina, ellaathaiyum thirumba build pannunga.
+
+**Store-a choose panradhu:**
+
+| Store | Edhukku nallaa irukkum | Trade-offs |
+| --- | --- | --- |
+| Ungaloda program-la FAISS | Experiments, offline jobs | Database features illa; persistence-a neengale paarthukkanum |
+| PostgreSQL-la pgvector | Already Postgres-la odura apps, latchakkanakkana chunks varaikkum | Data, metadata, vectors-ku oru system |
+| Dedicated vector database | Romba periya indexes, adhigamaana traffic | Innoru system-a odi secure pannanum |
+
+**Approximate index eppadi work aagudhu.** HNSW oru graph build pannum, angae ovvoru vector-um adhoda pakkathula irukkura sila neighbours-oda link aagirukkum, coarse-la irundhu fine varaikkum layers-la. Search mela layer-la aarambichu, query-ku pakkathula irukkura vectors-ku thaavi, keezha layers-la refine pannum. Vectors-oda oru chinna pagudhi-a mattum check pannina-um, perumbaalum nijamaana nearest-aanavatrula kittathatta ellaathaiyum kandupidikkum. Settings vegathukkum, evvalavu nijamaana neighbours kidaikkudhu-nukkum idaiyila trade pannum, adhanaala maatharappo recall-a alandhu paarunga.
+
+**Sandhogamaana aadharathoda top-k choose panradhu.** Kelvigal-oda oru test set-a, kandupidikka vendiya chunk-oda sernthu build pannunga. 1, 5, 10, 30-la recall alandhu paarunga. 30-la recall 5-a vida romba adhigam-na, adhigam retrieve panni oru reranker serunga. 30-layum kammi-na, problem munnaadiye irukku: parsing, chunking illa embedding model.
+
+**Index-a sync-la vechukkradhu, practice-la.** Ovvoru chunk-kum document id-yum position-um vachu oru id kodunga, example `manual-KX5-p12-c3`. Oru document maarum podhu, andha document id-oda ella chunks-aiyum delete panni, pudhusa ore transaction-la insert pannunga, adhanaala searches paadhi update-a paarkkaadhu. Ovvoru vector-oda embedding model peru-yum record pannunga. Raathri check, ovvoru model-oda vectors-a ennuradhu, indha lesson-oda exercise-la irundha thappa pidikkum, angae pazhaya, pudhu embeddings ore index-la kalandhidhu.
+
+**Practice-la pgvector.** Ungaloda app already Postgres use pannina, vectors data-oda pakkathulayae irukkalaam:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE chunks (
+  id text PRIMARY KEY,                 -- e.g. manual-KX5-p12-c3
+  doc_id text NOT NULL,
+  section text, page int, version text,
+  access_group text NOT NULL,
+  embed_model text NOT NULL,
+  body text NOT NULL,
+  embedding vector(384) NOT NULL
+);
+CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX ON chunks (doc_id);
+
+-- Top 20 for one user's groups, current version only:
+SELECT id, section, page, body, 1 - (embedding <=> $1) AS similarity
+FROM chunks
+WHERE access_group = ANY($2) AND version = 'current'
+ORDER BY embedding <=> $1
+LIMIT 20;
+```
+
+`<=>` cosine distance, adhanaala chinna-na pakkam. `SET hnsw.ef_search = 100;` graph-oda adhigamaana pagudhi-a search pannum, nalla recall-kku, konjam vega vilaiyila. Strict filters-oda, approximate index limit-a vida kammiyaana rows-a thirumba tharalaam; saamibathiya pgvector versions podhumaana rows pass aagura varaikkum scan pannalaam (iterative index scans), illa group padi partition pannalaam.
+
+**Index ungalukku evvalavu selavu vaikkudhu-nu alandhu paarunga.** Ungaloda sondha queries-la approximate results-a exact-oda compare pannunga:
+
+```python
+import numpy as np, faiss
+
+def ann_recall(vectors, queries, k=10, m=32, ef=64):
+    d = vectors.shape[1]
+    exact = faiss.IndexFlatIP(d); exact.add(vectors)
+    approx = faiss.IndexHNSWFlat(d, m, faiss.METRIC_INNER_PRODUCT)
+    approx.hnsw.efSearch = ef
+    approx.add(vectors)
+    _, truth = exact.search(queries, k)
+    _, found = approx.search(queries, k)
+    return np.mean([len(set(t) & set(f)) / k for t, f in zip(truth, found)])
+```
+
+Inner product cosine-oda samamaa irukka vectors normalise aagirukkanum. Recall sumaar 0.95-ku keezha irundha, `ef` illa `m`-a ethi, vegathai thirumba alandhu paarunga.
+
+**Code-la reranking.**
+
+```python
+from sentence_transformers import CrossEncoder
+
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+def rerank(question, candidates, keep=5):
+    scores = reranker.predict([(question, c["body"]) for c in candidates])
+    order = sorted(range(len(candidates)), key=lambda i: scores[i], reverse=True)
+    return [candidates[i] for i in order[:keep]]
+```
+
+20 mudhal 50 candidates-a rerank pannina pathu mudhal nooru milliseconds varaikkum aagum; ungaloda hardware-la alandhu paarunga. Indian-language text-ku multilingual reranker-a choose panni, ungaloda queries-la test pannunga.
+
+**Paadhi nilai illaama updates.** Maarina document-oda chunks-a `doc_id` key vachu ore transaction-la delete-um insert-um pannunga, adhanaala searches paadhi update-a paarkkaadhu. Ovvoru `embed_model`-kum raathri rows-a ennunga; onnukku mela value irundha, kalandha index.
+
+**Browser-la try pannunga.** Konja NumPy lines-la exact nearest-neighbour search. Query vector-a maathunga.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+docs = rng.normal(size=(1000, 64))
+docs /= np.linalg.norm(docs, axis=1, keepdims=True)          # normalise, so dot product = cosine
+query = docs[42] + 0.1 * rng.normal(size=64)
+query /= np.linalg.norm(query)
+
+scores = docs @ query
+top = np.argsort(-scores)[:5]
+print("top 5:", top.tolist())
+print("scores:", scores[top].round(3).tolist())
+```
+
+## Oru worked example
+
+Hyderabad-la oru electronics retailer 3,000 product manuals-aiyum help articles-aiyum mela oru support assistant build pannuraanga.
+
+- Chunks oru open embedding model-la embed aagi, PostgreSQL-la pgvector-oda store aagum, product model-um document type-um metadata-vaa.
+- "my washing machine shows error E-4012 and won't drain"-kku, plain vector search podhuvaana draining articles-a thirumba tharum, aana E-4012-a list panra page-a miss pannum, yen-na andha code oru rare token.
+- Avanga keyword search serthu rendu result lists-aiyum merge pannuraanga; error-code page ippo mudhalla varudhu.
+- Top 30-la oru reranker serkkuraanga; 60 kelvigal test-la, sariyaana chunk top anju-la 91% neram varudhu, vector search mattum irundha 72%.
+- Customer-oda product model-la oru filter vera models-oda manuals-a neekkudhu.
+
+| 60 kelvigal-la set-up | Top anju-la sariyaana chunk |
+| --- | --- |
+| Vector search mattum | 72% |
+| Plus keyword search, merge panna | Error-code kelvigal sari aachu |
+| Plus top 30-la reranker | 91% |
+| Plus product-model filter | Thappaana-model manuals neekkapattadhu |
+
+**Retailer enna vechukittaanga.** Team ippo chunking, embeddings, top-k, reranker-la ovvoru maatram pannina aprom adhoda 60-kelvi test-a odudhu, results-a repository-la oru table-la vechukkudhu, adhanaala oru setting yen choose pannom-nu yaarum ninaivu vechukka vendaam.
+
+## Podhuvaa panra thappugal
+
+- **Queries-aiyum chunks-aiyum veraveraya models-la embed panradhu.**
+- **Codes-kum IDs-kum vectors-a nambi irukkradhu.** Keyword search serunga.
+- **Test pannaama top-k pick panradhu.**
+- **Retrieval-ku aprom filter panradhu.** Search-kulla filter pannunga.
+- **Index-a update illa rebuild panna marakkradhu.**
+- **Search-ku aprom application code-la filter panradhu.** Permission filters query-la irukkanum.
+- **Approximate index-oda recall-a eppavume alakkaama irukkradhu.** Defaults neenga ninaikkradha vida adhigam miss pannalaam.
+- **Inner product-oda normalise pannaadha vectors**, appo adhu cosine similarity illa.
+
+## Vector index thevai illaadha neram
+
+- **Konja aayiram chunks**: NumPy-la exact search podhumaana vegam, perfect recall-um irukkum.
+- **Exact-match lookups**: IDs, codes, names keyword search illa database index-ku sondham.
+- **Filters-ae perumbaalaana velaiya seiyum**, example "indha customer-oda moonu contracts": adha neradiyaa fetch pannunga.
+
+## Demo-la irundhu production varaikkum
+
+- **Permission-um version filters-um search query-kullayae irukkanum.**
+- **Index settings illa data size maarum podhu ellaam ANN recall-aiyum latency-yaiyum alandhu paarunga.**
+- **Documents-a transactions-la update pannunga**, raathri mixed embedding models-a check pannunga.
+- **Ovvoru answer-oda retrieved ids-um scores-um log pannunga.**
+- **Reranker-oda latency-a ungaloda nijamaana candidate counts-la benchmark pannunga.**
+
+## Practice pannunga
+
+Keezha link panna Hugging Face semantic search lesson-a pannunga.
+
+1. Oru document set-oda 200 chunks-a FAISS illa pgvector-la index panni, pathu kelvigalukku top-5 retrieve pannunga.
+2. Codes illa names irukkura kelvigalukku keyword search serthu, results-a merge panni, compare pannunga.
+3. Top 20-la oru reranker serthu, ungaloda pathu kelvigalla maatrathai alandhu paarunga.
+4. Ungaloda index-la ann_recall-a rendu efSearch settings-la odi, ovvoru onnukkum recall-aiyum query time-aiyum record pannunga.
+
+Innum deep-aa padikka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-la chapter 6 embedding-based retrieval, approximate nearest neighbour search, reranking-a cover pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Top-k-a explain panna mudiyum, vector search eppo fail aagum-nu solla mudiyum, reranker enna serkkudhu-nu solla mudiyum.

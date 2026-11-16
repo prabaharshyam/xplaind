@@ -1,0 +1,264 @@
+---
+id: docker-basics
+lang: hinglish
+title: "Docker aur Compose"
+outcome: "Ek AI service ko container image mein package karna, sahi settings ke saath chalana, aur Docker Compose se kai services ka local stack start karna."
+answer: "Docker ek app aur uski zaroorat ki har cheez ko ek image mein package karta hai jo kahin bhi ek jaisi chalti hai. Docker Compose aise kai containers ko ek file se saath mein start karta hai."
+why_it_matters: "\"Mere machine par to chal raha hai\" waali problem ke bina AI services ko laptop se client ke servers ya cloud tak le jaane ka tareeka containers hain. Lagbhag har FDE aur platform job description Docker maangti hai, aur iske baad ka har deployment lesson ise maan leta hai."
+flashcards:
+  - q: "Container kya hai?"
+    a: "Ek chalta hua program jo apni zaroorat ki har cheez ke saath package hota hai, jaise Python version, libraries, code aur start command, taaki wo kahin bhi ek jaisa chale."
+  - q: "Image aur container mein kya farak hai?"
+    a: "Image package ki hui recipe ka result hai, jo store aur share hota hai. Container us image ka chalta hua instance hai."
+  - q: "Dockerfile kya hai?"
+    a: "Steps ki ek chhoti recipe, jisme har step ek layer jodta hai, aur jisse image banti hai."
+  - q: "Dockerfile mein code se pehle dependency files kyun copy karte hain?"
+    a: "Docker layers ko cache karta hai. Phir code badalne par har package dobara install nahi hota, isliye rebuilds seconds mein ho jaate hain."
+  - q: "Volume kya hai?"
+    a: "Aisi storage jo container remove hone par bhi bachi rehti hai, database files ya caches ke liye use hoti hai."
+  - q: "Docker Compose kya karta hai?"
+    a: "Ek file se kai containers ko saath start karta hai, naam se jodkar, jaise ek API aur uska database."
+  - q: "Production mein latest tag kyun use nahi karna chahiye?"
+    a: "Pata nahi chalta kya chal raha hai aur rollback nahi ho sakta. Images ko versions ya commit hashes se tag karo."
+  - q: "Containers ko non-root user se kyun chalana chahiye?"
+    a: "Agar container compromise ho jaye toh nuksaan kam hota hai, aur kai client security reviews ise zaroori maante hain."
+  - q: "Multi-stage build kya karta hai?"
+    a: "Ek stage mein saare tools ke saath build ya compile karta hai, phir sirf results ko ek chhoti final image mein copy karta hai, jo ship karne mein tez hoti hai aur jis par attack karne ko kam hota hai."
+  - q: "Ek .dockerignore file kyun jodni chahiye?"
+    a: "Wo .env files, Git history, data folders aur caches ko build se bahar rakhti hai, isliye secrets images mein copy nahi hote aur builds tez rehte hain."
+exercise:
+  title: "Is Dockerfile ko review karo"
+  setup: "Ek teammate ka AI API ke liye Dockerfile: FROM python:3.12 (full image); COPY . . pehle step ke roop mein; RUN pip install -r requirements.txt; ENV ANTHROPIC_API_KEY=sk-ant-...; CMD python main.py. Wo ise myapi:latest ke roop mein deploy karte hain. compose.yaml mein PostgreSQL container ka koi volume nahi hai."
+  questions:
+    - q: "Sabse serious problem kya hai?"
+      a: "API key image mein hi bake ho gayi hai. Jiske paas image hai, wo ise padh sakta hai. Use hatao, key rotate karo, aur run time par pass karo."
+    - q: "Rebuilds slow kyun hain, aur ise kaise fix karoge?"
+      a: "Pehle COPY . . ka matlab hai ki koi bhi code change install layer ko invalidate kar deta hai. requirements.txt copy karo, install karo, phir code copy karo. .dockerignore jodo."
+    - q: "Agle deploy par database ke data ka kya hoga?"
+      a: "Wo kho jaayega, kyunki wo container ke andar rehta hai. Database ke data folder ke liye ek named volume jodo."
+    - q: "Do aur improvements batao."
+      a: "Bahut chhoti image ke liye python:3.12-slim use karo, ek non-root USER jodo, aur images ko latest ki jagah versions se tag karo."
+ask:
+  - "Docker aur virtual machine mein kya farak hai?"
+  - "Apni Docker image ko chhota kaise banaun?"
+  - "Docker Compose mein containers aapas mein kaise baat karte hain?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Container** ek chalta hua program hai jo apni zaroorat ki har cheez ke saath package hota hai: Python version, libraries, aapka code aur uska start command. Ye aapke laptop, kisi colleague ki machine, client ke server ya cloud service par ek jaisa chalta hai.
+
+Aap container ek **image** se banate ho, aur image ek **Dockerfile** se, jo steps ki ek chhoti recipe hai. **Docker Compose** ek file se kai containers saath mein start karta hai, jaise aapka API, pgvector waala PostgreSQL database aur ek Redis cache, bilkul waise jode hue jaise production mein honge.
+
+Containers virtual machines nahi hain. Wo host ka Linux kernel share karte hain, isliye seconds mein start ho jaate hain aur kam memory use karte hain.
+
+```flow
+dir: LR
+Dockerfile -[docker build]-> Image | claims-api:1.4.0 se tag hua
+Image -[docker push]-> Registry | Docker Hub, GHCR, ek cloud registry
+Image -[docker run, compose up]-> Containers | laptop, server ya cloud par chal rahe
+```
+
+| | Virtual machine | Container |
+|---|---|---|
+| Har app kya saath leke chalta hai | App, uski libraries aur poora guest OS, hypervisor par | App aur uski libraries, container runtime par jo host kernel share karta hai |
+| Start hone ka time | Minutes | Seconds |
+| Memory | Gigabytes | Megabytes |
+
+Ye lesson Jaipur ke ek bank ki IT team ko document-search API handover karne ke baare mein hai, jo sab kuch apne servers par chalate hain.
+
+## Ye kaam kaise karta hai
+
+**Dockerfile.** Har line ek layer jodti hai:
+
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv sync --frozen --no-dev --no-install-project
+COPY src ./src
+USER 1000
+CMD [".venv/bin/uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Docker layers ko cache karta hai. Code se pehle dependency files copy karne ka matlab hai ki code badalne par har package dobara install nahi hota, isliye rebuilds seconds mein ho jaate hain.
+
+**Build aur run.** `docker build -t claims-api:1.4.0 .` ek image build karke tag karta hai. `docker run -p 8000:8000 --env-file .env claims-api:1.4.0` use chalata hai, container ke port ko aapke port se map karta hai aur settings environment variables ke roop mein pass karta hai. `docker ps`, `docker logs` aur `docker exec -it name bash` se andar dekha ja sakta hai.
+
+**Data.** Container ka apna filesystem remove hone par gayab ho jaata hai. Jo data bachna chahiye, jaise database ki files ya model cache, wo **volume** mein jaata hai.
+
+**Compose.** Ek `compose.yaml` services, unki images ya build folders, ports, environment, volumes aur kaun kis par depend karta hai, ye list karti hai. `docker compose up` sab start kar deta hai; services ek-doosre tak naam se pahunchti hain, isliye aapka API `postgres:5432` se connect hota hai.
+
+**Registries.** Images ek registry (Docker Hub, GitHub Container Registry ya client ki cloud registry) mein push hoti hain, aur servers wahan se pull karte hain. Har image ko sirf `latest` ki jagah ek version se tag karo, taaki pata rahe ki kya chal raha hai aur rollback ho sake.
+
+**Roz ke commands:**
+
+| Command | Kya karta hai |
+| --- | --- |
+| `docker build -t name:tag .` | Yahan ke Dockerfile se image build karta hai |
+| `docker run -p 8000:8000 name:tag` | Port map karke use chalata hai |
+| `docker ps` | Chalte hue containers ki list |
+| `docker logs -f name` | Container ke logs follow karta hai |
+| `docker exec -it name bash` | Chalte hue container ke andar shell kholta hai |
+| `docker images` | Images aur unke sizes ki list |
+| `docker compose up -d` | compose.yaml ki har service background mein start karta hai |
+| `docker compose down` | Unhe stop karke remove karta hai (volumes bache rehte hain) |
+
+**Jo container start nahi ho raha, use debug karna.** Pehle us par `docker logs` dekho: zyadatar failures mein ya toh koi environment variable missing hota hai, start command galat hota hai ya port pehle se use mein hota hai. Agar wo turant exit ho jaata hai, toh normal command ki jagah shell ke saath chalao aur andar dekho. Agar start hota hai par database tak nahi pahunchta, toh yaad rakho ki Compose ke andar database apne service name par hota hai, jaise `db`, `localhost` par nahi, kyunki har container ka apna network address hota hai.
+
+**AI apps ke liye images.** AI images tezi se bade ho jaate hain: machine learning libraries, model files aur system packages jodkar. Jahan ho sake model weights ko image se bahar rakho aur start-up par volume mein download karo, ya hosted model call karo. Multi-stage builds tab use karo jab compilers sirf packages install karne ke liye chahiye: ek stage mein build karo, results ko slim final stage mein copy karo. Chhoti images tez pull hoti hain, tez start hoti hain aur security scanners ko shikayat karne ke liye kam deti hain.
+
+**Production jaisa Dockerfile.** Do stages, ek health check aur image mein koi secret nahi:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS build
+WORKDIR /app
+RUN pip install --no-cache-dir uv
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+COPY src ./src
+
+FROM python:3.12-slim
+WORKDIR /app
+COPY --from=build /app/.venv ./.venv
+COPY --from=build /app/src ./src
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+RUN useradd --uid 1000 --create-home app
+USER app
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
+CMD ["uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Aur uske saath ek `.dockerignore`:
+
+```text
+.env
+.git
+__pycache__/
+data/
+models/
+*.ipynb
+```
+
+**Compose jo database ka intezaar kare.** Sirf `depends_on` container ke start hone tak intezaar karta hai, Postgres ke connections lene tak nahi:
+
+```yaml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on:
+      db: {condition: service_healthy}
+  db:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_PASSWORD: devonly, POSTGRES_DB: app}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:
+```
+
+`devonly` password sirf local machine ke liye hai; asli environments credentials secret store se lete hain.
+
+**Containers mein GPUs.** Host par NVIDIA ka container toolkit install ho toh `docker run --gpus all ...` container ko GPUs de deta hai. Compose mein unhe `deploy.resources.reservations.devices` ke neeche maango. Host driver se match karne waali CUDA base image use karo, aur model weights ko mounted volume mein rakho taaki image chhoti rahe.
+
+**Scan aur pin.** CI mein Trivy ya Docker Scout jaise tool se images ko known vulnerabilities ke liye scan karo, aur serious findings par fail karo. Base images ko ek version (ya digest) par pin karo, taaki agle mahine ka rebuild chupchaap Python ya system libraries na badal de.
+
+**AI apps mein size matter karta hai.** Har change ke baad `docker images` dekho. Hosted model waali Python app kuch sau megabytes ki honi chahiye; PyTorch aur CUDA waali kai gigabytes ki ho sakti hai, jo har deploy aur autoscale ko slow karti hai. Bhaari model serving ko apni alag image mein todo taaki API image chhoti rahe.
+
+**Browser mein try karo.** Ek chhota Dockerfile linter: ye teen common galtiyan flag karta hai. Dockerfile text edit karo aur chalao.
+
+```python
+dockerfile = """FROM python:latest
+COPY . /app
+RUN pip install -r /app/requirements.txt
+CMD ["python", "/app/main.py"]"""
+
+lines = [l.strip() for l in dockerfile.splitlines() if l.strip()]
+if any(l.startswith("FROM") and (":latest" in l or ":" not in l) for l in lines):
+    print("Pin the base image version instead of latest.")
+if not any(l.startswith("USER") for l in lines):
+    print("Add a USER line so the app does not run as root.")
+if lines.index(next(l for l in lines if l.startswith("COPY"))) < lines.index(next(l for l in lines if l.startswith("RUN pip"))):
+    print("Copy requirements first and install before copying the code, so builds reuse the cache.")
+```
+
+## Ek example se samjho
+
+Aap ek Jaipur bank ki IT team ko document-search API handover kar rahe ho, jo sab kuch apne servers par chalate hain. Unhe use try karne ke liye ek command chahiye.
+
+```yaml
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on: [db]
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+volumes:
+  pgdata:
+```
+
+Wo `.env.example` ko `.env` mein copy karte hain, model key aur database password bharte hain, `docker compose up -d` chalate hain, aur `localhost:8000/docs` kholte hain. API database tak `db:5432` par pahunchta hai. Jab wo machine restart karte hain, documents tab bhi indexed rehte hain kyunki database `pgdata` volume mein hai.
+
+Unki security team image scan karti hai aur flag karti hai ki wo root se chalti hai. `USER 1000` line ise fix karti hai. Wo image size bhi poochhte hain: `python:3.12-slim` use karne se wo full Python image ke 1 GB se zyada ki jagah 250 MB ke aas-paas rehti hai.
+
+| Bank ka review point | Pehle | Baad mein |
+| --- | --- | --- |
+| Root se chalta hai | Haan | Nahi: `USER 1000` |
+| Image size | Full Python image ke saath 1 GB se zyada | `python:3.12-slim` ke saath lagbhag 250 MB |
+| Image mein secrets | Koi nahi, run time par `.env` se pass hote hain | Unke scanner ne confirm kiya |
+| Restart ke baad data | Bacha, `pgdata` volume mein | Bacha |
+| Kaunsa version chal raha hai | `1.4.0` se tag hua | `1.3.2` par rollback test hua |
+
+## Aam galtiyaan
+
+- **Secrets ko image mein bake karna.** Jiske paas image hai wo unhe padh sakta hai. Secrets run time par pass karo.
+- **Production mein `latest` use karna.** Pata nahi chalta kya chal raha hai aur rollback nahi hota. Versions se tag karo.
+- **Data ko container ke andar store karna.** Agle deploy par wo gayab ho jaata hai. Volumes ya managed database use karo.
+- **Root se chalana.** Kai client security reviews ise reject kar dete hain. Non-root user jodo.
+- **Pehle poora folder copy karna.** Phir har code change sab packages dobara install karta hai. Dependency files copy karo, install karo, phir code copy karo. `.git`, `.env` aur data folders ke liye `.dockerignore` jodo.
+
+- **Sab kuch ke liye ek bada container.** API, database aur cache ko alag services rakho taaki har ek ko alag se restart, scale aur upgrade kiya ja sake.
+- **.dockerignore na hona**, jisse .env files aur data folders images ke andar chale jaate hain.
+- **Model weights ko image mein bake karna**, jisse wo gigabytes ki ho jaati hai aur deploy slow hota hai.
+- **Health condition ke bina depends_on**, jisse app database ke ready hone se pehle start ho jaati hai.
+
+## Jab aapko Docker ki zaroorat na ho
+
+- **Serverless platforms** jo seedhe aapke code se build karte hain, jaise Next.js app ke liye Vercel.
+- **Notebooks aur one-off scripts** jo aap khud chalate ho.
+- **Managed AI platforms** jahan aap sirf configuration aur prompts dete ho.
+
+Containers tab kaam ke ho jaate hain jab kai logon ya servers ko ek hi cheez ek hi tareeke se chalani ho.
+
+## Demo se production tak
+
+- **Images ko commit hash se tag karo**, sirf `latest` se kabhi nahi.
+- **CI mein images scan karo** aur serious vulnerabilities par fail karo.
+- **Non-root user se chalao**, health check ke saath.
+- **Secrets ko images se bahar rakho**; run time par inject karo.
+- **Image size par nazar rakho**, aur bhaari model serving ko apni alag image mein todo.
+
+## Practice karo
+
+Docker ki Get started guide aur Compose quickstart karo.
+
+1. REST API lesson ke FastAPI app ke liye ek Dockerfile likho, slim base image aur non-root user ke saath. `docker images` se image size check karo.
+2. Apne API aur volume waale PostgreSQL ke saath ek `compose.yaml` jodo. Sab restart karo aur confirm karo ki data bacha.
+3. Code ki ek line badlo, rebuild karo, aur confirm karo ki dependency layer cache se aayi.
+4. Apni image mein multi-stage build aur .dockerignore jodo, aur pehle aur baad ka size compare karo.
+
+**Aapka kaam poora jab:** aap image aur container ka farak samjha sako, aur ek nayi machine par ek command se apna API aur uska database start kar sako.

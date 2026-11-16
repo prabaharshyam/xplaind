@@ -1,0 +1,194 @@
+---
+id: gpus-quantization
+lang: tanglish
+title: "GPUs-um quantization-um"
+outcome: "Oru model-a GPU-la enna limit pannudhu-nu (weights-kum cache-kum memory, compute, bandwidth) purinjukkalaam, GPU types-um counts-um select pannalaam, models-a fit pannavum vegamaakkavum quantization use pannalaam."
+answer: "GPU-la irukkura oru model-a, adhoda weights-kum cache-kum irukkura memory thaan limit pannudhu. Quantization weights-a 8 illa 4 maadhiri kammiyaana bits-la store pannum, appo model fit aagum, konjam loss-oda sellavu kammiyaa odum."
+why_it_matters: "Self-hosting decisions-ae GPU decisions thaan, India cloud regions-la GPUs sellavum adhigam, kidaikkuradhum kammi. Oru deployment-a kai-kanakkula size panna theriyura platform engineers, clients-ku maadhathukku lakhs migaikkuraanga, thappaana hardware vaangaama thavirkkuraanga."
+flashcards:
+  - q: "Unga sondha GPU-la language model run panradha enna limit pannudhu?"
+    a: "Weights-kum KV cache-kum irukkura GPU memory, apram memory bandwidth, adhu thaan perumbaalum generation speed-a limit pannum."
+  - q: "Weights-ku evvalavu memory thevai?"
+    a: "Parameters × ovvoru parameter-oda bytes: 16-bit-la sumaar 2 bytes, 8-bit-la 1, 4-bit-la 0.5, adhanaala 7B model-ku sumaar 14, 7 illa 4 GB thevai."
+  - q: "KV cache-na enna?"
+    a: "Ovvoru active request-oda ovvoru token-kum store panna attention keys-um values-um; context length-oda concurrency-oda serndhu valarum."
+  - q: "KV cache yen weights-a vida mukkiyamaa irukkalaam?"
+    a: "Neraya concurrent neelamaana requests, weights-a vida adhiga memory edukkalaam, adhu evvalavu users fit aaguvaanga-nu limit pannum."
+  - q: "Quantization-na enna?"
+    a: "Weights-a, sila neram cache-aiyum, kammiyaana bits-la store panradhu; memory kuraiyum, speed perumbaalum yerum, konjam quality sellavaagum."
+  - q: "Quantize panna aprom yen evals-a thirumba run pannanum?"
+    a: "Maths, code, Indian-language text maadhiri sila tasks averages-a vida adhiga quality izhakkalaam."
+  - q: "Eppo model copies tensor parallelism-a vida nallaa irukkum?"
+    a: "Model oru GPU-la fit aagum podhu: thani copies easy-aanadhu, podhuvaa throughput-um nallaa scale aagum."
+  - q: "Throughput-kum latency-kum idaiyila trade-off enna?"
+    a: "Periya batches overall-aa adhiga tokens per second tharum, aana ovvoru user-kum response mella varum."
+  - q: "KV cache estimate-ku numbers enga kidaikkum?"
+    a: "Model-oda config.json-la: layers count, key-value heads count, head size (illa hidden size-a attention heads-vaala pirichadhu)."
+  - q: "bitsandbytes-oda 4-bit NF4 loading enna tharum?"
+    a: "Oru model-a oru GPU-la, adhoda 16-bit memory-la sumaar kaal pangula fit panna oru quick vazhi; experiments-kum LoRA training-kum nalladhu, konjam speed-um quality-yum sellavaagum."
+exercise:
+  title: "Deployment-a size pannunga"
+  setup: "Pune-la oru insurer claims summarisation-ku oru 8B model-a self-host panna virumburaanga. Peak load tests 30 active requests-a kaattudhu, ovvonnum 4,000 tokens context varaikkum. Avanga cloud region-la kidaikkura GPUs 24 GB, 80 GB cards. 16-bit-la, model-oda configuration-la KV cache-ku ovvoru token-kum sumaar 0.13 MB thevai. 4-bit version team-oda eval-la 1 point kammiyaa score pannudhu; FP8 version 16-bit-a maadhiriyae score pannudhu, aana pudhu GPUs thevai."
+  questions:
+    - q: "16-bit weights-ku evvalavu memory thevai?"
+      a: "Sumaar 16 GB: 8 billion parameters × 2 bytes."
+    - q: "Peak-ku evvalavu KV cache thevai?"
+      a: "Sumaar 30 × 4,000 × 0.13 MB, kittathatta 15.6 GB."
+    - q: "16-bit oru 24 GB card-la fit aagumaa?"
+      a: "Aagaadhu: weights-um cache-um serndhu sumaar 32 GB. 80 GB card-la fit aagum, illa sumaar 4 la irundhu 5 GB 4-bit weights 24 GB card-la fit aagum."
+    - q: "Options-kullae eppadi choose pannuveenga?"
+      a: "Cost-aiyum eval-aiyum ottippaarunga: 1-point loss ok-na, 24 GB cards-la 4-bit thaan romba sellavu kammi; illaina periya cards-la 16-bit illa FP8."
+ask:
+  - "LLM run panna evvalavu GPU memory thevai?"
+  - "KV cache-na enna?"
+  - "Quantization model quality-a paadhikkumaa?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Oru language model-a ungaloda sondha hardware-la run panradhu perumbaalum **GPU memory**, **memory bandwidth** pathina kelvi:
+
+- **Weights** GPU memory-la fit aaganum. 16-bit precision-la, ovvoru parameter-um 2 bytes edukkum.
+- **KV cache** ovvoru active request-oda ovvoru token-kum attention data-va store pannum; context length-oda concurrency-oda serndhu valarum.
+- **Generation speed** perumbaalum, ovvoru pudhu token-kum memory-la irundhu weights-a evvalavu vegamaa padikka mudiyum-nu limit aagum, raw compute-naala illa.
+
+**Quantization** weights-a (sila neram cache-aiyum) 16-ku badhila 8 illa 4 maadhiri kammiyaana bits-la store pannum, memory kuraiyum, speed perumbaalum yerum, konjam quality sellavaagum.
+
+| Oru 48 GB GPU, oru 14B model | Weights | KV cache | Serve aagura users |
+|---|---|---|---|
+| 16-bit weights | 28 GB | 20 GB | sumaar 25 |
+| 4-bit weights | 9 GB | 35 GB | sumaar 45 |
+
+Weights-ku memory ≈ parameters × ovvoru parameter-oda bytes. KV cache ≈ oru request-ku tokens × active requests × oru token-ku cache size.
+
+```flow
+dir: LR
+Weights-a 4-bit-ku quantize pannunga -> Weights 28 GB-la irundhu 9 GB-ku kuraiyum -> KV cache-ku innum idam kidaikkum -> 25 users-ku badhila sumaar 45 users
+```
+
+Indha lesson-la Hyderabad-la oru analytics firm self-hosted extraction model-ku GPUs-a size panradha follow pannuvom.
+
+## Idhu eppadi work aagudhu
+
+**Weights.** Memory ≈ parameters × ovvoru parameter-oda bytes. Oru 7B model: 16-bit-la sumaar 14 GB, 8-bit-la 7 GB, 4-bit-la 3.5 la irundhu 4 GB. Oru 70B model: 16-bit-la sumaar 140 GB, adhanaala pala GPUs, illa 4-bit-la sumaar 35 la irundhu 40 GB.
+
+**KV cache.** Context-la ovvoru token-kum, ovvoru layer-um keys-aiyum values-aiyum store pannum. Oru naduthara size model-ku idhu ovvoru token-kum pathu kilobytes la irundhu konjam nooru kilobytes varaikkum aagalaam. Adha context length-aala, concurrent requests-aala perukkunga: 8,000 tokens-oda 32 requests-ku weights-a vida adhiga memory thevai padalaam. vLLM maadhiri engines indha memory-a efficient-aa manage pannum, aana illaadha memory-a create panna mudiyaadhu. Kammiyaana maximum contexts-um quantized caches-um adhiga requests fit aaga vaikkum.
+
+**GPU choices.** Data-centre GPUs mukkiyamaa memory size (24 GB la irundhu 80 GB, adhukku mela), memory bandwidth, FP8 maadhiri low-precision formats support-la vidhyaasappadum. Sinna models perumbaalum sellavu kammiyaana 24 la irundhu 48 GB cards-la nallaa odum; periya models-ku high-memory cards-um adhukku naduvula vegamaana links-um thevai. Oru GPU-a vachi design panradhukku munnaadi, unga cloud India regions-la enna tharudhu-nu, quotas-um check pannunga.
+
+**Oru model-a pirichu vaikkradhu.** Tensor parallelism ovvoru layer-aiyum oru machine-la irukkura GPUs-la pirichudum; adhukku vegamaana GPU-to-GPU links thevai. Oru sinna model-oda neraya copies-a, ovvondrum thani GPU-la run panradhu easy-aanadhu, model oru card-la fit aagum podhu throughput-ai nallaa scale pannum.
+
+**Quantization methods.** Weight-only methods (4-bit-la GPTQ, AWQ maadhiri) kammiyaana quality loss-oda memory-a kuraikkum; pudhu GPUs-la FP8 paadhi memory-oda, 16-bit-ku kittathatta quality tharum. Eppavum ungaloda evals-a thirumba run pannunga: sila tasks (maths, code, Indian-language text) averages-a vida adhigam izhakkalaam.
+
+**Throughput vs latency.** Periya batches overall-aa adhiga tokens per second tharum, aana ovvoru user-kum response mella varum. Unga latency budget-ku ethiraa batch size-aiyum concurrency-yaiyum tune pannunga.
+
+**Weight memory oru paarvayila:**
+
+| Model size | 16-bit | 8-bit | 4-bit |
+| --- | --- | --- | --- |
+| 7B | sumaar 14 GB | sumaar 7 GB | sumaar 4 GB |
+| 14B | sumaar 28 GB | sumaar 14 GB | sumaar 8 la irundhu 9 GB |
+| 32B | sumaar 64 GB | sumaar 32 GB | sumaar 18 la irundhu 20 GB |
+| 70B | sumaar 140 GB | sumaar 70 GB | sumaar 35 la irundhu 40 GB |
+
+**KV cache-a estimate panradhu.** Oru model-oda configuration adhoda layers, key-value heads, head size-a list pannum. Oru token-ku cache kittathatta 2 (keys-um values-um) × layers × key-value heads × head size × oru value-oda bytes. Neenga allow panra context length-aalayum, peak active requests-aalayum perukkunga, adha user numbers-la irundhu guess pannaama load test-la measure pannunga. Engine-oda working space-ku konjam memory free-aa vidunga. GPUs vaangurathukko illa reserve panradhukko munnaadi indha kanakku potta, romba sellavaana sizing thappugal thavirkkalaam.
+
+**Quantization-a select panradhu.** Ungaloda budget-ku fit aagura romba adhigamaana precision-la aarambinga. GPUs support panna FP8 try pannunga, apram 8-bit, apram 4-bit weight-only methods. Ovvonnukkum ungaloda eval-aiyum oru short load test-aiyum run panni, quality, memory, tokens per second, peak-la latency-a record pannunga. Unga client ezhuthula otthukkura quality loss-oda romba sellavu kammiyaana option-a select pannunga.
+
+**Code-la oru memory planner.** Model-oda configuration-a padichu, unga traffic-ku weights-um KV cache-um estimate pannunga:
+
+```python
+import json
+
+def memory_gb(config_path, params_billion, weight_bits=16, kv_bits=16, context_tokens=4000, concurrent=20):
+    cfg = json.load(open(config_path))
+    layers = cfg["num_hidden_layers"]
+    kv_heads = cfg.get("num_key_value_heads", cfg["num_attention_heads"])
+    head_dim = cfg.get("head_dim") or cfg["hidden_size"] // cfg["num_attention_heads"]
+    weights = params_billion * 1e9 * weight_bits / 8
+    kv_per_token = 2 * layers * kv_heads * head_dim * kv_bits / 8
+    kv_total = kv_per_token * context_tokens * concurrent
+    return {"weights GB": round(weights / 1e9, 1),
+            "KV per token KB": round(kv_per_token / 1e3, 1),
+            "KV total GB": round(kv_total / 1e9, 1),
+            "total with 10% overhead GB": round((weights + kv_total) * 1.1 / 1e9, 1)}
+
+# memory_gb("config.json", params_billion=8, weight_bits=8)
+```
+
+Grouped-query attention-oda (32 layers, 8 key-value heads, head size 128) oru typical 8B model-ku, cache 16-bit-la ovvoru token-kum sumaar 131 KB, adhanaala 4,000 tokens-oda 20 requests-ku weights-ku mela kittathatta 10 GB thevai.
+
+**Quantize panna model-a load panradhu.** Transformers-la quick experiments-ku, 4-bit loading konjam lines thaan:
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+
+bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
+                         bnb_4bit_compute_dtype=torch.bfloat16)
+model = AutoModelForCausalLM.from_pretrained("org/model-8b-instruct", quantization_config=bnb,
+                                             device_map="auto")
+print(round(model.get_memory_footprint() / 1e9, 1), "GB")
+```
+
+Serving-ku, vegamaana quantized kernels irukkura engine-a use pannunga: vLLM, AWQ illa GPTQ-la munnaadiyae quantize panna checkpoints-a load pannum, illa support panra GPUs-la FP8-ku quantize pannum (`vllm serve org/model-8b-instruct --quantization fp8`).
+
+**Cache-aiyum quantize pannunga.** Neelamaana-context workloads-la KV cache weights-a vida periyadhaagalaam. vLLM maadhiri engines adha 8-bit-la store pannum, memory kittathatta paadhiyaagum, perumbaalum quality loss konjamdhaan. Weight quantization maadhiriyae test pannunga.
+
+**Quality loss-a unga task-la measure pannunga.** Ovvoru precision-lum golden set-a run panni, overall mattum illa category-vaariyaa compare pannunga. Quantization munnaadi neelamaana reasoning, maths, kammiyaa use aagura languages-a thaan mudhalla paadhikkum, adhanaala Indian-language cases-a thaniyaa check pannunga. Drop ettukkara alavukku irukkura idathula mattum antha precision-a vachukkunga.
+
+**Speed memory mattum illa.** Generation perumbaalum memory bandwidth-aala limit aagum: ovvoru token-kum weights-a oru thadavai padikkum, adhanaala sinna weights-na vegamaana tokens-nu artham. Aana sila quantized formats, poruththamaana kernels illaadha pazhaya GPUs-la mella odum. Unga unmaiyaana hardware-la tokens per second-aiyum time to first token-aiyum benchmark pannunga.
+
+## Oru worked example
+
+Hyderabad-la oru analytics firm, 200 concurrent users-kum 6,000 tokens varaikkum prompts-kum oru extraction model-a self-host panna virumbuthu.
+
+Candidate: oru 14B instruct model. 16-bit-la weights-ku sumaar 28 GB thevai. 200 requests × 6,000 tokens-ku KV cache estimate oru card-a vida romba adhigam, aana load tests-la unmaiyaana concurrency average 40 active requests. 4-bit AWQ weights-oda (sumaar 9 GB) oru 48 GB GPU-la, cache-ku kittathatta 35 GB meedhi irukku: indha model-oda configuration-la andha context length-ku sumaar 40 la irundhu 50 active requests-ku podhum.
+
+Evals: 16-bit field accuracy 95.1% edukkudhu; 4-bit 94.6%. Ettukkittaanga.
+
+Plan: moonu 48 GB GPUs, ovvondrum load balancer-ku pinnaala 4-bit model-oda thani copy-a run pannudhu, measure panna peak-ku size panni oru GPU headroom-oda. Idhu, tensor parallelism-oda 16-bit model run panra rendu 80 GB GPUs-oda mudhal proposal-oda moonu-la onnu sellavu, indha workload-ku nalla throughput-oda.
+
+| Option | GPUs | Field accuracy | Relative cost |
+| --- | --- | --- | --- |
+| Tensor parallelism-oda 16-bit | Rendu 80 GB | 95.1% | 3 |
+| 4-bit AWQ, moonu copies | Moonu 48 GB | 94.6% | 1 |
+
+## Podhuvaa panra thappugal
+
+- **Weights-ku mattum size panradhu.** Concurrency-a KV cache thaan decide pannudhu.
+- **Evals illaama quantize panradhu.** Unga tasks-layum languages-layum loss-a measure pannunga.
+- **Oru GPU-la fit aagura model-a pirikkradhu.** Copies perumbaalum tensor parallelism-a vida nallaa scale aagum.
+- **Oru GPU type kidaikkum-nu nenaikkradhu.** Regional availability-yum quotas-aiyum mudhalle check pannunga.
+- **Maximum context thevaiya vida romba adhigamaa set panradhu.** Cache memory waste aagum; users unmaiyaa anuppuradhukku set pannunga.
+- **KV estimates-la grouped-query attention-a marakkradhu**; attention heads illa, key-value heads use pannunga.
+- **Indian languages-la users ezhudhum podhu English-only tests-la quantization-a judge panradhu.**
+- **4-bit eppavum vegamnu nenaikkradhu.** Unga GPU-la benchmark pannunga.
+
+## Eppo GPUs pathi yosikka thevai illa
+
+- **Hosted API** illa client-oda cloud model service use pannum podhu.
+- **CPUs-la sinna models**, example GPU illaamayae podhumaana vegathula odura embeddings illa classifiers.
+- **Kammiyaana volume**, angae GPU-a manikku vaadagaikku edukkradhu API calls-a vida adhigam selavu.
+
+## Demo-la irundhu production-ku
+
+- **Memory plan pannunga**: weights-ku, peak concurrency-la KV cache-ku, overhead-ku, headroom-oda.
+- **Precision-aiyum quantization method-aiyum** release file-la **record pannunga.**
+- **Ovvoru precision maatramum golden set-a run pannunga**, category-vaariyaavum language-vaariyaavum.
+- **Perusaa vaangurathukko illa vaadagaikku edukkradhukku munnaadi** unmaiyaana GPUs-la **speed-a benchmark pannunga.**
+- Production-la **GPU memory-aiyum utilisation-aiyum monitor pannunga.**
+
+## Practice pannunga
+
+Hugging Face-oda quantization pathiya posts-aiyum vLLM PagedAttention post-aiyum padinga.
+
+1. 7B, 14B, 32B, 70B models-ku 16, 8, 4 bits-la weight memory-a calculate pannunga.
+2. Oru open model-ku adhoda configuration-la irundhu (layers, heads, head size) oru token-ku KV cache size-a kandupidichu, 4,000 tokens-oda 20 requests-ku memory estimate pannunga.
+3. Ungalukku oru GPU access irundhaa, oru sinna model-a 16-bit-lum 4-bit-lum serve panni, memory use, speed, unga eval score-a ottippaarunga.
+4. Rendu open models-oda config files-la memory_gb-a 16-bit, 4-bit weights-la run panni, 4,000 tokens-oda 10 users-ku entha model oru 24 GB GPU-la fit aagum-nu mudivu pannunga.
+
+Innum aazhama paarka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-la chapter 7 memory maths-aiyum quantization-aiyum, chapter 9 inference optimisation-aiyum solludhu.
+
+**Mudinjadhu-nu eppo sollalaam:** sollappatta model, context length, concurrency-kku oru GPU deployment-a size panna mudiyum, quantization choice-a evals-oda justify panna mudiyum.

@@ -1,0 +1,217 @@
+---
+id: tracing-llm-apps
+lang: hinglish
+title: "LLM apps ko trace karna"
+outcome: "Har request ko retrieval, prompts, model calls aur tools se guzarte hue trace karna seekhoge, inputs, outputs, tokens, cost aur timings ke saath, aur traces se galat answers ko debug karna."
+answer: "Tracing LLM request ke har step ko record karti hai: retrieval, prompts, model calls aur tool calls, inputs, outputs, tokens, cost aur time ke saath, taaki aap dekh sako ki answer galat kyun gaya."
+why_it_matters: "Jab client kehta hai 'assistant ne kal Ramesh ko galat answer diya', toh aapko exactly dekhna padta hai ki usne kya retrieve kiya, kaunsa prompt bheja aur wapas kya aaya. Traces ke bina aap andaaza lagate ho. Traces ke saath, zyadatar AI bugs minutes mein mil jaate hain."
+flashcards:
+  - q: "Trace kya hai?"
+    a: "Ek request ka shuru se aakhir tak record, nested spans se bana hua, har step ke liye ek, inputs, outputs aur timings ke saath."
+  - q: "Model-call span kya record karta hai?"
+    a: "Inputs, outputs, start aur end times, model ka naam, token counts aur cost."
+  - q: "Traces aam logs se kaise alag hain?"
+    a: "Logs batate hain ki kuch hua; traces har step ke inputs aur outputs dikhate hain, taaki aap dekh sako ki system ne wahi answer kyun diya."
+  - q: "Debugging mein kaunse attributes sabse zyada madad karte hain?"
+    a: "Ek pseudonymous user id, session id, app version, prompt version, aur retrieved document ids scores ke saath."
+  - q: "Traces ke liye kaunse privacy steps chahiye?"
+    a: "Bhejne se pehle personal data mask ya omit karo, retention period set karo, dekhne walon ko restrict karo, aur zaroorat ho toh in-region tool use karo."
+  - q: "Zyada volume par traces ko sample kaise karein?"
+    a: "Errors ya kharab feedback wale saare traces rakho, aur baaki ka ek sample."
+  - q: "Kisi kharab answer ka trace kholte hi pehla sawaal kya hota hai?"
+    a: "Kya sahi passage retrieve hua aur prompt mein gaya? Isse retrieval failures aur generation failures alag ho jaate hain."
+  - q: "OpenTelemetry kya hai?"
+    a: "Traces ka common open standard, jis par kai AI tracing tools bane hain."
+  - q: "OpenTelemetry GenAI conventions kya hain?"
+    a: "Model calls ke liye standard attribute names, jaise gen_ai.request.model aur gen_ai.usage.input_tokens, taaki alag-alag tracing tools aapke spans ko ek jaise padhein."
+  - q: "Tail sampling kya hai?"
+    a: "Trace khatam hone ke baad tay karna ki use rakhna hai ya nahi, taaki errors ya slow steps wale saare traces rahein aur normal wale ka sirf ek sample store ho."
+exercise:
+  title: "Trace padho"
+  setup: "Jaipur ke ek bank ke assistant ne ek customer ko bataya ki senior citizens ke liye fixed-deposit rate 7.1% hai; maujooda rate 7.6% hai. Trace dikhata hai: rewrite_query 0.3 s 'senior citizen FD rate'; hybrid_search top: doc 'FD rates April 2026' (0.74), 'FD rates October 2026' (0.72); rerank April wale document ko pehle rakhta hai; generate 2.1 s April wale document se 7.1% quote karta hai. Trace mein koi prompt version tag nahi hai."
+  questions:
+    - q: "Ye model ki failure hai ya retrieval ki?"
+      a: "Retrieval ki. Model ne top passage ko imaandari se quote kiya, jo ek purani rate sheet thi."
+    - q: "Trace kaunsa fix batata hai?"
+      a: "Rate sheets ke saath effective dates store karo aur superseded wali filter karo, taaki sirf October wali sheet eligible rahe."
+    - q: "Trace mein kya missing hai, aur ye kyun maayne rakhta hai?"
+      a: "Prompt version. Uske bina aap nahi bata sakte ki kisi haal ke prompt change ka isme haath tha ya nahi."
+    - q: "Is trace ka baad mein kya hona chahiye?"
+      a: "Ise golden set mein eval case ki tarah save karo, taaki ab se stale-rate retrieval test hota rahe."
+ask:
+  - "LLM trace mein mujhe kya record karna chahiye?"
+  - "LLM apps ko trace karne ke liye kaunse tools use kar sakta hoon?"
+  - "Traces se personal data ko bahar kaise rakhun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Trace** ek request ko shuru se aakhir tak record karta hai. Ye **spans** se bana hota hai, har step ke liye ek: query rewrite, retrieval, reranker, har model call, har tool call. Har span apne inputs, outputs, start aur end times store karta hai, aur model calls ke liye model ka naam, token counts aur cost. Spans nest hote hain, isliye aap dekh sakte ho ki agent ki teesri tool call doosre model turn ke andar hui.
+
+Aam application logs batate hain ki kuch hua. AI system ke traces batate hain ki usne wahi answer kyun diya. Langfuse aur Arize Phoenix jaise open-source tools, commercial tools, aur cloud providers ke apne tools, sab traces store karte aur dikhate hain. Kai OpenTelemetry par bane hain, jo traces ka common standard hai.
+
+```flow
+title: Trace 8f3a, ek citizen ka sawaal: 3.8 s, ₹0.42
+Trace 8f3a | tags: user anon-5521, session s-901, app 2.4.0, prompt v17 -> rewrite_query, 0.4 s | in: question, out: search text
+rewrite_query, 0.4 s -> hybrid_search, 0.3 s | out: doc ids aur scores
+hybrid_search, 0.3 s -> rerank, 0.2 s | out: reordered ids
+rerank, 0.2 s -> generate, 2.9 s | model, tokens in aur out, cost, output text
+```
+
+Is lesson mein hum Bhubaneswar ke ek state-government helpdesk assistant ke saath chalenge, jisne ek kisaan ko scheme ki galat amount bata di.
+
+## Ye kaam kaise karta hai
+
+**Instrument karo.** Zyadatar tools model client ke liye ek decorator ya wrapper dete hain. Har decorated function ek span ban jaata hai, aur model calls tokens aur cost apne-aap record karti hain. Aise attributes jodo jo baad mein kaam aayein: user id (ya pseudonymous id), session id, app version, prompt version, retrieved document ids aur unke scores.
+
+**Group karo.** Ek **session** ek conversation ke traces ko group karta hai; user ids se aap dekh sakte ho ki ek user ne sab kya experience kiya.
+
+**Data ka dhyaan rakho.** Traces mein prompts aur outputs hote hain, jinmein personal data ho sakta hai. Sensitive fields ko bhejne se pehle mask ya omit karo, retention period set karo, traces dekhne waalon ko restrict karo aur jab client maange toh self-hosted ya in-region tool ko prefer karo.
+
+**Unhe use karo.**
+
+- *Debug*: kharab answer ka trace kholo. Kya sahi passage retrieve hua? Kya woh prompt mein tha? Kya model ne use ignore kar diya?
+- *Measure*: step ke hisaab se latency, per request tokens aur cost, model ke hisaab se error rates.
+- *Improve*: dilchasp traces ko ek dataset mein save karo; woh eval cases ban jaate hain.
+
+**Sampling.** Zyada volume par, errors ya kam feedback wale saare traces rakho, aur baaki ka ek sample.
+
+**Har tool type kya deta hai:**
+
+| Option | Taakat | Kab sochein |
+| --- | --- | --- |
+| Open-source, self-hosted (Langfuse, Phoenix) | Data aapke paas rehta hai; chalana free | Client ko in-region ya on-premises data chahiye |
+| Commercial hosted tools | Sambhaalne ko kam; extra analysis features | Speed maayne rakhti hai aur data rules allow karte hain |
+| Cloud provider ki tracing | Maujooda cloud stack mein fit hoti hai | App pehle se usi cloud par chalta hai |
+| Apne store ke saath plain OpenTelemetry | Poora control, standard format | Aap pehle se observability tooling chalate ho |
+
+**Hafte ka trace review.** Har hafte tees minute alag rakho. Kharab user feedback, errors ya asaadharan roop se zyada cost wale traces nikaalo, aur aam wale traces ka ek random sample. Har kharab answer ke liye, fail hone wala step note karo: query rewrite, retrieval, reranking, prompt ya model. Notes gino. Kuch hafton baad counts dikhate hain ki engineering effort kahan kaam aayega, aur save kiye hue traces asli istemaal par based eval cases ka badhta hua set ban jaate hain.
+
+**Step ke hisaab se cost aur latency.** Kyunki har span time aur tokens record karta hai, step ke hisaab se totals ka chart banana aasaan hai. Teams aksar hairaan hoti hain: bade model par query-rewrite call answer se zyada cost kar sakti hai, ya reranker model se zyada deri jod sakta hai.
+
+**Plain OpenTelemetry se tracing.** Zyadatar LLM tracing tools (Langfuse, Arize Phoenix aur doosre) OpenTelemetry data accept karte hain, isliye standard se instrument karne par aap switch karne ke liye azaad rehte ho:
+
+```python
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+provider = TracerProvider()
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))   # endpoint and auth from env vars
+trace.set_tracer_provider(provider)
+tracer = trace.get_tracer("policy-rag")
+
+def answer(question, user_id, session_id):
+    with tracer.start_as_current_span("answer") as root:
+        root.set_attributes({"app.release": "assistant-2026.11.3", "user.id": user_id, "session.id": session_id})
+        with tracer.start_as_current_span("retrieve") as span:
+            hits = search(question)
+            span.set_attributes({"retrieval.ids": [h["id"] for h in hits],
+                                 "retrieval.top_score": hits[0]["score"] if hits else 0})
+        with tracer.start_as_current_span("generate") as span:
+            reply = call_model(question, hits)
+            span.set_attributes({"gen_ai.request.model": reply.model,
+                                 "gen_ai.usage.input_tokens": reply.usage.input_tokens,
+                                 "gen_ai.usage.output_tokens": reply.usage.output_tokens})
+        return reply
+```
+
+`gen_ai.*` naam generative AI ke liye OpenTelemetry ki conventions follow karte hain, jinhe tracing tools samajhte hain. `OTEL_EXPORTER_OTLP_ENDPOINT` ko apne tool par point karo, aur agar client maange toh use kisi Indian region mein self-host karo.
+
+**Export se pehle mask karo.** Personal data ko span attributes ya events mein jaane se pehle apne code mein hata do. Har prompt aur answer par laga hua ek chhota helper, security lessons ke masking patterns ke saath, shuru karne ke liye kaafi hai; store kiye hue traces ka ek sample review karke check karo ki ye kaam kar raha hai.
+
+**Jo traces maayne rakhte hain unhe rakho.** Sab kuch 10% par sample karne se woh zyadatar rare failures kho jaati hain jo aapko chahiye. Do aam tareeke:
+
+- **Apwaadon ke saath head sampling**: un requests ke traces hamesha rakho jo error dein, thumbs down paayein ya latency threshold paar karein (unhe ek attribute se mark karo jo aapka exporter ya collector check kare), aur baaki ko sample karo.
+- **OpenTelemetry Collector mein tail sampling**: collector har trace ke khatam hone ka intezaar karta hai, phir errors ya slow spans wale saare rakhta hai aur baaki ka ek percentage.
+
+**Traces se step ke hisaab se cost aur latency.** Spans ko naam se group karo aur roz ka time aur tokens jodo. "Step ke hisaab se total cost ka hissa" ka chart aksar ek sasti jeet dikhata hai, jaise bade model par chalta rewrite step, ya ek bade filter ki wajah se dheema retrieval.
+
+**Trace se test case tak.** Ek button ya command jodo jo ek trace id le aur uska sawaal, retrieved ids aur expected answer eval set mein likh de. Ye jitna aasaan hoga, eval set asli failures ke saath utna tez badhega.
+
+**Browser mein try karo.** Ek chhota tracer: har step apna time record karta hai, isliye dheema wala alag dikhta hai.
+
+```python
+import time, random
+from contextlib import contextmanager
+
+spans = []
+@contextmanager
+def span(name):
+    t0 = time.perf_counter()
+    yield
+    spans.append((name, (time.perf_counter() - t0) * 1000))
+
+random.seed(2)
+with span("answer"):
+    with span("rewrite"): time.sleep(0.02)
+    with span("retrieve"): time.sleep(random.uniform(0.05, 0.2))
+    with span("generate"): time.sleep(0.1)
+for name, ms in sorted(spans, key=lambda s: -s[1]):
+    print(f"{name:<9} {ms:6.0f} ms")
+```
+
+## Ek example se samjho
+
+Bhubaneswar ka ek state-government helpdesk assistant schemes ke baare mein citizens ke sawaalon ke jawab deta hai. Ek official report karta hai: "Usne ek kisaan ko bataya ki state ki crop-support scheme ki instalment ₹4,000 hai. Wo ₹2,000 hai." (Yahan scheme aur amounts example ke liye banaye gaye hain.)
+
+Aap us session ke traces search karte ho aur sawaal wala trace kholte ho:
+
+```text
+trace 8f3a  user=anon-5521  app=2.4.0  prompt=v17   3.8 s  ₹0.42
+  rewrite_query        0.4 s   "crop-support scheme instalment amount"
+  hybrid_search        0.3 s   top: doc 112 (0.71), doc 87 (0.69), doc 113 (0.66)
+  rerank               0.2 s   top: doc 87, doc 112, doc 113
+  generate             2.9 s   in 3,210 tok / out 182 tok
+```
+
+Doc 87 scheme ke ek pehle version ke baare mein 2019 ka note hai, jismein amount alag hai. Reranking ke baad woh sabse upar aaya, maujooda scheme guideline se bhi upar. Model ne use imaandari se quote kiya. Bug model nahi hai; ye ek purana document hai jis par effective date nahi hai.
+
+Aap `effective_from` metadata aur ek filter jodte ho, trace ki query ko ek test mein dobara chalate ho, aur is trace ko golden set mein save karte ho taaki ye case ab se test hota rahe. Poori jaanch mein pandrah minute lage kyunki har step record tha.
+
+| Jaanch ka step | Lagne wala time |
+| --- | --- |
+| User aur time se session ka trace dhundhna | 2 minutes |
+| Dekhna ki 2019 ka note sabse upar tha | 3 minutes |
+| Effective dates aur filter jodna, query dobara chalana | 8 minutes |
+| Trace ko golden-set case ki tarah save karna | 2 minutes |
+
+## Aam galtiyaan
+
+- **Sirf final answer log karna.** Aap retrieval failures aur generation failures mein farak nahi bata paoge.
+- **Version tags na hona.** Traces par app aur prompt versions ke bina, aap kisi badlaav ko quality drop se jod nahi sakte.
+- **Personal data ko unmasked trace karna.** Traces ek sensitive data store ban jaate hain. Mask karo, restrict karo aur expire karo.
+- **Kabhi dekhna hi nahi.** Traces tabhi kaam ke hain jab koi unhe padhe; har hafte ek sample review karo.
+- **Failures ko tests mein na badalna.** Har traced kharab answer ek taiyaar eval case hai.
+- **Sirf model call ko trace karna**, jisse retrieval aur tool problems dikhti hi nahi.
+- **Uniform sampling** jo zyadatar rare failures ko phenk deti hai.
+- **Har jagah proprietary tracing calls**, jisse baad mein switch karna dardnaak ho jaata hai; OpenTelemetry ko prefer karo.
+
+## Jab simple logs kaafi hon
+
+- **Har request par ek model call** bina retrieval ya tools ke: tokens, time aur outcome ke saath ek structured log line kaafi ho sakti hai.
+- **Sirf aapka use kiya hua prototype.**
+- **Batch jobs** jahan per-item logs aur ek summary report debugging cover kar dete hain.
+
+## Demo se production tak
+
+- **Har step ko trace karo**, release, user aur session attributes ke saath.
+- **Export se pehle personal data mask karo**, aur retention aur access controls set karo.
+- **Saari failures aur slow requests rakho**, baaki ko sample karo.
+- **Step ke hisaab se cost aur latency ka chart** har hafte banao.
+- **Kharab traces ko eval cases mein badlo**, ek command se.
+
+## Practice karo
+
+Langfuse ka tracing overview aur OpenTelemetry ka traces par page padho.
+
+1. Apne RAG app mein ek free, self-host ho sakne wale tool se tracing jodo, rewrite, retrieval (document ids aur scores ke saath), reranking aur generation ko alag spans ki tarah record karte hue.
+2. Traces ko app version aur prompt version se tag karo, aur bhejne se pehle email addresses aur phone numbers mask karo.
+3. Das sawaal poochho, sabse dheema step aur sabse mehnga request dhundho, aur ek kharab answer ka trace eval case ki tarah save karo.
+4. Apne traces ko OpenTelemetry ke zariye ek self-hosted tool mein export karo, phir endpoint ko doosre tool par badlo aur confirm karo ki wahi spans dikhte hain.
+
+Aur gehrayi ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 10 logs, traces aur AI applications ke liye kya record karna hai, ye cover karta hai.
+
+**Aapka kaam poora jab:** aap kisi bhi answer ka trace khol kar bata sako ki kaunsa step galat answer ka kaaran bana.
