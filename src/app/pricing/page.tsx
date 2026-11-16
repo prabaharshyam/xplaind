@@ -25,6 +25,7 @@ const ORDER: AiKind[] = [
   "resume",
   "book",
   "notes",
+  "scan",
 ];
 
 
@@ -216,7 +217,7 @@ export default function PricingPage() {
             {
               n: `${TIER_LIMITS.pro.book} + ${TIER_LIMITS.pro.notes} a day`,
               t: "Revise from your own notes",
-              d: `Turn a PDF of your notes into ${TIER_LIMITS.pro.book} tests or flashcard decks a day, and ask up to ${TIER_LIMITS.pro.notes} questions answered only from your file.`,
+              d: `Turn a PDF, Word or PowerPoint file of your notes into ${TIER_LIMITS.pro.book} tests or flashcard decks a day, and ask up to ${TIER_LIMITS.pro.notes} questions answered only from your file. Scanned pages and pictures in your slides are read too.`,
             },
           ].map((v) => (
             <li key={v.t}>
@@ -293,7 +294,7 @@ export default function PricingPage() {
                     {KIND_LABEL[k]}
                   </th>
                   <td className="p-4 md:px-6">
-                    {TIER_LIMITS.free[k]} {TIER_LIMITS.free[k] === 1 ? "try" : "tries"} in total
+                    {TIER_LIMITS.free[k] === 0 ? "Pro only" : `${TIER_LIMITS.free[k]} ${TIER_LIMITS.free[k] === 1 ? "try" : "tries"} in total`}
                   </td>
                   <td className="p-4 font-semibold md:px-6">{TIER_LIMITS.pro[k]} every day</td>
                 </tr>

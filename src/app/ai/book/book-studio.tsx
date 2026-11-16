@@ -6,8 +6,9 @@ import { aiPost } from "@/components/ai/ai-client";
 import { AiGate, useAiAccess } from "@/components/ai/ai-gate";
 import { AiWorking } from "@/components/ai/ai-working";
 import { primaryButton, secondaryButton } from "@/components/ui";
-import { type Book, buildBook, pickExcerpts } from "@/lib/book/chunk";
-import { MAX_FILE_MB, readBookFile } from "@/lib/book/read-file";
+import { type Book, type BookPage, buildBook, pickExcerpts } from "@/lib/book/chunk";
+import { MAX_FILE_MB, type ReadBook, readBookFile } from "@/lib/book/read-file";
+import { PicturePanel } from "./picture-panel";
 import { type BookQuestion, type BookTest, bookReport, DIFFICULTY_LABEL, type Difficulty, formatSeconds, pageList } from "@/lib/book/report";
 import { addBookTest, deleteBookTest, finishBookTest, retakeBookTest, useBookTests } from "@/lib/browser/book-store";
 import { type BookCard, type BookDeck, addDeck, deckCsv, deleteDeck, markCard, useDecks } from "@/lib/browser/book-cards-store";
@@ -95,15 +96,29 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [pending, setPending] = useState<ReadBook | null>(null);
+
+  const finish = (read: ReadBook, pages: BookPage[]) => {
+    const book = buildBook(read.title, pages, read.outline);
+    if (book.chunks.length < 3) {
+      setPending(null);
+      setError(read.pictures?.length
+        ? "We could not find enough text in that file. Its pages are mostly pictures: reading them is part of Pro."
+        : "We could not find enough text in that file. If it is a scanned book, the pages are pictures: reading them is part of Pro.");
+      return;
+    }
+    onBook(book);
+  };
+
   const pick = async (file: File | undefined) => {
     if (!file) return;
     setError(null);
+    setPending(null);
     setBusy("Opening your book…");
     try {
       const read = await readBookFile(file, (done, total) => setBusy(`Reading page ${done} of ${total}…`));
-      const book = buildBook(read.title, read.pages, read.outline);
-      if (book.chunks.length < 3) throw new Error("We could not find enough text in that file. If it is a scanned book, the pages are pictures: try a PDF with selectable text.");
-      onBook(book);
+      if (read.pictures?.length) setPending(read); // MB-12: ask before any picture leaves the device
+      else finish(read, read.pages);
     } catch (e) {
       setError(e instanceof Error ? e.message : "That file could not be opened.");
     } finally {
@@ -144,7 +159,7 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
           Choose your notes or book
         </h2>
         <p className="mx-auto mt-1 max-w-md leading-7 text-zinc-700 dark:text-zinc-300">
-          A PDF with selectable text, a Word (.docx) file, or a .txt or .md file, up to {MAX_FILE_MB} MB. It is read in your browser and never uploaded.
+          A PDF, a Word (.docx) or PowerPoint (.pptx) file, or a .txt or .md file, up to {MAX_FILE_MB} MB. Text is read in your browser and never uploaded. Pro can also read pictures inside your file, and asks you first.
         </p>
         <label htmlFor={inputId} className={`${primaryButton} mt-4 cursor-pointer`}>
           <Icon name="book" size={18} /> {busy ? "Reading…" : "Choose a file"}
@@ -152,7 +167,7 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
         <input
           id={inputId}
           type="file"
-          accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.doc,.txt,.md,text/plain,text/markdown"
+          accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation,.doc,.txt,.md,text/plain,text/markdown"
           className="sr-only"
           disabled={busy !== null}
           onChange={(e) => {
@@ -171,6 +186,17 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
           </p>
         )}
       </section>
+
+      {pending && pending.pictures && (
+        <PicturePanel
+          title={pending.title}
+          pages={pending.pages}
+          pictures={pending.pictures}
+          more={pending.morePictures ?? 0}
+          onDone={(pages) => finish(pending, pages)}
+          onSkip={() => finish(pending, pending.pages)}
+        />
+      )}
 
       {decks.length > 0 && (
         <section aria-labelledby="decks-h">

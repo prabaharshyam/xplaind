@@ -35,6 +35,8 @@ export type AiRequest<S extends z.ZodType> = {
   schema: S;
   maxTokens: number;
   effort: "low" | "medium" | "high";
+  /** Calls allowed per minute for this learner across every tool. Default 6; reading picture pages (MB-12) needs more. */
+  burst?: number;
 };
 
 /** Runs one guarded call. Returns the checked output, or a Response to send back as is. */
@@ -48,7 +50,7 @@ export async function runAi<S extends z.ZodType>(
   if (!admin) return problem(503, LIMIT_MESSAGE.off);
   const who = await aiCaller(admin);
 
-  const burst = await rateLimit(admin, `ai:${who.id}`, 60, 6);
+  const burst = await rateLimit(admin, `ai:${who.id}`, 60, req.burst ?? 6);
   if (burst) return burst;
 
   const day = todayInIST();

@@ -4,6 +4,7 @@ import { z } from "zod";
 // The guarded runner with the database, the session and the SDK replaced by fakes.
 const rpc = vi.fn();
 const create = vi.fn();
+const rateLimitMock = vi.hoisted(() => vi.fn(async (...args: unknown[]) => (args.length >= 0 ? null : null)));
 let profile: { id: string } | null = { id: "u1" };
 let user: { id: string; email: null } | null = { id: "u1", email: null };
 /** PAY-7: rows of earlier days' usage of one feature, for the free trial. */
@@ -23,7 +24,7 @@ function query() {
 vi.mock("@/lib/account/http", () => ({
   problem: (status: number, message: string) => Response.json({ error: message }, { status }),
   json: (body: unknown, status = 200) => Response.json(body, { status }),
-  rateLimit: async () => null,
+  rateLimit: rateLimitMock,
   visitorKey: () => "visitor-hash",
 }));
 vi.mock("@/lib/supabase/server", () => ({
@@ -69,6 +70,7 @@ beforeEach(() => {
   user = { id: "u1", email: null };
   rpc.mockReset();
   create.mockReset();
+  rateLimitMock.mockClear();
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -84,6 +86,15 @@ describe("runAi (CO-1, SC-5, PV-2)", () => {
     expect(rpc.mock.calls[1]).toEqual(["ai_record", expect.objectContaining({ p_tokens_in: 1000, p_tokens_out: 100, p_cost_usd: 0.00015 })]);
     expect(create.mock.calls[0][0]).toMatchObject({ model: "claude-haiku-5-5", output_config: { effort: "low" } });
     expect(create.mock.calls[0][0]).not.toHaveProperty("fallbacks");
+  });
+
+  it("allows 6 calls a minute by default, and a request can ask for more (MB-12 reads picture pages in batches)", async () => {
+    rpc.mockResolvedValue({ data: "ok", error: null });
+    create.mockResolvedValue(reply('{"answer":"42"}'));
+    await runAi(req);
+    expect(rateLimitMock.mock.calls[0]).toEqual([expect.anything(), "ai:u1", 60, 6]);
+    await runAi({ ...req, burst: 12 });
+    expect(rateLimitMock.mock.calls[1]).toEqual([expect.anything(), "ai:u1", 60, 12]);
   });
 
   it("keeps the main model, with its fallback, for grading (PAY-1)", async () => {

@@ -1,11 +1,13 @@
 // Reads a book in the browser (MB-1). A PDF is opened with PDF.js; nothing is uploaded.
 import { type BookPage, type BookSection, pagesFromText } from "./chunk";
+import { MAX_PICTURE_PAGES, type PicturePage, fitSize, canvasToJpeg, imageBytesToJpeg, looksLikePicture } from "./pictures";
 import { ensureStreamAsyncIterator } from "./stream-polyfill";
 
 export const MAX_FILE_MB = 60;
 export const MAX_PAGES = 1500;
 
-export type ReadBook = { title: string; pages: BookPage[]; outline: BookSection[] };
+/** `pictures` are pages (or slide pictures) drawn small in the browser, ready to be read by the AI if the learner is Pro and agrees (MB-12). `morePictures` counts those past the cap. */
+export type ReadBook = { title: string; pages: BookPage[]; outline: BookSection[]; pictures?: PicturePage[]; morePictures?: number };
 
 const titleFromName = (name: string) => name.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim() || "My book";
 
@@ -22,8 +24,19 @@ export async function readBookFile(file: File, onProgress?: (done: number, total
     const { pages, outline } = pagesFromText(docxHtmlToText(value));
     return { title: titleFromName(file.name), pages, outline };
   }
+  if (/\.pptx$/i.test(file.name) || file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation") {
+    const { readPptx } = await import("./pptx");
+    const { pages, pictures: found } = await readPptx(await file.arrayBuffer());
+    const pictures: PicturePage[] = [];
+    for (const pic of found.slice(0, MAX_PICTURE_PAGES)) {
+      const data = await imageBytesToJpeg(pic.bytes, pic.mime).catch(() => null);
+      if (data) pictures.push({ n: pic.n, data });
+    }
+    return { title: titleFromName(file.name), pages, outline: [], pictures, morePictures: Math.max(0, found.length - MAX_PICTURE_PAGES) };
+  }
+  if (/\.ppt$/i.test(file.name)) throw new Error("Old .ppt files cannot be read. Save it as .pptx or PDF in PowerPoint, then try again.");
   if (/\.doc$/i.test(file.name)) throw new Error("Old .doc files cannot be read. Save it as .docx or PDF in Word, then try again.");
-  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") throw new Error("Please choose a PDF, a Word (.docx) file, or a .txt or .md file.");
+  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") throw new Error("Please choose a PDF, a Word (.docx) or PowerPoint (.pptx) file, or a .txt or .md file.");
 
   // The legacy build carries polyfills for the newest JavaScript (Map.getOrInsertComputed,
   // Uint8Array.fromBase64 and others) that the modern build assumes and iPhone Safari lacks.
@@ -36,6 +49,8 @@ export async function readBookFile(file: File, onProgress?: (done: number, total
   try {
     const total = Math.min(doc.numPages, MAX_PAGES);
     const pages: BookPage[] = [];
+    const pictures: PicturePage[] = [];
+    let morePictures = 0;
     for (let n = 1; n <= total; n++) {
       const page = await doc.getPage(n);
       const content = await page.getTextContent();
@@ -45,6 +60,25 @@ export async function readBookFile(file: File, onProgress?: (done: number, total
         text += item.str + (item.hasEOL ? "\n" : "");
       }
       pages.push({ n, text });
+      // A page with almost no text is probably a scan or a picture: draw it small so a Pro learner can have it read (MB-12).
+      if (looksLikePicture(text)) {
+        if (pictures.length >= MAX_PICTURE_PAGES) morePictures += 1;
+        else {
+          const base = page.getViewport({ scale: 1 });
+          const { w } = fitSize(base.width, base.height);
+          const viewport = page.getViewport({ scale: w / base.width });
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          try {
+            await page.render({ canvas, viewport }).promise;
+            const data = canvasToJpeg(canvas);
+            if (data) pictures.push({ n, data });
+          } catch {
+            // A page that cannot be drawn is simply not offered for reading.
+          }
+        }
+      }
       page.cleanup();
       if (n % 10 === 0 || n === total) onProgress?.(n, total);
     }
@@ -66,7 +100,7 @@ export async function readBookFile(file: File, onProgress?: (done: number, total
     }
     const meta = (await doc.getMetadata().catch(() => null))?.info as { Title?: string } | undefined;
     const title = meta?.Title?.trim() && meta.Title.trim().length > 2 ? meta.Title.trim().slice(0, 160) : titleFromName(file.name);
-    return { title, pages, outline };
+    return { title, pages, outline, pictures, morePictures };
   } finally {
     void task.destroy();
   }
