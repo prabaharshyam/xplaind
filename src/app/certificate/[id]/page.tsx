@@ -54,7 +54,7 @@ async function Certificate({ params }: { params: PageProps<"/certificate/[id]">[
         </a>
       </div>
       <p className="mt-6 text-center text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-        Issued by Xplaind, a brand of ZEREH Venture, and verified at this address. It is not a university or government-accredited qualification.{" "}
+        Issued by Xplaind, a brand of ZEREH Ventures, and verified at this address. It is not a university or government-accredited qualification.{" "}
         <Link href={path ? `/roadmap/${path.id}` : "/paths"} className="underline underline-offset-2">
           See the roadmap
         </Link>
