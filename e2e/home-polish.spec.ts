@@ -35,7 +35,7 @@ test("roadmap, topic and project cards carry a line graphic, not just a small ic
   const scene = 'svg[viewBox="0 0 300 110"]';
   await page.goto("/paths");
   await expect(page.locator(scene)).toHaveCount(9);
-  await page.goto("/topics");
+  await page.goto("/library?view=topics");
   expect(await page.locator(scene).count()).toBeGreaterThanOrEqual(20);
   await page.goto("/projects");
   expect(await page.locator(scene).count()).toBeGreaterThanOrEqual(20);

@@ -264,7 +264,7 @@ export default function Home() {
                   title: "Understand any topic in 20 minutes",
                   text: "A plain-English explainer, an example from Indian work life, a quick check, and the one course or video worth your time.",
                   cta: { href: "/stop/what-is-ai", label: "Read the first lesson" },
-                  more: { href: "/topics", label: "Browse topics" },
+                  more: { href: "/library?view=topics", label: "Browse topics" },
                   tone: "sky",
                   visual: (
                     <div className="mx-auto max-w-[320px]">

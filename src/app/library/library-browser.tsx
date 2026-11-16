@@ -32,10 +32,22 @@ const KIND_STYLE: Record<LibraryKind, string> = {
 const KIND_LABEL: Record<LibraryKind, string> = { lesson: "Lesson", video: "Video lesson", skill: "Skill" };
 
 /** RM-10: filter lessons, video lessons and skills by tag. Filters live in the address, so a tag link opens the right view. */
-export function LibraryBrowser({ items, topics, channels }: { items: LibraryItem[]; topics: { id: ThemeId; label: string }[]; channels: string[] }) {
+export function LibraryBrowser({
+  items,
+  topics,
+  channels,
+  topicGrid,
+}: {
+  items: LibraryItem[];
+  topics: { id: ThemeId; label: string }[];
+  channels: string[];
+  /** LY-2: the cards of the "By topic" view, built on the server. */
+  topicGrid: React.ReactNode;
+}) {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const byTopic = params.get("view") === "topics";
   const kind = (params.get("kind") as LibraryKind | null) ?? "all";
   const topic = params.get("topic") as ThemeId | null;
   const level = params.get("level");
@@ -74,6 +86,20 @@ export function LibraryBrowser({ items, topics, channels }: { items: LibraryItem
 
   return (
     <div className="flex flex-col gap-5">
+      {/* LY-2: Library and Topics are one page with two views. */}
+      <div role="group" aria-label="View" className="flex flex-wrap gap-2">
+        <button type="button" aria-pressed={!byTopic} className={chip(!byTopic)} onClick={() => set("view", null)}>
+          All lessons, videos and skills
+        </button>
+        <button type="button" aria-pressed={byTopic} className={chip(byTopic)} onClick={() => set("view", "topics")}>
+          By topic
+        </button>
+      </div>
+
+      {byTopic ? (
+        topicGrid
+      ) : (
+        <>
       <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
         <label className="flex flex-col gap-1">
           <span className="text-sm font-semibold">Search</span>
@@ -201,6 +227,8 @@ export function LibraryBrowser({ items, topics, channels }: { items: LibraryItem
         </button>
       )}
       {results.length === 0 && <p className="rounded-2xl bg-zinc-100 p-4 dark:bg-zinc-900">Nothing matches. Clear a filter or try another word.</p>}
+        </>
+      )}
     </div>
   );
 }

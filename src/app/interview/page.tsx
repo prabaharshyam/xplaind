@@ -17,12 +17,13 @@ export const metadata: Metadata = pageMeta({
   path: "/interview",
 });
 
+// IP-4 (owner request, 2026-11-16): interview patterns and system design answers come last, and the
+// practice cards live under the Practice menu only, so each thing has one home.
 const HUB: { href: string; title: string; text: string; icon: IconName }[] = [
-  { href: "/interview/patterns", title: "Interview patterns", text: "RAG, agents, evals, serving and safety: the ideas every AI round reuses, and how to say them.", icon: "flow" },
-  { href: "/interview/design", title: "System design answers", text: "Worked LLM designs in the 35-minute shape interviewers expect.", icon: "target" },
   { href: "/interview/simulator", title: "Mock interview", text: "Answer out loud and get a report on the key points you covered.", icon: "mic" },
   { href: "/interview/answers", title: "Q&A by role", text: "Every question for your role with a short and a deeper answer.", icon: "chat" },
-  { href: "/practice", title: "Practice cards", text: "Flashcards that bring back the questions you missed.", icon: "check" },
+  { href: "/interview/patterns", title: "Interview patterns", text: "RAG, agents, evals, serving and safety: the ideas every AI round reuses, and how to say them.", icon: "flow" },
+  { href: "/interview/design", title: "System design answers", text: "Worked LLM designs in the 35-minute shape interviewers expect.", icon: "target" },
 ];
 
 export default function InterviewPage() {
@@ -42,7 +43,7 @@ export default function InterviewPage() {
       {/* IP-3: the interview hub: the ways to prepare, before the question bank. */}
       <div className="mx-auto max-w-6xl px-4 pt-10 md:px-6">
         <h2 className="text-2xl font-semibold tracking-tight">Prepare for your AI interview</h2>
-        <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {HUB.map((h) => (
             <li key={h.href}>
               <Link

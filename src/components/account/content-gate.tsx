@@ -48,7 +48,7 @@ export function GateCard({ reason, title, text }: { reason: SignUpReason; title:
       <AuthChoice reason={reason} className="mt-4" />
       <p className="mt-4 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
         Accounts are for learners aged 18 and over. Under 18? The quick answer and the first part of every lesson stay open:{" "}
-        <Link href="/topics" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+        <Link href="/library?view=topics" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
           browse lessons by topic
         </Link>
         .

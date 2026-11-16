@@ -3,8 +3,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
 import { secondaryButton } from "@/components/ui";
-import { Icon } from "@/components/art/icons";
-import { getGlossary } from "@/lib/content";
 import { getInterviewViews, quizPoolFor } from "@/lib/content/interview";
 import { PracticeView } from "./practice-view";
 
@@ -16,13 +14,7 @@ export const metadata: Metadata = pageMeta({
   path: "/practice",
 });
 
-/** Terms learners meet first, shown as a taste of the glossary (only those that exist are shown). */
-const STARTER_TERMS = ["token", "embedding", "rag", "hallucination", "fine-tuning", "prompt-engineering", "agent", "vector-database"];
-
 export default function PracticePage() {
-  const glossary = getGlossary();
-  const ids = new Set(glossary.map((g) => g.id));
-  const starters = STARTER_TERMS.filter((id) => ids.has(id)).map((id) => glossary.find((g) => g.id === id)!);
   return (
     <main>
       <PageHero
@@ -45,43 +37,10 @@ export default function PracticePage() {
           <Link href="/ai/book" className={secondaryButton}>
             Study from my notes & books
           </Link>
-          <Link href="/glossary" className={secondaryButton}>
-            AI glossary
-          </Link>
         </div>
       </PageHero>
       <div className="mx-auto max-w-3xl px-4 py-8">
         <PracticeView topic={null} questions={getInterviewViews()} quizPool={quizPoolFor(null)} />
-        {/* The glossary sits below the cards, so the cards are the first thing on the page (owner, 2026-11-06). */}
-        <section aria-labelledby="glossary-heading" className="mt-12 rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-start gap-4">
-            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-brand-700 text-white">
-              <Icon name="book" size={24} />
-            </span>
-            <div className="min-w-0">
-              <h2 id="glossary-heading" className="text-lg font-semibold">
-                AI glossary
-              </h2>
-              <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">
-                Stuck on a word in an answer? {glossary.length} AI terms explained in plain words, each linked to the lesson that teaches it.
-              </p>
-            </div>
-          </div>
-          {starters.length > 0 && (
-            <ul className="mt-4 flex flex-wrap gap-2" aria-label="Popular terms">
-              {starters.map((t) => (
-                <li key={t.id}>
-                  <Link href={`/glossary#${t.id}`} className="inline-flex min-h-11 items-center rounded-full border border-brand-300 bg-white px-3 text-sm font-medium text-brand-900 hover:bg-brand-100 dark:border-brand-800 dark:bg-zinc-900 dark:text-brand-200 dark:hover:bg-brand-950">
-                    {t.term}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link href="/glossary" className="mt-4 inline-flex min-h-11 items-center gap-1 font-medium text-brand-800 hover:underline dark:text-brand-300">
-            Open the AI glossary →
-          </Link>
-        </section>
       </div>
     </main>
   );
