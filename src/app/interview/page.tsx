@@ -42,8 +42,9 @@ export default function InterviewPage() {
       />
       {/* IP-5 (owner request, 2026-11-16): the Question bank is what a visitor came for, so it comes first.
           The ways to prepare sit in a side panel on wide screens and in a compact row above the list on phones. */}
-      <div className="mx-auto grid max-w-6xl gap-x-12 gap-y-6 px-4 py-8 md:px-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <aside aria-labelledby="prep-heading" className="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24 lg:self-start">
+      <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-6 px-4 py-8 md:px-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+        {/* min-w-0: a grid item will not shrink below its content by default, and the swipe row is wider than a phone. */}
+        <aside aria-labelledby="prep-heading" className="min-w-0 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24 lg:self-start">
           <h2 id="prep-heading" className="text-lg font-semibold tracking-tight">
             Prepare for your AI interview
           </h2>
