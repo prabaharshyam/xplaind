@@ -9,6 +9,7 @@ import { RoleGrid } from "@/components/home/role-grid";
 import { Testimonials } from "@/components/home/testimonials";
 import { MiniInterview, MiniLesson, MiniNotes, MiniPlan, MiniResume, MiniRoadmap } from "@/components/home/showcase";
 import { FeatureDeck } from "@/components/home/feature-deck";
+import { LanguagesSection } from "@/components/home/languages";
 import { ContinueCard } from "@/components/continue-card";
 import { Words } from "@/components/motion/words";
 import { RoadScene } from "@/components/three/road-scene";
@@ -56,6 +57,10 @@ const FAQ = [
   {
     q: "How is this different from YouTube and online courses?",
     a: "YouTube and course sites are great at teaching single topics, but they leave you to decide what to learn, in what order, and when you are ready for a job. Xplaind does that part. Each roadmap puts every topic a role needs in order, explains each one in a short plain-English lesson, points you to the one course or video that teaches it best, checks that you understood it, gives you a project to build at each stage and ends with interview practice. You still learn from the best courses out there; we tell you which one to take next.",
+  },
+  {
+    q: "Can I learn in Tamil or Hindi?",
+    a: "Yes. Every lesson is also written in everyday spoken Tamil and Hindi, the way you would explain it to a friend, and in Tanglish and Hinglish, which are the same Tamil and Hindi written in English letters. Technical terms, code and numbers stay in English, as they do at work. Open any lesson and use the Read in switch at the top. Videos, courses and the quick check are still in English.",
   },
   {
     q: "Which AI role should I choose?",
@@ -131,7 +136,7 @@ export default function Home() {
             </Link>
           </div>
           <ul data-hero-fade className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-700 dark:text-zinc-300" aria-label="Why it is easy to start">
-            {["Built for India's AI roles", "Mock interviews built in", "Independent, no paid rankings"].map((t) => (
+            {["Built for India's AI roles", "Lessons in Tamil and Hindi", "Mock interviews built in", "Independent, no paid rankings"].map((t) => (
               <li key={t} className="flex items-center gap-2">
                 <Icon name="tick" size={16} className="text-zinc-500 dark:text-zinc-400" /> {t}
               </li>
@@ -324,6 +329,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* LT-2: lessons in the learner's own language, shown with real samples. */}
+      <LanguagesSection />
 
       {/* SO-1: early users, in their own words (real, shared with permission). */}
       {testimonials.length > 0 && (
