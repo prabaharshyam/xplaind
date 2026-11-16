@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { announceNavigation } from "@/lib/nav-feedback";
 import {
   clearTest,
   parseTest,
@@ -62,6 +63,7 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
       });
       clearTest();
       setPath(test.goal);
+      announceNavigation(); // UX-7
       router.push("/result");
     } else {
       saveTest({ ...test, state });

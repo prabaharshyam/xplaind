@@ -2,6 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { isPageChangeLink } from "@/lib/nav-feedback";
 
 /**
  * UX-2: a thin violet bar across the top while a new page loads, so a tap always shows a response.
@@ -17,11 +18,7 @@ export function NavProgress() {
     const onClick = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as HTMLElement | null)?.closest?.("a");
-      if (!a || !a.href || a.target === "_blank" || a.hasAttribute("download")) return;
-      const to = new URL(a.href, location.href);
-      if (to.origin !== location.origin) return;
-      if (to.pathname === location.pathname && to.search === location.search) return; // same page or #anchor
-      if (to.pathname.startsWith("/go/") || to.pathname.startsWith("/api/")) return;
+      if (!isPageChangeLink(a, location)) return; // UX-7: the same check the loading screen uses
       const el = bar.current;
       if (!el) return;
       el.dataset.state = "loading";

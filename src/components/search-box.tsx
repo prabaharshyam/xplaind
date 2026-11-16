@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/art/icons";
+import { announceNavigation } from "@/lib/nav-feedback";
 import { KIND_LABEL, type SearchItem, search } from "@/lib/search/search";
 
 let cache: Promise<SearchItem[]> | null = null;
@@ -49,7 +50,10 @@ export function SearchBox({
     setOpen(false);
     onNavigate?.();
     if (item.h.startsWith("/go/")) window.open(item.h, "_blank", "noopener");
-    else router.push(item.h);
+    else {
+      announceNavigation(); // UX-7: show the loading screen while the page opens
+      router.push(item.h);
+    }
   };
 
   const big = size === "lg";
