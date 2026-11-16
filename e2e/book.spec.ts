@@ -44,6 +44,31 @@ const saved = {
   ],
 };
 
+test("a PDF opens in a browser without the newest JavaScript, as on an iPhone (MB-11)", async ({ page }) => {
+  // iPhone Safari cannot loop over a stream with `for await` and lacks Map.getOrInsertComputed and
+  // Uint8Array.fromBase64, which PDF.js's modern build uses. Remove them to stand in for Safari.
+  await page.addInitScript(() => {
+    const strip = (o: object, k: PropertyKey) => {
+      try {
+        Object.defineProperty(o, k, { value: undefined, configurable: true, writable: true });
+      } catch {}
+    };
+    strip(ReadableStream.prototype, Symbol.asyncIterator);
+    strip(ReadableStream.prototype, "values");
+    strip(Map.prototype, "getOrInsertComputed");
+    strip(Map.prototype, "getOrInsert");
+    strip(Uint8Array, "fromBase64");
+    strip(Uint8Array.prototype, "toHex");
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/ai/book");
+  await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
+  await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/3 pages · 3 sections/)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("a PDF is read in the browser and its chapters can be chosen before any AI call (MB-1)", async ({ page }) => {
   await page.goto("/ai/book");
   await expect(page.getByRole("heading", { level: 1, name: "Study from my notes & books" })).toBeVisible();

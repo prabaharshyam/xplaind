@@ -1,5 +1,6 @@
 // Reads a book in the browser (MB-1). A PDF is opened with PDF.js; nothing is uploaded.
 import { type BookPage, type BookSection, pagesFromText } from "./chunk";
+import { ensureStreamAsyncIterator } from "./stream-polyfill";
 
 export const MAX_FILE_MB = 60;
 export const MAX_PAGES = 1500;
@@ -24,8 +25,12 @@ export async function readBookFile(file: File, onProgress?: (done: number, total
   if (/\.doc$/i.test(file.name)) throw new Error("Old .doc files cannot be read. Save it as .docx or PDF in Word, then try again.");
   if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") throw new Error("Please choose a PDF, a Word (.docx) file, or a .txt or .md file.");
 
-  const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+  // The legacy build carries polyfills for the newest JavaScript (Map.getOrInsertComputed,
+  // Uint8Array.fromBase64 and others) that the modern build assumes and iPhone Safari lacks.
+  // It still loops over streams with `for await`, which Safari cannot do, hence the polyfill (MB-11).
+  ensureStreamAsyncIterator();
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString();
   const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
   const doc = await task.promise;
   try {
