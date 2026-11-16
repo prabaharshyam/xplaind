@@ -1,0 +1,239 @@
+---
+id: caching-and-speed
+lang: hi
+title: "Caching और speed"
+outcome: "Prompt caching, response caching और streaming से cost और इंतज़ार का समय घटा पाओगे।"
+answer: "Prompt caching prompt की दोहराई जाने वाली शुरुआत को कम cost पर दोबारा use करती है, response caching दोहराए सवालों के पूरे जवाब दोबारा देती है, और streaming text को लिखे जाते ही दिखा देती है।"
+why_it_matters: "धीमे apps को users छोड़ देते हैं, और बार-बार भेजे गए लंबे prompts पैसा बर्बाद करते हैं। Production में सबसे सस्ती बड़ी जीतें caching और streaming ही हैं।"
+flashcards:
+  - q: "Prompt caching क्या है?"
+    a: "Provider लंबे, न बदलने वाले prompt prefix का processed रूप store कर लेता है, इसलिए वैसे ही शुरू होने वाली अगली requests सस्ती और तेज़ होती हैं।"
+  - q: "Caching के लिए prompt को कैसे क्रम में रखें?"
+    a: "न बदलने वाला पहले: system prompt, tools, reference documents; बदलने वाला आखिर में: सवाल और हाल के turns।"
+  - q: "Prompt cache को क्या तोड़ता है?"
+    a: "Prefix में कोई भी बदलाव, जैसे शुरुआत के पास timestamp या user का नाम।"
+  - q: "Response caching क्या है?"
+    a: "Normalise किए request और versions से key बनाकर जवाब store करना, और दोहराई requests पर model call के बिना वही लौटा देना।"
+  - q: "Response caches कब share नहीं करने चाहिए?"
+    a: "जब जवाबों में personal या permission पर निर्भर data हो।"
+  - q: "Semantic caching का risk क्या है?"
+    a: "लगभग एक जैसे सवालों को अलग जवाब चाहिए हो सकते हैं, इसलिए similar-match caching गलत जवाब लौटा सकती है।"
+  - q: "Streaming किसे बेहतर करती है?"
+    a: "महसूस होने वाली speed को: users को पहले शब्द एक-दो seconds में दिख जाते हैं, हालाँकि कुल generation time वही रहता है।"
+  - q: "तीन और speed levers बताओ।"
+    a: "छोटे outputs, सरल steps के लिए छोटे models, और independent calls को parallel चलाना।"
+  - q: "लंबा prompt पहले token को धीमा क्यों करता है?"
+    a: "Model को लिखने से पहले पूरा input पढ़ना पड़ता है। Prompt caching न बदलने वाले prefix को दोबारा पढ़ने से बचाती है, इसलिए पहला token जल्दी आता है।"
+  - q: "Semantic caching कब गलत हो जाती है?"
+    a: "जब दो सवाल एक जैसे दिखें पर अलग जवाब चाहिए हों, जैसे 'order 41 का refund' और 'order 14 का refund', या ऐसे सवाल जिनका जवाब user पर निर्भर हो।"
+exercise:
+  title: "तेज़ करो"
+  setup: "Noida के एक tax-filing app का assistant user के upload किए Form 16 और tax rules के सवालों के जवाब देता है। हर request अभी आज की तारीख़ और user के नाम से शुरू होती है, फिर 8,000-token के tax rules, फिर user का Form 16, फिर सवाल। जवाब पूरा दिखने में 7 seconds लगते हैं। कई users वही सामान्य सवाल पूछते हैं, जैसे 'standard deduction क्या है?'"
+  questions:
+    - q: "Caching के लिए prompt को कैसे दोबारा क्रम में रखें?"
+      a: "पहले tax rules, फिर user का Form 16, फिर तारीख़, नाम और सवाल आखिर में।"
+    - q: "क्या response-cache हो सकता है, और क्या नहीं?"
+      a: "Rules के सामान्य सवाल rules version के हिसाब से cache हो सकते हैं; user के अपने Form 16 के जवाब कभी share नहीं होने चाहिए।"
+    - q: "7 seconds का इंतज़ार क्या ठीक करता है?"
+      a: "जवाब को stream करना, ताकि पहले शब्द एक-दो seconds में दिखें, और जहाँ हो सके छोटे जवाब।"
+    - q: "Response cache कब साफ़ करना पड़ेगा?"
+      a: "जब tax rules बदलें, जैसे नया budget आए, cache की key में rules version रखकर।"
+ask:
+  - "Prompt caching कैसे काम करती है?"
+  - "Semantic caching क्या है और क्या वो safe है?"
+  - "अपने LLM app को तेज़ कैसे महसूस कराऊँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+LLM apps में cost और इंतज़ार का समय घटाने की तीन techniques:
+
+- **Prompt caching**: Provider prompt की लंबी, न बदलने वाली शुरुआत (system prompt, कोई document, tool definitions) का processed रूप store कर लेता है, इसलिए वैसे ही शुरू होने वाली अगली requests सस्ती और तेज़ होती हैं।
+- **Response caching**: आपका app जवाब store करता है और वही (या बराबर की) request दोबारा आने पर सीधे लौटा देता है, model call पूरी तरह छोड़कर।
+- **Streaming**: जवाब generate होते-होते token-token करके user को भेजना, ताकि वो लगभग तुरंत पढ़ना शुरू कर सके।
+
+```flow
+dir: LR
+title: Prompt caching: न बदलने वाला हिस्सा पहले रखो
+न बदलने वाला prefix | instructions, tools, 40 page का contract: पहली call के बाद cached -> सवाल | हर request में बदलता है
+```
+
+सवाल 1 पूरा दाम देता है और 9 s लेता है; सवाल 2 से cached prefix पहला token लगभग 2 s में ले आता है।
+
+```flow
+title: Response cache: key = normalise किया सवाल + template version + model version
+सवाल -> Response cache में है?
+Response cache में है? -[hit]-> तुरंत जवाब, model call नहीं
+Response cache में है? -[miss]-> Model -> Tokens screen पर stream करो
+```
+
+ये lesson Chennai की एक legal-tech company के contract assistant को follow करता है, जहाँ वकील हर upload हुए agreement पर लगभग दस सवाल पूछते हैं।
+
+## ये काम कैसे करता है
+
+**Prompt caching।** Providers cache से पढ़े गए input tokens के लिए कम, अक्सर बहुत कम, चार्ज करते हैं, और उन्हें process करना भी तेज़ होता है। Cache एक exact prefix पर काम करता है: request उसी content से, उसी क्रम में शुरू होनी चाहिए। तो:
+
+- न बदलने वाला content पहले रखो: system prompt, tool definitions, लंबे reference documents;
+- बदलने वाला content आखिर में रखो: user का सवाल, बातचीत के ताज़ा turns;
+- ऊपर कोई बदलने वाली चीज़ (timestamp, user का नाम) मत डालो।
+
+Caches कुछ समय इस्तेमाल न होने पर expire हो जाते हैं; minimum length, lifetime और pricing के लिए अपने provider के नियम देखो।
+
+**Response caching।** जवाब को normalise किए request (और prompt व model version) की key से store करो। दोहराए, एक जैसे सवालों के लिए अच्छा है: FAQ जवाब, product descriptions, fixed text के translations। Expiry times रखो, underlying data बदलने पर invalidate करो, और जब जवाबों में personal या permission पर निर्भर data हो तो cached जवाब users में कभी share मत करो। "Semantic caching" एक जैसे की जगह मिलते-जुलते सवालों को match करती है; इसे सावधानी से use करो, क्योंकि लगभग एक जैसे सवालों को अलग जवाब चाहिए हो सकते हैं।
+
+**Streaming।** कुल generation time नहीं बदलता, पर users को पूरे जवाब का इंतज़ार करने की जगह आमतौर पर पहले शब्द एक-दो seconds में दिख जाते हैं। महसूस होने वाली speed बहुत बेहतर हो जाती है, और users जल्दी पढ़ना छोड़ सकते हैं या cancel कर सकते हैं। Stream के बीच के errors और disconnections संभालो।
+
+**बाकी speed levers।** छोटे outputs (generation time लंबाई के साथ बढ़ता है); सरल steps के लिए छोटे models; कम sequential model calls; independent calls को parallel चलाना; कम, बेहतर chunks retrieve करना।
+
+**तीनों techniques की तुलना:**
+
+| Technique | क्या बचाती है | कब काम करती है | किस पर नज़र रखें |
+| --- | --- | --- | --- |
+| Prompt caching | Input cost और पहले token का समय | लंबे एक जैसे prefixes जल्दी दोबारा use हों | Prefix का बदलना; cache expiry |
+| Response caching | पूरा model call | एक जैसे दोहराए सवाल | Personal data; पुराने जवाब |
+| Streaming | महसूस होने वाला इंतज़ार | Chat और लंबे जवाब | Stream के बीच errors और disconnects |
+
+**Cache काम कर रहा है, ये जाँचना।** Providers हर response के usage data में cached input tokens बताते हैं। उन्हें log करो। Prompt दोबारा क्रम में रखने के बाद, लगातार पाँच requests भेजो और पक्का करो कि cached count दूसरी request से बढ़ रहा है। अगर वो शून्य पर ही रहे, तो prefix में अब भी कुछ बदलने वाला है, अक्सर timestamp, request id, या बदलते क्रम में list हुई tool definitions।
+
+**Response caches को invalidate करना।** Key में वो हर input रखो जो जवाब बदलता है: सवाल, template या document version, prompt version और model। जो जवाब स्थिर हैं उन पर भी expiry रखो, और source बदलने पर entries साफ़ करो। Cache में बैठा गलत जवाब धीमे सही जवाब से बुरा है, क्योंकि जब तक कोई नोटिस न करे वो दोहराता रहता है।
+
+**समय कहाँ जाता है।** एक reply के दो phases होते हैं। पहले model पूरा input पढ़ता है (**prefill**); फिर reply को एक-एक token करके लिखता है (**decode**)। लंबे inputs पहले token को धीमा करते हैं; लंबे outputs उसके बाद सब कुछ धीमा करते हैं। इसलिए 20,000-token का document ज़्यादातर पहले token का समय बिगाड़ता है, और 1,000-token का जवाब ज़्यादातर कुल समय। Caching पहले में मदद करती है; छोटे जवाब और छोटे models दूसरे में।
+
+**Code में prompt caching।** Anthropic के API में आप stable prefix का अंत mark करते हो, और usage report बताती है कि cache से क्या पढ़ा गया:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+POLICY = open("returns_policy.md").read()          # long, rarely changes
+
+def ask(question):
+    reply = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=400,  # check the docs for current names
+        system=[
+            {"type": "text", "text": "You answer questions about our returns policy. Be brief."},
+            {"type": "text", "text": POLICY, "cache_control": {"type": "ephemeral"}},   # cache up to here
+        ],
+        messages=[{"role": "user", "content": question}],   # changing part goes last
+    )
+    u = reply.usage
+    print(f"cache write {u.cache_creation_input_tokens}, cache read {u.cache_read_input_tokens}, "
+          f"uncached {u.input_tokens}")
+    return reply
+
+ask("Can I return a kurta after 10 days?")       # first call writes the cache
+ask("Do you refund shipping charges?")           # later calls read it, cheaper and faster
+```
+
+Cache में लिखना सामान्य input से थोड़ा महँगा है; पढ़ना बहुत सस्ता। ये तब फ़ायदा देता है जब cache lifetime के अंदर वही prefix कई बार use हो। दूसरे providers अपने आप या अलग settings से cache करते हैं; सिद्धांत वही है, न बदलने वाला content पहले।
+
+**Code में response cache।** दोहराई, एक जैसी requests के लिए, एक dictionary या Redis store जिसकी key में वो सब हो जो जवाब को प्रभावित करता है:
+
+```python
+import hashlib, json, time
+
+CACHE, TTL_SECONDS = {}, 24 * 3600
+PROMPT_VERSION, MODEL = "faq-v3", "claude-sonnet-5-5"
+
+def cache_key(question, doc_version):
+    norm = " ".join(question.lower().split())
+    raw = json.dumps([norm, doc_version, PROMPT_VERSION, MODEL])
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+def cached_answer(question, doc_version, compute):
+    key = cache_key(question, doc_version)
+    hit = CACHE.get(key)
+    if hit and time.time() - hit["at"] < TTL_SECONDS:
+        return hit["answer"]
+    answer = compute(question)
+    CACHE[key] = {"answer": answer, "at": time.time()}
+    return answer
+```
+
+सिर्फ़ वही जवाब cache करो जो हर user के लिए एक जैसे हों। जो कुछ user के account, orders या permissions पर निर्भर हो, उसे या तो cache छोड़ना चाहिए या key में user का id रखना चाहिए।
+
+**Independent calls को parallel चलाना।** अगर किसी page को एक ही review से summary, sentiment label और तीन tags चाहिए, तो calls एक साथ चलाओ। कुल इंतज़ार जोड़ की जगह सबसे धीमी call का समय बन जाता है:
+
+```python
+import asyncio
+import anthropic
+
+aclient = anthropic.AsyncAnthropic()
+
+async def one(instruction, text):
+    r = await aclient.messages.create(model="claude-haiku-5-5", max_tokens=150,
+                                      messages=[{"role": "user", "content": f"{instruction}\n\n{text}"}])
+    return "".join(b.text for b in r.content if b.type == "text")
+
+async def analyse(review):
+    return await asyncio.gather(
+        one("Summarise in one line:", review),
+        one("Answer positive, negative or mixed:", review),
+        one("Give three topic tags, comma-separated:", review),
+    )
+```
+
+Fan out करते समय अपनी rate limits का ध्यान रखो; parallel calls की अचानक बाढ़ 429 errors ला सकती है।
+
+**Semantic caching, सावधानी से।** Embedding से मिलते-जुलते सवाल match करने से hit rates बढ़ सकते हैं, पर हर गलत match एक गलत जवाब परोसता है। ऊँचा similarity threshold रखो, इसे ऐसे सामान्य सवालों तक सीमित रखो जिनमें personal या numeric details न हों, और भरोसा करने से पहले measure करो कि matches कितनी बार गलत हैं।
+
+## एक example से समझो
+
+Chennai की एक legal-tech company का contract assistant वकील के upload किए 40-page के agreement के सवालों के जवाब देता है, आमतौर पर हर contract पर 10 सवाल।
+
+पहले: हर सवाल पर पूरा contract (लगभग 30,000 tokens) और सवाल भेजा जाता था। हर जवाब में 9 seconds लगते थे और input tokens का bill हर बार पूरा बनता था।
+
+बाद में:
+
+- Contract और instructions पहले आते हैं और cached होते हैं; सवाल आखिर में। दूसरे सवाल से, ज़्यादातर input tokens cache से दाम के एक छोटे हिस्से पर पढ़े जाते हैं और पहला token लगभग 2 seconds में आ जाता है।
+- जवाब screen पर stream होते हैं।
+- Firm के अपने standard template के आम सवाल ("हमारे standard NDA में notice period क्या है?") template version से key बने response cache से जवाब पाते हैं।
+
+हर contract session की cost लगभग 70% घट जाती है, और वकील शिकायत करना बंद कर देते हैं कि tool धीमा है।
+
+| हर contract session पर measure | पहले | बाद में |
+| --- | --- | --- |
+| पहले token का समय, बाद के सवाल | पूरे जवाब तक लगभग 9 s | लगभग 2 s, फिर stream |
+| पूरे बिल होने वाले input tokens | हर सवाल | पहले के बाद ज़्यादातर cached |
+| Cost | Baseline | लगभग 70% कम |
+
+**वकीलों के लिए क्या बदला।** नए contract का पहला सवाल अब भी पूरा समय लेता है, क्योंकि cache खाली है। बाद का हर सवाल तेज़ और सस्ता है, और stream होते text से वकील तुरंत पढ़ना शुरू कर देते हैं। Team ने पहले जवाब के नीचे एक छोटा note जोड़ा, "इस contract के आगे के सवाल तेज़ होंगे", जिससे लोगों ने tool को उसके सबसे धीमे पल से आँकना बंद कर दिया।
+
+## आम गलतियाँ
+
+- **Prompt की शुरुआत में बदलने वाला content।** ये cache तोड़ देता है।
+- **ऐसे जवाब cache करना जो user या बदलते data पर निर्भर हों।**
+- **Response caches के लिए expiry या invalidation न होना।**
+- **Chat interfaces में stream न करना।**
+- **ये मान लेना कि streaming generation को तेज़ करती है।** वो इंतज़ार को छोटा महसूस कराती है।
+- **हर user के जवाब globally cache करना।** एक user के order details दूसरे user तक पहुँच जाते हैं।
+- **सिर्फ़ averages मापना।** पहले token के समय और कुल समय के लिए p50 और p95 report करो।
+
+## Caching कब मदद नहीं करती
+
+- **हर request अलग है**, कोई लंबा साझा prefix नहीं और दोहराए सवाल कम।
+- **Traffic कम है और बिखरा हुआ**, इसलिए अगली request से पहले cached prefixes expire हो जाते हैं।
+- **जवाब हर बार ताज़ा चाहिए**, जैसे live prices या stock levels।
+- **धीमा हिस्सा कहीं और है**: retrieval, कोई धीमा tool या आपका अपना server। Model call को optimise करने से पहले measure करो।
+
+## Demo से production तक
+
+- **हर call पर cache read और write tokens log करो**, और हर feature का hit rate track करो।
+- **पहले token का समय और कुल समय** p50 और p95 पर, feature और model के हिसाब से track करो।
+- **Cache keys को** prompt, model और data के साथ version करो, और release पर caches साफ़ करो।
+- **हर जगह expiries रखो**, और source data बदलने पर साफ़ invalidation path।
+- **दो accounts से cache को test करो**, ये साबित करने के लिए कि कोई personal जवाब users के बीच नहीं जाता।
+
+## Practice करो
+
+नीचे जुड़ी prompt caching guide और streaming guide पढ़ो।
+
+1. अपने किसी prompt को दोबारा बनाओ ताकि न बदलने वाला content पहले आए, caching चालू करो, और पाँच requests पर token costs की तुलना करो।
+2. किसी chat interface में streaming जोड़ो और पहले-बाद में पहले token का समय measure करो।
+3. दोहराए जाने वाले एक सवाल type के लिए expiry के साथ response cache जोड़ो।
+4. अपने किसी app में prompt-caching वाला example जोड़ो, लगातार पाँच सवाल भेजो, और हर एक के लिए cache read tokens और पहले token का समय record करो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 9 prefill और decode, prompt caching और parallelism बताता है, और chapter 10 exact और semantic caches।
+
+**आप तब पूरा समझो जब** बता सको कि prompt caching क्या बचाती है, न बदलने वाला हिस्सा कहाँ रखना है, और कुल समय वही रहने पर भी streaming क्यों मदद करती है।

@@ -1,0 +1,181 @@
+---
+id: cost-control
+lang: hi
+title: "Cost control"
+outcome: "ये जान पाओगे कि app का पैसा कहाँ जाता है, और model choice, batching और limits से cost कैसे घटाई जाए।"
+answer: "LLM app की cost ज़्यादातर tokens से आती है। इसे घटाने के लिए जहाँ काफ़ी अच्छा चले वहाँ छोटे models चुनो, prompts trim करो, caching और batching करो, और spending limits लगाओ।"
+why_it_matters: "प्रति user cost के हिसाब से AI features मुनाफ़े वाले भी हो सकते हैं और बर्बादी वाले भी। जो engineers cost report पढ़कर उसे घटा सकते हैं, उनकी हर जगह कद्र होती है, खासकर भारतीय price points पर।"
+flashcards:
+  - q: "Cost control का पहला step क्या है?"
+    a: "मापना: हर call के tokens और cost को feature, user और model के tags के साथ log करो।"
+  - q: "आमतौर पर सबसे बड़ा cost lever क्या है?"
+    a: "Model choice: हर task के evals पास करने वाला सबसे सस्ता model use करो।"
+  - q: "Prompt size कैसे घटाते हैं?"
+    a: "System prompts trim करो, कम और छोटे chunks भेजो, लंबी history का summary बनाओ और इस्तेमाल न होने वाले tools हटाओ।"
+  - q: "Output size क्यों limit करें?"
+    a: "Output tokens आमतौर पर input से महँगे होते हैं; संक्षिप्त formats और max_tokens cost और समय दोनों घटाते हैं।"
+  - q: "कौन-सा काम batch APIs के लिए ठीक है?"
+    a: "वो काम जो घंटों इंतज़ार कर सकता है, जैसे रात के summaries, bulk classification और corpus को embed करना।"
+  - q: "कौन-सी limits budget को बचाती हैं?"
+    a: "प्रति user daily caps, agents पर step limits, spending alerts और provider की hard limits।"
+  - q: "रातों-रात cost के झटके किससे लगते हैं?"
+    a: "Retry storms, loop में फँसे agents, एक बहुत बड़ा document, या एक heavy user।"
+  - q: "ये कैसे साबित करें कि cost घटाने से नुकसान नहीं हुआ?"
+    a: "Cost के बदलाव के साथ, पहले और बाद के eval scores और user satisfaction दिखाओ।"
+  - q: "प्रति request cost कैसे निकालते हैं?"
+    a: "Input tokens × input price जमा output tokens × output price, और cached input का bill कम लगता है। Output प्रति token आमतौर पर कई गुना महँगा होता है।"
+exercise:
+  title: "बचत ढूँढो"
+  setup: "Jaipur का एक travel portal AI पर महीने के ₹8 लाख खर्च करता है। Feature के हिसाब से logs: हर रात 50,000 listings के hotel descriptions दोबारा लिखने में 50% जाता है; booking chat में 30%; review sentiment tagging में 20%। Chat का system prompt 5,000 tokens का है और replies औसतन 600 tokens के हैं, जबकि users सिर्फ़ पहली कुछ lines पढ़ते हैं। कोई spending alerts नहीं हैं।"
+  questions:
+    - q: "रात की rewriting में क्या बदलना चाहिए?"
+      a: "इसे batch API पर ले जाओ, और सिर्फ़ वो listings दोबारा लिखो जो पिछले run के बाद बदली हों।"
+    - q: "Sentiment tagging में क्या बदलना चाहिए?"
+      a: "Labelled reviews पर छोटा model test करो और accuracy टिकी रहे तो उसी पर आ जाओ।"
+    - q: "Users को नुकसान पहुँचाए बिना chat की cost कैसे घट सकती है?"
+      a: "System prompt trim करके cache करो, छोटे replies माँगो और max_tokens सेट करो।"
+    - q: "कौन-सी सुरक्षा जोड़नी चाहिए?"
+      a: "Budget के, मान लो, 80% पर spending alerts, प्रति user daily caps और provider की एक hard limit।"
+ask:
+  - "अपने LLM API की cost कैसे घटाऊँ?"
+  - "AI की cost feature के हिसाब से कैसे track करूँ?"
+  - "पैसे बचाने के लिए छोटा model use करूँ क्या?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+LLM apps में हर request पर पैसा लगता है, और users बढ़ने, prompts लंबे होने और agent loops से cost बढ़ती है। **Cost control** का मतलब है ये जानना कि पैसा कहाँ जाता है और user experience बिगाड़े बिना उसे घटाना। मुख्य levers हैं: model choice, prompt size, output size, caching, batching और limits।
+
+| Feature (tagged logs से) | ₹6 लाख महीने में हिस्सा | Fix |
+|---|---|---|
+| रात के ticket summaries | 45% | Batch API पर ले जाओ |
+| Live chat replies | 35% | Prompt trim और cache करो, replies cap करो |
+| Ticket classification | 20% | छोटा model (accuracy 94% से 93%) |
+
+```flow
+dir: LR
+हर call को feature के हिसाब से tag करो -> सबसे बड़ा हिस्सा ढूँढो -> एक fix लगाओ -> Caps जोड़ो | प्रति agent daily cap, budget के 80% पर alert, provider hard limit
+Caps जोड़ो -> अगला महीना: ₹2.7 लाख | customer satisfaction वैसी ही
+```
+
+ये lesson Kolkata के एक customer-service platform की कहानी है जो अपना model bill आधा करना चाहता था।
+
+## ये काम कैसे करता है
+
+**पहले मापो।** हर call के tokens और cost को feature, user और model के tags के साथ log करो। फिर आप जवाब दे सकते हो: कौन-सा feature सबसे महँगा है? कौन-से users? Agent का कौन-सा step? सिर्फ़ महीने का कुल योग ये छिपा देता है; प्रति user और प्रति feature cost दिखाती है कि कहाँ कदम उठाना है और क्या कोई feature अपना खर्च खुद निकाल सकता है।
+
+**Model choice: सबसे बड़ा lever।** छोटे models सबसे बड़े models से कई गुना सस्ते हो सकते हैं। Classification, साफ़ text से extraction, routing और छोटे replies जैसे आसान tasks में छोटा model अक्सर बड़े के बराबर चलता है। हर task को अपने eval set पर दो-तीन model sizes के साथ test करो और जो pass हो उनमें सबसे सस्ता use करो। सिर्फ़ मुश्किल requests बड़े model को भेजो।
+
+**Prompt size।** हर request अपने input का पैसा देती है। System prompts trim करो, कम और छोटे retrieved chunks भेजो, लंबी conversation history का summary बनाओ, और इस्तेमाल न होने वाले tool definitions हटाओ।
+
+**Output size।** Output tokens आमतौर पर input से ज़्यादा महँगे होते हैं। संक्षिप्त formats माँगो और `max_tokens` सेट करो।
+
+**Caching।** लंबे साझा prefixes के लिए prompt caching; बार-बार आने वाले सवालों के लिए response caching।
+
+**Batching।** जो काम इंतज़ार कर सकता है (रात के summaries, bulk classification, corpus को embed करना) वो batch APIs से जा सकता है, जिन पर providers आमतौर पर घंटों में नतीजे देने के बदले बड़ी छूट देते हैं।
+
+**Limits।** प्रति user daily caps, agents पर step limits, spending alerts और provider console में hard limits।
+
+**Arithmetic जानो।** प्रति request cost है input tokens × input price जमा output tokens × output price, जिसमें cached input का bill आमतौर पर बहुत कम लगता है। एक छोटा calculator अंदाज़ों को ईमानदार रखता है:
+
+```python
+def cost_per_request_inr(input_tokens, output_tokens, in_price_usd_per_m, out_price_usd_per_m,
+                         cached_share=0.0, cache_discount=0.9, usd_to_inr=85):
+    """Prices are US dollars per million tokens. cached_share: fraction of input served from the prompt cache."""
+    fresh = input_tokens * (1 - cached_share)
+    cached = input_tokens * cached_share * (1 - cache_discount)
+    usd = ((fresh + cached) * in_price_usd_per_m + output_tokens * out_price_usd_per_m) / 1e6
+    return usd * usd_to_inr
+
+def monthly_cost_inr(requests_per_month, **kw):
+    return requests_per_month * cost_per_request_inr(**kw)
+
+# A chat reply: 3,000 input tokens (60% cached), 250 output, $3 / $15 per million tokens
+per = cost_per_request_inr(3000, 250, 3, 15, cached_share=0.6)
+print(round(per, 2), round(monthly_cost_inr(300_000, input_tokens=3000, output_tokens=250,
+      in_price_usd_per_m=3, out_price_usd_per_m=15, cached_share=0.6)))
+```
+
+Prices और exchange rate बदलते रहते हैं, इसलिए उन्हें provider के मौजूदा page से पढ़ो और लिखकर रखो कि किस तारीख को check किया। ये arithmetic दो बातें जल्दी दिखा देता है: output tokens आमतौर पर input से कई गुना महँगे होते हैं, और हर call में दोहराए जाने वाले लंबे prompts तेज़ी से जुड़ जाते हैं।
+
+**Language भी मायने रखती है।** Tokenizer के हिसाब से, वही reply Hindi, Tamil या Bengali में English से कई गुना ज़्यादा tokens ले सकता है, इसलिए जिस भी language में serve करते हो, उसके लिए प्रति request tokens मापो। भारतीय भाषाओं में AI वाला lesson इसे cover करता है।
+
+**Difficulty के हिसाब से route करो।** एक छोटा, तेज़ classifier या rules आसान requests को सस्ते model को, scope से बाहर के सवालों को बिना model call वाले stock reply को, और सिर्फ़ मुश्किल वालों को सबसे मज़बूत model को भेज सकते हैं। AI app को layers में बढ़ाने वाला lesson routers और gateways cover करता है।
+
+**झटकों पर नज़र रखो।** Retry storms, loop में फँसे agents, एक विशाल document, या एक heavy user रातों-रात cost को कई गुना कर सकते हैं।
+
+**Levers और आम बचत:**
+
+| Lever | आम असर | Risk |
+| --- | --- | --- |
+| आसान tasks के लिए छोटा model | उस task पर बड़ी बचत | Test न किया तो quality गिर सकती है |
+| इंतज़ार कर सकने वाले काम के लिए Batch API | बड़ी छूट | घंटों की देरी |
+| Prompt caching | दोहराए prefixes पर input cost कम | Prefix बदला तो टूट जाता है |
+| छोटे prompts और outputs | उतनी ही अनुपात में बचत | Context या detail छूट सकता है |
+| Response caching | बार-बार की calls हटाता है | पुराने या साझा जवाब |
+| Caps और alerts | झटकों को रोकते हैं | Users limits से टकराते हैं |
+
+**एक cost dashboard जो कदम उठवाए।** Feature के हिसाब से रोज़ का खर्च, सबसे ज़्यादा use करने वाले users की प्रति user cost, प्रति सफल task cost, और top feature के लिए prompt के हर हिस्से से आने वाले tokens का हिस्सा दिखाओ। Budget और alert threshold की एक line जोड़ो। हर हफ़्ते review करो। Dashboard को एक नज़र में बताना चाहिए कि अगला कौन-सा feature optimise करना है और पिछले हफ़्ते का बदलाव काम आया या नहीं।
+
+**सुरक्षित तरीके से घटाना।** एक बार में एक lever बदलो और उससे पहले और बाद में उस feature के evals चलाओ। Cost और quality को साथ-साथ report करो। जब कोई बदलाव पैसा बचाए पर quality थोड़ी घटाए, जैसे यहाँ classifier में, तो लिख लो कि team ने ये trade-off क्यों माना।
+
+**Launch से पहले feature की कीमत लगाना।** Pilot से प्रति user प्रति महीने cost का अंदाज़ा लगाओ: प्रति user requests, प्रति request tokens और model की price। इसे उससे compare करो जो feature प्रति user कमाता या बचाता है। अगर किसी एक user की monthly cost उसकी value से ज़्यादा हो सकती है, तो caps पहले bill के बाद नहीं, launch से पहले लगाओ। असली traffic के पहले दो हफ़्तों में अंदाज़े को दोबारा देखो, क्योंकि असली users शायद ही कभी pilot group की तरह बर्ताव करते हैं।
+
+## एक example से समझो
+
+Kolkata का एक customer-service platform model calls पर महीने के ₹6 लाख खर्च करता है और इसे आधा करना चाहता है।
+
+Feature के हिसाब से logging दिखाती है:
+
+- 45% एक रात के job पर, जो team leads के लिए 10,000 support tickets का summary बनाता है, जिसे सुबह 10 बजे से पहले कोई नहीं पढ़ता;
+- 35% live chat replies पर;
+- 20% ticket classification पर।
+
+बदलाव:
+
+- रात के summaries provider की batch API पर बड़ी छूट के साथ चले जाते हैं, और सुबह से काफ़ी पहले पूरे हो जाते हैं।
+- Ticket classification बड़े model से छोटे पर आ जाता है; 400 labelled tickets पर accuracy 94% से 93% होती है, जिसे team मान लेती है।
+- Live chat बड़ा model ही रखता है, पर system prompt 40% trim होकर cache होता है और replies 200 tokens पर cap होते हैं।
+- प्रति agent daily cap और budget के 80% पर spending alert जोड़ा जाता है।
+
+अगले महीने का bill ₹2.7 लाख है, और customer satisfaction scores में कोई बदलाव नहीं।
+
+| बदलाव | Cost पर असर | Quality check |
+| --- | --- | --- |
+| रात के summaries batch पर | 45% खर्च पर बड़ी छूट | पहले की तरह 10 बजे से पहले तैयार |
+| Classification छोटे model पर | बहुत सस्ता | 400 tickets पर 94% से 93%, मान लिया गया |
+| Chat prompt 40% trim और cache; replies cap | Chat की cost कम | Satisfaction वैसी ही |
+
+## आम गलतियाँ
+
+- **Feature और user के हिसाब से मापे बिना optimise करना।**
+- **हर काम के लिए सबसे बड़ा model use करना।**
+- **जो काम इंतज़ार कर सकता है उसके लिए real-time दाम देना।**
+- **लंबे prompts और बिना limit के outputs।**
+- **Alerts या caps न होना।**
+- **Quality जाँचे बिना cost घटाना।** हर बदलाव पर evals चलाओ।
+
+## जब cost घटाना गलत लक्ष्य हो
+
+- **Feature अभी काम नहीं कर रहा।** पहले अपने evals पर quality ठीक करो; optimise बाद में।
+- **बचत बहुत छोटी है।** महीने के ₹2,000 बचाना हफ़्तों की engineering या मापने लायक quality गिरावट के लायक नहीं है।
+- **Latency या भरोसा ज़्यादा मायने रखता है।** High-stakes task पर कोई सस्ता model जो धीमा है या ज़्यादा गलतियाँ करता है, support और खोए users में ज़्यादा महँगा पड़ सकता है।
+
+## Demo से production तक
+
+- **हर call को tag करो**: feature, user, model और prompt version के साथ, और tokens और cost store करो।
+- **हर feature के लिए budgets सेट करो** alerts के साथ, और provider पर hard limits।
+- **Cost dashboard हर हफ़्ते review करो**, quality metrics के साथ, और हर model या prompt बदलाव के बाद दोबारा जाँचो।
+- **नियमित रूप से दोबारा दाम देखो।** Providers दाम घटाते हैं और सस्ते models लाते हैं; छह महीने पुराना चुनाव अब ज़्यादा पैसे दे रहा हो सकता है।
+- **सस्ते रास्ते को test करके रखो**, जैसे एक छोटा fallback model, ताकि cost उछले तो जल्दी switch कर सको।
+
+## Practice करो
+
+नीचे link किया Chip Huyen का production के लिए LLM applications बनाने वाला लेख पढ़ो, खासकर cost वाले हिस्से। और गहराई के लिए, उनकी किताब *AI Engineering* (O'Reilly, 2025) के chapters 9 और 10 inference cost, batch APIs, routing और caching को cover करते हैं।
+
+1. अपने किसी app में feature और user tags के साथ प्रति call cost logging जोड़ो, और सबसे महँगा feature ढूँढो।
+2. उस feature को अपने eval set पर छोटे model के साथ test करो और तय करो कि बदलना है या नहीं।
+3. कोई एक गैर-ज़रूरी job batch processing पर ले जाओ, या एक cap और एक alert जोड़ो।
+
+**आप तब पूरा कर चुके हो जब** आप feature और user के हिसाब से cost दिखा सको, और एक ऐसा बदलाव दिखा सको जिसने आपके eval scores को नुकसान पहुँचाए बिना cost घटाई।

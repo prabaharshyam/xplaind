@@ -1,0 +1,175 @@
+---
+id: ai-app-in-layers
+lang: hi
+title: "AI app को layers में बढ़ाना: context, guardrails, routing, caching और agents"
+outcome: "AI product को एक model call से शुरू करके, असली ज़रूरत आने पर ही context, guardrails, router और gateway, caches और agent steps जोड़ पाओगे, और monitoring पहले दिन से रखोगे।"
+answer: "एक model call से शुरू करो, फिर ज़रूरत पड़ने पर ही parts जोड़ो: context, guardrails, router और gateway, caches, फिर agent loops और actions। हर layer पर पहले दिन से नज़र रखो।"
+why_it_matters: "Teams एक भी खुश user आने से पहले जटिल AI platform बना डालती हैं, और फिर बता नहीं पातीं कि कौन-सा हिस्सा टूटा। एक बार में एक layer बढ़ाने से system सरल, सस्ता और debug करने लायक रहता है, और interviewers यही architecture की कहानी सुनना चाहते हैं।"
+flashcards:
+  - q: "सबसे सरल AI app architecture क्या है?"
+    a: "App user की query model को भेजता है और जवाब लौटा देता है। न context, न guardrails, न caching।"
+  - q: "App बढ़ने पर आमतौर पर सबसे पहले क्या आता है?"
+    a: "बेहतर context: documents या data से retrieval, और चीज़ें ढूँढने के लिए tools, ताकि model सही facts से जवाब दे।"
+  - q: "Input guardrails किससे बचाते हैं?"
+    a: "Private data के बाहरी services तक leak होने से, और हानिकारक या injected instructions के model तक पहुँचने से।"
+  - q: "Output guardrails क्या पकड़ते हैं?"
+    a: "User के देखने से पहले गलत format, बिना आधार या unsafe content, और leak हुआ personal data। फिर retry करो, fallback पर जाओ, या किसी इंसान को दे दो।"
+  - q: "Model router क्या करता है?"
+    a: "तय करता है कि हर request कहाँ जाए: सस्ता या strong model, कोई specialist, तैयार जवाब, या कोई इंसान, आमतौर पर एक छोटे, तेज़ classifier से।"
+  - q: "Gateway क्या जोड़ता है?"
+    a: "सारे model calls के लिए एक जगह: keys, access control, cost limits, logging, retries और providers के बीच fallbacks।"
+  - q: "Semantic cache risky क्यों है?"
+    a: "वो ऐसे सवाल के लिए भी पुराना जवाब लौटा देता है जो बस मिलता-जुलता लगता है। Match ढीला हो तो गलत जवाब जाता है, इसलिए threshold सोच-समझकर रखो और measure करो।"
+  - q: "Agent loops और write actions कब जोड़ने चाहिए?"
+    a: "सबसे आखिर में, और तभी जब tasks को सच में कई steps चाहिए या कुछ बदलना हो, और agent क्या कर सकता है इस पर approvals और limits के साथ।"
+exercise:
+  title: "Pune में clinic-booking assistant"
+  setup: "Pune में 40 clinics की एक chain ने WhatsApp assistant launch किया जो लंबे prompt वाला एक ही model call है। वो timings और fees के सवालों के जवाब देता है, पर patients अपनी lab reports के बारे में भी पूछते हैं, appointments book करने की कोशिश करते हैं, और कभी-कभी Aadhaar और phone numbers भी भेज देते हैं। Costs बढ़ रहे हैं, और वही दस सवाल traffic का 40% हैं।"
+  questions:
+    - q: "उन्हें सबसे पहले क्या जोड़ना चाहिए, और क्यों?"
+      a: "Context: अपने system से मौजूदा timings, fees और doctor schedules retrieve करो, ताकि जवाब लंबे prompt के अंदाज़े की जगह सही हों।"
+    - q: "इस assistant को कौन-से guardrails चाहिए?"
+      a: "Input: model call से पहले Aadhaar और phone numbers mask करो। Output: policy से आगे की medical advice block करो, और check करो कि बताई गई fees source से मेल खाती हैं।"
+    - q: "बार-बार आने वाले सवालों पर cost सुरक्षित तरीके से कैसे घटाएँ?"
+      a: "Top FAQs को तैयार जवाबों पर या normalise किए सवाल से key बने exact cache पर route करो। Semantic cache तभी use करो जब test से पता चले कि उसके matches भरोसे से वही सवाल हैं।"
+    - q: "क्या assistant को appointments खुद book करने चाहिए?"
+      a: "बाकी सब ठीक चलने के बाद ही: patient की confirmation के साथ एक tool के रूप में, वो क्या बदल सकता है इस पर limits के साथ, और हर booking log करके।"
+ask:
+  - "Production LLM app को कौन-से components चाहिए?"
+  - "Model router और gateway में क्या फ़र्क है?"
+  - "Semantic cache कब अच्छा idea है?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+हर AI product एक जैसे शुरू होता है: आपका app एक सवाल model को भेजता है और जवाब दिखाता है। ये अपने आप में पूरा, चलने वाला architecture है। ज़्यादातर असली products यहाँ से parts जोड़कर बढ़ते हैं, और क्रम मायने रखता है।
+
+कई teams जिस क्रम में बढ़ती हैं, वो आम क्रम:
+
+1. **Context बेहतर करो।** Model को सही information दो: documents से retrieval, data lookups, tools।
+2. **Guardrails लगाओ।** जो model में जाता है और जो बाहर आता है, दोनों check करो।
+3. **Router और gateway जोड़ो।** हर request को सही जगह भेजो, और सारे model calls एक जगह से manage करो।
+4. **Caches जोड़ो।** एक ही काम के लिए दो बार पैसे न दो।
+5. **Agent patterns जोड़ो।** Loops, कई steps, और ऐसे actions जो दुनिया में कुछ बदलते हैं।
+
+इन सबके साथ, पहले दिन से: **monitoring**, ताकि दिखे कि हर हिस्सा क्या कर रहा है।
+
+ये कोई सख़्त recipe नहीं है। बात ये है कि layer तभी जोड़ो जब कोई असली problem माँगे, ताकि system उतना ही सरल रहे जितना product इजाज़त दे।
+
+```flow
+title: बढ़े हुए AI app से गुज़रती एक request
+User का सवाल -> Input guardrails | personal data mask, injection block
+Input guardrails -> Router | intent: FAQ, account, scope से बाहर
+Router -[FAQ]-> Cache | exact या semantic
+Cache -[miss]-> Context retrieve करो | documents, data, tools
+Router -[account]-> Context retrieve करो
+Router -[scope से बाहर]-> तैयार जवाब
+Context retrieve करो -> Gateway | keys, limits, retries, fallback
+Gateway -> Model
+Model -> Output guardrails | format, facts, safety
+Output guardrails -[fail]-> Retry या इंसान को दो
+Output guardrails -[pass]-> जवाब दो और trace log करो
+```
+
+## ये काम कैसे करता है
+
+**Step 1: context बेहतर करना।** Model को सिर्फ़ अपना training data पता होता है और वो जो आप prompt में डालते हो। शुरुआती quality problems ज़्यादातर गायब या पुराने facts की वजह से होती हैं, इसलिए पहला जोड़ आमतौर पर retrieval (documents, database, search index) या tools (order lookup, calculator) होता है। RAG और tool-calling के lessons इन्हें गहराई से समझाते हैं।
+
+**Step 2: guardrails।** दो तरह के होते हैं।
+
+- **Input guardrails** private data को बाहरी services तक leak होने से रोकते हैं, जैसे model call से पहले Aadhaar numbers, phone numbers और names mask करके, और हानिकारक या injected instructions पकड़ते हैं।
+- **Output guardrails** user के देखने से पहले जवाब check करते हैं: format सही हो, बिना आधार के claims न हों, personal data न हो, और आपकी policy के ख़िलाफ़ कुछ न हो। Check fail होने पर आप retry कर सकते हो, दूसरे model पर fallback कर सकते हो, safe message लौटा सकते हो, या किसी इंसान को दे सकते हो।
+
+Guardrails latency बढ़ाते हैं, ख़ासकर streamed जवाबों में, जहाँ तय करना पड़ता है कि text दिखाने से पहले check करना है या दिखाते हुए। तेज़ checks inline रखो और धीमे checks एक sample पर चलाओ।
+
+**Step 3: router और gateway।**
+
+- **Router** तय करता है कि request कहाँ जाएगी, आमतौर पर एक छोटे, तेज़ intent classifier से। वो आसान सवाल सस्ते model को और मुश्किल सवाल strong model को भेज सकता है, billing disputes किसी इंसान को भेज सकता है, scope से बाहर के सवालों का विनम्र तैयार जवाब model call किए बिना दे सकता है, या message अस्पष्ट हो तो स्पष्टीकरण माँग सकता है ("मेरा account freeze करना है, या मौसम पूछ रहे हो?")।
+- **Gateway** वो एक जगह है जहाँ से हर model call गुज़रता है। वो API keys रखता है ताकि वो services में बिखरी न हों, तय करता है कि कौन-सा model कौन use कर सकता है, spend limits लागू करता है, हर call log करता है, और कोई provider down हो तो retry करता है या दूसरे provider पर fallback करता है।
+
+**Step 4: caches।**
+
+- **Exact cache:** वही normalise किया सवाल, template version और model हो तो वही stored जवाब मिलता है। Safe और सरल।
+- **Semantic cache:** जब नया सवाल पुराने सवाल जैसा *मतलब* रखे तो जवाब दोबारा use करना, embeddings और similarity threshold से match करके। सवाल दोहराए जाएँ तो बहुत बचत हो सकती है, पर ढीला match गलत जवाब दे देता है ("order 1 का refund" "order 2 के refund" के बहुत करीब है)। इसे तभी जोड़ो जब hit rate ऊँचा हो और आपने उसकी गलतियाँ measure कर ली हों।
+Reuse के लिए safe exact cache key में वो सब कुछ होना चाहिए जो जवाब बदल सकता है:
+
+```python
+import hashlib, re
+
+def cache_key(question, template_version, model, day):
+    """Same key only when the answer would be the same: same words, prompt, model and day."""
+    normalised = re.sub(r"\s+", " ", question.strip().lower())
+    raw = f"{normalised}|{template_version}|{model}|{day}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+# cache_key("What are Dr Mehta's timings?", "v7", "fast-model", "2026-11-08")
+```
+
+- **Prompt caching** और **KV cache** model provider या server पर होते हैं; इनके काम करने के लिए अपने prompt का न बदलने वाला हिस्सा सबसे पहले रखो।
+
+**Step 5: agent patterns।** अब तक हर request एक ही दिशा में बहती है। Agent patterns loops जोड़ते हैं (पहला जवाब अधूरा हो तो दोबारा retrieve करो), कई steps जोड़ते हैं, और ऐसे **write actions** जोड़ते हैं जैसे email भेजना या appointment book करना। ये system को बहुत ज़्यादा capable बनाते हैं और उतना ही ज़्यादा risky भी। इन्हें आखिर में जोड़ो, data बदलने वाली हर चीज़ पर approvals के साथ, tools क्या कर सकते हैं इस पर limits के साथ, और steps व spend पर budgets के साथ।
+
+**पहले दिन से monitoring।** हर request को trace की तरह log करो: input, retrieve किया context, model, prompt version, output, guardrail results, latency और cost, personal data mask करके। Dashboard पर कुछ signals track करो: error और refusal rates, guardrail triggers, हर request की cost, latency, और user feedback। System बढ़ने पर, कौन-सी layer fail हुई ये traces से ही पता चलता है।
+
+| Layer | कब जोड़ें | आम tools | साथ आने वाला नया risk |
+| --- | --- | --- | --- |
+| Context | जवाब facts चूक जाएँ या गढ़ें | Vector search, SQL, APIs | गलत या पुराने documents |
+| Guardrails | असली users और असली data आएँ | PII masking, validators, judge checks | Latency, गलत block होना |
+| Router | Requests मुश्किल या type में अलग हों | छोटा classifier, rules | गलत route हुई requests |
+| Gateway | एक से ज़्यादा model, service या team हो | LiteLLM, cloud gateways | एक ही जगह fail होने का खतरा |
+| Cache | कई सवाल दोहराए जाएँ | Redis, vector index | पुराना या गलत reuse |
+| Agents और actions | Tasks को कई steps या बदलाव चाहिए | Agent SDKs, LangGraph | बेकाबू loops, हानिकारक actions |
+
+## एक example से समझो
+
+Pune में 40 clinics की एक chain WhatsApp assistant चलाती है। वो एक model call और timings व fees की लंबी list वाले prompt से शुरू हुआ था। छह महीने बाद चार problems हैं: बताई गई fees कभी-कभी पुरानी होती हैं, patients अपने messages में Aadhaar और phone numbers भेज देते हैं, वही दस सवाल traffic का 40% हैं, और patients appointments book करने को कहते रहते हैं।
+
+वो इसे क्रम से बढ़ाते हैं:
+
+1. **Context।** Timings, fees और doctor schedules अब सवाल के समय clinic system से आते हैं। पुरानी fees की दिक्कत ख़त्म।
+2. **Guardrails।** किसी भी model call से पहले Aadhaar और phone numbers mask होते हैं। एक output check diagnosis जैसी लगने वाली हर चीज़ block करता है और confirm करता है कि fees clinic system से मेल खाती हैं।
+3. **Router।** एक छोटा classifier top FAQs को fixed जवाबों पर, lab-report के सवालों को secure link पर, और किसी भी अर्जेंट चीज़ को phone number पर भेजता है, बिना model call के।
+4. बाकी दोहराए जाने वाले सवालों के लिए **Exact cache**, normalise किए सवाल और तारीख़ से key बनाकर, क्योंकि schedules रोज़ बदलते हैं।
+5. **Booking एक tool के रूप में**, सबसे आखिर में: assistant एक slot सुझाता है, patient button से confirm करता है, और हर booking log होती है।
+
+| Measure | पहले | बाद में |
+| --- | --- | --- |
+| हर 1,000 messages पर model calls | 1,000 | 520 |
+| गलत fee या timing जवाब (हफ़्ते का sample) | 6% | 1% से कम |
+| Aadhaar numbers के साथ model को भेजे messages | रोज़ कुछ | कोई नहीं |
+| Chat में पूरी हुई bookings | 0 | booking requests का 22% |
+
+ये numbers सिर्फ़ समझाने के लिए हैं। उन्होंने semantic cache नहीं जोड़ा: एक test ने दिखाया कि वो "Dr Mehta's timings" को "Dr Mehra's timings" से match कर रहा था।
+
+## आम गलतियाँ
+
+- **पहले ही पूरा platform बना देना।** दस users से पहले पाँच layers का मतलब debug करने की पाँच जगहें और सीखा कुछ नहीं।
+- **Context ठीक होने से पहले agents जोड़ना।** गलत facts पर काम करने वाला agent तेज़ी से ज़्यादा नुकसान करता है।
+- **ऐसे guardrails जो सिर्फ़ log करें।** जो check block, retry या escalate न करे वो किसी को नहीं बचाता।
+- **Details वाले सवालों पर semantic cache।** Order numbers, names और dates के कारण मिलते-जुलते सवालों के मतलब अलग हो जाते हैं।
+- **Traces न होना।** हर request का trace न हो तो पता नहीं चलता कि retrieval, router या model में से क्या fail हुआ।
+- **Services में बिखरी keys और limits।** Gateway, सरल वाला भी, spend और access एक जगह रखता है।
+
+## कब सरल ही रहना है
+
+- **मुट्ठी भर लोगों के internal tools** को शायद कभी router, gateway या cache चाहिए ही नहीं।
+- **कम volume** में caching और routing की बचत इतनी छोटी होती है कि फ़र्क नहीं पड़ता।
+- **सिर्फ़ पढ़ने वाले जवाबों** को agent loops या write actions नहीं चाहिए।
+
+## Demo से production तक
+
+- **लिखकर रखो कि हर layer क्यों है**, उसने कौन-सी problem हल की और measure किया असर क्या रहा।
+- **Layers को अलग-अलग test करो**: retrieval recall, router accuracy, guardrail false-block rate, cache error rate।
+- **सब कुछ साथ में version करो**: prompts, router model, guardrail rules और cache keys, ताकि release को एक साथ rollback किया जा सके।
+- **सुरक्षित तरीके से fail हो**: कोई layer down हो तो request error page की जगह सरल path पर fallback करे।
+
+## Practice करो
+
+1. किसी AI feature का architecture जैसा आज है वैसा बनाओ जो आप जानते हो। पाँच layers में से कौन-सी उसमें हैं?
+2. हर गायब layer के लिए वो problem लिखो जो उसे जोड़ना सही ठहराएगी, और ये कि उसे कैसे measure करोगे।
+3. दोहराए जाने वाला एक सवाल type चुनो और तय करो: तैयार जवाब, exact cache, semantic cache या कुछ नहीं। कारण समझाओ।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 और उनका free article "Building a generative AI platform" इस architecture को step by step समझाते हैं।
+
+**आप तब पूरा समझो जब** पाँच layers को क्रम से बना सको, router और gateway का फ़र्क समझा सको, और बता सको कि semantic cache कब safe है।

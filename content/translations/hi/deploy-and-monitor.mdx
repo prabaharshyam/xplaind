@@ -1,0 +1,234 @@
+---
+id: deploy-and-monitor
+lang: hi
+title: "LLM app को deploy और monitor करना"
+outcome: "LLM app को online ला पाओगे और उसके errors, latency, cost और जवाबों की quality पर नज़र रख पाओगे।"
+answer: "LLM app को logging के साथ API के पीछे deploy करो, फिर errors, latency, token cost और जवाबों की quality monitor करो, और इनमें से कुछ भी अपनी limit पार करे तो alerts आएँ।"
+why_it_matters: "आपके laptop पर पड़ा app एक demo है। Monitoring के साथ deploy हुआ app एक product है, और ये वो project है जो employer को सबसे अच्छे से दिखाता है कि आप production में काम कर सकते हो।"
+flashcards:
+  - q: "LLM app monitoring किन चार तरह के signals को cover करती है?"
+    a: "Errors, latency, cost और quality।"
+  - q: "पहला LLM app deploy करने का आसान तरीका क्या है?"
+    a: "Managed serverless service या web app platform पर एक container, key secret settings में, एक health check और HTTPS के साथ।"
+  - q: "हर request में क्या log होना चाहिए?"
+    a: "Request id, pseudonymous user, latency, tokens, cost, model, prompt version और errors।"
+  - q: "पहले dashboard पर कौन-से numbers होने चाहिए?"
+    a: "प्रति दिन requests, error rate, p95 latency, प्रति दिन cost और feedback rate।"
+  - q: "बिना errors के भी quality क्यों गिर सकती है?"
+    a: "Providers models update करते हैं, documents बदलते हैं और users नए तरह के सवाल पूछने लगते हैं, और इसमें कोई request fail नहीं होती।"
+  - q: "चार quality signals बताओ।"
+    a: "User feedback, automatic checks, असली conversations की sampled review, और judge के साथ online evals।"
+  - q: "Changes कैसे release करने चाहिए?"
+    a: "पहले evals के साथ test environment में, फिर users के एक छोटे हिस्से को, और पिछला version roll back के लिए तैयार रखकर।"
+  - q: "पहले दिन से daily cost alert क्यों लगाएँ?"
+    a: "एक script या एक heavy user रातों-रात cost कई गुना कर सकता है; alert से आप bill आने से पहले कदम उठा सकते हो।"
+  - q: "TTFT और TPOT क्या हैं?"
+    a: "Time to first token: reply शुरू होने में कितना समय लगा। Time per output token: वो कितनी तेज़ी से आगे बढ़ता है। कुल latency = TTFT + TPOT × output tokens।"
+  - q: "Metrics, logs और traces में क्या फ़र्क है?"
+    a: "Metrics वो कुल आँकड़े हैं जो दिखाते हैं कि कुछ गड़बड़ है। Logs वो events हैं जो दिखाते हैं कि क्या हुआ। Trace एक request के steps को हर एक के समय और cost के साथ जोड़ता है।"
+exercise:
+  title: "Launch plan करो"
+  setup: "Mysuru की Sana अपने cooking channel के 20,000 followers के लिए Kannada और English का recipe assistant launch कर रही है। उसका plan: उसे laptop पर ngrok से चलाना, API key app.js में रखना ताकि browser सीधे model को call कर सके, और followers के शिकायत करने पर check करना।"
+  questions:
+    - q: "Hosting plan में क्या गलत है?"
+      a: "Laptop offline हो जाता है और scale नहीं होता। HTTPS और health check के साथ managed container या app platform use करो।"
+    - q: "App.js में key रखने में क्या गलत है?"
+      a: "कोई भी उसे browser से copy कर सकता है। उसे platform की secret settings में रखो और backend से model call करो।"
+    - q: "उसे क्या log करना और क्या देखना चाहिए?"
+      a: "हर request की latency, tokens, cost, errors और thumbs ratings, भाषा के हिसाब से एक छोटे daily dashboard पर।"
+    - q: "कौन-से alerts और limits जोड़ने चाहिए?"
+      a: "एक daily cost alert, एक error-rate alert, एक uptime check और प्रति user daily limit।"
+ask:
+  - "अपना पहला LLM app कहाँ deploy करूँ?"
+  - "LLM application में क्या monitor करना चाहिए?"
+  - "खराब prompt बदलाव को roll back कैसे करूँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+LLM app को deploy करने का मतलब है उसे online ऐसी जगह रखना जहाँ असली users भरोसे से पहुँच सकें। Monitoring का मतलब है वहाँ पहुँचने के बाद उसके बर्ताव पर नज़र रखना। LLM apps के लिए monitoring चार तरह के signals को cover करती है:
+
+- **Errors**: fail हुई requests, provider errors, timeouts।
+- **Latency**: users कितना इंतज़ार करते हैं, खासकर time to first token।
+- **Cost**: प्रति request, प्रति user और प्रति दिन tokens और पैसा।
+- **Quality**: क्या जवाब अब भी अच्छे हैं, user feedback, automatic checks और sampled review से।
+
+```flow
+Users -[HTTPS]-> Managed service पर Container, भारतीय region | secret settings से key, एक /health endpoint
+Managed service पर Container, भारतीय region -> Model API
+Managed service पर Container, भारतीय region -> हर request log होती है | id, user, latency, tokens, cost, model, prompt version, rating
+हर request log होती है -> Daily dashboard | requests, error rate, p95 latency, प्रति दिन cost, thumbs-up rate
+Daily dashboard -> Alerts | errors 2% से ऊपर, cost ₹150 प्रति दिन से ऊपर, app down
+Daily dashboard -[हर हफ़्ते]-> 20 असली conversations पढ़ो -> Fix -> Test env + evals -> छोटा release -> सभी users
+```
+
+ये lesson Coimbatore के final-year student Arjun की कहानी है, जो अपने college के regulations पर एक RAG app classmates के लिए deploy करता है।
+
+## ये काम कैसे करता है
+
+**आसानी से deploy करो।** पहले app के लिए managed platform काफ़ी है: serverless service पर एक container (जैसे Cloud Run, Azure Container Apps या Amazon ECS Express Mode), या Vercel, Render या Railway जैसे platform पर web app। API key को platform की secret settings में रखो, environment variables सेट करो, एक health-check endpoint जोड़ो और HTTPS चालू करो (आमतौर पर अपने-आप हो जाता है)।
+
+**हर request log करो**: request id, user (या pseudonymous id), latency, tokens, cost, model, prompt version और errors के साथ। Tracing tool या structured logs use करो।
+
+**Dashboards।** प्रति दिन requests, error rate, p95 latency, प्रति दिन cost और feedback rate वाला एक छोटा dashboard। शुरू में उसे रोज़ देखो।
+
+**Alerts।** Threshold से ऊपर error rate; daily budget से ऊपर cost; latency spikes; app का down होना। इन्हें ऐसी जगह भेजो जहाँ कोई देखेगा।
+
+**Quality signals।**
+
+- *User feedback*: thumbs up या down, वैकल्पिक कारण के साथ।
+- *Automatic checks*: format validity, refusals, citations मौजूद हैं या नहीं, guardrail triggers।
+- *Sampled review*: हफ़्ते में 20 असली conversations पढ़ो।
+- *Online evals*: live जवाबों के एक sample को judge से score करवाना।
+
+बिना किसी error के भी quality गिर सकती है: provider model update करता है, documents बदलते हैं, users नए तरह के सवाल पूछने लगते हैं।
+
+**Latency के दो हिस्से हैं।** Stream होते reply में users **time to first token** (TTFT) महसूस करते हैं और फिर **time per output token** (TPOT)। कुल समय लगभग TTFT + TPOT × output tokens है: 1.2 सेकंड का TTFT और 300 tokens के लिए प्रति token 30 ms मिलाकर करीब 10 सेकंड है, हालाँकि user 1.2 के बाद ही पढ़ना शुरू कर देता है। लोग मोटे तौर पर 100 से 150 ms प्रति token की रफ़्तार से पढ़ते हैं, इसलिए उससे तेज़ streaming शायद ही महसूस होती है, जबकि धीमा पहला token हमेशा महसूस होता है। **Percentiles** (p50, p95) report करो, सिर्फ़ average कभी नहीं: 100 ms के नौ replies और 3,000 ms का एक, average 390 ms देता है, जो किसी का भी हाल नहीं बताता।
+
+**Metrics, logs और traces।** Metrics वो कुल आँकड़े हैं जो बताते हैं कि 3:05 पर कुछ गड़बड़ हुई। Logs वो अलग-अलग events हैं जो बताते हैं कि 3:05 पर क्या हुआ। **Trace** एक request के हर step (retrieval, prompt, model call, tool calls, final answer) को हर एक के समय और cost के साथ जोड़ता है, ताकि आप देख सको कौन-सा step फ़ेल हुआ। Langfuse, LangSmith, Arize Phoenix या सादा OpenTelemetry जैसे tools इन्हें इकट्ठा करते हैं।
+
+**लोगों के बर्ताव से आने वाले signals।** Users शायद ही thumbs down दबाते हैं, पर उनका बर्ताव बोलता है: reply को बीच में रोक देना, regenerate दबाना, वही सवाल दोबारा अलग तरह से पूछना, या जो काम दो turns में होना चाहिए उस पर लंबी conversations। इन्हें explicit ratings के साथ track करो।
+
+**Drift के तीन प्रकार।** आपके code में कोई बदलाव न होने पर भी quality बदल सकती है:
+
+- **आपके अपने बदलाव**: prompt edit, नया document set, अलग chunk size।
+- **आपके users बदलते हैं**: नए तरह के सवाल, नई भाषा, exam results के ऐलान के बाद लंबे inputs।
+- **Model बदलता है**: provider उसी नाम के पीछे model को update या retire कर देता है। जहाँ मिलें वहाँ तारीख वाले model versions pin करो, और बदलने से पहले evals दोबारा चलाओ।
+
+**आपकी monitoring कितनी अच्छी है?** Software operations के तीन numbers: किसी समस्या को **पकड़ने में लगा समय**, उसे **हल करने में लगा समय**, और **change failure rate**, यानी उन releases का हिस्सा जिन्हें fix या rollback चाहिए। ऊँचा change failure rate बताता है कि आपके evals को release से पहले ज़्यादा पकड़ना चाहिए।
+
+**एक छोटा logging wrapper।** कोई tool खरीदने से पहले, कुछ lines ही ज़्यादातर फ़ायदा दे देती हैं। ये एक reply को stream करता है, TTFT और कुल समय मापता है, और हर request के लिए एक JSON line लिखता है:
+
+```python
+import json, time, uuid
+import anthropic
+
+client = anthropic.Anthropic()
+PRICES = {"input": 3 / 1e6, "output": 15 / 1e6}       # USD per token; check current prices
+USD_TO_INR = 84
+VERSION = "rag-v14"                                    # prompt and code version
+
+def answer(user_id, question, system, messages):
+    start, first, rid = time.monotonic(), None, str(uuid.uuid4())
+    record = {"id": rid, "user": user_id, "version": VERSION, "model": "claude-sonnet-5-5"}
+    try:
+        with client.messages.stream(model=record["model"], max_tokens=600,
+                                    system=system, messages=messages) as stream:
+            parts = []
+            for text in stream.text_stream:
+                first = first or time.monotonic()
+                parts.append(text)
+            final = stream.get_final_message()
+        u = final.usage
+        record |= {"ok": True, "stop": final.stop_reason,
+                   "in": u.input_tokens, "out": u.output_tokens,
+                   "cost_inr": round((u.input_tokens * PRICES["input"] + u.output_tokens * PRICES["output"]) * USD_TO_INR, 3)}
+        return "".join(parts), rid
+    except anthropic.APIError as err:
+        record |= {"ok": False, "error": type(err).__name__}
+        raise
+    finally:
+        now = time.monotonic()
+        record |= {"ttft_ms": round(((first or now) - start) * 1000), "total_ms": round((now - start) * 1000)}
+        with open("requests.jsonl", "a") as f:
+            f.write(json.dumps(record) + "\n")
+```
+
+सवाल और जवाब का text जानबूझकर छोड़ा गया है; नीचे privacy note देखो। एक daily job उस file को पढ़ता है और thresholds जाँचता है:
+
+```python
+import json, statistics
+
+def daily_report(path="requests.jsonl", cost_limit_inr=150, error_limit=0.02):
+    rows = [json.loads(line) for line in open(path)]
+    ok = [r for r in rows if r["ok"]]
+    p95 = statistics.quantiles([r["total_ms"] for r in ok], n=20)[-1]
+    errors = 1 - len(ok) / len(rows)
+    cost = sum(r["cost_inr"] for r in ok)
+    alerts = [msg for bad, msg in [
+        (errors > error_limit, f"error rate {errors:.1%}"),
+        (cost > cost_limit_inr, f"cost ₹{cost:.0f}"),
+        (any(r["stop"] == "max_tokens" for r in ok), "some replies were cut off"),
+    ] if bad]
+    return {"requests": len(rows), "p95_ms": round(p95), "errors": f"{errors:.1%}",
+            "cost_inr": round(cost), "alerts": alerts}
+```
+
+**Logs में privacy।** पूरे prompts और replies debugging को बहुत आसान बनाते हैं, पर वो निजी data हैं। भारत के Digital Personal Data Protection Act के तहत, अपने privacy notice में बताओ कि आप क्या रखते हो और क्यों, उसे सिर्फ़ उतने समय रखो जितना ज़रूरी हो, phone numbers, email addresses और ID numbers mask करो, और सीमित करो कि logs कौन पढ़ सकता है। कई teams हर request का metadata log करती हैं और पूरा text सिर्फ़ एक छोटे, सहमति वाले, masked sample का।
+
+**सुरक्षित तरीके से release करो।** Changes को पहले test environment में deploy करो, अपने evals चलाओ, फिर release करो, और सबके लिए जाने से पहले आदर्श रूप से users के एक छोटे हिस्से को। पिछला version roll back के लिए तैयार रखो।
+
+**Signals और वो क्या बताते हैं:**
+
+| Signal | Threshold का example | Breach क्या सुझाता है |
+| --- | --- | --- |
+| Error rate | 10 मिनट तक 2% से ऊपर | Provider outage, bug, खराब deploy |
+| p95 latency | 8 सेकंड से ऊपर | धीमी retrieval, लंबे outputs, provider की सुस्ती |
+| प्रति दिन cost | ₹150 से ऊपर | एक heavy user, एक script, एक loop |
+| Thumbs-down rate | एक हफ़्ते में दोगुना | गायब documents, prompt बदलाव, नए सवाल |
+| Refusal rate | एक topic पर अचानक बढ़ा | Documents index नहीं हुए |
+
+**बीस मिनट में हफ़्ते की review।** Dashboard खोलो और पिछले हफ़्ते से compare करो। सबसे हाल की दस thumbs-down conversations और दस random वाली पढ़ो। अगर कुछ गलत था तो हर conversation पर एक line लिखो कि क्या गलत हुआ। सबसे आम कारण चुनकर उसे ठीक करो। ये छोटी आदत ज़्यादातर quality समस्याओं को तब पकड़ लेती है जब किसी ने ज़ोर से शिकायत भी नहीं की होती, हफ़्तों पहले।
+
+**Rollback।** पिछला container image tag करके तैयार रखो। Rollback platform पर एक command या एक click होना चाहिए, और launch से पहले एक बार test किया हुआ। हर log line में version दर्ज करो, ताकि rollback के बाद आप पक्का कर सको कि पुराना version ही traffic serve कर रहा है।
+
+**Region चुनना।** अपने users के सबसे नज़दीक का hosting region चुनो जिसे data के कोई भी rules allow करते हों, जैसे भारतीय users के निजी data के लिए भारतीय region। जाँचो कि model provider या उसका cloud partner भी पास में endpoint देता है या नहीं, क्योंकि अगर हर model call महाद्वीप पार करती है तो तेज़ app server का ज़्यादा फ़ायदा नहीं। Region का चुनाव अपने README में लिखो, ताकि reviewers देख सकें कि ये सोच-समझकर किया गया था।
+
+## एक example से समझो
+
+Coimbatore का final-year student Arjun अपने college के regulations पर RAG app deploy करता है ताकि classmates use कर सकें।
+
+- वो FastAPI app को container बनाता है और API key को secret settings में रखकर भारतीय region की serverless container service पर deploy करता है।
+- हर request latency, tokens, cost, जवाब मिला या नहीं और thumbs rating log करती है।
+- एक सादा dashboard (एक notebook जो रोज़ logs पढ़ता है) पहला हफ़्ता दिखाता है: 1,240 सवाल, median latency 2.3 s, p95 6.8 s, 1.2% errors, कुल cost ₹410, rate किए गए जवाबों में 81% thumbs up।
+- Thumbs-down cases पढ़ने से पता चलता है कि ज़्यादातर नए exam timetable के बारे में हैं, जो अभी index नहीं हुआ था। वो उसे जोड़ देता है।
+- उसने ₹150 प्रति दिन पर जो alert लगाया था वो नौवें दिन fire होता है, जब किसी classmate की script 3,000 requests भेजती है; वो प्रति user daily limit जोड़ देता है।
+
+वो link और हफ़्ते के numbers की एक page की report अपने project के रूप में जमा करता है।
+
+| पहले हफ़्ते का number | Value |
+| --- | --- |
+| सवाल | 1,240 |
+| Median और p95 latency | 2.3 s और 6.8 s |
+| Errors | 1.2% |
+| कुल cost | ₹410 |
+| Rate किए गए जवाबों में thumbs up | 81% |
+| Fixes | नया exam timetable index किया; एक script के 3,000 requests भेजने के बाद प्रति user daily limit जोड़ी |
+
+## आम गलतियाँ
+
+- **Cost और tokens log न करना।**
+- **सिर्फ़ errors देखना।** Quality बिना errors के गिरती है।
+- **Alerts न होना।** समस्याएँ users पकड़ते हैं।
+- **Code या image में secrets।** Platform के secrets use करो।
+- **बिना rollback के big-bang releases।**
+- **Percentiles की जगह averages।** एक धीमी request average में छिप जाती है; p95 उसे दिखाता है।
+- **Version के बिना logs।** हर line पर model और prompt version के बिना आप नहीं बता सकते कि किस release से बदलाव आया।
+- **सब कुछ हमेशा के लिए log करना।** Logs में निजी data को masking, retention limit और सीमित access चाहिए।
+
+## जब सादा काफ़ी हो
+
+- **निजी tool या एक दिन का demo**: token usage और errors console पर print करो।
+- **मुट्ठीभर users वाला छोटा internal pilot**: एक log file, ऊपर वाली daily report और conversations की हफ़्तावार पढ़ाई।
+- **Hosted no-code assistant**, जहाँ platform का अपना usage page cost और errors cover करता है।
+
+Tracing tools, online evals और staged releases तब जोड़ो जब असली users app पर निर्भर हों या pipeline में कई steps हों।
+
+## Demo से production तक
+
+- **तय करो कि पहले कौन-सी failures पकड़नी हैं**, फिर उनके लिए metrics चुनो: गलत format, गायब जवाब, धीमे replies, बेकाबू cost।
+- **हर metric को बाँटकर देखो**: version, model, feature और दिन के हिसाब से, ताकि किसी बदलाव का कारण ढूँढा जा सके।
+- **Model versions pin करो** और बदलने से पहले evals दोबारा चलाओ।
+- **एक page का runbook लिखो**: alerts किसे जाते हैं, roll back कैसे करना है, backup model पर कैसे जाना है।
+- **जो ढूँढो उसे evals में वापस डालो**: हर असली failure एक test case बन जाती है।
+
+## Practice करो
+
+नीचे link किया Full Stack Deep Learning का LLMOps lecture देखो।
+
+इस lesson का check एक project है: अपने किसी LLM app को deploy करो और उसका link share करो, साथ में एक छोटी report या dashboard का link जिसमें एक हफ़्ते की latency, cost, error और feedback के numbers हों।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) के chapters 9 और 10 latency metrics, monitoring, observability और drift को cover करते हैं।
+
+**आप तब पूरा कर चुके हो जब** आप अपना live app, उसका dashboard, एक alert जो fire हुआ और data की वजह से आपने क्या बदला, ये दिखा सको।

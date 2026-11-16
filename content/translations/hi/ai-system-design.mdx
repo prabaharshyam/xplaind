@@ -1,0 +1,205 @@
+---
+id: ai-system-design
+lang: hi
+title: "AI system को design करना"
+outcome: "AI product को कागज़ पर design कर पाओगे: उसके parts, data कैसे बहता है, कहाँ fail हो सकता है और उसे कैसे measure करोगे।"
+answer: "AI system design का मतलब है बनाने से पहले उसके parts, उनके बीच data का बहाव, कहाँ वो fail हो सकता है और quality, cost व speed कैसे मापोगे, इसका नक्शा बनाना।"
+why_it_matters: "System design rounds ही senior offers तय करते हैं। साफ़ design बनाना और उसे ज़ोर से बोलकर सही ठहराना ऐसा हुनर है जो practice से ही बनता है।"
+flashcards:
+  - q: "AI system design क्या है?"
+    a: "AI product को कागज़ पर plan करना: users, success metric, components, request flow, failure modes, evaluation और operations।"
+  - q: "Design document कितना लंबा होना चाहिए?"
+    a: "दो से चार साफ़ pages, जिन्हें team और client सच में पढ़ें।"
+  - q: "Goal वाले section में क्या होना चाहिए?"
+    a: "कौन use करता है, किस task के लिए, और baseline के साथ success metric, जैसे 6 minutes से 2 से कम।"
+  - q: "कौन-से constraints AI design को आकार देते हैं?"
+    a: "Volume और peaks, latency budget, हर request की cost, languages, data residency, privacy rules और access rights।"
+  - q: "Request flow को step by step क्यों बताएँ?"
+    a: "ये दिखाता है कि कौन-सा data कहाँ जाता है, जिससे privacy, latency और failure की दिक्कतें जल्दी सामने आती हैं।"
+  - q: "Failure-mode table क्या है?"
+    a: "हर component के लिए क्या गलत हो सकता है और उसे पकड़ने वाला guard, जैसे outages के लिए fallback model।"
+  - q: "Launch bar क्या है?"
+    a: "Launch से पहले test set पर पूरी होने वाली तय thresholds, जैसे citations के साथ 85% सही।"
+  - q: "Open questions क्यों शामिल करें?"
+    a: "अनसुलझे trade-offs और उनके options दर्ज करने से team ईमानदार रहती है और client के फ़ैसलों पर ध्यान जाता है।"
+  - q: "रोज़ की requests से peak load का estimate कैसे निकालें?"
+    a: "रोज़ की requests को उन busy hours से भाग दो जिनमें वो आती हैं, peak factor (अक्सर 2 से 3) से गुणा करो, और rate limits से तुलना के लिए requests और tokens प्रति मिनट में बदलो।"
+  - q: "Latency budget क्या है?"
+    a: "कुल response time का target, जो हर step (retrieval, reranking, model का पहला token, tools) के लिए एक छूट में बँटा हो, ताकि हर हिस्से के पास पूरा करने के लिए एक number हो।"
+exercise:
+  title: "Design का नक्शा बनाओ"
+  setup: "Bhopal का एक राज्य स्वास्थ्य विभाग 5,000 field health workers के लिए एक assistant चाहता है जो हिंदी और अंग्रेज़ी के 300 guideline PDFs से vaccination schedules और scheme rules के सवालों के जवाब दे। Workers कमज़ोर mobile data पर basic Android phones use करते हैं। Guidelines साल में कुछ बार बदलती हैं। Data भारत में ही रहना चाहिए।"
+  questions:
+    - q: "आप कौन-सा success metric और baseline सुझाओगे?"
+      a: "जैसे, जवाब मिलने का समय, supervisor को फ़ोन करने पर लगभग 20 minutes से घटकर 1 minute से कम, एक test set पर citations के साथ 90% सही।"
+    - q: "कौन-से constraints design को सबसे ज़्यादा आकार देते हैं?"
+      a: "कमज़ोर data और basic phones, इसलिए छोटे streamed जवाब और हल्का interface; हिंदी और अंग्रेज़ी; भारतीय hosting; और guideline versions।"
+    - q: "दो failure modes और उनके guards बताओ।"
+      a: "Superseded guidelines, effective-date filters से संभाली जाती हैं; और provider outage, fallback model और supervisor को फ़ोन करने के साफ़ message से संभाला जाता है।"
+    - q: "Evaluation plan में क्या होगा?"
+      a: "असली workers के दोनों भाषाओं के सवालों का test set, जिसमें ऐसे सवाल भी हों जिनका जवाब नहीं है, recall और correctness metrics के साथ, और एक launch bar।"
+ask:
+  - "AI system design document में क्या होना चाहिए?"
+  - "AI system design interview की तैयारी कैसे करूँ?"
+  - "AI system के failure modes की list कैसे बनाऊँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+**AI system design** किसी AI product को बनाने से पहले या बनाते हुए कागज़ पर plan करना है। इसमें ये आता है कि वो किसकी सेवा करता है और सफलता कैसे मापी जाती है, उसके components और उनके बीच एक request कैसे बहती है, कहाँ fail हो सकता है, और production में उसे कैसे evaluate करके चलाया जाता है। एक छोटा design document team को फ़ैसलों पर सहमत होने, risks जल्दी पहचानने और clients व reviewers को system समझाने देता है।
+
+```flow
+User, एक underwriter -> Web app -> API service -> Input guardrails
+Input guardrails -> Hybrid search | department filter + effective date
+Hybrid search -> Reranker -[top 5]-> Insurer के cloud region में Model
+Insurer के cloud region में Model -[outage]-> Fallback model
+Insurer के cloud region में Model -> Output guardrails -> Citation links के साथ जवाब
+Fallback model -> Output guardrails
+```
+
+इसके आसपास: mask किया हुआ tracing, CI में evals, और latency, cost, feedback और refusals के dashboards।
+
+ये lesson Mumbai की एक general insurer के internal underwriting assistant के design को follow करता है।
+
+## ये काम कैसे करता है
+
+एक practical design document, दो से चार pages, में ये होता है:
+
+**1. Users और goals।** कौन use करता है, किस task के लिए, और baseline के साथ success metric (जैसे, "policy सवालों के जवाब का median समय 6 minutes से घटाकर 2 से कम करना")।
+
+**2. Requirements और constraints।** Volume और peak load, latency budget, हर request की cost, languages, data residency, privacy और compliance rules, कौन-सा data कौन देख सकता है।
+
+**3. Components।** Interface; API service; retrieval (document ingestion, parsing, chunking, embeddings, index, hybrid search, reranking); prompt और model के चुनाव (और एक fallback model); tools; guardrails; इंसानी review के बिंदु; logging, tracing और evaluation।
+
+**4. Request flow।** एक request के साथ step by step क्या होता है, हर step पर आगे जाते data के साथ। एक सरल diagram मदद करता है।
+
+**5. Failure modes और guards।** हर component के लिए क्या गलत हो सकता है और उसे क्या पकड़ेगा:
+
+- retrieval misses → hybrid search, metadata filters, recall का evaluation;
+- hallucination → grounding, citations, sources चुप हों तो मना करना;
+- injection → least privilege, data को mark करना, approvals;
+- provider outage → retries, fallback model, शालीन error;
+- बेकाबू cost → caps, budgets, alerts;
+- पुराना data → re-indexing pipeline, freshness alerts।
+
+**6. Evaluation।** Test set (आकार, sources, categories), retrieval और जवाबों के metrics, launch bar, और CI में regressions कैसे पकड़ी जाएँगी।
+
+**7. Operations।** Deployment, monitoring signals, alerts, on-call, release process और data retention।
+
+**8. Open questions और trade-offs।** जो अभी तय नहीं हुआ और उसके options।
+
+अगर आप interview नहीं, बना रहे हो, तो पहले दिन सारे boxes बनाने की जगह system को एक बार में एक layer बढ़ाओ। AI app को layers में बढ़ाने वाला lesson (context, guardrails, router और gateway, caches, agents) उसी क्रम को समझाता है।
+
+**एक failure-mode table:**
+
+| Component | क्या गलत हो सकता है | Guard |
+| --- | --- | --- |
+| Parsing | Scan की हुई tables बिगड़ जाएँ | Table extraction; flag किए pages का review |
+| Retrieval | Superseded circulars पहले rank हों | Effective-date filter |
+| Retrieval | सही passage छूट जाए | Hybrid search, reranker, recall track |
+| Generation | बिना आधार के claims | Citations ज़रूरी; sources चुप हों तो मना |
+| Documents | Upload की files में injection | Write tools नहीं; content को data माना जाए |
+| Provider | Outage या rate limits | Retries, fallback model, साफ़ message |
+| Cost | बेकाबू usage | हर user की caps, रोज़ का budget alert |
+
+**Design का review।** एक request को user के tap से जवाब तक चलकर देखो। हर box पर तीन सवाल पूछो: यहाँ कौन-सा data है, उसे कौन देख सकता है, और ये हिस्सा fail या धीमा हो तो क्या होगा। Security या compliance reviewer को walk-through में जल्दी बुलाओ। "ये data कहाँ store होता है?" जैसे सवाल पहले हफ़्ते में सस्ते हैं और दसवें हफ़्ते में महँगे।
+
+**इसे ताज़ा रखना।** Document को जीवित मानो। कोई फ़ैसला बदले तो page update करो और अंत में एक छोटे decision log में तारीख़ और कारण लिखो। फिर नए team members और client reviewers chat threads से इतिहास जोड़ने की जगह एक सही page पढ़ते हैं।
+
+**Code में back-of-envelope numbers।** Capacity, rate limits और cost कई design choices तय करते हैं; boxes बनाने से पहले इन्हें निकालो:
+
+```python
+def estimate(daily_requests, busy_hours=8, peak_factor=2.5,
+             in_tokens=3_500, out_tokens=350, price_in=3, price_out=15, usd_to_inr=84,
+             tpm_limit=400_000):
+    """Prices in USD per million tokens; check current prices and note the date."""
+    peak_per_min = daily_requests / (busy_hours * 60) * peak_factor
+    tokens_per_min = peak_per_min * (in_tokens + out_tokens)
+    cost_day = daily_requests * (in_tokens * price_in + out_tokens * price_out) / 1e6 * usd_to_inr
+    return {
+        "peak requests per minute": round(peak_per_min, 1),
+        "peak tokens per minute": round(tokens_per_min),
+        "within rate limit": tokens_per_min < tpm_limit,
+        "cost per day ₹": round(cost_day),
+        "cost per month ₹": round(cost_day * 30),
+    }
+
+print(estimate(daily_requests=20_000))
+```
+
+अगर peak tokens per minute provider की limit से ऊपर जाएँ, तो design को ऊँचा tier, caching, कुछ steps के लिए छोटा model या queue चाहिए। अगर महीने की cost client को चौंकाए, तो अभी पता करो, launch के बाद नहीं।
+
+**Latency budget, step by step।** एक target और हर step के लिए एक छूट लिखो, फिर उसके सामने measure करो:
+
+| Step | छूट (p95) |
+| --- | --- |
+| Auth, request parse करना | 50 ms |
+| Query rewrite (छोटा model) | 400 ms |
+| Hybrid search | 150 ms |
+| 30 candidates की reranking | 250 ms |
+| Model, पहले token तक | 1,200 ms |
+| पहले token तक कुल | लगभग 2 s |
+
+अब हर component के owner के पास एक number है। कुल समय खिसकने पर trace दिखाता है कि कौन-सा step अपनी छूट से बाहर गया।
+
+**Layers में architecture।** Parts जोड़ने का एक काम का क्रम, ज़रूरी से वैकल्पिक तक: अच्छे context (retrieval, tools) वाला model call; inputs और outputs पर guardrails; router और gateway (कई models, fallbacks, keys, budgets); caching; और आखिर में write actions वाले agent patterns। हर layer capability और नए failure modes दोनों जोड़ती है, इसलिए एक तभी जोड़ो जब measure की हुई ज़रूरत दिखे।
+
+**Design फ़ैसले records के रूप में।** Document में एक छोटा decision log रखो: तारीख़, फ़ैसला, सोचे गए options, कारण, किसने सहमति दी। जैसे: "2026-11-02: reranker के साथ hybrid search; सिर्फ़ vector ने policy codes चूके (recall 71% बनाम 89%); client IT के साथ सहमत।" बाद के reviewers और नए team members को सिर्फ़ क्या नहीं, क्यों भी दिखता है।
+
+**शुरू करने के लिए template।** Design document को repository में Markdown के रूप में रखो, इस lesson के आठ headings, estimate output, latency budget, failure-mode table और decision log के साथ। इसे pull requests में code की तरह review करो।
+
+## एक example से समझो
+
+Mumbai की एक general insurer के internal assistant का design summary, जो 2,000 policy wordings, circulars और underwriting guidelines से underwriters के सवालों के जवाब देता है:
+
+- *Goal*: underwriters का lookup समय 6 minutes से 2; launch bar 120 सवालों के test set पर citations के साथ 85% सही, और "documents में नहीं है" वाले 100% सवालों पर मना करना।
+- *Constraints*: 300 users, peak पर 40 requests प्रति मिनट, पहला token 2 s से कम, data भारत में, department के हिसाब से access।
+- *Components*: पुराने circulars के लिए OCR के साथ layout-aware parsing; section paths के साथ 400-token chunks; department filters और reranker के साथ hybrid search; insurer के cloud region से एक मध्यम आकार का model और fallback; links के रूप में दिखते citations; mask किए logs के साथ tracing।
+- *Failure modes*: superseded circulars (effective-date filter), scan की tables (table extraction, flag किए pages), upload के documents से injection (write tools नहीं), outage (fallback, फिर साफ़ message)।
+- *Evaluation*: recall at 5, calibrated judge से answer correctness और महीने के 30 जवाबों का underwriter review; CI में तेज़ checks।
+- *Operations*: container service, latency, cost, feedback और refusal rate के dashboards, रात में re-indexing।
+
+Document में दो दिन लगे और इसने एक महीने के rework को रोक दिया जब compliance team ने पहले हफ़्ते में data residency पूछी।
+
+| Design element | फ़ैसला |
+| --- | --- |
+| Goal | Lookup समय 6 minutes से 2 |
+| Launch bar | 120 सवालों पर citations के साथ 85% सही; scope से बाहर वालों पर 100% मना |
+| Constraints | 300 users, peak पर 40 requests प्रति मिनट, पहला token 2 s से कम, data भारत में |
+| फ़ायदा | Compliance के पहले हफ़्ते के residency सवाल का जवाब document से ही, एक महीने का rework बचा |
+
+## आम गलतियाँ
+
+- **User और metric की जगह model से शुरू करना।**
+- **Failure analysis न होना।** हर component किसी न किसी तरह fail होता है।
+- **Evaluation plan न होना।** "देखते हैं कैसा चलता है" कोई plan नहीं है।
+- **Constraints को नज़रअंदाज़ करना।** Latency, cost और data rules design को आकार देते हैं।
+- **लंबे documents जिन्हें कोई न पढ़े।** दो से चार साफ़ pages।
+- **Capacity और cost का estimate छोड़ देना**, और फिर launch के बाद rate limits या bill का पता चलना।
+- **पूरे system के लिए एक ही latency target** और हर step की छूट नहीं।
+- **बिना दर्ज कारण के design फ़ैसले**, जो हर महीने दोबारा बहस में आते हैं।
+
+## कब पूरा design document ज़रूरत से ज़्यादा है
+
+- **किसी idea को परखने के लिए एक हफ़्ते का prototype**: goal, data और success measure वाला आधे page का note काफ़ी है।
+- **कम users और बिना sensitive data वाला छोटा internal tool।**
+- **मौजूदा system के अंदर का बदलाव**, जिसे नए document की नहीं, उसके design document के update की ज़रूरत है।
+
+## Demo से production तक
+
+- **Design document को repository में रखो**, हर बड़े बदलाव के साथ update करके।
+- **Traffic, models या prices बदलने पर capacity और cost estimate दोबारा चलाओ।**
+- **हर step को उसकी latency छूट के सामने** traces से measure करो।
+- **Decision log** तारीख़ और कारण के साथ रखो।
+- **हर incident के बाद failure modes review करो** और नई rows जोड़ो।
+
+## Practice करो
+
+नीचे जुड़े LLM-based systems बनाने के Eugene Yan के patterns पढ़ो।
+
+इस lesson का check एक project है: किसी AI product के लिए दो से चार page का design document लिखो, जिसमें users और success metrics, components, request flow, failure modes और guards, evaluation और operations हों।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 AI application architecture को layer by layer बताता है, और chapter 9 latency और cost।
+
+**आप तब पूरा समझो जब** किसी को अपना design दस minutes में समझा सको और हर component के लिए "ये हिस्सा fail हो तो क्या होगा?" का जवाब दे सको।
