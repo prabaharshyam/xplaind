@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-16, after PR 101** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-16, after PR 102** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
@@ -16,7 +16,7 @@ This document holds no secrets and must never hold any. Keys live in Vercel and 
 2. Run `npm install`, then `npm run check` (lint, typecheck, unit tests, content validation). Everything should pass.
 3. Run `npm run dev` and open the home page, a roadmap (`/roadmap/ai-engineer`), a lesson (`/stop/rag-app`), `/videos`, `/interview`. Look at it in light and dark, at 360 px wide and at desktop width. Most owner feedback is about how pages look and read.
 4. Skim `docs/PRD.md` headings and the newest rows (NV-8, IP-4, LY-1, LY-2, UX-7, LT-1, LT-2, BR-10, PAY-7 to PAY-11, CG-1, RZ-1, BIZ-1, IR-1, PR-1, CT-1, IL-1, PP-1, then FOCUS-2, MB-8 to MB-10, LQ-1 to LQ-7). Requirement IDs such as `RM-2` are the spec and go at the start of every commit message. IDs must be unique: search the PRD before inventing one (on 16 Nov `LB-1` and `LB-2` turned out to be taken by the papers library).
-5. Read section 3 (the owner) and section 12 (what is pending) before proposing anything. Read the "Migrations not run in production" warning at the top of section 9 first: several shipped features need database tables that did not exist on 16 Nov.
+5. Read section 3 (the owner) and section 12 (what is pending) before proposing anything. Read the migrations note at the top of section 9: every migration in the repo was applied to production on 16 Nov, and a new one must be applied (and recorded there) when you add it.
 
 Starter prompt you can paste into a new Claude session:
 
@@ -235,7 +235,7 @@ PRD IDs in brackets.
 
 **Pro and payments** (PAY-1 to PAY-11, RZ-1, BIZ-1, CG-1, RF-1, AN-1): `/pricing` (menu link "Pricing", NV-8), passes of 7 days, 30 days, 6 months and 12 months, Razorpay or Cashfree checkout, promo codes (rows in `promo_codes`, never in the repo), referrals (`/r/<code>`), billing and receipts in Settings, a refund policy and terms, a one-time AI trial for free accounts, funnel counts without user ids. The learning content is free with a free account (an open preview for visitors and search engines); the AI tools are Pro.
 
-**Outcomes and community of learners (14 Nov)** interview readiness score (IR-1), AI project review (PR-1), resume-to-job match (JM-1), public profile `/u/<handle>` (PF-1), verified certificate `/certificate/<id>` (CT-1), tutor in Indian languages (IL-1), interview-date plan (PP-1), 2-minute level check (QS-1), progress nudges (NG-1), colleges page `/colleges` (CB-1), outcome stories `/stories` (OS-1). Several need the unrun migrations in 9.
+**Outcomes and community of learners (14 Nov)** interview readiness score (IR-1), AI project review (PR-1), resume-to-job match (JM-1), public profile `/u/<handle>` (PF-1), verified certificate `/certificate/<id>` (CT-1), tutor in Indian languages (IL-1), interview-date plan (PP-1), 2-minute level check (QS-1), progress nudges (NG-1), colleges page `/colleges` (CB-1), outcome stories `/stories` (OS-1). Their tables were created in production on 16 Nov (see 9).
 
 **Loading and look** a full-screen loading screen with the animated X on every load, page change and language switch (UX-7), a thin top bar (UX-2), Deep Teal and Brass brand (BR-10), typographic blog covers (BL-2), a menu with icons (UX-3) and a numbered phone menu (NV-5, NV-6).
 
@@ -251,7 +251,7 @@ PRD IDs in brackets.
 
 Migrations in `supabase/migrations`, applied in order. Run them in the Supabase SQL editor (or with the CLI). **Which ones are applied in production is not recorded in the repo; check.**
 
-> **Migrations not run in production (checked 16 Nov 2026).** The `Xplaind` Supabase project has the tables up to the promo codes migration (`payments`, `entitlements`, `promo_codes`, `promo_redemptions` and the earlier ones) but **none** of these: `commitments` (`20261107000000`), `referral_codes`, `referrals`, `funnel_daily` (`20261114000000`), `interview_readiness` (`20261114010000`), `project_reviews` (`20261114020000`), `public_profiles`, `certificates` (`20261114030000`), `batch_enquiries` (`20261114040000`). The code for the weekly emails, referrals, funnel counts, readiness score, project review, public profiles, certificates and the colleges form is live, so those features will fail or show nothing until the owner runs the migrations in order in the Supabase SQL editor. Re-check with `select table_name from information_schema.tables where table_schema = 'public'` and update this note.
+> **Migrations: all applied to production on 16 Nov 2026.** On 16 Nov a check of the `Xplaind` Supabase project found nine tables missing, because the 7 Nov and 14 Nov migrations had never been run while the code that uses them was live. With the owner's go-ahead they were applied in order through the Supabase tools: `commitments` (`20261107000000`), the week pass, referrals and funnel counts (`20261114000000`, which also changed the plan constraints and `grant_pass`), `interview_readiness`, `project_reviews`, `public_profiles` and `certificates`, and `batch_enquiries`. Before applying, each file was read and the live database checked for the things the files assume (the existing functions and constraints, and that the 4 payments and 2 entitlements fit the new plan list). Afterwards: all nine tables exist with row-level security on, the existing payments, entitlements and promo codes were untouched, and the security advisor showed nothing new beyond the "RLS enabled, no policy" notes for server-only tables, which is intended. `20261109000000_ai_guest_sample.sql` was already in place (its function existed), so it was skipped. The migration history table is empty because earlier tables were created in the SQL editor, so **check by table and function, not by the history**: `select table_name from information_schema.tables where table_schema = 'public'`. When you add a migration, apply it, then record it here.
 
 | Migration | Adds |
 | --- | --- |
@@ -261,15 +261,15 @@ Migrations in `supabase/migrations`, applied in order. Run them in the Supabase 
 | `20261028000000_roadmap_downloads.sql` | Roadmap PDF download records |
 | `20261031000000_last_lesson.sql` | Last lesson for "continue where you left off" |
 | `20261102000000_ai_guests.sql` | Guest AI usage limits |
-| `20261107000000_commitments.sql` | Weekly email commitments (opt-in, token for one-click unsubscribe). **Not run in production** |
+| `20261107000000_commitments.sql` | Weekly email commitments (opt-in, token for one-click unsubscribe). **Run in production on 16 Nov** |
 | `20261108000000_payments.sql` | `payments` and `entitlements` for Pro passes (run) |
 | `20261109000000_ai_guest_sample.sql` | Guest AI sample limits (no new table) |
 | `20261113000000_promo_codes.sql` | `promo_codes`, `promo_redemptions` (run; four codes exist, `xp100` expires 30 Nov 2026) |
-| `20261114000000_week_pass_referrals_funnel.sql` | 7-day pass, `referral_codes`, `referrals`, `funnel_daily`. **Not run** |
-| `20261114010000_interview_readiness.sql` | `interview_readiness`. **Not run** |
-| `20261114020000_project_reviews.sql` | `project_reviews`. **Not run** |
-| `20261114030000_profiles_certificates.sql` | `public_profiles`, `certificates`. **Not run** |
-| `20261114040000_batch_enquiries.sql` | `batch_enquiries`. **Not run** |
+| `20261114000000_week_pass_referrals_funnel.sql` | 7-day pass, `referral_codes`, `referrals`, `funnel_daily`. **Run in production on 16 Nov** |
+| `20261114010000_interview_readiness.sql` | `interview_readiness`. **Run in production on 16 Nov** |
+| `20261114020000_project_reviews.sql` | `project_reviews`. **Run in production on 16 Nov** |
+| `20261114030000_profiles_certificates.sql` | `public_profiles`, `certificates`. **Run in production on 16 Nov** |
+| `20261114040000_batch_enquiries.sql` | `batch_enquiries`. **Run in production on 16 Nov** |
 
 Tests: `npm run test:db` runs the row-level security tests against a real Postgres 16 with a small Supabase shim (`TEST_DATABASE_URL`, for example `postgresql://postgres@localhost:5432/postgres`). CI does the same in a service container. Every new table needs a policy and a test for it.
 
@@ -331,7 +331,7 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 ## 12. What is pending
 
 **Owner actions (Claude cannot do these):**
-0. **Run the missing Supabase migrations** (see the warning in 9): `20261107000000_commitments.sql`, then `20261114000000`, `20261114010000`, `20261114020000`, `20261114030000`, `20261114040000`, in that order, in the Supabase SQL editor of the `Xplaind` project. Until then the weekly emails, referrals, funnel counts, readiness score, project review, public profile, certificate and colleges form have no tables. Claude can run them through the Supabase tools if the owner says so.
+0. **Done 16 Nov: the missing Supabase migrations** (see the note in 9). Still to do on the owner's side for those features to work end to end: the weekly emails need `RESEND_API_KEY`, `CRON_SECRET` and a verified sending domain (item 1); try each new feature once with a real account (referral link, readiness score, project review, certificate, profile, the colleges form) and report what does not work. Supabase's advisor also flags **leaked-password protection is off** (Auth settings in the Supabase dashboard; some plans only): worth turning on.
 0b. **Native-speaker review of the translations (LT-1).** All 824 translation files are AI drafts. Read at least the Tamil and Hindi ones, then the Tanglish and Hinglish ones, and even out wording between the four versions of a lesson; record who reviewed with `reviewed_by` and the date in each file's front matter. The drafts most likely to need a proofread: the Tanglish of `regression-tests`, `scoring-open-ended-answers`, `security-questionnaires`, `synthetic-data-distillation`, `ai-app-in-layers`, `ai-cost-of-ownership` and `batching-model-tiering` (a drafting note said they got only a quick clean-up).
 0c. **Promo codes (16 Nov):** the four codes are live in the database (`xp100` 100% off, `xp50off`, `xp25pro`, `xp10new`, all for the 30-day pass). `xp100` was given an expiry of 30 Nov 2026, 23:59:59 India time. Set `expires_at` on the others if wanted.
 0d. **Name correction outside the repo:** the business is "ZEREH Ventures". If the old spelling "ZEREH Venture" is on the Cashfree or Razorpay application, GST records or any listing, correct it there.
@@ -379,6 +379,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **12 to 13 Nov (PR 65 to 76):** sign-in timeout (AC-13); the study loop for notes and books (MB-8 to MB-10, PR 68); a narrower product (FOCUS-2, PR 69); business details for the payment gateway (BIZ-1, PR 70); Razorpay beside Cashfree (RZ-1, PR 71); a one-time AI trial and a pricing page that sells on value (PAY-7, PAY-8, PR 72); promo codes (PAY-9, PR 73 and 74); the unslop passes (UX-5, UX-6, PR 75); learning free with an account, AI for Pro (CG-1, PAY-10, PR 76).
 - **14 Nov (PR 77 to 85):** a folded and then numbered phone menu (NV-5, NV-6); Pro on its own in the menu and "AI Studio" (NV-7); the 7-day pass, referrals and funnel counts (PAY-11, RF-1, AN-1); readiness score, project review, job match, profile and certificates (IR-1, PR-1, JM-1, PF-1, CT-1); tutor in Indian languages, interview-date plan, 2-minute check and nudges (IL-1, PP-1, QS-1, NG-1); colleges page, outcome stories and pricing around outcomes (CB-1, OS-1, OP-1); the Deep Teal and Brass rebrand (BR-10); typographic blog covers (BL-2).
 - **15 to 16 Nov (PR 86 to 95):** every lesson translated into Tamil, Hindi, Tanglish and Hinglish (LT-1): the pilot (PR 86), eight batches of Tamil and Hindi (PR 87 to 93, 161 lessons), the last 45 Tamil and Hindi lessons (PR 94) and the remaining 165 Tanglish and Hinglish lessons (PR 95). The build moved to a second Claude account partway through (16 Nov), and the last two passes ran as parallel Sonnet sub-agents.
+- **16 Nov (database, outside the repo):** the nine missing tables were created by applying the 7 Nov and 14 Nov migrations to production, and the `xp100` promo code got its 30 Nov expiry.
 - **16 Nov (PR 100 and 101):** this handover brought up to date and made a standing rule (DOC-3, PR 100); video lessons stop sending learners to youtube.com: the player is sandboxed so its YouTube links do nothing (VD-3, PR 101).
 - **16 Nov (PR 96 to 99):** the home page promotes lessons in your own language (LT-2, PR 96); the loading screen with the animated Xplaind X, and a steadier home search test (UX-7, PR 97); the business name corrected to ZEREH Ventures (BIZ-1, PR 98); the Library opens on technical lessons, Library and Topics merged, patterns and system design last in Interview, practice cards in one place, no glossary on Practice, and "Pricing" instead of "Pro" in the menu (LY-1, LY-2, IP-4, NV-8, PR 99). Also that day, outside the repo: `xp100` given an expiry of 30 Nov, and a read-only check of DNS, certificates and the Supabase tables (the migrations warning in 9).
 - **12 Nov:** the notes tool's study loop (MB-8 to MB-10, PR 68); a narrower product (FOCUS-2): the AI roadmap generator, X Bot and the Rust track removed, and the weekly plan and Monday emails merged as "Stay on track".
