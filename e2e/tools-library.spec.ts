@@ -50,9 +50,9 @@ test("the AI tools topic has its lessons, and the removed Rust track sends old l
   await page.goto("/topics/ai-tools");
   await expect(page.getByRole("link", { name: /Build AI voice agents with Vapi/ })).toBeVisible();
   await page.goto("/topics/rust");
-  await expect(page).toHaveURL(/\/topics$/);
+  await expect(page).toHaveURL(/\/library\?view=topics$/);
   await page.goto("/stop/rust-ownership-borrowing");
-  await expect(page).toHaveURL(/\/topics$/);
+  await expect(page).toHaveURL(/\/library\?view=topics$/);
   await page.goto("/blog/rust-programming-language-2026");
   await expect(page).toHaveURL(/\/blog$/);
 });

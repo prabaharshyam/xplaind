@@ -13,8 +13,8 @@ export const NAV_GROUPS: Group[] = [
     label: "Learn",
     items: [
       { href: "/paths", label: "Roadmaps", note: "A step-by-step path for each AI role", icon: "map", tone: "violet" },
-      { href: "/library", label: "Library", note: "Every lesson, video and skill", icon: "table", tone: "indigo" },
-      { href: "/topics", label: "Topics", note: "Lessons grouped by subject", icon: "flow", tone: "sky" },
+      // LY-2: Library and Topics are one page; "By topic" is a view inside it.
+      { href: "/library", label: "Library", note: "Every lesson, video and skill, or browse by topic", icon: "table", tone: "indigo" },
       { href: "/videos", label: "Videos", note: "Filter by topic", icon: "play", tone: "rose" },
       { href: "/projects", label: "Projects", note: "Guided builds for your portfolio", icon: "rocket", tone: "amber" },
       { href: "/glossary", label: "Glossary", note: "AI words in plain English", icon: "chat", tone: "teal" },
@@ -35,11 +35,12 @@ export const NAV_GROUPS: Group[] = [
     id: "interview",
     label: "Interview",
     items: [
-      { href: "/interview/patterns", label: "Interview patterns", note: "The ideas AI interviews are built on", icon: "flow", tone: "violet" },
-      { href: "/interview/design", label: "System design answers", note: "Worked LLM designs, step by step", icon: "server", tone: "indigo" },
+      // IP-4: patterns and system design answers are last.
       { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report", icon: "mic", tone: "rose" },
       { href: "/interview/answers", label: "Interview Q&A", note: "Every question and answer, by role", icon: "chat", tone: "teal" },
       { href: "/interview", label: "Question bank", note: "Every question, by topic and role", icon: "search", tone: "amber" },
+      { href: "/interview/patterns", label: "Interview patterns", note: "The ideas AI interviews are built on", icon: "flow", tone: "violet" },
+      { href: "/interview/design", label: "System design answers", note: "Worked LLM designs, step by step", icon: "server", tone: "indigo" },
     ],
   },
   {
@@ -63,10 +64,11 @@ export const NAV_GROUPS: Group[] = [
   },
 ];
 /**
- * NV-7: Pro has its own place, not inside a group: a "Pro" link in the desktop bar and a card at
- * the foot of the phone menu. BIZ-1: prices are always public, so gateways and visitors see what is sold.
+ * NV-7: Pro has its own place, not inside a group: a link in the desktop bar and a card at the foot
+ * of the phone menu. NV-8 (owner request, 2026-11-16): it is called "Pricing", not "Pro", and has no
+ * dot, because "Pro" with a dot made learners think they were already subscribed. BIZ-1: prices are always public, so gateways and visitors see what is sold.
  */
-export const PRO_LINK = { href: "/pricing", label: "Pro", title: "Xplaind Pro", note: "Daily AI tutor, interview feedback and resume reviews, from ₹249" } as const;
+export const PRO_LINK = { href: "/pricing", label: "Pricing", title: "Plans and pricing", note: "Daily AI tutor, interview feedback and resume reviews, from ₹249" } as const;
 
 export const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 

@@ -5,6 +5,8 @@ import sitemap, { PAGES_UPDATED_ON } from "./sitemap";
 
 // SE-2 and IQ-3: the sitemap lists every public page once, with a real date.
 const PRIVATE = ["/card/[id]", "/certificate/[id]", "/u/[handle]", "/commit/stopped", "/dashboard", "/pricing/return", "/result", "/settings", "/settings/billing", "/settings/billing/receipt/[order]", "/signin"];
+// Pages that only redirect elsewhere (a sitemap lists the page they land on, not the redirect). /topics became the Library's By topic view (LY-2).
+const REDIRECTS = ["/topics"];
 
 function routes(dir: string, prefix = ""): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -19,7 +21,7 @@ describe("sitemap", () => {
 
   it("lists every public page route", () => {
     const missing = routes(join(process.cwd(), "src/app"))
-      .filter((r) => !PRIVATE.includes(r))
+      .filter((r) => !PRIVATE.includes(r) && !REDIRECTS.includes(r))
       .filter((r) => {
         const fixed = r.split("/[")[0] || "/";
         return r.includes("[") ? !urls.some((u) => u.startsWith(`${fixed}/`) && u !== fixed) : !urls.includes(r);

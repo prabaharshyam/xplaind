@@ -55,7 +55,7 @@ export default async function TopicPage({ params }: PageProps<"/topics/[theme]">
         eyebrow="Topic roadmap"
         title={t.label}
         lead={`${lessons.length} lessons, about ${hours} hours in all, from the basics to advanced. Start with the first, or jump to what you need.`}
-        crumbs={[{ href: "/topics", label: "Topics" }]}
+        crumbs={[{ href: "/library?view=topics", label: "Library" }]}
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         <h2 className="text-2xl font-semibold">Lessons, easiest first</h2>

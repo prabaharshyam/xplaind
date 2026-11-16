@@ -1,6 +1,7 @@
 // RM-10: one tagged list of everything a learner can open: lessons, video lessons and
 // skills. Pages filter it by kind, topic, level and channel. Node only.
 import type { LevelId } from "@/lib/levels";
+import { isGoodToKnow, orderLibrary } from "@/lib/library-order";
 import { THEMES, type ThemeId } from "@/lib/themes";
 import { getChannels, getGlossary, getResource, getStops, lessonsWithTerm } from "./index";
 import { type Embed, resourceEmbed } from "./media";
@@ -24,6 +25,8 @@ export type LibraryItem = {
   embed: Embed | null;
   /** Lessons only: how many video lessons it has. */
   videos: number;
+  /** LY-1: a general-awareness item (Beginner 1 AI rules, bias, policy and the like). It is listed after the technical ones. */
+  goodToKnow: boolean;
 };
 
 export const TOPIC_LABEL: Record<ThemeId, string> = Object.fromEntries(THEMES.map((t) => [t.id, t.label])) as Record<ThemeId, string>;
@@ -48,6 +51,7 @@ export function libraryItems(): LibraryItem[] {
       minutes: s.hours * 60,
       embed: null,
       videos: s.videos.length,
+      goodToKnow: isGoodToKnow(s),
     });
   }
 
@@ -72,6 +76,7 @@ export function libraryItems(): LibraryItem[] {
         minutes: Math.max(1, Math.round(r.hours * 60)),
         embed,
         videos: 0,
+        goodToKnow: isGoodToKnow(s),
       });
     }
   }
@@ -93,6 +98,7 @@ export function libraryItems(): LibraryItem[] {
         minutes: v.minutes,
         embed: { kind: "video", id: v.youtube_id },
         videos: 0,
+        goodToKnow: false,
       });
     }
   }
@@ -113,7 +119,9 @@ export function libraryItems(): LibraryItem[] {
       minutes: null,
       embed: null,
       videos: 0,
+      // A skill is general awareness only when every lesson that teaches it is.
+      goodToKnow: lessons.every(isGoodToKnow),
     });
   }
-  return items;
+  return orderLibrary(items);
 }

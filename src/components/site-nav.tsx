@@ -129,8 +129,8 @@ function DesktopMenus({ path }: { path: string }) {
           </div>
         </details>
       ))}
+      {/* NV-8: no permanent dot here. It read as "you are subscribed"; the dot now only means "you are here". */}
       <Link href={PRO_LINK.href} aria-current={current(path, PRO_LINK.href)} className={`${tab(under(path, PRO_LINK.href))} gap-1.5`}>
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-brand-600 dark:bg-brand-400" />
         {PRO_LINK.label}
         {under(path, PRO_LINK.href) && dot}
       </Link>

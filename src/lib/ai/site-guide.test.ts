@@ -7,7 +7,8 @@ import { SITE_GUIDE, siteGuideText } from "./site-guide";
 describe("the AI tutor knows the site (FOCUS-2, took over from X Bot)", () => {
   it("only links to pages that exist", () => {
     for (const g of SITE_GUIDE) {
-      const dir = path.join(process.cwd(), "src/app", g.h === "/" ? "" : g.h);
+      const route = g.h.split(/[?#]/)[0]; // a link can carry a query, such as /library?view=topics
+      const dir = path.join(process.cwd(), "src/app", route === "/" ? "" : route);
       expect(existsSync(path.join(dir, "page.tsx")), g.h).toBe(true);
     }
   });

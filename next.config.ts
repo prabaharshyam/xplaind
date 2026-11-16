@@ -30,9 +30,10 @@ const nextConfig: NextConfig = {
       { source: "/ai/coach", destination: "/ai/tutor", permanent: true },
       { source: "/ai/roadmap", destination: "/paths", permanent: true },
       // The Rust track was dropped as off-topic for AI careers; its pages go to the topic list and the blog.
-      { source: "/topics/rust", destination: "/topics", permanent: true },
+      // LY-2: the topic list is now the Library's "By topic" view.
+      { source: "/topics/rust", destination: "/library?view=topics", permanent: true },
       ...["why-rust", "rust-basics", "rust-ownership-borrowing", "rust-structs-enums-matching", "rust-errors-traits-generics", "rust-concurrency-async", "rust-for-ai-and-python"].map(
-        (id) => ({ source: `/stop/${id}`, destination: "/topics", permanent: true }),
+        (id) => ({ source: `/stop/${id}`, destination: "/library?view=topics", permanent: true }),
       ),
       { source: "/blog/rust-programming-language-2026", destination: "/blog", permanent: true },
     ];

@@ -74,11 +74,12 @@ test("the resume review explains when AI is off, and its API refuses (RV-1)", as
   expect((await request.post("/api/ai/resume", { data: { resume: "short" } })).status()).toBe(400);
 });
 
-test("the Practice page points to the AI glossary (PR-9)", async ({ page }) => {
+test("the Practice page is about practice, with no AI glossary block (PR-9, removed 2026-11-16)", async ({ page }) => {
   await page.goto("/practice");
-  await expect(page.getByRole("heading", { name: "AI glossary" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "AI glossary", exact: true })).toHaveAttribute("href", "/glossary");
-  await expect(page.getByRole("link", { name: "Open the AI glossary →" })).toHaveAttribute("href", "/glossary");
+  await expect(page.getByRole("heading", { level: 1, name: "Practice" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI glossary" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "AI glossary" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Open the AI glossary →" })).toHaveCount(0);
 });
 
 test("PP-1: an interview date makes a plan of weeks ending in mock interviews", async ({ page }) => {

@@ -44,7 +44,7 @@ export function RoadmapGate({
         Accounts are for learners aged 18 and over. Under 18? Every lesson is
         still open:{" "}
         <Link
-          href="/topics"
+          href="/library?view=topics"
           className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300"
         >
           browse lessons by topic

@@ -61,8 +61,8 @@ export const SITE_GUIDE: GuideEntry[] = [
   },
   {
     t: "Browse lessons by topic",
-    a: "Topics groups every lesson by subject, such as RAG, agents, evals or Python, whichever roadmap it belongs to.",
-    h: "/topics",
+    a: "The Library's By topic view groups every lesson by subject, such as RAG, agents, evals or Python, whichever roadmap it belongs to.",
+    h: "/library?view=topics",
   },
   {
     t: "Test yourself on your own book",

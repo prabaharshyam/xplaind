@@ -31,6 +31,30 @@ describe("activeGroup (NV-2)", () => {
   });
 });
 
+describe("menu structure (LY-2, IP-4, NV-8)", () => {
+  const items = (id: string) => NAV_GROUPS.find((g) => g.id === id)!.items.map((i) => i.href);
+
+  it("has no separate Topics entry: Library covers it", () => {
+    expect(NAV_GROUPS.flatMap((g) => g.items).some((i) => i.href === "/topics")).toBe(false);
+    expect(items("learn")).toContain("/library");
+  });
+
+  it("puts interview patterns and system design answers last in the Interview menu", () => {
+    expect(items("interview").slice(-2)).toEqual(["/interview/patterns", "/interview/design"]);
+  });
+
+  it("keeps the practice cards in the Practice menu only", () => {
+    expect(items("practice")).toContain("/practice");
+    for (const g of NAV_GROUPS.filter((g) => g.id !== "practice")) expect(g.items.map((i) => i.href)).not.toContain("/practice");
+  });
+
+  it("does not call the pricing link Pro, which read as being subscribed", async () => {
+    const { PRO_LINK } = await import("./nav");
+    expect(PRO_LINK.label).not.toMatch(/^pro$/i);
+    expect(PRO_LINK.title).not.toMatch(/^pro$/i);
+  });
+});
+
 describe("Pro has its own place (NV-7)", () => {
   it("keeps the pricing page out of every menu group and names the AI group AI Studio", async () => {
     const { NAV_GROUPS, PRO_LINK } = await import("./nav");

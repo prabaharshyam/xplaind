@@ -40,7 +40,7 @@ test("the GenAI roadmap's topics open the drawer too", async ({ page }) => {
 });
 
 test("topic pages list lessons as cards", async ({ page }) => {
-  await page.goto("/topics");
+  await page.goto("/library?view=topics");
   await page.getByRole("link", { name: /^Agents/ }).first().click();
   await expect(page.getByRole("heading", { level: 1, name: "Agents" })).toBeVisible();
   await expect(page.getByRole("link", { name: /The agent loop/ })).toBeVisible();

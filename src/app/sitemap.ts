@@ -25,8 +25,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/colleges",
     "/stories",
     "/paths",
-    "/topics",
-    ...THEMES.map((t) => `/topics/${t.id}`),
+    ...THEMES.map((t) => `/topics/${t.id}`), // /topics itself redirects to the Library (LY-2)
     ...getPaths().map((p) => `/roadmap/${p.id}`),
     ...getPaths()
       .filter((p) => p.placement === "ladder" && p.id !== "genai-engineer")
