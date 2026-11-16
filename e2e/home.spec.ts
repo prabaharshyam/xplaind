@@ -60,7 +60,8 @@ test("search finds lessons and opens them", async ({ page }) => {
   await box.fill("build a rag");
   await expect(page.getByRole("option").first()).toContainText("Build a RAG app");
   await box.press("Enter");
-  await expect(page).toHaveURL(/\/stop\/rag-app$/);
+  // The first visit to a lesson compiles it on the dev server, which can take longer than the default 5 s.
+  await expect(page).toHaveURL(/\/stop\/rag-app$/, { timeout: 30_000 });
 });
 
 test("the home page passes the accessibility scan once scrolled through", async ({ page }) => {
