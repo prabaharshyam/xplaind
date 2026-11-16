@@ -42,6 +42,26 @@ test("IP-4: on the Interview page patterns and system design come last, and prac
   await expect(page.locator("main").getByRole("link", { name: /Practice cards/ })).toHaveCount(0);
 });
 
+test("IP-5: the Interview page opens on the question bank, with the preparation links in a side panel", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/interview");
+  const bank = await page.getByRole("heading", { level: 2, name: "Question bank" }).boundingBox();
+  const panel = page.getByRole("complementary", { name: "Prepare for your AI interview" });
+  const side = await panel.boundingBox();
+  expect(bank && side).toBeTruthy();
+  expect(bank!.y).toBeLessThan(500); // in view without scrolling past the header
+  expect(side!.x).toBeGreaterThan(bank!.x + 600); // to the right of the question bank, not above it
+  await expect(panel.getByRole("link")).toHaveCount(4);
+  await expect(panel.getByText("Worked LLM designs in the 35-minute shape interviewers expect.")).toBeVisible();
+
+  // On a phone the same links are a compact row of buttons, without the descriptions.
+  await page.setViewportSize({ width: 360, height: 740 });
+  await expect(panel.getByText("Worked LLM designs in the 35-minute shape interviewers expect.")).toBeHidden();
+  await expect(panel.getByRole("link", { name: "Mock interview" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+});
+
 test("the Practice page has no AI glossary block", async ({ page }) => {
   await page.goto("/practice");
   await expect(page.getByRole("heading", { level: 1, name: "Practice" })).toBeVisible();
