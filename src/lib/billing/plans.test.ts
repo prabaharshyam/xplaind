@@ -23,7 +23,10 @@ describe("Pro passes and limits (PAY-1)", () => {
   });
 
   it("gives a free account a one-time trial of 2 or 3 tries per AI helper (PAY-7)", () => {
-    for (const n of Object.values(TIER_LIMITS.free)) expect([2, 3]).toContain(n);
+    // Reading pictures in notes (MB-12) is Pro only: no free trial.
+    const { scan, ...trial } = TIER_LIMITS.free;
+    expect(scan).toBe(0);
+    for (const n of Object.values(trial)) expect([2, 3]).toContain(n);
   });
 
   it("counts the trial across days: what is left today is the trial minus every earlier use (PAY-7)", () => {

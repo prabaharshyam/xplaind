@@ -252,3 +252,47 @@ test("cards that are due today are counted and reviewed first (MB-10)", async ({
   await expect(page.getByText("Overdue card")).toBeVisible();
   expect((await wcag(page)).violations).toEqual([]);
 });
+
+/** A scanned book: every page is a drawing, with no text to select. */
+function scannedPdf(): Buffer {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  for (let i = 0; i < 3; i++) {
+    if (i > 0) doc.addPage();
+    doc.setFillColor(40, 40, 40).rect(60, 80 + i * 10, 300, 120, "F");
+  }
+  return Buffer.from(doc.output("arraybuffer"));
+}
+
+test("picture pages ask before anything is sent, and Pro reads them into the book (MB-12)", async ({ page }) => {
+  const sent: number[][] = [];
+  await page.route("**/api/ai/book-pictures", async (route) => {
+    const { images } = route.request().postDataJSON() as { images: { id: number; data: string }[] };
+    sent.push(images.map((i) => i.id));
+    expect(images.every((i) => i.data.startsWith("/9j/"))).toBe(true); // JPEG only
+    await route.fulfill({ json: { pages: images.map((i) => ({ id: i.id, text: `# Chapter ${i.id}\n${prose(`Topic ${i.id}`)}` })) } });
+  });
+  await page.goto("/ai/book");
+  await page.locator('input[type="file"]').setInputFiles({ name: "scanned.pdf", mimeType: "application/pdf", buffer: scannedPdf() });
+  await expect(page.getByRole("heading", { level: 2, name: /3 pages in “scanned” are pictures/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/will be sent to our AI to read/)).toBeVisible();
+  expect(sent).toEqual([]); // nothing left the device before the learner agreed
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Read the pictures (Pro)" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "scanned" })).toBeVisible({ timeout: 20_000 });
+  expect(sent).toEqual([[1, 2, 3]]);
+});
+
+test("a free account is told picture reading is Pro, and can carry on without it (MB-12)", async ({ page }) => {
+  await page.route("**/api/ai/book-pictures", (route) =>
+    route.fulfill({ status: 403, json: { error: "Reading pictures in your notes is part of Pro.", upgrade: "/pricing" } }),
+  );
+  await page.goto("/ai/book");
+  await page.locator('input[type="file"]').setInputFiles({ name: "scanned.pdf", mimeType: "application/pdf", buffer: scannedPdf() });
+  await page.getByRole("button", { name: "Read the pictures (Pro)" }).click({ timeout: 20_000 });
+  const alert = page.getByRole("alert").filter({ hasText: "part of Pro" });
+  await expect(alert).toBeVisible();
+  await expect(alert.getByRole("link", { name: "See Pro" })).toHaveAttribute("href", "/pricing");
+  await page.getByRole("button", { name: "Skip, use the text only" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "could not find enough text" })).toBeVisible();
+});

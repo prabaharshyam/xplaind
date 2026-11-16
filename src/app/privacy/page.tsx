@@ -43,7 +43,7 @@ const STORED: [string, string, string][] = [
   [
     "AI helper use",
     "For accounts: how many AI requests you made each day and their size, to keep within daily limits. For visitors without an account: the same counts under a short code made from your network address that changes every day; the address itself is not stored.",
-    "Counts are kept to enforce limits and our monthly spending cap. What you type into the AI tutor, resume review or book helper is not saved by us.",
+    "Counts are kept to enforce limits and our monthly spending cap. What you type into the AI tutor, resume review or book helper is not saved by us. Pictures from your notes are not saved either.",
   ],
   [
     "Pro pass payments (18 and over only)",
@@ -80,7 +80,7 @@ const PROCESSORS: [string, string][] = [
     paymentProvider() === "razorpay" ? "Razorpay" : "Cashfree Payments",
     "Takes payments for Pro passes, only if you buy one. It receives the amount, your email and mobile number, and handles your UPI, card or bank details itself.",
   ],
-  ["Anthropic", "Writes AI answers. It receives only the text of that request, such as your question, your code and its error, or your resume text, when you press the button."],
+  ["Anthropic", "Writes AI answers. It receives only the text of that request, such as your question, your code and its error, or your resume text, when you press the button. If you are a Pro learner and choose to have the picture pages of your notes read, those pages, drawn as small images, are sent to it too, and only those pages."],
   ["YouTube", "Plays videos inside lessons from its privacy-enhanced (no-cookie) player, and only after you press play."],
   ["jsDelivr", "Delivers the Python engine for the code playground the first time you press Run. Your code runs in your browser and is not sent anywhere."],
 ];

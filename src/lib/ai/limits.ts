@@ -1,7 +1,7 @@
 // CO-1: what AI calls may cost. Pure: no network, no database. The owner set a
 // US$20 monthly cap; per-learner daily caps keep one account from using it up.
 
-export const AI_KINDS = ["tutor", "grade", "interview", "book", "resume", "notes"] as const;
+export const AI_KINDS = ["tutor", "grade", "interview", "book", "resume", "notes", "scan"] as const;
 export type AiKind = (typeof AI_KINDS)[number];
 
 /** Calls one learner may make per India day, per feature. Grades follow the PRD's 5 (CO-1). */
@@ -17,6 +17,8 @@ export const DAILY_LIMIT: Record<AiKind, number> = {
   resume: 5,
   /** MB-8: one question answered from the learner's own notes, on the fast model. */
   notes: 30,
+  /** MB-12: one batch of up to 4 picture pages read into text, on the fast model. Pro only (the tiers in plans.ts give guests and free accounts none). */
+  scan: 20,
 };
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
@@ -25,7 +27,7 @@ export const DEFAULT_MODEL = "claude-opus-5-5";
  * daily allowances stay affordable; reviews and grading keep the strongest model (AI_MODEL).
  */
 export const DEFAULT_FAST_MODEL = "claude-haiku-5-5";
-export const FAST_KINDS: readonly AiKind[] = ["tutor", "notes"];
+export const FAST_KINDS: readonly AiKind[] = ["tutor", "notes", "scan"];
 
 /** The model for one feature: the fast model for FAST_KINDS, otherwise the main model. */
 export function modelFor(kind: AiKind, main: string, fast: string): string {
