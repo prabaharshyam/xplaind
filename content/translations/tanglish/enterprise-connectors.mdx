@@ -1,0 +1,214 @@
+---
+id: enterprise-connectors
+lang: tanglish
+title: "Enterprise connectors"
+outcome: "SharePoint, Salesforce, SAP, Jira, cloud storage-la irundhu documents-um records-um nambikkaiyaa edukka theriyanum: authentication, paging, rate limits, incremental sync, deletions, permissions."
+answer: "Enterprise connectors SharePoint, Salesforce, Jira maadhiri tools-la irundhu documents-a pull pannum; login, paging, rate limits, incremental sync-a handle pannum, ovvoru user-oda access rights-a-yum kaapaathum."
+why_it_matters: "Oru assistant adhu reach panna mudiyura data-va poruthu thaan useful. Adhu oru dozen business systems-la, ovvonnukkum thani API-yum quirks-um irukku. Connector velaiku FDE project-oda engineering time-la periya pagudhi pogum, adhu udainja bodhu clients-ku theriyura pagudhiyum idhu thaan."
+flashcards:
+  - q: "Connector-na enna?"
+    a: "SharePoint, Salesforce maadhiri oru business system-kum ungaloda AI system-kum idaiyila data-va maathura code."
+  - q: "Connectors perumbaalum eppadi authenticate pannum?"
+    a: "Client-oda IT team register panna app vazhiya OAuth-la, othukkitta sites illa objects-ku mattum read-only scope-la."
+  - q: "Paging cursor-a yen save pannanum?"
+    a: "Fail aana run page 1-la irundhu thirumba aarambikkaama, nindra idathula irundhu thodaranum-nu."
+  - q: "Connector rate limits-a eppadi handle pannanum?"
+    a: "Retry-After headers-a madhinga, 429 responses-ku back off pannunga, periya first loads-a off-peak hours-la pirichu panunga."
+  - q: "Incremental sync-na enna?"
+    a: "Mudhal full copy-kku aprom, change tokens, modified-since filters illa webhooks vechu, last run-kku aprom maariyadha mattum edukkuradhu."
+  - q: "Deletions-ku yen special care thevai?"
+    a: "Sync deletions-a report pannalana, delete panna documents search-la irundhutte irukkum. Deletions-a report panra method use pannunga, illa ids-a avvapodhu reconcile pannunga."
+  - q: "Connector edhellaam metadata vechukkanum?"
+    a: "Source id, URL, title, author, modified time, path illa object type, owner, access rights."
+  - q: "Ovvoru sync run-layum edhellaam record pannanum?"
+    a: "Read, added, changed, deleted, failed items, edutha neram, connector nindrunaalum failures thideernu adhigamaanaalum alerts."
+  - q: "Sync panna ovvoru item-kum content hash yen store pannanum?"
+    a: "Oru file-oda metadata maari text maaraama irundha, hash match aagum, adhanaala re-parse, re-embed skip panni neramum selavum micham pannalaam."
+  - q: "Microsoft Graph delta query deletions-a eppadi report pannum?"
+    a: "Deleted items delta results-la 'deleted' marker-oda varum, adhanaala connector avanga chunks-a index-la irundhu remove pannalaam."
+exercise:
+  title: "Connector-a fix pannunga"
+  setup: "Pune manufacturer-oda maintenance assistant, network file share-la irundhu 60,000 manuals-yum SAP-la irundhu work orders-yum padikkudhu. Ippo irukkura connector ovvoru raathiriyum ovvoru file-aiyum thirumba padikkudhu, ombadhu mani neram edukkudhu, sila samayam morning shift varaikkum odudhu. Retired manuals innum answers-la varudhu. Kadandha vaaram job file 41,000-la crash aagi, mudhalla irundhu thirumba aarambichudhu. Moonu naal fail aanadhu yaarukkum theriyala."
+  questions:
+    - q: "Raathiri run-a eppadi kurakkalaam?"
+      a: "Incremental sync-ku maarunga: modified times illa change journal-a compare panni, pudhu, maariya files-a mattum process pannunga."
+    - q: "Retired manuals yen innum varudhu, edhu fix pannum?"
+      a: "Deletions, moves detect aagala. File ids list-a index-oda reconcile panni, illaadhadha remove pannunga."
+    - q: "File 1-la irundhu thirumba aarambikkaama irukka eppadi?"
+      a: "Progress-a save pannunga, last processed path illa cursor maadhiri, fail aana aprom adhula irundhu thodarunga."
+    - q: "Moonu naal failure-a team eppadi kandupidichirukkalaam?"
+      a: "Ovvoru run-oda counts-a record panni, run fail aanaalum, start aagalainaalum, vazhakkatha vida romba kammiyaa items process aanaalum alert pannunga."
+ask:
+  - "Microsoft Graph delta sync eppadi work aagudhu?"
+  - "Connectors-a naanae build pannanuma, Airbyte use pannanuma?"
+  - "SharePoint-la irundhu permissions-a eppadi sync pannalaam?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Connector**-na oru business system-kum ungaloda AI system-kum idaiyila data-va maathura code. Perumbaalaana enterprise AI projects-ku pala thevaippadum:
+
+- **Documents**: SharePoint, OneDrive (Microsoft Graph vazhiyaa), Google Drive, Confluence, network file shares, cloud storage buckets.
+- **Records**: Salesforce maadhiri CRM systems, SAP maadhiri ERPs, Jira illa ServiceNow maadhiri ticketing, appuram client-oda sondha databases.
+- **Messages**: email, chat; privacy-naala jaakkirathaiyaa use pannanum.
+
+Connectors-a neengalae build pannalaam, integration platform use pannalaam (Airbyte, Fivetran-la neraya ready-made irukku), illa search, AI platform-oda bundled connectors use pannalaam. Edhu aanaalum, adhu enna pannudhu-nu purinjukkanum.
+
+```flow
+SharePoint -[Graph, OAuth, delta]-> Connector | pages, backs off, resumes
+Salesforce -[API, modified since]-> Connector
+Jira, file shares, databases -> Connector
+Connector -> Items + metadata + permissions + deletions -> Parse, chunk, embed -> Index for the assistant
+Parse, chunk, embed -> Run log | read 312, added 40, changed 266, deleted 6, failed 0
+```
+
+Indha lesson-la, Gurugram-la oru consumer-goods company-kaaga SharePoint-layum Salesforce-layum build panna sales assistant-a follow pannuvom.
+
+## Idhu eppadi work aagudhu
+
+**Authentication.** Perumbaalum client-oda IT team register panna app-oda OAuth, read-only-kum othukkitta sites, objects, projects-kum mattum scope pannirukkum. Sila systems API keys illa service users use pannum; avatrai secret manager-la store pannunga.
+
+**Pages-aa padikkradhu.** APIs results-a cursor illa next link-oda pages-aa tharum. Pages mudiyura varaikkum loop pannunga, cursor-a save pannunga, appo fail aana run thodara mudiyum.
+
+**Rate limits.** Ovvoru API-yum nimidathukku illa naalukku calls-a limit pannum; SharePoint-um Salesforce-um heavy users-a throttle pannum. `Retry-After` headers-a madhinga, 429 responses-ku back off pannunga, periya initial loads-a off-peak hours-la pirichu panunga.
+
+**Incremental sync.** Mudhal run ellathayum copy pannum. Aprom last run-kku piragu maariyadha mattum edukkum, change tokens (Microsoft Graph-oda delta queries), "modified since" filters illa webhooks use panni. Ovvoru raathiriyum 200,000 documents-a muzhusaa thirumba padikkradhu slow, selavaanadhu, throttle-um aagum.
+
+**Deletions.** Incremental feeds edhu delete aachu-nu sollanum, illaattina delete panna files eppavum searchable-aa irukkum. Ungaloda method deletions-a report pannudhaa-nu check pannunga; illaattina ids-a compare panra periodic reconciliation run pannunga.
+
+**Permissions.** Ovvoru item-oda access rights-a adhoda content-oda serthu padinga, permission-aware retrieval-ku.
+
+**Formats, metadata.** Source id, URL, title, author, modified time, path illa object type, owner vechukkunga. Idhu citations, filters, debugging-ku use aagum.
+
+**Observability.** Ovvoru run-kum items read, added, changed, deleted, failed, edutha neram record pannunga. Connector nindrunaalum, failure counts thideernu adhigamaanaalum alert pannunga.
+
+**Changes-a kandupidikkura vazhigal:**
+
+| Method | Eppadi work aagum | Gavanikka vendiyadhu |
+| --- | --- | --- |
+| Change illa delta tokens | API save panna token-kku aprom aana changes-a tharum | Tokens expire aagalaam illa udaiyalaam; full re-scan fallback vechukkunga |
+| Modified-since filter | Last run-kku aprom modified time irukkura items-a query pannum | Deletions-a perumbaalum miss pannum; clocks, time zones match aaganum |
+| Webhooks | Edhaavadhu maariyaa system ungala call pannum | Calls lose aagalaam; periodic check-oda serthu use pannunga |
+| Full comparison | Ellaa ids-aiyum list panni index-oda compare pannum | Periya sets-la slow; vaaram oru thadavai safety net-aa nallaa irukkum |
+
+**Build, buy, borrow.** Airbyte, Fivetran maadhiri integration platforms common systems-ku vaarakkanakkaana neram micham pannum, search platform-oda bundled connectors-ae permissions padikkalaam. Aanaalum adha check pannanum: avai deletions-a report pannudhaa, access rights-a padikkudhaa, alert panna use aagura run counts tharudhaa-nu confirm pannunga. System vichitthiramaa irundha (in-house database, vendor portal maadhiri), illa client-oda security team third-party tool-a approve pannaadhappo, neengalae ezhudhunga.
+
+**Code-la oru incremental connector.** SharePoint illa OneDrive library-ku Microsoft Graph-oda delta query maariya, delete aana items-a pages-aa tharum, adutha thadavai use panna oru link-oda mudiyum:
+
+```python
+import hashlib, json, time
+from pathlib import Path
+import httpx
+
+STATE = Path("state/sharepoint-delta.json")
+
+def get(client, url):
+    for attempt in range(5):
+        r = client.get(url)
+        if r.status_code in (429, 503):
+            time.sleep(int(r.headers.get("Retry-After", 2 ** attempt)))
+            continue
+        r.raise_for_status()
+        return r.json()
+    raise RuntimeError("gave up after repeated throttling")
+
+def sync(token, drive_id, index):
+    counts = {"read": 0, "upserted": 0, "deleted": 0, "skipped": 0, "failed": 0}
+    url = (json.loads(STATE.read_text())["delta_link"] if STATE.exists()
+           else f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/delta")
+    with httpx.Client(headers={"Authorization": f"Bearer {token}"}, timeout=30) as client:
+        while url:
+            page = get(client, url)
+            for item in page.get("value", []):
+                counts["read"] += 1
+                try:
+                    if "deleted" in item:
+                        index.delete_doc(item["id"]); counts["deleted"] += 1
+                    elif "file" in item:
+                        text = download_and_parse(client, item)            # your parser
+                        digest = hashlib.sha256(text.encode()).hexdigest()
+                        if index.hash_of(item["id"]) == digest:
+                            counts["skipped"] += 1
+                        else:
+                            index.upsert_doc(item["id"], text, digest, meta_from(item))
+                            counts["upserted"] += 1
+                except Exception:
+                    counts["failed"] += 1
+            url = page.get("@odata.nextLink")
+            if not url and "@odata.deltaLink" in page:
+                STATE.parent.mkdir(exist_ok=True)
+                STATE.write_text(json.dumps({"delta_link": page["@odata.deltaLink"]}))
+    print(counts)
+    return counts
+```
+
+Mudhal run-la save panna link illa, adhanaala ellathayum padikkum; aprom varra runs maatrangala mattum edukkum. Delta link-a last page success aana aprom mattum save pannunga, appo fail aana run changes-a skip pannaama thirumba pannum. Save panna link velai seiyaama ponaa, full re-scan-ku fall back pannunga.
+
+**Vaaram oru reconciliation.** Nalla change feeds kooda sila vishayangala miss pannum. Ids-a compare pannunga:
+
+```python
+def reconcile(source_ids: set, index_ids: set, index):
+    stale = index_ids - source_ids
+    for doc_id in stale:
+        index.delete_doc(doc_id)
+    missing = source_ids - index_ids
+    return {"removed_stale": len(stale), "missing_to_fetch": len(missing)}
+```
+
+**Maaraadha content-a skip pannunga.** Yaaraavadhu file-a rename pannaalum illa oru property edit pannaalum adhoda modified time maarum. Ovvoru document-oda extracted text-oda hash-a store panni, adhu match aanaa re-embed-a skip pannunga. Periya libraries-la idhu embedding cost-la perumbaalaana pagudhiya micham pannum.
+
+**Source-a madhinga.** Periya first loads-a client-oda time zone-la raathiri run pannunga, concurrency-a kammiyaa vainga, limits-a avanga IT team-oda othukkunga. Office hours-la client-oda SharePoint-a throttle aakkuradhu nambikkaiya izhakkura vegamaana vazhi.
+
+## Oru worked example
+
+Gurugram-la oru consumer-goods company-ku SharePoint (product sheets, trade-scheme circulars) mela, Salesforce (accounts, opportunities) mela oru sales assistant venum.
+
+SharePoint: aaru sites-ku read access-oda oru app registration. 38,000 files-oda mudhal full sync throttling limits-ku keezha irukka rendu raathiri odudhu. Aprom, ovvoru 15 nimidathukkum delta queries maariya, delete aana items-a mattum tharum, oru run-ku perumbaalum 200 mudhal 400, adhukku oru nimidam aagum. Ovvoru item-oda permissions-um padichu store aagudhu.
+
+Salesforce: Account, Opportunity, Product objects-ku mattum read-only integration user. Ovvoru 30 nimidathukkum "modified since" query-la records edukkapattu, retrieval-ku short text summaries-aa maathi, record id-yum owner-um metadata-vaa vechukkaraanga.
+
+Moonaavadhu vaaram, regional team oru SharePoint site-a rename pannaanga, delta token invalid aachu. Connector-oda error rate alert adichudhu; job andha site-ku raathiri full re-scan-ku fall back aachu, edhuvum miss aagala. Client-oda IT team-ku neenga ezhudhina runbook idha thaan exact-aa explain pannudhu.
+
+| Measure | Munnaadi | Aprom |
+| --- | --- | --- |
+| SharePoint sync | Raathiri full re-read, around 6 manineram, adikkadi throttle | Ovvoru 15 nimidam delta, around 1 nimidam |
+| Salesforce sync | Naalukku oru export | Ovvoru 30 nimidam |
+| Delete aanadhum searchable-aa irundha documents | Dozens | Onnum illa, vaaram check |
+| Fail aana sync-a kandupidikka aagura neram | Naatkal | Nimidangal, alerts vazhiyaa |
+
+## Podhuvaa panra thappugal
+
+- **Ovvoru thadavaiyum full re-sync.** Change tokens illa modified-since queries use pannunga.
+- **Deletions-a ignore panradhu.** Delete aana, expire aana documents-a thodarndhu quote pannitte irukkum.
+- **Romba periya access.** Muzhu tenant illa, peyar kuduththa sites, objects-ku read-only access kelunga.
+- **Fail aanadhukku aprom resume illa.** Page 9,000-la crash aanaa page 1-la irundhu thirumba aarambikka koodaadhu.
+- **Pesaadha connectors.** Sync nindra podhu yaarukkum alert varalainaa, assistant amaidhiyaa stale aagidum.
+- **Client-oda IT team-ku runbook illa.** Tokens udaiyum, permissions maarum, site rename aagum bodhu enna pannanum-nu ezhudhi vainga.
+- **Run mudiyaradhukku munnaadi sync cursor-a save panradhu.** Appuram crash aanaa changes eppavumae skip aagidum.
+- **Metadata mattum maariyum** ovvoru modified file-aiyum re-embed panradhu.
+
+## Custom connector thevai illaadha idangal
+
+- **Oru thadavai load**, fixed set files-ku: ore thadavai export panni ingest pannunga.
+- **Platform connector adha already cover pannudhu**, deletions-a report pannudhu, permissions-a padikkudhu.
+- **Users-ae thevaiyaana sila documents-a** neradiyaa upload pannalaam.
+
+## Demo-la irundhu production-ku
+
+- **Ovvoru run-oda counts-a record pannunga**, stalls, failure spikes-ku alert pannunga.
+- **Cursors-a success-ku aprom mattum save pannunga**, full re-scan fallback vechukkunga.
+- **Vaaram ids-a reconcile pannunga**, miss aana deletions-a pidikka.
+- **Content-a hash pannunga**, maaraadha documents-a skip panna.
+- **Schedules-yum limits-aiyum** client-oda IT team-oda ezhuthula othukkunga.
+
+## Practice pannunga
+
+Microsoft Graph overview-a padinga, apram neenga free-yaa use panna mudiyura, paging irukkura ethaavadhu oru API-a select pannunga (GitHub issues, public dataset API, illa developer tenant-oda Graph).
+
+1. Paging-oda ellaa items-aiyum edukkura, rate limits-a madhikkura, resume panna cursor-a store panra oru connector ezhudhunga.
+2. Last run-kku aprom maariya items-a mattum edukkura incremental mode-um, delete aana items-a kandupidikkura check-um serunga.
+3. Ovvoru run-oda counts-a (read, added, updated, deleted, failed) record panni, oru-vari summary print pannunga.
+4. Connector-a run pannunga, source-la oru file-a delete pannunga, thirumba run pannunga, andha file-oda chunks index-la illa-nu confirm pannunga.
+
+**Mudinjadhu-nu eppo sollalaam:** Ungaloda connector-a thodarndhu rendu thadavai run panni, rendavadhu run maariyadha mattum, oru deletion-um serthu edukkudhu-nu kaattamudiyum.

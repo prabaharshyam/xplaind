@@ -1,0 +1,136 @@
+---
+id: databases-replication-sharding
+lang: hinglish
+title: "Databases: indexes, replication aur sharding"
+outcome: "Ek workload ke liye SQL ya NoSQL chun paoge, indexes se queries tez kar paoge, replicas se reads scale kar paoge, aur sensible shard key ke saath data ko shards mein baant paoge."
+answer: "Indexes lookups tez karte hain. Replication database ki copy banata hai taaki reads servers mein faile. Jab ek server kaafi na ho, sharding data ko ek key ke hisaab se databases mein baant deta hai."
+why_it_matters: "Database aksar kisi system ka scale karne mein sabse mushkil hissa hota hai aur baad mein badalne mein sabse dard dene waala. Indexes, replicas aur sharding jaan lene se aap growth ke liye plan kar paoge aur har design interview ke database sawaalon ka jawab de paoge."
+flashcards:
+  - q: "Database index kya karta hai?"
+    a: "Ek column ki values ka sorted structure rakhta hai jo rows ko point karta hai, taaki us column se lookup mein poori table scan na karni pade."
+  - q: "Index ki cost kya hai?"
+    a: "Extra storage aur slow writes, kyunki har insert ya update ko index bhi update karna padta hai."
+  - q: "Read replica kya hai?"
+    a: "Database ki ek copy jo primary se changes leti hai aur read queries serve karti hai, jisse read load faila hai."
+  - q: "Replication lag kya hai?"
+    a: "Primary par badlaav ke replicas par dikhne se pehle ki der. Agar user lagging replica se padhe toh use apna hi update shayad na dikhe."
+  - q: "Sharding kya hai?"
+    a: "Ek table ko shard key ke hisaab se kai databases mein baantna, taaki har ek ke paas data ka ek hissa aur load ka ek hissa ho."
+  - q: "Achhi shard key kya banata hai?"
+    a: "Wo data aur traffic ko barabar failati hai aur ek request ko jo data chahiye use ek shard par rakhti hai."
+  - q: "Relational (SQL) database kab ek strong default hai?"
+    a: "Jab data mein saaf relationships hon aur aapko transactions aur flexible queries chahiye, jaise orders, payments aur users mein."
+exercise:
+  title: "Database plan karo"
+  setup: "Ek UPI payments app har transaction ke liye ek row store karti hai: transaction ID, sender ID, receiver ID, amount aur time. Wo din mein 2 crore transactions sambhalti hai; users zyadatar apni recent history dekhte hain."
+  questions:
+    - q: "Users hamesha 'my last 20 transactions' load karte hain. Kaunsa index madad karega?"
+      a: "(sender_id, time) par ek composite index, aur receiver ke liye bhi waisa hi, taaki database ek user ki rows par seedha jump kare, jo pehle se time order mein hon."
+    - q: "Reads, writes se das guna hain. Sharding se pehle pehla kadam kya hai?"
+      a: "History screens ke liye read replicas jodo, writes aur balance checks primary par rakho."
+    - q: "Ek user pay karke turant history kholta hai par payment gayab hai. Kyun, aur fix kya hai?"
+      a: "Replication lag: history aisi replica se padhi gayi jo abhi update nahi hui. User ke likhne ke baad thodi der tak uski apni recent writes primary se padho."
+    - q: "Agar sharding zaroori ho jaye, toh kya transaction date achhi shard key hai?"
+      a: "Nahi: aaj ki saari writes ek hi shard par girengi. User ID load ko baantta hai aur ek user ki history ek saath rakhta hai."
+ask:
+  - "SQL aur NoSQL mein se kaise chunun?"
+  - "Partitioning aur sharding mein kya farak hai?"
+  - "Composite indexes kaise kaam karte hain?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Zyadatar systems apna zaroori data ek **database** mein rakhte hain. Product badhne par database aksar sabse pehle dabav mein aata hai, kyunki har app server usse baat karta hai aur uska data sahi rehna chahiye. Chaar ideas aapko bahut door tak le jaate hain.
+
+- **Model chunna.** PostgreSQL aur MySQL jaise relational (SQL) databases data ko relationships waali tables mein rakhte hain aur transactions support karte hain. DynamoDB, MongoDB aur Cassandra jaise NoSQL databases usmein se kuch chhodkar aasaan horizontal scale ya flexible documents dete hain.
+- **Indexes** chune hue columns ka sorted structure rakhkar lookups tez karte hain.
+- **Replication** data ki copies kai servers par rakhta hai, reads baantne aur failures se bachne ke liye.
+- **Sharding** jab ek database kaafi na ho, toh data ko hi kai databases mein baant deta hai.
+
+```flow
+App servers -[writes]-> Primary
+Primary -[replication, may lag]-> Replica 1
+Primary -[replication, may lag]-> Replica 2
+App servers -[reads]-> Replica 1
+```
+
+```flow
+dir: LR
+title: Jab ek primary kaafi na ho: key se shard karo
+user_id % 4 -[0]-> Shard A
+user_id % 4 -[1]-> Shard B
+user_id % 4 -[2]-> Shard C
+user_id % 4 -[3]-> Shard D
+```
+
+## Ye kaam kaise karta hai
+
+**Access pattern ke hisaab se model chuno.** Relational database zyadatar products ke liye strong default hai: orders, users aur payments ke saaf relationships hote hain, transactions chahiye aur flexible queries kaam aati hain. NoSQL tab fit hota hai jab simple key lookups ke saath massive write scale, flexible document shapes ya time-series data chahiye. Kai systems dono use karte hain: core data ke liye PostgreSQL aur hot, simple data ke liye Redis ya key-value store.
+
+**Indexes** kitaab ke peeche ke index ki tarah kaam karte hain. Iske bina kisi customer ke orders dhoondhne ke liye har row scan karni padti hai: O(n). `customer_id` par B-tree index ke saath database lagbhag O(log n) mein seedha sahi rows par jump karta hai. `(customer_id, created_at)` par **composite index** unhein time se pehle se sorted bhi lautata hai. Indexes storage lete hain aur writes slow karte hain, isliye unhein asli query patterns ke liye jodo, aur `EXPLAIN` se check karo ki queries unhein use karti hain.
+
+**Replication** har badlaav ko ek **primary** se ek ya zyada **replicas** par copy karta hai. Writes primary par jaate hain; reads replicas par ja sakte hain. Isse read load baant jaata hai aur primary fail hone par replica sambhaal sakta hai. Zyadatar replication asynchronous hota hai, isliye replicas milliseconds ya seconds peeche reh sakte hain. Isi se wo classic bug aata hai jahan user kuch save karta hai aur agli screen par use nahi dikhta; fix hai user ki apni fresh writes primary se padhna.
+
+**Sharding** ek bade table ko **shard key** ke hisaab se kai independent databases mein baant deta hai. Ek hi key value waali har row ek hi shard par rehti hai. Achhi key data aur traffic dono ko barabar failati hai aur ek request ko jo chahiye use ek shard par rakhti hai. Sharding asli complexity jodta hai: shards ke paar queries slow hoti hain, shards ke paar transactions mushkil hain, aur shards jodte waqt data ko hilaana dhyaan maangta hai. Jab tak indexes, caching aur replicas kaafi na ho jaayein, ise taalo.
+
+| Technique | Kya solve karta hai | Cost |
+|---|---|---|
+| Index | slow lookups aur sorts | storage, slow writes |
+| Read replicas | bahut saare reads; failover | replication lag, zyada servers |
+| Vertical scaling | sab kuch, thodi der ke liye | price, ceiling |
+| Sharding | ek server ke liye bahut zyada data ya writes | complex queries, rebalancing, cross-shard transactions |
+| Caching (agla lesson) | hot data ke baar-baar reads | stale data, invalidation |
+
+**Browser mein try karo.** Consistent hashing shard jodne par sirf kuch keys hilaata hai. Chalao aur compare karo.
+
+```python
+import hashlib, bisect
+
+def ring(shards, points=50):
+    r = sorted((int(hashlib.md5(f"{s}-{i}".encode()).hexdigest(), 16), s) for s in shards for i in range(points))
+    return [h for h, _ in r], [s for _, s in r]
+
+def lookup(key, hashes, owners):
+    h = int(hashlib.md5(key.encode()).hexdigest(), 16)
+    return owners[bisect.bisect(hashes, h) % len(hashes)]
+
+keys = [f"user-{i}" for i in range(10_000)]
+before = {k: lookup(k, *ring(["A", "B", "C"])) for k in keys}
+after = {k: lookup(k, *ring(["A", "B", "C", "D"])) for k in keys}
+moved = sum(before[k] != after[k] for k in keys)
+print(f"{moved / len(keys):.0%} of keys moved when adding shard D")
+```
+
+## Ek example se samjho
+
+Fatima ki team poore India mein concerts aur events ke liye ek ticketing platform chalati hai. `bookings` table 30 crore rows tak badh gayi thi aur pages slow ho rahe the.
+
+**Step 1: indexes.** "My bookings" screen `SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC LIMIT 20` chalati thi. `EXPLAIN` ne full table scan dikhaya. `(user_id, created_at)` par composite index ne use 4 seconds se 3 milliseconds par la diya.
+
+**Step 2: read replicas.** Events browse karna aur bookings dekhna 90% traffic tha. Unhone do replicas jode aur wo reads wahan route kiye, seat holds aur payments primary par hi rakhe. Primary CPU 85% se 30% par aa gaya. Jaldi hi support tickets aaye: "I booked but my ticket is not showing." Busy sales ke dauran replica lag do seconds tak tha. Unhone app badli ki ki user ke book karne ke baad 30 seconds tak uski apni bookings primary se padhi jaayein.
+
+**Step 3: sharding, baad mein.** Ek saal baad, ek superstar ki tour sale ne writes ko us had se upar pahuncha diya jo ek primary le sakta tha. Unhone bookings ko `user_id` se shard kiya, jisne writes ko barabar baanta aur har user ki history ek shard par rakhi. Unhone `event_id` se shard karne ka socha, par ek hit tour apni saari bookings ek overloaded shard par daal deti, ek **hot shard**. Har event ki seat inventory ek alag, chhoti table mein apne database par rahi, kyunki seat holds ko ek event ke andar strong consistency chahiye thi.
+
+Order matter karta tha: har step agle se sasta tha, aur unhone agla step tabhi liya jab measurements ne dikhaya ki zaroorat hai.
+
+## Aam galtiyaan
+
+**Sab kuch index karna.** Har index har write ko slow karta hai. Un columns ko index karo jinpar aapki asli queries filter aur sort karti hain.
+
+**Replication lag ko ignore karna.** Write ke turant baad replicas se padhne par stale data dikhta hai. Primary se "read your own writes" plan karo.
+
+**Bahut jaldi sharding.** Ye baad ke har badlaav ko mushkil bana deta hai. Pehle indexes, query fixes, caching aur replicas khatam karo.
+
+**Aisi shard key jo hot spots banati hai.** Dates, ya ek popular customer ya event load ko ek shard par dher kar sakte hain. Aisi keys chuno jinki kai barabar use hone waali values hon.
+
+**Hot paths par cross-shard joins ki zaroorat.** Agar aam requests ko har shard padhna pade, toh key aapke access pattern ke liye galat hai.
+
+**NoSQL sirf isliye chunna kyunki wo scalable sunai deta hai.** Agar aapko transactions aur flexible queries chahiye, toh achhe se index kiya hua relational database aksar saalon tak aapka kaam chalayega.
+
+## Practice karo
+
+1. Watch & learn panel mein sharding aur replication ke video lessons dekho.
+2. Upar ka exercise karo.
+3. Project check karo: ek query ko index ke saath aur bina index ke time karo aur query plan padho.
+4. Kisi app ke liye jise aap jaante ho, wo table batao jise sharding ki sabse zyada sambhaavna hai aur wo key jo aap chunoge.

@@ -1,0 +1,257 @@
+---
+id: errors-retries-cost
+lang: hinglish
+title: "Errors, retries aur cost"
+outcome: "Rate limits aur API errors ko retries se handle karo, aur apni app kitna kharch kar sakti hai uspar cap lagao."
+answer: "LLM APIs kabhi-kabhi fail aur rate-limit hoti hain, isliye exponential backoff ke saath retry karo, timeouts set karo, aur tokens aur daily spend cap karo taaki ek bug bada bill na bana de."
+why_it_matters: "Production mein APIs fail hoti hain aur bills badhte hain. Jin engineers par log bharosa karte hain, unki apps samajhdaari se retry karti hain, tameez se fail hoti hain aur kabhi achanak bada bill nahi dikhatin."
+flashcards:
+  - q: "Kaunse API errors retry karne layak hain?"
+    a: "429 rate limits, 500 aur 503 server errors, provider overloaded errors, aur network timeouts. Ye aksar thodi der baad success ho jaate hain."
+  - q: "Kaunse errors bina badle retry nahi karne chahiye?"
+    a: "400 bad request, 401 invalid key, 403 not permitted aur 404 unknown model. Iski jagah wajah theek karo."
+  - q: "Jitter ke saath exponential backoff kya hai?"
+    a: "Har failure ke baad zyada der intezaar karna, jaise 1, 2, 4, 8 seconds, saath mein thodi randomness taaki kai clients ek saath retry na karein, aur kuch attempts ke baad ruk jaana."
+  - q: "Retry-after header aapko kya batata hai?"
+    a: "Dobara try karne se pehle server kitni der ka intezaar chahta hai. Apne backoff time ki jagah isko follow karo."
+  - q: "SDK ki retry settings pehle kyun check karein?"
+    a: "Kai official SDKs pehle se retry karte hain. Upar se apna loop jodne se attempts multiply ho jaate hain aur API flood ho sakti hai."
+  - q: "Rate limits ke neeche kaise raho?"
+    a: "Concurrency limit karo, batch jobs ko failao, aur jo kaam urgent nahi hai uske liye batch APIs use karo."
+  - q: "Chaar cost guards batao."
+    a: "Monthly spending limit ya alert, har call par max_tokens cap, per-user daily limits, aur har request ke tokens aur cost ko log karna."
+  - q: "Fallback kya hota hai?"
+    a: "Jab calls baar-baar fail ho rahi hon tab kya hota hai: cached answer, simpler model, friendly 'try again', ya kisi insaan ko route karna."
+  - q: "Circuit breaker kya karta hai?"
+    a: "Lagaatar kai failures ke baad woh kuch der ke liye failing service ko call karna band kar deta hai aur seedhe fallback use karta hai, taaki users ko intezaar na karna pade."
+  - q: "Batch API kab use karni chahiye?"
+    a: "Us kaam ke liye jo ghanton ruk sakta hai, jaise raat ki summaries ya evals. Providers batch requests ke liye aksar bahut kam charge karte hain, aur ye normal rate limits mein usi tarah count nahi hoti."
+exercise:
+  title: "Retry loop theek karo"
+  setup: "Indore ki ek app 2,000 product descriptions mein se har ek ke liye model API call karti hai. Uska code: while True: call try karo; kisi bhi error par turant retry. Ek saath 50 calls chalti hain, koi timeout nahi, koi max_tokens nahi. Ek raat bill ₹4,000 ki jagah ₹45,000 aa jaata hai. Logs mein bahut saare 429 errors hain, aur ek PDF se paste kiye gaye description par ek 400 error ('input too long') hai, jo 3,000 baar retry hua."
+  questions:
+    - q: "400 error itna mehnga kyun pada?"
+      a: "400 ka matlab hai request hi galat hai, isliye woh kabhi success nahi ho sakti. Use hamesha retry karne se wahi lamba, mehnga input hazaron baar bheja gaya."
+    - q: "429 errors ko kaise handle karna chahiye?"
+      a: "Exponential backoff aur jitter ke saath retry karo, retry-after ko follow karo, kuch attempts ke baad ruk jao, aur concurrency 50 se kam karo."
+    - q: "Har call par kaunse do limits cost ko cap karenge?"
+      a: "Length limit se upar ke inputs ko truncate ya reject karo, aur reply par max_tokens set karo."
+    - q: "Account-level kaunsa guard bill ko jaldi rok deta?"
+      a: "Provider console mein monthly spending limit, jaise 50% par alert ke saath, aur har run ka cost logging."
+ask:
+  - "Kaunse API errors retry karne chahiye?"
+  - "Meri AI app ko bada bill banane se kaise rokun?"
+  - "Rate limit kya hai aur use kaise handle karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Language model APIs kabhi-kabhi fail hoti hain, aur har call mein paise lagte hain. Production-ready app dono sambhaalti hai:
+
+- **Errors**: rate limits, overloaded servers, timeouts, bad requests, authentication problems.
+- **Retries**: temporary errors ke liye sahi tareeke se dobara try karna.
+- **Cost caps**: aise limits jo bug ya heavy user ko bada bill banane se rokte hain.
+
+```flow
+Model API call karo -> Success?
+Success? -[haan]-> Result use karo | tokens aur cost log karo
+Success? -[nahi]-> Retry ho sakta hai? | 429, 500, 503, overloaded, timeout
+Retry ho sakta hai? -[nahi]-> Jaldi fail karo | log karo, alert karo, wajah theek karo
+Retry ho sakta hai? -[haan]-> Attempts bache hain?
+Attempts bache hain? -[haan]-> Wait karo | retry-after, ya 2^n seconds + jitter
+Wait karo -> Model API call karo
+Attempts bache hain? -[nahi]-> Fallback | cache, chhota model, "try again", ya koi insaan
+```
+
+Is lesson mein hum Fatima ke saath chalenge, jiska raat ka review-summarising job fail ho gaya aur bill teen guna ho gaya.
+
+## Ye kaam kaise karta hai
+
+**Errors ko do kisam mein baanto.**
+
+- *Retry karne layak*: `429` rate limit, `500` aur `503` server errors, provider ke "overloaded" errors, network timeouts. Ye aksar thodi der baad success ho jaate hain.
+- *Bina badle retry karne layak nahi*: `400` bad request (aapka input galat hai, jaise bahut lamba ya malformed), `401` invalid key, `403` not permitted, `404` unknown model. Retry karne par wahi toota hua request dobara jaata hai; iski jagah wajah theek karo.
+
+**Exponential backoff ke saath retry karo.** Ruko, phir retry karo; har baar wait double karo (1 s, 2 s, 4 s, 8 s), thodi randomness (jitter) jodo taaki kai clients ek hi pal retry na karein, aur kuch attempts ke baad ruk jao. Agar response mein `retry-after` header ho, toh utni der wait karo. Kai official SDKs apne aap retry karte hain; upar se doosri retry layer jodne ki jagah default settings check karo.
+
+**Rate limits.** Providers har minute requests aur tokens limit karte hain. Inke neeche rehne ke liye concurrency (kitni calls ek saath chalti hain) limit karo, batch jobs ko failao aur jo kaam urgent nahi hai uske liye batch APIs use karo. Zyada limits aam taur par zyada usage tiers ke saath aati hain.
+
+**Timeouts.** Har call par timeout set karo taaki atki hui request aapki app ko hang na kare.
+
+**Fallbacks.** Important features ke liye decide karo ki calls lagaatar fail hone par kya hoga: cached answer, simpler model, friendly "please try again", ya kisi insaan ko route karna.
+
+**Cost guards.**
+
+- Provider console mein monthly spending limit ya alerts set karo: runaway bug se bachne ka sabse simple tareeka.
+- Har call par `max_tokens` cap karo taaki ek request bahut bada reply na bana sake.
+- Har user ke liye roz ki requests limit karo.
+- Har request ke tokens aur cost log karo taaki dikhe ki paisa kahan ja raha hai.
+- Loops aur retries cap karo; jo bug hamesha retry karta hai, woh hamesha kharch karta hai.
+
+**Backoff numbers mein.** 1 second base, doubling aur 1 second tak ke jitter ke saath, paanch attempts roughly itna wait karte hain:
+
+| Attempt | Isse pehle wait | Ab tak total time |
+| --- | --- | --- |
+| 1 | 0 s | 0 s |
+| 2 | lagbhag 1 se 2 s | lagbhag 1.5 s |
+| 3 | lagbhag 2 se 3 s | lagbhag 4 s |
+| 4 | lagbhag 4 se 5 s | lagbhag 8.5 s |
+| 5 | lagbhag 8 se 9 s | lagbhag 17 s |
+
+Uske baad ruk jao aur fallback use karo. Interactive features mein users 17 seconds intezaar nahi karenge, isliye kam attempts aur tez fallback use karo. Raat ke batch jobs mein lambe waits theek hain.
+
+**Har request ki cost.** Har response batata hai ki kitne input aur output tokens use hue. Provider ke abhi ke prices se multiply karo aur result ko request id, user aur feature ke saath log karo. Hafte mein ek baar feature aur user ke hisaab se cost dekhne se jaldi pata chal jaata hai ki bill koi ek feature, ek user ya ek bug badha raha hai.
+
+**Code mein ek retry wrapper.** Sirf wahi retry karo jo baad mein success ho sakta hai, `retry-after` ko maano, aur ruk jao:
+
+```python
+import random, time
+import anthropic
+
+RETRYABLE = (anthropic.RateLimitError, anthropic.APIConnectionError,
+             anthropic.APITimeoutError, anthropic.InternalServerError)
+
+def with_retries(call, attempts=4, base=1.0, cap=20.0):
+    for attempt in range(attempts):
+        try:
+            return call()
+        except RETRYABLE as err:
+            if attempt == attempts - 1:
+                raise
+            header = getattr(getattr(err, "response", None), "headers", {}) or {}
+            wait = float(header.get("retry-after", 0)) or min(cap, base * 2 ** attempt) + random.random()
+            time.sleep(wait)
+        # Anything else (400, 401, 403, 404) is raised immediately: fix the request instead.
+
+client = anthropic.Anthropic(max_retries=0)    # turn off SDK retries so they do not stack with yours
+reply = with_retries(lambda: client.messages.create(
+    model="claude-sonnet-5-5", max_tokens=300,  # check the docs for current names
+    messages=[{"role": "user", "content": "Summarise this complaint in one line: ..."}]))
+```
+
+Ya toh SDK ke built-in retries use karo ya apna wrapper, dono kabhi nahi, warna ek failure kai requests trigger kar sakta hai.
+
+**Ek circuit breaker.** Jab provider down ho, retries har user ko poora retry time intezaar karwate hain. Breaker haal ke failures yaad rakhta hai aur seedhe fallback par chala jaata hai:
+
+```python
+class Breaker:
+    def __init__(self, threshold=5, cool_off=60):
+        self.fails, self.threshold, self.cool_off, self.opened = 0, threshold, cool_off, 0.0
+
+    def call(self, primary, fallback):
+        if self.fails >= self.threshold and time.time() - self.opened < self.cool_off:
+            return fallback()                      # open: do not even try
+        try:
+            result = primary()
+            self.fails = 0
+            return result
+        except RETRYABLE:
+            self.fails += 1
+            if self.fails >= self.threshold:
+                self.opened = time.time()
+            return fallback()
+```
+
+Fallback same ya kisi aur provider ka chhota model, cached answer ya ek saaf message ho sakta hai. Primary ko galat URL par point karke test karo.
+
+**Concurrency limit karo.** Jo jobs fan out hoti hain, unmein ek saath kitni calls chalein ye cap karo taaki rate limits ke andar raho:
+
+```python
+import asyncio
+SEM = asyncio.Semaphore(8)                       # at most 8 calls in flight
+
+async def limited(coro_factory):
+    async with SEM:
+        return await coro_factory()
+```
+
+**Jo kaam ruk sakta hai use batch karo.** Raat ke jobs, jaise din ke tickets summarise karna ya evals chalana, batch API se ja sakte hain. Anthropic ki API mein aap kai requests ek saath submit karte ho aur results baad mein lete ho, normal calls se kam price par:
+
+```python
+batch = client.messages.batches.create(requests=[
+    {"custom_id": f"ticket-{t['id']}",
+     "params": {"model": "claude-haiku-5-5", "max_tokens": 200,
+                "messages": [{"role": "user", "content": f"Summarise: {t['text']}"}]}}
+    for t in tickets
+])
+print(batch.id, batch.processing_status)         # poll later, then fetch the results
+```
+
+Provider ki abhi ki batch pricing aur turnaround time check karo, aur note karo ki kab check kiya.
+
+## Ek example se samjho
+
+Fatima ki app har raat 300 chhote sellers ke customer reviews summarise karti hai. Ek subah woh dekhti hai ki job aadha fail ho gaya aur bill normal se teen guna hai.
+
+Logs batate hain: peak par provider ne `429` errors diye; uske code ne turant aur bina ruke retry karke API flood kar di; Hindi mein ek review mein 40,000 characters ke repeated emoji the, jisse ek request bahut bada ho gaya, aur woh `400` ke saath fail hui aur 200 baar retry hui.
+
+Uske fixes:
+
+```python
+import random, time
+import anthropic
+
+RETRYABLE = {429, 500, 503, 529}   # 529 is Anthropic's "overloaded"
+
+# Create the client with anthropic.Anthropic(max_retries=0),
+# so the SDK's own retries do not stack on top of these.
+def call_with_retry(send, max_attempts=5):
+    for attempt in range(max_attempts):
+        try:
+            return send()
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            status = getattr(e, "status_code", None)   # None for timeouts and network errors
+            if (status is not None and status not in RETRYABLE) or attempt == max_attempts - 1:
+                raise
+            time.sleep(min(30, 2 ** attempt) + random.random())
+```
+
+Woh har review ko 4,000 characters tak truncate karti hai, summaries ke liye `max_tokens=300` set karti hai, ek samay mein zyada se zyada paanch calls chalati hai, aur aadhe par alert ke saath monthly spend limit lagati hai. Agle mahine ka bill normal ho jaata hai aur raat ka job poora hota hai.
+
+| Problem | Fix | Effect |
+| --- | --- | --- |
+| 429 par turant, bina ruke retries | Jitter ke saath backoff, paanch attempts | Peak par flooding nahi |
+| 400 error ko 200 baar retry karna | 400, 401, 403, 404 par jaldi fail | 200 ki jagah ek failure log hua |
+| 40,000-character ka review | Input ko 4,000 characters tak truncate | Request size cap hua |
+| Lambi summaries | `max_tokens=300` | Output size cap hua |
+| Ek saath bahut calls | Ek samay mein zyada se zyada paanch | Rate limit ke andar |
+| Koi spending guard nahi | 50% par alert ke saath monthly limit | Runaway bill jaldi ruk jaata hai |
+
+## Aam galtiyaan
+
+- **Sab kuch retry karna.** 400 aur 401 errors apne aap theek nahi hote.
+- **Turant aur hamesha ke liye retry karna.** Back off karo, jitter jodo aur ruk jao.
+- **Spending limit ya alerts na hona.**
+- **`max_tokens` cap na hona.**
+- **Double retries.** Apna jodne se pehle check karo ki SDK pehle se kya karta hai.
+- **SDK retries aur apne retries saath mein.** Failures multiply hokar requests ki baadh ban jaate hain.
+- **Outage ke dauran hamesha retry karna.** Circuit breaker aur fallback use karo.
+- **Urgent aur batch kaam ko ek hi limits se chalana**, jisse raat ke jobs din ke users ko bhookha rakh dete hain.
+
+## Jab simple handling kaafi hai
+
+- **Personal script**: SDK ke default retries aur ek spending alert kaafi hain.
+- **Kam traffic waale internal tools**, jahan kabhi-kabhi "please try again" ki cost kam hai.
+- **One-off batch jobs** jinhe aap khud dekhte ho aur dobara chala sakte ho.
+
+Circuit breakers, fallbacks, concurrency limits aur per-user caps tab jodo jab asli users feature par depend karte hon ya traffic zyada ho.
+
+## Demo se production tak
+
+- **Ek hi retry layer**, attempts aur reasons log hote hue.
+- **Circuit breaker aur fallback** har user-facing model call ke liye.
+- **Interactive aur batch kaam ke liye alag limits aur keys.**
+- **Error rate, retry rate aur spend par alert** har feature ke hisaab se.
+- **Fallback path ko** staging mein jaanboojh kar primary tod ke, regularly test karo.
+
+## Practice karo
+
+Neeche link kiye gaye API errors aur rate limits pages padho.
+
+1. Ek wrapper likho jo sirf retryable errors ko exponential backoff aur jitter ke saath retry kare, aur use ek fake function se test karo jo do baar 429 ke saath fail ho aur phir success ho.
+2. Use 400 error par jaldi fail karwao.
+3. Apne API account par spending limit ya alert lagao aur apni kisi app mein har call mein `max_tokens` jodo.
+4. Apne wrapper mein circuit breaker jodo, primary ko galat URL par point karo, aur confirm karo ki breaker khulne ke ek second ke andar users ko fallback milta hai.
+
+**Aapka kaam poora jab:** aap samjha sako ki kaunse errors retry karne hain aur kaise, aur teen guards bata sako jo aapki app ka kharch cap karte hain.

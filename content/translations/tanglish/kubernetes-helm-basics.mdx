@@ -1,0 +1,259 @@
+---
+id: kubernetes-helm-basics
+lang: tanglish
+title: "Kubernetes-um Helm-um basics"
+outcome: "Client-oda platform team unga service-a odura Kubernetes set-up-a padichu maathalaam: deployments, services, config, scaling, Helm charts."
+answer: "Kubernetes containers-a servers muzhukka odudhu: Deployment unga app-oda copies-a odikittu irukka vechukkum, Service avangalukku oru address kudukkum, Helm andha set-up-a reusable chart-aa package pannum."
+why_it_matters: "Perumbaalaana periya Indian enterprises-um avangaloda cloud partners-um services-a Kubernetes-la odraanga. Neenga cluster-a build panna maateenga, aana adhula deploy pannanum, adhoda errors-a padikkanum, adhoda owners-kooda avanga language-la pesanum."
+flashcards:
+  - q: "Kubernetes enna pannudhu?"
+    a: "Containers-a oru cluster muzhukka odudhu, neenga describe pannadha maadhiri reality irukkura maadhiri paathukkudhu: start pannum, restart pannum, move pannum, load-balance pannum."
+  - q: "Helm-na enna?"
+    a: "Oru app-oda Kubernetes files-a ellaam serthu, ovvoru environment-kum maathikkalaam-ngra values-oda oru chart-aa bundle panra package manager."
+  - q: "Pod-kum Deployment-kum enna difference?"
+    a: "Pod-na odikittu irukkura containers-oda oru disposable set; Deployment-na entha image-oda evvalavu pods odanum, update-a eppadi roll out pannanum-nu sollradhu."
+  - q: "Service enna pannum?"
+    a: "Oru stable name-um address-um kudukkum, adhu healthy-aa irukkura pods-ku traffic anuppum."
+  - q: "Resource requests-um limits-um-na enna?"
+    a: "Requests-na container-ku guarantee-aa kidaikkuradhu; limits-na adhu use panna mudiyura maximum. Memory limit-a thaandina OOMKilled-nu kolla padum."
+  - q: "Liveness, readiness probes enna pannum?"
+    a: "Liveness pod uyiroda irukku-nu Kubernetes-ku solludhu; readiness pod traffic vaangalaam-nu solludhu."
+  - q: "Helm release-a eppadi roll back pannuvinga?"
+    a: "helm rollback-oda, adhu munnaadi irundha release-oda settings-ukkum image-ukkum thirumbi pogum."
+  - q: "'latest' image tag-a yen avoid pannanum?"
+    a: "Entha version odudhu-nu theriyaadhu, adhanaala rollbacks-um audits-um oru guess aaiduchu."
+  - q: "PodDisruptionBudget edha protect pannudhu?"
+    a: "Node maintenance-la oru neraththula evvalavu pods-a down panna mudiyum-nu limit pannum, adhanaala service-ku pothuma replicas odikittu irukkum."
+  - q: "Pods GPU-va eppadi request pannum?"
+    a: "NVIDIA device plugin irukkura cluster-la, container-oda resources-la nvidia.com/gpu-ku limit set pannuradhu moolama; GPU nodes-ku perumbaalum porundhura toleration-um thevai."
+exercise:
+  title: "Cluster-a padinga"
+  setup: "Gurugram-la oru insurer-oda Kubernetes cluster-la, Helm use panni oru document-classification API deploy panni irukkinga. Oru upgrade-ku aprom: ovvoru deploy-kum aprom oru nimisham varaikkum users-ku errors varudhu; oru pod CrashLoopBackOff kaattudhu; chart-la image tag 'latest'; oru colleague kadandha vaaram kubectl edit-la oru environment variable-a fix pannaanga, adhu indha innaiku upgrade-kku aprom kaanaama pochu."
+  questions:
+    - q: "Ovvoru deploy-kum aprom varra errors-ku enna reason-aa irukkalaam?"
+      a: "Readiness probe illa: pudhu pods model load panni mudikkradhukku munnadiyae traffic vandhurudhu. /ready-la oru probe serunga."
+    - q: "CrashLoopBackOff pod-a eppadi investigate pannuvinga?"
+      a: "Last state-ukkum events-ukkum kubectl describe pod, crash aana container-oda output-ku kubectl logs --previous."
+    - q: "'latest' tag-ku badhila enna vaikkanum?"
+      a: "classify-api:1.4.2 maadhiri oru specific version tag, adhanaala rollbacks-um audits-um exact-aa enna odudhu-nu therinjukkum."
+    - q: "kubectl edit fix yen kaanaama pochu, sariyaana vazhi enna?"
+      a: "Helm upgrade chart-a thirumba apply pannidhu. Maatrathai chart-oda values-la podunga, apram upgrade pannunga."
+ask:
+  - "Pod, Deployment, Service-kku enna difference?"
+  - "Thirumba thirumba restart aagura pod-a eppadi debug panradhu?"
+  - "Helm chart-na enna?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Kubernetes** containers-a oru group of machines (cluster) muzhukka odudhu. Neenga enna venum-nu describe pannuveenga, example "indha image-oda moonu copies, ovvonnukkum 1 CPU, 2 GB memory, indha name-la reach pannalaam", Kubernetes adhukku reality match aagura maadhiri paathukkum: containers-a start pannum, crash aanadha restart pannum, fail aana machines-la irundhu move pannum, traffic-a spread pannum.
+
+**Helm** oru app-oda ella Kubernetes files-aiyum adjustable values-oda oru **chart**-aa package pannum, adhanaala adhe chart staging-layum production-layum vera vera settings-oda install aagum.
+
+FDE-aa neenga perumbaalum Kubernetes-oda edge-la velai seiveenga: oru image-um oru chart-o illa konjam YAML files-o ship pannuveenga, cluster-a client-oda platform team odum.
+
+```flow
+Veliya irundhu traffic, HTTPS -> Ingress | contracts.bank.example
+Ingress -> Service: contracts-api | stable name; ready-aa irukkura pods-ku mattum anuppum
+Service: contracts-api -> Pod 1
+Service: contracts-api -> Pod 2
+Service: contracts-api -> Pod 3
+Deployment | contracts-api:2.3.1-oda 3 replicas; ovvoru pod-um 500m CPU, 1Gi request pannum, limits 1 CPU, 2Gi; probes /health, /ready -> Pod 1
+ConfigMap and Secret | settings, platform team-oda model key -> Pod 2
+Helm chart + values-staging.yaml or values-prod.yaml -[helm upgrade, helm rollback]-> Deployment
+```
+
+Indha lesson, Mumbai-la oru bank-oda Kubernetes platform-la deploy panna oru contract-analysis API-a follow pannum.
+
+## Idhu eppadi work aagudhu
+
+Mukkiyamaana objects:
+
+- **Pod**: onnu illa athukku mela containers sernthu odradhu. Pods disposable; Kubernetes avangala suthandhirama replace pannum.
+- **Deployment**: entha image-oda evvalavu pods odanum-nu, pudhu version-a eppadi roll out pannanum-nu (mella, konjam konjama maathi) sollum.
+- **Service**: oru stable name-um address-um, ippo healthy-aa irukkura pods-ku traffic anuppum.
+- **Ingress**: veliya irundhu varra HTTP traffic-a services-ku route pannum, perumbaalum HTTPS-oda.
+- **ConfigMap**, **Secret**: settings-um sensitive values-um pods-ku environment variables-aa illa files-aa pogum.
+- **HorizontalPodAutoscaler**: CPU, memory illa custom metrics base-la pods-a add illa remove pannum.
+
+Ovvoru container-um **requests** (guarantee kidaikkuradhu), **limits** (use panna mudiyura maximum) declare pannum. Memory limit-a thaandura container kolla padum, idhu `OOMKilled`-nu kaattum. **Probes** oru pod eppo alive (liveness), traffic-ku ready (readiness)-nu Kubernetes-ku solludhu; idhu serving lesson-la vandha `/health`, `/ready` endpoints-oda map aagum.
+
+Neenga `kubectl` use pannuveenga: `get pods`, `describe pod`, `logs`, `rollout status`, `rollout undo`. Helm-la: `helm install`, `helm upgrade --values prod.yaml`, `helm rollback`.
+
+**Common pod states-um enna pannanum-nu:**
+
+| State | Perumbaalum artham | Mudhal command |
+| --- | --- | --- |
+| Pending | Requests-ku edam irukkura machine illa | Scheduling events-ku `kubectl describe pod` |
+| ImagePullBackOff | Image name, tag, illa registry access thappu | Tag-a, registry secret-a check pannunga |
+| CrashLoopBackOff | App start aana udane exit aagudhu | `kubectl logs --previous` |
+| OOMKilled | Memory limit thaandiduchu | Peak memory-a measure pannunga; limit-a ooku illa use-a kammi pannunga |
+| Running but not ready | Readiness probe fail aagudhu | `/ready` endpoint-um adhoda dependencies-um check pannunga |
+
+**Requests, limits-a eppadi choose pannradhu.** Set pannradhukku munnaadi measure pannunga. Realistic inputs-oda load test odunga, users anuppura periya documents-um serthu, ovvoru pod-oda memory, CPU-va paarunga. Requests-a normal use pakkam vainga, memory limits-a neenga paartha peak-ku mela comfortable-aa vainga. Romba kammi requests cluster-a pods-a romba nerukkama pack panna vidum; romba kammi limits periya inputs-la pods-a kollum. Numbers-a platform team-kooda agree pannunga, ennanna machines-ku avanga thaan selavu pannuraanga.
+
+**Platform team-kooda velai seiyradhu.** Avanga enna tharuvaanga-nu mudhalayae kelunga: namespace, ingress set-up, Secrets eppadi create aagum, entha registries allowed, monitoring, log collection. Neraya platform teams-ku standard chart illa required labels, resource limits maadhiri policies irukkum, adhai ignore panra deploy reject aagum.
+
+**AI API-kku shape panna Deployment.** Probes, resources, safe rollout, streams-ku grace period:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: claims-api}
+spec:
+  replicas: 3
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}        # never drop below 3 during a rollout
+  selector: {matchLabels: {app: claims-api}}
+  template:
+    metadata: {labels: {app: claims-api}}
+    spec:
+      terminationGracePeriodSeconds: 120                    # longer than the longest streamed answer
+      containers:
+        - name: api
+          image: registry.example.in/claims-api:3f9c2e1
+          ports: [{containerPort: 8000}]
+          envFrom: [{secretRef: {name: claims-api-secrets}}]
+          resources:
+            requests: {cpu: "500m", memory: "768Mi"}
+            limits: {memory: "1536Mi"}
+          readinessProbe:
+            httpGet: {path: /ready, port: 8000}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: claims-api}
+spec:
+  minAvailable: 2
+  selector: {matchLabels: {app: claims-api}}
+```
+
+**Autoscaling.** Mudhalla CPU-la scale pannunga; perumbaalum model calls-ku kaathirukkura AI APIs-ku, ovvoru pod-ku in-flight requests maadhiri custom metric load-a nallaa track pannum:
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: claims-api}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: claims-api}
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 65}}
+```
+
+**GPU workloads.** Model server pod GPUs-a explicit-aa kekkum, GPU nodes-la odavum anumadhi kidaikkum:
+
+```yaml
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.10.1
+          resources: {limits: {nvidia.com/gpu: 1}}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+```
+
+Model weights-a persistent volume-la illa pre-warmed cache-la vainga, ovvoru pod start-lum download panna vendaam, illana scale up pannuvadhukku pala nimisham aagum.
+
+**Ovvoru environment-kum Helm values.** Templates-a onnu mattum vainga, differences-a sinnadhaa vainga:
+
+```yaml
+# values-prod.yaml
+replicas: 3
+image: {tag: 3f9c2e1}
+resources: {requests: {cpu: 500m, memory: 768Mi}, limits: {memory: 1536Mi}}
+hpa: {min: 3, max: 12}
+```
+
+`helm upgrade --install claims-api ./chart -f values-prod.yaml --atomic --timeout 10m` pudhu pods ready aagala-na thaanaa roll back pannum.
+
+**Browser-la try pannunga.** Apply pannradhukku munnaadi, oru Deployment-la probes-um limits-um missing-aa-nu check pannunga. YAML-a edit pannunga.
+
+```python
+import yaml
+
+deployment = yaml.safe_load("""
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: api
+          image: registry.example.in/claims-api:latest
+          resources: {requests: {cpu: 500m}}
+""")
+spec = deployment["spec"]
+if spec.get("replicas", 1) < 2:
+    print("fewer than 2 replicas: one restart takes the service down")
+for c in spec["template"]["spec"]["containers"]:
+    if c["image"].endswith(":latest"): print(f"{c['name']}: pin the image tag")
+    if "readinessProbe" not in c: print(f"{c['name']}: add a readiness probe")
+    if "limits" not in c.get("resources", {}): print(f"{c['name']}: set a memory limit")
+```
+
+## Oru worked example
+
+Mumbai bank-ku oru contract-analysis API-a adhoda Kubernetes platform-la deploy panreenga. Platform team ungalukku oru namespace kuduthu, Helm chart kekkuraanga.
+
+Unga chart-oda `values-prod.yaml`-la 3 replicas, 500m CPU, 1Gi memory requests, 1 CPU, 2Gi limits, `contracts-api:2.3.1` image tag, ingress host, model key irukkura oru Secret-oda reference irukku (Secret-a platform team create pannuvaanga; unga chart-la adhoda value irukkaadhu).
+
+`helm upgrade`-ku aprom, moonu pods-la rendu thirumba thirumba restart aagudhu. Neenga check pannreenga:
+
+```bash
+kubectl get pods -n contracts
+kubectl describe pod contracts-api-7d9c-xk2lp -n contracts   # Last State: OOMKilled
+kubectl logs contracts-api-7d9c-xk2lp -n contracts --previous
+```
+
+`OOMKilled`: pudhu version periya tokenizer-um oru PDF library-yum load pannudhu, periya contracts-la adhu peak 2.4 GB-ku pogudhu. `helm rollback contracts-api` pannitu users-a affect aagaama paathukkureenga, platform team-kooda agree panni limit-a 3Gi-ku ookureenga, adutha memory jump deploy-kku munnaadiyae pidikka CI-la 300-page contract test serkkureenga.
+
+| Step | Command illa maatram |
+| --- | --- |
+| Restarts-a kandupidikkradhu | `kubectl get pods -n contracts` |
+| Reason-a kandupidikkradhu | `kubectl describe pod ...` OOMKilled-nu kaattuchu |
+| Users-a protect panradhu | `helm rollback contracts-api` |
+| Fix | Memory limit 3Gi-ku ooki, platform team-kooda agree pannom |
+| Prevent | CI-la 300-page contract test serthom |
+
+## Podhuvaa panra thappugal
+
+- **Resource requests, limits illaama irukkradhu.** Pods nerukka padum, illa matha pods-a nerukkum. Rendaiyum measurements-la irundhu eppavum set pannunga.
+- **Readiness probe illaama irukkradhu.** Models load aagikittu irukkura pods-ku traffic varum, ovvoru deploy-kum aprom users-ku errors theriyum.
+- **Chart-la Secrets.** Values files Git-la poi serum. Platform manage panra Secrets-a reference pannunga.
+- **`latest`-a image tag-aa use panradhu.** Rollbacks-um audits-um guess aaidum.
+- **Production-la kubectl edit-la fix panradhu.** Adutha Helm upgrade adha revert pannidum. Chart-a maathunga.
+- **Kammiyaana replicas-oda maxUnavailable zero-ku mela irukkradhu**, adhanaala rollout capacity-a kammi pannum.
+- **Sinna termination grace period**, adhu ovvoru deploy-lum streamed answers-a naduvula vettidum.
+- **Pod start-la model weights download panradhu**, scale-up mella aagum.
+
+## Kubernetes thevai illaadha neram
+
+- **Konjam services, modest traffic**: serverless containers (Cloud Run, Container Apps, ECS on Fargate) simple.
+- **Platform engineers illaadha sinna team**, cluster-a paathukkuradhae main velai aaidum.
+- **Prototypes, pilots**, client-oda platform team ungalukkaaga already oru cluster oduraanga-na thavira.
+
+## Demo-la irundhu production-ku
+
+- **Load tests-la irundhu requests, limits set pannunga**, OOMKilled pods-ku alert vainga.
+- **Sollradha check panra readiness, liveness probes use pannunga.**
+- **Capacity-a protect pannunga** maxUnavailable 0, PodDisruptionBudget-oda.
+- **`helm upgrade --atomic`-oda deploy pannunga**, rollback oru command-la irukkattum.
+- **GPU workloads-ku model weights-a volumes-la cache pannunga.**
+
+## Practice pannunga
+
+Kubernetes basics tutorial-um Helm-oda quickstart-um pannunga. Oru free local cluster (kind, minikube, illa Docker Desktop-oda) pothum.
+
+1. Unga containerised FastAPI app-a Deployment, Service, `/ready`, `/health`-la readiness, liveness probes-oda deploy pannunga.
+2. Adha "staging" (1 replica), "prod" (3 replicas)-ku thani values-oda Helm chart-aa package pannunga.
+3. Memory limit-a venumnae romba kammiyaa vainga, pod `OOMKilled` aagura-a paarunga, `kubectl describe`-la reason-a padinga, apram fix panni thirumba roll out pannunga.
+4. maxUnavailable 0, PodDisruptionBudget-oda deploy pannunga, rollout nadakkum podhu load test odunga, entha request-um fail aagala-nu confirm pannunga.
+
+**Mudinjadhu-nu eppo sollalaam:** Unga app-a Helm-la deploy, upgrade, roll back panna mudiyum, oru pod yen odala-nu `kubectl describe`-la irundhu explain panna mudiyum.

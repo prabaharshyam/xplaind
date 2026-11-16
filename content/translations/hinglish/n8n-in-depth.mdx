@@ -1,0 +1,161 @@
+---
+id: n8n-in-depth
+lang: hinglish
+title: "n8n in depth"
+outcome: "Production-grade n8n workflows banao: sub-workflows, loops aur batching, data merge karna, code nodes, AI agent nodes, error workflows, versioning aur self-hosting ki basics."
+answer: "Production n8n workflows sub-workflows, batching, merge aur code nodes, AI agent nodes, alerts ke liye ek error workflow, aur changes ke liye version control use karte hain."
+why_it_matters: "Simple workflows aasaan hote hain; jin par businesses bharosa karte hain woh sainkdon items sambhaalte hain, limits waale APIs call karte hain, errors se recover karte hain aur badhne par bhi maintain karne layak rehte hain. Ye skills hobbyist ko us insaan se alag karte hain jise company apne operations saunp sake."
+flashcards:
+  - q: "n8n mein sub-workflow kya hai?"
+    a: "Ek reusable workflow jo doosre workflows se call hota hai, function ki tarah, shared logic ke liye jaise 'customer look up karo' ya 'alert bhejo'."
+  - q: "n8n mein API ki rate limit ka respect kaise karte hain?"
+    a: "Items ko Loop Over Items se batches mein process karo, batches ke beech Wait node lagao, aur bade results ko page-by-page lo."
+  - q: "Merge node kya karta hai?"
+    a: "Do branches ke items ko position se ya email ya order id jaise matching field se jodta hai."
+  - q: "Code node kab use karna chahiye?"
+    a: "Chhote logic ke liye jo visual nodes cover nahi karte, jaise unusual formats ya date maths. Use chhota aur comments ke saath rakho."
+  - q: "AI node ke saath structured output parser kyun use karte hain?"
+    a: "Taaki baad ke nodes ko reliable, naam waale fields milein, aise free text ki jagah jiska shape har run mein badal jaata hai."
+  - q: "Write ko idempotent kya banata hai?"
+    a: "Record banane se pehle check karna ki woh pehle se hai ya nahi, taaki workflow dobara chalane par duplicates na bane."
+  - q: "Error workflow kya karta hai?"
+    a: "Jab koi aur workflow fail hota hai toh apne aap chalta hai, aur workflow, fail hua node aur execution ke link ke saath kisi ko alert karta hai."
+  - q: "n8n ko self-host karne par aap kya zimmedaari lete ho?"
+    a: "Uske database ke backups, updates, security aur scaling, jaise high volume ke liye workers ke saath queue mode."
+exercise:
+  title: "Reconciliation workflow ka plan banao"
+  setup: "Nagpur ki ek pharmacy chain raat ko chalne waala n8n workflow chahti hai jo POS API ki 3,000 sales ko payment gateway ke API ke UPI settlements se compare kare. Gateway ka API 1 second mein 5 requests allow karta hai aur ek page mein adhiktam 100 records deta hai. Mismatches ek sheet mein jaayenge, aur finance head ko Teams par summary milegi. Kuch fail ho toh workflow dobara chalaya ja sakta hai."
+  questions:
+    - q: "Limit tode bina 3,000 settlements kaise fetch karoge?"
+      a: "Results ko 100-100 karke page karo aur pages ko batches mein loop karo, Wait node ke saath taaki 5 requests per second se neeche raho."
+    - q: "Sales ko settlements se kaunsa node match karta hai?"
+      a: "Merge node, order ya transaction id jaise shared field par match karke."
+    - q: "Dobara chalane par wahi mismatch do baar na jude, ye kaise sunishchit karoge?"
+      a: "Row likhne se pehle check karo ki us transaction ki row pehle se hai ya nahi, ek sub-workflow mein jo har write ke liye use ho."
+    - q: "Raat ko gateway API down ho toh kya hona chahiye?"
+      a: "Us node par retries, phir error workflow finance-ops channel ko execution link ke saath alert karta hai, taaki koi baad mein dobara chala sake."
+ask:
+  - "n8n mein rate limits kaise handle karun?"
+  - "Sub-workflow kab use karna chahiye?"
+  - "n8n self-host karun ya n8n cloud use karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Aapke pehle n8n workflow mein ek trigger aur kuch nodes the. Asli business automations aage jaate hain: woh hazaaron records process karte hain, strict limits waale APIs call karte hain, kai systems ka data jodte hain, AI steps shaamil karte hain, aur raat ke 3 baje kuch fail ho toh bhi chalte rehna chahiye.
+
+In sab ke liye n8n mein building blocks hain:
+
+| Building block | Kis kaam ka |
+| --- | --- |
+| **Sub-workflows** | Reusable workflows jo doosre workflows se call hote hain, functions ki tarah |
+| **Loops aur batches** | API limits ka respect karne ke liye items ko groups mein process karna |
+| **Merge aur split** | Do sources ka data jodna, ya lists ko items mein todna |
+| **Code nodes** | Chhote JavaScript ya Python snippets un logic ke liye jo visual nodes cover nahi karte |
+| **AI nodes** | Model calls, structured output parsers, aur tools waale agent nodes |
+| **Error workflows** | Woh workflow fail hone par chalte hain jo apni settings mein unka naam deta hai, aur kisi ko alert karte hain |
+
+```flow
+Schedule: 6 am -> Shopify: orders, page-by-page
+Schedule: 6 am -> Gateway: settlements, batch aur wait
+Shopify: orders, page-by-page -> Merge on order id
+Gateway: settlements, batch aur wait -> Merge on order id
+Merge on order id -> Code: mismatches flag karo -> Sub-workflow: naya ho toh row likho -> AI: har mismatch samjhao -> Slack: summary
+Koi bhi failure -> Error workflow | execution link ke saath finance-ops ko alert
+```
+
+Is lesson mein hum Bengaluru ke ek skincare brand ko follow karenge jo daily order reconciliation automate karta hai. End tak aap aise workflows banaoge jo volume, limits, AI aur failure sambhaalte hain.
+
+## Ye kaam kaise karta hai
+
+### Structure
+
+Har workflow ko ek hi kaam par focused rakho. Shared logic, jaise "customer look up karo" ya "alert bhejo", un **sub-workflows** mein rakho jinhe doosre workflows call karein. Nodes ko saaf naam do: "Get open orders from Shopify", "HTTP Request 3" nahi. Ek colleague ko, ya aapko teen mahine baad, canvas dekhkar workflow samajh aana chahiye.
+
+### Volume aur rate limits
+
+Kai APIs limit lagate hain ki aap per second ya per minute kitni requests bhej sakte ho, aur ek baar mein adhiktam ek page ke results lautaate hain. Use karo:
+
+- **pagination**, taaki results ek saath nahi balki page-by-page fetch ho;
+- **Loop Over Items** batch size ke saath, items ko groups mein process karne ke liye;
+- batches ke beech **Wait** node, limit ke neeche rehne ke liye.
+
+```flow
+dir: LR
+3,000 items -> 100 ka ek batch -> API calls -> Wait 1 s
+Wait 1 s -[agla batch]-> 100 ka ek batch
+```
+
+### Data merge karna
+
+**Merge** node do branches ke items ko jodta hai, position se ya matching field se, jaise sheet rows ko CRM contacts se email par, ya orders ko payments se order id par match karna.
+
+### Code nodes
+
+Unusual formats parse karne, date maths ya amounts ko Indian tareeke se format karne (₹1,25,000) ke liye useful. Unhe chhota aur comments ke saath rakho. Complex logic ko code node ke andar test aur maintain karna mushkil hai; agar badh jaaye toh use proper service mein le jao.
+
+### AI steps
+
+Saaf prompt ke saath model node aur **structured output parser** use karo, taaki baad ke nodes ko free text nahi balki reliable, naam waale fields milein. **Agent nodes** multi-step tasks ke liye tools, jaise doosre nodes ya sub-workflows, call kar sakte hain. Inhe kisi bhi agent ki tarah treat karo: sirf zaroori tools do, steps ki ginti limit karo, aur payments jaise risky actions ke liye approval maango.
+
+### Reliability
+
+| Practice | Kyun |
+| --- | --- |
+| Flaky nodes par retries | Temporary API errors doosri koshish mein khud theek ho jaate hain |
+| Idempotent writes | Record banane se pehle check karo ki woh hai ya nahi, taaki reruns duplicate na banayein |
+| Ek error workflow | Aapki team chat mein workflow ka naam, fail hua node aur execution link post karta hai |
+| Item-count checks | Un runs ko pakadte hain jo chupchaap kuch bhi process nahi karte |
+
+### Maintainability
+
+Workflows ko JSON ki tarah Git mein export karo, ya jahan available ho wahan n8n ke source control features use karo. Alag development aur production instances ya projects rakho, aur credentials har environment ke liye alag store karo. Production ko chhoone se pehle changes development mein test karo.
+
+### Self-hosting basics
+
+n8n ko khud chalane se, jaise Docker se, data par aapka control rehta hai. Phir uske database ke backups, updates, security aur scaling aapki zimmedaari hoti hai. High volume ke liye **queue mode** executions ko alag worker processes par chalata hai.
+
+## Ek example se samjho
+
+Bengaluru ka ek D2C skincare brand apne Shopify store se din ke lagbhag 1,500 orders bechta hai. Har subah finance team do ghante orders ko payment gateway settlements aur accounting sheet se match karne mein lagati hai. Woh ise automate karte hain:
+
+| # | Node | Kya karta hai |
+| --- | --- | --- |
+| 1 | Schedule trigger | Subah 6 baje chalta hai |
+| 2 | Shopify | Kal ke orders 250-250 ke pages mein fetch karta hai |
+| 3 | Loop mein HTTP Request | Payment gateway ke API se settlements batches mein fetch karta hai, uski limit ka respect karne ke liye 1-second wait ke saath |
+| 4 | Merge | Orders aur settlements ko order id par jodta hai |
+| 5 | Code | Mismatches flag karta hai: amount alag hai, settlement missing hai, refund record nahi hua; amounts ko Indian style mein format karta hai |
+| 6 | Sub-workflow "write to accounting sheet" | Jodne se pehle check karta hai ki order ki row hai ya nahi, isliye reruns safe hain |
+| 7 | Structured output waala AI node | Finance team ke liye har mismatch ki ek line ki explanation likhta hai |
+| 8 | Slack | Totals aur mismatch sheet ka link post karta hai |
+| + | Error workflow | Kisi bhi failure par execution link ke saath finance-ops channel ko alert karta hai |
+
+**Results:**
+
+| Measure | Pehle | Baad mein |
+| --- | --- | --- |
+| Finance team ka subah ka reconciliation | Lagbhag 2 ghante | Flagged cases review karne mein lagbhag 15 minute |
+| Din mein mile mismatches | Alag-alag, kuch chhoot jaate the | 20 se 40, sab reason ke saath list |
+
+**Ek kharab subah.** Ek din 6 baje payment gateway ka API down tha. Node ne teen baar retry kiya, phir error workflow ne fail hue execution ke link ke saath alert post kiya. Team ne 9 baje workflow dobara chalaya. Kyunki har write pehle maujood row check karta tha, rerun duplicates ke bina poora hua.
+
+## Aam galtiyaan
+
+- **Ek bada workflow.** Use saaf naamon ke saath sub-workflows mein todo.
+- **Rate limits ko ignore karna.** Paginate, batch aur wait karo.
+- **Non-idempotent writes.** Reruns duplicates banate hain.
+- **Bade code nodes mein dabaya hua logic.** Code chhota rakho; complex logic ko service mein le jao.
+- **Na version control, na test instance.** Production mein changes chupchaap cheezein tod dete hain.
+- **AI output free text ki tarah.** Structured output parser use karo taaki baad ke steps ko reliable fields milein.
+
+## Practice karo
+
+n8n ka N8N102 Integrations course poora karo, jo neeche link hai, aur hosting overview padho.
+
+1. **Volume.** Aisa workflow banao jo API ya sheet se kam se kam 100 items batches mein process kare, batches ke beech wait ke saath.
+2. **Merge, write, AI.** Do data sources ka merge, records likhne ke liye ek sub-workflow jo maujood rows check kare, aur structured output waala ek AI step jodo.
+3. **Failure.** Ek error workflow jodo jo aapko alert kare, jaan-boojhkar ek node tod do, aur alert aur clean rerun confirm karo. Error workflows manual test runs ke liye nahi chalte, isliye workflow ko uske trigger par chalne do.
+
+**Aapka kaam poora jab:** aap apna workflow lagaataar do baar duplicates banaye bina rerun kar sako, aur fail hue execution ke link ke saath error alert dikha sako.

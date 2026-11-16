@@ -1,0 +1,210 @@
+---
+id: regression-tests
+lang: hinglish
+title: "Prompts ke liye regression tests"
+outcome: "Har change par apna eval set automatically chalao, taaki ek jagah ka fix chupke se doosri jagah kuch tod na de."
+answer: "Prompt regression tests har change par aapka eval set automatically chalate hain, taaki ek case ka fix release se pehle chupke se doosre cases ko na tode."
+why_it_matters: "Prompt changes un jagahon par cheezein tod dete hain jahan kisi ne dekha hi nahi. Automatic regression tests hi team ko confidence se prompts aur models badalne dete hain."
+flashcards:
+  - q: "LLM app mein regression kya hai?"
+    a: "Koi change, jaise prompt tweak, model upgrade ya naya chunking setting, ke baad jo pehle chalta tha woh chalna band ho jaye."
+  - q: "Regression tests ke do tiers kaunse hain?"
+    a: "Har push par tez deterministic checks, aur deploy se pehle ya nightly judges ke saath poore evals."
+  - q: "Fast checks aam taur par kya cover karte hain?"
+    a: "App start hota hai, outputs parse hote hain, required fields maujood hain, must-refuse inputs refuse hote hain, aur kuch critical cases pass hote hain."
+  - q: "Ek change fuller eval kaise pass karta hai?"
+    a: "Overall quality production se set tolerance ke andar rehni chahiye, aur koi bhi critical category zara bhi na girni chahiye."
+  - q: "Tests mein non-deterministic outputs ko kaise handle karte hain?"
+    a: "Low temperature use karo, exact text ki jagah criteria par judge karo, aur borderline cases ek se zyada baar chalao."
+  - q: "Model upgrades ko change kyun maante hain?"
+    a: "Naya model overall behtar ho sakta hai aur aapke specific cases ya formats par kharab bhi; apne evals dekhkar decide karo."
+  - q: "Regression tests kahan chalne chahiye?"
+    a: "CI mein: har pull request par fast checks, fail hone par merge block, aur deploy se pehle full eval."
+  - q: "Har production bug ka kya hota hai?"
+    a: "Woh ek naya regression test case ban jata hai."
+  - q: "Score changes ke liye tolerance kaise set karte ho?"
+    a: "Ek hi version ko kai baar chalao aur dekho ki scores sirf chance se kitne hilte hain, phir tolerance us noise se thoda upar rakho. Critical categories ko koi tolerance nahi milti."
+  - q: "Tests mein model versions pin kyun karte hain?"
+    a: "Provider ek hi naam ke peeche model update kar sakta hai. Pinned, dated versions se test results din-ba-din compare ho paate hain."
+exercise:
+  title: "Gates set karo"
+  setup: "Chennai ki ek insurtech ka claims-summary feature JSON deta hai jisme fields hain claim_id, summary aur risk_flags. Prompts mein changes seedhe kiye jaate hain aur do outputs padhkar check hote hain. Pichhle mahine ek prompt change se motor claims ke liye risk_flags khaali aa gaye, aur ek provider ke model update ne date formats badal diye, jisse ek downstream report toot gayi. Dono production tak pahunch gaye."
+  questions:
+    - q: "Har push par kaunse fast checks hone chahiye?"
+      a: "Teeno fields ke saath valid JSON, date formats jaise expected hain, jahan test cases expect karte hain wahan non-empty risk_flags, aur kuch critical claims."
+    - q: "Motor-claims ki problem kisse pakdi jaati?"
+      a: "Category ke hisaab se score karne waala full eval, jisme motor claims aisi category ho jiske results gir na sakein."
+    - q: "Model updates ko kaise handle karna chahiye?"
+      a: "Model versions pin karo, aur kisi naye version par jaane se pehle full eval aur fast checks chalao."
+    - q: "In do incidents ka kya hona chahiye?"
+      a: "Dono test cases ban jaayein: flags expect karne waala motor claims, aur downstream report ke liye date-format check."
+ask:
+  - "Deploy karne se pehle prompt changes ko kaise test karun?"
+  - "Tests mein non-deterministic outputs ko kaise handle karun?"
+  - "Kya mujhe naye model version par upgrade karna chahiye?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Regression** tab hota hai jab kisi change ke baad woh cheez chalna band ho jaye jo pehle chalti thi. LLM apps mein regressions aam hain aur chupke se hote hain. Ek prompt tweak jo ek case theek karta hai, teen aur cases tod deta hai. Ek model upgrade output format badal deta hai. Naya chunking setting zyadatar questions behtar karta hai, par ek zaroori document kho deta hai.
+
+**Regression tests** har change par aapka eval set automatically dobara chalate hain, taaki ye toot-phoot users ke dekhne se pehle pakdi jaye.
+
+```flow
+Pull request | koi prompt, model, retrieval ya code change -> Fast tier, har push par, lagbhag 90 s | app start hota hai, JSON valid, 4 options 1 answer, duplicates nahi, must-refuse cases, 15 critical cases
+Fast tier, har push par, lagbhag 90 s -[fail hua]-> Merge block hua
+Fast tier, har push par, lagbhag 90 s -[pass hua]-> Full tier, deploy se pehle ya nightly | 120 cases, production baseline ke against category ke hisaab se judge scores
+Full tier, deploy se pehle ya nightly -> Tolerance ke andar, aur koi critical category nahi giri?
+Tolerance ke andar, aur koi critical category nahi giri? -[haan]-> Deploy
+Production bugs -> Naye test cases -> Fast tier, har push par, lagbhag 90 s
+```
+
+Ye lesson Noida ki ek edtech company ke quiz-generation feature ko follow karta hai, jo chapter text ko multiple-choice questions mein badalta hai.
+
+## Ye kaam kaise karta hai
+
+**Tests ke do tiers.**
+
+- *Har push par fast checks* (seconds se kuch minutes): code-level ke saste, deterministic checks. Kya app start hota hai? Kya output valid JSON ki tarah parse hota hai? Kya required fields maujood hain? Kya jaane-pehchaane must-refuse inputs refuse hote hain? Kya kuch critical cases ab bhi pass hote hain?
+- *Zaroori changes par ya nightly fuller evals*: poora test set model judges ke saath, aur scores ko maujooda production version se category ke hisaab se compare karna.
+
+**Baseline se compare karo.** Maujooda production version ke scores store karke rakho. Change tab pass hota hai jab overall quality set tolerance se zyada na gire aur koi critical category (safety, refusals, key customers ke cases) zara bhi na gire.
+
+**Non-determinism ko handle karo.** Model outputs har run mein badalte hain. Jahan ho sake tests ke liye low temperature use karo, exact text ki jagah criteria par judge karo, aur borderline cases ko ek se zyada baar chalao.
+
+**Model upgrades bhi changes hain.** Jab provider naya model release kare, ya aap switch karne ka sochein, full eval chalao. Release notes se nahi, results se decide karo: naya model overall behtar ho sakta hai aur aapke specific cases par kharab.
+
+**CI mein jodo.** Har pull request par fast checks chalao; fail hone par merge block karo. Prompt ya model change deploy karne se pehle fuller eval chalao. Results store karo taaki trends dikh sakein.
+
+**Har bug jodo.** Har production failure ek regression test case ban jata hai.
+
+**Har tier mein kya jaata hai:**
+
+| Tier | Kab chalta hai | Contents | Time |
+| --- | --- | --- | --- |
+| Fast | Har push par | Chhote set par code checks, critical cases, must-refuse inputs | Seconds se minutes |
+| Full | Deploy se pehle, nightly | Poora test set, judges, category ke hisaab se comparison | Minutes se ek ghanta |
+| Model candidate | Jab naya model aaye | Full tier plus downstream use hone waale format checks | Jitna zaroori ho |
+
+**Ek CI workflow, shabdon mein.** Har pull request par dependencies install karo, test settings ke saath app start karo, fast tier chalao, aur koi bhi check fail ho toh job fail kar do. Main branch par merge hone par, ya "run full eval" jaise label par, full tier chalao. Scores ko store ki hui production baseline se category ke hisaab se compare karo, pull request par ek table post karo, aur agar koi critical category giri ho toh fail kar do. Har run ke results commit ke saath store karo, taaki aap quality ko waqt ke saath chart kar sakein aur dheeme girav ko pakad sakein.
+
+**Tolerances set karna.** Ek hi version par full tier kai baar chalao taaki dekh sako ki sirf randomness se scores kitne hilte hain. Overall tolerance ko us noise se thoda upar rakho. Critical categories, jaise safety aur refusals, ke liye koi girav allow mat karo, aur wahan zyada cases jodo taaki ek failure saaf dikhe.
+
+**Fast tier, code mein.** Property checks saade tests hain. Ye pytest use karta hai aur kuch saved chapters par quiz generator chalata hai:
+
+```python
+import json, pytest
+from quiz import generate_quiz             # your app's function
+
+CHAPTERS = json.load(open("tests/fast_chapters.json"))   # 15 saved chapters
+
+@pytest.mark.parametrize("chapter", CHAPTERS, ids=lambda c: c["id"])
+def test_quiz_shape(chapter):
+    quiz = json.loads(generate_quiz(chapter["text"]))
+    assert 3 <= len(quiz["questions"]) <= 10
+    for q in quiz["questions"]:
+        assert len(q["options"]) == 4
+        assert len(set(q["options"])) == 4, "duplicate options"
+        assert q["answer"] in q["options"]
+
+def test_refuses_out_of_scope():
+    out = generate_quiz("Write me a poem about cricket.")
+    assert json.loads(out).get("error") == "not_a_chapter"
+```
+
+**Baseline comparison, code mein.** Full tier har case ka ek score aur uski category likhta hai; ye script candidate run ko store ki hui production run se compare karti hai:
+
+```python
+import json
+from collections import defaultdict
+
+CRITICAL = {"safety", "refusals"}
+
+def by_category(path):
+    scores = defaultdict(list)
+    for line in open(path):
+        r = json.loads(line)
+        scores[r["category"]].append(r["score"])
+    return {c: sum(v) / len(v) for c, v in scores.items()}
+
+def compare(baseline_path, candidate_path, tolerance=0.02):
+    base, cand = by_category(baseline_path), by_category(candidate_path)
+    problems = []
+    for cat, b in base.items():
+        drop = b - cand.get(cat, 0)
+        limit = 0 if cat in CRITICAL else tolerance
+        if drop > limit:
+            problems.append(f"{cat}: {b:.2f} -> {cand.get(cat, 0):.2f}")
+    return problems
+
+problems = compare("evals/production.jsonl", "evals/candidate.jsonl")
+print("PASS" if not problems else "FAIL\n" + "\n".join(problems))
+raise SystemExit(1 if problems else 0)       # a non-zero exit fails the CI job
+```
+
+**Girav par bharosa karne se pehle noise naapo.** Bina badle production version par full tier teen se paanch baar chalao. Agar history accuracy apne aap 0.84 aur 0.87 ke beech hilti hai, toh 0.85 par aaya candidate regress nahi hua. Chhoti categories mein cases badhao: 20 cases ho toh ek failure 5-point ka swing hai.
+
+**Flaky cases.** Kuch cases ek run mein pass aur agle mein fail ho jaate hain. Unhe teen baar chalao aur do pass maango, ya case ko theek karo: aksar expected answer hi ambiguous hota hai. Bina samjhe kisi flaky case ko bas delete mat karo.
+
+**Bill chhota rakho.** Judge ke saath full evals har run par paise lete hain. Jin inputs aur prompts mein badlaav nahi hai unke outputs cache karo, routine runs ke liye sasta judge aur releases se pehle strong judge use karo, aur full tier ko har push par nahi, labels par ya nightly chalao.
+
+**Jo test karte ho use pin karo.** Har run ke saath exact model version, prompt version, retrieval settings aur judge prompt record karo. Ek score tabhi doosre score se compare ho sakta hai jab dono ek hi tareeke se bane hon.
+
+## Ek example se samjho
+
+Noida ki ek ed-tech company ka quiz-generation feature chapter text se multiple-choice questions JSON mein banata hai.
+
+Unka setup:
+
+- *Har push par*: 15 chapters app se guzarte hain; check hota hai ki har output valid JSON hai jisme chaar options aur ek sahi answer hai, koi duplicate option nahi, aur sensitive historical content waale do chapters mein koi disallowed phrasing na aaye. 90 seconds lagte hain.
+- *Deploy se pehle*: 120 chapters ko factual accuracy aur difficulty ke liye ek judge score karta hai, aur production se subject ke hisaab se compare hota hai.
+
+Ek developer cost kam karne ke liye prompt chhota karta hai. Fast checks pass ho jaate hain. Full eval mein science ki accuracy waisi hi hai par history 9 points neeche hai, kyunki chhote prompt mein woh instruction chhoot gaya jo kehta tha ki sirf chapter ke facts use karo. Release se pehle change ko dobara banaya jaata hai.
+
+Mahine baad, provider ka naya model overall 3 points zyada score karta hai par JSON fields ko alag order mein deta hai, jise ek purana client parser handle nahi kar paata. Fast checks ise pakad lete hain, aur switch se pehle parser theek kiya jaata hai.
+
+| Change | Fast tier | Full tier | Decision |
+| --- | --- | --- | --- |
+| Cost bachane ke liye prompt chhota kiya | Pass hua | History accuracy 9 points neeche | Release se pehle dobara banaya |
+| Provider ka naya model | Purane parser ko todne waala JSON field-order change pakda | Overall 3 points zyada | Parser theek kiya, phir switch |
+
+## Aam galtiyaan
+
+- **Prompts ke liye koi automated tests nahi.** Prompt changes bhi code changes hain.
+- **Exact-text comparisons.** Outputs badalte hain; properties aur criteria check karo.
+- **Sirf averages dekhna.** Critical categories ko alag se protect karo.
+- **Evals chalaye bina models upgrade karna.**
+- **Production bugs ko test set mein na jodna.**
+- **Fast tier ko slow hone dena.** Agar woh kuch minutes se zyada leta hai toh log use skip karne lagte hain. Slow cases ko full tier mein le jao.
+- **Judge aur app ek saath badalna.** Pata nahi chalta ki kaunse change ne score hilaya.
+- **Green dikhane ke liye failing cases delete karna.** App theek karo ya case theek karo, aur likh lo kyun.
+
+## Jab halka testing kaafi hai
+
+- **Roz badalta prototype**: ek poora suite jise aap baar-baar likhte rahein, usse kuch smoke checks behtar hain.
+- **Kuch expert users waale internal tools**, jo problems jaldi batate hain: fast tier rakho, full tier sirf bade changes se pehle chalao.
+- **Fixed, deterministic steps**, jaise kisi jaane-pehchaane file format ko parse karna: aam unit tests kaafi hain.
+
+Full tier, baselines aur critical categories tab jodo jab asli users output par depend karne lagein.
+
+## Demo se production tak
+
+- **Fast tier par merges block karo**, aur use kuch minutes ke andar rakho.
+- **Har prompt, model ya retrieval release se pehle full tier chalao**, aur category table pull request par post karo.
+- **Har run store karo** uske commit aur versions ke saath, aur dheeme girav ko pakadne ke liye scores ko waqt ke saath chart karo.
+- **Test set ko har quarter review karo**: purane cases hatao, naye user patterns aur har production bug jodo.
+- **Model upgrade ki checklist rakho**: full tier, har downstream consumer ke liye format checks, cost aur latency ki comparison.
+
+## Practice karo
+
+Neeche link kiya hua Hamel Husain ka evals article dobara padho.
+
+1. Apne eval set ko fast tier (code checks ke saath 10 se 20 cases) aur full tier mein baanto.
+2. CI workflow ke saath fast tier har push par automatically chalao.
+3. Aisa change karo jo ek category behtar kare aur doosri tode, aur dikhao ki aapka setup use pakadta hai.
+4. Apna full tier ek hi unchanged version par teen baar chalao, dekho har category kitni hilti hai, aur usse apna tolerance set karo.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ke chapters 3 aur 4 evaluation methods aur evaluation pipeline banane ko cover karte hain.
+
+**Aapka kaam poora jab:** aap ek pull request dikha sako jo failing regression check se block hui, aur samjha sako ki naya model apnaana hai ya nahi, ye kisne decide kiya.

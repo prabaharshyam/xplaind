@@ -1,0 +1,242 @@
+---
+id: data-quality-pii
+lang: hinglish
+title: "Data quality aur personal data"
+outcome: "Data ko model tak pahunchne se pehle check karo, aur documents, prompts aur logs mein naam, phone numbers, Aadhaar aur PAN numbers jaise personal data ko dhoondho aur mask karo."
+answer: "Data model tak pahunchne se pehle gaps aur errors ke liye check karo, aur documents, prompts aur logs mein naam, phone, Aadhaar aur PAN numbers jaise personal data ko dhoondho aur mask karo."
+why_it_matters: "Kharab records confident galat answers dete hain, aur galat jagah par personal data India ke DPDP Act aur doosre laws ke under legal risk banata hai. Clients ke data protection officers theek se poochte hain ki aap dono ko kaise handle karte ho, aur ise baad mein jodne se behtar hai pehle se build karna."
+flashcards:
+  - q: "Data quality checking ka kya matlab hai?"
+    a: "Data ko index karne ya model ko bhejne se pehle check karna ki woh complete, valid, consistent aur current hai."
+  - q: "Paanch tarah ke data quality rules batao."
+    a: "Required fields maujood hon, valid values, uniqueness, freshness, aur text sanity jaise har parsed page par kaafi characters."
+  - q: "Ek fail hua rule kaunse teen outcomes trigger kar sakta hai?"
+    a: "Poore batch ko block karna, kharab records ko quarantine karna, ya sirf warn karna."
+  - q: "PAN ya Aadhaar jaise structured identifiers kaise dhoondhein?"
+    a: "Patterns se: PAN paanch letters, chaar digits aur ek letter hota hai; Aadhaar checksum ke saath 12 digits; saath mein mobiles, emails, IFSC codes aur GSTINs."
+  - q: "Named-entity recognition kis kaam aata hai?"
+    a: "Free text mein naam, jagahein aur organisations dhoondhne ke liye, jo patterns nahi pakad sakte."
+  - q: "Pseudonymisation kya hai?"
+    a: "Asli personal data ko realistic fakes ya tokens se badalna, jaise test aur staging data mein."
+  - q: "Reversible masking kya hai?"
+    a: "Model call se pehle personal data ko PERSON_1 jaise placeholders se badalna, phir answer mein asli values wapas daalna."
+  - q: "PII detector ka recall kyun measure karein?"
+    a: "Koi detector perfect nahi hota, khaaskar Indian names aur mixed-language text par. Measured recall batata hai ki kitna personal data nikal jaata hai."
+  - q: "Personal-data detector ko kaise measure karein?"
+    a: "Asli documents ke sample mein personal data haath se label karo, detector chalao, aur ginti karo ki label kiye items mein se kitne mile (recall) aur uske milaye hue mein se kitne asli the (precision)."
+  - q: "Staging aur tests ke liye realistic fake data kyun use karein?"
+    a: "Isse kisi ko expose kiye bina formats aur edge cases asli data ke kareeb rehte hain. Faker jaise tools Indian names, addresses aur phone numbers bana sakte hain."
+exercise:
+  title: "Treatment decide karo"
+  setup: "Hyderabad ka ek bank customer complaint emails ke replies draft karne wala assistant bana raha hai. Emails mein naam, mobile numbers, account numbers, PAN numbers aur kabhi-kabhi Aadhaar numbers hote hain. Data flows: (1) emails index hote hain taaki staff purani complaints search kar sake; (2) email text reply draft karne ke liye ek external model ko jaata hai; (3) application logs aur traces; (4) testing ke liye ek staging environment."
+  questions:
+    - q: "Flow (1) ke liye kaunsa treatment sahi hai?"
+      a: "Data rakho, kyunki staff ko chahiye, par permissions se search restrict karo aur Aadhaar numbers mask karo, jinki task ko zaroorat nahi."
+    - q: "Flow (2) ke liye kaunsa treatment sahi hai?"
+      a: "Reversible masking: call se pehle names, numbers, account numbers, PAN aur Aadhaar ko placeholders se badlo, phir draft mein restore karo."
+    - q: "Flows (3) aur (4) ka kya?"
+      a: "Logs aur traces: default se masked. Staging: realistic fake data, asli customer emails kabhi nahi."
+    - q: "Detector 99% PAN numbers par par 85% names par kaam karta hai. Team ko kya karna chahiye?"
+      a: "Name detection behtar karo, jaise bank ki customer-name list ko lookup ki tarah use karke, aur launch se pehle labelled emails par dobara measure karo."
+ask:
+  - "Indian documents mein personal data kaise detect karun?"
+  - "Masking aur pseudonymisation mein kya farak hai?"
+  - "Kya main customer data external AI model ko bhej sakta hoon?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Har AI data pipeline mein do judi hui jobs hoti hain:
+
+- **Data quality**: data ko index karne ya model ko bhejne se pehle check karna ki woh complete, valid, consistent aur current hai. Missing fields, duplicate records, impossible dates aur garbled text sab galat answers ban jaate hain.
+- **Personal data handling**: personal data (naam, phone numbers, emails, addresses, Aadhaar, PAN, bank account numbers, health details) dhoondhna aur har us jagah ke liye tay karna jahan woh jaata hai ki use rakhna hai, mask karna hai, pseudonymise karna hai ya hata dena hai.
+
+```flow
+Raw records -> Quality checks
+Quality checks -[fail]-> Quarantine, block ya warn
+Quality checks -[pass]-> Personal data dhoondho | patterns + NER + context words
+Personal data dhoondho -[index]-> Rakho, permissions se restrict karke
+Personal data dhoondho -[external model]-> Jo task ko nahi chahiye use mask karo
+Personal data dhoondho -[logs aur traces]-> Default se mask karo
+Personal data dhoondho -[staging aur tests]-> Realistic fakes se badlo
+```
+
+Ye lesson Coimbatore ke ek hospital group ko follow karta hai jo follow-up calls ke liye discharge-note summariser bana raha hai.
+
+## Ye kaam kaise karta hai
+
+**Quality checks tests ki tarah.** Aise rules likho jinhe data ko poora karna hai, aur har batch par chalao:
+
+- required fields maujood hon (har claim mein policy number aur date);
+- values valid hon (dates future mein nahi, amounts positive, PIN codes chhe digits);
+- uniqueness (koi duplicate invoice numbers nahi);
+- freshness (sabse naya record ek din se purana nahi);
+- text sanity (parse hue pages mein kaafi characters; garbled symbols ki lambi runs nahi).
+
+Great Expectations jaisi libraries ya simple pytest-style checks kaam karte hain. Har rule ke liye tay karo ki failure batch ko block kare, kharab records ko quarantine kare ya sirf warn kare.
+
+**Personal data dhoondhna.** In sabko milao:
+
+- structured identifiers ke liye *patterns*: Indian mobile numbers, emails, PAN (paanch letters, chaar digits, ek letter), Aadhaar (12 digits, behtar ho toh uske checksum ke saath), IFSC codes, GSTINs;
+- naam, jagahon aur organisations ke liye *named-entity recognition*, Presidio ya spaCy jaise tools se;
+- confidence badhane ke liye *context words* ("Aadhaar no.", "DOB").
+
+Koi detector perfect nahi. Asli documents ke labelled sample par uska recall measure karo, khaaskar Indian names aur mixed-language text par.
+
+**Har flow ke liye treatment choose karna.**
+
+- *Index mein*: aksar rakho (staff ko customer names chahiye), par permissions se restrict karo.
+- *External model ke prompts mein*: sirf wahi bhejo jo task ko chahiye; jo identifiers answer ko nahi chahiye unhe mask karo.
+- *Logs aur traces mein*: default se mask karo.
+- *Test aur staging data mein*: realistic fakes se badlo (pseudonymise).
+
+**Reversible masking.** Kuch tasks ke liye aap model call se pehle "Lakshmi Narayanan, 98400 12345" ko "PERSON_1, PHONE_1" se badalte ho aur baad mein answer mein asli values wapas daal dete ho. Model ko asli data kabhi dikhta hi nahi, phir bhi user ko poora reply milta hai.
+
+**Indian identifier patterns, shabdon mein:**
+
+| Identifier | Pattern | Extra check |
+| --- | --- | --- |
+| Mobile number | 6 se 9 se shuru hone wale 10 digits, aksar +91 ke saath | "mob", "ph" jaise context words |
+| PAN | 5 letters, 4 digits, 1 letter | Chautha letter holder type batata hai |
+| Aadhaar | 12 digits, aksar chaar-chaar ke groups mein | Verhoeff checksum |
+| IFSC | 4 letters, ek zero, 6 letters ya digits | Bank code list |
+| GSTIN | 2-digit state code se shuru hone wale 15 characters | Isme PAN hota hai |
+| PIN code | 6 digits | Valid pehla digit |
+
+**Masking practice mein.** Reversible masking ek mapping rakhta hai, jaise PERSON_1 se asli naam, sirf memory mein, request ki length tak. Prompt kehta hai "PERSON_1 was discharged on...", model likhta hai "Call PERSON_1 to check...", aur code nurse ke dekhne se pehle asli naam wapas daal deta hai. External model ko identity kabhi nahi milti, aur mapping kabhi log nahi hoti.
+
+**Code mein quality checks.** Seedhe functions jo fail hui rows return karte hain, taaki har batch clean aur quarantined mein baant sake:
+
+```python
+import re
+from datetime import date
+
+RULES = {
+    "policy number present": lambda r: bool(r.get("policy_no")),
+    "claim date not in future": lambda r: r["claim_date"] <= date.today(),
+    "amount positive": lambda r: r["amount_paise"] > 0,
+    "PIN code 6 digits": lambda r: bool(re.fullmatch(r"[1-9]\d{5}", r.get("pin", ""))),
+    "text long enough": lambda r: len(r.get("text", "")) > 200,
+}
+
+def check_batch(rows, unique_key="claim_id"):
+    clean, quarantine, seen = [], [], set()
+    for r in rows:
+        failed = [name for name, ok in RULES.items() if not _safe(ok, r)]
+        if r.get(unique_key) in seen:
+            failed.append("duplicate id")
+        seen.add(r.get(unique_key))
+        (quarantine if failed else clean).append({**r, "_failed": failed} if failed else r)
+    print(f"{len(clean)} clean, {len(quarantine)} quarantined")
+    return clean, quarantine
+
+def _safe(rule, row):
+    try:
+        return rule(row)
+    except (KeyError, TypeError):
+        return False
+```
+
+Har batch mein har rule ki failures gino. Kisi ek rule mein achanak jump aaye toh aksar matlab hota hai ki source ka format badla, data kharab nahi hua.
+
+**Presidio se personal data detect karna.** Microsoft ka open-source Presidio patterns, context words aur named-entity models ko milata hai. Haal ke versions mein PAN aur Aadhaar jaise kuch Indian identifiers ke recognisers hain; baaki ke liye apne jodo:
+
+```python
+from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
+
+analyzer = AnalyzerEngine()
+analyzer.registry.add_recognizer(PatternRecognizer(
+    supported_entity="IN_IFSC",
+    patterns=[Pattern("ifsc", r"\b[A-Z]{4}0[A-Z0-9]{6}\b", 0.6)],
+    context=["ifsc", "branch", "bank"]))
+
+text = "Refund to Lakshmi Narayanan, IFSC HDFC0001234, mobile 9840012345."
+for r in analyzer.analyze(text=text, language="en"):
+    print(r.entity_type, text[r.start:r.end], round(r.score, 2))
+```
+
+**Detector ko type aur language ke hisaab se measure karo.** 100 asli snippets haath se label karo (labels ke liye masked copies theek hain), phir:
+
+```python
+def detector_recall(labelled, detect):
+    """labelled: list of (text, set of (start, end, type)); detect returns the same shape."""
+    found = total = 0
+    for text, gold in labelled:
+        hits = detect(text)
+        total += len(gold)
+        found += sum(any(abs(s - hs) < 3 and abs(e - he) < 3 for hs, he, _ in hits) for s, e, _ in gold)
+    return found / total if total else 1.0
+```
+
+Indian names, transliterated text aur mixed scripts mein detectors sabse zyada chookte hain; unka recall alag se report karo.
+
+**Staging ke liye fake data.** Production data ko staging mein kabhi copy mat karo. Use generate karo:
+
+```python
+from faker import Faker
+fake = Faker("en_IN")
+print(fake.name(), fake.phone_number(), fake.address())
+```
+
+Wahi shapes aur edge cases (lambe naam, missing fields, Hindi text) rakho, taaki staging wahi bugs pakde jo production pakdta.
+
+## Ek example se samjho
+
+Coimbatore ka ek hospital group ek assistant chahta hai jo follow-up calls ke liye discharge notes summarise kare. Notes mein patient names, phone numbers, addresses, diagnoses aur doctors ke naam hote hain.
+
+Quality checks un notes ko reject karte hain jinme discharge date nahi hai, ek jaane-pehchaane double-export bug se aaye duplicates (3% records) flag karte hain, aur 40 scanned notes quarantine karte hain jinka OCR text zyadatar symbols hai.
+
+Personal data ke liye data protection officer yeh tay karte hain:
+
+- Summariser ko clinical content chahiye, identity nahi. Names, phone numbers, addresses aur hospital ids model call se pehle mask hote hain aur nurse ko dikhaye jaane wale summary mein restore hote hain.
+- Logs aur traces sirf masked text rakhte hain.
+- Staging environment templates se bane synthetic notes use karta hai.
+
+200 hand-labelled notes par detector test karne par phone numbers 97% mile par patient names sirf 81%, kai Tamil names jo lowercase mein likhe the chhoot gaye. Hospital ki apni patient-name list ko lookup ki tarah jodne se ye 98% ho jaata hai. DPO measured figures ke saath design document par sign off karte hain.
+
+| Check | Finding | Action |
+| --- | --- | --- |
+| Discharge date missing | Kuch notes | Reject |
+| Duplicate exports | 3% records | Flag karke hataye |
+| Garbled OCR text | 40 scanned notes | Re-scan ke liye quarantine |
+| Phone number detection | 97% mile | Accept |
+| Patient name detection | 81%, phir hospital ki name list se 98% | Fix ke baad accept |
+
+## Aam galtiyaan
+
+- **Quality ko ek baar aankh se check karna.** Data badalta hai; har batch par checks automate karo.
+- **Bina measure kiye detector par bharosa karna.** Indian data par name detection vendors ke English benchmarks se kaafi kamzor ho sakta hai.
+- **Har flow ke liye ek hi rule.** Index, prompts, logs aur test data ko alag treatments chahiye.
+- **Aisi masking jo task tod de.** Agar model ko answer dene ke liye date chahiye, toh use mask karna result bigaad deta hai. Field ke hisaab se tay karo.
+- **Free text bhool jaana.** Personal data comments, notes aur email bodies mein chhupa hota hai, sirf naam wale columns mein nahi.
+- **Production data ko staging ya tests mein copy karna.** Iski jagah realistic fakes generate karo.
+- **Ek overall detector score.** Recall ko identifier type aur language ke hisaab se measure karo.
+- **Aise rules jo missing field par crash ho jaate hain** failure record karne ki jagah.
+
+## Jab halke checks kaafi hain
+
+- **Sirf public ya synthetic data**, bina personal information ke: quality checks phir bhi matter karte hain, PII detection bahut kam.
+- **Ek baar ka analysis** jo aap khud chalate aur haath se check karte ho.
+- **Aisa data jo pehle se validated aata hai** kisi trusted system se jiske apne contracts aur checks hain.
+
+## Demo se production tak
+
+- **Har batch par quality checks chalao**, failures quarantine karo aur har rule mein jumps par alert lagao.
+- **Detector recall measure karo** har quarter labelled sample par aur badlaavon ke baad.
+- **Logs aur traces mein default se mask karo**, aur har exception document karo.
+- **Staging aur tests mein generated data** use karo.
+- **Masking rules review karo** jab bhi naye document types ya languages aayein.
+
+## Practice karo
+
+Presidio overview aur Great Expectations introduction padho.
+
+1. Apne chune hue dataset ke liye paanch quality checks likho aur chalao, failures ko alag file mein quarantine karke.
+2. Indian mobile numbers, PAN aur email ke patterns aur ek name detector ke saath masking function banao, aur apne likhe 30 sentences par test karo, jisme do languages ke Indian names hon.
+3. Ek model call ke aaspaas reversible masking implement karo aur restored output dikhao.
+4. Apne masking function ka recall 30 labelled sentences par measure karo, English aur aapki use ki hui doosri language ke hisaab se baant kar.
+
+Aur gehrai mein jaane ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 8 data quality checks cover karta hai, aur chapter 10 sensitive data ko detect aur mask karna.
+
+**Aap tab done ho jab aap** apne detector ka measured recall personal data ke har type ke hisaab se report kar sako, aur masked logs ke saath ek sahi unmasked answer dikha sako.

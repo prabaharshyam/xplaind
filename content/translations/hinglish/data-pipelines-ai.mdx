@@ -1,0 +1,212 @@
+---
+id: data-pipelines-ai
+lang: hinglish
+title: "AI ke liye data pipelines"
+outcome: "Aisi pipeline design karo jo AI system ke data ko fresh rakhe: ETL ya ELT, scheduled ya change-driven updates, incremental indexing, aur parsers ya embedding models badalne par re-processing."
+answer: "Ek AI data pipeline sources se data extract karti hai, use clean aur transform karti hai, aur index ko schedule par ya har change par update karti hai, sirf jo badla usi ko re-process karte hue."
+why_it_matters: "Ek baar ke export par bana RAG system kuch hafton mein stale ho jaata hai, aur stale jawab galat jawab se bhi tez bharosa todte hain. Clients umeed karte hain ki assistant ko kal ke circular ka pata ho. Pipelines yahi sach banati hain, aur production RAG ke zyadatar bugs yahin hote hain."
+flashcards:
+  - q: "AI system ki data pipeline aam taur par kya karti hai?"
+    a: "Sources se extract karti hai, parse, clean, chunk, embed karti hai, index mein likhti hai aur record karti hai ki kya hua."
+  - q: "ETL aur ELT mein kya farak hai?"
+    a: "ETL destination mein load karne se pehle transform karta hai; ELT pehle raw data land karta hai aur wahin transform karta hai."
+  - q: "Change data capture kya hai?"
+    a: "Database ke har insert, update aur delete ko events ki tarah stream karna, taaki indexes kuch seconds mein sync rahein."
+  - q: "Har document ki raw copy kyun rakhein?"
+    a: "Taaki parsing ya chunking badalne ke baad client ke systems se dheere-dheere dobara fetch kiye bina re-process kar sakein."
+  - q: "Chunks ko stable ids kyun chahiye?"
+    a: "Taaki ek update theek purane chunks ko replace kare aur delete unhe hata de, duplicates jama hone ki jagah."
+  - q: "Freshness kaise chunni chahiye?"
+    a: "Source ke hisaab se, ki woh kitni tez badalta hai aur kitna matter karta hai: live records ke liye CDC, libraries ke liye minutes, archives ke liye nightly."
+  - q: "Embedding model badalne par kya hona chahiye?"
+    a: "Saare vectors ko naye index mein rebuild karo, evaluate karo, phir switch karo; purane aur naye vectors mix nahi ho sakte."
+  - q: "Pipeline health tracking mein kya hona chahiye?"
+    a: "Process hue, fail hue aur skip hue documents, likhe gaye chunks, embedding cost, aur har source ka sabse naye document ki umar."
+  - q: "Chunk ids ko document id aur position se kyun banayein?"
+    a: "Tab kisi document ko update ya delete karte waqt id prefix se uske purane chunks theek hata sakte hain, aur koi orphaned chunk searchable nahi bachta."
+  - q: "Index alias kya hai?"
+    a: "Ek naam jo application padhti hai, jo ek physical index ki taraf point karta hai. Alias ko naye index par switch karne se jo serve ho raha hai woh turant badal jaata hai, aur wapas switch karna hi rollback hai."
+exercise:
+  title: "Pipeline theek karo"
+  setup: "Kanpur ke ek leather exporter ka RAG assistant SharePoint se product specs aur ERP se order status index karta hai. Problems: chunking badalne ke baad re-process karne ka matlab 20,000 files ko teen din mein dobara download karna; edit kiye gaye specs results mein do baar dikhte hain; indexing nightly chalti hai isliye answers mein order status ek din purana hai; aur sirf naye documents ke liye naya embedding model on karne ke baad search kharab ho gayi."
+  questions:
+    - q: "Teen din ka re-download kaise bachayein?"
+      a: "Raw files ko source ids aur versions ke saath storage mein land karo, aur us copy se re-process karo."
+    - q: "Edit kiye specs do baar kyun dikhte hain, aur kya fix karta hai?"
+      a: "Chunks ke paas stable ids nahi hain, isliye updates purane delete kiye bina naye chunks jodte hain. Document id aur position se ids use karo, aur ek step mein replace karo."
+    - q: "Order status current kaise rahe?"
+      a: "ERP table ke liye change data capture ya baar-baar incremental updates use karo, taaki changes seconds ya minutes mein index tak pahunchein."
+    - q: "Embedding model switch mein kya galat hua?"
+      a: "Purane aur naye vectors mix ho gaye. Sab kuch naye model ke saath naye index mein rebuild karo, evaluate karo, phir switch karo."
+ask:
+  - "ETL aur ELT mein kya farak hai?"
+  - "RAG index ko source systems ke saath sync mein kaise rakhun?"
+  - "Bina downtime ke embedding models kaise badlun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Ek **data pipeline** data ko wahan se jahan woh bana hai wahan le jaati hai jahan woh use hota hai, raaste mein use transform karte hue. AI system ke liye pipeline aam taur par ye karti hai: sources se extract (connectors ke through), documents parse, clean, chunk, embed, index mein likhna, aur record karna ki kya hua.
+
+Do classic shapes:
+
+- **ETL** (extract, transform, load): destination mein likhne se pehle transform karo.
+- **ELT** (extract, load, transform): pehle raw data ko warehouse ya lake mein land karo, wahin transform karo. Modern analytics stacks mein common.
+
+RAG ke liye ek hybrid typical hai: raw documents aur metadata storage mein land karo (taaki aap hamesha re-process kar sako), phir index ke liye chunks aur embeddings mein transform karo.
+
+**Change data capture (CDC)** database ke har insert, update aur delete ko events ki tarah stream karta hai, taaki search index jaise downstream systems nightly batch ka intezaar karne ki jagah kuch seconds mein sync rahein.
+
+```flow
+Notices portal -[har 15 minute]-> Raw store | files + ids
+Berth table -[CDC]-> Change events
+Tariff book -[publication par]-> With effective date
+Raw store -> Parse -> Chunk -> Embed -> Collection v2 | alias "live"
+Change events -> Ek record update karo -> Collection v2
+With effective date -> Collection v2
+```
+
+Har chunk apna document id aur position, parser v3, chunking v2 aur embedding model e5 record karta hai. Health har source ke hisaab se track hoti hai: process hue, fail hue, bina badle skip hue, aur sabse naye document ki umar.
+
+Ye lesson Chennai ke ek port operator ke assistant ke saath chalta hai, jo tariffs, notices aur berth schedules ke sawaalon ke jawab deta hai.
+
+## Ye kaam kaise karta hai
+
+**Raw copy rakho.** Original files aur records ko unke source ids aur versions ke saath store karo. Jab aap chunking ya parser badlo, toh client ke systems se sab kuch dobara fetch karne ki jagah raw se re-process karo.
+
+**Stable ids.** Har document ko ek stable id do (source system plus source id) aur har chunk ko ek id jo usse aur uski position se bane. Phir updates theek purane chunks ko replace karte hain; deletes unhe hata dete hain.
+
+**Incremental indexing.** Har badle hue document ke liye: uske purane chunks delete karo, parse, chunk, embed karo aur naye insert karo, ek aise step mein jo aadha document index mein nahi chhod sakta. Jin documents ka content hash nahi badla unhe skip karo.
+
+**Schedules aur triggers.** Freshness har source ke liye chuno: aksar badalne waale aur turant matter karne waale records (ticket status, stock levels) ke liye CDC ya webhooks, document libraries ke liye har 15 minute, archives ke liye nightly. Freshness target client ke saath tay karo.
+
+**Sab kuch version karo.** Har chunk ke saath parser, chunking settings aur embedding model version record karo. Jab aap embedding model upgrade karte ho, saare vectors rebuild hone chahiye, kyunki purane aur naye vectors mix nahi ho sakte. Naya index purane ke saath banao, evaluate karo, phir switch karo.
+
+**Orchestration.** Airflow, Dagster, Prefect ya cloud ki workflow service jaise tools steps schedule karte hain, failures retry karte hain aur history dikhate hain. Chhote projects ke liye achhi logging waala ek scheduled job kaafi hai.
+
+**Pipeline health.** Process hue, fail hue, unchanged skip hue documents, likhe gaye chunks, embedding cost aur har source ke sabse naye document ki umar track karo. Freshness phisalne par alert karo.
+
+**Freshness ko sources se milana:**
+
+| Source | Kab badalta hai | Kitna matter karta hai | Method |
+| --- | --- | --- | --- |
+| Berth schedule table | Lagaataar | Turant | Change data capture |
+| Notices portal | Roz | Ghante ke andar | Har 15 minute check karo |
+| Tariff book | Saal mein do baar | Publication par | Publication par process karo |
+| Purane circulars ka archive | Kabhi-kabhi | Kam | Nightly ya weekly |
+
+**Indexes ko safely switch karna.** Naya index live index ke saath, ek naye naam se banao. Golden set dono par chalao aur category ke hisaab se compare karo, sirf overall nahi. Agar naya jeete, toh application jo alias padhti hai use naye collection par point karo; switch ek second leta hai aur deploy nahi chahiye. Purana collection ek hafte tak rakho taaki rollback wahi ek-second ka change ho. Use tabhi delete karo jab naya index production mein saaf chal chuka ho.
+
+**Atomic updates.** Document update karne ka matlab hai uske purane chunks delete karna aur naye insert karna. Dono ek transaction mein karo, ya pehle naye chunks likho aur phir purane version se delete karo, taaki search kabhi aadha document ya kuch bhi na dekhe. Jin files ka content hash nahi badla unhe skip karne se embedding cost kam rehti hai, khaaskar un document libraries par jo dheere badalti hain.
+
+**Code mein ek ingestion step.** Stable ids, ek content hash, har chunk par versions aur ek atomic replace:
+
+```python
+import hashlib
+
+PARSER_V, CHUNKER_V, EMBED_MODEL = "pdf-3", "headings-350-50", "multilingual-e5-base@2024-06"
+
+def ingest_document(db, source, source_id, raw_bytes, parse, chunk, embed):
+    doc_id = f"{source}:{source_id}"
+    digest = hashlib.sha256(raw_bytes).hexdigest()
+    row = db.fetchone("SELECT content_hash, versions FROM documents WHERE id = %s", (doc_id,))
+    versions = {"parser": PARSER_V, "chunker": CHUNKER_V, "embed": EMBED_MODEL}
+    if row and row[0] == digest and row[1] == versions:
+        return "skipped"                                   # nothing changed
+    text = parse(raw_bytes)
+    pieces = chunk(text)
+    vectors = embed([p["text"] for p in pieces])
+    with db.transaction():                                 # searches never see half a document
+        db.execute("DELETE FROM chunks WHERE doc_id = %s", (doc_id,))
+        for i, (p, v) in enumerate(zip(pieces, vectors)):
+            db.execute("""INSERT INTO chunks (id, doc_id, section, body, embedding, parser_v, chunker_v, embed_model)
+                          VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                       (f"{doc_id}#c{i}", doc_id, p["section"], p["text"], v, PARSER_V, CHUNKER_V, EMBED_MODEL))
+        db.execute("""INSERT INTO documents (id, content_hash, versions, indexed_at) VALUES (%s,%s,%s, now())
+                      ON CONFLICT (id) DO UPDATE SET content_hash = EXCLUDED.content_hash,
+                      versions = EXCLUDED.versions, indexed_at = now()""", (doc_id, digest, versions))
+    return f"indexed {len(pieces)} chunks"
+
+def delete_document(db, source, source_id):
+    with db.transaction():
+        db.execute("DELETE FROM chunks WHERE doc_id = %s", (f"{source}:{source_id}",))
+        db.execute("DELETE FROM documents WHERE id = %s", (f"{source}:{source_id}",))
+```
+
+Embedding transaction se pehle hoti hai, isliye dheema, mehnga hissa lock ke bahar hai. Parser, chunker ya embedding version badalne par document dobara process hota hai, chaahe file na badli ho.
+
+**Alias se indexes swap karna.** Postgres mein ek view alias ka kaam kar sakta hai:
+
+```sql
+-- Build chunks_v2 alongside chunks_v1, evaluate it, then switch in one statement:
+CREATE OR REPLACE VIEW chunks_live AS SELECT * FROM chunks_v2;
+-- Rollback is the same statement pointing back to chunks_v1.
+```
+
+Qdrant jaise vector databases aur OpenSearch jaise search engines mein native aliases hote hain jo isi tarah kaam karte hain.
+
+**Freshness ek number ki tarah.** Har source ke liye, jo sabse naya source modification time aapne index kiya hai woh record karo, aur jab woh tay target se peeche ho jaaye toh alert karo:
+
+```sql
+SELECT split_part(id, ':', 1) AS source,
+       max(indexed_at) AS last_indexed,
+       now() - max(indexed_at) AS lag
+FROM documents GROUP BY 1 ORDER BY lag DESC;
+```
+
+**Users ko nuksan pahunchaye bina backfills.** Poori library ko dobara embed karna (model badalne ke baad) ghante le sakta hai aur rate limits hit kar sakta hai. Ise sirf naye index par, concurrency limit ke saath, off-peak ghanton mein chalao, aur ruk jaaye toh aakhri poore hue document se resume karo.
+
+## Ek example se samjho
+
+Chennai ke ek port operator ka assistant tariffs, shipping agents ko notices aur berth schedules ke sawaalon ke jawab deta hai.
+
+- **Notices** (document portal par PDF circulars): har 15 minute mein check hote hain. Naye ya badle hue files raw hi storage mein land hote hain, phir parse, chunk aur embed hote hain. Badle hue notice ke purane chunks ek transaction mein replace hote hain.
+- **Berth schedule** (ek database table jo lagaataar update hoti hai): CDC changes stream karta hai; har change index mein ek chhota record kuch seconds mein update karta hai.
+- **Tariff book** (ek bada document, saal mein do baar revise hota hai): publication par process hoti hai, effective date store ke saath, taaki retrieval date se filter kar sake.
+
+Chauthe mahine mein aap tables ke liye chunking badalte ho taaki rows saath rahein. Kyunki raw files aur stable ids maujood hain, ek re-processing job raat bhar mein notices index ko naye collection mein rebuild kar deta hai. Tariff sawaalon par golden set 84% se 90% tak behtar hota hai, aur aap alias naye collection par switch kar dete ho. Rollback ka matlab hota use wapas switch karna.
+
+| Change | Pehle | Baad mein |
+| --- | --- | --- |
+| Table-aware chunking | Tariff sawaalon par 84% | Tariff sawaalon par 90% |
+| Notices ka rebuild time | Dinon tak dobara fetch karna | Raat bhar, raw copy se |
+| Naye index par switch | Safely mumkin nahi | Alias change, rollback taiyaar |
+
+## Aam galtiyaan
+
+- **Raw copy nahi.** Har re-processing ka matlab client se dheema, throttle hua dobara fetch.
+- **Unstable chunk ids.** Updates purane chunks hataye bina naye jodte hain, aur duplicates jama ho jaate hain.
+- **Embedding model versions mix karna.** Search chupchaap kharab hoti hai. Rebuild karo aur switch karo.
+- **Sab ke liye ek hi schedule.** Freshness ko is se milao ki har source kitni tez badalta hai aur kitna matter karta hai.
+- **Freshness alert nahi.** Atki hui pipeline tab tak theek dikhti hai jab tak koi kal ke notice ke baare mein na poochhe.
+- **Database transaction ke andar embed karna,** jab dheeme API calls chal rahe hon tab locks pakde rehna.
+- **Chunks par versions nahi,** isliye pata nahi chalta ki kaunse parser ya model ne unhe banaya.
+- **Har change ke baad sab kuch dobara embed karna,** sirf badle documents ki jagah.
+
+## Jab ek simple script kaafi hai
+
+- **Documents ka ek fixed set** jo demo ya pilot ke liye ek baar load hota hai.
+- **Kuch files jo mahine mein ek baar badalti hain**: schedule par sab kuch dobara index karo.
+- **Ek managed RAG service** jo sync, versions aur deletions pehle se sambhaalti hai.
+
+Poori pipeline tab banao jab documents aksar badalte hon, kai sources se aate hon, ya tay samay ke andar fresh hone chahiye.
+
+## Demo se production tak
+
+- Har chunk par **raw copies**, stable ids aur versions rakho.
+- **Documents ko atomically replace karo,** aur unchanged ko hash se skip karo.
+- **Alias ke through indexes swap karo,** purana index rollback ke liye rakhte hue.
+- Har source ke liye tay target ke mukable **freshness lag par alert karo**.
+- **Har run ke counts aur embedding cost log karo.**
+
+## Practice karo
+
+dbt ka ETL versus ELT wala piece aur Debezium ka feature overview padho.
+
+1. Apni RAG ingestion ko aise restructure karo ki raw files pehle ek folder ya bucket mein land hon, har document ko ek stable id mile aur har chunk parser aur embedding versions record kare.
+2. Updates aise banao ki woh document ke purane chunks replace karein aur unchanged files ko content hash se skip karein. Ek badli hui file update hoti dikhao aur ek delete ki gayi file gayab hoti dikhao.
+3. Chunk size badlo, naye index mein rebuild karo, dono ko apne golden set par compare karo aur switch karo.
+4. Sirf chunker version string badlo, ingestion dobara chalao, aur confirm karo ki har document re-process hota hai jabki doosra run un sab ko skip karta hai.
+
+**Aapka kaam poora jab:** aap bina downtime ke embedding model ya chunking badal sako aur switch karne se pehle saabit kar sako ki naya index behtar hai.

@@ -1,0 +1,233 @@
+---
+id: mcp-servers-clients
+lang: hinglish
+title: "MCP servers aur clients"
+outcome: "Samjhao ki Model Context Protocol AI apps ko tools aur data se kaise jodta hai, ek chhota MCP server banao, aur jaano ki kaunse security sawaal poochhne hain."
+answer: "Model Context Protocol (MCP) AI apps ko tools aur data se jodne ka ek open standard hai: ek MCP server tools aur resources expose karta hai, aur AI apps clients ki tarah connect hote hain."
+why_it_matters: "AI assistants aur agents mein tools aur company data plug karne ka ab common tareeka MCP ban gaya hai. Clients naam leke maangte hain, jaise hamare ticketing system ke liye ek MCP server, aur FDE job posts mein bhi ye likha hota hai. Pieces pata ho toh banana tez hai."
+flashcards:
+  - q: "MCP kaunsi problem solve karta hai?"
+    a: "Har AI app ko har tool ke liye custom code chahiye hota tha. MCP mein ek system ko ek baar server ki tarah wrap karte hain aur koi bhi MCP client use kar sakta hai."
+  - q: "Ek MCP server kaunsi teen cheezein offer kar sakta hai?"
+    a: "Tools jo model call kar sake, resources jo app context mein padh sake, aur prompts jo users chun sakein."
+  - q: "Host, client aur server kya hain?"
+    a: "Host AI app hai; uske andar ek client har server se ek connection rakhta hai; server kisi system ke tools aur data expose karta hai."
+  - q: "MCP ke do main transports kaunse hain?"
+    a: "Same machine ke local servers ke liye standard input and output, aur remote servers ke liye HTTP, jisme OAuth jaisi authentication chahiye."
+  - q: "Python MCP tool ko schema kahan se milta hai?"
+    a: "Function ke naam, type hints aur docstring se."
+  - q: "MCP server ko user ki tarah kyun act karna chahiye?"
+    a: "Taaki system user ki apni permissions lagaye; super-user credential se har user sab kuch dekh sakta hai."
+  - q: "run_sql tool aam taur par kharab idea kyun hai?"
+    a: "Model jo bhi likhe, woh poora database expose ho jaata hai. Task-shaped tools se jo ho sakta hai woh limit hota hai."
+  - q: "MCP prompt injection kaise le jaa sakta hai?"
+    a: "Tool descriptions aur results model mein jaate hain, isliye malicious server ya poison kiya hua record chhupe hue instructions la sakta hai."
+  - q: "Tools ke alawa MCP server aur kya offer kar sakta hai?"
+    a: "Resources, yaani data jo host padh sake jaise files ya records, aur prompts, yaani reusable templates jo user chun sake."
+  - q: "MCP mein tool poisoning kya hai?"
+    a: "Aisa server jiske tool descriptions ya results model ke liye instructions chhupa dete hain, jaise secrets padhne ko ya doosra tool call karne ko kehna."
+exercise:
+  title: "MCP server ko review karo"
+  setup: "Kochi ki ek shipping company ki IT team ko apne ERP ke liye ek free community MCP server milta hai. Ismein tools hain: run_sql(query), get_shipment(id), update_shipment(id, fields) aur send_email(to, body). Ye ek config file mein set ek admin database account se connect hota hai. Ye koi logs nahi rakhta. Staff ise aaj hi apne desktop assistants mein install karna chahta hai."
+  questions:
+    - q: "Install karne se pehle IT ko kya check karna chahiye?"
+      a: "Kisne likha, kaunsa code chalta hai, kya-kya reach kar sakta hai, kaise authenticate karta hai, aur kya woh data kahin aur bhejta hai."
+    - q: "Admin database account mein risk kya hai?"
+      a: "Assistant ke through har user ko admin access mil jaata hai. Server ko har user ki tarah uski apni permissions ke saath act karna chahiye."
+    - q: "Kaunse tools hatane ya restrict karne chahiye?"
+      a: "run_sql hatao; update_shipment ko specific fields tak approval ke saath restrict karo; send_email ko internal recipients tak limit karo ya approval maango."
+    - q: "Production use se pehle kya jodna zaroori hai?"
+      a: "Har call ka user, tool aur arguments ke saath logging, aur company sign-on se authentication."
+ask:
+  - "Model Context Protocol simple words mein kya hai?"
+  - "Python mein MCP server kaise banaun?"
+  - "Kya third-party MCP servers install karna safe hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Pehle har AI app ko har tool ke liye apna custom code chahiye hota tha: chat app mein ticketing system ke liye ek integration, coding assistant mein doosra, agent mein teesra. **Model Context Protocol** (MCP) ek open standard hai jo ye theek karta hai. Aap kisi system ko ek baar **MCP server** ki tarah wrap karte ho; phir koi bhi **MCP client**, jaise desktop assistant, IDE ya aapka apna agent, use dhoondh kar use kar sakta hai.
+
+Ek MCP server teen tarah ki cheezein offer kar sakta hai:
+
+- **Tools**: actions jo model call kar sakta hai, jaise `search_tickets` ya `create_invoice`.
+- **Resources**: data jo app context mein padh sakta hai, jaise file, record ya schema.
+- **Prompts**: reusable prompt templates jo user chun sakta hai.
+
+```flow
+dir: LR
+title: Ek server, kai hosts: har app ke liye naya integration nahi
+IDE assistant, a host -[client]-> Maintenance-log server | tools: find_machine, get_maintenance_history, log_observation
+Chat assistant, a host -[client]-> Maintenance-log server
+Chat assistant, a host -[client]-> Spare-parts server
+```
+
+Ye lesson Pune ki ek manufacturing company ko follow karta hai, jiske engineers wahi maintenance data par do alag AI assistants use karte hain.
+
+## Ye kaam kaise karta hai
+
+**Roles.** *Host* woh AI application hai jisme user kaam karta hai. Uske andar ek MCP *client* har *server* se ek connection rakhta hai. Client server se poochhta hai ki woh kya offer karta hai, tool list model ko deta hai, aur jab model tool call kare, toh client call sahi server ko bhejta hai aur result wapas laata hai.
+
+**Transports.** Local server usi machine par ek process ki tarah chalta hai aur standard input and output par baat karta hai, jo desktop tools aur developer machines ke liye theek hai. Remote server ek web service ki tarah chalta hai aur HTTP par baat karta hai, jo shared company systems ke liye theek hai aur proper authentication maangta hai, aam taur par OAuth.
+
+**Server banana.** Python, TypeScript aur dusri languages ke liye official SDKs hain. Python mein ek minimal server kuch lines ka hota hai:
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("tickets")
+
+@mcp.tool()
+def search_tickets(query: str, status: str = "open") -> list[dict]:
+    """Search support tickets by keywords. status is 'open' or 'closed'. Returns up to 10."""
+    return ticket_db.search(query, status=status, limit=10)
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+Function ka naam, type hints aur docstring tool ka schema ban jaate hain, isliye pichhle lesson ki tool design ki salah seedhe lagu hoti hai.
+
+**Security.** MCP server aisa code hai jise asli systems tak access hai. Poochho: kisne likha, kya reach kar sakta hai, kaunse credentials use karta hai, aur kya woh user ki tarah (uski permissions maante hue) act karta hai ya sab kuch kar sakne waale service account ki tarah? Tool descriptions aur results model mein jaate hain, isliye malicious server ya poison kiya hua record prompt injection la sakta hai. Least privilege use karo, third-party servers install karne se pehle review karo, aur har call log karo.
+
+**Local aur remote servers:**
+
+| Pehlu | Local (standard input and output) | Remote (HTTP) |
+| --- | --- | --- |
+| Kahan chalta hai | User ki machine par | Company server ya cloud par |
+| Kis ke liye achha | Developer tools, local files | Shared company systems |
+| Authentication | User ka apna machine access | OAuth, behtar hai single sign-on se |
+| Updates | Har user apni copy update karta hai | Ek baar update, sabke liye |
+| Logging | Machine ke hisaab se | Central audit log |
+
+**Kisi bhi server ke liye security sawaal:**
+
+| Sawaal | Kyun zaroori hai |
+| --- | --- |
+| Kisne likha, aur kya hum code padh sakte hain? | Server utne access ke saath chalta hai jitna aap dete ho |
+| Kaunse systems aur data tak pahunch sakta hai? | Galti ya attack ka nuksaan limit hota hai |
+| User ki tarah act karta hai ya service account ki tarah? | Tay hota hai ki user permissions lagengi ya nahi |
+| Kaunse tools write ya send karte hain? | Unhe tight limits ya approval chahiye |
+| Kya calls user, tool aur arguments ke saath log hote hain? | Incidents ki jaanch ke liye zaroori |
+
+**Tools design karna.** Kisi bhi agent tool ki tarah wahi salah: kam, task-shaped tools, saaf descriptions aur madadgaar errors. Kyunki kai hosts ek hi server use karenge, achhe descriptions aur bhi zaroori hain; ek vague tool ki bharpaayi ke liye har host mein prompt tune nahi kar sakte. Write tools ko narrow rakho, jaise `log_observation` sirf notes table mein likhe, taaki confused ya manipulate kiya hua model bhi kam nuksaan kar sake.
+
+**Tools se zyada.** Ek server teen tarah ki cheezein de sakta hai. **Tools** woh functions hain jo model call kar sakta hai. **Resources** woh data hain jo host padh kar dikha ya attach kar sakta hai, jaise file, ticket ya database row, jo URI se address hota hai. **Prompts** reusable templates hain jo user menu se chun sakta hai, jaise "summarise this ticket thread". Tools model-driven hote hain; resources aur prompts aam taur par app ya user chunta hai.
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("tickets")
+
+@mcp.resource("ticket://{ticket_id}")
+def ticket(ticket_id: str) -> str:
+    """The full text of one ticket."""
+    t = ticket_db.get(ticket_id)
+    return f"{t.title}\n\n{t.body}"
+
+@mcp.prompt()
+def summarise_ticket(ticket_id: str) -> str:
+    return f"Summarise ticket {ticket_id} in five bullets and list open questions."
+```
+
+**Apna client likhna.** Desktop assistants aur code editors jaise hosts mein clients pehle se hote hain, par aap usi SDK se apne Python code se bhi connect kar sakte ho:
+
+```python
+import asyncio
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+async def main():
+    server = StdioServerParameters(command="python", args=["tickets_server.py"])
+    async with stdio_client(server) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools = await session.list_tools()
+            print([t.name for t in tools.tools])
+            result = await session.call_tool("search_tickets", {"query": "refund", "status": "open"})
+            print(result.content[0].text)
+
+asyncio.run(main())
+```
+
+Aapka app `tools.tools` ko model ko tool definitions ki tarah dega aur model ke tool calls ko `session.call_tool` par route karega, wahi round trip jo tool-calling lesson mein tha.
+
+**Model connect karne se pehle server test karo.** `npx @modelcontextprotocol/inspector` se chalne waala MCP Inspector ek page kholta hai jahan aap server ke tools list kar sakte ho, apne arguments ke saath call kar sakte ho aur raw results dekh sakte ho. Zyadatar bugs chat se zyada yahan jaldi dikhte hain.
+
+**MCP ke khaas threats.**
+
+- **Tool poisoning**: tool description ya result model ko kuch aur karne ko kehta hai, jaise `~/.ssh` padhna ya kisi URL par data bhejna. Third-party servers ke descriptions padho, aur results ko data samjho.
+- **Approval ke baad badlaav**: jis server ko aapne approve kiya, woh baad mein apne tool descriptions update kar sakta hai. Versions pin karo aur changes review karo.
+- **Name clashes**: do servers ek hi naam ka tool offer karein toh model confuse ho sakta hai ki kaunsa chalega. Tool names ke aage server ka purpose prefix karo.
+- **Bahut zyada reach**: company-wide token waala ek server sab kuch expose kar sakta hai. Aise servers ko prefer karo jo signed-in user ki tarah act karein, OAuth scopes task jitne narrow rakhke.
+
+**Browser mein try karo.** MCP messages JSON-RPC hain. Ye woh tool call banata hai jo client bhejta hai aur reply ka shape check karta hai.
+
+```python
+import json
+
+request = {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+           "params": {"name": "search_tickets", "arguments": {"query": "refund", "status": "open"}}}
+reply = {"jsonrpc": "2.0", "id": 7,
+         "result": {"content": [{"type": "text", "text": "T-1042: refund delayed"}], "isError": False}}
+
+print(json.dumps(request, indent=2))
+assert reply["id"] == request["id"], "replies must match the request id"
+print("tool said:", reply["result"]["content"][0]["text"])
+```
+
+## Ek example se samjho
+
+Pune ki ek manufacturing company ke engineers apne IDE mein ek AI assistant aur apne chat tool mein doosra use karte hain. Dono ko maintenance log database tak access chahiye.
+
+Do integrations ki jagah aap ek remote MCP server banate ho jisme teen tools hain: `find_machine` (tag ya naam se), `get_maintenance_history` (kisi machine ke last N events) aur `log_observation` (note jodta hai; sirf notes table mein likhta hai). Ye har user ko company ke single sign-on se authenticate karta hai aur us user ki apni permissions se database query karta hai, isliye ek contractor sirf apna plant dekhta hai.
+
+Dono assistants usi server se connect hote hain. Ek engineer chat mein poochhta hai: "CNC-14 ka spindle last kab service hua, aur kya tab se kisi ne vibration report kiya hai?" Assistant `find_machine` call karta hai, phir `get_maintenance_history`, aur dates aur log mein likhe naamon ke saath jawab deta hai. Har call server ke audit log mein user, tool aur arguments ke saath dikhti hai.
+
+Jab IT baad mein naya spare-parts system jodta hai, toh woh doosra MCP server jodta hai, aur dono assistants ko assistants mein koi badlaav kiye bina woh tools mil jaate hain.
+
+| Event | Kya hua |
+| --- | --- |
+| Engineer CNC-14 ke baare mein poochhta hai | Chat assistant ne find_machine, phir get_maintenance_history call kiya |
+| Contractor doosre plant ke baare mein poochhta hai | Server ki per-user permissions ne kuch return nahi kiya |
+| Audit review | Har call user, tool aur arguments ke saath listed thi |
+| Naya spare-parts system | Doosra server jodha gaya; dono assistants ko uske tools mil gaye |
+
+## Aam galtiyaan
+
+- **Anjaan servers install karna.** Third-party server utne access ke saath chalta hai jitna aap dete ho. Code padho ya trusted sources use karo.
+- **Ek super-user credential.** Agar server user ki apni permissions ignore kare, toh har user sab kuch tak pahunch sakta hai.
+- **Poora database expose karna.** Task-shaped tools do, `run_sql` tool nahi, jab tak users khud database administrators na hon.
+- **Tool results ko trusted maan lena.** Ticket ya document ke text mein injected instructions ho sakte hain; host ko use data ki tarah lena chahiye.
+- **Logging na hona.** Tool calls ke record ke bina aap jaanch nahi kar sakte ki assistant ne kya kiya.
+- **Third-party servers ke tool descriptions aur code padhe bina install karna.**
+- **Pin na kiye hue server versions.** Baad ka update badal sakta hai ki tools kya karte ya kehte hain.
+- **Sabke liye ek service-account token.** User permissions lagna band ho jaati hain.
+
+## Jab MCP ki zaroorat nahi
+
+- **Ek app, kuch tools, jo sirf wahi use kare**: code mein plain tool definitions simple hain.
+- **Fixed workflows** jahan aapka code functions seedhe call karta hai aur koi model tools nahi chunta.
+- **Strict environments** jahan har nayi connection ko security review chahiye: ek in-process tool set se shuru karo, aur tools share hone par MCP par jao.
+
+MCP tab kaam aata hai jab kai hosts ya agents ko wahi tools chahiye, ya aap chahte ho ki users apne maujooda assistants ko aapke systems mein plug karein.
+
+## Demo se production tak
+
+- **Remote servers ko OAuth ke peeche chalao**, narrow scopes ke saath, behtar hai company ke single sign-on se.
+- **Har call ko centrally log karo**, user, tool, arguments aur result size ke saath.
+- **Server versions pin karo aur review karo**, tool descriptions ke badlaav bhi.
+- **Company ke liye approved-server list rakho**, aur baaki block karo.
+- **Har tool par rate-limit aur timeout lagao**, aur write tools ke liye approval maango.
+
+## Practice karo
+
+Anthropic ka free Introduction to Model Context Protocol course lo, ya official introduction aur ek server quickstart padho.
+
+1. Apni pasand ke chhote SQLite database (books, fees, appointments) par do tools ke saath ek local MCP server banao.
+2. Use kisi MCP-capable client se connect karo aur aise sawaal poochho jinhe dono tools chahiye.
+3. Ek write tool jodo jo sirf ek table mein insert kare, har call ko file mein log karo, aur kisi ek record mein chhupa hua prompt injection try karo ki aapka client use kaise sambhaalta hai.
+4. Apna server MCP Inspector mein kholo, har tool ko galat arguments ke saath call karo, aur har woh error message behtar banao jisse model recover nahi kar paata.
+
+**Aapka kaam poora jab:** aap host, client aur server samjha sako, apna server asli client mein chalta dikha sako, aur kisi bhi MCP server ke baare mein teen security sawaal bata sako.

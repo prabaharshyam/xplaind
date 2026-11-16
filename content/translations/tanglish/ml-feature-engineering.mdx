@@ -1,0 +1,229 @@
+---
+id: ml-feature-engineering
+lang: tanglish
+title: "Feature engineering"
+outcome: "Raw records-a models-ku help panra features-aa maathunga: neram vazhiyaa aggregates, ratios, date parts, categories-ku encodings, text, location features, koodave leakage-a thavirthu, training-um serving-um consistent-aa vachirukkunga."
+answer: "Feature engineering raw records-a, model kathukkura inputs-aa maathum, example kadaisi 30 naalla counts, ratios, date parts, encode panna categories, future data-va use pannaama."
+why_it_matters: "Tabular ML-la, nalla features fancy models-a vida jeikkum. Anubavamulla ML engineers-oda modelling neratthoda perumbaalaana pagudhi inga thaan pogum. Future information-a leak pannaama, production-layum features-a ade maadhiri compute pannradhu thaan, real-world results-a notebook results-la irundhu vera paduthudhu."
+flashcards:
+  - q: "Feature engineering-na enna?"
+    a: "Raw data-la irundhu model inputs-a uruvaakkuradhu, transactions table-la irundhu 'kadaisi 30 naalla orders' maadhiri, oru domain expert edha paarpaaro adha pidikkuradhu."
+  - q: "Time-window feature-oda moonu vagaigal sollunga."
+    a: "Windows-la aggregates (7, 30, 90 naalla counts, sums, averages), trends (indha maadham vs ponadhu), recency (kadaisi event-la irundhu naatkal)."
+  - q: "Indian calendar features yen mukkiyam?"
+    a: "Demand-um payments-um Diwali, Onam, Eid, Pongal maadhiri festivals-a, maadha aarambathula salary days-a follow pannum."
+  - q: "Target encoding-na enna, adhoda risk enna?"
+    a: "Oru category-a adhoda average outcome-aala maathuradhu. Ella data-layum compute pannaa target leak aagum; training folds-kulla mattum compute pannunga."
+  - q: "Features-oda mukkiya vidhi enna?"
+    a: "Oru feature prediction neraththula kidaikkura information-a mattum use pannanum. Ovvoru aggregate-aiyum prediction time-la irundhu 'as of' compute pannunga."
+  - q: "Training-serving skew-na enna?"
+    a: "Training-layum production-layum features vera vera maadhiri compute aanaa, timezone mismatch maadhiri, live model amaidhiyaa mosama work aagum."
+  - q: "Training-serving skew-a eppadi thadukkalaam?"
+    a: "Feature code-a oru thadavai ezhudhi rendu idathulayum use pannunga, illa feature store use pannunga."
+  - q: "Romba nalla validation score vandhaa enna pannanum?"
+    a: "Kondaaduradhukku munnaadi leakage irukkaa-nu investigate pannunga, mukkiyamaa ippo serthadha features-um joins-um."
+  - q: "Oru feature-ku 'as of'-na enna artham?"
+    a: "Prediction time-ku munnaadi nadandha events-a mattum vachu compute panna value, scoring date-ku munnaadi 30 naalla orders maadhiri, apram nadandhadhu illa."
+  - q: "Feature code-a ColumnTransformer illa shared module-la yen vaikkanum?"
+    a: "Training-um serving-um sariyaa ade transformations-a odanum, accuracy-a amaidhiyaa kuraikkura training-serving mismatches thavirkka."
+exercise:
+  title: "Oru date-ku 'as of' features build pannunga"
+  setup: "Kochi-la oru grocery app, 1 November 2026-la ovvoru customer-um adutha 14 naalla order panvaangala-nu predict pannudhu. Ungakitta orders table (customer, date, amount, delivered_late)-um oru support table (customer, ticket_date)-um irukku. Candidate features: (A) October 2026-la orders, (B) 1 November-ku munnaadi kadaisi order-la irundhu naatkal, (C) 1 mudhal 14 November varaikkum support tickets ennikkai, (D) October orders-la late-aa deliver aanadhoda share, (E) November-la selavu panna total amount."
+  questions:
+    - q: "Entha features use panna safe?"
+      a: "(A), (B), (D). Avai 1 November-ku munnaadi irundhu information-a mattum use pannum."
+    - q: "(C)-um (E)-um yen leaks?"
+      a: "Prediction date-ku apram irukkura data-va use pannudhu, adhu unmaiyaana use-la model-ku kidaikkaadhu."
+    - q: "Indha prediction-ku useful-aana oru seasonal feature sollunga."
+      a: "Adutha 14 naalla Diwali maadhiri oru festival irukkaa, illa maadha aarambathula salary week-aa-nu."
+    - q: "(D)-a production-la training-la compute pannura ade maadhiri irukka eppadi urudhi pannuveenga?"
+      a: "Rendu idathulayum ade feature function-a, ade 'as of' date logic-yum timezone-yum vachu use pannunga, illa shared feature store."
+ask:
+  - "Machine learning model-ku nalla feature-na edhu?"
+  - "Training-serving skew-na enna?"
+  - "Neraya values irukkura categories-a eppadi encode panradhu?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Feature engineering** raw data-la irundhu model inputs-a uruvaakkum. Oru transactions table churn model-ku nera-aa neraya solladhu; "kadaisi 30 naalla orders", "munnaadi quarter-oda compare panna maadha selavu maatram", "kadaisi order-la irundhu naatkal" maadhiri features sollum.
+
+Nalla features oru domain expert edha paarpaaro adha pidikkum.
+
+```flow
+dir: LR
+title: Prediction date: 1 Nov
+Kadandha kaalam, anumadhi | orders, sessions, tickets -> 1 Nov "as of" features | counts, trends, recency
+1 Nov "as of" features -[predict]-> Edhirkaalam, features-la eppovum illa | adutha orders: idhu thaan label
+```
+
+Indha lesson-la Bengaluru-la oru food-delivery company-a follow pannuvom, avanga entha customers 14 naalla marubadiyum order pannuvaanga-nu predict pannuraanga.
+
+## Idhu eppadi work aagudhu
+
+**Time windows-la aggregates.** Kadaisi 7, 30, 90 naalla counts, sums, averages, maximums. Trends: indha maadham vs ponadhu. Recency: kadaisi event-la irundhu naatkal.
+
+**Ratios-um differences-um.** EMI-kum income-kum, oru visit-ku selavu, oru order-ku returns, category average-oda ottina vilai.
+
+**Date, time parts.** Kizhamai, manikkoor, maadham, festival kaalangal (Diwali, Onam, Eid, Pongal), maadha aarambathula salary days. India-la demand-um payment patterns-um romba seasonal.
+
+**Categories.** Kammi values-ku one-hot encoding; neraya values-ku frequency illa target encoding (leakage thavirkka, target encoding training folds-la mattum compute pannunga); arumaiyaana categories-a "other"-la group pannunga.
+
+**Text.** Simple: neelam, keyword flags. Strong: language model-la irundhu embeddings, features-aa use pannalaam.
+
+**Location.** Oru store illa hub-kku distance, PIN code characteristics, city tier.
+
+**Leakage.** Mukkiya vidhi: oru feature prediction neraththula kidaikkura information-a mattum use pannanum. Ovvoru aggregate-aiyum prediction time-la irundhu "as of" compute pannunga. Future data-va amaidhiyaa serkkura features (neenga score panra order-ku apram record aana oru refund) testing-la model-a brilliant-aa kaattum, production-la fail aagum.
+
+**Training-serving consistency.** Features training-layum serving-layum ade maadhiri compute aaganum. Feature code-a oru thadavai ezhudhi marubadiyum use pannunga, illa feature store use pannunga. Mismatches (timezone vithyaasam, "active"-nu vera definition) production models-a amaidhiyaa mosamaakkum.
+
+**Selection.** Adhigam features eppavum nalladhu illa. Payanilladha illa redundant-aanavatrai remove pannunga; kaalam muzhukka importance-yum stability-yum check pannunga.
+
+**Data type-ku feature ideas:**
+
+| Raw data | Example features |
+| --- | --- |
+| Transactions | Kadaisi 7, 30, 90 naalla orders; average value; munnaadi 30 naalla compare panna maatram; kadaisi order-la irundhu naatkal |
+| Ratings, support | Kadaisi rating; kadaisi 30 naalla tickets; late deliveries-oda share |
+| Dates | Kizhamai, manikkoor, maadham, festival window, salary week |
+| Categories | Kammi values-ku one-hot; neraya values-ku frequency illa fold-safe target encoding; arumaiyaana values "other"-aa group |
+| Text | Neelam, keyword flags, embeddings |
+| Location | Store illa hub-ku distance, city tier |
+
+**Experts-oda aarambinga.** Nalla features perumbaalum business theriyura makkalai kettu varum: "oru customer pogapporaanga-nu edhu ungalai ninaikka vaikkum?" Delivery managers late-delivery share-a sonnaanga; finance payday timing-a sonnaanga. Ovvonnum oru feature-aa maari, automatic-aa vandha edhaiyum vida nalla work aachu.
+
+**Pandas-la point-in-time features.** Ellaathaiyum oru cutoff date-ku "as of", adhukku munnaadi nadandha events-la irundhu mattum compute pannunga:
+
+```python
+import numpy as np, pandas as pd
+
+rng = np.random.default_rng(2)
+events = pd.DataFrame({
+    "customer": rng.integers(1, 301, 6000),
+    "ts": pd.Timestamp("2026-01-01") + pd.to_timedelta(rng.integers(0, 300, 6000), unit="D"),
+    "amount": rng.gamma(2, 400, 6000).round(),
+    "late": rng.random(6000) < 0.1,
+})
+
+def features_as_of(events, cutoff):
+    past = events[events.ts < cutoff]
+    out = {}
+    for days in (7, 30, 90):
+        w = past[past.ts >= cutoff - pd.Timedelta(days=days)]
+        g = w.groupby("customer")
+        out[f"orders_{days}d"] = g.size()
+        out[f"spend_{days}d"] = g.amount.sum()
+    g = past.groupby("customer")
+    out["days_since_last"] = (cutoff - g.ts.max()).dt.days
+    out["late_share"] = g.late.mean()
+    f = pd.DataFrame(out).fillna(0)
+    f["spend_trend"] = f.spend_30d / (f.spend_90d / 3 + 1)          # last month vs monthly average
+    return f
+
+cut = pd.Timestamp("2026-09-01")
+X = features_as_of(events, cut)
+print(X.describe().T[["mean", "max"]].round(1).head(8))
+```
+
+Training-ku, pala cutoffs-la (maadham-ku onnu) features build pannunga, ovvonnum adhoda cutoff-ku apram vandha labels-oda serndhu. Idhu neraya examples tharum, kaalam muzhukka stability-yum test pannum.
+
+**Festival, salary-cycle features.**
+
+```python
+FESTIVALS = pd.to_datetime(["2026-03-04", "2026-08-28", "2026-10-20", "2026-11-08"])   # check the year's dates
+
+def calendar_features(dates):
+    d = pd.Series(pd.to_datetime(dates))
+    days_to_fest = d.apply(lambda x: min(((f - x).days for f in FESTIVALS if f >= x), default=365))
+    return pd.DataFrame({"dow": d.dt.dayofweek, "month": d.dt.month,
+                         "salary_week": (d.dt.day <= 7).astype(int),
+                         "days_to_festival": days_to_fest.clip(upper=60)})
+```
+
+Festival dates ovvoru varushamum maarum, region-ku region vera, adhanaala adha code-la illa, date-oda oru table-la vainga.
+
+**Pipeline-kulla encoding.** Categorical handling-a model-oda serthu vainga, appo serving, training-oda match aagum:
+
+```python
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, TargetEncoder
+from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import HistGradientBoostingClassifier
+
+prep = ColumnTransformer([
+    ("few", OneHotEncoder(handle_unknown="infrequent_if_exist", min_frequency=20), ["city_tier", "channel"]),
+    ("many", TargetEncoder(), ["pin_code"]),           # fitted with internal cross-fitting to limit leakage
+], remainder="passthrough")
+model = make_pipeline(prep, HistGradientBoostingClassifier())
+```
+
+scikit-learn-oda `TargetEncoder` `fit_transform` podhu cross-fitting use pannum, adhu naive target encoding-aala varra leakage-a kuraikkum.
+
+**Ovvoru feature group-oda value-vum measure pannunga.** Ovvoru group-um (recency, spend, delivery, calendar) irundhum illaamayum, ade time split-la train pannunga, thelivaa help panra groups-a mattum vachukkunga. Oru cutoff maadham-la mattum help panra features probably noise.
+
+## Oru worked example
+
+Bengaluru-la oru food-delivery company, oru customer 14 naalla marubadiyum order pannuvaangala-nu predict pannudhu.
+
+Raw data: orders, ratings, app sessions, support tickets, promotions.
+
+Ovvoru prediction date-kum "as of" build panna features:
+
+- kadaisi 7, 30, 90 naalla orders; kadaisi order-la irundhu naatkal;
+- average order value-vum, munnaadi 30 naalum compare panna adhoda maatramum;
+- kadaisi 30 naalla 15 nimishathukku mela delay aana orders-oda share;
+- kadaisi kodutha rating; kadaisi 30 naalla support tickets;
+- orders-la weekend share; customer bodhuvaa payday week-la order pannuvaangalaa;
+- city tier, nearest cloud kitchen cluster-ku distance.
+
+Results: order counts mattum irundha baseline AUC 0.72 ettiyadhu; engineered features-oda 0.81. Romba value-aana pudhu features delay share-um order value-oda maatramum.
+
+Oru leakage payam: "customer adutha 7 naalla support-a contact pannaanga" oru early draft-la thappaana join moolama vandhirundhudhu; validation score 0.95-ku thaavina podhu, adhu nambavae mudiyaadha alavu nalladhaa irundhadhaala kandupidichaanga.
+
+| Model | AUC |
+| --- | --- |
+| Baseline: order counts mattum | 0.72 |
+| Engineered features-oda | 0.81 |
+| Thaetchaiyaa vandha leaky feature-oda | 0.95 (nambavae mudiyaadha alavu nalladhu) |
+| Leak-a remove panna apram | 0.81 |
+
+**Entha features mukkiyam, yen.** Delay share, business already sandeghicha vishayatha pidichudhu: customers oru late delivery-a mannippaanga, aana oru maadhathula rendu aanaa competitor-a try pannuvaanga. Order value-oda maatram, customers mella mella pogaradha pidichudhu, niruththradhukku munnaadi sinna baskets order pannuvaanga. Rendume raw order counts-la theriyaadhu. Rendume operations team-oda pesinadhula vandhadhu, company kitta already irukkura data-la irundhu compute panna cheap-um. Enna help pannala-nu team-um kathukkitaanga: order recency serthaa app session counts-a konjam kooda add pannala, adhanaala adha vittuttaanga, selavaana oru daily data pipeline-a migaichaanga.
+
+## Podhuvaa panra thappugal
+
+- **Features-la future information.** Ellaathaiyum prediction time-la irundhu "as of" compute pannunga.
+- **Training-kum serving-kum vera code.** Feature code-a share pannunga illa feature store use pannunga.
+- **Ella data-layum target encoding.** Training folds-kulla mattum compute pannunga.
+- **Indian calendar effects-a ignore panradhu.** Festivals-um salary cycles-um mukkiyam.
+- **Nambavae mudiyaadha alavu nalla scores.** Leakage-ku investigate pannunga.
+
+- **Ore neram nooru features build panradhu.** Features-a sinna groups-aa serthu, ovvoru group-oda gain-aiyum measure pannunga, appo entha features thangal idathukkum maintenance cost-kum worth-nu theriyum.
+- **Prediction naal illa adhukku apram irukkura aggregates.**
+- **Festival dates-a oru thadavai hard-code panni**, adutha varusham thappaa pogradhu.
+- **Feature code-a share pannaama**, training-layum serving-layum copy panradhu.
+
+## Heavy feature engineering thevai illaadha idangal
+
+- **Images, audio, neelamaana text maadhiri unstructured data**, enga neural networks thangal sondha features-a kathukkum.
+- **Strong pretrained model illa embeddings** neenga thevai-nu irukkura-dha already pidichirundhaa.
+- **Romba sinna data**, enga konjam expert features-um simple model-um nooru engineered features-a vida jeikkum.
+
+## Demo-la irundhu production varai
+
+- **Prediction time-ku "as of" features compute pannunga**, future data-la fail aagura tests-oda.
+- **Feature code-a share pannunga** training-kum serving-kum, illa feature store use pannunga.
+- **Calendars-a data tables-la vainga**, varusham, region-ku dates-oda.
+- **Feature distributions-a drift-kaaga track pannunga**, ovvoru source-oda missing rates-yum.
+- **Ovvoru retrain-layum feature group-ku value-a measure pannunga**, help panradha niruththuna adha vittudunga.
+
+## Practice pannunga
+
+Kaggle-oda Feature Engineering course-a mudichu, Google-oda Rules of ML-la feature engineering section-a padinga.
+
+1. Oru transactions dataset-la irundhu, select panna oru date-ku "as of" compute panna, future data illaadha paththu time-windowed features build pannunga.
+2. Oru simple baseline-a vida unga features-aala model evvalavu improve aachu-nu measure pannunga.
+3. Vendumae oru leaky feature-a serthu, score thaavardha paarunga, adha pidikkura oru test ezhudhunga.
+4. Moonu maadha cutoffs-la features build panni, mudhal rendula train panni moonavadhula test pannunga, days_since_last mattum use panra model-oda compare pannunga.
+
+**Mudinjadhu-nu eppo sollalaam:** Ovvoru feature-um prediction time-ku "as of" eppadi compute aagudhu-nu, training-um serving-um adha ade maadhiri eppadi compute pannudhu-nu explain panna mudiyum.

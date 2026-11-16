@@ -1,0 +1,165 @@
+---
+id: how-llm-inference-works
+lang: tanglish
+title: "LLM inference-oda ulle: prefill, decode, KV cache"
+outcome: "Oru LLM reply-la mudhal vaarthaikku munnaadi yen wait irukku, adhukku apram yen oru speed irukku-nu explain pannunga, oru KV cache-oda size-a kanakku pannunga, latency, throughput, cost-ku sariyaana lever-a select pannunga."
+answer: "Oru model muzhu prompt-aiyum oru thadavaiyae padikkum (prefill), apram oru oru token-aa ezhudhum (decode), KV cache-la save panna velaiya reuse pannum. Prefill mudhal vaarthai wait-a decide pannum; decode adhukku apram speed-a decide pannum."
+why_it_matters: "Oru AI product-oda ovvoru speed, cost mudivum, prompt length-la irundhu GPU size varaikkum, edhu API use pannanum-nu varaikkum, prefill-um decode-um eppadi velai seiyudhu-nu thaan irundhu varudhu. Adha purinjukkura engineers slow apps-a sikkiram sari pannuvaanga, interviews-la serving kelvigalukku nambikkaiyaa badhil solluvaanga."
+flashcards:
+  - q: "Prefill-la enna nadakkum?"
+    a: "Model ella prompt tokens-aiyum oru thadavaiyae padichu, KV cache-a nirappum. GPU evvalavu compute panna mudiyum-nu adhu limit aagum."
+  - q: "Decode-la enna nadakkum?"
+    a: "Model oru oru token-aa ezhudhum. Ovvoru step-layum model-oda weights-a memory-la irundhu thirumba load pannum, adhanaala adhu computing power illa, memory speed-aala limit aagum."
+  - q: "TTFT-na enna?"
+    a: "Time to first token: mudhal vaarthai theriyaradhukku munnaadi irukkura wait. Prompt length-oda, server load-oda adhigam aagum."
+  - q: "TPOT-na enna?"
+    a: "Mudhal token-ku apram oru output token-ku aagura neram. Total neram sumaar TTFT + TPOT × output tokens-oda ennikkai."
+  - q: "KV cache edhai store pannum?"
+    a: "Munnaadi irukkura ovvoru token-oda key, value vectors, adhanaala ovvoru pudhu token-um adhai thirumba kanakku pannaadhu. Velai migikkum, aana context length-oda, batch size-oda valarura GPU memory-a use pannum."
+  - q: "Continuous batching-na enna?"
+    a: "Neraya requests-a serthu serve panni, mudincha ovvoru request-aiyum udane oru pudhu request vechu maathuradhu, adhanaala chinna replies, neenda replies-aala thaamadhamaagaadhu."
+  - q: "Speculative decoding eppadi vegamaakkum?"
+    a: "Oru chinna model sila tokens-a draft pannum; main model adhai oru pass-la check panni, othukkura tokens-a vechukkum. Output maaradhu, vegam mattum adhigam."
+  - q: "Average-a vida p95 latency-a yen paakkanum?"
+    a: "Konjam romba slow requests average-a thirichidum. Irubadhula oru user-ku slow-aa edhu theriyudhu-nu p95 kaattum."
+exercise:
+  title: "Chennai support bot yen slow-aa irukku?"
+  setup: "Chennai-la oru telecom, thanga sonda GPU-la 8-billion-parameter open model vechu oru support chatbot odudhu. Ovvoru request-um 6,000-token prompt (instructions, policies, chat history) anuppi, sumaar 250 tokens thirumbi vaangudhu. Users 4 seconds kaali box-a paathukittae irukkaanga, apram reply vegamaa stream aagudhu-nu pugaar solraanga. Busy neraththula replies-um slow aagi, sila requests out-of-memory errors-oda fail aagudhu."
+  questions:
+    - q: "4-second kaali wait edhu pagudhi, adhai edhu odikkudhu?"
+      a: "Prefill, adhu time to first token-a decide pannum. 6,000-token prompt thaan mukkiya kaaranam, busy neraththula queueing adha innum mosamaakkudhu."
+    - q: "Andha wait-a kuraikka rendu vazhi sollunga."
+      a: "Prompt-a sirusaakkunga (history-a trim pannunga, adikkadi thevaippadaadha policies-a retrieval-ku maathunga), fixed instructions-a prompt caching vechu reuse pannunga, ovvoru thadavaiyum thirumba process aagaadha madhiri."
+    - q: "Out-of-memory errors yen busy neraththula mattum varudhu?"
+      a: "Ovvoru active request-um adhoda 6,000-token context-oda valarura oru KV cache-a vechirukku. Orae neraththula neraya requests-na, GPU memory-yala vachikka mudiyadha alavukku cache aagum."
+    - q: "Periya GPU vaangaama busy-hour problem-a edhu sari pannum?"
+      a: "Chinna contexts, paged KV cache memory-um continuous batching-um irukkura serving engine (vLLM maadhiri), concurrent requests-ku oru cap, quality nikkudhunaa quantised KV cache."
+ask:
+  - "En LLM app-la mudhal vaarthai varradhukku yen ivvalavu neram aagudhu?"
+  - "KV cache-ku evvalavu GPU memory thevai?"
+  - "LLMs-ku latency-kum throughput-kum enna difference?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Oru language model-ku prompt anuppumbodhu, rendu vagai velai nadakkudhu.
+
+1. **Prefill.** Model unga prompt-oda ovvoru token-aiyum orae neraththula, parallel-aa padikkum. Idhai seiyumbodhu, ovvoru token-kum sila results-a **KV cache**-la save pannum. Prefill-a GPU oru second-la evvalavu arithmetic panna mudiyum-nu limit pannum, adhanaala neenda prompts-ku adhigam neram aagum.
+2. **Decode.** Model reply-a oru oru token-aa ezhudhum. Ovvoru token-um uruvaakka, adhoda ella weights-aiyum GPU memory-la irundhu thirumba padikkanum, aana adhai vechu konjam maths mattum thaan pannum. Decode-a computing power illa, memory-la irundhu data evvalavu vegamaa nagarudhu-nu limit pannum.
+
+Indha pirivu users enna feel pannuraanga-nu explain pannum. Edhuvum theriyaradhukku munnaadi irukkura kaali wait perumbaalum prefill, adhai **time to first token (TTFT)**-nu alappaanga. Adhukku apram text-oda speed decode, adhai **time per output token (TPOT)**-nu alappaanga. Sumaar:
+
+**total time ≈ TTFT + TPOT × output tokens-oda ennikkai**
+
+```flow
+title: Oru LLM server vazhiyaa oru request
+dir: LR
+Prompt varudhu -> Queue | GPU busy-na kaathirukkum
+Queue -> Prefill | ella prompt tokens-aiyum oru thadavaiyae padikkum
+Prefill -> KV cache nirambudhu | ovvoru token-kum save aagum
+KV cache nirambudhu -> Decode step | oru pudhu token
+Decode step -> Mudinjudhaa? | stop token illa length limit
+Mudinjudhaa? -[illa]-> Decode step
+Mudinjudhaa? -[aamaa]-> Reply muzhusaa mudinjudhu
+```
+
+## Idhu eppadi work aagudhu
+
+**KV cache.** Oru transformer-la, ovvoru pudhu token-um attention vazhiyaa munnaadi irukkura ovvoru token-aiyum thirumbi paakkum, adhukku ovvonnukkum oru "key", oru "value" vector thevai. Ovvoru step-layum muzhu sequence-ukkum idhai thirumba kanakku pannaa waste, adhanaala model adhai store panni, ovvoru pudhu token-kum innoru jodi serkkum. Andha store thaan KV cache. Adhu neraya computation-a migikkum, aana GPU memory-a use pannum, adhoda alavu context length-oda, orae neraththula serve aagura requests-oda ennikkai-yoda valarum.
+
+Special tricks illaama, adhoda size sumaar:
+
+**2 × layers × model width × context tokens × batch size × oru number-ku bytes**
+
+2 keys-kum values-kum. *AI Engineering* book 13-billion-parameter Llama 2 model-a (40 layers, width 5,120) 2,048 tokens-oda 32 requests-a, oru number-ku 2 bytes-la serve panradhai kanakku pannudhu: sumaar 54 GB, model weights-a vida adhigam. Neraya pudhu models keys-aiyum values-aiyum attention heads-ukkulla share pannum, adhu idha romba kuraikkum, aana problem-oda vadivam adhae thaan: neenda contexts-um neraya users-um memory-a saappiduvaanga.
+
+```python
+def kv_cache_gb(layers, width, context, batch, bytes_per_value=2, kv_share=1.0):
+    """kv_share < 1 for models that share keys and values across heads (for example 0.125)."""
+    return 2 * layers * width * context * batch * bytes_per_value * kv_share / 1e9
+
+def reply_seconds(ttft_s, tpot_ms, output_tokens):
+    return ttft_s + tpot_ms / 1000 * output_tokens
+
+print(round(kv_cache_gb(40, 5120, 2048, 32), 1))   # 53.7, the book's example
+print(reply_seconds(1.2, 40, 300))                 # 13.2 seconds for 300 tokens
+```
+
+**Batching.** Oru request-a decode panra GPU perumbaalum memory-kaaga kaathirukkum, adhanaala adhukku migira arithmetic irukkum. Neraya requests-a serthu serve pannaa andha migira capacity-a use panni **throughput**-a (ella users-um serthu oru second-ku tokens) yerthum, adhu oru request-ku aagura cost-a kuraikkum.
+
+- **Static batching** oru muzhu batch-kaaga kaathirukkum. Mudhal requests, kadaisi requests-kaaga kaathirukkum.
+- **Dynamic batching** batch niranjaalum illa oru chinna timer mudinjaalum aarambikkum.
+- **Continuous batching** ovvoru step-layum mudincha request-a veliya edhuthu, oru pudhu request-a serkkum, adhanaala 20-token reply 1,000-token reply-kaaga kaathirukkaadhu. vLLM, TensorRT-LLM, Text Generation Inference maadhiri serving engines idhai seiyum.
+
+Batching konjam latency-a kudutthu, neraya throughput-a vaangum. Konjam slow-aana mudhal tokens-a othukkitta, throughput irandu, moonu madangu aagum-nu teams solraanga.
+
+**Speculative decoding.** Oru chinna, vegamaana **draft** model adutha sila tokens-a oohikkum. Main model ellaathaiyum oru pass-la check pannum, check panradhu prefill maadhiri parallel-aa irukkaradhaala adhu sila-vu. Adhu othukkura tokens-a vechukkum, thannoda oru token-a serkkum. Output main model ezhudhirukkum adhae thaan, vegam mattum adhigam. Code maadhiri oohikka mudiyura text-la nallaa work aagum. DeepMind idhaala 70-billion-parameter model-oda reply neram paadhikku mela kuraindhadhaa sonnaanga.
+
+**Prompt caching.** Neraya requests orae neenda instructions-oda aarambichaa, server andha shared aarambathukku KV cache-a vechukkittu adhoda prefill-a thaandalaam. Providers cached input tokens-ku romba kammiya price vaippaanga. Prompt-oda fixed pagudhi-a mudhalla vainga.
+
+**Batch APIs.** Yaarum kaathirukkaadha velaikku, nightly summaries maadhiri, providers sumaar paadhi vilaila batch endpoints tharuvaanga, mani neraththukkulla results varum.
+
+| Neenga paakkura problem | Edhu pagudhi | Udhavura levers |
+| --- | --- | --- |
+| Reply-ku munnaadi neenda kaali wait | Prefill (TTFT) | Chinna prompts, prompt caching, kammiyaana queueing, streaming |
+| Reply slow-aa stream aagudhu | Decode (TPOT) | Chinna illa quantised model, speculative decoding, vegamaana GPU memory |
+| Busy neraththula mattum slow | Queueing-um memory-um | Continuous batching, innum replicas, concurrency limits |
+| Neenda chats-oda out-of-memory | KV cache | Chinna context, paged illa quantised KV cache, kammiyaana concurrent requests |
+| Offline jobs-ku cost adhigam | Throughput | Batch APIs, periya batches, chinna models |
+
+## Oru worked example
+
+Chennai-la oru telecom company thanga sonda GPU-la 8-billion-parameter open model vechu oru support chatbot odudhu. Ovvoru request-um sumaar 6,000 tokens (instructions, policies, chat history) anuppi, sumaar 250 tokens thirumbi vaangum. Users mudhal vaarthaikku sumaar 4 seconds kaathirukkaanga; apram text sumaar oru token-ku 25 ms-la stream aagudhu.
+
+Total neram ≈ 4 + 0.025 × 250 ≈ 10 seconds. Stream nalla irukku; kaali wait thaan problem, adhu prefill.
+
+Avanga moonu maatrangal pannuraanga:
+
+1. **Prompt-a trim pannuraanga.** Bot-ku adikkadi thevaippadaadha policies retrieval-ku poguthu, chat history paththu turns-ku apram summarise aagudhu. Average prompt 2,500 tokens-ku kurayudhu.
+2. **Fixed aarambathai cache pannuraanga.** 1,200-token instructions ovvoru request-kum orae maadhiri irukkum, adhanaala adhai mudhalla vechu cache pannuraanga.
+3. **Server-a paged KV cache memory-oda continuous batching-ku maathuraanga**, oru GPU-ku concurrent requests-ku cap vaikkiraanga.
+
+| Measure | Munnaadi | Aprom |
+| --- | --- | --- |
+| p50 time to first token | 4.0 s | 0.9 s |
+| p95 time to first token | 7.5 s | 1.8 s |
+| Busy hour-la oru GPU-ku requests | 6 | 20 |
+| Oru naalaikku out-of-memory errors | 40 | 0 |
+
+Indha numbers oru udhaaranathukkaaga, eppadi yosikkanum-nu kaatturadhukku. Avanga average-a illa, **p95**-a track panna aarambikkuraanga, yen-na oru stuck request average-a, perumbaalaana users feel panradhai vida romba mosamaa kaattalaam.
+
+## Podhuvaa panra thappugal
+
+- **Neenda prompt-kaaga model-a kutram solradhu.** Mudhal vaarthai wait perumbaalum prefill. Hardware vaangaradhukku munnaadi prompt-a kuraichu cache pannunga.
+- **Averages mattum measure panradhu.** p50, p95 use pannunga, mudhal-token neraththa prompt length-oda plot pannunga.
+- **GPU "utilisation"-a mattum paakkradhu.** Oru GPU 100% busy-nu sollalaam, aana payanulla velai konjam thaan seiyum. Oru second-ku tokens-aiyum oru request-ku cost-aiyum track pannunga.
+- **KV cache memory-a ignore panradhu.** Weights easy-aa porundhinaalum, neenda contexts × neraya users GPU memory-a thaandalaam.
+- **Marainjirukkura tokens-a udane nadakkum-nu ennuradhu.** Reasoning, agent steps users paakkaadha tokens-a generate pannum; avai mudhal theriyura vaarthaiya thaamadhappadutthum.
+- **Offline jobs-ku online API use panradhu.** Yaarum kaathirukkaadhappo batch APIs sila-vu.
+
+## Edha mudhalla pannanum
+
+Slow-aana pagudhi-a target panra romba sila-vaana maatrathoda aarambinga.
+
+- **Mudhal vaarthai wait romba neram:** prompt-a sirusaakki cache pannunga, reply-a stream pannunga, apram queueing-a paarunga.
+- **Stream romba slow:** pudhu GPU-ku munnaadi, chinna illa quantised model, illa speculative decoding.
+- **Scale-la romba selavu:** batching-um batch APIs-um, apram model tiering.
+
+## Demo-la irundhu production-ku
+
+- **Oru latency budget vainga.** Udhaaranathukku, p95 mudhal token 2 seconds-kku kezhe, apram kuraindhadhu oru second-ku 15 tokens.
+- **TTFT-aiyum TPOT-aiyum thaniyaa measure pannunga**, user nijamaave paakkura mudhal token varra neraththaiyum.
+- **Real prompt lengths-oda load-test pannunga.** Chinna test prompts prefill, KV cache problems-a maraikkum.
+- **Prompts-oda fixed pagudhi-a stable-aa, mudhalla vainga**, caching work aaga.
+- **Model maatrathukku apram thirumba check pannunga.** Vera tokenizer-oda illa vera size-oda pudhu model, indha ella numbers-aiyum maathum.
+
+## Practice pannunga
+
+1. Edhaavadhu oru LLM API-a streaming on-oda koopdunga. Oru chinna prompt-kum 5,000-token prompt-kum mudhal token neraththaiyum total neraththaiyum record pannunga. Edhu adhigam maarichu?
+2. Melae irukkura code-a vechu, unga favourite open model-ku 8,000 tokens, 16 users-la KV cache-a estimate pannunga.
+3. Ungaluku theriyura oru slow AI feature-a edunga, adhu table-la edhu row-la varum-nu, mudhalla neenga try panna pora lever-a ezhudhunga.
+
+Innum aazhama paaka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-oda chapter 9 inference metrics, KV cache, batching, speculative decoding-a cover pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Prefill-aiyum decode-aiyum oru nimidathula explain panna mudiyum, oru model-oda size-la irundhu KV cache-a estimate panna mudiyum, slow-aana mudhal vaarthaikkum slow-aana stream-kum sariyaana lever-a select panna mudiyum.

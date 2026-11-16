@@ -1,0 +1,212 @@
+---
+id: data-pipelines-ai
+lang: tanglish
+title: "AI-ku data pipelines"
+outcome: "Oru AI system-oda data-va fresh-aa vechukkura pipeline-a design panna mudiyum: ETL illa ELT, scheduled illa change-driven updates, incremental indexing, parsers illa embedding models maarum podhu re-processing."
+answer: "Oru AI data pipeline sources-la irundhu data-va extract panni, clean panni, transform panni, oru schedule-la illa ovvoru change-layum index-a update pannum, maarunadhai mattum re-process pannum."
+why_it_matters: "Oru one-off export-la build panna RAG system sila vaarangalla stale aagum, stale answers thappaana answers-a vida nambikkaiyai vegamaa kedukkum. Clients assistant-ku netthu vandha circular theriyanum-nu edhirpaarpaanga. Adha unmaiyaakkuradhu pipelines thaan, production RAG bugs-la perumbaalum irukkurathum adhula thaan."
+flashcards:
+  - q: "Oru AI system-ku data pipeline podhuvaa enna seiyum?"
+    a: "Sources-la irundhu extract panni, parse panni, clean panni, chunk panni, embed panni, index-la ezhudhi, enna nadandhadhu-nu record pannum."
+  - q: "ETL-kum ELT-kum enna difference?"
+    a: "ETL, destination-la load panna munnaadi transform pannum; ELT mudhalla raw data-va land panni, anga transform pannum."
+  - q: "Change data capture-na enna?"
+    a: "Oru database-la irundhu ovvoru insert, update, delete-aiyum events-aa stream panradhu, adhanaala indexes sila seconds-la sync-la irukkum."
+  - q: "Ovvoru document-oda raw copy-a yen vechukkanum?"
+    a: "Parsing illa chunking-a maathinaa, client-oda systems-la irundhu mella thirumba fetch pannaama, re-process panna mudiyum-nu."
+  - q: "Chunks-ku yen stable ids thevai?"
+    a: "Oru update sariyaa pazhaya chunks-a maathum, oru deletion avai-a eduthudum, duplicates kuvikkaama irukkum-nu."
+  - q: "Freshness-a eppadi select pannanum?"
+    a: "Source vaaripaa, adhu evvalavu vegamaa maarum, evvalavu mukkiyam-nu poruthu: live records-ku CDC, libraries-ku nimishangal, archives-ku nightly."
+  - q: "Embedding model maarum podhu enna nadakkanum?"
+    a: "Ella vectors-aiyum oru pudhu index-la thirumba build panni, evaluate panni, appuram switch pannunga; pazhaya, pudhu vectors-a kalakka koodaadhu."
+  - q: "Pipeline health tracking-la enna irukkanum?"
+    a: "Process aana, fail aana, skip aana documents, ezhudhina chunks, embedding cost, ovvoru source-layum pudhu document-oda vayadhu."
+  - q: "Chunk ids-a document id-yum position-yum vechu yen build pannanum?"
+    a: "Appo oru document-a update illa delete pannum podhu, id prefix vechu adhoda pazhaya chunks-a sariyaa eduthudalaam, searchable-aa orphaned chunks onnum meedhi irukkaadhu."
+  - q: "Index alias-na enna?"
+    a: "Application padikkura oru peyar, oru physical index-a point pannum. Alias-a oru pudhu index-ku maathinaa, serve aaguradhu udanae maarum, thirumba maathinaa adhu thaan rollback."
+exercise:
+  title: "Pipeline-a sari pannunga"
+  setup: "Kanpur-la oru leather exporter-oda RAG assistant, SharePoint-la irundhu product specs-aiyum ERP-la irundhu order status-aiyum index pannudhu. Problems: chunking maatrathukku aprom re-process pannanum-naa 20,000 files-a moonu naal download pannanum; edit panna specs results-la rendu thadavai varudhu; indexing nightly odradhunaala answers-la order status oru naal pazhaiyadhu; oru pudhu embedding model pudhu documents-ku mattum on panna aprom, search mosamaachu."
+  questions:
+    - q: "Moonu naal re-download-a eppadi thavirkkalaam?"
+      a: "Raw files-a source ids-um versions-um oda storage-la land pannunga, andha copy-la irundhu re-process pannunga."
+    - q: "Edit panna specs yen rendu thadavai varudhu, edhu sari pannum?"
+      a: "Chunks-ku stable ids illa, adhanaala updates pazhaya chunks-a delete pannaama pudhu chunks-a serkkudhu. Document id-yum position-yum vechu ids use panni, oru step-la replace pannunga."
+    - q: "Order status eppadi current-aa irukkum?"
+      a: "ERP table-ku change data capture illa adikkadi incremental updates use pannunga, appo changes seconds illa nimishangalla index-ku varum."
+    - q: "Embedding model switch-la enna thappaa pochu?"
+      a: "Pazhaya, pudhu vectors kalandhuduchu. Ellaathaiyum pudhu model-oda oru pudhu index-la thirumba build panni, evaluate panni, appuram switch pannunga."
+ask:
+  - "ETL-kum ELT-kum enna difference?"
+  - "Oru RAG index-a source systems-oda eppadi sync-la vechukkalaam?"
+  - "Downtime illaama embedding models-a eppadi maathalaam?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Oru **data pipeline**, data uruvaagura idathula irundhu use aaguradha idathukku, pogura vazhila transform pannitte, move pannum. Oru AI system-ku, pipeline podhuvaa idhu seiyum: sources-la irundhu extract panradhu (connectors vazhiyaa), documents-a parse panradhu, clean panradhu, chunk panradhu, embed panradhu, index-la ezhudhuradhu, enna nadandhadhu-nu record panradhu.
+
+Rendu classic shapes:
+
+- **ETL** (extract, transform, load): destination-la ezhudharadhukku munnaadi transform panradhu.
+- **ELT** (extract, load, transform): mudhalla raw data-va oru warehouse illa lake-la land panni, anga transform panradhu. Modern analytics stacks-la common.
+
+RAG-ku, oru hybrid thaan typical: raw documents-aiyum metadata-vaiyum storage-la land pannunga (appo ennaikkum re-process pannalaam), appuram index-ku chunks-aiyum embeddings-aiyum maathunga.
+
+**Change data capture (CDC)** oru database-la irundhu ovvoru insert, update, delete-aiyum events-aa stream pannum, adhanaala search index maadhiri downstream systems oru nightly batch-ukku kaathirukkaama, sila seconds-la sync-la irukkum.
+
+```flow
+Notices portal -[ovvoru 15 nimisham]-> Raw store | files + ids
+Berth table -[CDC]-> Change events
+Tariff book -[publish aagum podhu]-> With effective date
+Raw store -> Parse -> Chunk -> Embed -> Collection v2 | alias "live"
+Change events -> Oru record-a update pannunga -> Collection v2
+With effective date -> Collection v2
+```
+
+Ovvoru chunk-um adhoda document id-yum position-yum, parser v3, chunking v2, embedding model e5-yum record pannum. Health ovvoru source-kum track aagum: process aanadhu, fail aanadhu, maaraama skip aanadhu, pudhu document-oda vayadhu.
+
+Indha lesson, Chennai-la oru port operator-oda assistant-a follow pannum, adhu tariffs, notices, berth schedules pathi kelvigalukku badhil solludhu.
+
+## Idhu eppadi work aagudhu
+
+**Raw copy-a vechukkunga.** Original files-aiyum records-aiyum adhoda source ids-um versions-um oda store pannunga. Chunking illa parser-a maathum podhu, client-oda systems-la irundhu ellaathaiyum thirumba fetch pannaama, raw-la irundhu re-process pannalaam.
+
+**Stable ids.** Ovvoru document-kum oru stable id-yum (source system plus source id), ovvoru chunk-kum adhula irundhum adhoda position-la irundhum varra oru id-yum kodunga. Appo updates sariyaa pazhaya chunks-a maathum; deletions avai-a eduthudum.
+
+**Incremental indexing.** Maarina ovvoru document-kum: adhoda pazhaya chunks-a delete pannunga, parse, chunk, embed panni pudhusa insert pannunga, oru document-a paadhi index aana nilaila vittuvida mudiyaadha oru step-la. Content hash maaraadha documents-a skip pannunga.
+
+**Schedules, triggers.** Ovvoru source-kum freshness-a select pannunga: adikkadi maarura, udanae mukkiyamaana records-ku (ticket status, stock levels) CDC illa webhooks, document libraries-ku ovvoru 15 nimisham, archives-ku nightly. Freshness target-a client-oda othukkunga.
+
+**Ellaathaiyum version pannunga.** Ovvoru chunk-oda parser, chunking settings, embedding model version-a record pannunga. Embedding model-a upgrade pannum podhu, ella vectors-um thirumba build aaganum, yenna pazhaya, pudhu vectors-a kalakka mudiyaadhu. Pudhu index-a pazhaya index-oda serthu build panni, evaluate panni, appuram switch pannunga.
+
+**Orchestration.** Airflow, Dagster, Prefect, illa cloud-oda workflow service maadhiri tools steps-a schedule panni, failures-a retry panni, history-a kaattum. Chinna projects-ku, nalla logging-oda oru scheduled job podhum.
+
+**Pipeline health.** Process aana, fail aana, maaraama skip aana documents, ezhudhina chunks, embedding cost, ovvoru source-layum pudhu document-oda vayadhu-va track pannunga. Freshness thavarumbodhu alert pannunga.
+
+**Freshness-a sources-oda poruthuradhu:**
+
+| Source | Eppo maarum | Evvalavu mukkiyam | Method |
+| --- | --- | --- | --- |
+| Berth schedule table | Eppovum | Udanae | Change data capture |
+| Notices portal | Dhinamum | Oru manikkulla | Ovvoru 15 nimisham check pannunga |
+| Tariff book | Varushathukku rendu thadavai | Publish aagum podhu | Publish aagum podhu process pannunga |
+| Pazhaya circulars archive | Arudhaa | Kammi | Nightly illa weekly |
+
+**Indexes-a safe-aa switch panradhu.** Pudhu index-a live index-oda serthu, oru pudhu peyar-la build pannunga. Golden set-a rendu-layum odi, overall mattum illa, category vaaripaa compare pannunga. Pudhusu jeyichaa, application padikkura alias-a pudhu collection-ku point pannunga; switch oru second edukkum, deploy thevai illa. Pazhaya collection-a oru vaaram vechirunga, appo rollback adhe oru-second maatram. Pudhu index production-la sudhamaa odina aprom mattum adha delete pannunga.
+
+**Atomic updates.** Oru document-a update panradhu-nu sollradhu, adhoda pazhaya chunks-a delete panni, pudhusa insert panradhu. Rendaiyum oru transaction-la pannunga, illa mudhalla pudhu chunks-a ezhudhi, appuram pazhayadha version vechu delete pannunga, appo oru search ennaikkum paadhi document-a, illa onnumae illaama paarkkaadhu. Content hash maaraadha files-a skip panradhu embedding cost-a kuraikkum, mella maarura document libraries-la romba.
+
+**Code-la oru ingestion step.** Stable ids, oru content hash, ovvoru chunk-layum versions, oru atomic replace:
+
+```python
+import hashlib
+
+PARSER_V, CHUNKER_V, EMBED_MODEL = "pdf-3", "headings-350-50", "multilingual-e5-base@2024-06"
+
+def ingest_document(db, source, source_id, raw_bytes, parse, chunk, embed):
+    doc_id = f"{source}:{source_id}"
+    digest = hashlib.sha256(raw_bytes).hexdigest()
+    row = db.fetchone("SELECT content_hash, versions FROM documents WHERE id = %s", (doc_id,))
+    versions = {"parser": PARSER_V, "chunker": CHUNKER_V, "embed": EMBED_MODEL}
+    if row and row[0] == digest and row[1] == versions:
+        return "skipped"                                   # nothing changed
+    text = parse(raw_bytes)
+    pieces = chunk(text)
+    vectors = embed([p["text"] for p in pieces])
+    with db.transaction():                                 # searches never see half a document
+        db.execute("DELETE FROM chunks WHERE doc_id = %s", (doc_id,))
+        for i, (p, v) in enumerate(zip(pieces, vectors)):
+            db.execute("""INSERT INTO chunks (id, doc_id, section, body, embedding, parser_v, chunker_v, embed_model)
+                          VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                       (f"{doc_id}#c{i}", doc_id, p["section"], p["text"], v, PARSER_V, CHUNKER_V, EMBED_MODEL))
+        db.execute("""INSERT INTO documents (id, content_hash, versions, indexed_at) VALUES (%s,%s,%s, now())
+                      ON CONFLICT (id) DO UPDATE SET content_hash = EXCLUDED.content_hash,
+                      versions = EXCLUDED.versions, indexed_at = now()""", (doc_id, digest, versions))
+    return f"indexed {len(pieces)} chunks"
+
+def delete_document(db, source, source_id):
+    with db.transaction():
+        db.execute("DELETE FROM chunks WHERE doc_id = %s", (f"{source}:{source_id}",))
+        db.execute("DELETE FROM documents WHERE id = %s", (f"{source}:{source_id}",))
+```
+
+Embedding transaction-ukku munnaadi nadakkudhu, adhanaala mella, selavaana pagudhi lock-ukku veliya irukku. Parser, chunker, embedding version maaruna, file maaraama irundhaalum document re-process aagum.
+
+**Alias vechu indexes-a swap panradhu.** Postgres-la, oru view alias-aa velai seiyum:
+
+```sql
+-- Build chunks_v2 alongside chunks_v1, evaluate it, then switch in one statement:
+CREATE OR REPLACE VIEW chunks_live AS SELECT * FROM chunks_v2;
+-- Rollback is the same statement pointing back to chunks_v1.
+```
+
+Qdrant maadhiri vector databases-um OpenSearch maadhiri search engines-um, adhe maadhiri velai seiyra native aliases vechirukkum.
+
+**Freshness oru number-aa.** Ovvoru source-kum, neenga index panna pudhu source modification time-a record pannunga, othukkitta target-ku pinnaadi poga alert pannunga:
+
+```sql
+SELECT split_part(id, ':', 1) AS source,
+       max(indexed_at) AS last_indexed,
+       now() - max(indexed_at) AS lag
+FROM documents GROUP BY 1 ORDER BY lag DESC;
+```
+
+**Users-a paadhikkaama backfills.** Oru muzhu library-a thirumba embed panradhu (oru model maatrathukku aprom) manineram edukkalaam, rate limits-a adikkalaam. Adha pudhu index-ku mattum, oru concurrency limit-oda, off-peak neram-la odunga, nindru ponaa kadaisi mudincha document-la irundhu thodarungal.
+
+## Oru worked example
+
+Chennai port operator-oda assistant, tariffs, shipping agents-ku notices, berth schedules pathi kelvigalukku badhil solludhu.
+
+- **Notices** (oru document portal-la PDF circulars): ovvoru 15 nimishamum check aagum. Pudhu illa maariya files raw-aa storage-la land aagi, appuram parse, chunk, embed aagum. Maariya notice-oda pazhaya chunks oru transaction-la replace aagum.
+- **Berth schedule** (eppovum update aagura oru database table): CDC changes-a stream pannum; ovvoru change-um index-la oru chinna record-a sila seconds-la update pannum.
+- **Tariff book** (varushathukku rendu thadavai revise aagura oru periya document): publish aagum podhu process aagum, effective date store aagum, appo retrieval date vechu filter pannalaam.
+
+Naalaavadhu maadham, tables-ku rows-a serthu vechukka chunking-a maathureenga. Raw files-um stable ids-um irukkurathaala, oru re-processing job raathiri-kulla notices index-a oru pudhu collection-la rebuild pannudhu. Tariff kelvigalukku golden set 84%-la irundhu 90%-ku improve aagudhu, appuram alias-a pudhu collection-ku switch panreenga. Rollback-na adha thirumba switch panradhu thaan.
+
+| Change | Munnaadi | Aprom |
+| --- | --- | --- |
+| Table-aware chunking | Tariff kelvigalukku 84% | Tariff kelvigalukku 90% |
+| Notices-ku rebuild neram | Naatkal thirumba fetch panradhu | Raathirila, raw copy-la irundhu |
+| Pudhu index-ku switch | Safe-aa mudiyaadhu | Alias change, rollback ready |
+
+## Podhuvaa panra thappugal
+
+- **Raw copy illa.** Ovvoru re-processing-um client-la irundhu mella, throttle aana thirumba fetch aagum.
+- **Unstable chunk ids.** Updates pazhaya chunks-a eduthudaama pudhu chunks-a serkkum, duplicates kuvindhidum.
+- **Embedding model versions-a kalakkuradhu.** Search amaidhiyaa mosamaagum. Rebuild panni switch pannunga.
+- **Ellaathukkum ore schedule.** Ovvoru source evvalavu vegamaa maarum, evvalavu mukkiyam-nu poruthu freshness-a poruthunga.
+- **Freshness alert illa.** Oru stuck pipeline, yaaraavadhu netthu vandha notice pathi kekkura varaikkum nallaa irukkura maadhiri theriyum.
+- **Database transaction-kulla embed panradhu,** mella API calls odum podhu locks-a pidichu vechirukkum.
+- **Chunks-la versions illa,** adhanaala entha parser illa model adha uruvaakkichunu solla mudiyaadhu.
+- **Ovvoru maatrathukkum ellaathaiyum thirumba embed panradhu,** maarina documents-a mattum illa.
+
+## Oru simple script podhumaana neramgal
+
+- **Oru demo illa pilot-ku, oru thadavai load panna fixed documents set.**
+- **Maasam oru thadavai maarura sila files**: schedule-la ellaathaiyum thirumba index pannunga.
+- **Sync, versions, deletions-a already handle panra oru managed RAG service.**
+
+Documents adikkadi maarum podhu, pala sources-la irundhu varum podhu, illa othukkitta neram-kulla fresh-aa irukkanum-naa, muzhu pipeline-a build pannunga.
+
+## Demo-la irundhu production-ku
+
+- Ovvoru chunk-layum **raw copies-um**, stable ids-um, versions-um vechirunga.
+- **Documents-a atomic-aa replace pannunga,** maaraadhadha hash vechu skip pannunga.
+- **Alias vazhiyaa indexes-a swap pannunga,** pazhaya index-a rollback-ku vechirunga.
+- Ovvoru source-kum othukkitta target-oda **freshness lag-ku alert pannunga**.
+- **Ovvoru run-oda counts-aiyum embedding cost-aiyum log pannunga.**
+
+## Practice pannunga
+
+dbt-oda ETL versus ELT article-aiyum Debezium-oda feature overview-vaiyum padinga.
+
+1. Unga RAG ingestion-a, raw files mudhalla oru folder illa bucket-la land aagura maadhiri, ovvoru document-kum oru stable id kidaikkura maadhiri, ovvoru chunk-um parser, embedding versions-a record panra maadhiri restructure pannunga.
+2. Updates, oru document-oda pazhaya chunks-a replace panra maadhiri, maaraadha files-a content hash vechu skip panra maadhiri pannunga. Oru maarina file update aaguradhaiyum, delete panna file maraiyuradhaiyum kaattunga.
+3. Chunk size-a maathi, oru pudhu index-la rebuild panni, rendaiyum unga golden set-la compare panni switch pannunga.
+4. Chunker version string-a mattum maathi, ingestion-a thirumba odi, ovvoru document-um re-process aaguradhaiyum, rendavadhu run ellaathaiyum skip panradhaiyum confirm pannunga.
+
+**Mudinjadhu-nu eppo sollalaam:** Downtime illaama embedding model-a illa chunking-a maatha mudiyum, switch panna munnaadi pudhu index nalladhu-nu prove panna mudiyum.

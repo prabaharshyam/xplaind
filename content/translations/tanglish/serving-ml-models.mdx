@@ -1,0 +1,224 @@
+---
+id: serving-ml-models
+lang: tanglish
+title: "Model-a serve panradhu"
+outcome: "Train panna model-a use-ku konduvara kathukkalaam, raathri batch scoring-aa illa real-time API-aa, consistent preprocessing, input validation, versioning, latency targets, safe rollout-oda."
+answer: "Model-a schedule-la batch scoring-aa illa real-time API-aa serve pannunga, training-la use panna adhe preprocessing-a use panni, inputs-a validate panni, ovvoru model-kum version kodunga."
+why_it_matters: "Notebook-la irukkura model oru value-um create pannaadhu. Adha nambikkaiyaa serve panradhu, training-la irundha adhe preprocessing-oda, pudhu versions-a safe-aa rollout panra vazhiyoda, indha idathula thaan neraya ML projects nikkum. Employers indha gap-a close panra engineers-a thedaranga."
+flashcards:
+  - q: "Serving-oda rendu main patterns enna?"
+    a: "Batch inference, schedule-la neraya records-a score panradhu, real-time inference, oru request-a milliseconds-la score panra API."
+  - q: "Batch inference-a eppo choose pannanum?"
+    a: "Business scores-ku kaathirukka mudinja ellaa nerathulayum. Idhu simple, selavu kammi, monitor panna easy."
+  - q: "Preprocessing-a model-oda yen package pannanum?"
+    a: "Features training-la compute pannadhu maadhiriye compute aaganum. Service-la thirumba implement pannina, predictions-la sathamillaama thappugal varum."
+  - q: "Real-time service-la inputs-a yen validate pannanum?"
+    a: "Illa-na missing fields, thappaana types, units mismatch, range-ku veliya irukkura values ellaam sathamillaama thappaana predictions kodukkum."
+  - q: "Shadow mode-na enna?"
+    a: "Pudhu model live requests-a ippo irukkura model-oda serthu score pannum, aana decisions-a affect pannaadhu, adhanaala outputs-a safe-aa compare pannalaam."
+  - q: "Canary release-na enna?"
+    a: "Mudhalla traffic-oda konjam share-a pudhu model-ku anuppuradhu, results nalla irundha adha adhigam pannuradhu."
+  - q: "Model service-ku fallback-na enna?"
+    a: "Model illaadha podhu edhu pannanum-nu munnaadiye plan panna decision, example oru simple rule, illa manual review-ku anuppuradhu."
+  - q: "Ovvoru prediction log-layum enna record aaganum?"
+    a: "Inputs illa adhoda summaries, output, model version, timestamp, personal data mask panni."
+  - q: "Users-oda oru stable share-a canary model-ku eppadi anuppuradhu?"
+    a: "Ovvoru user-oda id-yaiyum hash panni 0 mudhal 99 varaikkum oru number aakkunga, canary percentage-ku keezha irukkura users-a pudhu model-ku anuppunga, adhanaala ovvoru user-kum eppavum adhe version thaan theriyum."
+  - q: "Model-a ovvoru request-kum illa, start-up-la yen load pannanum?"
+    a: "Load aaga seconds-um memory-um aagum. App-oda start-up-la oru thadavai pannina, ovvoru prediction-um fast-aa irukkum, load-la memory theerndhu pogaadhu."
+exercise:
+  title: "Serving-a choose panni plan pannunga"
+  setup: "Surat-la oru diamond exporter-ku rendu models irukku: (A) adutha maadhathukku ovvoru product-oda demand forecast, planners ovvoru Monday-um use pannuvaanga; (B) salesperson order system-la type panra podhu, vazhakkamaana illaadha quotes-a flag panra price check, idhu 200 milliseconds-kulla respond pannanum. (B)-oda pudhu version ready, oru partner system weights-a carats-la anuppudhu, internal system cents use pannudhu."
+  questions:
+    - q: "Ovvoru model-kum edhu serving pattern set aagum?"
+      a: "(A) batch, vaaram oru thadavai score panni oru table-la ezhudhuradhu; (B) real-time, latency budget-oda oru API."
+    - q: "(B)-oda pudhu version-a safe-aa eppadi release pannuveenga?"
+      a: "Shadow mode-la odunga, adhoda flags-a ippo irukkura version-oda compare pannunga, apram muzhu rollout-ku munnaadi traffic-oda konjam share-ku canary pannunga."
+    - q: "(B)-a carats versus cents problem-la irundhu eppadi protect pannuveenga?"
+      a: "Schema vachu inputs-a expected ranges, units-oda validate pannunga, partner channel-la varra values-a reject pannunga illa convert pannunga."
+    - q: "Price-check service down-aa irundha enna nadakkanum?"
+      a: "Oru fallback: order-a 'not checked' marker-oda continue aaga vidunga, illa simple rule-based limit podunga, sales-a block pannaadheenga."
+ask:
+  - "API-ku badhila batch inference-a eppo use pannanum?"
+  - "Pudhu model version-a safe-aa eppadi deploy panradhu?"
+  - "Feature store-na enna?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Serving**-na model-oda predictions-a, adhu use aagura idathula kidaikka vaikkuradhu. Rendu main patterns:
+
+- **Batch inference**: schedule-la neraya records-a score panradhu (ella customers-kum raathri churn scores, ovvoru store-kum vaaram demand forecasts), results-a oru table-la ezhudhuradhu, matha systems adha padikkum.
+- **Real-time (online) inference**: oru request-a milliseconds-la score panra API (payment time-la fraud check, seller type panra podhu price suggestion).
+
+Business kaathirukka mudinja ellaa nerathulayum batch-a choose pannunga; idhu simple, selavu kammi, monitor panna easy.
+
+```flow
+title: Batch, raathri
+Scheduler -> Registry-la irundhu model v7 load pannu -> Innaikku varaikkum features compute pannu -> Ella active loans-um score pannu -> loan_id, score, v7, timestamp ezhudhu -> Collections team-oda ranked list
+```
+
+```flow
+title: Real time, ovvoru request-kum
+Application form -> FastAPI service | model v7 start-up-la load aachu
+FastAPI service -> 42 fields validate pannu
+42 fields validate pannu -[thappaana input]-> Reject pannu
+42 fields validate pannu -> Features compute pannu | training-la irundha adhe code
+Features compute pannu -> Score, version return pannu | 80 ms-ku kammiyaa
+Score, version return pannu -> Decision | illa service down-na manual review
+```
+
+Indha lesson-la Kolkata-la oru non-banking finance company-a follow pannuvom, avanga oru default-risk model-a rendu vazhiyilayum serve panraanga.
+
+## Idhu eppadi work aagudhu
+
+**Muzhu prediction path-aiyum package pannunga.** Model mattum podhaadhu; preprocessing-um feature computation-um training-la irundha maadhiriye irukkanum. Adha serthu package pannunga (scikit-learn pipeline, saved preprocessing object, shared feature code), model-oda serthu version-um kodunga.
+
+**Batch.** Oru scheduled job registered model-a load pannum, scoring time-ku features compute pannum, predict pannum, results-a model version, timestamp-oda ezhudhum, counts-um score distributions-um log pannum. Orchestrator illa oru simple scheduler use pannunga.
+
+**Real-time.** Oru web service (example FastAPI, illa BentoML maadhiri model-serving framework) start-up-la model-a load pannum, ovvoru request-oda input-aiyum schema vachu validate pannum, features compute pannum ("kadandha oru mani neraththula transactions" maadhiri vishayangalukku aduthadha feature store-la irundhu), predict pannum, model version-oda score-a return pannum. Model service fail aanaa, latency budgets, timeouts, oru fallback (rule-based decision) set pannunga.
+
+**Input validation.** Fields missing, types thappu, values training ranges-ku veliya irukkura requests-a reject pannunga illa flag pannunga. Silent garbage in-na silent garbage out.
+
+**Versioning-um rollout-um.** Pudhu versions-a mella mella deploy pannunga: shadow mode (pudhu model pazhaya model-oda score pannum, aana decisions-a affect pannaadhu), apram canary (traffic-oda konjam share), apram muzhu rollout. Results-a compare panni, thevai-na rollback pannunga.
+
+**Performance.** p95 latency-yum throughput-um alandhu paarunga. Chinna models, requests-a batch panradhu, features-a precompute panradhu help pannum. Tree models-a CPU-la milliseconds-la serve pannalaam.
+
+**Logging.** Monitoring, debugging-ku inputs (illa adhoda summaries), outputs, model version log pannunga, personal data mask panni.
+
+**Batch-aa real-time-aa:**
+
+| Kelvi | Batch | Real-time |
+| --- | --- | --- |
+| Score eppo thevai? | Mani neram illa naal kazhichu-num ok | Request-kullaye |
+| Cost | Kammi: schedule-la odum | Adhigam: eppavum on-la irukkura service |
+| Monitoring | Ovvoru run-oda counts, distributions | Ovvoru request-oda latency, errors, drift |
+| Failure-oda impact | Oru report late-aa varum | Customer journey block aagum, adhanaala fallback thevai |
+| Typical examples | Churn lists, forecasts, risk reviews | Fraud checks, pricing, credit decisions |
+
+**Rollout path-a vaarthaiyila.** Mudhalla shadow mode: pudhu version ovvoru request-aiyum score pannum, aana adhoda output log mattum aagum. Unmaiyaana results theriyura alavukku neram kazhichu, ovvoru version-oda scores, nijamaa nadandhadha evvalavu nallaa rank pannichu-nu, segment-by-segment compare pannunga. Apram konjam share-la canary, error rates-um business measures-um paathukitte. Apram muzhu rollout, munnaadi irundha version innum loaded-aa illa oru deploy dhooram-la irukkanum. Ovvoru stage-kum oru peru solla pattha owner-um, munnaerarathukku illa rollback-ku ezhudhina oru condition-um irukkanum, adha stage aarambikkradhukku munnaadiye mudivu pannanum.
+
+**Batch-yum real-time-yum consistent-aa vechukkradhu.** Oru model rendu vazhiyilayum serve aanaa, rendu paths-um adhe registered version-a load pannanum, adhe feature code-a call pannanum. Oru useful test: records-oda oru sample-a batch job-layum API-layum score panni, ovvoru score-um match aagudhaa-nu check pannunga.
+
+**Code-la oru real-time service.** Start-up-la oru thadavai load pannunga, inputs-a training ranges-oda validate pannunga, ovvoru prediction-oda version-a record pannunga:
+
+```python
+from contextlib import asynccontextmanager
+import mlflow.pyfunc, pandas as pd
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+MODELS = {}
+
+@asynccontextmanager
+async def lifespan(app):
+    MODELS["champion"] = mlflow.pyfunc.load_model("models:/claims-fraud@champion")
+    MODELS["challenger"] = mlflow.pyfunc.load_model("models:/claims-fraud@challenger")
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+class Claim(BaseModel):
+    claim_amount_inr: float = Field(gt=0, le=5_000_000)        # the range seen in training
+    policy_age_days: int = Field(ge=0, le=20_000)
+    hospital_tier: int = Field(ge=1, le=3)
+    prior_claims: int = Field(ge=0, le=50)
+
+@app.post("/score")
+def score(claim: Claim, user_id: str):
+    X = pd.DataFrame([claim.model_dump()])
+    main = float(MODELS["champion"].predict(X)[0])
+    shadow = float(MODELS["challenger"].predict(X)[0])          # logged, never used for the decision
+    log_prediction(user_id, claim, main=main, shadow=shadow)
+    return {"score": main, "model": "champion"}
+```
+
+Pydantic, range-ku veliya irukkura inputs-a model paakkaradhukku munnaadiye theliva oru 422-oda reject pannidum.
+
+**User hash vachu canary.** Challenger nijamaana decisions-ku ready aanaa, users-oda oru stable slice-a adhukku route pannunga:
+
+```python
+import hashlib
+
+def bucket(user_id: str) -> int:
+    return int(hashlib.sha256(user_id.encode()).hexdigest()[:8], 16) % 100
+
+def pick_model(user_id: str, canary_percent: int = 5) -> str:
+    return "challenger" if bucket(user_id) < canary_percent else "champion"
+```
+
+Oru user-kum eppavum adhe model kidaikkum, adhanaala avanga experience consistent-aa irukkum, comparison-um clean-aa irukkum. Percentage-a steps-la ethunga (5, 25, 50, 100), ovvoru group-oda outcomes-um errors-um paathukitte.
+
+**Version stamp-oda batch scoring.**
+
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+def score_batch(in_path, out_path, alias="champion"):
+    model_uri = f"models:/claims-fraud@{alias}"
+    model = mlflow.pyfunc.load_model(model_uri)
+    df = pd.read_parquet(in_path)
+    df["score"] = model.predict(df[FEATURES])
+    df["model_version"] = mlflow.MlflowClient().get_model_version_by_alias("claims-fraud", alias).version
+    df["scored_at"] = datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(timespec="seconds")
+    df.to_parquet(out_path)
+    print(f"{len(df)} rows; score mean {df['score'].mean():.3f}; share above 0.8: {(df['score'] > 0.8).mean():.1%}")
+```
+
+Print aagura summary oru selavu illaadha monitor: mean-la illa high-score share-la periya jump irundha, yaarum list-a vachu action edukkradhukku munnaadi paakkalaam.
+
+**Oru consistency test.** 500 records-a batch job-layum API-layum score pannunga, scores oru chinna tolerance varaikkum match aagudhu-nu assert pannunga. Difference irundha, rendu paths-um features-a veraveraya compute pannudhu-nu artham; idhu served models-la romba common-aana silent bug.
+
+## Oru worked example
+
+Kolkata-la oru NBFC-kitta (non-banking finance company) oru trained default-risk model irukku.
+
+- **Batch**: ovvoru raathiri-yum ella active loans-um early-warning risk-ku score aagum; collections team-ku ovvoru kaalai-yum oru ranked list theriyum. Job evvalavu loans score aachu, ovvoru risk band-la evvalavu share-nu log pannum; counts thideernu maarinaa alert varum.
+- **Real-time**: loan application-la, oru FastAPI service applicant-a p95-la 80 milliseconds-kum kammiyaa score pannum. Oru Pydantic model vachu 42 input fields-a validate pannum, bank-statement features-a training-la use panna adhe code-la compute pannum. Service down-aa irundha, application auto-decide aagaama manual review-ku pogum.
+- **Rollout**: version 7 rendu vaaram version 6-ku pakkathula shadow mode-la odichu. Defaults theriya maadhakkanakka aagum, adhanaala rendu vaaram shadow scores vachu, idhu defaults-a nallaa rank pannudhu-nu prove panna mudiyaadhu. Adhukku badhila team adhoda live scores stable-aa, sensible-aa irukkaa-nu check pannum, results theriyum pazhaya loans-la back-test-a nambum, adhula idhu defaults-a nallaa rank pannichu. Apram 20% traffic-ku pochu, apram 100%. Registry version 6-a rollback-ku ready-aa vachirukku.
+
+Oru early bug: service-ku oru partner channel-la income lakhs-la vandhudhu, innoru channel-la rupees-la vandhudhu. Input range validation mudhal naalle idha pidichudhu.
+
+| Version 7-oda stage | Traffic | Outcome |
+| --- | --- | --- |
+| Shadow | 0% decisions, 100% scored | Live scores stable; back-test-la version 6-a vida nalla |
+| Canary | 20% | Errors-layum complaints-layum ethum increase illa |
+| Muzhu rollout | 100% | Version 6 registry-la ready-aa vechaanga |
+
+## Podhuvaa panra thappugal
+
+- **Batch podhumaana idathula real-time-a use panradhu.** Cost-um complexity-um adhigam aagum.
+- **Service-la preprocessing-a thirumba implement panradhu.** Training-oda code share pannunga.
+- **Input validation illaama irukkradhu.** Units mismatch-um missing fields-um sathamillaama predictions-a kedukkum.
+- **Ellaathaiyum oru thadavai deploy panradhu.** Shadow-um canary releases-um use pannunga.
+- **Fallback illaama irukkradhu.** Model illaadha podhu enna nadakkum-nu munnaadiye mudivu pannunga.
+- **Input range checks illaama irukkradhu**, adhanaala range-ku veliya irukkura values confident-aana kirukku-thanamaa result kodukkum.
+- **Ovvoru request-kum random canary assignment**, adhanaala oru user rendu models-aiyum paarkkiraanga.
+- **Batch-um real-time paths-um features-a veraveraya compute panradhu.**
+
+## Serving service thevaiyillaadha neram
+
+- **Scores daily illa weekly thevai**: table-la ezhudhura batch job selavu kammi, simple.
+- **Client app-layum database-layum odura alavukku chinna models**, example rules illa SQL-aa export panna chinna tree.
+- **Hosted ML platform** client munnaadiye odikkittu irundha, adhu endpoints, canaries, monitoring tharum.
+
+## Demo-la irundhu production varaikkum
+
+- **Registry alias-la irundhu load pannunga**, ovvoru prediction-oda version-a log pannunga.
+- **Inputs-a validate pannunga**, training ranges-oda.
+- **Shadow-oda rollout pannunga, apram hash-based canary**, ovvoru group-oda outcomes-a paathukitte.
+- **Batch-real-time consistency-a test pannunga**, CI-la.
+- **p95 latency, errors, score distributions-a track pannunga.**
+
+## Practice pannunga
+
+BentoML-oda introduction-um Google-oda Rules of ML-la serving section-um padinga; FastAPI lesson-la kathukkittadha thirumba use pannunga.
+
+1. Oru batch scoring script ezhudhunga, adhu saved pipeline-a load panni, oru CSV-a score panni, results-a model version-oda ezhudhanum.
+2. Adhe pipeline-a FastAPI endpoint-aa serve pannunga, input validation-um latency measurement-um serthu.
+3. Pudhu model version-a adhe inputs-la shadow mode-la odi, outputs-a compare pannunga.
+4. Hash-based canary-a 10%-la serunga, 1,000 fake user ids anuppunga, kittathatta 100 challenger-ku pogudhu-nu, ovvoru id-um eppavum adhe group-la vizhudhu-nu confirm pannunga.
+
+**Mudinjadhu-nu eppo sollalaam:** Oru model-a rendu vazhiyilayum, adhe inputs-ku identical predictions-oda serve panna mudiyum, ungaloda rollout plan-a explain panna mudiyum.

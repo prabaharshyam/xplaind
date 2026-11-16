@@ -1,0 +1,165 @@
+---
+id: how-llm-inference-works
+lang: hinglish
+title: "LLM inference ke andar: prefill, decode aur KV cache"
+outcome: "Samjhao ki LLM reply mein pehle shabd se pehle wait aur uske baad ek speed kyun hoti hai, KV cache ka size nikaalo, aur latency, throughput ya cost ke liye sahi lever chuno."
+answer: "Model poora prompt ek saath padhta hai (prefill), phir ek-ek token likhta hai (decode), aur KV cache mein save kiya kaam reuse karta hai. Prefill pehle shabd ka wait set karta hai; decode uske baad ki speed."
+why_it_matters: "Ek AI product ke har speed aur cost decision, prompt length se lekar GPU size aur kaunsa API use karna hai tak, prefill aur decode ke kaam karne ke tareeke se nikalta hai. Jo engineers ise samajhte hain woh slow apps jaldi theek karte hain aur interviews mein serving ke sawaalon ke jawab confidence se dete hain."
+flashcards:
+  - q: "Prefill mein kya hota hai?"
+    a: "Model saare prompt tokens ek saath padhta hai aur KV cache bharta hai. GPU kitna compute kar sakta hai, ye uski limit hai."
+  - q: "Decode mein kya hota hai?"
+    a: "Model ek-ek token likhta hai. Har step mein model ke weights memory se dobara load hote hain, isliye ye computing power se nahi, memory speed se limited hai."
+  - q: "TTFT kya hai?"
+    a: "Time to first token: pehla shabd dikhne se pehle ka wait. Ye prompt length aur server load ke saath badhta hai."
+  - q: "TPOT kya hai?"
+    a: "Pehle ke baad har output token ka time. Total time lagbhag TTFT + TPOT × output tokens ki ginti hota hai."
+  - q: "KV cache kya store karta hai?"
+    a: "Har pichhle token ke key aur value vectors, taaki har naya token unhe dobara compute na kare. Ye kaam bachata hai par GPU memory use karta hai jo context length aur batch size ke saath badhti hai."
+  - q: "Continuous batching kya hai?"
+    a: "Kai requests ko saath serve karna aur har khatam hui request ki jagah turant nayi request daalna, taaki chhote replies lambe replies ki wajah se na rukein."
+  - q: "Speculative decoding cheezein kaise tez karti hai?"
+    a: "Ek chhota model kuch tokens ka draft banata hai; main model unhe ek pass mein check karta hai aur jinse sahmat ho unhe rakhta hai. Output wahi rehta hai, sirf tez hota hai."
+  - q: "Average ki jagah p95 latency kyun dekhte hain?"
+    a: "Kuch bahut slow requests average ko bigaad deti hain. p95 dikhata hai ki bees mein se sabse slow user kya jhelta hai."
+exercise:
+  title: "Chennai ka support bot slow kyun hai?"
+  setup: "Chennai ki ek telecom apne GPU par 8-billion-parameter open model ke saath ek support chatbot chalati hai. Har request 6,000-token prompt (instructions, policies aur chat history) bhejti hai aur lagbhag 250 tokens wapas paati hai. Users shikayat karte hain ki woh 4 seconds tak khaali box ko ghoorte rehte hain, phir reply tezi se stream hota hai. Busy ghanton mein replies bhi slow ho jaate hain aur kuch requests out-of-memory errors ke saath fail hoti hain."
+  questions:
+    - q: "4-second ka khaali wait kaunsa hissa hai, aur use kya chalata hai?"
+      a: "Prefill, jo time to first token set karta hai. 6,000-token prompt mukhya wajah hai, jise busy ghanton mein queueing aur kharab karti hai."
+    - q: "Us wait ko kam karne ke do tareeke batao."
+      a: "Prompt chhota karo (history trim karo, kam use hone waali policies ko retrieval mein le jao), aur fixed instructions ko prompt caching se reuse karo taaki har baar dobara process na hon."
+    - q: "Out-of-memory errors sirf busy ghanton mein kyun aate hain?"
+      a: "Har active request ke paas ek KV cache hota hai jo uske 6,000-token context ke saath badhta hai. Ek saath zyada requests ka matlab GPU memory ke rakh sakne se zyada cache."
+    - q: "Bada GPU kharide bina busy-hour problem kya theek karta hai?"
+      a: "Chhote contexts, paged KV cache memory aur continuous batching waala serving engine (jaise vLLM), concurrent requests par cap, aur quality bani rahe toh quantised KV cache."
+ask:
+  - "Mere LLM app mein pehla shabd aane mein itna time kyun lagta hai?"
+  - "KV cache ko kitni GPU memory chahiye?"
+  - "LLMs ke liye latency aur throughput mein kya farak hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Jab aap language model ko prompt bhejte ho, do alag tarah ka kaam hota hai.
+
+1. **Prefill.** Model aapke prompt ka har token ek hi samay par, parallel mein padhta hai. Ye karte hue woh har token ke liye kuch results **KV cache** mein save karta hai. Prefill is baat se limited hai ki GPU ek second mein kitna arithmetic kar sakta hai, isliye lambe prompts mein zyada time lagta hai.
+2. **Decode.** Model reply ek-ek token karke likhta hai. Har token banane ke liye use apne saare weights GPU memory se dobara padhne padte hain, par unke saath woh thoda hi maths karta hai. Decode computing power se nahi, is baat se limited hai ki data memory se kitni tezi se move karta hai.
+
+Ye batwara samjhata hai ki users kya mehsoos karte hain. Kuch dikhne se pehle ka khaali wait zyadatar prefill hai, jise **time to first token (TTFT)** ke roop mein naapa jaata hai. Uske baad text ki speed decode hai, jise **time per output token (TPOT)** ke roop mein naapa jaata hai. Lagbhag:
+
+**total time ≈ TTFT + TPOT × output tokens ki ginti**
+
+```flow
+title: LLM server se guzarti ek request
+dir: LR
+Prompt aata hai -> Queue | GPU busy ho toh wait karta hai
+Queue -> Prefill | saare prompt tokens ek saath padhta hai
+Prefill -> KV cache bharta hai | har token ke liye save
+KV cache bharta hai -> Decode step | ek naya token
+Decode step -> Ho gaya? | stop token ya length limit
+Ho gaya? -[nahi]-> Decode step
+Ho gaya? -[haan]-> Reply poora
+```
+
+## Ye kaam kaise karta hai
+
+**KV cache.** Transformer mein har naya token attention ke zariye har pichhle token ko dekhta hai, jiske liye har ek ka ek "key" aur ek "value" vector chahiye. Har step par poori sequence ke liye inhe dobara compute karna waste hoga, isliye model unhe store karta hai aur har naye token ke liye ek aur jodi jodta hai. Wahi store KV cache hai. Ye bahut computation bachata hai, par GPU memory use karta hai, aur uski matra context length aur ek saath serve ki ja rahi requests ki sankhya ke saath badhti hai.
+
+Kisi special trick ke bina, uska size lagbhag hai:
+
+**2 × layers × model width × context tokens × batch size × har number ke bytes**
+
+2 keys aur values ke liye hai. *AI Engineering* book 13-billion-parameter Llama 2 model (40 layers, width 5,120) ko 2,048 tokens ki 32 requests serve karte hue, har number ke 2 bytes par, nikaalti hai: lagbhag 54 GB, jo model weights se bhi zyada hai. Kai naye models keys aur values ko attention heads ke beech share karte hain, jo ise bahut chhota kar deta hai, par problem ki shakal wahi hai: lambe contexts aur bahut saare users memory kha jaate hain.
+
+```python
+def kv_cache_gb(layers, width, context, batch, bytes_per_value=2, kv_share=1.0):
+    """kv_share < 1 for models that share keys and values across heads (for example 0.125)."""
+    return 2 * layers * width * context * batch * bytes_per_value * kv_share / 1e9
+
+def reply_seconds(ttft_s, tpot_ms, output_tokens):
+    return ttft_s + tpot_ms / 1000 * output_tokens
+
+print(round(kv_cache_gb(40, 5120, 2048, 32), 1))   # 53.7, the book's example
+print(reply_seconds(1.2, 40, 300))                 # 13.2 seconds for 300 tokens
+```
+
+**Batching.** Ek request decode karta GPU zyadatar memory ka intezaar karta hai, isliye uske paas arithmetic bacha hota hai. Kai requests ko saath serve karne se wo bachi hui capacity kaam aati hai aur **throughput** (saare users mein milakar tokens per second) badhta hai, jo per request cost kam karta hai.
+
+- **Static batching** poore batch ka intezaar karti hai. Pehli requests baad waalon ka intezaar karti hain.
+- **Dynamic batching** tab shuru hoti hai jab batch bhar jaaye ya ek chhota timer khatam ho jaaye.
+- **Continuous batching** har step par khatam hui request ko nayi se badal deti hai, isliye 20-token reply kabhi 1,000-token waale ka intezaar nahi karta. vLLM, TensorRT-LLM aur Text Generation Inference jaise serving engines ye karte hain.
+
+Batching thodi latency dekar bahut throughput leti hai. Teams batate hain ki thode slow pehle tokens maanne par throughput double ya triple ho jaata hai.
+
+**Speculative decoding.** Ek chhota, tez **draft** model agle kuch tokens ka andaaza lagata hai. Main model sabko ek hi pass mein check karta hai, jo sasta hai kyunki checking prefill ki tarah parallel hoti hai. Woh jinse sahmat ho unhe rakhta hai aur apna ek token jodta hai. Output bilkul wahi hota hai jo main model likhta, bas tez. Ye code jaise predictable text par sabse achha kaam karta hai. DeepMind ne bataya ki isse 70-billion-parameter model ka reply time aadhe se zyada kam hua.
+
+**Prompt caching.** Agar kai requests ek hi lambe instructions se shuru hoti hain, toh server us shared shuruaat ka KV cache rakh sakta hai aur uska prefill skip kar sakta hai. Providers cached input tokens ki price bahut kam rakhte hain. Prompt ka fixed hissa pehle rakho.
+
+**Batch APIs.** Jis kaam ka koi intezaar nahi kar raha, jaise nightly summaries, uske liye providers lagbhag aadhi keemat par batch endpoints dete hain jo ghanton mein results lauta dete hain.
+
+| Jo problem aap dekhte ho | Kaunsa hissa | Madad karne waale levers |
+| --- | --- | --- |
+| Reply se pehle lamba khaali wait | Prefill (TTFT) | Chhote prompts, prompt caching, kam queueing, streaming |
+| Reply dheere stream hota hai | Decode (TPOT) | Chhota ya quantised model, speculative decoding, tez GPU memory |
+| Sirf busy samay par slow | Queueing aur memory | Continuous batching, aur replicas, concurrency limits |
+| Lambi chats ke saath out-of-memory | KV cache | Chhota context, paged ya quantised KV cache, kam concurrent requests |
+| Offline jobs ke liye cost zyada | Throughput | Batch APIs, bade batches, chhote models |
+
+## Ek example se samjho
+
+Chennai ki ek telecom company apne GPU par 8-billion-parameter open model ke saath ek support chatbot chalati hai. Har request lagbhag 6,000 tokens (instructions, policies aur chat history) bhejti hai aur lagbhag 250 tokens wapas paati hai. Users pehle shabd ke liye lagbhag 4 seconds wait karte hain; phir text lagbhag 25 ms per token par stream hota hai.
+
+Total time ≈ 4 + 0.025 × 250 ≈ 10 seconds. Stream theek hai; khaali wait problem hai, aur wo prefill hai.
+
+Woh teen badlaav karte hain:
+
+1. **Prompt trim karte hain.** Jo policies bot ko kam chahiye hoti hain woh retrieval mein chali jaati hain, aur chat history das turns ke baad summarise hoti hai. Average prompt 2,500 tokens par aa jaata hai.
+2. **Fixed shuruaat ko cache karte hain.** 1,200-token instructions har request ke liye identical hain, isliye unhe pehle rakhkar cache kiya jaata hai.
+3. **Server ko paged KV cache memory ke saath continuous batching par le jaate hain**, aur per GPU concurrent requests par cap lagate hain.
+
+| Measure | Pehle | Baad mein |
+| --- | --- | --- |
+| p50 time to first token | 4.0 s | 0.9 s |
+| p95 time to first token | 7.5 s | 1.8 s |
+| Busy hour mein per GPU requests | 6 | 20 |
+| Roz out-of-memory errors | 40 | 0 |
+
+Ye numbers illustration ke liye hain, ye dikhane ke liye ki kaise sochna hai. Woh average nahi, **p95** track karna bhi shuru karte hain, kyunki ek atki hui request average ko us se kahin zyada kharab dikha sakti hai jo zyadatar users mehsoos karte hain.
+
+## Aam galtiyaan
+
+- **Lambe prompt ke liye model ko dosh dena.** Pehle shabd ka wait zyadatar prefill hai. Hardware kharidne se pehle prompt kaato aur cache karo.
+- **Sirf averages naapna.** p50 aur p95 use karo, aur first-token time ko prompt length ke saath plot karo.
+- **Sirf GPU "utilisation" dekhna.** Ek GPU 100% busy dikha sakta hai jabki kaam kam ka kar raha ho. Tokens per second aur cost per request track karo.
+- **KV cache memory ko ignore karna.** Weights aasaani se fit hon tab bhi lambe contexts × bahut saare users GPU memory se zyada ho sakte hain.
+- **Chhupe tokens ko turant maan lena.** Reasoning aur agent steps aise tokens generate karte hain jo users kabhi nahi dekhte; woh pehle dikhne waale shabd ko late kar dete hain.
+- **Offline jobs ke liye online API use karna.** Jab koi intezaar nahi kar raha, tab batch APIs sasti hain.
+
+## Pehle kaunsa lever kheenchna hai
+
+Slow hisse ko target karne waale sabse sasta badlaav se shuru karo.
+
+- **Pehle shabd ka wait bahut lamba:** prompt chhota karke cache karo, reply stream karo, phir queueing dekho.
+- **Stream bahut slow:** naye GPU se pehle chhota ya quantised model, ya speculative decoding.
+- **Scale par bahut mehenga:** batching aur batch APIs, phir model tiering.
+
+## Demo se production tak
+
+- **Latency budget set karo.** Maan lo, p95 first token 2 seconds se kam aur uske baad kam se kam 15 tokens per second.
+- **TTFT aur TPOT alag-alag naapo**, aur woh time bhi jab tak user ko sach mein pehla token dikhta hai.
+- **Real prompt lengths ke saath load-test karo.** Chhote test prompts prefill aur KV cache problems chhupa dete hain.
+- **Prompts ka fixed hissa stable aur pehle rakho**, taaki caching kaam kare.
+- **Model badalne ke baad dobara check karo.** Alag tokenizer ya size waala naya model ye saare numbers badal deta hai.
+
+## Practice karo
+
+1. Streaming on karke koi bhi LLM API call karo. Ek chhote prompt aur 5,000-token prompt ke liye time to first token aur total time record karo. Sabse zyada kya badla?
+2. Upar ke code se apne favourite open model ke liye 8,000 tokens aur 16 users par KV cache ka andaaza lagao.
+3. Ek slow AI feature chuno jo aap jaante ho aur likho ki woh table ki kaunsi row mein aata hai aur pehla lever jo aap try karoge.
+
+Zyada gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 9 inference metrics, KV cache, batching aur speculative decoding cover karta hai.
+
+**Aapka kaam poora jab:** aap ek minute mein prefill aur decode samjha sako, model ke size se KV cache ka andaaza laga sako, aur slow pehle shabd ke liye alag aur slow stream ke liye alag sahi lever chun sako.

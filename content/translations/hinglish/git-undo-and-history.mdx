@@ -1,0 +1,127 @@
+---
+id: git-undo-and-history
+lang: hinglish
+title: "Git mein undo karna: restore, reset, revert aur reflog"
+outcome: "Kisi bhi stage par change undo karo, unsaved edit se lekar pushed commit tak, reset aur revert mein se chuno, aur reflog se kaam recover karo."
+answer: "Uncommitted edits ke liye restore, apne unpushed commits ke liye reset, pushed commits ke liye revert, aur khoya samjha hua kaam dhoondhne ke liye reflog use karo."
+why_it_matters: "Har koi kabhi na kabhi galat cheez commit karta hai. Har situation ka safe undo jaanne se aap use ek minute mein fix kar paate ho, main todne ya poore din ka kaam khone ki jagah."
+flashcards:
+  - q: "Jo edit stage nahi kiya use kaise fenkein?"
+    a: "git restore file.py. File apne last committed version par wapas chali jaati hai. Edit hamesha ke liye chala jaata hai."
+  - q: "Ek file ko unstage karke apne edits kaise rakhein?"
+    a: "git restore --staged file.py."
+  - q: "reset --soft, --mixed aur --hard aapke changes ke saath kya karte hain?"
+    a: "Sab branch ko peeche le jaate hain. Soft changes ko staged rakhta hai, mixed (default) unstaged rakhta hai, hard unhe delete kar deta hai."
+  - q: "Main par reset ki jagah revert kyun use karein?"
+    a: "Revert ek naya commit jodta hai jo purane ko undo karta hai, isliye history sirf badhti hai aur teammates ki copies abhi bhi match karti hain. Reset history rewrite karta hai."
+  - q: "Apne last, unpushed commit mein message theek karna ya koi file bhoolna kaise fix karein?"
+    a: "Fix ko stage karo aur git commit --amend chalao. Ye last commit ko replace kar deta hai. Jo commit shared branch par pehle hi push ho chuka hai use kabhi amend mat karo."
+  - q: "Reflog kya hai?"
+    a: "Un sabhi jagahon ka local log jahan aapki branch ka tip raha hai. Galat gaye reset ya rebase ke baad commits dhoondhne aur restore karne mein ye madad karta hai."
+exercise:
+  title: "Sahi undo chuno"
+  setup: "Har situation ke liye batao ki aap kaunsa command use karoge aur woh safe kyun hai."
+  questions:
+    - q: "Aapne utils.py edit kiya, stage nahi kiya, aur original wapas chahiye."
+      a: "git restore utils.py. Kuch commit nahi hua, isliye aur kuch affect nahi hota."
+    - q: "Aapke last commit mein, jo push nahi hua, secret waali .env file bhi chali gayi."
+      a: "git reset --soft HEAD~1, .env hatao, use .gitignore mein jodo, phir se commit karo. Kyunki woh kabhi push nahi hua, rewrite safe hai. Shak ho toh secret ko rotate kar do."
+    - q: "Kal main mein merge hue ek commit ne checkout tod diya. Doosre use pull kar chuke hain."
+      a: "git revert <commit>, phir push karo. Ye shared history rewrite kiye bina ek naye commit se change ko undo karta hai."
+    - q: "Aapne git reset --hard HEAD~3 chalaya aur teen commits kho diye jo chahiye the."
+      a: "git reflog se reset se pehle ka commit id dhoondho, phir git reset --hard <woh id> ya git branch rescue <woh id>."
+ask:
+  - "Maine GitHub par secret push kar diya. Kya revert kaafi hai?"
+  - "Merge commit ko undo kaise karun?"
+  - "restore aur checkout mein kya farak hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Git aapka kaam teen jagah rakhta hai, aur har ek ka apna undo hai:
+
+- **Working folder**: jo files aap abhi edit kar rahe ho.
+- **Staging area**: jo aapne `git add` se agle commit mein jaane ke liye mark kiya hai.
+- **History**: commits khud, pehle sirf aapke laptop par, phir push karne par shared server par.
+
+Sahi undo is par depend karta hai ki galti kahan hai aur sabse zyada is par ki kya kisi aur ke paas woh pehle se hai. Jo rule lagbhag sab kuch decide karta hai: **jo history kisi ke paas nahi hai use rewrite kar sakte ho; jo history doosre pehle hi pull kar chuke hain use rewrite nahi karna chahiye.**
+
+## Ye kaam kaise karta hai
+
+```flow
+title: Galti kahan hai?
+Mistake -> Where is it?
+Where is it? -[edited, not staged]-> git restore file | edit fenk do
+Where is it? -[staged, not committed]-> git restore --staged file | edit rakho, unstage karo
+Where is it? -[committed, not pushed]-> git reset or git commit --amend | apni history rewrite karo
+Where is it? -[pushed to a shared branch]-> git revert commit | ek commit jodo jo use undo kare
+git reset or git commit --amend -[went wrong]-> git reflog | purana commit dhoondho aur wapas jao
+```
+
+**Restore** files par kaam karta hai. `git restore app.py` unstaged edits fenk deta hai aur last committed version wapas laata hai. `git restore --staged app.py` file ko staging area se nikaalta hai par aapke edits rakhta hai.
+
+**Reset** aapki branch ka label pehle ke kisi commit par wapas le jaata hai. Jin commits ko aap paar karte ho unke changes ka kya hota hai, woh mode par depend karta hai:
+
+| Command | Branch peeche jaati hai | Un commits ke changes | Kab use karein |
+| --- | --- | --- | --- |
+| `git reset --soft HEAD~1` | Haan | Rehte hain, aur staged | Last commit ko alag tareeke se dobara karna ho |
+| `git reset HEAD~1` (mixed) | Haan | Rehte hain, unstaged | Kya commit karna hai use todna ya dobara chunna ho |
+| `git reset --hard HEAD~1` | Haan | Aapki files se delete ho jaate hain | Kaam hamesha ke liye hatana ho (pakka kar lo) |
+| `git revert <id>` | Nahi | Ek naya commit unhe undo karta hai | Commit pehle hi shared ho |
+
+`HEAD~1` ka matlab "jahan main hoon usse ek commit pehle". `HEAD~3` matlab teen.
+
+**Amend** last commit ke liye ek chhota reset hai: ek fix stage karo aur `git commit --amend` chalao, last commit ko sudhre hue commit se replace karne ke liye. Push karne se pehle message mein typo ya bhooli hui file ke liye ye perfect hai.
+
+**Revert** kabhi kuch rewrite nahi karta. `git revert a1b2c3d` dekhta hai ki us commit ne kya badla aur ek naya commit banata hai jo use wapas badal deta hai. History badhti hai; sabki copy abhi bhi line up rehti hai. Main par yahi undo aapko chahiye.
+
+**Stash** kaam ko commit kiye bina ek taraf rakh deta hai. `git stash` aapke adhoore edits save karta hai aur ek clean folder deta hai, jaise kisi doosri branch par urgent bug fix karne ke liye; `git stash pop` edits wapas laata hai. Koi bhi command jo uncommitted changes fenk de, usse pehle ye safe move hai, kyunki edits stash ho jaayein toh agla step galat jaaye tab bhi recover ho sakte hain.
+
+**Reflog** aapka safety net hai. Jab bhi aapki branch ka tip hilta hai, commit, reset, rebase ya checkout se, Git use lagbhag 90 din tak reflog mein note karta hai. `git reflog` un positions ki list deta hai, aur aap kisi par bhi wapas ja sakte ho.
+
+## Ek worked example
+
+Rahul Hyderabad mein ek e-commerce company ke liye recommendation API par kaam kar raha hai. Shukrawaar shaam hai.
+
+**Pehli galti: ek debug print.** `ranker.py` mein `print(user)` bikhre hue hain aur usne stage nahi kiya. `git restore ranker.py` use turant saaf kar deta hai.
+
+**Doosri galti: commit mein secret.** Uske last commit mein, jo abhi push nahi hua, API key waali `.env` chali gayi hai. Woh chalata hai:
+
+```bash
+git reset --soft HEAD~1
+git restore --staged .env
+echo ".env" >> .gitignore
+git add .gitignore ranker.py
+git commit -m "Add category boost to ranker"
+```
+
+Commit secret ke bina dobara ban jaata hai. Kyunki woh kabhi push nahi hua, ise rewrite karna safe hai. Phir bhi woh key rotate karta hai, kyunki savdhaan rehne ki soch ye hai ki history mein disk par padi secret leak ho sakti hai.
+
+**Teesri galti: main par bad change.** Somwar ko ek teammate ka merged commit ranker ko naye users ke liye empty lists dene par majboor kar deta hai. Woh ek din se main par hai aur sab use pull kar chuke hain. Main ko reset karne se har copy tootegi. Iski jagah:
+
+```bash
+git switch main
+git pull
+git revert 7f3e9c1
+git push
+```
+
+"Revert 'Boost recent items'" naam ka naya commit normal pull request aur pipeline se jaata hai. Bug chala gaya, history intact hai, aur team baad mein original change ko theek se fix karti hai.
+
+**Chauthi galti: khoya hua dopahar.** Apni branch saaf karte waqt Rahul `git reset --hard HEAD~3` chalata hai aur samajhta hai ki un teen commits mein se ek woh test tha jo use chahiye tha. Woh `git reflog` chalata hai, `e41d2aa HEAD@{1}: commit: Add tests for cold-start users` dekhta hai, aur `git cherry-pick e41d2aa` se use wapas le aata hai. Agar kabhi commit hua tha toh kuch bhi sach mein nahi khota.
+
+## Aam galtiyaan
+
+- **Shared branch ko reset karna.** Main par `git reset` plus force push sabki history rewrite kar deta hai. Jo bhi shared ho uspar `git revert` use karo.
+- **Ye sochna ki revert secret hata deta hai.** Revert secret ko history mein chhod deta hai. Key rotate karo; history se hatane ke liye special tools aur coordinated rewrite chahiye.
+- **Bina check kiye --hard use karna.** Pehle `git status` aur `git stash`. `--hard` se delete hue uncommitted edits reflog mein nahi hote.
+- **Pushed commit ko amend karna.** Ye commit ko naye se replace karta hai, isliye jinhone purana pull kiya tha woh diverge ho jaate hain.
+- **Bhool jaana ki reflog hai.** "Mera kaam kho gaya" waali zyadatar ghabrahat `git reflog` par khatam hoti hai.
+
+## Practice karo
+
+1. Ek practice repository mein teen commits banao. Har reset mode ko baari-baari se use karo aur har ek ke baad `git status` dekho.
+2. Ek commit revert karo aur naye commit ka diff `git show` se padho.
+3. `git reset --hard HEAD~2` chalao, phir khoye hue commits `git reflog` se recover karo.
+4. Apne aap ke liye ek line ka rule likho: unshared kaam ke liye kaunsa undo, aur shared kaam ke liye kaunsa.

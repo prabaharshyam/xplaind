@@ -1,0 +1,235 @@
+---
+id: rag-app
+lang: hinglish
+title: "Ek RAG app banao"
+outcome: "Apne documents par question answering banao jo pehle retrieve kare, phir sources ke saath jawab de."
+answer: "RAG app aapke documents se sawaalon ke jawab deta hai: har sawaal ke liye sabse relevant passages retrieve karta hai, phir model se kehta hai ki sirf un passages se, sources ke saath, jawab de."
+why_it_matters: "RAG un GenAI features mein se hai jo companies sabse zyada ship karti hain. Ise shuru se end tak banana aur bata paana ki ye kahan fail hota hai, interview ke liye ek mazboot kahaani hai."
+flashcards:
+  - q: "RAG ke teen steps kaunse hain?"
+    a: "Relevant passages retrieve karo, prompt ko unse augment karo, aur aisa jawab generate karo jo sirf unhi passages ko use aur cite kare."
+  - q: "Companies model train karne ki jagah RAG kyun chunti hain?"
+    a: "Training nahi chahiye aur documents badalne par ye current rehta hai; retrain karne ki jagah re-index karte hain."
+  - q: "Ingestion mein kya hota hai?"
+    a: "Documents load karo, clean text nikaalo, titles aur pages ke saath chunk karo, har chunk ko embed karo aur metadata ke saath store karo."
+  - q: "Contextual retrieval kya hai?"
+    a: "Embed karne se pehle chunk ke saath ek chhota description jodna ki wo document mein kahan baitha hai, aur keyword search ke saath milana, taaki retrieval failures kam hon."
+  - q: "RAG app ko mana karna kyun aana chahiye?"
+    a: "Jab documents chup hon, refusal path ke bina model andaaza lagata hai, aur users ko pata nahi chalta."
+  - q: "RAG app ko evaluate kaise karein?"
+    a: "Expected sources aur answers wale ek fixed question set se, retrieval (recall at k) aur answers (correctness, faithfulness) ko alag-alag naapkar."
+  - q: "Zyadatar RAG failures kahan se aati hain?"
+    a: "Retrieval se: sahi passage kabhi mila hi nahi, aksar parsing, chunking ya keyword search ki kami ki wajah se."
+  - q: "RAG app ko current aur safe kaise rakhein?"
+    a: "Badle huye documents re-index karo, superseded wale filter karo, aur har user ki permissions ke hisaab se retrieval filter karo."
+  - q: "Reciprocal rank fusion kya hai?"
+    a: "Keyword aur vector results ko milane ka simple tareeka: har document ko har list mein 1/(k + rank) score milta hai, scores jode jaate hain, aur sabse zyada total jeetta hai."
+  - q: "Retrieval se pehle follow-up sawaalon ko rewrite kyun karein?"
+    a: "'ITI students ke liye kya?' akele kuch matlab nahi rakhta. Chat history ke saath use poora sawaal bana dene se search sahi passages dhoondh leta hai."
+exercise:
+  title: "RAG app ka plan banao"
+  setup: "Visakhapatnam ki ek port authority 120 documents par staff assistant chahti hai: tariff schedules (tables), standard operating procedures, scan kiye hue purane circulars, aur ek monthly notice jo pichhle mahine ke notice ki jagah leta hai. Staff ke alag-alag clearance levels hain. Pehla prototype demo mein achha jawab deta hai par kisi ne use naapa nahi."
+  questions:
+    - q: "Ingestion ko kya khaas tarah se sambhaalna hoga?"
+      a: "Tariff schedules ki tables, scan kiye circulars ke liye OCR, aur citations ke liye headings aur page numbers rakhna."
+    - q: "Monthly notice ko kaise sambhaaloge?"
+      a: "Effective dates store karo, pichhle notice ko superseded mark karo, aur superseded documents ko default mein filter kar do."
+    - q: "Clearance levels retrieval ko kaise affect karte hain?"
+      a: "Har chunk ke saath access groups store karo aur user ke groups ke hisaab se retrieval filter karo, taaki restricted passages prompt tak kabhi pahunche hi nahi."
+    - q: "Pehle test set mein kya hona chahiye?"
+      a: "Expected sources aur answers ke saath lagbhag 50 asli staff sawaal, jinmein kam se kam das aise ho jinka jawab nahi diya ja sakta."
+ask:
+  - "Apna pehla RAG app kaise banaun?"
+  - "RAG ke liye kaunsa vector database use karun?"
+  - "RAG system ko evaluate kaise karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**RAG app** (retrieval-augmented generation) aapke apne documents se sawaalon ke jawab deta hai. Har sawaal ke liye wo:
+
+1. Aapke documents ke index se sabse relevant passages **retrieve** karta hai;
+2. Prompt ko un passages se **augment** karta hai;
+3. Aisa jawab **generate** karta hai jo sirf un passages ko use aur cite karta hai.
+
+Companies ke liye apne data par language models use karne ka ye sabse common tareeka hai, kyunki isme model training nahi chahiye aur documents badalne par ye current rehta hai.
+
+```flow
+title: Ingestion: ek baar, phir updates par
+PDFs -> Extract text, OCR -> Chunk by heading | about 400 tokens, with title and section
+Chunk by heading -> Embed -> Index (pgvector) | metadata: doc, page, section, dates
+```
+
+```flow
+title: Query ke waqt
+Question -> Hybrid search | vectors + keywords -[top 20]-> Rerank
+Rerank -[top 5]-> Prompt | instructions + passages [1] to [5] with sources + question
+Prompt -> Model -> Answer with citations [2][4] | or "I could not find this..."
+```
+
+Is lesson mein hum Coimbatore ke ek college ko follow karenge jo regulations, fees, exams aur scholarships ke baare mein students ke sawaalon ke liye assistant bana raha hai.
+
+## Ye kaam kaise karta hai
+
+**Ingestion (ek baar, phir updates par).** Documents load karo, clean text nikaalo, titles aur page numbers ke saath chunks mein baanto, har chunk ko embed karo aur uske metadata ke saath ek index mein store karo.
+
+**Query ke waqt.**
+
+- Sawaal ko embed karo; top candidates retrieve karo (vector search, behtar hai keyword search ke saath hybrid); chaaho toh rerank karke best paanch rakho.
+- Prompt banao: instructions, har passage ek id aur source ke saath label kiya hua, phir sawaal.
+- Model ko instruct karo: sirf passages se jawab do; passage ids cite karo; agar passages mein jawab nahi hai toh wahi bolo.
+- Jawab uske citations ke saath lautao, source documents se linked.
+
+**Contextual retrieval.** Chunks mein aksar context nahi hota ("limit 45 days hai"). Chunk ke aage ek chhota description jodna ki wo document mein kahan hai, aur embeddings ko keyword search ke saath milana, naapne par retrieval failures kam karta hai.
+
+**"Pata nahi" kehna.** Bharosemand RAG app tab mana kar deta hai jab documents chup hon. Apne tests mein aise sawaal bhi rakho jinka jawab nahi diya ja sakta.
+
+**Evaluation.** Expected sources aur answers ke saath sawaalon ka ek fixed set rakho. Retrieval (recall at k) aur answers (correctness, faithfulness) ko alag-alag naapo, aur har badlaav ke baad dobara chalao.
+
+**Freshness aur access.** Badle huye documents re-index karo; superseded wale filter karo; agar users ki permissions alag hain, toh retrieval ko is hisaab se filter karo ki har user kya dekh sakta hai.
+
+**Ek minimal query function:**
+
+```python
+def answer(question, user):
+    hits = hybrid_search(question, k=20, filters={"access": user.groups})
+    top = rerank(question, hits)[:5]
+    passages = "\n\n".join(
+        f"[{i+1}] {h.title}, section {h.section}, page {h.page}\n{h.text}"
+        for i, h in enumerate(top)
+    )
+    prompt = (
+        "Answer using only the passages. Cite like [2] after each sentence. "
+        "If the passages do not answer the question, say so and name the office to contact.\n\n"
+        f"Passages:\n{passages}\n\nQuestion: {question}"
+    )
+    return call_model(prompt), top
+```
+
+Jawab ke saath `top` bhi lautane se interface har citation ko uske document aur page se link kar sakta hai, aur jab jawab galat jaaye toh aapke logs dikha sakte hain ki kya retrieve hua tha.
+
+**Sabse pehle kya naapein:**
+
+| Measure | Kis sawaal ka jawab deta hai | Kis target par jaana hai |
+| --- | --- | --- |
+| Recall at 5 | Kya sahi passage retrieve hua? | Golden set par 85% se upar |
+| Correctness | Kya jawab sahi hai? | Client ke saath tay kiya hua |
+| Faithfulness | Kya har claim kisi passage se support hota hai? | 0.9 se upar |
+| Na-jawab-dene-layak sawaalon par refusal rate | Kya wo maanta hai jab documents chup hon? | 75% se upar |
+| Latency | Kya ye kaafi tez hai? | Pehle shabd 2 seconds ke andar |
+
+**Galat jawab debug karna.** Pehle retrieved passages dekho. Agar sahi passage gayab hai, toh problem ingestion ya retrieval mein hai: parsing, chunking, filters ya search. Agar wo maujood hai aur jawab phir bhi galat hai, toh problem prompt ya model mein hai. Ye ek check bahut andaaza lagane se bacha deta hai.
+
+**Ek chhota RAG app jo aap chala sakte ho.** Ye ek open embedding model, keywords ke liye BM25, unhe milane ke liye reciprocal rank fusion, aur citations ke saath jawab dene ke liye Anthropic ka API use karta hai. `sentence-transformers rank_bm25 anthropic` install karo:
+
+```python
+import numpy as np
+from rank_bm25 import BM25Okapi
+from sentence_transformers import SentenceTransformer
+import anthropic
+
+embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")   # small, English
+client = anthropic.Anthropic()
+
+def ingest(chunks):
+    """chunks: list of {"id", "title", "page", "text"}."""
+    texts = [f"{c['title']}. {c['text']}" for c in chunks]
+    vectors = embedder.encode(texts, normalize_embeddings=True)
+    bm25 = BM25Okapi([t.lower().split() for t in texts])
+    return {"chunks": chunks, "vectors": vectors, "bm25": bm25}
+
+def search(index, question, k=5, pool=20):
+    q = embedder.encode([question], normalize_embeddings=True)[0]
+    by_vector = np.argsort(-(index["vectors"] @ q))[:pool]
+    by_keyword = np.argsort(-index["bm25"].get_scores(question.lower().split()))[:pool]
+    fused = {}
+    for ranking in (by_vector, by_keyword):
+        for rank, i in enumerate(ranking):
+            fused[int(i)] = fused.get(int(i), 0) + 1 / (60 + rank)      # reciprocal rank fusion
+    best = sorted(fused, key=fused.get, reverse=True)[:k]
+    return [index["chunks"][i] for i in best]
+
+def answer(index, question):
+    hits = search(index, question)
+    passages = "\n\n".join(f"[{n}] {h['title']}, page {h['page']}\n{h['text']}" for n, h in enumerate(hits, 1))
+    reply = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=500,          # check the docs for current names
+        system="Answer only from the passages. Cite like [2] after each sentence. "
+               "If they do not contain the answer, say so and suggest who to ask.",
+        messages=[{"role": "user", "content": f"Passages:\n{passages}\n\nQuestion: {question}"}])
+    return "".join(b.text for b in reply.content if b.type == "text"), hits
+```
+
+Kuch hazaar chunks par ye laptop par memory mein chal jaata hai. Usse aage, vectors ko vector database ya pgvector mein le jao aur wahi functions rakho.
+
+**Search se pehle follow-ups rewrite karo.** Chat mein "ITI students ke liye kya?" kuch kaam ka retrieve nahi karta. Retrieval se pehle ek chhote, tez model se pichhle kuch turns ke saath latest message ko ek standalone sawaal mein rewrite karwao ("ITI students ke liye fee waiver limit kya hai?") aur usse search karo. Dono versions log karo.
+
+**Kuch lines mein retrieval naapo.** Har golden sawaal ke liye record karo ki kaunse chunk ids milne chahiye:
+
+```python
+def recall_at_k(index, golden, k=5):
+    """golden: list of (question, set_of_correct_chunk_ids)."""
+    hits = 0
+    for q, correct in golden:
+        found = {h["id"] for h in search(index, q, k=k)}
+        hits += bool(found & correct)
+    return hits / len(golden)
+```
+
+Chunking, embedding model, filters ya fusion settings mein har badlaav se pehle aur baad ise chalao. Jo badlaav haath se try kiye teen sawaalon par jawab behtar kare par recall 88% se 79% par gira de, wo ek kadam peeche hai.
+
+**Retrieval quality ke do roop.** **Context recall**: kya passages mein wo tha jo chahiye tha? **Context precision**: jo retrieve hua uska kitna hissa sach mein relevant tha? Kam recall galat ya "pata nahi" jawab deta hai; kam precision tokens waste karta hai aur model ka dhyaan bhatka sakta hai.
+
+## Ek example se samjho
+
+Coimbatore ka ek college 25 PDFs se academic regulations, fees, exams aur scholarships ke baare mein students ke sawaalon ke liye assistant banata hai.
+
+- Ingestion: page numbers ke saath text nikaala, headings ke hisaab se lagbhag 400-token ke chunks mein baanta, document title aur section aage jode, embed kiya aur pgvector mein store kiya.
+- Retrieval: hybrid search (vectors plus keywords), top 20 ko rerank karke 5.
+- Prompt: "Sirf passages se jawab do. [2] jaise cite karo. Agar jawab passages mein nahi hai toh bolo 'Ye mujhe college regulations mein nahi mila' aur contact karne ke liye office suggest karo."
+- Interface: jawab citations dikhata hai jo sahi page par PDF kholte hain.
+
+50 sawaalon ke saath testing (aath na-jawab-dene-layak sawaal milakar): 42 jawab-dene-layak sawaalon mein se 40 sahi citations ke saath sahi nikle, 8 na-jawab-dene-layak mein se 6 ko sahi tarah mana kiya gaya. Do failures ek fee circular se aayi jo scanned image thi; OCR ke baad dono theek ho gayi. Students ab office mein line lagane se pehle assistant se poochhte hain, aur staff ko kam repeat sawaalon ke jawab dene padte hain.
+
+| 50 sawaalon ka test set | Result |
+| --- | --- |
+| Jawab-dene-layak sawaal jo sahi citations ke saath sahi nikle | OCR fix ke baad 42 mein se 42 |
+| Na-jawab-dene-layak sawaal jinhe sahi mana kiya gaya | 8 mein se 6 |
+| Scanned fee circular se judi failures | 2, OCR se theek hui |
+
+**College ne kya seekha.** Sabse badi ek gain model se nahi, parsing se aayi: jab scanned fee circular padhne laayak hua, do galat jawab sahi ho gaye. Sahi page par PDF kholne wale citations ne office staff ko assistant par itna bharosa dilaya ki wo students ko uski taraf bhejne lage, aur isi se usage badha.
+
+## Aam galtiyaan
+
+- **Citations nahi.** Users check nahi kar sakte, aur galtiyaan dhyaan mein nahi aatin.
+- **Refusal path nahi.** Documents chup hon toh model andaaza lagata hai.
+- **Retrieval evaluation chhod dena.** Zyadatar failures retrieval failures hoti hain.
+- **Scanned documents aur tables ko ignore karna.** Unhe OCR aur table-aware parsing chahiye.
+- **Ek baar index karke bhool jaana.** Documents badalte hain; re-index karo.
+- **Raw follow-up message se search karna.** Pehle use standalone sawaal mein rewrite karo.
+- **Ek saath kai retrieval settings badalna.** Ek badlo aur recall dobara chalao.
+
+## Jab RAG ki zaroorat nahi
+
+- **Documents context mein fit ho jaate hain** aur kam badalte hain: unhe prompt mein daal do, cached.
+- **Jawab database mein hai**, jaise order status ya bhari hui fees: tool ya query use karo, text search nahi.
+- **Sawaalon ko poore collection par reasoning chahiye**, jaise "kaunsi policies ek doosre ka khandan karti hain?": RAG tukde dhoondhta hai, overview nahi.
+
+## Demo se production tak
+
+- Expected chunks aur answers ke saath **golden set rakho**, aur har badlaav par recall aur answer checks chalao.
+- Har jawab ke saath **rewrite ki hui query, retrieved ids aur scores log karo**.
+- Document badalne par **re-index karo**, aur superseded versions hata do.
+- **Ranking se pehle permissions se filter karo**, model ke text dekhne ke baad kabhi nahi.
+- Topic ke hisaab se **"pata nahi" rate track karo**, jo gayab documents ki taraf ishaara karta hai.
+
+## Practice karo
+
+Neeche link kiya Anthropic ka contextual retrieval article padho.
+
+Is lesson ka check ek project hai: 20 ya usse zyada documents par ek RAG app push karo jo sources ke saath jawab de aur jab pata na ho toh bole. Ek README mein paanch example sawaal, usne diye jawab aur har ek kaunse source se aaya, ye jodo. Ek failure jodo jo aapne dhoondhi aur theek ki, toh ye aur mazboot ho jaata hai.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 RAG architecture, term-based aur embedding retrieval, unhe milana, query rewriting aur retrieval evaluate karna cover karta hai.
+
+**Aapka kaam poora jab:** aap citations ke saath jawab, ek sahi refusal aur ye dikha sako ki retrieval ko aapne kaise naapa.

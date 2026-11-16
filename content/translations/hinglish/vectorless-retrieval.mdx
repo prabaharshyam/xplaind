@@ -1,0 +1,222 @@
+---
+id: vectorless-retrieval
+lang: hinglish
+title: "Vectors ke bina lambe documents"
+outcome: "Lambe, structured documents se retrieve karo, model ko unki table of contents navigate karwakar, aur jaano ki ye kab vector search ko haraata hai."
+answer: "Lambe, achhi tarah structured documents ke liye, model table of contents padhkar sahi sections khud khol sakta hai, jo contracts aur manuals par vector search ko haraa sakta hai."
+why_it_matters: "Annual reports, regulations aur contracts lambe, cross-referenced aur structured hote hain. Chunk-and-embed us structure ko kho deta hai, aur jab 'note 14' ke baare mein jawab galat hote hain toh clients dhyaan dete hain. Tree-based, reasoning-led retrieval ek naya approach hai jise jaanna chahiye, aur uski cost jaanna utna hi zaroori hai."
+flashcards:
+  - q: "Vectorless retrieval kya hai?"
+    a: "Lambe document ka structure sections ke tree ki tarah summaries ke saath rakhna, aur model ko sahi pages tak navigate karne dena."
+  - q: "Chunk-and-embed RAG ko kab mushkil hoti hai?"
+    a: "Ek lambe structured document par jahan position maayne rakhti hai, cross-references door-door hain aur kai passages ek jaise dikhte hain."
+  - q: "Tree kaise banta hai?"
+    a: "Headings se, har node ke title, page range aur ek chhote summary ke saath, jo aksar indexing ke dauran model likhta hai."
+  - q: "Model har sawaal par kaise navigate karta hai?"
+    a: "Woh top-level titles aur summaries padhta hai, kholne ke liye nodes chunta hai, leaf sections tak dohraata hai, phir unke poore text se jawab deta hai."
+  - q: "Tree navigation kya kar sakta hai jo vectors nahi kar sakte?"
+    a: "'see note 14' jaise references follow karna, us node ko kholkar."
+  - q: "Tree navigation ki cost kya hai?"
+    a: "Har sawaal par kai sequential model calls, isliye ye vector lookup se dheema aur mehenga hai."
+  - q: "Ye kab suit karta hai aur kab nahi?"
+    a: "Ye kuch lambe, high-value documents ke liye suit karta hai jinhe precision chahiye; chhote documents ke bade collections ke liye nahi, jahan hybrid search jeetta hai."
+  - q: "Production systems aksar in approaches ko kaise milate hain?"
+    a: "Search se chuno ki kaunse documents maayne rakhte hain, phir har lambe document ke andar tree navigation."
+  - q: "Headings parse kiye bina document ka tree kahan se aa sakta hai?"
+    a: "Kai PDFs mein built-in table of contents (bookmarks) hota hai, jise PyMuPDF jaisi libraries levels, titles aur page numbers ki tarah padhti hain."
+  - q: "Har sawaal par node openings ko cap kyun karte hain?"
+    a: "Har opening ek sequential model call hai. Cap latency aur cost ko bounded rakhta hai aur bhatakne ki jagah ek saaf 'not found' ko force karta hai."
+exercise:
+  title: "Retrieval chuno"
+  setup: "Chennai ki ek legal team ek port project ke 450-page concession agreement ke baare mein sawaal poochhti hai, jisme definitions Schedule A mein hain, kai clauses 'subject to clause 18.3' kehte hain, aur har saal ke tariffs ke liye annexures hain. Alag se, firm ki knowledge team 30,000 chhote internal notes par search chahti hai. Pehla prototype dono ke liye vector RAG use karta hai."
+  questions:
+    - q: "Concession agreement par vector RAG ko mushkil kyun hoti hai?"
+      a: "Jawab door ke cross-references aur definitions par depend karte hain, aur saalana tariff annexures ek jaise dikhte hain, isliye similarity unhe alag nahi kar paati."
+    - q: "Tree navigation 'saal 5 ka tariff cap kya hai aur kaunsi conditions lagu hain' ka jawab kaise dega?"
+      a: "Annexures kholega, phir saal 5 ka tariff node, uska reference conditions clause tak follow karega, aur dono ko pages ke saath cite karega."
+    - q: "30,000 notes ke liye kaunsa approach theek hai?"
+      a: "Reranking ke saath hybrid search; chhote notes par tree navigation dheema aur mehenga hoga aur koi fayda nahi."
+    - q: "Navigation loop par kaunsi limit honi chahiye?"
+      a: "Har sawaal par kholi gayi nodes ka cap, jaise chhe, taaki cost aur latency bounded rahein."
+ask:
+  - "PageIndex kya hai aur ye kaise kaam karta hai?"
+  - "Vector search ki jagah tree search kab use karna chahiye?"
+  - "PDF se table-of-contents tree kaise banaun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Standard RAG documents ko chunks mein kaatta hai, embed karta hai aur similarity se retrieve karta hai. Ye kai chhote documents ke liye achha chalta hai. Ek lambe, structured document ke liye kam achha chalta hai, jaise 300-page annual report, insurance regulation ya master services agreement, jahan:
+
+- jawab is par depend karta hai ki passage kahan hai ("standalone mein nahi, consolidated statements ke notes mein");
+- text kehta hai "as defined in section 2.4" aur definition bahut door hai;
+- kai passages ek jaise dikhte hain (har saal ki revenue table), isliye similarity unhe alag nahi kar paati.
+
+**Vectorless retrieval** document ka structure rakhta hai. Aap table of contents se ek tree banate ho (chapters, sections, sub-sections, har ek ka chhota summary) aur model ko khud sochkar neeche jaane dete ho: top level padho, sambhaavit section chuno, use kholo, phir chuno, aur aakhir mein sahi pages padho. PageIndex jaise open-source projects is idea ko package karte hain.
+
+```flow
+title: Annual report FY2026, 320 pages: the model opens only the branches it needs
+Annual report -> Corporate overview | strategy, products
+Annual report -> Directors' report | performance, risks
+Annual report -> Standalone statements | parent company only
+Annual report -[opened: analysts mean consolidated]-> Consolidated statements
+Consolidated statements -> Balance sheet, P&L, cash flow
+Consolidated statements -[opened]-> Notes
+Notes -[opened]-> Note 38 Contingent liabilities | p.241, refers to Note 41
+Note 38 Contingent liabilities -[opened]-> Note 41 Disputed tax matters | p.247
+Note 41 Disputed tax matters -> Answer cites Note 38 and Note 41
+```
+
+Ye lesson Mumbai ki ek equity research team ko follow karta hai jo ek company ke annual report ke baare mein precise sawaal poochh rahi hai.
+
+## Ye kaam kaise karta hai
+
+**Tree ek baar banao.** Document ki headings ko ek hierarchy mein parse karo. Har node ke liye title, page range aur kuch lines ka summary store karo, jise model indexing ke dauran likh sakta hai. Scanned ya kharab format waale documents ko pehle clean karna padega; ye method utna hi achha hai jitna structure ye dhoondh paata hai.
+
+**Har sawaal par navigate karo.** Model ko sawaal aur top-level nodes do (sirf titles aur summaries, jo sasta hai). Poochho ki kaunse nodes kholne hain aur kyun. Unhe expand karo, leaf sections tak dohraao, phir unka poora text prompt mein daalo aur sections aur pages cite karte hue jawab do.
+
+**References follow karo.** Jab koi section kahe "see note 14", toh model us node ko maang sakta hai. Vectors ye nahi kar sakte.
+
+**Costs.** Har sawaal mein sequence mein kai model calls lagte hain, isliye ye ek vector lookup se dheema aur mehenga hai. Ye kuch lambe, high-value documents aur un sawaalon ke liye suit karta hai jahan precision maayne rakhti hai, jaise ek analyst kisi company ki filings ke baare mein poochhe. Ye 50,000 support articles mein search ke liye suit nahi karta; wahan hybrid search jeetta hai.
+
+Kai production systems dono ko milate hain: kaunse documents maayne rakhte hain ye chunne ke liye vector ya keyword search, aur har lambe document ke andar tree navigation.
+
+**Vector RAG aur tree navigation:**
+
+| Factor | Vector RAG | Tree navigation |
+| --- | --- | --- |
+| Best documents | Kai chhote | Kuch lambe, structured |
+| Cross-references | Chhoot jaate hain | Follow hote hain |
+| Ek jaise dikhne waale passages | Aksar confuse hote hain | Tree mein position se alag hote hain |
+| Har sawaal par calls | Ek search, ek jawab | Sequence mein kai |
+| Latency | Aam taur par tez: ek lookup | Dheemi: har call ke saath badhti hai |
+| Setup | Chunk aur embed | Headings parse karo, node summaries likho |
+
+**Tree ko check karna.** Method par bharosa karne se pehle, har document ka tree print karo aur use asli table of contents se compare karo. Dekho ki kahin flat trees to nahi jahan headings detect nahi hui, aise sections jinke page ranges overlap karte hain, aur vague summaries. Kuch zaroori documents ka tree haath se theek karna aksar worth hota hai, kyunki wahi documents baar-baar query honge.
+
+**Node summaries likhna.** Achhe summaries batate hain ki section mein kya hai, ye nahi ki woh kya argue karta hai: "Contingent liabilities by type, both years, with references to tax notes" model ko chunne mein madad karta hai; "Discusses the company's risks" nahi karta. Un key terms ko shaamil karo jinke baare mein users poochhte hain, jaise taxes, schemes ya contract parties ke naam.
+
+**PDF ke bookmarks se tree banao.** Kai lambe PDFs ek table of contents ke saath aate hain jise PyMuPDF padh sakta hai:
+
+```python
+import fitz
+
+def build_tree(pdf_path):
+    doc = fitz.open(pdf_path)
+    toc = doc.get_toc()                         # [[level, title, page], ...]
+    nodes = []
+    for i, (level, title, page) in enumerate(toc):
+        end = next((p - 1 for l, _, p in toc[i + 1:] if l <= level), doc.page_count)
+        nodes.append({"id": f"n{i}", "level": level, "title": title.strip(),
+                      "pages": (page, max(page, end)), "summary": None})
+    return doc, nodes
+
+def text_of(doc, node):
+    a, b = node["pages"]
+    return "\n".join(doc[p - 1].get_text() for p in range(a, b + 1))
+```
+
+Agar `get_toc()` khaali ho, toh font size se headings detect karo, ya zaroori documents ke liye pehle do levels haath se likho. Har node ka `summary` ek model indexing ke waqt ek baar bharta hai.
+
+**Navigation loop.** Titles aur summaries dikhao, model ko nodes chunne do, unhe kholo, aur cap par ruk jao:
+
+```python
+import json
+
+def children(nodes, parent):
+    if parent is None:
+        return [n for n in nodes if n["level"] == 1]
+    i = nodes.index(parent)
+    out = []
+    for n in nodes[i + 1:]:
+        if n["level"] <= parent["level"]:
+            break
+        if n["level"] == parent["level"] + 1:
+            out.append(n)
+    return out
+
+def navigate(question, doc, nodes, choose, answer, max_open=6):
+    """choose(question, options) -> {"open": [ids], "done": bool}, as structured output."""
+    frontier, gathered, opened = children(nodes, None), [], 0
+    while frontier and opened < max_open:
+        menu = [{"id": n["id"], "title": n["title"], "pages": n["pages"], "summary": n["summary"]} for n in frontier]
+        pick = choose(question, json.dumps(menu, ensure_ascii=False))
+        chosen = [n for n in frontier if n["id"] in pick["open"]][: max_open - opened]
+        if not chosen:
+            break
+        next_frontier = []
+        for n in chosen:
+            opened += 1
+            kids = children(nodes, n)
+            if kids:
+                next_frontier += kids
+            else:
+                gathered.append((n["title"], n["pages"], text_of(doc, n)))
+        if pick.get("done"):
+            break
+        frontier = next_frontier
+    if not gathered:
+        return "I could not find a section that answers this.", []
+    return answer(question, gathered), [(t, p) for t, p, _ in gathered]
+```
+
+Dikhaye gaye har menu aur kiye gaye har choice ko log karo. Jab jawab galat ho, toh log saaf dikhata hai ki model kahan galat mudaa.
+
+**References follow karna.** Jab gather kiye text mein "see Note 14" ho, toh matching node ko agle menu mein jodo chaahe woh child na ho. Gather kiye text par "Note \d+", "Section \d+(\.\d+)*" ya "Schedule [IVX]+" ke liye ek simple regex zyadatar annual reports aur circulars cover kar leta hai.
+
+**Search ke saath milao.** Lambe documents ki library ke liye, document titles aur node summaries par keyword ya vector search se document aur ek starting node chuno, phir uske andar navigate karo.
+
+## Ek example se samjho
+
+Mumbai ki ek equity research team poochhti hai: "FY2026 ke ant mein disputed GST demands ki contingent liability kitni thi, aur kya woh badhi hai?"
+
+Annual report 320 pages ka hai. Plain vector search paanch chunks lautata hai jo GST aur contingent liabilities ka zikr karte hain, standalone statements se, consolidated statements se, directors' report se aur pichhle saal ke comparison column se. Model standalone aur consolidated figures mila deta hai aur galat jawab deta hai.
+
+Tree navigation ke saath:
+
+1. Model top level dekhta hai: Corporate overview, Directors' report, Standalone financial statements, Consolidated financial statements. Jab tak na bola jaye, analysts ka matlab consolidated hota hai, isliye woh use kholta hai.
+2. Andar: Balance sheet, Profit and loss, Cash flow, Notes. Woh Notes kholta hai, phir "Note 38: Contingent liabilities and commitments".
+3. Note mein dono saal ki ek table hai aur disputed tax details ke liye Note 41 ka reference hai. Model Note 41 bhi kholta hai.
+
+Jawab Note 38 (page 241) aur Note 41 (page 247) cite karta hai aur dono saal usi table se deta hai. Isme paanch model calls aur lagbhag nau seconds lage, jabki vector RAG mein do seconds se kam. Team ek sahi jawab ke liye intezaar karne mein khush hai jise woh page se check kar sakte hain.
+
+| Approach | Sahi | Calls | Time |
+| --- | --- | --- | --- |
+| Vector RAG | Nahi: standalone aur consolidated figures mila diye | 2 | 2 s se kam |
+| Tree navigation | Haan, dono saal aur page citations ke saath | 5 | Lagbhag 9 s |
+
+## Aam galtiyaan
+
+- **Sab kuch ke liye use karna.** Kai chhote documents ke liye tree search dheema aur mehenga hai aur koi fayda nahi.
+- **Toote hue table of contents par bharosa karna.** Scanned ya kharab tag kiye PDFs flat ya galat tree dete hain. Bharosa karne se pehle tree check karo.
+- **Model ko bhatakne dena.** Har sawaal par woh kitne nodes khol sakta hai uska cap lagao, warna cost aur latency bina limit ke badhti hain.
+- **Evaluation chhodna.** Usi golden set par apne hybrid RAG se compare karo; kisi method ko isliye mat apnao ki woh zyada smart sunai deta hai.
+- **Page numbers kho dena.** Page aur section ke citations mukhya fayda hain; har step mein unhe bachaye rakho.
+- **Node openings par cap nahi**, isliye mushkil sawaal bhatakte hain aur cost badha dete hain.
+- **Aise tree par bharosa karna jise asli table of contents se print karke check nahi kiya.**
+
+## Jab vectors use karne chahiye
+
+- **Kai chhote documents**, jaise FAQs ya support articles: hybrid search tez aur sasti hai.
+- **Aise documents jinme asli structure nahi hai**, jaise chat logs ya emails.
+- **Tight latency budgets**, jahan kai sequential calls bahut dheemi hain.
+
+## Demo se production tak
+
+- **Ingestion ke baad har document ka tree check karo** aur zaroori wale haath se theek karo.
+- **Har sawaal par openings aur time cap karo**, ek saaf "not found" jawab ke saath.
+- **Har sawaal ke menus aur choices log karo.**
+- **Ek hi document version par baar-baar poochhe gaye sawaalon ke jawab cache karo.**
+- **Document ka naya version aane par trees aur summaries dobara banao.**
+
+## Practice karo
+
+PageIndex introduction padho aur uske docs skim karo ki tree kaise banta hai.
+
+1. Ek lambe public document lo, jaise kisi listed company ka annual report ya regulator ka master circular. Page ranges ke saath headings ka ek tree banao, zaroorat ho toh pehle do levels haath se.
+2. Das sawaal likho jinhe sahi section chahiye, jinme do aise hon jinhe cross-reference chahiye.
+3. Unhe apne hybrid RAG se aur ek simple navigate-the-tree loop se (zyada se zyada chhe node openings) answer karo. Correctness, latency aur cost compare karo.
+4. Apne document ka tree print karo, use printed table of contents se compare karo, aur pehle teen farak theek karo.
+
+**Aapka kaam poora jab:** aap bata sako ki aapke test mein kis tarah ke sawaal aur document par tree navigation jeeta, aur uski cost kya thi.

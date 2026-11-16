@@ -1,0 +1,217 @@
+---
+id: graph-rag
+lang: hinglish
+title: "Graph RAG"
+outcome: "Jaano ki knowledge graph retrieval ko kab behtar banata hai, GraphRAG documents se entities, relationships aur community summaries kaise banata hai, aur ordinary RAG ke muqable iska kharcha kitna hai."
+answer: "Graph RAG aapke documents se entities aur relationships ka ek knowledge graph banata hai, jo un sawaalon mein madad karta hai jo kai facts ko jodte hain, par indexing cost zyada hai."
+why_it_matters: "Kuch sawaalon ko kai documents ke beech connections chahiye (\"pichhli quarter mein delay hui shipments se kaun se suppliers jude hain?\") ya poori collection ka nazariya chahiye (\"in 500 complaints ke mukhya themes kya hain?\"). Similarity search inhe kharab tareeke se sambhaalta hai. Graph RAG ek jawab hai, aur ye jaanna zaroori hai ki ye apne kharche ke laayak kab hai."
+flashcards:
+  - q: "Kaun se do tarah ke sawaal standard RAG ko haraate hain?"
+    a: "Multi-hop sawaal jo documents ke beech links follow karte hain, aur global sawaal jo poori collection ke baare mein hote hain."
+  - q: "Graph RAG mein knowledge graph kya hai?"
+    a: "Companies, logon aur projects jaise entities nodes ke roop mein, aur unke beech ke relationships edges ke roop mein, documents se nikale hue."
+  - q: "GraphRAG mein communities kya hain?"
+    a: "Kareeb se jude entities ke clusters, jinka har ek ek model kai level of detail par summarise karta hai."
+  - q: "Local aur global search mein kya farak hai?"
+    a: "Local search sawaal ke entities, neighbours aur source chunks jama karta hai; global search community summaries par map karke answers ko jodta hai."
+  - q: "Graph RAG indexing ka kharcha kitna hai?"
+    a: "Har chunk aur community par model calls, aksar sirf embedding ke kharche se kai guna zyada, aur documents badalne par updates."
+  - q: "Entity resolution kya hai, aur ye kyun matter karta hai?"
+    a: "'ABC Infra Ltd' aur 'ABC Infrastructure' jaise variants ko merge karna; galat merges ya duplicates unhe use karne waale har answer ko bigaad dete hain."
+  - q: "Graph RAG kab kaam ka hai?"
+    a: "Contracts, investigations aur supplier networks jaisi entity-rich collections ke liye, jahan multi-hop ya global sawaal aksar aur keemti hote hain."
+  - q: "Halke alternatives kya hain?"
+    a: "Filtering ke liye entity metadata, key relationships ki ek chhoti table, ya document groups ke summaries."
+  - q: "Graph RAG mein entity resolution kya hai?"
+    a: "Ye tay karna ki alag-alag likhe naam, jaise 'ABC Infra Ltd' aur 'ABC Infrastructure', ek hi entity hain, taaki graph mein unke relationships jud jayein."
+  - q: "Local graph search context kaise jama karta hai?"
+    a: "Sawaal mein jin entities ka naam hai unhe dhoondho, ek ya do hops ke andar unke neighbours aur un relationships ke source chunks jama karo, aur usi se answer do."
+exercise:
+  title: "Graph ya nahi?"
+  setup: "Delhi ke ek conglomerate mein teen assistants: (A) 200 policy documents par HR policy ke sawaal; (B) ek investigations team jo 8,000 vendor invoices, emails aur audit reports ko jodkar related parties dhoondhti hai; (C) ek strategy team jo 50,000 comments par poochti hai 'do saal ke customer feedback mein kaun se themes baar-baar aate hain?'"
+  questions:
+    - q: "Kaun sa assistant hybrid RAG par hi rahe?"
+      a: "(A): policy lookups single-document sawaal hain jahan graphs bina fayde ke kharcha badhate hain."
+    - q: "(B) knowledge graph ke liye kyun theek hai?"
+      a: "Sawaal kai documents mein vendors, logon aur payments ke beech relationships follow karte hain: classic multi-hop."
+    - q: "(C) ko kaise approach karoge?"
+      a: "Community ya group summaries par global search, ya halka alternative jaise comments ko cluster karke har cluster ko summarise karna."
+    - q: "(B) ki team ko pehle kis cheez mein invest karna chahiye?"
+      a: "Vendor aur logon ke naamon ke liye entity resolution, aur har relationship ke liye source documents se wapas links."
+ask:
+  - "GraphRAG kya hai aur ye kaise kaam karta hai?"
+  - "RAG ke liye knowledge graph kab use karun?"
+  - "GraphRAG mein local aur global search mein kya farak hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Standard RAG sawaal se milte-julte passages retrieve karta hai. Do tarah ke sawaal ise haraate hain:
+
+- Links follow karne waale **multi-hop sawaal**: "Delay hue Chennai metro package ke contractor ke saath kaun se projects share karte hain?" Facts alag-alag documents mein hain aur koi ek passage sawaal se milta-julta nahi hai.
+- Poori collection ke baare mein **global sawaal**: "Pichhle saal ki customer complaints mein baar-baar aane waali problems kya hain?" Kisi ek passage mein answer nahi hai; woh kai se ubharta hai.
+
+**Graph RAG** ek **knowledge graph** jodta hai: entities (log, companies, products, jagahein, events) nodes ke roop mein aur unke beech ke relationships edges ke roop mein, documents se nikale hue. Phir retrieval relationships follow kar sakta hai aur related entities ke groups ke pehle se likhe summaries use kar sakta hai. Microsoft ka open-source GraphRAG ek jaana-maana implementation hai; Neo4j jaise graph databases doosra raasta hain.
+
+```flow
+Documents -> Chunks -> Model entities aur relationships nikaalta hai -> Knowledge graph
+Knowledge graph -> Communities dhoondhi aur summarise ki jaati hain
+Sawaal -[local search]-> Entities + neighbours + source chunks
+Sawaal -[global search]-> Community summaries par map, phir reduce
+```
+
+```flow
+dir: LR
+title: Graph ka ek hissa
+Project: Metro Pkg 4 | overrun 27% -[contractor]-> ABC Infra
+ABC Infra -[also on]-> Project: Pune Ring Road
+ABC Infra -[sub-contracts to]-> XYZ Steel
+```
+
+Is lesson mein hum Mumbai ki ek infrastructure finance company ko follow karenge, jiske analysts aise sawaal poochte hain jo sau-sau project documents tak failte hain.
+
+## Ye kaam kaise karta hai
+
+**Indexing (GraphRAG style).**
+
+1. Documents ko hamesha ki tarah chunk karo.
+2. Har chunk se entities aur relationships, chhoti descriptions ke saath ("ABC Infra, contractor; Package 4 ke liye steel supply karta hai"), nikaalne ke liye ek model use karo.
+3. Duplicates ko merge karo ("ABC Infra Ltd" aur "ABC Infrastructure").
+4. **Communities** dhoondho: kareeb se jude entities ke clusters.
+5. Har community ka summary ek model se kai level of detail par likhwao.
+
+**Querying.**
+
+- Khaas entities ke baare mein sawaalon ke liye *local search*: sawaal ki entities dhoondho, unke neighbours, relationships aur source chunks jama karo, aur usi se answer do.
+- Poori collection ke sawaalon ke liye *global search*: sawaal ko community summaries par map karo, phir adhoore answers ko ek mein reduce karo.
+
+**Kharche.** Indexing har chunk aur har community par ek model call karti hai, isliye sirf embedding se kai guna zyada kharcha ho sakta hai, aur documents badalne par ise dobara chalana ya update karna padta hai. Entity extraction galtiyan karta hai; merges aisi cheezein jod sakte hain jo alag rehni chahiye. Queries, khaaskar global wali, bahut tokens use karti hain.
+
+**Kab kaam ka hai.** Aisi collections jo entities aur relationships se bhari hon (contracts, investigations, research literature, supplier networks, case files), jahan multi-hop ya global sawaal aksar aur keemti hon. Zyadatar FAQ-style ya policy-lookup assistants ke liye achhi metadata ke saath hybrid search sasta aur kaafi hai.
+
+**Halke alternatives.** Nikaale hue entities ko metadata ki tarah store karo aur unpar filter karo; key relationships ki ek chhoti structured table rakho; document groups ke summaries generate karo. Aksar ye zyadatar fayda de dete hain.
+
+**Standard RAG versus Graph RAG:**
+
+| Pehlu | Hybrid RAG | Graph RAG |
+| --- | --- | --- |
+| Single-document sawaal | Strong | Behtar nahi |
+| Multi-hop sawaal | Weak | Strong |
+| Poori collection ke sawaal | Weak | Community summaries ke saath strong |
+| Indexing cost | Sirf embeddings | Har chunk aur community par model calls |
+| Updates | Badle chunks ko dobara embed | Dobara extract aur dobara merge |
+| Failure risk | Chhoote hue passages | Galat extractions aur merges |
+
+**Dono ke beech routing.** Kam teams hybrid RAG ko replace karti hain; woh un sawaalon ke liye ek graph jodti hain jinka jawab hybrid nahi de sakta. Ek chhota classifier, ya ek model call, tay karta hai ki sawaal entities ke beech relationships ki baat karta hai ("kaun se contractors ... par bhi kaam karte hain", "aur kaun ... se juda hai") ya poori collection ke baare mein hai ("baar-baar aane waale ..."). Woh graph search par jaate hain; baaki sab hybrid RAG par. Har sawaal ka route log karo, taaki test set par router ki galtiyan check kar sako.
+
+**Citations rakhna.** Har entity, relationship aur community summary ko un chunks ke links rakhne chahiye jinse woh bana. Phir answers asli documents ko cite kar sakte hain, aur analysts check kar sakte hain ki koi nikaala hua relationship sach mein likha hai ya extraction ke dauraan gadh liya gaya.
+
+**Code mein ek chhota graph.** Model se triples (structured output ke roop mein) nikalo, NetworkX mein load karo, aur neighbourhoods se local sawaalon ke jawab do:
+
+```python
+import networkx as nx
+from pydantic import BaseModel
+
+class Triple(BaseModel):
+    subject: str
+    relation: str
+    object: str
+
+class Extraction(BaseModel):
+    triples: list[Triple]
+
+def normalise(name):
+    n = name.lower().replace("limited", "ltd").replace("infrastructure", "infra")
+    return " ".join(w for w in n.replace(".", "").split() if w not in {"ltd", "pvt", "private"})
+
+def build_graph(chunks, extract):
+    """extract(text) -> Extraction, via structured output from a model."""
+    g = nx.MultiDiGraph()
+    for c in chunks:
+        for t in extract(c["text"]).triples:
+            s, o = normalise(t.subject), normalise(t.object)
+            g.add_node(s, label=t.subject); g.add_node(o, label=t.object)
+            g.add_edge(s, o, relation=t.relation, source=c["id"])
+    return g
+
+def local_context(g, entities, hops=2, limit=40):
+    nodes = set()
+    for e in map(normalise, entities):
+        if e in g:
+            nodes |= set(nx.ego_graph(g.to_undirected(as_view=True), e, radius=hops))
+    facts = [f'{g.nodes[u]["label"]} —{d["relation"]}→ {g.nodes[v]["label"]} [{d["source"]}]'
+             for u, v, d in g.subgraph(nodes).edges(data=True)]
+    return facts[:limit]
+```
+
+Facts ke saath unke source chunk ids bhi aate hain, isliye answer asli documents ko cite kar sakta hai. `normalise` rules entity resolution ki ek kachchi shuruaat hain; zaroori entities ke liye merges haath se check karo, aur un naamon ki ek list rakho jinhe kabhi merge nahi karna.
+
+**Global sawaalon ke liye communities.** Kareeb se jude entities ko group karo aur har group ko ek baar summarise karo:
+
+```python
+from networkx.algorithms.community import louvain_communities
+
+def communities(g, seed=7):
+    groups = louvain_communities(g.to_undirected(), seed=seed)
+    return sorted(groups, key=len, reverse=True)
+```
+
+Ek model har community ka summary likhta hai (un chunk ids ke saath jinse usne liya). "Saare packages mein baar-baar aane waale delay ke kaaran kya hain?" jaise sawaal ke liye, har community summary se ye sawaal poochho, phir adhoore answers ko jodo.
+
+**Graph par bharosa karne se pehle extraction check karo.** 50 nikaale hue triples ka sample lo aur har ek ko mark karo: source mein likha hai, implied hai, ya galat hai. Agar kuch percent se zyada galat hain, toh uske upar kuch bhi banane se pehle extraction prompt behtar karo (allowed entity types aur relations do).
+
+**Pehle indexing ka bill estimate karo.** Chunks × (extraction prompt + chunk + output tokens) gino, plus har community ke liye ek summary call. Collection ke 5% par chalao, naapo, aur poori cheez karne se pehle guna karo.
+
+## Ek example se samjho
+
+Mumbai ki ek infrastructure finance company hazaaron project reports, contractor agreements aur site inspection notes review karti hai. Analysts aise sawaal poochte hain jaise "20% se zyada cost overruns waale projects mein kaun se contractors dikhte hain, aur woh aur kahaan kaam karte hain?"
+
+Hybrid RAG single-project sawaalon ka achha jawab deta hai par ye nahi sambhaal paata: facts sau-sau documents mein bikhre hain.
+
+Ek pilot 3,000 documents se projects, contractors, sub-contractors, locations aur inspection findings ka graph banata hai. Indexing ka kharcha embedding-only pipeline se lagbhag 25 guna hai, ek baar ka kharcha plus weekly updates. Entity merging ke liye company name variants ki haath se banayi list chahiye, kyunki ek hi contractor kai spellings mein dikhta hai.
+
+Multi-hop aur global sawaalon ke 40-sawaal test set par graph approach 70% ka achha jawab deta hai, hybrid RAG 30%. Single-document sawaalon par woh behtar nahi hai. Company dono rakhti hai: sawaal jab projects ke beech relationships ki baat karein toh graph search par jaate hain, warna hybrid RAG par.
+
+| Measure | Hybrid RAG | Graph approach |
+| --- | --- | --- |
+| 40 mein se multi-hop aur global sawaal jinka achha jawab mila | 30% | 70% |
+| Single-document sawaal | Achha | Behtar nahi |
+| Indexing cost | Baseline | Lagbhag 25 guna, plus weekly updates |
+| Extra kaam | Koi nahi | Contractor name variants ki haath se banayi list |
+
+## Aam galtiyaan
+
+- **Simple lookups ke liye Graph RAG.** Bina fayde ke kharcha badhata hai.
+- **Entity resolution ko ignore karna.** Duplicate ya galat merge hue entities unhe use karne waale har answer ko bigaad dete hain.
+- **Updates bhool jaana.** Ek baar bana graph purana ho jaata hai.
+- **Koi comparison nahi.** Jo sawaal matter karte hain unpar hybrid RAG ke saamne naapo.
+- **Citations kho dena.** Entities aur summaries se source chunks tak wapas links rakho.
+- **Nikaale hue relationships par bharosa karna bina unka source text se sample check kiye.**
+- **Free-form relation names.** Extractor ko ek fixed list do, warna graph lagbhag-duplicates se bhar jaata hai.
+- **Poori collection ko index karne se pehle cost estimate chhod dena.**
+
+## Kab Graph RAG kaam ka nahi
+
+- **Sawaal zyadatar ek document ya ek fact ke baare mein hain**: hybrid RAG unhe sasta jawab deta hai.
+- **Documents lagataar badalte rehte hain**, jisse re-extraction mehenga ho jaata hai.
+- **Kam entities aur relationships matter karte hain**: logon dwara maintain ki hui key facts ki ek chhoti table kaafi ho sakti hai.
+
+## Demo se production tak
+
+- Har entity, relationship aur summary par **source chunk ids rakho.**
+- Har prompt ya model change ke baad ek sample par **extraction accuracy naapo.**
+- **Incrementally update karo**: badle documents ko dobara extract karo aur community summaries ko schedule par dobara chalao.
+- Graph aur hybrid search ke beech **sawaalon ko route karo**, aur route log karo.
+- **Indexing aur query cost** ko ordinary RAG se alag **track karo.**
+
+## Practice karo
+
+Microsoft Research ka GraphRAG post padho aur local aur global search par GraphRAG docs par ek nazar daalo.
+
+1. 30 se 50 related documents lo (kisi ek industry ke news articles achhe kaam karte hain) aur ek model se entities aur relationships ko ek simple table mein nikalo.
+2. Paanch multi-hop ya global sawaal likho aur unka jawab apne hybrid RAG aur ek chhote graph-based approach dono se do.
+3. Dono ke liye indexing cost aur answer quality record karo.
+4. Apne graph se 30 triples ka sample lo aur har ek ko stated, implied ya wrong mark karo; har ek ka share report karo.
+
+**Aapka kaam poora jab:** aap bata sako ki kin sawaalon mein graph ne madad ki, kitni, aur kya woh indexing cost ke laayak tha.

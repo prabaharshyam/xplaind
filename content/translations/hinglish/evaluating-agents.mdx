@@ -1,0 +1,212 @@
+---
+id: evaluating-agents
+lang: hinglish
+title: "Agents ko evaluate karna"
+outcome: "Ek agent ko evaluate karne ka suite banaoge: sandbox, graders, trajectory checks aur repeated runs."
+answer: "Agent ko tasks ke set par chalao aur outcome aur trajectory dono ko score karo. Har task ko kai baar chalao aur safety violations count karo. Hamesha sandbox mein chalao."
+why_it_matters: "Agents asli actions lete hain aur har baar alag tarah se behave karte hain. Sirf final message dekhoge toh galat refunds ya chhoote hue approvals jaisi problems miss ho jaayengi."
+flashcards:
+  - q: "Agent evaluate karte waqt kaun si do cheezein score hoti hain?"
+    a: "Outcome, yaani goal achieve hua ya nahi; aur trajectory, yaani wahan tak kaise pahunche: tools, steps, safety aur approvals."
+  - q: "Consistency kyun measure karein?"
+    a: "Agents deterministic nahi hote. Har task ko kai baar chalane se pata chalta hai ki woh kitne bharose se succeed karta hai."
+  - q: "Agent eval task mein kya chahiye?"
+    a: "Ek realistic request, ek defined starting state jaise seeded sandbox data, aur ek saaf success condition."
+  - q: "Trajectory rules kya hote hain?"
+    a: "Liye gaye steps par checks, jaise pehle quote diye bina refund nahi, zyada se zyada 12 steps, kisi bhi payment se pehle approval."
+  - q: "Agent evals sandbox mein kyun chalayein?"
+    a: "Agents asli actions lete hain; fake APIs ya seeded data waala resettable sandbox production ko safe rakhta hai aur runs ko repeatable banata hai."
+  - q: "Safety violations ka target kya hai?"
+    a: "Zero. Bina approval ka koi payment ya koi forbidden action, outcome kuch bhi ho, failure hai."
+  - q: "Agent suite mein kaun se trap tasks hone chahiye?"
+    a: "Jinhe refuse ya escalate karna ho, fail hone waale tools, missing information jiske liye sawaal poochna pade, aur prompt injection attempts."
+  - q: "Failed transcripts kyun padhein?"
+    a: "Scores batate hain ki kuch badla; transcripts batate hain kyun, aur wahi batata hai ki kya fix karna hai."
+  - q: "pass@k aur pass^k mein kya farak hai?"
+    a: "pass@k: k runs mein se kam se kam ek mein task succeed hota hai. pass^k: saare k runs mein succeed hota hai. Users pass^k feel karte hain, kyunki har conversation chalni chahiye."
+  - q: "Model grader par bharosa kaise karein?"
+    a: "Ek sample haath se grade karo, model grader ke verdicts se compare karo, aur use wahin use karo jahan agreement zyada ho. Uska prompt ya model badalne ke baad dobara check karo."
+exercise:
+  title: "Agent eval design karo"
+  setup: "Bhubaneswar ki ek telecom ka agent plan changes sambhaalta hai: customer ka maujooda plan check karta hai, eligible plans offer karta hai, confirmation ke baad plan badalta hai, aur ₹2,000 se upar ke bill disputes escalate karta hai. Ab tak ki testing: team haath se paanch chats try karti hai aur final messages padhti hai."
+  questions:
+    - q: "Suite mein kaun si task categories honi chahiye?"
+      a: "Routine plan changes, decline karne waali ineligible requests, ₹2,000 se upar ke bill disputes jo escalate hone chahiye, ek fail hoti plan API, aur injection attempts."
+    - q: "Kaun sa code check saabit karta hai ki plan change succeed hua?"
+      a: "Sandbox account mein sahi start date ke saath naya plan dikhe, aur koi doosra account na badla ho."
+    - q: "Yahan kaun se trajectory rules matter karte hain?"
+      a: "Offer karne se pehle eligibility check, change_plan se pehle explicit confirmation, bade disputes ke liye escalation, aur ek step limit."
+    - q: "Sirf final messages padhna kaafi kyun nahi?"
+      a: "Message sahi dikhe tab bhi agent ne bina confirmation ke plan badal diya ho ya galat account chhoo diya ho."
+ask:
+  - "AI agent ko evaluate kaise karun?"
+  - "Agents ke liye pass at k kya hota hai?"
+  - "Agent testing ke liye sandbox kaise banaun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Agent ko evaluate karne ka matlab hai use tasks ke ek set par chalana aur score karna ki kya hua. Do cheezein score hoti hain:
+
+- **Outcome**: kya goal achieve hua? Refund sahi se issue hua, report accurate thi, ticket sahi team ko gaya?
+- **Trajectory**: wahan tak kaise pahunche? Kaun se tools, kitne steps, koi unsafe ya waste hua action, jahan zaroori tha wahan approval maanga?
+
+Kyunki agents deterministic nahi hote aur kai steps lete hain, aap **consistency** bhi measure karte ho: har task ko kai baar chalao aur dekho woh kitni baar succeed hota hai.
+
+```flow
+Task | "refund my course, I joined 5 days ago"; seeded sandbox: student 812, payment ₹3,499 -> Agent run 1
+Task -> Agent run 2
+Task -> Agent run 3
+Agent run 1 -> Graders | outcome code se: student 812 ko ₹3,499 ka refund? trajectory rules se: refund se pehle quote, payment se pehle approval, zyada se zyada 10 steps; quality calibrated model grader se
+Agent run 2 -> Graders
+Agent run 3 -> Graders
+Graders -> Metrics | success, teeno runs mein success, steps, cost, safety violations (0 hone chahiye)
+```
+
+Har run ek fresh sandbox se shuru hota hai.
+
+Is lesson mein hum Hyderabad ki ek edtech company ke course-refund agent ko follow karenge.
+
+## Ye kaam kaise karta hai
+
+**Tasks.** 30 se 100 realistic tasks likho, ek defined starting state ke saath (ek fake customer account, ek sandbox database, documents ka set) aur ek saaf success condition ke saath. Common cases, mushkil cases, woh tasks jinhe refuse ya escalate karna chahiye, aur traps waale tasks (error dene waala tool, missing information jiske liye sawaal poochna pade) cover karo.
+
+**Graders.** Har check ke liye sabse sasta reliable grader use karo:
+
+- End state par *code checks*: kya refund row database mein sahi amount ke saath hai? File ban gayi? Ye precise aur sasta hai.
+- Trajectory par *rules*: pehle `get_cancellation_quote` call kiye bina `issue_refund` ka call nahi; 12 se zyada steps nahi; kisi bhi payment se pehle approval maanga gaya.
+- Open-ended quality ke liye (customer reply accurate aur polite thi?) *model graders*, rubric ke saath, human grades se check kiye hue.
+- Ek sample ka *human review*, khaaskar shuru mein.
+
+**Metrics.** Success rate; kai runs mein se saare runs mein success (reliability ka ek sakht measure); har task ke average steps, tokens, cost aur time; safety violations (zero hone chahiye); escalation correctness.
+
+**Environment.** Evals ko aise sandbox mein chalao jo tasks ke beech reset ho: fake APIs ya seed data waala test database. Evals ko kabhi production systems par mat chalao.
+
+**Waqt ke saath track karo.** Har prompt, tool ya model change par suite chalao aur history rakho. Har dilchasp production failure ko naye task ki tarah jodo.
+
+**Transcripts padho.** Numbers batate hain ki kuch badla; das failed trajectories padhne se pata chalta hai kyun.
+
+**Metrics aur woh kya batate hain:**
+
+| Metric | Definition | Kya batata hai |
+| --- | --- | --- |
+| Success rate | Un runs ka hissa jo success condition poori karte hain | Average capability |
+| All-runs success | Un tasks ka hissa jo har run mein succeed hote hain | Woh reliability jo users feel karte hain |
+| Steps, tokens, cost per task | Runs par averages | Efficiency |
+| Safety violations | Forbidden actions, missing approvals | Us par bharosa kiya bhi ja sakta hai ya nahi |
+| Escalation correctness | Tabhi aur sirf tabhi escalate kiya jab karna chahiye tha | Edge cases mein judgement |
+
+**Sandbox banana.** Tools ko boundary par fake karo: kuch students aur payments ke saath seed kiya hua test database, ek fake payment API jise ek baar fail hone ko kaha ja sake, aur ek approval tool jo test script se jawab de. Har run se pehle sab kuch reset karo. Seed data ko repository mein rakho, taaki koi bhi failure reproduce kar sake. Sandbox wahi jagah hai jahan aap traps bhi rakh sakte ho, jaise student ke message mein chhupa hua instruction, asli systems ko khatre mein daale bina.
+
+**Transcripts ko fixes mein badalna.** Jab koi task fail ho, uski trajectory padho aur fail hone waale step ka naam lo: galat tool, galat argument, chhoota hua check, ya kharab final reply. Jis tool, description ya prompt ne ise kiya use fix karo, us task ko kai baar dobara chalao, phir poora suite dobara chalao taaki pata chale kuch aur nahi toota.
+
+**Code mein ek eval harness.** Har task apna seed data, apna success check aur woh trajectory rules lekar chalta hai jinhe use maanna hai:
+
+```python
+from dataclasses import dataclass, field
+from typing import Callable
+
+@dataclass
+class Task:
+    id: str
+    prompt: str
+    seed: dict                                   # starting state for the sandbox
+    success: Callable[[dict], bool]              # checks the final sandbox state
+    rules: list[Callable[[list], str | None]] = field(default_factory=list)
+
+def no_refund_without_quote(trace):
+    names = [s["name"] for s in trace if s["type"] == "tool"]
+    if "issue_refund" in names and ("get_quote" not in names or names.index("get_quote") > names.index("issue_refund")):
+        return "refund issued before a quote"
+
+def at_most(n):
+    return lambda trace: f"{len(trace)} steps" if len(trace) > n else None
+
+def run_suite(tasks, run_agent, make_sandbox, k=3):
+    results = []
+    for t in tasks:
+        outcomes = []
+        for _ in range(k):
+            box = make_sandbox(t.seed)           # fresh state every run
+            trace = run_agent(t.prompt, box)
+            broken = [msg for rule in t.rules if (msg := rule(trace))]
+            outcomes.append({"ok": t.success(box.state) and not broken, "broken": broken,
+                             "steps": len(trace)})
+        results.append({"task": t.id, "outcomes": outcomes})
+    n = len(results)
+    any_ok = sum(any(o["ok"] for o in r["outcomes"]) for r in results) / n
+    all_ok = sum(all(o["ok"] for o in r["outcomes"]) for r in results) / n
+    print(f"pass@{k} {any_ok:.0%}   pass^{k} {all_ok:.0%}")
+    return results
+```
+
+**Success count karne ke do tareeke.** **pass@k** task ko solved maanta hai agar k runs mein se koi ek succeed ho; ye measure karta hai ki agent *kar sakta kya hai*. **pass^k** use tabhi maanta hai jab saare k runs succeed hon; ye measure karta hai ki users kis par *bharosa kar sakte hain*. Har run par 90% waale agent ka pass^3 lagbhag 73% hota hai, agar runs independent hon. Customer-service tasks ke agent benchmarks isi wajah se pass^k report karte hain.
+
+**Model graders ko calibrate karo.** Open-ended checks ke liye (reply accurate aur polite thi?), 50 transcripts haath se grade karo, usi 50 par model grader chalao, aur agreement count karo. Agar woh lagbhag 85% se kam cases mein sahmat ho, toh rubric behtar karo ya woh check human ke paas hi rakho. Grader ka prompt ya model badalne par dobara check karo.
+
+**Har task ka cost aur time.** Har run ke liye success ke saath tokens, cost aur wall-clock time bhi record karo. Jo change success mein 3 points jodta hai par cost doguni kar deta hai, shaayad us layak nahi; jo success wahi rakhkar cost aadha kar de, woh aam taur par layak hai.
+
+**Suite ko production se badhao.** Har hafte traces mein asli failures ya ajeeb requests se do-teen tasks jodo, customer ki details ko seed data se badalkar.
+
+## Ek example se samjho
+
+Hyderabad ki ek ed-tech company ka ek agent course-refund requests sambhaalta hai: enrolment check karta hai, refund policy lagata hai, ₹5,000 se kam ke refunds approval ke baad issue karta hai, aur baaki escalate karta hai.
+
+Eval suite mein seeded students aur payments waale sandbox mein 60 tasks hain:
+
+- 30 routine refunds (succeed hone chahiye),
+- 10 policy window ke bahar (tameez se decline hone chahiye),
+- 10 ₹5,000 se upar ke (escalate hone chahiye),
+- 5 jahan payment API ek baar error deti hai (retry karna chahiye, phir escalate),
+- 5 jinmein student ke message mein prompt injection hai (ignore karna chahiye).
+
+Graders: refunds table par code checks; trajectory rules (refund se pehle quote, payment se pehle approval, zyada se zyada 10 steps); reply tone ke liye ek model grader, 40 human-graded replies par calibrate kiya hua (88% agreement).
+
+Har task teen baar chalta hai. Baseline: 82% success, teeno runs mein 71% success, aur ek safety violation (approval tool ke timeout hone par bina approval ke refund issue ho gaya). Fix ye hai ki timeout ko "approve nahi hua" maana jaaye. Changes ke baad suite 93% success, teeno runs mein 88% aur zero violations dikhata hai. Wahi suite ab har change par CI mein chalta hai.
+
+| Measure | Baseline | Fixes ke baad |
+| --- | --- | --- |
+| Success | 82% | 93% |
+| Teeno runs mein success | 71% | 88% |
+| Safety violations | 1: timeout ke baad bina approval ke refund | 0: timeout ab approve nahi hua maana jaata hai |
+
+## Aam galtiyaan
+
+- **Sirf final message ko score karna.** Agent ne raaste mein kuch unsafe kiya ho sakta hai.
+- **Har task ka ek hi run.** Agents badalte rehte hain; consistency measure karo.
+- **Asli systems par evals.** Resettable sandbox use karo.
+- **Sirf happy paths.** Refusals, escalations, tool failures aur injection attempts bhi rakho.
+- **Transcripts kabhi na padhna.** Scores batate hain ki fail hua, kyun nahi.
+- **Har task ka ek run report karna.** Kai chalao aur pass@k aur pass^k dono report karo.
+- **Aise model grader par bharosa jise kisi ne check nahi kiya**, human grades ke saath.
+- **Runs ke beech shared sandbox.** Ek run ki bachi hui state agle run ko ittefaq se pass ya fail kara deti hai.
+
+## Kab halka evaluation kaafi hai
+
+- **Kuch tools waale read-only agents**: expected answers waale sawaalon ka set aur step limit check kaafi ho sakta hai.
+- **Shuruaati prototypes**: haath se padhe hue das tasks us harness se zyada batate hain jise aap baar-baar likhte rehte ho.
+- **Fixed workflows**: har step ko aam code ki tarah test karo, saath mein kuch end-to-end cases.
+
+Sandboxes, trajectory rules aur repeated runs mein tabhi invest karo jab agents asli systems par kaam karne lagein ya bahut saare users unpar nirbhar hon.
+
+## Demo se production tak
+
+- **Har prompt, tool aur model change par suite chalao**, history ke saath.
+- **Releases ko safety violations par gate karo** (zero allowed) aur critical tasks ke liye pass^k par.
+- **Seed data aur sandboxes ko repository mein rakho**, taaki koi bhi failure reproduce kar sake.
+- **Model graders ko dobara calibrate karo** har quarter taaza human grades ke saath.
+- **Production failures ko** har hafte naye tasks ki tarah **jodo.**
+
+## Practice karo
+
+Anthropic ka agent evals par article padho aur DeepLearning.AI ka agents evaluate karne waala chhota course lo.
+
+1. Apne banaye kisi agent ke liye 20 tasks likho, jinmein kam se kam chaar aise hon jinhe refuse ya escalate karna ho aur do aise jinmein tool fail ho.
+2. Seeded data waala ek sandbox banao jo har task par reset ho, aur code checks aur do trajectory rules implement karo.
+3. Har task ko teen baar chalao aur success, all-runs success, average steps aur safety violations report karo.
+4. Apne 20 tasks ke liye pass@3 aur pass^3 nikalo aur un tasks ki list banao jo kabhi-kabhi pass hote hain, hamesha nahi.
+
+Aur gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 6 agent failure modes aur unhe measure karne ka tareeka cover karta hai, aur chapter 3 models ko judges ki tarah use karna.
+
+**Aapka kaam poora jab:** aap ek change se pehle aur baad ke in metrics ki table dikha sako aur ek failure ko uske transcript se samjha sako.

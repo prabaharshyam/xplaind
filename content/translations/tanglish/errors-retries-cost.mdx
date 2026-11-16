@@ -1,0 +1,257 @@
+---
+id: errors-retries-cost
+lang: tanglish
+title: "Errors, retries, cost"
+outcome: "Rate limits-a, API errors-a retries-oda handle pannunga, unga app evvalavu selavu panna mudiyum-nu oru cap podunga."
+answer: "LLM APIs sila neram fail aagum, rate-limit-um aagum; adhanaala exponential backoff-oda retry pannunga, timeouts set pannunga, tokens-yum daily spend-yum cap pannunga, appo oru bug periya bill-a yerra vaikkaadhu."
+why_it_matters: "Production-la APIs fail aagum, bills valarum. Makkal nambura engineers-oda apps nalla muraila retry pannum, mariyaadhaiyaa fail aagum, yaarukkum periya bill-a sudden-aa kaattaadhu."
+flashcards:
+  - q: "Entha API errors-a retry panna worth?"
+    a: "429 rate limits, 500, 503 server errors, provider overloaded errors, network timeouts. Idhellam konjam neram kazhichu success aagum."
+  - q: "Entha errors-a maathaama retry pannakoodaadhu?"
+    a: "400 bad request, 401 invalid key, 403 not permitted, 404 unknown model. Adhukku badhila reason-a fix pannunga."
+  - q: "Jitter-oda exponential backoff-na enna?"
+    a: "Ovvoru failure-kum apram adhigama kaathirukkuradhu, 1, 2, 4, 8 seconds maadhiri, koodave konjam randomness, appo neraya clients ore neram retry pannaadhu, aprom konjam attempts-la niruththudradhu."
+  - q: "Retry-after header unga-kitta enna solludhu?"
+    a: "Marubadiyum try panradhukku munnaadi server evvalavu neram kaathirukka virumbudhu-nu. Ungalodaya backoff neraththa vida idhukku mariyaadhai kudunga."
+  - q: "SDK-oda retry settings-a mudhalla yen check pannanum?"
+    a: "Neraya official SDKs already retry pannum. Mela unga sondha loop-a serthaa attempts perugi API-a flood panniduvaanga."
+  - q: "Rate limits-ku keezha eppadi irukkalaam?"
+    a: "Concurrency-a limit pannunga, batch jobs-a paravi vainga, urgent illaadha velaiku batch APIs use pannunga."
+  - q: "Naalu cost guards sollunga."
+    a: "Monthly spending limit illa alert, ovvoru call-layum max_tokens cap, per-user daily limits, ovvoru request-ku tokens-yum cost-yum log panradhu."
+  - q: "Fallback-na enna?"
+    a: "Calls thodarndhu fail aanaa enna nadakkum: cached answer, simple-aana model, friendly 'try again', illa oru aal-kitta route panradhu."
+  - q: "Circuit breaker enna pannum?"
+    a: "Thodarndhu pala failures vandha, konjam neram andha failing service-a kooppidaama nera fallback use pannum, appo users kaathirukka vendiya thevai illa."
+  - q: "Batch API-a eppo use pannanum?"
+    a: "Manikkanakka kaathirukkalaam-nu irukkura velaiku, raathiri summaries illa evals maadhiri. Providers batch requests-ku romba kammi charge panraanga, adhukku normal rate limits-ku count aagaadhu."
+exercise:
+  title: "Retry loop-a sari pannunga"
+  setup: "Indore-la oru app 2,000 product descriptions-ku ovvonnukkum oru model API-a call pannudhu. Adhoda code: while True: call-a try pannu; edhu error vandhaalum udane retry pannu. Oru nerathula 50 calls odudhu, timeout illa, max_tokens illa. Oru raathiri bill ₹4,000-ku badhila ₹45,000 aaiduchu. Logs-la neraya 429 errors, oru PDF-la irundhu paste panna description-ku oru 400 error ('input too long'), adhu 3,000 thadavai retry aagirukku."
+  questions:
+    - q: "400 error yen ivvalavu selavu vechudhu?"
+      a: "400-na request thaan thappu, adhanaala adhu eppovume success aagaadhu. Adha endless-aa retry pannaadhunaala, ore neelamaana, selavaana input aayirakkanakkula thadavai anuppappattudhu."
+    - q: "429 errors-a eppadi handle pannanum?"
+      a: "Exponential backoff-um jitter-um vachu retry pannunga, retry-after-ku mariyaadhai kudunga, konjam attempts-la niruththunga, concurrency-a 50-la irundhu kammi pannunga."
+    - q: "Ovvoru call-layum selavu-a cap panra rendu limits edhu?"
+      a: "Oru length limit-a thaandura inputs-a truncate illa reject pannunga, reply-la max_tokens set pannunga."
+    - q: "Bill-a seekiramae niruththiyirukkura account-level guard edhu?"
+      a: "Provider console-la monthly spending limit, 50% maadhiri oru point-la alert, koodave ovvoru run-oda cost logging."
+ask:
+  - "Entha API errors-a retry pannanum?"
+  - "En AI app periya bill-a yerraama eppadi thadukkalaam?"
+  - "Rate limit-na enna, adha eppadi handle panradhu?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Language model APIs sila neram fail aagum, ovvoru call-kum panam selavu aagum. Production-ku ready-aana app rendaiyum handle pannum:
+
+- **Errors**: rate limits, overloaded servers, timeouts, bad requests, authentication problems.
+- **Retries**: temporary-aana errors-ku, sariyaana muraila marubadiyum try panradhu.
+- **Cost caps**: oru bug illa adhiga use panravanga periya bill-a yerra vaikkaama thadukkura limits.
+
+```flow
+Model API-a call pannu -> Success?
+Success? -[aamaa]-> Result-a use pannu | tokens-um cost-um log pannu
+Success? -[illa]-> Retry panna mudiyumaa? | 429, 500, 503, overloaded, timeout
+Retry panna mudiyumaa? -[illa]-> Seekiram fail aagu | log pannu, alert pannu, reason-a fix pannu
+Retry panna mudiyumaa? -[aamaa]-> Attempts meedhi irukkaa?
+Attempts meedhi irukkaa? -[aamaa]-> Wait pannu | retry-after, illa 2^n seconds + jitter
+Wait pannu -> Model API-a call pannu
+Attempts meedhi irukkaa? -[illa]-> Fallback | cache, sinna model, "try again", illa oru aal
+```
+
+Indha lesson-la Fatima-a follow pannuvom. Avanga raathiri review-summarising job fail aagi, bill moonu madangu aachu.
+
+## Idhu eppadi work aagudhu
+
+**Errors-a rendu vagaiya piringa.**
+
+- *Retry panna worth*: `429` rate limit, `500`, `503` server errors, provider "overloaded" errors, network timeouts. Idhellam konjam neram kazhichu success aagum.
+- *Maathaama retry pannakoodaadhu*: `400` bad request (unga input thappu, example romba neelam illa malformed), `401` invalid key, `403` not permitted, `404` unknown model. Retry panna, adhe udaindha request marubadiyum pogum; adhukku badhila reason-a fix pannunga.
+
+**Exponential backoff-oda retry pannunga.** Kaathirunga, apram retry pannunga; ovvoru thadavaiyum wait-a rendu madangu aakkunga (1 s, 2 s, 4 s, 8 s), konjam randomness (jitter) serunga, appo neraya clients ore neram retry pannaadhu, konjam attempts-kku apram niruththunga. Response-la `retry-after` header irundha, avvalavu neram wait pannunga. Neraya official SDKs thaanaagavae retry pannum; mela innoru retry layer serkkaama, default settings-a check pannunga.
+
+**Rate limits.** Providers nimisham-ku requests-um tokens-um limit pannuvaanga. Concurrency-a (ore neram evvalavu calls odudhu) limit panni, batch jobs-a paravi vachu, urgent illaadha velaikku batch APIs use panni, keezha irukkalaam. Adhiga limits-ku bodhuvaa adhiga usage tiers thevai.
+
+**Timeouts.** Ovvoru call-layum timeout set pannunga, appo stuck aana request unga app-a hang pannaadhu.
+
+**Fallbacks.** Mukkiyamaana features-ku, calls thodarndhu fail aanaa enna nadakkum-nu mudivu pannunga: cached answer, simple-aana model, friendly "please try again", illa oru aal-kitta route panradhu.
+
+**Cost guards.**
+
+- Provider console-la monthly spending limit illa alerts set pannunga: oru bug control illaama poradhukku simple-aana protection.
+- Ovvoru call-layum `max_tokens` cap pannunga, appo oru request periya reply-a uruvaakkaadhu.
+- Oru user-ku naalaikku requests-a limit pannunga.
+- Ovvoru request-kum tokens-um cost-um log pannunga, appo panam enga pogudhu-nu theriyum.
+- Loops-um retries-um cap pannunga; endless-aa retry panra bug, endless-aa selavu pannum.
+
+**Backoff numbers-la.** Base 1 second, rendu madangu, 1 second varaikkum jitter vachu, anju attempts-ku roughly wait:
+
+| Attempt | Adhukku munnaadi wait | Ippo varaikkum total neram |
+| --- | --- | --- |
+| 1 | 0 s | 0 s |
+| 2 | sumaar 1 mudhal 2 s | sumaar 1.5 s |
+| 3 | sumaar 2 mudhal 3 s | sumaar 4 s |
+| 4 | sumaar 4 mudhal 5 s | sumaar 8.5 s |
+| 5 | sumaar 8 mudhal 9 s | sumaar 17 s |
+
+Adhukku apram niruththi, fallback use pannunga. Interactive features-ku users 17 seconds kaathirukka maattaanga, adhanaala kammi attempts-um vegamaana fallback-um use pannunga. Raathiri batch jobs-ku neenda waits okay.
+
+**Request-ku cost.** Ovvoru response-um evvalavu input, output tokens use aachu-nu solludhu. Provider-oda ippo irukkura prices-a vachu multiply panni, adha request id, user, feature-oda log pannunga. Vaaram-oru thadavai feature-ku, user-ku cost-a paartha, oru feature, oru user, illa oru bug thaan bill-a yerra vaikkudhaa-nu seekiram theriyum.
+
+**Code-la oru retry wrapper.** Apram success aagura vishayatha mattum retry pannunga, `retry-after`-ku mariyaadhai kudunga, niruththunga:
+
+```python
+import random, time
+import anthropic
+
+RETRYABLE = (anthropic.RateLimitError, anthropic.APIConnectionError,
+             anthropic.APITimeoutError, anthropic.InternalServerError)
+
+def with_retries(call, attempts=4, base=1.0, cap=20.0):
+    for attempt in range(attempts):
+        try:
+            return call()
+        except RETRYABLE as err:
+            if attempt == attempts - 1:
+                raise
+            header = getattr(getattr(err, "response", None), "headers", {}) or {}
+            wait = float(header.get("retry-after", 0)) or min(cap, base * 2 ** attempt) + random.random()
+            time.sleep(wait)
+        # Anything else (400, 401, 403, 404) is raised immediately: fix the request instead.
+
+client = anthropic.Anthropic(max_retries=0)    # turn off SDK retries so they do not stack with yours
+reply = with_retries(lambda: client.messages.create(
+    model="claude-sonnet-5-5", max_tokens=300,  # check the docs for current names
+    messages=[{"role": "user", "content": "Summarise this complaint in one line: ..."}]))
+```
+
+SDK-oda built-in retries-a illa unga wrapper-a, edhaavadhu onnu mattum use pannunga, rendaiyum illa; illanaa oru failure pala requests-a trigger pannidum.
+
+**Oru circuit breaker.** Provider down-aa irundhaa, retries ovvoru user-aiyum muzhu retry neram kaathirukka vaikkum. Breaker sameebathiya failures-a gnaabagam vechu, nera fallback-ku poidum:
+
+```python
+class Breaker:
+    def __init__(self, threshold=5, cool_off=60):
+        self.fails, self.threshold, self.cool_off, self.opened = 0, threshold, cool_off, 0.0
+
+    def call(self, primary, fallback):
+        if self.fails >= self.threshold and time.time() - self.opened < self.cool_off:
+            return fallback()                      # open: do not even try
+        try:
+            result = primary()
+            self.fails = 0
+            return result
+        except RETRYABLE:
+            self.fails += 1
+            if self.fails >= self.threshold:
+                self.opened = time.time()
+            return fallback()
+```
+
+Fallback, adhe illa vera provider-oda sinna model-aa, cached answer-aa, illa theliva oru message-aa irukkalaam. Primary-a thappaana URL-ku point panni test pannunga.
+
+**Concurrency-a limit pannunga.** Fan out aagura jobs-ku, ore neram evvalavu calls odalaam-nu cap pannunga, appo rate limits-kulla irukkalaam:
+
+```python
+import asyncio
+SEM = asyncio.Semaphore(8)                       # at most 8 calls in flight
+
+async def limited(coro_factory):
+    async with SEM:
+        return await coro_factory()
+```
+
+**Kaathirukka koodiya velaya batch pannunga.** Raathiri jobs, example andha naal tickets-a summarise panradhu illa evals odudhu, batch API-la pogalaam. Anthropic-oda API-la neraya requests-a oru thadavai submit panni, results-a apram edukkalaam, normal calls-a vida kammi vilaila:
+
+```python
+batch = client.messages.batches.create(requests=[
+    {"custom_id": f"ticket-{t['id']}",
+     "params": {"model": "claude-haiku-5-5", "max_tokens": 200,
+                "messages": [{"role": "user", "content": f"Summarise: {t['text']}"}]}}
+    for t in tickets
+])
+print(batch.id, batch.processing_status)         # poll later, then fetch the results
+```
+
+Provider-oda ippo irukkura batch pricing-yum turnaround time-yum check panni, check panna date-a note pannikkunga.
+
+## Oru worked example
+
+Fatima-oda app 300 sinna sellers-ku ovvoru raathiriyum customer reviews-a summarise pannudhu. Oru kaalaila job paadhila fail aagi, bill normal-a vida moonu madangu irukkarathai paakkuraanga.
+
+Logs solradhu: Peak neraththula provider `429` errors thandhaanga; avanga code udane, mudivu illaama retry panni API-a flood pannichu; Hindi-la oru review-la, 40,000 characters repeated emoji irundhadhaala oru request romba periyadhaa aachu, adhu `400`-oda fail aagi 200 thadavai retry aachu.
+
+Avanga fixes:
+
+```python
+import random, time
+import anthropic
+
+RETRYABLE = {429, 500, 503, 529}   # 529 is Anthropic's "overloaded"
+
+# Create the client with anthropic.Anthropic(max_retries=0),
+# so the SDK's own retries do not stack on top of these.
+def call_with_retry(send, max_attempts=5):
+    for attempt in range(max_attempts):
+        try:
+            return send()
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            status = getattr(e, "status_code", None)   # None for timeouts and network errors
+            if (status is not None and status not in RETRYABLE) or attempt == max_attempts - 1:
+                raise
+            time.sleep(min(30, 2 ** attempt) + random.random())
+```
+
+Ovvoru review-aiyum 4,000 characters-ku truncate pannuraanga, summaries-ku `max_tokens=300` set pannuraanga, ore neram maximum anju calls mattum odudhu, paadhi pogum podhu alert varra maadhiri oru monthly spend limit-um vechaanga. Adutha maadha bill normal-ku thirumbudhu, raathiri job mudikkudhu.
+
+| Problem | Fix | Effect |
+| --- | --- | --- |
+| 429-la udane, mudivu illaama retries | Jitter-oda backoff, anju attempts | Peak-la flood illa |
+| 400 error-a 200 thadavai retry | 400, 401, 403, 404-la seekiram fail aagu | 200 illa, oru failure log aagum |
+| 40,000-character review | Input-a 4,000 characters-ku truncate | Request size cap aachu |
+| Neelamaana summaries | `max_tokens=300` | Output size cap aachu |
+| Ore neram neraya calls | Maximum anju calls | Rate limit-kulla |
+| Spending guard illa | 50%-la alert-oda monthly limit | Control illaadha bill seekiram nikkum |
+
+## Podhuvaa panra thappugal
+
+- **Ellathaiyum retry panradhu.** 400, 401 errors thaanaagavae sariyaagaadhu.
+- **Udane, endless-aa retry panradhu.** Back off pannunga, jitter serunga, niruththunga.
+- **Spending limit illa alerts illaama irukkradhu.**
+- **`max_tokens` cap illaama irukkradhu.**
+- **Rendu thadavai retry.** Unga sondha retry serkkaradhukku munnaadi SDK ippave enna pannudhu-nu check pannunga.
+- **SDK retries-um unga retries-um serndhu.** Failures perugi requests flood aagum.
+- **Outage-la endless-aa retry panradhu.** Circuit breaker-um fallback-um use pannunga.
+- **Urgent velaiyum batch velaiyum ore limits-la odradhu**, appo raathiri jobs pagal users-a pattini podum.
+
+## Simple handling pothum-nu irukkura idangal
+
+- **Sondha personal script**: SDK-oda default retries-um oru spending alert-um pothum.
+- **Kammi traffic irukkura internal tools**, avvappo oru "please try again" kuraindha selavu thaan.
+- **Neenga paathukkura, marubadiyum odavaikkalaam-nu irukkura one-off batch jobs.**
+
+Unmaiyaana users oru feature-a nambirukkum podhu, illa traffic adhigama irukkum podhu, circuit breakers, fallbacks, concurrency limits, per-user caps serunga.
+
+## Demo-la irundhu production varai
+
+- **Oru retry layer mattum**, attempts-um reasons-um log aagura maadhiri.
+- **Circuit breaker-um fallback-um** user-ku mun varra ovvoru model call-kum.
+- **Interactive velaikkum batch velaikkum thani limits-um keys-um.**
+- **Error rate, retry rate, spend-ku** feature-ku alert vainga.
+- **Fallback path-a** staging-la primary-a vaendumae udachu, aprom aprom test pannunga.
+
+## Practice pannunga
+
+Keezha link panni irukkura API errors, rate limits pages-a padinga.
+
+1. Retry panna mudiyura errors-a mattum exponential backoff-um jitter-um vachu retry panra oru wrapper ezhudhunga, rendu thadavai 429-oda fail aagi, apram success aagura oru fake function vachu test pannunga.
+2. 400 error-la seekiram fail aagura maadhiri aakkunga.
+3. Unga API account-la oru spending limit illa alert vachu, unga apps-la onnula ovvoru call-kum `max_tokens` serunga.
+4. Unga wrapper-ku circuit breaker serthu, primary-a thappaana URL-ku point panni, breaker open aana oru second-kulla users-ku fallback kidaikkudhu-nu confirm pannunga.
+
+**Mudinjadhu-nu eppo sollalaam:** Entha errors-a eppadi retry pannanum-nu explain panna mudiyum, unga app selavu panradha cap panra moonu guards-a peru sollamudiyum.

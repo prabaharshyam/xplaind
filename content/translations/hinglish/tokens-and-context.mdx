@@ -1,0 +1,218 @@
+---
+id: tokens-and-context
+lang: hinglish
+title: "Tokens aur context window"
+outcome: "Samjhao ki tokens kya hain, ek request ka cost estimate karo, aur inputs ko context window ke andar rakho."
+answer: "Tokens text ke woh tukde hain jo model padhta hai, har ek lagbhag ek shabd ka teen-chauthai. Context window ek request mein aane waale tokens ki sabse badi sankhya hai, aur cost har token par lagta hai."
+why_it_matters: "Cost, speed aur limits sab tokens mein naape jaate hain. Interviewers context windows ke baare mein aksar poochhte hain, aur apps production mein tab toot-te hain jab inputs chupchaap bahut bade ho jaate hain."
+flashcards:
+  - q: "Token kya hai?"
+    a: "Model ki vocabulary se text ka ek chhota tukda: aksar ek common shabd, kabhi shabd ka hissa, ek number ya punctuation."
+  - q: "100 tokens lagbhag kitne English words hote hain?"
+    a: "Lagbhag 75 words. Hindi ya Tamil jaise Indian scripts ko wahi matlab dene ke liye aksar zyada tokens lagte hain."
+  - q: "Context window kya hai?"
+    a: "Ek call mein tokens ki maximum sankhya, jo bheji gayi har cheez aur reply ko milakar ginti hai."
+  - q: "Chat app mein context window ko kya bharta hai?"
+    a: "System prompt, ab tak ki poori conversation, documents ya retrieved passages, tool definitions aur results, aur max_tokens tak reply."
+  - q: "Lambi chats har turn par mehngi kyun hoti jaati hain?"
+    a: "API ko koi memory nahi hoti, isliye har turn poori history ko input tokens ki tarah dobara bhejta hai."
+  - q: "Ek call ka cost kaise estimate karte hain?"
+    a: "Input tokens × input price plus output tokens × output price. Output tokens aam taur par kai guna mehnge hote hain."
+  - q: "Context window ke andar rehne ke teen tareeke batao."
+    a: "Purane turns ko summarise ya trim karo, sirf relevant passages retrieve karo, max_tokens set karo, aur bahut bade inputs ko warning ke saath truncate karo."
+  - q: "Prompt caching kya karta hai?"
+    a: "Prompt ki dohrayi gayi, bilkul same shuruaat, jaise lamba system prompt, ko baad ke calls mein bahut sasta aur tez bana deta hai."
+  - q: "Lambe context mein model facts kyun chhod sakta hai?"
+    a: "Models lambe input ki shuruaat aur ant ki jaankari beech wali se behtar use karte hain, isliye beech mein dabi koi detail chhoot sakti hai."
+  - q: "Context budget kya hai?"
+    a: "Ek plan ki input ka har hissa kitne tokens use kar sakta hai: system prompt, history, retrieved text, tool results aur reply ke liye jagah."
+exercise:
+  title: "Conversation ka cost estimate karo"
+  setup: "Ek chatbot ka system prompt 1,000 tokens ka hai. Har user question lagbhag 100 tokens ka aur har answer lagbhag 200 tokens ka hai. History har turn dobara bheji jaati hai. Maan lo ₹0.0003 per input token aur ₹0.0015 per output token."
+  questions:
+    - q: "Turn 1 kitne input tokens bhejta hai?"
+      a: "1,000 system + 100 question = 1,100 input tokens."
+    - q: "Turn 5 kitne input tokens bhejta hai?"
+      a: "1,000 system + 4 pichhle turns × 300 (question plus answer) + 100 naya question = 2,300 input tokens."
+    - q: "Turn 5 ka cost kitna hota hai?"
+      a: "Input 2,300 × ₹0.0003 = ₹0.69; output 200 × ₹0.0015 = ₹0.30; lagbhag ₹0.99."
+    - q: "Lambi chats ka cost kam karne wale do badlaav batao."
+      a: "System prompt ko cache karo, aur kuch turns ke baad history ko summarise karo taaki har turn har message ki jagah ek chhota summary dobara bheje."
+ask:
+  - "Hindi messages mein zyada tokens kyun lagte hain?"
+  - "Jab conversation context window se bahar chali jaati hai tab kya hota hai?"
+  - "Prompt caching paise kaise bachata hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Language models **tokens** padhte aur likhte hain, text ke chhote tukde: aksar poora common shabd, kabhi shabd ka hissa, ek number ya punctuation mark. Models use karne ki har cheez tokens mein naapi jaati hai:
+
+- **Price**: providers har million input tokens aur har million output tokens par charge karte hain; output tokens aam taur par kai guna mehnge hote hain.
+- **Limits**: **context window** ek call mein tokens ki maximum sankhya hai, jo bheji gayi har cheez aur reply ko milakar ginti hai.
+- **Speed**: zyada output tokens generate hone mein zyada time lete hain.
+
+| Ek API call ki context window ka hissa | Tokens | Note |
+|---|---|---|
+| System prompt | 1,200 | Har call mein same |
+| Conversation history | 3,000 | Har turn badhti hai |
+| Retrieved passages | 800 | |
+| Naya user message | 150 | Tamil text zyada tokens leta hai |
+| Reply, max_tokens tak | 300 | |
+
+Sab kuch ginti mein aata hai, aur har call par poore input ka paisa lagta hai.
+
+```flow
+dir: LR
+title: Ek call, shuru se ant tak
+System prompt + history + passages + naya message -[input tokens, har call ka paisa]-> Model
+Model -[output tokens, max_tokens tak]-> Reply
+```
+
+Ye lesson Chennai ki ek e-learning company ko follow karta hai jo Tamil aur English mein doubt-solving chatbot bana rahi hai.
+
+## Ye kaam kaise karta hai
+
+**Token kya hota hai.** Tokenizer text ko ek fixed vocabulary ke tukdon mein baant deta hai. English mein 100 tokens lagbhag 75 words hote hain. Hindi, Tamil aur doosre Indian scripts ko wahi matlab dene ke liye aksar zyada tokens lagte hain, isliye wahi message zyada cost kar sakta hai aur window ka zyada hissa le sakta hai. Numbers aur code bhi kai tokens mein tootte hain.
+
+**Counting.** Provider dashboards aur replies har call ka token usage report karte hain, aur providers bhejne se pehle ginne ke liye token-counting endpoints ya libraries dete hain.
+
+**Context window ko kya bharta hai.** Chat app mein har call par bheji gayi har cheez ginti mein aati hai:
+
+- system prompt;
+- ab tak ki poori conversation (API ko memory nahi hoti; aap use dobara bhejte ho);
+- koi bhi documents ya retrieved passages;
+- tool definitions aur tool results;
+- aur `max_tokens` tak reply.
+
+Jaise-jaise conversation badhti hai, har turn zyada history dobara bhejta hai, isliye har turn ka cost badhta hai.
+
+**Cost estimate karna.** Cost = input tokens × input price + output tokens × output price. Example: 2,000 input tokens aur 500 output tokens, jahan har token par output input se paanch guna mehnga hai. Input 2,000 units ginta hai; output 500 × 5 = 2,500 units. Output lambai mein chauthai hai, phir bhi zyada cost karta hai.
+
+**Window ke andar rehna.** Purane conversation turns ko trim ya summarise karo; poore documents ki jagah sirf relevant passages retrieve karo; ek samajhdaar `max_tokens` set karo; bahut bade inputs ko warning ke saath truncate karo. Bahut lambe contexts beech mein dabi details ke liye answer quality bhi ghata dete hain.
+
+**Caching.** Agar kai calls ek lambi, bilkul same shuruaat share karti hain (bada system prompt ya koi document), toh prompt caching dohraye gaye input ko bahut sasta aur tez bana sakta hai. Ek agla lesson ise cover karta hai.
+
+**Conversation ki lambai ke saath cost kaise badhta hai** (1,200-token system prompt, 100-token questions, 250-token answers, history dobara bheji jaati hai):
+
+| Turn | Bheje gaye input tokens | Jinmein history |
+| --- | --- | --- |
+| 1 | 1,300 | 0 |
+| 3 | 2,000 | 700 |
+| 6 | 3,050 | 1,750 |
+| 10 | 4,450 | 3,150 |
+
+Turn 10 tak, aap jiska paisa dete ho uska zyadatar hissa history hota hai. Purane turns ko ek chhote paragraph mein summarise karne se input lagbhag flat rehta hai, aur system prompt ko cache karne se pehli call ke baad har call mein uske 1,200 tokens bahut sasta ho jaate hain.
+
+**Bhejne se pehle ginti karo.** Jo kuch bhi user paste kar sakta hai, jaise koi document ya lamba message, model ko call karne se pehle uske tokens ginao. Agar bahut lamba ho, toh ya sirf relevant hisse retrieve karo, pehle summarise karo, ya user ko saaf bata do ki ye bahut lamba hai. Chupchaap cut-off ya achanak bill se kahin behtar hai saaf message ke saath fail hona.
+
+**Code mein tokens ginao.** Jo kuch bhi user bada bana sakta hai, use bhejne se pehle ginao. Anthropic ke SDK ke saath, ginti wahi tokenizer use karti hai jo model karega:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+MODEL = "claude-sonnet-5-5"                  # check the docs for current names
+
+def count(system, messages):
+    return client.messages.count_tokens(model=MODEL, system=system, messages=messages).input_tokens
+
+english = [{"role": "user", "content": "Please send the electricity bill for October."}]
+hindi = [{"role": "user", "content": "कृपया अक्टूबर का बिजली का बिल भेजें।"}]
+print(count("Be brief.", english), count("Be brief.", hindi))   # the Hindi line usually costs more
+```
+
+Open models ke liye, Hugging Face ka model ka apna tokenizer (`AutoTokenizer.from_pretrained(...)`) offline exact counts deta hai. "4 characters per token" jaise rough rules sirf English ke liye sahi baithte hain.
+
+**Ek context budget.** Pehle se tay karo ki window kaise baantni hai, taaki ek hissa doosron ko dhakel na sake:
+
+| Hissa | Budget (example, 16,000-token target) | Budget se upar ho toh |
+| --- | --- | --- |
+| System prompt aur tools | 2,000 | Chhota karo; kam use hone waale rules ko retrieval mein le jao |
+| Conversation history | 4,000 | Purane turns ko summarise karo |
+| Retrieved passages | 6,000 | Kam, behtar chunks |
+| Tool results | 2,000 | Sirf zaroori fields return karo |
+| Reply (`max_tokens`) | 2,000 | Chhote answers maango |
+
+Target aam taur par model ke maximum se kaafi neeche hota hai, kyunki har token ke saath cost aur delay badhte hain, aur limit se pehle hi quality aksar girne lagti hai.
+
+**History ko budget ke andar rakhna.** Latest turns ko shabd ke shabd rakho aur purane turns ko ek chalte hue summary mein sameto:
+
+```python
+def fit_history(history, summary, budget_tokens, count_fn, keep_last=6):
+    """history: list of {"role", "content"} turns, oldest first."""
+    recent = history[-keep_last:]
+    older = history[:-keep_last]
+    if older:
+        summary = summarise(summary, older)       # one cheap model call, done rarely
+    prefix = [{"role": "user", "content": f"Summary of the earlier conversation: {summary}"},
+              {"role": "assistant", "content": "Understood."}] if summary else []
+    msgs = prefix + recent
+    while count_fn(msgs) > budget_tokens and len(recent) > 2:
+        recent = recent[2:]                       # drop the oldest user-assistant pair
+        msgs = prefix + recent
+    return msgs, summary
+```
+
+`summarise` aapka apna function hai: ek chhoti model call jo purane summary ko un turns ke saath milati hai jinhe sametna hai. Sirf tab summarise karo jab history budget paar kare, har turn par nahi.
+
+**Lamba context free attention nahi hai.** Models lambe input ke har hisse ko barabar achhe se use nahi karte. Jo tests lambe document mein ek fact chhupate hain (aksar "needle in a haystack" kehlate hain) woh dikhate hain ki beech ke facts shuruaat ya ant ke paas wale facts se kam bharose se milte hain. Sabse zaroori instructions shuruaat mein, sawaal ant mein rakho, aur retrieved passages ko relevance ke order mein do.
+
+**Maximum aur effective context.** Ek model 200,000 tokens ya usse zyada le sakta hai, par woh unhe kitna achhe se use karta hai woh task ke hisaab se badalta hai. Apna case test karo: ek realistic document mein ek jaana hua fact alag-alag jagah chhupao aur dekho ki answers sahi rehte hain ya nahi.
+
+## Ek example se samjho
+
+Chennai ki ek e-learning company Class 10 ke students ke liye Tamil aur English mein doubt-solving chatbot bana rahi hai.
+
+Ek hafte ki testing se measurements:
+
+- Syllabus guidance ke saath system prompt: 1,200 tokens.
+- Ek typical question: English mein 60 tokens, Tamil mein lagbhag 150.
+- Ek typical answer: 250 tokens.
+- Das turns ke baad, history har call mein lagbhag 3,000 tokens jodti hai.
+
+Unke model ki prices par, das-turn ki chat do-turn ki chat se lagbhag chaar guna mehngi padi, zyadatar dobara bheji gayi history ki wajah se. Woh teen cheezein badalte hain: chhe turns ke baad history summarise karna, system prompt cache karna, aur answers ko 300 tokens par cap karna. Har conversation ka average cost 55% gir jaata hai, aur Tamil users lambe sessions mein ab app ke per-call input cap tak nahi pahunchte.
+
+**Tamil users pehle limit par kyun pahunche.** Wahi sawaal Tamil mein English se lagbhag dhai guna tokens leta tha, aur Tamil answers bhi tokens mein lambe the. Cost control karne ke liye team ne har call ko 16,000 input tokens par cap kiya. Lambe revision sessions mein, Tamil conversations lagbhag 30 turns ke baad us cap tak pahunch jaati thi, jabki English wali shaayad hi kabhi. Chhe turns ke baad history summarise karne se dono theek hue, aur isse bot tez jawab bhi dene laga, kyunki chhote inputs jaldi process hote hain. Team ab har prompt badlaav ko Tamil aur English dono conversations se test karti hai, aur har language ke liye cost per conversation alag report karti hai, taaki jo badlaav English mein sasta par Tamil mein mehnga ho woh ship hone se pehle pakda jaaye.
+
+## Aam galtiyaan
+
+- **Tokens ki jagah words ginna.** Prices aur limits tokens mein hain, aur Indian languages zyada use karti hain.
+- **Bhool jaana ki history dobara bheji jaati hai.** Lambi chats mehngi ho jaati hain.
+- **Output price ko ignore karna.** Output tokens aam taur par zyada cost karte hain.
+- **`max_tokens` na dena.** Replies lambe aur mehnge ho sakte hain.
+- **Poore documents thoons dena.** Jo relevant hai wahi retrieve karo.
+
+- **Maan lena ki bada context window sab theek kar deta hai.** Bahut lambe inputs zyada cost karte hain, dheere hote hain, aur beech ki details aksar chhoot jaati hain. Jo relevant hai woh bhejo, jo bhi aapke paas hai woh nahi.
+- **Indian-language tokens ko English rules se estimate karna.** Asli tokenizer se ginti karo.
+- **Window ko isliye bharna kyunki woh hai.** Har extra token cost aur delay badhata hai aur accuracy ghata sakta hai.
+
+## Jab context ko kareeb se manage karne ki zaroorat nahi
+
+- **Chhoti, single-turn calls**, jaise kisi message ko classify karna: design karte waqt ek baar ginti karo aur aage badho.
+- **Kam volume ke internal tools**, jahan bada bill engineering time se sasta hai.
+- **Chhote records par batch jobs**, jahan har input lagbhag ek hi size ka hota hai.
+
+Lambi chats, paste kiye documents, bahut saare tool results wale agents aur scale par Indian languages mein kisi bhi cheez ke liye context ko kareeb se manage karo.
+
+## Demo se production tak
+
+- **Har call ke input aur output tokens log karo**, jahan ho sake hisse ke hisaab se: system, history, retrieved, tools.
+- **Budgets ko code mein lagu karo**, sirf prompt mein nahi.
+- **User input ki length cap karo** saaf message ke saath, aur bhejne se pehle ginti karo.
+- **Token growth par alert lagao**: average input size badhna aksar ka matlab hai ki history ya retrieval trim nahi ho rahi.
+- **Models badalne par budgets dobara check karo**, kyunki tokenizers aur prices alag hote hain.
+
+## Practice karo
+
+Neeche link kiya hua context windows guide aur token-counting page padho.
+
+1. Wahi 100-word ka paragraph English mein aur kisi Indian language mein jo aap jaante ho, uske tokens ginao.
+2. Apne app ki 10-turn conversation ka cost maujooda prices par estimate karo, phir paanch turns ke baad history summarise karke.
+3. Apne kisi app mein `max_tokens` cap aur bahut bade inputs ke liye warning jodo.
+4. 30 page ke document mein shuruaat, beech aur ant mein ek fact chhupao, har baar uske baare mein poochho, aur note karo ki model kahan chookta hai.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 2 tokens aur tokenization cover karta hai, aur chapter 5 context length aur ye ki models lambe inputs ko kitna achhe se use karte hain.
+
+**Aapka kaam poora jab:** aap token counts se ek request ka cost estimate kar sako aur woh sab kuch list kar sako jo context window mein ginta hai.

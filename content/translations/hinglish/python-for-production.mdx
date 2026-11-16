@@ -1,0 +1,205 @@
+---
+id: python-for-production
+lang: hinglish
+title: "Production ke liye Python"
+outcome: "Aisi Python likho jis par doosre engineers bharosa kar sakein: type hints, dataclasses, bahar ke data ke liye Pydantic models, aur network calls ke liye async code."
+answer: "Production Python mein type hints, dataclasses, bahar ke data ko validate karne ke liye Pydantic aur network calls ke liye async code hota hai, taaki doosre engineers us par bharosa aur use maintain kar sakein."
+why_it_matters: "Client projects saalon chalte hain aur kai haathon se guzarte hain. Typed aur validated code kharab data ko darwaze par hi pakad leta hai aur ek service ko ek saath kai requests sambhalne deta hai. AI engineering roles ke interviewers iski ummeed rakhte hain."
+flashcards:
+  - q: "Type hints kya hain?"
+    a: "Annotations jo batate hain ki function kya leta hai aur kya lautaata hai, jaise def score(t: Ticket) -> float. Python run time par inhe ignore karta hai; tools inse galtiyaan pakadte hain."
+  - q: "Poore project mein type hints kaun check karta hai?"
+    a: "mypy ya pyright jaise type checkers, jo aamtaur par CI mein chalte hain, aur aapka editor jab aap type karte ho."
+  - q: "Dataclass kya hai?"
+    a: "@dataclass se mark ki hui class jo mukhya roop se data rakhti hai; Python uska constructor, equality aur printing aapke liye likh deta hai."
+  - q: "Pydantic model, dataclass se kaise alag hai?"
+    a: "Ye validate karta hai. Jo surakshit roop se convert ho sakta hai use convert karta hai, jo nahi ho sakta use reject karta hai, aur theek-theek batata hai ki kaunsa field fail hua."
+  - q: "Pydantic validation kahan hona chahiye?"
+    a: "Har us boundary par jahan data andar aata hai: API requests, config files, CSV rows aur khaaskar LLM output."
+  - q: "async aur await kisme madad karte hain?"
+    a: "Ek hi process mein kai dheemay network calls ka ek saath intezaar karne mein, jaise kai model API calls. Ye bhaari computation ko tez nahi karte."
+  - q: "Async code ke andar requests.get ya time.sleep call karne par kya hota hai?"
+    a: "Poora event loop block ho jaata hai, isliye aur kuch nahi chalta. httpx aur asyncio.sleep jaisi async libraries use karo."
+  - q: "Semaphore se concurrency par cap kyun lagayein?"
+    a: "Hazaaron requests ek saath bhejne se rate limits tooti hain aur aap block ho sakte ho. Semaphore seemit karta hai ki ek samay mein kitni requests chal rahi hon."
+exercise:
+  title: "Model ke reply ko validate karo"
+  setup: "Ek Pydantic model Order ke fields hain: order_id (str), qty (int, 0 se bada), price_inr (float, 0 se bada) aur pin (str, theek 6 characters). WhatsApp messages se orders nikaalne wala ek LLM chaar replies lautaata hai: (1) order_id 'A12', qty '3', price_inr 499, pin '411001'; (2) order_id 'A13', qty 'two', price_inr 250, pin '560001'; (3) order_id 'A14', qty 1, price_inr 120, pin 41100; (4) order_id 'A15', qty 2, price_inr 80, pin field hi nahi."
+  questions:
+    - q: "Kaunsa reply pass hota hai, aur Pydantic uske saath kya karta hai?"
+      a: "Reply 1 pass hota hai. Pydantic text '3' ko integer 3 mein convert kar deta hai."
+    - q: "Reply 2 kyun fail hota hai?"
+      a: "'two' ko integer mein convert nahi kiya ja sakta, isliye qty us field ka naam batate hue error ke saath validation mein fail hota hai."
+    - q: "Reply 3 mein kaunsi do problems hain?"
+      a: "PIN text nahi, number hai, aur usme sirf 5 digits hain. Settings ke hisaab se woh type check mein fail hota hai, aur 6-character wale rule mein toh har haal mein fail hota hai."
+    - q: "Fail hue replies ke saath code ko kya karna chahiye?"
+      a: "Validation errors log kare aur zyada sakht prompt ke saath retry kare, ya message kisi insaan ko bhej de, kharab data store karne ki jagah."
+ask:
+  - "Pydantic kya hai aur AI apps ise kyun use karte hain?"
+  - "Python mein async kab use karna chahiye?"
+  - "Kya type hints se Python tez ho jaati hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Script wali Python aur production wali Python dikhne mein ek jaisi hain, par dabaav mein bahut alag behave karti hain. Script ek baar chalti hai, aapke laptop par, us data par jo aapne dekha hai. Production code din mein hazaaron baar chalta hai, us data par jo aapne kabhi dekha nahi, aur aapke jaane ke baad doosre log use badalte hain.
+
+Chaar aadatein zyadatar farak mita deti hain:
+
+| Aadat | Kya karti hai | Sabse zyada kahan kaam ki |
+| --- | --- | --- |
+| **Type hints** | Batate hain ki har function kya leta aur lautaata hai, taaki editors aur checkers code chalne se pehle galtiyaan pakad lein | Aapka likha har function |
+| **Dataclasses** | Saade records ko bina boilerplate ke saaf shape dete hain | Aapka apna internal data |
+| **Pydantic models** | Bahar se aaye data ko check karte hain aur galat ho toh saaf error ke saath mana kar dete hain | API requests, files, LLM replies |
+| **async aur await** | Ek process ko ek saath kai dheemay network calls ka intezaar karne dete hain | Jo services model APIs ko call karti hain |
+
+```flow
+dir: LR
+title: Bahar ganda, bharose ke nakaabil input; andar saaf, anumaan lagaane layak code
+API requests -[Pydantic se validate karo]-> Typed, checked objects
+CSV rows -[Pydantic se validate karo]-> Typed, checked objects
+LLM JSON reply -[Pydantic se validate karo]-> Typed, checked objects
+Typed, checked objects -> Aapka system | andar dataclasses, har function mein type hints
+```
+
+Is lesson mein Bengaluru ka ek lending startup LLM se loan enquiry emails ke fields nikalwata hai; phir unmein se 200 ko tezi se process karna hai. Lesson ke end tak aap bahar se aaye data ko sahi se validate kar paoge, aur samajh paoge ki async kab madad karta hai.
+
+## Ye kaam kaise karta hai
+
+### Type hints
+
+```python
+def emi(principal: float, annual_rate: float, months: int) -> float:
+    ...
+```
+
+Python run time par hints ko ignore karti hai; string pass karne se apne aap koi error nahi aata. Inki value tools se aati hai: jahan number chahiye wahan string dene par aapka editor warning deta hai, aur **mypy** ya **pyright** jaise type checkers CI mein poore project ko check karte hain. Hints documentation ka bhi kaam karte hain: `def score(ticket: Ticket) -> float` agle engineer ko kisi comment se zyada batata hai.
+
+### Dataclasses
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class LineItem:
+    sku: str
+    qty: int
+    price: float
+```
+
+`@dataclass` us class ka constructor, equality aur printing likh deta hai jo mukhya roop se data rakhti hai. Inhe apne internal records ke liye use karo, jahan aap tay karte ho ki andar kya jaayega.
+
+### Pydantic: boundary par validation
+
+**Pydantic** model dataclass jaisa dikhta hai par **validate** karta hai. Ise dictionary ya JSON do aur ye:
+
+- Jo surakshit roop se convert ho sakta hai use convert karta hai, jaise "42" ko 42;
+- Jo nahi ho sakta use reject karta hai, jaise number ki jagah "five lakh";
+- Theek-theek batata hai ki kaunsa field kyun fail hua.
+
+| `amount_inr: int` ke liye input | Result |
+| --- | --- |
+| `500000` | Accept |
+| `"500000"` | 500000 mein convert |
+| `"5,00,000"` | Reject (commas ki wajah se), jab tak aap cleaning step na jodo |
+| `"five lakh"` | Saaf error ke saath reject |
+| Gaayab | Reject, jab tak field ka default na ho |
+
+Har us boundary par Pydantic use karo jahan data andar aata hai: request bodies, config files, CSV rows, aur **khaaskar LLM output**, jo aksar lagbhag sahi hota hai. Edge par validate karne ka matlab hai ki kharab data aapke baaki code tak pahunchta hi nahi, jahan woh teen functions baad uljhane wale errors paida karta.
+
+### async aur await
+
+Ek normal function **block** karta hai: jab woh model ke reply ka do second intezaar karta hai, us process mein aur kuch nahi hota. `async def` function reply ka `await` kar sakta hai aur tab tak **event loop** ko doosra kaam chalane deta hai.
+
+```flow
+dir: LR
+title: Ek-ek karke, blocking: lagbhag 6 s
+Call 1, 2 s -> Call 2, 2 s -> Call 3, 2 s -> 6 s baad poora
+```
+
+```flow
+dir: LR
+title: async ke saath ek saath: lagbhag 2 s
+Shuru -> Call 1, 2 s
+Shuru -> Call 2, 2 s
+Shuru -> Call 3, 2 s
+Call 1, 2 s -> lagbhag 2 s baad poora
+Call 2, 2 s -> lagbhag 2 s baad poora
+Call 3, 2 s -> lagbhag 2 s baad poora
+```
+
+Ye sirf **intezaar** mein madad karta hai, network ya disk ka, na ki images resize karne jaise bhaari computation mein. Aur chain ki har library ka async-aware hona zaroori hai: `requests` ki jagah `httpx`, `time.sleep` ki jagah `asyncio.sleep`.
+
+## Ek example se samjho
+
+Bengaluru ka ek lending startup LLM se loan enquiry emails ke fields nikalwana chahta hai. Model JSON lautaata hai. Woh zyadatar sahi hota hai, par kabhi koi field gaayab hota hai, ya amount mein number ki jagah "five lakh" likha hota hai.
+
+**Reply ko validate karna:**
+
+```python
+import logging
+from pydantic import BaseModel, Field, ValidationError
+
+log = logging.getLogger(__name__)
+
+class Enquiry(BaseModel):
+    name: str
+    city: str
+    amount_inr: int = Field(gt=0, le=10_000_000)
+    purpose: str | None = None
+
+def parse(reply: str) -> Enquiry | None:
+    try:
+        return Enquiry.model_validate_json(reply)
+    except ValidationError as e:
+        log.warning("bad model reply: %s", e.errors())
+        return None
+```
+
+`parse('{"name": "Divya", "city": "Pune", "amount_inr": "500000"}')` ek valid `Enquiry` lautaata hai, amount ko integer mein convert karke. `"amount_inr": "five lakh"` wala reply field ka naam batate hue error ke saath fail hota hai, isliye code kachra store karne ki jagah zyada sakht prompt se retry kar sakta hai.
+
+**200 emails ko process karna.** Model ko ek-ek karke call karne mein latency ka 200 guna samay lagta hai: har ek par 2 seconds ke hisaab se lagbhag 7 minute. `httpx.AsyncClient` aur `asyncio.gather` ke saath emails ek saath bheje jaate hain, aur ek **semaphore** seemit karta hai ki ek samay mein kitne chal rahe hon, taaki startup provider ki rate limit ke neeche rahe:
+
+```python
+import asyncio
+import httpx
+
+sem = asyncio.Semaphore(10)
+
+async def extract(client, email):
+    async with sem:
+        reply = await call_model(client, email)   # your async model call
+        return parse(reply)
+
+async def main(emails):
+    async with httpx.AsyncClient(timeout=30) as client:
+        return await asyncio.gather(*(extract(client, e) for e in emails))
+
+results = asyncio.run(main(emails))
+```
+
+| Tareeka | 200 emails ka samay | Rate-limit ka risk |
+| --- | --- | --- |
+| Ek-ek karke | lagbhag 7 minute | Koi nahi |
+| Saare 200 ek saath | seconds, phir bahut saare 429 errors | Zyada |
+| 10 ki limit ke saath async | lagbhag 40 seconds | Kam |
+
+## Aam galtiyaan
+
+- **Hints ko checks samajhna.** `amount: int` run time par string ko nahi rokta. Bahar ke data ko Pydantic se validate karo; hints apne code ke liye use karo.
+- **Bahut der se validate karna.** Jo kharab data boundary se nikal jaata hai woh teen functions baad uljhane wale error ki tarah dikhta hai. Andar aate hi validate karo.
+- **Async code ke andar block karna.** `async def` ke andar `requests.get` ya `time.sleep` call karne se poora event loop jam jaata hai.
+- **Concurrency ki koi limit na rakhna.** Ek saath 5,000 requests bhejne se rate limits tooti hain aur aap block ho sakte ho. Cap lagao.
+- **Har jagah dictionaries.** Functions ke beech raw dicts bhejne se `"ammount"` jaisi typos chhup jaati hain. Apne data ko ek model do.
+- **CPU wale bhaari kaam ke liye async use karna.** Isse image processing ya model training tez nahi hogi.
+
+## Practice karo
+
+Neeche link kiya FastAPI ka Python types ka introduction padho, phir Pydantic models wala page.
+
+1. **Ek model.** Invoice ke liye ek Pydantic model likho: number, date, vendor, 15 characters ka GSTIN, line items aur total.
+2. **Use todo.** Use paanch JSON strings do, jinme do tooti hui hon, aur errors print karo.
+3. **Async.** Ek async function likho jo 50 invoices ko "process" kare, model call ki jagah `asyncio.sleep(1)` ke saath, pehle ek-ek karke, phir `asyncio.gather` aur 10 ki limit ke saath. Samay compare karo.
+
+**Aapka kaam poora jab:** aap samjha sako ki Pydantic kisi system ke edge par kyun hona chahiye, aur async us service ki madad kyun karta hai jo model API ko call karti hai par uski nahi jo images resize karti hai.

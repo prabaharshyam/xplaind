@@ -1,0 +1,176 @@
+---
+id: ai-app-in-layers
+lang: hinglish
+title: "AI app ko layers mein badhao: context, guardrails, routing, caching aur agents"
+outcome: "AI product ko ek single model call se shuru karo, aur context, guardrails, router aur gateway, caches aur agent steps tabhi jodo jab asli zaroorat aaye, monitoring pehle din se."
+answer: "Ek model call se shuru karo, phir parts tabhi jodo jab zaroorat dikhe: context, guardrails, router aur gateway, caches, phir agent loops aur actions. Har layer ko pehle din se dekhte raho."
+why_it_matters: "Teams ek bhi khush user hone se pehle complex AI platform bana leti hain, phir bata nahi paati ki kaunsa hissa toota. System ko ek-ek layer karke badhaana use simple, sasta aur debug karne laayak rakhta hai, aur interviewers yahi architecture kahani sunne ki ummeed rakhte hain."
+flashcards:
+  - q: "Sabse simple AI app architecture kya hai?"
+    a: "App user ki query model ko bhejta hai aur answer wapas deta hai. Na context, na guardrails, na caching."
+  - q: "App ke badhne par aam taur par pehle kya aata hai?"
+    a: "Behtar context: documents ya data se retrieval, aur cheezein dekhne ke liye tools, taaki model sahi facts se jawab de."
+  - q: "Input guardrails kisse bachate hain?"
+    a: "Private data ka bahar ki services mein leak hona, aur harmful ya inject kiye gaye instructions ka model tak pahunchna."
+  - q: "Output guardrails kya pakadte hain?"
+    a: "User ke dekhne se pehle galat format, unsupported ya unsafe content, aur leak hua personal data. Phir retry, fall back ya kisi insaan ko de dena."
+  - q: "Model router kya karta hai?"
+    a: "Tay karta hai ki har request kahan jaaye: sasta ya strong model, specialist, stock reply ya insaan, aam taur par chhote, tez classifier se."
+  - q: "Gateway kya jodta hai?"
+    a: "Saare model calls ke liye ek jagah: keys, access control, cost limits, logging, retries aur providers ke beech fallbacks."
+  - q: "Semantic cache risky kyun hai?"
+    a: "Woh ek answer ko aise sawaal ke liye dobara use karta hai jo sirf milta-julta lagta hai. Dheela match galat answer deta hai, isliye threshold dhyan se set karo aur naapo."
+  - q: "Agent loops aur write actions kab jodne chahiye?"
+    a: "Aakhir mein, aur tabhi jab tasks ko sach mein kai steps chahiye ya kuch badalna ho, approvals aur is par limits ke saath ki agent kya kar sakta hai."
+exercise:
+  title: "Pune mein ek clinic-booking assistant"
+  setup: "Pune ke 40 clinics ki ek chain ne ek WhatsApp assistant launch kiya jo ek lambe prompt waala single model call hai. Woh timings aur fees ke sawaalon ka jawab deta hai, par patients apni lab reports ke baare mein bhi poochte hain, appointments book karne ki koshish karte hain, aur kabhi-kabhi Aadhaar aur phone numbers share kar dete hain. Costs badh rahe hain, aur wahi das sawaal traffic ka 40% hain."
+  questions:
+    - q: "Unhe sabse pehle kya jodna chahiye, aur kyun?"
+      a: "Context: apne system se maujooda timings, fees aur doctor schedules retrieve karo, taaki answers lambe prompt se andaza lagane ki jagah sahi hon."
+    - q: "Is assistant ko kaunse guardrails chahiye?"
+      a: "Input: model ko call karne se pehle Aadhaar aur phone numbers mask karo. Output: policy se aage ki medical advice block karo, aur check karo ki bataye gaye fees source se match karte hain."
+    - q: "Baar-baar aane waale sawaalon par cost safely kaise kam kar sakte hain?"
+      a: "Top FAQs ko stock answers ya normalised question par key kiye exact cache par route karo. Semantic cache tabhi use karo jab test kar lo ki uske matches bharosemand tareeke se wahi sawaal hain."
+    - q: "Kya assistant khud appointments book kare?"
+      a: "Sirf baaki sab kaam karne ke baad: ek tool ki tarah, patient ki confirmation ke saath, kya badal sakta hai us par limits ke saath, aur har booking ki logging ke saath."
+ask:
+  - "Production LLM app ko kaunse components chahiye?"
+  - "Model router aur gateway mein kya farak hai?"
+  - "Semantic cache kab achha idea hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Har AI product ek hi tarah shuru hota hai: aapka app model ko ek sawaal bhejta hai aur answer dikhata hai. Yeh ek poora, kaam karne waala architecture hai. Zyadatar asli products yahin se parts jodkar badhte hain, aur order maayne rakhta hai.
+
+Ek aam order, jaise kai teams badhti hain:
+
+1. **Context behtar karo.** Model ko sahi information do: documents se retrieval, data lookups, tools.
+2. **Guardrails lagao.** Model mein jo jaata hai aur jo nikalta hai, dono check karo.
+3. **Router aur gateway jodo.** Har request ko sahi jagah bhejo, aur saare model calls ko ek jagah manage karo.
+4. **Caches jodo.** Ek hi kaam ke liye do baar paise mat do.
+5. **Agent patterns jodo.** Loops, kai steps aur duniya mein cheezein badalne waale actions.
+
+Is sab ke saath, pehle din se: **monitoring**, taaki aap dekh sako ki har hissa kya kar raha hai.
+
+Yeh koi sakht recipe nahi hai. Matlab yeh hai ki layer tabhi jodo jab koi asli problem maange, taaki system utna hi simple rahe jitna product ijaazat de.
+
+```flow
+title: Badhe hue AI app se guzarti ek request
+User question -> Input guardrails | personal data mask, injection block
+Input guardrails -> Router | intent: FAQ, account, scope ke bahar
+Router -[FAQ]-> Cache | exact ya semantic
+Cache -[miss]-> Retrieve context | documents, data, tools
+Router -[account]-> Retrieve context
+Router -[scope ke bahar]-> Stock reply
+Retrieve context -> Gateway | keys, limits, retries, fallback
+Gateway -> Model
+Model -> Output guardrails | format, facts, safety
+Output guardrails -[fail]-> Retry ya insaan ko do
+Output guardrails -[pass]-> Answer do aur trace log karo
+```
+
+## Ye kaam kaise karta hai
+
+**Step 1: context behtar karo.** Model sirf apna training data aur jo aap prompt mein daalte ho woh jaanta hai. Shuruaati quality problems zyadatar missing ya purane facts hoti hain, isliye pehla jod aam taur par retrieval (documents, database, search index) ya tools (order lookup, calculator) hota hai. RAG aur tool-calling ke lessons inhe gehraai se cover karte hain.
+
+**Step 2: guardrails.** Do tarah ke hote hain.
+
+- **Input guardrails** private data ko bahar ki services mein leak hone se rokte hain, jaise model call se pehle Aadhaar numbers, phone numbers aur names mask karke, aur harmful ya inject kiye gaye instructions pakadte hain.
+- **Output guardrails** user ke dekhne se pehle answer check karte hain: valid format, koi unsupported claim nahi, koi personal data nahi, aapki policy ke khilaaf kuch nahi. Check fail ho toh retry kar sakte ho, kisi aur model par fall back kar sakte ho, safe message de sakte ho ya kisi insaan ko de sakte ho.
+
+Guardrails latency badhate hain, khaaskar streamed answers mein, jahan tay karna padta hai ki text dikhane se pehle check karein ya dikhate waqt. Tez checks inline rakho aur dheeme wale ek sample par.
+
+**Step 3: router aur gateway.**
+
+- **Router** tay karta hai ki request kahan jaaye, aam taur par ek chhote, tez intent classifier se. Woh aasaan sawaal sasta model ko aur mushkil sawaal strong model ko bhej sakta hai, billing disputes insaan ko bhej sakta hai, scope ke bahar ke sawaalon ka jawab bina model call kiye ek polite stock reply se de sakta hai, ya message ambiguous ho toh clarification maang sakta hai ("Freeze my account, or the weather?").
+- **Gateway** woh ek jagah hai jisse har model call guzarta hai. Woh API keys rakhta hai taaki woh services mein bikhri na hon, tay karta hai ki kaun kaunsa model use kar sakta hai, spend limits lagu karta hai, har call log karta hai, aur ek provider down ho toh retry ya doosre provider par fall back karta hai.
+
+**Step 4: caches.**
+
+- **Exact cache:** wahi normalised question, template version aur model ho toh wahi stored answer milta hai. Safe aur simple.
+- **Semantic cache:** jab naya sawaal purane sawaal ke jaisa *matlab* rakhta ho toh answer dobara use karo, embeddings aur similarity threshold se match karke. Sawaal repeat hon toh yeh bahut bacha sakta hai, par dheela match galat answer deta hai ("refund for order 1" "refund for order 2" ke kareeb hai). Ise tabhi jodo jab hit rate zyada ho aur aapne uski galtiyaan naapi hon.
+
+Dobara use karne ke liye safe exact cache key mein woh sab shaamil hota hai jo answer badalta hai:
+
+```python
+import hashlib, re
+
+def cache_key(question, template_version, model, day):
+    """Same key only when the answer would be the same: same words, prompt, model and day."""
+    normalised = re.sub(r"\s+", " ", question.strip().lower())
+    raw = f"{normalised}|{template_version}|{model}|{day}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+# cache_key("What are Dr Mehta's timings?", "v7", "fast-model", "2026-11-08")
+```
+
+- **Prompt caching** aur **KV cache** model provider ya server par hote hain; unke kaam karne ke liye apne prompt ka fixed hissa pehle rakho.
+
+**Step 5: agent patterns.** Ab tak har request ek hi taraf behti thi. Agent patterns loops (pehla answer adhoora ho toh dobara retrieve karo), kai steps, aur email bhejne ya appointment book karne jaise **write actions** jodte hain. Yeh system ko bahut zyada capable aur bahut zyada risky banate hain. Inhe aakhir mein jodo, data badalne waali har cheez ke liye approvals ke saath, tools kya kar sakte hain us par limits ke saath, aur steps aur spend par budgets ke saath.
+
+**Pehle din se monitoring.** Har request ko trace ki tarah log karo: input, retrieved context, model, prompt version, output, guardrail results, latency aur cost, personal data mask karke. Dashboard par kuch signals track karo: error aur refusal rates, guardrail triggers, cost per request, latency aur user feedback. System badhne par traces hi batati hain ki kaunsi layer fail hui.
+
+| Layer | Kab jodein | Aam tools | Kaunsa naya risk laati hai |
+| --- | --- | --- | --- |
+| Context | Answers facts chhodte ya gadhte hain | Vector search, SQL, APIs | Galat ya purane documents |
+| Guardrails | Asli users aur asli data aate hain | PII masking, validators, judge checks | Latency, galat blocks |
+| Router | Requests ki difficulty ya type alag hai | Chhota classifier, rules | Galat route hui requests |
+| Gateway | Ek se zyada model, service ya team | LiteLLM, cloud gateways | Single point of failure |
+| Cache | Bahut saare repeated sawaal | Redis, vector index | Purana ya galat reuse |
+| Agents aur actions | Tasks ko kai steps ya badlaav chahiye | Agent SDKs, LangGraph | Bekaabu loops, harmful actions |
+
+## Ek example se samjho
+
+Pune ke 40 clinics ki ek chain WhatsApp assistant chalati hai. Woh timings aur fees list karne waale lambe prompt ke saath ek model call se shuru hua. Chhe mahine baad chaar problems hain: bataye gaye fees kabhi-kabhi purane hote hain, patients messages mein Aadhaar aur phone numbers share karte hain, wahi das sawaal traffic ka 40% hain, aur patients assistant se appointments book karwane ko kehte rehte hain.
+
+Woh ise order mein badhate hain:
+
+1. **Context.** Timings, fees aur doctor schedules ab sawaal ke waqt clinic system se aate hain. Purane fees gayab.
+2. **Guardrails.** Kisi bhi model call se pehle Aadhaar aur phone numbers mask hote hain. Ek output check diagnosis jaisa lagne waali har cheez block karta hai aur confirm karta hai ki fees clinic system se match karte hain.
+3. **Router.** Ek chhota classifier top FAQs ko fixed answers par, lab-report sawaalon ko secure link par, aur kisi bhi urgent cheez ko phone number par bhejta hai, bina model call ke.
+4. **Exact cache** baaki repeated sawaalon ke liye, normalised question aur date par key kiya hua, kyunki schedules roz badalte hain.
+5. **Booking ek tool ki tarah**, aakhir mein: assistant ek slot propose karta hai, patient button se confirm karta hai, aur har booking log hoti hai.
+
+| Measure | Pehle | Baad mein |
+| --- | --- | --- |
+| Har 1,000 messages par model calls | 1,000 | 520 |
+| Galat fee ya timing answers (hafte ka sample) | 6% | 1% se kam |
+| Aadhaar numbers ke saath model ko bheje messages | Roz kuch | Koi nahi |
+| Chat mein poori hui bookings | 0 | Booking requests ka 22% |
+
+Numbers samjhane ke liye hain. Unhone semantic cache nahi jodi: ek test ne dikhaya ki woh "Dr Mehta's timings" ko "Dr Mehra's timings" se match kar deti thi.
+
+## Aam galtiyaan
+
+- **Pehle poora platform bana dena.** Das users se pehle paanch layers ka matlab debug karne ke paanch jagah aur seekha kuch nahi.
+- **Context theek hone se pehle agents jodna.** Galat facts par kaam karne waala agent zyada nuksaan karta hai, aur tezi se.
+- **Sirf log karne waale guardrails.** Jo check block, retry ya escalate nahi karta, woh kuch protect nahi karta.
+- **Details waale sawaalon par semantic cache.** Order numbers, names aur dates milte-julte sawaalon ke matlab alag kar dete hain.
+- **Traces na hona.** Har request ki trace ke bina aap nahi bata sakte ki retrieval, router ya model mein se kaun fail hua.
+- **Keys aur limits services mein bikhre hona.** Gateway, simple hi sahi, spend aur access ko ek jagah rakhta hai.
+
+## Jab simple rehna theek hai
+
+- **Kuch logon ke internal tools** ko shaayad kabhi router, gateway ya cache ki zaroorat na pade.
+- **Kam volume** caching aur routing ki bachat ko itna chhota bana deta hai ki farak nahi padta.
+- **Read-only answers** ko agent loops ya write actions nahi chahiye.
+
+## Demo se production tak
+
+- **Likh lo ki har layer kyun hai**, uski solve ki hui problem aur naape gaye asar ke saath.
+- **Layers ko alag se test karo**: retrieval recall, router accuracy, guardrail false-block rate, cache error rate.
+- **Sab kuch saath version karo**: prompts, router model, guardrail rules aur cache keys, taaki release ek saath rollback ho sake.
+- **Safely fail karo**: agar koi layer down hai, toh request ko error page ki jagah ek simple path par fall back karna chahiye.
+
+## Practice karo
+
+1. Kisi AI feature ka architecture jo aap jaante ho, jaisa abhi hai waisa banao. Paanch layers mein se kaunsi usme hain?
+2. Har missing layer ke liye likho ki kaunsi problem use jodne ko sahi thehrayegi, aur use kaise naapoge.
+3. Ek repeated question type chuno aur tay karo: stock answer, exact cache, semantic cache ya kuch nahi. Kyun, samjhao.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 10 aur unka free article "Building a generative AI platform" is architecture ko step by step samjhate hain.
+
+**Aapka kaam poora jab:** aap paanchon layers ko order mein bana sako, router aur gateway ka farak samjha sako, aur bata sako ki semantic cache kab safe hai.

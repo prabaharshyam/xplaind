@@ -1,0 +1,245 @@
+---
+id: tool-calling
+lang: tanglish
+title: "Tool calling"
+outcome: "Oru model-ku oru tool kudukkalaam, adhu ketkura call-a odalaam, result-a thirumba anuppi adhu badhil solla vaikkalaam."
+answer: "Tool calling oru model-a unga code-a oru function odikka sollikka vidum, example oru order check panradhu. Unga code adha odum, result-a thirumba anuppum, model adha vechu badhil solum."
+why_it_matters: "Model edhaiyaavadhu lookup panna, maths-a nambagamaa seiya, actions edukka tool calling thaan vazhi. Ovvoru agent-oda building block-um idhu thaan."
+flashcards:
+  - q: "Tool calling-na enna?"
+    a: "Model, unga code oru describe panna function-a specific arguments-oda odanum-nu kekka vidradhu, apram result-a vechu badhil solradhu."
+  - q: "Model tool-a thaanaave odumaa?"
+    a: "Illa. Model kekka mattum seiyum; unga code validate pannum, tool-a odum, result-a thirumba anuppum, adhanaala neenga control-la irukkeenga."
+  - q: "Oru tool-a describe panna entha moonu pagudhigal?"
+    a: "Oru name, oru description, oru input schema."
+  - q: "Eppo tool-a call pannanum-nu model mukkiyamaa edha vachu mudivu pannum?"
+    a: "Adhoda name-um description-um, adhanaala avai clear-aa, specific-aa irukkanum."
+  - q: "Tool round trip-oda steps enna?"
+    a: "Message-um tools-um anuppunga; model oru call kekkum; unga code validate panni odum; result-a thirumba anuppunga; model badhil solum illa thirumba call pannum."
+  - q: "Oru tool fail aanaa enna thirumba anuppanum?"
+    a: "Tool result-aa oru clear error message, example edhu kidaikkala, user-kitta enna kekkanum-nu, adhanaala model recover aagum."
+  - q: "Tool calling-a eppadi safe-aa vachirukkalaam?"
+    a: "Arguments-a validate pannunga, read-only tools-um actions seira tools-um pirichu vainga, risky actions-ku confirmation vaanga, results-a data-vaa nenachukkunga."
+  - q: "Server-side tools-na enna?"
+    a: "Web search maadhiri model provider thaane odura tools. Unga sondha systems-ku tools unga pakkam odum."
+  - q: "tool_choice edha control pannum?"
+    a: "Model mudivu pannalaamaa (auto), edhaavadhu oru tool use pannanumaa (any), oru per solla pattha tool-a use pannanumaa, illa tools use pannakoodaadha (none)."
+  - q: "Ungakitta irukkura ella tools-aiyum model-ku yen kudukka koodaadhu?"
+    a: "Adhigam tools-na neenda prompts-um adhigam thappaana choices-um. Alandhu paatha help pannura tools-a mattum vainga, eppavum serndhu use aagura tools-a merge pannunga."
+exercise:
+  title: "Round trip-a trace pannunga"
+  setup: "Bhopal-la oru electricity distributor thanga WhatsApp assistant-ku tools serkkudhu: get_bill(consumer_no), get_outage_status(area), register_complaint(consumer_no, issue). Oru consumer ezhudhuraanga: 'Arera Colony-la kaalaila irundhu power illa, en bill 4471283 romba adhigamaa irukku.' Consumer numbers 7 digits. Outage service methuvaa irukku, sila samayam time out aagudhu."
+  questions:
+    - q: "Model entha tools-a, entha arguments-oda call pannanum?"
+      a: "area 'Arera Colony'-oda get_outage_status, consumer number 4471283-oda get_bill."
+    - q: "get_bill-a odika munnaadi code enna seiyanum?"
+      a: "Argument-a validate pannunga: 7 digits, indha WhatsApp number andha consumer-oda link aagi irukkudhaa-nu."
+    - q: "get_outage_status time out aanaa enna return pannanum?"
+      a: "'Outage status ippo kidaikkala; neenga oru complaint register pannalaam' maadhiri clear message, kaali result illa."
+    - q: "Model udanae register_complaint-a call pannalaamaa?"
+      a: "Consumer confirm pannina aprom mattum, yenna adhu oru record create pannum; model adha offer panni mudhalla kekkanum."
+ask:
+  - "LLMs-la function calling-na enna?"
+  - "Entha tool-a call pannanum-nu model eppadi mudivu pannum?"
+  - "Oru tool model-ku errors-a eppadi return pannanum?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Tool calling** (function calling-nu-m solluvaanga) oru model-a unga code-a use panna vidum. Neenga model-ku tools-a describe pannuveenga: adhoda per, adhu enna seiyum, edhellaam inputs edukkum. Oru kelvikku oru tool thevai-na, model adha specific arguments-oda call panna oru request-oda badhil solum. Unga code tool-a odum, result-a thirumba anuppum, model adha vechu badhil solum.
+
+Model thaanaave edhaiyum odaadhu. Unga code control-la irukkum.
+
+```flow
+title: The model never runs anything itself: your code stays in control
+1. Your app sends the user message + tool list -> 2. The model asks: tool_use get_order_status | order_id
+2. The model asks: tool_use get_order_status -> 3. Your app validates the arguments and runs the real function
+3. Your app validates the arguments and runs the real function -> 4. tool_result | "Shipped 3 Nov, out for delivery"
+4. tool_result -> 5. The model gives a final answer, or another tool_use
+```
+
+Indha lesson-la Gurugram-la oru fashion e-commerce site, thanga support chat-ku order tools serkkaradha follow pannuvom.
+
+## Idhu eppadi work aagudhu
+
+**Tool-a describe pannunga.** Ovvoru tool-kum oru name, oru description, oru input schema irukku:
+
+```python
+tools = [{
+    "name": "get_order_status",
+    "description": "Look up an order's status and expected delivery date by order id. "
+                   "Use when the customer asks where their order is.",
+    "input_schema": {
+        "type": "object",
+        "properties": {"order_id": {"type": "string", "description": "Like ORD-12345678"}},
+        "required": ["order_id"],
+    },
+}]
+```
+
+Eppo tool-a call pannanum-nu model mukkiyamaa adhoda **name-um description-um** vechu mudivu pannum, schema-la irundhu arguments-a nirappum. Clear-aana, specific-aana descriptions vera edhaiyum vida mukkiyam.
+
+**Round trip.**
+
+1. User-oda message-aiyum tool list-aiyum anuppunga.
+2. Model oru tool-use request-oda badhil solum, example `{"order_id": "ORD-48213907"}`-oda `get_order_status`.
+3. Unga code arguments-a validate pannum, nijamaana function-a odum, oru result vaangum.
+4. Andha request-oda link aana oru tool-result message-la result-a thirumba anuppunga.
+5. Model final answer-a ezhudhum, illa innoru tool kekkum.
+
+**Errors-um results thaan.** Order illa, illa oru service down-naa, tool result-aa oru clear error message anuppunga ("ORD-48213907 id-la entha order-um kidaikkala; customer-a id-a check panna sollunga"). Appo model guess panna badhila recover aagalaam, user-a kekkalaam, illa apology sollalaam.
+
+**Safety.** Edhaiyum odika munnaadi arguments-a validate pannunga. Read-only tools-a, maathura tools-la irundhu pirichu vainga, risky actions-ku confirmation vaanga. Tool results-a data-vaa nenachukkunga, instructions-aa illa.
+
+**Server-side tools.** Sila providers thaane odura tools-um tharuvaanga (web search maadhiri). Unga sondha systems-ku, tools-a unga pakkam odinga.
+
+**Nalla, mosamaana tool definitions:**
+
+| Pagudhi | Mosam | Nalladhu |
+| --- | --- | --- |
+| Name | `order` | `get_order_status` |
+| Description | "Order API" | "Look up an order's status and delivery date by order id. Use when the customer asks where their order is." |
+| Parameter | `id: string` | `order_id`, "Like ORD-12345678"-nu describe panninadhu |
+| Error result | Kaali | "No order found with id ...; ask the customer to check the id" |
+
+**Arguments-a validate panradhu.** Model-oda arguments-a oru web form-la irundhu varra input maadhiri nenachukkunga. Schema-ku ethiraa types-aiyum formats-aiyum check pannunga, andha record-la act panna user-ku anumadhi irukka-nu check pannunga, matha edhaiyum oru useful error result-oda reject pannunga. Oru model vera customer-oda order-a sernthu oru sariyaana-format id-a produce pannalaam, adhanaala ownership checks unga code-la irukkanum, prompt-la illa.
+
+**Oru reply-la pala tool calls.** Calls onnu mattonnu-a sarndhu illaama irundhaa, model oru thadavaiyilaye onnukku mela tools-a kekkalaam, example oru order status-um return policy-yum. Avatrai odunga, venumna parallel-aa, ovvoru request-kum request id-oda link aana oru result anuppunga. Oru call innoru call-oda result-a sarndhu irundhaa, model avatrai thani turns-la kekkum.
+
+**Tools-ku idaila choose panradhu.** Rendaavadhu, moonaavadhu tool-a serkkum podhu, konjam nijamaana kelvigalukku model edha pick pannudhu-nu test pannunga. Thappaa choose pannaa, fix kittathatta eppavum descriptions-la irukkum: ovvoru tool eppo apply aagum, eppo aagaadhu-nu thelivaa sollunga.
+
+**Moonu vagai tools, moonu level risk.**
+
+| Vagai | Examples | Risk | Rule |
+| --- | --- | --- | --- |
+| Read: arivai edukkradhu | Order status, product search, policy lookup | Kammi-la irundhu naduthara: data-va expose pannalaam | User-ku paarkka anumadhi irukka-nu check pannunga; thevaiyaana fields-a mattum return pannunga |
+| Compute: thiramaiya neettikkradhu | Calculator, date maths, sandbox-la code odradhu | Sandbox pannaa kammi | Paisa, dates-ku model arithmetic-a vida tools-a prefer pannunga |
+| Write: ulagathai maathradhu | Return start panradhu, email anuppradhu, record update panradhu, payment seiyradhu | Adhigam | Confirmation, limits, oru audit log; nambikkai illaadha text-la irundhu mattum eppavum seiyaadheenga |
+
+**Tool use-a steer panradhu.** Default-aa model oru tool-a call pannalaamaa-nu mudivu pannum (`auto`). Edhaavadhu oru tool venum-nu kekkalaam (`any`), oru per solla pattha tool venum-nu kekkalaam (structured output-ku useful), illa oru turn-ku tools-a off pannalaam (`none`). Fixed workflows-la tools-a force panradhu handy; open chat-la, clear descriptions-oda `auto` thaan perumbaalum nallaa work aagum.
+
+**Code-la muzhu round trip.** Idhu Anthropic-oda Python SDK-a use pannudhu; matha providers-um adhe pattern-a follow pannuvaanga. Arguments Pydantic-aala validate aagum, ownership code-la check aagum, write tool-ku customer-oda confirmation thevai:
+
+```python
+import anthropic
+from pydantic import BaseModel, Field, ValidationError
+
+client = anthropic.Anthropic()
+MODEL = "claude-sonnet-5-5"            # check the docs for current model names
+
+class OrderArgs(BaseModel):
+    order_id: str = Field(pattern=r"^ORD-\d{8}$")
+
+ORDERS = {"ORD-48213907": {"customer": "c_101", "status": "Out for delivery today"}}
+
+def get_order_status(customer_id, order_id):
+    order = ORDERS.get(order_id)
+    if not order or order["customer"] != customer_id:          # ownership check in code
+        return f"No order {order_id} on this account; ask the customer to check the id."
+    return order["status"]
+
+def start_return(customer_id, order_id, confirmed=False):
+    if not confirmed:
+        return "Not started: ask the customer to confirm the return first."
+    return f"Return started for {order_id}; pickup in 2 days."
+
+TOOLS = [
+    {"name": "get_order_status", "description": "Look up an order's status by order id. Use when the customer asks where an order is.",
+     "input_schema": OrderArgs.model_json_schema()},
+    {"name": "start_return", "description": "Start a return. Only after the customer has clearly confirmed in this chat.",
+     "input_schema": OrderArgs.model_json_schema()},
+]
+HANDLERS = {"get_order_status": get_order_status, "start_return": start_return}
+
+def chat_turn(customer_id, messages, confirmed=False):
+    while True:
+        reply = client.messages.create(model=MODEL, max_tokens=600, tools=TOOLS, messages=messages)
+        messages.append({"role": "assistant", "content": reply.content})
+        calls = [b for b in reply.content if b.type == "tool_use"]
+        if not calls:
+            return "".join(b.text for b in reply.content if b.type == "text")
+        results = []
+        for call in calls:                                   # one result per request, matched by id
+            try:
+                args = OrderArgs.model_validate(call.input)
+                fn = HANDLERS[call.name]
+                extra = {"confirmed": confirmed} if call.name == "start_return" else {}
+                out, err = fn(customer_id, args.order_id, **extra), False
+            except ValidationError:
+                out, err = "Order ids look like ORD-12345678. Ask the customer for theirs.", True
+            results.append({"type": "tool_result", "tool_use_id": call.id, "content": out, "is_error": err})
+        messages.append({"role": "user", "content": results})
+
+msgs = [{"role": "user", "content": "Where is ORD-48213907?"}]
+print(chat_turn("c_101", msgs))
+```
+
+Moonu vishayam gavanikkanum. Customer id unga session-la irundhu varum, model-la irundhu eppavum illa. Confirmation flag unga sondha interface-aala set aagum ("Yes, start the return" button), customer othukitaanga-nu model solradhaala illa. Thappaana illa vera aal-oda order id-kum adhe magizhchiyaana message thaan varum, adhanaala vera yaarodavo order irukku-nu bot eppavum confirm pannaadhu. Nijamaana app-la, agent-loop lesson kaattura maadhiri, `while` loop-a oru step limit-oda cap pannunga.
+
+**Tool set-a choose panradhu.** Adhigam tools adhigam thiramaigal tharum, aana choose panradhai kashtamaakkum, context-a descriptions-aala nirappum. Konjam palakkangal:
+
+- **Konjam tools-oda aarambinga**, oru test question-ku thevaippattaa mattum onna serunga.
+- **Help pannaadha tools-a edunga**: oru tool illaama success kuraiyalaina, adha vittudunga.
+- **Usage-a gavanichukkunga**: ovvoru tool-ku calls-a ennunga. Eppavum call aagaadha tool mosamaa describe aagi irukkalaam; adikkadi thappaa call aagura tool-ku simple-aana design thevai irukkalaam.
+- **Eppavum serndhu odura tools-a merge pannunga**, "find customer" apram "get orders" maadhiri, onna.
+
+**MCP-oda tools-a share panradhu.** Model Context Protocol AI apps-ku tools-um data-vum expose panna oru open standard. Oru tool-a oru MCP server-aa oru thadava ezhudhunga, MCP-a support panra entha app-um agent-um adha use pannalaam. Adhe rules: inputs-a validate pannunga, permissions-a check pannunga, write actions-la jaakkirathaiyaa irunga.
+
+**Tool use-a test panradhu.** Nijamaana kelvigal list-a vainga, neenga edhirpaarkkura tool-um arguments-um oda, tool thevai illaadha kelvigal-um serthu. Tools, descriptions, illa model-la ovvoru maatrathukkum aprom adha odunga, thappaana tool, thappaana arguments, thavara vitta calls-a ennunga. Berkeley Function Calling Leaderboard maadhiri public benchmarks models-a idhula compare pannum, aana unga sondha kelvigal innum mukkiyam.
+
+## Oru worked example
+
+Gurugram-la oru fashion e-commerce site thanga support chat-ku order tools serkkudhu: `get_order_status`, `get_return_policy`, `start_return` (customer confirm pannanum).
+
+Oru customer ezhudhuraanga: "Where is my kurta order ORD-48213907? If it's late I want to return it."
+
+1. Model id-oda `get_order_status`-a call pannum.
+2. Code return pannum: "Shipped 3 Nov, out for delivery today, Gurugram hub."
+3. Model order innaiku varum-nu badhil sollum, `get_return_policy`-a call panni 15-naal return window-a explain pannum.
+4. Order late illa-nu adhu `start_return`-a call pannaadhu; customer vazhiyil nindraal, mudhalla confirmation kekkum.
+
+Oru customer thappaana id type pannaa, tool oru "not found" message return pannum, model avangala confirmation SMS-a check panna sollum.
+
+| Customer message | Call aana tools | Result |
+| --- | --- | --- |
+| "Where is ORD-48213907? Return if late" | get_order_status, get_return_policy | Innaiku varum; 15-naal return window explain aachu |
+| Return pannanum-nu vazhiyil nirkkiraanga | Confirm aagura varaikkum onnum illa | start_return-ku munnaadi confirmation kekkum |
+| Thappaana order id | get_order_status "not found" return pannum | Confirmation SMS-a check panna solludhu |
+
+## Podhuvaa panra thappugal
+
+- **Vague tool descriptions.** Appo model thappaana tool-a, illa edhuvum call pannaadhu.
+- **Arguments-a validate pannaama tools-a odradhu.**
+- **Errors-a vizhungradhu.** Avatrai clear tool results-aa return pannunga.
+- **Confirmation illaama risky actions.**
+- **Tool result-a thirumba anuppa marakkradhu.** Adhu illaama model badhil solla mudiyaadhu.
+- **Model-la irundhu identity-yum consent-aiyum nambradhu.** User id-yum "customer othukitaanga"-nu solradhum tool arguments-la illa, unga app-la irundhu varanum.
+- **Periya results-a return panradhu.** Model-ku thevaiyaana konjam fields-a mattum return pannunga; periya results tokens-a selavu pannum, adha kuzhappum.
+- **Model-la sums seiyradhu.** Totals, discounts, dates-a oru tool calculate pannattum.
+
+## Tools eppo thevai illa
+
+- **Badhil prompt-layae illa already retrieve panna documents-la irukku.**
+- **Oru fixed step eppavum odum**: unga code-la function-a call panni, adhoda result-a prompt-la podunga.
+- **Oru JSON shape mattum thevai**: structured output simple-aa irukkalaam, force panna oru single tool adha pera oru vazhi.
+
+## Demo-la irundhu production-ku
+
+- **Tool definitions-a prompt-oda version pannunga**, ovvoru maatrathukkum tool choice-a test pannunga.
+- **Ovvoru call-aiyum log pannunga**: tool, arguments, result size, neram, errors, yaaruku odichu.
+- **Ovvoru tool-kum timeouts set pannunga**, oru tool methuvaa irundhaa clear message return pannunga.
+- **Read, write tools-a code-layum permissions-layum pirichu vainga**, writes-ku audit log-oda.
+- **Write actions-a user-ku-um naal-ku-um rate-limit pannunga.**
+
+## Practice pannunga
+
+Keezha link panni irukkura tool-use overview-a padinga.
+
+1. Oru model-ku oru read-only tool kudunga (example oru weather lookup illa oru chinna product table), code-la muzhu round trip-a mudinga.
+2. Theriyaadha inputs-ku tool oru error return panna vainga, model adha handle pannuradha kaattunga.
+3. Rendaavadhu tool-a serthu, aindhu vera kelvigalukku model edha choose pannudhu-nu test pannunga.
+
+Innum aazhama paaka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-la chapter 6 tool types, write actions, function calling, tool set choose panradhu pathi cover pannudhu.
+
+**Mudinjadhu-nu eppo sollalaam:** Tool-a yaaru odum, eppo adha call pannanum-nu model edha vechu mudivu pannum, adhu fail aanaa enna thirumba anuppanum-nu explain panna mudiyum.

@@ -1,0 +1,195 @@
+---
+id: embeddings
+lang: hinglish
+title: "Embeddings"
+outcome: "Samjho ki embedding kya hai, aur ek embedding use karke pata lagao ki kaunse sentences ka matlab milta-julta hai."
+answer: "Embedding text ko numbers ki list mein badalta hai, taaki milte-julte matlab waale texts ko paas-paas ke numbers milein. AI isi se similar sentences dhoondta hai, chaahe unmein ek bhi word common na ho."
+why_it_matters: "Search, RAG aur recommendation exact words ki jagah meaning samajhne ke liye embeddings use karte hain. Lagbhag har GenAI interview round mein inke baare mein poochha jaata hai."
+flashcards:
+  - q: "Embedding kya hai?"
+    a: "Numbers ki ek list jo kisi text ka meaning represent karti hai, taaki milte-julte meaning waale texts ke vectors similar direction mein point karein."
+  - q: "Embeddings 'how do I get my money back' se 'refund policy' kaise dhoondh lete hain?"
+    a: "Dono texts mein koi word common nahi hai par meaning milta-julta hai, isliye unke vectors paas-paas hote hain."
+  - q: "Cosine similarity kya hai?"
+    a: "Do vectors ki direction compare karne waala score: 1 ka matlab same direction, lagbhag 0 ka matlab unrelated."
+  - q: "Kya do alag embedding models ke vectors compare kar sakte hain?"
+    a: "Nahi. Har model ki apni space hoti hai. Model badalne par sab kuch dobara embed karna padta hai."
+  - q: "Embed karne se pehle lambe documents ko chunk kyun karein?"
+    a: "Lambe document ka ek hi vector detail kho deta hai, aur model ki input limit ke aage ka text chupchaap kat jaata hai."
+  - q: "Kya 0.62 similarity score ka matlab 62% relevant hona hai?"
+    a: "Nahi. Scores sirf ranking ke liye hain, aur achhe thresholds model ke hisaab se alag hote hain, isliye cut-offs apne data se set karo."
+  - q: "Embeddings kahan kamzor hain?"
+    a: "Exact terms par, jaise order numbers, product codes aur rare names. Inke liye keyword search ke saath jodo."
+  - q: "Vector database ki zaroorat kab padti hai?"
+    a: "Jab aapke paas millions of vectors hon. Kuch hazaar ke liye NumPy array aur dot product kaafi hain."
+  - q: "Ek million 768-dimension embeddings ko kitni memory chahiye?"
+    a: "32-bit floats mein lagbhag 3 GB (1,000,000 × 768 × 4 bytes), 16-bit mein aadhi, aur 8-bit mein chauthai."
+  - q: "Kuch embedding models ko 'query:' aur 'passage:' prefixes kyun chahiye?"
+    a: "Unhein in markers ke saath train kiya gaya tha taaki sawaal aur documents mein farak kar sakein. Chhod dene par search quality chupchaap gir jaati hai."
+exercise:
+  title: "Embedding setup chuno"
+  setup: "Jaipur ki ek travel company ko 15,000 FAQ answers aur 40,000 customer reviews par English aur Hindi mein semantic search chahiye. Queries mein 'refund kab milega', 'cancel my Goa trip' aur 'TRV-88213' jaise booking ids shaamil hain. Ek engineer ka suggestion hai ki har review ko ek vector ki tarah embed karo, top English-only leaderboard model use karo, aur 0.7 se upar ke score waale results dikhao."
+  questions:
+    - q: "Model choice mein kya galat hai?"
+      a: "Customers Hindi aur Hinglish mein likhte hain. Multilingual model chuno aur decide karne se pehle bees real queries par candidates test karo."
+    - q: "Booking id waali query kaise fail hogi, aur kya fix karega?"
+      a: "Exact codes par embeddings kamzor hain. Keyword search jodo, ya id jaisi dikhne waali queries ko direct lookup par bhejo."
+    - q: "Kya 0.7 ka threshold theek hai?"
+      a: "Bina evidence ke nahi. Thresholds model ke hisaab se alag hote hain; labelled relevant aur irrelevant pairs par scores dekhkar ek chuno."
+    - q: "Kya 55,000 texts ke liye vector database chahiye?"
+      a: "Zaroori nahi. Normalised NumPy array ya maujooda Postgres mein pgvector kaafi hai; dedicated database optional hai."
+ask:
+  - "Embeddings meaning ko kaise capture karte hain?"
+  - "Indian languages ke liye kaunsa embedding model use karun?"
+  - "Cosine similarity aur dot product mein kya farak hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Embedding numbers ki ek list hai jo kisi text ka meaning represent karti hai. Ek sentence embedding model mein jaata hai aur, maan lo, 384 ya 1,536 numbers ban kar nikalta hai. Ye numbers akele dekhne par kisi insaan ke liye kuch matlab nahi rakhte. Asli baat ye hai ki do lists kaise compare hoti hain: milte-julte matlab waale texts ki lists lagbhag same direction mein point karti hain, aur unrelated texts ki lists alag-alag direction mein.
+
+Semantic search ka yehi trick hai. "How do I get my money back?" aur "refund policy" mein ek bhi word common nahi, phir bhi unke embeddings paas-paas hain, isliye embeddings par bani search ek se doosra dhoondh leti hai. Keyword search ise miss kar deta.
+
+Aap embeddings ko search, RAG, duplicate tickets dhoondhne, customer feedback ko theme ke hisaab se group karne aur milte-julte items recommend karne ke liye use karoge.
+
+```flow
+dir: LR
+"How do I get my money back?" -[embedding model]-> 0.12, -0.40, 0.88 ...
+"Refund policy" -[embedding model]-> 0.10, -0.37, 0.91 ...
+"Video buffers on mobile data" -[embedding model]-> -0.65, 0.22, 0.05 ...
+0.12, -0.40, 0.88 ... -> Close: similar meaning
+0.10, -0.37, 0.91 ... -> Close: similar meaning
+-0.65, 0.22, 0.05 ... -> Far: a different meaning
+```
+
+Is lesson mein hum Chennai ki ek edtech company ki support team ke saath chalenge, jo chahti hai ki agents ko similar solved tickets dikhein.
+
+## Ye kaam kaise karta hai
+
+1. **Embedding model text padhta hai.** Ye ek neural network hai jise bahut saare aise text pairs par train kiya gaya hai jo match hone chahiye (sawaal aur uska jawab, title aur uska article) aur aise pairs par jo match nahi hone chahiye. Training match hone waale pairs ko paas laati hai.
+2. **Ye ek vector output karta hai.** Chhota ho ya lamba, har text ek model ke liye same length ka vector ban jaata hai. Alag models alag lengths dete hain, aur alag models ke vectors ek doosre se compare nahi kiye ja sakte.
+3. **Vectors ko similarity score se compare karte hain.** Aam taur par cosine similarity: 1 ka matlab same direction, 0 ka matlab unrelated. Kai libraries vectors ko normalise kar deti hain, isliye simple dot product bhi wahi ranking deta hai.
+4. **Baad mein search ke liye vectors store karo.** Kuch hazaar texts ke liye NumPy array kaafi hai. Millions ke liye pgvector, Qdrant ya Pinecone jaisa vector database approximate index se nearest vectors jaldi dhoondh leta hai.
+
+Do practical baatein. Pehli, query aur documents dono ko same model se embed karo. Doosri, embedding model ki apni input limit hoti hai, aksar kuch sau tokens, aur usse lamba kuch bhi chupchaap kat jaata hai. Lambe documents ko embed karne se pehle chunks mein todne ki ek wajah ye bhi hai.
+
+**Model chunna:**
+
+| Option | Size aur cost | Kiske liye achha |
+| --- | --- | --- |
+| Chhota open model (jaise MiniLM) | Laptop par chalta hai, free | Prototypes, English text, hazaaron items |
+| Bada open multilingual model | Speed ke liye GPU chahiye, chalaana free | Indian languages, Hinglish, behtar quality |
+| Hosted embedding API | Per token pay, koi server nahi | Tez shuruaat, bada scale, managed updates |
+
+**Chunne se pehle test karo.** Bees real queries lo aur har ek ke liye woh ticket ya passage jo sabse pehle aana chahiye. Do-teen candidate models se sab kuch embed karo aur gino ki sahi item kitni baar top teen mein aata hai. Isme ek afternoon lagta hai aur ye kisi bhi public leaderboard se behtar hai, kyunki ye aapke users ke words, spellings aur languages use karta hai. Model badalne ka sochte waqt ye test dobara karo, kyunki badalne ka matlab poora collection dobara embed karna hai.
+
+**Code mein embeddings.** `sentence-transformers` library ke saath:
+
+```python
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+docs = ["Dhoni hit the winning six in 2011", "Add the soaked rice to the biryani masala",
+        "Kohli scored a century in Perth", "Fry onions until golden brown"]
+vecs = model.encode(docs, normalize_embeddings=True)            # shape (4, 384)
+
+query = model.encode(["how to cook biryani"], normalize_embeddings=True)[0]
+scores = vecs @ query                                            # cosine, because vectors are normalised
+for score, text in sorted(zip(scores, docs), reverse=True)[:2]:
+    print(f"{score:.2f}  {text}")
+```
+
+**Multilingual models aur unke prefixes.** Hindi, Tamil, Hinglish aur doosri Indian-language text ke liye multilingual model use karo. Kuch models, jaise E5 family, inputs ko query ya passage ke roop mein mark karne ki ummeed rakhte hain:
+
+```python
+m = SentenceTransformer("intfloat/multilingual-e5-base")
+passages = m.encode(["passage: बिरयानी बनाने के लिए चावल भिगो दें", "passage: Kohli scored a century"],
+                    normalize_embeddings=True)
+q = m.encode(["query: biryani kaise banate hain"], normalize_embeddings=True)[0]
+print(passages @ q)
+```
+
+Har model ke card mein uske prefixes, input limit aur languages padho. Prefixes chhootne par error nahi aata, bas results kharab hote hain, isliye ye miss karna aasaan hai.
+
+**Size aur storage.** Har vector mein fixed dimensions hote hain (384, 768, 1,024 ya zyada). Storage = vectors × dimensions × bytes: ek million 768-dimension vectors 32-bit floats mein lagbhag 3 GB lete hain. 16-bit mein store karne se aadha ho jaata hai, lagbhag bina kisi loss ke; 8-bit ya binary quantisation ise aur chhota karta hai, quality mein thoda nuksaan ke saath. Kuch naye models aise train kiye gaye hain ki aap har vector ka sirf pehla hissa (jaise 1,024 mein se 256 dimensions) rakh kar bhi achhi search kar sakte hain. Koi bhi shrinking apni golden queries par test karo.
+
+**Benchmarks sirf shuruaat hain.** MTEB jaise public leaderboards kai tasks aur languages par embedding models compare karte hain, jo shortlist banane mein madad karta hai. Faisla aapka apna test karta hai, jisme aapke users ki queries aur spellings hon.
+
+```python
+def top3_hit_rate(model, queries, corpus, correct_ids):
+    """queries[i] should find corpus item correct_ids[i] in its top 3."""
+    c = model.encode(corpus, normalize_embeddings=True)
+    q = model.encode(queries, normalize_embeddings=True)
+    top3 = (-(q @ c.T)).argsort(axis=1)[:, :3]
+    return sum(correct_ids[i] in top3[i] for i in range(len(queries))) / len(queries)
+```
+
+**Model badalne ka matlab re-embed karna.** Alag models ke vectors alag spaces mein rehte hain aur mix nahi kiye ja sakte. Har vector ke saath model ka naam aur version store karo, aur kisi bhi switch ke liye poora re-embed (aur test) plan karo.
+
+## Ek example se samjho
+
+Maan lo Chennai ki ek edtech support team ke paas 2,000 purane tickets hain aur woh agents ko similar solved tickets dikhana chahti hai.
+
+```python
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+model = SentenceTransformer("all-MiniLM-L6-v2")   # small, free, runs on a laptop
+tickets = [
+    "Payment deducted but course not unlocked",
+    "Money taken twice for one order",
+    "Video keeps buffering on mobile data",
+    "Certificate shows the wrong name",
+]
+vectors = model.encode(tickets, normalize_embeddings=True)
+
+query = model.encode(["UPI debited, no access to the course"], normalize_embeddings=True)
+scores = vectors @ query.T            # dot product = cosine similarity here
+for i in np.argsort(-scores[:, 0])[:2]:
+    print(round(float(scores[i, 0]), 2), tickets[i])
+```
+
+Top result pehla ticket hai, jabki query mein "UPI debited" aur "no access" likha hai aur ticket mein "payment deducted" aur "not unlocked". Doosra double-charge waala ticket hona chahiye: wo bhi paise ke baare mein hai, isliye paas hai, par thoda kam. Buffering aur certificate tickets ka score kam hona chahiye. Run karke check karo: exact scores model version par depend karte hain.
+
+Ab "certificate name spelling mistake" try karo. Ye certificate ticket se strongly match hona chahiye aur baaki sabse weakly. Agar nahi hota, toh aap jis tarah encode ya compare kar rahe ho usmein kuch galat hai.
+
+**Team ne kya measure kiya.** 30 real agent queries par chhote English model ne sahi ticket ko 22 baar top teen mein rakha. Multilingual model ne ye 27 baar kiya, zyadatar isliye ki usne Tamil-English mix mein likhi queries pakdi, jaise "payment cut aachu, course open aagala". Team ne multilingual model chuna aur order ids ke liye keyword search rakhi, jise dono models achhe se handle nahi kar paaye.
+
+## Aam galtiyaan
+
+- **Models mix karna.** Do alag embedding models ke vectors alag spaces mein rehte hain. Model badalte waqt sab kuch re-embed karo.
+- **Poore documents embed karna.** 30 pages ke PDF ko ek vector mein nichodne se detail kho jaati hai, aur model ki limit ke aage ka text gir jaata hai. Pehle chunk karo.
+- **Score ko probability maan lena.** 0.62 ka matlab "62% relevant" nahi hai. Scores sirf ranking ke liye kaam ke hain, aur achhe thresholds model ke hisaab se alag hote hain, isliye koi bhi cut-off apne data se set karo.
+- **Exact terms ko ignore karna.** Order numbers, product codes aur rare names par embeddings kamzor hain. Jab ye maayne rakhte hon, toh keyword search ke saath jodo.
+- **Apne text par test na karna.** Jo model public leaderboard mein top par hai, woh Indian names, Hinglish ya aapke domain ke jargon par kharab kar sakta hai. Chunne se pehle bees real queries par check karo.
+- **Model ke query aur passage prefixes bhool jaana.** Koi error nahi aata; bas results kharab ho jaate hain.
+- **Do models ke vectors** ek hi index mein mix karna.
+- **Sirf leaderboard dekhkar chunna.** Apni queries par test karo.
+
+## Jab embeddings sabse achha tool nahi hain
+
+- **Exact identifiers**: order numbers, PAN, part codes aur names keyword search ya database lookup se behtar milte hain.
+- **Bahut chhote collections**, jaise 30 FAQs: keyword matching ya sab kuch prompt mein daal dena zyada simple hai.
+- **Structured filters**, jaise "pichhle hafte ke ₹5,000 se upar ke orders": SQL query similarity se behtar hai.
+
+## Demo se production tak
+
+- **Har vector ke saath model ka naam, version aur dimensions store karo.**
+- **Golden query set rakho** aur har model ya setting badalne par hit rate dobara chalao.
+- **Embedding jobs ko batch karo**, aur unka cost aur time track karo.
+- **Model switch ke liye re-embeds plan karo**, aur purana index tab tak rakho jab tak naya tests pass na kar le.
+- **Storage par nazar rakho**: precision aur dimensions defaults se nahi, apne tests se chuno.
+
+## Practice karo
+
+Neeche link kiya hua Hugging Face notebook karo. Phir ye karo:
+
+1. Bees sentences embed karo: das cricket ke baare mein aur das cooking ke baare mein.
+2. Apni teen queries ke liye top teen sentences aur unke scores print karo.
+3. "biryani kaise banate hain" jaisi ek Hinglish query jodo aur dekho ki kya woh ab bhi cooking sentences dhoondhti hai.
+4. Das Hinglish queries par English-only model aur multilingual model ke liye top3_hit_rate chalao aur compare karo.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 3 embeddings aur unhein compare karne ke tareeke cover karta hai, aur chapter 6 embedding-based retrieval cover karta hai.
+
+**Aapka kaam poora jab:** aap kisi dost ko samjha sako ki "car" aur "automobile" paas-paas kyun aate hain, aur aisi ek tarah ki query bata sako jahan sirf embeddings fail ho jaayein.

@@ -1,0 +1,205 @@
+---
+id: python-for-production
+lang: tanglish
+title: "Production-kkaana Python"
+outcome: "Matha engineers nambakkoodiya Python ezhudhalaam: type hints, dataclasses, veliyila irundhu varra data-kku Pydantic models, network calls-kku async code."
+answer: "Production Python, type hints, dataclasses, veliyila irundhu varra data-va validate panna Pydantic, network calls-kku async code ivatrai use pannum; adhanaala matha engineers adha nambi maintain panna mudiyum."
+why_it_matters: "Client projects pala varusham irukkum, pala peru kaikku maarum. Type potta, validate panna code, mosamaana data-va vaasalayae pidikkum, oru service pala requests-a orae neraththula handle pannavum vidum. AI engineering roles-kku interview panravanga idha edhirpaarpaanga."
+flashcards:
+  - q: "Type hints-na enna?"
+    a: "def score(t: Ticket) -> float maadhiri, oru function edhai edukkum, edhai return pannum-nu solra annotations. Python run time-la ivatrai kandukkaadhu; thappugalai pidikka tools ivatrai use pannum."
+  - q: "Oru project muzhukka type hints-a edhu check pannum?"
+    a: "mypy illa pyright maadhiri type checkers, perumbaalum CI-la odum; neenga type pannumbodhu ungal editor-um."
+  - q: "Dataclass-na enna?"
+    a: "@dataclass-aala kurikkapatta, mukkiyamaa data-va vechirukkura oru class; adhoda constructor, equality, printing-a Python ungalukkaaga ezhudhidum."
+  - q: "Pydantic model, dataclass-la irundhu eppadi vera paadudhu?"
+    a: "Adhu validate pannum. Paadhukaappa convert panna mudinjadhai convert pannum, mudiyaadhadha reject pannum, entha field fail aachu-nu sariyaa solum."
+  - q: "Pydantic validation enga nadakkanum?"
+    a: "Data ulla varra ovvoru boundary-layum: API requests, config files, CSV rows, kurippa LLM output."
+  - q: "async-um await-um edhukku help pannum?"
+    a: "Pala model API calls maadhiri, pala medhuvaana network calls-kaaga orae process-la orae neraththula kaathirukka. Kadumaiyaana computation-a idhu vegappaduthaadhu."
+  - q: "async code-kkulla requests.get illa time.sleep-a call panna enna aagum?"
+    a: "Muzhu event loop-aiyum block pannum, vera edhuvum odaadhu. httpx, asyncio.sleep maadhiri async libraries-a use pannunga."
+  - q: "Oru semaphore vechu concurrency-a yen cap panrom?"
+    a: "Aayirakkanakkaana requests-a orae neraththula anuppina rate limits trip aagi, ungalai block pannalaam. Oru semaphore, ethanai in flight-la irukkalaam-nu limit pannum."
+exercise:
+  title: "Model-oda reply-a validate pannunga"
+  setup: "Oru Pydantic model Order-la fields: order_id (str), qty (int, 0-a vida peridhu), price_inr (float, 0-a vida peridhu), pin (str, sariyaa 6 characters). WhatsApp messages-la irundhu orders-a edukkura oru LLM naalu replies tharudhu: (1) order_id 'A12', qty '3', price_inr 499, pin '411001'; (2) order_id 'A13', qty 'two', price_inr 250, pin '560001'; (3) order_id 'A14', qty 1, price_inr 120, pin 41100; (4) order_id 'A15', qty 2, price_inr 80, pin field illa."
+  questions:
+    - q: "Entha reply pass aagum, Pydantic adhukku enna pannum?"
+      a: "Reply 1 pass aagum. Pydantic '3' ngra text-a 3 ngra integer-aa convert pannum."
+    - q: "Reply 2 yen fail aagudhu?"
+      a: "'two'-a integer-aa convert panna mudiyaadhu, adhanaala qty, andha field-oda peyara solra oru error-oda validation-la fail aagum."
+    - q: "Reply 3-la irukkura rendu pirachanaigal enna?"
+      a: "PIN text illaama oru number-aa irukku, 5 digits mattum thaan irukku. Settings-a poruthu type check-la fail aagum; eppadiyum 6-character rule-la fail aagum."
+    - q: "Fail aana replies-kku code enna pannanum?"
+      a: "Mosamaana data-va store panradhukku badhila, validation errors-a log panni, innum urudhiyaana prompt-oda retry pannanum, illanna andha message-a oru aal kitta anuppanum."
+ask:
+  - "Pydantic-na enna, AI apps yen adha use pannudhu?"
+  - "Python-la async-a eppo use pannanum?"
+  - "Type hints Python-a vegamaakkumaa?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Script Python-um production Python-um paarkka orae maadhiri irukkum, aana azhuththathula romba vera maadhiri nadandhukkum. Oru script, ungal laptop-la, neenga paartha data-vula, oru thadava odum. Production code oru naalaikku aayirakkanakkaana thadava, neenga paarthae illaadha data-vula odum; neenga ponadhukku appuram vera aalgal adha maathuvaanga.
+
+Naalu pazhakkangal perumbaalaana idaiveliyai moodidum:
+
+| Pazhakkam | Enna pannum | Enga romba mukkiyam |
+| --- | --- | --- |
+| **Type hints** | Ovvoru function-um edhai edukkum, edhai return pannum-nu sollum; adhanaala code odradhukku munnaadiyae editors, checkers thappugalai pidikkum | Neenga ezhudhura ovvoru function-layum |
+| **Dataclasses** | Boilerplate illaama, saadhaarana records-kku oru thelivaana vadivam tharum | Unga sondha internal data-vukku |
+| **Pydantic models** | Veliyila irundhu varra data-va check panni, thappaa irundhaa thelivaana error-oda maruthudum | API requests, files, LLM replies |
+| **async and await** | Oru process, pala medhuvaana network calls-kaaga orae neraththula kaathirukka vidum | Model APIs-a call panra services |
+
+```flow
+dir: LR
+title: Veliyila kuzhappamaana, nambamudiyaadha input; ulla suththamaana, edhirpaarkkakkoodiya code
+API requests -[Pydantic-aala validate]-> Type potta, check panna objects
+CSV rows -[Pydantic-aala validate]-> Type potta, check panna objects
+LLM JSON reply -[Pydantic-aala validate]-> Type potta, check panna objects
+Type potta, check panna objects -> Unga system | ulla dataclasses, ovvoru function-layum type hints
+```
+
+Indha lesson-la Bengaluru-la oru lending startup, loan enquiry emails-la irundhu fields-a LLM vechu edukkudhu; apparam adhula 200-a vegamaa process pannanum. Lesson mudiyum podhu, veliyila irundhu varra data-va sariyaa validate pannavum, async eppo help pannum-nu therinjukkavum mudiyum.
+
+## Idhu eppadi work aagudhu
+
+### Type hints
+
+```python
+def emi(principal: float, annual_rate: float, months: int) -> float:
+    ...
+```
+
+Python run time-la hints-a kandukkaadhu; oru string-a kudutha adhuvae error raise pannaadhu. Adhoda mathippu tools-la irundhu varudhu: oru number vara vendiya idathula string kudutha ungal editor echarikkum, **mypy**, **pyright** maadhiri type checkers CI-la oru muzhu project-a check pannum. Hints documentation-um thaan: `def score(ticket: Ticket) -> float`, oru comment-a vida adutha engineer-kku adhigam sollum.
+
+### Dataclasses
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class LineItem:
+    sku: str
+    qty: int
+    price: float
+```
+
+`@dataclass`, mukkiyamaa data-va vechirukkura oru class-kku constructor, equality, printing-a ezhudhidum. Ulla enna pogudhu-nu neenga control panra, unga sondha internal records-kku idha use pannunga.
+
+### Pydantic: boundary-la validation
+
+Oru **Pydantic** model paarkka dataclass maadhiri irukkum, aana **validate** pannum. Adhukku oru dictionary illa JSON kudutha, adhu:
+
+- Paadhukaappa convert panna mudinjadhai convert pannum, udhaaranam "42"-a 42-aa;
+- Mudiyaadhadha reject pannum, udhaaranam oru number-kku "five lakh";
+- Entha field, yen fail aachu-nu sariyaa solum.
+
+| `amount_inr: int`-kkaana input | Result |
+| --- | --- |
+| `500000` | Yeththukkum |
+| `"500000"` | 500000-aa convert aagum |
+| `"5,00,000"` | Reject (commas), neenga oru cleaning step serthaa thavira |
+| `"five lakh"` | Thelivaana error-oda reject |
+| Illai | Reject, andha field-kku oru default irundhaa thavira |
+
+Data ulla varra ovvoru boundary-layum Pydantic-a use pannunga: request bodies, config files, CSV rows, **kurippaa LLM output**; adhu perumbaalum kittathatta sariyaa irukkum. Vaasalayae validate pannaa, mosamaana data ungal code-oda meedhikku pogavae pogaadhu; ponaa moonu functions thalli kuzhappamaana errors-aa varum.
+
+### async and await
+
+Oru saadhaarana function **block** aagum: oru model reply-kkaaga rendu vinaadi kaathirukkumbodhu, andha process-la vera edhuvum nadakkaadhu. Oru `async def` function reply-a `await` panni, idaippatta neraththula **event loop** vera velaiyai oda vidum.
+
+```flow
+dir: LR
+title: Varisaiyaa, blocking: sumaar 6 s
+Call 1, 2 s -> Call 2, 2 s -> Call 3, 2 s -> 6 s-kku appuram mudinjudhu
+```
+
+```flow
+dir: LR
+title: async-oda concurrent: sumaar 2 s
+Start -> Call 1, 2 s
+Start -> Call 2, 2 s
+Start -> Call 3, 2 s
+Call 1, 2 s -> sumaar 2 s-la mudinjudhu
+Call 2, 2 s -> sumaar 2 s-la mudinjudhu
+Call 3, 2 s -> sumaar 2 s-la mudinjudhu
+```
+
+Idhu network illa disk-a **kaathirukkuradhukku** mattum thaan help pannum; images-a resize panradhu maadhiri kadumaiyaana computation-kku illa. Adhoda changili-la irukkura ovvoru library-um async-a purinjadhaa irukkanum: `requests`-kku badhila `httpx`, `time.sleep`-kku badhila `asyncio.sleep`.
+
+## Oru udhaaranam
+
+Bengaluru-la oru lending startup, loan enquiry emails-la irundhu fields-a LLM vechu edukka ninaikkudhu. Model JSON-a return pannudhu. Adhu perumbaalum sariyaa irukkum, aana sila neram oru field illaama irukkum, illa amount oru number-kku badhila "five lakh"-nu irukkum.
+
+**Reply-a validate panradhu:**
+
+```python
+import logging
+from pydantic import BaseModel, Field, ValidationError
+
+log = logging.getLogger(__name__)
+
+class Enquiry(BaseModel):
+    name: str
+    city: str
+    amount_inr: int = Field(gt=0, le=10_000_000)
+    purpose: str | None = None
+
+def parse(reply: str) -> Enquiry | None:
+    try:
+        return Enquiry.model_validate_json(reply)
+    except ValidationError as e:
+        log.warning("bad model reply: %s", e.errors())
+        return None
+```
+
+`parse('{"name": "Divya", "city": "Pune", "amount_inr": "500000"}')` oru valid `Enquiry`-a return pannum; amount oru integer-aa convert aagiyirukkum. `"amount_inr": "five lakh"` irukkura oru reply, andha field-oda peyara solra oru error-oda fail aagum; adhanaala code kuppaiyai store panradhukku badhila, innum urudhiyaana prompt-oda retry pannalaam.
+
+**200 emails-a process panradhu.** Model-a onnonna call panna latency 200 madangu aagum: onnukku 2 vinaadi-na sumaar 7 nimisham. `httpx.AsyncClient`, `asyncio.gather` vechaa emails orae neraththula anuppappadum; oru **semaphore** orae neraththula ethanai in flight-la irukkalaam-nu limit pannum, adhanaala startup provider-oda rate limit-kku keezhayae irukkum:
+
+```python
+import asyncio
+import httpx
+
+sem = asyncio.Semaphore(10)
+
+async def extract(client, email):
+    async with sem:
+        reply = await call_model(client, email)   # your async model call
+        return parse(reply)
+
+async def main(emails):
+    async with httpx.AsyncClient(timeout=30) as client:
+        return await asyncio.gather(*(extract(client, e) for e in emails))
+
+results = asyncio.run(main(emails))
+```
+
+| Approach | 200 emails-kku neram | Rate-limit risk |
+| --- | --- | --- |
+| Onnonna | sumaar 7 nimisham | Illai |
+| 200-aiyum orae neraththula | vinaadigal, apparam neraiya 429 errors | Adhigam |
+| 10 limit-oda async | sumaar 40 vinaadi | Kammi |
+
+## Podhuvaa panra thappugal
+
+- **Hints-a checks-aa ninaikkiradhu.** `amount: int`, run time-la oru string-a thadukkaadhu. Veliyila irundhu varra data-va Pydantic-aala validate pannunga; ungal sondha code-kku hints use pannunga.
+- **Romba thaamadhamaa validate panradhu.** Boundary-a thaandi nazhuvura mosamaana data, moonu functions thalli oru kuzhappamaana error-aa theriyum. Ulla varumbodhae validate pannunga.
+- **async code-kkulla block panradhu.** `async def`-kkulla `requests.get` illa `time.sleep`-a call panna, muzhu event loop-um uraindhudum.
+- **Varambillaadha concurrency.** 5,000 requests-a orae neraththula anuppina rate limits trip aagi, ungalai block pannalaam. Cap pannunga.
+- **Ellaa idaththulayum dictionaries.** Functions-kku naduvula raw dicts anuppuradhu `"ammount"` maadhiri typos-a maraichudum. Unga data-vukku oru model kudunga.
+- **CPU-heavy velaikku async use panradhu.** Idhu image processing illa model training-a vegappaduthaadhu.
+
+## Practice pannunga
+
+Keezha link pannirukkura FastAPI-oda Python types introduction-a padichu, apparam Pydantic models page-a paadinga.
+
+1. **Oru model.** Oru invoice-kku Pydantic model ezhudhunga: number, date, vendor, 15 characters irukkura GSTIN, line items, total.
+2. **Udainga.** Adhukku ainthu JSON strings kudunga, adhula rendu udaindhadhaa, errors-a print pannunga.
+3. **Async.** 50 invoices-a "process" panra oru async function ezhudhunga; model call-kku badhila `asyncio.sleep(1)` irukkattum; mudhalla onnonna, apparam `asyncio.gather`-um 10 limit-um vechu. Nerangalai oppidunga.
+
+**Mudinjadhu-nu eppo sollalaam:** Pydantic yen oru system-oda vilimbula irukkanum-num, model API-a call panra oru service-kku async yen help pannum, images-a resize panradhukku yen udhavaadhu-num explain panna mudiyum.

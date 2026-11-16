@@ -1,0 +1,183 @@
+---
+id: model-merging
+lang: hinglish
+title: "Model merging: fine-tuned models ko ek mein milana"
+outcome: "Samjhao ki model merging kya hai aur ek multi-task model train karne se kab behtar hai, averaging, task vectors, SLERP, TIES, DARE aur layer stacking describe karo, aur merged model ko safely test karo."
+answer: "Model merging ek hi base se fine-tune kiye gaye models ke weights ko ek model mein milata hai. Ye bina retraining ya GPUs ke skills jod sakta hai, par ise kisi bhi naye model ki tarah test karna padta hai."
+why_it_matters: "Teams aksar alag tasks ke liye alag models fine-tune karti hain, phir sabko serve aur maintain karne mein jhoojhti hain. Merging kai skills ko ek model mein samet sakta hai, tasks ko ek ke baad ek train karne se aane waali forgetting se bacha sakta hai, aur kai top open models merges hi hain. Ise try karna sasta hai aur galat use karna aasan."
+flashcards:
+  - q: "Model merging kya hai?"
+    a: "Do ya zyada models ke weights ko, aam taur par ek hi base se fine-tune kiye gaye, ek model mein milana."
+  - q: "Merging ensemble se kaise alag hai?"
+    a: "Ensemble kai models chalata hai aur unke answers milata hai, jisme kai calls ka kharcha aata hai. Merging weights ko ek baar milati hai, isliye aap ek model serve karte ho."
+  - q: "Task vector kya hai?"
+    a: "Fine-tuning ne jo badlaav kiya: fine-tuned weights - base weights. Task vectors jodne se skills judti hain; ek ko ghataane se koi behaviour hat sakta hai."
+  - q: "Sab tasks par ek model train karne ki jagah merge kyun karein?"
+    a: "Har task ko alag se achhe se train kiya ja sakta hai, pichhle tasks bhoole bina, aur merge ko GPUs nahi chahiye."
+  - q: "TIES aur DARE merging se pehle kya karte hain?"
+    a: "Woh zyadatar chhote weight badlaav hata dete hain, jo mostly noise jodte hain, taaki alag tasks ke important badlaav ek doosre se kam takraayein."
+  - q: "SLERP kya hai?"
+    a: "Spherical linear interpolation: do models ko seedhe average ki jagah ek mudi hui raah par blend karna, jisme ek factor tay karta hai ki kaunsa zyada count hoga. Ye ek baar mein do models merge karta hai."
+  - q: "Layer stacking kya hai?"
+    a: "Alag-alag models ki layers se ek model banana, kabhi-kabhi bada model. Achha kaam karne ke liye ise aam taur par aur training chahiye."
+  - q: "Merge ke baad hamesha kya karna chahiye?"
+    a: "Merged model ko har us task par test karo jo use handle karna hai, aur check karo ki usne general abilities ya safety behaviour nahi khoya."
+exercise:
+  title: "Ek bank ke teen assistants ke liye ek model"
+  setup: "Mumbai ke ek bank ke paas ek hi open 8B base model par teen LoRA adapters hain: ek customer complaints classify karta hai, ek English aur Hindi mein replies draft karta hai, aur ek KYC documents se fields extract karta hai. Teen adapters serve karna sambhal sakta hai, par team branch laptops par bina internet ke ek model rakhna chahti hai."
+  questions:
+    - q: "Yahan merging try karna sahi kyun hai?"
+      a: "Teeno adapters ek hi base model share karte hain, isliye unke badlaav ek aise model mein mil sakte hain jo laptop par fit ho, bina retraining ke."
+    - q: "Unhe pehle kaunsa method try karna chahiye?"
+      a: "Adapters ka ek simple weighted average, phir agar tasks takraayein toh TIES ya DARE. Simple se shuru karo aur compare karo."
+    - q: "Merge ko kaise judge karna chahiye?"
+      a: "Har task ke apne test set par uske alag adapter ke saamne, saath mein general aur safety checks. Chhote drops tabhi maano jab woh bar poora karein."
+    - q: "Merged model ki extraction accuracy 96% se 88% par aa jaati hai. Ab kya?"
+      a: "Extraction adapter ko zyada weight do, TIES ya DARE use karo, ya extraction ko alag adapter rakho aur baaki do ko hi merge karo."
+ask:
+  - "Model merging kya hai aur kyun kaam karti hai?"
+  - "TIES, DARE aur SLERP mein kya farak hai?"
+  - "Ek model fine-tune karne ki jagah models ko kab merge karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Fine-tuning ek model ko badalti hai. **Model merging** do ya zyada models ko unke weights milakar ek model mein jodti hai. Ye aam taur par tab sabse achha kaam karti hai jab models ek hi **base model** se fine-tune kiye gaye hon, taaki unke weights match karein.
+
+Ye sab kyun?
+
+- **Ek model mein kai skills.** Agar aapne ek model complaints ke liye aur doosra replies ke liye fine-tune kiya, toh ek merge dono kar sakta hai.
+- **Tasks ko ek ke baad ek train karne se forgetting nahi.** Task A par train karke phir task B par train karne se model aksar A bhool jaata hai. Har ek ko alag train karke merge karne se ye nahi hota.
+- **GPUs ki zaroorat nahi.** Simple merges weights par arithmetic hain aur ek aam computer par chalte hain.
+- **Chhote deployments.** Kai ki jagah ek model, jo phones, laptops aur kam memory waale doosre devices par, ya jahan data device se bahar nahi jaana chahiye, wahan kaam aata hai.
+
+Merging **ensemble** se alag hai. Ensemble kai models chalata hai aur unke answers milata hai, jisme har request par kai calls lagti hain. Merge weights ko ek baar milati hai; uske baad aap normal cost par ek hi model serve karte ho.
+
+Merging abhi bhi nayi aur kuch had tak experimental hai. Open model leaderboards ki kai top entries merges rahi hain, par results badalte hain, isliye har merge ko ek naya model samjho jise test karna hai.
+
+```flow
+title: Fine-tuned models ko merge karna
+Base model -> Task A ke liye fine-tune | adapter ya full
+Base model -> Task B ke liye fine-tune
+Task A ke liye fine-tune -> Task vector A | A - base
+Task B ke liye fine-tune -> Task vector B | B - base
+Task vector A -> Combine | average, SLERP, TIES, DARE
+Task vector B -> Combine
+Combine -> Merged model
+Merged model -> Har task, general skills, safety test karo
+```
+
+## Ye kaam kaise karta hai
+
+**Task vectors.** Fine-tuned model ke weights mein se base model ke weights ghata do toh aapko ek **task vector** milta hai: fine-tuning ne jo badlaav kiya. LoRA mein adapter khud hi lagbhag task vector hota hai. Task vectors ko base mein jodne se skills judti hain, aur ek ko ghataane se koi behaviour kam ho sakta hai, jise researchers ne anchaahi abilities ya biases ko kamzor karne ke liye use kiya hai.
+
+**Linear combination.** Sabse simple merge weights ya task vectors ka ek weighted average hai. Ye hairaan karne waali had tak achha kaam karta hai, khaaskar ek hi base ke models ke liye. "Model soups" ne ek hi model ke kai fine-tuned versions ko average kiya aur bina extra running cost ke accuracy badhayi. Weights ek model ko doosre se zyada count karwane dete hain.
+
+**SLERP.** Spherical linear interpolation do models ko seedhi line ki jagah ek mudi hui raah par blend karta hai, jo ek plain average se behtar har model ka character bacha sakta hai. 0 se 1 ke beech ka interpolation factor tay karta hai ki kaunsa model zyada count hoga. Ye ek baar mein do models merge karta hai; teesra merge karne ke liye dohrao.
+
+**TIES aur DARE.** Fine-tuning lagbhag har weight badalti hai, par zyadatar badlaav bahut chhote hote hain aur kam jodte hain. Alag tasks ke wo chhote badlaav merge hone par takra sakte hain. Dono methods pehle har task vector ko **prune** karte hain, sirf important badlaav rakhkar:
+
+- **TIES** sabse bade badlaav rakhta hai, phir merge se pehle un conflicts ko sulajhaata hai jahan tasks ek weight ko ulti disha mein dhakelte hain.
+- **DARE** zyadatar badlaav random tareeke se hata deta hai aur baaki ko rescale karta hai taaki unka overall effect bana rahe.
+
+Dono aksar plain averaging se saaf behtar merges dete hain, aur jitne zyada models merge karo, faayda utna badhta hai.
+
+**Layer stacking.** Weights milane ki jagah, alag-alag models ki layers se ek model banao, jise kabhi "frankenmerge" kehte hain. Ye chhote models se bada model bana sakta hai (ek team ne 7B model ki do copies se 10.7B model banaya), aur ye maujooda model se mixture-of-experts model shuru karne ka ek tareeka hai. Inhe achha kaam karne ke liye aam taur par aur training chahiye.
+
+**Concatenation** adapters ko side by side jodta hai. Ye saare parameters rakhta hai, isliye memory nahi bachata aur shaayad hi worth hai.
+
+PEFT ke saath do LoRA adapters ko merge karna aisa dikhta hai:
+
+```python
+from peft import PeftModel
+from transformers import AutoModelForCausalLM
+
+base = AutoModelForCausalLM.from_pretrained("base-model-id")
+model = PeftModel.from_pretrained(base, "adapters/complaints", adapter_name="complaints")
+model.load_adapter("adapters/replies", adapter_name="replies")
+
+# Combine into a new adapter; TIES keeps the strongest changes (density) and resolves conflicts.
+model.add_weighted_adapter(
+    adapters=["complaints", "replies"], weights=[1.0, 1.0],
+    adapter_name="merged", combination_type="ties", density=0.3,
+)
+model.set_adapter("merged")
+```
+
+Poore models ke liye, open-source tool mergekit ek chhoti configuration file se merges chalata hai.
+
+| Method | Kaise combine karta hai | Strengths | Kis cheez se bachna hai |
+| --- | --- | --- | --- |
+| Weighted average | Weights ya task vectors ka average | Simple, aksar achha | Tasks takra sakte hain |
+| SLERP | Do models ko ek curve par blend karta hai | Do ka smooth blend | Ek baar mein do models |
+| TIES | Bade badlaav rakhta hai, sign conflicts sulajhaata hai | Kai tasks ke saath behtar | Density setting tune karni padti hai |
+| DARE | Zyadatar badlaav random hata kar rescale karta hai | Robust, lagana simple | Randomness; ek se zyada baar test karo |
+| Layer stacking | Layers jodta hai, size badha sakta hai | Upscale ya MoE bana sakta hai | Aam taur par aur training chahiye |
+
+**Apne browser mein try karo.** Do task vectors ka average lo, phir ek TIES-style merge try karo jo sirf bade badlaav rakhta hai.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+base = rng.normal(size=10)
+task_a = np.where(rng.random(10) < 0.3, rng.normal(0, 1, 10), rng.normal(0, 0.05, 10))
+task_b = np.where(rng.random(10) < 0.3, rng.normal(0, 1, 10), rng.normal(0, 0.05, 10))
+
+average = base + (task_a + task_b) / 2
+def trim(v, keep=0.3):
+    cut = np.quantile(np.abs(v), 1 - keep)
+    return np.where(np.abs(v) >= cut, v, 0)
+ties = base + trim(task_a) + trim(task_b)
+print("average change:", (average - base).round(2))
+print("TIES change:   ", (ties - base).round(2))
+```
+
+## Ek example se samjho
+
+Mumbai ke ek bank ke paas ek hi open 8B base model par teen LoRA adapters hain: complaint classification, English aur Hindi mein reply drafting, aur KYC field extraction. Woh branch laptops par bina internet ke ek model chahte hain.
+
+Woh teen merges try karte hain aur har ek ko har task ke apne test set par test karte hain:
+
+| Model | Complaint accuracy | Reply quality (reviewer score, 5 mein se) | KYC extraction accuracy |
+| --- | --- | --- | --- |
+| Alag adapters (target) | 93% | 4.3 | 96% |
+| Teeno ka weighted average | 89% | 4.0 | 84% |
+| TIES, density 0.3 | 92% | 4.2 | 88% |
+| Complaints aur replies ka TIES; KYC alag | 92% | 4.2 | 96% |
+
+Numbers illustration ke liye hain. Extraction, sabse precise task, har poore merge mein sabse zyada prabhavit hua. Team complaints aur replies ke liye ek merged model ship karti hai aur KYC adapter ko alag rakhti hai, jo sirf tab load hota hai jab koi document scan hota hai. Dono laptops par fit ho jaate hain. Woh apne safety aur refusal checks bhi dobara chalate hain, kyunki merging us behaviour ko kamzor kar sakti hai jis par kisi bhi adapter ko train nahi kiya gaya tha.
+
+## Aam galtiyaan
+
+- **Alag bases ke models ko merge karna**, risks samjhe bina. Results aam taur par kharab hote hain.
+- **Sirf ek task test karna.** Ek merge chupchaap kisi doosre task ya general abilities ko nuksaan pahuncha sakta hai.
+- **Safety checks chhodna.** Merge ke baad refusal aur safety behaviour kamzor ho sakta hai.
+- **Leaderboard merges par aankh mundkar bharosa karna.** Kuch benchmarks ke liye tune hote hain; apne data par test karo.
+- **Memory bachane ke liye concatenation use karna.** Ye nahi bachati.
+- **Licence bhool jaana.** Merge har us model ki licence terms inherit karta hai jo usmein hai.
+
+## Jab merge nahi karna
+
+- **Jin tasks ko high precision chahiye** unhe alag adapters ki tarah rakhna behtar ho sakta hai.
+- **Aap har task ke liye kaafi data ke saath ek achha multi-task fine-tune afford kar sakte ho.**
+- **Kai adapters serve karna pehle se sasta hai**, kyunki kai servers use efficiently support karte hain.
+- **Models alag base models se aate hain.**
+
+## Demo se production tak
+
+- **Merges ko models ki tarah version karo**: inputs, method, weights aur settings ek config file mein.
+- **Alag adapters ko** fallback aur comparison ke liye rakho.
+- **Har release se pehle har task, saath mein general aur safety checks test karo.**
+- **Koi bhi input model badle toh dobara merge karo**, aur dobara test karo.
+
+## Practice karo
+
+1. Hugging Face par ek merged model dhoondho aur uska card padho: kaunse models aur kaunsa method use hua?
+2. Ek hi base par do chhote LoRA adapters ko averaging aur TIES se merge karo, aur har task ke kuch examples par compare karo.
+3. Apne field mein ek merge ka test plan likho: kaunse tasks, kaunse test sets, kaunse safety checks.
+
+Zyada gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 7 model merging aur multi-task fine-tuning cover karta hai.
+
+**Aapka kaam poora jab:** aap merging aur ensembling ka farak samjha sako, task vectors aur TIES ya DARE kya jodte hain, ye describe kar sako, aur merged model ko test karne ka plan bana sako.

@@ -1,0 +1,169 @@
+---
+id: fastapi-rest-apis
+lang: tanglish
+title: "FastAPI-oda REST APIs"
+outcome: "FastAPI-la oru sinna typed REST API build pannunga: endpoints, request-um response-um models, status codes, errors, tests."
+answer: "FastAPI Python-la typed functions-la irundhu REST APIs build pannum: ovvoru endpoint-um adhoda request, response models-a declare pannum, FastAPI data-va validate panni API docs-a thaanaagavae ezhudhum."
+why_it_matters: "Client-kaaga neenga deploy panra ovvoru AI system-um oru API vazhiyaa thaan reach aagum, avanga app, workflow tool, illa vera service moolama. Python teams API build panna FastAPI thaan romba common vazhi, adhoda typed models thappaana requests-a free-aa pidikkum."
+flashcards:
+  - q: "Endpoint-na enna?"
+    a: "Oru URL-um oru HTTP method-um serndhadhu, POST /tickets oru ticket create panna, GET /tickets/42 onna padikka maadhiri."
+  - q: "GET, POST, PUT, PATCH, DELETE-na enna artham?"
+    a: "GET edhayum maathaama padikkum, POST create illa velaiya trigger pannum, PUT replace pannum, PATCH konjam update pannum, DELETE remove pannum."
+  - q: "401-kum 403-kum enna difference?"
+    a: "401-na caller sign in pannala. 403-na sign in pannirukkaanga, aana idha panna anumadhi illa."
+  - q: "FastAPI eppo 422 tharum?"
+    a: "Request body Pydantic model-oda validation-la fail aanaa, entha fields fail aachu-nu oru list-oda."
+  - q: "Unga API eppo 503 tharanum?"
+    a: "Model provider maadhiri oru dependency down-aa irundhaa, appo callers apram retry pannalaam-nu theriyum."
+  - q: "response_model enna pannum?"
+    a: "Caller-ku enna thirumbi pogudhu-nu control pannum, appo cost figures maadhiri internal fields thaetchaiyaa leak aagaadhu."
+  - q: "Depends edhukku use aagudhu?"
+    a: "Database session, current user, model client maadhiri shared vishayangala endpoints-kulla inject panna, tests-la adha fakes-a maathikka."
+  - q: "Text inputs-ku maximum length yen vechanum?"
+    a: "Illanaa yaaraavadhu periya document anuppalaam, unga token bill yerum, illa request timeout aagum."
+exercise:
+  title: "Status code-a select pannunga"
+  setup: "Hyderabad hospital-ku unga FastAPI service discharge notes-a summarise pannudhu. Anju calls varudhu: (1) sign-in token illaadha oru request; (2) sign in panna oru nurse, avanga ward-ku veliya irukkura oru patient-oda summary kekkuraanga, rules adha thadukkudhu; (3) 'notes' 5 characters irukkura body, 20-character minimum-kku kezha; (4) GET /summaries/99999, adhu illa; (5) model provider down-aa irukkum podhu oru valid request."
+  questions:
+    - q: "(1)-kum (2)-kum edhu codes?"
+      a: "(1) 401, sign in pannala. (2) 403, sign in panniyirukkaanga, aana anumadhi illa."
+    - q: "(3)-ku edhu code, adha yaar produce pannuvaanga?"
+      a: "422, Pydantic model-la irundhu FastAPI thaanaagavae produce pannum, unga function odradhukku munnaadi, 'notes' field-a peru solli."
+    - q: "(4)-kum (5)-kum edhu codes?"
+      a: "(4) 404, kidaikkala. (5) 503, oru dependency kidaikkala, adhanaala caller apram retry pannalaam."
+    - q: "Idhukku 200 kodutthu 'error: true' yen thara koodaadhu?"
+      a: "Retry logic-um, monitoring-um, callers-um status codes-a nambi irukkaanga. 200-na ellaam work aachu-nu artham, adhanaala errors gavanikkaama poidum."
+ask:
+  - "400-kum 422 error-kum enna difference?"
+  - "FastAPI app-a eppadi test panradhu?"
+  - "En FastAPI endpoints async-aa irukkanuma?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+REST API, vera programs unga system-a HTTP vazhiyaa use panna vaikkum. Ovvoru **endpoint**-um oru URL-um oru method-um: `POST /tickets` oru ticket create pannum, `GET /tickets/42` onna padikkum. Caller JSON anuppum, JSON thirumbi varum, eppadi nadandhudhu-nu sollura oru **status code**-oda.
+
+FastAPI-na idhumaadhiri APIs build panna oru Python framework. Type hints-um Pydantic models-um vachu saadharana functions ezhudhuveenga; FastAPI adha input-a validate panra, output-a JSON-aa maathura, `/docs`-la interactive documentation publish panra endpoints-aa maathidum. Adhu async code-a native-aavum odum, model APIs-a kaathirukkura services-ku adhu nalla poruthama irukkum.
+
+```flow
+Caller | vera team-oda app: POST /claims/triage -> FastAPI body-a Pydantic-la validate pannum
+FastAPI body-a Pydantic-la validate pannum -[fail aana]-> 422 | thappaana fields-oda list
+FastAPI body-a Pydantic-la validate pannum -[ok]-> Model client-a inject pannu | Depends
+Model client-a inject pannu -> Unga function model API-a call pannum
+Unga function model API-a call pannum -[model down]-> 503 | "konjam neram kazhichu try pannunga"
+Unga function model API-a call pannum -[ok]-> response_model output-a filter pannum
+response_model output-a filter pannum -> 200 | category: "motor", summary: "Rear bumper damage"
+```
+
+Indha lesson-la Kochi-la oru insurance broker-a follow pannuvom, avanga vera teams oru claims-triage service-a call panna virumburaanga.
+
+## Idhu eppadi work aagudhu
+
+**Methods.** GET padikkum, edhayum maathakoodaadhu. POST create illa velaiya trigger pannum. PUT replace pannum, PATCH konjam update pannum, DELETE remove pannum. Indha arthangalukku kattupaadaa irundha, caches-um retries-um vera engineers-um sariyaa ooga mudiyum.
+
+**Status codes.** Success-ku 200 OK-um 201 Created-um. Malformed request-ku 400, caller sign in pannala-na 401, sign in pannirundhum idha panna kudaadhunaa 403, adhu illaina 404, body validation-la fail aanaa 422 (FastAPI-oda default), avanga romba adhigama anuppuraanga-na 429. 500-na unga code udainjirukku, 503-na model provider maadhiri oru dependency down.
+
+**Models.** Request body-la oru Pydantic model irundhaa, unga function odradhukku munnaadi FastAPI thappaana input-a 422-oda, entha fields fail aachu-nu oru list-oda reject pannum. `response_model` thirumbi enna pogudhu-nu control pannum, appo cost figure maadhiri internal field thaetchaiyaa leak aagaadhu.
+
+**Dependencies.** FastAPI-oda `Depends` database session, current user, model client maadhiri shared vishayangala ovvoru endpoint-kullayum inject pannum. Tests-la adha fakes-a maathikkalaam.
+
+**Testing.** `TestClient` unga app-a memory-la, server illaama call pannum, adhanaala endpoint tests milliseconds-la odum.
+
+**Callers nambura status codes:**
+
+| Code | Artham | Caller-oda saadharana reaction |
+| --- | --- | --- |
+| 200, 201 | Success, illa created | Result-a use pannu |
+| 400 | Malformed request | Request-a sari pannu; retry pannaadha |
+| 401 | Sign in pannala | Sign in pannu, apram retry pannu |
+| 403 | Anumadhi illa | Niruththu; access kelu |
+| 404 | Kidaikkala | Id-a check pannu |
+| 422 | Body validation-la fail | Peru solla pattadha fields-a sari pannu |
+| 429 | Romba requests | Kaathiru, apram retry pannu |
+| 500 | Unga code udaindhudhu | Report pannu |
+| 503 | Oru dependency down | Backoff-oda apram retry pannu |
+
+**Kaalam kadandhum nikkura endpoints design panradhu.** Resources-ku nouns (`/claims`, `/claims/{id}`), actions-ku methods use pannunga. Path-la illa header-la oru version vainga (`/v1/claims`), appo callers-a udaikkaama API-a apram maathalaam. Ella idathulayum ore error shape-a thirumbi tharunga, example `{"detail": "..."}`, appo callers errors-a oru idathulaye handle pannalaam. Ovvoru endpoint-a code-layae oru summary-yum examples-um vachu document pannunga; FastAPI avatrai `/docs`-la thaanaagavae kaattum, perumbaalum vera teams padikkura ore documentation adhu thaan.
+
+**Browser-la try pannunga.** Request validation thaan nalla API-oda uyir. Dictionary-a maathi oru thappaana body anuppi paarunga.
+
+```python
+from pydantic import BaseModel, Field, ValidationError
+
+class NewOrder(BaseModel):
+    item_id: str = Field(pattern=r"^SKU-\d{4}$")
+    quantity: int = Field(gt=0, le=20)
+    pin_code: str = Field(pattern=r"^[1-9]\d{5}$")
+
+body = {"item_id": "SKU-0042", "quantity": 0, "pin_code": "56001"}
+try:
+    print(NewOrder.model_validate(body))
+except ValidationError as err:
+    for e in err.errors():
+        print("422:", e["loc"][0], "-", e["msg"])
+```
+
+## Oru worked example
+
+Kochi-la oru insurance broker-ku, vera teams claim descriptions anuppi, oru category-yum oru summary-yum thirumbi vaanga venum.
+
+```python
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Claims triage")
+
+class ClaimIn(BaseModel):
+    policy_no: str = Field(pattern=r"^[A-Z]{3}\d{7}$")
+    description: str = Field(min_length=20, max_length=5000)
+
+class ClaimOut(BaseModel):
+    category: str
+    summary: str
+
+@app.post("/claims/triage", response_model=ClaimOut, status_code=200)
+async def triage(claim: ClaimIn, llm=Depends(get_llm)):
+    try:
+        result = await llm.classify(claim.description)
+    except ProviderDown:
+        raise HTTPException(503, "Triage is unavailable; try again shortly")
+    return ClaimOut(category=result.category, summary=result.summary)
+```
+
+Policy number "abc123"-oda oru request model-a kooda pogaadhu: FastAPI field-a peru solli 422 tharum. Model provider down-aa irundhaa, callers-ku kuzhappamaana 500 illa, retry panna koodiya 503 kidaikkum.
+
+Test model-a fake pannum:
+
+```python
+from fastapi.testclient import TestClient
+
+def test_triage_returns_category():
+    app.dependency_overrides[get_llm] = lambda: FakeLLM("motor", "Rear bumper damage")
+    r = TestClient(app).post("/claims/triage",
+        json={"policy_no": "MOT1234567", "description": "Car was hit from behind at a signal"})
+    assert r.status_code == 200 and r.json()["category"] == "motor"
+```
+
+`/docs`-a thirandhaa, broker-oda vera teams endpoint-a browser-laye try pannalaam, request schema-vum already ezhudhi irukkum.
+
+**Vera teams mudhalla gavanicha vishayam.** Broker-oda mobile team oru naalaiyilaye integrate pannidaanga, perumbaalum `/docs` ovvoru field-yum, adhoda rules-um, oru example-um kaattinadhaala, thappaana requests entha field-nu peru solli 422-oda thirumbi vandhadhaalayum. Model provider-ku konjam neram outage aana podhu, avanga app crash aagaama 503-ku "Triage is busy, try again in a minute"-nu kaattudhu, yen-na entha vagai failure-nu status code adhukku sonnadhu.
+
+## Podhuvaa panra thappugal
+
+- **Errors-ku 200 thirumbi tharadhu.** Status 200-oda `"error": true`-nu body sonna, ella retry, monitoring tools-um udaiyum. Sariyaana code use pannunga.
+- **Database rows-a nera thirumbi tharadhu.** Internal fields leak aagum. Eppavum oru response model set pannunga.
+- **Async endpoints-la blocking calls.** `async def`-kulla synchronous model client server-a freeze pannum. Async client use pannunga, illa endpoint-a simple `def`-oda declare pannunga, appo FastAPI adha thread pool-la odavaikkum.
+- **Model call-la timeout illa.** Oru hang aana request oru worker-a eppovum pidichu vechukkum. Timeouts set panni 503 illa 504 thirumbi tharunga.
+- **Input limits-a thavara vidradhu.** Maximum length illanaa, yaaraavadhu 300-page document-a paste pannuvaanga, unga token bill yerum.
+
+## Practice pannunga
+
+FastAPI tutorial-a "Handling Errors", "Testing" varaikkum seinga, MDN-oda HTTP overview-a oru thadavai skim pannunga.
+
+1. Text (20 mudhal 5,000 characters) edukkura, edhaavadhu model API-la illa fake-la irundhu oru summary thirumbi tharura `POST /summaries` build pannunga.
+2. Theriyaadha id-ku 404 tharura `GET /summaries/{id}` serunga.
+3. `TestClient`-oda moonu tests ezhudhunga: oru success, short text-ku oru 422, oru 404.
+
+**Mudinjadhu-nu eppo sollalaam:** 401, 403, 422, 503-kum idaiyila irukkura difference-a oru teammate-kitta explain panna mudiyum, unga API-oda `/docs` page-a kaatta mudiyum.

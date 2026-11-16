@@ -1,0 +1,217 @@
+---
+id: tracing-llm-apps
+lang: tanglish
+title: "LLM apps-a trace panradhu"
+outcome: "Ovvoru request-aiyum retrieval, prompts, model calls, tools vazhiyaa trace panna kathukkalaam, inputs, outputs, tokens, cost, timings-oda, traces vachu thappaana answers-a debug pannalaam."
+answer: "Tracing LLM request-oda ovvoru step-aiyum record pannum: retrieval, prompts, model calls, tool calls, inputs, outputs, tokens, cost, time-oda, adhanaala oru answer yen thappa pochu-nu paarkkalaam."
+why_it_matters: "Client 'assistant nethu Ramesh-ku thappaana answer kuduthudhu'-nu sollum podhu, adhu enna retrieve pannichu, entha prompt anuppichu, enna thirumba vandhudhu-nu exact-aa paakkanum. Traces illaama neenga ooghikkireenga. Traces irundha, perumbaalaana AI bugs nimidangalla kandupidikkalaam."
+flashcards:
+  - q: "Trace-na enna?"
+    a: "Oru request-oda mudhal-la irundhu mudivu varaikkum record, nested spans-la, ovvoru step-kum onnu, inputs, outputs, timings-oda."
+  - q: "Model-call span enna record pannum?"
+    a: "Inputs, outputs, start-um end-um times, model peru, token counts, cost."
+  - q: "Traces normal logs-la irundhu eppadi vera?"
+    a: "Logs edhaavadhu nadandhudhu-nu solum; traces ovvoru step-oda inputs-aiyum outputs-aiyum kaattum, adhanaala system yen andha answer kuduthudhu-nu paarkkalaam."
+  - q: "Debug panra podhu entha attributes romba help pannum?"
+    a: "Oru pseudonymous user id, session id, app version, prompt version, retrieved document ids scores-oda."
+  - q: "Traces-ku enna privacy steps thevai?"
+    a: "Anuppradhukku munnaadi personal data-va mask illa omit pannunga, retention period set pannunga, paarkkaravangala restrict pannunga, thevai-na in-region tool use pannunga."
+  - q: "Adhigamaana volume-la traces-a eppadi sample pannanum?"
+    a: "Errors illa mosamaana feedback irukkura ella traces-aiyum vechukkunga, meedhi-la oru sample."
+  - q: "Oru mosamaana answer-oda trace-a thirakkum podhu mudhal kelvi enna?"
+    a: "Sariyaana passage retrieve aagi prompt-la pottaangala? Idhu retrieval failures-a generation failures-la irundhu pirikkum."
+  - q: "OpenTelemetry-na enna?"
+    a: "Traces-ku common open standard, neraya AI tracing tools idha base panni irukku."
+  - q: "OpenTelemetry GenAI conventions-na enna?"
+    a: "Model calls-ku standard attribute names, example gen_ai.request.model, gen_ai.usage.input_tokens, adhanaala veraveraya tracing tools ungaloda spans-a onnu maadhiriye padikkum."
+  - q: "Tail sampling-na enna?"
+    a: "Trace mudinja aprom adha vechukkalaamaa-nu mudivu panradhu, adhanaala errors illa slow steps irukkura ella traces-um irukkum, normal-aanadhula oru sample mattum store aagum."
+exercise:
+  title: "Trace-a padinga"
+  setup: "Jaipur-la oru bank-oda assistant oru customer-ku senior citizens-ku fixed-deposit rate 7.1%-nu sonnadhu; ippo irukkura rate 7.6%. Trace kaattuvadhu: rewrite_query 0.3 s 'senior citizen FD rate'; hybrid_search top: doc 'FD rates April 2026' (0.74), 'FD rates October 2026' (0.72); rerank April document-a mudhalla vaikkudhu; generate 2.1 s April document-la irundhu 7.1%-a quote pannudhu. Trace-la prompt version tag illa."
+  questions:
+    - q: "Idhu model failure-aa, retrieval failure-aa?"
+      a: "Retrieval. Model top passage-a nermaiyaa quote pannichu, adhu pazhaya rate sheet."
+    - q: "Trace edhu fix-a kaattudhu?"
+      a: "Rate sheets-oda effective dates-a store pannunga, superseded aanadha filter pannunga, adhanaala October sheet mattum eligible-aa irukkum."
+    - q: "Trace-la enna missing, yen mukkiyam?"
+      a: "Prompt version. Adhu illaama, saamibathula panna prompt change idhula oru pangu vagichudha-nu solla mudiyaadhu."
+    - q: "Idhukku aprom indha trace-a enna pannanum?"
+      a: "Golden set-la oru eval case-aa save pannunga, adhanaala ippo irundhu stale-rate retrieval test aagum."
+ask:
+  - "LLM trace-la naan enna record pannanum?"
+  - "LLM apps-a trace panna entha tools use pannalaam?"
+  - "Traces-la irundhu personal data-va eppadi veliya vechukkalaam?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Trace** oru request-a mudhal-la irundhu mudivu varaikkum record pannum. Idhu **spans**-la aagirukkum, ovvoru step-kum onnu: query rewrite, retrieval, reranker, ovvoru model call, ovvoru tool call. Ovvoru span-um adhoda inputs, outputs, start-um end-um times-a store pannum, model calls-ku model peru, token counts, cost-um. Spans nest aagum, adhanaala agent-oda moonaavadhu tool call rendaavadhu model turn-kulla nadandhadhu-nu paarkkalaam.
+
+Normal application logs edhaavadhu nadandhudhu-nu solum. AI system-oda traces adhu yen andha answer kuduthudhu-nu solum. Langfuse, Arize Phoenix maadhiri open-source tools, commercial tools, cloud providers-oda sondha tools ellaam traces-a store panni kaattum. Neraya OpenTelemetry mela build aagirukku, adhu traces-ku common standard.
+
+```flow
+title: Trace 8f3a, oru citizen kelvi: 3.8 s, ₹0.42
+Trace 8f3a | tags: user anon-5521, session s-901, app 2.4.0, prompt v17 -> rewrite_query, 0.4 s | in: question, out: search text
+rewrite_query, 0.4 s -> hybrid_search, 0.3 s | out: doc ids, scores
+hybrid_search, 0.3 s -> rerank, 0.2 s | out: reordered ids
+rerank, 0.2 s -> generate, 2.9 s | model, tokens in-um out-um, cost, output text
+```
+
+Indha lesson-la Bhubaneswar-la oru state-government helpdesk assistant-a follow pannuvom, adhu oru vivasayi-ku scheme amount-a thappaa sonnadhu.
+
+## Idhu eppadi work aagudhu
+
+**Instrument pannunga.** Perumbaalaana tools model client-ku oru decorator illa wrapper tharum. Decorate panna ovvoru function-um oru span aagum, model calls tokens-aiyum cost-aiyum thaanaagavae record pannum. Aprom help panra attributes serunga: user id (illa pseudonymous id), session id, app version, prompt version, retrieved document ids, adhoda scores.
+
+**Group pannunga.** Oru **session** oru conversation-oda traces-a group pannum; user ids vachu oru user ellaam enna experience panninaanga-nu paarkkalaam.
+
+**Data-va kavanichukkunga.** Traces-la prompts-um outputs-um irukkum, adhula personal data irukkalaam. Sensitive fields-a anuppradhukku munnaadi mask illa omit pannunga, retention period set pannunga, traces-a yaar paarkkalaam-nu restrict pannunga, client kettaa self-hosted illa in-region tool-a prefer pannunga.
+
+**Use pannunga.**
+
+- *Debug*: mosamaana answer-oda trace-a thirakkunga. Sariyaana passage retrieve aachaa? Adhu prompt-la irundhudha? Model adha ignore pannidhaa?
+- *Measure*: step-wise latency, oru request-ku tokens-um cost-um, model-wise error rates.
+- *Improve*: suvaarasyamaana traces-a oru dataset-la save pannunga; adhu eval cases aagum.
+
+**Sampling.** Adhigamaana volume-la, errors illa kammiyaana feedback irukkura ella traces-aiyum vechukkunga, meedhi-la oru sample.
+
+**Ovvoru tool type-um enna tharum:**
+
+| Option | Palam | Eppo yosikkanum |
+| --- | --- | --- |
+| Open-source, self-hosted (Langfuse, Phoenix) | Data ungakittayae irukkum; odavaikka free | Client-ku in-region illa on-premises data thevai |
+| Commercial hosted tools | Paarthukka kammi; extra analysis features | Vegam mukkiyam, data rules allow pannum |
+| Cloud provider-oda tracing | Ippo irukkura cloud stack-oda set aagum | App already andha cloud-la odudhu |
+| Ungaloda sondha store-oda plain OpenTelemetry | Muzhu control, standard format | Neenga already observability tooling odikkureenga |
+
+**Vaaram oru trace review.** Ovvoru vaaramum muppadhu nimidam othukkunga. Mosamaana user feedback, errors, illa vazhakkathukku maaraa adhigamaana cost irukkura traces-um, normal-aanadhula oru random sample-um edunga. Ovvoru mosamaana answer-kum, fail aana step-a note pannunga: query rewrite, retrieval, reranking, prompt illa model. Notes-a ennunga. Konja vaarangal kazhichu counts, engineering effort enga payan tharum-nu kaattum, save panna traces nijamaana use-la irundhu vandha eval cases-oda valarndhukitte irukkura set-aa aagum.
+
+**Step-wise cost-um latency-yum.** Ovvoru span-um time-aiyum tokens-aiyum record pannradhaala, step-wise totals-a chart panradhu easy. Teams-ku aachariyam irukkum: periya model-la oru query-rewrite call answer-a vida adhigam selavu aagalaam, illa oru reranker model-a vida adhigam delay serkkalaam.
+
+**Plain OpenTelemetry vachu tracing.** Perumbaalaana LLM tracing tools (Langfuse, Arize Phoenix, matravai) OpenTelemetry data-va accept pannum, adhanaala standard vachu instrument pannina, neenga switch panra freedom-oda irukkalaam:
+
+```python
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+provider = TracerProvider()
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))   # endpoint and auth from env vars
+trace.set_tracer_provider(provider)
+tracer = trace.get_tracer("policy-rag")
+
+def answer(question, user_id, session_id):
+    with tracer.start_as_current_span("answer") as root:
+        root.set_attributes({"app.release": "assistant-2026.11.3", "user.id": user_id, "session.id": session_id})
+        with tracer.start_as_current_span("retrieve") as span:
+            hits = search(question)
+            span.set_attributes({"retrieval.ids": [h["id"] for h in hits],
+                                 "retrieval.top_score": hits[0]["score"] if hits else 0})
+        with tracer.start_as_current_span("generate") as span:
+            reply = call_model(question, hits)
+            span.set_attributes({"gen_ai.request.model": reply.model,
+                                 "gen_ai.usage.input_tokens": reply.usage.input_tokens,
+                                 "gen_ai.usage.output_tokens": reply.usage.output_tokens})
+        return reply
+```
+
+`gen_ai.*` names generative AI-ku OpenTelemetry-oda conventions-a follow pannudhu, tracing tools adha purinjukkum. `OTEL_EXPORTER_OTLP_ENDPOINT`-a ungaloda tool-ku point pannunga, client kettaa Indian region-la self-host pannunga.
+
+**Export-ku munnaadi mask pannunga.** Personal data span attributes illa events-kulla pogradhukku munnaadi ungaloda code-la strip pannunga. Neenga attach panra ovvoru prompt-kum answer-kum security lessons-la irundha masking patterns-oda oru chinna helper pottaa, aarambikka podhum; store panna traces-oda oru sample-a review panni, adhu velai seiyudhaa-nu check pannunga.
+
+**Mukkiyamaana traces-a vechukkunga.** Ellaathaiyum 10%-la sample pannina, ungalukku thevaiyaana arithaana failures-la perumbaalum poidum. Rendu common vazhigal:
+
+- **Exceptions-oda head sampling**: error aagura, thumbs down vaangura, latency threshold-a daandura requests-oda traces-a eppavum vechukkunga (adha ungaloda exporter illa collector check panra oru attribute-oda mark pannunga), meedhiyai sample pannunga.
+- **OpenTelemetry Collector-la tail sampling**: collector ovvoru trace-um mudiyura varaikkum kaathirundhu, errors illa slow spans irukkura ellaathaiyum, matha-vatrula oru percentage-aiyum vechukkum.
+
+**Traces-la irundhu step-wise cost-um latency-yum.** Spans-a peru vachu group panni, naalukku time-aiyum tokens-aiyum serunga. "Step-wise total cost-oda share" chart aduthadha oru easy win-a kaattum, example periya model-la odura rewrite step, illa oru periya filter-naala mella aagura retrieval.
+
+**Trace-la irundhu test case varaikkum.** Oru trace id-a eduthu, adhoda kelvi, retrieved ids, expected answer-a eval set-la ezhudhura oru button illa command serunga. Idhu evvalavu easy-aa irukko, eval set nijamaana failures-oda avvalavu vegama valarum.
+
+**Browser-la try pannunga.** Oru chinna tracer: ovvoru step-um adhoda time-a record pannum, adhanaala mella aagura step thani-aa theriyum.
+
+```python
+import time, random
+from contextlib import contextmanager
+
+spans = []
+@contextmanager
+def span(name):
+    t0 = time.perf_counter()
+    yield
+    spans.append((name, (time.perf_counter() - t0) * 1000))
+
+random.seed(2)
+with span("answer"):
+    with span("rewrite"): time.sleep(0.02)
+    with span("retrieve"): time.sleep(random.uniform(0.05, 0.2))
+    with span("generate"): time.sleep(0.1)
+for name, ms in sorted(spans, key=lambda s: -s[1]):
+    print(f"{name:<9} {ms:6.0f} ms")
+```
+
+## Oru worked example
+
+Bhubaneswar-la oru state-government helpdesk assistant schemes pathi citizens-oda kelvigalukku badhil solludhu. Oru official report pannuraanga: "Adhu oru vivasayi-ku state-oda crop-support scheme-la instalment ₹4,000-nu sonnadhu. Adhu ₹2,000." (Inga scheme-um amounts-um example-kaaga uruvaakkinadhu.)
+
+Andha session-oda traces-a search panni, sandhegamaana trace-a thirakkureenga:
+
+```text
+trace 8f3a  user=anon-5521  app=2.4.0  prompt=v17   3.8 s  ₹0.42
+  rewrite_query        0.4 s   "crop-support scheme instalment amount"
+  hybrid_search        0.3 s   top: doc 112 (0.71), doc 87 (0.69), doc 113 (0.66)
+  rerank               0.2 s   top: doc 87, doc 112, doc 113
+  generate             2.9 s   in 3,210 tok / out 182 tok
+```
+
+Doc 87 scheme-oda munnaadi irundha version pathi 2019 note, vera amount-oda. Reranking-ku aprom adhu mudhalla vandhudhu, ippo irukkura scheme guideline-a vida mela. Model adha nermaiyaa quote pannichu. Bug model illa; adhu effective date illaadha pazhaya document.
+
+`effective_from` metadata-vum oru filter-um serkkureenga, trace-oda query-a oru test-la thirumba odavaikkureenga, ippo irundhu indha case test aaga indha trace-a golden set-la save pannureenga. Ovvoru step-um record aagirundhadhaala, muzhu investigation-um pathinainju nimidam thaan aachu.
+
+| Investigation-la step | Aana neram |
+| --- | --- |
+| User-um time-um vachu session-oda trace-a kandupidikkradhu | 2 nimidam |
+| 2019 note mudhalla irundhadhai paarkkradhu | 3 nimidam |
+| Effective dates-um filter-um serthu, query-a thirumba odavaikkradhu | 8 nimidam |
+| Trace-a golden-set case-aa save panradhu | 2 nimidam |
+
+## Podhuvaa panra thappugal
+
+- **Final answer-a mattum log panradhu.** Retrieval failures-a generation failures-la irundhu pirichu solla mudiyaadhu.
+- **Version tags illaama irukkradhu.** Traces-la app, prompt versions illaama, oru maatrathai oru quality drop-oda inaikka mudiyaadhu.
+- **Personal data-va mask pannaama trace panradhu.** Traces oru sensitive data store aagidum. Mask pannunga, restrict pannunga, expire pannunga.
+- **Eppavume paarkkaama irukkradhu.** Yaaraavadhu padichaa thaan traces payan; vaaram oru sample-a review pannunga.
+- **Failures-a tests-aa maathaama irukkradhu.** Trace panna ovvoru mosamaana answer-um oru ready-made eval case.
+- **Model call-a mattum trace panradhu**, adhanaala retrieval, tool problems theriyaadhu.
+- **Uniform sampling**, adhu arithaana failures-la perumbaalaanadha thookki podum.
+- **Ellaa idathulayum proprietary tracing calls**, adhanaala pinnaadi switch panradhu vedhanai; OpenTelemetry-a prefer pannunga.
+
+## Simple logs podhum-na
+
+- **Ovvoru request-kum oru model call** retrieval illa tools illaama: tokens, time, outcome-oda oru structured log line podhum.
+- **Neenga mattum use panra prototype.**
+- **Batch jobs**, angae per-item logs-um oru summary report-um debugging-a cover pannidum.
+
+## Demo-la irundhu production varaikkum
+
+- **Ovvoru step-aiyum trace pannunga**, release, user, session attributes-oda.
+- **Export-ku munnaadi personal data-va mask pannunga**, retention-um access controls-um set pannunga.
+- **Ella failures-aiyum slow requests-aiyum vechukkunga**, meedhiyai sample pannunga.
+- **Step-wise cost-um latency-yum** vaaram chart pannunga.
+- **Mosamaana traces-a eval cases-aa maathunga**, oru command-la.
+
+## Practice pannunga
+
+Langfuse-oda tracing overview-um OpenTelemetry-oda traces page-um padinga.
+
+1. Ungaloda RAG app-la oru free, self-host panna mudiyura tool vachu tracing serunga, rewrite, retrieval (document ids-um scores-um serthu), reranking, generation-a thaniya spans-aa record pannunga.
+2. Traces-a app version-oda prompt version-oda tag pannunga, anuppradhukku munnaadi email addresses-um phone numbers-um mask pannunga.
+3. Pathu kelvigal kelunga, romba mella irukkura step-aiyum romba selavu aagura request-aiyum kandupidinga, oru mosamaana answer-oda trace-a eval case-aa save pannunga.
+4. Ungaloda traces-a OpenTelemetry vazhiyaa oru self-hosted tool-ku export pannunga, apram endpoint-a innoru tool-ku maathi, adhe spans theriyudhaa-nu confirm pannunga.
+
+Innum deep-aa padikka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-la chapter 10 logs, traces, AI applications-ku enna record pannanum-nu cover pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Entha answer-oda trace-aiyum thirandhu, entha step thappaana answer-ku kaaranam-nu solla mudiyum.

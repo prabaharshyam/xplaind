@@ -1,0 +1,166 @@
+---
+id: catching-hallucinations
+lang: hinglish
+title: "Hallucination pakadna: models baatein kyun gadhte hain aur kaise detect karein"
+outcome: "Samjha paoge ki models hallucinate kyun karte hain, apne model ke woh sawaal dhoondh paoge jahan woh hallucinate karta hai, aur judge checks, claim-by-claim verification, entailment models aur self-consistency se unsupported claims ko automatically detect kar paoge."
+answer: "Models tab baatein gadhte hain jab woh apne hi andaazon par build karte hain ya jitna jaante hain usse aage jawab dete hain. Har claim ko source se check karke, judge ya entailment model se, ya dobara sample karke pakdo."
+why_it_matters: "Ek confident, gadha hua fact ek client, ek court case ya ek patient ka bharosa tak gawa sakta hai. Jo teams hallucination ko question type ke hisaab se measure karti hain aur automatically pakadti hain, woh AI ko serious kaam mein bhej sakti hain; jo bas umeed rakhti hain, woh nahi."
+flashcards:
+  - q: "Hallucination kya hai?"
+    a: "Ek confident jawab, ya uska koi hissa, jo facts ya model ko di gayi source se support nahi hota."
+  - q: "Hallucination mein 'snowballing' kya hai?"
+    a: "Model apne hi pehle ke galat statement ko fact maan leta hai aur uspar build karta rehta hai, pehle waale ko justify karne ke liye aur errors jodta hai."
+  - q: "Hallucination aksar karwane waale do question types batao."
+    a: "Niche topics jo model ne kam dekhe, aur un cheezon ke baare mein sawaal jo exist hi nahi karti, jaise koi insaan ne jis topic par kuch kaha hi nahi, us par usne kya kaha."
+  - q: "Local aur global factual consistency kya hain?"
+    a: "Local: jawab kisi di gayi source, jaise document ya policy, se match karta hai. Global: woh widely accepted facts se match karta hai."
+  - q: "Claim-by-claim checking kaise kaam karti hai?"
+    a: "Jawab ko alag-alag claims mein todo, har ek ko akela khada hone laayak banao, har ek ke liye evidence dhoondho, aur har claim ko supported ya nahi judge karo."
+  - q: "Entailment (NLI) model kya karta hai?"
+    a: "Source aur claim dene par woh claim ko supported, contradicted ya dono nahi, aise label karta hai. Factual consistency ke liye ek chhota, sasta checker."
+  - q: "SelfCheckGPT ka idea kya hai?"
+    a: "Model ko kuch aur baar sample karo. Agar naye jawab original se match nahi karte, toh original shaayad gadha hua hai."
+  - q: "Detect karne se pehle hi hallucination kya kam karta hai?"
+    a: "Model ko facts dena (retrieval), use sirf unhi se jawab dene aur na pata ho toh bolne ko kehna, aur citations maangna."
+exercise:
+  title: "Indian freelancers ke liye ek tax-help assistant"
+  setup: "Bengaluru ka ek fintech freelancers ke income tax sawaalon ka jawab Income Tax Act ke retrieved sections aur CBDT circulars se dene waala assistant chalata hai. 100 jawab review karne waale ek lawyer ko 9 mein unsupported claim mila, zyadatar rare deductions aur aise circulars ke baare mein jo exist hi nahi karte."
+  questions:
+    - q: "Unhe sabse pehle kya measure karna chahiye?"
+      a: "Question type ke hisaab se hallucination rate. Review ne pehle hi rare deductions aur non-existent circulars ke sawaal bata diye hain, isliye unke liye alag test cases chahiye."
+    - q: "Woh unsupported claims ko automatically kaise detect kar sakte hain?"
+      a: "Har jawab ko claims mein todo aur har claim ko retrieved sections se check karo, judge model ya entailment model se. Jis claim ka koi support na ho use flag karo."
+    - q: "Jab sources sawaal ka jawab na dein toh assistant ko kya karna chahiye?"
+      a: "Saaf bolna aur general knowledge se jawab dene ki jagah chartered accountant ki taraf point karna."
+    - q: "Kya jawab ko paanch baar sample karke compare karna yahan achha everyday check hai?"
+      a: "Spot checks ke liye kaam ka hai, par har jawab ke liye bahut mehnga. Claims ko retrieved sources se check karna sasta aur seedha hai."
+ask:
+  - "Language models hallucinate kyun karte hain?"
+  - "Hallucinations ko automatically kaise detect karun?"
+  - "RAG app mein hallucinations kaise kam karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Hallucination** ek confident jawab hai, ya uska koi hissa, jo facts ya model ko di gayi source se support nahi hota. 2023 mein ek law firm par fine laga kyunki unhone court filings mein woh cases daal diye the jo ek chatbot ne gadhe the. Khatra ye nahi hai ki model ko pakka nahi pata; khatra ye hai ki woh pakka bolta hai.
+
+Correctness ke do kaam ke kism hain:
+
+- **Local factual consistency**: kya jawab kisi di gayi source, jaise retrieved document, company policy ya data se match karta hai? Ye summaries, support assistants aur RAG apps ke liye matter karta hai.
+- **Global factual consistency**: kya woh widely accepted facts se match karta hai? Ye open chat, research aur fact-checking ke liye matter karta hai.
+
+Local consistency check karna bahut aasaan hai, kyunki source haath mein hoti hai. Models ko retrieval se facts dene ki ye ek aur wajah hai.
+
+**Ye kyun hota hai.** Do explanations kaafi discuss hote hain:
+
+1. **Self-delusion, ya snowballing.** Model ko pata nahi chalta ki di gayi text kaunsi hai aur usne khud likhi kaunsi. Agar pehla sentence thoda galat ho, toh baad ke sentences use fact maan kar uspar build karte hain.
+2. **Model ki jaankari se aage sikhana.** Training mein models un logon ke likhe jawab copy karte hain jinhe woh cheezein pata thin jo model ko nahi pata. Isse woh us jaankari ke bina bhi confident jawab dena seekh jaate hain.
+
+Practice mein hallucinations do jagah jhund mein aate hain: **niche topics** jo model ne kam dekhe, aur **un cheezon ke baare mein sawaal jo exist hi nahi karti** ("X ke baare mein RBI ne kya kaha?" jabki usne kuch kaha hi nahi).
+
+```flow
+title: Jawab ko unsupported claims ke liye check karna
+Jawab -> Alag-alag claims mein todo
+Alag-alag claims mein todo -> Har claim ko akela khada karo | "woh" ki jagah subject likho
+Har claim ko akela khada karo -> Evidence dhoondho | retrieved source ya search
+Evidence dhoondho -> Har claim judge karo | supported, contradicted, unknown
+Har claim judge karo -> Koi unsupported hai?
+Koi unsupported hai? -[nahi]-> Jawab dikhao
+Koi unsupported hai? -[haan]-> Hatao, dobara likho ya refuse karo | aur review ke liye log karo
+```
+
+## Ye kaam kaise karta hai
+
+**Pehle roko.** Detection woh pakadta hai jo nikal gaya; prevention matra kam karta hai.
+
+- Model ko facts do: documents ke liye retrieval, live data ke liye tools.
+- Use bolo ki sirf di gayi sources se jawab de, aur warna "mujhe nahi pata" ya "documents ismein cover nahi karte" bole.
+- Har claim ke liye source passage ka citation maango, aur check karo ki cited passage exist karta hai.
+- Factual tasks ke liye temperature low rakho, aur lambe tasks ko chhote steps mein todo taaki errors snowball na karein.
+
+**Dhoondho ki aapka model kahan hallucinate karta hai.** Detectors banane se pehle, fail hue jawab padho aur group karo. Weak spots ko target karne waale test cases banao: rare topics, false premise waale sawaal, aise sawaal jinka jawab sources nahi de sakte. In ke bina ka test set ek tasalli dene waala number dikhayega jo real users ko nahi dikhega.
+
+**Judge se detect karo.** Judge model ko source aur jawab do, aur poochho ki jawab mein kuch aisa hai jo source support nahi karti. Strong models ye achhe se karte hain, khaaskar short answers par. Bharosa karne se pehle ek sample par judge ko human labels se check karo.
+
+**Claim-by-claim detect karo.** Lambe jawab mein sach aur jhooth statements mile hote hain, isliye ek verdict problems chhupa deta hai. Google DeepMind ka SAFE method pattern dikhata hai: jawab ko alag claims mein todo, har ek ko akela khada hone laayak dobara likho, evidence search karo, phir har claim judge karo. RAG apps ke liye "search" step bas retrieved passages hain.
+
+**Entailment model se detect karo.** Natural language inference (NLI) models ek premise (source) aur ek hypothesis (claim) lete hain aur batate hain **entailment** (supported), **contradiction** ya **neutral** (pata nahi). Isi kaam ke liye train kiye chhote, open models har claim par tez aur sasta chalte hain.
+
+**Dobara sample karke detect karo.** SelfCheckGPT usi sawaal ke kai naye jawab sample karta hai. Agar woh original jawab ke claims se match nahi karte, toh woh claims shaayad gadhe hue hain, kyunki model jo sach mein jaanta hai use dohrata hai aur jo gadhta hai usme badlav karta hai. Ise source nahi chahiye, par cost kai guna badh jaati hai, isliye spot checks ya high-stakes jawabon ke liye use karo.
+
+Entailment model ke saath ek simple claim checker:
+
+```python
+def unsupported_claims(answer, sources, split_claims, entails):
+    """split_claims(text) -> list of standalone claims.
+    entails(premise, claim) -> 'entailment' | 'contradiction' | 'neutral'."""
+    flagged = []
+    for claim in split_claims(answer):
+        verdicts = [entails(src, claim) for src in sources]
+        if "entailment" not in verdicts:
+            flagged.append({"claim": claim, "contradicted": "contradiction" in verdicts})
+    return flagged
+
+# for item in unsupported_claims(reply, retrieved_passages, split_claims, nli):
+#     log_for_review(item)
+```
+
+| Method | Source chahiye? | Har jawab ka cost | Kiske liye best |
+| --- | --- | --- | --- |
+| Poore jawab par judge model | Haan, ya search | Medium | Short answers, quick checks |
+| Judge ke saath claim-by-claim | Haan, ya search | Zyada | Bahut facts waale lambe jawab |
+| Har claim par entailment (NLI) model | Haan | Kam | RAG app ka har jawab |
+| Dobara sampling (self-consistency) | Nahi | Bahut zyada | Spot checks, open sawaal |
+| Citation check | Haan | Bahut kam | Koi bhi app jo sources dikhata hai |
+
+## Ek example se samjho
+
+Bengaluru ka ek fintech freelancers ke income tax sawaalon ka jawab Income Tax Act ke retrieved sections aur CBDT circulars se dene waala assistant chalata hai. Ek tax lawyer 100 jawab review karke 9 mein unsupported claim paata hai. Chhe rare deductions ke baare mein hain, aur teen aise circulars describe karte hain jo exist hi nahi karte.
+
+Unke steps:
+
+1. **Targeted test set.** 150 sawaal: aam waale, rare deductions, aur false premises waale 30 sawaal ("Section 44ADA ke under freelancer GST par 2025 ka circular kya kehta hai?").
+2. **Prevention.** Prompt ab bolta hai ki sirf passages se jawab do, jab woh sawaal cover na karein toh saaf bolo, aur har claim ke liye section cite karo.
+3. **Har jawab par detection.** Ek entailment model har claim ko retrieved passages se check karta hai. Unsupported claims hata diye jaate hain aur agar core jawab unpar depend karta hai, toh assistant bolta hai ki woh jawab nahi de sakta aur chartered accountant suggest karta hai.
+4. **Weekly review.** Ek judge model sample score karta hai, aur lawyer woh sab review karta hai jo checks ne flag kiya.
+
+| 150-question set par measure | Pehle | Baad mein |
+| --- | --- | --- |
+| Kisi bhi unsupported claim waale jawab | 11% | 2% |
+| False-premise sawaal jinhe sach maan kar jawab diya gaya | 60% | 7% |
+| Jawab jo refuse karte hain jab nahi karna chahiye | 1% | 4% |
+
+Numbers sirf samjhane ke liye hain. Aakhri row ka trade-off dekho: strict checks se assistant thoda zyada refuse karta hai. Team dono numbers track karti hai, kyunki sab kuch refuse karne waala assistant bhi ek failure hai.
+
+## Aam galtiyaan
+
+- **Sirf woh sawaal test karna jo model ko achhe se aate hain.** Rare topics aur false-premise sawaal jodo, warna aapka score aapko dhokha dega.
+- **Lambe jawab ke liye ek verdict.** Claims ek-ek karke check karo; ek gadha hua figure nau sach sentences mein chhup sakta hai.
+- **Citations ko bina check kiye maan lena.** Confirm karo ki cited passage exist karta hai aur claim ko support karta hai.
+- **Source hone par general knowledge se check karna.** RAG app mein retrieved passages ke against judge karo.
+- **Sirf hallucinations ginna.** Refusals bhi track karo, taaki fixes assistant ko bekaar na bana dein.
+- **Maan lena ki bada model theek kar dega.** Bade models common facts par kam hallucinate karte hain par niche aur false-premise sawaalon par ab bhi gadhte hain.
+
+## Jab detection kaafi nahi
+
+- **High-stakes jawab**, jaise legal, medical ya financial advice, ke loop mein ek qualified insaan chahiye.
+- **Koi bharosemand source nahi hai.** Agar aap bata hi nahi sakte ki facts kya hain, toh koi checker nahi bata sakta.
+- **Real-time voice** mein claim checks ke liye time nahi bachta; uske badle ise safe, scripted topics tak seemit rakho.
+
+## Demo se production tak
+
+- **Har jawab par sasta checks** (citations, entailment) chalao, aur mehnge checks ek sample par.
+- **Har flag kiye gaye claim ko** source ke saath log karo, taaki reviewers retrieval ya documents theek kar sakein.
+- **Topic ke hisaab se hallucination aur refusal rates track karo,** aur model ya prompt update ke baad achanak badlav par alert karo.
+- **Confirm hui failures ko test set mein daalo,** taaki woh bina pata chale wapas na aayein.
+
+## Practice karo
+
+1. Kisi bhi chat assistant se kisi aisi cheez ke baare mein teen sawaal poochho jo exist nahi karti, jaise banayi hui sarkari scheme. Woh kitni baar saath deta hai?
+2. Ek lamba jawab lo, use haath se claims mein todo, aur har ek ko source se supported ya nahi mark karo.
+3. Ek prompt rule aur ek output check likho jo aapko mile sabse bure claim ko rok deta.
+
+Aur gehrai mein jaane ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ke chapters 2 aur 4 batate hain ki hallucinations kyun hote hain aur factual consistency kaise measure karein.
+
+**Aapka kaam poora jab:** aap batao sako ki models kyun hallucinate karte hain iske do explanations, ise trigger karne waale do kism ke sawaal, aur ise detect karne ke teen tareeke.

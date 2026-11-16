@@ -1,0 +1,232 @@
+---
+id: first-llm-api-call
+lang: hinglish
+title: "Code se LLM API call karna"
+outcome: "Python script se language model ko prompt bhejo aur uska reply apne program mein use karo."
+answer: "LLM API call karne ke liye provider ka Python SDK install karo, API key ko environment variable mein set karo, messages ki list bhejo, aur response se text padho."
+why_it_matters: "AI use karne aur AI ke saath build karne ke beech ki line yahi hai. Is path ki har aage ki app, RAG se agents tak, isi ek call se shuru hoti hai."
+flashcards:
+  - q: "LLM API call se aapko kya wapas milta hai?"
+    a: "Model ka reply, saath mein details jaise kitne input aur output tokens use hue aur kyun ruka."
+  - q: "Aapki API key kahan rehni chahiye?"
+    a: "Environment variable mein, aksar .gitignore mein listed .env file se load hoke. Code mein kabhi nahi. Jo key kabhi bhi commit ho gayi, use rotate karo."
+  - q: "SDK kya hota hai?"
+    a: "Software development kit: ek official library jo API ki HTTP details ko wrap karti hai, jaise Anthropic Python SDK."
+  - q: "max_tokens kya karta hai?"
+    a: "Reply kitna lamba ho sakta hai ye cap karta hai, jisse har call ki cost aur time limit mein rehte hain."
+  - q: "System prompt kya hota hai?"
+    a: "Poori conversation ke liye standing instructions, jaise assistant ka role, tone aur rules."
+  - q: "Kya API pehle ki calls yaad rakhti hai?"
+    a: "Nahi. Conversation aage badhane ke liye pehle ke user aur assistant turns naye message ke saath dobara bhejo."
+  - q: "Ek call ki cost kaise nikaalte hain?"
+    a: "Input tokens aur output tokens ko model ke abhi ke per-token prices se multiply karo aur jod do."
+  - q: "Shuru mein model kaise chunein?"
+    a: "Mid-sized model se shuru karo, apne asli task par test karo, phir cost ke liye chhota ya quality ke liye bada try karo."
+  - q: "Reply ko stream kyun karein?"
+    a: "User ko poore answer ka intezaar karne ki jagah words likhe jaate hi dikhte hain, jisse lambe replies bahut tez lagte hain."
+  - q: "Kaunse API errors retry karne layak hain?"
+    a: "Rate limits, overload aur timeouts, har baar badhte wait ke saath. Aapki request ki galtiyan, jaise bad key ya invalid input, dobara bhi fail hongi."
+exercise:
+  title: "Predict karo API kya karegi"
+  setup: "Chennai ki Meera ek chatbot likhti hai. Call 1 messages bhejti hai: user 'My name is Meera.' Reply aata hai 'Nice to meet you, Meera!'. Call 2 sirf ye bhejti hai: user 'What is my name?'. Call 3 ye bhejti hai: user 'My name is Meera.', assistant 'Nice to meet you, Meera!', user 'What is my name?'. Har call mein max_tokens=50. Call 3 40 input aur 12 output tokens report karti hai. Maan lo ₹0.0002 per input token aur ₹0.0008 per output token."
+  questions:
+    - q: "Kya call 2 ko uska naam pata hoga? Kyun?"
+      a: "Nahi. API pehle ki calls yaad nahi rakhti; call 2 mein koi history nahi hai."
+    - q: "Kya call 3 ko uska naam pata hoga?"
+      a: "Haan, kyunki pehle ke turns messages list mein dobara bheje gaye the."
+    - q: "Call 3 ki cost kitni thi?"
+      a: "40 × 0.0002 + 12 × 0.0008 = 0.008 + 0.0096 = lagbhag ₹0.018."
+    - q: "Agar woh max_tokens=50 ke saath 500-word ka essay maange toh kya hoga?"
+      a: "Reply lagbhag 50 tokens par kat jaata hai, aur stop reason dikhata hai ki token limit pahunch gayi."
+ask:
+  - "Apni API key safe kaise rakhun?"
+  - "Model meri pehli baat kyun bhool jaata hai?"
+  - "LLM API call ki cost kitni hoti hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Code se language model call karna kisi bhi web API call karne jaisa hai: aapka program aapke prompt ke saath ek request bhejta hai, provider model chalata hai, aur aapko reply wapas milta hai, saath mein details jaise kitne tokens use hue. Isse aapke apne programs summarise, classify, extract aur likh sakte hain.
+
+Har bada provider ek API aur ek official Python SDK (software development kit) deta hai jo HTTP details ko wrap karta hai.
+
+```flow
+dir: LR
+Aapki script | client = Anthropic(), key environment se, messages.create(...) -[HTTPS POST: model, max_tokens, system, messages]-> Model provider | system prompt + message history par model chalata hai
+Model provider -[reply text, usage, stop reason]-> Aapki script padhti hai | .content ke text blocks, tokens mein reply.usage
+```
+
+Is lesson mein hum Gurugram ke backend developer Vikram ke saath chalenge, jo ek tool bana raha hai jo bikhre hue meeting notes ko saaf summaries mein badalta hai.
+
+## Ye kaam kaise karta hai
+
+**Key lo.** Provider ke developer console mein account banao, zaroorat ho toh thoda credit daalo, aur ek API key banao. Use password ki tarah treat karo.
+
+**Key ko code se bahar rakho.** Use environment variable mein store karo, aksar `.env` file mein jo `.gitignore` mein listed ho. SDK aam taur par use ek standard variable naam se khud padh leta hai.
+
+**SDK install karo** apne project ke virtual environment mein pip se.
+
+**Ek message bhejo.** Ek typical call model ka naam batati hai, output length par limit lagati hai, aur messages ki list pass karti hai. Yahan Anthropic ke Python SDK ke saath dikhaya hai; doosre providers ke SDKs bhi yahi pattern follow karte hain:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()          # reads ANTHROPIC_API_KEY from the environment
+
+reply = client.messages.create(
+    model="claude-sonnet-5-5",          # check the docs for current model names
+    max_tokens=300,
+    system="You are a concise assistant for a small bakery in Pune.",
+    messages=[{"role": "user", "content": "Write a two-line WhatsApp message announcing fresh plum cakes for Christmas."}],
+)
+
+text = "".join(b.text for b in reply.content if b.type == "text")
+print(text)
+print("tokens in:", reply.usage.input_tokens, "out:", reply.usage.output_tokens)
+```
+
+Reply ka `content` blocks ki ek list hai. Naye models text se pehle ek thinking block rakh sakte hain, isliye ye maan lene ki jagah ki pehla block hi answer hai, wo blocks chuno jinka type `text` hai.
+
+**Message list.** Conversation roles (user aur assistant) waale messages ki list hai. Chat aage badhane ke liye pehle ke turns naye message ke saath dobara bhejo; API apne aap pehle ki calls yaad nahi rakhti. **System** prompt standing instructions set karta hai.
+
+**Usage aur cost.** Har reply input aur output tokens report karta hai. Model ke per-token price se multiply karo toh pata chalta hai har call ki cost kitni hai. Build karte waqt usage print karo taaki cost kabhi chaunka na de.
+
+**Model chunna.** Providers bade, zyada capable models aur chhote, tez, sasti models dete hain. Mid-sized model se shuru karo aur badalne se pehle test karo.
+
+**Request ke parts, aur woh kya control karte hain:**
+
+| Part | Kya control karta hai | Tip |
+| --- | --- | --- |
+| `model` | Capability, speed aur price | Current naam docs mein dekho |
+| `max_tokens` | Maximum reply length | Hamesha set karo |
+| `system` | Poori chat ke liye role, tone, rules | Calls ke beech stable rakho |
+| `messages` | Ab tak ki conversation | User aur assistant turns baari-baari se |
+| Reply `usage` | Use hue tokens | Pehle din se log karo |
+| Reply stop reason | Kyun ruka: khatam hua, ya token limit par pahuncha | Limit par pahunche toh answer kata hua hai |
+
+**Streaming.** Lamba reply khatam hone mein das second ya zyada lag sakte hain. Streaming mein API text ko likhe jaate hi bhejti hai, isliye user lagbhag ek second mein padhna shuru kar deta hai. Chat interfaces lagbhag hamesha stream karte hain; background jobs, jaise raat bhar mein hazaar files summarise karna, ko aksar iski zaroorat nahi hoti.
+
+**Errors aur retries.** API calls kabhi-kabhi fail hoti hain, aur aapke code ko ye expect karna chahiye:
+
+| Error | Matlab | Kya karein |
+| --- | --- | --- |
+| 401 ya 403 | Key missing, galat ya allowed nahi | Key theek karo; retry mat karo |
+| 400 | Aapki request mein kuch invalid hai | Message padho aur request theek karo |
+| 429 | Rate limit: har minute bahut zyada requests ya tokens | Ruko aur retry karo, speed kam karke |
+| 500, 529 ya timeout | Provider error ya overload | Badhte wait ke saath retry karo; agar chalta rahe toh backup model par jao |
+
+Anthropic ka SDK rate limits, overloads aur connection errors ko pehle se do-teen baar badhte waits ke saath retry karta hai; kitni baar `max_retries` se aur kitna wait `timeout` se set kar sakte ho. Aapke code ko phir bhi decide karna hai ki sab retries fail hone par user ko kya dikhega.
+
+**Ek chhota chat program.** Ye sab pieces ek saath laata hai: history, streaming, bhejne se pehle token check, cut-off detection aur errors.
+
+```python
+import anthropic
+
+client = anthropic.Anthropic(max_retries=3, timeout=60)
+MODEL = "claude-sonnet-5-5"            # check the docs for current model names
+SYSTEM = "You help students in Kerala plan their study week. Be brief."
+history = []
+
+def ask(text):
+    history.append({"role": "user", "content": text})
+    size = client.messages.count_tokens(model=MODEL, system=SYSTEM, messages=history).input_tokens
+    if size > 20_000:
+        history.pop()
+        return "This conversation is too long. Please start a new one."
+    try:
+        with client.messages.stream(model=MODEL, max_tokens=500, system=SYSTEM, messages=history) as stream:
+            for chunk in stream.text_stream:
+                print(chunk, end="", flush=True)        # words appear as they arrive
+            reply = stream.get_final_message()
+    except anthropic.RateLimitError:
+        history.pop()
+        return "Busy right now. Please try again in a minute."
+    except anthropic.APIStatusError as err:
+        history.pop()
+        return f"The AI service returned an error ({err.status_code})."
+    except anthropic.APIConnectionError:
+        history.pop()
+        return "Could not reach the AI service. Check the connection."
+    history.append({"role": "assistant", "content": reply.content})
+    if reply.stop_reason == "max_tokens":
+        print("\n[reply cut off at the length limit]")
+    print(f"\n(tokens in {reply.usage.input_tokens}, out {reply.usage.output_tokens})")
+
+ask("I have maths and chemistry exams in two weeks. Make a plan for Monday.")
+ask("Move chemistry to the evening.")             # the model sees the first turn too
+```
+
+Error aane par user ka message history se hata diya jaata hai, taaki agli koshish mein do user messages lagaatar na jaayein.
+
+**Sampling settings.** Kuch models `temperature` jaisi settings leti hain, jo control karti hai ki wording kitni alag-alag ho; model words kaise chunta hai wala lesson inhe samjhata hai. Naye models inme se kuch settings fix kar sakte hain, isliye bharosa karne se pehle model ka documentation check karo.
+
+**Conversation history mein paise lagte hain.** Kyunki aap har turn poori history dobara bhejte ho, lambi chats har message ke saath mehngi hoti jaati hain: turn 20 turns 1 se 19 ke liye dobara input ke roop mein pay karta hai. Asli apps purane turns ko trim ya summarise karti hain, aur system prompt stable rakhti hain taaki providers use cache kar sakein aur dohraye hue hisse ke liye kam charge karein.
+
+**Browser mein try karo.** Dekho ki history dobara bhejne se har turn ki cost kaise badhti hai. Numbers badlo aur phir chalao.
+
+```python
+system_tokens, question, answer = 1200, 100, 250
+history = 0
+for turn in range(1, 11):
+    sent = system_tokens + history + question
+    print(f"turn {turn:>2}: {sent:>5} input tokens")
+    history += question + answer       # this turn is resent next time
+```
+
+## Ek example se samjho
+
+Gurugram ka backend developer Vikram ek command-line tool banata hai jo bikhre hue meeting notes ko action items ke saath saaf summary mein badalta hai.
+
+- Woh apni key ke saath `.env` banata hai, `.env` ko `.gitignore` mein jodta hai, aur `python-dotenv` se load karta hai.
+- Uski script notes file padhti hai, use system prompt ke saath bhejti hai ("Summarise in five bullet points, then list action items as owner: task: due date"), aur reply aur token usage print karti hai.
+- Do page ke note par ye lagbhag 1,800 input aur 250 output tokens use karta hai; uske model ke prices par ye ek run ke liye ek rupaye se bahut kam hai.
+- Woh ek check jodta hai: agar notes file 20,000 characters se zyada ho, toh woh user ko warn karta hai, taaki galti se bade bills na aayein.
+
+Woh repository ko bina key ke aur example output dikhane waale README ke saath GitHub par push karta hai.
+
+| Run | Input | Input tokens | Output tokens | Cost |
+| --- | --- | --- | --- | --- |
+| Do page ke notes | 1 file | lagbhag 1,800 | lagbhag 250 | ₹1 se bahut kam |
+| 60-page ka notes dump | 20,000-character check ne roka | 0 | 0 | ₹0 |
+
+Length check mein Vikram ko do lines lagi aur ye har aane waale user ko achanak bill se bachata hai.
+
+**Script se aadat tak.** Vikram ke teammates ne ek hafte ke andar tool use karna shuru kar diya. Sabse zyada use hone waali cheez summary nahi, balki fixed "owner: task: due date" format mein action-item list thi, kyunki use seedhe apne tracker mein paste kar sakte the. Ye poori tarah system prompt se aaya, jo dikhata hai ki LLM app ki value ka kitna hissa clever code se nahi, saaf instructions se aata hai.
+
+## Aam galtiyaan
+
+- **API key ko code mein hard-code karna.** Environment variables use karo; jo key kabhi bhi commit hui use rotate karo.
+- **`max_tokens` bhool jaana.** Output hamesha cap karo.
+- **API se umeed karna ki woh pehle ki calls yaad rakhegi.** Conversation history khud bhejo.
+- **Purane model names use karna.** Docs mein current list dekho.
+- **Usage numbers ko ignore karna.** Apni pehli call se tokens track karo.
+
+- **Poora response object logs mein print karna.** Usme user ka text ho sakta hai. Iski jagah ids, token counts aur timings log karo.
+- **Maan lena ki har call success hogi.** Rate limits, overloads aur timeouts handle karo, aur user ko saaf message dikhao.
+- **Sab kuch retry karna.** Bad key ya invalid request har baar ek hi tarah fail hoti hai.
+- **Stop reason ko ignore karna.** Jo reply `max_tokens` par pahuncha woh adhoora hai.
+
+## Jab abhi API ki zaroorat nahi
+
+- **One-off tasks**: ek summary ya draft ke liye chat app tez hai.
+- **Spreadsheet ya no-code kaam**: n8n ya spreadsheet add-on jaise tools aapke liye pehle se model call kar sakte hain.
+- **Prompts seekhna**: pehle provider ke console ya workbench mein prompts try karo, phir jo kaam kare use code mein le jao.
+
+## Demo se production tak
+
+- **Key ko server par rakho.** Use kabhi mobile app ya browser code mein mat bhejo; browser aapke server ko call karta hai, aur aapka server model ko call karta hai.
+- **Har user ke liye limits lagao**: requests per minute aur tokens per day, taaki ek user ya script bill na badha sake.
+- **Metadata log karo**: request id, model, tokens, laga hua time, stop reason aur error type.
+- **Model version pin karo** jahan provider dated names deta hai, aur naye par jaane se pehle test karo.
+- **Outages ki planning karo**: user ke liye saaf message, aur important features ke liye ek backup model.
+
+## Practice karo
+
+Apni language ke liye neeche link kiya gaya provider getting-started guide follow karo.
+
+Is lesson ka check ek chhota project hai: ek command-line ya web app push karo jo LLM API call kare, API key ko code se bahar rakhe, aur har call ka token usage print kare. Repository ka link submit karo.
+
+Aur gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 2 sampling settings cover karta hai, aur chapter 9 latency, streaming aur API calls ki cost cover karta hai.
+
+**Aapka kaam poora jab:** aap script se model call kar sako, do-turn ki conversation aage badha sako, aur bata sako ki ek call ki cost kitni thi.

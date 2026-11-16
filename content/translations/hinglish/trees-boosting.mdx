@@ -1,0 +1,206 @@
+---
+id: trees-boosting
+lang: hinglish
+title: "Trees aur gradient boosting"
+outcome: "Tabular data ke liye decision trees, random forests aur gradient-boosted trees (XGBoost, LightGBM) use karna seekho: ye kaise kaam karte hain, inhe kaise tune karein, aur inki predictions kaise explain karein."
+answer: "Decision tree yes-no sawaal poochkar data ko baantta hai. Random forest bahut saare trees ka average leta hai, aur gradient boosting (XGBoost, LightGBM) aise trees jodta hai jo pehle ki galtiyan theek karte hain; ye tabular data ke liye sabse suit karta hai."
+why_it_matters: "Tabular business data (customers, transactions, claims, loans) ke liye gradient-boosted trees aam taur par sabse strong practical choice hain aur tabular problems mein aksar neural networks ko peeche chhod dete hain. India ki kai fintech, e-commerce aur insurance teams inpar depend karti hain."
+flashcards:
+  - q: "Decision tree predict kaise karta hai?"
+    a: "Features ke baare mein sawaalon ki ek series poochkar, jaise 'EMI-to-income 0.45 se upar hai?', branches follow karke ek leaf par prediction tak pahunchta hai."
+  - q: "Random forest kya hai?"
+    a: "Bahut saare trees, har ek rows aur features ke random sample par train hota hai, aur unki predictions ka average liya jaata hai. Bharosemand aur tootna mushkil."
+  - q: "Gradient boosting kya hai?"
+    a: "Trees ek ke baad ek bante hain, har ek ab tak ke ensemble ki galtiyan theek karta hai. XGBoost, LightGBM aur CatBoost popular libraries hain."
+  - q: "Trees business data ke liye kyun suit karte hain?"
+    a: "Mixed feature types sambhaalte hain, scaling ki zaroorat nahi, non-linear effects aur interactions pakadte hain, aur missing values se kaam chala lete hain."
+  - q: "Early stopping kya hai?"
+    a: "Jab validation error improve hona band ho jaaye, tab trees jodna rok dena, jisse boosting overfit nahi hoti."
+  - q: "SHAP values kya explain karti hain?"
+    a: "Ek individual prediction ko har feature ne kitna upar ya neeche dhakela, jaise is applicant ka risk zyada kyun hai."
+  - q: "Feature importance gumraah kyun kar sakti hai?"
+    a: "Correlated features importance ko unpredictable tareeke se baant lete hain, aur leaky feature sabse important dikh sakta hai."
+  - q: "Trees kya achhe se nahi kar paate?"
+    a: "Dekhe hue target values ke bahar extrapolate karna, ya raw images, audio ya text se seedha seekhna, jahan neural networks jeette hain."
+  - q: "Boosting mein early stopping kya karta hai?"
+    a: "Training data ka ek hissa alag rakhta hai aur jab wahan score improve hona band ho jaaye, tab trees jodna rok deta hai, yaani trees ki ginti aapke liye khud chun leta hai."
+  - q: "Permutation importance built-in importance se behtar kyun ho sakti hai?"
+    a: "Ye held-out data par ek feature ki values shuffle karne par score kitna girta hai, woh naapti hai, jo split counts se zyada real use dikhati hai."
+exercise:
+  title: "Boosting run ko diagnose karo"
+  setup: "Mumbai ka ek insurer claims predict karne ke liye LightGBM train karta hai. Run A: depth 15, learning rate 0.3, 2,000 trees, early stopping nahi: training AUC 0.99, validation AUC 0.70. Run B: depth 6, learning rate 0.03, 50 rounds bina improvement ke early stopping: 640 trees par ruk jaata hai, training AUC 0.84, validation AUC 0.80. Dono runs mein top feature 'claim_settled_amount' hai."
+  questions:
+    - q: "Run A mein kya galat hua?"
+      a: "Overfitting: deep trees, high learning rate aur bahut saare trees ne training data ko lagbhag perfectly fit kar liya, par naye data par achha generalise nahi hua."
+    - q: "Training AUC kam hone ke bawajood Run B behtar kyun hai?"
+      a: "Iska validation AUC zyada hai, aur naye data ke liye wahi matter karta hai. Training aur validation ke beech chhota gap kam overfitting dikhata hai."
+    - q: "'claim_settled_amount' mein shak wali baat kya hai?"
+      a: "Ye claim settle hone ke baad hi pata chalta hai, isliye ye outcome leak karta hai. Ise hatana chahiye aur validation score dobara check karna chahiye."
+    - q: "Ek customer ke high predicted risk ko aap kaise explain karoge?"
+      a: "Us prediction ke SHAP values se, unhe saaf reasons mein badalkar, jaise pichhle saal mein do claims aur high-risk vehicle category."
+ask:
+  - "Random forest aur gradient boosting mein kya farak hai?"
+  - "XGBoost ya LightGBM ko tune kaise karein?"
+  - "SHAP values ko simple words mein samjhao."
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Decision tree** features ke baare mein sawaalon ki ek series poochkar predict karta hai: "Kya EMI-to-income ratio 0.45 se upar hai? Agar haan, toh kya applicant ne pichhle saal koi payment miss ki hai?" Har jawab ek branch se hote hue leaf par prediction tak le jaata hai. Trees ye sawaal data se seekhte hain.
+
+Akela tree aasaani se overfit ho jaata hai. Do ensemble methods ise theek karte hain:
+
+- **Random forest**: bahut saare trees, har ek rows aur features ke random sample par train hota hai, aur predictions ka average liya jaata hai. Bharosemand aur tootna mushkil.
+- **Gradient boosting**: trees ek ke baad ek bante hain, har naya tree ab tak ke ensemble ki galtiyan theek karta hai. XGBoost, LightGBM aur CatBoost popular implementations hain. Tabular data par aam taur par sabse accurate.
+
+```flow
+EMI / income above 0.45? -[yes]-> Missed a payment in the last 12 months?
+EMI / income above 0.45? -[no]-> Credit history under 2 years?
+Missed a payment in the last 12 months? -[yes]-> Risk 0.41
+Missed a payment in the last 12 months? -[no]-> Risk 0.18
+Credit history under 2 years? -[yes]-> Risk 0.12
+Credit history under 2 years? -[no]-> Risk 0.03
+```
+
+Boosting aise hi bahut saare trees jodta hai: tree 1, phir tree 2 ka chhota sa correction, aur aise hi tree 640 tak.
+
+Ye lesson Gurugram ke ek digital lender ko follow karta hai jo personal loans par 90-day defaults predict karta hai.
+
+## Ye kaam kaise karta hai
+
+**Trees business data ke liye kyun suit karte hain.** Ye mixed feature types sambhaalte hain, feature scaling ki zaroorat nahi, non-linear effects aur interactions apne aap pakad lete hain ("self-employed applicants ke liye high EMI ratio zyada matter karta hai"), aur missing values sambhaal lete hain (zyadatar boosting libraries inhe natively handle karti hain).
+
+**Boosting ki key settings.**
+
+- *Trees ki ginti* aur *learning rate*: bahut chhote steps (low learning rate ke saath zyada trees) aam taur par behtar generalise karte hain; validation set par early stopping use karo taaki validation error improve hona band hote hi trees jodna ruk jaaye.
+- *Tree depth*: shallow trees (depth 3 se 8) complexity ko limit karte hain.
+- Har tree ke liye rows aur columns ka *subsampling*: randomness jodta hai jo overfitting kam karti hai.
+- *Har leaf par minimum samples* aur regularisation terms: model ko chhote groups fit karne se rokte hain.
+
+**Categorical features.** Kam categories ke liye one-hot encoding chalti hai; bahut zyada (city, product) ho toh leakage se bachne ke liye dhyaan se target encoding use karo, ya aisi library jo categories ko seedha handle kare.
+
+**Predictions explain karna.** Feature importance dikhati hai ki model ne overall kin features par bharosa kiya, par correlated features ke saath gumraah kar sakti hai. SHAP values individual predictions explain karti hain: har feature ne is applicant ke risk ko kitna upar ya neeche dhakela. Regulated decisions mein aksar aise explanations chahiye hote hain.
+
+**Limits.** Trees dekhe hue target values ke bahar extrapolate nahi kar sakte, aur raw images, audio ya text ke liye sahi tool nahi hain, jahan neural networks jeette hain.
+
+**Boosting tune karna, order mein:**
+
+| Setting | Kahan se shuru karein | Asar |
+| --- | --- | --- |
+| Learning rate | 0.03 se 0.1 | Kam rakhne par slow, par aam taur par behtar generalise |
+| Trees ki ginti | Zyada, early stopping ke saath | Early stopping sahi ginti aapke liye chun leta hai |
+| Max depth | 4 se 8 | Deeper trees zyada interactions pakadte hain aur zyada overfit karte hain |
+| Row aur column subsampling | 0.7 se 0.9 | Randomness overfitting kam karti hai |
+| Har leaf par minimum samples | 20 se 100 | Model ko chhote groups fit karne se rokta hai |
+
+Time ke hisaab se split kiye validation set par tune karo, phir ek baad ke test period par ek baar confirm karo. Training aur validation scores ke beech ka gap jo badhta hi jaaye, wahi overfitting ka sabse saaf sanket hai.
+
+**Ek split par teen models, code mein.**
+
+```python
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
+from sklearn.metrics import roc_auc_score
+
+X, y = make_classification(n_samples=12_000, n_features=20, n_informative=10, flip_y=0.03, random_state=4)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.25, random_state=4)
+
+models = {
+    "single tree": DecisionTreeClassifier(max_depth=6, random_state=4),
+    "random forest": RandomForestClassifier(n_estimators=300, min_samples_leaf=5, n_jobs=-1, random_state=4),
+    "boosting": HistGradientBoostingClassifier(learning_rate=0.05, max_iter=2000, max_depth=6,
+                                               early_stopping=True, validation_fraction=0.15,
+                                               n_iter_no_change=30, random_state=4),
+}
+for name, m in models.items():
+    m.fit(X_tr, y_tr)
+    tr = roc_auc_score(y_tr, m.predict_proba(X_tr)[:, 1])
+    te = roc_auc_score(y_te, m.predict_proba(X_te)[:, 1])
+    print(f"{name:<14} train {tr:.3f}  test {te:.3f}")
+print("trees used by boosting:", models["boosting"].n_iter_)
+```
+
+Early stopping ne 2,000 tak mein se trees ki ginti chuni. Train aur test scores ka gap ek nazar mein overfitting dikha deta hai.
+
+**Importance jo real use dikhaye.**
+
+```python
+from sklearn.inspection import permutation_importance
+
+r = permutation_importance(models["boosting"], X_te, y_te, scoring="roc_auc", n_repeats=5, random_state=4)
+top = np.argsort(-r.importances_mean)[:5]
+for i in top:
+    print(f"feature {i}: drop in AUC {r.importances_mean[i]:.3f} ± {r.importances_std[i]:.3f}")
+```
+
+Correlated features importance baant lete hain, isliye ek feature sirf isliye unimportant dikh sakta hai kyunki uska twin signal utha raha hai. Dono ko ek saath hatakar check karo.
+
+**Common sense se match karne waale constraints.** Agar EMI-to-income ratio badhne par risk kabhi kam nahi hona chahiye, toh model ko ye bata do. `HistGradientBoostingClassifier(monotonic_cst=[...])` har feature ke liye 1, -1 ya 0 leta hai, jisse model ko credit committees ke saamne defend karna aasaan hota hai aur naye data par aksar zyada robust bhi.
+
+**Native categorical support.** pandas categorical columns ke saath `categorical_features="from_dtype"` do, aur boosting model one-hot encoding ke bina categories par seedha split karta hai. LightGBM, XGBoost aur CatBoost bhi yahi dete hain, zyada tuning options ke saath; CatBoost bahut saari categories waale data par apne strong defaults ke liye jaana jaata hai.
+
+**Thoda tune karo, dhyaan se.** Learning rate, depth aur har leaf par minimum samples par ek chhota search, time-based validation set par score karke, aam taur par zyadatar gain pakad leta hai. Bade searches validation set ko hi overfit kar dete hain.
+
+## Ek worked example
+
+Gurugram ka ek digital lender 120 features se personal loans par 90-day default predict karta hai: bureau data, bank-statement summaries, application details aur app usage.
+
+- Logistic regression baseline: ROC AUC 0.71.
+- Random forest: 0.75.
+- Early stopping ke saath LightGBM, depth 6, learning rate 0.03, row aur column subsampling: 0.79, un loans par test kiya jo training se baad ke quarter ke the.
+
+Explanation: SHAP dikhata hai ki top drivers bank statements mein bounce hue EMIs, EMI-to-income ratio aur credit history ki length hain. Har rejected applicant ke top teen reasons ko rejection letter ke liye plain-language messages mein map kiya jaata hai.
+
+Development ke dauran ek warning sign: "number of collection calls" naam ke feature ki importance bahut high thi. Ye loans bigadne ke baad record hota tha, isliye outcome leak kar raha tha. Ise hatane par validation AUC 0.86 se gir kar honest 0.79 par aa gaya.
+
+| Model | Validation ROC AUC (baad ka quarter) |
+| --- | --- |
+| Logistic regression baseline | 0.71 |
+| Random forest | 0.75 |
+| LightGBM, tuned, early stopping | 0.79 |
+| Leaky collection-calls feature ke saath LightGBM | 0.86 (asli nahi) |
+
+**Model se rejection letter tak.** Lending mein, reject hue applicant ko mukhya reasons batane padte hain; RBI ke fair practices rules lenders se unhe likhit mein dene ko kehte hain. Har rejection ke liye team risk ko upar dhakelne waale sabse bade SHAP values wale teen features leti hai, aur har ek ko compliance team ke saath tay hue plain sentence se map karti hai: "Pichhle chhe mahine mein kai EMI payments bounce hue", "Aapke maujooda EMIs aapki income ka bada hissa hain", "Aapki credit history do saal se chhoti hai". Engineers ye sentences us waqt khud nahi likhte; ye ek reviewed list se aate hain, isliye wording consistent, accurate aur fair rehti hai. Wahi SHAP values analysts ko ye pakadne mein bhi madad karte hain ki model kisi aise feature par toh nahi tika jispar nahi tikna chahiye, jaise location ka proxy.
+
+## Aam galtiyaan
+
+- **Early stopping ke bina deep trees.** Boosting jaldi overfit ho jaati hai.
+- **Feature importance par aankh moond kar bharosa karna.** Jab koi feature bahut achha lage, toh leakage check karo.
+- **Time-ordered data par random splits.** Baad ke period par validate karo.
+- **Saikdon categories ko one-hot encode karna.** Category-aware methods use karo.
+- **Regulated uses mein explanations chhod dena.** Lending aur insurance decisions ke liye reasons chahiye.
+
+- **Alag alag test sets par models compare karna.** Har candidate ko same baad ke period ke data par evaluate karo, warna comparison ka koi matlab nahi.
+- **Early stopping nahi**, toh trees ki ginti bas ek andaza hoti hai.
+- **Built-in importance ko sach maan lena** jab features correlated ho.
+- **Bade hyperparameter searches** jo validation set ko overfit kar dete hain.
+
+## Jab trees sahi tool nahi hain
+
+- **Images, audio aur free text**, jahan neural networks aur pretrained models jeette hain.
+- **Training range se bahut door ki predictions**, jinpar trees extrapolate nahi kar sakte.
+- **Poori tarah transparent formula chahiye**: logistic regression ya scorecard approve karna aasaan ho sakta hai.
+- **Bahut chhote datasets**, jahan simple linear model aksar behtar generalise karta hai.
+
+## Demo se production tak
+
+- **Early stopping use karo** aur chuni hui trees ki ginti record karo.
+- **Baad ke time period par validate karo** aur train-test gap par nazar rakho.
+- **Jahan business rule saaf ho wahan monotonic constraints lagao.**
+- **Har model version ke saath permutation importance store karo**, aur versions ke beech compare karo.
+- **Individual decisions ke explanations rakho**, jahan customers ya regulators puch sakte hain.
+
+## Practice karo
+
+scikit-learn ki ensembles guide aur XGBoost ka introduction padho; Kaggle ke Intermediate ML mein XGBoost lesson karo.
+
+1. Ek public tabular dataset par decision tree, random forest aur gradient-boosted model train karo, aur held-out set par compare karo.
+2. Early stopping ke saath learning rate, depth aur trees ki ginti tune karo, aur best validation score note karo.
+3. Teen individual predictions ke liye SHAP explanations banao aur unhe plain language mein likho.
+4. Ek feature par monotonic constraint lagao, retrain karo, aur test score tatha us feature ke against predictions ka plot compare karo.
+
+**Aapka kaam poora jab:** aap bata sako ki boosting ek tree se behtar kyun hai, apne tuning results dikha sako, aur ek prediction ko saaf shabdon mein samjha sako.

@@ -1,0 +1,143 @@
+---
+id: scaling-load-balancing
+lang: hinglish
+title: "Scaling aur load balancing"
+outcome: "Vertical aur horizontal scaling samjhao, app servers ko stateless rakho taaki wo scale out ho sakein, aur load balancers aur health checks se traffic baanto aur server failures se bacho."
+answer: "Vertical scaling ek server ko bada karti hai; horizontal scaling aur servers jodti hai. Load balancer requests ko unke beech baanta hai, jo tabhi kaam karta hai jab servers koi state na rakhein."
+why_it_matters: "India mein traffic spikes mein aata hai: exam results, IPL finals, festive sales. Load balancer ke peeche scale out hone wale systems chalte rehte hain; ek bade server se bandhe systems gir jaate hain. Ye ek core interview topic bhi hai."
+flashcards:
+  - q: "Vertical scaling kya hai?"
+    a: "Ek machine ko bada karna, zyada CPU, memory ya disk ke saath. Simple hai par ek ceiling hai aur ek single point of failure."
+  - q: "Horizontal scaling kya hai?"
+    a: "Load baantne wali aur machines jodna. Load balancer aur stateless servers chahiye par bahut aage tak badh sakta hai."
+  - q: "App server ke stateless hone ka kya matlab hai?"
+    a: "Wo requests ke beech apni memory mein user data nahi rakhta, isliye koi bhi server koi bhi request sambhaal sakta hai."
+  - q: "Scale out kiye gaye system mein session data kahan jaana chahiye?"
+    a: "Redis ya database jaise shared store mein, ya ek signed token mein jo client har request ke saath bhejta hai."
+  - q: "Health check kya hai?"
+    a: "Ek regular request jo load balancer har server ko bhejta hai; fail hone wale servers recover hone tak traffic lena band kar dete hain."
+  - q: "Round robin kya hai?"
+    a: "Ek load-balancing rule jo har nayi request ko baari-baari agle server ko bhejta hai."
+  - q: "Autoscaling kya hai?"
+    a: "Load ke hisaab se, jaise CPU use ya requests per second, servers ko automatically jodna ya hatana."
+exercise:
+  title: "Isse scale karo"
+  setup: "Ek state board ki results website normal din 2 lakh students ko serve karti hai. Result wale din pehle ek ghante mein 40 lakh students koshish karte hain. Ek app server lagbhag 500 requests per second sambhaalta hai."
+  questions:
+    - q: "Agar us ghante mein har student 5 requests karta hai, toh average load requests per second mein kitna hai?"
+      a: "40 lakh × 5 = 2 crore requests 3,600 seconds mein: lagbhag 5,500 per second."
+    - q: "Us average ke liye kitne app servers chahiye, aur zyada ka plan kyun banayein?"
+      a: "Lagbhag 11. Usse 2 se 3 gunaa plan karo, kyunki pehle kuch minutes ghante ke average se bahut zyada busy hote hain, aur ek server fail hone par bhi bachne ke liye."
+    - q: "Maujooda app har student ka login session server memory mein store karti hai. Servers jodne par kya toot-ta hai?"
+      a: "Student ki agli request aise doosre server par ja sakti hai jo session nahi jaanta, isliye wo logout ho jaate hain. Sessions Redis mein le jao ya tokens use karo."
+    - q: "Results publish hone ke baad kabhi nahi badalte. Aur kya load kam karta hai?"
+      a: "Har result ko cache karo aur static pages CDN se serve karo, taaki zyadatar requests app servers tak pahunche hi nahi."
+ask:
+  - "Vertical scaling kab behtar choice hai?"
+  - "Sticky sessions kaise kaam karti hain aur unse kyun bachein?"
+  - "Layer 4 aur layer 7 load balancer mein kya farak hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Scaling** ye hai ki system zyada kaam kaise sambhaalta hai. Do tareeke hain.
+
+**Vertical scaling** (scaling up) ek machine ko bada karti hai: zyada CPU cores, zyada memory, tez disks. Isme code badalne ki zaroorat nahi, isliye ye aksar pehla kadam hota hai. Par ek machine kitni badi ho sakti hai, uski ek ceiling hai, upar ke paas keemat tezi se badhti hai, aur agar wo ek machine fail ho gayi, toh sab ruk jaata hai.
+
+**Horizontal scaling** (scaling out) kaam baantne wali aur machines jodti hai. Ye bahut aage tak badh sakti hai aur kisi bhi ek machine ke khone par bhi chalti hai. Iske liye do cheezein chahiye: requests baantne ke liye aage ek **load balancer**, aur aise app servers jo **stateless** hon, taaki koi bhi server koi bhi request sambhaal sake.
+
+```flow
+title: Vertical: ek bada server, ek ceiling aur ek single point of failure ke saath
+Users -> One big server | more CPU, more RAM
+```
+
+```flow
+title: Horizontal: load balancer ke peeche stateless app servers
+Users -> Load balancer | health checks
+Load balancer -> app1
+Load balancer -> app2
+Load balancer -> app3
+app1 -> Shared state | database, Redis
+app2 -> Shared state
+app3 -> Shared state
+```
+
+## Ye kaam kaise karta hai
+
+**Statelessness.** Agar app server 1 kisi user ka shopping cart apni memory mein rakhta hai, toh user ki agli request ko server 1 par hi wapas jaana padega. Ye users ko servers se baandh deta hai aur server restart hone par carts kho jaate hain. Iski jagah shared state ko app servers ke bahar rakho. Carts aur sessions Redis ya database mein rakho aur files object storage mein. Identity ko ek signed token, jaise JWT, mein le jao jo client har baar bhejta hai. Tab servers ek-doosre ki jagah le sakte hain.
+
+**Load balancers** aane wala saara traffic lete hain aur har request ko ek healthy server ko bhejte hain. Common rules:
+
+| Rule | Kaise chunta hai | Kab achha hai |
+|---|---|---|
+| Round robin | baari-baari agla server | servers ek jaise hon aur requests milti-julti hon |
+| Least connections | sabse kam open requests wala server | kuch requests dheemi hon, jaise file uploads |
+| Weighted | bade servers ko zyada traffic | servers size mein alag hon |
+| User ya IP ka hash | wahi user wahi server par | cache locality chahiye; state ke liye sahaara bankar use na karo |
+
+Load balancers **health checks** bhejte hain, jaise har kuch seconds mein `/health` par ek request. Fail hone wala server recover hone tak rotation se hata diya jaata hai, isliye ek crash outage nahi banta. **Layer 4** balancer network address aur port se route karta hai aur bahut tez hota hai. **Layer 7** balancer HTTP samajhta hai, isliye `/api` aur `/images` ko alag services par route kar sakta hai aur HTTPS sambhaal sakta hai. Cloud mein aap aam taur par managed balancer use karte ho, jaise AWS Application Load Balancer ya Google Cloud Load Balancing; nginx aur HAProxy khud chalane waale popular options hain.
+
+**Autoscaling** servers jodti hai jab koi metric, jaise CPU 60% se upar ya requests per second, oonchi bani rahe, aur gir jaaye toh hata deti hai. Ye shaant dinon mein paisa bachati hai aur busy dinon mein aapko bachati hai. Par naye servers start hone mein ek-do minute lagte hain, isliye jaane-pehchane spikes, jaise raat 12 baje ki sale, ke liye pehle se scale up karo.
+
+Yaad rakho ki app servers ko scale karne se dabaav us cheez par chala jaata hai jo wo share karte hain. Das app servers ek database par toot padein toh use dabaa sakte hain; agle lessons mein iske liye caches, replicas aur sharding hain.
+
+**Interviews mein**, scaling ke sawaal aam taur par "traffic das gunaa ho jaaye toh kya hoga?" se shuru hote hain. Achha jawab pehle bottleneck ka naam leta hai, phir fix: load balancer ke peeche stateless app servers, headroom ke saath autoscaling, phir database aur cache jaise shared tiers. Health checks aur ye ki server marne par kya hota hai, ye zaroor bolo; isse dikhta hai ki aap sirf growth nahi, failure ke baare mein bhi sochte ho.
+
+**Apne browser mein try karo.** Jab kuch requests dheemi hon, tab round robin ko least connections se compare karo.
+
+```python
+import random
+
+def simulate(policy, servers=3, n=3000, seed=4):
+    rng = random.Random(seed)
+    busy = [0.0] * servers
+    worst, rr = 0.0, 0
+    for _ in range(n):
+        busy = [max(0.0, b - 1.0) for b in busy]                  # each tick, servers finish some work
+        i = rr % servers if policy == "round robin" else busy.index(min(busy))
+        rr += 1
+        busy[i] += rng.choice([0.5] * 9 + [12.0])                 # 1 in 10 requests is slow
+        worst = max(worst, busy[i])
+    return worst
+
+for p in ("round robin", "least connections"):
+    print(f"{p:<18} worst queue: {simulate(p):.1f}")
+```
+
+## Ek example se samjho
+
+Vikram ek cricket fantasy app ki engineering chalata hai. Normal dinon mein traffic steady rehta hai, par IPL match lock hone se pehle ke aakhri das minutes mein users apni teams edit karne daudte hain, aur traffic lagbhag bees gunaa uchhal jaata hai.
+
+App ek bade server par shuru hui, har season vertical scale ki gayi. Ek final ke dauraan wo 100% CPU par pahunchi, requests queue mein lag gayi, aur kai users apni teams save nahi kar paye. Bada server option double cost ka tha aur phir bhi kaafi nahi tha.
+
+Uski team teen steps mein horizontal scaling par gayi:
+
+1. **App ko stateless banaya.** Sessions server memory se Redis mein gaye, aur upload ki gayi profile photos object storage mein. Ab koi bhi server kisi bhi user ko serve kar sakta tha.
+2. **Aage ek managed layer 7 load balancer lagaya**, ek `/health` endpoint ke saath jo check karta hai ki app Redis aur database tak pahunch sakti hai. Check fail karne wale servers apne aap hat jaate hain.
+3. **Autoscaling set ki** requests per second par, saath mein ek scheduled rule jo har match lock se 30 minute pehle servers jodta hai, kyunki naye servers ready hone mein lagbhag 90 seconds lagte the.
+
+Agle final ke dauraan traffic lagbhag 2,000 se 40,000 requests per second tak badha. Group 4 se 60 servers tak badha aur lock ke baad wapas gira. Peak ke dauraan jab do servers crash hue, toh health checks ne unhe seconds mein hata diya aur users ko pata bhi nahi chala.
+
+Naya bottleneck database tha, jisne har team edit dekha. Isi ne Vikram ki team ko cache aur read replicas jodne par laaya, jo agle lessons ka subject hai.
+
+## Aam galtiyaan
+
+**App servers par state rakhna.** In-memory sessions aur local file uploads doosra server jodte hi toot jaate hain. Pehle state ko bahar nikaalo.
+
+**Sticky sessions par nirbhar rehna.** Users ko servers se pin karna state ki problem chhupa deta hai aur load ko asamaan baanta hai. Ise sirf chhote samay ke patch ki tarah use karo.
+
+**Health checks na hona, ya bahut halke hona.** Jo check sirf "OK" lautata hai wo tab bhi pass ho sakta hai jab server apne database tak nahi pahunch pa raha. Zaroori dependencies check karo, par checks ko tez rakho.
+
+**Autoscaling bahut der se.** Agar servers start hone mein do minute lagte hain, toh ek minute mein peak par pahunchne wala spike madad aane se pehle khatam ho jaata hai. Jaane-pehchane events ke liye pehle se scale karo.
+
+**Ye bhool jaana ki load balancer bhi fail ho sakta hai.** Managed, redundant balancer use karo ya ek se zyada chalao.
+
+**Galat tier ko scale karna.** Agar bottleneck database hai toh app servers jodne se madad nahi milti. Pehle naapo.
+
+## Practice karo
+
+1. Watch & learn panel mein horizontal versus vertical scaling aur load balancers ke video lessons dekho.
+2. Upar wala exercise karo.
+3. Project check karo: ek balancer ke peeche do app copies, phir ek ko band karo aur traffic ko shift hote dekho.
+4. Spike ke dauraan apni use ki hui ek app dekho, jaise results day, aur uska sketch banao ki aap use kaise scale karoge.

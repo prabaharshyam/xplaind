@@ -1,0 +1,169 @@
+---
+id: fastapi-rest-apis
+lang: hinglish
+title: "FastAPI se REST APIs"
+outcome: "FastAPI mein ek chhoti typed REST API banao: endpoints, request aur response models, status codes, errors aur tests."
+answer: "FastAPI Python mein typed functions se REST APIs banata hai: har endpoint apne request aur response models declare karta hai, aur FastAPI data validate karta hai aur API docs khud likh deta hai."
+why_it_matters: "Client ke liye jo bhi AI system aap deploy karte ho, woh API ke zariye hi pahunchta hai, unki app, workflow tool ya kisi aur service se. Python teams ke liye API banane ka sabse common tareeka FastAPI hai, aur uske typed models galat requests free mein pakad lete hain."
+flashcards:
+  - q: "Endpoint kya hota hai?"
+    a: "Ek URL aur ek HTTP method, jaise ticket banane ke liye POST /tickets ya ek ticket padhne ke liye GET /tickets/42."
+  - q: "GET, POST, PUT, PATCH aur DELETE ka kya matlab hai?"
+    a: "GET kuch badle bina padhta hai, POST create karta hai ya kaam trigger karta hai, PUT replace karta hai, PATCH thoda update karta hai, DELETE hata deta hai."
+  - q: "401 aur 403 mein kya farak hai?"
+    a: "401 ka matlab caller sign in nahi hai. 403 ka matlab woh sign in hai par ye karne ki ijaazat nahi hai."
+  - q: "FastAPI 422 kab return karta hai?"
+    a: "Jab request body Pydantic model ke against validation mein fail ho, aur kaunse fields fail hue iski list ke saath."
+  - q: "Aapki API ko 503 kab return karna chahiye?"
+    a: "Jab koi dependency, jaise model provider, down ho, taaki callers ko pata chale ki baad mein retry kar sakte hain."
+  - q: "response_model kya karta hai?"
+    a: "Caller ko kya wapas jaata hai ye control karta hai, taaki cost figures jaise internal fields galti se leak na hon."
+  - q: "Depends kis kaam aata hai?"
+    a: "Shared cheezein, jaise database session, current user ya model client, endpoints mein inject karne ke liye, aur tests mein unhe fakes se badalne ke liye."
+  - q: "Text inputs par maximum length kyun lagayein?"
+    a: "Nahi toh koi bahut bada document bhej sakta hai aur aapka token bill badh jaata hai, ya request timeout ho jaati hai."
+exercise:
+  title: "Status code chuno"
+  setup: "Hyderabad ke ek hospital ke liye aapki FastAPI service discharge notes summarise karti hai. Paanch calls aati hain: (1) bina sign-in token ki ek request; (2) sign in kiya hua ek nurse apne ward ke bahar ke patient ka summary maangti hai, jo rules mein mana hai; (3) ek body jisme 'notes' 5 characters ka hai, 20-character minimum se kam; (4) GET /summaries/99999, jo exist nahi karta; (5) model provider down hone par ek valid request."
+  questions:
+    - q: "(1) aur (2) ke liye kaunse codes?"
+      a: "(1) 401, sign in nahi hai. (2) 403, sign in hai par ijaazat nahi."
+    - q: "(3) ke liye kaunsa code, aur use kaun banata hai?"
+      a: "422, jo FastAPI Pydantic model se khud banata hai, aapka function chalne se pehle, 'notes' field ka naam leke."
+    - q: "(4) aur (5) ke liye kaunse codes?"
+      a: "(4) 404, nahi mila. (5) 503, ek dependency available nahi hai, isliye caller baad mein retry kar sakta hai."
+    - q: "In sab ke liye 'error: true' ke saath 200 kyun nahi return karna chahiye?"
+      a: "Retry logic, monitoring aur callers status codes par depend karte hain. 200 ka matlab hai sab theek chala, isliye errors kisi ko dikhte hi nahi."
+ask:
+  - "400 aur 422 error mein kya farak hai?"
+  - "FastAPI app ko kaise test karun?"
+  - "Kya mere FastAPI endpoints async hone chahiye?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+REST API doosre programs ko aapke system ko HTTP par use karne deti hai. Har **endpoint** ek URL aur ek method hota hai: `POST /tickets` ek ticket banata hai, `GET /tickets/42` ek ticket padhta hai. Caller JSON bhejta hai aur JSON wapas paata hai, ek **status code** ke saath jo batata hai ki kya hua.
+
+FastAPI aisi APIs banane ke liye ek Python framework hai. Aap type hints aur Pydantic models ke saath aam functions likhte ho; FastAPI unhe endpoints mein badal deta hai jo input validate karte hain, output ko JSON mein convert karte hain aur `/docs` par interactive documentation publish karte hain. Ye async code bhi natively chalata hai, jo un services ke liye achha hai jo model APIs ka intezaar karti hain.
+
+```flow
+Caller | kisi aur team ki app: POST /claims/triage -> FastAPI body ko Pydantic se validate karta hai
+FastAPI body ko Pydantic se validate karta hai -[fail ho]-> 422 | galat fields ki list
+FastAPI body ko Pydantic se validate karta hai -[ok]-> Model client inject karo | Depends
+Model client inject karo -> Aapka function model API ko call karta hai
+Aapka function model API ko call karta hai -[model down]-> 503 | "thodi der mein try karo"
+Aapka function model API ko call karta hai -[ok]-> response_model output filter karta hai
+response_model output filter karta hai -> 200 | category: "motor", summary: "Rear bumper damage"
+```
+
+Is lesson mein hum Kochi ke ek insurance broker ke saath chalenge, jo chahta hai ki doosri teams ek claims-triage service call karein.
+
+## Ye kaam kaise karta hai
+
+**Methods.** GET padhta hai aur kuch badalna nahi chahiye. POST create karta hai ya kaam trigger karta hai. PUT replace karta hai, PATCH thoda update karta hai, DELETE hata deta hai. In matlabon par tike rehne se caches, retries aur doosre engineers sahi andaaza laga paate hain.
+
+**Status codes.** Success ke liye 200 OK aur 201 Created. Malformed request ke liye 400, caller sign in nahi hai toh 401, sign in hai par ye karne ki ijaazat nahi toh 403, cheez exist nahi karti toh 404, body validation mein fail ho toh 422 (FastAPI ka default), bahut zyada bhej rahe hon toh 429. 500 ka matlab aapka code toot gaya, aur 503 ka matlab koi dependency, jaise model provider, down hai.
+
+**Models.** Request body par Pydantic model ka matlab hai ki aapka function chalne se pehle FastAPI galat input ko 422 ke saath reject karta hai, aur batata hai ki kaunse fields fail hue. `response_model` control karta hai ki kya wapas jaata hai, taaki cost figure jaisa internal field galti se leak na ho.
+
+**Dependencies.** FastAPI ka `Depends` shared cheezein, jaise database session, current user ya model client, har endpoint mein inject karta hai. Tests mein unhe fakes se badal dete ho.
+
+**Testing.** `TestClient` aapki app ko memory mein call karta hai, bina server ke, isliye endpoint tests milliseconds mein chalte hain.
+
+**Status codes jin par callers depend karte hain:**
+
+| Code | Matlab | Caller ka aam reaction |
+| --- | --- | --- |
+| 200, 201 | Success, ya created | Result use karo |
+| 400 | Malformed request | Request theek karo; retry mat karo |
+| 401 | Sign in nahi hai | Sign in karo, phir retry |
+| 403 | Ijaazat nahi | Ruk jao; access maango |
+| 404 | Nahi mila | Id check karo |
+| 422 | Body validation mein fail | Bataye gaye fields theek karo |
+| 429 | Bahut zyada requests | Ruko, phir retry |
+| 500 | Aapka code toota | Report karo |
+| 503 | Dependency down hai | Backoff ke saath baad mein retry |
+
+**Aise endpoints design karna jo purane na hon.** Resources ke liye nouns (`/claims`, `/claims/{id}`) aur actions ke liye methods use karo. Path ya header mein version rakho (`/v1/claims`) taaki baad mein callers ko tode bina API badal sako. Har jagah ek hi error shape return karo, jaise `{"detail": "..."}`, taaki callers errors ek hi jagah handle kar sakein. Aur har endpoint ko code mein hi summary aur examples ke saath document karo; FastAPI unhe `/docs` par khud dikhata hai, jo aksar akela documentation hota hai jo doosri teams padhti hain.
+
+**Browser mein try karo.** Request validation achhi API ki jaan hai. Dictionary badalkar ek galat body bhejke dekho.
+
+```python
+from pydantic import BaseModel, Field, ValidationError
+
+class NewOrder(BaseModel):
+    item_id: str = Field(pattern=r"^SKU-\d{4}$")
+    quantity: int = Field(gt=0, le=20)
+    pin_code: str = Field(pattern=r"^[1-9]\d{5}$")
+
+body = {"item_id": "SKU-0042", "quantity": 0, "pin_code": "56001"}
+try:
+    print(NewOrder.model_validate(body))
+except ValidationError as err:
+    for e in err.errors():
+        print("422:", e["loc"][0], "-", e["msg"])
+```
+
+## Ek example se samjho
+
+Kochi ka ek insurance broker chahta hai ki doosri teams claim descriptions bhejein aur ek category aur summary wapas paayein.
+
+```python
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Claims triage")
+
+class ClaimIn(BaseModel):
+    policy_no: str = Field(pattern=r"^[A-Z]{3}\d{7}$")
+    description: str = Field(min_length=20, max_length=5000)
+
+class ClaimOut(BaseModel):
+    category: str
+    summary: str
+
+@app.post("/claims/triage", response_model=ClaimOut, status_code=200)
+async def triage(claim: ClaimIn, llm=Depends(get_llm)):
+    try:
+        result = await llm.classify(claim.description)
+    except ProviderDown:
+        raise HTTPException(503, "Triage is unavailable; try again shortly")
+    return ClaimOut(category=result.category, summary=result.summary)
+```
+
+Policy number "abc123" waali request model tak pahunchti hi nahi: FastAPI field ka naam leke 422 return karta hai. Agar model provider down ho, toh callers ko confusing 500 ki jagah 503 milta hai jise woh retry kar sakte hain.
+
+Test model ko fake karta hai:
+
+```python
+from fastapi.testclient import TestClient
+
+def test_triage_returns_category():
+    app.dependency_overrides[get_llm] = lambda: FakeLLM("motor", "Rear bumper damage")
+    r = TestClient(app).post("/claims/triage",
+        json={"policy_no": "MOT1234567", "description": "Car was hit from behind at a signal"})
+    assert r.status_code == 200 and r.json()["category"] == "motor"
+```
+
+`/docs` kholo aur broker ki doosri teams endpoint ko browser mein hi try kar sakti hain, request schema pehle se likha hua.
+
+**Doosri teams ne sabse pehle kya notice kiya.** Broker ki mobile team ne ek din mein integrate kar liya, zyadatar isliye ki `/docs` har field, uske rules aur ek example dikhata tha, aur galat requests 422 ke saath exact field ka naam leke wapas aati thin. Jab model provider ka thodi der ke liye outage hua, unki app crash hone ki jagah 503 par "Triage is busy, try again in a minute" dikha rahi thi, kyunki status code ne use bata diya tha ki ye kis tarah ka failure hai.
+
+## Aam galtiyaan
+
+- **Errors ke liye 200 return karna.** Status 200 ke saath `"error": true` waali body har retry aur monitoring tool ko tod deti hai. Sahi code use karo.
+- **Apne database rows seedhe return karna.** Internal fields leak ho jaate hain. Hamesha response model set karo.
+- **Async endpoints mein blocking calls.** `async def` ke andar synchronous model client server ko freeze kar deta hai. Async client use karo, ya endpoint ko simple `def` se declare karo taaki FastAPI use thread pool mein chalaye.
+- **Model call par timeout na hona.** Ek atki hui request ek worker ko hamesha ke liye bandh kar leti hai. Timeouts set karo aur 503 ya 504 return karo.
+- **Input limits chhod dena.** Maximum length ke bina koi 300-page ka document paste kar deta hai aur aapka token bill badh jaata hai.
+
+## Practice karo
+
+FastAPI tutorial "Handling Errors" aur "Testing" tak karo, aur MDN ka HTTP overview skim karo.
+
+1. `POST /summaries` banao jo text (20 se 5,000 characters) le aur kisi bhi model API ya fake se summary return kare.
+2. `GET /summaries/{id}` jodo jo anjaan id par 404 return kare.
+3. `TestClient` se teen tests likho: ek success, chhote text ke liye ek 422, aur ek 404.
+
+**Aapka kaam poora jab:** aap 401, 403, 422 aur 503 ka farak ek teammate ko samjha sako, aur apni API ka `/docs` page dikha sako.

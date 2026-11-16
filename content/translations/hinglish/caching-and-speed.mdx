@@ -1,0 +1,239 @@
+---
+id: caching-and-speed
+lang: hinglish
+title: "Caching aur speed"
+outcome: "Prompt caching, response caching aur streaming se cost aur intezaar ka time kam karo."
+answer: "Prompt caching prompt ke baar-baar aane waale shuruaati hisse ko kam kharche mein reuse karti hai, response caching repeated sawaalon ke poore jawab reuse karti hai, aur streaming text ko likhe jaate hi dikhati hai."
+why_it_matters: "Slow apps ko users chhod dete hain, aur baar-baar bheje gaye lambe prompts paise waste karte hain. Production mein caching aur streaming sabse sasti badi jeet hain."
+flashcards:
+  - q: "Prompt caching kya hai?"
+    a: "Provider ek lambe, na badalne waale prompt prefix ka processed form store kar leta hai, isliye usi tarah shuru hone waali agli requests sasti aur tez hoti hain."
+  - q: "Caching ke liye prompt ko kis order mein rakhna chahiye?"
+    a: "Pehle stable content: system prompt, tools, reference documents; aakhir mein badalne waala content: sawaal aur recent turns."
+  - q: "Prompt cache kya tod deta hai?"
+    a: "Prefix mein koi bhi badlaav, jaise shuru ke paas timestamp ya user name."
+  - q: "Response caching kya hai?"
+    a: "Normalise ki hui request aur versions ko key banakar answers store karna, aur repeated requests par bina model call ke wahi lauta dena."
+  - q: "Response caches kab share nahi karne chahiye?"
+    a: "Jab answers mein personal ya permission par depend karne waala data ho."
+  - q: "Semantic caching ka risk kya hai?"
+    a: "Lagbhag ek jaise sawaalon ko alag answers chahiye ho sakte hain, isliye similar-match caching galat answer lauta sakti hai."
+  - q: "Streaming kya improve karti hai?"
+    a: "Perceived speed: users pehle shabd ek-do second mein dekh lete hain, jabki total generation time wahi rehta hai."
+  - q: "Teen aur speed levers batao."
+    a: "Chhote outputs, simple steps ke liye chhote models, aur independent calls ko parallel chalana."
+  - q: "Lamba prompt pehle token ko slow kyun karta hai?"
+    a: "Model ko likhne se pehle poora input padhna padta hai. Prompt caching stable prefix ko dobara padhne se bachati hai, isliye pehla token jaldi aata hai."
+  - q: "Semantic caching kab galat ho jaati hai?"
+    a: "Jab do sawaal ek jaise dikhte hain par unhe alag answers chahiye, jaise 'order 41 ka refund' aur 'order 14 ka refund', ya aise sawaal jinka answer user par depend karta hai."
+exercise:
+  title: "Isse tez banao"
+  setup: "Noida ke ek tax-filing app ka assistant user ke upload kiye Form 16 aur tax rules ke sawaalon ke jawab deta hai. Har request abhi aaj ki date aur user ke naam se shuru hoti hai, phir 8,000-token tax rules, phir user ka Form 16, phir sawaal. Poora jawab dikhne mein 7 seconds lagte hain. Bahut se users wahi general sawaal poochte hain, jaise 'standard deduction kya hai?'"
+  questions:
+    - q: "Caching ke liye prompt ko kaise reorder karna chahiye?"
+      a: "Pehle tax rules, phir user ka Form 16, aur date, name aur sawaal aakhir mein."
+    - q: "Kya response-cache ho sakta hai, aur kya nahi?"
+      a: "Rules ke general sawaal rules version se cache ho sakte hain; user ke apne Form 16 ke answers share nahi hone chahiye."
+    - q: "7 second ke intezaar ko kya theek karta hai?"
+      a: "Answer ko stream karna taaki pehle shabd ek-do second mein dikh jaayein, aur jahan ho sake chhote answers."
+    - q: "Response cache kab clear karna chahiye?"
+      a: "Jab tax rules badlein, jaise naya budget, cache ko rules version par key karke."
+ask:
+  - "Prompt caching kaise kaam karti hai?"
+  - "Semantic caching kya hai aur kya woh safe hai?"
+  - "Apne LLM app ko tez kaise mehsoos karaun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+LLM apps mein cost aur intezaar ka time teen techniques kam karti hain:
+
+- **Prompt caching**: provider ek prompt ke lambe, na badalne waale shuruaati hisse (system prompt, koi document, tool definitions) ka processed form store kar leta hai, isliye usi tarah shuru hone waali agli requests sasti aur tez hoti hain.
+- **Response caching**: aapka app answers store karta hai aur wahi (ya equivalent) request dobara aane par seedha lauta deta hai, model call ko poori tarah skip karke.
+- **Streaming**: reply ko generate hote hi token-by-token user tak bhejna, taaki woh lagbhag turant padhna shuru kar sake.
+
+```flow
+dir: LR
+title: Prompt caching: stable hissa pehle rakho
+Stable prefix | instructions, tools, 40-page contract: pehli call ke baad cached -> Sawaal | har request mein badalta hai
+```
+
+Sawaal 1 poora price deta hai aur 9 s leta hai; sawaal 2 se, cached prefix pehle token ko lagbhag 2 s par le aata hai.
+
+```flow
+title: Response cache: key = normalise kiya sawaal + template version + model version
+Sawaal -> Response cache mein hai?
+Response cache mein hai? -[hit]-> Turant answer, koi model call nahi
+Response cache mein hai? -[miss]-> Model -> Tokens ko screen par stream karo
+```
+
+Ye lesson Chennai ki ek legal-tech company ke contract assistant ko follow karta hai, jahan lawyers har upload kiye agreement par lagbhag das sawaal poochte hain.
+
+## Ye kaam kaise karta hai
+
+**Prompt caching.** Providers cache se padhe gaye input tokens ke liye kam, aksar bahut kam, charge karte hain, aur unhe process karna bhi tez hota hai. Cache exact prefix par kaam karta hai: request ko wahi content, usi order mein, se shuru hona chahiye. Isliye:
+
+- stable content pehle rakho: system prompt, tool definitions, lambe reference documents;
+- badalne waala content aakhir mein rakho: user ka sawaal, conversation ke latest turns;
+- upar kuch bhi variable (timestamp, user name) mat jodo.
+
+Kuch der use na hone par caches expire ho jaate hain; minimum length, lifetime aur pricing ke liye apne provider ke rules dekho.
+
+**Response caching.** Answer ko normalise ki hui request (aur prompt aur model version) ki key par store karo. Baar-baar aane waale, ek jaise sawaalon ke liye achha: FAQ answers, product descriptions, fixed text ke translations. Expiry times set karo, underlying data badalne par invalidate karo, aur jab cached answers mein personal ya permission par depend karne waala data ho, unhe users ke beech kabhi share mat karo. "Semantic caching" identical ki jagah similar sawaalon ko match karti hai; ise dhyaan se use karo, kyunki lagbhag ek jaise sawaalon ko alag answers chahiye ho sakte hain.
+
+**Streaming.** Total generation time nahi badalta, par users poore reply ka intezaar karne ki jagah aam taur par ek-do second mein pehle shabd dekh lete hain. Perceived speed bahut behtar ho jaati hai, aur users padhna rok sakte hain ya jaldi cancel kar sakte hain. Stream ke beech aane waale errors aur disconnections ko handle karo.
+
+**Aur speed levers.** Chhote outputs (generation time length ke saath badhta hai); simple steps ke liye chhote models; kam sequential model calls; independent calls ko parallel chalana; kam, par behtar chunks retrieve karna.
+
+**Teeno techniques ki tulna:**
+
+| Technique | Kya bachati hai | Kab kaam karti hai | Kis cheez se bachna hai |
+| --- | --- | --- | --- |
+| Prompt caching | Input cost aur pehle token tak ka time | Lambe identical prefixes jaldi dobara use hon | Prefix badalna; cache expiry |
+| Response caching | Poori model call | Identical repeated sawaal | Personal data; purane answers |
+| Streaming | Intezaar ka mehsoos hone waala time | Chat aur lambe answers | Stream ke beech errors aur disconnects |
+
+**Cache kaam kar raha hai ya nahi, check karna.** Providers har response ke usage data mein cached input tokens batate hain. Unhe log karo. Prompt reorder karne ke baad, lagaataar paanch requests bhejo aur dekho ki cached count doosri request se badhta hai ya nahi. Agar woh zero hi rehta hai, toh prefix mein ab bhi kuch variable baitha hai, aksar timestamp, request id, ya badalte order mein listed tool definitions.
+
+**Response caches ko invalidate karna.** Key mein har woh input daalo jo answer badalta hai: sawaal, template ya document version, prompt version aur model. Stable answers par bhi expiry lagao, aur source badalne par entries clear karo. Cached galat answer, dheere aaye sahi answer se bura hai, kyunki jab tak koi dhyaan na de, woh baar-baar repeat hota rehta hai.
+
+**Time kahan jaata hai.** Ek reply ke do phases hote hain. Pehle model poora input padhta hai (**prefill**); phir woh reply ek-ek token karke likhta hai (**decode**). Lambe inputs pehle token ko slow karte hain; lambe outputs uske baad ki har cheez ko. Isliye 20,000-token document zyadatar time to first token ko hurt karta hai, aur 1,000-token answer zyadatar total time ko. Caching pehle waale mein madad karti hai; chhote answers aur chhote models doosre mein.
+
+**Code mein prompt caching.** Anthropic ke API mein aap stable prefix ka end mark karte ho, aur usage report batati hai ki cache se kya padha gaya:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+POLICY = open("returns_policy.md").read()          # long, rarely changes
+
+def ask(question):
+    reply = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=400,  # check the docs for current names
+        system=[
+            {"type": "text", "text": "You answer questions about our returns policy. Be brief."},
+            {"type": "text", "text": POLICY, "cache_control": {"type": "ephemeral"}},   # cache up to here
+        ],
+        messages=[{"role": "user", "content": question}],   # changing part goes last
+    )
+    u = reply.usage
+    print(f"cache write {u.cache_creation_input_tokens}, cache read {u.cache_read_input_tokens}, "
+          f"uncached {u.input_tokens}")
+    return reply
+
+ask("Can I return a kurta after 10 days?")       # first call writes the cache
+ask("Do you refund shipping charges?")           # later calls read it, cheaper and faster
+```
+
+Cache mein likhna normal input se thoda mehenga hai; padhna bahut sasta. Ye tab fayda deta hai jab cache lifetime ke andar wahi prefix kai baar use ho. Doosre providers automatically ya alag settings ke saath cache karte hain; principle, stable content pehle, wahi hai.
+
+**Code mein response cache.** Baar-baar aane waali identical requests ke liye, ek dictionary ya Redis store, jiski key woh sab ho jo answer ko affect karta hai:
+
+```python
+import hashlib, json, time
+
+CACHE, TTL_SECONDS = {}, 24 * 3600
+PROMPT_VERSION, MODEL = "faq-v3", "claude-sonnet-5-5"
+
+def cache_key(question, doc_version):
+    norm = " ".join(question.lower().split())
+    raw = json.dumps([norm, doc_version, PROMPT_VERSION, MODEL])
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+def cached_answer(question, doc_version, compute):
+    key = cache_key(question, doc_version)
+    hit = CACHE.get(key)
+    if hit and time.time() - hit["at"] < TTL_SECONDS:
+        return hit["answer"]
+    answer = compute(question)
+    CACHE[key] = {"answer": answer, "at": time.time()}
+    return answer
+```
+
+Sirf woh answers cache karo jo har user ke liye same hon. Jo bhi user ke account, orders ya permissions par depend kare, woh ya toh cache skip kare ya key mein user id shaamil kare.
+
+**Independent calls ko parallel chalana.** Agar ek page ko ek hi review se summary, sentiment label aur teen tags chahiye, toh calls ek saath chalao. Total wait sabse slow call jitna hota hai, sum jitna nahi:
+
+```python
+import asyncio
+import anthropic
+
+aclient = anthropic.AsyncAnthropic()
+
+async def one(instruction, text):
+    r = await aclient.messages.create(model="claude-haiku-5-5", max_tokens=150,
+                                      messages=[{"role": "user", "content": f"{instruction}\n\n{text}"}])
+    return "".join(b.text for b in r.content if b.type == "text")
+
+async def analyse(review):
+    return await asyncio.gather(
+        one("Summarise in one line:", review),
+        one("Answer positive, negative or mixed:", review),
+        one("Give three topic tags, comma-separated:", review),
+    )
+```
+
+Fan out karte waqt rate limits ka dhyaan rakho; parallel calls ka burst 429 errors la sakta hai.
+
+**Semantic caching, dhyaan se.** Embedding se similar sawaalon ko match karne se hit rate badh sakta hai, par har galat match galat answer serve karta hai. High similarity threshold use karo, ise un general sawaalon tak seemit rakho jinmein personal ya numeric details na hon, aur us par bharosa karne se pehle naapo ki kitni baar matches galat hain.
+
+## Ek example se samjho
+
+Chennai ki ek legal-tech company ka contract assistant lawyer ke upload kiye 40-page agreement ke sawaalon ke jawab deta hai, aam taur par ek contract par 10 sawaal.
+
+Pehle: har sawaal ke saath poora contract (lagbhag 30,000 tokens) aur sawaal bheja jaata tha. Har answer mein 9 seconds lagte the aur input tokens har baar poore bill hote the.
+
+Baad mein:
+
+- Contract aur instructions pehle aate hain aur cached hote hain; sawaal aakhir mein. Doosre sawaal se, zyadatar input tokens cache se price ke ek chhote hisse par padhe jaate hain aur pehla token lagbhag 2 seconds mein aa jaata hai.
+- Answers screen par stream hote hain.
+- Firm ke apne standard template ke common sawaal ("Hamare standard NDA mein notice period kya hai?") template version se key kiye response cache se answer hote hain.
+
+Ek contract session ki cost lagbhag 70% girti hai, aur lawyers tool ke slow hone ki shikayat karna band kar dete hain.
+
+| Contract session ka measure | Pehle | Baad mein |
+| --- | --- | --- |
+| Time to first token, baad ke sawaal | Poore answer tak lagbhag 9 s | Lagbhag 2 s, phir stream |
+| Poore bill hone waale input tokens | Har sawaal | Pehle ke baad zyadatar cached |
+| Cost | Baseline | Lagbhag 70% kam |
+
+**Lawyers ke liye kya badla.** Naye contract par pehle sawaal mein ab bhi poora time lagta hai, kyunki cache khaali hai. Uske baad ka har sawaal tez aur sasta hai, aur stream hue text se lawyers turant padhna shuru kar dete hain. Team ne pehle answer ke neeche ek chhota note joda, "Is contract ke agle sawaal tez honge", jisse log tool ko uske sabse slow pal se judge karna band kar gaye.
+
+## Aam galtiyaan
+
+- **Prompt ke shuru mein variable content.** Ye cache tod deta hai.
+- **User ya badalte data par depend karne waale answers ko cache karna.**
+- **Response caches ke liye expiry ya invalidation na hona.**
+- **Chat interfaces mein stream na karna.**
+- **Ye maan lena ki streaming generation ko tez banati hai.** Ye intezaar ko chhota mehsoos karaati hai.
+- **Per-user answers ko globally cache karna.** Ek user ke order details doosre user tak pahunch jaate hain.
+- **Sirf averages naapna.** Time to first token aur total time ke liye p50 aur p95 report karo.
+
+## Caching kab madad nahi karti
+
+- **Har request alag hai**, koi lamba shared prefix nahi aur repeated sawaal kam.
+- **Traffic kam aur bikhra hua hai**, isliye agli request se pehle hi cached prefixes expire ho jaate hain.
+- **Answers har baar fresh chahiye**, jaise live prices ya stock levels.
+- **Slow hissa kahin aur hai**: retrieval, koi slow tool ya aapka apna server. Model call optimise karne se pehle naapo.
+
+## Demo se production tak
+
+- **Har call par cache read aur write tokens log karo**, aur har feature ka hit rate track karo.
+- **Time to first token aur total time ko** p50 aur p95 par, feature aur model ke hisaab se track karo.
+- **Cache keys ko version karo** prompt, model aur data ke saath, aur release par caches clear karo.
+- **Har jagah expiry lagao**, aur source data badalne par ek explicit invalidation raasta rakho.
+- **Do accounts se cache test karo** ye saabit karne ke liye ki koi personal answer users ke beech cross nahi karta.
+
+## Practice karo
+
+Neeche link kiya prompt caching guide padho, aur streaming guide bhi.
+
+1. Apne kisi ek prompt ko restructure karo taaki stable content pehle aaye, caching enable karo, aur paanch requests par token costs compare karo.
+2. Ek chat interface mein streaming jodo aur pehle aur baad mein time to first token naapo.
+3. Ek repeated sawaal type ke liye expiry ke saath response cache jodo.
+4. Prompt-caching example ko apne kisi app mein jodo, lagaataar paanch sawaal bhejo, aur har ek ke liye cache read tokens aur time to first token record karo.
+
+Zyada gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 9 prefill aur decode, prompt caching aur parallelism cover karta hai, aur chapter 10 exact aur semantic caches.
+
+**Aapka kaam poora jab:** aap samjha sako ki prompt caching kya bachati hai, na badalne waala hissa kahan jaana chahiye, aur total time wahi rehne par bhi streaming kyun madad karti hai.

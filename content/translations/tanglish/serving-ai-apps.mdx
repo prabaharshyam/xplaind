@@ -1,0 +1,252 @@
+---
+id: serving-ai-apps
+lang: tanglish
+title: "Oru AI app-a serve panradhu"
+outcome: "Production-la oru AI API-a odunga: workers, timeouts, streaming responses, health checks, graceful shutdown."
+answer: "Oru AI API-a neraya workers-oda, model calls-ku timeouts-oda, users-ku vegamaa text therira streamed responses-oda, health checks-oda, nadandhukkittu irukkura requests-a mudikkura shutdown-oda serve pannunga."
+why_it_matters: "Unga laptop-la work aagura FastAPI app, irubadhu real users vandhaa vizhalaam: slow model calls-la requests thongum, workers block aagum, paththu seconds-ku yaarukkum mudhal vaarthai therithaadhu. Adha sariyaa serve panradhu pilot-la irundhu production-ku pogura mudhal step."
+flashcards:
+  - q: "Oru app-a serve panradhu-na enna?"
+    a: "Users nambura maadhiri adha odavaikkradhu: thaanaa start aagi, crash aanaa restart aagi, neraya requests-a kaiyaandhu, progress-a vegamaa kaattum."
+  - q: "Neraya Uvicorn workers yen odanum?"
+    a: "CPU-heavy velai oru process-a ellaarukkum block pannum. Neraya workers, perumbaalum oru core-ku onnu illa rendu, load-a pirichukkum."
+  - q: "Timeouts-a eppadi layer pannanum?"
+    a: "Model calls-la, muzhu request-la, load balancer-la set pannunga, ulle irukkura timeouts veliya irukkuradhai vida chinnadhaa irukkanum."
+  - q: "AI responses-a yen stream pannanum?"
+    a: "Mudhal token varra neram, muzhu generation neraththula irundhu oru second-kku kezhe varum, adhanaala users spinner-ku badhila progress-a paarpaanga."
+  - q: "/health-kum /ready-kum enna difference?"
+    a: "/health process up-nu solludhu; /ready database maadhiri dependencies reach aaga mudiyudhu-nu solludhu, adhanaala ready-aa irukkura instances-ku mattum traffic pogum."
+  - q: "Health checks yen model-a kooppudakoodaadhu?"
+    a: "Adhu kaasu selavu, provider mella irukkum podhu fail aagi, healthy-aa irukkura instances-a service-la irundhu eduthudum."
+  - q: "Graceful shutdown-na enna?"
+    a: "Deploy-la, pudhu requests-a edukkradha nirutthi, nadandhukkittu irukkuravatrai, neelamaana streams kooda, oru grace period-kulla mudikka vidradhu."
+  - q: "Nimishangal edukkura jobs-a eppadi kaiyaalanum?"
+    a: "Job-a eduthukitu, udane oru id-a thirumbi kuduthu, oru background queue-la process pannunga, client poll pannalaam illa webhook varalaam."
+  - q: "Load shedding-na enna?"
+    a: "Service capacity-la irukkum podhu, 429 illa 503-oda extra requests-a vegamaa maruthuradhu, adhanaala already eduthukitta requests nalla neraththula mudiyum."
+  - q: "Graceful shutdown period yen neelamaana stream-a vida adhigamaa irukkanum?"
+    a: "Illaina deploy, innum padichukittu irukkura users-ku answers-a nadula vettidum."
+exercise:
+  title: "Saayangaala slowdown-a fix pannunga"
+  setup: "Patna-la oru exam-prep app-oda AI answer service oru Uvicorn process-la odudhu. Raathiri 9 manikku, students-ku entha text-um varra munnaadi 15 seconds kaathirukkaanga, sila requests nimishangal thongudhu, summarise panna PDF uploads ellaarayum freeze pannudhu, platform-oda health check model-a koopududhu, adhanaala provider mella irukkum podhu ellaam instances-um restart aagudhu."
+  questions:
+    - q: "Mudhal text-ku 15-second kaathirukkradha edhu fix pannum?"
+      a: "Answer-a token token-aa stream pannunga, appo mudhal vaarthaigal oru second-kku kezhe therium."
+    - q: "Requests nimishangal thonguradha edhu thadukkum?"
+      a: "Model call-layum, request-layum, load balancer-layum timeouts, onnu fire aagum podhu udhavura message-oda."
+    - q: "PDF summarising-a eppadi kaiyaalanum?"
+      a: "Adha oru background queue-ku nagarthunga: udane oru job id-a thirumbi kuduthu, progress kaattunga, ready aanadhum summary-a eduthukkonga."
+    - q: "Health check adhukku badhila enna pannanum?"
+      a: "Process-ku oru sutthamaana /health-um, database-aiyum queue-vaiyum check panra /ready-um, model-a eppavum illa."
+ask:
+  - "Evvalavu Uvicorn workers odanum?"
+  - "FastAPI-la irundhu responses-a eppadi stream panradhu?"
+  - "Background job queue-a eppo use pannanum?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Serve panradhu-na unga application-a real users nambura maadhiri odavaikkradhu. Adhu thaanaa start aagum, crash aanaa restart aagum, orey neraththula neraya requests-a kaiyaalum, model mella irundhaalum vegamaa edhaavadhu kaattum.
+
+Oru Python AI service-ku, usual stack app-ku FastAPI-um, adha odavaikkura server-aa **Uvicorn**-um, parallelism-ku neraya worker processes-um. Munnaadi load balancer, ingress, illa Cloud Run maadhiri platform, HTTPS-a kaiyaala, traffic-a pirikka.
+
+AI services-ku rendu special gunangal. Requests mella irukkum, pala neram 2 mudhal 30 seconds, yen-naa model calls-ku kaathirukkum. Users adha progress paartha mattum thaan poruththukkuvaanga, adhanaala thaan **streaming** mukkiyam.
+
+```flow
+Users -[HTTPS]-> Load balancer | timeout 30 s, checks /ready
+Load balancer -> Container 1 | 4 workers, Uvicorn + FastAPI
+Load balancer -> Container 2 | 4 workers
+Container 1 -> Model API | timeout 25 s, tokens streamed to the user
+Container 1 -> Background queue | OCR, indexing; a job id and status
+```
+
+Indha lesson-la Lucknow-la oru edtech company-oda doubt-solving assistant-a follow pannuvom, adhu ovvoru saayangaalamum uuruvadhu pola mella aagum.
+
+## Idhu eppadi work aagudhu
+
+**Workers-um concurrency-yum.** Async endpoints-oda oru Uvicorn process, network-ku kaathirukkura neraya requests-a pidichukkum. PDF parse panradhu, local embedding model odradhu maadhiri CPU-heavy velai andha process-a block pannum. Adhanaala neraya workers odunga, perumbaalum oru CPU core-ku onnu illa rendu, illa heavy velaiya background queue-ku nagarthunga.
+
+**Ellaa idathulayum timeouts.** Ovvoru model, tool call-layum, request muzhusaa-layum, load balancer-layum timeout set pannunga, ulle irukkuradhu veliya irukkuradha vida chinnadhaa irukkanum. Thongarathukku badhila theliva 503 illa 504-a thirumbi kudunga.
+
+**Streaming.** `StreamingResponse`-um server-sent events-um vachu, model tokens-a produce panra maadhiri client-ku forward pannalaam. Mudhal token varra neram, muzhu generation neraththula irundhu oru second-kku romba kezhe varum. Client disconnect-a kaiyaalunga, appo yaarum padikkaadha tokens-ku kaasu kudukka maatteenga.
+
+**Health checks.** Sutthamaana `/health` endpoint (process up) -um `/ready` endpoint-um (database maadhiri dependencies reach aagudhu) platform-a udanja instances-a restart pannavum, ready-aa irukkuravatrukku mattum traffic anuppavum vidum. Health check-la model-a koopudaadheenga.
+
+**Graceful shutdown.** Deploy-kaaga platform oru instance-a nirutthum podhu, pudhu requests-a edukkradha nirutthi, nadandhukkittu irukkuravatra oru grace period-kulla mudikka viddanum. Neelamaana streaming responses-ku, unga usual generation-a vida neelamaana grace period thevai.
+
+**Background velai.** 500-page PDF-a index panradhu maadhiri nimishangal edukkura jobs, oru request-kulla varaadhu. Job-a eduthukkittu, udane oru id-a thirumbi kuduthu, oru worker queue-la process pannunga, client poll pannalaam illa webhook varalaam.
+
+**Oru streaming endpoint:**
+
+```python
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+
+app = FastAPI()
+
+# Question is your Pydantic request model; model_stream is your async model client.
+@app.post("/answer")
+async def answer(req: Request, body: Question):
+    async def tokens():
+        async for text in model_stream(body.text, timeout=25):
+            if await req.is_disconnected():
+                break                     # stop paying for unread tokens
+            yield f"data: {text}\n\n"
+    return StreamingResponse(tokens(), media_type="text/event-stream")
+```
+
+**Munnaadiyum pinnaadiyum alakkradhu.** Ovvoru request-kum moonu numbers record pannunga: mudhal token varra neram, mothama neram, timeout aanadha. Average illa, 95th percentile-a paarunga, yen-naa romba mella irukkura requests thaan users puhar panradhu. Launch-ku munnaadi, edhir paarkkura saayangaala peak-la Locust maadhiri tool-oda load-test pannunga, ovvoru maatraththukkum aprom thirumbavum.
+
+**Oru nijamaana streaming endpoint.** Model-la irundhu tokens-a server-sent events-aa, oru timeout-oda, oru concurrency cap-oda, disconnect handling-oda forward pannunga:
+
+```python
+import asyncio, json
+import anthropic
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+app = FastAPI()
+client = anthropic.AsyncAnthropic(timeout=30, max_retries=2)
+SLOTS = asyncio.Semaphore(50)                     # at most 50 model calls at once per process
+
+class Question(BaseModel):
+    text: str
+
+@app.post("/answer")
+async def answer(req: Request, body: Question):
+    if SLOTS.locked():
+        raise HTTPException(status_code=429, detail="Busy, please retry in a few seconds")
+    async def events():
+        async with SLOTS:
+            try:
+                async with client.messages.stream(
+                        model="claude-sonnet-5-5", max_tokens=600,         # check the docs for current names
+                        messages=[{"role": "user", "content": body.text}]) as stream:
+                    async for text in stream.text_stream:
+                        if await req.is_disconnected():
+                            return                                         # stop paying for unread tokens
+                        yield f"data: {json.dumps({'text': text})}\n\n"
+                yield "data: [DONE]\n\n"
+            except anthropic.APIError:
+                yield f"data: {json.dumps({'error': 'The AI service is unavailable. Please try again.'})}\n\n"
+    return StreamingResponse(events(), media_type="text/event-stream")
+
+@app.get("/health")
+async def health():
+    return {"ok": True}
+```
+
+Ovvoru chunk-aiyum JSON-aa encode panna, text-kulla irukkura newlines event format-a udaikkaadhu. `async with`-a vittu veliya vandhaa stream close aagum, adhu user disconnect aanaa generation-a nirutthum.
+
+**Odavaikkradhu.** Neraya worker processes, neelamaana stream-a vida neelamaana graceful timeout:
+
+```bash
+gunicorn app.main:app -k uvicorn.workers.UvicornWorker --workers 4 \
+  --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 90
+```
+
+**Queue-oda background jobs.** Neelamaana velai oru worker-ku pogum; request udane oru job id-a thirumbum. Redis Queue-oda:
+
+```python
+from redis import Redis
+from rq import Queue
+
+queue = Queue("ingest", connection=Redis.from_url("redis://redis:6379"))
+
+@app.post("/documents")
+async def upload(doc_id: str):
+    job = queue.enqueue("workers.index_pdf", doc_id, job_timeout=1800, retry=None)
+    return {"job_id": job.id, "status_url": f"/jobs/{job.id}"}
+
+@app.get("/jobs/{job_id}")
+async def job_status(job_id: str):
+    job = queue.fetch_job(job_id)
+    return {"status": job.get_status() if job else "unknown"}
+```
+
+Celery, Arq, cloud task queues-um adhe pattern-a thaan follow pannum.
+
+**Unmaiya sollura readiness.** `/ready` database-aiyum vector store-aiyum oru vegamaana query-yum chinna timeout-yum vechu check pannanum, models illa indexes load aagura varaikkum start-up-la 503 thirumbi kudukkanum. Appo platform nijamaave badhil solla mudiyura instances-ku mattum traffic anuppum.
+
+**Unga browser-la try pannunga.** Concurrency cap yen mukkiyam-nu paarunga: adhai thaandi varra requests kaathirukkum. Numbers-a maathi odunga.
+
+```python
+import asyncio, random, time
+
+async def model_call(i, slots):
+    async with slots:
+        await asyncio.sleep(random.uniform(0.05, 0.15))     # pretend model latency
+        return i
+
+async def main(cap, n=40):
+    slots = asyncio.Semaphore(cap)
+    t0 = time.perf_counter()
+    await asyncio.gather(*(model_call(i, slots) for i in range(n)))
+    print(f"cap {cap:>2}: {n} requests in {time.perf_counter() - t0:.2f} s")
+
+random.seed(0)
+for cap in (2, 10, 40):
+    await main(cap)
+```
+
+## Oru worked example
+
+Lucknow edtech-oda doubt-solving assistant oru Uvicorn process-aa odichu. Saayangaala padikkura neraththula, students-ku edhaavadhu text varra munnaadi 12 seconds aachu. Moondril oru pangu requests load balancer-oda 30-second limit-la timeout aachu, kaiyezhuththu notes-a OCR-ku upload panradhu ellaarukkum server-a freeze pannuchu.
+
+Maatrangal:
+
+- Answers stream aagum: mudhal vaarthaigal sumaar 700 milliseconds-la therium.
+- Ovvoru container-kum naalu Uvicorn workers, rendu containers, load balancer-kku pinnaadi.
+- Timeouts: model call 25 s, request 28 s, load balancer 30 s. Timeout aanaa, app blank error-ku badhila "Idhu vazhakkatha vida neram edukkudhu; thirumba try pannunga"-nu anuppum.
+- OCR oru background queue-ku poyichu. Upload oru job id-a thirumbum; page "Unga notes-a padikkaren..."-nu kaattum, ready aanadhum result-a eduthukkum.
+- `/ready` database-aiyum queue-vaiyum check pannum; udanja container 20 seconds-kulla traffic edukkradha nirutthum.
+
+Saayangaala peak-la timeouts 33%-la irundhu 1%-kku kezhe vizhundhuchu, answer paakkaama vittu pona students ennikkai rendu paththil moonu pangu kuraindhadhu.
+
+| Saayangaala peak-la alavu | Munnaadi | Aprom |
+| --- | --- | --- |
+| Mudhal text varra neram | Sumaar 12 s | Sumaar 0.7 s |
+| Timeout aana requests | 33% | 1%-kku kezhe |
+| OCR uploads-aala server freezes | Dhinam | Illa |
+| Answer-ku munnaadi poiduravanga | Baseline | Rendu paththil moonu pangu kuraivu |
+
+## Podhuvaa panra thappugal
+
+- **Production-la oru worker.** Oru block aana request ellaarayum nirutthum. Neraya odunga, alandhu paarunga.
+- **Timeouts illaama.** Oru thongura model call oru worker-a ennaikkum pidichu vechukkum.
+- **Muzhu answer-kku kaathirukkradhu.** Streaming illaina, users spinner-a paathu poiduvaanga.
+- **Model-a koopura health checks.** Adhu kaasu selavu, provider mella irukkum podhu fail aagi, healthy instances-a veliya edukkum.
+- **Requests-kulla neelamaana jobs.** Konjam seconds-ku mela CPU edukkura edhukkum queue use pannunga.
+- **Launch-ku munnaadi load test illaama.** Mudhal saayangaala peak thaan service-oda mudhal real traffic-a irukkakoodaadhu.
+- **Orey neraththula model calls-ku cap illaama**, adhanaala oru burst provider rate limits-a adichu, ovvoru request-um mella aagum.
+- **SSE events-la raw text**, answer-kulla oru newline stream-a udaikkum.
+- **Process uyiroda irukku-nu mattum solra ready checks.**
+
+## Simple-aa serve panna podhumaana idangal
+
+- **Konjam users-oda internal tools**: oru process, timeouts, oru health check podhum.
+- **Users-a ethir kollaadha batch jobs**: oru web service-a vida scheduled script nalladhu.
+- **Platform-hosted functions**, serverless routes maadhiri, platform workers-aiyum shutdown-aiyum paarthukkum.
+
+## Demo-la irundhu production-ku
+
+- Oru process-ku **concurrency-a cap pannunga**, theliva 429-oda load-a shed pannunga.
+- Ulle-la irundhu veliya varaikkum **timeouts set pannunga**: model call, request, load balancer.
+- **Disconnect handling-oda stream pannunga**, graceful shutdown-a neelamaana stream-a vida neelamaa vainga.
+- Job ids-um status-um irukkura queue-ku **neelamaana velaiya nagarthunga**.
+- p95-la **mudhal token neram, mothama neram, timeouts-a track pannunga**.
+
+## Practice pannunga
+
+FastAPI-oda deployment concepts page-a, streaming pathi avanga custom responses page-a padinga.
+
+1. Unga FastAPI app-ku, model tokens-a client-ku forward panra oru streaming endpoint-a serunga, munnaadiyum pinnaadiyum mudhal token neraththa alandhu paarunga.
+2. Model call-layum request-layum timeouts, `/health`, `/ready` endpoints-a serthu, naalu workers-oda odunga.
+3. Oru mella task-a job id-um status endpoint-um irukkura background job-ku nagarthunga.
+4. Oru load tool-oda unga endpoint-ku 100 concurrent requests anuppi, extra requests timeout aagaama, vegamaa 429 kidaikkudhu-nu confirm pannunga.
+
+Innum aazhama padikka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-la chapter 9 latency, throughput, streaming-a cover pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Mudhal token neram oru second-kku kezhe irukkradhai, oru timeout udhavura error-a thirumbi tharradhai, oru mella job innum matha users-a block pannaadhadhai kaattalaam.

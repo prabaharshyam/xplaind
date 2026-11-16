@@ -1,0 +1,228 @@
+---
+id: guardrails
+lang: hinglish
+title: "Guardrails"
+outcome: "Model ke aas-paas input aur output checks lagao: topic limits, personal data masking, format validation aur policy checks, har ek ke liye rules ya models chunkar."
+answer: "Guardrails model ke aas-paas ke checks hain: input checks off-topic ya unsafe requests ko block karte hain aur personal data mask karte hain, aur output checks users ke dekhne se pehle format aur policy validate karte hain."
+why_it_matters: "Clients ki legal aur brand teams poochti hain ki assistant ko medical advice dene, kisi customer ka apmaan karne ya phone number leak karne se kya rokta hai. Guardrails iska concrete jawab hain, aur ye tay karte hain ki pilot risk review pass karta hai ya nahi."
+flashcards:
+  - q: "Guardrails kya hain?"
+    a: "Model se pehle aur baad, aur actions se pehle chalne waale checks jo system ko uske rules ke andar rakhte hain, aur jo prompts aur training se chhoot jaata hai use pakadte hain."
+  - q: "Input, output aur action guardrails kya hain?"
+    a: "Input andar aane waali cheez check karta hai, output model jo banata hai use check karta hai, aur action checks tool call ke asar mein aane se pehle chalte hain."
+  - q: "Sabse sasta pehle, teen tarah ke checks batao."
+    a: "Rules jaise regular expressions aur schema validation, chhote classifiers, aur model checks."
+  - q: "Guardrail kaun se actions le sakta hai?"
+    a: "Tameez wale message ke saath block karna, mask karna, model se dobara try karwakar rewrite karna, ya kisi insaan ko route karna."
+  - q: "Prompt mein 'never give medical advice' likhna guardrail kyun nahi hai?"
+    a: "Ye ek request hai jise model ignore kar sakta hai. Ek control output check karta hai aur rule tootne par action leta hai."
+  - q: "Guardrails ko kaun se do error rates report karne chahiye?"
+    a: "Jo block hona chahiye us par catch rate, aur sahi requests par false-block rate."
+  - q: "Guardrails ko kai languages mein test kyun karein?"
+    a: "Indian users languages mix karte hain, aur English par tune kiye checks aksar Hindi, Tamil ya Hinglish messages ko miss karte hain ya galat block karte hain."
+  - q: "Guardrail latency kam kaise rakhein?"
+    a: "Sasti rule checks pehle chalao aur jahan ho sake checks parallel chalao, aur model checks sirf wahan use karo jahan rules decide nahi kar sakte."
+  - q: "Ek rule asli Aadhaar number ko kisi bhi 12 digits se kaise alag kar sakta hai?"
+    a: "Aadhaar numbers Verhoeff check digit par khatam hote hain. Ise check karne se zyadatar random 12-digit numbers, jaise order ids, reject ho jaate hain, aur false matches kam hote hain."
+  - q: "Streaming ke saath output guardrails mushkil kyun hain?"
+    a: "Check karne ke liye poora reply banne se pehle hi shabd user tak pahunch jaate hain. Text stream hote waqt chunks mein check karo, aur strict checks actions ke liye rakho, jo stream nahi hote."
+exercise:
+  title: "Guardrails chuno"
+  setup: "Kochi ke ek bank ka assistant customers ke accounts aur loans ke sawaalon ke jawab deta hai. Risk team ke rules: kisi doosre customer ka data kabhi mat batao; specific stocks par investment advice mat do; poora card number ya PIN kabhi mat maango; sirf banking sawaalon ke jawab do; aur ₹10,000 se upar ke fund transfers ke liye one-time password chahiye. Customers English aur Malayalam mein likhte hain."
+  questions:
+    - q: "Kaun se rules ek simple rule check lagu kar sakta hai?"
+      a: "Card numbers aur PINs mask karna, replies ke account numbers sign-in kiye customer se match karte hain ya nahi ye check karna, aur transfers par ₹10,000 ka OTP rule."
+    - q: "Kisko classifier ya model check chahiye?"
+      a: "Replies mein stock-specific investment advice aur off-topic sawaal pakadna, jise rules bharose se judge nahi kar sakte."
+    - q: "Investment-advice check fire hone par kya hona chahiye?"
+      a: "Ek baar zyada sakht instruction ke saath regenerate karo; agar tab bhi fail ho, toh ek safe template bhejo aur human advisor offer karo."
+    - q: "Guardrails ko kaise test karoge?"
+      a: "English aur Malayalam mein ek red-team set, jismein block hone waale messages aur milte-julte pass hone waale messages hon, aur dono error rates report karo."
+ask:
+  - "AI applications mein guardrails kya hain?"
+  - "NeMo Guardrails use karun ya khud likhun?"
+  - "Guardrails mein false positives kaise naapun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Guardrails** woh checks hain jo model se pehle aur baad mein chalte hain taaki system apne rules ke andar rahe. Ye akele kisi model ko safe nahi banate; ye ek layer hain jo prompts aur model training se chhoot gayi cheezein pakadti hai.
+
+- **Input guardrails** us par chalte hain jo user (ya koi document, ya tool) bhejta hai: off-topic requests, abuse, prompt injection attempts, personal data jo model tak nahi pahunchna chahiye.
+- **Output guardrails** us par chalte hain jo model banata hai: galat format, banned topics, personal data, bina support ke claims, tone.
+- **Action guardrails** tool call ke asar mein aane se pehle chalte hain: amount limits, allowed recipients, zaroori approvals.
+
+```flow
+User text, documents, tool results -> Input: Aadhaar, PAN, phone mask karo -> Input: injection classifier -> Input: topic ke andar hai?
+Input: injection classifier -[flag hua]-> Ek fixed message
+Input: topic ke andar hai? -> Model -> Output: medical advice ya claim promise?
+Output: medical advice ya claim promise? -[haan]-> Ek baar regenerate, phir ek safe template aur ek insaan
+Output: medical advice ya claim promise? -[nahi]-> Output: sirf customer ka apna policy number
+Output: sirf customer ka apna policy number -> Action: limits, allowed recipients, approvals -> Tool chalta hai
+```
+
+Har trigger apni wajah ke saath log hota hai.
+
+Is lesson mein hum Chennai ki ek health-insurance company ke policy assistant ko follow karenge.
+
+## Ye kaam kaise karta hai
+
+Har check ek rule, ek classifier ya ek model judgement hota hai, sabse sasta se sabse flexible tak:
+
+- **Rules**: Aadhaar, PAN ya phone numbers ke liye regular expressions; domains ki allow-lists; JSON output ka schema validation; maximum lengths. Tez, predictable, test karne mein aasan. Jahan bhi rules decide kar sakein, wahan use karo.
+- **Classifiers**: ek judgement ke liye train kiye chhote models, jaise toxicity, prompt injection ya topic. Tez aur sasta, jaane-pehchane error rates ke saath.
+- **Model checks**: language model se poochna "Kya ye reply specific medical dosage advice deta hai? Yes ya no mein jawab do." Flexible, dheera, aur khud bhi galti kar sakta hai.
+
+Har check ka trigger hone par ek **action** hota hai: tameez wale message ke saath block karna, mask karna (phone number ko [PHONE] se badalna), rewrite karna (model se bina problem ke dobara try karne ko kehna), ya kisi insaan ko route karna.
+
+Sasti checks pehle aur jahan ho sake parallel chalao, taaki guardrails kam latency jodein. Har trigger ko wajah ke saath log karo, kyunki guardrails false positives bhi dete hain, aur block hue sahi users bhi ek kharcha hain.
+
+**Testing.** Ek red-team set banao: woh requests jinhe block hona chahiye (English, Hindi, Hinglish aur Tamil mein, agar aapke users inhe likhte hain) aur milte-julte jo pass hone chahiye. Catch rate aur false-block rate dono naapo, aur har change par dobara chalao.
+
+**Sahi check chunna:**
+
+| Lagu karne ka rule | Sabse achha check | Kyun |
+| --- | --- | --- |
+| Logs mein Aadhaar ya PAN nahi | Regular expression, plus Aadhaar checksum | Exact aur tez |
+| Output valid JSON ho | Schema validation | Exact |
+| Prompt injection nahi | Chhota classifier | Tez, jaana-pehchana error rate |
+| Sirf product ke sawaal | Examples ke saath model check | Judgement chahiye |
+| Medical treatment advice nahi | Model check | Judgement chahiye |
+| Sirf ₹5,000 se kam ka refund | Tool ke arguments par rule | Exact |
+
+**Blocked message design karna.** Block product ka hissa hai. Batao ki assistant kis cheez mein madad kar sakta hai, user ki language mein, aur agla kadam do, jaise human agent ya sahi page. Bina aage ka raasta bataye kabhi mat kaho "aapka message flag hua". Trigger aur wajah log karo, aur har hafte blocks ke ek sample ko review karo, kyunki false blocks tab tak dikhte nahi jab tak koi dekhe nahi.
+
+**Code ki tarah guardrails.** Har check ko apne chhote function mein apne tests ke saath rakho, aur uski configuration, jaise thresholds aur word lists, version control mein. Phir changes kisi bhi aur code ki tarah review aur red-team set se guzarte hain, aur incident ke waqt aap dekh sakte ho ki har check ka kaun sa version chal raha tha.
+
+**Code mein ek guard pipeline.** Pehle sasti rules, checks parallel, ant mein ek decision:
+
+```python
+import asyncio, re
+from dataclasses import dataclass
+
+@dataclass
+class Verdict:
+    action: str          # "allow", "mask", "block" or "human"
+    reason: str = ""
+    text: str = ""
+
+D = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],
+     [4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],
+     [8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]]
+P = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],
+     [9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]]
+
+def verhoeff_ok(digits):
+    c = 0
+    for i, ch in enumerate(reversed(digits)):
+        c = D[c][P[i % 8][int(ch)]]
+    return c == 0
+
+def mask_aadhaar(text):
+    def swap(m):
+        digits = re.sub(r"\D", "", m.group(0))
+        return "[AADHAAR]" if verhoeff_ok(digits) else m.group(0)
+    return re.sub(r"\b[2-9]\d{3}\s?\d{4}\s?\d{4}\b", swap, text)
+
+async def injection_score(text):      # a small classifier you host or call; returns 0 to 1
+    ...
+
+async def off_topic(text):            # a model check with examples; returns True or False
+    ...
+
+async def check_input(text):
+    text = mask_aadhaar(text)
+    score, wander = await asyncio.gather(injection_score(text), off_topic(text))
+    if score is not None and score > 0.9:
+        return Verdict("block", "likely prompt injection")
+    if wander:
+        return Verdict("block", "off topic", "I can help with orders, returns and delivery. What do you need?")
+    return Verdict("allow", text=text)
+```
+
+Rule pehle chalta hai aur kuch kharcha nahi karta; classifier aur model check ek saath chalte hain, isliye sabse dheera wala delay tay karta hai, unka jod nahi.
+
+**Catch rate aur false blocks ek saath naapo.** "Should block" ya "should pass" label kiya hua ek red-team set:
+
+```python
+def guard_report(cases, guard):
+    """cases: list of (text, should_block, language)."""
+    from collections import defaultdict
+    stats = defaultdict(lambda: {"caught": 0, "bad": 0, "false_block": 0, "good": 0})
+    for text, should_block, lang in cases:
+        blocked = guard(text).action in {"block", "human"}
+        s = stats[lang]
+        if should_block:
+            s["bad"] += 1; s["caught"] += blocked
+        else:
+            s["good"] += 1; s["false_block"] += blocked
+    for lang, s in stats.items():
+        print(f"{lang}: catch {s['caught']}/{s['bad']}, false blocks {s['false_block']}/{s['good']}")
+```
+
+Language ke hisaab se report karo: English par tune kiya guard aksar Hinglish attacks miss karta hai aur Tamil text ko over-block karta hai.
+
+**Streaming aur output checks.** Agar aap replies stream karte ho, toh output checks har sentence par ya har kuch sau characters par chalao jaise woh aate hain, aur agar koi fail ho toh ek chhote message ke saath stream rok do. Actions (tool calls) ke liye streaming ki problem nahi hai: kuch bhi chalane se pehle poore arguments check karo.
+
+**Retries aur fallbacks.** Khaali ya malformed reply jaisi quality failures ke liye, ek retry aksar theek kar deta hai. Safety failures ke liye, alag jawab ki ummeed mein wahi request dobara mat bhejo; block karo ya hand over karo.
+
+## Ek example se samjho
+
+Chennai ki ek health-insurance company customers ke liye ek policy assistant deploy karti hai. Risk team ki requirements: medical advice nahi, doosre customers ka data disclose nahi, claim approval ke promise nahi, aur sirf company ke products ke sawaal.
+
+Aapke guardrails:
+
+1. **Input, rule**: text ke model ya logs tak pahunchne se pehle Aadhaar, PAN aur phone numbers mask karo.
+2. **Input, classifier**: user text aur retrieve kiye documents par ek prompt-injection detector; flag hue inputs ko ek fixed message se jawab do.
+3. **Input, model check**: kya ye company ke insurance products ke baare mein hai? Agar nahi, toh reply: "Main aapki policy, claims aur premiums ke sawaalon mein madad kar sakta hoon."
+4. **Output, model check**: kya reply specific medical treatment advice deta hai ya kehta hai ki claim approve hoga? Agar haan, toh ek baar zyada sakht instruction ke saath regenerate karo; agar tab bhi fail ho, toh ek safe template bhejo aur human agent offer karo.
+5. **Output, rule**: reply mein sign-in kiye customer ke alawa koi policy number nahi hai.
+
+300 messages ke ek red-team set par system jitna block hona chahiye uska 96% block karta hai aur sahi sawaalon ka 2.5% galat block karta hai, zyadatar "maruthuvam" (medical treatment) ke baare mein Tamil messages jo asal mein hospital cover ke baare mein poochh rahe the. Aap topic check ke prompt mein Tamil examples jodte ho aur false-block rate 1% par aa jaata hai. Guardrails 95th percentile par 220 milliseconds jodte hain, jise client manzoor karta hai.
+
+| 300 red-team messages par measure | Pehla version | Tamil examples jodne ke baad |
+| --- | --- | --- |
+| Block hone waale messages pakde gaye | 96% | 96% |
+| Sahi messages galat block hue | 2.5% | 1% |
+| Joda gaya latency, 95th percentile | 220 ms | 220 ms |
+
+## Aam galtiyaan
+
+- **Guardrails sirf system prompt mein.** Prompt mein "Never give medical advice" ek request hai, control nahi. Outputs check karo.
+- **Har cheez ke liye model checks.** Jahan rule decide kar sake wahan rules use karo; woh tez hain aur test ho sakte hain.
+- **Sirf catches naapna.** False blocks asli users ko pareshaan karte hain. Dono track karo.
+- **Sirf English mein testing.** Indian users languages mix karte hain; aapka red-team set bhi waisa hi hona chahiye.
+- **Chupchaap block karna.** User ko batao ki aap kis cheez mein madad kar sakte ho, aur log karo ki kyun block kiya.
+- **Har 12-digit number ko Aadhaar maan lena.** False matches kam karne ke liye check digit use karo.
+- **Safety block ke baad tab tak retry karna** jab tak model kuch aisa na de jo pass ho jaye.
+- **Har check ko sequence mein chalana**, jisse unke delays jud jaate hain.
+
+## Kab kam guardrails theek hain
+
+- **Bharose ke staff ke liye internal tools**, non-sensitive data par: schema checks aur logging kaafi ho sakte hain.
+- **Koi free-text input nahi**, jaise sirf buttons aur forms: uski jagah fields validate karo.
+- **Provider ki built-in safety** pehle se general harmful content cover karti hai, aur aapka domain koi khaas risk nahi jodta.
+
+Jaise-jaise stakes badhein aur jodo: personal data, paisa, health, bachche, public users ya asli duniya mein actions.
+
+## Demo se production tak
+
+- **Har check ko tested code ki tarah rakho**, uski configuration version control mein.
+- Check, version aur wajah ke saath **har trigger log karo**, aur har hafte blocks ka ek sample review karo.
+- Har change par language ke hisaab se **catch aur false-block rates track karo.**
+- **Guardrail latency ka budget rakho** aur checks parallel chalao.
+- Jo bhi language aap support karte ho, usmein product team ke saath **blocked messages likho.**
+
+## Practice karo
+
+NeMo Guardrails overview aur OWASP Top 10 for LLM applications padho.
+
+1. Das rules likho jinhe aapke assistant ko follow karna hai, aur har ek ke liye tay karo ki rule, classifier ya model check use lagu karega.
+2. Rules ke saath personal-data masking aur ek model-based output check implement karo.
+3. Kam se kam do languages mein 40 messages ka ek red-team set banao (20 block hone chahiye, 20 milte-julte pass hone chahiye), aur catch aur false-block rates report karo.
+4. Apne 40 messages par language ke hisaab se baant kar guard_report chalao, aur sabse kharab false-block rate waali language ko pehle theek karo.
+
+Aur gehrai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 10 input aur output guardrails, latency aur streaming ke saath unke trade-offs, aur fallbacks cover karta hai.
+
+**Aapka kaam poora jab:** aap apni guardrail list, har ek ka action, aur apne red-team set par dono error rates dikha sako.

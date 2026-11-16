@@ -1,0 +1,224 @@
+---
+id: serving-ml-models
+lang: hinglish
+title: "Model ko serve karna"
+outcome: "Train kiye hue model ko istemaal mein laana seekhoge, chahe raat ke batch scoring ke roop mein ya real-time API ke roop mein, consistent preprocessing, input validation, versioning, latency targets aur safe rollout ke saath."
+answer: "Model ko ya toh schedule par batch scoring ki tarah serve karo ya real-time API ki tarah, training wala hi preprocessing laga kar, inputs validate karke aur har model ko version dekar."
+why_it_matters: "Notebook mein pada model koi value nahi banata. Use bharose ke saath serve karna, training wale hi preprocessing ke saath aur naye versions ko safely rollout karne ke tareeke ke saath, wahi jagah hai jahan kai ML projects atak jaate hain. Employers aise engineers dhundhte hain jo ye gap bhar sakein."
+flashcards:
+  - q: "Serving ke do main patterns kaunse hain?"
+    a: "Batch inference, yaani schedule par kai records ko score karna, aur real-time inference, yaani aisa API jo ek request ko milliseconds mein score kare."
+  - q: "Batch inference kab chunni chahiye?"
+    a: "Jab bhi business scores ke liye intezaar kar sake. Ye simple hai, sasta hai aur monitor karna aasaan hai."
+  - q: "Preprocessing ko model ke saath package kyun karein?"
+    a: "Features bilkul waise hi nikalne chahiye jaise training mein nikle the. Unhe service mein dobara likhne se predictions mein chupchaap galtiyaan aati hain."
+  - q: "Real-time service mein inputs validate kyun karein?"
+    a: "Warna missing fields, galat types, units ka mismatch aur range se bahar ki values chupchaap galat predictions bana deti hain."
+  - q: "Shadow mode kya hai?"
+    a: "Naya model live requests ko maujooda model ke saath-saath score karta hai, par faislon par asar nahi daalta, taaki outputs ko safely compare kiya ja sake."
+  - q: "Canary release kya hai?"
+    a: "Pehle traffic ka ek chhota hissa naye model ko bhejna, aur nateeje theek rahein toh use badhana."
+  - q: "Model service ke liye fallback kya hota hai?"
+    a: "Model available na hone par pehle se tay kiya hua faisla, jaise koi seedha rule ya manual review ko bhej dena."
+  - q: "Har prediction ke log mein kya record hona chahiye?"
+    a: "Inputs ya unke summaries, output, model version aur timestamp, personal data masked rakh kar."
+  - q: "Users ke ek stable hisse ko canary model par kaise bhejein?"
+    a: "Har user ki id ko hash karke 0 se 99 ke beech ka number banao, aur jo users canary percentage se neeche hon unhe naye model par bhejo, taaki har user ko hamesha wahi version dikhe."
+  - q: "Model ko har request par nahi, start-up par load kyun karein?"
+    a: "Load karne mein seconds aur memory lagti hai. Ise app ke start-up mein ek baar karne se har prediction tez rehti hai aur load mein memory khatam nahi hoti."
+exercise:
+  title: "Serving chuno aur plan karo"
+  setup: "Surat ke ek diamond exporter ke paas do models hain: (A) agle mahine ke liye har product ki demand forecast, jise planners har Monday use karte hain; (B) ek price check jo salesperson ke order system mein type karte samay ajeeb quotes ko flag karta hai, aur jise 200 milliseconds ke andar jawab dena hota hai. (B) ka naya version taiyaar hai, aur ek partner system weights carats mein bhejta hai jabki internal system cents mein chalta hai."
+  questions:
+    - q: "Har model ke liye kaunsa serving pattern sahi hai?"
+      a: "(A) batch, har hafte score karke ek table mein likhna; (B) real-time, latency budget ke saath ek API."
+    - q: "(B) ka naya version safely kaise release karoge?"
+      a: "Ise shadow mode mein chalao, iske flags ko maujooda version se compare karo, phir poore rollout se pehle traffic ke chhote hisse par canary chalao."
+    - q: "(B) ko carats versus cents wali problem se kaise bachaoge?"
+      a: "Schema se inputs ko expected ranges aur units ke khilaaf validate karo, aur partner channel se aayi values ko reject karo ya convert karo."
+    - q: "Agar price-check service band ho toh kya hona chahiye?"
+      a: "Ek fallback: order ko 'not checked' marker ke saath aage badhne do, ya koi seedhi rule-based limit lagao, sales ko block mat karo."
+ask:
+  - "API ki jagah batch inference kab use karni chahiye?"
+  - "Naya model version safely kaise deploy karun?"
+  - "Feature store kya hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Serving** ka matlab hai model ki predictions ko wahan available karana jahan unka istemaal hota hai. Do main patterns:
+
+- **Batch inference**: schedule par kai records ko score karna (sabhi customers ke liye raat ke churn scores, har store ke liye hafte ki demand forecasts) aur nateeje ek table mein likhna jise doosre systems padhein.
+- **Real-time (online) inference**: ek API jo ek request ko milliseconds mein score kare (payment ke samay fraud check, seller ke type karte samay price suggestion).
+
+Jab bhi business intezaar kar sake, batch chuno; ye simple hai, sasta hai aur monitor karna aasaan hai.
+
+```flow
+title: Batch, raat ko
+Scheduler -> Registry se model v7 load karo -> Aaj tak ke hisaab se features nikalo -> Sabhi active loans ko score karo -> loan_id, score, v7, timestamp likho -> Collections team ki ranked list
+```
+
+```flow
+title: Real time, har request par
+Application form -> FastAPI service | model v7 start-up par load hua
+FastAPI service -> 42 fields validate karo
+42 fields validate karo -[galat input]-> Reject karo
+42 fields validate karo -> Features nikalo | wahi code jo training mein tha
+Features nikalo -> Score aur version lautao | 80 ms se kam mein
+Score aur version lautao -> Faisla | ya service band ho toh manual review
+```
+
+Is lesson mein hum Kolkata ki ek non-banking finance company ke saath chalenge, jo ek default-risk model ko dono tarah se serve karti hai.
+
+## Ye kaam kaise karta hai
+
+**Poora prediction path package karo.** Akela model kaafi nahi hai; preprocessing aur feature computation training jaise hi hone chahiye. Unhe saath mein package karo (scikit-learn pipeline, saved preprocessing object, shared feature code) aur model ke saath unhe bhi version do.
+
+**Batch.** Ek scheduled job registered model load karta hai, scoring ke samay ke hisaab se features nikalta hai, predict karta hai, nateeje model version aur timestamp ke saath likhta hai, aur counts aur score distributions log karta hai. Orchestrator ya koi simple scheduler use karo.
+
+**Real-time.** Ek web service (jaise FastAPI, ya BentoML jaisa model-serving framework) start-up par model load karti hai, har request ke input ko schema se validate karti hai, features nikalti hai (aksar "pichhle ek ghante ke transactions" jaisi cheezon ke liye feature store se), predict karti hai aur model version ke saath score lautati hai. Latency budgets, timeouts aur ek fallback (rule-based faisla) tay karo, agar model service fail ho jaye.
+
+**Input validation.** Jin requests mein fields missing hon, types galat hon ya values training ki ranges se bahar hon, unhe reject ya flag karo. Silent garbage in ka nateeja silent garbage out hota hai.
+
+**Versioning aur rollout.** Naye versions dheere-dheere deploy karo: shadow mode (naya model purane ke saath score karta hai par faislon par asar nahi daalta), phir canary (traffic ka chhota hissa), phir poora rollout. Nateeje compare karo aur zaroorat ho toh rollback karo.
+
+**Performance.** p95 latency aur throughput naapo. Chhote models, requests ki batching aur features ki precomputing se madad milti hai. Tree models aam taur par CPU par milliseconds mein serve ho jaate hain.
+
+**Logging.** Monitoring aur debugging ke liye inputs (ya unke summaries), outputs aur model version log karo, personal data masked rakh kar.
+
+**Batch ya real-time:**
+
+| Sawaal | Batch | Real-time |
+| --- | --- | --- |
+| Score kab chahiye? | Ghanton ya dinon baad bhi chalega | Request ke andar hi |
+| Cost | Kam: schedule par chalta hai | Zyada: hamesha chalu service |
+| Monitoring | Har run ke counts aur distributions | Har request ki latency, errors aur drift |
+| Failure ka asar | Ek report mein deri | Customer ka raasta rukna, isliye fallback chahiye |
+| Aam examples | Churn lists, forecasts, risk reviews | Fraud checks, pricing, credit decisions |
+
+**Rollout ka raasta shabdon mein.** Pehle shadow mode: naya version har request ko score karta hai par uska output sirf log hota hai. Jab asli nateeje dikhne layak samay beet jaye, tab segment-by-segment compare karo ki har version ke scores ne jo asal mein hua use kitna achha rank kiya. Phir chhote hisse par canary, error rates aur business measures dekhte hue. Phir poora rollout, jismein pichhla version abhi bhi loaded rahe ya ek deploy ki doori par ho. Har stage ka ek naamit owner hota hai aur aage badhne ya rollback karne ki ek likhi hui shart hoti hai, jo stage shuru hone se pehle tay ho jaati hai.
+
+**Batch aur real-time ko consistent rakhna.** Jab model dono tarah se serve hota hai, toh dono paths ko wahi registered version load karna chahiye aur wahi feature code bulana chahiye. Ek kaam ka test: records ke ek sample ko batch job se aur API se score karo aur check karo ki har score mel khata hai.
+
+**Code mein ek real-time service.** Start-up par ek baar load karo, inputs ko training ki ranges se validate karo, har prediction ke saath version record karo:
+
+```python
+from contextlib import asynccontextmanager
+import mlflow.pyfunc, pandas as pd
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+MODELS = {}
+
+@asynccontextmanager
+async def lifespan(app):
+    MODELS["champion"] = mlflow.pyfunc.load_model("models:/claims-fraud@champion")
+    MODELS["challenger"] = mlflow.pyfunc.load_model("models:/claims-fraud@challenger")
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
+class Claim(BaseModel):
+    claim_amount_inr: float = Field(gt=0, le=5_000_000)        # the range seen in training
+    policy_age_days: int = Field(ge=0, le=20_000)
+    hospital_tier: int = Field(ge=1, le=3)
+    prior_claims: int = Field(ge=0, le=50)
+
+@app.post("/score")
+def score(claim: Claim, user_id: str):
+    X = pd.DataFrame([claim.model_dump()])
+    main = float(MODELS["champion"].predict(X)[0])
+    shadow = float(MODELS["challenger"].predict(X)[0])          # logged, never used for the decision
+    log_prediction(user_id, claim, main=main, shadow=shadow)
+    return {"score": main, "model": "champion"}
+```
+
+Pydantic, range se bahar ke inputs ko model tak pahunchne se pehle hi saaf 422 ke saath reject kar deta hai.
+
+**User hash se canary.** Jab challenger asli faislon ke liye taiyaar ho, toh users ka ek stable hissa us par bhejo:
+
+```python
+import hashlib
+
+def bucket(user_id: str) -> int:
+    return int(hashlib.sha256(user_id.encode()).hexdigest()[:8], 16) % 100
+
+def pick_model(user_id: str, canary_percent: int = 5) -> str:
+    return "challenger" if bucket(user_id) < canary_percent else "champion"
+```
+
+Ek hi user ko hamesha wahi model milta hai, jisse unka experience consistent rehta hai aur comparison saaf rehta hai. Percentage ko steps mein badhao (5, 25, 50, 100), har group ke outcomes aur errors dekhte hue.
+
+**Version stamp ke saath batch scoring.**
+
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+def score_batch(in_path, out_path, alias="champion"):
+    model_uri = f"models:/claims-fraud@{alias}"
+    model = mlflow.pyfunc.load_model(model_uri)
+    df = pd.read_parquet(in_path)
+    df["score"] = model.predict(df[FEATURES])
+    df["model_version"] = mlflow.MlflowClient().get_model_version_by_alias("claims-fraud", alias).version
+    df["scored_at"] = datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(timespec="seconds")
+    df.to_parquet(out_path)
+    print(f"{len(df)} rows; score mean {df['score'].mean():.3f}; share above 0.8: {(df['score'] > 0.8).mean():.1%}")
+```
+
+Print hone wala summary ek sasta monitor hai: mean mein ya oonche scores wale hisse mein badi chhalaang, kisi ke list par action lene se pehle dekhne layak hai.
+
+**Ek consistency test.** 500 records ko batch job aur API, dono se score karo, aur assert karo ki scores ek chhoti tolerance tak mel khate hain. Farak ka matlab hai ki dono paths features alag tarah se nikal rahe hain, jo served models mein sabse aam silent bug hai.
+
+## Ek example se samjho
+
+Kolkata ki ek NBFC (non-banking finance company) ke paas ek trained default-risk model hai.
+
+- **Batch**: har raat sabhi active loans ko early-warning risk ke liye score kiya jaata hai; collections team ko har subah ek ranked list dikhti hai. Job score kiye gaye loans ki sankhya aur har risk band ka hissa log karta hai; counts mein tez badlaav ho toh alert chalta hai.
+- **Real-time**: loan application ke samay, ek FastAPI service applicant ko p95 par 80 milliseconds se kam mein score karti hai. Woh ek Pydantic model se 42 input fields validate karti hai aur bank-statement features usi code se nikalti hai jo training mein use hua tha. Agar service band ho, toh application auto-decide hone ki jagah manual review ko bheji jaati hai.
+- **Rollout**: version 7 do hafte tak version 6 ke bagal mein shadow mode mein chala. Defaults dikhne mein mahine lagte hain, isliye do hafte ke shadow scores saabit nahi kar sakte ki ye unhe behtar rank karta hai. Iski jagah team ye check karti hai ki iske live scores stable aur samajhdaar hain, aur purane loans par, jinke nateeje pata hain, ek back-test par bharosa karti hai, jahan isne defaults ko behtar rank kiya. Phir ye 20% traffic par gaya, phir 100% par. Registry version 6 ko rollback ke liye taiyaar rakhti hai.
+
+Ek shuruaati bug: service ko ek partner channel se income lakhs mein mil rahi thi aur doosre se rupees mein. Input range validation ne pehle hi din ise pakad liya.
+
+| Version 7 ka stage | Traffic | Nateeja |
+| --- | --- | --- |
+| Shadow | 0% faisle, 100% scored | Live scores stable; back-test mein version 6 se behtar |
+| Canary | 20% | Errors ya shikayaton mein koi badhat nahi |
+| Poora rollout | 100% | Version 6 registry mein taiyaar rakha gaya |
+
+## Aam galtiyaan
+
+- **Jab batch se kaam chal jaye tab real-time chunna.** Isse cost aur complexity badhti hai.
+- **Service mein preprocessing dobara likhna.** Training ke saath code share karo.
+- **Input validation na hona.** Units ka mismatch aur missing fields chupchaap predictions bigaad dete hain.
+- **Sab kuch ek saath deploy karna.** Shadow aur canary releases use karo.
+- **Fallback na hona.** Pehle se tay karo ki model available na ho toh kya hoga.
+- **Input range checks na hona**, jisse range se bahar ki values poore confidence ke saath bakwaas deti hain.
+- **Har request par random canary assignment**, jisse ek user ko dono models dikhte hain.
+- **Batch aur real-time paths ka features alag tarah se nikalna.**
+
+## Jab serving service ki zaroorat shayad na ho
+
+- **Scores roz ya hafte mein chahiye**: table mein likhne wala batch job sasta aur simple hai.
+- **Aise models jo client app ya database mein hi chal sakein**, jaise rules ya SQL ke roop mein export kiya gaya ek chhota tree.
+- **Ek hosted ML platform** jo client pehle se chalata hai, aur jo endpoints, canaries aur monitoring deta hai.
+
+## Demo se production tak
+
+- **Registry alias se load karo** aur har prediction ke saath version log karo.
+- **Inputs ko validate karo**, training ki ranges ke khilaaf.
+- **Shadow se rollout karo, phir hash-based canary se**, har group ke outcomes dekhte hue.
+- **Batch aur real-time ki consistency ko test karo**, CI mein.
+- **p95 latency, errors aur score distributions ko track karo.**
+
+## Practice karo
+
+BentoML ka introduction aur Google ke Rules of ML ka serving wala section padho; FastAPI wale lesson mein jo seekha use dobara use karo.
+
+1. Ek batch scoring script likho jo saved pipeline load kare, ek CSV score kare aur nateeje model version ke saath likhe.
+2. Usi pipeline ko FastAPI endpoint ki tarah serve karo, input validation aur latency measurement ke saath.
+3. Naye model version ko unhi inputs par shadow mode mein chalao aur outputs compare karo.
+4. 10% par hash-based canary jodo, 1,000 fake user ids bhejo, aur pakka karo ki lagbhag 100 challenger tak pahunche aur har id hamesha usi group mein gire.
+
+**Aapka kaam poora jab:** aap model ko dono tarah se serve kar sako, ek hi inputs par identical predictions ke saath, aur apna rollout plan samjha sako.

@@ -1,0 +1,166 @@
+---
+id: running-models-on-many-gpus
+lang: tanglish
+title: "Neraya GPUs-la models-a odurathu: replicas, tensor, pipeline parallelism"
+outcome: "Oru model-a GPUs-ukkulla eppadi parappuranga-nu explain pannunga, serving illa training-ku adha copy panradhukkum (replicas), split panradhukkum (tensor illa pipeline parallelism) idaiyila choose pannunga, oru deployment-a size pannunga."
+answer: "Model oru GPU-la porundhina, adhoda copies-a odi neraya users-a serve pannunga. Porundhaadhuna, split pannunga: ovvoru layer-aiyum GPUs-ukkulla (tensor) illa layers-oda groups-a GPUs-ukkulla (pipeline)."
+why_it_matters: "70B parameters-um adhukku mela irukkura open models oru GPU-la porundhaadhu, real traffic-ku oru copy-a vida adhigam thevai. Oru model-a eppadi parappanum-nu choose panradhu cost, speed, reliability-a decide pannum, adhu ML platform interviews-la oru standard kelvi."
+flashcards:
+  - q: "Replica (data) parallelism-na enna?"
+    a: "Neraya GPUs-la model-oda muzhu copies-a odradhu. Serving-ku, ovvoru copy-um vera vera requests-a handle pannum; training-ku, ovvonnum vera vera batches-a handle pannum."
+  - q: "Tensor parallelism-na enna?"
+    a: "Ovvoru layer-oda matrix velaiya, orae neraththula compute panra neraya GPUs-ukkulla pirikkuradhu. Romba periya model-a odha vaikkum, latency-aiyum kuraikkalaam."
+  - q: "Pipeline parallelism-na enna?"
+    a: "Vera vera layers-oda groups-a vera vera GPUs-la vekkuradhu, adhanaala data onnula irundhu adutha onnukku pogum. Training throughput-ku nalladhu; thani requests-ku delay serkkum."
+  - q: "Tensor parallelism-ku GPUs-ukku idaiyila yen vegamaana links thevai?"
+    a: "GPUs ovvoru layer-kullayum partial results-a maathikkum. Slow connections-la, andha communication speed-up-a ratthu pannidalam."
+  - q: "Low-latency serving-ku edha parallelism-a perumbaalum thavirppaanga?"
+    a: "Pipeline parallelism, yen-na ovvoru request-um ovvoru stage-layum oru oru thadavai poganum."
+  - q: "Oru deployment-a size panrappo mudhal kelvi enna?"
+    a: "Model-oda oru copy, adhoda KV cache-oda, oru GPU-la porundhumaa? Aamaa-na replicas use pannunga; illanaa split pannunga."
+  - q: "Context-um sequence parallelism-um edhukku udhavum?"
+    a: "Romba neenda inputs-ku, sequence-a illa adhoda mela nadakkura operations-a GPUs-ukkulla pirichu."
+  - q: "Weights-a thaandi training-ku enna extra memory thevai?"
+    a: "Gradients-um optimiser states-um, perumbaalum weights-a vida pala madangu, adhanaala training indha-vatra GPUs-ukkulla shard panradhu maadhiri tricks use pannum."
+exercise:
+  title: "Hyderabad insurer-ku 70B model-a serve panradhu"
+  setup: "Hyderabad-la oru insurer, 2,000 staff use panra oru internal assistant-ku 70-billion-parameter open model-a thangalae host pannanum-nu virumburaanga, p95 first-token time 2 seconds-kku kezhe. Avangakitta ovvoru server-layum fast links-oda connect aana, 80 GB-oda 8 GPUs irukkura servers irukku."
+  questions:
+    - q: "16-bit precision-la model oru GPU-la porundhumaa?"
+      a: "Illa. 70 billion parameters 2 bytes-la sumaar 140 GB, oru 80 GB GPU-vai vida adhigam, KV cache-ku munnaadiyae."
+    - q: "Oru server-kulla adhai eppadi split pannanum?"
+      a: "4 GPUs-la tensor parallelism (illa 8-bit precision-la 2), server-kulla irukkura fast links-a use panni, adhu KV cache-ku idam vittu vaikkum."
+    - q: "Innum neraya users-a eppadi serve pannuvaanga?"
+      a: "8 GPUs-la rendu copies-a odunga (4-4 vaaga rendu groups), traffic valara valara, load balancer-ku pinnaadi innum copies-oda servers serunga."
+    - q: "Rendu servers-ukkum idaiyila pipeline parallelism yen venaam?"
+      a: "Ovvoru request-um rendu servers-lum slow network-la oru oru thadavai pogum, delay serkkum, model oru server-kulla porundhumbodhu adhu thevai illa."
+ask:
+  - "Oru GPU-la porundhaadha model-a eppadi odalaam?"
+  - "Tensor-kum pipeline parallelism-kum enna difference?"
+  - "70B model-a serve panna enna GPUs thevai?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Oru GPU-ku oru fixed alavu memory-um speed-um irukku. Rendu vera vera problems ungala neraya use panna thallum:
+
+1. **Model oru GPU-ku romba periyadhu.** 16-bit precision-la oru 70B model-ku adhoda weights-kae sumaar 140 GB thevai, oru 80 GB GPU-vai vida adhigam.
+2. **Oru copy ungaloda ella users-aiyum serve panna mudiyaadhu.** Model porundhinaalum, traffic-ku neraya copies thevai padalaam.
+
+Rendu adippadai badhilgal irukku: model-a **copy** pannunga, illa **split** pannunga.
+
+- **Replica parallelism** (training-la **data parallelism**-nu solluvaanga): neraya GPUs-la muzhu copies-a odunga. Ovvoru copy-um vera vera requests-a serve pannum, illa vera vera batches-la train aagum.
+- **Model parallelism**: oru model-a GPUs-ukkulla split pannunga. Rendu mukkiya vazhigal **tensor parallelism** (ovvoru layer-kullayum velaiya split panradhu), **pipeline parallelism** (layers-a groups-aa pirikkuradhu).
+
+Real systems perumbaalum rendaiyum serkkum: 4 GPUs-la split aana oru model, adhu maadhiri neraya groups replicas-aa.
+
+```flow
+title: Oru model-a eppadi parappanum-nu select panradhu
+Model-um edhirpaakkura traffic-um -> KV cache-ku idam-oda oru GPU-la porundhumaa?
+KV cache-ku idam-oda oru GPU-la porundhumaa? -[aamaa]-> Replicas | oru GPU-ku oru copy
+KV cache-ku idam-oda oru GPU-la porundhumaa? -[illa]-> Oru server-kulla porundhumaa?
+Oru server-kulla porundhumaa? -[aamaa]-> Adhoda GPUs-la tensor parallelism
+Oru server-kulla porundhumaa? -[illa]-> Servers-kulla tensor, servers-ukku idaiyila pipeline
+Replicas -> Innum traffic-ku copies serunga | load balancer-ku pinnaadi
+Adhoda GPUs-la tensor parallelism -> Innum traffic-ku copies serunga | load balancer-ku pinnaadi
+Servers-kulla tensor, servers-ukku idaiyila pipeline -> Innum traffic-ku copies serunga | load balancer-ku pinnaadi
+```
+
+## Idhu eppadi work aagudhu
+
+**Replicas.** Romba simple, romba robust option: ovvoru GPU-vum (illa GPUs-oda group-um) muzhu model-a vechirukkum, thannoda sonda requests-a handle pannum. Neraya replicas-na neraya throughput, onnu fail aanaa matha onnu serve pannikittae irukkum. Vera vera size models-um, vera vera memory GPUs-um irukkumbodhu, edha engae vekkanum-nu mudivu panradhu oru packing puzzle aagum: oru 40 GB GPU-la moonu 13B models-aa, illa oru 34B model-aa?
+
+**Tensor parallelism.** Oru layer perumbaalum matrix multiplication. Matrices-a, sollunga, 4 GPUs-ukkulla split pannunga: ovvonnum thannoda slice-a orae neraththula compute pannum, apram results-a maathikkum. Idhu romba periya model-a porunda vaikkum, velai pagirndhu kolvadhaala latency-a kuraikkalaam. Catch communication: GPUs ovvoru layer-kullayum pesikkum, adhanaala adhukku romba vegamaana links thevai, oru server-kulla GPUs-ukku idaiyila irukkura high-speed connections maadhiri. Slow networks-la, tensor parallelism perumbaalum payan tharaadhu.
+
+**Pipeline parallelism.** Layers 1-la irundhu 20 varaikkum GPU 1-la, 21-la irundhu 40 varaikkum GPU 2-la, ippadiye vainga. Oru request ovvoru stage-layum oru oru thadavai pogum. Batches-a chinna "micro-batches"-aa pirichaa ella stages-um busy-aa irukkum, adhu training throughput-ku udhavum. Serving-ku, ovvoru request-um ovvoru stage-kaagavum, adhukku idaiyila irukkura network hops-kaagavum kaathirukkum, adhanaala latency mukkiyam-na pipeline parallelism-a thavirppaanga. Oru model oru server-kku romba periyadhaa irukkumbodhu servers-a serkka thaan perumbaalum use aagum.
+
+**Neenda inputs.** **Context parallelism** romba neenda input-a GPUs-ukkulla pirikkum, **sequence parallelism** adhoda mela nadakkura operations-a pirikkum. Avai mukkiyamaa romba neenda context windows-ku mukkiyam.
+
+**Training-ku innum thevai.** Weights-ukku mela, training gradients-aiyum optimiser states-aiyum vechukkum, perumbaalum weights-oda size-a vida pala madangu. **Sharding**-oda data parallelism (andha states-a GPUs-ukkulla parappuradhu, ZeRO illa FSDP maadhiri) serthu, tensor, pipeline parallelism-um, periya teams romba periya models-a train panna vaikkum. Fine-tuning-ku, LoRA-um quantisation-um perumbaalum idhu perumbaalaanavatrai thevai illaama aakkum.
+
+Serving engines vivarangala paathukkum. vLLM-oda, oru model-a 4 GPUs-ukkulla split panradhu oru setting:
+
+```python
+from vllm import LLM, SamplingParams
+
+# Split each layer across 4 GPUs in this server (tensor parallelism).
+llm = LLM(model="your-org/your-70b-model", tensor_parallel_size=4)
+out = llm.generate(["Summarise this claim note: ..."], SamplingParams(max_tokens=200))
+print(out[0].outputs[0].text)
+
+# More users? Run more copies (replicas) on other GPU groups or servers
+# behind a load balancer. Spanning servers adds pipeline_parallel_size.
+```
+
+| Approach | Edhai split pannum | Edhukku nalladhu | Mukkiya cost |
+| --- | --- | --- | --- |
+| Replicas (data parallelism) | Onnum illa; muzhu copies | Innum users, reliability | Ovvoru copy-kum model porunthanum |
+| Tensor parallelism | Ovvoru layer-kullayum velai | Romba periya models, kammi latency | GPUs-ukku idaiyila romba vegamaana links thevai |
+| Pipeline parallelism | Layers-oda groups | Servers-ukku idaiyila romba periya models; training | Ovvoru request-kum delay serkkum |
+| Context illa sequence parallelism | Input sequence | Romba neenda contexts | Complexity |
+| Sharded data parallelism (training) | Gradients-um optimiser states-um | Periya models-a train panradhu | Communication overhead |
+
+**Unga browser-la try pannunga.** Oru model-ku evvalavu GPUs thevai? Size, precision, GPU memory-a maathunga.
+
+```python
+import math
+
+def gpus_needed(params_billion, bytes_per_param, gpu_gb, kv_cache_gb, headroom=0.9):
+    need = params_billion * bytes_per_param + kv_cache_gb
+    return need, math.ceil(need / (gpu_gb * headroom))
+
+for params, bpp in [(8, 2), (70, 2), (70, 1)]:
+    need, n = gpus_needed(params, bpp, gpu_gb=80, kv_cache_gb=20)
+    print(f"{params}B at {bpp} bytes: {need:.0f} GB -> {n} GPU(s) of 80 GB")
+```
+
+## Oru worked example
+
+Hyderabad-la oru insurer, 2,000 staff-ku 70B open model-a thangalae host panna virumburaanga, p95 first-token time 2 seconds-kku kezhe. Ovvoru server-kum 80 GB-oda 8 GPUs, server-kulla fast links.
+
+1. **Oru GPU-la porundhumaa?** 70 billion × 2 bytes ≈ 16-bit-la 140 GB. Illa.
+2. **Oru server-kulla?** Aamaa. 4 GPUs-la tensor parallelism 320 GB tharum, neraya concurrent chats-oda KV cache-ku podhumaana idam vittu. 8-bit precision-la, quality avanga test set-la confirm aanaa, 2 GPUs-ae vechukkalaam.
+3. **Innum users.** Ovvoru server-um rendu copies-a (4 GPUs-oda rendu groups) vechirukkum. Oru copy-ae avanga busy-hour traffic-a latency budget-kulla nallaa handle pannudhu-nu load tests kaattudhu, adhanaala oru server-la rendu copies headroom tharum, oru GPU fail aanaalum thaanguvom.
+
+| Set-up | Use aana GPUs | Busy-hour p95 first token | Notes |
+| --- | --- | --- | --- |
+| Tensor 4, oru copy | 4 | 1.4 s | Oru GPU fail aanaa spare illa |
+| Tensor 4, rendu copies | 8 | 0.9 s | Select pannadhu: headroom, failover |
+| 8-bit-la Tensor 2, naalu copies | 8 | 0.8 s | Quantise pannina apram quality check thevai |
+| Rendu servers-ukku idaiyila pipeline | 16 | 2.6 s | Slow, selavu adhigam; thevai illa |
+
+Numbers udhaaranathukkaaga. Avanga 8-bit option-aiyum test panna plan pannuraanga, quality nikkudhunaa adhu orae hardware-la capacity-a irandu madangu aakkum.
+
+## Podhuvaa panra thappugal
+
+- **Oru GPU-la porundhura model-a split panradhu.** Replicas simple-aa, perumbaalum vegamaa irukkum.
+- **Slow networks-la tensor parallelism.** Fast links-oda oru server-kulla vechukkunga.
+- **Model porundhumaa-nu check panrappo KV cache-a marandhuduradhu.**
+- **Chat serving-ku pipeline parallelism.** Adhu ovvoru request-kum delay serkkum.
+- **Headroom illaama.** Oru copy-kku failover illa; oru GPU fault service-a down aakkum.
+- **Average traffic-la irundhu size panradhu.** Busy hour-kku size pannunga, real prompt lengths-oda load tests-oda.
+
+## Idhu ellaam thevai illaadha idangal
+
+- **Hosted APIs**: provider paathukkum.
+- **Oru GPU-la nalla idam irukkura porundhura chinna models**: thevai padumbodhu replicas-a serunga.
+- **LoRA-oda, quantisation-oda fine-tuning**, adhu perumbaalum oru GPU-lae porundhum.
+
+## Demo-la irundhu production-ku
+
+- **GPUs vaangaradhukku munnaadi ovvoru copy-kkum memory-a measure pannunga** (weights-um, unga context length-oda concurrency-la KV cache-um).
+- **Ovvoru layout-aiyum real prompt, reply lengths-oda load-test pannunga.**
+- **Makkal nambi irukkura edhu service-kum kuraindhadhu rendu copies-a vainga.**
+- **Ovvoru replica-vaaiyaa monitor pannunga**: utilisation, queue length, latency, errors.
+- **Model maatrathukku apram thirumba plan pannunga**, size-um context length-um layout-a maathum.
+
+## Practice pannunga
+
+1. Oru 7B, oru 34B, oru 70B model-ku 16-bit-layum 8-bit-layum, weights-ku ovvonnukkum evvalavu 24 GB, 48 GB, 80 GB GPUs thevai-nu kandupidinga.
+2. 500 users-ku failover-oda oru 70B model-a serve panna oru layout varainga, ovvoru pagudhi-yum edha parallelism use pannudhu-nu sollunga.
+3. Tensor parallelism yen GPUs-ukku idaiyila vegamaana links-a virumbudhu, pipeline parallelism yen virumbala-nu oru nanbarukku explain pannunga.
+
+Innum aazhama paaka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-oda chapter 9 replica, tensor, pipeline, context, sequence parallelism-a cover pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Oru kudukkapatta model-kum GPU-kum replicas-kum splitting-kum idaiyila decide panna mudiyum, tensor-kum pipeline parallelism-kum difference-a explain panna mudiyum, oru simple serving layout-a size panna mudiyum.

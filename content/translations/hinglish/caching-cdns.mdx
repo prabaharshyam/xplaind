@@ -1,0 +1,139 @@
+---
+id: caching-cdns
+lang: hinglish
+title: "Caching aur CDNs"
+outcome: "Tay karo ki kya cache karna hai aur kahan, samajhdaar expiry ke saath cache-aside use karo, cached data ko kaafi fresh rakho, aur static files aur media ko users ke paas wale CDN se serve karo."
+answer: "Cache data ki ek copy kisi tez jagah rakhta hai taaki repeat requests dheere kaam ko chhod dein. CDN files ko users ke paas ke servers par rakhta hai. Mushkil hissa purani copies ko expire karna hai."
+why_it_matters: "System ko tez banane aur zyada traffic sambhaalne ka caching sabse sasta tareeka hai, aur India bhar mein videos aur images jaldi isliye load hote hain kyunki CDNs hain. Invalidation galat ho toh users ko galat prices ya purane results dikhte hain, isliye ye interview ka favourite topic hai."
+flashcards:
+  - q: "Cache hit aur cache miss kya hain?"
+    a: "Hit tab hota hai jab data pehle se cache mein ho. Miss tab, jab nahi hota, isliye use dheeri source se laana padta hai."
+  - q: "Cache-aside pattern kaise kaam karta hai?"
+    a: "App pehle cache check karta hai; miss par database padhta hai, result ko expiry ke saath cache mein store karta hai, phir wapas deta hai."
+  - q: "TTL ka kya matlab hai?"
+    a: "Time to live: ek cached item expire hokar dobara fetch hone se pehle kitni der rehta hai."
+  - q: "CDN kya karta hai?"
+    a: "Kai shehron ke servers par files ki copies rakhta hai, taaki users aapke origin ki jagah paas ke server se download karein."
+  - q: "Cache invalidation kya hai?"
+    a: "Original badalne par cached data ko hatana ya refresh karna, taaki users ko purani values na dikhein."
+  - q: "Cache stampede kya hai?"
+    a: "Jab ek popular item expire hota hai aur kai requests ek saath miss hoti hain, sab ek saath database par toot padti hain."
+  - q: "Kya kam hi cache karna chahiye, ya sirf thodi der ke liye?"
+    a: "Wo data jo abhi bilkul exact hona chahiye, jaise account balances, checkout par seat availability, ya users ke beech share hone wala koi bhi private data."
+exercise:
+  title: "Cache karein ya nahi?"
+  setup: "Festive sale ke dauran ek shopping app ke har item ke liye tay karo."
+  questions:
+    - q: "Product images aur app ki JavaScript files."
+      a: "Lambi expiry ke saath CDN par cache karo; file badalne par file ka naam badlo."
+    - q: "Ek popular phone ka product page text aur price."
+      a: "30 se 60 seconds jaise chhote TTL ke saath cache karo, aur price update hone par use clear karo."
+    - q: "Checkout par dikhaye gaye, kitni units bachi hain."
+      a: "Checkout par source of truth se live padho; browse pages par zyada se zyada bahut chhota cache."
+    - q: "Ek user ka apna cart."
+      a: "Use user ke hisaab se key karke ek tez store mein rakho, par kabhi shared page cache mein nahi, taaki ek user ka cart kisi doosre ko kabhi na dikhe."
+ask:
+  - "Redis aur CDN mein kya farak hai?"
+  - "Cache stampede ko kaise rokein?"
+  - "Expire hone ka intezaar karne ki jagah cache kab clear karna chahiye?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Cache** data ki ek copy aisi jagah rakhta hai jo uske aam thikaane se zyada tez ya paas hai, taaki repeat requests ka jawab bina kaam dobara kiye jaldi mil jaaye. Memory se padhne mein microseconds lagte hain; ek database query mein milliseconds lag sakte hain; duniya ke doosre kone tak ki ek request mein sau milliseconds lagte hain.
+
+Caches kai layers par hote hain:
+
+- **browser** wo images aur scripts rakhta hai jo woh pehle download kar chuka hai;
+- ek **CDN** (content delivery network) kai shehron ke servers par files rakhta hai;
+- Redis jaisa ek **application cache** mehengi queries ya API calls ke results rakhta hai;
+- **database** hot pages ko apni memory mein rakhta hai.
+
+```flow
+User in Patna -[1. an image]-> CDN edge in Kolkata
+CDN edge in Kolkata -[hit]-> Served in about 20 ms
+CDN edge in Kolkata -[miss]-> Origin storage
+User in Patna -[2. product API]-> App server -> Redis cache
+Redis cache -[hit]-> About 1 ms
+Redis cache -[miss]-> Database | the result is stored in Redis with a TTL
+```
+
+## Ye kaam kaise karta hai
+
+**Cache-aside** application caches ke liye sabse common pattern hai. Har read par app pehle cache check karta hai. Hit par cached value deta hai. Miss par database padhta hai, result ko expiry ke saath cache mein store karta hai, aur wapas deta hai. Writes database ko jaate hain, aur phir app cached copy ko delete ya update karta hai.
+
+Har cached item ko ek **TTL** (time to live) chahiye. Chhote TTLs data ko zyada fresh rakhte hain par zyada misses karte hain; lambe TTLs tez hote hain par purana data dene ka risk rehta hai. Data ke type ke hisaab se chuno, ye dekhkar ki wo kitni baar badalta hai aur purana hone ki kitni cost hai.
+
+**Cache invalidation**, yaani source badalne ke baad cached data ko sahi rakhna, mushkil hissa hai. Options ye hain: items ko apne TTL par expire hone do; jab bhi data likha jaaye key delete karo; ya `price:v42` jaise keys ko version karo, taaki naya data nayi key use kare. CDN par files ke liye, aam trick file ke naam mein content hash daalna hai, jaise `app.3f9a1c.js`, taaki badli hui file ek naya URL ho aur purani copies ko kabhi clear karna na pade.
+
+Jab koi bahut popular key expire hoti hai, toh hazaaron requests ek saath miss hokar sab database par pad sakti hain: ek **cache stampede**. Fixes mein shaamil hain: sirf ek request ko key refresh karne dena jabki baaki intezaar karein ya purani value paayein, TTLs mein chhota random jitter jodna, aur hot keys ko expire hone se pehle refresh karna.
+
+Cloudflare, Akamai, Amazon CloudFront aur Google Cloud CDN jaise **CDNs** ke servers India aur duniya bhar mein hain. Ye images, video, scripts aur poore cacheable pages tak user ke paas se serve karte hain, jisse load time kam hota hai aur aapke origin servers ka bojh halka hota hai. Video platforms inpar poori tarah nirbhar hain.
+
+| Kya | Kahan cache karein | Typical TTL | Kis baat ka dhyaan rakhein |
+|---|---|---|---|
+| Images, video, JS aur CSS | CDN aur browser | dinon se ek saal tak, hashed names ke saath | purani files agar naam na badle |
+| Published results jaise public pages | CDN | minutes | updates par clear karna |
+| Mehengi query ke results | Redis | seconds se minutes | purani values, stampedes |
+| User sessions | Redis | ghante | security; users ke beech kabhi share mat karo |
+| Balances, checkout par live inventory | cache mat karo, ya bahut thodi der | zyada se zyada seconds | galat numbers paise ki cost karte hain |
+
+**Apne browser mein try karo.** Ek chhota cache simulate karo aur dekho ki uske size ke saath hit rate kaise badalta hai.
+
+```python
+from collections import OrderedDict
+import random
+
+def hit_rate(capacity, requests):
+    cache, hits = OrderedDict(), 0
+    for key in requests:
+        if key in cache:
+            hits += 1; cache.move_to_end(key)
+        else:
+            cache[key] = True
+            if len(cache) > capacity: cache.popitem(last=False)   # evict the least recently used
+    return hits / len(requests)
+
+random.seed(1)
+popular = [f"page-{int(random.paretovariate(1.2))}" for _ in range(5000)]   # a few pages get most traffic
+for size in (5, 20, 100):
+    print(f"cache of {size:>3}: {hit_rate(size, popular):.0%} hits")
+```
+
+## Ek worked example
+
+Rohan Delhi ki ek online test-prep company mein kaam karta hai. Jab JEE answer key release hoti hai, lakhon students minutes ke andar wahi pages kholte hain, aur site pehle ghisatne lagti thi.
+
+Usne pehle naapa. Answer-key PDF aur images zyadatar bytes the; "my score" API ne zyadatar database queries ki.
+
+**Static files CDN par.** Usne PDF, images aur front-end files ko ek CDN ke peeche object storage mein daala, content-hashed names aur ek saal ke browser cache ke saath. Guwahati aur Kochi ke students ab paas ke edge servers se download karne lage. Origin bandwidth 90% se zyada gir gayi.
+
+**Hot queries Redis par.** Saare questions ko sahi options ke saath dikhane wala page har student ke liye ek jaisa tha. Usne ise cache-aside se 5 minute ke TTL ke saath Redis mein cache kiya. Jab board ne ek vivadit answer sahi kiya, ek admin action ne key delete kar di, taaki fix 5 minute mein nahi, turant dikhe.
+
+**Stampede protection.** Theek 10 baje cached list expire ho gayi jabki 20,000 students refresh kar rahe the, aur database spike ho gaya. Rohan ne ek lock jodi taaki ek request key dobara banaye jabki baaki ek-do second tak pichhli value paayein, saath mein TTLs par random jitter.
+
+**Jo usne cache nahi kiya.** Har student ka calculate kiya hua score unke apne responses se compute hua aur per user store hua; use kabhi shared page cache mein nahi daala gaya, isliye koi student kisi doosre ka score kabhi nahi dekh sakta tha.
+
+Agle release ke din, peak par bhi page loads ek second se kam rahe, aur database kabhi apni aadhi capacity se upar nahi gaya.
+
+## Aam galtiyaan
+
+**TTL ke bina cache karna.** Phir badlaav ke baad data hamesha galat rehta hai. Hamesha expiry lagao, chaahe lambi ho.
+
+**Shared cache mein private data cache karna.** Ek logged-in user ke liye cache kiya hua page kisi doosre ko serve ho sakta hai. Personal data ko shared caches se bahar rakho, ya user ke hisaab se key karo.
+
+**Writes par invalidation bhoolna.** Database update karke cache nahi karne se expiry tak purani value dikhti hai. Jahan freshness matter karti hai wahan write par key delete karo.
+
+**Jo data exact hona chahiye use cache karna.** Checkout par seat counts, balances aur stock levels us pal source of truth se aane chahiye jab wo matter karte hain.
+
+**Stampedes ko ignore karna.** Load ke dauran ek hot key expire hona database ko gira sakta hai. Locks, early refresh ya jittered TTLs use karo.
+
+**Naape bina cache karna.** Jo dheera hai aur jo aksar padha jaata hai use cache karo. Kam use hone wale data ko cache karne se sirf complexity badhti hai.
+
+## Practice karo
+
+1. Watch & learn panel mein CDNs kaise kaam karte hain aur interviews mein caching kaise aata hai, uske video lessons dekho.
+2. Upar ka exercise karo.
+3. Project check karo: ek dheeri function ke aage cache-aside, hit aur miss logs aur timings ke saath.
+4. Kisi bade site par apne browser ke developer tools kholo aur cached responses aur CDN headers dhoondho.

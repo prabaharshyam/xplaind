@@ -1,0 +1,165 @@
+---
+id: scoring-open-ended-answers
+lang: hinglish
+title: "Open-ended answers ko score karna: exact checks, similarity aur side-by-side comparison"
+outcome: "AI answer ko score karne ka sahi tareeka chuno: use chalao, match karo, reference se words ya meaning ke hisaab se compare karo, ya do answers ko side by side compare karo, aur har method ke blind spots jaano."
+answer: "Jo exact check ho sakta hai pehle use score karo. Jahan kai sahi answers hain wahan embeddings se meaning compare karo ya judge use karo, aur do systems mein se chunne ke liye answers ko side by side compare karo."
+why_it_matters: "Jo score quality ko track nahi karta woh team ko hafton tak galat disha mein bhej deta hai. Kaunsa measure kis task par fit hota hai, aur har ek kaise bhatka sakta hai, yeh jaanna hi us eval mein farak hai jis par bharosa ho sake aur dashboard par ek number mein."
+flashcards:
+  - q: "Functional correctness kya hai?"
+    a: "Check karna ki output apna kaam karta hai ya nahi: code tests pass karta hai, SQL sahi rows deta hai, JSON schema se match karta hai. Jab mil sake, yeh sabse bharosemand score hai."
+  - q: "Exact match kab kaam karta hai?"
+    a: "Chhote, closed answers ke liye, jaise number, date, label ya multiple-choice letter, lowercase jaise chhote clean-ups ke baad."
+  - q: "BLEU aur ROUGE kya measure karte hain?"
+    a: "Ek answer reference answer ke saath kitne words aur word sequences share karta hai. Woh matching words ko reward karte hain, matching meaning ko nahi."
+  - q: "Lexical similarity bhatka kyun sakti hai?"
+    a: "Alag words mein diya sahi answer kam score paata hai, aur reference ke words copy karne waala galat answer zyada score paata hai. References bhi galat ya adhoore ho sakte hain."
+  - q: "Semantic similarity kaise naapi jaati hai?"
+    a: "Dono texts ko embeddings mein badalkar compare karte hain, aam taur par cosine similarity se. Yeh paraphrases pakadti hai par embedding model par depend karti hai."
+  - q: "Pairwise comparison kya hai?"
+    a: "Do answers ko side by side dikhakar poochna ki kaunsa behtar hai. Logon ko 10 mein se score dene se yeh aasaan lagta hai, aur bahut saare votes ko ranking mein badla ja sakta hai."
+  - q: "Preference votes se decide kab nahi karna chahiye?"
+    a: "Jab sawaal ka sahi answer ho jo voter ko shayad na pata ho, jaise maths, law ya health facts. Popular ka matlab correct nahi hota."
+  - q: "Scoring method chunne ka sabse safe order kya hai?"
+    a: "Pehle functional checks, phir exact match, phir open text ke liye judge ya similarity, aur do systems mein se chunne ke liye pairwise comparison."
+exercise:
+  title: "Hindi customer-reply assistant ko score karna"
+  setup: "Delhi ke ek electronics retailer ke paas ek assistant hai jo customer emails ke Hindi aur English mein replies draft karta hai. Har reply mein order number, refund ho toh uska amount, aur ek polite closing honi chahiye. Team ke paas unke best agents ke likhe replies ke saath 300 purane emails hain, aur woh do prompt versions compare karna chahte hain."
+  questions:
+    - q: "Kaunse parts exact check ho sakte hain?"
+      a: "Draft mein order number aur refund amount email aur order system se match karte hain ya nahi. Ye woh facts hain jinki ek hi sahi value hoti hai."
+    - q: "Yahan agents ke replies ke against ROUGE kamzor measure kyun hai?"
+      a: "Ek achha reply agent ke words se bilkul alag words use kar sakta hai, khaaskar Hindi aur English ke beech, phir bhi sahi ho sakta hai. ROUGE use saza dega."
+    - q: "Unhe do prompt versions mein se kaise chunna chahiye?"
+      a: "Reviewers ya ek checked judge model ko same emails ke dono drafts random order mein side by side dikhao, wins gino, aur saath mein exact fact checks bhi rakho."
+    - q: "Yahan preference vote kab risky hoga?"
+      a: "Agar voters order data nahi dekh sakte, toh woh galat refund amount batane waale fluent reply ko pasand kar sakte hain. Facts ko check karna hai, vote nahi."
+ask:
+  - "Open-ended LLM answers ko kaise evaluate karun?"
+  - "Kya LLMs ke liye BLEU aur ROUGE abhi bhi useful hain?"
+  - "Pairwise evaluation kya hai aur kab use karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Calculator ko test karna aasaan hai: 2 + 2 ka jawab 4 hi hona chahiye. Emails, summaries ya explanations likhne waale AI ko test karna mushkil hai, kyunki kai achhe answers ho sakte hain. Ye lesson aise answers par number lagane ke mukhya tareeke aur har ek kab fit hota hai, yeh batata hai.
+
+Chaar families hain, sabse exact se sabse kam exact tak:
+
+1. **Functional correctness.** Kya output kaam karta hai? Generate kiya code apne tests pass karta hai, generate ki hui SQL query sahi rows deti hai, extract kiya invoice total ledger se match karta hai.
+2. **Exact match.** Kya answer reference jaisa hi hai? Numbers, dates, labels aur multiple-choice letters ke liye achha hai.
+3. **Reference se similarity.** Answer kisi jaane-maane achhe answer ke kitna kareeb hai, **words** mein (BLEU aur ROUGE jaisi lexical similarity) ya **meaning** mein (embeddings use karne waali semantic similarity)?
+4. **Judgement.** Koi insaan ya judge model answer ko rate karta hai, akele (5 mein se score) ya doosre answer ke saamne (**pairwise comparison**). LLM judges waala lesson judge prompts ko gehraai se cover karta hai.
+
+```flow
+title: Answer ko kaise score karna hai, yeh chunna
+Score karne ka answer -> Kya ise chala ya test kar sakte ho? | code, SQL, schema
+Kya ise chala ya test kar sakte ho? -[haan]-> Functional check | sabse bharosemand
+Kya ise chala ya test kar sakte ho? -[nahi]-> Ek sahi chhota answer hai? | number, label, date
+Ek sahi chhota answer hai? -[haan]-> Exact match
+Ek sahi chhota answer hai? -[nahi]-> Achhe reference answers hain?
+Achhe reference answers hain? -[haan]-> Meaning similarity ya reference ke saath judge
+Achhe reference answers hain? -[nahi]-> Rubric ke saath judge
+Meaning similarity ya reference ke saath judge -> Do systems mein se chunna hai? -[haan]-> Side-by-side comparison
+```
+
+## Ye kaam kaise karta hai
+
+**Functional correctness.** Agar aap use chala ya test kar sakte ho, toh pehle wahi karo. Code assistant ko unit tests chalakar score karte hain. Text-to-SQL feature generate ki hui aur reference dono queries ko test database par chalata hai aur results compare karta hai. Extraction feature fields ko system of record se check karta hai. Kuch aur itna bharosemand nahi hai. OpenAI ne paya ki ek coding benchmark par word-overlap scores sahi aur galat solutions ke liye lagbhag ek jaise the, isliye sirf code chalane se dono alag hue.
+
+**Exact match**, dhyan se. Pehle normalise karo: lowercase, spaces trim, number formats standard karo. Aise answers se savdhaan raho jinme sahi value galat answer ke andar hoti hai: "Born on 12 September 1929" mein "1929" hai, par agar asli date 12 June hai toh yeh galat hai. Labels ke liye poora sentence nahi, label field compare karo.
+
+**Lexical similarity.** Dono texts ko words ya word pairs mein todo aur overlap gino. BLEU (machine translation se) aur ROUGE (summarisation se) sabse jaane-maane versions hain. Ek judi hui idea, **edit distance**, ginti hai ki ek string ko doosri banane mein kitne letter changes lagte hain, jo names aur codes ke liye kaam aati hai.
+
+Aaj ke models ke liye inki kamzoriyaan gambhir hain:
+
+- Alag words mein diya sahi answer kam score paata hai. "How is it going?" aur "How are you?" mein bahut kam common hai.
+- Reference ke words copy karne waala galat answer zyada score paata hai. "Let's eat, grandma" aur "Let's eat grandma" words ke hisaab se lagbhag ek jaise hain.
+- References mein achhe answers chhoot sakte hain, ya woh seedhe galat ho sakte hain.
+
+Phir bhi woh sasti smoke alarm ki tarah madad karte hain, jaise yeh notice karne ke liye ki ek template change ne har reply tod diya.
+
+**Semantic similarity.** Answer aur reference ko embeddings mein badlo aur cosine similarity se compare karo, -1 se 1 tak. Paraphrases ka score zyada aata hai. Bade scale par sasta hai, par score embedding model par depend karta hai, "refund approved" aur "refund rejected" ko kareeb maan sakta hai, aur sahi threshold logon ke judgements se check karke hi set karna padta hai.
+
+```python
+import numpy as np
+
+def cosine(a, b):
+    a, b = np.asarray(a), np.asarray(b)
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+def score(answer, reference, embed, must_include=()):
+    """embed(text) returns a vector. must_include holds facts that need an exact check."""
+    facts_ok = all(f.lower() in answer.lower() for f in must_include)
+    return {"facts_ok": facts_ok, "meaning": round(cosine(embed(answer), embed(reference)), 3)}
+
+# score(draft, agent_reply, embed, must_include=["ORD-48213", "₹2,499"])
+```
+
+Pattern dekho: jin facts ka sahi hona zaroori hai unke liye exact checks, wording ke liye similarity.
+
+**Pairwise comparison.** Do gaano mein se kaunsa pasand hai yeh batana, har ek ko 10 mein se score dene se aasaan hai. Answers ke liye bhi yahi sach hai. Wahi sawaal do answers ke saath, random order mein aur bina labels ke dikhao, aur poochho ki kaunsa behtar hai, tie ki ijaazat dete hue. Wins gino. Bahut saare models hon toh Elo ya Bradley–Terry jaise ranking methods wins ko league table mein badalte hain; public arenas yahi karke lakhon votes se chatbots ko rank karte hain.
+
+Do limits maayne rakhti hain:
+
+- **Preference correctness nahi hai.** Agar voter ko sahi answer nahi pata, jaise maths result ya medical fact, toh woh confident galat answer ko pasand kar sakta hai. Style aur helpfulness par vote karao; facts alag se check karo.
+- **Isme bahut saari comparisons lagti hain**, aur models jodne par pairs ki ginti tezi se badhti hai. Do prompts ya do models ke beech product decision ke liye, apne khud ke sawaalon par 100 se 300 side-by-side comparisons aam taur par kaafi hoti hain.
+
+| Method | Kis liye best | Cost | Mukhya risk |
+| --- | --- | --- | --- |
+| Functional check | Code, SQL, extraction, formats | Ek baar bana toh kam | Cases chhodne waale tests |
+| Exact match | Numbers, labels, chhote facts | Bahut kam | Galat answer ke andar sahi value |
+| Lexical (BLEU, ROUGE) | Smoke tests, translation drift | Bahut kam | Words copy karne ko reward, meaning ko nahi |
+| Semantic similarity | Reference waale paraphrased answers | Kam | Ulte facts ke liye kareeb meaning ka score |
+| Rubric ke saath judge | Bina reference ka open text | Medium | Judge bias; logon se check karo |
+| Pairwise comparison | Do systems mein se chunna | Medium se zyada | Preference ko correctness samajhna |
+
+## Ek example se samjho
+
+Delhi ke ek electronics retailer ke paas ek assistant hai jo customer emails ke Hindi aur English mein replies draft karta hai. Har reply mein sahi order number aur refund amount quote karna hai aur politely close karna hai. Team prompt A (maujooda) ko prompt B (naya) se compare karna chahti hai, 300 purane emails aur apne best agents ke replies ke saath.
+
+Pehle woh agents ke replies ke against ROUGE try karte hain. Prompt A ka score 0.41 aur prompt B ka 0.33 aata hai, jisse lagta hai ki B kharab hai. Drafts padhne par kahani alag nikalti hai: B chhota, saaf Hindi likhta hai jo agents ke lambe replies ke saath kam words share karta hai.
+
+Isliye woh teen layers mein score karte hain:
+
+| Layer | Prompt A | Prompt B |
+| --- | --- | --- |
+| Order number aur refund amount sahi (order system ke against exact check) | 94% | 97% |
+| Agent ke reply ke kareeb meaning (cosine 0.80 se upar) | 88% | 90% |
+| Do senior agents ke judge kiye side-by-side wins, 150 emails, ties allowed | 38% | 51% (11% ties) |
+| Agent ke reply ke against ROUGE-L | 0.41 | 0.33 |
+
+Numbers sirf samjhane ke liye hain. B facts aur preference dono mein jeetta hai, aur sirf word overlap mein haarta hai, jise woh dashboard se hata dete hain. Woh har release par exact checks chalate rehte hain.
+
+## Aam galtiyaan
+
+- **BLEU ya ROUGE ko mukhya quality score banana** chat, summaries ya explanations ke liye.
+- **Similarity score se facts check karwana.** "Approved" aur "rejected" kareeb lag sakte hain. Zaroori facts exact check karo.
+- **Sahi answer waale sawaalon par vote karwana.** Preference yeh dhoondhti hai ki logon ko kya pasand hai, yeh nahi ki sach kya hai.
+- **Answers ko fixed order mein dikhana.** Log aur judges pehla ya lamba answer pasand karte hain. Order randomise karo aur similar lengths compare karo.
+- **Aisi threshold par bharosa karna jise kisi ne check nahi kiya.** Similarity thresholds ek sample par human judgements se compare karke chuno.
+- **Sab kuch ke liye ek hi number.** Zyadatar products ko kuch scores chahiye: facts, format, meaning, preference.
+
+## Jab simple rakhna theek hai
+
+- **Closed tasks:** classification, extraction aur routing exact checks aur precision aur recall se score hote hain. Similarity ya judges ki zaroorat nahi.
+- **Shuruaati prototypes:** koi metric banane se pehle 30 answers khud padho.
+- **Kam aane waale high-stakes answers:** legal ya medical outputs ko scores kuch bhi kahein, expert review chahiye.
+
+## Demo se production tak
+
+- **Scores ko layer karo:** har response par exact checks, ek sample par judge ya similarity, releases ke liye side-by-side comparison.
+- **References ka version test set ke saath rakho**, aur galat mile toh theek karo.
+- **Metrics ko har kuch mahine logon ke against dobara check karo**, kyunki jo metric human judgement se door chala jaye woh bina metric se bhi bura hai.
+- **Scores segment ke hisaab se report karo:** language, topic, length. Overall gain Hindi replies mein girav ko chhupa sakta hai.
+
+## Practice karo
+
+1. Kisi bhi AI feature se reference answers ke saath das answers lo. Unhe exact match se, word overlap se aur apne judgement se score karo. In teeno mein kahan asehmati hai?
+2. Likho ki har answer mein kaunse exact facts hone chahiye, aur unke liye ek check banao.
+3. Do prompts ko das sawaalon par random order mein side by side compare karo. Kya aapki preferences word-overlap scores se match hui?
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 3 exact evaluation, similarity measures aur comparative evaluation cover karta hai.
+
+**Aapka kaam poora jab:** aap kisi task ke liye scoring method chun sako, samjha sako ki open answers par BLEU aur ROUGE kyun bhatkate hain, aur bata sako ki preference vote par kab bharosa nahi kar sakte.

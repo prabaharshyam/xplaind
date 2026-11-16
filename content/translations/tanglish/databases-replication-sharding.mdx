@@ -1,0 +1,136 @@
+---
+id: databases-replication-sharding
+lang: tanglish
+title: "Databases: indexes, replication, sharding"
+outcome: "Oru workload-ku SQL-a NoSQL-a-nu choose pannalaam, indexes-oda queries-a vegamaakkalaam, replicas-oda reads-a scale pannalaam, sensible shard key-oda data-va shards-a pirikkalaam."
+answer: "Indexes lookups-a vegamaakkum. Replication oru database-a copy pannum, appo reads servers-ku naduvula pirinjirukkum. Oru server podhaadhu-na, sharding data-va oru key-a vachu databases-a pirikkum."
+why_it_matters: "Database thaan perumbaalum oru system-la scale panna romba kashtamaana paguthi, apram maathuradhukku romba vedhanai tharum. Indexes, replicas, sharding theriyum-na valarchikku plan pannalaam, ovvoru design interview-layum database kelvigalukku badhil sollalaam."
+flashcards:
+  - q: "Database index enna seiyum?"
+    a: "Oru column-oda values-oda sorted structure-a vachirukkum, adhu rows-a point pannum, appo andha column-a vachu lookup panna muzhu table-a scan pannaa thevai illa."
+  - q: "Index-oda cost enna?"
+    a: "Extra storage, mella aagura writes, yenna ovvoru insert, update-um index-aiyum update pannanum."
+  - q: "Read replica-na enna?"
+    a: "Primary-la irundhu maatrangala vaangi, read queries-a serve panra database-oda copy, read load-a pirikkum."
+  - q: "Replication lag-na enna?"
+    a: "Primary-la oru maatram replicas-la therivadharkku munnadi irukkura thaamadham. Lag-la irukkura replica-la padicha, user-oda sonthamaana update-a avanga paakka maattaanga."
+  - q: "Sharding-na enna?"
+    a: "Oru table-a shard key-a vachu pala databases-a pirikkradhu, ovvonnum data-voda oru paguthiyum load-oda oru paguthiyum vachirukkum."
+  - q: "Nalla shard key-na enna?"
+    a: "Data-vaiyum traffic-aiyum samamaa pirikkum, oru request-ku thevaiyaana data-va oru shard-la vachirukkum."
+  - q: "Relational (SQL) database eppo oru strong default?"
+    a: "Data-la clear relationships irundhu, transactions-um flexible queries-um thevai-na, orders, payments, users maadhiri."
+exercise:
+  title: "Database-a plan pannunga"
+  setup: "Oru UPI payments app ovvoru transaction-kum oru row store pannum: transaction ID, sender ID, receiver ID, amount, time. Oru naalaikku 2 crore transactions handle pannum; users perumbaalum thangaloda recent history-a thaan paappaanga."
+  questions:
+    - q: "Users eppovum 'my last 20 transactions'-a load pannuvaanga. Entha index help pannum?"
+      a: "(sender_id, time)-la oru composite index, receiver-kum adhe maadhiri, appo database oru user-oda rows-ku time order-la already irukkura nilaiyilaye jump pannum."
+    - q: "Reads, writes-a vida patthu madangu. Sharding-ku munnadi mudhal step enna?"
+      a: "History screens-ku read replicas-a serunga, writes-um balance checks-um primary-la irukkattum."
+    - q: "Oru user pay panni udanae history-a thirandhaa, payment illa. Yen, fix enna?"
+      a: "Replication lag: history innum update aagaadha replica-la irundhu padichchudhu. User ezhudhina appuram konjam neram, avanga sonthamaana recent writes-a primary-la irundhu padinga."
+    - q: "Sharding thevai-na, transaction date oru nalla shard key-aa?"
+      a: "Illa: indhaikku ella writes-um oru shard-la poi vizhum. User ID load-a pirichi, oru user-oda history-a serndhu vaikkum."
+ask:
+  - "SQL-a NoSQL-a-nu eppadi choose pannradhu?"
+  - "Partitioning-kum sharding-kum enna difference?"
+  - "Composite indexes eppadi work aagum?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Perumbaalaana systems adhoda mukkiyamaana data-va oru **database**-la vachirukkum. Oru product valarum podhu, database thaan perumbaalum mudhalla strain aagum paguthi, yenna ovvoru app server-um adhoda pesum, adhoda data sariyaa irukkanum. Naalu ideas romba thooram kondu pogum.
+
+- **Model-a choose pannradhu.** PostgreSQL, MySQL maadhiri relational (SQL) databases data-va relationships-oda tables-la store pannum, transactions-a support pannum. DynamoDB, MongoDB, Cassandra maadhiri NoSQL databases adhula sila vishayangalai vittuttu, easy-aana horizontal scale-ku illa flexible documents-ku mudhalitam kudukkum.
+- **Indexes** theerndhedutha columns-oda sorted structure-a vachirundhu lookups-a vegamaakkum.
+- **Replication** data-voda copies-a pala servers-la vachirukkum, reads-a pirikkavum failures-la irundhu thappikkavum.
+- **Sharding** oru database podhaadhaa-na, data-vaiye pala databases-a pirikkum.
+
+```flow
+App servers -[writes]-> Primary
+Primary -[replication, may lag]-> Replica 1
+Primary -[replication, may lag]-> Replica 2
+App servers -[reads]-> Replica 1
+```
+
+```flow
+dir: LR
+title: Oru primary podhaadhaa-na: key-a vachu shard pannunga
+user_id % 4 -[0]-> Shard A
+user_id % 4 -[1]-> Shard B
+user_id % 4 -[2]-> Shard C
+user_id % 4 -[3]-> Shard D
+```
+
+## Idhu eppadi work aagudhu
+
+**Access pattern-a vachu model-a choose pannunga.** Perumbaalaana products-ku relational database oru strong default: orders, users, payments-ku clear relationships irukku, transactions vendum, flexible queries-um payanpadum. Simple key lookups-oda perusaana write scale, flexible document shapes, illa time-series data vendumna NoSQL set aagum. Neraya systems rendaiyum use pannum: core data-ku PostgreSQL, hot, simple data-ku Redis illa oru key-value store.
+
+**Indexes** oru puthagathoda pinnaadi irukkura index maadhiri work aagum. Adhu illaadhaa, oru customer-oda orders-a kandupidikka ovvoru row-aiyum scan pannanum: O(n). `customer_id`-la oru B-tree index irundhaa, database sariyaana rows-ku sumaar O(log n)-la nera jump aagum. `(customer_id, created_at)`-la oru **composite index** avatha time order-layum already sort panni tharum. Indexes storage-a eduthukkum, writes-a mella aakkum, adhanaala unmaiyaana query patterns-ku mattum serunga, `EXPLAIN`-la queries avatha use pannudhaanu check pannunga.
+
+**Replication** ovvoru maatrathaiyum oru **primary**-la irundhu oru illa adhigamaana **replicas**-ku copy pannum. Writes primary-ku pogum; reads replicas-ku pogalaam. Idhu read load-a pirikkum, primary fail aanaa oru replica takeover pannalaam. Perumbaalaana replication asynchronous, adhanaala replicas milliseconds illa seconds lag aagalaam. Adhunaala thaan oru classic bug varum: user edhaavadhu save pannuvaanga, adutha screen-la adha paakka maattaanga; fix, user-oda sonthamaana fresh writes-a primary-la irundhu padikkradhu.
+
+**Sharding** oru perusaana table-a **shard key**-a vachu pala thaniyaana databases-a pirikkum. Adhe key value irukkura ovvoru row-um adhe shard-la irukkum. Nalla key data-vaiyum traffic-aiyum samamaa pirikkum, oru request-ku thevaiyaanadha oru shard-la vachirukkum. Sharding unmaiyaana complexity-a serkkum: shards-a thaandi queries mella, shards-a thaandi transactions kashtam, shards-a serkkum podhu data-va nagarthuradhu kavanam thevai. Indexes, caching, replicas podhaadha varaikkum adha thalli podunga.
+
+| Technique | Edha sari pannum | Cost |
+|---|---|---|
+| Index | mella lookups, sorts | storage, mella writes |
+| Read replicas | romba reads; failover | replication lag, adhigam servers |
+| Vertical scaling | ellaam, konjam neram | vilai, ceiling |
+| Sharding | oru server-ku romba data illa romba writes | complex queries, rebalancing, cross-shard transactions |
+| Caching (adutha lesson) | hot data-va thirumba thirumba padikkradhu | stale data, invalidation |
+
+**Browser-la try pannunga.** Consistent hashing, oru shard-a serkkum podhu konjam keys-a mattum nagarthum. Run panni compare pannunga.
+
+```python
+import hashlib, bisect
+
+def ring(shards, points=50):
+    r = sorted((int(hashlib.md5(f"{s}-{i}".encode()).hexdigest(), 16), s) for s in shards for i in range(points))
+    return [h for h, _ in r], [s for _, s in r]
+
+def lookup(key, hashes, owners):
+    h = int(hashlib.md5(key.encode()).hexdigest(), 16)
+    return owners[bisect.bisect(hashes, h) % len(hashes)]
+
+keys = [f"user-{i}" for i in range(10_000)]
+before = {k: lookup(k, *ring(["A", "B", "C"])) for k in keys}
+after = {k: lookup(k, *ring(["A", "B", "C", "D"])) for k in keys}
+moved = sum(before[k] != after[k] for k in keys)
+print(f"{moved / len(keys):.0%} of keys moved when adding shard D")
+```
+
+## Oru worked example
+
+Fatima-oda team India muzhukka concerts, events-ku oru ticketing platform nadathuraanga. `bookings` table 30 crore rows-a valarndhuduchu, pages mella aagudhu.
+
+**Step 1: indexes.** "My bookings" screen `SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC LIMIT 20` run pannichu. `EXPLAIN` oru full table scan-a kaattichu. `(user_id, created_at)`-la oru composite index adha 4 seconds-la irundhu 3 milliseconds-ku kuraichuchu.
+
+**Step 2: read replicas.** Events-a browse panradhum bookings-a paakradhum traffic-oda 90%. Rendu replicas-a serthu, indha reads-a angae route pannaanga, seat holds-um payments-um primary-laye irundhudhu. Primary CPU 85%-la irundhu 30%-ku vizhundhudhu. Sattunu support tickets vandhudhu: "I booked but my ticket is not showing." Busy sales-la replica lag rendu seconds varaikkum irundhudhu. Oru user book pannina appuram 30 seconds-ku, avangaloda sonthamaana bookings-a primary-la irundhu padikkura maadhiri app-a maathinaanga.
+
+**Step 3: sharding, apuram.** Oru varusham kazhichu, oru superstar-oda tour sale writes-a oru primary thaanguradhukku mela thalli vittuchu. Bookings-a `user_id`-a vachu shard pannaanga, adhu writes-a samamaa pirichi, ovvoru user-oda history-yum oru shard-la vachirundhudhu. `event_id`-a vachu shard panna yosichaanga, aana oru hit tour adhoda ella bookings-aiyum oru overloaded shard-la podum, adhu oru **hot shard**. Ovvoru event-oda seat inventory, adhuvae thanaa oru sirya table-la, oru thaniyaana database-la irundhudhu, yenna seat holds-ku oru event-kulla strong consistency thevai.
+
+Order mukkiyam: ovvoru step-um adutha step-a vida cheap, measurements thevai-nu kaattina appuram thaan adutha step-a eduthaanga.
+
+## Podhuvaa panra thappugal
+
+**Ellaathukkum index poduradhu.** Ovvoru index-um ovvoru write-aiyum mella aakkum. Ungaloda unmaiyaana queries filter pannura, sort pannura columns-a index pannunga.
+
+**Replication lag-a ignore panradhu.** Oru write-ku udanae replicas-la irundhu padicha stale data therium. Primary-la irundhu "read your own writes" plan pannunga.
+
+**Romba munnadi sharding panradhu.** Idhu apram varra ovvoru maatratha-yum kashtamaakkum. Mudhalla indexes, query fixes, caching, replicas-a mudikkunga.
+
+**Hot spots uruvaakkura shard key.** Dates, oru popular customer illa event oru shard-la load-a kuviyum. Samamaa use aagura neraya values irukkura keys-a select pannunga.
+
+**Hot paths-la cross-shard joins thevai-nu irukkradhu.** Common requests ella shards-aiyum padikkanum-na, ungaloda access pattern-ku key thappu.
+
+**Scalable-nu kekkuthu-nu NoSQL-a choose panradhu.** Transactions-um flexible queries-um thevai-na, nallaa index panna relational database perumbaalum varushakkanakkula ungalukku serve pannum.
+
+## Practice pannunga
+
+1. Watch & learn panel-la sharding, replication pathi irukkura video lessons-a paarunga.
+2. Mela irukkura exercise-a pannunga.
+3. Project check-a pannunga: index-oda, index illaama oru query-yoda neram-a ottunga, query plan-a padinga.
+4. Neenga therinja oru app-ku, sharding thevaippadara table-a peru solli, neenga select panna key-a sollunga.

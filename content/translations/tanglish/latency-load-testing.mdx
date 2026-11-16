@@ -1,0 +1,226 @@
+---
+id: latency-load-testing
+lang: tanglish
+title: "Latency budgets-um load testing-um"
+outcome: "Ovvoru step-kum oru latency target vainga, averages-a vida percentiles-a measure pannunga, users-kku munnaadi oru AI service engae odayum-nu kandupidikka adha load-test pannunga."
+answer: "Ovvoru step-kum oru latency target vainga, average-a vida 95th, 99th percentiles-a measure pannunga, service engae odayudhu-nu kandupidikka realistic traffic-oda load-test pannunga."
+why_it_matters: "\"Demo-la vegamaa irundhudhu\" oru AI pilot-oda kadaisi vaarthaigalla romba common. Real traffic peaks-la varum, providers slow aagum, queues valarum. Oru latency budget-um oru load test-um launch-day panic-a, oru plan-oda theriyura limit-aa maathum."
+flashcards:
+  - q: "Latency budget-na enna?"
+    a: "Ettukkalaam-aana romba neenda response time, auth, retrieval, reranking, model time to first token maadhiri steps-ukkulla pirichu."
+  - q: "Averages-a vida percentiles-a yen use pannanum?"
+    a: "Average oru slow tail-a maraikkalaam; p95, p99 romba slow-aana users enna feel panraanga-nu kaattum."
+  - q: "Generation time-a edhu adhigam decide pannum?"
+    a: "Output length. Chinna answers vegam."
+  - q: "Time to first token-a edhu set pannum?"
+    a: "Mukkiyamaa prompt length-um provider latency-yum, adhanaala context-a trim pannaa udhavum."
+  - q: "Provider rate limits throughput-a yen cap pannum?"
+    a: "Neenga evvalavu servers odinaalum, tokens-per-minute limits requests-a niruthum; adha seekkiram yerthikkunga."
+  - q: "Oru load test-a edhu realistic aakkum?"
+    a: "Question types-oda real mix, messages-ukku idaiyila think time, typical lengths, expected peak-a thaandi oru ramp."
+  - q: "Perumbaalum fake model-oda yen test pannanum?"
+    a: "Real-model load tests panam selavu pannum, rate limits-a theerthidum; realistic delays-oda oru fake server perumbaalaana bottlenecks-a kandupidikkum."
+  - q: "Oru load test edhai watch pannanum?"
+    a: "p50, p95, p99 latency, error rate, CPU, memory, database connections, provider 429 responses."
+  - q: "Load tests-la oru fake model server yen use pannanum?"
+    a: "Panam selavu pannaama, rate limits-a thotaama, realistic delays-oda reply pannum, adhanaala real model-la oru chinna run-kku munnaadi, ungaloda sonda system-oda limits-a pala thadavai test pannalaam."
+  - q: "Fixed-load test-la theriyaadhu, aana oru ramp test-la edhu theriyum?"
+    a: "Users adhigamaagura madhiri latency yera aarambikkura illa errors varra point, adhu thaan ungaloda nijamaana capacity."
+exercise:
+  title: "Bottleneck-a kandupidinga"
+  setup: "Lucknow-la oru exam board-oda results assistant, results naalil 2,000 concurrent students-a handle pannanum. Oru fake model-oda mudhal load test, 300 users-ku apram p95 latency romba yerudhu-nu kaattudhu, CPU 30%-la, neraya requests database connections-kaaga kaathirukkudhu. Real model-oda oru chinna test 900 users-la irundhu 429 errors-a kaattudhu. Answers average 450 tokens."
+  questions:
+    - q: "Mudhal bottleneck edhu?"
+      a: "Database connection pool: CPU perumbaalum free-aa irukkumbodhu requests connections-kaaga queue-la nirkkudhu."
+    - q: "Adhai edhu sari pannum?"
+      a: "Database-oda limits-ukkulla pool size-a yerthunga, results lookups-ku indexes serunga, apram thirumba test pannunga."
+    - q: "429s-a eppadi handle pannuveenga?"
+      a: "Results naalukku romba munnaadiyae adhigam tokens-per-minute limit kelunga, gateway vazhiyaa oru fallback model serunga."
+    - q: "Speed-kum limit-kum innum edhu udhavum?"
+      a: "150 mudhal 200 tokens vaaraikkum cap panna chinna answers, adhu generation neraththaiyum tokens per minute-aiyum kuraikkum."
+ask:
+  - "Oru LLM application-a eppadi load test pannalaam?"
+  - "p95 latency-na enna?"
+  - "Slow-aana AI app-la bottleneck-a eppadi kandupidikkalaam?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Oru **latency budget**-na, steps vaariyaa pirichu, ettukkalaam-aana romba neenda response time. Oru chat assistant-ku: mudhal token 95th percentile-la 1.5 seconds-kulla, muzhu answer 8 seconds-kulla. Apram budget steps-ukkulla pirikkum: auth 50 ms, query rewrite 300 ms, retrieval-um reranking-um 400 ms, model time to first token 700 ms.
+
+**Load testing**-na, realistic traffic-a system-ku anuppi, step step-aa yerthi, response times, errors, resource use-a record pannuradhu, adhanaala edhu load-la odayum, mudhalla edhu odayum-nu theriyum.
+
+```flow
+dir: LR
+title: Latency budget: p95 mudhal token 2 s-la
+Auth, 50 ms -> Rewrite, 300 ms -> Retrieve + rerank, 400 ms -> Model first token, 700 ms -> Slack, 550 ms
+```
+
+| Concurrent users | 50 | 100 | 200 | 300 | 500 | 550 |
+|---|---|---|---|---|---|---|
+| Munnaadi: 10 connections-oda oru pool | 1 s | 2 s | 6 s | | | |
+| Aprom: 40-oda oru pool + oru index | 1 s | 1 s | 1 s | 1 s | 1 s | 1 s |
+
+Users ennikkai-ku p95 mudhal token, oru fake model-oda measure panninadhu.
+
+Indha lesson Jaipur-la oru intercity bus operator, thiruvizha season traffic-kaaga thaangaloda booking assistant-a thayaar panradhai follow pannum.
+
+## Idhu eppadi work aagudhu
+
+**Averages illa, percentiles.** 2 seconds average, 5% users 15 seconds kaathirukkaradha maraikkalaam. Median (p50), 95th (p95), 99th percentile (p99)-a track pannunga. Users slow-aanavatrai thaan gnyabagam vechukkuvaanga.
+
+**Step vaariyaa budget.** Traces ovvoru step-oda timing-a tharum. Total target-a miss pannumbodhu, edhu step-a attack pannanum-nu budget kaattum: slow reranker, romba neraya chunks, chinna model podhumaana idathula periya model, illa cold start.
+
+**AI-ku mattum irukkura factors.** Output length generation neraththa adhigam decide pannum, adhanaala chinna answers vegam. Time to first token prompt length-a poruthu irukku, adhanaala context-a trim pannunga. Provider latency mani neraththa, region-a poruthu maarum. Tokens per minute-oda rate limits, neenga evvalavu servers odinaalum throughput-a cap pannum; periya launch-ku munnaadi adhai check pannunga, provider-kitta seekkiram adhigam limits kelunga.
+
+**Test-a design panradhu.** Real nadandhukkura vidhatha model pannunga: question types-oda mix, messages-ukku idaiyila think time, typical prompt, answer lengths, expected peak (udhaaranathukku, 7 pm-ku 300 concurrent users). Locust (Python) illa k6 maadhiri tools use pannunga. Kammi-la irundhu expected peak-ai thaandi ramp pannunga, hold pannunga, p95, error rate, CPU, memory, database connections, provider 429 responses-a watch pannunga.
+
+**Tests-la model costs.** Real models-oda load tests nijamaana panam selavu pannum, rate limits-a theerthidum. Perumbaalaana rounds-a, oru realistic delay-ku apram reply panra fake model server-oda odunga, apram real provider-oda oru chinna, kattuppaattoda test.
+
+**Podhuvaa varra bottlenecks-um fixes-um:**
+
+| Load-la theriyura symptom | Sandhegamaana kaaranam | Fix |
+| --- | --- | --- |
+| Latency yerudhu, CPU kammi | Database connections illa locks-kaaga kaathirukkudhu | Periya pool, indexes, kammiyaana queries |
+| CPU 100%-la | Romba sila workers illa heavy parsing | Innum workers, background jobs |
+| 429 errors | Provider rate limit | Adhigam limit, fallback model, chinna outputs |
+| Mudhal token mattum slow | Neenda prompts | Context-a trim pannunga, prefix-a cache pannunga |
+| Muzhu answers slow | Neenda outputs | Answer length-a cap pannunga |
+| Oru nimidathukku apram errors | Timeouts romba kammiyaa vechirukku | Layers-ukkulla timeouts-a align pannunga |
+
+**Oru fake model server-a build panradhu.** Provider-oda adhae API-oda oru chinna service ezhudhunga. Mudhal token-ku munnaadi unga traces-la irundhu sample panna oru realistic neram kaathirukkum, apram oru typical token rate-la oru fixed reply-a stream pannum. Oru setting vechu app-a adhukku point pannunga. Ippo neenga naal muzhukka free-aa load tests odalaam, provider-oda sonda limits-a thavira ella bottleneck-aiyum kandupidikkalaam, adha oru chinna real test check pannum.
+
+**Result-a report panradhu.** Users-ukku p95 chart-a, budget line-a, ovvoru round-layum kandupidicha bottleneck-um adhoda fix-um, neenga edhirpaakkura adutha ceiling-a kaattunga. Clients system adutha edhu odayum-nu therinjukkradhai virumbuvaanga, yen-na adhu enna plan pannanum-nu sollum.
+
+**Oru fake model server.** Real API-oda adhae streaming shape, unga traces-la irundhu sample panna delays:
+
+```python
+import asyncio, json, random
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+
+app = FastAPI()
+FIRST_TOKEN_S = [0.6, 0.8, 0.9, 1.1, 1.4, 2.2]       # sampled from real traces
+TOKENS_PER_S = 60
+REPLY = "This is a fixed answer of realistic length used only for load testing. " * 6
+
+@app.post("/v1/messages")
+async def messages():
+    async def stream():
+        await asyncio.sleep(random.choice(FIRST_TOKEN_S))
+        for word in REPLY.split():
+            yield f"data: {json.dumps({'text': word + ' '})}\n\n"
+            await asyncio.sleep(1 / TOKENS_PER_S)
+        yield "data: [DONE]\n\n"
+    return StreamingResponse(stream(), media_type="text/event-stream")
+```
+
+Test environment-la mattum configuration vazhiyaa unga app-oda model base URL-a adhukku point pannunga. Requests-oda oru pagudhikku 429 errors thirumba switch-a serunga, unga retries-aiyum fallbacks-aiyum test panna.
+
+**Ramp aagura oru Locust test.**
+
+```python
+from locust import HttpUser, task, between, LoadTestShape
+import random
+
+QUESTIONS = [l.strip() for l in open("load/questions.txt")]     # real questions, masked
+
+class Learner(HttpUser):
+    wait_time = between(5, 20)                                   # think time between messages
+
+    @task
+    def ask(self):
+        with self.client.post("/answer", json={"text": random.choice(QUESTIONS)},
+                              stream=True, catch_response=True, timeout=60) as r:
+            for _ in r.iter_lines():
+                pass                                             # read the whole stream
+            if r.status_code != 200:
+                r.failure(f"status {r.status_code}")
+
+class Ramp(LoadTestShape):
+    steps = [(60, 10), (120, 50), (180, 100), (240, 200), (300, 300)]   # (end second, users)
+    def tick(self):
+        t = self.get_run_time()
+        for end, users in self.steps:
+            if t < end:
+                return users, 10
+        return None
+```
+
+`locust -f load/locustfile.py --host https://staging.example.in --csv results`-oda odunga. CSV files ovvoru step-kum p50, p95, p99-a tharum; users-ku p95-a plot panni, unga budget line-a mark pannunga.
+
+**Time to first token-ku thani measurement thevai.** Locust-oda built-in timing muzhu request-a cover pannum. Streaming-ku, app-oda sonda traces-la first-byte time-a-um record pannunga, ovvoru ramp step-kum p95 first-token time-a angae irundhu padinga.
+
+**Real model-la oru kattuppaattoda run.** Fake server-oda bottlenecks-a sari panna apram, provider latency-yum limits-um confirm panna, expected peak-la, unga rate limits-kum budget-kum ulle, real model-oda oru chinna test odunga. API account-a yaar vechirukkaangalo avangakitta munnaadiyae andha run-a othukkunga.
+
+**Traces thirandhu vechu results-a padinga.** 100 users-la p95 jump aanaa, andha nimidatha slow-aana traces-a thirandhu paarunga. Valarndha step (database waits, reranker, model slots-kaaga queueing) thaan bottleneck, melae irukkura fix table perumbaalum marundhai sollum.
+
+**Unga browser-la try pannunga.** Timings list-la irundhu percentiles. Average slow tail-a maraikkum.
+
+```python
+import random, statistics
+
+random.seed(6)
+timings = [random.gauss(1.2, 0.2) for _ in range(950)] + [random.uniform(4, 9) for _ in range(50)]
+timings.sort()
+p = lambda q: timings[int(q * (len(timings) - 1))]
+print(f"average {statistics.mean(timings):.2f} s")
+print(f"p50 {p(0.5):.2f} s, p95 {p(0.95):.2f} s, p99 {p(0.99):.2f} s")
+```
+
+## Oru worked example
+
+Jaipur-la oru intercity bus operator, bus bookings-ukkum complaints-ukkum oru AI assistant-a launch panraanga, thiruvizha payanam neraththula 500 concurrent users-ku peak aagum-nu edhirpaakkaraanga.
+
+Budget: mudhal token p95-la 2 s-kku kezhe, muzhu answer p95-la 10 s-kku kezhe, errors 1%-kku kezhe.
+
+Round 1, realistic delays-oda oru fake model-oda: p95 mudhal token 50 users-la 1.1 s-la irundhu 200 users-la 6 s-ku yerudhu. Traces requests database connections-kaaga queue-la nikkudhu-nu kaattudhu: pool size 10. Adhai 40-ku yerthi, route table-la oru index serkkum podhu, 500 users-la p95 1.3 s-ku varudhu.
+
+Round 2, 300 users-la real model-oda 10 nimida test: provider 429 errors sumaar 220 users-la aarambikkudhu. Token-per-minute limit thaan ceiling. Neenga rendu vaaram munnaadiyae adhigam limit kekkureenga, gateway vazhiyaa oru fallback model serkkureenga, answer length-a 200 tokens-ku cap pannureenga, adhu average generation neraththaiyum moonril onnu kuraikkudhu.
+
+Final test 550 users-la budget-a meet pannudhu. Launch naal peak 480 users-a edhuvum prachanai illaama adaiyudhu, ungaloda report adutha bottleneck-a (sumaar 700 users-la provider limits) list pannum, client plan pannalaam.
+
+| Round | Kandupidippu | Fix | Result |
+| --- | --- | --- | --- |
+| 1, fake model | 200 users-la p95 6 s; 10 connection pool | 40 pool, route-table index | 500 users-la p95 1.3 s |
+| 2, real model | Sumaar 220 users-la irundhu 429s | Adhigam limit, fallback, 200-token cap | 550 users-la budget meet aachu |
+| Launch naal | Peak 480 users | Edhuvum thevai illa | Prachanai illa |
+
+## Podhuvaa panra thappugal
+
+- **Averages-a report panradhu.** p95, p99 use pannunga.
+- **Oru neraththula oru request-a mattum test panradhu.** Concurrency problems (pools, locks, rate limits) load-la mattum theriyum.
+- **Realistic illaadha traffic.** Think time illaama orae maadhiri chinna prompts thappaana numbers-a tharum.
+- **Real-model load tests-la panatha selavu panradhu.** Perumbaalaana rounds-ku fake model use pannunga.
+- **Provider limits-a marandhuduradhu.** Adhu pala neram nijamaana ceiling-aa irukkum. Seekkiram check panni yerthunga.
+- **Ovvoru round-kum real model-oda load-test panradhu**, budget-aiyum rate limits-aiyum theerthudum.
+- **Think time illaama**, adhanaala konjam test users aayirakkanakkaanavanga maadhiri nadandhukkuvaanga.
+- **Stream aagura answers-ku total time-a mattum measure panradhu**; first-token time-aiyum track pannunga.
+
+## Muzhu load test-a konjam neram ottalaam
+
+- **Konjam users-oda internal tools**: pathu concurrent requests-oda oru quick check podhum.
+- **Batch systems**, angae oru user-ku latency-a vida oru manikku throughput mukkiyam; adhai test pannunga.
+- **Ungalukkaaga scale aagura platforms**, nalla limits-oda, aarambikka pilots-ku, rate limits check panna varaikkum.
+
+## Demo-la irundhu production-ku
+
+- **Step vaariyaa oru latency budget vainga**, traces-a adhoda oppidunga.
+- **Launch-ku munnaadi, periya maatrangalukku munnaadi load-test pannunga**, perumbaalum oru fake model server-oda.
+- **p50, p95, p99-yum errors-aiyum** ovvoru ramp step-kum, kandupidicha bottleneck-oda report pannunga.
+- **Traffic patterns maarumbodhu thirumba test pannunga**, exam season illa festival sale maadhiri.
+- **Production-la p95 first-token time-ku alert vainga.**
+
+## Practice pannunga
+
+Monitoring pathi Google SRE chapter-aiyum Locust-oda first-test guide-aiyum padinga.
+
+1. Pathu real requests-oda traces-a vechu, unga app-ku step vaariyaa oru latency budget ezhudhunga.
+2. Oru realistic neram kaathirundhu oru fixed reply-a stream panra oru fake model endpoint-a build pannunga, unga app-a adhukku point pannunga.
+3. Locust-oda 10-la irundhu 200 users varaikkum load-test pannunga, ovvoru step-layum p50, p95, errors-a record pannunga, mudhal bottleneck-a kandupidichu sari pannunga.
+4. Fake model server-oda unga app-oda Locust ramp-a odunga, p95 mudhal thadavai unga budget-a thaandura user count-a note pannunga.
+
+Innum aazhama paaka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-oda chapter 9 latency metrics, percentiles, throughput-kum latency-kum idaiyilaana trade-off-a cover pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Users-ku p95 chart-a kaattalaam, mudhal bottleneck-aiyum adhai nagartha maatrathaiyum sollalaam.

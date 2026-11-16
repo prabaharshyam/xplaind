@@ -1,0 +1,236 @@
+---
+id: batching-model-tiering
+lang: tanglish
+title: "Batching-um model tiering-um"
+outcome: "Quality-a kedukkaama model selavai kuraiyunga: easy requests-a sirusaana models-ku anuppunga, kashtamaanavai-a escalate pannunga, kaaththirukka mudiyura velaiya discounted batch APIs-vazhiyaa ottunga."
+answer: "Easy requests-a sirusaana, cheap models-ku anuppi, kashtamaanavai-a mattum periya models-ku escalate pannitu, kaaththirukka mudiyura velaiya discounted batch APIs-vazhiyaa ottina, model selavu kurayum."
+why_it_matters: "Model selavu perumbaalum oru AI system-oda romba periya running cost, adhu success-oda sernthu valarum. Bill irandu madangu aagum podhu clients gavanippaanga. Tiering-um batching-um saadhaarananaa selavai paadhi illa adhukkum mela kuraikkum, adhai kaattura thiramai oru pilot-a renew panna help pannum."
+flashcards:
+  - q: "Model tiering-na enna?"
+    a: "Simple requests-a sirusaana, cheap, vegamaana models-ku, kashtamaanavai-a mattum periya models-ku anuppuradhu."
+  - q: "Batch API-na enna?"
+    a: "Neraya urgent illaadha requests-a serthu anuppura vazhi; providers maninerangal-kulla, periya discount-oda results-a tharuvaanga."
+  - q: "Moonu tiering patterns sollunga."
+    a: "Task vaariyaa fixed, check fail aanaa escalate panra cascade, mudhalaavadhae kashtatha predict panra router."
+  - q: "Oru cascade work aaga enna thevai?"
+    a: "Sirusaana model-oda output-ku oru nambalaam-aana check, oru validator maadhiri, appo failures escalate aagum, aagaama poga maattaadhu."
+  - q: "Oru sirusaana model-a select pannumbodhu unmaiyaana kelvi enna?"
+    a: "Neenga adhukku anuppura requests-la adhu podhumaa-nu, route vaariyaa evals-vechu alandhu."
+  - q: "Batch jobs failures-a eppadi handle pannanum?"
+    a: "Sila items fail aagum-nu edhirpaarunga, results-a unga sondha ids-vechu match pannunga, failures-a thirumba submit pannunga, velaiya idempotent-aa vechukkunga."
+  - q: "Cost per successful task-a yen alakkanum?"
+    a: "Adikkadi fail aagura, retry illa oru aal thevaippadura oru cheap model, mothatha-la adhigam selavaagalam."
+  - q: "Tiering-oda nalla sernthu work aagura vera levers edhu?"
+    a: "Prompt caching, sirusaana prompts-um outputs-um, kammiyaana retrieved chunks, orae maadhiri answers-a cache panradhu."
+  - q: "Oru cascade selavai kuraikkudhu-nu eppadi theriyum?"
+    a: "Escalate aana items-ku large-model calls-yum edhaavadhu human fixes-yum serthu, cost per successful task-a, ellaathaiyum large model-ku anuppuradhoda compare pannunga."
+  - q: "Fail aana items-a oru batch job enna pannanum?"
+    a: "Avatrai id-vaariyaa oru pudhu, sirusaana batch-la illa oru real-time retry queue-la serthu, ethanai fail aachu, yen-nu report pannanum."
+exercise:
+  title: "Bill-a kuraiyunga"
+  setup: "Surat-la oru e-commerce marketplace, thangaloda periya model-la real-time-la moonu AI tasks-a ottudhu: (A) maadham 2 million pudhu product listings-a categorise panradhu, seller batches-aa dhinam raththiri upload aagum; (B) buyer chat questions-ku badhil solradhu; (C) managers-ku oru vaaraanthira seller complaints summary ezhudhuradhu. Maadha selavu ₹18 lakh."
+  questions:
+    - q: "Task (A) eppadi maaranum?"
+      a: "Adhai raththiri batch API-ku nagarthunga, oru validator-oda sirusaana model-a test pannunga, failures-a periya model-ku escalate pannunga."
+    - q: "Task (B)-a eppadi tier pannanum?"
+      a: "Order status maadhiri simple questions-a sirusaana model-ku route pannunga, complex-aanavai-a periya model-la vechukkunga, route vaariyaa evals-oda."
+    - q: "Task (C) eppadi maaranum?"
+      a: "Adhu kaaththirukkalaam, adhanaala batch API-vazhiyaa ottunga; summary quality-ku thevaippattaa periya model-a vechukkunga."
+    - q: "Maatrangalukku aprom team enna report pannanum?"
+      a: "Cost per successful task-a vechu, ovvoru task-kum munnaadi-aprom cost-um quality-yum oru table-la."
+ask:
+  - "Oru sirusaana model-ukkum periya model-ukkum idaiyila eppadi select panradhu?"
+  - "Batch API-a eppo use pannanum?"
+  - "Model cascade-na enna?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Language-model systems-ku selavai kuraikkura rendu romba valimaiyaana levers:
+
+- **Model tiering** (illa routing): ovvoru request-kum romba capable-aana model thevai illa. Classify, extract illa simple questions-ku badhil solradhu oru sirusaana, cheap, vegamaana model-aal; kashtamaanavai-a mattum oru periya model-ku anuppunga.
+- **Batching**: seconds-kulla answer thevai illaadha velai, ex: dhinam raththiri document tagging, nethaiya tickets-a summarise panradhu, oru corpus-a re-embed panradhu, oru **batch API**-vazhiyaa pogum. Providers batches-a maninerangal-kulla, periya discount-oda process pannuvaanga, perumbaalum saadhaarana price-la sumaar paadhi.
+
+Rendumae unga traffic theriyanum: easy-aana requests evvalavu share, kaaththirukka mudiyura requests evvalavu share.
+
+```flow
+Varra velai -> Mani-nerangal kaaththirukka mudiyumaa?
+Mani-nerangal kaaththirukka mudiyumaa? -[aama]-> Batch API, discount-oda | ids-vechu results, failures-a thirumba ottunga
+Mani-nerangal kaaththirukka mudiyumaa? -[illa]-> Sirusaana model -> Validator pass aachaa?
+Validator pass aachaa? -[aama]-> Answer
+Validator pass aachaa? -[illa, sumaar 2.5%]-> Periya model -> Answer
+Fit summaries maadhiri kashtamaana task -[neraa]-> Periya model
+```
+
+Indha lesson, Pune-la oru HR-tech company-la maadham 400,000 resumes-a process panra resume-screening service-a follow pannum.
+
+## Idhu eppadi work aagudhu
+
+**Tiering patterns.**
+
+- *Task vaariyaa fixed*: ovvoru feature-um adhoda evals-la pass aagura romba cheap-aana model-a use pannum. Oru standard form-la irundhu extraction-ku oru sirusaana model podhum; oru legal summary draft panna oru periya model thevai. Idhu romba simple-um, romba common-um.
+- *Cascade*: mudhalla sirusaana model-a try pannunga; adhoda output-a check pannunga (confidence, oru validator, adhu thaanaa solra "unsure"); check fail aanaa mattum periya model-ku escalate pannunga.
+- *Router*: oru classifier, illa oru sirusaana model, kashtatha predict panni, mudhalaavadhae model-a pick pannum. RouteLLM maadhiri research systems idha preference data-la irundhu kathukkum.
+
+Ovvoru route-kkum adhoda sondha eval thevai. Unmaiyaana kelvi "sirusaana model nallaa irukkaa?" illa, "naanga adhukku anuppura requests-la adhu podhumaa?"
+
+**Batching patterns.** Requests-a oru file-la serunga (ovvoru request-kum unga sondha id-oda oru JSON line), batch-a submit pannunga, poll pannunga illa notification varum, apram results-a ids-oda match pannunga. Partial failure-kku design pannunga: sila items error aagi thirumba submit panna vendiyirukkum. Reruns safe-aa irukka, batch velaiya idempotent-aa vechukkunga.
+
+**Serthu use panna vendiya vera cost levers.** Neelamaana, thirumba thirumba varra prefixes-ku prompt caching; sirusaana prompts-um outputs-um (neenga thevai-nu irukkura fields-a mattum kelunga); reranking-ku aprom kammiyaana retrieved chunks; orae maadhiri answers-a cache panradhu.
+
+**Cost per successful task-a alanga**, oru call-ku cost mattum illa. Paadhi neram fail aagi, oru retry-um illa oru aal-um thevaippadura oru cheap model, mothatha-la adhigam selavaagalam.
+
+**Resume pipeline-ku routes:**
+
+| Task | Route | Yen | Evidence |
+| --- | --- | --- | --- |
+| Field extraction | Sirusaana model, validation fail aanaa escalate | Sirusaana model kittathatta adhae accuracy | 500 resumes-la 98%-ku badhila 97% |
+| Fit summary | Periya model | Sirusaana model theliva mosam | Recruiter ratings |
+| Bulk uploads | Raththiri batch API | Kaalaila thevai, seconds-kulla illa | Discounted price |
+| Pagal uploads | Real time | Recruiters kaaththirukkaanga | Latency thevaigal |
+
+**Oru cascade-kku validator build panradhu.** Edhu escalate aagum-nu andha check thaan mudivu pannum, adhanaala adhu mosamaana outputs-a nambalaam-aa pidikkanum. Extraction-ku, JSON schema-oda validate pannunga, required fields irukkaa, sariyaa irukkaa-nu check pannunga (oru email-la at sign irukkum, years of experience 0-ku 50-ku idaiyila), mudinja idathula totals-a compare pannunga. Free text-ku, oru cheap judge illa adhu thaanaa solra "unsure" work aagalam, aana test pannunga: nambaradhukku munnaadi, oru labelled set-la adhu evvalavu mosamaana outputs-a miss pannudhu-nu alanga.
+
+**Oru batch job-a ottradhu.** Ovvoru request-kum unga sondha id-oda oru line ezhudhunga, submit pannunga, batch id-a record pannunga. Results varum podhu, ids-vechu match pannunga, successes-a ezhudhunga, failures-a oru pudhu batch-la serunga. Ovvoru write-yum idempotent-aa aakkunga, appo oru crash-ku aprom batch-a thirumba ottina duplicates varaadhu.
+
+**Oru cascade, code-la.** Mudhalla sirusaana model, oru strict validator, check fail aanaa mattum periya model:
+
+```python
+import json
+import anthropic
+from pydantic import BaseModel, ValidationError
+
+client = anthropic.Anthropic()
+SMALL, LARGE = "claude-haiku-5-5", "claude-sonnet-5-5"     # check the docs for current names
+
+class Resume(BaseModel):
+    name: str
+    years_experience: float
+    skills: list[str]
+    last_employer: str | None = None
+
+def extract(model, text):
+    r = client.messages.create(model=model, max_tokens=500,
+        messages=[{"role": "user", "content": "Return only JSON with name, years_experience, skills, "
+                   f"last_employer (null if absent).\n\n{text}"}])
+    out = "".join(b.text for b in r.content if b.type == "text")
+    return out, r.usage
+
+def valid(raw, text):
+    try:
+        item = Resume.model_validate_json(raw)
+    except ValidationError:
+        return None
+    if not 0 <= item.years_experience <= 50 or not item.skills:
+        return None
+    if item.name.split()[0].lower() not in text.lower():      # the name must appear in the resume
+        return None
+    return item
+
+def cascade(text, stats):
+    raw, usage = extract(SMALL, text)
+    stats["small_calls"] += 1
+    if (item := valid(raw, text)):
+        return item
+    stats["escalated"] += 1
+    raw, usage = extract(LARGE, text)
+    return valid(raw, text)            # None goes to a person
+```
+
+Escalation rate-a track pannunga. Adhu yerinaa, sirusaana model oru pudhu vagai input-la thinaruthu, savings kuraiyudhu-nu artham.
+
+**Anthropic-oda Message Batches API-vechu requests-a batch pannunga.** Urgent illaadha velaiya orae dhadavaiyaa submit pannunga, results-a unga sondha ids-vechu edunga:
+
+```python
+import time
+
+def run_batch(items):
+    batch = client.messages.batches.create(requests=[
+        {"custom_id": it["id"],
+         "params": {"model": SMALL, "max_tokens": 500,
+                    "messages": [{"role": "user", "content": f"Return only JSON ...\n\n{it['text']}"}]}}
+        for it in items])
+    while client.messages.batches.retrieve(batch.id).processing_status != "ended":
+        time.sleep(60)
+    done, failed = {}, []
+    for result in client.messages.batches.results(batch.id):
+        if result.result.type == "succeeded":
+            msg = result.result.message
+            done[result.custom_id] = "".join(b.text for b in msg.content if b.type == "text")
+        else:
+            failed.append(result.custom_id)
+    return done, failed            # resubmit `failed`, or send them to the real-time path
+```
+
+Batch processing saadhaarana calls-a vida kammi price, oru naal varaikkum aagalam; ippo irukkura price-yum turnaround-yum date-oda check pannunga. Batch outputs-a real-time-a maadhiri thaan exact-aa validate pannunga.
+
+**Cost per successful task, alandhadhu.** 200 items-oda oru sample-la, ovvoru path-kum, panna model calls, tokens, cost, final result sariyaa-nu record pannunga. Apram compare pannunga:
+
+| Path | Accuracy | Oru item-ku cost |
+| --- | --- | --- |
+| Ellaathukkum periya model | alandhadhu | alandhadhu |
+| Cascade | alandhadhu | alandhadhu, escalations-a serthu |
+| Cascade + uploads-ku batch | alandhadhu | alandhadhu |
+
+Andha task-oda accuracy bar-a meet panra romba cheap-aana path-a pick pannunga.
+
+## Oru worked example
+
+Pune-la oru HR-tech company thangaloda clients-ku resumes-a screen pannudhu. Ovvoru resume-kum job description-oda structured extraction (name, skills, experience)-um oru fit summary-um kidaikkum. Volume: maadham 400,000 resumes, perumbaalum oru hiring drive-ku munnaadi raththiri bulk-aa upload aagum.
+
+Munnaadi: ovvoru resume-um real-time-la oru periya model-vazhiyaa pochu. Maadha model selavu: sumaar ₹14 lakh.
+
+Redesign:
+
+1. Extraction, oru strict JSON schema-oda oru sirusaana model-ku nagarudhu. 500 resumes golden set-la, field accuracy 97%, periya model-ku 98%; validation failures (2.5%) periya model-ku escalate aagum.
+2. Fit summary periya model-lae irukkum, recruiter ratings-la sirusaana model theliva mosam-aa irundhadhu.
+3. Bulk uploads raththiri discount-oda batch API-vazhiyaa pogum. Vela naal-la serkkapatta resumes mattum real time-la odum.
+4. Aayirakkanakkaana resumes-ku orae maadhiri irukkura job description, prompt-oda aarambathula irukkum, cache aagum.
+
+Maadha selavu sumaar ₹5 lakh-ku kuraiyudhu. Summaries-oda recruiter ratings maaralai, rendu numbers-yum monthly review-la pakkam pakkamaa report pannuveenga.
+
+| Measure | Munnaadi | Aprom |
+| --- | --- | --- |
+| Maadha model selavu | Sumaar ₹14 lakh | Sumaar ₹5 lakh |
+| Extraction field accuracy | 98% | 97% + escalation |
+| Summaries-oda recruiter rating | Baseline | Maaralai |
+
+## Podhuvaa panra thappugal
+
+- **Sirusaana model-a vibe-la select panradhu.** Ovvoru route-kum evals-a ottunga; cheap-aa, thappaa irundhaa selavaanadhu.
+- **User-facing velaiya batch panradhu.** Batches-ku maninerangal aagalam. Kaaththirukka mudiyuradha mattum batch pannunga.
+- **Escalation path illaama irukkradhu.** Nambalaam-aana failure check illaadha cascade, mosamaana answers-a munnaadi anuppum.
+- **Retries-a kanakku-la vidradhu.** Cost per successful task-a ennunga.
+- **Partial batch failures-a marakkradhu.** Sila items eppavum fail aagum; thirumba ottradhukku plan pannunga.
+- **Oru weak validator**, sirusaana model-oda mosamaana outputs-a pass pannum, appo cascade quality-a izhandhu selavai miccham pannum.
+- **Fail aana batch items-a ignore panradhu**, adhu sappunu kaanaama pogum.
+- **Cost per successful task-ku badhila cost per call-a compare panradhu.**
+
+## Tiering-um batching-um worth illaadha idangal
+
+- **Kammi volume**: savings engineering neraththa vida sirusaa.
+- **Ellaa requests-um urgent**, adhanaala batching set aagaadhu.
+- **Sirusaana model unga evals-la fail aagudhu**, neenga adhukku anuppura traffic-la.
+- **Cascade escalate panna nambalaam-aana validator illa.**
+
+## Demo-la irundhu production-ku
+
+- **Escalation rate-yum cost per successful task-yum** ovvoru feature-kum track pannunga.
+- **Ovvoru model illa prompt change-layum routes-a thirumba evaluate pannunga.**
+- **Batch failures-a id-vaariyaa handle pannunga**, retries-oda, oru report-oda.
+- **Urgent velaiyum batch velaiyum thani limits-la irukkattum**, appo raththiri jobs pagal users-a slow pannaadhu.
+- **Prices-a dates-oda record pannunga**, cost comparison-la.
+
+## Practice pannunga
+
+Unga provider-oda batch processing guide-a, RouteLLM post-a padinga.
+
+1. Oru feature-a pick pannunga, oru sirusaana-vum oru periya model-yum 50 golden cases-la evaluate pannunga. Ovvonnukkum accuracy-yum oru case-ku cost-yum record pannunga.
+2. Oru cascade build pannunga: mudhalla oru validator-oda sirusaana model, failures-a periya model-ku escalate pannunga. Blended accuracy-yum cost-yum alanga.
+3. 100 urgent illaadha requests-a oru batch API-vazhiyaa ottunga, fail aana items-a handle pannunga, cost-a real-time calls-oda compare pannunga.
+4. 50 resumes-a cascade-vazhiyaa ottunga, escalation rate-yum oru sariyaana extraction-ku cost-yum record pannunga, periya model mattum use pannaadhadhoda compare pannunga.
+
+Innum aazhama padikka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025) puthagathoda 9-aam chapter batching-yum inference cost-yum cover pannum, 10-aam chapter model routers-a.
+
+**Mudinjadhu-nu eppo sollalaam:** oru feature-ku cost-yum quality-yum kaattura oru munnaadi-aprom table-a kaattalaam, andha split-a justify pannalaam.

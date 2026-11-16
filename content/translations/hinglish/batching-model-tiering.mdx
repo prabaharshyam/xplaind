@@ -1,0 +1,236 @@
+---
+id: batching-model-tiering
+lang: hinglish
+title: "Batching aur model tiering"
+outcome: "Quality bigaade bina model costs kam karo: aasaan requests chhote models ko bhejo, mushkil ko escalate karo, aur jo kaam ruk sakta hai use discounted batch APIs se chalao."
+answer: "Aasaan requests ko chhote, sasta models ko bhejkar, sirf mushkil ko bade models par escalate karke, aur jo kaam ruk sakta hai use discounted batch APIs se chalakar model costs kam karo."
+why_it_matters: "Model spend aksar AI system ka sabse bada running cost hota hai, aur success ke saath badhta hai. Bill double hone par clients dhyan dete hain. Tiering aur batching aam taur par cost aadhi ya usse zyada kam kar dete hain, aur ise dikha paana pilot renew karwane ka hissa hai."
+flashcards:
+  - q: "Model tiering kya hai?"
+    a: "Simple requests ko chhote, sasta, tez models ko bhejna aur sirf mushkil ko bade models ko."
+  - q: "Batch API kya hai?"
+    a: "Kai non-urgent requests ek saath submit karne ka tareeka; providers ghanton mein, bade discount par results lauta dete hain."
+  - q: "Teen tiering patterns batao."
+    a: "Task ke hisaab se fixed, ek cascade jo fail hue checks par escalate karta hai, aur ek router jo pehle se difficulty predict karta hai."
+  - q: "Cascade ko kaam karne ke liye kya chahiye?"
+    a: "Chhote model ke output par ek bharosemand check, jaise validator, taaki failures aage pass hone ki jagah escalate hon."
+  - q: "Chhota model chunte waqt asli sawaal kya hai?"
+    a: "Kya woh un requests par kaafi achha hai jo aap use asal mein bhejte ho, har route ke evals se naapa hua."
+  - q: "Batch jobs failures ko kaise handle karein?"
+    a: "Maano ki kuch items fail honge, results apne ids se match karo, failures dobara submit karo, aur kaam idempotent rakho."
+  - q: "Cost per successful task kyun naapein?"
+    a: "Sasta model jo aksar fail hota hai aur retries ya insaanon ki zaroorat padti hai, woh overall mehnga pad sakta hai."
+  - q: "Tiering ke saath kaunse aur levers achhe se chalte hain?"
+    a: "Prompt caching, chhote prompts aur outputs, kam retrieved chunks, aur ek jaise answers ko cache karna."
+  - q: "Kaise pata chale ki cascade paise bacha raha hai?"
+    a: "Escalate hue items ke bade-model calls aur insaani fixes samet cost per successful task ko sab kuch bade model ko bhejne se compare karo."
+  - q: "Batch job ko fail hue items ka kya karna chahiye?"
+    a: "Unhe id ke hisaab se ek naye, chhote batch ya real-time retry queue mein jama karo, aur report karo ki kitne fail hue aur kyun."
+exercise:
+  title: "Bill kam karo"
+  setup: "Surat ka ek e-commerce marketplace apne sabse bade model par real time mein teen AI tasks chalata hai: (A) mahine ki 2 million nayi product listings ko categorise karna, jo roz raat seller batches mein upload hoti hain; (B) buyer chat sawaalon ka jawab dena; (C) managers ke liye seller complaints ka weekly summary likhna. Mahine ka spend ₹18 lakh hai."
+  questions:
+    - q: "Task (A) ko kaise badalna chahiye?"
+      a: "Use raat ko batch API par le jao aur validator ke saath chhota model test karo, failures bade model ko escalate karo."
+    - q: "Task (B) ko kaise tier karna chahiye?"
+      a: "Order status jaise simple sawaal chhote model par route karo aur complex wale bade model par rakho, har route ke evals ke saath."
+    - q: "Task (C) ko kaise badalna chahiye?"
+      a: "Woh ruk sakta hai, isliye batch API se chalao; agar summary quality ko zaroorat ho toh bada model rakho."
+    - q: "Changes ke baad team ko kya report karna chahiye?"
+      a: "Cost per successful task ke hisaab se har task ke pehle aur baad ke cost aur quality ki table."
+ask:
+  - "Chhote aur bade model mein se kaise chunun?"
+  - "Batch API kab use karun?"
+  - "Model cascade kya hai?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Language-model systems ke liye cost kam karne ke do sabse mazboot levers:
+
+- **Model tiering** (ya routing): har request ko sabse capable model ki zaroorat nahi hoti. Classify, extract ya simple sawaalon ke jawab chhote, sasta, tez model se karwao; sirf mushkil wale bade model ko bhejo.
+- **Batching**: jo kaam seconds mein answer nahi maangta, jaise raat ko document tagging, kal ke tickets ka summary ya corpus ka re-embedding, woh **batch API** se jaata hai. Providers batches ko ghanton mein, bade discount par process karte hain, aksar normal price ka lagbhag aadha.
+
+Dono ke liye apna traffic jaanna zaroori hai: kitne requests aasaan hain, aur kitne ruk sakte hain.
+
+```flow
+Aane waala kaam -> Kya ghanton ruk sakta hai?
+Kya ghanton ruk sakta hai? -[haan]-> Batch API, discounted | ids se results, failures dobara chalao
+Kya ghanton ruk sakta hai? -[nahi]-> Chhota model -> Validator pass hua?
+Validator pass hua? -[haan]-> Answer
+Validator pass hua? -[nahi, lagbhag 2.5%]-> Bada model -> Answer
+Fit summaries jaisa mushkil task -[seedha]-> Bada model
+```
+
+Ye lesson Pune ki ek HR-tech company ki resume-screening service ko follow karta hai jo mahine mein 400,000 resumes process karti hai.
+
+## Ye kaam kaise karta hai
+
+**Tiering patterns.**
+
+- *Task ke hisaab se fixed*: har feature sabse sasta model use karta hai jo apne evals pass kare. Standard form se extraction ko shaayad sirf chhota model chahiye; legal summary draft karne ko bada. Yeh sabse simple aur sabse common hai.
+- *Cascade*: pehle chhota model try karo; uske output ko check karo (confidence, validator, ya khud se kaha "unsure"); sirf check fail hone par bade model ko escalate karo.
+- *Router*: ek classifier, ya chhota model, difficulty predict karke model pehle se chunta hai. RouteLLM jaise research systems yeh preference data se seekhte hain.
+
+Har route ko apna eval chahiye. Asli sawaal "kya chhota model achha hai?" nahi, balki "kya woh un requests par kaafi achha hai jo hum use bhejte hain?" hai.
+
+**Batching patterns.** Requests ko ek file mein jama karo (har request ke liye apne id ke saath ek JSON line), batch submit karo, poll karo ya notification lo, phir results ko ids se match karo. Partial failure ke liye design karo: kuch items error honge aur dobara submit karne honge. Batch kaam ko idempotent rakho taaki reruns safe hon.
+
+**Saath mein use karne laayak aur cost levers.** Lambe, repeated prefixes ke liye prompt caching; chhote prompts aur outputs (bas wahi fields maango jo chahiye); reranking ke baad kam retrieved chunks; ek jaise answers ko cache karna.
+
+**Cost per successful task naapo**, sirf cost per call nahi. Sasta model jo aadhi baar fail hota hai aur retry ya insaan chahta hai, overall mehnga pad sakta hai.
+
+**Resume pipeline ke routes:**
+
+| Task | Route | Kyun | Evidence |
+| --- | --- | --- | --- |
+| Field extraction | Chhota model, validation fail par escalate | Chhota model lagbhag utna hi accurate | 500 resumes par 98% ke saamne 97% |
+| Fit summary | Bada model | Chhota model saaf kamzor | Recruiter ratings |
+| Bulk uploads | Raat ko batch API | Subah tak chahiye, seconds mein nahi | Discounted price |
+| Din ke uploads | Real time | Recruiters intezaar karte hain | Latency ki zaroorat |
+
+**Cascade ke liye validator banana.** Check hi tay karta hai ki kya escalate hoga, isliye use kharab outputs ko bharosemand tareeke se pakadna chahiye. Extraction ke liye JSON schema ke against validate karo, check karo ki required fields maujood aur plausible hain (email mein at sign hota hai, years of experience 0 se 50 ke beech), aur jahan ho sake totals compare karo. Free text ke liye sasta judge ya khud ka kaha "unsure" kaam kar sakta hai, par test karo: bharosa karne se pehle labelled set par naapo ki woh kitne kharab outputs chhod deta hai.
+
+**Batch job chalana.** Har request ke liye apne id ke saath ek line likho, submit karo, aur batch id record karo. Results aane par ids se match karo, successes likho, aur failures ko naye batch mein jama karo. Har write ko idempotent banao, taaki crash ke baad batch dobara chalane par duplicates na bane.
+
+**Code mein ek cascade.** Pehle chhota model, ek strict validator, aur bada model sirf check fail hone par:
+
+```python
+import json
+import anthropic
+from pydantic import BaseModel, ValidationError
+
+client = anthropic.Anthropic()
+SMALL, LARGE = "claude-haiku-5-5", "claude-sonnet-5-5"     # check the docs for current names
+
+class Resume(BaseModel):
+    name: str
+    years_experience: float
+    skills: list[str]
+    last_employer: str | None = None
+
+def extract(model, text):
+    r = client.messages.create(model=model, max_tokens=500,
+        messages=[{"role": "user", "content": "Return only JSON with name, years_experience, skills, "
+                   f"last_employer (null if absent).\n\n{text}"}])
+    out = "".join(b.text for b in r.content if b.type == "text")
+    return out, r.usage
+
+def valid(raw, text):
+    try:
+        item = Resume.model_validate_json(raw)
+    except ValidationError:
+        return None
+    if not 0 <= item.years_experience <= 50 or not item.skills:
+        return None
+    if item.name.split()[0].lower() not in text.lower():      # the name must appear in the resume
+        return None
+    return item
+
+def cascade(text, stats):
+    raw, usage = extract(SMALL, text)
+    stats["small_calls"] += 1
+    if (item := valid(raw, text)):
+        return item
+    stats["escalated"] += 1
+    raw, usage = extract(LARGE, text)
+    return valid(raw, text)            # None goes to a person
+```
+
+Escalation rate track karo. Agar woh badhta hai, toh chhota model kisi naye tarah ke input se jujh raha hai, aur bachat kam ho rahi hai.
+
+**Anthropic ke Message Batches API se requests batch karo.** Non-urgent kaam ek saath submit karo aur results apne ids se lo:
+
+```python
+import time
+
+def run_batch(items):
+    batch = client.messages.batches.create(requests=[
+        {"custom_id": it["id"],
+         "params": {"model": SMALL, "max_tokens": 500,
+                    "messages": [{"role": "user", "content": f"Return only JSON ...\n\n{it['text']}"}]}}
+        for it in items])
+    while client.messages.batches.retrieve(batch.id).processing_status != "ended":
+        time.sleep(60)
+    done, failed = {}, []
+    for result in client.messages.batches.results(batch.id):
+        if result.result.type == "succeeded":
+            msg = result.result.message
+            done[result.custom_id] = "".join(b.text for b in msg.content if b.type == "text")
+        else:
+            failed.append(result.custom_id)
+    return done, failed            # resubmit `failed`, or send them to the real-time path
+```
+
+Batch processing normal calls se sasta hota hai aur ek din tak le sakta hai; maujooda price aur turnaround date ke saath check karo. Batch outputs ko bilkul waise hi validate karo jaise real-time wale.
+
+**Cost per successful task, naapa hua.** 200 items ke sample par, har path ke liye record karo ki kitne model calls hue, tokens, cost aur final result sahi tha ya nahi. Phir compare karo:
+
+| Path | Accuracy | Per item cost |
+| --- | --- | --- |
+| Sab kuch bade model se | naapa hua | naapa hua |
+| Cascade | naapa hua | naapa hua, escalations samet |
+| Cascade plus uploads ke liye batch | naapa hua | naapa hua |
+
+Us task ke accuracy bar ko poora karne waala sabse sasta path chuno.
+
+## Ek example se samjho
+
+Pune ki ek HR-tech company apne clients ke liye resumes screen karti hai. Har resume ko structured extraction (name, skills, experience) aur job description ke against fit summary milta hai. Volume: mahine ke 400,000 resumes, zyadatar hiring drive se pehli shaam bulk mein upload hote hain.
+
+Pehle: har resume real time mein bade model se guzarta tha. Mahine ka model spend: lagbhag ₹14 lakh.
+
+Naya design:
+
+1. Extraction ek strict JSON schema ke saath chhote model par jaata hai. 500 resumes ke golden set par field accuracy 97% hai, jabki bade model ki 98%; validation failures (2.5%) bade model ko escalate hote hain.
+2. Fit summary bade model par hi rehta hai, jahan chhota model recruiter ratings mein saaf kamzor tha.
+3. Bulk uploads raat ko discount par batch API se chalte hain. Sirf kaam ke din jode gaye resumes real time mein chalte hain.
+4. Job description, jo hazaaron resumes ke liye ek jaisa hota hai, prompt ke shuru mein rehta hai aur cache hota hai.
+
+Mahine ka spend lagbhag ₹5 lakh par aa jaata hai. Summaries ki recruiter ratings nahi badli, aur aap dono numbers monthly review mein saath-saath report karte ho.
+
+| Measure | Pehle | Baad mein |
+| --- | --- | --- |
+| Mahine ka model spend | Lagbhag ₹14 lakh | Lagbhag ₹5 lakh |
+| Extraction field accuracy | 98% | 97% plus escalation |
+| Summaries ki recruiter rating | Baseline | Wahi |
+
+## Aam galtiyaan
+
+- **Chhota model vibe se chunna.** Har route ke liye evals chalao; sasta aur galat mehnga padta hai.
+- **User-facing kaam ko batch karna.** Batches mein ghante lag sakte hain. Sirf wahi batch karo jo ruk sakta hai.
+- **Escalation path na hona.** Bharosemand failure check ke bina cascade kharab answers aage bhej deta hai.
+- **Hisaab mein retries ko ignore karna.** Cost per successful task ginto.
+- **Partial batch failures bhool jaana.** Kuch items hamesha fail hote hain; rerun ka plan rakho.
+- **Kamzor validator** jo chhote model ke kharab outputs pass kar de, jisse cascade quality kho kar paise bachata hai.
+- **Fail hue batch items ko ignore karna**, jo chupke se gayab ho jaate hain.
+- **Cost per successful task ki jagah cost per call compare karna.**
+
+## Jab tiering aur batching worth nahi
+
+- **Kam volume**: bachat engineering time se chhoti hai.
+- **Har request urgent hai**, isliye batching fit nahi baithta.
+- **Chhota model aapke evals fail karta hai** us traffic par jo aap use bhejoge.
+- **Cascade ke escalate hone ke liye koi bharosemand validator nahi hai.**
+
+## Demo se production tak
+
+- **Escalation rate aur cost per successful task track karo**, har feature ke liye.
+- **Routes ko dobara evaluate karo** har model ya prompt change par.
+- **Batch failures ko id ke hisaab se handle karo**, retries aur ek report ke saath.
+- **Urgent aur batch kaam ko alag limits par rakho** taaki raat ke jobs din ke users ko dheema na karein.
+- **Prices ko dates ke saath record karo**, cost comparison mein.
+
+## Practice karo
+
+Apne provider ki batch processing guide aur RouteLLM post padho.
+
+1. Ek feature chuno aur ek chhote aur ek bade model ko 50 golden cases par evaluate karo. Har ek ke liye accuracy aur cost per case record karo.
+2. Ek cascade banao: pehle chhota model validator ke saath, failures bade model ko escalate. Blended accuracy aur cost naapo.
+3. 100 non-urgent requests ek batch API se chalao, fail hue items handle karo, aur cost ko real-time calls se compare karo.
+4. 50 resumes cascade se chalao, escalation rate aur har sahi extraction ka cost record karo, aur sirf bade model se compare karo.
+
+Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 9 batching aur inference cost cover karta hai, aur chapter 10 model routers.
+
+**Aapka kaam poora jab:** aap ek feature ke liye cost aur quality ki before-and-after table dikha sako aur us split ko justify kar sako.

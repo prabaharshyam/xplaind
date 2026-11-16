@@ -1,0 +1,207 @@
+---
+id: how-models-pick-words
+lang: hinglish
+title: "Model agla word kaise chunta hai: temperature, top-p aur top-k"
+outcome: "Samjhao ki language model har agla token kaise chunta hai, predict karo ki temperature, top-p aur top-k kya karte hain, aur kisi task ke liye unhe samajhdaari se set karo."
+answer: "Model har possible agle word ko score deta hai, scores ko chances mein badalta hai aur ek chunta hai. Temperature, top-p aur top-k badalte hain ki ye pick kitni adventurous hai, isliye ek hi prompt alag-alag answers de sakta hai."
+why_it_matters: "Ye wo settings hain jo aap har LLM call par control karte ho. Galat set karne par facts mein bhatakna ya robotic copy milti hai, aur interviewers aksar poochte hain ki ek hi prompt alag answers kyun deta hai."
+flashcards:
+  - q: "Language model ek sentence kaise banata hai?"
+    a: "Ek baar mein ek token. Har step par woh har possible agle token ko score deta hai, ek chuna jaata hai, aur woh pick agle step se pehle text mein jud jaata hai."
+  - q: "Logits kya hain?"
+    a: "Woh raw scores jo model har possible agle token ko deta hai. Zyada ka matlab zyada likely. Inhe softmax se chances mein badla jaata hai."
+  - q: "Temperature kya karta hai?"
+    a: "Logits ke chances banne se pehle ye unhe divide karta hai. Kam ho toh top choice haavi ho jaata hai aur answers steady rehte hain. Zyada ho toh chances flat ho jaate hain aur answers zyada badalte hain."
+  - q: "Practice mein temperature 0 ka kya matlab hai?"
+    a: "Hamesha sabse zyada score waala token lo (greedy). Ye sabse steady setting hai, par na identical outputs ki guarantee hai na sahi outputs ki."
+  - q: "Top-k top-p se kaise alag hai?"
+    a: "Top-k options ki fixed sankhya rakhta hai. Top-p utne options rakhta hai jitne mein total chance p tak pahunche, isliye jab model sure ho toh group chhota ho jaata hai."
+  - q: "Kya temperature aur top-p ko saath mein badalna chahiye?"
+    a: "Aam taur par nahi. Dono ek hi choice ko reshape karte hain, isliye dono badalne se results ka andaaza lagana mushkil ho jaata hai. Kai providers ek hi adjust karne ki salaah dete hain."
+  - q: "Kya kam temperature hallucinations rokta hai?"
+    a: "Nahi. Model confidently har baar galat answer chun sakta hai. Facts retrieval, citations aur checks se theek karo, temperature se nahi."
+  - q: "Kam temperature ke liye ek kaam aur zyada ke liye ek kaam batao."
+    a: "Kam: extraction, classification, documents se answers, code. Zyada: names brainstorm karna, slogans, story ideas."
+exercise:
+  title: "Teen features ke liye dials set karo"
+  setup: "Bengaluru ki ek fintech teen LLM features jod rahi hai: (1) bank SMS se amount, date aur merchant ko JSON mein nikaalna, (2) sirf help-centre articles use karke customer questions ke jawab dena, (3) naye savings account ke liye das playful names suggest karna. Ek developer har jagah temperature 1.0 use karne ka plan bana raha hai kyunki woh default hai."
+  questions:
+    - q: "Feature 1 ke liye kaunsi settings theek hain, aur kyun?"
+      a: "Temperature 0 ke aas-paas aur default top-p. Extraction ka ek hi sahi answer hota hai, isliye steady output chahiye. Use structured output ke saath jodo taaki JSON hamesha valid rahe."
+    - q: "Feature 2 kabhi-kabhi refund rule gadh deta hai. Kya temperature kam karne se theek hoga?"
+      a: "Akele nahi. Model kisi bhi temperature par confidently galat ho sakta hai. Answers ko retrieved articles mein ground karo, citations maango aur ek check jodo."
+    - q: "Feature 3 ke liye aap kya use karoge?"
+      a: "Zyada temperature, lagbhag 0.8 se 1.0, kyunki variety hi goal hai. Zaroorat se zyada names generate karo, phir kisi insaan ko chunne do."
+    - q: "Ek tester kehta hai ki feature 1 ne temperature 0 par do alag outputs diye. Kya ye bug hai?"
+      a: "Zaroori nahi. Temperature 0 par bhi runs ke beech outputs thode alag ho sakte hain. Settings log karo aur kai runs test karo, exact repeatability maan mat lo."
+ask:
+  - "Top-p aur top-k mein kya farak hai?"
+  - "Ek hi prompt alag answers kyun deta hai?"
+  - "RAG chatbot ke liye kitna temperature use karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+Language model poora answer ek saath nahi likhta. Woh ek baar mein ek **token** likhta hai (token ek word ya word ka ek tukda hota hai). Har ek ko chunne ke liye woh har token ko jo use pata hai ek score deta hai, application scores ko chances mein badalti hai, aur ek token chuna jaata hai. Chuna hua token text mein jud jaata hai, aur answer khatam hone tak agle token ke liye ye sab dobara hota hai.
+
+Is chunne ke step ko **sampling** kehte hain. Ise badalne ke liye model badalne ki zaroorat nahi. API call par kuch settings decide karti hain ki pick kitni adventurous hogi: **temperature**, **top-p** aur **top-k**. Ye woh settings hain jinhe aap apni lagbhag har LLM call par chhuoge.
+
+Isi wajah se ek hi prompt do alag answers de sakta hai. Model koi ek stored reply nahi dhoondh raha. Har step par uske paas kai reasonable agle tokens hote hain, aur sampling unmein se chunta hai.
+
+```flow
+dir: LR
+title: Reply likhne ka ek step
+Prompt aur ab tak ka text -> Model har token ko score deta hai | logits
+Model har token ko score deta hai -> Temperature scores ko reshape karta hai
+Temperature scores ko reshape karta hai -> Chances jodkar 100 percent bante hain | softmax
+Chances jodkar 100 percent bante hain -> Top-k aur top-p kam likely tokens hata dete hain
+Top-k aur top-p kam likely tokens hata dete hain -> Chance ke hisaab se random mein ek chuno
+Chance ke hisaab se random mein ek chuno -> Use text mein jodo
+Use text mein jodo -> Prompt aur ab tak ka text
+```
+
+Is lesson mein hum Bengaluru ki ek fintech team ke saath chalenge jo teen LLM features jod rahi hai aur har ek ke liye settings chunni hain.
+
+## Ye kaam kaise karta hai
+
+1. **Model har possible agle token ko score deta hai.** In raw scores ko **logits** kehte hain. Bada number matlab model sochta hai ki woh token yahan zyada fit hota hai. Ek vocabulary mein das hazaaron tokens hote hain, isliye har step par das hazaaron scores hote hain.
+2. **Softmax scores ko chances mein badalta hai.** Har score 0 aur 1 ke beech ka number ban jaata hai, aur saare numbers jodkar 1 hote hain. Sabse zyada score waale token ko sabse zyada chance milta hai, par poora nahi.
+3. **Temperature pehle scores ko reshape karta hai.** Softmax se pehle har logit ko temperature se divide kiya jaata hai. **Kam** temperature (maan lo 0.2) gaps ko chauda karta hai, isliye top token lagbhag poora chance le leta hai. **Zyada** temperature (maan lo 1.5) gaps ko chhota karta hai, isliye rare tokens ko asli chance milta hai. Theek 1 par kuch nahi badalta. 0 par model hamesha top token leta hai, jise **greedy** decoding kehte hain.
+4. **Top-k aur top-p list ko kaatte hain.** **Top-k** sirf k sabse achhe tokens rakhta hai, jaise 40. **Top-p** (nucleus sampling bhi kehte hain) tokens ka sabse chhota group rakhta hai jiske chances jodkar p ho jaayein, jaise 0.9. Bache hue tokens ke chances dobara jodkar 1 hone tak scale up ho jaate hain.
+5. **Ek token random mein chuna jaata hai, uske chance ke hisaab se.** 60% waala token das mein se lagbhag chhe baar chuna jaata hai. Phir loop dobara shuru hota hai.
+6. **Ye ruk jaata hai** jab model end token likhe, maximum length par pahunche, ya aapka chuna hua **stop sequence** aa jaaye.
+
+**Har setting kya karti hai:**
+
+| Setting | Kya control karti hai | Kam value | Zyada value |
+| --- | --- | --- | --- |
+| Temperature | Chances kitne flat hain | Steady, sabse safe wording dohrata hai | Zyada varied, zyada surprising, bakwaas ka zyada risk |
+| Top-p | Likely mass ka kitna hissa rakhna hai | Kam options, safe | Zyada options, zyada variety |
+| Top-k | Kitne tokens rakhne hain | Kam options, safe | Zyada options, zyada variety |
+| Max tokens | Sabse lamba allowed reply | Sasta, kat sakta hai | Lamba, zyada kharch |
+| Stop sequences | Woh text jo reply ko khatam karta hai | Zaroorat nahi | Bekaabu output rokta hai aur kharch bachata hai |
+
+Jab model bahut sure ho toh top-k aur top-p alag tarah behave karte hain. Agar ek token ka 95% chance ho, toh top-p 0.9 sirf wahi ek token rakh sakta hai, jabki top-k 40 phir bhi 40 rakhta hai. Isi liye top-p model ke sure hone ke hisaab se adapt karta hai aur top-k nahi.
+
+Defaults provider aur model ke hisaab se alag hote hain, aur kuch naye models inme se kuch settings fix ya ignore karte hain. Jo model aap use karte ho uske liye provider ka documentation check karo.
+
+## Ek example se samjho
+
+Prompt lo "My favourite Indian city to visit is" aur maan lo model paanch agle tokens ko ye scores deta hai. Maths aasaani se follow ho sake isliye numbers banaye hue hain.
+
+| Token | Score (logit) |
+| --- | --- |
+| Mumbai | 3.0 |
+| Delhi | 2.5 |
+| Chennai | 1.5 |
+| Jaipur | 0.5 |
+| Pune | -0.5 |
+
+Chaar temperatures par chances ye rahe:
+
+| Temperature | Mumbai | Delhi | Chennai | Jaipur | Pune |
+| --- | --- | --- | --- | --- | --- |
+| 0.2 | 92.4% | 7.6% | 0.1% | 0.0% | 0.0% |
+| 0.5 | 70.2% | 25.8% | 3.5% | 0.5% | 0.1% |
+| 1.0 | 51.5% | 31.2% | 11.5% | 4.2% | 1.6% |
+| 2.0 | 36.9% | 28.7% | 17.4% | 10.6% | 6.4% |
+
+0.2 par model lagbhag har baar "Mumbai" bolta hai. 2.0 par woh solah koshishon mein lagbhag ek baar Pune bolta hai.
+
+Ab temperature 1.0 par list kaato. Upar se chances jodte hain: Mumbai 51.5%, phir Delhi 82.7%, phir Chennai 94.2%. **Top-p 0.9** ke saath, 90% tak pahunchne waala sabse chhota group ye teen hain. **Top-k 3** ke saath group bhi wahi teen hain. Unke chances jodkar 100% hone tak scale up hote hain: Mumbai 54.7%, Delhi 33.1%, Chennai 12.2%. Jaipur aur Pune ab chune nahi ja sakte.
+
+Aap maths ko Python ki kuch lines mein check kar sakte ho:
+
+```python
+import numpy as np
+
+tokens = ["Mumbai", "Delhi", "Chennai", "Jaipur", "Pune"]
+logits = np.array([3.0, 2.5, 1.5, 0.5, -0.5])
+
+def chances(logits, temperature=1.0):
+    scaled = logits / temperature
+    e = np.exp(scaled - scaled.max())      # subtract the max for numeric safety
+    return e / e.sum()
+
+for t in (0.2, 0.5, 1.0, 2.0):
+    print(t, np.round(chances(logits, t) * 100, 1))
+
+def top_p(probs, p=0.9):
+    order = np.argsort(-probs)
+    keep, total = [], 0.0
+    for i in order:
+        keep.append(i)
+        total += probs[i]
+        if total >= p:
+            break
+    out = np.zeros_like(probs)
+    out[keep] = probs[keep]
+    return out / out.sum()
+
+print(np.round(top_p(chances(logits)) * 100, 1))   # [54.7 33.1 12.2  0.   0. ]
+rng = np.random.default_rng(0)
+print(tokens[rng.choice(5, p=top_p(chances(logits)))])
+```
+
+Asli call mein aap wahi dials naam se set karte ho. Exact naam provider par depend karte hain, par aise dikhte hain:
+
+```python
+reply = client.messages.create(
+    model=MODEL_NAME,            # whichever model you use
+    max_tokens=200,
+    temperature=0.2,             # steady
+    messages=[{"role": "user", "content": "Pull the amount and merchant from this SMS: ..."}],
+)
+```
+
+**Team ne kya chuna.** SMS extractor ke liye unhone temperature 0 aur structured output use kiya, isliye JSON hamesha valid raha aur fields idhar-udhar nahi bhatke. Help-centre answers ke liye unhone 0.2 ka kam temperature aur citations ke saath retrieval use kiya. Account names ke liye 0.9, bees names generate kiye aur product manager ko chunne diya.
+
+## Aam kaamon ke liye shuruaati points
+
+Ye shuruaati points hain, rules nahi. Apne examples par test karo.
+
+| Kaam | Try karne ke liye temperature | Kyun |
+| --- | --- | --- |
+| Extraction, classification, routing | 0 se 0.2 | Ek hi sahi answer, isliye steady sabse achha |
+| Documents se answers (RAG) | 0 se 0.3 | Sources ke kareeb raho |
+| Code likhna ya theek karna | 0 se 0.3 | Chhote badlaav code tod sakte hain |
+| Summaries aur emails | 0.3 se 0.7 | Thodi natural wording, kam drift |
+| Brainstorming, names, slogans | 0.7 se 1.0 | Variety chahiye |
+
+## Jab ye settings galat lever hain
+
+- **Hallucinations rokne ke liye.** Kam temperature model ko har baar apni top choice lene deta hai, par top choice galat ho sakti hai. Model ko facts do (retrieval), sources maango aur answer check karo. Grounding aur citations wala lesson dekho.
+- **Valid JSON paane ke liye.** Ye umeed mat rakho ki kam temperature saaf JSON dega. Structured output use karo, jo model ko aapke format tak seemit karta hai. Structured output wala lesson dekho.
+- **Results ko bilkul repeatable banane ke liye.** Temperature 0 par bhi, servers requests kaise batch karte hain aur arithmetic kaise karte hain iski wajah se runs ke beech outputs thode alag ho sakte hain. Agar audit trail chahiye, toh input, settings aur output log karo.
+- **Saaf na likhe prompt ko theek karne ke liye.** Agar instruction vague hone ki wajah se answers badalte hain, toh prompt ko tight karna kisi bhi setting se zyada madad karta hai.
+
+## Playground se production tak
+
+- **Settings ek hi jagah rakho.** Har task ke liye temperature aur baaki settings config mein rakho, code mein bikhri hui nahi, aur har call ke saath log karo taaki kharab answer reproduce kar sako.
+- **Ek se zyada baar test karo.** Har test question teen se paanch baar chalao. Agar runs ke beech scores bahut badalte hain, toh ek run kuch bhi dikhaye, feature kaafi steady nahi hai.
+- **Kai answers sample karna ek tool hai, default nahi.** Aap kai answers generate karke woh chun sakte ho jis par zyadatar sehmat hon, ya jo judge ko pasand aaye. Ye aksar mushkil reasoning questions ko behtar banata hai, par kai guna kharch aur delay badhata hai. Jahan stakes justify karein wahan use karo.
+- **Cost cap karo.** Max tokens set karo, aur agar reply ka saaf ant hai toh stop sequence jodo, taaki ek ajeeb reply chalta rahe aur paise na khaaye.
+- **Retry tabhi madad karta hai jab randomness ho.** Temperature 0 par wahi call dobara chalane se aam taur par wahi galat answer milta hai.
+
+## Aam galtiyaan
+
+- **Har jagah default temperature use karna.** Extraction aur brainstorming ko bahut alag settings chahiye.
+- **Temperature aur top-p ko saath mein badalna.** Dono ek hi choice ko reshape karte hain. Ek badlo, test karo, phir decide karo ki doosre ko chhuna hai ya nahi.
+- **Temperature 0 ko sahi maan lena.** Iska matlab steady hai, aur steady galat answer phir bhi galat hai.
+- **Factual tasks mein "zyada creative" answers ke liye zyada temperature lagana.** Aapko zyada variety milti hai aur zyada galtiyan bhi.
+- **Ek run se setting judge karna.** Ek lucky ya unlucky sample bahut kam batata hai. Kai baar chalao.
+- **Stop sequence ya max tokens bhool jaana.** Jo reply kabhi khatam nahi hota usmein paise lagte hain.
+
+## Practice karo
+
+Apna playground ya API kholo aur ye experiment chalao.
+
+1. Ek factual question aur ek creative request lo, jaise "Ek chai stall ke liye paanch names suggest karo".
+2. Har ek ko temperature 0, 0.7 aur 1.2 par paanch-paanch baar chalao. Likho kitne alag answers mile.
+3. Temperature 1.0 par top-p 0.5 jodo aur compare karo.
+4. Do lines likho ki har task ke liye kaunsi setting use karoge aur kyun.
+
+Is topic par aur gehrai se padhne ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 2 sampling aur test-time compute cover karta hai.
+
+**Aapka kaam poora jab:** aap kisi dost ko samjha sako ki ek hi prompt alag answers kyun deta hai, aur bata sako ki extraction task aur naming task ke liye aap pehle kaunsi setting badloge.

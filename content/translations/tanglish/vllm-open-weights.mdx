@@ -1,0 +1,234 @@
+---
+id: vllm-open-weights
+lang: tanglish
+title: "vLLM and open-weight models"
+outcome: "Oru open-weight model-a vLLM-la serve pannunga, size, quantization, GPU-va numbers-oda justify pannunga, OpenAI-compatible endpoint-kku pinnaadi production-ku ready aakkunga."
+answer: "vLLM open-weight models-a GPUs-la efficient-aa serve panni, OpenAI-compatible API tharum; own evals-la model-a select panni, memory-a size panni, versions-a pin pannunga."
+why_it_matters: "Sila organisations-ku data avangaloda servers-ai vittu pogakkoodaadhu, illa volume romba adhigam, API selavu thaanga mudiyaadhu. Open-weight models-a nallaa serve panna theriyaradhu, indha rendu situations-layum oru nijamaana option."
+flashcards:
+  - q: "Open-weight models-na enna?"
+    a: "Weights-a publish panna models; avai licence terms-padi, ungaloda sondha hardware-la odalaam."
+  - q: "vLLM-na enna?"
+    a: "OpenAI-compatible API-oda, open-weight models-a GPUs-la efficient-aa serve panra open-source engine."
+  - q: "PagedAttention enna seiyum?"
+    a: "Ovvoru request-oda attention cache-a sinna pages-la manage pannum, adhanaala GPU memory-la neraya requests porundum."
+  - q: "Continuous batching-na enna?"
+    a: "Matha requests mudiyum podhu pudhu requests odura batch-la serum; muzhu batch-kku kaathirukkaama GPU busy-aa irukkum."
+  - q: "Oru open-weight model-a eppadi choose pannanum?"
+    a: "Ungaloda sondha evals-la irundhu, licence, supported languages (Indian ones-um), context length, size paarthu."
+  - q: "vLLM-la maximum context length yen mukkiyam?"
+    a: "Kuraiyaa irundhaa cache-ku adhigam memory kidaikkum, adhanaala neraya concurrent requests porundum."
+  - q: "Production-la edhai pin pannanum?"
+    a: "Model revision-um vLLM version-um; ovvoru upgrade-kku munnaadiyum evals."
+  - q: "OpenAI-compatible API yen help pannum?"
+    a: "Irukkura client code-um gateways-um maaraama velai seiyum; maaruradhu perumbaalum oru model alias-a maathuradhu mattum."
+  - q: "Entha vLLM metrics innum capacity thevai-nu kaattum?"
+    a: "Queue-la kaathirukkura requests-um KV cache usage-um. Valarndhutte irukkura queue, illa niraiya pogura cache-na replicas serkkunga, contexts-a kuraiyungal, illa concurrency-a kuraiyungal."
+  - q: "Oru schema-oda porundura JSON-a vLLM thara mudiyumaa?"
+    a: "Mudiyum. Adhoda OpenAI-compatible server structured output requests-a support panni, generation-a oru JSON schema-kku kattuppaduthum."
+exercise:
+  title: "Self-hosting-a plan pannunga"
+  setup: "Kochi-la oru hospital, patient discharge summaries-a avangaloda sondha servers-layae vachchukkanum. English-layum Malayalam-layum summaries draft panna oru model venum, naal-ku sumaar 8,000 requests, 6,000-token contexts-oda 25 concurrent requests-la peak. Avangakitta rendu 48 GB GPUs-um oru Kubernetes cluster-um irukku. Oru engineer public leaderboard-la top model-a select pannalaam-nu solraanga."
+  questions:
+    - q: "Model-a eppadi choose pannanum?"
+      a: "Hospital-oda sondha golden set-a English-layum Malayalam-layum pala open-weight models-la odi, licences-a check panni."
+    - q: "Sizing-la entha memory factors irukkanum?"
+      a: "Select panna precision-la weights-um, 6,000 tokens-la 25 concurrent requests-ku KV cache-um, headroom-oda."
+    - q: "Quantization eppo ok?"
+      a: "Evals-la, ethaiyum Malayalam-la, quality loss clinicians-ku ottukkara alavukku sinnadhaa irukkum podhu."
+    - q: "Production-la eppadi odanum?"
+      a: "Cluster-la containers-la vLLM, gateway-kku pinnaadi, health checks, metrics, pinned versions, quarterly evaluated upgrades-oda."
+ask:
+  - "vLLM-na enna, yen fast?"
+  - "Entha open-source model-a self-host pannanum?"
+  - "14B model-ku evvalavu GPU memory thevai?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+**Open-weight models** avangaloda weights-a publish pannuvaanga, adhanaala neenga adhai ungaloda sondha hardware-la odalaam. **vLLM**-na adhu maadhiri models-a GPUs-la efficient-aa serve panra open-source engine. Adhoda rendu mukkiya ideas:
+
+- **PagedAttention**: ovvoru request-oda attention cache-a vachchirukkura memory-a, operating system memory-a manage panra maadhiri, sinna pages-la manage pannum, adhanaala oru GPU-la neraya requests porundum.
+- **Continuous batching**: matha requests mudinja udane pudhu requests batch-la serum, muzhu batch-kku kaathirukkaama, adhanaala GPU busy-aa irukkum.
+
+vLLM oru **OpenAI-compatible API**-a expose pannum, adhanaala perumbaalaana client code-um gateways-um maaraama avoda velai seiyum.
+
+```flow
+Client code illa gateway -[OpenAI-compatible API]-> vLLM server
+vLLM server -> Continuous batching | requests ovvoru step-layum batch-la serum, vittu pogum
+Continuous batching -> GPU memory, 48 GB | 4-bit weights sumaar 9 GB; KV cache pages-la: PagedAttention, veenaana idaiveli illa
+vLLM server -> Metrics | oru second-ku tokens, queue length, cache usage
+```
+
+Model revision-aiyum vLLM version-aiyum pin pannunga.
+
+Indha lesson, Chennai-la claim documents-a avangaloda sondha servers-la vachchukkanum-nra oru insurance company-a follow pannum.
+
+## Idhu eppadi work aagudhu
+
+**Model-a choose panradhu.** Task-la irundhum ungaloda evals-la irundhum aarambinga, leaderboards-la illa. Commercial use-ku licence-a, adhu handle panra languages-a (Indian languages models-ukku naduvula romba maarum), context length, size-a check pannunga. Sinna models (7-la irundhu 14 billion parameters) oru GPU-la odum, extraction, classification, grounded RAG answers-ku perumbaalum podhum.
+
+**Memory-a size panradhu.** Oru rough rule: 16-bit precision-la oru parameter-ku sumaar 2 bytes weights-ku thevai. 8-billion-parameter model-ku weights-ku sumaar 16 GB thevai. Adhoda mela, attention (KV) cache concurrent requests-oda, avaloda context length-oda valarum. 24 GB GPU, modest concurrency-oda 8B model-a serve pannum; 70B model-ku 16-bit-la sumaar 140 GB thevai, adhanaala pala GPUs illa quantization.
+
+**Quantization.** Weights-a 8 illa 4 bits-la store panna memory paadhi illa moonrula naalu bhagam kurayum, perumbaalum speed-um koodum, ungaloda sondha evals-la neenga measure pannanum-nra sinna quality loss-oda. Common formats: AWQ, GPTQ, FP8.
+
+**Odutradhu.**
+
+```bash
+pip install vllm
+vllm serve Qwen/Qwen2.5-7B-Instruct --max-model-len 8192 --gpu-memory-utilization 0.90
+# now: POST http://localhost:8000/v1/chat/completions
+```
+
+Mukkiya settings: maximum context length (kuraivaa irundhaa neraya concurrent requests porundum), GPU memory share, pala GPUs-la tensor parallelism (`--tensor-parallel-size 2`), quantization.
+
+**Production-la.** Weights-a volume-la illa internal image-la serthu, container-la, gateway-kku pinnaadi, health checks, metrics (tokens per second, queue length, cache usage), GPUs anumadhikkura idathula autoscaling-oda odunga. Model revision-aiyum vLLM version-aiyum pin pannunga, ovvoru upgrade-kku munnaadiyum evaluate pannunga.
+
+**Mukkiya vLLM settings:**
+
+| Setting | Example | Effect |
+| --- | --- | --- |
+| `--max-model-len` | 8192 | Kuraivaana limits, concurrent requests-ku adhigam idam tharum |
+| `--gpu-memory-utilization` | 0.90 | vLLM use panna mudiyura GPU memory share |
+| `--tensor-parallel-size` | 2 | Oru machine-la pala GPUs-la oru model-a pirikkum |
+| `--quantization` | awq | Memory migaththa quantized checkpoint-a use pannum |
+
+**API-oda nyaayamaa compare panradhu.** Adhe golden set-a self-hosted model-layum oru API model-layum odunga. Task-um language-um vaaripaa accuracy, realistic load test-la p95 latency, 1,000 requests-ku cost-a record pannunga; GPUs-oda muzhu maadhaanthira cost-a nijamaana volume-aal pirichadhu-um serthu. Self-hosting, full load-la per token nallaa selavukkum, kammi use-la mahaa selavaagum, adhanaala nijamaana expected volume-a use pannunga. Client-oda team sign off panna mudiyra oru short table-aa result-a ezhudhunga.
+
+**Adhai operate panradhu.** Queue length-aiyum cache usage-aiyum paarunga: valarra queue-na innum capacity illa kuraivaana contexts thevai. Oru spare GPU illa replica vachchukkunga, oru failure illa upgrade service-a niruththaama irukka. Weights-a internal registry illa volume-la store pannunga, yen-na start-up-la internet-la irundhu download panradhu slow, locked-down networks-la block-um aagalaam.
+
+**Container-la vLLM odutradhu.** Volume-la weights, pinned image, port 8000-la OpenAI-compatible server:
+
+```bash
+docker run --gpus all --rm -p 8000:8000 \
+  -v /data/hf-cache:/root/.cache/huggingface \
+  -e HF_TOKEN \
+  vllm/vllm-openai:v0.10.1 \
+  --model Qwen/Qwen2.5-7B-Instruct --max-model-len 8192 \
+  --gpu-memory-utilization 0.90 --served-model-name chat-local
+```
+
+`--served-model-name` clients use panra peraiyai set pannum, adhanaala apps-a maathaama, adiyila irukkura model-a maathalaam.
+
+**Entha OpenAI-style API-yum maadhiri call pannunga, structured output-oda.**
+
+```python
+from openai import OpenAI
+from pydantic import BaseModel
+
+class Claim(BaseModel):
+    policy_number: str
+    amount_inr: int
+    reason: str
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="not-needed-locally")
+r = client.chat.completions.create(
+    model="chat-local",
+    messages=[{"role": "user", "content": "Extract: Policy HX-22981, claim of Rs 18,400 for a cracked windscreen."}],
+    response_format={"type": "json_schema", "json_schema": {"name": "claim", "schema": Claim.model_json_schema()}},
+)
+print(Claim.model_validate_json(r.choices[0].message.content))
+```
+
+Server generation-a schema-kku kattuppaduthum, adhanaala reply parse aagum; apdiyum structured-output lesson solra maadhiri values-a validate pannunga.
+
+**Go-live-kku munnaadi load testing.** Realistic prompts-a adhigamaagura concurrency-la anuppi, first token varra neram, tokens per second, errors-a record pannunga:
+
+```python
+import asyncio, time
+from openai import AsyncOpenAI
+
+aclient = AsyncOpenAI(base_url="http://localhost:8000/v1", api_key="x")
+
+async def one(prompt):
+    t0 = time.perf_counter(); first = None
+    stream = await aclient.chat.completions.create(model="chat-local", stream=True, max_tokens=300,
+                                                   messages=[{"role": "user", "content": prompt}])
+    async for chunk in stream:
+        if first is None and chunk.choices and chunk.choices[0].delta.content:
+            first = time.perf_counter() - t0
+    return first, time.perf_counter() - t0
+
+async def run(prompts, concurrency):
+    sem = asyncio.Semaphore(concurrency)
+    async def limited(p):
+        async with sem:
+            return await one(p)
+    results = await asyncio.gather(*(limited(p) for p in prompts))
+    ttft = sorted(r[0] for r in results if r[0]); total = sorted(r[1] for r in results)
+    print(f"c={concurrency}: p95 first token {ttft[int(0.95 * (len(ttft) - 1))]:.2f}s, "
+          f"p95 total {total[int(0.95 * (len(total) - 1))]:.2f}s")
+
+# for c in (1, 8, 32, 64): asyncio.run(run(sample_prompts, c))
+```
+
+P95 first-token neram ungaloda budget-a thaandura concurrency thaan, oru replica-oda capacity.
+
+**Metrics-a paarunga.** vLLM `/metrics`-la Prometheus metrics-a expose pannum, odikittu irukkura, kaaththirukkura requests-um KV cache usage-um serthu. Requests romba neram kaathirundhaa illa cache usage nirambiye irundhaa alert pannunga, CPU-va vida indha signals-la replicas-a scale pannunga.
+
+**Shared prefixes-a reuse pannunga.** Prefix caching, adhe system prompt illa document-oda aarambikkura requests-a, adhai thirumba compute panradhai thavirkka vaikkum; chat-kum RAG workloads-kum help aagum. Ungaloda version-la adhu on-la irukkaa-nu paarunga, shared content-a prompts-oda aarambathula vachchukkunga.
+
+**Browser-la try pannunga.** Ungaloda traffic-ku KV cache-a estimate pannunga, adhu perumbaalum oru GPU evvalavu users-a serve pannum-nu mudivu pannum.
+
+```python
+layers, kv_heads, head_dim, bytes_per = 32, 8, 128, 2      # a typical 8B model at 16-bit
+per_token = 2 * layers * kv_heads * head_dim * bytes_per
+for users, context in [(10, 4000), (40, 4000), (40, 16000)]:
+    gb = per_token * users * context / 1e9
+    print(f"{users} users x {context} tokens: {gb:.1f} GB of KV cache")
+```
+
+## Oru worked example
+
+Chennai-la oru insurance company claim documents-a avangaloda sondha servers-la vachchukkanum. Claim forms-la irundhu 20 fields-a extract panna, claims staff-ku short grounded answers tharanum, naal-ku sumaar 30,000 requests.
+
+300 real forms-la evals, 7-la irundhu 14 billion parameters-oda moonu open-weight models-a oru frontier API-oda compare pannum. Nalla 14B model 95% field accuracy adaiyudhu, API-oda 97%-kku ethiraa; data on-premises-la irukkanum-nu client andha gap-a ottukkaraanga.
+
+Sizing: 16-bit-la 14B model-ku weights-ku sumaar 28 GB thevai. 4-bit AWQ quantization-oda sumaar 9 GB thevai, evals 94.5%-kku mattum irangudhu. Oru 48 GB GPU-la, KV cache-ku sumaar 30 GB meedhi. Claim requests 8,000-token limit-kulla sumaar 3,000 tokens average, load test p95-la oru request-ku 3 second-kku keezha 40 concurrent requests-a kaattudhu. Rendu GPUs headroom-um redundancy-yum tharum.
+
+vLLM client-oda Kubernetes cluster-la containers-la odudhu, munnaadi irundha adhe gateway-kku pinnaadi, adhanaala application code oru model alias-a mattum maathudhu. Eval suite pass aana apram, upgrades quarter-ku oru thadava nadakkum.
+
+| Option | Field accuracy | Weights-ku memory | Notes |
+| --- | --- | --- | --- |
+| Frontier API | 97% | Porundhaadhu | Data premises-a vittu pogum |
+| 14B model, 16-bit | 95% | Sumaar 28 GB | Porundhum, cache-ku kammi idam |
+| 14B model, 4-bit AWQ | 94.5% | Sumaar 9 GB | p95-la 3 s-kku keezha 40 concurrent requests; select pannaanga |
+
+## Podhuvaa panra thappugal
+
+- **Leaderboard-la irundhu model-a pick panradhu.** Ungaloda sondha data-vilum languages-layum test pannunga.
+- **Sizing-la KV cache-a marakkradhu.** Weights porundhum, apram server load-la fail aagum. Concurrency-ku size pannunga.
+- **Measure pannaama quantize panradhu.** Sila tasks mathadhai vida adhigam quality izhakkum. Ungaloda evals-a odunga.
+- **Licences-a ignore panradhu.** Sila open-weight licences commercial use illa periya deployments-a restrict pannum.
+- **Pin pannaadha versions.** Pudhu model revision illa engine release outputs-a maathalaam. Pin panni evaluate pannunga.
+- **GPU server-ku CPU-la scale panradhu**; queue, cache metrics-la scale pannunga.
+- **Pin pannaadha images, model revisions**, adhanaala restart behaviour-a maathudhu.
+- **Load test illaama**, adhanaala capacity-a users thaan kandupidikkuraanga.
+
+## vLLM-oda self-host panna koodaadha neram
+
+- **Kammiyaana illa spiky volume**, GPUs thevai illaama kidakkaradhu API calls-a vida adhigam selavaagum.
+- **Romba strong models thevai**, avai API-aa mattum kidaikkalaam.
+- **Adhai operate panna yaarum illa**: GPUs, drivers, upgrades, on-call nijamaana velai.
+
+## Demo-la irundhu production varaikkum
+
+- **Image-aiyum model revision-aiyum pin pannunga**, weights volumes-la cache aagi.
+- **Ovvoru model, setting maatrathukkum load test pannunga**, oru replica-ku capacity-a record pannunga.
+- **Queue length-ukkum KV cache usage-ukkum alert panni scale pannunga.**
+- **Gateway-kku pinnaadi vainga**, oru alias-um oru fallback-um oda.
+- **Failures-kum rolling upgrades-kum oru spare replica vachchukkunga.**
+
+## Practice pannunga
+
+Neenga access panna mudiyra entha GPU-lum vLLM quickstart-a follow pannunga (sinna model-ku oru free notebook GPU podhum), PagedAttention post-a padinga.
+
+1. Oru sinna instruct model-a vLLM-la serve panni, OpenAI-compatible client-oda call pannunga.
+2. 7B, 14B, 70B model-ku 16-bit-layum 4-bit-layum weight memory-a kanakku pannunga, ovvonnukkum evvalavu GPUs thevai-nu estimate pannunga.
+3. Ungaloda extraction illa RAG golden set-a self-hosted model-layum oru API model-layum odi, accuracy, latency, 1,000 requests-ku cost-a compare pannunga.
+4. Load test-a naalu concurrency levels-la odi, p95 first-token neram 2 seconds-kku keezha irukkura mikavum adhigamaana ondrai ezhudhunga.
+
+Innum aazhama, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025)-la chapter 9, inference servers, batching, prefix caching, throughput-aiyum latency-yaiyum measure panradhu cover pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Oru model-a OpenAI-compatible endpoint-kku pinnaadi serve panni, adhoda size, quantization, GPU choice-a numbers-oda justify panna mudiyum.

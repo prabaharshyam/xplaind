@@ -1,0 +1,229 @@
+---
+id: document-parsing-ocr
+lang: hinglish
+title: "Documents parse karna aur OCR"
+outcome: "PDFs, scans, slides aur Word files ko retrieval ke liye saaf, order mein text aur saabut tables mein badlo, aur text extraction, OCR aur layout-aware parsing mein se chunna seekho."
+answer: "Document parsing PDFs, scans aur slides ko AI ke liye saaf text aur tables mein badalta hai. Digital PDFs ke liye text extraction, scans ke liye OCR aur complex pages ke liye layout-aware tools use karo."
+why_it_matters: "Bahut saare RAG failures retrieval se nahi, parsing se shuru hote hain: columns mix ho gaye, tables bekaar text mein flatten ho gayi, scanned pages khaali. Achhi parsing aksar RAG system mein sabse sasta bada improvement hai aur jab answers galat jaayein toh sabse pehle check karne wali cheez."
+flashcards:
+  - q: "RAG ke liye document parsing kya hai?"
+    a: "Files ko text aur structure mein badalna: reading order mein paragraphs, headings, saabut tables aur citations ke liye page numbers."
+  - q: "Parsing ke teen main approaches kaunse hain?"
+    a: "Digital files se text extraction, scans aur photos ke liye OCR, aur layout-aware parsing jo headings, columns, tables aur reading order detect karti hai."
+  - q: "Kaise pata chalega ki PDF page shayad scan hai?"
+    a: "Usme extract hone layak characters bahut kam hote hain, kyunki page ek image hai."
+  - q: "Simple extraction mein do-column pages mein kya galat hota hai?"
+    a: "Text dono columns ke aar-paar line-by-line padha jaata hai, aur beparwah sentences mix ho jaate hain."
+  - q: "RAG ke liye tables ko text mein kaise badlein?"
+    a: "Headers ko values ke saath rakho, jaise har row ke liye ek line: 'Plan Gold: premium ₹12,450, sum insured ₹5,00,000', aur ek table ya poori rows ko ek chunk mein rakho."
+  - q: "OCR accuracy ko kya affect karta hai?"
+    a: "Image resolution, skew, parchhaiyan, stamps, haath ki likhaai, aur ye ki OCR document ki languages support karta hai aur unpar set hai ya nahi."
+  - q: "Repeated headers aur footers kyun hatayein?"
+    a: "Woh har page par aate hain aur har chunk aur uske embedding ko gandi kar dete hain."
+  - q: "Har parsed document ke liye kya track karna chahiye?"
+    a: "Pages, har page par characters, mile hue tables aur OCR confidence, saath mein original se compare kiya hua ek sample."
+  - q: "Code scanned page ko digital page se kaise alag bata sakta hai?"
+    a: "Har page par extract hone layak characters ginti karo. Jis page par lagbhag koi text nahi par ek image use dhak rahi hai, woh bahut sambhaavna se OCR chahiye wala scan hai."
+  - q: "OCR confidence scores kyun rakhein?"
+    a: "Kam confidence wale words aur pages ko review ya dobara process ke liye flag kiya ja sakta hai, garbled text ko chupke se index mein daalne ki jagah."
+exercise:
+  title: "Garbled answers ko diagnose karo"
+  setup: "Bengaluru ki ek property firm ka RAG assistant 300 lease agreements ke baare mein sawaalon ke jawab deta hai. Retrieval sahi pages dhoondh leta hai phir bhi rent escalation ke answers aksar galat hote hain. Inspection dikhata hai: rent schedules tables hain jo ek ghuli-mili line ki tarah nikalti hain; purane leases Kannada aur English text wale scans hain; har page par firm ka letterhead aur 'Confidential' footer hai; aur clause numbering kho gayi hai."
+  questions:
+    - q: "Rent schedules ko kaise parse karna chahiye?"
+      a: "Layout-aware ya table-aware parser se, har row ko uske headers ke saath text mein badalkar, jaise 'Year 3: monthly rent ₹1,15,000', ek chunk mein rakhkar."
+    - q: "Scanned leases ke liye kya karna chahiye?"
+      a: "Unhe har page par kam characters se detect karo, Kannada aur English enable karke OCR chalao, confidence scores rakho aur pages spot-check karo."
+    - q: "Letterhead aur footer ka kya karein?"
+      a: "Aisi lines dhoondho jo zyadatar pages par repeat hoti hain aur chunking se pehle unhe hata do."
+    - q: "Clause numbering kho jaana kyun matter karta hai?"
+      a: "Citations aur sawaal clauses ko refer karte hain, jaise 'clause 7.2'. Headings aur clause numbers ko har chunk ke saath store hone wale section path mein rakho."
+ask:
+  - "RAG ke liye PDFs parse karne ke liye kaunse tools achhe hain?"
+  - "PDFs mein tables ko kaise handle karun?"
+  - "Indian languages ke documents ko OCR kaise karun?"
+translated_on: 2026-11-16
+---
+
+## Ye kya hai
+
+**Document parsing** files ko aise text aur structure mein badalti hai jo RAG system use kar sake: sahi reading order mein paragraphs, sections batane wali headings, rows aur columns ke saath saabut tables, aur citations ke liye page numbers. Teen approaches, jo aksar milakar use hote hain:
+
+- Digital PDFs aur Office files se **text extraction**: tez aur sasta, par layout ke liye andha.
+- Scans aur photos ke liye **OCR** (optical character recognition): text ki images ko text mein badalta hai.
+- **Layout-aware parsing**: aise models jo headings, columns, tables, figures aur reading order detect karte hain, phir har hissa sahi se extract karte hain. Docling aur Unstructured jaise open-source tools aur cloud document services ye karte hain. Vision-language models bhi pages ko seedhe padh sakte hain.
+
+```flow
+Ek file -> Kis type ki? | digital PDF, scan, mixed, Word, slides, image
+Kis type ki? -[digital]-> Text extraction ya layout-aware parser
+Kis type ki? -[scan]-> Sahi languages ke saath OCR, ya vision-language model
+Text extraction ya layout-aware parser -> Layout | columns se reading order, headings se section path, tables se headers wali rows
+Sahi languages ke saath OCR, ya vision-language model -> Layout
+Layout -> Clean | repeated headers, footers, page numbers, watermarks hatao
+Clean -> Metadata ke saath chunks | document, section path, page, OCR confidence
+```
+
+Ye lesson Kochi ki ek insurance company ko follow karta hai jiska assistant sahi pages dhoondh leta tha phir bhi galat jawab deta tha.
+
+## Ye kaam kaise karta hai
+
+**Pehle document type pehchano.** Digital PDF, scanned PDF, mixed, Word, slides, spreadsheet ya image. Jis page mein extract hone layak characters bahut kam hon woh shayad scan hai.
+
+**Reading order.** Simple extraction do-column pages ko line-by-line aar-paar padhti hai aur columns mix kar deti hai. Layout analysis columns dhoondhti hai aur har ek ko baari-baari padhti hai.
+
+**Tables.** Flatten hui tables matlab kho deti hain: "Premium 12,450 Sum insured 5,00,000" rows ke beech ambiguous ho jaata hai. Tables ko structured data ki tarah extract karo, phir har ek ko aise text mein badlo jo headers ko values ke saath rakhe (Markdown ya har row ke liye ek line: "Plan Gold: premium ₹12,450, sum insured ₹5,00,000"). Poori table, ya headers ke saath poori rows, ek chunk mein rakho.
+
+**Headings aur sections.** Har chunk ke saath heading text aur section path ("Part B > Exclusions > 4.2") rakho. Ye retrieval, filters aur citations mein madad karta hai.
+
+**OCR quality.** Accuracy image quality tay karti hai: resolution, skew, parchhaiyan, stamps aur haath ki likhaai. Indian documents aksar English ko Hindi, Tamil ya doosre scripts ke saath milate hain; aisa OCR use karo jo unhe support kare aur languages set karo. Images ko pre-process karo (seedha karo, contrast badhao) aur kamzor pages flag karne ke liye OCR confidence scores rakho.
+
+**Headers, footers aur noise.** Repeated page headers, footers, page numbers aur watermarks chunks ko gandi kar dete hain. Zyadatar pages par repeat hone wale text ko detect karke hata do.
+
+**Output check karo.** Pages ka sample lo aur originals se compare karo, khaaskar tables aur scanned pages. Har document ke liye track karo: pages, har page par characters, mile hue tables, OCR confidence.
+
+**Har approach kya handle karta hai:**
+
+| Problem | Text extraction | OCR | Layout-aware parsing |
+| --- | --- | --- | --- |
+| Digital text | Haan | Zaroorat nahi | Haan |
+| Scanned pages | Nahi: text khaali | Haan | Haan, OCR ke saath |
+| Do columns | Aksar mix ho jaate hain | Aksar mix ho jaate hain | Sahi reading order |
+| Tables | Flatten ho jaati hain | Flatten ho jaati hain | Rows aur columns bachte hain |
+| Headings | Plain text ki tarah kho jaati hain | Kho jaati hain | Detect hoti hain |
+| Speed aur cost | Sabse tez, sabse sasta | Dheemi | Sabse dheemi, sabse accurate |
+
+Ek practical pattern: pehle sasti text extraction chalao, phir sirf wahi pages jo checks mein fail hon, jaise kam character counts ya detect hui tables, layout-aware parsing ya OCR ko bhejo. Isse bade document sets par cost kam rehta hai.
+
+**Pages ko sasti se mehngi ki taraf route karo.** Plain extraction try karo, aur sirf kamzor pages OCR ko bhejo:
+
+```python
+import fitz                                       # PyMuPDF
+import pytesseract
+from PIL import Image
+import io
+
+def page_text(page, min_chars=200, langs="eng+hin+tam"):
+    text = page.get_text("text")
+    if len(text.strip()) >= min_chars:
+        return text, "digital", None
+    pix = page.get_pixmap(dpi=300)
+    img = Image.open(io.BytesIO(pix.tobytes("png")))
+    data = pytesseract.image_to_data(img, lang=langs, output_type=pytesseract.Output.DICT)
+    words = [(w, int(c)) for w, c in zip(data["text"], data["conf"]) if w.strip() and int(c) >= 0]
+    conf = sum(c for _, c in words) / len(words) if words else 0
+    return " ".join(w for w, _ in words), "ocr", conf
+
+def parse_pdf(path):
+    pages = []
+    for i, page in enumerate(fitz.open(path), start=1):
+        text, how, conf = page_text(page)
+        pages.append({"page": i, "text": text, "method": how, "ocr_conf": conf,
+                      "needs_review": how == "ocr" and conf < 70})
+    return pages
+```
+
+Tesseract ko Hindi, Tamil aur doosri languages ke liye unke language packs install chahiye. Kam average confidence wale pages review list mein ya kisi behtar OCR service ya vision model ke paas jaate hain.
+
+**Tables row-wise text ki tarah.** `pdfplumber` digital PDFs mein tables dhoondhta hai; har row ko uske headers ke saath likho taaki woh chunking mein bach jaaye:
+
+```python
+import pdfplumber
+
+def tables_as_text(path):
+    out = []
+    with pdfplumber.open(path) as pdf:
+        for n, page in enumerate(pdf.pages, start=1):
+            for table in page.extract_tables():
+                header, *rows = table
+                for row in rows:
+                    cells = [f"{h}: {v}" for h, v in zip(header, row) if h and v]
+                    if cells:
+                        out.append({"page": n, "text": "; ".join(cells)})
+    return out
+
+# "Plan: Gold; Premium: ₹12,450; Sum insured: ₹5,00,000"
+```
+
+Ab har row ek aisa poora sentence hai jise retriever match kar sakta hai aur model quote kar sakta hai.
+
+**Mushkil pages ke liye layout-aware tools.** Docling aur Unstructured jaise open-source parsers aur cloud document services columns, headings aur tables ko saath mein detect karte hain. Ye dheeme hain aur kabhi paid, isliye inhe un pages ke liye rakho jo sasti checks mein fail hote hain.
+
+**Vision models parsers ki tarah.** Ganday scans, forms aur merged cells wali tables ke liye page image ko vision model ko Markdown output maangte hue bhejna aksar classic OCR se behtar hota hai. Numbers dhyaan se check karo: vision models kabhi-kabhi digits galat padhte hain, isliye jahan ho sake totals compare karo.
+
+**Record karo ki har page kaise padha gaya.** Har page ke liye method, confidence aur parser version store karo. Jab answers galat jaayein, aap turant dekh sakte ho ki source text kabhi sahi tha ya nahi.
+
+**Apne browser mein try karo.** Woh lines dhoondho jo zyadatar pages par repeat hoti hain, jaise headers aur footers, taaki chunking se pehle unhe hataya ja sake.
+
+```python
+from collections import Counter
+
+pages = [
+    "ACME Insurance - Confidential\nPolicy terms\nPage 1",
+    "ACME Insurance - Confidential\nClaims process\nPage 2",
+    "ACME Insurance - Confidential\nExclusions\nPage 3",
+]
+counts = Counter(line for p in pages for line in set(p.splitlines()))
+repeated = {l for l, n in counts.items() if n >= 0.6 * len(pages)}
+clean = ["\n".join(l for l in p.splitlines() if l not in repeated and not l.startswith("Page ")) for p in pages]
+print("removed:", repeated)
+print(clean)
+```
+
+## Ek example se samjho
+
+Kochi ki ek insurance company ka RAG assistant premiums aur exclusions ke baare mein galat jawab deta hai. Retrieval logs dikhate hain ki sahi pages mil rahe hain, par text garbled hai.
+
+Uske 600 policy documents ki inspection dikhati hai:
+
+- Do-column policy wordings columns ke aar-paar padhi gayi, jisse beparwah sentences mix ho gaye.
+- Premium tables flatten ho gayi, isliye model ne plans aur ages mila diye.
+- 70 purane endorsements aise scans the jinme text bilkul nahi tha.
+- Har page par repeated header aur disclaimer footer tha.
+
+Aap saare PDFs ke liye layout-aware parser par switch karte ho, kam text wale pages par English aur Malayalam ke liye OCR enable karke. Tables ko har row ke liye ek line mein badla jaata hai, column headers repeat karke. Section paths har chunk ke saath store hote hain, aur repeated headers aur footers hata diye jaate hain.
+
+80-question golden set par, retrieval ya prompts mein koi badlaav kiye bina, sahi answers 62% se 84% tak badhte hain. Barah pages ka OCR confidence ab bhi threshold se neeche hai; aap unhe client ke liye list karte ho, jo unme se nau ke liye behtar scans deta hai.
+
+| Mili problem | Fix |
+| --- | --- |
+| Do-column wordings mix ho gayi | Layout-aware parser |
+| Flatten hui premium tables | Har row ke liye ek line, headers repeat |
+| 70 scanned endorsements | English aur Malayalam ke liye OCR |
+| Repeated header aur footer | Chunking se pehle hataye |
+| 80-question golden set par result | 62% se 84% sahi, retrieval ya prompts badle bina |
+
+## Aam galtiyaan
+
+- **Sab kuch ke liye ek extractor.** Scans, digital PDFs aur slides ko alag handling chahiye.
+- **Tables ko flatten karna.** Headers ko values ke saath, aur rows ko saath rakho.
+- **Reading order ignore karna.** Policies, circulars aur reports mein multi-column pages common hain.
+- **Sirf English-OCR.** Apne documents ki languages set karo, jaise Hindi, Tamil ya Malayalam, aur har ek ka ek sample page check karo.
+- **Output ko page se kabhi compare na karna.** Kuch bhi index karne se pehle kuch parsed pages ko originals ke saath print karo. Das minute ke spot checks zyadatar parsing bugs dhoondh lete hain.
+- **Language packs ka na hona**, jisse Hindi ya Tamil pages bina error ke kachra nikalte hain.
+- **Tables ko running text mein flatten karna.** Har row ke saath headers rakho.
+- **Ye record na karna ki kaunse pages OCR hue**, jisse kamzor text trace nahi ho paata.
+
+## Jab simple extraction kaafi hai
+
+- **Saaf digital PDFs** jinme single columns aur kam tables hon.
+- **Text sources** jaise HTML pages, Markdown ya saaf headings wali Word files.
+- **Structured exports** (CSV, JSON, database dumps), jinhe parsing ki zaroorat hi nahi.
+
+## Demo se production tak
+
+- **Pages ko checks se route karo**: pehle sasti extraction, OCR ya layout tools sirf kamzor pages ke liye.
+- **Har page ke liye method, confidence aur parser version store karo.**
+- **Har hafte parsed pages ka sample originals se compare karo**, khaaskar tables aur scans.
+- **Har document ke characters per page aur mile hue tables track karo**, parser failures pakadne ke liye.
+- **Tools behtar hone par re-parse karo**, jo raw copies aapne rakhi hain unse.
+
+## Practice karo
+
+Docling ka overview aur PDFs parse karne par Unstructured ka article padho.
+
+1. Paanch alag documents collect karo: ek do-column report, ek table wala document, ek scanned page, ek slide deck aur ek Indian language mein government circular.
+2. Unhe simple text extraction aur ek layout-aware tool dono se parse karo, aur reading order aur tables ke liye outputs compare karo.
+3. Ek table ko headers ke saath row-wise text mein badlo, aur measure karo ki aapke RAG app mein teen table sawaalon ke answers behtar hote hain ya nahi.
+4. Apne scanned page par parse_pdf ko Indian-language pack ke saath aur uske bina chalao aur confidence aur text compare karo.
+
+**Aap tab done ho jab aap** ek hi page ko kharab aur achhe se parse hua dikha sako, aur samjha sako ki kaunse parsing choice ne use fix kiya.

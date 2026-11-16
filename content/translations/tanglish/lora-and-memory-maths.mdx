@@ -1,0 +1,200 @@
+---
+id: lora-and-memory-maths
+lang: tanglish
+title: "LoRA, QLoRA, GPU memory maths"
+outcome: "Oru model odavum train panna vum evvalavu GPU memory thevai-nu estimate pannunga, LoRA-um QLoRA-um fine-tuning-a oru card-la eppadi fit aakkudhu-nu explain pannunga."
+answer: "Oru model-ku adhoda weights-ku memory thevai, training-ku adha vida pala madangu adhigam thevai. LoRA weights-a freeze pannitu, ovvoru layer-kum rendu sinna matrices-a train pannum, QLoRA freeze panna weights-a 4-bit-laum store pannum."
+why_it_matters: "Oru model unga GPU-la fit aagudhaa-nu thaan cost-a, hardware-a, enna build panna mudiyum-nu mudivu pannum. Interviewers memory-a appove estimate panna solluvaanga, clients oru set-up yen innoru set-up-a vida pathu madangu selavaagudhu-nu kepaanga."
+flashcards:
+  - q: "16-bit-la 7B model-oda weights-ku evvalavu memory thevai?"
+    a: "Sumaar 14 GB: 7 billion parameters, ovvonnukkum 2 bytes."
+  - q: "Training memory-la vachirukkura naalu vishayam enna?"
+    a: "Weights, gradients, optimizer-oda running values, activations. Mudhal moonum trainable parameters-oda ennikkaiyoda scale aagum."
+  - q: "7B model-a full fine-tune panna sumaar evvalavu memory thevai?"
+    a: "Activations-ku munnaadi sumaar 56 GB, 16-bit weights, gradients, standard Adam optimizer-oda. Perumbaalaana single GPUs-ku idhu romba adhigam."
+  - q: "LoRA-oda idea enna?"
+    a: "Original weights-a freeze pannunga. Choose panna ovvoru layer-kum, periya matrix muzhuvadhayum illaama, rendu sinna matrices-a train pannunga, adhoda product thaan update."
+  - q: "LoRA-la rank r-na enna?"
+    a: "Rendu sinna matrices-oda width. Periya r update-ku adhiga capacity tharum, adhiga memory-yum edukkum. 8 la irundhu 64 maadhiri values common starting points."
+  - q: "LoRA yen memory-a micham pannudhu?"
+    a: "Andha sinna matrices-ku mattum gradients-um optimizer values-um thevai, adhanaala training memory freeze panna weights-oda konjam extra-vaa irukkum."
+  - q: "LoRA-kku QLoRA enna serkkudhu?"
+    a: "Freeze panna base weights-a 4-bit-la store pannum, adhu 16-bit size-la sumaar naalaavadhu pagudhi, sinna LoRA matrices adhiga precision-la train aagum."
+  - q: "Training mudinja aprom LoRA adapter-a eppadi use panradhu?"
+    a: "Thaniyaa vechu base model mela load pannalaam, illa weights-la merge pannalaam, adhanaala serving-ku extra selavu illa."
+exercise:
+  title: "Fit aagumaa?"
+  setup: "Hyderabad startup 13B-parameter open model-a loan-agreement summaries ezhudha adapt panna virumbudhu. Avangakitta oru 24 GB GPU irukku. Oru teammate, 'Normal-aa fine-tune pannalaam' nu solraanga."
+  questions:
+    - q: "13B weights-ku 16-bit-la evvalavu memory thevai, model load-ae aagumaa?"
+      a: "13 billion times 2 bytes sumaar 26 GB. Idhu 24 GB-ku mela, adhanaala indha card-la 16-bit-la load aagaadhu."
+    - q: "Full fine-tuning possible-aa?"
+      a: "Illa. Weights-oda sumaar naalu madangu, sumaar 104 GB, activations-um thevai. Oru 24 GB card-ku romba aduththu."
+    - q: "4-bit weights-ku evvalavu thevai, idhu enna possible aakkudhu?"
+      a: "13 billion times 0.5 bytes sumaar 6.5 GB. Idhu LoRA matrices-kum activations-kum card-la idam vidum, adhanaala QLoRA realistic."
+    - q: "QLoRA choose panradhukku munnaadi enna check pannanum?"
+      a: "Nallaa ezhudhuna prompt ye velaiya mudikkudhaa-nu, 4-bit model-oda quality avanga summaries-la oru test set-la pothumaa irukkaa-nu."
+ask:
+  - "7B model-ku evvalavu GPU memory thevai?"
+  - "LoRA-kum QLoRA-kum enna difference?"
+  - "LoRA full fine-tuning-a vida model-a mosamaakkumaa?"
+translated_on: 2026-11-16
+---
+
+## Idhu enna
+
+Oru GPU-ku oru fixed alavu memory irukku, oru language model adhukkulla fit aaganum. Adhu fit aagudhaa-nu thaan neenga entha hardware rent pannuveenga, evvalavu selavu, oru project possible-aa-nu mudivu pannum. Nalla vishayam, indha maths unga manasulayae pannura alavu simple.
+
+Oru model-na **parameters**, illa **weights**-nu solra romba periya number list. "7B" model-la 7 billion irukku. Ovvoru number-um adhoda **precision**-a poruthu konjam bytes edukkum:
+
+| Format | Number-ku bytes | 7B model-oda weights |
+| --- | --- | --- |
+| 32-bit (FP32) | 4 | 28 GB |
+| 16-bit (FP16 or BF16) | 2 | 14 GB |
+| 8-bit (INT8) | 1 | 7 GB |
+| 4-bit (INT4) | 0.5 | 3.5 GB |
+
+Ovvoru number-kum kammi bits use panradhuku **quantization**-nu peru. Idhu model-a sinnadhaakkum, konjam quality kuraiyum.
+
+Oru model-a odradhukku adhoda weights memory-la irukkanum, konjam working space-um. **Training**-ku romba adhigam thevai, ennanna computer ovvoru weight-aiyum eppadi maathanum-nu notes-um vechukkum. Adhanaala oru model-a fine-tune panna, sumaar odradha vida naalu madangu memory thevai padalaam.
+
+**LoRA** (low-rank adaptation) andha cost-la perumbaagathai thavirkkura oru trick. Idhu original weights-a freeze panni, adhukku badhila oru sinna add-on-a train pannum. **QLoRA** innoru trick serkkum: freeze panna weights-a 4-bit-la store pannum. Rendum sernthu, oru saadhaarana GPU-vaala, illaina oru rack GPUs thevai padura model-a fine-tune panna mudiyum.
+
+```flow
+title: Training GPU memory-la enna vachirukkum
+Weights | model-ae -> Gradients | ovvoru trainable weight-kum onnu
+Gradients | ovvoru trainable weight-kum onnu -> Optimizer values | Adam-ku ovvoru trainable weight-kum innum rendu
+Optimizer values | Adam-ku ovvoru trainable weight-kum innum rendu -> Activations | batch size-oda, text length-oda valarum
+Activations | batch size-oda, text length-oda valarum -> Mothama thevai padura GPU memory
+```
+
+Indha lesson Hyderabad startup, oru 24 GB GPU-la 13B model-a adapt panna mudiyumaa-nu mudivu pannradha follow pannum.
+
+## Idhu eppadi work aagudhu
+
+**Full fine-tuning yen heavy.** Oru weight-a train panna, computer-ku weight, oru **gradient** (entha pakkam, evvalavu maathanum), **optimizer**-oda running values thevai. Popular-aana Adam optimizer ovvoru weight-kum rendu values vachukkum. Adhanaala ovvoru trainable weight-kum memory-la sumaar naalu numbers thevai. 16-bit-la 7B model-ku:
+
+- weights: 7B × 2 bytes = 14 GB
+- gradients: 14 GB
+- optimizer values: 28 GB (weight-ku rendu)
+- total: sumaar **56 GB**, **activations**-ku munnaadi, adhu batch size-oda, text length-oda valara temporary results.
+
+Neraya set-ups stability-kaaga optimizer values-a 32-bit-la vechukkum, adhu total-a innum ooki vidum. Perumbaalaana single GPUs-la 12 la irundhu 48 GB irukkum, adhanaala 7B model-a kooda full fine-tune panna onnula fit aagaadhu.
+
+**LoRA adha eppadi fix pannudhu.** Model-la oru layer 4096 × 4096 maadhiri oru periya weights matrix vachirukku, adhu sumaar 16.8 million numbers. Full fine-tuning ellathaiyum update pannum. LoRA adhukku badhila:
+
+1. andha matrix-a **freeze** pannum, adhanaala gradient-um optimizer values-um thevai illa;
+2. rendu sinna matrices serkkum, A (4096 × r), B (r × 4096), r-na **rank**-nu solra oru sinna number, 8 maadhiri;
+3. A, B-a mattum train pannum. Adhoda product thaan layer-oda update.
+
+r = 8-la, rendu matrices-layum 4096 × 8 × 2 = 65,536 numbers irukku. Idhu original matrix-oda sumaar **0.4%**. LoRA choose panna layers-ku apply aagum, perumbaalum attention projections-ku. 32 layers, ovvoru layer-kum rendu matrices irukkura 7B model-ku, sumaar **4.2 million** trainable parameters, model-oda sumaar 0.06%.
+
+Gradients-kum optimizer values-kum aagura memory pala gigabytes-la irundhu pala megabytes-ku kammi aagum. Micham irukkardhu freeze panna weights, konjam extra, activations.
+
+**QLoRA innum eppadi poguthu.** Freeze panna weights thaan micham irukkura periya cost. QLoRA adha **4-bit**-la store pannum, 16-bit size-oda naalaavadhu pagudhi. Forward, backward passes-la thevaippadum podhu adhiga precision-ku thirumba convert aagum, sinna LoRA matrices adhiga precision-la train aagum. 7B model-oda freeze panna weights 14 GB-la irundhu sumaar 3.5 GB-ku kuraiyum.
+
+**Training-ku aprom.** LoRA matrices oru sinna file, perumbaalum pala megabytes. Adha **thaniyaa vechu** base model mela load pannalaam, idhu oru base model-a vera vera adapters-oda neraya customers-ku serve panna vidum. Illa weights-la **merge** pannalaam, adhanaala serving-ku extra selavu illa.
+
+**7B model-ku memory, rough guide-aa:**
+
+| Approach | Weights | Training-ku extra | 24 GB GPU-la fit aagumaa? |
+| --- | --- | --- | --- |
+| Full fine-tuning, 16-bit | 14 GB | sumaar 42 GB, activations-oda | Illa |
+| 16-bit model-la LoRA | 14 GB | LoRA-ku pala MB, activations-oda | Aamaa, sinna batch-oda |
+| QLoRA, 4-bit base | 3.5 GB | LoRA-ku pala MB, activations-oda | Aamaa, idam micham irukkum |
+
+Activations unga batch size-a, text length-a poruthu irukkum, adhanaala idhai starting estimates-aa eduthukittu, unga hardware-la measure pannunga.
+
+## Oru worked example
+
+Hyderabad startup 13B model-a loan-agreement summaries ezhudha adapt panna virumbudhu. Avangakitta oru 24 GB GPU irukku. Step by step paarunga.
+
+1. **Model load aagumaa?** 13 billion × 2 bytes = 16-bit-la 26 GB. Idhu 24 GB-ku mela. Load-ae aagaadhu.
+2. **Full fine-tuning panna mudiyumaa?** Weights-oda sumaar naalu madangu thevai: sumaar 104 GB, activations-um. Illa.
+3. **4-bit-na?** 13 billion × 0.5 bytes = 6.5 GB. Card-la LoRA matrices-kum activations-kum nalla idam micham irukkum.
+4. **Adhanaala realistic option QLoRA.**
+
+Avanga estimates-a check panna use panna helper idho:
+
+```python
+def weights_gb(params_billion, bytes_per_number):
+    return params_billion * bytes_per_number          # billions x bytes = GB
+
+for name, b in [("16-bit", 2), ("8-bit", 1), ("4-bit", 0.5)]:
+    print(name, weights_gb(13, b), "GB for 13B")
+# 16-bit 26 GB, 8-bit 13 GB, 4-bit 6.5 GB
+
+def full_finetune_gb(params_billion):
+    # 16-bit weights + gradients + two Adam values per weight = 4 numbers of 2 bytes
+    return params_billion * 2 * 4
+
+print(full_finetune_gb(7), "GB for full fine-tuning of 7B, before activations")  # 56
+```
+
+Hugging Face PEFT library-oda oru typical LoRA set-up idhu maadhiri irukkum:
+
+```python
+from peft import LoraConfig, get_peft_model
+
+config = LoraConfig(
+    r=8,                                   # rank: width of the two small matrices
+    lora_alpha=16,                         # scales the update
+    target_modules=["q_proj", "v_proj"],   # which layers get adapters
+    lora_dropout=0.05,
+    task_type="CAUSAL_LM",
+)
+model = get_peft_model(base_model, config)
+model.print_trainable_parameters()         # a tiny fraction of the model
+```
+
+Layer names models-ku models maarum, adhanaala model-oda documentation-a check pannunga. QLoRA-ku, base model mudhalla bitsandbytes library vazhiyaa 4-bit-la load aagum, apram ade LoRA set-up apply aagum.
+
+**Startup mudhalla enna pannichu.** Edhaiyum train panradhukku munnaadi, 50 sample agreements-la nalla prompt-a try pannaanga. Avanga checklist-oda adhu 71% score pannichu. 1,200 reviewed summaries-oda QLoRA-la, oru quick trial held-out test set-la 88% adaichu. Rendu numbers-aiyum record-la vechaanga, gap upkeep-a justify pannunadhaala mattum QLoRA choose pannaanga. Indha numbers oru method-oda illustration: prompt-oda compare pannunga, apram mudivu pannunga.
+
+## Settings-a choose panradhu
+
+| Setting | Enna pannum | Starting point |
+| --- | --- | --- |
+| Rank r | Update-oda capacity | 8 la irundhu 16. Quality kammi-na mattum ooki |
+| Alpha | Update-a scale pannum | Perumbaalum 2 × r, apram adjust pannunga |
+| Target layers | Adapters enga pogum | Mudhalla attention layers. Thevai-na innum serunga |
+| Learning rate | Step size | Full fine-tuning-a vida adhigam. Library-oda guide follow pannunga |
+| Batch size, text length | Activation memory-a odikkum | Memory theerndha, mudhalla idhai kammi pannunga |
+
+## LoRA, QLoRA use pannaadha neram
+
+- **Nalla prompt pothum.** Mudhalla prompt-a test pannunga. Adhukku nimishangal thaan.
+- **Problem knowledge illaadhadhu.** Retrieval use pannunga. Maaritte irukkura facts-a store panna adapter mosamaana idam.
+- **Hosted model-a mattum call panna mudiyum.** Neenga vachirukkaadha model-ku adapter attach panna mudiyaadhu, provider avangaloda fine-tuning tharuvaanga-na thavira.
+- **Mudinja alavu nalla quality thevai, compute-um irukku.** Full fine-tuning oru task-ku innum tight-aa fit aagalaam, aanaa LoRA perumbaalum aduththu varum.
+- **Romba kammi examples.** Romba sinna dataset, entha method-aanaalum vegamaa overfit aagum.
+
+## Demo-la irundhu production-ku
+
+- **Nijamaana memory-a measure pannunga.** Estimates enna try pannanum-nu solluvaa. Oru short job odi, unga nijamaana batch size, text length-la GPU memory use-a paarunga.
+- **Serving-kum memory thevai.** Serving neram, oru model-ku adhoda weights-um, ovvoru user-oda conversation length-oda valara **KV cache**-um thevai. GPUs, quantization lesson-a paarunga.
+- **Quantize panna model-a test pannunga.** Four-bit konjam quality-a edukkum. Benchmarks-la mattum illa, unga test set-la check pannunga.
+- **Adapters-a code maadhiri version pannunga.** Ovvoru adapter-kum base model, data, settings, test score-a record pannunga, test set-a locked-aa vainga.
+- **Mothatha-yum cost pannunga.** Final run-ku mattum illa, experiments-ku GPU hours-um serunga. Perumbaalaana runs experiments thaan.
+- **Base model maarum-nu plan pannunga.** Oru adapter adhu train aana base model-oda mattum thaan work aagum. Pudhu base model-na thirumba train pannanum.
+
+## Podhuvaa panra thappugal
+
+- **Weights-a mattum ennuradhu.** Training-ku mela gradients, optimizer values, activations-um thevai.
+- **Activations-a marakkradhu.** Neelamaana text-um periya batch-um, weights fit aanaalum memory-a mudichidum.
+- **Aarambathula rank-a romba adhigam vaikkradhu.** Adhiga rank-na adhiga memory-um overfit risk-um. Kammiyaa aarambinga.
+- **4-bit free-nu nenaikkradhu.** Idhu konjam quality-ku periya memory savings-a trade panradhu. Test pannunga.
+- **Adapters-um base models-um mix panradhu.** Oru adapter adhu train aana base model-oda kattu.
+- **Prompt baseline-a skip panradhu.** Training-ku panam selavu pannradhukku munnaadi, nallaa ezhudhuna prompt-oda eppavum compare pannunga.
+
+## Practice pannunga
+
+Kanakku pannunga, apram GPU access irundhaa nijamaa try pannunga.
+
+1. Moonu open models-a edunga, example 3B, 8B, 70B. Ovvonnukkum, weights-oda memory-a 16-bit, 8-bit, 4-bit-la ezhudhunga.
+2. Ovvonnum 16 GB, 24 GB, 80 GB GPU-la, odradhukkum QLoRA-kum fit aagudhaa-nu sollunga.
+3. Oru free notebook-la sinna model-oda, mela irukkura maadhiri oru LoRA config serthu trainable parameters-a print pannunga. Percentage-a ezhudhunga.
+
+Innum aazhama padikka, Chip Huyen-oda *AI Engineering* (O'Reilly, 2025) chapter 7 memory maths, quantization, parameter-efficient fine-tuning-a explain pannum.
+
+**Mudinjadhu-nu eppo sollalaam:** Oru model oru GPU-la fit aagumaa-nu manasulayae estimate panna mudiyum, LoRA full fine-tuning-a vida yen romba kammi memory edukkudhu-nu rendu sentences-la explain panna mudiyum.
