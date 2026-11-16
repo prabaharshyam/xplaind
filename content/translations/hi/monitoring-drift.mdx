@@ -1,0 +1,216 @@
+---
+id: monitoring-drift
+lang: hi
+title: "Monitoring और drift"
+outcome: "Production में model को monitor कर पाओगे: service health, input data drift, prediction drift, देर से आने वाला असली outcome और segment के हिसाब से performance, साथ में alerts और retraining policy।"
+answer: "Production में चल रहे model को service health, input data और predictions के drift, और असली outcomes आने पर segment के हिसाब से accuracy, तीनों के लिए monitor करो, और हर एक पर alerts लगाओ।"
+why_it_matters: "Models चुपचाप खराब होते हैं: customers बदलते हैं, fraudsters ढल जाते हैं, कोई partner data format बदल देता है, अर्थव्यवस्था बदलती है। Monitoring के बिना किसी के नोटिस करने से पहले model महीनों तक गलत रह सकता है। Deploy किए model को भरोसेमंद रखने वाली चीज़ monitoring ही है।"
+flashcards:
+  - q: "Model monitoring कौन-सी चार layers देखता है?"
+    a: "Service health, data quality और input drift, prediction drift, और असली outcomes आने पर performance।"
+  - q: "Data drift और concept drift में क्या फ़र्क है?"
+    a: "Data drift का मतलब inputs बदल गए; concept drift का मतलब inputs और outcomes के बीच का रिश्ता ही बदल गया।"
+  - q: "Monitoring baseline क्या है?"
+    a: "Training और validation data के सेव किए statistics, जैसे feature और score distributions, जिनसे live data की तुलना होती है।"
+  - q: "Prediction rates रोज़ क्यों देखें?"
+    a: "Approvals या positive predictions में अचानक उछाल अक्सर outcomes आने से बहुत पहले ही upstream bug दिखा देता है।"
+  - q: "Labels देर से आएँ तो monitor कैसे करें?"
+    a: "Labels आते जाएँ तो performance track करो, और तब तक complaints, overrides या शुरुआती behaviour जैसे proxies use करो।"
+  - q: "Segment के हिसाब से monitor क्यों करें?"
+    a: "Drift अक्सर किसी एक region, channel या partner में शुरू होता है और overall numbers में छिप जाता है।"
+  - q: "Monitoring में feedback loop क्या है?"
+    a: "Model उसी data को बदल देता है जिससे वो बाद में सीखता है, जैसे block किए गए transactions का outcome कभी दिखता ही नहीं।"
+  - q: "Feedback loops के बावजूद unbiased labels कैसे रखें?"
+    a: "एक छोटा random holdout या human-review sample रखो जो model के फ़ैसले को बायपास करे।"
+  - q: "PSI के लिए आम rules of thumb क्या हैं?"
+    a: "करीब 0.1 से नीचे थोड़ा बदलाव, 0.1 से 0.25 नज़र रखने लायक मध्यम shift, 0.25 से ऊपर जाँचने लायक बड़ा shift। अपनी limits खुद तय करो।"
+  - q: "Model के फ़ैसलों में से एक छोटा random holdout क्यों रखें?"
+    a: "इससे model को परखने के लिए unbiased outcomes मिलते हैं, क्योंकि जो फ़ैसले model block कर देता है उनमें असल में क्या होता, ये कभी पता नहीं चलता।"
+exercise:
+  title: "Dashboard पढ़ो"
+  setup: "Hyderabad के एक insurer का claim-fraud model रोज़ करीब 4% claims flag करता है। सोमवार को एक hospital network के claims पर flags 15% पर पहुँच जाते हैं, जबकि बाकी सारे sources 4% के आसपास ही रहते हैं। Drift reports दिखाती हैं कि उस network का 'admission और claim के बीच के दिन' feature अब हमेशा 0 है। अलग से, छह महीनों में flag किए गए claims में से बाद में fraud साबित होने वाले claims का हिस्सा धीरे-धीरे 40% से गिरकर 28% हो गया है।"
+  questions:
+    - q: "सोमवार के उछाल की वजह शायद क्या थी?"
+      a: "Upstream में data बदलाव: network का feed admission dates ठीक से भेजना बंद कर गया, इसलिए feature 0 पढ़ रहा है।"
+    - q: "तुरंत सही response क्या है?"
+      a: "Contain करो: उस network के claims को बिना उस feature वाले fallback model या rules पर भेजो, और network या data team से feed ठीक करने को कहो।"
+    - q: "40% से 28% तक की धीमी गिरावट क्या बताती है?"
+      a: "Concept drift या बदलते fraud patterns: model के flags कम सटीक हैं। ये जाँच और retrain शुरू करने का trigger है।"
+    - q: "Retrain किया model production तक कैसे पहुँचे?"
+      a: "उसी evaluation और promotion checks से गुज़रकर, मौजूदा model से तुलना के बाद, फिर shadow और canary stages से।"
+ask:
+  - "Data drift और concept drift में क्या फ़र्क है?"
+  - "Population stability index क्या है?"
+  - "Model को कितनी बार retrain करना चाहिए?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+Model monitoring चार layers देखता है:
+
+- **Service health**: model चल रहा है? Latency, errors, throughput।
+- **Data quality और input drift**: inputs अब भी सही हैं और training data जैसे हैं? Missing values, नई categories, खिसकी हुई distributions।
+- **Prediction drift**: scores या predicted classes की distribution बदल गई?
+- **Performance**: असली outcomes आने पर, accuracy अब भी वहीं है जहाँ थी, overall और segment के हिसाब से?
+
+**Data drift** का मतलब inputs बदल गए; **concept drift** का मतलब inputs और outcomes के बीच का रिश्ता बदल गया (वही features अब अलग तरह से predict करते हैं, जैसे fraud patterns बदलने पर)।
+
+| Layer | क्या check होता है | क्या पकड़ता है |
+|---|---|---|
+| Service health | Latency और errors, हर मिनट | Outages |
+| Inputs | Schema, missing rates, baseline से हर feature का drift, रोज़ | Upstream bugs, नए data shapes |
+| Predictions | Partner और city के हिसाब से approval rate, रोज़ | Behaviour में अचानक बदलाव |
+| Performance | Labels आते जाएँ तो महीने और segment के हिसाब से default rate | धीमी गिरावट, concept drift |
+
+```flow
+dir: LR
+Alert -> Owner -> Runbook
+Runbook -> Investigate
+Runbook -> Fallback
+Runbook -> Roll back
+Runbook -> Retrain
+```
+
+ये lesson Bengaluru की एक buy-now-pay-later company को follow करता है, जिसका credit model checkout पर छोटे loans approve करता है।
+
+## ये काम कैसे करता है
+
+**Baselines.** Training और validation data के summary statistics सेव करो (हर feature की distributions, score distributions, segment shares)। Monitoring live data की तुलना इन्हीं से करता है।
+
+**Data checks.** Schema checks (types, allowed values), missing-value rates, और हर feature का drift score, जैसे population stability index या statistical distance measures। जिन features की distribution threshold से ज़्यादा खिसके उन्हें flag करो।
+
+**Prediction checks.** हर predicted class का हिस्सा, average score, action threshold से ऊपर वालों का हिस्सा। अचानक उछाल अक्सर कोई outcome आने से पहले ही upstream bug का संकेत देता है।
+
+**देर से आने वाला ground truth.** Outcomes अक्सर देर से आते हैं: loan default 90 दिन बाद, churn एक महीने बाद। Labels आने पर performance track करो, और तब तक proxies use करो (complaints, overrides, शुरुआती repayment behaviour)।
+
+**Segments.** Region, channel, product और customer type के हिसाब से track करो; drift अक्सर किसी एक segment में शुरू होता है।
+
+**Alerts और response.** हर drift पर action ज़रूरी नहीं। Severity के साथ thresholds तय करो: investigate, retrain, roll back, या fallback पर switch। Alerts को एक owner और runbook तक route करो।
+
+**Retraining policy.** Schedule पर (महीने में एक बार), trigger पर (drift या performance गिरना), या दोनों पर retrain करो। हर retrained model उन्हीं evaluation और promotion checks से गुज़रे जिनसे पहला model गुज़रा था, मौजूदा production model से तुलना समेत।
+
+**Feedback loops.** Models उसी data को बदल सकते हैं जिससे वो बाद में सीखते हैं: transactions block करने वाले fraud model के साथ आपको कभी पता नहीं चलता कि वो fraud थे या नहीं। Unbiased labels के लिए एक छोटा random holdout या human review sample रखो।
+
+**Severities के साथ alert thresholds:**
+
+| Signal | Threshold | Severity | Response |
+| --- | --- | --- | --- |
+| Error rate | 5 मिनट तक 1% से ऊपर | High | On-call को page करो; service check करो |
+| Feature missing rate | Baseline से दोगुना | Medium | Source की जाँच करो |
+| Partner के हिसाब से approval rate | एक दिन में 10 points से ज़्यादा बदलाव | High | Inputs check करो; ज़रूरत हो तो fallback model |
+| किसी key feature का drift score | 3 दिन तक तय limit से ऊपर | Medium | Review करो; retrain पर सोचो |
+| Segment के हिसाब से default rate | दो महीने तक plan से ऊपर | Medium | हाल के data के साथ retrain करो |
+
+**Drift score कैसे पढ़ें.** Population stability index तुलना करता है कि किसी feature की values training data और live data में buckets में कैसे बँटती हैं। छोटी values का मतलब थोड़ा बदलाव; बड़ी values का मतलब असली shift। इसे संकेत समझो, फ़ैसला नहीं: जिस feature को model मुश्किल से use करता है उसमें shift शायद मायने न रखे, जबकि उसके सबसे ज़रूरी feature में छोटा shift भी मायने रख सकता है। Action से पहले drift के साथ feature importance भी देखो।
+
+**Runbook लिखना.** हर alert के लिए लिखो कि owner कौन है, सबसे पहले जाँचने वाली तीन चीज़ें क्या हैं, fallback पर कैसे जाना है, और roll back कब करना है। Fallback तैयार और tested रखो, जैसे परेशान करने वाले feature के बिना एक सरल model या rules policy, ताकि containment मिनटों में हो जाए।
+
+**Code में Population stability index.** Training data पर किसी feature के buckets बनाओ, फिर live data की तुलना उन्हीं buckets में करो:
+
+```python
+import numpy as np
+
+def psi(expected, actual, buckets=10):
+    edges = np.unique(np.quantile(expected, np.linspace(0, 1, buckets + 1)))
+    edges[0], edges[-1] = -np.inf, np.inf
+    e = np.histogram(expected, edges)[0] / len(expected)
+    a = np.histogram(actual, edges)[0] / len(actual)
+    e, a = np.clip(e, 1e-6, None), np.clip(a, 1e-6, None)
+    return float(np.sum((a - e) * np.log(a / e)))
+
+def drift_report(train_df, live_df, features, warn=0.1, alert=0.25):
+    rows = []
+    for f in features:
+        value = psi(train_df[f].dropna(), live_df[f].dropna())
+        missing_change = live_df[f].isna().mean() - train_df[f].isna().mean()
+        level = "alert" if value > alert else "warn" if value > warn else "ok"
+        rows.append((f, round(value, 3), f"{missing_change:+.1%}", level))
+    return sorted(rows, key=lambda r: -r[1])
+```
+
+आम rules of thumb PSI को 0.1 से नीचे stable और 0.25 से ऊपर बड़ा shift मानते हैं, पर thresholds model owner के साथ तय करो और पिछले महीनों के हिसाब से जाँचो। Evidently जैसी libraries charts के साथ ऐसी ही reports बना देती हैं।
+
+**Segment के हिसाब से prediction rates.** Upstream bugs अक्सर सबसे पहले किसी एक partner या region में positive predictions के हिस्से में उछाल के रूप में दिखते हैं:
+
+```python
+def rate_alerts(today, history, min_change=0.10):
+    """today/history: dict segment -> approval rate; history holds the 30-day average."""
+    return {s: (history[s], r) for s, r in today.items()
+            if s in history and abs(r - history[s]) > min_change}
+```
+
+**ईमानदार outcomes के लिए holdout.** अगर model कोई transaction block कर दे, तो आपको कभी पता नहीं चलता कि वो fraud थी या नहीं। एक छोटे random हिस्से को (business और risk teams से तय करके, अक्सर 1% से काफ़ी कम) model के फ़ैसले को छोड़कर सामान्य handling या human review में जाने दो, और outcome record करो:
+
+```python
+import random
+
+def decide(txn, model_score, threshold=0.8, holdout_rate=0.005):
+    if random.random() < holdout_rate:
+        return {"action": "review", "holdout": True}       # outcome measured without the model's influence
+    return {"action": "block" if model_score > threshold else "allow", "holdout": False}
+```
+
+Holdout पर precision और recall मापो, ताकि दुनिया बदलने पर model असल में कैसा चल रहा है ये दिखे।
+
+**LLM apps के लिए drift.** यही बातें inputs (question length, language mix, topics) और outputs (refusal rate, answer length, citation rate, judge scores) पर भी लागू होती हैं। Hindi सवालों का बढ़ता हिस्सा या कोई नया topic cluster ऐसा drift है जिसमें retraining नहीं, नए documents या prompt बदलाव चाहिए हो सकते हैं।
+
+## एक worked example
+
+Bengaluru की एक BNPL (buy now, pay later) company का credit model checkout पर छोटे loans approve करता है।
+
+Monitoring dashboard और alerts:
+
+- Service: p95 latency और error rate।
+- Inputs: training baseline के मुकाबले 40 features के रोज़ drift scores; हर partner के payloads पर schema checks।
+- Predictions: partner और city के हिसाब से approval rate।
+- Performance: outcomes आते जाएँ तो approval month और segment के हिसाब से 60-day default rate।
+
+मार्च में, एक बड़े e-commerce partner का approval rate रातोंरात 61% से 79% हो जाता है। Input drift दिखाता है कि उस partner के लिए "device age" feature शून्य पर गिर गया: उनके app update ने उसे भेजना बंद कर दिया, और model ने शून्य को "बिल्कुल नया device" पढ़ा, जो low-risk signal है। Team दो घंटे के अंदर उस partner को बिना उस feature वाले fallback model पर डाल देती है, और partner अपना payload ठीक कर देता है।
+
+अलग से, चार महीनों में tier-3 cities के first-time borrowers में defaults का धीरे-धीरे बढ़ना, हाल के data और पहले के छोटे loans पर repayment behaviour के एक नए feature के साथ retraining trigger करता है। Retrained model promotion checks पास करता है और shadow और canary stages से roll out होता है।
+
+Borderline applicants का 2% random sample score की परवाह किए बिना approve होता है, इसलिए company उन applicants के बारे में सीखती रहती है जिन्हें model वरना reject कर देता।
+
+| Event | किससे पकड़ा | Response | समय |
+| --- | --- | --- | --- |
+| Partner approvals 61% से 79% हुए | Approval-rate alert, फिर input drift | उस partner के लिए fallback model | दो घंटे |
+| Tier-3 first-time borrowers ज़्यादा default कर रहे हैं | चार महीनों तक segment के हिसाब से performance | नए feature के साथ retrain, shadow फिर canary | हफ़्ते |
+
+## आम गलतियाँ
+
+- **सिर्फ़ uptime monitor करना।** चलता हुआ model भी बुरी तरह गलत हो सकता है।
+- **Baselines न होना।** Drift के लिए तुलना करने को कुछ चाहिए।
+- **हर छोटे drift पर alert करना।** Thresholds और severities तय करो, वरना alerts को लोग अनदेखा करने लगते हैं।
+- **समस्या नोटिस करने के लिए labels का इंतज़ार करना।** Inputs और predictions रोज़ देखो।
+- **Feedback loops को अनदेखा करना।** सीखने के लिए unbiased samples रखो।
+- **हर PSI की हल्की हिलावट पर alert करना**, जिससे लोग alerts को अनदेखा करना सीख जाते हैं।
+- **Holdout न होना**, जिससे outcomes सिर्फ़ उन्हीं cases के होते हैं जिन्हें model ने जाने दिया।
+- **सिर्फ़ inputs monitor करना**, segment के हिसाब से prediction rates नहीं।
+
+## जब हल्का monitoring काफ़ी है
+
+- **एक बार के analysis में use हुआ model।**
+- **Low-impact recommendations**, जहाँ फ़ैसला हमेशा इंसान लेते हैं और errors सस्ते हैं।
+- **Stable inputs**, जैसे किसी नियंत्रित process में लगा fixed sensor, जहाँ error और range checks ज़्यादातर समस्याएँ पकड़ लेते हैं।
+
+## Demo से production तक
+
+- **हर model version के साथ baselines save करो।**
+- **Drift और segment reports रोज़ चलाओ**, तय thresholds और owners के साथ।
+- **Random holdout रखो** जहाँ फ़ैसले outcomes छिपा देते हैं, business से तय करके।
+- **Labels आते जाएँ तो performance track करो**, segment के हिसाब से।
+- **Runbooks लिखो**, हर alert के लिए fallback और rollback steps के साथ।
+
+## Practice करो
+
+Evidently का introduction और Made With ML और Google के Rules of ML में monitoring वाले lessons पढ़ो।
+
+1. किसी training set से baseline statistics सेव करो, फिर नए batch में drift simulate करो (एक feature को shift करो, दूसरे को तोड़ो) और दोनों को drift report से पकड़ो।
+2. Simulated दिनों में segment के हिसाब से approval या positive-prediction rate का एक छोटा dashboard बनाओ।
+3. एक पेज की monitoring और retraining policy लिखो: क्या check होता है, thresholds, किसे alert जाता है और वो क्या करते हैं।
+4. अपने baseline और simulated batch पर drift_report चलाओ, और check करो कि shift किया हुआ feature flag हुआ और stable वाले नहीं।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 AI applications के लिए monitoring, drift और metrics पर है।
+
+**आपका काम पूरा जब:** आप किसी simulated upstream bug से आया alert दिखा सको और runbook response समझा सको।

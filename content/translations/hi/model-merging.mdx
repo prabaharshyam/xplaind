@@ -1,0 +1,183 @@
+---
+id: model-merging
+lang: hi
+title: "Model merging: fine-tuned models को एक में मिलाना"
+outcome: "समझा पाओगे कि model merging क्या है और कब वो एक multi-task model train करने से बेहतर है, averaging, task vectors, SLERP, TIES, DARE और layer stacking बता पाओगे, और merged model को सुरक्षित तरीके से test कर पाओगे।"
+answer: "Model merging एक ही base से fine-tune हुए models के weights को एक model में मिला देता है। बिना retraining और GPUs के skills जोड़ सकते हो, पर हर नए model की तरह इसे भी test करना ज़रूरी है।"
+why_it_matters: "Teams अक्सर अलग-अलग tasks के लिए अलग models fine-tune करती हैं, फिर उन सबको serve और maintain करने में उलझती हैं। Merging कई skills को एक model में समेट सकता है, tasks को एक के बाद एक train करने से होने वाला forgetting बचाता है, और कई top open models merges ही हैं। इसे आज़माना सस्ता है और गलत use करना आसान।"
+flashcards:
+  - q: "Model merging क्या है?"
+    a: "दो या ज़्यादा models के weights को, जो आमतौर पर एक ही base से fine-tune हुए हों, एक model में मिलाना।"
+  - q: "Merging, ensemble से कैसे अलग है?"
+    a: "Ensemble कई models चलाकर उनके जवाब मिलाता है, जिसमें कई calls का खर्च लगता है। Merging weights को एक बार मिलाता है, इसलिए आप एक ही model serve करते हो।"
+  - q: "Task vector क्या है?"
+    a: "Fine-tuning ने जो बदलाव किया: fine-tuned weights घटा base weights। Task vectors जोड़ने से skills जुड़ती हैं; एक को घटाने से कोई behaviour हट सकता है।"
+  - q: "सब tasks पर एक model train करने की जगह merge क्यों करें?"
+    a: "हर task को अलग से और अच्छे से train कर सकते हो, पिछले tasks भूले बिना, और merge के लिए GPUs नहीं चाहिए।"
+  - q: "Merging से पहले TIES और DARE क्या करते हैं?"
+    a: "वो weight के ज़्यादातर छोटे बदलावों को हटा देते हैं, जो ज़्यादातर noise ही जोड़ते हैं, ताकि अलग-अलग tasks के ज़रूरी बदलाव एक-दूसरे में कम दखल दें।"
+  - q: "SLERP क्या है?"
+    a: "Spherical linear interpolation: सीधे average की जगह घुमावदार रास्ते पर दो models को मिलाना, जिसमें एक factor तय करता है कि किस model को ज़्यादा वज़न मिले। ये एक बार में दो को merge करता है।"
+  - q: "Layer stacking क्या है?"
+    a: "अलग-अलग models की layers से एक model बनाना, कभी-कभी इससे बड़ा model बनता है। अच्छा चलने के लिए आमतौर पर आगे और training चाहिए।"
+  - q: "Merge के बाद हमेशा क्या करना चाहिए?"
+    a: "Merged model को हर उस task पर test करो जो उसे संभालना है, और check करो कि उसने general क्षमताएँ या safety behaviour नहीं खोया।"
+exercise:
+  title: "एक bank के तीन assistants के लिए एक model"
+  setup: "Mumbai के एक bank के पास एक ही open 8B base model पर तीन LoRA adapters हैं: एक customer complaints classify करता है, एक English और Hindi में replies draft करता है, और एक KYC documents से fields extract करता है। तीन adapters serve करना संभालने लायक है, पर team बिना internet वाले branch laptops पर एक ही model रखना चाहती है।"
+  questions:
+    - q: "यहाँ merging आज़माना वाजिब क्यों है?"
+      a: "तीनों adapters एक ही base model share करते हैं, इसलिए उनके बदलाव एक ऐसे model में मिल सकते हैं जो laptop पर fit हो, बिना retraining के।"
+    - q: "उन्हें पहले कौन-सा method आज़माना चाहिए?"
+      a: "Adapters का सादा weighted average, फिर अगर tasks आपस में टकराएँ तो TIES या DARE। सादे से शुरू करो और तुलना करो।"
+    - q: "Merge को कैसे परखें?"
+      a: "हर task के अपने test set पर उसके अलग adapter से तुलना करके, साथ में general और safety checks। छोटी गिरावट तभी मानो जब वो मानक पूरा करे।"
+    - q: "Merged model की extraction accuracy 96% से गिरकर 88% हो गई। अब क्या करें?"
+      a: "Extraction adapter को ज़्यादा weight देकर देखो, TIES या DARE use करो, या extraction को अलग adapter रखो और बाकी दो को ही merge करो।"
+ask:
+  - "Model merging क्या है और ये काम क्यों करता है?"
+  - "TIES, DARE और SLERP में क्या फ़र्क है?"
+  - "एक model fine-tune करने की जगह models को merge कब करूँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+Fine-tuning एक model को बदलती है। **Model merging** दो या ज़्यादा models को उनके weights मिलाकर एक बना देता है। ये आमतौर पर तब सबसे अच्छा चलता है जब models एक ही **base model** से fine-tune हुए हों, ताकि उनके weights आपस में मेल खाएँ।
+
+ये करें क्यों?
+
+- **एक model में कई skills।** अगर आपने complaints के लिए एक model और replies के लिए दूसरा fine-tune किया है, तो एक merge दोनों कर सकता है।
+- **Tasks को क्रम से train करने से होने वाला forgetting नहीं।** Task A पर train करके फिर task B पर करने से model अक्सर A भूल जाता है। हर एक को अलग से train करके merge करने से ये बचता है।
+- **GPUs नहीं चाहिए।** सादे merges weights पर गणित हैं और आम computer पर चल जाते हैं।
+- **छोटे deployments।** कई की जगह एक model, phones, laptops और कम memory वाले दूसरे devices पर, या जहाँ data device से बाहर नहीं जाना चाहिए, काम आता है।
+
+Merging **ensemble** से अलग है। Ensemble कई models चलाकर उनके जवाब मिलाता है, जिसमें हर request पर कई calls का खर्च लगता है। Merge weights को एक बार मिलाता है; उसके बाद आप एक ही model normal cost पर serve करते हो।
+
+Merging अभी नया है और कुछ हद तक experimental भी। Open model leaderboards की कई top entries merges रही हैं, पर नतीजे अलग-अलग आते हैं, इसलिए हर merge को test करने वाला नया model मानो।
+
+```flow
+title: Fine-tuned models को merge करना
+Base model -> Task A के लिए fine-tune | adapter या full
+Base model -> Task B के लिए fine-tune
+Task A के लिए fine-tune -> Task vector A | A घटा base
+Task B के लिए fine-tune -> Task vector B | B घटा base
+Task vector A -> मिलाओ | average, SLERP, TIES, DARE
+Task vector B -> मिलाओ
+मिलाओ -> Merged model
+Merged model -> हर task, general skills, safety test करो
+```
+
+## ये काम कैसे करता है
+
+**Task vectors।** Fine-tuned model के weights में से base model के weights घटाओ तो **task vector** मिलता है: fine-tuning ने जो बदलाव किया। LoRA में adapter खुद ही मूल रूप से task vector है। Base में task vectors जोड़ने से skills मिलती हैं, और एक घटाने से कोई behaviour कम हो सकता है, जिसे researchers ने अनचाही क्षमताओं या biases को कमज़ोर करने में use किया है।
+
+**Linear combination।** सबसे सादा merge weights या task vectors का weighted average है। ये हैरानी की हद तक अच्छा चलता है, ख़ासकर एक ही base के models के लिए। "Model soups" ने एक model के कई fine-tuned versions का average लेकर बिना extra running cost के accuracy बढ़ाई। Weights एक model को दूसरे से ज़्यादा वज़न देने देते हैं।
+
+**SLERP।** Spherical linear interpolation दो models को सीधी रेखा की जगह घुमावदार रास्ते पर मिलाता है, जो सादे average से हर model का स्वभाव बेहतर बचा सकता है। 0 से 1 तक का interpolation factor तय करता है कि किस model को ज़्यादा वज़न मिले। ये एक बार में दो models merge करता है; तीसरा merge करने के लिए इसे दोहराओ।
+
+**TIES और DARE।** Fine-tuning लगभग हर weight बदलती है, पर ज़्यादातर बदलाव बहुत छोटे होते हैं और कम जोड़ते हैं। अलग-अलग tasks के वो छोटे बदलाव merge करने पर टकरा सकते हैं। दोनों methods पहले हर task vector को **prune** करते हैं, सिर्फ़ ज़रूरी बदलाव रखते हुए:
+
+- **TIES** सबसे बड़े बदलाव रखता है, फिर merge से पहले उन जगहों के टकराव सुलझाता है जहाँ tasks किसी weight को उलटी दिशाओं में धकेलते हैं।
+- **DARE** ज़्यादातर बदलाव random तरीके से हटा देता है और बचे हुए को rescale करता है ताकि उनका कुल असर बना रहे।
+
+दोनों अक्सर सादे averaging से साफ़ तौर पर बेहतर merges देते हैं, और जितने ज़्यादा models merge करो उतना फ़ायदा बढ़ता है।
+
+**Layer stacking।** Weights मिलाने की जगह अलग-अलग models की layers से एक model बनाओ, जिसे कभी "frankenmerge" कहते हैं। इससे छोटे models से बड़ा model बन सकता है (एक team ने 7B model की दो copies से 10.7B model बनाया), और ये किसी मौजूदा model से mixture-of-experts model शुरू करने का एक तरीका भी है। इन्हें अच्छा चलाने के लिए आमतौर पर आगे और training चाहिए।
+
+**Concatenation** adapters को साथ-साथ जोड़ता है। ये सारे parameters रखता है, इसलिए memory नहीं बचती और शायद ही कभी काम का होता है।
+
+PEFT से दो LoRA adapters को merge करना ऐसा दिखता है:
+
+```python
+from peft import PeftModel
+from transformers import AutoModelForCausalLM
+
+base = AutoModelForCausalLM.from_pretrained("base-model-id")
+model = PeftModel.from_pretrained(base, "adapters/complaints", adapter_name="complaints")
+model.load_adapter("adapters/replies", adapter_name="replies")
+
+# Combine into a new adapter; TIES keeps the strongest changes (density) and resolves conflicts.
+model.add_weighted_adapter(
+    adapters=["complaints", "replies"], weights=[1.0, 1.0],
+    adapter_name="merged", combination_type="ties", density=0.3,
+)
+model.set_adapter("merged")
+```
+
+पूरे models के लिए, open-source tool mergekit एक छोटी configuration file से merges चलाता है।
+
+| Method | कैसे मिलाता है | ताकत | ध्यान रखें |
+| --- | --- | --- | --- |
+| Weighted average | Weights या task vectors का average | सादा, अक्सर अच्छा | Tasks आपस में टकरा सकते हैं |
+| SLERP | दो models को एक घुमाव पर मिलाता है | दो का smooth मेल | एक बार में दो models |
+| TIES | बड़े बदलाव रखता है, sign के टकराव सुलझाता है | कई tasks के साथ बेहतर | Density setting tune करनी पड़ती है |
+| DARE | ज़्यादातर बदलाव random हटाता है, rescale करता है | Robust, लगाना आसान | Randomness; एक से ज़्यादा बार test करो |
+| Layer stacking | Layers जोड़ता है, size बढ़ा सकता है | Upscale या MoE बना सकता है | आमतौर पर आगे training चाहिए |
+
+**Browser में ही आज़माओ।** दो task vectors का average लो, फिर TIES जैसा merge आज़माओ जो सिर्फ़ बड़े बदलाव रखता है।
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(7)
+base = rng.normal(size=10)
+task_a = np.where(rng.random(10) < 0.3, rng.normal(0, 1, 10), rng.normal(0, 0.05, 10))
+task_b = np.where(rng.random(10) < 0.3, rng.normal(0, 1, 10), rng.normal(0, 0.05, 10))
+
+average = base + (task_a + task_b) / 2
+def trim(v, keep=0.3):
+    cut = np.quantile(np.abs(v), 1 - keep)
+    return np.where(np.abs(v) >= cut, v, 0)
+ties = base + trim(task_a) + trim(task_b)
+print("average change:", (average - base).round(2))
+print("TIES change:   ", (ties - base).round(2))
+```
+
+## एक example से समझो
+
+Mumbai के एक bank के पास एक ही open 8B base model पर तीन LoRA adapters हैं: complaint classification, English और Hindi में reply drafting, और KYC field extraction। वो बिना internet वाले branch laptops पर एक model चाहते हैं।
+
+वो तीन merges आज़माते हैं और हर एक को हर task के अपने test set पर test करते हैं:
+
+| Model | Complaint accuracy | Reply quality (reviewer score, 5 में से) | KYC extraction accuracy |
+| --- | --- | --- | --- |
+| अलग adapters (लक्ष्य) | 93% | 4.3 | 96% |
+| तीनों का weighted average | 89% | 4.0 | 84% |
+| TIES, density 0.3 | 92% | 4.2 | 88% |
+| Complaints और replies का TIES; KYC अलग | 92% | 4.2 | 96% |
+
+ये numbers समझाने के लिए एक उदाहरण हैं। Extraction, जो सबसे सटीक task है, हर पूरे merge में सबसे ज़्यादा प्रभावित हुआ। Team complaints और replies के लिए merged model ship करती है और KYC adapter अलग रखती है, जो सिर्फ़ तब load होता है जब कोई document scan होता है। दोनों laptops पर fit हो जाते हैं। वो अपने safety और refusal checks भी दोबारा चलाते हैं, क्योंकि merging उस behaviour को कमज़ोर कर सकता है जिस पर किसी adapter को train नहीं किया गया था।
+
+## आम गलतियाँ
+
+- **अलग bases के models को merge करना**, जोखिम समझे बिना। नतीजे आमतौर पर खराब होते हैं।
+- **सिर्फ़ एक task test करना।** Merge चुपचाप किसी और task या general क्षमताओं को नुकसान पहुँचा सकता है।
+- **Safety checks छोड़ना।** Merge के बाद refusal और safety behaviour कमज़ोर पड़ सकता है।
+- **Leaderboard merges पर आँख मूँदकर भरोसा करना।** कुछ benchmarks के लिए tune किए गए होते हैं; अपने data पर test करो।
+- **Memory बचाने के लिए concatenation use करना।** उससे नहीं बचती।
+- **Licence भूल जाना।** Merge में शामिल हर model के licence की शर्तें उसे विरासत में मिलती हैं।
+
+## Merge कब न करें
+
+- **ऊँची precision माँगने वाले tasks** को अलग adapters रखना बेहतर हो सकता है।
+- **आप एक अच्छा multi-task fine-tune कर सकते हो**, जिसमें हर task के लिए काफ़ी data है।
+- **कई adapters serve करना पहले से सस्ता है**, क्योंकि कई servers इसे कुशलता से support करते हैं।
+- **Models अलग base models से आए हैं।**
+
+## Demo से production तक
+
+- **Merges को models की तरह version करो**: inputs, method, weights और settings एक config file में।
+- **अलग adapters रखे रहो**, fallback और तुलना के लिए।
+- **हर release से पहले हर task, साथ में general और safety checks test करो।**
+- **कोई भी input model बदले तो दोबारा merge करो**, और फिर test करो।
+
+## Practice करो
+
+1. Hugging Face पर कोई merged model ढूँढो और उसका card पढ़ो: कौन-से models और कौन-सा method use हुआ?
+2. एक base पर दो छोटे LoRA adapters लेकर उन्हें averaging और TIES से merge करो, और हर task के कुछ examples पर तुलना करो।
+3. अपने field में किसी merge के लिए test plan लिखो: कौन-से tasks, कौन-से test sets, कौन-से safety checks।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 7 model merging और multi-task fine-tuning को कवर करता है।
+
+**आप तब पूरा समझे जब आप** merging और ensembling का फ़र्क समझा सको, task vectors और TIES या DARE क्या जोड़ते हैं ये बता सको, और merged model को test करने का plan बना सको।

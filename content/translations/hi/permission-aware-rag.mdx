@@ -1,0 +1,229 @@
+---
+id: permission-aware-rag
+lang: hi
+title: "Permission-aware RAG"
+outcome: "हर chunk के साथ access rights सेव करके, search के अंदर filter करके और rights को source के साथ sync रखकर RAG system को सिर्फ़ वही passages लौटाने वाला बना पाओगे जो मौजूदा user देख सकता है।"
+answer: "Permission-aware RAG हर chunk को कौन देख सकता है ये सेव करता है और search के अंदर ही मौजूदा user के हिसाब से filter करता है, ताकि model को वो passage कभी न मिले जो वो user पढ़ नहीं सकता।"
+why_it_matters: "Enterprise AI project को खत्म करने का सबसे तेज़ तरीका ये है कि किसी intern के सवाल पर CEO का salary letter सामने आ जाए। मिली-जुली sensitivity वाले documents रखने वाला हर client इसे test करेगा, और security teams इसे launch की शर्त बनाती हैं।"
+flashcards:
+  - q: "Permission-aware RAG क्या है?"
+    a: "Retrieval को ऐसा बनाना कि वो सिर्फ़ वही passages लौटाए जिन्हें पूछने वाला user original system में देख सकता है; इसे security trimming भी कहते हैं।"
+  - q: "Permissions कैसे capture होती हैं?"
+    a: "Ingestion पर, हर document के users और groups source से पढ़ो और उन्हें हर chunk पर metadata की तरह सेव करो।"
+  - q: "Permission filter search के अंदर ही क्यों चलना चाहिए?"
+    a: "Retrieval के बाद filter करने पर restricted chunks results को प्रभावित करते हैं और scores, counts व timing के ज़रिए leak होते हैं, और कुछ बचता भी नहीं है।"
+  - q: "यहाँ deny by default का क्या मतलब है?"
+    a: "जिस chunk का permission data गायब है वो ठीक होने तक किसी को नहीं दिखता; 'कोई rule नहीं' का मतलब कभी public नहीं।"
+  - q: "Rights को content से अलग क्यों sync करें?"
+    a: "Permissions रोज़ बदलती हैं; आज lock हुआ document, भले उसका text न बदला हो, results से गायब होना चाहिए।"
+  - q: "User की पहचान और groups कहाँ से आने चाहिए?"
+    a: "सिर्फ़ verified sign-on token से, request body से कभी नहीं।"
+  - q: "Check-at-source वाला विकल्प क्या है?"
+    a: "Candidates retrieve करो, फिर कुछ भी model तक पहुँचने से पहले source system से user की तरह पूछो कि क्या वो हर एक को खोल सकता है।"
+  - q: "Permission-aware RAG को कौन-से tests चाहिए?"
+    a: "अलग-अलग roles वाले personas और 'नहीं दिखना चाहिए' वाले सवाल, CI में चलते हुए।"
+  - q: "Nested groups को पहले से resolve क्यों करें?"
+    a: "Users groups के अंदर के groups में हो सकते हैं। Sign-in या index के समय उन्हें flatten करने से search filter एक सरल overlap check use कर सकता है।"
+  - q: "Permission-aware RAG में defence in depth क्या है?"
+    a: "Search query में filter करना और वही rule database में भी लागू करना, जैसे row-level security से, ताकि एक bug से documents leak न हों।"
+exercise:
+  title: "Leaks ढूँढो"
+  setup: "Gurugram की एक consulting firm का knowledge assistant 40,000 SharePoint files index करता है। मौजूदा design: chunks में permission data नहीं है; API user का department request के एक field से पढ़ता है; retrieval top 20 chunks लेता है और फिर उनमें से वो हटाता है जो नाम से 'Confidential' marked folders में हैं; और index महीने में एक बार rebuild होता है। एक junior analyst को ऐसा answer मिला जिसमें partner-only pricing memo quote था।"
+  questions:
+    - q: "Leak की root cause क्या है?"
+      a: "Chunks पर permissions सेव नहीं थीं, इसलिए retrieval source की access rules का सम्मान नहीं कर सकता; folder-name वाला rule उस memo को चूक गया।"
+    - q: "Identity को कैसे सँभालना चाहिए?"
+      a: "User और groups को verified sign-on token से लो, किसी ऐसे request field से नहीं जिसे कोई भी बदल सकता है।"
+    - q: "Filtering कैसे बदलनी चाहिए?"
+      a: "हर chunk पर allowed users और groups सेव करो और search के अंदर filter करो, जिन chunks का permission data गायब है उन्हें deny करो।"
+    - q: "कौन-सा sync और कौन-से tests चाहिए?"
+      a: "Change events या schedule से हर कुछ मिनट में permission sync, और persona tests जो साबित करें कि वो memo किसी analyst तक कभी नहीं पहुँचता।"
+ask:
+  - "RAG system में access control कैसे जोड़ूँ?"
+  - "Security trimming क्या है?"
+  - "SharePoint permissions को vector database में कैसे sync करूँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+एक RAG system कई sources से text को एक ही index में copy करता है। उन sources में access rules थे: सिर्फ़ HR के लिए खुली SharePoint site, किसी एक project team के साथ shared drive, किसी एक customer के account manager को दिखने वाला ticket। जब तक आप न करो, index उन rules को नहीं रखता।
+
+**Permission-aware RAG** (इसे security trimming या document-level access control भी कहते हैं) ये पक्का करता है कि retrieval हमेशा सिर्फ़ वही passages लौटाए जिन्हें पूछने वाला user original system में देख सकता है। अगर user SharePoint में document नहीं खोल सकता, तो assistant उसे quote नहीं कर सकता।
+
+```flow
+title: Ingestion
+SharePoint file + उसकी permissions -> Chunk text + allowed_groups, allowed_users | गायब? किसी को नहीं दिखेगा
+SharePoint file + उसकी permissions -[हर 10 मिनट में दोबारा sync]-> Chunk text + allowed_groups, allowed_users
+```
+
+```flow
+title: Query
+User sign in करता है -> Verified token | user, groups
+Verified token -> Filter के साथ Search | allowed_groups user के साथ एक group साझा करता है, search के अंदर, ranking से पहले
+Filter के साथ Search -> सिर्फ़ अनुमति वाले chunks model तक जाते हैं
+```
+
+ये lesson Mumbai की एक asset management company के assistant को follow करता है, जो research notes, HR policies, board papers और client agreements पर चलता है।
+
+## ये काम कैसे करता है
+
+**Ingestion पर rights capture करो.** Document index करते समय ये भी निकालो कि उसे कौन पढ़ सकता है: source system की permissions से users और groups। इन्हें हर chunk पर metadata की तरह सेव करो, जैसे `allowed_groups: ["hr-core", "leadership"]`, `allowed_users: [...]`।
+
+**Search के अंदर filter करो.** Query के समय user की पहचान और groups उनके verified sign-on token से लो और एक filter जोड़ो: सिर्फ़ वो chunks जिनमें `allowed_groups` user के groups से overlap करे, या `allowed_users` में वो हों। Filter vector या keyword search के अंदर, ranking से पहले चलना चाहिए, ताकि restricted chunks candidate list तक पहुँचें ही नहीं। Retrieval के बाद filter करने पर scores, counts और timing के ज़रिए leak होता है, और user के पास कोई result न बचे ऐसा भी हो सकता है।
+
+**Deny by default.** जिस chunk का permission data गायब है वो ठीक होने तक किसी को नहीं दिखता। "कोई rule नहीं" को कभी "public" मत समझो।
+
+**Rights को sync में रखो.** Permissions रोज़ बदलती हैं: लोग teams में आते हैं, files share होती हैं, sites lock होती हैं। Rights को content से अलग, schedule पर या change events से दोबारा sync करो। Lag मापो और client से तय करो ("permission बदलाव 15 मिनट के अंदर लागू हो जाते हैं")।
+
+**Groups बड़े हो जाते हैं.** Users सैकड़ों groups में हो सकते हैं, एक-दूसरे के अंदर nested भी। Nested groups को sign-in या index के समय resolve करो, और समझदारी से cache करो।
+
+**विकल्प: source पर check करना.** छोटे result sets के लिए, आप candidates retrieve करके source system से user की तरह पूछ सकते हो कि क्या वो हर document खोल सकता है। ये हमेशा ताज़ा रहता है पर धीमा है, और इसे भी कुछ model तक पहुँचने से पहले ही होना चाहिए।
+
+**Test करो.** अलग-अलग roles वाले test users और "नहीं दिखना चाहिए" वाले सवालों का एक set बनाओ, और उन्हें CI में चलाओ।
+
+**Access कहाँ लागू करें:**
+
+| Approach | कैसे काम करता है | ताकत | कमज़ोरी |
+| --- | --- | --- | --- |
+| Index में filter | Permissions chunks पर सेव; search में filter | तेज़, scale होता है | Permission sync चाहिए; थोड़ा lag |
+| Source पर check | हर candidate के लिए source system से पूछना | हमेशा ताज़ा | धीमा; ज़्यादा calls |
+| हर group के लिए अलग indexes | हर audience के लिए एक index | कुछ groups के लिए सरल | कई groups पर बिखर जाता है |
+| Retrieval के बाद filter | आखिर में restricted results हटाना | कोई काम की नहीं | Leaks और खाली results |
+
+**CI में persona tests.** हर role के लिए test users बनाओ, जैसे analyst, HR staff, director और contractor, जिनकी group memberships पता हों। हर एक के लिए ऐसे सवाल लिखो जिनमें वो documents हों जो उसे दिखने चाहिए और वो जो कभी नहीं दिखने चाहिए। Model के answer पर नहीं, retrieve हुए chunk ids पर assert करो, क्योंकि खतरा ये है कि कोई restricted chunk prompt में पहुँचे ही। Ingestion, search या permission sync में हर बदलाव पर ये tests चलाओ।
+
+**Sync window तय करना.** Permission बदलाव index में तुरंत लागू नहीं हो सकते। असली lag मापो, उसे client की security team से लिखित में तय करो, और sync fail हो या देर से चले तो alert करो। सबसे sensitive sources के लिए, जैसे board papers, दूसरी layer के तौर पर source पर check करने पर विचार करो।
+
+**Schema में deny by default.** बिना access data के chunk index करना ही नामुमकिन बना दो:
+
+```sql
+CREATE TABLE chunks (
+  id text PRIMARY KEY,
+  doc_id text NOT NULL,
+  body text NOT NULL,
+  embedding vector(384) NOT NULL,
+  allowed_groups text[] NOT NULL CHECK (cardinality(allowed_groups) > 0)
+);
+CREATE INDEX ON chunks USING gin (allowed_groups);
+
+-- The search, with the user's groups from the verified token as $2:
+SELECT id, body FROM chunks
+WHERE allowed_groups && $2
+ORDER BY embedding <=> $1
+LIMIT 20;
+```
+
+`&&` का मतलब है "दोनों arrays में कम से कम एक value साझा है"। बिना groups वाला chunk insert ही नहीं हो सकता।
+
+**Row-level security से दूसरा ताला.** अगर application database session पर user के groups set करता है, तो कोई `WHERE` भूल भी जाए तब भी Postgres वही rule लागू कर सकता है:
+
+```sql
+ALTER TABLE chunks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY read_by_group ON chunks FOR SELECT
+  USING (allowed_groups && string_to_array(current_setting('app.user_groups', true), ','));
+-- per request, inside a transaction:
+-- SELECT set_config('app.user_groups', 'hr-core,all-staff', true);
+```
+
+ऐसे role से connect करो जो table का owner नहीं है, क्योंकि जब तक आप `ALTER TABLE chunks FORCE ROW LEVEL SECURITY` भी न चलाओ, table owners policies को छोड़ देते हैं।
+
+**Nested groups को flatten करो.** Directories में groups के अंदर groups होते हैं। उन्हें एक बार resolve करो, cycles के खिलाफ़ guard के साथ:
+
+```python
+def expand_groups(user_groups, parents_of):
+    """parents_of: dict mapping a group to the groups that contain it."""
+    seen, stack = set(), list(user_groups)
+    while stack:
+        g = stack.pop()
+        if g in seen:
+            continue
+        seen.add(g)
+        stack.extend(parents_of.get(g, []))
+    return sorted(seen)
+```
+
+Result को session के लिए cache करो, और जब user दोबारा sign in करे या directory बदले तब refresh करो।
+
+**Persona tests जो answers नहीं, ids जाँचते हैं.**
+
+```python
+import pytest
+
+PERSONAS = {
+    "analyst":    {"groups": ["all-staff"],             "never": {"board-2026-q3-c1", "salaries-c4"}},
+    "hr_staff":   {"groups": ["all-staff", "hr-core"],  "never": {"board-2026-q3-c1"}},
+    "contractor": {"groups": ["contractors"],           "never": {"handbook-c2", "salaries-c4"}},
+}
+QUESTIONS = ["What did the board decide about the Pune office?", "What is the salary band for level 5?",
+             "What is the leave policy?"]
+
+@pytest.mark.parametrize("persona", PERSONAS)
+def test_never_retrieves_restricted(persona, search):
+    p = PERSONAS[persona]
+    for q in QUESTIONS:
+        ids = {c["id"] for c in search(q, groups=p["groups"])}
+        assert not ids & p["never"], f"{persona} retrieved {ids & p['never']} for: {q}"
+```
+
+Test तब fail होता है जब कोई मना किया हुआ chunk retrieve भी हो जाए, model के उसे दोहराने से बहुत पहले।
+
+**Caches, summaries और memories भी leak करते हैं.** Restricted documents से बना cached answer, सेव की हुई conversation summary या agent memory पर वही access rules लागू होने चाहिए, या उन्हें user के हिसाब से key किया जाए। Retrieval के बाद retrieve हुआ text जहाँ-जहाँ सेव होता है, वो हर जगह जाँचो।
+
+## एक worked example
+
+Mumbai की एक asset management company research notes, HR policies, board papers और client agreements पर एक ही assistant चाहती है।
+
+Ingestion पर, एक connector हर SharePoint file और उसकी permissions पढ़ता है, groups expand करता है और हर chunk पर `allowed_groups` सेव करता है। Query के समय API user के groups उनके OIDC token से पढ़ता है और filter को hybrid search में जोड़ देता है।
+
+पाँच personas के साथ testing:
+
+- एक analyst पूछता है "पिछली board meeting में merger पर क्या चर्चा हुई?" Board-paper का कोई chunk retrieve नहीं होता; assistant कहता है कि उस topic पर उसे कोई accessible document नहीं मिला।
+- एक director वही सवाल पूछता है और board minutes को cite करता हुआ answer पाता है।
+- एक analyst पूछता है "senior managers के लिए notice period क्या है?" सभी employees के लिए खुली HR policy retrieve होती है; confidential salary bands की file नहीं।
+
+Pilot के दौरान HR team एक draft policy को restrict कर देती है। Permission sync हर दस मिनट में चलता है, इसलिए दस मिनट तक पुराने rights लागू रहते हैं। Client की security team इस window को लिखित में मान लेती है, और माँगती है कि sync fail हो तो alert आए।
+
+| Persona | सवाल | Result |
+| --- | --- | --- |
+| Analyst | "पिछली board meeting में merger पर क्या चर्चा हुई?" | Board-paper का कोई chunk नहीं; बताया गया कि कोई accessible document नहीं मिला |
+| Director | वही सवाल | Board minutes को cite करता answer |
+| Analyst | "Senior managers का notice period?" | HR policy retrieve हुई; salary bands की file नहीं |
+
+## आम गलतियाँ
+
+- **Retrieval के बाद filter करना।** Restricted chunks results को प्रभावित करते हैं और leak हो सकते हैं। Search के अंदर filter करो।
+- **गायब permissions को public मान लेना।** Deny by default।
+- **Content sync करना पर rights नहीं।** आज lock हुआ document index में दिखता रहता है।
+- **Request body की identity पर भरोसा।** User और groups सिर्फ़ verified token से लो।
+- **Negative tests न होना।** हर persona को क्या नहीं दिखना चाहिए, ये test करो, सिर्फ़ ये नहीं कि क्या दिखना चाहिए।
+- **Restricted documents से बने answers को users के बीच cache करना।**
+- **Permission tests में retrieved ids की जगह model के answer पर assert करना।**
+- **Nested groups expand न होना**, जिससे users वो documents चूक जाते हैं जो उन्हें दिखने चाहिए, या tests गलत वजह से pass हो जाते हैं।
+
+## जब permission-aware retrieval ज़रूरी नहीं
+
+- **सब कुछ सब पढ़ सकते हैं**, जैसे public policies या छपी हुई handbook।
+- **किसी एक user के अपने documents**, जहाँ index वैसे भी user के हिसाब से अलग होता है।
+- **कुछ साफ़ audiences**, जहाँ हर audience के लिए अलग indexes सरल हैं।
+
+## Demo से production तक
+
+- **Access को query में भी और database में भी लागू करो**, deny by default।
+- **Ingestion, search या sync में हर बदलाव पर CI में persona tests चलाओ।**
+- **तय window के मुकाबले permission sync lag मापो और उस पर alert करो।**
+- **Caches, summaries और memories को user या access group के हिसाब से scope करो।**
+- **हर search के लिए use हुए groups log करो**, audits के लिए।
+
+## Practice करो
+
+Microsoft का security filter pattern और access control के साथ RAG पर Pinecone का लेख पढ़ो।
+
+1. अपने RAG index के हर chunk में `allowed_groups` field जोड़ो, अपने documents में कम से कम तीन groups के साथ।
+2. User के groups को (असली या simulated) verified token से पढ़ो और search के अंदर filter करो।
+3. तीन personas पर पाँच "नहीं दिखना चाहिए" tests लिखो और उन्हें अपने test suite में चलाओ।
+4. Row-level security policy जोड़ो, अपनी search से जानबूझकर WHERE clause हटाओ, और पक्का करो कि restricted chunks फिर भी नहीं आते।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 private जानकारी के leak के खिलाफ़ guardrails पर है, और chapter 6 retrieval पर।
+
+**आपका काम पूरा जब:** आप दो users को एक ही सवाल पूछकर अलग, सही answers पाते दिखा सको, और एक test जो साबित करे कि restricted document model तक कभी नहीं पहुँचता।

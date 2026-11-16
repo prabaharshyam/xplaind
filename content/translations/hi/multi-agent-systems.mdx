@@ -1,0 +1,215 @@
+---
+id: multi-agent-systems
+lang: hi
+title: "Multi-agent systems"
+outcome: "मुख्य multi-agent patterns (workers के साथ supervisor, hand-offs, और reviewer agents) चुनकर बना पाओगे, और हर एक के failure modes भी जानोगे।"
+answer: "Multi-agent systems काम को agents में बाँटते हैं: workers को चलाने वाला supervisor, एक-दूसरे को hand off करते agents, या output जाँचने वाला reviewer agent। हर एक cost और नए failure modes जोड़ता है।"
+why_it_matters: "Teams कई agents की तरफ़ जल्दी, अक्सर बहुत जल्दी, चली जाती हैं। किस task पर कौन-सा pattern फिट होता है और tokens व reliability में उसकी क्या कीमत है, ये जानकर आप ऐसे systems design कर सकते हो जो चलें, और design reviews और interviews में उन्हें defend भी कर सकते हो।"
+flashcards:
+  - q: "तीन मुख्य multi-agent patterns कौन-से हैं?"
+    a: "Supervisor और workers, specialists के बीच hand-offs, और generator और reviewer।"
+  - q: "Supervisor pattern कैसे काम करता है?"
+    a: "एक lead agent plan बनाता है और worker agents को, जिन्हें अक्सर tools की तरह describe किया जाता है, शायद parallel में call करता है, फिर उनके results जोड़ता है।"
+  - q: "Hand-off क्या है?"
+    a: "एक tool call जो conversation को उसके context के साथ एक agent से specialist agent तक ले जाता है।"
+  - q: "Permissions के लिए hand-offs क्यों मदद करते हैं?"
+    a: "हर agent के पास narrow permissions वाला एक domain होता है, जैसे सिर्फ़ billing agent refunds देता है।"
+  - q: "Hand-offs में कौन-से risks हैं?"
+    a: "Agents के बीच ping-pong, transfer में context खो जाना, और users को बार-बार खुद को दोहराना पड़ना।"
+  - q: "Generator-reviewer जोड़ी को सुरक्षित कैसे रखें?"
+    a: "Revision rounds पर cap लगाओ, और reviewer को जाने-पहचाने खराब drafts पर test करो ताकि वो सब कुछ approve न कर दे।"
+  - q: "Multi-agent runs को trace कैसे करें?"
+    a: "हर agent के steps एक ही request id के नीचे, ताकि एक request पूरा flow दिखाए।"
+  - q: "कब कई agents से बचना चाहिए?"
+    a: "जब task क्रम से चलने वाला और कसकर जुड़ा हो; अच्छे tools वाला एक agent आम तौर पर cost और reliability में जीतता है।"
+  - q: "Reviewer agent को test कैसे करें?"
+    a: "उसे जानबूझकर डाली गई गलतियों वाले drafts दो और गिनो कि कितने पकड़े। खराब drafts पास करने वाला reviewer झूठा भरोसा देता है।"
+  - q: "ज़्यादातर multi-agent failures की वजह क्या होती है?"
+    a: "कमज़ोर models से ज़्यादा, roles का साफ़ न होना और agents का अपनी जानकारी आगे न देना। साफ़ briefs और hand-off summaries इसमें बहुत कुछ ठीक कर देते हैं।"
+exercise:
+  title: "Pattern चुनो"
+  setup: "Pune की एक insurance company को चाहिए: (A) एक customer assistant जो policy सवाल, claims status और premium payments सँभाले, जहाँ सिर्फ़ staff-approved कुछ flows ही payments ले सकें; (B) दस अलग competitor websites से बनने वाली एक साप्ताहिक market report; (C) claim rejections के बारे में customer letters जिनमें regulatory wording हो और खास reference numbers शामिल हों।"
+  questions:
+    - q: "(A) के लिए कौन-सा pattern ठीक है, और क्यों?"
+      a: "Hand-offs: एक front-desk agent policy, claims और payments specialists को pass करे, ताकि payment permissions एक narrow agent के पास ही रहें।"
+    - q: "(B) के लिए कौन-सा ठीक है?"
+      a: "Supervisor और workers: हर competitor के लिए एक worker, parallel में, हर एक fixed-format summary लौटाए, और supervisor उन्हें merge करे।"
+    - q: "(C) के लिए कौन-सा ठीक है?"
+      a: "Generator और reviewer: reviewer wording, reference numbers और timelines को checklist से जाँचे, और rounds की संख्या पर cap हो।"
+    - q: "(A) में आप कौन-सा safety rule जोड़ोगे?"
+      a: "लगातार hand-offs पर limit, जिसके बाद conversation किसी इंसान के पास जाए, और हर transfer पर एक summary आगे जाए।"
+ask:
+  - "Supervisor और hand-off multi-agent design में क्या फ़र्क है?"
+  - "Agents को conversation आगे-पीछे pass करने से कैसे रोकूँ?"
+  - "क्या multi-agent system एक single agent से बेहतर है?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+**Multi-agent system** एक task को कई agents में बाँट देता है, हर एक के अपने instructions, tools और context के साथ। तीन patterns ज़्यादातर असली designs को कवर करते हैं:
+
+- **Supervisor और workers**: एक lead agent plan बनाता है, sub-tasks worker agents को (अक्सर ऐसे tools की तरह जिन्हें वो call कर सके) सौंपता है और उनके results जोड़ता है।
+- **Hand-offs**: एक agent तब तक conversation सँभालता है जब तक कुछ उसकी role से बाहर का न आ जाए, फिर control को context के साथ किसी specialist agent को पास कर देता है। Customer service में आम है: front-desk agent billing सवाल billing agent को hand off करता है।
+- **Generator और reviewer**: एक agent काम बनाता है; दूसरा उसे criteria के हिसाब से जाँचकर feedback के साथ वापस भेजता है।
+
+पिछले lesson में sub-agents के ज़रिए समझाया था कि बाँटना क्यों मदद करता है: साफ़ contexts, specialised tools, parallel काम। ये lesson patterns चुनने और चलाने के बारे में है।
+
+```flow
+title: Supervisor + workers: parallel, summaries वापस lead को
+Lead -> Worker 1
+Lead -> Worker 2
+Lead -> Worker 3
+```
+
+```flow
+dir: LR
+title: Hand-offs: एक summary और आखिरी turns आगे दो; ज़्यादा से ज़्यादा 2 hand-offs, फिर इंसान
+Front desk -[billing?]-> Billing
+Front desk -[cards?]-> Cards
+```
+
+```flow
+dir: LR
+title: Generator + reviewer: ज़्यादा से ज़्यादा 2 rounds
+Writer -[draft]-> Reviewer
+Reviewer -[problems]-> Writer
+```
+
+ये lesson Bengaluru के एक bank के customer assistant को follow करता है, जिसे एक बड़े agent से specialists के सेट में दोबारा बनाया गया।
+
+## ये काम कैसे करता है
+
+**Supervisor और workers.** Supervisor user का goal और tools की तरह describe किए गए workers की list देखता है ("research_competitor: researches one named company, returns a 200-word summary with sources")। वो तय करता है कि किसे call करना है, शायद parallel में, और final answer लिखता है। ताकत: parallelism, context isolation। Risks: धुँधला delegation, दोहराया हुआ काम, summaries में details खो जाना, ज़्यादा token use।
+
+**Hand-offs.** हर agent के पास अपने tools और permissions वाला एक domain होता है। Hand-off खुद एक tool call है ("transfer_to_billing") जो conversation को आगे ले जाता है। ताकत: हर agent छोटा और focused रहता है; permissions narrow रहती हैं (सिर्फ़ billing agent refunds दे सकता है)। Risks: agents के बीच ping-pong, transfer में context खोना, users का खुद को दोहराना।
+
+**Generator और reviewer.** Reviewer के पास checklist या rubric होता है और वो खास समस्याएँ लौटाता है। ताकत: वो errors पकड़ता है जो एक pass में छूट जाती हैं। Risks: अंतहीन loops (rounds पर cap लगाओ), ऐसे reviewers जो सब कुछ approve कर देते हैं (reviewer को जाने-पहचाने खराब drafts पर test करो)।
+
+**Shared state बनाम messages.** Agents एक common state object share कर सकते हैं (जैसे graph frameworks में) या messages pass कर सकते हैं। Shared state debugging आसान बनाता है; messages agents को ज़्यादा independent रखते हैं। जो भी हो, हर agent के steps एक ही request id के नीचे trace करो।
+
+**कब नहीं.** अगर task क्रम से चलने वाला और कसकर जुड़ा है, तो अच्छे tools वाला एक agent आम तौर पर cost और reliability में जीतता है। पहले single-agent baseline मापो।
+
+**Patterns की तुलना:**
+
+| Pattern | ताकत | Risks | किसके लिए अच्छा |
+| --- | --- | --- | --- |
+| Supervisor और workers | Parallel काम, साफ़ contexts | धुँधला delegation, ज़्यादा token use | Research, चौड़ा analysis |
+| Hand-offs | छोटे focused agents, narrow permissions | Ping-pong, खोया context | अलग-अलग domains वाली customer service |
+| Generator और reviewer | वो errors पकड़ता है जो एक pass में छूटती हैं | Loops, नरम reviewers | Regulated या high-stakes लेखन |
+
+**Hand-off design करना.** Hand-off tool में भेजने वाले agent की लिखी एक छोटी summary होनी चाहिए: customer कौन है (verification के बाद), उसने क्या पूछा, क्या हो चुका है और क्या बाकी है। आखिरी कुछ turns भी साथ भेजो। ऐसी scripted conversations से test करो जो domains पार करती हों, जैसे balance सवाल के बाद card block, और देखो कि customer को अपनी पहचान या request कभी दोहरानी न पड़े। हर hand-off को उसकी वजह के साथ log करो ताकि वो agents पकड़ में आएँ जो अपना काम आगे टाल रहे हैं।
+
+**Role descriptions लिखना.** हर agent की description में लिखा हो कि वो क्या सँभालता है, क्या hand off करना है, और क्या कभी नहीं करना है। Overlaps सबसे बुरे failures देते हैं: दो agents जो दोनों सोचते हैं कि refunds उनके हैं, या तो झगड़ेंगे या दोनों action ले लेंगे। Descriptions को साथ-साथ रखकर पढ़ो और test से पहले हर overlap हटा दो।
+
+**Code में hand-off.** Hand-off एक tool है जिसके arguments में अगले agent के लिए ज़रूरी summary होती है। Conversation आगे ले जाना और transfers गिनना आपका code करता है, model नहीं:
+
+```python
+AGENTS = {
+    "front_desk": {"tools": ["get_profile", "transfer"], "prompt": "Greet, verify, route."},
+    "cards":      {"tools": ["block_card", "card_status", "transfer"], "prompt": "Card issues only."},
+    "loans":      {"tools": ["loan_balance", "transfer"], "prompt": "Loan questions only."},
+}
+TRANSFER_TOOL = {
+    "name": "transfer",
+    "description": "Hand the customer to another team. Use only for requests outside your role.",
+    "input_schema": {"type": "object", "properties": {
+        "to": {"type": "string", "enum": list(AGENTS)},
+        "summary": {"type": "string", "description": "Who the verified customer is, what they asked, what is done, what remains"},
+    }, "required": ["to", "summary"]},
+}
+MAX_TRANSFERS = 3
+
+def handle_transfer(state, args):
+    state["transfers"] += 1
+    if state["transfers"] > MAX_TRANSFERS or args["to"] == state["agent"]:
+        state["agent"] = "human_queue"
+        return "Passing you to a person who can help with all of this."
+    state["handoff_notes"].append({"from": state["agent"], "to": args["to"], "summary": args["summary"]})
+    state["agent"] = args["to"]
+    return f"Transferred to {args['to']}."
+```
+
+पाने वाला agent अपने prompt और tools, hand-off summary और आखिरी कुछ turns के साथ शुरू करता है, पूरी history के साथ नहीं। सिर्फ़ `cards` agent के पास `block_card` है, इसलिए उलझा हुआ front-desk agent कोई card block नहीं कर सकता।
+
+**Reviewer को जानबूझकर डाली गलतियों से test करो.** Generator-और-reviewer जोड़ी उतनी ही अच्छी है जितना अच्छा reviewer:
+
+```python
+PLANTED = [
+    ("Interest is 12% a year; the EMI on ₹5 lakh over 5 years is ₹4,000.", "wrong EMI"),   # real EMI is about ₹11,100
+    ("You can withdraw your fixed deposit any time without penalty.", "missing penalty"),
+    ("This loan is guaranteed approved.", "promise of approval"),
+]
+
+def reviewer_recall(review_fn):
+    caught = sum(1 for draft, _ in PLANTED if not review_fn(draft)["pass"])
+    return caught / len(PLANTED)
+```
+
+असली reviews से 20 से 50 planted mistakes का एक set रखो, और reviewer का prompt या model बदलने पर हर बार recall track करो। ये भी देखो कि वो अच्छे drafts को बहुत ज़्यादा fail न करे, वरना writers उसे अनदेखा करना सीख जाएँगे।
+
+**Agents के systems क्यों fail होते हैं.** Multi-agent failures के studies बताते हैं कि ज़्यादातर समस्याएँ कमज़ोर models की नहीं होतीं: roles overlap करते हैं या धुँधले होते हैं, agents अपनी खोज आगे नहीं देते, कोई बहुत जल्दी रुक जाता है, या कोई तैयार result जाँचता ही नहीं। हर role की सीमाएँ लिखो, hand-off summaries ज़रूरी करो, और तैयार answer जाँचने की साफ़ ज़िम्मेदारी किसी एक agent (या अपने code) को दो।
+
+**अतिरिक्त cost गिनो.** हर agent instructions और tool definitions दोहराता है, और summaries अतिरिक्त calls हैं। Single-agent baseline के मुकाबले हर task पर tokens मापो और तय करो कि quality या speed में मिला फ़ायदा इसकी कीमत चुकाता है या नहीं।
+
+## एक worked example
+
+Bengaluru के एक bank का customer assistant balances, card blocks, loan queries और complaints सँभालता है।
+
+Version one, 22 tools वाला एक single agent, 9% बार गलत tools चुनता था और उसे card-block permissions सुरक्षित रूप से दी ही नहीं जा सकती थीं।
+
+Version two hand-offs use करता है:
+
+- Balances और FAQs के लिए read-only tools और हर specialist के लिए एक hand-off tool वाला **front-desk agent**।
+- एक **cards agent** जो cards block कर सकता है (पहचान confirm करने के बाद) पर पैसे move नहीं कर सकता।
+- Loan accounts की read access और prepayment calculator वाला **loans agent**।
+- एक **complaints agent** जो grievance system में complaints record करता है और customer को complaint reference number देता है।
+
+हर hand-off एक छोटी summary और आखिरी कुछ turns भेजता है, इसलिए customers को खुद को दोहराना नहीं पड़ता। एक rule लगातार दो से ज़्यादा hand-offs रोकता है और उसकी जगह इंसान के पास route करता है। गलत tool choices 2% पर आ जाते हैं, और security team approve करती है क्योंकि हर agent की permissions narrow हैं। Token use 30% बढ़ता है, मुख्यतः summaries से, जिसे bank स्वीकार कर लेता है।
+
+Generator-reviewer जोड़ी सिर्फ़ complaint responses के लिए जोड़ी जाती है, जहाँ एक reviewer agent tone और ये जाँचता है कि reference number और timelines सही हैं; वो 6% drafts में समस्याएँ पकड़ता है।
+
+| Measure | एक agent, 22 tools | चार specialists को hand-offs |
+| --- | --- | --- |
+| गलत tool choices | 9% | 2% |
+| Card-block permissions | सुरक्षित रूप से दी नहीं जा सकती थीं | सिर्फ़ cards agent के पास, identity checks के बाद |
+| Token use | Baseline | Summaries की वजह से करीब 30% ज़्यादा |
+| Security review | Approve नहीं हुआ | Approve हुआ |
+
+## आम गलतियाँ
+
+- **आसान task के लिए कई agents।** एक से शुरू करो; जब समस्या मापो तब बाँटो।
+- **धुँधले roles।** Overlap करते agents झगड़ते हैं या काम दोहराते हैं। तीखी role descriptions लिखो।
+- **जानकारी खोने वाले hand-offs।** Summary और हाल के turns pass करो, और test करो कि users को ज़रूरी बातें कभी दोहरानी न पड़ें।
+- **Loop limits न होना।** Agents काम आगे-पीछे हमेशा के लिए लौटाते रह सकते हैं।
+- **सिर्फ़ हर agent के अलग traces।** एक request में सभी agents के steps साथ दिखने चाहिए।
+- **बिना test किए reviewers।** मापो कि वो कितनी planted mistakes पकड़ते हैं।
+- **खुद को transfer करने वाले agents।** Code में इसे block करो, और transfers पर cap लगाओ।
+
+## जब एक agent काफ़ी है
+
+- **एक domain और मुट्ठी भर tools**: single agent सस्ता है और debug करना आसान।
+- **क्रम से चलने वाले, कसकर जुड़े steps**, जहाँ बाँटना सिर्फ़ hand-off नुकसान जोड़ता है।
+- **कम volume**, जहाँ कई agents की engineering लागत वसूल नहीं होती।
+
+कई agents में तब बाँटो जब domains को अलग permissions चाहिए, काम parallel में चल सकता हो, या एक context सब कुछ न रख सके।
+
+## Demo से production तक
+
+- **हर agent को एक ही request id के नीचे trace करो**, hand-off summaries दिखती हुई।
+- **Transfer rates और loops track करो**, हर agent जोड़ी के लिए, और सबसे खराब conversations हर हफ़्ते review करो।
+- **हर agent की permissions अलग रखो**, tool code में enforce करके।
+- **हर release पर planted mistakes पर reviewer recall मापो।**
+- **एक single-agent baseline रखो** और हर बड़े बदलाव पर cost और quality की तुलना करो।
+
+## Practice करो
+
+LangChain की multi-agent guide और Anthropic का multi-agent research write-up पढ़ो।
+
+1. एक front-desk agent बनाओ जो अलग tools वाले दो specialists को hand off करे।
+2. Hand-off limit जोड़ो और उस तक पहुँचने पर इंसान को transfer करो।
+3. इसकी तुलना सारे tools वाले एक single agent से 20 test conversations पर करो: wrong-tool rate, tokens और user का दोहराना।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 multi-agent reflection पर है, जिसमें एक agent काम करता है और दूसरा उसे परखता है।
+
+**आपका काम पूरा जब:** आप बता सको कि कौन-सा pattern चुना, क्यों चुना, और एक agent के मुकाबले उसकी क्या कीमत पड़ी।

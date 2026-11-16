@@ -1,0 +1,200 @@
+---
+id: lora-and-memory-maths
+lang: ta
+title: "LoRA, QLoRA, GPU memory கணக்கு"
+outcome: "ஒரு model-ஐ run பண்ணவும் train பண்ணவும் எவ்வளவு GPU memory வேணும்னு estimate பண்ணவும், LoRA, QLoRA ஏன் fine-tuning-ஐ ஒரே card-ல பொருந்த வைக்குதுன்னு விளக்கவும் முடியும்."
+answer: "ஒரு model-க்கு அதோட weights-க்கு memory வேணும், training-க்கு அதைவிட பல மடங்கு வேணும். LoRA weights-ஐ freeze பண்ணி, ஒவ்வொரு layer-க்கும் ரெண்டு சின்ன matrices-ஐ மட்டும் train பண்ணும்; QLoRA frozen weights-ஐ 4-bit-லயும் வைக்கும்."
+why_it_matters: "ஒரு model உங்க GPU-ல பொருந்துதா இல்லையாங்குறது cost-ஐயும், hardware-ஐயும், நீங்க என்ன build பண்ணலாம்ங்குறதையும் முடிவு பண்ணும். Interviewers அந்த இடத்துலயே memory-ஐ estimate பண்ணச் சொல்லுவாங்க; ஒரு setup இன்னொண்ணை விட பத்து மடங்கு ஏன் costly-னு clients கேப்பாங்க."
+flashcards:
+  - q: "16-bit-ல 7B model-ஓட weights-க்கு எவ்வளவு memory வேணும்?"
+    a: "கிட்டத்தட்ட 14 GB: 7 billion parameters-ஐ ஒவ்வொண்ணுக்கும் 2 bytes-ஆல பெருக்கணும்."
+  - q: "Training memory-ல வச்சிருக்குற நாலு விஷயங்கள் என்ன?"
+    a: "Weights, gradients, optimizer-ஓட running values, activations. முதல் மூணும் trainable parameters எண்ணிக்கைக்கு ஏத்த மாதிரி வளரும்."
+  - q: "7B model-ஐ full fine-tuning பண்ண கிட்டத்தட்ட எவ்வளவு memory வேணும்?"
+    a: "16-bit weights, gradients, standard Adam optimizer-ஓட, activations-ஐ சேர்க்கறதுக்கு முன்னாடியே கிட்டத்தட்ட 56 GB. பெரும்பாலான single GPUs-க்கு இது ரொம்ப அதிகம்."
+  - q: "LoRA-வோட idea என்ன?"
+    a: "Original weights-ஐ freeze பண்ணுங்க. தேர்ந்தெடுத்த ஒவ்வொரு layer-க்கும், முழு பெரிய matrix-க்கு பதிலா, ரெண்டு சின்ன matrices-ஐ train பண்ணுங்க; அதுங்களோட product தான் update."
+  - q: "LoRA-ல rank r-னா என்ன?"
+    a: "அந்த ரெண்டு சின்ன matrices-ஓட width. r பெருசா இருந்தா update-க்கு capacity அதிகம், memory-உம் அதிகம் ஆகும். 8-ல இருந்து 64 வரை பொதுவான starting points."
+  - q: "LoRA ஏன் memory-ஐ மிச்சப்படுத்துது?"
+    a: "சின்ன matrices-க்கு மட்டும் தான் gradients, optimizer values வேணும்; அதனால training memory கிட்டத்தட்ட frozen weights-ஓட சின்ன extra தான்."
+  - q: "LoRA-வுக்கு QLoRA என்ன சேர்க்குது?"
+    a: "Frozen base weights-ஐ 4-bit-ல, அதாவது 16-bit அளவுல கிட்டத்தட்ட கால் பங்குல வைக்கும்; சின்ன LoRA matrices அதிக precision-ல train ஆகும்."
+  - q: "Training முடிஞ்ச பிறகு LoRA adapter-ஐ எப்படி use பண்றது?"
+    a: "ஒண்ணு தனியா வச்சு base model மேல load பண்ணலாம், இல்ல weights-க்குள்ள merge பண்ணலாம்; அப்போ serving-க்கு extra cost எதுவும் இல்ல."
+exercise:
+  title: "Fit ஆகுமா?"
+  setup: "Hyderabad-ல ஒரு startup 13B-parameter open model-ஐ loan-agreement summaries எழுதுற மாதிரி adapt பண்ண விரும்புது. அவங்ககிட்ட ஒரு 24 GB GPU தான் இருக்கு. ஒரு teammate சொல்றாரு, 'normal-ஆவே fine-tune பண்ணிடலாம்.'"
+  questions:
+    - q: "13B weights-க்கு 16-bit-ல எவ்வளவு memory வேணும், model load ஆகவே ஆகுமா?"
+      a: "13 billion × 2 bytes கிட்டத்தட்ட 26 GB. இது 24 GB-ஐ விட அதிகம், அதனால இந்த card-ல 16-bit-ல load ஆகாது."
+    - q: "Full fine-tuning சாத்தியமா?"
+      a: "இல்ல. Weights-ஓட கிட்டத்தட்ட நாலு மடங்கு வேணும், அதாவது 104 GB, activations தனி. ஒரு 24 GB card-க்கு இது ரொம்ப ரொம்ப அதிகம்."
+    - q: "4-bit weights-க்கு எவ்வளவு வேணும், அது என்ன சாத்தியமாக்கும்?"
+      a: "13 billion × 0.5 bytes கிட்டத்தட்ட 6.5 GB. LoRA matrices-க்கும் activations-க்கும் card-ல இடம் மிஞ்சும், அதனால QLoRA realistic."
+    - q: "QLoRA-ஐ தேர்ந்தெடுக்கறதுக்கு முன்னாடி அவங்க என்ன check பண்ணணும்?"
+      a: "நல்லா எழுதின ஒரு prompt-ஏ வேலையை முடிக்குதான்னு, 4-bit model-ஓட quality அவங்க summaries-ல ஒரு test set-ல போதுமானதா இருக்கான்னு."
+ask:
+  - "7B model-க்கு எவ்வளவு GPU memory வேணும்?"
+  - "LoRA-வுக்கும் QLoRA-வுக்கும் என்ன வித்தியாசம்?"
+  - "Full fine-tuning-ஐ விட LoRA model-ஐ மோசமாக்குமா?"
+translated_on: 2026-11-16
+---
+
+## இது என்ன
+
+ஒரு GPU-க்கு fixed அளவு memory தான் இருக்கு, ஒரு language model அதுக்குள்ள பொருந்தணும். அது பொருந்துதான்னு தான் எந்த hardware வாடகைக்கு எடுக்கணும், எவ்வளவு செலவாகும், ஒரு project சாத்தியமா இல்லையாங்குறதையே முடிவு பண்ணும். நல்ல விஷயம், இந்த கணக்கை மனசுக்குள்ளயே போட்டுடலாம்.
+
+ஒரு model-ங்குறது **parameters** அல்லது **weights**-ன்னு சொல்ற ரொம்ப பெரிய எண்கள் list. "7B" model-ல 7 billion இருக்கு. ஒவ்வொரு எண்ணும் அதோட **precision**-ஐ பொறுத்து சில bytes எடுக்கும்:
+
+| Format | ஒரு எண்ணுக்கு bytes | 7B model-ஓட weights |
+| --- | --- | --- |
+| 32-bit (FP32) | 4 | 28 GB |
+| 16-bit (FP16 அல்லது BF16) | 2 | 14 GB |
+| 8-bit (INT8) | 1 | 7 GB |
+| 4-bit (INT4) | 0.5 | 3.5 GB |
+
+ஒரு எண்ணுக்கு குறைவான bits use பண்றதை **quantization**-னு சொல்வாங்க. Quality-ல கொஞ்சம் இழப்புல model சின்னதாகும்.
+
+ஒரு model-ஐ run பண்ண அதோட weights memory-ல வேணும், கூட கொஞ்சம் வேலை செய்ற இடமும் வேணும். **Training**-க்கு ரொம்ப அதிகம் வேணும், ஏன்னா ஒவ்வொரு weight-ஐயும் எப்படி மாத்தணும்னு computer குறிப்புகளையும் வச்சிருக்கும். அதனால தான் ஒரு model-ஐ fine-tune பண்ண, அதை run பண்றதை விட நாலு மடங்கு memory வேணும்.
+
+**LoRA** (low-rank adaptation) அந்த செலவுல பெரும்பகுதியை தவிர்க்குற ஒரு trick. இது original weights-ஐ freeze பண்ணி, அதுக்கு பதிலா ஒரு சின்ன add-on-ஐ train பண்ணும். **QLoRA** இன்னொரு trick சேர்க்கும்: frozen weights-ஐ 4-bit-ல வைக்கும். ரெண்டும் சேர்ந்தா, இல்லன்னா ஒரு rack GPU வேணும்ங்குற model-ஐ, ஒரு சாதாரண GPU-லயே fine-tune பண்ணலாம்.
+
+```flow
+title: Training GPU memory-ல என்ன வச்சிருக்கும்
+Weights | model தானே -> Gradients | ஒவ்வொரு trainable weight-க்கும் ஒண்ணு
+Gradients | ஒவ்வொரு trainable weight-க்கும் ஒண்ணு -> Optimizer values | Adam-க்கு ஒவ்வொரு trainable weight-க்கும் ரெண்டு கூடுதலா
+Optimizer values | Adam-க்கு ஒவ்வொரு trainable weight-க்கும் ரெண்டு கூடுதலா -> Activations | batch size, text நீளத்தோட வளரும்
+Activations | batch size, text நீளத்தோட வளரும் -> தேவையான மொத்த GPU memory
+```
+
+Hyderabad-ல ஒரு startup, 13B model-ஐ ஒரே 24 GB GPU-ல adapt பண்ண முடியுமான்னு முடிவு பண்றதை இந்த lesson follow பண்ணும்.
+
+## இது எப்படி work ஆகுது
+
+**Full fine-tuning ஏன் கனமா இருக்கு.** ஒரு weight-ஐ train பண்ண, computer-க்கு அந்த weight தானே, ஒரு **gradient** (எந்த பக்கம், எவ்வளவு மாத்தணும்), **optimizer**-ஓட running values வேணும். பிரபலமான Adam optimizer ஒரு weight-க்கு ரெண்டு values வச்சிருக்கும். அதனால ஒவ்வொரு trainable weight-க்கும் memory-ல கிட்டத்தட்ட நாலு எண்கள் வேணும். 16-bit-ல ஒரு 7B model-க்கு:
+
+- weights: 7B × 2 bytes = 14 GB
+- gradients: 14 GB
+- optimizer values: 28 GB (ஒரு weight-க்கு ரெண்டு)
+- மொத்தம்: கிட்டத்தட்ட **56 GB**, இது **activations**-ஐ சேர்க்கறதுக்கு முன்னாடி; activations-னா batch size, text நீளத்தோட வளர்ற temporary results.
+
+நிறைய setups stability-க்காக optimizer values-ஐ 32-bit-ல வச்சிருக்கும், அது மொத்தத்தை இன்னும் அதிகமாக்கும். பெரும்பாலான single GPUs-ல 12-ல இருந்து 48 GB தான் இருக்கும், அதனால ஒரு 7B model-ஐ கூட full fine-tune பண்ண ஒரே GPU-ல பொருந்தாது.
+
+**LoRA இதை எப்படி சரி பண்ணுது.** Model-ல ஒரு layer-ல ஒரு பெரிய weights matrix இருக்கும், உதாரணமா 4096 × 4096 எண்கள், அதாவது கிட்டத்தட்ட 16.8 million. Full fine-tuning அத்தனையும் update பண்ணும். LoRA அதுக்கு பதிலா:
+
+1. அந்த matrix-ஐ **freeze** பண்ணும், அதனால அதுக்கு gradient-உம் optimizer values-உம் வேணாம்;
+2. ரெண்டு சின்ன matrices சேர்க்கும், A (4096 × r), B (r × 4096); r-னா **rank**-ன்னு சொல்ற ஒரு சின்ன எண், உதாரணமா 8;
+3. A, B-ஐ மட்டும் train பண்ணும். அதுங்களோட product தான் layer-க்கான update.
+
+r = 8-ல, அந்த ரெண்டு matrices-லயும் 4096 × 8 × 2 = 65,536 எண்கள் இருக்கும். இது original matrix-ல கிட்டத்தட்ட **0.4%**. LoRA தேர்ந்தெடுத்த layers-ல apply ஆகும், பெரும்பாலும் attention projections-ல. 32 layers இருக்குற 7B model-ல, ஒரு layer-க்கு ரெண்டு இப்படிப்பட்ட matrices-னு வச்சா, கிட்டத்தட்ட **4.2 million** trainable parameters, model-ல கிட்டத்தட்ட 0.06%.
+
+அப்போ gradients, optimizer values-க்கான memory பத்து கணக்கான gigabytes-ல இருந்து பத்து கணக்கான megabytes-க்கு இறங்கும். மிஞ்சுறது frozen weights, சின்ன extra, activations.
+
+**QLoRA இன்னும் எப்படி போகுது.** இப்போ மிச்சமிருக்குற பெரிய செலவு frozen weights தான். QLoRA அதை **4-bit**-ல, 16-bit அளவுல கால் பங்குல வைக்கும். Forward, backward passes-ல தேவைப்படும்போது அதிக precision-க்கு திருப்பி மாத்திக்கும், சின்ன LoRA matrices அதிக precision-ல train ஆகும். 7B model-ஓட frozen weights 14 GB-ல இருந்து கிட்டத்தட்ட 3.5 GB-க்கு சுருங்கும்.
+
+**Training-க்கு அப்புறம்.** LoRA matrices ஒரு சின்ன file, பெரும்பாலும் பத்து கணக்கான megabytes. அதை **தனியா வச்சு** base model மேல load பண்ணலாம்; அப்போ ஒரே base model-ஐ வெவ்வேற adapters-ஓட பல customers-க்கு serve பண்ணலாம். இல்லன்னா weights-க்குள்ள **merge** பண்ணலாம்; அப்போ serving-க்கு extra cost எதுவும் இல்ல.
+
+**7B model-க்கு memory, ஒரு தோராயமான guide:**
+
+| Approach | Weights | Training-க்கு extra | 24 GB GPU-ல fit ஆகுமா? |
+| --- | --- | --- | --- |
+| Full fine-tuning, 16-bit | 14 GB | கிட்டத்தட்ட 42 GB + activations | இல்ல |
+| 16-bit model மேல LoRA | 14 GB | LoRA-க்கு பத்து கணக்கான MB, + activations | ஆமா, சின்ன batch-ஓட |
+| QLoRA, 4-bit base | 3.5 GB | LoRA-க்கு பத்து கணக்கான MB, + activations | ஆமா, இடம் மிச்சமிருக்கும் |
+
+Activations உங்க batch size, text நீளத்தை பொறுத்தது, அதனால இதெல்லாம் starting estimates-ன்னு எடுத்துக்கிட்டு, உங்க சொந்த hardware-ல அளந்து பாருங்க.
+
+## ஒரு worked example
+
+Hyderabad startup 13B model-ஐ loan-agreement summaries எழுதுற மாதிரி adapt பண்ண விரும்புது. அவங்ககிட்ட ஒரு 24 GB GPU இருக்கு. Step by step பார்ப்போம்.
+
+1. **Model load ஆகுமா?** 13 billion × 2 bytes = 16-bit-ல 26 GB. இது 24 GB-ஐ விட அதிகம். Load-ஏ ஆகாது.
+2. **Full fine-tuning பண்ணலாமா?** Weights-ஓட கிட்டத்தட்ட நாலு மடங்கு வேணும்: கிட்டத்தட்ட 104 GB, activations தனி. முடியாது.
+3. **4-bit-னா?** 13 billion × 0.5 bytes = 6.5 GB. LoRA matrices-க்கும் activations-க்கும் card-ல நிறைய இடம் மிஞ்சும்.
+4. **அதனால realistic option QLoRA.**
+
+அவங்க estimates-ஐ check பண்ண use பண்ற helper இது:
+
+```python
+def weights_gb(params_billion, bytes_per_number):
+    return params_billion * bytes_per_number          # billions x bytes = GB
+
+for name, b in [("16-bit", 2), ("8-bit", 1), ("4-bit", 0.5)]:
+    print(name, weights_gb(13, b), "GB for 13B")
+# 16-bit 26 GB, 8-bit 13 GB, 4-bit 6.5 GB
+
+def full_finetune_gb(params_billion):
+    # 16-bit weights + gradients + two Adam values per weight = 4 numbers of 2 bytes
+    return params_billion * 2 * 4
+
+print(full_finetune_gb(7), "GB for full fine-tuning of 7B, before activations")  # 56
+```
+
+Hugging Face PEFT library-ஓட ஒரு வழக்கமான LoRA setup இப்படி இருக்கும்:
+
+```python
+from peft import LoraConfig, get_peft_model
+
+config = LoraConfig(
+    r=8,                                   # rank: width of the two small matrices
+    lora_alpha=16,                         # scales the update
+    target_modules=["q_proj", "v_proj"],   # which layers get adapters
+    lora_dropout=0.05,
+    task_type="CAUSAL_LM",
+)
+model = get_peft_model(base_model, config)
+model.print_trainable_parameters()         # a tiny fraction of the model
+```
+
+Layer பேர்கள் model-க்கு model வேறுபடும், அதனால அந்த model-ஓட documentation-ஐ check பண்ணுங்க. QLoRA-க்கு, base model-ஐ முதல்ல bitsandbytes library மூலமா 4-bit-ல load பண்ணி, அப்புறம் அதே LoRA setup-ஐ apply பண்ணுவாங்க.
+
+**Startup முதல்ல என்ன பண்ணுச்சு.** எதையும் train பண்றதுக்கு முன்னாடி, 50 sample agreements-ல ஒரு நல்ல prompt-ஐ try பண்ணாங்க. அவங்க checklist-க்கு எதிரா அது 71% score பண்ணுச்சு. 1,200 reviewed summaries-ஓட QLoRA-ல, ஒரு quick trial held-out test set-ல 88% வந்துச்சு. ரெண்டு எண்களையும் record-ல வச்சாங்க, அந்த இடைவெளி upkeep-ஐ justify பண்ணுச்சுன்னு தான் QLoRA-ஐ தேர்ந்தெடுத்தாங்க. இந்த எண்கள் முறையை புரிய வைக்க ஒரு உதாரணம் தான்: prompt-ஓட compare பண்ணுங்க, அப்புறம் முடிவு பண்ணுங்க.
+
+## Settings-ஐ தேர்ந்தெடுக்குறது
+
+| Setting | என்ன பண்ணும் | Starting point |
+| --- | --- | --- |
+| Rank r | Update-ஓட capacity | 8-ல இருந்து 16. Quality குறைஞ்சா மட்டும் ஏத்துங்க |
+| Alpha | Update-ஐ scale பண்ணும் | பெரும்பாலும் 2 × r, அப்புறம் adjust பண்ணுங்க |
+| Target layers | Adapters எங்க போகும் | முதல்ல attention layers. தேவைன்னா மேலும் சேருங்க |
+| Learning rate | Step size | Full fine-tuning-ஐ விட அதிகம். Library-ஓட guide-ஐ follow பண்ணுங்க |
+| Batch size, text நீளம் | Activation memory-ஐ தீர்மானிக்கும் | Memory தீர்ந்தா முதல்ல இதை குறைங்க |
+
+## LoRA அல்லது QLoRA-ஐ எப்போ use பண்ணக்கூடாது
+
+- **ஒரு நல்ல prompt போதும்.** முதல்ல prompt-ஐ test பண்ணுங்க. அதுக்கு சில நிமிஷம் தான் ஆகும்.
+- **பிரச்சனை missing knowledge.** Retrieval use பண்ணுங்க. மாறிக்கிட்டே இருக்குற facts-ஐ வைக்க adapter நல்ல இடம் இல்ல.
+- **Hosted model-ஐ மட்டும் தான் call பண்ண முடியும்.** உங்ககிட்ட இல்லாத model-ல adapter-ஐ attach பண்ண முடியாது; provider தன்னோட சொந்த fine-tuning தந்தா தவிர.
+- **முடிஞ்ச அளவு சிறந்த quality வேணும், compute-உம் இருக்கு.** Full fine-tuning ஒரு task-க்கு இன்னும் இறுக்கமா பொருந்தலாம், LoRA பெரும்பாலும் கிட்டத்தட்ட அதுக்கு நெருக்கமா வரும்.
+- **ரொம்ப கம்மி examples தான் இருக்கு.** எந்த method-ஆ இருந்தாலும், ஒரு சின்ன dataset சீக்கிரமே overfit ஆகும்.
+
+## Demo-ல இருந்து production-க்கு
+
+- **உண்மையான memory-ஐ அளங்க.** Estimates எதை try பண்ணலாம்னு சொல்லும். ஒரு short job-ஐ run பண்ணி, உங்க உண்மையான batch size, text நீளத்துல GPU-ஓட memory use-ஐ படிங்க.
+- **Serving-க்கும் memory வேணும்.** Serving நேரத்துல, ஒரு model-க்கு அதோட weights-உம், ஒவ்வொரு user-ஓட conversation நீளத்தோட வளர்ற **KV cache**-உம் வேணும். GPUs, quantization பத்தின lesson-ஐ பாருங்க.
+- **Quantized model-ஐ test பண்ணுங்க.** Four-bit-ல quality கொஞ்சம் போகும். Benchmarks-ல மட்டும் இல்ல, உங்க சொந்த test set-ல check பண்ணுங்க.
+- **Adapters-ஐ code மாதிரி version பண்ணுங்க.** ஒவ்வொரு adapter-க்கும் base model, data, settings, test score-ஐ record பண்ணுங்க, test set-ஐ locked-ஆ வச்சிருங்க.
+- **முழுசையும் cost பண்ணுங்க.** Final run-க்கு மட்டும் இல்ல, experiments-க்கான GPU hours-ஐயும் சேருங்க. பெரும்பாலான runs experiments தான்.
+- **Base model மாறும்னு plan பண்ணுங்க.** ஒரு adapter அது train ஆன base model-ஓட மட்டும் தான் வேலை செய்யும். புது base model-னா மறுபடி train பண்ணணும்.
+
+## பொதுவா பண்ற தப்புகள்
+
+- **Weights-ஐ மட்டும் எண்ணுறது.** Training-க்கு அதுக்கு மேல gradients, optimizer values, activations வேணும்.
+- **Activations-ஐ மறக்குறது.** Weights பொருந்தினாலும், நீளமான text அல்லது பெரிய batch-ல memory தீர்ந்துடும்.
+- **ஆரம்பத்துலயே rank-ஐ ரொம்ப அதிகமா வைக்குறது.** அதிக rank-னா அதிக memory, overfitting risk-உம் அதிகம். குறைஞ்சதுல ஆரம்பிங்க.
+- **4-bit இலவசம்னு நினைக்குறது.** இது சின்ன quality இழப்புக்கு பெரிய memory சேமிப்பு-ங்குற trade. Test பண்ணுங்க.
+- **Adapters-ஐயும் base models-ஐயும் குழப்புறது.** ஒரு adapter அது train ஆன base model-ஓட இணைஞ்சது.
+- **Prompt baseline-ஐ தவிர்க்குறது.** Training-க்கு பணம் செலவழிக்கறதுக்கு முன்னாடி எப்பவும் நல்லா எழுதின ஒரு prompt-ஓட compare பண்ணுங்க.
+
+## Practice பண்ணுங்க
+
+கணக்கை போடுங்க, GPU access இருந்தா உண்மையாவே try பண்ணுங்க.
+
+1. மூணு open models-ஐ எடுங்க, உதாரணமா 3B, 8B, 70B. ஒவ்வொண்ணுக்கும், weights-ஓட memory-ஐ 16-bit, 8-bit, 4-bit-ல எழுதுங்க.
+2. ஒவ்வொண்ணும் 16 GB, 24 GB, 80 GB GPU-ல fit ஆகுமான்னு, run பண்றதுக்கும் QLoRA-வுக்கும் சொல்லுங்க.
+3. ஒரு free notebook-ல ஒரு சின்ன model-ஓட, மேல இருக்கற மாதிரி ஒரு LoRA config-ஐ சேர்த்து, trainable parameters-ஐ print பண்ணுங்க. Percentage-ஐ எழுதிக்கோங்க.
+
+இன்னும் ஆழமா படிக்க, Chip Huyen-ஓட *AI Engineering* (O'Reilly, 2025) புத்தகத்தோட 7-ஆவது chapter, memory கணக்கு, quantization, parameter-efficient fine-tuning-ஐ விளக்குது.
+
+**இதுக்கு அப்புறம் உங்களால முடியணும்:** ஒரு குறிப்பிட்ட model ஒரு குறிப்பிட்ட GPU-ல fit ஆகுமான்னு மனசுலயே estimate பண்ணவும், full fine-tuning-ஐ விட LoRA-க்கு ஏன் ரொம்ப குறைஞ்ச memory போதும்னு ரெண்டு வாக்கியத்துல விளக்கவும்.

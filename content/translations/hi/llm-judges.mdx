@@ -1,0 +1,203 @@
+---
+id: llm-judges
+lang: hi
+title: "LLM judges और उनकी limits"
+outcome: "जवाबों को grade करने के लिए model use कर पाओगे, और जाँच पाओगे कि उसके grades किसी इंसान के grades से मेल खाते हैं।"
+answer: "LLM judge एक model है जो किसी दूसरे model के जवाबों को rubric के against grade करता है। उस पर भरोसा करने से पहले एक sample पर जाँचो कि उसके grades किसी इंसान के grades से मेल खाते हैं।"
+why_it_matters: "कुछ गुण, जैसे tone या helpfulness, code से जाँचना मुश्किल होते हैं, इसलिए teams model को judge की तरह use करती हैं। Judges में जाने-पहचाने biases होते हैं, और जो engineers उन्हें जाँचते हैं वो अलग दिखते हैं।"
+flashcards:
+  - q: "LLM judge क्या है?"
+    a: "एक language model जिसे किसी दूसरे model के output को rubric के against grade करने को कहा जाता है, वहाँ जहाँ code checks judge नहीं कर सकते।"
+  - q: "अच्छी judge rubric कैसी होती है?"
+    a: "एक बार में एक narrow, specific सवाल, yes या no या छोटा labelled scale, और पहले एक छोटा reason माँगना।"
+  - q: "Judge को क्या देना ज़रूरी है?"
+    a: "सवाल, output, और जो reference उसे चाहिए: faithfulness के लिए passages, expected answers, या policy।"
+  - q: "भरोसा करने से पहले judge को कैसे जाँचें?"
+    a: "लोगों से 30 से 100 outputs उसी rubric से grade करवाओ और नापो कि judge कितनी बार सहमत होता है।"
+  - q: "Position bias क्या है?"
+    a: "दो जवाबों की तुलना में judges अक्सर किसी एक position को पसंद करते हैं। क्रम बदलो और सिर्फ़ वो verdicts गिनो जो दोनों बार एक जैसे हों।"
+  - q: "Length bias क्या है?"
+    a: "Judges लंबे जवाबों को ऊँचा rate करते हैं, चाहे वो बेहतर न हों।"
+  - q: "Judge की जगह code कब use करें?"
+    a: "Exact values, JSON validity, required fields, word limits, citations का होना और banned phrases के लिए।"
+  - q: "Judge की cost कैसे कम रखें?"
+    a: "जहाँ agreement ऊँचा रहे वहाँ छोटे models use करो, और judges को offline या samples पर चलाओ।"
+  - q: "Judge 'एक model और एक prompt' क्यों है?"
+    a: "Judge का model या prompt, कुछ भी बदलो तो आपके पास दूसरा judge है, इसलिए पुराने और नए scores की तुलना बिना दोबारा calibrate किए नहीं हो सकती।"
+  - q: "Cohen's kappa सादे agreement में क्या जोड़ता है?"
+    a: "वो संयोग से होने वाले agreement को घटाकर सुधार देता है। अगर 90% outputs pass होते हैं, तो दो graders जो हमेशा pass कहते हैं वो कुछ जाने बिना भी 90% बार सहमत होंगे।"
+exercise:
+  title: "Judge को ठीक करो"
+  setup: "Bengaluru की एक support team ये judge prompt use करती है: 'Rate this reply from 1 to 10 for quality.' जिन जवाबों की customers ने शिकायत की, उन पर भी scores का average 8.7 आता है। A-बनाम-B tests में judge 68% बार reply A चुनता है। लंबे जवाबों को ज़्यादा score मिलता है। Judge ये भी check करता है कि जवाब में ticket number है या नहीं, जिसे वो कभी-कभी गलत पकड़ता है।"
+  questions:
+    - q: "Rubric में क्या गलत है?"
+      a: "एक धुँधला 1-से-10 quality scale। उसकी जगह specific yes-or-no सवाल रखो, जैसे 'क्या reply email के हर सवाल का जवाब देता है?'"
+    - q: "A के लिए 68% पसंद को कैसे संभालोगे?"
+      a: "Position bias: हर तुलना दोनों क्रमों में चलाओ और सिर्फ़ वो verdicts गिनो जो सहमत हों।"
+    - q: "Length के असर को कैसे संभालोगे?"
+      a: "Code से check होने वाली word limit जोड़ो, और rubric में एक line डालो कि length quality नहीं है।"
+    - q: "Ticket number कौन check करे?"
+      a: "Code: एक सादा pattern match exact, मुफ़्त और एक जैसा होता है।"
+ask:
+  - "भरोसेमंद LLM-as-a-judge कैसे बनाऊँ?"
+  - "LLM judges में कौन-से biases होते हैं?"
+  - "Judge को calibrate करने के लिए कितने human grades चाहिए?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+**LLM judge** एक language model है जिसे किसी दूसरे model के output को grade करने को कहा जाता है: "क्या ये जवाब passages के प्रति faithful है? Reason के साथ yes या no में जवाब दो", या "इस reply को इस rubric के against 1 से 5 में rate करो"। Judges की वजह से open-ended outputs (summaries, explanations, replies) को बड़े पैमाने पर evaluate करना मुमकिन होता है, जहाँ code checks नहीं कर सकते।
+
+पर judge खुद भी एक model है, जिसमें errors और biases होते हैं। उसके scores पर भरोसा करने से पहले उसे जाँचना ज़रूरी है।
+
+```flow
+Case | एक excerpt और उसकी summary -> Code checks | word limit 150? citation है? Exact और मुफ़्त
+Case -> Judge | "List unsupported statements, then SUPPORTED or UNSUPPORTED"
+Judge -> Calibration | 80 summaries को दो lawyers ने grade किया; judge 74 पर सहमत: 92.5%
+Calibration -> इस rubric के लिए भरोसेमंद
+Judge -> Pairwise tests | A, B और B, A दिखाओ; सिर्फ़ consistent verdicts रखो
+```
+
+ये lesson Chennai के एक legal-tech startup को follow करता है जो नाप रहा है कि उसकी judgment summaries में unsupported claims हैं या नहीं।
+
+## ये काम कैसे करता है
+
+**Narrow, specific rubric लिखो।** Judges धुँधले scales ("ये जवाब कितना अच्छा है, 1 से 10?") से बेहतर एक बार में एक साफ़ सवाल ("क्या जवाब में कोई ऐसा claim है जो passages से समर्थित नहीं?") पर करते हैं। Yes या no, या छोटा labelled scale पसंद करो, और पहले एक छोटा reason माँगो।
+
+**Judge को वो दो जो उसे चाहिए।** सवाल, output, और reference: faithfulness के लिए retrieved passages, correctness के लिए expected answer, compliance के लिए policy।
+
+**इंसानों से agreement जाँचो।** एक या दो लोगों से उसी rubric से 30 से 100 outputs grade करवाओ। Judge से तुलना करो। अगर agreement कम है, तो असहमतियाँ पढ़ो और rubric या examples ठीक करो। Judge का prompt या model बदलने के बाद दोबारा जाँचो।
+
+**जाने-पहचाने biases।**
+
+- *Position bias*: दो जवाबों की तुलना में judges अक्सर पहले (या दूसरे) दिखाए गए को पसंद करते हैं। Positions बदलो और average लो।
+- *Length bias*: लंबे, ज़्यादा detail वाले जवाब बेहतर न हों तब भी ज़्यादा score पाते हैं।
+- *Self-preference*: models अपने ही परिवार के outputs को ऊँचा rate कर सकते हैं।
+- *Leniency*: judges अक्सर ज़रूरत से ज़्यादा उदार होते हैं; साफ़ तौर पर खराब examples से calibrate करो।
+
+**जब code फ़ैसला कर सके तब code use करो।** Exact values, JSON validity, required fields, word limits, citation का होना, banned phrases: ये code से जाँचना बेहतर है, जो मुफ़्त, तेज़ और हमेशा एक जैसा होता है।
+
+**Cost।** Judges हर case पर model calls जोड़ते हैं। जहाँ agreement ऊँचा रहे वहाँ छोटे models use करो, और judges को offline या samples पर चलाओ।
+
+**Biases और उनके fixes:**
+
+| Bias | कैसा दिखता है | Fix |
+| --- | --- | --- |
+| Position | पहले दिखाया गया जवाब ज़्यादा बार चुनता है | दोनों क्रम चलाओ; consistent verdicts रखो |
+| Length | लंबे जवाबों को ज़्यादा score | Code में word limit; rubric कहे कि length quality नहीं है |
+| Self-preference | अपने परिवार के outputs को ऊँचा rate करता है | दूसरे परिवार का judge use करो, या इंसानों से मिलाकर जाँचो |
+| Leniency | ज़्यादातर outputs pass | साफ़ खराब examples डालो; verdict से पहले समस्याएँ माँगो |
+
+**Agreement निकालना।** Yes-or-no judge के लिए, agreement उन cases का हिस्सा है जहाँ judge और इंसान का label मेल खाता है। सिर्फ़ rate नहीं, असहमतियाँ देखो: अगर judge उन outputs को pass करता है जिन्हें लोग fail करते हैं, तो वो बहुत उदार है और असली समस्याएँ निकल जाएँगी। दोनों तरह की असहमतियाँ अलग-अलग track करो, और failures पर ऊँचे agreement का लक्ष्य रखो, क्योंकि eval उन्हीं को पकड़ने के लिए है।
+
+**Judge prompt लिखना।** एक सवाल बताओ, reference material दो, pass और fail को एक-एक छोटे example से define करो, और judge से जवाब देने से पहले evidence list करने को कहो। पहले reason माँगने से verdicts ज़्यादा consistent होते हैं और असहमतियाँ पढ़ते समय समझना आसान होता है।
+
+**Judge model चुनना।** Agreement का level तय करने के लिए एक मज़बूत model से शुरू करो, फिर उसी calibration set पर एक छोटा, सस्ता model आज़माओ। अगर agreement दो-तीन points के अंदर रहे, तो रोज़ के runs के लिए छोटा वाला use करो और spot checks के लिए मज़बूत वाला रखो। Judge के model version को किसी भी दूसरी dependency की तरह pin करो: चुपचाप होने वाला model update scores खिसका सकता है और इस महीने के numbers को पिछले महीने से बेमेल बना सकता है।
+
+**Pipeline में judges कहाँ फ़िट होते हैं।** पहले code checks चलाओ और जो outputs उनमें पहले ही fail हैं उनके लिए judge छोड़ दो, जिससे calls बचती हैं। Offline evals में हर case पर judge चलाओ, और online monitoring के लिए live traffic के एक छोटे random sample पर। Production में judge के failures को review queue में भेजो, जहाँ लोग उन्हें confirm या पलटते हैं, और confirm हुए cases को test set में जोड़ो।
+
+**Code में एक judge।** पहले evidence और आख़िर में verdict माँगो, structured output के रूप में, ताकि verdicts गिनना और reasons पढ़ना आसान हो:
+
+```python
+import json
+import anthropic
+
+client = anthropic.Anthropic()
+JUDGE_MODEL = "claude-sonnet-5-5"           # pin a dated version where offered
+JUDGE_PROMPT = """You check one thing: does the ANSWER contain any claim not supported by the PASSAGES?
+Ignore style, length and tone.
+PASS example: every number and fact in the answer appears in a passage.
+FAIL example: the answer gives a fee the passages never mention.
+Reply only with JSON: {"unsupported_claims": [...], "verdict": "pass" or "fail"}"""
+
+def judge(question, passages, answer):
+    msg = f"QUESTION:\n{question}\n\nPASSAGES:\n{passages}\n\nANSWER:\n{answer}"
+    r = client.messages.create(model=JUDGE_MODEL, max_tokens=400, system=JUDGE_PROMPT,
+                               messages=[{"role": "user", "content": msg}])
+    text = "".join(b.text for b in r.content if b.type == "text")
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return {"verdict": "error", "raw": text}       # count these; do not guess
+```
+
+जब guaranteed shape चाहिए तो उस lesson के structured-output features use करो; ऊपर का fallback कम से कम टूटे हुए replies को छिपाने की जगह गिनता है।
+
+**इंसानों के साथ agreement, code में।** उन्हीं cases पर judge और इंसान के labels की तुलना करो, और संयोग के लिए सुधार करो:
+
+```python
+def agreement(human, judge):
+    """Two equal-length lists of 'pass' / 'fail'."""
+    n = len(human)
+    observed = sum(h == j for h, j in zip(human, judge)) / n
+    p_h, p_j = human.count("pass") / n, judge.count("pass") / n
+    expected = p_h * p_j + (1 - p_h) * (1 - p_j)
+    kappa = (observed - expected) / (1 - expected) if expected < 1 else 1.0
+    missed = sum(h == "fail" and j == "pass" for h, j in zip(human, judge))
+    return {"agreement": round(observed, 2), "kappa": round(kappa, 2), "failures_missed": missed}
+```
+
+Kappa लगभग 0.6 से ऊपर आमतौर पर काम लायक और 0.8 से ऊपर मज़बूत होता है। `failures_missed` का हर case पढ़ो: वही समस्याएँ हैं जिन्हें judge निकलने देता।
+
+**Judge एक model और एक prompt है।** दोनों में से कुछ भी बदलो और आपके पास नया judge है जिसके scores पुराने वाले से तुलना लायक नहीं हैं। हर score के साथ judge का model version और prompt version store करो, और जब भी कुछ बदलो, नए numbers पर भरोसा करने से पहले calibration set पर दोबारा चलाओ।
+
+**Judges के प्रकार।** Rubric वाले general model के अलावा specialised भी होते हैं: outputs को score करने के लिए train किए reward models, एक ही check (toxicity, faithfulness) के लिए fine-tune किए छोटे classifiers, और comparison judges जो दो जवाबों में बेहतर चुनते हैं। Specialised judges किसी एक narrow काम के लिए सस्ते और ज़्यादा consistent होते हैं; general judges लचीले और शुरू करने में तेज़ होते हैं।
+
+**Judges खुद से भी असहमत होते हैं।** एक ही judge को एक ही case पर दो बार चलाओ तो वो अलग verdicts दे सकता है। अपने calibration set पर ये नापो; अगर कुछ percent से ज़्यादा पलटें, तो rubric कसो, जहाँ supported हो वहाँ temperature 0 use करो, या नज़दीकी cases में तीन runs का majority लो।
+
+## एक example से समझो
+
+Chennai का एक legal-tech startup court judgments की summaries बनाता है। वो नापना चाहते हैं कि summaries में unsupported claims हैं या नहीं।
+
+- Judge prompt: "Here is a judgment excerpt and a summary. List any statement in the summary not supported by the excerpt. Then answer SUPPORTED or UNSUPPORTED."
+- दो lawyers 80 summaries grade करते हैं। Judge उनसे 74 पर सहमत होता है (92.5%)।
+- एक अलग comparison काम में (दो summaries में कौन बेहतर है), judge ने 63% बार वही चुना जो पहले दिखाया गया था। वो दोनों क्रम दिखाने और सिर्फ़ consistent verdicts गिनने पर आ जाते हैं।
+- उन्हें ये भी मिलता है कि judge लंबी summaries को ऊँचा rate करता है। वो 150-word limit के लिए code check जोड़ते हैं और rubric में एक line डालते हैं कि length quality नहीं है।
+
+Faithfulness judge अब हर model या prompt बदलाव पर चलता है, और lawyers हर महीने 20 cases की spot-check करते हैं।
+
+| Finding | Fix | Result |
+| --- | --- | --- |
+| Judge 80 में से 74 पर lawyers से सहमत | कुछ नहीं चाहिए | Faithfulness के लिए भरोसेमंद |
+| 63% बार पहली summary चुनी | दोनों क्रम, सिर्फ़ consistent verdicts | निष्पक्ष तुलना |
+| लंबी summaries को ऊँचा rate किया | Code में 150-word limit; length पर rubric line | Length को अब इनाम नहीं |
+
+## आम गलतियाँ
+
+- **इंसानों से agreement जाँचे बिना judge पर भरोसा करना।**
+- **धुँधले 1-से-10 scales।**
+- **Position और length bias को नज़रअंदाज़ करना।**
+- **जो चीज़ें code जाँच सकता है उनके लिए judge use करना।**
+- **Judge बदलने के बाद दोबारा कभी न जाँचना।**
+- **अलग judge versions के scores की तुलना करना।** पहले दोबारा calibrate करो।
+- **Parse न हो सकने वाले judge replies को छिपाना।** उन्हें errors गिनो और देखो।
+- **सिर्फ़ agreement report करना**, chance-corrected agreement या छूटे हुए failures नहीं।
+
+## जब LLM judge use न करें
+
+- **Code फ़ैसला कर सकता है**: exact values, formats, word counts, required fields, banned phrases।
+- **Reference answer है और ठीक-ठीक मेल खाना चाहिए**, जैसे कोई number या category।
+- **High-stakes verdicts** जिनकी ज़िम्मेदारी इंसानों की होनी चाहिए, जैसे medical या legal correctness: experts use करो, और judge सिर्फ़ उनके review की प्राथमिकता तय करने के लिए।
+- **आपने अभी agreement नहीं जाँचा**: जब तक नहीं जाँचते, judge का score एक अंदाज़ा है।
+
+## Demo से production तक
+
+- **Judge के model और prompt versions pin करो** और हर score के साथ store करो।
+- **50 से 100 human-graded cases का calibration set रखो** और हर judge बदलाव पर उसे दोबारा चलाओ।
+- **Judge की error और flip rates track करो।**
+- **Production में judge के failures को human review में भेजो**, और confirm हुए को test set में जोड़ो।
+- **Judge की cost का budget अलग रखो** और सब कुछ judge करने की जगह live traffic का sample लो।
+
+## Practice करो
+
+नीचे link किए Eugene Yan के LLM patterns article का evaluation section पढ़ो।
+
+1. अपने app के outputs की किसी एक quality के लिए yes-or-no judge prompt लिखो।
+2. 30 outputs खुद grade करो और निकालो कि judge कितनी बार सहमत होता है।
+3. Pairwise comparison में क्रम बदलकर position bias test करो।
+4. अपने 30 graded outputs पर agreement function चलाओ और judge से छूटा हर failure पढ़ो।
+
+ज़्यादा गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 3 AI as a judge को कवर करता है: ये कैसे काम करता है, इसके biases और limits, और specialised judges।
+
+**आप तब पूरा कर चुके हो जब** human grades के साथ अपने judge का agreement rate दिखा सको, और एक bias बता सको जो आपने पाया और संभाला।

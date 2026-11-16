@@ -1,0 +1,217 @@
+---
+id: quality-cost-speed
+lang: hi
+title: "Quality, cost और speed के trade-offs"
+outcome: "समझा पाओगे कि quality, cost और speed को एक-दूसरे के बदले तौलने पर क्या छोड़ना पड़ता है और क्या मिलता है।"
+answer: "हर AI system quality, cost और speed को एक-दूसरे के बदले तौलता है: बड़ा model बेहतर होता है पर धीमा और महँगा, इसलिए वो सबसे सस्ता option चुनो जो आपकी quality bar पूरी करे।"
+why_it_matters: "हर असली design trade-offs का एक सेट होता है। Interviewers सुनते हैं कि आप उन्हें ज़ोर से बोलते हो या नहीं और numbers से उनका साथ देते हो या नहीं।"
+flashcards:
+  - q: "हर LLM app कौन-सी तीन चीज़ें एक-दूसरे के बदले तौलता है?"
+    a: "Quality, cost और speed।"
+  - q: "हर option के लिए क्या नापना चाहिए?"
+    a: "Evals से category के हिसाब से quality, हर request की cost, median और 95th percentile पर latency, और time to first token।"
+  - q: "Options को table में क्यों रखें?"
+    a: "इससे trade-offs product owner के साथ एक business बातचीत बन जाते हैं, हर choice के numbers के साथ।"
+  - q: "Quality को कैसे judge करना चाहिए?"
+    a: "सिर्फ़ कुल accuracy से नहीं, category के हिसाब से और गलतियों के नतीजों के हिसाब से।"
+  - q: "तीन free wins बताओ।"
+    a: "Streaming, prompt caching, और छोटे prompts और outputs; साथ में steps को parallel चलाना और बेकार steps हटाना।"
+  - q: "Difficulty के हिसाब से routing क्या है?"
+    a: "आसान requests को तेज़, सस्ते model पर और मुश्किल वाली को strong model पर भेजना, और router की गलतियाँ भी नापना।"
+  - q: "कौन-से budgets तय करने चाहिए?"
+    a: "एक latency budget और हर request की cost की ceiling, फिर उनके अंदर quality को ज़्यादा से ज़्यादा करो।"
+  - q: "फ़ैसले को दोबारा क्यों देखें?"
+    a: "दाम गिरते हैं, models सुधरते हैं और usage बढ़ता है, इसलिए सबसे अच्छा trade-off हर कुछ महीनों में बदल जाता है।"
+  - q: "Options का Pareto frontier क्या है?"
+    a: "वो options जिन्हें कोई और option हर पैमाने पर एक साथ नहीं हराता। Frontier से बाहर वाला option quality, cost और speed तीनों में किसी और option से बुरा है, और उसे हटाया जा सकता है।"
+  - q: "Average की जगह p95 latency क्यों बताएँ?"
+    a: "Average धीमी tail को छुपा देता है। बीस में से एक user का छह seconds इंतज़ार करना ही लोगों को याद रहता है, और p95 वो दिखाता है।"
+exercise:
+  title: "फ़ैसला लो"
+  setup: "Delhi की एक travel company का booking assistant 200 test questions पर options की तुलना करता है। Small model: 79% accuracy, ₹0.05 प्रति request, 1.4 s p95। Large model: 88%, ₹0.50, 4.2 s। Router: 86%, ₹0.18, 2.5 s। Refund rules पर गलत जवाबों से महँगे disputes होते हैं; आम travel tips कम मायने रखते हैं। तय latency budget है: p95 पर पहले शब्द 1.5 s के अंदर।"
+  questions:
+    - q: "Cost और latency की पूरी तस्वीर में कौन-सा option सबसे ठीक बैठता है?"
+      a: "Router: large model की accuracy के पास, करीब एक तिहाई cost पर और latency काफ़ी कम।"
+    - q: "Refund questions को कैसे संभालना चाहिए?"
+      a: "उन्हें large model पर route करो, और उस category के लिए reranker भी सोचो, क्योंकि वहाँ गलतियाँ महँगी हैं।"
+    - q: "1.5 s के पहले-शब्द वाले budget को कैसे पूरा करें?"
+      a: "Answers को stream करो ताकि पहले शब्द जल्दी दिखें, और prompts छोटे रखो।"
+    - q: "Team को ये choice दोबारा कब देखनी चाहिए?"
+      a: "हर कुछ महीनों में, या जब दाम, models या traffic काफ़ी बदलें।"
+ask:
+  - "LLM app में quality, cost और latency का balance कैसे बनाऊँ?"
+  - "Model routing क्या है?"
+  - "AI trade-offs एक product manager को कैसे समझाऊँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+हर LLM app तीन चीज़ों को एक-दूसरे के बदले तौलता है:
+
+- **Quality**: जवाब कितनी बार सही, पूरे और सुरक्षित होते हैं।
+- **Cost**: हर request और हर महीने का पैसा।
+- **Speed**: users को कितना इंतज़ार करना पड़ता है।
+
+बड़े models, ज़्यादा retrieved context, rerankers, reflection steps और agent loops आमतौर पर quality बढ़ाते हैं, और cost और latency भी। अच्छी engineering इन trade-offs को साफ़ दिखाती है और product के मालिकों के साथ सोच-समझकर इन्हें तय करती है।
+
+```flow
+dir: LR
+title: चुना गया: exclusions और claims के लिए router + reranker: 88%, ₹0.30, 3.1 s p95
+Question -> Router
+Router -[easy]-> Small model | 76%, ₹0.08, 1.6 s
+Router -[hard: exclusions, claims]-> Large model + reranker | 89%, ₹0.64, 4.3 s
+```
+
+Streaming से पहले शब्द एक second से कम में दिख जाते हैं।
+
+ये lesson Hyderabad की एक health-insurance company के बारे में है, जिसके call-centre agents live calls के दौरान एक assistant use करते हैं।
+
+## ये काम कैसे करता है
+
+**तीनों को एक ही test set पर नापो।** हर option के लिए ये record करो:
+
+- आपके eval से quality (सिर्फ़ कुल नहीं, category के हिसाब से);
+- हर request की cost (tokens गुणा दाम);
+- median और 95th percentile पर latency, और time to first token।
+
+**Options को table में रखो।** जैसे: small model, large model, large model plus reranker। तब trade-off एक business बातचीत बन जाता है: "Reranker accuracy 85% से 89% करता है और p95 पर हर request में 400 ms जोड़ता है; क्या ये worth है?"
+
+**पूछो कि कौन-सी quality मायने रखती है।** आम chat के लिए 85% ठीक हो सकता है; medical या financial जवाबों में quality और safety सबसे ऊपर होती है। गलतियों को उनके नतीजों के हिसाब से तौलो।
+
+**पहले free wins ढूँढो।** कुछ बदलाव quality को नुकसान पहुँचाए बिना speed या cost सुधारते हैं:
+
+- streaming (महसूस होने वाली speed);
+- prompt caching (दोहराए गए prefixes पर cost और speed);
+- छोटे outputs और prompts;
+- एक-दूसरे पर निर्भर न रहने वाले steps को parallel चलाना;
+- बेकार steps हटाना।
+
+**Difficulty के हिसाब से route करो।** आसान requests को तेज़, सस्ते model पर और मुश्किल वाली को strong model पर भेजो। नापो कि router कितनी बार गलत करता है।
+
+**Budgets तय करो।** एक latency budget (जैसे p95 पर first token 1.5 s से कम) और हर request की cost की ceiling पर सहमत हो जाओ, फिर उनके अंदर quality को ज़्यादा से ज़्यादा करो।
+
+**दोबारा देखो।** दाम गिरते हैं, models सुधरते हैं और usage बढ़ता है; सबसे अच्छा trade-off बदलता है। हर कुछ महीनों में table फिर से चलाओ।
+
+**Levers और उनके असर:**
+
+| Lever | Quality | Cost | Speed |
+| --- | --- | --- | --- |
+| बड़ा model | बढ़ती है | बढ़ती है | धीमा |
+| Reranker | बढ़ती है | थोड़ी बढ़ती है | थोड़ा धीमा |
+| ज़्यादा retrieved context | अक्सर बढ़ती है, फिर घटती है | बढ़ती है | First token धीमा |
+| Router | Large model के पास | घटती है | Average में तेज़ |
+| Streaming | वही | वही | बहुत तेज़ लगता है |
+| Prompt caching | वही | घटती है | First token तेज़ |
+| छोटे outputs | वही या बेहतर | घटती है | तेज़ |
+
+**नतीजों के हिसाब से weight देना।** Test set को categories में बाँटो और हर एक को business से एक weight दिलवाओ: यहाँ गलत जवाब कितना महँगा है? Insurer के लिए exclusions और claims का weight सबसे ज़्यादा था, आम सवालों का सबसे कम। Weighted score options को सादी accuracy से अलग क्रम में रख सकता है, और choice की वजह सबके सामने साफ़ कर देता है।
+
+**Recommendation लिखना।** Product owner के लिए एक paragraph: जिन options पर सोचा गया, चुना गया option, उसकी quality, cost और latency, सबसे accurate option की तुलना में वो क्या छोड़ता है, और दोबारा कब देखना है। जैसे: "हम exclusions और claims पर reranker के साथ router recommend करते हैं: 88% accuracy, हर request करीब ₹0.30 और p95 पर 3.1 s। हर जगह reranker के साथ large model 1 point बेहतर है पर cost दोगुनी और live calls पर धीमा है।"
+
+**Router को नापना।** Router तभी पैसे बचाता है जब वो सही requests को सही model पर भेजे। Test questions के एक sample को easy या hard label करो, router चलाओ, और दो तरह की गलतियाँ गिनो: hard questions जो small model पर गए, जिससे quality गिरती है, और easy questions जो large model पर गए, जिससे पैसे बर्बाद होते हैं। पहली तरह की ज़्यादा मायने रखती है। अगर वो किसी high-risk category में आम है, तो उस पूरी category को strong model पर route करो, जैसा insurer ने exclusions और claims के लिए किया।
+
+**Code में एक weighted comparison।** हर option को category के हिसाब से business weights के साथ score करो, फिर उसके बगल में cost और latency दिखाओ:
+
+```python
+WEIGHTS = {"exclusions": 3.0, "claims": 3.0, "premiums": 2.0, "general": 1.0}
+
+def weighted_quality(results):
+    """results: list of (category, correct_bool)."""
+    num = sum(WEIGHTS[c] * ok for c, ok in results)
+    den = sum(WEIGHTS[c] for c, _ in results)
+    return num / den
+
+def p95(values):
+    v = sorted(values)
+    return v[int(0.95 * (len(v) - 1))]
+
+def summarise(option_runs):
+    """option_runs: name -> list of dicts with category, correct, cost_inr, ms."""
+    table = []
+    for name, runs in option_runs.items():
+        table.append({"option": name,
+                      "quality": round(weighted_quality([(r["category"], r["correct"]) for r in runs]), 3),
+                      "cost_inr": round(sum(r["cost_inr"] for r in runs) / len(runs), 3),
+                      "p95_ms": p95([r["ms"] for r in runs])})
+    return table
+```
+
+**वो options हटाओ जिन्हें कोई न चुने।** कोई option dominated है अगर कोई दूसरा quality, cost और speed में कम से कम उतना अच्छा हो और किसी एक में उससे बेहतर:
+
+```python
+def frontier(table):
+    def dominates(a, b):
+        better_or_equal = a["quality"] >= b["quality"] and a["cost_inr"] <= b["cost_inr"] and a["p95_ms"] <= b["p95_ms"]
+        strictly = a["quality"] > b["quality"] or a["cost_inr"] < b["cost_inr"] or a["p95_ms"] < b["p95_ms"]
+        return better_or_equal and strictly
+    return [o for o in table if not any(dominates(other, o) for other in table if other is not o)]
+```
+
+जो बचता है वही असली choice है, और वो एक business choice है: कितनी quality कितने रुपयों और milliseconds के लायक है।
+
+**पहले budgets, फिर quality ज़्यादा से ज़्यादा।** Product owner के साथ हर request की cost की ceiling और p95 latency target तय करो, frontier को उन options तक छाँटो जो दोनों के अंदर हों, और उनमें से सबसे अच्छी quality वाला चुनो। इससे एक धुँधली बहस छोटी meeting बन जाती है।
+
+**दाम और models बदलते रहते हैं।** Comparison को तारीख और use किए गए दामों के साथ रखो। जब कोई provider दाम घटाए या नया model लाए, वही test set दोबारा चलाओ और table update करो; सबसे अच्छी choice अक्सर कुछ महीनों में बदल जाती है।
+
+**हर रुपये पर quality ही पूरी कहानी नहीं है।** Safety-critical categories के लिए एक minimum quality तय करो जिससे नीचे कोई बचत न खरीदी जा सके, और उन categories को cost की परवाह किए बिना strong model पर route करो।
+
+## एक example से समझो
+
+Hyderabad की एक health-insurance company का assistant अपने call-centre agents के policy सवालों के जवाब देता है।
+
+Team 150 test questions पर चार options की तुलना करती है:
+
+| Option | Accuracy | हर request की cost | p95 latency |
+|---|---|---|---|
+| Small model | 76% | ₹0.08 | 1.6 s |
+| Large model | 85% | ₹0.60 | 3.9 s |
+| Large model + reranker | 89% | ₹0.64 | 4.3 s |
+| Router (small; hard ones to large) | 86% | ₹0.24 | 2.8 s |
+
+Product owner का नज़रिया: agents live calls पर होते हैं, इसलिए latency बहुत मायने रखती है; coverage के गलत जवाबों से शिकायतें और refunds होते हैं, इसलिए accuracy उससे भी ज़्यादा मायने रखती है। वो exclusions और claims के सवालों (सबसे risky categories) के लिए reranker के साथ router चुनते हैं, और कुल मिलाकर 88%, हर request करीब ₹0.30 और p95 पर 3.1 s तक पहुँचते हैं। Streaming से पहले शब्द एक second से कम में दिखते हैं।
+
+| फ़ैसले का कारक | उसने choice को कैसे ढाला |
+| --- | --- |
+| Agents live calls पर | Latency मायने रखती है, इसलिए streaming और router |
+| Coverage के गलत जवाबों से शिकायतें और refunds | Exclusions और claims के लिए reranker |
+| Call-centre volume पर cost | Router ज़्यादातर traffic small model पर रखता है |
+
+## आम गलतियाँ
+
+- **चुपचाप एक ही dimension को optimise करना।** तीनों दिखाओ।
+- **सिर्फ़ कुल accuracy।** गलतियों के नतीजों और categories के हिसाब से weight दो।
+- **Tail latency को अनदेखा करना।** Users धीमी requests याद रखते हैं।
+- **Free wins छोड़ देना।** पहले streaming और caching।
+- **फ़ैसले को कभी दोबारा न देखना।**
+- **Product owner के बिना चुनना।** Trade-off एक business फ़ैसला है; table दिखाओ और उन्हें तौलने दो।
+- **बिना weight की accuracy**, जब कुछ गलतियाँ बाकियों से कहीं ज़्यादा महँगी हों।
+- **Dominated options को** चर्चा में रखना।
+- **ऐसी comparison जिसमें तारीख या दाम दर्ज न हों**, जो चुपचाप पुरानी पड़ जाती है।
+
+## जब पूरा trade-off study ज़रूरी नहीं
+
+- **कम volume**: कुछ रुपये रोज़ पर सबसे strong model ठीक है; optimise बाद में।
+- **कोई एक option हर target पूरा करे** और काफ़ी गुंजाइश भी बचे।
+- **शुरुआती prototypes**, जहाँ पहले ये सीखना है कि task काम भी करता है या नहीं।
+
+## Demo से production तक
+
+- **Comparison table रखो** तारीखों, दामों और test set version के साथ।
+- **Production में quality, हर request की cost और p95 latency track करो**, feature के हिसाब से।
+- **High-risk categories के लिए minimum quality तय करो** जिसके नीचे routing नहीं जा सकती।
+- **Comparison दोबारा चलाओ** जब दाम बदलें, नए models आएँ और traffic बहुत बदले।
+- **Router की गलतियाँ नापो**, category के हिसाब से, हर महीने।
+
+## Practice करो
+
+नीचे दिया Chip Huyen का production वाला article दोबारा पढ़ो, cost और latency पर ध्यान देते हुए।
+
+1. अपने app में दो या तीन options के लिए quality, हर request की cost और p95 latency की table बनाओ।
+2. Product owner के लिए एक paragraph की recommendation लिखो, trade-off साफ़ शब्दों में बताते हुए।
+3. एक ऐसा बदलाव करो जो quality को नुकसान पहुँचाए बिना speed सुधारे, और उसे नापो।
+4. अपनी option table frontier function को दो और एक-एक वाक्य लिखो कि हटाया गया हर option dominated क्यों था।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 4 cost और latency के मुकाबले models चुनने पर है, और chapter 9 latency और cost metrics पर।
+
+**आपका काम पूरा जब:** आप एक trade-off table दिखा सको और किसी choice को ऐसे शब्दों में justify कर सको जो non-engineer भी समझे।

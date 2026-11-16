@@ -1,0 +1,156 @@
+---
+id: reasoning-models
+lang: hi
+title: "Reasoning models और test-time compute: model को कब ज़्यादा सोचने दें"
+outcome: "Chain of thought, best-of-N और reasoning models समझा पाओगे, कठिन जवाब सही पाने का सबसे सस्ता तरीका चुन पाओगे, और बढ़ी हुई cost और इंतज़ार को काबू में रख पाओगे।"
+answer: "Test-time compute का मतलब है बेहतर जवाब के लिए जवाब देते समय ज़्यादा खर्च करना: कदम-दर-कदम सोचना, कई जवाब sample करके सबसे अच्छा रखना, या ऐसा model use करना जो पहले सोचने के लिए train हुआ हो।"
+why_it_matters: "Reasoning models और 'think step by step' गलत जवाब को सही बना सकते हैं, पर cost और इंतज़ार को कई गुना भी कर सकते हैं। ये जानना कि ज़्यादा सोचना कब फ़ायदा देता है और कब नहीं, अब एक core design फ़ैसला है और interview का आम topic भी।"
+flashcards:
+  - q: "Test-time compute क्या है?"
+    a: "Training के समय नहीं, जवाब देते समय ज़्यादा computing खर्च करना: लंबी reasoning, या कई जवाब लेकर सबसे अच्छा रखना।"
+  - q: "Chain-of-thought prompting क्या है?"
+    a: "Model से कहना कि जवाब देने से पहले problem पर कदम-दर-कदम काम करे। Maths, logic और multi-step सवालों में सबसे ज़्यादा मदद करता है।"
+  - q: "Best-of-N क्या है?"
+    a: "N जवाब बनाना और सबसे अच्छा रखना, जिसे कोई checker, scoring model या majority vote चुनता है। Cost करीब N गुना होती है।"
+  - q: "Verifier क्या है?"
+    a: "जो जवाब को check या score करे: code के लिए tests, एक SQL run, एक rule check, या एक reward model। अच्छे verifiers best-of-N को worth बनाते हैं।"
+  - q: "Majority vote (self-consistency) कब अच्छा काम करता है?"
+    a: "जब जवाब exact हों और तुलना करना आसान हो, जैसे एक number, एक class label या multiple-choice का letter।"
+  - q: "Reasoning model क्या है?"
+    a: "ऐसा model जो जवाब देने से पहले देर तक सोचने के लिए train हुआ हो, अक्सर छुपे thinking tokens के साथ और इस setting के साथ कि कितना effort खर्च करना है।"
+  - q: "Reasoning user experience को क्यों बिगाड़ सकती है?"
+    a: "Thinking reply से पहले होती है, इसलिए user को पहले दिखने वाले शब्द के लिए ज़्यादा इंतज़ार करना पड़ता है और extra tokens के पैसे भी देने पड़ते हैं।"
+  - q: "कठिन task पर सबसे सस्ता पहला कदम क्या है?"
+    a: "Test set पर सादे जवाब को नापो, फिर step-by-step prompting आज़माओ। Sampling या reasoning model पर तभी जाओ जब numbers कहें।"
+exercise:
+  title: "JEE-style maths के जवाब grade करना"
+  setup: "Kota की एक coaching company चाहती है कि AI रोज़ 300 JEE-style maths problems पर students के final जवाब check करे और गलतियाँ समझाए। एक mid-size model पर सादा prompt, जिनके जवाब पता हैं ऐसी 200 problems में 71% checks सही करता है। हर problem का एक ही numeric जवाब है। एक reasoning model 90% score करता है, पर हर problem पर 6 गुना cost और 20 seconds लेता है।"
+  questions:
+    - q: "Reasoning model से पहले उन्हें क्या आज़माना चाहिए?"
+      a: "उसी model पर step-by-step prompting, फिर 5 samples पर majority vote। हर जवाब एक number है, इसलिए vote गिनना आसान है।"
+    - q: "यहाँ majority vote अच्छा fit क्यों है?"
+      a: "जवाब exact है। अगर 5 में से 4 samples 12.5 देते हैं, तो वो सहमति मज़बूत सबूत है, और असहमति उन problems को बताती है जिन्हें ज़्यादा ध्यान से check करना है।"
+    - q: "Reasoning model रखते हुए cost कैसे काबू में रखें?"
+      a: "सिर्फ़ वो problems reasoning model पर भेजो जहाँ सस्ते samples असहमत हों। ज़्यादातर आसान problems वहाँ तक पहुँचती ही नहीं।"
+    - q: "Students एक check के लिए 20 seconds इंतज़ार करते हैं। क्या मदद करेगा?"
+      a: "Thinking के दौरान progress दिखाओ, checks background में चलाओ और पूरे होने पर notify करो, या तेज़ जवाब पहले दिखाओ और अगर ध्यान से किया check अलग निकले तो update करो।"
+ask:
+  - "Normal model की जगह reasoning model कब use करूँ?"
+  - "Chain of thought और best-of-N में क्या फ़र्क है?"
+  - "Reasoning को मेरे app को धीमा और महँगा करने से कैसे रोकूँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+AI में ज़्यादातर पैसा आपके model देखने से पहले ही खर्च हो जाता है: उसे train करने में। **Test-time compute** उसका दूसरा पहलू है। इसका मतलब है जवाब देने के पल ज़्यादा computing खर्च करना, ताकि जवाब के सही होने की संभावना बढ़े। "Test time" inference के लिए research का शब्द है, यानी जब model use होता है।
+
+ऐसा करने के तीन आम तरीके हैं।
+
+1. **कदम-दर-कदम सोचने को कहो।** ये **chain-of-thought** (CoT) prompting है: model जवाब से पहले अपनी reasoning लिखता है। इसका करीबी रिश्तेदार **self-critique** है, जिसमें model खत्म करने से पहले अपने draft को खुद check करता है।
+2. **कई जवाब बनाओ और सबसे अच्छा रखो।** ये **best-of-N** है। विजेता को आप **verifier** (एक test, एक rule check या एक scoring model) से चुनते हो, या majority vote से जब जवाब exact हों।
+3. **Reasoning model use करो।** ये models जवाब देने से पहले देर तक सोचने के लिए train होते हैं। ज़्यादातर में आप तय कर सकते हो कि कितना effort खर्च हो, और कुछ thinking को छुपाकर सिर्फ़ result दिखाते हैं।
+
+तीनों accuracy के बदले पैसा और इंतज़ार देते हैं। हुनर ये जानने में है कि ये सौदा कब worth है।
+
+```flow
+title: कितनी thinking चाहिए, ये चुनना
+New question -> Plain model के लिए कठिन? | अपना test set देखो
+Plain model के लिए कठिन? -[नहीं]-> Plain जवाब | तेज़ और सस्ता
+Plain model के लिए कठिन? -[हाँ]-> Step-by-step prompt | पहले यही आज़माओ
+Step-by-step prompt -> काफ़ी है?
+काफ़ी है? -[हाँ]-> Ship करो
+काफ़ी है? -[नहीं]-> क्या जवाब check हो सकते हैं? | tests, rules, exact values
+क्या जवाब check हो सकते हैं? -[हाँ]-> N sample करो और verify करो | best-of-N या vote
+क्या जवाब check हो सकते हैं? -[नहीं]-> Reasoning model | effort budget तय करो
+```
+
+## ये काम कैसे करता है
+
+**Chain of thought।** सबसे सादा रूप एक line जोड़ता है: "जवाब से पहले कदम-दर-कदम सोचो," या "अपनी reasoning समझाओ, फिर आख़िरी line में final जवाब दो।" आप चाहे तो वो steps list कर सकते हो जो आप चाहते हो, या एक worked example दिखा सकते हो। 2022 के जिस paper ने इस method को नाम दिया, उसने maths word problems पर बड़े फ़ायदे दिखाए, और बाद के काम में पाया गया कि ये बनाई हुई बातें कम कर सकता है। पेच लंबाई का है: reasoning वाले जवाब में tokens बहुत ज़्यादा होते हैं, और सब पर पैसा और समय लगता है।
+
+**Best-of-N।** कई जवाब माँगो, हो सके तो थोड़ी variety के साथ (ज़्यादा temperature या थोड़े अलग prompts), फिर एक चुनो।
+
+- **Verifier के साथ।** बनाया हुआ code tests पर चलाओ, बनाई हुई SQL चलाकर check करो कि rows आती हैं, या देखो कि निकाली गई तारीख़ असली तारीख़ है। OpenAI ने पाया कि maths के लिए अच्छे verifier वाला एक छोटा model, बिना verifier वाले करीब 30 गुना बड़े model की बराबरी कर गया।
+- **Majority vote से**, जिसे self-consistency भी कहते हैं। वही maths सवाल पाँच बार पूछो और सबसे आम final number लो। ये तब चलता है जब जवाब exact हों: एक number, एक label, एक choice।
+- **Scoring model से।** एक reward model या LLM judge हर जवाब को rate करता है। ये open-ended text के लिए चलता है पर judge जितना ही अच्छा होता है।
+
+N जवाब sample करने पर cost करीब N गुना होती है, इसलिए N आमतौर पर छोटा रहता है: असली products में 3 से 8। सैकड़ों या हज़ारों samples वाले research runs दिखाते हैं कि फ़ायदे आते रहते हैं, पर कोई product हर request पर इसका खर्च नहीं उठा सकता।
+
+**Reasoning models।** ये, अक्सर ऐसी problems पर reinforcement learning से जिनके जवाब check हो सकते हैं, reply से पहले एक लंबी अंदरूनी chain of thought बनाने के लिए train होते हैं। आप इसे आमतौर पर effort या budget setting से काबू करते हो। ये maths, code, planning और multi-step analysis में चमकते हैं। आसान सवालों पर ज़्यादातर cost और देरी ही जोड़ते हैं।
+
+Majority voting के लिए एक छोटा helper:
+
+```python
+from collections import Counter
+
+def majority_answer(ask, question, n=5):
+    """ask(question) returns the model's final answer as a short string."""
+    answers = [ask(question).strip().lower() for _ in range(n)]
+    best, votes = Counter(answers).most_common(1)[0]
+    agreement = votes / n
+    # Low agreement is a signal: send it to a stronger model or a person.
+    return best, agreement
+
+# answer, agreement = majority_answer(ask, "If 3x + 7 = 25, what is x?")
+# if agreement < 0.6: escalate(question)
+```
+
+| Method | Extra cost | Extra इंतज़ार | कब सबसे अच्छा | किससे सावधान रहें |
+| --- | --- | --- | --- | --- |
+| Step-by-step prompt | Output tokens का 2 से 5 गुना | Seconds | Multi-step problems | लंबे जवाब जिन्हें users को scroll करके पार करना पड़ता है |
+| 5 का majority vote | करीब 5 गुना | Parallel चलाओ तो थोड़ा | Exact जवाब: numbers, labels | Free-form text के लिए बेकार |
+| Verifier के साथ best-of-N | करीब N गुना plus checks | Parallel हो तो थोड़ा | Code, SQL, ऐसे formats जिन्हें आप test कर सको | कमज़ोर verifier बुरे जवाब चुनता है |
+| Reasoning model | अक्सर 3 से 10 गुना | Seconds से minutes | कठिन maths, code, planning | आसान सवालों पर भी thinking के पैसे देना |
+
+ये multipliers options की तुलना के लिए मोटे patterns हैं, दाम नहीं। अपने सवालों पर नापो।
+
+## एक example से समझो
+
+Kota की एक coaching company चाहती है कि AI JEE-style maths problems पर students के जवाब check करे और गलतियाँ समझाए, करीब 300 problems रोज़। वो जवाब पता वाली 200 problems का एक test set बनाते हैं और options की तुलना करते हैं।
+
+| Option | सही checks | 100 problems की cost | आम इंतज़ार |
+| --- | --- | --- | --- |
+| Mid-size model, plain prompt | 71% | ₹20 | 3 s |
+| वही model, step-by-step prompt | 81% | ₹55 | 8 s |
+| Step-by-step, 5 का majority | 88% | ₹275 | 9 s (parallel) |
+| Reasoning model, medium effort | 90% | ₹120 | 20 s |
+| Route: 5 का majority, reasoning model सिर्फ़ तब जब votes असहमत हों | 91% | ₹140 | ज़्यादातर के लिए 9 s, कुछ के लिए 25 s |
+
+ये numbers सिर्फ़ मिसाल के लिए हैं, ये दिखाने को कि तुलना कैसे करें। दो बातें उभरकर आती हैं। Step-by-step prompt एक बड़ी और सस्ती जीत थी। और routing ने हर अकेले option को हरा दिया: जब पाँच में से चार या पाँच samples सहमत हों तो जवाब लगभग हमेशा सही होता है, इसलिए सिर्फ़ विवादित problems (करीब छह में से एक) reasoning model पर जाती हैं।
+
+वो "Checking your working…" progress bar के साथ दिखाते हैं, क्योंकि जब students को दिखे कि कुछ हो रहा है तो वो छोटा इंतज़ार मान लेते हैं।
+
+## आम गलतियाँ
+
+- **हर चीज़ के लिए reasoning model use करना।** सादे lookups, greetings और formatting को इसकी ज़रूरत नहीं। आप ऐसी thinking के पैसे देते हो जो कुछ नहीं जोड़ती।
+- **सस्ता कदम छोड़ देना।** एक step-by-step prompt अक्सर बहुत कम खर्च पर फ़ासले का बड़ा हिस्सा पाट देता है।
+- **Free-form text पर vote करना।** दो अच्छे paragraphs कभी एक जैसे नहीं होते, इसलिए vote को कुछ नहीं मिलता। इसकी जगह verifier या judge use करो।
+- **कमज़ोर verifier पर भरोसा करना।** अगर checker को बेवकूफ़ बनाना आसान है, तो best-of-N वो जवाब चुनता है जो उसे सबसे अच्छे से बेवकूफ़ बनाए।
+- **Users को raw reasoning दिखाना।** वो लंबी होती है, उलझा सकती है और उसमें गलत मोड़ हो सकते हैं। जवाब और एक छोटी explanation दिखाओ।
+- **इंतज़ार को भूल जाना।** Thinking खत्म होने तक user को कुछ नहीं दिखता। "User को दिखने वाले पहले शब्द तक का समय" नापो, model का first token नहीं।
+
+## जब ज़्यादा सोचना गलत tool है
+
+- **Model के पास facts नहीं हैं।** ज़्यादा देर सोचने से knowledge नहीं जुड़ती। Retrieval use करो।
+- **Task सादा या creative है।** छोटे replies, summaries और tone बदलना शायद ही सुधरते हैं।
+- **एक छोटे फ़ायदे से ज़्यादा latency मायने रखती है।** एक voice agent या autocomplete दस seconds इंतज़ार नहीं कर सकता।
+- **आप फ़ायदा नाप नहीं सकते।** Test set के बिना आप ज़्यादा खर्च करोगे और पता नहीं चलेगा कि मदद हुई या नहीं।
+
+## Demo से production तक
+
+- **Difficulty के हिसाब से route करो।** आसान सवाल तेज़ model पर भेजो और तभी escalate करो जब कोई check fail हो या samples असहमत हों।
+- **Budget की cap लगाओ।** Effort या thinking limits और एक maximum output length तय करो, और हर request की cost track करो।
+- **Samples parallel चलाओ।** पाँच जवाब एक साथ लगभग उतना ही समय लेते हैं जितना एक।
+- **Progress दिखाओ।** एक दिखता हुआ step या progress message इंतज़ार को छोटा महसूस कराता है।
+- **Disagreements log करो।** जिन सवालों पर samples असहमत हों, वही आपके सबसे अच्छे test cases और training examples हैं।
+
+## Practice करो
+
+1. जवाब पता वाले दस maths या logic सवाल लो। किसी भी chat model पर एक plain prompt और फिर एक step-by-step prompt score करो।
+2. जो सवाल उसने गलत किए, उनके लिए हर एक के पाँच जवाब sample करो और majority लो। Vote ने कितने ठीक किए?
+3. हर method की cost और इंतज़ार लिखो, और तय करो कि student app के लिए आप कौन-सा ship करोगे।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) के chapters 2 और 5 test-time compute और chain-of-thought prompting पर हैं।
+
+**आपका काम पूरा जब:** आप test-time compute खर्च करने के तीन तरीके समझा सको, बता सको कि majority vote कब चलता है, और reasoning costs को काबू में रखने के दो तरीके बता सको।

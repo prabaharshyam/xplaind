@@ -1,0 +1,217 @@
+---
+id: online-evals-feedback
+lang: hi
+title: "Online evals और feedback"
+outcome: "Automatic checks, sample किए model-graded scores, user feedback और human review से live traffic पर quality माप पाओगे, और जो मिले उसे fixes और नए test cases में बदल पाओगे।"
+answer: "Online evals automatic checks, sample किए model-graded scores, user feedback और human review से live traffic पर quality मापते हैं, फिर failures को नए test cases में बदलते हैं।"
+why_it_matters: "Golden sets सिर्फ़ उन सवालों को कवर करते हैं जिनके बारे में आपने सोचा था। Real users कुछ और पूछते हैं, documents बदलते हैं और providers models update करते हैं। Client के नोटिस करने से पहले quality गिरती पकड़ने और ये साबित करने का तरीका कि system सुधर रहा है, online evaluation ही है।"
+flashcards:
+  - q: "Offline और online evals में क्या फ़र्क है?"
+    a: "Offline evals ship करने से पहले एक fixed golden set test करते हैं; online evals ship करने के बाद real traffic score करके अनजानी समस्याएँ ढूँढते हैं।"
+  - q: "Online signal की चार किस्में कौन-सी हैं?"
+    a: "Automatic checks, एक sample पर model-graded scores, user feedback, और एक sample का human review।"
+  - q: "Asynchronously score क्यों करें?"
+    a: "Response भेजने के बाद traces से checks और judges चलाने पर users के लिए कोई latency नहीं जुड़ती।"
+  - q: "Online scoring को sample कैसे करें?"
+    a: "सब पर सस्ते rules; random 5 से 10% पर और हर उस trace पर जिसमें negative feedback या guardrail trigger हो, judge।"
+  - q: "Feedback कब काम का होता है?"
+    a: "कुछ quick reasons के साथ thumbs down, और साथ में implicit signals, जैसे एक मिनट के अंदर rephrase किया हुआ सवाल।"
+  - q: "साप्ताहिक feedback loop क्या है?"
+    a: "सबसे खराब traces पढ़ो, उन्हें वजह के हिसाब से group करो, सबसे बड़े group को ठीक करो, और representative cases को golden set में जोड़ो।"
+  - q: "Judge को नियमित रूप से दोबारा क्यों जाँचें?"
+    a: "Judge scores drift करते हैं और उनके blind spots होते हैं; हर कुछ हफ़्तों में कोई इंसान करीब 50 samples grade करे तो वो ईमानदार रहता है।"
+  - q: "Online scores को slice क्यों करें?"
+    a: "एक स्थिर average ये छिपा सकता है कि कोई एक topic, language या version बहुत ज़्यादा खराब हो रहा है।"
+  - q: "Chat app में तीन implicit feedback signals बताओ।"
+    a: "Reply को बीच में रोक देना, regenerate दबाना, और एक-दो मिनट के अंदर वही सवाल दूसरे शब्दों में फिर पूछना।"
+  - q: "Degenerate feedback loop क्या है?"
+    a: "जब system उसी चीज़ पर आए feedback से सीखता है जो वो पहले से दिखाता है, तो वो पहले click हुई चीज़ों की तरफ़ सिमटता जाता है, और वो बेहतर options छिप जाते हैं जो कभी दिखाए ही नहीं गए।"
+exercise:
+  title: "वजह ढूँढो"
+  setup: "Delhi के एक edtech का tutor assistant offline में 89% score करता था। Launch के एक महीने बाद: negative feedback 5% से 9% हो गया; judge का faithfulness score 0.94 पर स्थिर है; दो हफ़्ते पहले prompt बदलने के बाद औसत answer length दोगुनी हो गई; और सबसे ज़्यादा चुनी गई negative-feedback वजह 'too long' है। Hindi conversations में English की तुलना में negative rate दोगुना है।"
+  questions:
+    - q: "स्थिर faithfulness score तसल्ली क्यों नहीं देता?"
+      a: "Answers sources के प्रति faithful होकर भी बेकार हो सकते हैं; faithfulness length, साफ़ता या सवाल से मेल को नहीं मापता।"
+    - q: "बढ़ोतरी की सबसे संभावित वजह क्या है?"
+      a: "Prompt बदलाव जिसने answer length दोगुनी कर दी, जो 'too long' feedback से मेल खाता है।"
+    - q: "Hindi gap क्या सुझाता है?"
+      a: "Language-specific समस्या जिसे slice करके पढ़ना चाहिए: शायद Hindi में लंबे या कमज़ोर answers, या offline में Hindi cases की कमी।"
+    - q: "अगली बार ये ship करने से पहले ही पकड़ में आए, इसके लिए team को क्या जोड़ना चाहिए?"
+      a: "Golden set में length check और Hindi cases, साथ में answer length या language के हिसाब से negative feedback में अचानक बदलाव पर alert।"
+ask:
+  - "AI answers पर काम का user feedback कैसे इकट्ठा करूँ?"
+  - "Offline और online evaluation में क्या फ़र्क है?"
+  - "AI conversations को कितनी बार review करना चाहिए?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+**Offline evals** ship करने से पहले एक fixed golden set test करते हैं। **Online evals** ship करने के बाद real traffic पर जो होता है उसे score करते हैं। दोनों चाहिए: offline evals जानी-पहचानी regressions रोकते हैं; online evals अनजानी वाली ढूँढते हैं।
+
+Online signals चार तरह के होते हैं:
+
+- **Automatic checks**, हर response पर: सही format, citations हैं या नहीं, refusal या नहीं, length, latency, guardrail triggers।
+- **Model-graded scores**, एक sample पर: sources के प्रति faithfulness, relevance, tone; इन्हें वो judge model score करता है जिसे आपने human grades से जाँच लिया हो।
+- **User feedback**: thumbs up या down, एक वजह, उन्होंने answer copy किया, दोबारा पूछा या किसी इंसान तक escalate किया।
+- **Human review**: कोई expert हफ़्ते का sample पढ़कर label करता है कि क्या गलत हुआ।
+
+```flow
+Live request -[बिना इंतज़ार]-> User को answer
+Live request -> Trace सेव हुआ
+Trace सेव हुआ -> हर trace पर Rules | format, citations, refusal, length, latency
+Trace सेव हुआ -> 10% sample + सभी negative feedback पर Judge | faithfulness, relevance
+Trace सेव हुआ -> User feedback | thumbs और वजह, rephrase किया सवाल, escalation
+Trace सेव हुआ -> साप्ताहिक human review | वजह के हिसाब से label किए 50 traces
+हर trace पर Rules -> दिन, version, topic, language के हिसाब से Dashboard
+10% sample + सभी negative feedback पर Judge -> दिन, version, topic, language के हिसाब से Dashboard
+User feedback -> दिन, version, topic, language के हिसाब से Dashboard
+साप्ताहिक human review -> दिन, version, topic, language के हिसाब से Dashboard
+दिन, version, topic, language के हिसाब से Dashboard -[अचानक बदलाव पर alerts]-> सबसे बड़ी वजह ठीक करो -> Offline golden set में cases जोड़ो
+```
+
+ये lesson Chennai के एक telecom के customer assistant को follow करता है, जिसका negative feedback launch के छह हफ़्ते बाद लगभग दोगुना हो गया।
+
+## ये काम कैसे करता है
+
+**Asynchronously score करो.** Response user तक चले जाने के बाद, traces से checks और judges चलाओ, ताकि कोई latency न जुड़े।
+
+**समझदारी से sample करो.** सभी traces को rules से सस्ते में score करो; random 5 से 10% पर और हर उस trace पर जिसमें negative feedback या guardrail trigger हो, judge चलाओ।
+
+**Feedback को आसान और खास बनाओ.** Thumbs down के बाद तीन quick reasons ("wrong", "incomplete", "not what I asked") सिर्फ़ thumbs down से कहीं ज़्यादा देते हैं। Implicit signals भी मदद करते हैं: एक मिनट के अंदर rephrase किया सवाल अक्सर बताता है कि पहला answer चूक गया।
+
+**एक संख्या नहीं, trends देखो.** दिन और version के हिसाब से dashboards: faithfulness, refusal rate, negative feedback rate, escalations। अचानक बदलावों पर alert करो, जैसे document upload के बाद refusal rate का दोगुना होना, या provider के model update के बाद faithfulness का गिरना।
+
+**Loop बंद करो.** हर हफ़्ते: सबसे खराब score वाले और negative rating वाले traces पढ़ो, उन्हें वजह के हिसाब से group करो (retrieval miss, stale document, prompt gap, out-of-scope सवाल), सबसे बड़े group को ठीक करो, और representative cases को offline golden set में जोड़ो ताकि fix टिका रहे।
+
+**Judge को जाँचो.** Judge model की भी अपनी errors होती हैं। हर कुछ हफ़्तों में किसी इंसान से judge किए 50 samples grade करवाओ और agreement जाँचो। Agreement गिरे, तो उसके numbers पर भरोसा करने से पहले judge prompt ठीक करो।
+
+**Signals और वो क्या पकड़ते हैं:**
+
+| Signal | Cost | क्या पकड़ता है |
+| --- | --- | --- |
+| हर trace पर rule checks | लगभग मुफ़्त | टूटे formats, missing citations, धीमे responses |
+| Topic के हिसाब से refusal rate | मुफ़्त | Missing documents, ज़्यादा सख़्त prompts |
+| Sample पर judge | Model calls | Unfaithful या irrelevant answers |
+| Thumbs और reasons | मुफ़्त | Users को असल में क्या नापसंद है |
+| एक मिनट में rephrase | मुफ़्त | वो answers जो सवाल से चूक गए |
+| साप्ताहिक human review | Staff का समय | वो वजहें जिन्हें कोई automatic signal नाम नहीं देता |
+
+**साप्ताहिक review चलाना.** 50 traces निकालो: judge score में सबसे खराब 20, negative feedback वाले 20, और 10 random। हर एक के लिए एक छोटी list से एक वजह का label लिखो: retrieval miss, stale या missing document, prompt gap, out of scope, model error, या fine। Labels गिनो। सबसे बड़ा group अगले हफ़्ते का fix है। Counts हफ़्ते-दर-हफ़्ते रखो, ताकि आप और client देख सकें कि fixes आते-आते वजहें घट रही हैं।
+
+**Client को बताना.** सिर्फ़ offline score नहीं, online dashboard और साप्ताहिक वजहों के counts भी साझा करो। जो team समस्या पकड़ती है, समझाती है और ठीक होती दिखाती है, उस पर clients उस team से कहीं ज़्यादा भरोसा करते हैं जो सिर्फ़ launch का ऊँचा number बताती है।
+
+**Deterministic sampling.** Judge के लिए traces trace id को hash करके चुनो, ताकि एक ही trace हमेशा sample के अंदर या बाहर रहे, और reruns व dashboards एक-दूसरे से मेल खाएँ:
+
+```python
+import hashlib
+
+def in_sample(trace_id, rate=0.08):
+    h = int(hashlib.sha256(trace_id.encode()).hexdigest()[:8], 16)
+    return h / 0xFFFFFFFF < rate
+
+def should_judge(trace):
+    return (in_sample(trace["id"])
+            or trace.get("feedback") == "down"
+            or trace.get("guardrail_triggered")
+            or trace.get("stop_reason") == "max_tokens")
+```
+
+**Conversation से implicit signals.** लोग शायद ही कभी thumbs down दबाते हैं, पर उनका behaviour बहुत कुछ बताता है। ख़त्म हो चुकी conversations पर चलने वाला एक छोटा detector:
+
+```python
+from difflib import SequenceMatcher
+
+def implicit_signals(turns):
+    """turns: list of {"role", "text", "at" (seconds), "stopped_early", "regenerated"}."""
+    flags = []
+    users = [t for t in turns if t["role"] == "user"]
+    for a, b in zip(users, users[1:]):
+        similar = SequenceMatcher(None, a["text"].lower(), b["text"].lower()).ratio() > 0.6
+        if similar and b["at"] - a["at"] < 90:
+            flags.append("rephrased within 90 s")
+    if any(t.get("stopped_early") for t in turns):
+        flags.append("stopped a reply")
+    if any(t.get("regenerated") for t in turns):
+        flags.append("regenerated")
+    if any(w in t["text"].lower() for t in users for w in ("wrong", "not what i asked", "galat")):
+        flags.append("said it was wrong")
+    return flags
+```
+
+Explicit ratings के बगल में, flags को हर दिन और हर version के हिसाब से गिनो। कम thumbs down पर ज़्यादा rephrasing वाला version शायद बेहतर नहीं है।
+
+**Feedback को सोच-समझकर design करो.** स्वाभाविक मौकों पर पूछो (answer के बाद, task के बीच में नहीं), इसे एक tap का रखो, और thumbs down के बाद दो-तीन reasons दो। याद रखो कि feedback कौन देता है: नाराज़ users और बहुत खुश users, इसलिए explicit ratings झुकी हुई होती हैं। दिखाए गए दो options में पहले वाले पर feedback भी ज़्यादा आता है, सिर्फ़ इसलिए कि वो पहले था। Versions की तुलना एक ही feedback design से करो, redesigns के पार नहीं।
+
+**Dashboard के लिए एक query.** अगर traces Postgres में आते हैं, तो version के हिसाब से रोज़ का view कुछ ही लाइनों का है:
+
+```sql
+SELECT date(created_at AT TIME ZONE 'Asia/Kolkata') AS day, app_version,
+       count(*) AS requests,
+       avg(CASE WHEN feedback = 'down' THEN 1.0 ELSE 0 END) AS thumbs_down_rate,
+       avg(CASE WHEN judge_verdict = 'fail' THEN 1.0 END) AS judge_fail_rate,
+       avg(CASE WHEN refused THEN 1.0 ELSE 0 END) AS refusal_rate
+FROM traces
+WHERE created_at > now() - interval '30 days'
+GROUP BY 1, 2 ORDER BY 1, 2;
+```
+
+**सिमटते loops से सावधान.** अगर आप feedback से rank या recommend करते हो, तो आप ज़्यादातर उसी के बारे में सीखते हो जो आपने पहले से दिखाया। Traffic का एक छोटा हिस्सा दूसरे options explore करने के लिए रखो, और बदलावों को सिर्फ़ clicks से नहीं, offline evals से भी परखो।
+
+## एक worked example
+
+Chennai के एक telecom का customer assistant अपने offline golden set पर 91% पास हुआ। Launch के छह हफ़्ते बाद negative feedback 6% से रेंगकर 11% हो गया।
+
+Online data ने दिखाया:
+
+- Faithfulness (10% sample पर judge किया) 0.93 पर स्थिर: answers अपने sources से मेल खाते थे।
+- Refusal rate 8% से बढ़कर 17%।
+- ज़्यादातर negative feedback "not what I asked" वजह के साथ आया।
+
+उनमें से 60 traces पढ़ने पर वजह सामने आई: एक नया prepaid plan launch हुआ था, customers उसके बारे में Tamil और English में पूछ रहे थे, और plan documents index में जोड़े ही नहीं गए थे। Assistant ने सही तरह से refuse किया, और customers नाराज़ हुए।
+
+Fixes: marketing team के plan launches अब indexing job trigger करते हैं; किसी topic का refusal rate उछले तो alert बजता है; नए plans के 25 सवाल golden set में जुड़ गए। एक हफ़्ते में negative feedback वापस 6% पर आ गया। Monthly review में आपने client को timeline दिखाई, जिसने शुरुआती 91% से कहीं ज़्यादा भरोसा बनाया।
+
+| हफ़्ता | Negative feedback | Refusal rate | Action |
+| --- | --- | --- | --- |
+| Launch | 6% | 8% | कुछ नहीं |
+| हफ़्ता 6 | 11% | 17% | 60 traces पढ़े: नए plan documents missing |
+| हफ़्ता 7 | 6% | 8% | Plan launches indexing trigger करते हैं; topic refusal alert; 25 golden cases जोड़े |
+
+## आम गलतियाँ
+
+- **Online signals के बिना ship करना।** आपको समस्याओं का पता गुस्से में आए users या client के boss से चलता है।
+- **बिना जाँचे judge पर भरोसा।** Judge scores drift करते हैं और उनके blind spots होते हैं; human grades से नियमित तुलना करो।
+- **Feedback इकट्ठा करके कभी न पढ़ना।** साप्ताहिक review schedule करो।
+- **सिर्फ़ averages।** एक स्थिर average छिपा सकता है कि कोई एक topic या language बहुत खराब हो रहा है। Topic, language और version के हिसाब से slice करो।
+- **Tests जोड़े बिना fix करना।** अगले बदलाव के बाद वही failure लौट आती है।
+- **ऐसा random sampling जो हर run में बदलता है।** Samples स्थिर रखने के लिए trace id hash करो।
+- **सिर्फ़ explicit ratings पर भरोसा।** कम लोग देते हैं, और वो negative और positive की तरफ़ झुकी होती हैं।
+- **सिर्फ़ clicks या thumbs के लिए optimise करना**, जो product को वही करने की तरफ़ सिकोड़ सकता है जो वो पहले से करता है।
+
+## जब online evals रुक सकते हैं
+
+- **Launch से पहले**: अच्छे test set पर offline evals पहले आते हैं।
+- **बहुत कम traffic**: sample करने की जगह हर conversation पढ़ो।
+- **कुछ experts वाले internal tools**, जो कुछ गलत हो तो सीधे बता देते हैं।
+
+## Demo से production तक
+
+- **Traces से asynchronously score करो**, response path में कभी नहीं।
+- **Feedback और implicit flags को trace id और version के साथ सेव करो।**
+- **Version और topic के हिसाब से अचानक बदलावों पर alert करो**, किसी एक खराब conversation पर नहीं।
+- **साप्ताहिक वजह-review चलाओ** और counts client के साथ साझा करो।
+- **हर कुछ हफ़्तों में judge को human grades से दोबारा जाँचो।**
+
+## Practice करो
+
+Langfuse का evaluation overview और evaluation process पर Eugene Yan का लेख पढ़ो।
+
+1. अपने app में तीन reasons वाला thumbs up या down जोड़ो, trace id के साथ सेव करके।
+2. दो automatic checks (citation मौजूद, response length limit के अंदर) और faithfulness के लिए एक judge लिखो, जो responses भेजे जाने के बाद 10% sample पर चले।
+3. Judge किए 30 samples खुद grade करो और गिनो कि आप judge से कितनी बार सहमत हैं।
+4. अपनी खुद की conversations के एक हफ़्ते पर implicit_signals चलाओ और flag हुई conversations की तुलना उनसे करो जिन्हें thumbs down मिला।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 explicit और conversational feedback, feedback design और उसके biases पर है, और chapter 3 judges पर।
+
+**आपका काम पूरा जब:** आप अपने online scores का एक साप्ताहिक view दिखा सको और एक बदलाव जो आपने उन्हीं की वजह से किया।

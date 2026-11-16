@@ -1,0 +1,210 @@
+---
+id: regression-tests
+lang: hi
+title: "Prompts के लिए regression tests"
+outcome: "हर बदलाव पर अपना eval set अपने-आप चलाओ ताकि एक जगह का fix दूसरी जगह को चुपचाप न तोड़े।"
+answer: "Prompt regression tests हर बदलाव पर आपका eval set अपने-आप चलाते हैं, ताकि एक case का fix release से पहले बाकी को चुपचाप न तोड़े।"
+why_it_matters: "Prompt बदलाव उन जगहों पर चीज़ें तोड़ते हैं जहाँ किसी ने देखा ही नहीं। Automatic regression tests ही team को भरोसे के साथ prompts और models बदलने देते हैं।"
+flashcards:
+  - q: "LLM app में regression क्या है?"
+    a: "कुछ ऐसा जो पहले काम करता था, किसी बदलाव के बाद काम करना बंद कर दे, जैसे prompt tweak, model upgrade या नई chunking setting।"
+  - q: "Regression tests के दो tiers कौन-से हैं?"
+    a: "हर push पर तेज़ deterministic checks, और deploys से पहले या nightly judges के साथ पूरे evals।"
+  - q: "Fast checks आमतौर पर क्या cover करते हैं?"
+    a: "App start होता है, outputs parse होते हैं, ज़रूरी fields मौजूद हैं, जो inputs मना होने चाहिए वो मना होते हैं, और कुछ critical cases pass होते हैं।"
+  - q: "कोई बदलाव पूरा eval कैसे pass करता है?"
+    a: "कुल quality production से एक तय tolerance के अंदर रहे, और कोई critical category बिल्कुल न गिरे।"
+  - q: "Tests में non-deterministic outputs को कैसे संभालें?"
+    a: "Low temperature use करो, exact text की जगह criteria पर judge करो, और borderline cases को एक से ज़्यादा बार चलाओ।"
+  - q: "Model upgrades को भी बदलाव क्यों मानें?"
+    a: "नया model कुल मिलाकर बेहतर और आपके अपने cases या formats पर बुरा हो सकता है; अपने evals से तय करो।"
+  - q: "Regression tests कहाँ चलने चाहिए?"
+    a: "CI में: हर pull request पर fast checks, fail होने पर merges रुकें, और deploy से पहले पूरा eval।"
+  - q: "हर production bug का क्या होता है?"
+    a: "वो एक नया regression test case बन जाता है।"
+  - q: "Score बदलावों की tolerance कैसे तय करें?"
+    a: "वही version कई बार चलाओ ताकि दिखे कि scores संयोग से कितना हिलते हैं, और tolerance उस noise से ज़रा ऊपर रखो। Critical categories को कोई tolerance नहीं।"
+  - q: "Tests में model versions को pin क्यों करें?"
+    a: "Provider उसी नाम के पीछे model update कर सकता है। Pinned, तारीख वाले versions से test results दिन-दर-दिन तुलना लायक रहते हैं।"
+exercise:
+  title: "Gates लगाओ"
+  setup: "Chennai की एक insurtech का claims-summary feature claim_id, summary और risk_flags fields वाला JSON लौटाता है। Prompt में बदलाव सीधे किए जाते हैं और दो outputs पढ़कर check किए जाते हैं। पिछले महीने एक prompt बदलाव ने motor claims के लिए risk_flags खाली कर दिए, और एक provider के model update ने date formats बदल दिए, जिससे एक downstream report टूट गई। दोनों production तक पहुँच गए।"
+  questions:
+    - q: "हर push पर कौन-से fast checks होने चाहिए?"
+      a: "तीनों fields के साथ valid JSON, उम्मीद के मुताबिक date formats, जहाँ test cases उम्मीद करें वहाँ खाली न होने वाले risk_flags, और कुछ critical claims।"
+    - q: "Motor-claims की दिक्कत किससे पकड़ में आती?"
+      a: "Category के हिसाब से score करने वाला पूरा eval, जिसमें motor claims एक ऐसी category हो जिसके results गिर नहीं सकते।"
+    - q: "Model updates को कैसे संभालना चाहिए?"
+      a: "Model versions pin करो, और किसी भी नए version पर जाने से पहले पूरा eval और fast checks चलाओ।"
+    - q: "इन दोनों incidents का क्या होना चाहिए?"
+      a: "हर एक test cases बने: flags की उम्मीद वाले motor claims, और downstream report के use वाला date-format check।"
+ask:
+  - "Deploy करने से पहले prompt बदलाव कैसे test करूँ?"
+  - "Tests में non-deterministic outputs कैसे संभालूँ?"
+  - "क्या मुझे नए model version पर upgrade करना चाहिए?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+**Regression** तब होता है जब कुछ जो पहले काम करता था, किसी बदलाव के बाद काम करना बंद कर दे। LLM apps में regressions आम और चुपचाप होते हैं। एक prompt tweak जो एक case ठीक करे, तीन और तोड़ देता है। एक model upgrade output format बदल देता है। एक नई chunking setting ज़्यादातर सवाल सुधारती है पर एक ज़रूरी document खो देती है।
+
+**Regression tests** हर बदलाव पर आपका eval set अपने-आप दोबारा चलाते हैं, ताकि users के देखने से पहले ये टूट-फूट पकड़ में आ जाए।
+
+```flow
+Pull request | एक prompt, model, retrieval या code बदलाव -> Fast tier, हर push पर, करीब 90 s | app start होता है, JSON valid, 4 options और 1 जवाब, duplicates नहीं, must-refuse cases, 15 critical cases
+Fast tier, हर push पर, करीब 90 s -[fail]-> Merge रुका
+Fast tier, हर push पर, करीब 90 s -[pass]-> Full tier, deploy से पहले या nightly | 120 cases, production baseline के मुकाबले category के हिसाब से judge scores
+Full tier, deploy से पहले या nightly -> Tolerance के अंदर, और कोई critical category नहीं गिरी?
+Tolerance के अंदर, और कोई critical category नहीं गिरी? -[हाँ]-> Deploy
+Production bugs -> नए test cases -> Fast tier, हर push पर, करीब 90 s
+```
+
+ये lesson Noida की एक edtech company के quiz-generation feature के बारे में है, जो chapter text को multiple-choice सवालों में बदलता है।
+
+## ये काम कैसे करता है
+
+**Tests के दो tiers।**
+
+- *हर push पर fast checks* (seconds से कुछ minutes): सस्ते, deterministic, code-level checks। क्या app start होता है? क्या output valid JSON के रूप में parse होता है? क्या ज़रूरी fields मौजूद हैं? क्या जाने-पहचाने must-refuse inputs मना किए जाते हैं? क्या critical cases का एक छोटा set अब भी pass होता है?
+- *ज़रूरी बदलावों पर या nightly पूरे evals*: model judges के साथ पूरा test set, category के हिसाब से scores की तुलना मौजूदा production version से।
+
+**Baseline से तुलना करो।** मौजूदा production version के scores रखो। कोई बदलाव तब pass होता है जब कुल quality एक तय tolerance से ज़्यादा न गिरे और कोई critical category (safety, refusals, key customers के cases) बिल्कुल न गिरे।
+
+**Non-determinism संभालो।** Model outputs runs के बीच बदलते हैं। जहाँ हो सके tests के लिए low temperature रखो, exact text की जगह criteria पर judge करो, और borderline cases को एक से ज़्यादा बार चलाओ।
+
+**Model upgrades भी बदलाव हैं।** जब कोई provider नया model निकाले, या आप बदलने की सोचो, तो पूरा eval चलाओ। Release notes से नहीं, results से तय करो: नया model कुल मिलाकर बेहतर और आपके अपने cases पर बुरा हो सकता है।
+
+**इसे CI में जोड़ो।** हर pull request पर fast checks चलाओ; fail होने पर merging रोको। Prompt या model बदलाव deploy करने से पहले पूरा eval चलाओ। Results रखो ताकि trends दिखें।
+
+**हर bug जोड़ो।** हर production failure एक regression test case बन जाती है।
+
+**हर tier में क्या जाता है:**
+
+| Tier | कब चलता है | Contents | समय |
+| --- | --- | --- | --- |
+| Fast | हर push पर | छोटे set पर code checks, critical cases, must-refuse inputs | Seconds से minutes |
+| Full | Deploy से पहले, nightly | पूरा test set, judges, category के हिसाब से तुलना | Minutes से एक घंटा |
+| Model candidate | जब कोई नया model आए | Full tier plus downstream में use होने वाले format checks | जितना चाहिए |
+
+**CI workflow शब्दों में।** हर pull request पर dependencies install करो, test settings के साथ app start करो, fast tier चलाओ, और कोई check fail हो तो job fail करो। Main branch में merge पर, या "run full eval" जैसे label पर, full tier चलाओ। Scores की तुलना रखे हुए production baseline से category के हिसाब से करो, pull request पर एक table post करो, और अगर कोई critical category गिरी हो तो fail करो। हर run के results commit के साथ रखो, ताकि आप समय के साथ quality का chart बना सको और धीमी गिरावट पकड़ सको।
+
+**Tolerances तय करना।** Full tier को उसी version पर कई बार चलाओ और देखो कि अकेली randomness से scores कितना हिलते हैं। Overall tolerance उस noise से ज़रा ऊपर रखो। Safety और refusals जैसी critical categories में कोई गिरावट न दो, और वहाँ और cases जोड़ो ताकि एक अकेली failure साफ़ दिखे।
+
+**Code में fast tier।** Property checks सादे tests होते हैं। ये pytest use करता है और कुछ saved chapters पर quiz generator चलाता है:
+
+```python
+import json, pytest
+from quiz import generate_quiz             # your app's function
+
+CHAPTERS = json.load(open("tests/fast_chapters.json"))   # 15 saved chapters
+
+@pytest.mark.parametrize("chapter", CHAPTERS, ids=lambda c: c["id"])
+def test_quiz_shape(chapter):
+    quiz = json.loads(generate_quiz(chapter["text"]))
+    assert 3 <= len(quiz["questions"]) <= 10
+    for q in quiz["questions"]:
+        assert len(q["options"]) == 4
+        assert len(set(q["options"])) == 4, "duplicate options"
+        assert q["answer"] in q["options"]
+
+def test_refuses_out_of_scope():
+    out = generate_quiz("Write me a poem about cricket.")
+    assert json.loads(out).get("error") == "not_a_chapter"
+```
+
+**Code में baseline तुलना।** Full tier हर case का एक score उसकी category के साथ लिखता है; ये script एक candidate run की तुलना रखे हुए production run से करती है:
+
+```python
+import json
+from collections import defaultdict
+
+CRITICAL = {"safety", "refusals"}
+
+def by_category(path):
+    scores = defaultdict(list)
+    for line in open(path):
+        r = json.loads(line)
+        scores[r["category"]].append(r["score"])
+    return {c: sum(v) / len(v) for c, v in scores.items()}
+
+def compare(baseline_path, candidate_path, tolerance=0.02):
+    base, cand = by_category(baseline_path), by_category(candidate_path)
+    problems = []
+    for cat, b in base.items():
+        drop = b - cand.get(cat, 0)
+        limit = 0 if cat in CRITICAL else tolerance
+        if drop > limit:
+            problems.append(f"{cat}: {b:.2f} -> {cand.get(cat, 0):.2f}")
+    return problems
+
+problems = compare("evals/production.jsonl", "evals/candidate.jsonl")
+print("PASS" if not problems else "FAIL\n" + "\n".join(problems))
+raise SystemExit(1 if problems else 0)       # a non-zero exit fails the CI job
+```
+
+**गिरावट पर भरोसा करने से पहले noise नापो।** बिना बदले production version पर full tier तीन से पाँच बार चलाओ। अगर history accuracy अपने-आप 0.84 और 0.87 के बीच हिलती है, तो 0.85 पर आया candidate regress नहीं हुआ। छोटी categories में cases जोड़ो: 20 cases में एक failure 5 points का झटका है।
+
+**Flaky cases।** कुछ cases एक run में pass और अगले में fail होते हैं। उन्हें तीन बार चलाओ और दो passes माँगो, या case ठीक करो: अक्सर उम्मीद का जवाब ही अस्पष्ट होता है। किसी flaky case को समझे बिना बस delete मत करो।
+
+**Bill छोटा रखो।** Judge वाले full evals हर run पर पैसे लेते हैं। जिन inputs और prompts में बदलाव नहीं हुआ उनके outputs cache करो, routine runs के लिए सस्ता judge और releases से पहले strong judge use करो, और full tier हर push पर नहीं बल्कि labels पर या nightly चलाओ।
+
+**जो test करते हो उसे pin करो।** हर run के साथ ठीक model version, prompt version, retrieval settings और judge prompt record करो। एक score सिर्फ़ उसी तरह बने दूसरे score से तुलना लायक होता है।
+
+## एक example से समझो
+
+Noida की एक ed-tech company का quiz-generation feature chapter text से multiple-choice सवाल JSON के रूप में बनाता है।
+
+उनका setup:
+
+- *हर push पर*: app से 15 chapters; checks कि हर output चार options और एक सही जवाब के साथ valid JSON है, duplicate options नहीं हैं, और संवेदनशील ऐतिहासिक content वाले दो chapters कोई disallowed phrasing नहीं बनाते। 90 seconds लगते हैं।
+- *Deploy से पहले*: 120 chapters जिन्हें एक judge ने factual accuracy और difficulty के लिए score किया, और subject के हिसाब से production से तुलना।
+
+एक developer cost घटाने के लिए prompt छोटा करता है। Fast checks pass हो जाते हैं। Full eval दिखाता है कि science के लिए accuracy वही है पर history के लिए 9 points गिरी, क्योंकि छोटे prompt ने "सिर्फ़ chapter में मौजूद facts use करो" वाला instruction छोड़ दिया था। Release से पहले बदलाव को दोबारा बनाया जाता है।
+
+महीनों बाद, provider का नया model कुल मिलाकर 3 points ज़्यादा score करता है पर JSON fields अलग क्रम में लौटाता है, जिसे एक पुराना client parser संभाल नहीं पाता। Fast checks इसे पकड़ लेते हैं, और बदलने से पहले parser ठीक कर दिया जाता है।
+
+| बदलाव | Fast tier | Full tier | फ़ैसला |
+| --- | --- | --- | --- |
+| Cost बचाने के लिए prompt छोटा किया | Pass हुआ | History accuracy 9 points गिरी | Release से पहले दोबारा बनाया |
+| Provider का नया model | JSON field-order बदलाव पकड़ा जो एक पुराना parser तोड़ रहा था | कुल मिलाकर 3 points ज़्यादा | Parser ठीक किया, फिर बदला |
+
+## आम गलतियाँ
+
+- **Prompts के लिए automated tests न होना।** Prompt बदलाव code बदलाव हैं।
+- **Exact-text तुलना।** Outputs बदलते हैं; properties और criteria check करो।
+- **सिर्फ़ averages।** Critical categories को अलग से बचाओ।
+- **Evals चलाए बिना models upgrade करना।**
+- **Production bugs को test set में न जोड़ना।**
+- **Fast tier को धीमा होने देना।** अगर वो कुछ minutes से ज़्यादा लेता है तो लोग उसे skip करते हैं। धीमे cases को full tier में ले जाओ।
+- **Judge और app को एक साथ बदलना।** आप बता नहीं सकते कि किस बदलाव ने score हिलाया।
+- **Green पाने के लिए failing cases delete करना।** App ठीक करो या case ठीक करो, और लिखो कि क्यों।
+
+## जब हल्की testing काफ़ी है
+
+- **एक prototype जो रोज़ बदलता है**: मुट्ठी भर smoke checks उस पूरे suite से बेहतर हैं जिसे आप बार-बार दोबारा लिखते रहो।
+- **कुछ expert users वाले internal tools**, जो दिक्कतें जल्दी बता देते हैं: fast tier रखो, full tier सिर्फ़ बड़े बदलावों से पहले चलाओ।
+- **तय, deterministic steps**, जैसे किसी जाने-पहचाने file format को parse करना: सादे unit tests काफ़ी हैं।
+
+Full tier, baselines और critical categories तब जोड़ो जब असली users output पर निर्भर होने लगें।
+
+## Demo से production तक
+
+- **Fast tier पर merges रोको**, और उसे कुछ minutes के अंदर रखो।
+- **हर prompt, model या retrieval release से पहले full tier चलाओ**, और pull request पर category table post करो।
+- **हर run को रखो** उसके commit और versions के साथ, और धीमी गिरावट पकड़ने के लिए scores का chart समय के साथ बनाओ।
+- **Test set की तिमाही review करो**: पुराने cases हटाओ, नए user patterns और हर production bug जोड़ो।
+- **Model upgrade की checklist रखो**: full tier, हर downstream consumer के लिए format checks, cost और latency की तुलना।
+
+## Practice करो
+
+नीचे दिया Hamel Husain का evals वाला article दोबारा पढ़ो।
+
+1. अपने eval set को एक fast tier (code checks वाले 10 से 20 cases) और एक full tier में बाँटो।
+2. CI workflow से fast tier हर push पर अपने-आप चलाओ।
+3. एक ऐसा बदलाव करो जो एक category सुधारे और दूसरी तोड़े, और दिखाओ कि आपका setup उसे पकड़ता है।
+4. अपना full tier एक बिना बदले version पर तीन बार चलाओ, नोट करो कि हर category कितनी हिलती है, और उसी से अपनी tolerance तय करो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) के chapters 3 और 4 evaluation methods और एक evaluation pipeline बनाने पर हैं।
+
+**आपका काम पूरा जब:** आप किसी failing regression check से रुका हुआ एक pull request दिखा सको, और समझा सको कि नया model अपनाने का फ़ैसला किस चीज़ ने किया।

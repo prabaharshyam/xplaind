@@ -1,0 +1,168 @@
+---
+id: synthetic-data-distillation
+lang: hi
+title: "Synthetic data और distillation: model के बनाए data से training"
+outcome: "तय कर पाओगे कि model के बनाए data का use कब फ़ायदेमंद है, उसे सुरक्षित तरीके से generate और filter करना, और एक बड़े model की किसी एक task में skill को छोटे, सस्ते model में distil करना।"
+answer: "Synthetic data वो training या test data है जो इंसानों की जगह किसी model ने बनाया हो। Distillation में बड़े model के answers से छोटे model को train किया जाता है। दोनों पैसे बचाते हैं, पर इन्हें जाँचना पड़ता है और असली data भी मिलाना पड़ता है।"
+why_it_matters: "अच्छा labelled data ज़्यादातर AI projects का सबसे धीमा और महँगा हिस्सा है, ख़ासकर भारतीय भाषाओं में। Model के बनाए data को बनाना, जाँचना और use करना, और ये जानना कि वो कहाँ फेल होता है, एक project को महीनों से हफ़्तों में ला सकता है।"
+flashcards:
+  - q: "Synthetic data क्या है?"
+    a: "ऐसे training या test examples जो असली लोगों से इकट्ठा करने की जगह किसी model या program ने बनाए हों।"
+  - q: "Synthetic data use करने के चार कारण बताओ।"
+    a: "ज़्यादा examples, दुर्लभ cases की बेहतर coverage, कभी-कभी बेहतर quality, और जब असली data use न हो सके तब privacy। इससे distillation भी संभव होता है।"
+  - q: "Distillation क्या है?"
+    a: "बड़े teacher model के answers पर छोटे student model को train करना, ताकि एक task में कम cost और ज़्यादा speed पर लगभग वैसी ही quality मिले।"
+  - q: "Back-translation क्या है?"
+    a: "किसी text को translate करके, दूसरे model से वापस translate करना और original से compare करना। बड़ा फ़र्क हो तो translation ख़राब है।"
+  - q: "Generate किए examples के लिए तीन आसान filters बताओ।"
+    a: "Duplicates और near-duplicates हटाओ, बहुत छोटे या बहुत लंबे examples हटाओ, और वो examples हटाओ जहाँ output बस input को दोहरा देता है।"
+  - q: "Model collapse क्या है?"
+    a: "जब models को बार-बार model के बनाए data पर train किया जाता है, तो दुर्लभ cases धुँधले पड़ जाते हैं और गलतियाँ जमा होती जाती हैं। असली data मिलाने से ये रुकता है।"
+  - q: "Distilled model दिखने से कमज़ोर क्यों हो सकता है?"
+    a: "वो teacher का style बिना उसकी skill के copy कर सकता है, और सही दिखने वाले पर गलत answers देता है, ख़ासकर training topics के बाहर।"
+  - q: "किसी दूसरे provider के outputs पर train करने से पहले क्या check करना चाहिए?"
+    a: "उसकी terms of use। कई providers अपने outputs से competing models train करने की इजाज़त नहीं देते।"
+exercise:
+  title: "Hinglish support inbox के लिए सस्ता intent classifier"
+  setup: "Gurugram की एक travel company को महीने में English, Hindi और Hinglish में 50,000 support messages मिलते हैं। एक बड़ा model उन्हें 20 intents में बाँटता है, हाथ से label किए 500 messages पर 94% accuracy से, पर महीने का खर्च ₹1.2 lakh है। Visa refund जैसे तीन intents के पास हर एक के 30 से कम असली examples हैं।"
+  questions:
+    - q: "छोटे classifier के लिए training data कैसे बना सकते हैं?"
+      a: "बड़े model से लगभग 20,000 असली पुराने messages label करवाओ, personal data को पहले mask करके। Label quality नापने के लिए एक sample हाथ से spot-check करो।"
+    - q: "तीन दुर्लभ intents की कमी को कैसे भरें?"
+      a: "दुर्लभ असली examples के paraphrases English, Hindi और Hinglish में generate करो, duplicates filter करो, और एक sample किसी इंसान से check करवाओ।"
+    - q: "छोटे model को कैसे judge करना चाहिए?"
+      a: "उन्हीं 500 हाथ से label किए messages पर, जो training में कभी use नहीं हुए, बड़े model के 94% के सामने, और सिर्फ़ overall नहीं, हर intent के हिसाब से।"
+    - q: "अगर बड़े model की आदत baggage complaints को गलत intent में डालने की हो, तो क्या risk है?"
+      a: "Student वही गलती copy कर लेता है। हाथ से जाँचे samples और हर intent के scores उसे पकड़ लेते हैं, और सुधारे हुए labels वापस training data में जाने चाहिए।"
+ask:
+  - "Model train करने के लिए synthetic data कब use करूँ?"
+  - "Distillation और fine-tuning में क्या फ़र्क है?"
+  - "Model collapse क्या है?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+**Synthetic data** वो data है जो असली लोगों से इकट्ठा करने की जगह किसी model या program ने बनाया हो। आप किसी बड़े model से 5,000 customer सवाल लिखवा सकते हो, English examples को Marathi में translate करवा सकते हो, support tickets का ढेर label करवा सकते हो, या किसी evaluation के लिए test cases लिखवा सकते हो।
+
+**Distillation** इसका एक अहम use है। एक छोटे **student** model को किसी task में बड़े **teacher** model की नक़ल करना सिखाया जाता है, teacher के answers को training data बनाकर। मक़सद ऐसा model है जो बहुत सस्ता और तेज़ हो, और उस task में quality teacher के क़रीब हो। शुरुआती जाना-माना example DistilBERT है, जिसने अपने teacher की language-understanding क्षमता का लगभग 97% बनाए रखा, जबकि वो 40% छोटा और 60% तेज़ था।
+
+Teams synthetic data पाँच मुख्य कारणों से use करती हैं:
+
+- **Quantity.** असली labelled data इकट्ठा करना धीमा और महँगा है। Model एक घंटे में हज़ारों examples बना सकता है।
+- **Coverage.** आप दुर्लभ cases के examples जानबूझकर बना सकते हो: अजीब complaints, बहुत लंबे inputs, मुश्किल edge cases या testing के लिए attacks।
+- **Quality.** कभी-कभी एक मज़बूत model जल्दबाज़ी में काम करती इंसानी team से ज़्यादा consistent labels या मुश्किल सवाल लिखता है।
+- **Privacy.** जब असली records use नहीं हो सकते, जैसे patient files या insurance claims, तो realistic बनावटी records उनकी जगह ले सकते हैं।
+- **Distillation.** एक सस्ता model किसी महँगे model से कोई task सीख सकता है।
+
+```flow
+title: Synthetic data बनाना और use करना
+Real seed examples | कुछ सौ, जाँचे हुए
+Real seed examples -> मज़बूत model से generate करो | paraphrase, translate, label, create
+मज़बूत model से generate करो -> Filter और verify करो | duplicates, length, judges, tests
+Filter और verify करो -> क्या sample काफ़ी अच्छा है?
+क्या sample काफ़ी अच्छा है? -[नहीं]-> Prompt या seeds ठीक करो
+Prompt या seeds ठीक करो -> मज़बूत model से generate करो
+क्या sample काफ़ी अच्छा है? -[हाँ]-> Real data के साथ मिलाओ | सब कुछ synthetic नहीं
+Real data के साथ मिलाओ -> Student model को train करो
+Student model को train करो -> Real, अनदेखे data पर test करो | आख़िरी judge
+```
+
+## ये काम कैसे करता है
+
+**Generate करने के तरीके।** आम methods, सबसे सरल से ज़्यादा involved तक:
+
+1. **Templates और rules.** "I booked [service] on [date] and want a refund" जैसे template को values की lists से भरो। सस्ता और predictable, पर दोहराव वाला।
+2. **Paraphrasing.** Model को एक असली example दो और उसके कई rewordings माँगो। "How do I cancel my ticket?" से "I want to cancel my booking" और "Ticket cancel kaise karu?" बनते हैं। दुर्लभ classes बढ़ाने का अच्छा तरीका।
+3. **Translation.** ज़्यादा data वाली भाषा से, जैसे English, कम data वाली भाषा में, जैसे Kannada, examples translate करो। Quality **back-translation** से जाँचो: नतीजे को किसी दूसरे model से वापस English में translate करो और original से compare करो। अगर बहुत अलग हो, तो वो example हटा दो।
+4. **Labelling.** किसी मज़बूत model से असली, बिना label वाले data को label करवाओ। ये अक्सर सबसे अच्छी value है, क्योंकि inputs असली रहते हैं और सिर्फ़ labels model बनाता है।
+5. **Simulation.** एक model customer बने और दूसरा support agent, और पूरी conversations बनें, training या testing के लिए।
+6. **Instruction generation.** हाथ से लिखे tasks के एक छोटे set से शुरू करो और model से उसी style में नए tasks और answers गढ़वाओ। कई शुरुआती open instruction datasets इसी तरह बने थे।
+
+**Train करने से पहले verify करो।** Model के बनाए data में गलतियाँ होती हैं, इसलिए filtering optional नहीं है।
+
+- **हो सके तो run करो।** Code को tests के सामने execute किया जा सकता है, और SQL को sample database पर चलाया जा सकता है। जिस data को चलाकर जाँचा जा सके वो generate करने में सबसे सुरक्षित है, इसीलिए code synthetic data के सबसे आम प्रकारों में से एक है।
+- **Judge use करो।** एक LLM judge हर example को लिखे हुए quality rules के सामने score कर सकता है, या off-topic या बनावटी facts वाले examples को flag कर सकता है।
+- **सरल filters लगाओ।** Exact और near duplicates हटाओ, बहुत छोटे या बहुत लंबे examples, जहाँ output input को दोहराए, और जहाँ एक ही सवाल के answers आपस में टकराएँ।
+- **एक sample ख़ुद पढ़ो।** 100 random examples पढ़ने में तीस मिनट लगते हैं, और वो ऐसी समस्याएँ पकड़ लेते हैं जो कोई filter नहीं पकड़ेगा।
+
+एक छोटी filter script बुनियादी चीज़ें cover कर देती है:
+
+```python
+import json
+from difflib import SequenceMatcher
+
+def keep(ex, seen):
+    q, a = ex["input"].strip(), ex["output"].strip()
+    if not (5 <= len(q.split()) <= 120):        # too short or too long
+        return False
+    if a.lower() == q.lower() or q.lower() in a.lower():  # output repeats the input
+        return False
+    for s in seen[-500:]:                        # near-duplicate of a recent example
+        if SequenceMatcher(None, q.lower(), s).ratio() > 0.9:
+            return False
+    seen.append(q.lower())
+    return True
+
+seen, kept = [], []
+for line in open("generated.jsonl"):
+    ex = json.loads(line)
+    if keep(ex, seen):
+        kept.append(ex)
+print(f"kept {len(kept)} examples")
+```
+
+**किसी task को distil करना।** Teacher को अपनी task के असली inputs के बड़े set पर चलाओ, उसके answers (filter करने के बाद) रखो, और उन pairs पर एक छोटे model को fine-tune करो। Student को असली, हाथ से label किए उस data पर test करो जो उसने कभी नहीं देखा, और उसी test पर teacher से compare करो।
+
+| Method | किसके लिए अच्छा | मुख्य risk |
+| --- | --- | --- |
+| Templates और rules | सरल formats, जल्दी test cases | दोहराव वाला, unrealistic text |
+| Paraphrasing | दुर्लभ classes बढ़ाना, अलग-अलग wording | Users जैसे असल में लिखते हैं उससे भटक जाता है |
+| Back-translation के साथ translation | English से भारतीय भाषा का data | अकड़ी हुई, formal भाषा जो users बोलते नहीं |
+| असली inputs की model से labelling | Classification और extraction | Teacher की गलतियाँ student की गलतियाँ बन जाती हैं |
+| Simulation | Multi-turn conversations, agent testing | दोनों तरफ़ से model जैसी आवाज़ |
+| Distillation | एक task के लिए सस्ता, तेज़ model | Skill के बिना style की नक़ल |
+
+## एक example से समझो
+
+Gurugram की एक travel company हर महीने 50,000 support messages को refund, date change और baggage जैसे 20 intents में बाँटती है। एक बड़ा model हाथ से label किए 500 messages पर 94% accuracy से ये करता है, पर महीने का खर्च ₹1.2 lakh है।
+
+वो 20,000 असली पुराने messages लेते हैं, नाम, phone numbers और booking IDs mask करते हैं, और बड़े model से उन्हें label करवाते हैं। एक support lead 300 labels जाँचता है और 93% सही पाता है, ज़्यादातर गलतियाँ दो intents में जिन्हें guide ने ठीक से describe नहीं किया था। वो guide ठीक करते हैं, उन दो intents को दोबारा label करते हैं और फिर जाँचते हैं।
+
+Visa refund समेत तीन intents के पास हर एक के 30 से कम असली examples हैं। इनके लिए वो बड़े model से हर असली example को English, Hindi और Hinglish में पाँच तरह से paraphrase करवाते हैं, duplicates filter करते हैं, और एक sample किसी इंसान से check करवाते हैं। आख़िरी 21,500 में synthetic examples लगभग 10% हैं।
+
+वो labelled set पर एक छोटे open-weight model को fine-tune करते हैं और उसे उन्हीं original 500 messages पर test करते हैं, जो training में कभी use नहीं हुए।
+
+| Option | 500 असली messages पर accuracy | सबसे कमज़ोर intent | मासिक cost |
+| --- | --- | --- | --- |
+| Large model, prompted | 94% | 85% (visa refund) | ₹1.2 lakh |
+| Small model, सिर्फ़ असली labels | 90% | 52% (visa refund) | ₹9,000 |
+| Small model, असली labels + synthetic दुर्लभ intents | 93% | 81% (visa refund) | ₹9,000 |
+
+Numbers सिर्फ़ समझाने के लिए हैं, ये दिखाने के लिए कि compare कैसे करना है। Synthetic examples ने मुख्य रूप से दुर्लभ intents में मदद की। Team उन messages के लिए बड़े model को fallback की तरह रखती है जिन पर छोटा model अनिश्चित होता है, और हर महीने असली, हाथ से जाँचे messages का ताज़ा sample training set में जोड़ती है।
+
+## आम गलतियाँ
+
+- **बिना जाँचे output पर train करना।** Garbage in, garbage out। Filter करो, verify करो और एक sample पढ़ो।
+- **Synthetic data पर test करना।** आख़िरी test असली data पर होना चाहिए जो training में कभी use नहीं हुआ। वरना आप ये नाप रहे हो कि student teacher की कितनी अच्छी नक़ल करता है, ये नहीं कि वो users की कितनी अच्छी सेवा करता है।
+- **पूरी तरह synthetic हो जाना।** Models को बार-बार model के बनाए data पर train करने से **model collapse** हो सकता है: दुर्लभ cases धुँधले पड़ते हैं और गलतियाँ जमा होती हैं। Mix में असली data रखो।
+- **Student से teacher को हराने की उम्मीद करना।** Distilled model उस task में अपने teacher से शायद ही आगे निकलता है। अगर teacher कमज़ोर है, तो पहले उसे ठीक करो।
+- **Terms of use को नज़रअंदाज़ करना।** कई providers अपने outputs से competing models train करने की इजाज़त नहीं देते। Terms पढ़ो, और दर्ज करो कि कौन-सा data किस model ने बनाया।
+- **Data कहाँ से आया ये भूल जाना।** अगर teacher किसी benchmark पर train हुआ था, तो उस पर आपके student का score दूषित हो सकता है।
+
+## Model के बनाए data की सीमाएँ
+
+- **Skill के बिना style.** मज़बूत models की नक़ल करने के लिए train किए models पर research में पाया गया कि वो style की नक़ल अच्छी करते थे पर facts और नए tasks में कमज़ोर रहे। जो student ऐसे solutions पर train होता है जिन्हें वो ख़ुद हल नहीं कर सकता, वो आत्मविश्वास से गलत answers देना सीख सकता है।
+- **Bias का बढ़ना.** अगर teacher कुछ answers की तरफ़ झुका है, तो student वो bias सीख लेता है, कभी-कभी और मज़बूती से।
+- **अनजानी lineage.** Model का बनाया data छिपा देता है कि ज्ञान कहाँ से आया, जिसमें teacher के training data की संभावित copyright समस्याएँ भी शामिल हैं।
+- **Unrealistic भाषा.** Generate की गई Hindi अक्सर उससे ज़्यादा formal होती है जैसी लोग WhatsApp पर असल में लिखते हैं। असली seed examples उसे ज़मीन से जोड़े रखते हैं।
+
+## Practice करो
+
+1. कोई classification task चुनो जिसे आप जानते हो। 20 असली examples लिखो, फिर किसी chat model से हर एक के 5 paraphrases माँगो। पढ़ो: कौन-से ऐसे हैं जो असली user कभी नहीं लिखेगा?
+2. ऊपर वाली filter script अपने generate किए set पर चलाओ और नोट करो कि वो कितने examples क्यों हटाती है।
+3. Task को distil करने का एक छोटा plan लिखो: teacher, inputs की संख्या, labels कैसे जाँचोगे, और कौन-सा असली test set use करोगे।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 8 data synthesis, verification और distillation को cover करता है।
+
+**आप तब पूरा समझ चुके हो जब आप** synthetic data use करने के तीन कारण बता सको, समझा सको कि उसे कैसे verify करना है, और बता सको कि distilled model को असली, अनदेखे data पर ही क्यों test करना चाहिए।

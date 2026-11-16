@@ -1,0 +1,159 @@
+---
+id: perplexity-and-cross-entropy
+lang: hi
+title: "Perplexity और cross-entropy: language models को कैसे नापते हैं"
+outcome: "Cross-entropy और perplexity को आसान शब्दों में समझा पाओगे, token probabilities से perplexity निकाल पाओगे, bits per byte से models की सही तुलना कर पाओगे, और इन numbers से base model चुनना, data filter करना और contamination पकड़ना सीखोगे।"
+answer: "Cross-entropy नापती है कि असली text देखकर model कितना हैरान होता है; perplexity मोटे तौर पर बताती है कि हर token के लिए वो कितने choices तौल रहा है। कम हो तो बेहतर, पर तुलना सिर्फ़ एक ही text और एक ही tokenizer पर करो।"
+why_it_matters: "Training curves, model reports और research papers सब cross-entropy और perplexity में लिखे होते हैं। इन्हें सही पढ़ पाओ तो अपने domain के लिए base model चुन सकते हो, data leaks पकड़ सकते हो, training data साफ़ कर सकते हो, और ऐसी तुलनाओं से बच सकते हो जो scientific दिखती हैं पर मतलब कुछ नहीं रखतीं।"
+flashcards:
+  - q: "Language model के लिए cross-entropy क्या नापती है?"
+    a: "असल में जो अगला token आया, उसे देखकर model औसतन कितना हैरान हुआ। कम मतलब वो text को बेहतर predict करता है।"
+  - q: "Perplexity क्या है?"
+    a: "Cross-entropy का exponential। मोटे तौर पर, हर अगले token के लिए model कितने बराबर संभावना वाले choices तौल रहा है।"
+  - q: "Perplexity 4 का क्या मतलब है?"
+    a: "औसतन model उतना ही उलझन में है जितना 4 बराबर संभावना वाले अगले tokens में से चुनते हुए होता।"
+  - q: "Bits या nats?"
+    a: "Cross-entropy की दो units: bits में log base 2 लगता है, nats में natural log। PyTorch और TensorFlow nats में report करते हैं। Perplexity दोनों में एक ही रहती है।"
+  - q: "अलग-अलग models की perplexity सीधे क्यों नहीं मिला सकते?"
+    a: "अलग tokenizers text को अलग-अलग tokens में तोड़ते हैं, इसलिए per-token numbers अलग हो जाते हैं। Bits per byte या per character से तुलना हो सकती है।"
+  - q: "Chat model की perplexity अक्सर उसके base model से ज़्यादा क्यों होती है?"
+    a: "Post-training उसे instructions मानना सिखाती है, raw text predict करना नहीं, इसलिए plain next-token prediction में वो अक्सर कमज़ोर होता है, पर काम का ज़्यादा होता है।"
+  - q: "Perplexity data contamination कैसे दिखा सकती है?"
+    a: "जो text model ने रट रखा हो, उसे predict करना उसके लिए असामान्य रूप से आसान होता है। किसी benchmark पर बहुत कम perplexity का मतलब है कि वो training data में रहा होगा।"
+  - q: "Data cleaning में perplexity का एक use बताओ।"
+    a: "Gibberish या टूटे text को flag करना, जिसकी perplexity बहुत ज़्यादा होती है, या वो नए examples छोड़ देना जिन्हें model पहले से आसानी से predict कर लेता है।"
+exercise:
+  title: "तेलुगु legal text के लिए base model चुनना"
+  setup: "Hyderabad की एक legal-tech team तेलुगु court judgements पर एक open model की training आगे बढ़ाना चाहती है। उनके पास अलग tokenizers वाले तीन candidate base models हैं और 2,000 तेलुगु judgement paragraphs का एक held-out set है। Model A उस set पर perplexity 9 report करता है, model B 14 और model C 21।"
+  questions:
+    - q: "क्या इन numbers से वो कह सकते हैं कि model A सबसे अच्छा है?"
+      a: "अभी नहीं। Models अलग tokenizers use करते हैं, इसलिए per-token perplexity की तुलना नहीं हो सकती। जो tokenizer तेलुगु को बहुत छोटे टुकड़ों में तोड़ता है, वो per token कम perplexity दिखा सकता है।"
+    - q: "उन्हें सही तुलना कैसे करनी चाहिए?"
+      a: "Bits per byte (या per character) में बदलो: पूरे set की total cross-entropy को text के bytes की गिनती से भाग दो। तीनों के लिए text एक ही है, इसलिए ये तुलना के लायक है।"
+    - q: "बदलने के बाद bits per byte में model B सबसे अच्छा निकला। क्या उसे चुनने के लिए इतना काफ़ी है?"
+      a: "ये अच्छा signal है कि वो तेलुगु legal text को पहले से कितना अच्छा model करता है, पर उन्हें summaries जैसे असली tasks पर भी test करना चाहिए, और speed और token cost भी देखना चाहिए।"
+    - q: "एक judgement की perplexity बाकियों से बहुत ज़्यादा है। वो क्या हो सकता है?"
+      a: "हो सकता है खराब scan या extraction से टूटा text हो, या कोई दूसरी भाषा हो। ऐसे outliers ढूँढने का ऊँची perplexity एक सस्ता तरीका है।"
+ask:
+  - "Perplexity आसान भाषा में क्या है?"
+  - "Cross-entropy और perplexity में क्या फ़र्क है?"
+  - "क्या दो अलग models की perplexity की तुलना कर सकता हूँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+Language model का बुनियादी काम अगला token predict करना है। ये metrics नापते हैं कि वो किसी text पर ये काम कितना अच्छा करता है।
+
+**Cross-entropy** हर उस token पर model की औसत "हैरानी" है जो असल में अगला आया। अगर model ने सही अगले token को 0.9 probability दी थी, तो वो ज़रा भी हैरान नहीं हुआ; अगर 0.01 दी थी, तो बहुत हैरान हुआ। हैरानी को probability के negative logarithm से नापते हैं, इसलिए पक्के predictions की लगभग कोई कीमत नहीं लगती और भरोसे के साथ की गई गलतियों की बहुत लगती है। Language model को train करने का मतलब है उसके training text पर उसकी cross-entropy घटाना; training run में जो "loss" गिरता दिखता है, वो यही number है।
+
+**Perplexity** cross-entropy का exponential है। ये एक abstract number को समझने लायक बना देती है: मोटे तौर पर, **model हर step पर कितने बराबर संभावना वाले options में से चुन रहा है**। Perplexity 4 का मतलब है कि model औसतन उतना ही उलझन में है जितना चार बराबर संभावना वाले अगले tokens में से चुनते हुए होता। कम हो तो बेहतर।
+
+Papers में दो और units दिखती हैं। **Bits** में log base 2 लगता है और **nats** में natural logarithm; PyTorch और TensorFlow nats में report करते हैं। **Bits per character** और **bits per byte** total को tokens की गिनती की जगह text की लंबाई से भाग देते हैं, और models की तुलना में ये बहुत मायने रखता है, आगे देखोगे।
+
+ये ideas Claude Shannon के 1951 के काम से आए हैं, जो अंग्रेज़ी text predict करने पर था। जो model text को अच्छे से predict करता है, वो उसे अच्छे से compress भी कर सकता है: 3.4 bits per byte वाला model, सिद्धांत में, text को उसके original size के आधे से भी कम में रख सकता है।
+
+```flow
+title: Token probabilities से perplexity तक
+Text -> Tokenize
+Tokenize -> Model हर असली अगले token की probability देता है
+Model हर असली अगले token की probability देता है -> हर एक का minus log लो | हर token पर हैरानी
+हर एक का minus log लो -> औसत निकालो | cross-entropy
+औसत निकालो -> Exponentiate करो | perplexity
+औसत निकालो -> Total को text के bytes से भाग दो | bits per byte, tokenizers के पार तुलना लायक
+```
+
+## ये काम कैसे करता है
+
+**निकालना कैसे है।** आपको वो probability चाहिए जो model ने हर असली अगले token को दी। कई APIs इन्हें **logprobs** के रूप में लौटाती हैं; open models में ये सीधे मिल जाती हैं।
+
+```python
+import math
+
+def perplexity_from_logprobs(logprobs):
+    """logprobs: natural-log probabilities of each actual next token."""
+    cross_entropy = -sum(logprobs) / len(logprobs)    # nats per token
+    return math.exp(cross_entropy), cross_entropy
+
+def bits_per_byte(logprobs, text):
+    total_bits = -sum(logprobs) / math.log(2)         # convert nats to bits
+    return total_bits / len(text.encode("utf-8"))
+
+# Example: three tokens predicted with probabilities 0.5, 0.25 and 0.8
+lp = [math.log(0.5), math.log(0.25), math.log(0.8)]
+print(perplexity_from_logprobs(lp))                   # perplexity about 2.15
+```
+
+Hugging Face Transformers में input को labels की तरह pass करो तो cross-entropy loss सीधे मिल जाता है, और `exp(loss)` ही perplexity है। लंबे texts के लिए sliding-window version primary resource में दिखाया गया है।
+
+**किसी value का मतलब text पर निर्भर करता है।**
+
+- **Structured text** (HTML, code, forms) ज़्यादा predictable होता है, इसलिए perplexity कम।
+- **बड़ी vocabulary** हर step पर ज़्यादा options देती है, इसलिए perplexity ज़्यादा होती है।
+- **ज़्यादा context** से predict करना आसान होता है, इसलिए model जितना पिछला text देखता है, perplexity उतनी गिरती है।
+- **जो text model ने रट लिया हो**, उसकी perplexity असामान्य रूप से कम होती है; **gibberish या अजीब ideas** की बहुत ज़्यादा।
+
+**तुलना का जाल।** Perplexity per token होती है, और अलग models अलग tokenizers use करते हैं। जो tokenizer तेलुगु को बहुत छोटे-छोटे टुकड़ों में तोड़ता है, वो हर टुकड़े को predict करना आसान बना देता है, और model बेहतर हुए बिना per-token perplexity कम दिखती है। एक ही text पर models की तुलना करने के लिए **bits per byte** (या per character) use करो: कुल हैरानी को text की अपनी लंबाई से भाग दो, जो हर model के लिए एक जैसी है।
+
+**Post-trained models।** Instruction tuning और preference tuning model को helpful बनना सिखाते हैं, raw text predict करना नहीं। Chat models की perplexity अक्सर उनके base models से *ज़्यादा* होती है जबकि वो कहीं ज़्यादा काम के होते हैं। Quantisation भी perplexity को अनपेक्षित तरीकों से बदल सकती है। इसलिए perplexity raw text पर **base models** की तुलना और training curves के लिए सबसे अच्छी है, chat assistants की ranking के लिए नहीं।
+
+**व्यावहारिक इस्तेमाल।**
+
+- **अपने domain के लिए base model चुनना।** आपके held-out text पर कम bits per byte का मतलब है continued training या fine-tuning के लिए बेहतर शुरुआत।
+- **Training पर नज़र रखना।** Validation loss (cross-entropy) सीखना दिखाता है, और training loss से फ़ासला overfitting का संकेत है।
+- **Contamination पकड़ना।** Benchmark सवालों पर असामान्य रूप से कम perplexity का मतलब है कि model ने उन्हें training में देखा है।
+- **Data साफ़ करना।** बहुत ज़्यादा perplexity टूटे extractions, गलत भाषा या spam दिखाती है; बहुत कम perplexity उन चीज़ों के लगभग-duplicates दिखाती है जो model पहले से जानता है।
+
+| Use | क्या compare करें | किस बात का ध्यान रखें |
+| --- | --- | --- |
+| अपने text के लिए base model चुनना | Held-out text पर bits per byte | अलग tokenizers per-token numbers को अनुचित बना देते हैं |
+| Training monitor करना | Training और validation loss | Units: ज़्यादातर frameworks में nats |
+| Contamination पकड़ना | Test items पर perplexity बनाम वैसे ही अनदेखे text पर | कुछ text वैसे ही predict करना आसान होता है |
+| Training data filter करना | बहुत ज़्यादा या बहुत कम perplexity वाले outliers | अजीब पर सही text की भी perplexity ऊँची आती है |
+| Chat assistants को rank करना | Perplexity use मत करो | Post-training perplexity बढ़ा देती है |
+
+## एक example से समझो
+
+Hyderabad की एक legal-tech team तेलुगु court judgements पर एक open model की training आगे बढ़ाना चाहती है। उनके पास तीन candidate base models और 2,000 held-out judgement paragraphs हैं।
+
+| Model | Report की गई perplexity (per token) | पूरे set के tokens | Bits per byte |
+| --- | --- | --- | --- |
+| A | 9 | 2.4 million | 1.77 |
+| B | 14 | 1.1 million | 0.97 |
+| C | 21 | 1.3 million | 1.33 |
+
+Set लगभग 43 लाख bytes का text है। Numbers सिर्फ़ समझाने के लिए हैं। Per-token perplexity पर A सबसे अच्छा दिखता है। पर A का tokenizer तेलुगु को B के मुकाबले दोगुने से ज़्यादा tokens में तोड़ता है, जिससे हर token का अंदाज़ा लगाना आसान हो जाता है। जब कुल हैरानी को उतने ही bytes से भाग दिया जाता है, तो तेलुगु legal text को B सबसे अच्छा model करता है, और उसका efficient tokenizer training और इस्तेमाल को भी सस्ता बनाएगा।
+
+वो paragraphs को perplexity से sort भी करते हैं। सबसे ऊँचे 30 निकलते हैं garbled scans और कुछ अंग्रेज़ी pages; training से पहले वो extraction ठीक कर लेते हैं। आख़िर में, कोई फ़ैसला करने से पहले वो B को असली tasks पर test करते हैं (judgements का summary बनाना, उन पर सवालों के जवाब देना), क्योंकि text को अच्छे से model करना एक signal है, task quality की गारंटी नहीं।
+
+## आम गलतियाँ
+
+- **अलग tokenizers के पार per-token perplexity की तुलना करना।** Bits per byte या per character use करो।
+- **Bits और nats को मिला देना।** 2.0 nats का loss लगभग 2.9 bits है; perplexity दोनों में वही रहती है।
+- **Chat models को perplexity से rank करना।** Post-training उसे ऐसे तरीकों से बदलती है जिनका usefulness से कोई लेना-देना नहीं।
+- **कम perplexity को quality समझ लेना।** इसका मतलब रटना भी हो सकता है, या बस बहुत predictable text।
+- **हर model के लिए अलग test set use करना।** बिल्कुल एक ही text पर तुलना करो।
+- **Context length को नज़रअंदाज़ करना।** लंबे context के साथ score किए गए models की perplexity कम आती है।
+
+## जब इन metrics की ज़रूरत नहीं
+
+- **किसी application के लिए API से hosted chat model use करना**: उसे task tests पर परखो, perplexity पर नहीं।
+- **Instruction-tuned assistants की तुलना**: अपने tasks पर evals और side-by-side comparisons use करो।
+- **Classification के लिए छोटे fine-tunes**: accuracy, precision और recall ज़्यादा बताते हैं।
+
+## Demo से production तक
+
+- **हर training run में validation loss track करो**, एक बताई हुई unit में।
+- **एक held-out domain set रखो** और जिस भी base model पर आप विचार करो, उसके bits per byte दर्ज करो।
+- **Data pipelines में perplexity filters use करो** ताकि टूटा या दूसरी भाषा का text पकड़ में आए, और जो वो flag करें उसका एक sample review करो।
+- **नए benchmark results में contamination check करो** जब किसी model के scores ज़रूरत से ज़्यादा अच्छे लगें।
+
+## Practice करो
+
+1. ऊपर वाले function को अपनी बनाई probabilities के साथ चलाओ: जब model हमेशा 50% पक्का हो तो perplexity कितनी आती है? हमेशा 90% पक्का हो तो?
+2. किसी भी छोटे open model से एक सामान्य text paragraph की perplexity निकालो, फिर उसी paragraph के शब्द शफल करके निकालो। क्या बदलता है?
+3. किसी दोस्त को दो वाक्यों में समझाओ कि अलग tokenizers वाले दो models की तुलना per-token perplexity से क्यों नहीं हो सकती।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 3 entropy, cross-entropy, perplexity और bits per byte को cover करता है।
+
+**आपका काम पूरा जब:** आप perplexity को "कितने choices" के रूप में समझा सको, token probabilities से उसे निकाल सको, और बता सको कि models की सही तुलना के लिए bits per byte ही क्यों सही तरीका है।

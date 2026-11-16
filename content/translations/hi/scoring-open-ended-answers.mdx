@@ -1,0 +1,165 @@
+---
+id: scoring-open-ended-answers
+lang: hi
+title: "Open-ended answers को score करना: exact checks, similarity और side-by-side comparison"
+outcome: "AI answer को score करने का सही तरीका चुन पाओगे: उसे run करना, match करना, reference से शब्दों या मतलब के आधार पर compare करना, या दो answers को side by side देखना, और हर method के blind spots जानना।"
+answer: "जो चीज़ exact check हो सकती है, उसे पहले check करो। जहाँ कई सही answers हों, वहाँ embeddings से मतलब compare करो या judge use करो, और दो systems में से चुनने के लिए answers को side by side compare करो।"
+why_it_matters: "जो score quality को नहीं दिखाता, वो team को हफ्तों तक गलत दिशा में भेज देता है। कौन-सा measure किस task पर फिट बैठता है और हर एक कैसे गुमराह कर सकता है, ये जानना भरोसेमंद eval और dashboard पर पड़े एक number के बीच का फ़र्क है।"
+flashcards:
+  - q: "Functional correctness क्या है?"
+    a: "ये check करना कि output अपना काम करता है या नहीं: code tests pass करता है, SQL सही rows देता है, JSON schema से मेल खाता है। जब मिल जाए, तो यही सबसे भरोसेमंद score है।"
+  - q: "Exact match कब काम करता है?"
+    a: "छोटे, बंद answers के लिए जैसे number, date, label या multiple-choice letter, lowercase करने जैसी छोटी सफ़ाई के बाद।"
+  - q: "BLEU और ROUGE क्या measure करते हैं?"
+    a: "कि एक answer reference answer के साथ कितने शब्द और शब्दों के क्रम share करता है। ये शब्दों के मिलने को इनाम देते हैं, मतलब के मिलने को नहीं।"
+  - q: "Lexical similarity गुमराह क्यों कर सकती है?"
+    a: "अलग शब्दों में दिया सही answer कम score पाता है, और reference के शब्द copy करने वाला गलत answer ज़्यादा score पाता है। References खुद भी गलत या अधूरे हो सकते हैं।"
+  - q: "Semantic similarity कैसे measure होती है?"
+    a: "दोनों texts को embeddings में बदलकर compare करते हैं, आमतौर पर cosine similarity से। ये paraphrases पकड़ लेती है, पर embedding model पर निर्भर रहती है।"
+  - q: "Pairwise comparison क्या है?"
+    a: "दो answers को side by side दिखाकर पूछना कि कौन-सा बेहतर है। लोगों के लिए ये 10 में से score देने से आसान है, और बहुत सारे votes को ranking में बदला जा सकता है।"
+  - q: "Preference votes से फ़ैसला कब नहीं करना चाहिए?"
+    a: "जब सवाल का कोई सही answer हो जो voter को शायद पता न हो, जैसे maths, law या health के facts। Popular होना और सही होना एक चीज़ नहीं है।"
+  - q: "Scoring method चुनने का सबसे सुरक्षित क्रम क्या है?"
+    a: "पहले functional checks, फिर exact match, open text के लिए judge या similarity, और दो systems में से चुनने के लिए pairwise comparison।"
+exercise:
+  title: "Hindi customer-reply assistant को score करना"
+  setup: "Delhi के एक electronics retailer का assistant customer emails के replies Hindi और English में draft करता है। हर reply में order number, refund हो तो उसकी amount, और एक विनम्र समापन होना चाहिए। Team के पास उनके best agents के लिखे replies के साथ 300 पुराने emails हैं, और उन्हें दो prompt versions compare करने हैं।"
+  questions:
+    - q: "कौन-से हिस्से exact check हो सकते हैं?"
+      a: "Draft में order number और refund amount email और order system से मेल खाते हैं या नहीं। ये ऐसे facts हैं जिनकी एक ही सही value है।"
+    - q: "Agents के replies के सामने ROUGE यहाँ कमज़ोर measure क्यों है?"
+      a: "एक अच्छा reply agent के शब्दों से बिल्कुल अलग शब्द use कर सकता है, ख़ासकर Hindi और English के बीच, और फिर भी सही हो सकता है। ROUGE उसे सज़ा देगा।"
+    - q: "दोनों prompt versions में से कैसे चुनें?"
+      a: "Reviewers को, या एक जाँचे हुए judge model को, same emails के दोनों drafts random order में side by side दिखाओ और wins गिनो, साथ में exact fact checks भी चलाओ।"
+    - q: "यहाँ preference vote कब risky होगा?"
+      a: "अगर voters order data नहीं देख सकते, तो वो ऐसा fluent reply पसंद कर सकते हैं जिसमें refund amount गलत लिखी हो। Facts check करने होते हैं, उन पर vote नहीं होता।"
+ask:
+  - "Open-ended LLM answers को evaluate कैसे करूँ?"
+  - "क्या LLMs के लिए BLEU और ROUGE अब भी काम के हैं?"
+  - "Pairwise evaluation क्या है और कब use करूँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+Calculator को test करना आसान है: 2 + 2 हमेशा 4 होना चाहिए। Emails, summaries या explanations लिखने वाले AI को test करना मुश्किल है, क्योंकि कई अच्छे answers होते हैं। ये lesson ऐसे answers पर number लगाने के मुख्य तरीके बताता है, और ये भी कि कौन-सा कब फिट बैठता है।
+
+चार families हैं, सबसे exact से कम exact तक:
+
+1. **Functional correctness.** क्या output काम करता है? Generate किया code अपने tests pass करता है, generate की गई SQL query सही rows देती है, extract किया invoice total ledger से मेल खाता है।
+2. **Exact match.** क्या answer reference जैसा ही है? Numbers, dates, labels और multiple-choice letters के लिए अच्छा है।
+3. **Reference से similarity.** Answer एक जाने-माने अच्छे answer से कितना क़रीब है, **शब्दों** में (lexical similarity, जैसे BLEU और ROUGE) या **मतलब** में (semantic similarity, embeddings से)?
+4. **Judgement.** कोई इंसान या judge model answer को rate करता है, अकेले (5 में से score) या किसी दूसरे answer के सामने (**pairwise comparison**)। LLM judges वाला lesson judge prompts को गहराई से बताता है।
+
+```flow
+title: Answer को कैसे score करें, ये चुनना
+Score करने वाला answer -> क्या आप इसे run या test कर सकते हो? | code, SQL, schema
+क्या आप इसे run या test कर सकते हो? -[हाँ]-> Functional check | सबसे भरोसेमंद
+क्या आप इसे run या test कर सकते हो? -[नहीं]-> क्या एक ही सही छोटा answer है? | number, label, date
+क्या एक ही सही छोटा answer है? -[हाँ]-> Exact match
+क्या एक ही सही छोटा answer है? -[नहीं]-> क्या अच्छे reference answers हैं?
+क्या अच्छे reference answers हैं? -[हाँ]-> Meaning similarity या reference के साथ judge
+क्या अच्छे reference answers हैं? -[नहीं]-> Rubric के साथ judge
+Meaning similarity या reference के साथ judge -> क्या दो systems में से चुन रहे हो? -[हाँ]-> Side-by-side comparison
+```
+
+## ये काम कैसे करता है
+
+**Functional correctness.** अगर आप उसे execute या test कर सकते हो, तो सबसे पहले वही करो। Code assistant को unit tests चलाकर score किया जाता है। Text-to-SQL feature generate की गई और reference, दोनों queries को एक test database पर चलाकर results compare करता है। Extraction feature fields को system of record से check करता है। और कुछ भी इतना भरोसेमंद नहीं है। OpenAI ने पाया कि एक coding benchmark पर सही और गलत solutions के word-overlap scores लगभग एक जैसे थे, इसलिए सिर्फ़ code चलाने से ही फ़र्क पता चला।
+
+**Exact match**, सावधानी से। पहले normalise करो: lowercase, spaces trim, number formats एक जैसे। उन answers से सावधान रहो जिनमें सही value गलत answer के अंदर हो: "Born on 12 September 1929" में "1929" है, पर अगर असली date 12 June है तो ये गलत है। Labels के लिए पूरा वाक्य नहीं, label field compare करो।
+
+**Lexical similarity.** दोनों texts को शब्दों या शब्दों के जोड़ों में बाँटकर overlap गिना जाता है। BLEU (machine translation से) और ROUGE (summarisation से) सबसे जाने-माने versions हैं। एक जुड़ा idea है **edit distance**, जो गिनता है कि एक string को दूसरी में बदलने के लिए कितने अक्षर बदलने पड़ेंगे, नामों और codes के लिए काम का है।
+
+आज के models के लिए इनकी कमज़ोरियाँ गंभीर हैं:
+
+- अलग शब्दों में दिया सही answer कम score पाता है। "How is it going?" में "How are you?" से बहुत कम शब्द मिलते हैं।
+- Reference के शब्द copy करने वाला गलत answer ज़्यादा score पाता है। "Let's eat, grandma" और "Let's eat grandma" शब्दों के हिसाब से लगभग एक जैसे हैं।
+- References में अच्छे answers छूट सकते हैं, या वो सीधे गलत हो सकते हैं।
+
+फिर भी ये सस्ते smoke alarms की तरह मदद करते हैं, जैसे ये पकड़ने के लिए कि template बदलने से हर reply टूट गया।
+
+**Semantic similarity.** Answer और reference को embeddings में बदलो और -1 से 1 तक cosine similarity से compare करो। Paraphrases को ऊँचा score मिलता है। बड़े scale पर ये सस्ती है, लेकिन score embedding model पर निर्भर है, ये "refund approved" और "refund rejected" को क़रीब बता सकती है, और सही threshold लोगों के judgements से मिलाकर ही तय करना होता है।
+
+```python
+import numpy as np
+
+def cosine(a, b):
+    a, b = np.asarray(a), np.asarray(b)
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+def score(answer, reference, embed, must_include=()):
+    """embed(text) returns a vector. must_include holds facts that need an exact check."""
+    facts_ok = all(f.lower() in answer.lower() for f in must_include)
+    return {"facts_ok": facts_ok, "meaning": round(cosine(embed(answer), embed(reference)), 3)}
+
+# score(draft, agent_reply, embed, must_include=["ORD-48213", "₹2,499"])
+```
+
+Pattern देखो: जिन facts का सही होना ज़रूरी है उनके लिए exact checks, wording के लिए similarity।
+
+**Pairwise comparison.** दो गानों में से कौन-सा पसंद है ये बताना, हर एक को 10 में से score देने से आसान है। Answers के लिए भी यही सच है। एक ही सवाल के दो answers random order में, बिना labels के दिखाओ, और पूछो कौन-सा बेहतर है, tie की भी इजाज़त दो। Wins गिनो। कई models हों तो Elo या Bradley–Terry जैसे ranking methods wins को league table में बदल देते हैं; public arenas इसी तरह लाखों votes से chatbots को rank करते हैं।
+
+दो limits मायने रखती हैं:
+
+- **Preference का मतलब correctness नहीं है।** अगर voter को सही answer नहीं पता, जैसे maths result या medical fact, तो वो आत्मविश्वास से कहे गलत answer को पसंद कर सकता है। Style और helpfulness पर vote कराओ; facts अलग से check करो।
+- **इसमें बहुत सारी comparisons लगती हैं**, और models जोड़ने पर pairs की संख्या तेज़ी से बढ़ती है। दो prompts या दो models के बीच product का फ़ैसला करने के लिए, आपके अपने सवालों पर 100 से 300 side-by-side comparisons आमतौर पर काफ़ी होती हैं।
+
+| Method | किसके लिए सबसे अच्छा | Cost | मुख्य risk |
+| --- | --- | --- | --- |
+| Functional check | Code, SQL, extraction, formats | बनने के बाद कम | ऐसे tests जो cases छोड़ देते हैं |
+| Exact match | Numbers, labels, छोटे facts | बहुत कम | गलत answer के अंदर सही value |
+| Lexical (BLEU, ROUGE) | Smoke tests, translation drift | बहुत कम | शब्द copy करने को इनाम, मतलब को नहीं |
+| Semantic similarity | Reference वाले paraphrased answers | कम | उल्टे facts को भी क़रीबी score |
+| Rubric के साथ judge | बिना reference का open text | मध्यम | Judge bias; लोगों से मिलाकर check करो |
+| Pairwise comparison | दो systems में से चुनना | मध्यम से ज़्यादा | Preference को correctness समझ लेना |
+
+## एक example से समझो
+
+Delhi के एक electronics retailer का एक assistant है जो customer emails के replies Hindi और English में draft करता है। हर reply में सही order number और refund amount बताना है और विनम्रता से ख़त्म करना है। Team 300 पुराने emails और उनके best agents के replies से prompt A (मौजूदा) को prompt B (नया) से compare करना चाहती है।
+
+वो पहले agents के replies के सामने ROUGE try करते हैं। Prompt A को 0.41 और prompt B को 0.33 मिलता है, जिससे लगता है B ख़राब है। Drafts पढ़ने पर कहानी अलग निकलती है: B छोटी, साफ़ Hindi लिखता है जो agents के लंबे replies से कम शब्द share करती है।
+
+तो वो तीन layers में score करते हैं:
+
+| Layer | Prompt A | Prompt B |
+| --- | --- | --- |
+| Order number और refund amount सही (order system से exact check) | 94% | 97% |
+| Agent के reply के मतलब के क़रीब (cosine 0.80 से ऊपर) | 88% | 90% |
+| दो senior agents के judge किए side-by-side wins, 150 emails, ties allowed | 38% | 51% (11% ties) |
+| Agent के reply के सामने ROUGE-L | 0.41 | 0.33 |
+
+Numbers सिर्फ़ समझाने के लिए हैं। B facts और preference दोनों में जीतता है, और सिर्फ़ word overlap में हारता है, जिसे वो dashboard से हटा देते हैं। Exact checks हर release पर चलते रहते हैं।
+
+## आम गलतियाँ
+
+- **Chat, summaries या explanations के लिए BLEU या ROUGE को मुख्य quality score बनाना।**
+- **Similarity score से facts check करवाना।** "Approved" और "rejected" क़रीब दिख सकते हैं। मुख्य facts exact check करो।
+- **जिन सवालों के सही answers हैं उन पर vote कराना।** Preference ये बताती है कि लोगों को क्या पसंद है, ये नहीं कि सच क्या है।
+- **Answers हमेशा एक ही क्रम में दिखाना।** लोग और judges पहले या लंबे answer को पसंद करते हैं। Order randomise करो और एक जैसी लंबाई के answers compare करो।
+- **ऐसे threshold पर भरोसा करना जिसे किसी ने जाँचा नहीं।** Similarity thresholds एक sample पर इंसानी judgements से मिलाकर चुनो।
+- **सब कुछ के लिए एक ही number।** ज़्यादातर products को कुछ scores चाहिए: facts, format, meaning, preference।
+
+## कब सादा रखें
+
+- **Closed tasks:** classification, extraction और routing को exact checks और precision, recall से score करो। Similarity या judges की ज़रूरत नहीं।
+- **शुरुआती prototypes:** कोई भी metric बनाने से पहले 30 answers ख़ुद पढ़ो।
+- **दुर्लभ high-stakes answers:** legal या medical outputs को, scores जो भी कहें, expert review चाहिए।
+
+## Demo से production तक
+
+- **Scores को layers में रखो:** हर response पर exact checks, एक sample पर judge या similarity, releases के लिए side-by-side comparison।
+- **References को test set के साथ version करो**, और गलत मिलने पर ठीक करो।
+- **हर कुछ महीनों में metrics को लोगों से फिर मिलाकर check करो**, क्योंकि जो metric इंसानी judgement से दूर होता जाता है, वो बिना metric से भी बुरा है।
+- **Scores segment के हिसाब से report करो:** भाषा, topic, लंबाई। कुल मिलाकर सुधार, Hindi replies में आई गिरावट छिपा सकता है।
+
+## Practice करो
+
+1. किसी भी AI feature से, जिसके reference answers हों, दस answers लो। उन्हें exact match, word overlap और अपने judgement, तीनों से score करो। तीनों कहाँ असहमत हैं?
+2. हर answer में जो exact facts होने चाहिए, उन्हें लिखो और उनके लिए एक check बनाओ।
+3. दस सवालों पर दो prompts को random order में side by side compare करो। क्या आपकी पसंद word-overlap scores से मेल खाई?
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 3 exact evaluation, similarity measures और comparative evaluation को cover करता है।
+
+**आप तब पूरा समझ चुके हो जब आप** किसी दिए गए task के लिए scoring method चुन सको, समझा सको कि open answers पर BLEU और ROUGE क्यों गुमराह करते हैं, और बता सको कि preference vote पर कब भरोसा नहीं किया जा सकता।

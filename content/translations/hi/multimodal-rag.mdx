@@ -1,0 +1,226 @@
+---
+id: multimodal-rag
+lang: hi
+title: "Multimodal RAG"
+outcome: "Images, charts, tables, slides और scanned pages पर retrieve करके जवाब दे पाओगे, या तो उन्हें text में बदलकर, या page images retrieve करके vision-language model से जवाब दिलाकर।"
+answer: "Multimodal RAG images, charts, slides और scans पर सवालों के जवाब देता है, या तो उन्हें पहले text में बदलकर, या page images retrieve करके vision model को पढ़ने देकर।"
+why_it_matters: "किसी company का बहुत सारा ज्ञान slides, scanned forms, engineering drawings, charts और photos में होता है। Text-only RAG उसे छोड़ देता है या बिगाड़ देता है। Multimodal retrieval अब practical है, और visual documents वाले clients इसे माँगेंगे।"
+flashcards:
+  - q: "Multimodal RAG क्या है?"
+    a: "ऐसे content से retrieve करके जवाब देना जो plain text नहीं है: slides, charts, tables, scans, diagrams और photos।"
+  - q: "दो मुख्य approaches कौन-से हैं?"
+    a: "Visual content को text में बदलकर normal RAG use करना, या page images सीधे retrieve करके vision-language model को भेजना।"
+  - q: "Text में बदलने के pros और cons क्या हैं?"
+    a: "Queries सस्ती, किसी भी text model के साथ चलता है, cite करना आसान; पर descriptions में details खो जाती हैं और पहले से तय करना पड़ता है कि क्या ज़रूरी है।"
+  - q: "Image retrieval के pros और cons क्या हैं?"
+    a: "OCR errors के बिना layout, charts और visual detail बचे रहते हैं; पर indexes बड़े, tokens ज़्यादा और queries धीमी।"
+  - q: "ColPali क्या है?"
+    a: "एक approach जो retrieval के लिए page images को बिना OCR सीधे embed करता है।"
+  - q: "Chart readings से सावधान क्यों रहें?"
+    a: "Vision models छोटा text और numbers गलत पढ़ सकते हैं; page cite करो और key values को underlying data से check करो।"
+  - q: "Image resolution काफ़ी ऊँचा क्यों रखें?"
+    a: "कम resolution पर छोटे labels, tags और handwriting गायब हो जाते हैं, और model उनके बारे में जवाब नहीं दे पाता।"
+  - q: "Multimodal काम के लिए golden set में क्या होना चाहिए?"
+    a: "ऐसे सवाल जिनके लिए visual content चाहिए, ताकि आप बता सको कि multimodal route ने मदद की या नहीं।"
+  - q: "Page image को vision model तक कैसे भेजें?"
+    a: "Page को image में render करो, encode करो, और message में image block की तरह सवाल और page cite करने के instruction के साथ शामिल करो।"
+  - q: "Multimodal embedding model से क्या कर सकते हैं?"
+    a: "Images और text को एक ही vector space में रख सकते हो, ताकि text का सवाल उससे मेल खाता page image या photo retrieve कर सके।"
+exercise:
+  title: "Route चुनो"
+  setup: "Bengaluru की एक real-estate investment firm 2,000 documents पर एक assistant चाहती है: charts वाले quarterly investor decks, scanned lease agreements, site inspection photos, और rents के Excel से बने PDF tables। Analysts ऐसे सवाल पूछते हैं: 'Whitefield park के लिए Q2 chart में occupancy क्या थी?' और 'unit 4B की lease में lock-in period क्या है?'"
+  questions:
+    - q: "Scanned leases के लिए कौन-सा route ठीक है?"
+      a: "OCR से text में बदलना, क्योंकि analysts clause text खोजते हैं और उन्हें सटीक wording और citations चाहिए।"
+    - q: "Investor deck charts के लिए कौन-सा route ठीक है?"
+      a: "Vision-language model के साथ image retrieval, slide cite करके, और जहाँ source spreadsheets हों वहाँ key values उनसे check करके।"
+    - q: "Rent tables को कैसे सँभालें?"
+      a: "उन्हें images की तरह नहीं, बल्कि हर row के लिए headers बनाए रखकर structured text में extract करो।"
+    - q: "Split का फ़ैसला सबूत के साथ कैसे करोगे?"
+      a: "हर content type के सवालों वाला golden set बनाओ, दोनों routes चलाओ, और type के हिसाब से accuracy, latency और cost की तुलना करो।"
+ask:
+  - "Charts और images वाले PDFs पर RAG कैसे बनाऊँ?"
+  - "Vision-language model क्या है?"
+  - "Documents को OCR करूँ या image embeddings use करूँ?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+**Multimodal RAG** ऐसे content से retrieve करके जवाब देता है जो plain text नहीं है: slides, charts, tables, scanned pages, diagrams और photos। दो मुख्य approaches हैं:
+
+- **Text में बदलो, फिर normal RAG use करो।** Scans को OCR करो, images और charts को vision-language model से describe कराओ, tables को text में extract करो, और सब कुछ text की तरह index करो। सरल और मौजूदा pipelines के साथ चलता है।
+- **Images सीधे retrieve करो।** हर page को multimodal embedding model से image की तरह index करो (ColPali जैसे approaches page images को बिना OCR embed करते हैं), सबसे relevant page images retrieve करो, और जवाब देने के लिए उन्हें **vision-language model** को भेजो।
+
+कई systems दोनों को मिलाते हैं।
+
+```flow
+title: Text में बदलो: सस्ता, normal RAG
+Scan -[OCR]-> Text index
+Chart -[VLM describe करता है]-> Text index
+Table -[extract]-> Text index
+Text index -> एक normal RAG जवाब
+```
+
+```flow
+title: Images retrieve करो
+Page -[render]-> Image -[multimodal embedding]-> Image index
+Question -[embed]-> Top 3 page images
+Image index -> Top 3 page images
+Top 3 page images -> एक vision-language model images से जवाब देता है
+```
+
+Hybrid में forms के लिए OCR text और photos, diagrams व slides के लिए image retrieval use होती है, और हर जवाब के साथ page thumbnail दिखता है ताकि उसे check किया जा सके।
+
+ये lesson Vadodara की एक chemicals manufacturer को follow करता है, जिसके engineers scans, photos और diagrams से भरी 15 साल की maintenance reports query करते हैं।
+
+## ये काम कैसे करता है
+
+**Text में बदलने वाला route.**
+
+- Charts और diagrams: vision-language model से axis labels, values और trends समेत विस्तृत description माँगो, और उसे page reference के साथ सेव करो।
+- Images में tables: उन्हें structured text में extract करो।
+- Photos: use case के लिए जो ज़रूरी है उसके हिसाब से caption करो ("flange joint पर जंग, ऊपर बाएँ")।
+
+Pros: सस्ती queries, किसी भी text model के साथ चलता है, filter और cite करना आसान। Cons: descriptions में details खो जाती हैं, और पहले से तय करना पड़ता है कि क्या ज़रूरी है।
+
+**Image-retrieval route.**
+
+- हर page या slide को image की तरह render करो।
+- उसे multimodal retrieval model से embed करो।
+- Query के समय सवाल को embed करो, top pages retrieve करो और images को सवाल के साथ vision-language model को pass करो।
+
+Pros: layout, charts और visual details बचे रहते हैं; OCR errors नहीं। Cons: बड़े indexes, image inputs ज़्यादा tokens लेते हैं और ज़्यादा समय, और इसे support करने वाले tools कम हैं।
+
+**Evaluation.** ऐसे सवालों वाला golden set बनाओ जिनके लिए visual content चाहिए ("revenue chart में Q3 की value क्या थी?", "photo में कौन-सा valve खुला दिखता है?") और routes की तुलना करो।
+
+**व्यावहारिक सावधानियाँ.** Vision models charts में छोटा text और numbers गलत पढ़ सकते हैं; page cite करने को कहो और जहाँ numbers मायने रखते हैं, वहाँ underlying data हो तो उससे check करो। Images को पर्याप्त resolution पर रखो।
+
+**Content type के हिसाब से चुनना:**
+
+| Content | बेहतर route | क्यों |
+| --- | --- | --- |
+| Text-heavy scans और forms | OCR से text | सटीक wording, सस्ता, searchable |
+| Tables | Structured text में extract | सटीक जवाबों के लिए rows और headers बने रहते हैं |
+| Charts | Image route, या सावधानी से लिखी description | Values और trends तस्वीर में ही हैं |
+| Diagrams और drawings | Image route | Labels, positions और connections मायने रखते हैं |
+| Photos | Image route | Caption में detail का अंदाज़ा लगाना मुश्किल है |
+| Slides | Image route | Layout में ही मतलब है |
+
+**काम की descriptions लिखना.** Visuals के लिए text route use करो तो vision model से सामान्य caption नहीं, वो माँगो जो users पूछेंगे। Chart के लिए: title, axes, units, हर labelled value और मुख्य trend। Piping diagram के लिए: equipment tags, valve states और connections। हर description के साथ page number सेव करो। Golden set पर कुछ pages पर test किया हुआ एक focused description prompt, query cost के एक छोटे हिस्से में image route के साथ का बहुत सारा फ़ासला पाट सकता है।
+
+**सबूत दिखाना.** Visual content के साथ citation के तौर पर page या slide का thumbnail ज़्यादा काम का है। Engineers और analysts image पर एक नज़र डालकर जवाब पक्का कर सकते हैं, जिससे model की कभी-कभार छोटे numbers की गलत पढ़ाई भी पकड़ में आती है।
+
+**Code में pages render करना और visuals describe करना.** PyMuPDF PDF pages को images बनाता है; vision model focused prompt से उन्हें describe करता है:
+
+```python
+import base64
+import fitz                                      # PyMuPDF
+import anthropic
+
+client = anthropic.Anthropic()
+CHART_PROMPT = ("Describe this page for search. For each chart: title, axes and units, every labelled value, "
+                "and the main trend. For tables: headers and every row. Quote numbers exactly as shown.")
+
+def page_images(pdf_path, dpi=150):
+    doc = fitz.open(pdf_path)
+    for i, page in enumerate(doc, start=1):
+        yield i, page.get_pixmap(dpi=dpi).tobytes("png")
+
+def describe(png_bytes):
+    r = client.messages.create(
+        model="claude-sonnet-5-5", max_tokens=800,           # check the docs for current names
+        messages=[{"role": "user", "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                         "data": base64.b64encode(png_bytes).decode()}},
+            {"type": "text", "text": CHART_PROMPT}]}])
+    return "".join(b.text for b in r.content if b.type == "text")
+
+# Text route: store describe(png) with the page number, and index it like any other chunk.
+```
+
+जवाब देते समय, यही image block format image route के लिए retrieve किए top page images को सवाल के साथ भेजने देता है।
+
+**Text queries से images retrieve करना.** Multimodal embedding model images और text को एक ही space में रखता है:
+
+```python
+from PIL import Image
+from sentence_transformers import SentenceTransformer
+
+clip = SentenceTransformer("clip-ViT-B-32")
+img_vecs = clip.encode([Image.open(p) for p in photo_paths], normalize_embeddings=True)
+q = clip.encode(["rust on a flange joint"], normalize_embeddings=True)[0]
+best = (img_vecs @ q).argsort()[::-1][:5]
+```
+
+ऐसे general models photos के लिए चलते हैं। Text और charts से भरे document pages के लिए, page retrieval पर train किए models (ColPali family एक जाना-माना उदाहरण है) कहीं बेहतर करते हैं; दोनों को अपने golden set पर test करो।
+
+**Image tokens के पैसे लगते हैं.** Vision model को भेजा गया page image कई tokens के रूप में bill होता है, करीब-करीब उसके size के अनुपात में। दस नहीं, top दो या तीन pages भेजो, जब हो सके तो काम के हिस्से तक crop करो, और ऐसा resolution चुनो जहाँ छोटे numbers अब भी पढ़े जा सकें। हर route के लिए प्रति सवाल cost मापो।
+
+**Images से पढ़े numbers जाँचो.** Vision models कभी-कभी charts और scans में छोटे digits गलत पढ़ते हैं। जहाँ underlying data मौजूद है (chart के पीछे की spreadsheet), उससे link करके तुलना करो; वरना जवाब के साथ page thumbnail दिखाओ ताकि users खुद check कर सकें।
+
+**अपने browser में try करो.** Image inputs size के हिसाब से tokens लेते हैं। अलग-अलग sizes पर page images भेजने की cost का अनुमान लगाओ।
+
+```python
+def image_tokens(width, height):
+    return (width * height) / 750                 # a common rule of thumb; check your provider's docs
+
+for w, h in [(1600, 2000), (1000, 1250), (800, 1000)]:
+    t = image_tokens(w, h)
+    print(f"{w}x{h}: about {t:,.0f} tokens per page, {3 * t:,.0f} for three pages")
+```
+
+## एक worked example
+
+Vadodara की एक chemicals manufacturer चाहती है कि उसके plant engineers 15 साल की maintenance reports query कर सकें: scanned forms, equipment की photos, piping diagrams और root-cause reviews के slide decks।
+
+आप 60 सवालों पर दोनों routes test करते हो:
+
+- *Text में बदलना*: forms के लिए OCR, photos और diagrams के लिए model की लिखी descriptions। 58% सही। Failures: descriptions में वो detail छूट गई जो engineers ने पूछी, जैसे किस valve tag पर गोला लगा है।
+- *Image retrieval*: multimodal retriever से embed किए page images; top तीन pages vision-language model को भेजे गए। 79% सही। Failures: scans पर छोटे हाथ से लिखे नोट्स।
+
+आप एक hybrid ship करते हो: scanned forms OCR से जाते हैं (उनके text fields ही engineers खोजते हैं), जबकि photos, diagrams और slides images की तरह retrieve होते हैं। जवाबों के साथ page thumbnail दिखता है ताकि engineers check कर सकें। Query cost text-only route से करीब चार गुना है, जिसे client उन सवालों पर accuracy की बड़ी छलाँग के लिए मान लेता है जो उनके लिए सबसे ज़रूरी हैं।
+
+| 60 सवालों पर Route | सही | मुख्य failures | Query cost |
+| --- | --- | --- | --- |
+| Text में बदलना | 58% | गोला लगे valve tags जैसी details छूटीं | 1 |
+| Image retrieval | 79% | छोटे हाथ से लिखे नोट्स | करीब 4 |
+| Content type के हिसाब से hybrid | Ship हुआ | Forms के लिए OCR, photos और diagrams के लिए images | दोनों के बीच |
+
+## आम गलतियाँ
+
+- **Visual content को अनदेखा करना।** Text-only pipelines charts और photos को चुपचाप छोड़ देते हैं।
+- **Chart readings पर ज़्यादा भरोसा।** Vision models छोटे numbers गलत पढ़ते हैं; pages cite करो और key values check करो।
+- **कम-resolution images।** Details गायब हो जाती हैं; पूछे जाने वाले सवालों के लिए काफ़ी resolution रखो।
+- **Golden set में visual सवाल न होना।** तब आप बता नहीं सकते कि multimodal काम ने मदद की या नहीं।
+- **हर चीज़ के लिए image route।** Text-heavy documents text की तरह सस्ते और अक्सर बेहतर होते हैं।
+- **Charts और diagrams के लिए generic captions।** वो values और labels माँगो जो users को चाहिए होंगे।
+- **हर सवाल पर कई full-resolution pages भेजना**, जो धीमा और महँगा है।
+- **Document pages के लिए photo model use करना।** Page-retrieval model भी test करो।
+
+## जब text-only RAG काफ़ी है
+
+- **Visuals वही दोहराते हैं जो text कहता है**, जैसे कई reports में जहाँ charts बताए गए numbers को दर्शाते हैं।
+- **Tables को PDF parser साफ़-साफ़ text में extract कर सकता है।**
+- **कम सवालों को visuals चाहिए**, इसलिए कुछ key pages को हाथ से describe करना सस्ता है।
+
+## Demo से production तक
+
+- **हर description और retrieve की गई image के साथ page numbers और thumbnails रखो।**
+- **Route के हिसाब से प्रति query cost track करो**, image tokens समेत।
+- **Description prompt सुधरे तो pages को दोबारा describe करो**, और descriptions को version करो।
+- **एक visual golden set रखो** और models बदलने पर उसे दोबारा चलाओ।
+- **Users को गलत पढ़े numbers flag करने दो**, और उन्हें test set में जोड़ो।
+
+## Practice करो
+
+Hugging Face का multimodal RAG notebook करो, और text route के लिए Docling या ऐसा कोई tool use करो।
+
+1. Charts, tables या photos वाले 20 pages इकट्ठा करो, और visual content माँगने वाले 15 सवाल लिखो।
+2. Text में बदलने वाला route और image-retrieval route, दोनों बनाओ।
+3. प्रति query accuracy, latency और cost की तुलना करो, और तय करो कि कौन-सा content type किस route पर जाए।
+4. पाँच chart pages को focused prompt से और एक सादे 'describe this image' prompt से describe करो, और गिनो कि हर version आपके कितने chart सवालों के जवाब दे सकता है।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 6 text से आगे के RAG पर है, जिसमें multimodal और tabular data शामिल हैं।
+
+**आपका काम पूरा जब:** आप एक ऐसा सवाल दिखा सको जिसका सही जवाब सिर्फ़ image route ने दिया और समझा सको कि क्यों।

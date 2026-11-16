@@ -1,0 +1,231 @@
+---
+id: security-privacy
+lang: hi
+title: "Security और privacy"
+outcome: "LLM app में API keys, user data और access को सुरक्षित रख पाओगे, OWASP list को checklist की तरह use करके।"
+answer: "LLM app को secure करने के लिए: API keys server-side रखो, तय करो कि कौन क्या access कर सकता है, personal data mask करो, prompt injection से बचाव करो और OWASP LLM Top 10 को checklist की तरह use करो।"
+why_it_matters: "Key leak हो जाए या data leak हो जाए, तो product पर भरोसा ख़त्म हो जाता है। भारत का data protection कानून भी personal data पर नियम लगाता है, इसलिए security काम का हिस्सा है, कोई extra चीज़ नहीं।"
+flashcards:
+  - q: "Model API key कहाँ रहनी चाहिए?"
+    a: "Server-side environment variables या secret manager में, कभी browser code, mobile apps या Git में नहीं।"
+  - q: "System prompts में secrets क्यों नहीं डालने चाहिए?"
+    a: "मान लो कि users system prompt निकाल सकते हैं।"
+  - q: "Data minimisation क्या है?"
+    a: "Model को सिर्फ़ वही भेजना जो task के लिए चाहिए, जिससे कुछ leak होने पर नुकसान कम होता है, और ये DPDP Act के principles से भी मेल खाता है।"
+  - q: "User की identity कहाँ से आनी चाहिए?"
+    a: "Verified session या token से, browser से भेजे गए id से कभी नहीं।"
+  - q: "Model output को untrusted क्यों मानें?"
+    a: "उसे सीधे HTML, SQL या shell commands में डालने से script injection या उससे बुरा हो सकता है; escape या validate करो।"
+  - q: "Logs में personal data का क्या होना चाहिए?"
+    a: "उसे mask करो, retention periods तय करो और logs कौन पढ़ सकता है ये सीमित करो।"
+  - q: "Model provider की terms में क्या check करना चाहिए?"
+    a: "Data कैसे store और use होता है, retention, training में use, और कौन-से regions उपलब्ध हैं।"
+  - q: "LLM app security reviews के लिए कौन-सी checklist ठीक है?"
+    a: "LLM applications के लिए OWASP Top 10, हर item के लिए अपना defence लिखकर।"
+  - q: "Reverse map के साथ masking क्या करती है?"
+    a: "Model call से पहले personal data को [PHONE_1] जैसे placeholders से बदल देती है, फिर आपके server पर reply में असली values वापस डाल देती है।"
+  - q: "Retrieval को user permissions से filter क्यों करना चाहिए?"
+    a: "वरना shared documents में search करने पर किसी दूसरे user या department का data prompt में आ सकता है, और model उसे दोहरा सकता है।"
+exercise:
+  title: "App को review करो"
+  setup: "Pune की एक fintech का loan-help chatbot: React app सीधे model को call करता है और key bundle में है; system prompt में internal loan-approval rules और एक database password है; हर request PAN और bank statements समेत customer की पूरी profile भेजती है; customer id एक hidden form field से आता है; replies innerHTML से डाले जाते हैं; और logs पूरी chats हमेशा रखते हैं।"
+  questions:
+    - q: "Key का fix क्या है?"
+      a: "Model calls को backend पर ले जाओ जहाँ key secret manager में हो, और खुली हुई key को तुरंत rotate करो।"
+    - q: "System prompt से क्या हटाना चाहिए?"
+      a: "Database password (जिसे rotate करना होगा), और कोई भी internal चीज़ जो company नहीं चाहेगी कि users देखें।"
+    - q: "Customer data और identity को कैसे संभालें?"
+      a: "हर सवाल के लिए सिर्फ़ ज़रूरी fields भेजो, और customer id verified session से लो।"
+    - q: "Replies और logs का क्या?"
+      a: "Replies को text या sanitised content की तरह render करो, और logs में PAN व दूसरा personal data mask करके retention period रखो।"
+ask:
+  - "अपनी OpenAI या Claude API key को सुरक्षित कैसे रखूँ?"
+  - "LLM applications के लिए OWASP Top 10 क्या है?"
+  - "AI model को कौन-सा personal data भेजना चाहिए?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+LLM apps में आम web security की चिंताएँ और कुछ नई चिंताएँ एक साथ आती हैं। LLM applications के लिए OWASP Top 10 एक बहुत use होने वाली checklist है। ज़्यादातर apps के लिए ये areas सबसे ज़्यादा मायने रखते हैं:
+
+- **Secrets**: API keys और credentials।
+- **User data**: models को भेजी जाने वाली, logs में रखी जाने वाली या answers में खुल जाने वाली personal जानकारी।
+- **Access**: app कौन use कर सकता है और हर user क्या देख सकता है।
+- **Model-specific risks**: prompt injection, system prompt का leak होना, excessive agency, model output को असुरक्षित तरीके से handle करना।
+
+| | पहले | बाद में |
+|---|---|---|
+| API key | Browser के JavaScript में, सीधे model को भेजी जाती है | सिर्फ़ backend पर, secrets से |
+| Prompt | "admin password: ..." | कोई secrets नहीं |
+| Customer data | पूरा record model को जाता है | Tool सिर्फ़ order id, status और date लौटाता है |
+| Customer id | Browser से लिया जाता है | Verified session से लिया जाता है |
+| Reply | Raw HTML की तरह डाला जाता है | Text की तरह render होता है |
+| Logs | Phone numbers वाली पूरी chats | Masked, 30 दिन रखे जाते हैं |
+
+```flow
+dir: LR
+title: बाद में: key कभी browser तक नहीं पहुँचती
+Browser -> Backend | key secrets से, customer id session से
+Backend -> Model
+```
+
+ये lesson Bengaluru के एक direct-to-consumer brand के support bot की security review को follow करता है।
+
+## ये काम कैसे करता है
+
+**Keys server पर रखो।** Model API key server-side environment variables या secret manager में रहती है। उसे कभी browser JavaScript, mobile apps या Git में मत डालो। Browser आपके backend को call करता है; आपका backend model को call करता है। अगर कोई key leak हो जाए, तो तुरंत revoke करो।
+
+**Prompts में secrets नहीं।** मान लो कि users system prompt निकाल सकते हैं। Passwords, keys या ऐसी internal-only जानकारी मत डालो जिसे आप दिखाना नहीं चाहोगे।
+
+**सिर्फ़ वही भेजो जो task को चाहिए।** "मेरा order कहाँ है?" का जवाब देने वाले support bot को order status चाहिए, customer की पूरी profile, payment details या address history नहीं। Data minimisation से कुछ leak होने पर नुकसान कम होता है, और ये भारत के DPDP Act का एक principle भी है।
+
+Logs और traces में **personal data mask करो**, retention periods तय करो और access सीमित करो।
+
+**Authenticate और authorise करो।** Users sign in करते हैं; हर request check करती है कि वो कौन हैं; retrieval और tools सिर्फ़ उसी user का data access करते हैं। Browser से आए user id पर बिना verify किए भरोसा मत करो।
+
+**Model output को untrusted मानो।** उसे सीधे HTML (cross-site scripting), SQL या shell commands में मत डालो। किसी भी user input की तरह उसे escape या validate करो।
+
+**Capabilities सीमित रखो।** Tools को ज़रूरत भर की सबसे कम permissions; risky actions के लिए approvals; हर user पर rate limits।
+
+**Vendor terms।** देखो कि आपका model provider data कैसे store और use करता है, और अपने users व clients की ज़रूरतों से मेल खाने वाली settings और regions चुनो।
+
+**Checklist से गुज़रो।** अपने app के लिए LLM applications का OWASP Top 10 देखो और हर item के लिए अपना defence लिख लो।
+
+**ज़्यादातर LLM apps के लिए checklist items:**
+
+| Area | सवाल | अच्छा जवाब |
+| --- | --- | --- |
+| Keys | क्या key browser में या Git history में दिख सकती है? | नहीं; server-side, कभी खुल गई हो तो rotated |
+| Prompts | क्या system prompt में कुछ secret है? | नहीं |
+| Data | हर feature के लिए model तक क्या पहुँचता है? | सिर्फ़ वो fields जो task को चाहिए |
+| Identity | User id कहाँ से आता है? | Verified session से |
+| Output | Model output कैसे दिखाया या use किया जाता है? | Escaped text; किसी भी query या command से पहले validated |
+| Logs | कौन-सा personal data log होता है, और कितने समय तक? | Masked; तय retention; सीमित access |
+| Tools | Model क्या trigger कर सकता है? | Least privilege; risky actions के लिए approval |
+| Vendor | Provider data को कैसे use और store करता है? | Terms जाँचे हुए; सही region और settings |
+
+**अंदर और बाहर के रास्ते पर guardrails.** **Input guardrail** वो जाँचता है जो model को जाने वाला है: personal data, company secrets, attack के संकेत। **Output guardrail** वो जाँचता है जो वापस आता है, इससे पहले कि कोई उसे देखे या code उस पर चले: personal data, unsafe content, बिगड़ा हुआ output, ऐसा tool call जो नहीं होना चाहिए। Guardrail fire हो तो आप block, mask, retry या किसी इंसान को सौंप सकते हो। दो trade-offs: हर check में देरी जुड़ती है, और streaming में output checks मुश्किल होते हैं क्योंकि पूरा reply जाँचने से पहले ही शब्द user तक पहुँच जाते हैं। Streamed chat के लिए chunks में check करो, और सबसे सख़्त checks शब्दों के लिए नहीं, actions के लिए रखो।
+
+**Leaks अक्सर अच्छी नीयत से शुरू होते हैं।** 2023 में Samsung के engineers ने मदद पाने के लिए internal source code एक public chatbot में paste कर दिया। Apps में भी यही होता है: कोई developer internal policy को system prompt में paste कर देता है, या कोई tool पूरी database row को context में खींच लाता है। हर feature के लिए पूछो: "क्या हमारे servers से बाहर जा रहा है, और क्या उसे जाना ज़रूरी है?"
+
+**Mask, call, unmask.** कई tasks के लिए model को असली identifiers चाहिए ही नहीं। Call से पहले उन्हें placeholders से बदलो, एक map अपने server पर रखो, और बाद में असली values वापस डाल दो:
+
+```python
+import re
+
+PATTERNS = {
+    "PAN": r"\b[A-Z]{5}[0-9]{4}[A-Z]\b",
+    "AADHAAR": r"\b[2-9][0-9]{3}\s?[0-9]{4}\s?[0-9]{4}\b",
+    "PHONE": r"(?<!\d)(?:\+91[\s-]?)?[6-9][0-9]{9}(?!\d)",
+    "EMAIL": r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b",
+    "UPI": r"\b[\w.-]+@(?:ok\w+|ybl|paytm|upi|ibl|axl)\b",
+}
+
+def mask(text):
+    mapping, count = {}, {}
+    for label in ["UPI", "EMAIL", "PAN", "AADHAAR", "PHONE"]:     # UPI first: UPI ids look like emails
+        def swap(m, label=label):
+            count[label] = count.get(label, 0) + 1
+            key = f"[{label}_{count[label]}]"
+            mapping[key] = m.group(0)
+            return key
+        text = re.sub(PATTERNS[label], swap, text)
+    return text, mapping
+
+def unmask(text, mapping):
+    for key, value in mapping.items():
+        text = text.replace(key, value)
+    return text
+
+safe, keys = mask("My PAN is ABCDE1234F and mobile 9876543210, UPI ravi@okaxis.")
+print(safe)    # My PAN is [PAN_1] and mobile [PHONE_1], UPI [UPI_1].
+```
+
+ऐसे patterns कुछ forms छोड़ देते हैं और कुछ बेकसूर numbers पकड़ लेते हैं, इसलिए उन्हें असली (masked) samples पर test करो, और जहाँ दाँव ऊँचा हो वहाँ Microsoft Presidio जैसा dedicated detection tool use करो। Masking की भी limits हैं: model वो PAN check नहीं कर सकता जो उसने कभी देखा ही नहीं, इसलिए ऐसे tasks में check आपके अपने code में होना चाहिए।
+
+**Retrieval को permissions का सम्मान करना चाहिए।** RAG app में search index में अक्सर कई users या departments के documents होते हैं। Prompt में कुछ भी जाने से **पहले**, results को इस आधार पर filter करो कि sign-in किया हुआ user क्या पढ़ सकता है; जो चीज़ model को दिखा दी गई, उसका राज़ वो नहीं रख सकता।
+
+**Bill को भी काबू में रखो।** बिना limit के requests एक user, एक script या एक attacker को खर्च बढ़ाने या सबके लिए app धीमा करने देते हैं। Per-user rate limits, input length पर एक cap और daily budget alert लगाओ।
+
+**LLM applications के लिए OWASP Top 10 (2025), हर एक के साथ एक defence:**
+
+| Risk | एक defence |
+| --- | --- |
+| Prompt injection | Retrieved और user text को data मानो; tools क्या कर सकते हैं ये सीमित करो |
+| Sensitive information disclosure | Data minimisation, masking, output checks |
+| Supply chain | Packages को pin और scan करो; भरोसेमंद sources के models और datasets use करो |
+| Data and model poisoning | Training और retrieval data sources को review और track करो |
+| Improper output handling | Output escape करो; SQL, shell या HTML से पहले validate करो |
+| Excessive agency | Least-privilege tools; actions के लिए approval |
+| System prompt leakage | Prompts में secrets या access rules नहीं; उन्हें code में लागू करो |
+| Vector and embedding weaknesses | Retrieval पर permission filters; हर tenant के लिए अलग indexes |
+| Misinformation | Grounding, citations, और "मुझे नहीं पता" कहना |
+| Unbounded consumption | Rate limits, input caps, budgets |
+
+**भारतीय कानून, संक्षेप में।** Digital Personal Data Protection Act, 2023 और इसके Rules, जो चरणों में लागू हो रहे हैं, भारत में लोगों के digital personal data पर लागू होते हैं। व्यवहार में: आप जो इकट्ठा करते हो उसके लिए साफ़ notice और consent, सिर्फ़ बताए गए मक़सद के लिए use, सिर्फ़ ज़रूरत भर रखना, वाजिब security से बचाना, लोगों को अपना data access और erase करने देना, और breaches report करना। बच्चों के data के लिए verifiable parental consent चाहिए। ये एक सार है, legal advice नहीं; अपने case के लिए मौजूदा rules देखो।
+
+**Git history में secrets की जाँच।** Code से key हटाने से वो history से नहीं हटती। पूरी repository history पर secret scanner चलाओ, जो भी मिले उसे rotate करो, और scanner को CI में जोड़ो ताकि नए secrets push होने से पहले पकड़े जाएँ।
+
+**Users के बीच access की testing।** दो test accounts बनाओ और पहले वाले से requests में ids बदलकर और bot से सीधे पूछकर दूसरे के orders पढ़ने की कोशिश करो। दोनों fail होने चाहिए। इन्हें automated tests की तरह रखो।
+
+## एक example से समझो
+
+Bengaluru का एक D2C brand एक support bot बनाता है। पहले version की security review में ये मिलता है:
+
+- API key React front end में थी, browser के developer tools में दिख रही थी। Fix: calls backend पर चली गईं; key rotate हुई।
+- System prompt में "reference के लिए" admin dashboard password था। हटाया और rotate किया।
+- Order के सवालों का जवाब देने के लिए bot customer का पूरा record (address, phone, पुराने orders, saved payment method) prompt में खींच लाता था। Fix: एक tool सिर्फ़ order id, status और expected date लौटाता है।
+- Customer id browser request के एक field से आता था। Fix: उसकी जगह verified session से लिया जाता है।
+- Bot के replies raw HTML की तरह डाले जाते थे; एक crafted message script inject कर सकता था। Fix: replies text की तरह render होते हैं।
+- Logs में phone numbers के साथ पूरी conversations रखी जाती थीं। Fix: masking और 30 दिन की retention।
+
+| Finding | Fix |
+| --- | --- |
+| React front end में API key | Calls backend पर गईं; key rotate हुई |
+| System prompt में admin password | हटाया और rotate किया |
+| Prompt में पूरा customer record | Tool सिर्फ़ order id, status और date लौटाता है |
+| Browser से customer id | Verified session से लिया गया |
+| Replies raw HTML की तरह | Text की तरह render |
+| Logs में phone numbers वाली पूरी chats | Masked, 30 दिन retention |
+
+## आम गलतियाँ
+
+- **Front-end code या Git में API keys।**
+- **System prompts में secrets।**
+- **पूरे customer records model को भेजना।**
+- **Browser से आए user ids पर भरोसा करना।**
+- **Model output को raw HTML की तरह render करना।**
+- **Permission filters के बिना retrieval।** जो document user को कभी दिखना ही नहीं चाहिए, model उसे ख़ुशी से quote कर देगा।
+- **Access rules सिर्फ़ prompt में लिखना।** Prompt में "दूसरे customers के orders कभी मत दिखाओ" लिखना बस एक उम्मीद है; code में check एक असली control है।
+- **Use पर कोई limit नहीं।** एक script bill बढ़ा सकती है या सबके लिए app धीमा कर सकती है।
+
+## जब risk कम हो
+
+- **अपने laptop पर अपने data के साथ एक personal tool** में भी key Git से बाहर होनी चाहिए, पर masking या audit logs नहीं चाहिए।
+- **सिर्फ़ public data**, जैसे प्रकाशित सरकारी circulars पर बना bot: output handling, injection और cost limits पर ध्यान दो।
+- **एक छोटी भरोसेमंद team के लिए read-only internal tools**: key सुरक्षित रखो और tools की पहुँच सीमित करो, लेकिन पूरे guardrail stacks रुक सकते हैं।
+
+Personal data, पैसा, write actions, बहुत सारे users, या banking, insurance और health जैसे regulated sectors हों तो risk तेज़ी से बढ़ता है।
+
+## Demo से production तक
+
+- **एक data map लिखो**: हर feature के लिए, कौन-सा personal data use होता है, कहाँ जाता है, कितने समय रखा जाता है।
+- **अपने model provider के साथ data processing agreement sign करो**, और retention व region settings उसी के अनुसार चुनो।
+- **Checks को automate करो**: CI में secret scanner, दो-account access tests, injection tests और output-escaping tests।
+- **Keys को schedule पर rotate करो** और access वाला कोई भी चला जाए तो तुरंत।
+- **Incidents के लिए plan बनाओ**: कौन फ़ैसला लेगा, keys कैसे revoke होंगी, प्रभावित users और regulator को कैसे और कितनी जल्दी बताना है।
+- **हर कुछ महीनों में access review करो**: logs, index और admin tools कौन पढ़ सकता है।
+
+## Practice करो
+
+नीचे link किए LLM applications के OWASP Top 10 को देखो।
+
+1. जाँचो कि आपके app की API key कहाँ रहती है, और पक्का करो कि वो कभी browser या Git history तक नहीं पहुँचती।
+2. एक feature के लिए model को भेजे जाने वाले data की list बनाओ, और जो task को नहीं चाहिए उसे हटा दो।
+3. आपके app पर लागू हर OWASP item के लिए अपना defence लिखो।
+4. mask function को दस realistic support messages पर चलाओ, नोट करो कि क्या छूटा या गलत पकड़ा गया, और एक pattern सुधारो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 5 attacks और defences को cover करता है, और chapter 10 input व output guardrails और masking को।
+
+**आप तब पूरा समझ चुके हो जब आप** बता सको कि key कहाँ रहती है, model तक कौन-सा data पहुँचता है और क्यों, और एक user को दूसरे user का data देखने से कैसे रोका जाता है।

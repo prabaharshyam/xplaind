@@ -1,0 +1,154 @@
+---
+id: model-size-and-scaling
+lang: hi
+title: "Model size और scaling laws: parameters, training data और compute"
+outcome: "किसी model का size पढ़ पाओगे, उसे चाहिए memory और training compute का अंदाज़ा लगा पाओगे, Chinchilla rule और ये समझा पाओगे कि models अब उससे कहीं ज़्यादा क्यों train होते हैं, और परख पाओगे कि छोटा model कब बेहतर चुनाव है।"
+answer: "Parameters, data और compute बढ़ने के साथ model की quality अनुमान लगाने लायक तरीके से बढ़ती है। तय budget के लिए size और data साथ-साथ बढ़ाओ (हर parameter पर करीब 20 tokens); popular models इससे कहीं ज़्यादा देर train होते हैं।"
+why_it_matters: "Model के नामों में 8B या 70B जैसे sizes होते हैं, और model, GPU और budget का हर चुनाव इन numbers के मतलब पर टिका है। Scaling समझने से ये भी साफ़ होता है कि नया छोटा model पुराने बड़े model को क्यों हरा सकता है, और फ़ायदे और महँगे क्यों होते जाते हैं।"
+flashcards:
+  - q: "Model के नाम में 8B का क्या मतलब है?"
+    a: "करीब 8 billion parameters: वो numbers जिन्हें training बदलती है। ज़्यादा parameters ज़्यादा सीख सकते हैं, पर ज़्यादा memory और compute माँगते हैं।"
+  - q: "Model के weights को कितनी memory चाहिए?"
+    a: "Parameters गुणा हर parameter के bytes। 2 bytes वाले 7 billion parameters करीब 14 GB, KV cache और बाकी overhead से पहले।"
+  - q: "Mixture-of-experts model क्या है?"
+    a: "ऐसा model जो expert sub-networks में बँटा है और हर token पर बस कुछ ही active होते हैं। Mixtral 8x7B में कुल 46.7B parameters हैं, पर हर token पर करीब 12.9B active होते हैं, इसलिए ये बहुत छोटे model की तरह चलता है।"
+  - q: "Chinchilla rule of thumb क्या है?"
+    a: "तय training budget से सबसे अच्छा model पाने के लिए, हर parameter पर करीब 20 training tokens use करो, और model size और data साथ-साथ बढ़ाओ।"
+  - q: "Models अब हर parameter पर 20 tokens से कहीं ज़्यादा क्यों train होते हैं?"
+    a: "छोटे model को ज़्यादा देर train करने से करोड़ों users के लिए उसे चलाना सस्ता पड़ता है। जैसे Llama 3 8B करीब 15 trillion tokens पर train हुआ।"
+  - q: "Training compute का अंदाज़ा कैसे लगाएँ?"
+    a: "करीब 6 × parameters × training tokens floating-point operations। इसे अपनी GPUs की काम की speed से भाग दो तो GPU-hours मिलते हैं।"
+  - q: "सुधार और महँगे क्यों होते जाते हैं?"
+    a: "फ़ायदे power law का पालन करते हैं: quality में हर अगले कदम के लिए पिछले से कई गुना ज़्यादा data और compute चाहिए।"
+  - q: "क्या नया छोटा model पुराने बड़े model को हरा सकता है?"
+    a: "हाँ। बेहतर data और training methods से, जैसे, एक आम knowledge benchmark पर Llama 3 8B ने Llama 2 70B को हरा दिया।"
+exercise:
+  title: "क्या Bengaluru की startup को अपना Kannada model pre-train करना चाहिए?"
+  setup: "Bengaluru की एक startup ऐसा model चाहती है जो Kannada में अच्छा लिखे। एक founder scratch से 1-billion-parameter model pre-train करने का सुझाव देता है। उनके पास करीब 3 billion tokens अच्छा Kannada text है, compute के लिए कुछ लाख रुपये का budget है, और 8B parameters वाले open models तक पहुँच है जो Kannada में ठीक-ठाक हैं, पर बढ़िया नहीं।"
+  questions:
+    - q: "1B parameters के लिए Chinchilla कितने training tokens सुझाएगा?"
+      a: "करीब 20 billion tokens, यानी उनके पास जितना Kannada text है उसका लगभग सात गुना।"
+    - q: "20 billion tokens में करीब कितना compute लगेगा?"
+      a: "करीब 6 × 1 billion × 20 billion = 1.2 × 10²⁰ operations, यथार्थ utilisation पर एक high-end GPU पर कुछ सौ घंटे: सहने लायक।"
+    - q: "तो क्या compute समस्या है?"
+      a: "नहीं, data है। 3 billion tokens के साथ वो वही text कई बार दोहराएँगे, और scratch से train हुआ 1B model किसी 8B open model से कहीं कम जानेगा।"
+    - q: "बेहतर plan शायद क्या है?"
+      a: "किसी मौजूदा open model को उनके Kannada text पर आगे train करो, या fine-tune करो, फिर असली Kannada tasks पर उनके मौजूदा सबसे अच्छे model से तुलना करो।"
+ask:
+  - "Model के नाम में 7B या 70B का क्या मतलब है?"
+  - "Chinchilla scaling law क्या है?"
+  - "छोटे models इतने अच्छे क्यों होते जा रहे हैं?"
+translated_on: 2026-11-16
+---
+
+## ये क्या है
+
+तीन numbers बताते हैं कि language model कितना बड़ा है और उसमें कितना कुछ लगा है।
+
+1. **Parameters**: model के अंदर वो numbers जिन्हें training बदलती है। "Llama 3 8B" में करीब 8 billion हैं। ज़्यादा parameters model को सीखने की ज़्यादा capacity देते हैं, और चलाने के लिए ज़्यादा memory और compute माँगते हैं।
+2. **Training tokens**: उसने कितने text से सीखा। Meta के Llama models 1.4 trillion tokens (Llama 1) से 2 trillion (Llama 2) और करीब 15 trillion (Llama 3) तक गए।
+3. **Training compute**: training में कितने arithmetic operations लगे, जो FLOPs (floating-point operations) में नापे जाते हैं। एक आम अंदाज़ा है **6 × parameters × training tokens**।
+
+**Scaling law** experiments से बताता है कि इनके बढ़ने पर quality कैसे सुधरती है। हैरान करने वाली बात ये है कि सुधार smooth और अनुमान लगाने लायक होता है, इसलिए labs छोटे models train करके एक curve fit कर सकती हैं और पैसा लगाने से पहले ही अंदाज़ा लगा सकती हैं कि बहुत बड़ा model कैसा करेगा।
+
+```flow
+title: Model कितना अच्छा है ये क्या तय करता है
+Compute budget -> Model size | parameters
+Compute budget -> Training data | tokens, quality, variety
+Model size -> Quality
+Training data -> Quality
+Model size -> Running cost | memory, प्रति token speed
+Quality -> सबसे छोटा model चुनो जो आपका मानक पूरा करे
+Running cost -> सबसे छोटा model चुनो जो आपका मानक पूरा करे
+```
+
+## ये काम कैसे करता है
+
+**Size और memory।** Model चलाने के लिए उसके weights GPU memory में fit होने चाहिए: parameters गुणा हर parameter के bytes। 16-bit precision (2 bytes) पर 7B model को करीब 14 GB और 70B model को करीब 140 GB चाहिए, KV cache और बाकी overhead से पहले। 8 या 4 bits में Quantisation इसे घटाता है, जैसा GPU वाला lesson समझाता है।
+
+**Dense और sparse।** Dense model में हर token के लिए हर parameter use होता है। **Mixture-of-experts** (MoE) model layers को "experts" में बाँटता है और एक छोटा router हर token के लिए कुछ चुनता है। Mixtral 8x7B में कुल 46.7 billion parameters हैं, पर हर token के लिए सिर्फ़ करीब 12.9 billion active होते हैं, इसलिए ये करीब 13B model के cost और speed पर चलता है जबकि ज़्यादा knowledge रखता है। सारे experts को रखने के लिए memory फिर भी चाहिए।
+
+**Chinchilla rule।** 2022 में DeepMind ने अलग-अलग sizes के 400 से ज़्यादा models अलग-अलग मात्रा के data पर train किए और पूछा: तय compute budget के लिए size और data का कौन-सा मेल सबसे अच्छा model देता है? जवाब: करीब **हर parameter पर 20 training tokens**, दोनों को साथ बढ़ाते हुए। पहले के कई बड़े models undertrained थे: GPT-3 में 175 billion parameters थे पर सिर्फ़ 300 billion training tokens, यानी हर parameter पर 2 से कम। DeepMind का 70-billion-parameter Chinchilla, 1.4 trillion tokens पर train होकर, कहीं बड़े models से बेहतर निकला।
+
+**Chinchilla से आगे।** ये rule *training* का cost optimise करता है। पर popular model करोड़ों बार *use* होता है, और छोटा model चलाना सस्ता है। इसलिए labs अब छोटे models को हर parameter पर 20 tokens से कहीं ज़्यादा train करती हैं: Llama 3 8B ने करीब 15 trillion tokens देखे, हर parameter पर करीब 1,900। Training ज़्यादा महँगी पड़ती है, पर हर user की request सस्ती पड़ती है, और ज़्यादा data के साथ quality बढ़ती रहती है।
+
+**Diminishing returns।** Quality power law का पालन करती है, इसलिए हर कदम पिछले से महँगा पड़ता है। Language modelling में training loss को करीब 3.4 से 2.8 तक घटाने के लिए करीब दस गुना ज़्यादा data चाहिए। किसी task पर 90% से 95% तक जाना 60% से 90% तक जाने से कहीं ज़्यादा महँगा हो सकता है।
+
+**Bottlenecks।** दो सीमाएँ सामने हैं: अच्छा public text खत्म हो रहा है, क्योंकि training sets नई लिखाई से तेज़ बढ़ते हैं, और training runs को भारी मात्रा में बिजली चाहिए। Synthetic data, बेहतर data selection और ज़्यादा कुशल models में दिलचस्पी की ये भी एक वजह है।
+
+Planning के लिए एक quick calculator:
+
+```python
+def weights_gb(params_billion, bytes_per_param=2):
+    return params_billion * bytes_per_param           # 1B params x 2 bytes = 2 GB
+
+def training_gpu_hours(params, tokens, gpu_flops=312e12, utilisation=0.4):
+    flops = 6 * params * tokens                       # common estimate
+    return flops / (gpu_flops * utilisation) / 3600
+
+print(weights_gb(8))                                  # 16 GB at 16-bit
+print(round(training_gpu_hours(1e9, 20e9)))           # 1B model, 20B tokens: about 267 GPU-hours
+print(round(training_gpu_hours(8e9, 15e12)))          # 8B model, 15T tokens: about 1.6 million GPU-hours
+```
+
+यहाँ GPU की speed 16-bit precision पर एक high-end data-centre GPU का peak है; असली utilisation आमतौर पर 30% से 50% होती है।
+
+| Model | Parameters | Training tokens | हर parameter पर tokens |
+| --- | --- | --- | --- |
+| GPT-3 (2020) | 175 billion | 300 billion | 1.7 |
+| Chinchilla (2022) | 70 billion | 1.4 trillion | 20 |
+| Llama 2 70B (2023) | 70 billion | 2 trillion | 29 |
+| Llama 3 8B (2024) | 8 billion | करीब 15 trillion | करीब 1,900 |
+
+## एक example से समझो
+
+Bengaluru की एक startup ऐसा model चाहती है जो Kannada में अच्छा लिखे। एक founder अपने Kannada text पर scratch से 1-billion-parameter model pre-train करने का सुझाव देता है।
+
+वो हिसाब लगाते हैं:
+
+1. **ज़रूरी data।** Chinchilla 1B parameters के लिए करीब 20 billion tokens सुझाता है। उनके पास करीब 3 billion tokens अच्छा Kannada text है, और आम web crawl में Kannada सिर्फ़ 0.01% के आसपास है।
+2. **Compute।** 6 × 1 billion × 20 billion = 1.2 × 10²⁰ operations, एक high-end GPU पर करीब 270 घंटे, या आठ पर डेढ़ दिन। सहने लायक।
+3. **असली सीमा data है।** 3 billion tokens को कई बार दोहराकर train करने से नए data के मुकाबले कम सीखने को मिलता है, और 1B model बिना किसी general knowledge के शुरू होता है।
+
+वो 200 असली Kannada लिखने के tasks पर तीन plans की तुलना करते हैं:
+
+| Plan | Quality score (10 में से, native reviewers) | बनाने का cost | हर 1,000 replies चलाने का cost |
+| --- | --- | --- | --- |
+| Scratch से pre-train किया 1B model | 4.1 | ज़्यादा: data का काम और compute | बहुत कम |
+| 8B open model, जैसा है वैसा use किया | 6.2 | कुछ नहीं | कम |
+| 8B open model, उनके Kannada text पर आगे की training | 7.6 | मध्यम | कम |
+
+ये numbers समझाने के लिए एक उदाहरण हैं। Compute कभी bottleneck नहीं था; data था, और मौजूदा model की पहले से बनी बढ़त। वो open model की आगे की training चुनते हैं।
+
+## आम गलतियाँ
+
+- **अलग generations के parameter counts की तुलना करना।** नया 8B model पुराने 70B को हरा सकता है।
+- **MoE models में सिर्फ़ कुल parameters गिनना।** Speed और cost active parameters के साथ चलते हैं; memory कुल के साथ।
+- **Parameter counts से GPUs का size तय करते समय KV cache और overhead भूल जाना।**
+- **Product model के लिए Chinchilla को लक्ष्य मान लेना।** वो training cost optimise करता है; ज़्यादा use होने वाले models कहीं ज़्यादा देर train होते हैं।
+- **Data quality को नज़रअंदाज़ करना।** उतने ही tokens का बेहतर text बेहतर model देता है।
+- **काफ़ी data के बिना scratch से pre-train करना।** Open model से शुरू करना आमतौर पर कहीं बेहतर है।
+
+## बड़ा कब बेहतर नहीं है
+
+- **Classification या extraction जैसे सीमित tasks** अक्सर छोटे models से ही मानक पूरा कर लेते हैं।
+- **ज़्यादा volume** में बड़े model का running cost हावी हो जाता है।
+- **Latency budgets** छोटे models को पसंद करते हैं, जो हर token तेज़ लिखते हैं।
+- **On-device या private deployments** में शायद सिर्फ़ छोटे models ही fit हों।
+
+## Demo से production तक
+
+- **सबसे छोटे model से शुरू करो जो काम कर सके**, और तभी ऊपर जाओ जब आपका test set कहे।
+- **कुल parameters, precision और KV cache से hardware का size तय करो**, थोड़ी गुंजाइश के साथ।
+- **Model के चुनावों पर नियमित रूप से दोबारा सोचो।** नए छोटे models फ़ासला कम करते जा रहे हैं।
+- **किसी भी training project में compute से पहले data की planning करो**, और नापो कि आपके पास असल में कितना काम का data है।
+
+## Practice करो
+
+1. तीन open models चुनो। Parameters, MoE हो तो active parameters, और हर एक को 16-bit और 4-bit पर चाहिए memory लिखो।
+2. Calculator से Chinchilla बिंदु पर 3B model की training compute का अंदाज़ा लगाओ। कितने GPU-hours?
+3. कोई हाल का छोटा model ढूँढो जो आपके काम के किसी benchmark पर पुराने बड़े model को हराता हो।
+
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 2 model size, scaling laws और उनके bottlenecks को कवर करता है।
+
+**आप तब पूरा समझे जब आप** model के size से उसकी memory का अंदाज़ा लगा सको, Chinchilla rule और ये समझा सको कि products उससे आगे क्यों train होते हैं, और बता सको कि छोटा model कब बेहतर चुनाव है।
