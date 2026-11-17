@@ -6,7 +6,7 @@ import { json, problem } from "@/lib/account/http";
 import { body } from "@/lib/ai/route";
 import { runAi } from "@/lib/ai/run";
 import { lineUrl } from "@/lib/ai/tts";
-import { voiceAccess } from "@/lib/ai/voice-access";
+import { trialLeft, trialUsed, voiceAccess } from "@/lib/ai/voice-access";
 import { VOICE_BURST, VoiceTurnRequest, bankFollowUp, cleanTurn, turnDecision, voiceTurnPrompt } from "@/lib/ai/voice-interview";
 import { interviewFrom } from "@/lib/ai/voice-plan-server";
 
@@ -22,6 +22,8 @@ export async function POST(request: Request) {
   const { ctx, find } = interviewFrom(req);
   const q = find(req.questionId);
   if (!q) return problem(400, "Unknown question.");
+  // VI-13: a follow-up mints a voice line, so a free account with its interview used gets none.
+  if (access.trial && !(await trialLeft(access))) return trialUsed();
   // A skipped answer, or two follow-ups already: move on without a model call.
   if (turnDecision(req.exchanges) === "done") return json({ follow_up: null });
 

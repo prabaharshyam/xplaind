@@ -95,7 +95,8 @@ export async function runAi<S extends z.ZodType>(
   if (verdict === "day" || verdict === "month")
     return problem(429, LIMIT_MESSAGE[verdict as "day" | "month"]);
   // AN-1: a free account using one of its trial turns, counted without identifying anyone.
-  if (onTrial(who)) await bump(admin, "ai_trial_used");
+  // VI-13: the free AI interview counts once (its report), not once per follow-up or end-of-answer check.
+  if (onTrial(who) && (req.kind === "voice_trial" || !req.kind.startsWith("voice"))) await bump(admin, "ai_trial_used");
   const model = modelFor(req.kind, settings.model, settings.fastModel, req.model);
 
   const client = new Anthropic({

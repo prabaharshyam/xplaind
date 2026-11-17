@@ -600,7 +600,8 @@ function useProStatus(checked: number): ProStatus {
         if (u.signin) return setPro("signin");
         if (!u.show) return;
         if (u.tier === "pro") return setPro("yes");
-        setPro(u.trial && (u.used ?? 0) < (u.limit ?? 0) ? "trial" : "no");
+        // Any use of the report allowance (2, so a failed report can be retried) means the free interview is used.
+        setPro(u.trial && (u.used ?? 0) === 0 && (u.limit ?? 0) > 0 ? "trial" : "no");
       })
       .catch(() => undefined);
     return () => {

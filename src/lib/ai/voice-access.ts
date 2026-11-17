@@ -32,14 +32,13 @@ export async function voiceAccess(opts: { proOnly?: string } = {}): Promise<Voic
   return { admin, who, trial: true };
 }
 
-/** VI-13: whether this free account still has its free interview (its report not yet given). Reads only. */
+/**
+ * VI-13: whether this free account still has its free interview: no report asked for yet. The report
+ * allowance is 2 so a failed report can be retried, but any use closes new interviews. Reads only.
+ */
 export async function trialLeft(access: VoiceAccess): Promise<boolean> {
-  const day = todayInIST();
-  const allowed = await allowanceToday(access.admin, access.who, "voice_trial", day);
-  if (allowed <= 0) return false;
-  // allowanceToday counts earlier days only; today's own uses are on today's row.
-  const { data } = await access.admin.from("ai_usage").select("calls").eq("user_id", access.who.id).eq("day", day).eq("kind", "voice_trial").maybeSingle();
-  return (data?.calls ?? 0) < allowed;
+  const { data } = await access.admin.from("ai_usage").select("calls").eq("user_id", access.who.id).eq("kind", "voice_trial");
+  return (data ?? []).reduce((n: number, r: { calls: number | null }) => n + (r.calls ?? 0), 0) === 0;
 }
 
 /**

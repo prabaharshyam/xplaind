@@ -49,10 +49,10 @@ export const TIER_LIMITS: Record<Tier, Record<AiKind, number>> = {
   /** PAY-7: for free accounts these are a one-time trial per feature, not a daily allowance. */
   /** MB-12: reading picture pages is Pro only. VI-13 (2026-11-17, owner request): one free AI interview of
    *  2 questions, so people hear the interviewer follow up on their own words before they buy. It is one
-   *  scored report (voice_trial), up to 3 starts (a denied microphone or a dropped call can be retried), and
+   *  scored report (voice_trial: 2, so a report that fails can be retried once; any use closes new starts), up to 3 starts (a denied microphone or a dropped call can be retried), and
    *  turns for 2 questions with 2 follow-ups each plus spare (voice, voice_end). Planning from a job
    *  description stays Pro. */
-  free: { tutor: 3, grade: 3, interview: 2, book: 2, resume: 2, notes: 3, scan: 0, voice: 6, voice_end: 60, voice_plan: 0, voice_start: 3, voice_trial: 1 },
+  free: { tutor: 3, grade: 3, interview: 2, book: 2, resume: 2, notes: 3, scan: 0, voice: 6, voice_end: 60, voice_plan: 0, voice_start: 3, voice_trial: 2 },
   /** VI-3: 40 voice turns is about four 5-question interviews (at most 11 calls each). */
   pro: { tutor: 50, grade: 20, interview: 5, book: 10, resume: 3, notes: 100, scan: 60, voice: 40, voice_end: 300, voice_plan: 10, voice_start: 0, voice_trial: 0 },
 };

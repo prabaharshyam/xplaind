@@ -31,7 +31,7 @@ describe("Pro passes and limits (PAY-1)", () => {
     const { scan, voice, voice_end, voice_plan, voice_start, voice_trial, ...trial } = TIER_LIMITS.free;
     expect(scan).toBe(0);
     expect(voice_plan).toBe(0);
-    expect([voice, voice_end, voice_start, voice_trial]).toEqual([6, 60, 3, 1]);
+    expect([voice, voice_end, voice_start, voice_trial]).toEqual([6, 60, 3, 2]);
     for (const n of Object.values(trial)) expect([2, 3]).toContain(n);
   });
 
@@ -39,7 +39,8 @@ describe("Pro passes and limits (PAY-1)", () => {
     const f = TIER_LIMITS.free;
     // At most 2 turns a question (a follow-up after the answer and after the first follow-up).
     expect(f.voice).toBeGreaterThanOrEqual(TRIAL_QUESTIONS * 2);
-    expect(f.voice_trial).toBe(1);
+    // One report, plus one retry if it fails (the guard counts a call before it is made).
+    expect(f.voice_trial).toBe(2);
     // Guests get none, and before Pro opens nobody gets a trial (the daily limits are the same for all).
     for (const k of ["voice", "voice_end", "voice_start", "voice_trial"] as const) {
       expect(TIER_LIMITS.guest[k]).toBe(0);
