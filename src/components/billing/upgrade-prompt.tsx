@@ -37,7 +37,7 @@ export function UpgradePrompt() {
       onClick={(e) => {
         if (e.target === dialog.current) dialog.current?.close();
       }}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] max-w-none rounded-2xl bg-white p-0 text-zinc-900 backdrop:bg-black/60 dark:bg-zinc-900 dark:text-white"
+      className="xp-glass-direct rounded-[1.75rem] m-auto w-[min(28rem,calc(100vw-2rem))] max-w-none p-0 text-zinc-900 backdrop:bg-black/50 backdrop:backdrop-blur-sm dark:text-white"
     >
       <div className="p-6">
         <p className="grid size-10 place-items-center rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
