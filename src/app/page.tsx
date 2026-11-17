@@ -206,10 +206,13 @@ export default function Home() {
           </div>
           <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">
             One roadmap per job. Not sure?{" "}
-            <Link href="/start" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
-              Take the 2-minute level check
-            </Link>
-            .
+            {/* On a phone the link starts its own line, so it never breaks mid-phrase. */}
+            <span className="block sm:inline">
+              <Link href="/start" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+                Take the 2-minute level check
+              </Link>
+              .
+            </span>
           </p>
           <div className="mt-8" data-rise-group>
             <RoleGrid

@@ -42,3 +42,22 @@ test("roadmap, topic and project cards carry a line graphic, not just a small ic
   await page.goto("/projects");
   expect(await page.locator(scene).count()).toBeGreaterThanOrEqual(20);
 });
+
+test("on a phone the level-check link starts its own line under 'Choose your AI role' (HM-3)", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto("/");
+  const lead = page.getByText("One roadmap per job. Not sure?");
+  await lead.scrollIntoViewIfNeeded();
+  const link = lead.getByRole("link", { name: "Take the 2-minute level check" });
+  const box = (await link.boundingBox())!;
+  const text = await page.evaluate(() => {
+    const p = [...document.querySelectorAll("p")].find((x) => x.textContent?.startsWith("One roadmap per job"))!;
+    const r = document.createRange();
+    r.setStart(p.firstChild!, 0);
+    r.setEnd(p.firstChild!, p.firstChild!.textContent!.length);
+    const rects = r.getClientRects();
+    return rects[rects.length - 1].bottom;
+  });
+  expect(box.y).toBeGreaterThanOrEqual(text - 1); // the link sits below the sentence before it
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
