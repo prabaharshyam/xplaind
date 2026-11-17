@@ -682,7 +682,16 @@ function Listener({
       }
       if (sarvam) {
         setFinishing(true);
-        onAnswer(await capture.finish(), seconds);
+        const heard = await capture.finish();
+        if (!heard) {
+          // Nothing came back in time (a slow connection): never treat that as a skipped question.
+          sent.current = false;
+          setFinishing(false);
+          setProblem("We couldn't catch that answer. Please say it again, or tap Type to type it.");
+          capture.start();
+          return;
+        }
+        onAnswer(heard, seconds);
       } else {
         dictation.abort();
         onAnswer(said, seconds);

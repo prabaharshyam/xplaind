@@ -22,7 +22,10 @@ export async function POST(request: Request) {
   const audio = await request.blob();
   if (audio.size === 0 || audio.size > MAX_PIECE_BYTES) return problem(413, "That piece of audio is too long.");
   const q = getContent().interview.find((x) => x.data.id === url.searchParams.get("q"))?.data;
+  const began = Date.now();
   const text = await transcribe(audio, type, q ? keytermsFor(q) : [], settings);
+  // VI-9: timing and size only (never the words), so a slow or failing piece can be found in the logs.
+  console.log(JSON.stringify({ hear: Date.now() - began, bytes: audio.size, type, ok: text !== null }));
   if (text === null) return problem(502, "We could not hear that clearly.");
   return json({ text });
 }

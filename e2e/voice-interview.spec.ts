@@ -380,3 +380,31 @@ test("with Sarvam, answers are recorded in pieces, transcribed as you talk, and 
   expect(await page.evaluate(() => (window as unknown as { __mic: { enabled: boolean } }).__mic.enabled)).toBe(false);
   await expect(page.getByRole("heading", { name: "Your AI interview report" })).toBeVisible({ timeout: 10_000 });
 });
+
+test("a transcription request that never answers cannot freeze the call: it says so and listens again (VI-9)", async ({ page }) => {
+  await page.addInitScript(fakeSpeechOut);
+  await page.addInitScript(fakeRecordingMic);
+  await page.route("**/api/ai/voice/start", (route) =>
+    route.fulfill({
+      json: {
+        questions: [{ text: OPENING, audio: null }],
+        acks: [{ text: "Okay.", audio: null }],
+        closing: { text: "That's the end of the interview.", audio: null },
+        hear: "signed-token",
+      },
+    }),
+  );
+  await page.route("**/api/ai/voice/hear**", () => new Promise(() => {})); // never answers
+  const turns: unknown[] = [];
+  await page.route("**/api/ai/voice/turn", (route) => {
+    turns.push(route.request().postDataJSON());
+    return route.fulfill({ json: { follow_up: null } });
+  });
+  await page.goto("/interview/simulator?question=what-is-rag");
+  await page.getByRole("button", { name: "Start the AI interviewer" }).click();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  // 2.5 s of speech, 5 s of silence, then at most 8 s waiting for the text: then a clear message, not a frozen screen.
+  await expect(page.getByRole("alert").filter({ hasText: "We couldn't catch that answer" })).toBeVisible({ timeout: 25_000 });
+  expect(turns).toEqual([]); // not sent as an empty, skipped answer
+  await expect(page.getByRole("button", { name: "Type" })).toBeEnabled();
+});

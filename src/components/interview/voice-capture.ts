@@ -13,6 +13,12 @@ export type Mic = { stream: MediaStream; ctx: AudioContext; analyser: AnalyserNo
 
 const TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
 const FRAME_MS = 50;
+/** One piece never waits longer than this for its text; a stuck request must not freeze the call. */
+const PIECE_TIMEOUT_MS = 15_000;
+/** When the answer ends, its last pieces get at most this long before the answer is sent with what is back. */
+const FINISH_WAIT_MS = 8_000;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+type Piece = MediaRecorder & { markHeard?: () => void; done?: Promise<void> };
 /** The room is measured for this long at the start of each turn before speech is looked for. */
 const CALIBRATE_MS = 300;
 
@@ -58,7 +64,12 @@ export function useVoiceCapture({ mic, hearUrl, onFailed }: { mic: Mic | null; h
     (blob: Blob, index: number) => {
       if (!hearUrl) return;
       setPending((n) => n + 1);
-      const job = fetch(hearUrl, { method: "POST", headers: { "Content-Type": blob.type.split(";")[0] || "audio/webm" }, body: blob })
+      const job = fetch(hearUrl, {
+        method: "POST",
+        headers: { "Content-Type": blob.type.split(";")[0] || "audio/webm" },
+        body: blob,
+        signal: AbortSignal.timeout(PIECE_TIMEOUT_MS),
+      })
         .then(async (res) => {
           if (!res.ok) throw new Error(String(res.status));
           const { text: heard } = (await res.json()) as { text: string };
@@ -78,26 +89,36 @@ export function useVoiceCapture({ mic, hearUrl, onFailed }: { mic: Mic | null; h
   /** Starts a new piece; when it stops, sends it if it held speech. */
   const record = useCallback(() => {
     if (!mic) return;
-    const rec = new MediaRecorder(mic.stream, mic.type ? { mimeType: mic.type } : undefined);
+    const rec: Piece = new MediaRecorder(mic.stream, mic.type ? { mimeType: mic.type } : undefined);
     const chunks: Blob[] = [];
     const index = pieces.current.length;
     pieces.current.push("");
     let heard = false;
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-    rec.onstop = () => {
-      if (heard && chunks.length) upload(new Blob(chunks, { type: chunks[0].type || mic.type }), index);
-    };
-    (rec as MediaRecorder & { markHeard?: () => void }).markHeard = () => (heard = true);
+    // `done` resolves once the piece is handed over and (if it held speech) its upload has started.
+    rec.done = new Promise<void>((resolve) => {
+      rec.onstop = () => {
+        if (heard && chunks.length) upload(new Blob(chunks, { type: chunks[0].type || mic.type }), index);
+        resolve();
+      };
+    });
+    rec.markHeard = () => (heard = true);
     rec.start();
     recorder.current = rec;
   }, [mic, upload]);
 
+  /** Closes the current piece (it is sent if it held speech) and, if asked, starts the next one. */
   const cut = useCallback(
-    (again: boolean) => {
-      const rec = recorder.current as (MediaRecorder & { markHeard?: () => void }) | null;
-      if (rec && rec.state !== "inactive") rec.stop();
+    (again: boolean): Promise<void> => {
+      const rec = recorder.current as Piece | null;
+      let done = Promise.resolve();
+      if (rec && rec.state !== "inactive") {
+        rec.stop();
+        done = rec.done ?? done;
+      }
       recorder.current = null;
       if (again) record();
+      return done;
     },
     [record],
   );
@@ -126,22 +147,22 @@ export function useVoiceCapture({ mic, hearUrl, onFailed }: { mic: Mic | null; h
       if (now - began < CALIBRATE_MS) return void room.push(level);
       if (!vad.current) vad.current = newVad(now, room.length ? room.reduce((a, b) => a + b, 0) / room.length : undefined);
       const { vad: next, cut: shouldCut } = stepVad(vad.current, level, now);
-      if (next.voiced) (recorder.current as MediaRecorder & { markHeard?: () => void })?.markHeard?.();
+      if (next.voiced) (recorder.current as Piece | null)?.markHeard?.();
       const was = vad.current;
       vad.current = next;
       if (next.voiced !== was.voiced) setVoiced(next.voiced);
       if (next.lastVoiceAt !== null && was.lastVoiceAt === null) setSpoke(true);
-      if (shouldCut) cut(true);
+      if (shouldCut) void cut(true);
     }, FRAME_MS);
   }, [mic, record, cut]);
 
   /** Sends the last piece and resolves with the whole answer once every piece is transcribed. */
   const finish = useCallback(async (): Promise<string> => {
     stopLoop();
-    cut(false);
-    // MediaRecorder hands over its data just after stop; give it a moment, then wait for every piece.
-    await new Promise((r) => setTimeout(r, 120));
-    await Promise.allSettled(inflight.current);
+    // Wait for the last piece to be handed over (so the end of the answer is not lost), then for every
+    // piece's text, but never for long: a slow request must not freeze the call.
+    await Promise.race([cut(false), sleep(1500)]);
+    await Promise.race([Promise.allSettled(inflight.current), sleep(FINISH_WAIT_MS)]);
     return pieces.current.filter(Boolean).join(" ").trim();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cut]);
