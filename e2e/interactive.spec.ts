@@ -151,7 +151,16 @@ test("the top bar is the same light, frosted bar on the home page and after leav
   const header = page.locator(".site-header");
   const tone = () => header.evaluate((h) => getComputedStyle(h).backgroundColor);
   const onHome = await tone();
-  expect(onHome).toMatch(/255, 255, 255|oklab\(0\.99/); // white, however the browser writes it
+  // NV-9: the bar is the light --chrome tint (one step off the white page), not white. Read it back as
+  // RGBA through a canvas, so it does not matter how the browser writes the colour.
+  const [r, g, b, a] = await header.evaluate((h) => {
+    const ctx = document.createElement("canvas").getContext("2d")!;
+    ctx.fillStyle = getComputedStyle(h).backgroundColor;
+    ctx.fillRect(0, 0, 1, 1);
+    return [...ctx.getImageData(0, 0, 1, 1).data];
+  });
+  expect(Math.min(r, g, b), `bar colour ${onHome}`).toBeGreaterThan(225); // light
+  expect(a, `bar colour ${onHome}`).toBeLessThan(255); // frosted: the page shows through
   await page.locator('main a[href="/paths"]:visible').first().click();
   await expect(page).toHaveURL(/\/paths$/);
   await expect.poll(tone).toBe(onHome);

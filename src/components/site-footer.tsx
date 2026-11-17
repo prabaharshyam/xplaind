@@ -56,7 +56,7 @@ const link = "rounded text-zinc-600 underline-offset-4 hover:text-zinc-950 hover
 export function SiteFooter() {
   const whatsapp = getCommunity().whatsapp_url;
   return (
-    <footer className="site-footer relative mt-16 overflow-hidden border-t border-zinc-200 bg-white text-sm dark:border-white/10 dark:bg-[#071a1d]">
+    <footer className="site-footer relative mt-16 overflow-hidden bg-(--chrome) text-sm">
       <div className="mx-auto max-w-6xl px-4 pt-12 pb-8 md:px-6">
         <div className="grid gap-10 lg:grid-cols-[1.1fr_2fr]">
           <div className="max-w-sm">
@@ -66,7 +66,7 @@ export function SiteFooter() {
             <p className="mt-4 leading-relaxed text-zinc-600 dark:text-zinc-400">
               Step-by-step AI career roadmaps with plain-English lessons, projects and interview practice. Our mission: help India learn AI faster.
             </p>
-            <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mt-5 rounded-2xl bg-white p-4 dark:bg-white/5">
               <p className="font-medium text-zinc-900 dark:text-zinc-100">Learn with others</p>
               <p className="mt-1 text-zinc-600 dark:text-zinc-400">
                 Ask questions, share what you are building and find study partners in our WhatsApp group.
@@ -112,7 +112,7 @@ export function SiteFooter() {
           </nav>
         </div>
 
-        <div className="mt-12 flex flex-col gap-3 border-t border-brand-100 pt-6 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:text-zinc-400">
+        <div className="mt-12 flex flex-col gap-3 pt-6 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between dark:text-zinc-400">
           <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>© Xplaind. AI, explained simply.</span>
             <Link href="/about" className={`${link} inline-flex min-h-11 items-center sm:min-h-0`}>

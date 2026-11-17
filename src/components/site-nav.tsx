@@ -86,7 +86,7 @@ function DesktopMenus({ path }: { path: string }) {
   }, [path]);
 
   const tab = (on: boolean) =>
-    `relative flex h-10 items-center gap-1 rounded-full px-3 text-sm transition hover:bg-brand-50 hover:text-brand-950 dark:hover:bg-white/10 dark:hover:text-white ${
+    `relative flex h-10 items-center gap-1 rounded-full px-3 text-sm transition hover:bg-brand-100 hover:text-brand-950 dark:hover:bg-white/10 dark:hover:text-white ${
       on ? "font-semibold text-brand-900 dark:text-white" : "text-zinc-700 dark:text-zinc-300"
     }`;
   const dot = <span aria-hidden="true" className="absolute inset-x-3 -bottom-[9px] h-0.5 rounded-full bg-brand-700 dark:bg-brand-300" />;
@@ -103,8 +103,9 @@ function DesktopMenus({ path }: { path: string }) {
             {active === g.id && dot}
             {active === g.id && <span className="sr-only"> (current section)</span>}
           </summary>
+          {/* NV-9: only an open panel floats, so only an open panel has a shadow. */}
           <div
-            className={`nav-panel absolute top-full left-0 z-50 mt-3 rounded-3xl border border-zinc-200/80 bg-white p-3 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.18),0_8px_20px_-12px_rgba(0,0,0,0.15)] dark:border-zinc-800 dark:bg-zinc-900 ${
+            className={`nav-panel absolute top-full left-0 z-50 mt-3 rounded-3xl border border-zinc-200/80 bg-white p-3 group-open:shadow-[0_24px_60px_-20px_rgba(0,0,0,0.18),0_8px_20px_-12px_rgba(0,0,0,0.15)] dark:border-zinc-800 dark:bg-zinc-900 ${
               g.items.length > 4 ? "w-[38rem]" : "w-[22rem]"
             }`}
           >
@@ -139,10 +140,10 @@ function DesktopMenus({ path }: { path: string }) {
 }
 
 /**
- * NV-6 (owner request, 2026-11-13): the phone menu as a set of big, numbered rows that unfold.
- * Each group is a row: a mono number (the road-marker signature), the name in the display face and a
- * hint of what is inside. Tapping a row unfolds its links as tiles that cascade in, the plus turns
- * into a minus and the other rows step back. One group open at a time; the group you are in starts
+ * NV-6 (owner request, 2026-11-13): the phone menu as a set of big rows that unfold.
+ * Each group is a row: the name in the display face and a hint of what is inside (NV-9: no index
+ * numbers; the order carries no meaning). Tapping a row unfolds its links as tiles that cascade in,
+ * the plus turns into a minus and the other rows step back. One group open at a time; the group you are in starts
  * open. The rows rise in one after another when the menu opens (globals.css, .site-menu[open]).
  * Under reduced motion everything simply appears.
  */
@@ -171,9 +172,6 @@ function PhoneMenu({ path }: { path: string }) {
               onClick={() => setOpen(isOpen ? null : g.id)}
               className="group/row flex w-full items-center gap-4 rounded-2xl px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
             >
-              <span aria-hidden="true" className={`w-6 shrink-0 font-mono text-xs tabular-nums transition-colors duration-300 ${isOpen || active === g.id ? "text-brand-700 dark:text-brand-300" : "text-zinc-400 dark:text-zinc-500"}`}>
-                {String(gi + 1).padStart(2, "0")}
-              </span>
               <span className="min-w-0 flex-1">
                 <span className={`block font-display text-[1.75rem] leading-9 font-semibold tracking-tight transition-colors duration-300 ${active === g.id ? "text-brand-800 dark:text-brand-300" : "text-zinc-950 dark:text-white"}`}>
                   {g.label}

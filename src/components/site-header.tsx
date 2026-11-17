@@ -9,24 +9,27 @@ import { DesktopNav, PhoneNavLinks } from "./site-nav";
 /** The site's top bar. A plain details element opens the phone menu, so it works without JavaScript. */
 export function SiteHeader() {
   return (
-    <header className="site-header sticky top-0 z-50 border-b border-brand-100/80 bg-white/70 backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-[#071a1d]/70">
+    // NV-9: the bar is set apart from the page by one tone step (--chrome), not a line.
+    <header className="site-header sticky top-0 z-50 bg-(--chrome)/85 backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 md:px-6">
         <Link href="/" className="shrink-0" aria-label="Xplaind home">
           <BrandLogo height={22} />
         </Link>
-        <nav aria-label="Main" className="hidden md:block">
+        {/* NV-9: the full bar needs about 900 px (five groups plus search and account), so tablets keep the
+            phone menu and the bar starts at 1024 px; at 768 px it ran 128 px past the screen. */}
+        <nav aria-label="Main" className="hidden lg:block">
           <DesktopNav />
         </nav>
         <div className="flex items-center gap-2">
           <HeaderSearch />
           <XpChip />
-          <SignInLink className="hidden h-10 items-center rounded-full px-3 text-sm font-medium text-zinc-800 hover:bg-brand-50 hover:text-brand-950 sm:inline-flex dark:text-zinc-200 dark:hover:bg-white/10" />
+          <SignInLink className="hidden h-10 items-center rounded-full px-3 text-sm font-medium text-zinc-800 hover:bg-brand-100 hover:text-brand-950 sm:inline-flex dark:text-zinc-200 dark:hover:bg-white/10" />
           <AccountButton className="site-cta hidden sm:inline-flex h-10 items-center rounded-full bg-brand-700 px-4 text-sm font-medium text-white shadow-sm shadow-brand-700/30 hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700" />
           <AccountMenu />
           <ClaimOnSignIn />
           {/* BR-6: top right on larger screens; on phones it is a row in the menu, so the bar fits 360 px. */}
           <ThemeToggle className="hidden sm:grid" />
-          <details className="site-menu group relative md:hidden">
+          <details className="site-menu group relative lg:hidden">
             <summary className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 [&::-webkit-details-marker]:hidden">
               <span className="sr-only">Menu</span>
               <span aria-hidden="true" className="flex w-4 flex-col gap-1">
@@ -37,7 +40,7 @@ export function SiteHeader() {
             {/* NV-3: a full-height menu with the groups, the main action first. */}
             <nav
               aria-label="Main"
-              className="fixed inset-x-0 top-14 bottom-0 z-50 flex flex-col gap-6 overflow-y-auto overscroll-contain border-t border-zinc-200 bg-white px-3 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] dark:border-zinc-800 dark:bg-zinc-950"
+              className="fixed inset-x-0 top-14 bottom-0 z-50 flex flex-col gap-6 overflow-y-auto overscroll-contain bg-white px-3 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] dark:border-zinc-800 dark:bg-zinc-950"
             >
               <AccountButton className="flex min-h-12 items-center justify-center rounded-full bg-brand-700 px-6 text-base font-medium text-white hover:bg-brand-800" />
               <SignInLink
@@ -46,7 +49,7 @@ export function SiteHeader() {
               />
               <PhoneNavLinks />
               <ThemeToggle labelled />
-              <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 empty:hidden dark:border-zinc-800">
+              <div className="flex flex-col gap-2 pt-2 empty:hidden">
                 <SignedInLinks
                   linkClass="flex min-h-12 items-center rounded-2xl px-3 text-base font-medium text-zinc-900 hover:bg-brand-50 dark:text-zinc-100 dark:hover:bg-white/5"
                   buttonClass="flex min-h-12 w-full items-center rounded-2xl px-3 text-left text-base font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-white/5"
