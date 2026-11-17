@@ -7,6 +7,7 @@ import { SiteMotion } from "@/components/motion/site-motion";
 import { SiteFooter } from "@/components/site-footer";
 import { NavProgress } from "@/components/nav-progress";
 import { PageLoader } from "@/components/page-loader";
+import { SkipLink } from "@/components/skip-link";
 import { PageLoaderControl } from "@/components/page-loader-control";
 import { SiteHeader } from "@/components/site-header";
 import { allowIndexing } from "@/lib/indexing";
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
+        <SkipLink />
         {/* UX-7: on screen from the first paint; PageLoaderControl hides and brings it back. */}
         <PageLoader />
         <SiteHeader />
