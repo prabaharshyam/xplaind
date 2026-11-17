@@ -29,7 +29,7 @@ export function Celebrate({ message, onDone }: { message: string; onDone: () => 
           />
         ))}
       </div>
-      <p role="status" className="flex items-center gap-3 rounded-full bg-zinc-900 px-5 py-3 text-white shadow-2xl dark:bg-white dark:text-black">
+      <p role="status" className="xp-glass-strong relative z-0 flex items-center gap-3 rounded-full px-5 py-3 font-medium text-zinc-900 dark:text-white">
         {message}
       </p>
     </div>

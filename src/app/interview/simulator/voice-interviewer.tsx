@@ -594,7 +594,7 @@ function RoundButton({
   disabled?: boolean;
   title?: string;
 }) {
-  const fill = tone === "primary" ? "bg-white text-brand-950 hover:bg-brand-50" : tone === "end" ? "bg-rose-600 text-white hover:bg-rose-700" : "bg-white/10 text-white hover:bg-white/20";
+  const fill = tone === "primary" ? "bg-white text-brand-950 hover:bg-brand-50" : tone === "end" ? "bg-rose-600 text-white hover:bg-rose-700" : "xp-glass-btn-dark text-white";
   return (
     <button
       type="button"

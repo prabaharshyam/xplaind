@@ -477,7 +477,7 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="sticky top-14 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-950/90">
+      <div className="sticky top-16 md:top-[4.25rem] z-10 -mx-4 flex items-center justify-between gap-3 border-b border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-950/90">
         <p className="text-sm font-medium">
           Question {i + 1} of {test.questions.length}
         </p>
