@@ -266,14 +266,9 @@ html.lenis {
   body:has(.lx-trackbar) { padding-bottom: 4rem; }
 }
 
-/* NV-3: the phone menu fills the screen below the top bar. A backdrop filter would make the bar the
-   menu's containing block, so the bar turns solid while the menu is open, and the page behind it
-   stops scrolling. */
+/* NV-3: while the phone menu is open, the page behind it stops scrolling. (GL-1: the bar's glass is
+   drawn on a ::before layer, so the bar is no longer the fixed menu's containing block.) */
 @media (max-width: 767px) {
-  .site-header:has(details.site-menu[open]) {
-    backdrop-filter: none;
-    background: var(--background);
-  }
   html:has(.site-header details.site-menu[open]) { overflow: hidden; }
 }
 
@@ -398,7 +393,8 @@ select:not([multiple]) {
 
 /* NV-6: when the phone menu opens, its rows rise in one after another. */
 @media (prefers-reduced-motion: no-preference) {
-  .site-menu[open] > nav { animation: nav-fade 220ms ease-out both; }
+  /* GL-1: backwards, not both: a filled opacity animation would stop the sheet's glass from blurring the page. */
+  .site-menu[open] > nav { animation: nav-fade 220ms ease-out backwards; }
   .site-menu[open] [data-nav-row] { animation: nav-rise 560ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i, 0) * 55ms + 60ms); }
 }
 @keyframes nav-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -433,3 +429,82 @@ select:not([multiple]) {
 .xp-range::-moz-range-thumb { width: 32px; height: 32px; border: 0; border-radius: 10px; background: var(--color-brand-300); }
 .xp-range:active::-webkit-slider-thumb { transform: scale(1.12); }
 .xp-range:focus-visible { outline: 2px solid var(--color-brand-200); outline-offset: 4px; border-radius: 12px; }
+
+/* GL-1 (owner request, 2026-11-17, mock-up): Apple-style glass. One material, used where things float
+   over the page (the top bar, its menus, the phone menu), never behind reading text. The material is
+   drawn on a ::before layer, not on the element itself, so the element does not become the containing
+   block of the fixed phone menu, and menus nested in the bar still blur the page behind them (a
+   backdrop-filter on an ancestor would cut them off from it). The element must be positioned and
+   form a stacking context (a z-index, or a parent that has one), so the layer stays behind its content. Solid
+   when the browser has no backdrop-filter, when the person asks for less transparency, and in forced
+   colours. */
+:root {
+  --glass-fill: rgb(255 255 255 / 0.62);
+  --glass-fill-strong: rgb(255 255 255 / 0.82);
+  --glass-edge: rgb(255 255 255 / 0.75);
+  --glass-rim: rgb(6 31 34 / 0.08);
+  --glass-shine: rgb(255 255 255 / 0.9);
+  --glass-shadow: 0 10px 30px -12px rgb(6 31 34 / 0.28), 0 2px 6px -2px rgb(6 31 34 / 0.08);
+  --glass-solid: #ffffff;
+}
+:root[data-theme="dark"] {
+  --glass-fill: rgb(10 46 51 / 0.55);
+  --glass-fill-strong: rgb(8 36 40 / 0.8);
+  --glass-edge: rgb(255 255 255 / 0.14);
+  --glass-rim: rgb(0 0 0 / 0.35);
+  --glass-shine: rgb(255 255 255 / 0.16);
+  --glass-shadow: 0 12px 36px -12px rgb(0 0 0 / 0.6), 0 2px 6px -2px rgb(0 0 0 / 0.3);
+  --glass-solid: #0a2e33;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --glass-fill: rgb(10 46 51 / 0.55);
+    --glass-fill-strong: rgb(8 36 40 / 0.8);
+    --glass-edge: rgb(255 255 255 / 0.14);
+    --glass-rim: rgb(0 0 0 / 0.35);
+    --glass-shine: rgb(255 255 255 / 0.16);
+    --glass-shadow: 0 12px 36px -12px rgb(0 0 0 / 0.6), 0 2px 6px -2px rgb(0 0 0 / 0.3);
+    --glass-solid: #0a2e33;
+  }
+}
+.xp-glass::before,
+.xp-glass-strong::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  /* The rim of the glass: a bright top edge, a faint outline and a soft lift off the page. */
+  box-shadow: inset 0 1px 0 var(--glass-shine), inset 0 0 0 1px var(--glass-edge), 0 0 0 1px var(--glass-rim), var(--glass-shadow);
+}
+.xp-glass-strong::before { background: var(--glass-fill-strong); }
+/* Glass buttons: a lighter pane that brightens on hover and presses in. */
+.xp-glass-btn {
+  background: rgb(255 255 255 / 0.5);
+  box-shadow: inset 0 1px 0 var(--glass-shine), inset 0 0 0 1px var(--glass-edge), 0 1px 2px var(--glass-rim);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+.xp-glass-btn:hover { background: rgb(255 255 255 / 0.75); }
+.xp-glass-btn:active { transform: scale(0.97); }
+:where([data-theme="dark"]) .xp-glass-btn { background: rgb(255 255 255 / 0.08); }
+:where([data-theme="dark"]) .xp-glass-btn:hover { background: rgb(255 255 255 / 0.14); }
+@media (prefers-color-scheme: dark) {
+  :where(:root:not([data-theme])) .xp-glass-btn { background: rgb(255 255 255 / 0.08); }
+  :where(:root:not([data-theme])) .xp-glass-btn:hover { background: rgb(255 255 255 / 0.14); }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .xp-glass::before, .xp-glass-strong::before { background: var(--glass-solid); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .xp-glass::before, .xp-glass-strong::before { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .xp-glass-btn { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (forced-colors: active) {
+  .xp-glass::before, .xp-glass-strong::before { background: Canvas; border: 1px solid CanvasText; box-shadow: none; }
+}

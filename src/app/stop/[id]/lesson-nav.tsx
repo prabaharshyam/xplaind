@@ -35,7 +35,7 @@ export function LessonNav({ sections }: { sections: SectionLink[] }) {
 
   return (
     <>
-      <div className="sticky top-14 z-30 -mx-4 h-1 bg-zinc-200 lg:hidden dark:bg-zinc-800" aria-hidden="true">
+      <div className="sticky top-16 md:top-[4.25rem] z-30 -mx-4 h-1 bg-zinc-200 lg:hidden dark:bg-zinc-800" aria-hidden="true">
         <div className="h-full bg-emerald-600 transition-[width] duration-500" style={{ width: `${percent}%` }} />
       </div>
       <div className="hidden lg:block lg:h-full lg:pt-10">
