@@ -14,8 +14,14 @@ import { asData, DATA_RULE, HOUSE_STYLE } from "./prompt";
 export const VOICE_QUESTION_COUNTS = [3, 5] as const;
 export const MAX_VOICE_QUESTIONS = 5;
 export const MAX_FOLLOW_UPS = 2;
+/**
+ * VI-14 (2026-11-17, owner report: the candidate asked Zarina to explain her question and she moved on):
+ * times per question the interviewer may explain or rephrase her question when the candidate asks. They
+ * do not count as follow-ups, so a candidate who is lost is never moved on mid-question.
+ */
+export const MAX_CLARIFICATIONS = 2;
 const MAX_ANSWER_CHARS = 3000;
-const MAX_ASKED_CHARS = 300;
+const MAX_ASKED_CHARS = 500;
 
 /** VI-3: calls one learner may make a minute across the AI tools; follow-ups come every 30 to 90 seconds. */
 export const VOICE_BURST = 12;
@@ -31,11 +37,13 @@ const Exchange = z.strictObject({
   /** What the learner said, as text. Empty when they skipped. */
   answer: z.string().max(MAX_ANSWER_CHARS + 1000),
   seconds: z.number().min(0).max(900),
+  /** VI-14: what was asked was the interviewer explaining her question, not a follow-up. */
+  clarify: z.boolean().optional(),
 });
 export type Exchange = z.infer<typeof Exchange>;
 
 const QuestionId = z.string().min(1).max(80);
-const Exchanges = z.array(Exchange).min(1).max(MAX_FOLLOW_UPS + 1);
+const Exchanges = z.array(Exchange).min(1).max(MAX_FOLLOW_UPS + MAX_CLARIFICATIONS + 1);
 
 /** One follow-up turn: the question and everything said about it so far. */
 export const VoiceTurnRequest = z.strictObject({ questionId: QuestionId, exchanges: Exchanges, ...SetupFields });
@@ -65,19 +73,39 @@ export type VoiceQuestion = {
 
 const said = (e: Exchange) => e.answer.trim().length > 0;
 
+/** Follow-ups asked so far for this question, not counting the times she explained the question. */
+export const followUpsAsked = (exchanges: readonly Exchange[]) => exchanges.slice(1).filter((e) => !e.clarify).length;
+const clarificationsGiven = (exchanges: readonly Exchange[]) => exchanges.filter((e) => e.clarify).length;
+
 /**
- * Whether to ask a follow-up now, before any model call. No follow-up after a skipped or silent answer
- * (there is nothing to probe), and never more than MAX_FOLLOW_UPS. Pure, for tests.
+ * VI-14: whether the candidate's reply asks the interviewer for help with the question (to repeat,
+ * explain or rephrase it, or says they did not follow) rather than answering it. A cheap first check,
+ * used only to decide whether a model call is worth making once the follow-ups are used up; the model
+ * makes the real call. Pure, for tests.
  */
-export function turnDecision(exchanges: readonly Exchange[]): "ask" | "done" {
+export function asksForHelp(answer: string): boolean {
+  const t = answer.toLowerCase().replace(/\s+/g, " ").trim();
+  if (!t) return false;
+  return /\b(don'?t|do not|didn'?t|did not|not able to|unable to|couldn'?t|could not) (really )?(understand|get|follow|catch)\b|\b(explain|clarify|rephrase|repeat|elaborate)\b|\bsay (that|it) again\b|\bwhat do you mean\b|\bwhat does (that|this|it) mean\b|\bnot (clear|sure what you mean)\b|\bcome again\b|\bpardon\b|\bconfus(ed|ing)\b|\bone more time\b/.test(t);
+}
+
+/**
+ * Whether to call the model now, before any model call. Nothing after a skipped or silent answer (there
+ * is nothing to probe). "ask": a follow-up or, if the candidate asked for help, an explanation. "clarify":
+ * the follow-ups are used up, but the candidate seems to be asking for help with the question, so she may
+ * still explain it (VI-14). "done": move on. Pure, for tests.
+ */
+export function turnDecision(exchanges: readonly Exchange[]): "ask" | "clarify" | "done" {
   if (exchanges.length === 0 || !said(exchanges[exchanges.length - 1])) return "done";
-  return exchanges.length - 1 < MAX_FOLLOW_UPS ? "ask" : "done";
+  const helpLeft = clarificationsGiven(exchanges) < MAX_CLARIFICATIONS;
+  if (followUpsAsked(exchanges) < MAX_FOLLOW_UPS) return "ask";
+  return helpLeft && asksForHelp(exchanges[exchanges.length - 1].answer) ? "clarify" : "done";
 }
 
 // ------------------------------------------------------------- follow-ups --
 
 /** The model's answer for one turn. Kept loose: limits are applied in cleanTurn. */
-export const VoiceTurnOutput = z.object({ follow_up: z.string(), done: z.boolean() });
+export const VoiceTurnOutput = z.object({ follow_up: z.string(), done: z.boolean(), clarify: z.boolean() });
 export type VoiceTurnOutput = z.infer<typeof VoiceTurnOutput>;
 
 const transcript = (q: VoiceQuestion, exchanges: readonly Exchange[]) =>
@@ -85,16 +113,26 @@ const transcript = (q: VoiceQuestion, exchanges: readonly Exchange[]) =>
     .map((e, i) =>
       i === 0
         ? `Main question: ${q.question}\n${asData("answer", e.answer, MAX_ANSWER_CHARS)}`
-        : `Follow-up ${i}, as sent back by the browser:\n${asData("follow_up_asked", e.asked, MAX_ASKED_CHARS)}\n${asData("answer", e.answer, MAX_ANSWER_CHARS)}`,
+        : e.clarify
+          ? `The interviewer explained the question (the candidate had asked for help; not a follow-up), as sent back by the browser:\n${asData("interviewer_explained", e.asked, MAX_ASKED_CHARS)}\n${asData("answer", e.answer, MAX_ANSWER_CHARS)}`
+          : `Follow-up, as sent back by the browser:\n${asData("follow_up_asked", e.asked, MAX_ASKED_CHARS)}\n${asData("answer", e.answer, MAX_ANSWER_CHARS)}`,
     )
     .join("\n\n");
 
 export function voiceTurnPrompt(q: VoiceQuestion, exchanges: readonly Exchange[], ctx?: InterviewContext) {
   const first = exchanges.length === 1;
+  const mode = turnDecision(exchanges);
+  const helpLeft = clarificationsGiven(exchanges) < MAX_CLARIFICATIONS;
   const system = [
     "You are a calm, fair senior interviewer for an AI role at a company in India, running a spoken mock interview for Xplaind. Your question will be read aloud by the browser. Pitch the follow-up at the experience level the role asks for, when it is given.",
     HOUSE_STYLE,
     DATA_RULE,
+    helpLeft
+      ? "First, read the candidate's latest reply. If instead of answering they asked you something about the question (to repeat, explain or rephrase it, what a word in it means, or what you are looking for), or said they did not understand it, set clarify to true and done to false, and in follow_up help them the way a kind human interviewer would: answer what they asked in plain words (say what the question is really about, define any term they asked about, or put it in an everyday example), without giving away the answer or the points a strong answer covers, then ask the question again more simply. Up to 70 words, warm and spoken. Never move on or ask something new when they asked for help. If they asked something unrelated to the interview, say briefly that you can talk about it after the interview, then ask the question again."
+      : "",
+    mode === "clarify"
+      ? "You have no follow-ups left for this question: only help if the candidate asked for it as above; otherwise set clarify to false, done to true and follow_up to an empty string."
+      : "If the candidate answered (they did not ask for help), set clarify to false and follow these rules:",
     "Ask exactly one follow-up question, the way a demanding senior interviewer would, about what the candidate actually said. Pick the move that would reveal the most: challenge a claim (\"Why that and not X?\"), ask for specifics or numbers (\"How big, how many, how fast?\"), test a trade-off or failure (\"What breaks if...?\", \"What would you do when...?\"), ask for real experience (\"Tell me about a time you actually did this\"), or press on a rubric point they skipped or got wrong. Refer to their own words.",
     "Talk like a friendly, professional human interviewer on a call. The candidate has just heard a short \"Okay\" or \"Mm-hm\" from you, so do not start with another acknowledgement, and never say whether the answer was right or good.",
     "follow_up: do not coach, hint at, or give the answer. One or two short sentences, at most 35 words, plain spoken English with no lists, symbols or code, as you would say it out loud.",
@@ -110,7 +148,7 @@ export function voiceTurnPrompt(q: VoiceQuestion, exchanges: readonly Exchange[]
   const about = ctx ? contextBlock(ctx) : "";
   return {
     system,
-    messages: [{ role: "user" as const, content: `${about ? `${about}\n\n` : ""}The interview so far:\n\n${transcript(q, exchanges)}\n\nAsk the next follow-up.` }],
+    messages: [{ role: "user" as const, content: `${about ? `${about}\n\n` : ""}The interview so far:\n\n${transcript(q, exchanges)}\n\nReply to the candidate's latest words: help if they asked for it, otherwise ask the next follow-up.` }],
     schema: VoiceTurnOutput,
   };
 }
@@ -181,11 +219,17 @@ export const CLOSING_LINE = "That's the end of the interview. Thank you! Give me
  * The follow-up to ask, or null to move on. The first follow-up is required (VI-1): if the model declines,
  * the bank's own follow-up is asked instead. Pure.
  */
-export function cleanTurn(out: VoiceTurnOutput, q: VoiceQuestion, exchanges: readonly Exchange[]): string | null {
-  if (turnDecision(exchanges) === "done") return null;
+export function cleanTurn(out: VoiceTurnOutput, q: VoiceQuestion, exchanges: readonly Exchange[]): { line: string; clarify: boolean } | null {
+  const mode = turnDecision(exchanges);
+  if (mode === "done") return null;
   const asked = oneLine(out.follow_up, MAX_ASKED_CHARS);
-  if (asked.length >= 8 && !out.done) return asked;
-  return exchanges.length === 1 ? (bankFollowUp(q, exchanges) ?? null) : null;
+  const helpLeft = clarificationsGiven(exchanges) < MAX_CLARIFICATIONS;
+  // VI-14: she explains the question when the candidate asked for help (never past the limit).
+  if (out.clarify && helpLeft && asked.length >= 8) return { line: asked, clarify: true };
+  if (mode === "clarify") return null;
+  if (asked.length >= 8 && !out.done) return { line: asked, clarify: false };
+  const bank = followUpsAsked(exchanges) === 0 ? bankFollowUp(q, exchanges) : null;
+  return bank ? { line: bank, clarify: false } : null;
 }
 
 /** A follow-up from the bank not asked yet, used when the model declines or the call fails. Pure. */
@@ -390,7 +434,7 @@ export function buildVoiceReport(out: VoiceReportOutput, items: readonly AskedIt
       questionId: q.id,
       question: q.question,
       answered,
-      followUps: Math.max(0, exchanges.length - 1),
+      followUps: followUpsAsked(exchanges),
       points,
       coverage: q.rubric.length ? Math.round((covered / q.rubric.length) * 100) : 0,
       depth: answered ? clamp(m?.depth ?? 0, 0, 5) : 0,
