@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DraftNote } from "@/components/draft-note";
 import { FlowDiagram } from "@/components/flow-diagram";
 import { PageHero } from "@/components/page-hero";
 import { primaryButton, textLink } from "@/components/ui";
@@ -79,7 +78,6 @@ export default async function DesignPage({ params }: PageProps<"/interview/desig
           </ol>
         </nav>
         <div className="flex min-w-0 flex-col gap-6">
-          {d.reviewed_by === "UNREVIEWED" && <DraftNote />}
           <blockquote className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 text-lg leading-8 dark:border-brand-900 dark:bg-brand-950/30">
             <span className="block text-sm font-semibold text-brand-900 dark:text-brand-200">The question</span>
             &ldquo;{d.prompt}&rdquo;

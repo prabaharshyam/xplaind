@@ -1,7 +1,6 @@
 import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DraftNote } from "@/components/draft-note";
 import { PageHero } from "@/components/page-hero";
 import { muted, textLink } from "@/components/ui";
 import { getGlossary, lessonsWithTerm } from "@/lib/content";
@@ -25,10 +24,6 @@ export default function GlossaryPage() {
     <main>
       <PageHero shape="bulb" theme="ai-basics" seed="glossary" icon="book" eyebrow="Glossary" title="AI glossary" lead={`${terms.length} AI terms in plain words. Each links to the lessons that teach it.`} />
       <div className="mx-auto max-w-3xl px-4 py-8">
-      <div>
-        <DraftNote />
-      </div>
-
       <nav aria-label="Letters" className="mt-6">
         <ol className="flex flex-wrap gap-1.5">
           {letters.map((l) => (

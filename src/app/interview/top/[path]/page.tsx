@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DraftNote } from "@/components/draft-note";
 import { JsonLd } from "@/components/json-ld";
 import { PageHero } from "@/components/page-hero";
 import { primaryButton, textLink } from "@/components/ui";
@@ -92,7 +91,6 @@ export default async function TopInterviewPage({ params }: PageProps<"/interview
                 <h2 id={`${q.id}-h`} className="mt-2 text-xl leading-snug font-semibold text-balance">
                   {q.question}
                 </h2>
-                {!q.reviewed && <DraftNote />}
 
                 <h3 className="mt-4 text-sm font-semibold text-emerald-800 dark:text-emerald-400">Short answer</h3>
                 <p className="mt-1 leading-7">{q.short_answer}</p>

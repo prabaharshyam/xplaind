@@ -3,7 +3,6 @@ import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { ContentGate } from "@/components/account/content-gate";
 import { notFound } from "next/navigation";
-import { DraftNote } from "@/components/draft-note";
 import { PageHero } from "@/components/page-hero";
 import { muted, textLink } from "@/components/ui";
 import { getProject, getProjects, getStop, stagesWithGuide } from "@/lib/content";
@@ -115,11 +114,6 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[id]"
             </section>
           )}
           </ContentGate>
-          {p.drafted_with_ai && (
-            <div className="mt-8">
-              <DraftNote />
-            </div>
-          )}
         </div>
       </div>
     </main>
