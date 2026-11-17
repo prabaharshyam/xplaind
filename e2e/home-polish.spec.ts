@@ -61,3 +61,23 @@ test("on a phone the level-check link starts its own line under 'Choose your AI 
   expect(box.y).toBeGreaterThanOrEqual(text - 1); // the link sits below the sentence before it
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
+
+test("'Choose your AI role' stays on one line on phones, with 'Compare all roles' under it on the left (HM-4)", async ({ page }) => {
+  for (const width of [360, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/");
+    const h = page.locator("#roles-heading");
+    await h.scrollIntoViewIfNeeded();
+    const lines = await h.evaluate((e) => Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight)));
+    expect(lines, `${width}px`).toBe(1);
+    const hb = (await h.boundingBox())!;
+    const cb = (await page.locator("#roles").getByRole("link", { name: "Compare all roles →" }).boundingBox())!;
+    expect(cb.y).toBeGreaterThan(hb.y + hb.height - 2); // under the heading
+    expect(Math.abs(cb.x - hb.x)).toBeLessThan(2); // on the left edge, not pushed right
+  }
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.goto("/");
+  const h = (await page.locator("#roles-heading").boundingBox())!;
+  const c = (await page.locator("#roles").getByRole("link", { name: "Compare all roles →" }).boundingBox())!;
+  expect(c.x).toBeGreaterThan(h.x + h.width); // from 640 px up it sits beside the heading, on the right
+});

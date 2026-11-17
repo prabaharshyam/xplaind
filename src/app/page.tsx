@@ -196,7 +196,7 @@ export default function Home() {
       <section id="roles" aria-labelledby="roles-heading" className="scroll-mt-20 py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={1} label="Start here" />
-          <div className="mt-4 flex items-end justify-between gap-4">
+          <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
             <h2 id="roles-heading" data-words className="max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
               <Words text="Choose your AI role" />
             </h2>
