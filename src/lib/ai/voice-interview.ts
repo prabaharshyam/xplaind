@@ -118,18 +118,38 @@ export const ACK_LINES = ["Okay.", "Mm-hm.", "Got it.", "Right, okay.", "I see."
 /** Words after which a speaker is clearly mid-thought: wait longer before sending. */
 const TRAILING = /\b(and|but|so|because|or|then|like|um+|uh+|er+|which|that|the|a|an|to|of|for|with|if|when|is|are|was|basically|actually|i mean|you know)$/i;
 
+/** VI-9 (owner's choice, 17 Nov): the silence that ends an answer. Patient, because people stop to think. */
+export const PAUSE_MS = 5000;
+export const TRAILING_PAUSE_MS = 7000;
+
 /**
- * VI-8: how long a pause ends the learner's answer, from what they have said so far. A trailing "and",
- * "so" or "um", or a very short answer, means they are still thinking: wait longer. A long answer that
- * ends cleanly can go sooner. Pure, for tests.
+ * VI-9: how long a pause ends the learner's answer: 5 seconds of silence, or 7 when they trailed off on
+ * "and", "so", "um" or a comma, since they are clearly mid-thought. Pure, for tests.
  */
 export function pauseToSend(said: string): number {
-  const text = said.trim().toLowerCase().replace(/[.,!?;:]+$/, "");
-  const words = text ? text.split(/\s+/).length : 0;
-  if (!words) return Infinity;
-  if (TRAILING.test(text) || said.trim().endsWith(",")) return 4500;
-  if (words < 6) return 3500;
-  return words >= 25 ? 2000 : 2600;
+  const text = said.trim().toLowerCase().replace(/[.!?;:]+$/, "");
+  if (!text) return Infinity;
+  return TRAILING.test(text.replace(/,$/, "")) || text.endsWith(",") ? TRAILING_PAUSE_MS : PAUSE_MS;
+}
+
+/** Common AI words a speech model mishears; sent to it as hints with each question's own terms. */
+const AI_TERMS = ["RAG", "LLM", "embeddings", "vector database", "transformer", "attention", "fine-tuning", "prompt", "tokens", "chunking", "retrieval", "hallucination", "LangChain", "agent", "evaluation", "latency", "inference", "GPU", "API", "Python"];
+
+/**
+ * VI-9: up to 50 hint terms for speech-to-text (Sarvam keyterms, 64 characters each): the question's own
+ * rubric keywords first, then common AI terms, without repeats. Pure, for tests.
+ */
+export function keytermsFor(q: { rubric: readonly { keywords?: readonly string[] }[] }): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of [...q.rubric.flatMap((r) => r.keywords ?? []), ...AI_TERMS]) {
+    const term = t.trim().slice(0, 64);
+    if (term.length < 2 || seen.has(term.toLowerCase())) continue;
+    seen.add(term.toLowerCase());
+    out.push(term);
+    if (out.length === 50) break;
+  }
+  return out;
 }
 
 /**

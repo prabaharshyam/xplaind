@@ -71,14 +71,13 @@ describe("what the interviewer says, and when it answers (VI-7, VI-8)", () => {
     for (const a of ACK_LINES) expect(a).not.toMatch(/great|good|excellent|correct|wrong/i);
   });
 
-  it("waits longer when the learner is mid-thought, and less after a long, finished answer", () => {
+  it("waits 5 seconds of silence, and 7 when the learner trails off mid-thought (VI-9)", () => {
     expect(pauseToSend("")).toBe(Infinity);
-    expect(pauseToSend("We split the documents and")).toBe(4500);
-    expect(pauseToSend("I would use chunking because")).toBe(4500);
-    expect(pauseToSend("so the idea is, um")).toBe(4500);
-    expect(pauseToSend("first we embed the text,")).toBe(4500);
-    expect(pauseToSend("RAG means retrieval")).toBe(3500);
-    expect(pauseToSend("RAG retrieves relevant passages and adds them to the prompt")).toBe(2600);
-    expect(pauseToSend("word ".repeat(30) + "done")).toBe(2000);
+    expect(pauseToSend("RAG retrieves relevant passages and adds them to the prompt")).toBe(5000);
+    expect(pauseToSend("RAG means retrieval")).toBe(5000);
+    expect(pauseToSend("We split the documents and")).toBe(7000);
+    expect(pauseToSend("I would use chunking because")).toBe(7000);
+    expect(pauseToSend("so the idea is, um")).toBe(7000);
+    expect(pauseToSend("first we embed the text,")).toBe(7000);
   });
 });

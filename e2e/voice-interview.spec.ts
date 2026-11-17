@@ -119,7 +119,7 @@ const startRoute = (page: Page, calls: unknown[] = []) =>
 
 const spoken = (page: Page) => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken);
 
-test("a call that runs itself: the interviewer speaks, listens, sends on a pause, says okay, follows up and reports (VI-1, VI-2, VI-4, VI-7, VI-8)", async ({ page }) => {
+test("a call that runs itself (browser speech-to-text): the interviewer speaks, listens, sends on a pause, says okay, follows up and reports (VI-1, VI-2, VI-4, VI-7, VI-8)", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(fakeSpeechOut);
   await page.addInitScript(fakeMicrophone, [
@@ -146,8 +146,8 @@ test("a call that runs itself: the interviewer speaks, listens, sends on a pause
 
   // VI-2: a consent notice before anything is sent.
   await expect(page.getByRole("heading", { level: 2, name: "Before you start" })).toBeVisible();
-  await expect(page.getByText(/Only that text \(the transcript\) is sent to our AI/)).toBeVisible();
-  await expect(page.getByText(/voice is made by Sarvam AI/)).toBeVisible();
+  await expect(page.getByText(/Only the text \(the transcript\) goes to our AI/)).toBeVisible();
+  await expect(page.getByText(/Xplaind\s+does not keep the recordings/)).toBeVisible();
   expect(starts).toEqual([]);
   expect((await wcag(page)).violations).toEqual([]);
   await page.getByRole("button", { name: "I agree, start the interview" }).click();
@@ -163,7 +163,7 @@ test("a call that runs itself: the interviewer speaks, listens, sends on a pause
   await expect(call.getByText("Basically we retrieve relevant chunks", { exact: false })).toBeVisible();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
-  await expect(page.getByRole("status").filter({ hasText: "Zarina is thinking" })).toBeVisible({ timeout: 6000 });
+  await expect(page.getByRole("status").filter({ hasText: "Zarina is thinking" })).toBeVisible({ timeout: 10_000 });
   // VI-8: an instant "Okay" while the follow-up is written. Reduced motion: the thinking dots stay still.
   await expect.poll(() => spoken(page)).toContain("Okay.");
   expect(await page.locator('[class*="xp-think"]').first().evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
@@ -174,7 +174,7 @@ test("a call that runs itself: the interviewer speaks, listens, sends on a pause
   await expect.poll(() => spoken(page)).toContain(FOLLOW_UP);
 
   // The second answer is also sent on a pause, then the report.
-  await expect(page.getByRole("heading", { name: "Your AI interview report" })).toBeFocused({ timeout: 12_000 });
+  await expect(page.getByRole("heading", { name: "Your AI interview report" })).toBeFocused({ timeout: 20_000 });
   await expect(page.getByRole("meter", { name: "Interview score" })).toHaveAttribute("aria-valuenow", "72");
   await expect(page.getByText("You said: “we retrieve relevant chunks”")).toBeVisible();
   await expect.poll(() => spoken(page)).toContain("That's the end of the interview.");
@@ -202,10 +202,10 @@ test("trailing off waits longer, warns before sending, and Hold on waits for Don
   await page.getByRole("button", { name: "Start the AI interviewer" }).click();
   await page.getByRole("button", { name: "I agree, start the interview" }).click();
   const hold = page.getByRole("button", { name: "Hold on, I'm not done" });
-  await expect(page.getByText("Sending in a moment…")).toBeVisible({ timeout: 6000 });
+  await expect(page.getByText("Sending in a moment…")).toBeVisible({ timeout: 10_000 });
   await hold.click();
   await expect(page.getByText("Take your time. Tap Done when you finish.")).toBeVisible();
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(4000);
   expect(turns).toEqual([]); // held: nothing was sent
   await page.getByRole("button", { name: "Done" }).click();
   await expect.poll(() => turns.length).toBe(1);
@@ -271,4 +271,112 @@ test("when the microphone is blocked, the learner is told plainly and can type i
   await page.getByRole("button", { name: "Send answer" }).click();
   await expect.poll(() => turns.length).toBe(1);
   await expect(page.getByRole("heading", { name: "Your AI interview report" })).toBeVisible();
+});
+
+/**
+ * A microphone, recorder and audio graph for the Sarvam path (VI-9): each time the microphone is unmuted,
+ * it is loud ("speech") from 0.5 s to 2.5 s, then quiet. The recorder hands over a small fake clip.
+ */
+const fakeRecordingMic = () => {
+  const w = window as unknown as Record<string, unknown> & { __mic: { enabled: boolean; on: number } };
+  const mic = { enabled: false, on: 0 };
+  w.__mic = mic;
+  const track = {
+    get enabled() {
+      return mic.enabled;
+    },
+    set enabled(v: boolean) {
+      if (v && !mic.enabled) mic.on = Date.now();
+      mic.enabled = v;
+    },
+    stop() {},
+  };
+  const stream = { getAudioTracks: () => [track], getTracks: () => [track] };
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: async () => stream } });
+  class Ctx {
+    createAnalyser() {
+      return {
+        fftSize: 1024,
+        getFloatTimeDomainData(buf: Float32Array) {
+          const t = Date.now() - mic.on;
+          const level = mic.enabled && t > 500 && t < 2500 ? 0.2 : 0.002;
+          buf.fill(level);
+        },
+      };
+    }
+    createMediaStreamSource() {
+      return { connect() {} };
+    }
+    resume() {
+      return Promise.resolve();
+    }
+    close() {
+      return Promise.resolve();
+    }
+  }
+  w.AudioContext = Ctx;
+  class Recorder {
+    static isTypeSupported = (t: string) => t.startsWith("audio/webm");
+    state = "inactive";
+    ondataavailable: ((e: { data: Blob }) => void) | null = null;
+    onstop: (() => void) | null = null;
+    start() {
+      this.state = "recording";
+    }
+    stop() {
+      this.state = "inactive";
+      setTimeout(() => {
+        this.ondataavailable?.({ data: new Blob(["fake audio"], { type: "audio/webm" }) });
+        this.onstop?.();
+      }, 10);
+    }
+  }
+  w.MediaRecorder = Recorder;
+};
+
+test("with Sarvam, answers are recorded in pieces, transcribed as you talk, and sent after 5 seconds of real silence (VI-9)", async ({ page }) => {
+  await page.addInitScript(fakeSpeechOut);
+  await page.addInitScript(fakeRecordingMic);
+  await page.route("**/api/ai/voice/start", (route) =>
+    route.fulfill({
+      json: {
+        questions: [{ text: OPENING, audio: null }],
+        acks: [{ text: "Okay.", audio: null }],
+        closing: { text: "That's the end of the interview.", audio: null },
+        hear: "signed-token",
+      },
+    }),
+  );
+  const pieces: { url: string; type: string | undefined }[] = [];
+  await page.route("**/api/ai/voice/hear**", (route) => {
+    pieces.push({ url: route.request().url(), type: route.request().headers()["content-type"] });
+    return route.fulfill({ json: { text: "Um, we retrieve relevant chunks and add them to the prompt." } });
+  });
+  const turns: { exchanges: { answer: string }[] }[] = [];
+  await page.route("**/api/ai/voice/turn", (route) => {
+    turns.push(route.request().postDataJSON());
+    return route.fulfill({ json: { follow_up: null } });
+  });
+  await page.route("**/api/ai/voice/report", (route) => route.fulfill({ json: report }));
+
+  await page.goto("/interview/simulator?question=what-is-rag");
+  await page.getByRole("button", { name: "Start the AI interviewer" }).click();
+  await expect(page.getByText(/recorded in short pieces and sent to Sarvam AI/)).toBeVisible();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  const call = page.getByRole("dialog", { name: "Zarina" });
+
+  // The piece is cut at the pause and transcribed while the learner is still "thinking"; the caption hides the "um".
+  await expect(call.getByText("we retrieve relevant chunks and add them to the prompt.")).toBeVisible({ timeout: 8000 });
+  await expect(call.getByText(/^Um,/)).toHaveCount(0);
+  expect(pieces[0].url).toMatch(/\/api\/ai\/voice\/hear\?t=signed-token&q=what-is-rag$/);
+  expect(pieces[0].type).toBe("audio/webm");
+  // A thinking pause is not the end: nothing is sent for the first seconds of silence.
+  await page.waitForTimeout(2000);
+  expect(turns).toEqual([]);
+  // After 5 seconds of real silence the answer is sent, with the words as said (the report counts fillers).
+  await expect.poll(() => turns.length, { timeout: 8000 }).toBe(1);
+  expect(turns[0].exchanges[0].answer).toBe("Um, we retrieve relevant chunks and add them to the prompt.");
+  // The microphone is muted while it is not the learner's turn, so the interviewer's voice is never recorded.
+  expect(await page.evaluate(() => (window as unknown as { __mic: { enabled: boolean } }).__mic.enabled)).toBe(false);
+  await expect(page.getByRole("heading", { name: "Your AI interview report" })).toBeVisible({ timeout: 10_000 });
 });

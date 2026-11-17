@@ -3,6 +3,7 @@
 // the closing line), each with a signed URL for its voice, so the browser can fetch them ahead of time.
 import { json, problem } from "@/lib/account/http";
 import { body } from "@/lib/ai/route";
+import { hearToken } from "@/lib/ai/stt";
 import { lineUrl, ttsSettings } from "@/lib/ai/tts";
 import { voiceAccess } from "@/lib/ai/voice-access";
 import { ACK_LINES, CLOSING_LINE, MAX_VOICE_QUESTIONS, questionLine } from "@/lib/ai/voice-interview";
@@ -24,5 +25,7 @@ export async function POST(request: Request) {
     questions: req.questionIds.map((id, i) => line(questionLine(i, req.questionIds.length, bank.get(id)!.question))),
     acks: ACK_LINES.map(line),
     closing: line(CLOSING_LINE),
+    // VI-9: with Sarvam on, answers are transcribed by Sarvam (pieces posted with this token).
+    hear: hearToken(tts),
   });
 }

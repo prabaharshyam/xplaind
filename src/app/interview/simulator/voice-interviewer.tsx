@@ -7,6 +7,7 @@ import { MIC_BLOCKED, joinText, speak, stopSpeaking, useDictation, useSpeechSupp
 import { readinessLabel, type Readiness } from "@/lib/interview/readiness";
 import type { SimQuestion } from "@/lib/interview/analyse";
 import { pauseToSend, type Exchange, type VoiceReport } from "@/lib/ai/voice-interview";
+import { type Mic, canRecord, closeMic, openMic, useVoiceCapture } from "@/components/interview/voice-capture";
 
 /**
  * VI-1 to VI-8: the AI voice interviewer (Pro), as a call. One tap starts it. The interviewer speaks in a
@@ -22,7 +23,7 @@ type Failure = { message: string; upgrade?: string; signin?: boolean };
 /** One spoken line: its words, and a URL for its natural voice (null: the browser reads it). */
 type Spoken = { text: string; audio: string | null };
 type Line = { who: "ai" | "me"; text: string };
-type Lines = { questions: Spoken[]; acks: Spoken[]; closing: Spoken };
+type Lines = { questions: Spoken[]; acks: Spoken[]; closing: Spoken; hear: string | null };
 type CallState = "speaking" | "listening" | "thinking" | "paused";
 type Phase =
   | { kind: "consent" }
@@ -63,6 +64,10 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
   const last = useRef<Spoken | null>(null);
   const live = useRef(true);
   const ackTurn = useRef(0);
+  /** VI-9: the microphone for Sarvam speech-to-text, opened at Start; null means the browser's own recogniser. */
+  const [mic, setMic] = useState<Mic | null>(null);
+  const [hear, setHear] = useState<string | null>(null);
+  const micRef = useRef<Mic | null>(null);
 
   // VI-5: if the browser already blocks the microphone for this site, say so before the interview starts.
   useEffect(() => {
@@ -80,6 +85,7 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
       live.current = false;
       audio.current?.pause();
       stopSpeaking();
+      closeMic(micRef.current);
     };
   }, []);
 
@@ -112,6 +118,8 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
         const res = await post("/api/ai/voice/report", { ...(pathId ? { pathId } : {}), items: all.filter((i) => i.exchanges.length > 0) });
         if (!res.ok) return setPhase({ kind: "report-failed", failure: await failureFrom(res) });
         const data = (await res.json()) as { report: VoiceReport; readiness: Readiness | null };
+        closeMic(micRef.current);
+        micRef.current = null;
         setPhase({ kind: "report", report: data.report, readiness: data.readiness });
         setStatus("Your interview report is ready.");
       } catch {
@@ -162,6 +170,8 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
     el.src = SILENT_WAV;
     void el.play().catch(() => undefined);
     audio.current = el;
+    // VI-9: the audio graph for listening must also be created inside the tap.
+    const ctx = canRecord() && !typing ? new AudioContext() : null;
     setPhase({ kind: "starting" });
     setStatus("Getting the interviewer ready.");
     try {
@@ -172,6 +182,21 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
       return setPhase({ kind: "stopped", failure: { message: "We could not reach the interviewer. Check your connection and try again." } });
     }
     script.current.acks.forEach(warm);
+    if (ctx && script.current.hear) {
+      try {
+        const m = await openMic(ctx);
+        micRef.current = m;
+        setMic(m);
+        setHear(script.current.hear);
+      } catch (e) {
+        void ctx.close().catch(() => undefined);
+        // Blocked: type instead. Any other failure: the browser's own recogniser still listens.
+        if ((e as Error).name === "NotAllowedError") {
+          setMicDenied(true);
+          setTyping(true);
+        }
+      }
+    } else void ctx?.close().catch(() => undefined);
     setItems(questions.map((q) => ({ questionId: q.id, exchanges: [] })));
     setLines([]);
     setStartedAt(Date.now());
@@ -259,7 +284,9 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
             <Listener
               key={`${phase.turn.index}-${phase.turn.followUp}`}
               state={phase.state}
-              voice={speechIn && !typing}
+              voice={(!!mic || speechIn) && !typing}
+              mic={mic}
+              hearUrl={mic && hear ? `/api/ai/voice/hear?t=${hear}&q=${encodeURIComponent(questions[phase.turn.index].id)}` : null}
               onMicBlocked={() => setTyping(true)}
               onTyping={setTyping}
               onAnswer={(text, seconds) => void answer(phase.turn, text, seconds)}
@@ -349,14 +376,14 @@ function Consent({
           What is sent to our AI
         </p>
         <p className="mt-1">
-          Your browser turns your speech into text. Only that text (the transcript) is sent to our AI, Anthropic&apos;s
-          Claude, to ask follow-ups and score you. Your voice is never uploaded to Xplaind or stored. The interviewer&apos;s
-          voice is made by Sarvam AI from the interviewer&apos;s lines, which can quote what you said. We keep only your
-          score, not what you said.
+          Your spoken answers are recorded in short pieces and sent to Sarvam AI, which turns them into text. Xplaind
+          does not keep the recordings; Sarvam handles them under its own terms. Only the text (the transcript) goes to our AI, Anthropic&apos;s Claude,
+          to ask follow-ups and score you. Sarvam AI also makes the interviewer&apos;s voice. We keep only your score, not
+          what you said.
         </p>
         <p className={`mt-2 text-sm ${muted}`}>
-          In Chrome and Edge, speech-to-text sends your audio to the browser maker (Google or Microsoft) to turn it into
-          text. Prefer not to? Type your answers instead.
+          If Sarvam is not available, your browser&apos;s own speech-to-text is used, which in Chrome and Edge sends audio
+          to Google or Microsoft. Prefer not to send your voice anywhere? Type your answers instead.
         </p>
       </div>
       {micDenied && (
@@ -586,15 +613,21 @@ const EndIcon = () => (
 
 // ---- the learner's turn ------------------------------------------------------------
 
+const FILLER = /\b(um+|uh+|erm+|hmm+|ah+)\b[,.]?\s*/gi;
+/** The caption without "um" and "uh": they are still counted in the report, but they are noise to read. */
+const caption = (text: string) => text.replace(FILLER, "").replace(/\s{2,}/g, " ").trim();
+
 /**
- * VI-7 and VI-8: hands-free listening. The microphone opens by itself, what is heard shows as a caption,
- * and a pause sends it: longer if the learner trails off on "and" or "um" (pauseToSend). Just before an
- * automatic send the caption says so and offers "Hold on", which waits for "Done". Pause, typing and End
- * are always one tap away. If a phone will not open the microphone without a tap, "Tap to answer" shows.
+ * VI-7 to VI-9: hands-free listening. With Sarvam on (VI-9), the answer is recorded in pieces and each is
+ * transcribed as the learner talks; silence is measured from the microphone itself. Otherwise the
+ * browser's own recogniser listens. An answer is sent after 5 seconds of silence, 7 after a trailing "and"
+ * or "um" (pauseToSend); just before, the caption says so and offers "Hold on", which waits for "Done".
  */
 function Listener({
   state,
   voice,
+  mic,
+  hearUrl,
   onMicBlocked,
   onTyping,
   onAnswer,
@@ -605,6 +638,8 @@ function Listener({
 }: {
   state: CallState;
   voice: boolean;
+  mic: Mic | null;
+  hearUrl: string | null;
   onMicBlocked: () => void;
   onTyping: (v: boolean) => void;
   onAnswer: (text: string, seconds: number) => void;
@@ -613,74 +648,130 @@ function Listener({
   onEnd: () => void;
   endLabel: string;
 }) {
-  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const sarvam = !!mic && !!hearUrl;
+  /** When the learner started answering, for the pace in the report. Not shown, so a ref. */
+  const startedAt = useRef<number | null>(null);
   const [held, setHeld] = useState(false);
-  // The answer text the "Sending" warning was raised for; new words make it stale, so it hides by itself.
-  const [warnedFor, setWarnedFor] = useState<string | null>(null);
+  const [sendingIn, setSendingIn] = useState<number | null>(null);
+  const [finishing, setFinishing] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   const sent = useRef(false);
-  const onStart = useCallback(() => setStartedAt((s) => s ?? Date.now()), []);
-  const { text, setText, interim, listening, notice, start, abort } = useDictation({ onStart, onBlocked: onMicBlocked });
-  const said = joinText(text, interim).trim();
+  const onStart = useCallback(() => {
+    startedAt.current ??= Date.now();
+  }, []);
+  const dictation = useDictation({ onStart, onBlocked: onMicBlocked });
+  const capture = useVoiceCapture({ mic, hearUrl, onFailed: setProblem });
+  const said = sarvam ? capture.text : joinText(dictation.text, dictation.interim).trim();
+  const hearing = sarvam ? capture.voiced : !!dictation.interim;
+  const listening = sarvam ? capture.listening : dictation.listening;
+  const notice = problem ?? dictation.notice;
+  const spoke = sarvam ? capture.spoke : !!said;
+  useEffect(() => {
+    if (spoke) onStart();
+  }, [spoke, onStart]);
 
   const send = useCallback(
-    (skip = false) => {
+    async (skip = false) => {
       if (sent.current) return;
       sent.current = true;
-      abort();
-      const seconds = startedAt === null ? 0 : Math.min(MAX_SECONDS, Math.round((Date.now() - startedAt) / 1000));
-      onAnswer(skip ? "" : said, seconds);
+      const seconds = startedAt.current === null ? 0 : Math.min(MAX_SECONDS, Math.round((Date.now() - startedAt.current) / 1000));
+      if (skip) {
+        capture.abort();
+        dictation.abort();
+        return onAnswer("", seconds);
+      }
+      if (sarvam) {
+        setFinishing(true);
+        onAnswer(await capture.finish(), seconds);
+      } else {
+        dictation.abort();
+        onAnswer(said, seconds);
+      }
     },
-    [abort, onAnswer, said, startedAt],
+    [capture, dictation, onAnswer, said, sarvam],
   );
 
-  // The microphone opens by itself, once, when it is the learner's turn, and closes otherwise.
+  // The microphone opens by itself, once, when it is the learner's turn, and is muted otherwise.
   const opened = useRef(false);
   useEffect(() => {
     if (state === "listening" && voice && !sent.current && !opened.current) {
       opened.current = true;
-      start();
+      if (sarvam) capture.start();
+      else dictation.start();
     }
     if (state !== "listening" && opened.current) {
       opened.current = false;
-      abort();
+      capture.abort();
+      dictation.abort();
     }
-  }, [state, voice, start, abort]);
+  }, [state, voice, sarvam, capture, dictation]);
 
-  // VI-8: a pause ends the answer. Every new word restarts the clock; "Sending" shows just before.
+  // VI-9: the browser recogniser has no sound level, so its silence is the time since the words last changed.
+  const changedAt = useRef(0);
   useEffect(() => {
-    if (state !== "listening" || !voice || !said || sent.current || held) return;
-    const wait = pauseToSend(said);
-    const warn = window.setTimeout(() => setWarnedFor(said), Math.max(0, wait - WARN_MS));
-    const go = window.setTimeout(() => send(), wait);
-    return () => {
-      window.clearTimeout(warn);
-      window.clearTimeout(go);
-    };
-  }, [said, state, voice, held, send]);
+    changedAt.current = Date.now();
+  }, [said]);
+
+  // Every 200 ms: how long has the learner been quiet, and is it time to warn or to send? The latest values
+  // are read from a ref, so the clock keeps a steady beat however often the caption changes.
+  const latest = useRef({ sarvam, capture, said, spoke, send });
+  useEffect(() => {
+    latest.current = { sarvam, capture, said, spoke, send };
+  });
+  useEffect(() => {
+    if (state !== "listening" || !voice || held) return;
+    const id = window.setInterval(() => {
+      const l = latest.current;
+      if (sent.current) return;
+      const now = Date.now();
+      const quiet = l.sarvam ? l.capture.quiet(now) : l.said ? now - changedAt.current : 0;
+      if (!l.spoke || quiet === 0) return setSendingIn(null);
+      const left = pauseToSend(l.said || "…") - quiet;
+      if (left <= 0) {
+        setSendingIn(null);
+        void l.send();
+      } else setSendingIn(left <= WARN_MS ? left : null);
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [state, voice, held]);
 
   const myTurn = state === "listening";
-  const sending = myTurn && !held && warnedFor !== null && warnedFor === said;
+  const shown = caption(said);
   return (
     <>
       {myTurn && voice && (
         <div className="flex flex-col gap-3 rounded-2xl bg-white/[0.06] p-4" aria-live="off">
           <p className="flex items-center gap-3 text-sm font-medium text-brand-300">
-            <VoiceBars active={listening && !!interim} tone="teal" />
-            {sending ? "Sending in a moment…" : held ? "Take your time. Tap Done when you finish." : listening ? "Listening" : "Starting the microphone…"}
+            <VoiceBars active={listening && hearing} tone="teal" />
+            {finishing
+              ? "Sending…"
+              : sendingIn !== null && !held
+                ? "Sending in a moment…"
+                : held
+                  ? "Take your time. Tap Done when you finish."
+                  : listening
+                    ? hearing
+                      ? "Listening"
+                      : spoke
+                        ? "Listening. Take your time."
+                        : "Listening"
+                    : "Starting the microphone…"}
           </p>
-          <p className="min-h-14 text-lg leading-8">{said || <span className="text-white/60">Go ahead, answer out loud.</span>}</p>
+          <p className="min-h-14 text-lg leading-8">
+            {shown || <span className="text-white/60">{sarvam && capture.pending ? "Writing down what you said…" : "Go ahead, answer out loud."}</span>}
+          </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-            {sending && !held && (
+            {sendingIn !== null && !held && (
               <button type="button" onClick={() => setHeld(true)} className="font-medium text-white underline underline-offset-4">
                 Hold on, I&apos;m not done
               </button>
             )}
-            {!listening && !said && notice && (
-              <button type="button" onClick={start} className="font-medium text-white underline underline-offset-4">
+            {!sarvam && !listening && !said && notice && (
+              <button type="button" onClick={dictation.start} className="font-medium text-white underline underline-offset-4">
                 Tap to answer
               </button>
             )}
-            <button type="button" onClick={() => send(true)} className="text-white/75 underline underline-offset-4 hover:text-white">
+            <button type="button" onClick={() => void send(true)} className="text-white/75 underline underline-offset-4 hover:text-white">
               Skip this question
             </button>
           </div>
@@ -698,16 +789,16 @@ function Listener({
           className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            if (text.trim()) send();
+            if (dictation.text.trim()) void send();
           }}
         >
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-white/85">Your answer</span>
             <textarea
-              value={text}
+              value={dictation.text}
               onChange={(e) => {
                 onStart();
-                setText(e.target.value);
+                dictation.setText(e.target.value);
               }}
               rows={4}
               placeholder="Type your answer as you would say it…"
@@ -715,10 +806,10 @@ function Listener({
             />
           </label>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <button type="submit" className="min-h-11 rounded-full bg-white px-5 font-medium text-brand-950 disabled:opacity-50" disabled={!text.trim()}>
+            <button type="submit" className="min-h-11 rounded-full bg-white px-5 font-medium text-brand-950 disabled:opacity-50" disabled={!dictation.text.trim()}>
               Send answer
             </button>
-            <button type="button" onClick={() => send(true)} className="text-sm text-white/75 underline underline-offset-4 hover:text-white">
+            <button type="button" onClick={() => void send(true)} className="text-sm text-white/75 underline underline-offset-4 hover:text-white">
               Skip this question
             </button>
           </div>
@@ -745,7 +836,7 @@ function Listener({
           </RoundButton>
         )}
         {voice && (
-          <RoundButton label="Done" onClick={() => send()} tone="primary" disabled={!myTurn || !said}>
+          <RoundButton label="Done" onClick={() => void send()} tone="primary" disabled={!myTurn || !spoke || finishing}>
             <CheckIcon />
           </RoundButton>
         )}
