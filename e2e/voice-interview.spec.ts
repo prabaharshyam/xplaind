@@ -4,7 +4,11 @@ import { expect, test, type Page } from "@playwright/test";
 // VI-1 to VI-7: the AI voice interviewer (Pro), hands-free. The AI and voice routes are mocked, as in the
 // MB-12 tests: CI has no AI or voice key. A fake microphone "says" an answer, then goes quiet.
 
-const wcag = (page: Page) => new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+// Checked with reduced motion, so the page's entrance animations (VI-12) are not caught half-faded.
+const wcag = async (page: Page) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  return new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+};
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
 
 test.use({ viewport: { width: 360, height: 740 } });
@@ -523,12 +527,16 @@ test("one mock interview: a Pro learner picks role, experience and company, and 
   await startRoute(page, starts);
   await page.goto("/interview/simulator?path=genai-engineer");
   await expect(page.getByRole("heading", { name: "What are you preparing for?" })).toBeVisible();
-  // Pro: the AI interviewer comes first; practising alone stays, free, below it.
-  await expect(page.locator("section h2").filter({ hasText: /AI interviewer|Practise on your own/ }).first()).toHaveText(/AI interviewer/);
-  await expect(page.getByRole("heading", { name: /Practise on your own/ })).toBeVisible();
+  // VI-12: the page sells the AI interviewer; the free warm-up sits lower, marked as the lesser option.
+  await expect(page.getByRole("heading", { level: 1, name: "Mock interviews that talk back" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Free warm-up" })).toBeVisible();
+  // VI-12: the live line: her real opening line names the role and company as they are chosen.
+  await expect(page.getByText(/practice interview for the Generative AI & LLM Engineer role\. We'll go through 3 questions/)).toBeVisible();
   await page.getByLabel("Experience needed").selectOption("mid");
   await page.getByLabel("Kind of questions").selectOption("scenarios");
   await page.getByLabel("Company (optional)").fill("Acme");
+  await expect(page.getByText(/for the Generative AI & LLM Engineer role at Acme\./)).toBeVisible();
+  const opening = await page.getByText(/^“Hi, I'm your AI interviewer/).textContent();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
   await page.getByRole("button", { name: "Start the AI interviewer" }).click();
@@ -536,6 +544,8 @@ test("one mock interview: a Pro learner picks role, experience and company, and 
   await expect.poll(() => starts.length).toBe(1);
   expect(starts[0].setup).toEqual({ pathId: "genai-engineer", experience: "mid", company: "Acme" });
   expect(starts[0].questionIds).toHaveLength(3);
+  // The preview did not lie: the first question asked is the one the opening line named.
+  expect(opening).toContain((await page.getByRole("dialog", { name: "Zarina" }).getByText(/\?$/).first().textContent())?.trim().slice(-30));
 });
 
 test("a pasted job description plans the interview: bank questions plus one written for the job, sent back sealed (VI-11)", async ({ page }) => {
@@ -567,7 +577,7 @@ test("a pasted job description plans the interview: bank questions plus one writ
     return route.fulfill({ json: { follow_up: null } });
   });
   await page.goto("/interview/simulator");
-  await page.getByRole("radio", { name: "Paste a job description" }).check();
+  await page.getByRole("radio", { name: "Paste a job description" }).check({ force: true });
   const plan = page.getByRole("button", { name: "Plan and start the AI interview" });
   const box = page.getByRole("textbox", { name: /^Job description/ });
   await box.fill("GenAI Engineer, Bengaluru.");
@@ -588,19 +598,43 @@ test("a pasted job description plans the interview: bank questions plus one writ
   expect(turns[0]).toMatchObject({ plan: "sealed-plan", questionId: "what-is-rag" });
 });
 
-test("without Pro, practising alone comes first and the job description explains the upgrade (VI-11)", async ({ page }) => {
+test("without Pro, the AI interviewer offers Pro and the free warm-up stays one tap away (VI-11, VI-12)", async ({ page }) => {
   await usage(page, "free");
+  await page.goto("/interview/simulator");
+  await expect(page.getByRole("link", { name: "Get Pro to start" })).toHaveAttribute("href", "/pricing");
+  await expect(page.getByRole("button", { name: "Start the AI interviewer" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Or warm up free" }).click();
+  await expect(page.getByRole("button", { name: /Type my answers instead|Start, typing my answers/ })).toBeVisible();
+  await page.getByRole("radio", { name: "Paste a job description" }).check({ force: true });
+  await expect(page.getByText(/Practising from a job description needs the AI interviewer/)).toBeVisible();
+  await page.getByRole("button", { name: "choose a role instead" }).click();
+  await expect(page.getByRole("button", { name: /Type my answers instead|Start, typing my answers/ })).toBeVisible();
+  expect((await wcag(page)).violations).toEqual([]);
+});
+
+test("when the plan is refused, the reason and the way to Pro are shown (VI-11)", async ({ page }) => {
   await page.route("**/api/ai/voice/plan", (route) => route.fulfill({ status: 403, json: { error: "The AI voice interviewer is part of Pro.", upgrade: "/pricing" } }));
   await page.goto("/interview/simulator");
-  await expect(page.locator("section h2").filter({ hasText: /AI interviewer|Practise on your own/ }).first()).toHaveText(/Practise on your own/);
-  await expect(page.getByRole("link", { name: "Get Pro" })).toHaveAttribute("href", "/pricing");
-  await page.getByRole("radio", { name: "Paste a job description" }).check();
+  await page.getByRole("radio", { name: "Paste a job description" }).check({ force: true });
   await page.getByRole("textbox", { name: /^Job description/ }).fill("x".repeat(200));
   await page.getByRole("button", { name: "Plan and start the AI interview" }).click();
   const alert = page.getByRole("alert").filter({ hasText: "The AI voice interviewer is part of Pro." });
   await expect(alert).toBeVisible();
   await expect(alert.getByRole("link", { name: "See Pro" })).toHaveAttribute("href", "/pricing");
-  // Back to a role: the free version starts as before.
-  await page.getByRole("button", { name: "choose a role instead" }).click();
-  await expect(page.getByRole("button", { name: /Type my answers instead|Start, typing my answers/ })).toBeVisible();
+});
+
+test("how it works: the slider walks through the four stages to a sample report (VI-12)", async ({ page }) => {
+  await page.goto("/interview/simulator");
+  await page.getByRole("link", { name: "See a sample report" }).click();
+  await expect(page.getByText("Verdict: Lean hire")).toBeVisible();
+  const slider = page.getByRole("slider", { name: "Step of the interview" });
+  await slider.focus();
+  await page.keyboard.press("Home");
+  await expect(page.getByText("Zarina asks the question aloud")).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByText("You answer, she waits for you")).toBeVisible();
+  await page.getByRole("button", { name: "She digs in" }).click();
+  await expect(page.getByText(/Which evals exactly/)).toBeVisible();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
 });

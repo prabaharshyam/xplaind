@@ -6,8 +6,11 @@ import { loadContent } from "../src/lib/content/load";
 const { bundle } = loadContent(path.resolve(__dirname, "../content"));
 const questionByText = new Map(bundle.interview.map((q) => [q.data.question, q.data]));
 
-const wcag = (page: import("@playwright/test").Page) =>
-  new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+// With reduced motion, so the mock interview page's entrance animations (VI-12) are not caught half-faded.
+const wcag = async (page: import("@playwright/test").Page) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  return new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+};
 
 test.use({ viewport: { width: 360, height: 740 } });
 
@@ -22,7 +25,7 @@ test("a typed mock interview ends with a report on key points", async ({ page })
   await expect(page.getByRole("heading", { level: 1, name: "Mock interview" })).toBeVisible();
   await expect(page.getByRole("combobox").first()).toHaveValue("genai-engineer"); // the Role list
   expect((await wcag(page)).violations).toEqual([]);
-  await page.getByRole("radio", { name: "3" }).check();
+  await page.getByRole("radio", { name: "3" }).check({ force: true });
   // Headless Chromium has no speech service, so start in typing mode.
   await page.getByRole("button", { name: /Type my answers instead|Start, typing my answers/ }).click();
 
@@ -168,7 +171,7 @@ test("on a phone-like speech engine, every question of a voice interview still h
   });
   await page.addInitScript(iphoneLikeSpeech, false);
   await page.goto("/interview/simulator?path=genai-engineer");
-  await page.getByRole("radio", { name: "3" }).check();
+  await page.getByRole("radio", { name: "3" }).check({ force: true });
   await page.getByRole("button", { name: "Allow the microphone and start" }).click();
   for (let i = 1; i <= 3; i++) {
     await expect(page.getByText(`Question ${i} of 3`)).toBeVisible();

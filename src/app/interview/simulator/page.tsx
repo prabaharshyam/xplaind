@@ -1,6 +1,5 @@
 import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
-import { PageHero } from "@/components/page-hero";
 import { getPaths } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import type { Pickable } from "@/lib/interview/setup";
@@ -32,20 +31,8 @@ export default function SimulatorPage() {
   }));
   return (
     <main>
-      <div className="print:hidden">
-        <PageHero shape="microphone"
-          theme="client"
-          seed="simulator"
-          icon="mic"
-          eyebrow="Interview prep"
-          title="Mock interview"
-          lead="Tell us the role, or paste the job description. Then answer out loud, one question at a time, and see what you covered and missed."
-          crumbs={[{ href: "/interview", label: "Interview questions" }]}
-        />
-      </div>
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <Simulator questions={questions} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} aiOn={aiEnabled()} />
-      </div>
+      {/* VI-12: the page is the interview room; the setup carries its own first screen and title. */}
+      <Simulator questions={questions} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} aiOn={aiEnabled()} />
     </main>
   );
 }

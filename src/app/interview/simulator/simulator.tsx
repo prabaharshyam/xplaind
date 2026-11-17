@@ -7,8 +7,9 @@ import { abortRecognition, joinText, useDictation, useSpeechSupported } from "@/
 import { useAiAccess } from "@/components/ai/ai-gate";
 import { AnswerReviewBlock, InterviewReviewPanel, useInterviewReview } from "@/components/ai/ai-interview-review";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
-import { VOICE_QUESTION_COUNTS } from "@/lib/ai/voice-interview";
+import { VOICE_QUESTION_COUNTS, questionLine } from "@/lib/ai/voice-interview";
 import { VoiceInterviewer, type CallQuestion } from "./voice-interviewer";
+import { Exchange, Reveal, Stages, room } from "./room";
 import { MAX_JD_CHARS, MIN_JD_CHARS, type InterviewSetup } from "@/lib/ai/interview-plan";
 import { EXPERIENCE, STYLES, pickForSetup, type ExperienceId, type Pickable, type StyleId } from "@/lib/interview/setup";
 import { recordInterview } from "@/lib/browser/activity-store";
@@ -70,6 +71,15 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   const [planError, setPlanError] = useState<{ message: string; upgrade?: string } | null>(null);
   const [call, setCall] = useState<{ questions: CallQuestion[]; setup?: InterviewSetup; plan?: string | null; pathId: string | null } | null>(null);
   const pro = useProStatus();
+  const [howStage, setHowStage] = useState(0);
+  // VI-12: the questions the AI interviewer will ask, picked as the setup changes and shown in the preview.
+  // Fixed on the first render (the page is prerendered); a new draw after each start, or on "Other questions".
+  const [seed, setSeed] = useState(1);
+  const reshuffle = () => setSeed((s) => (s * 1103515245 + 12345) % 2 ** 31);
+  const preview = useMemo(
+    () => pickForSetup(questions, { pathId: pathId || null, experience: experience || null, style, count: Math.max(...COUNTS), seed }) as SimQuestion[],
+    [questions, pathId, experience, style, seed],
+  );
 
   const setupFields = (): InterviewSetup | undefined => {
     const fields: InterviewSetup = {
@@ -79,17 +89,13 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
     };
     return Object.keys(fields).length ? fields : undefined;
   };
-  const pick = (n: number) =>
-    fixedQuestion
-      ? [fixedQuestion]
-      : (pickForSetup(questions, { pathId: pathId || null, experience: experience || null, style, count: n, seed: Math.floor(Math.random() * 2 ** 31) }) as SimQuestion[]);
-
   /** VI-1 and VI-11: the AI interviewer (Pro), for a role or for a pasted job description. */
   const startVoice = async () => {
     if (!needAccount("interview")) return; // SU-1, and PV-2: accounts are for adults only
     setPlanError(null);
     if (source === "role" || fixedQuestion) {
-      setCall({ questions: pick(voiceCount), setup: setupFields(), pathId: pathId || null });
+      setCall({ questions: fixedQuestion ? [fixedQuestion] : preview.slice(0, voiceCount), setup: setupFields(), pathId: pathId || null });
+      reshuffle();
       setStage({ kind: "voice" });
       window.scrollTo({ top: 0 });
       return;
@@ -116,7 +122,8 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   const start = (useVoice: boolean) => {
     if (!needAccount("interview")) return; // SU-1: the mock interview needs a free account
     setVoice(useVoice && speechSupported);
-    setSession(pick(count));
+    setSession(fixedQuestion ? [fixedQuestion] : preview.slice(0, count));
+    reshuffle();
     setAnswers([]);
     setStage({ kind: "question", index: 0 });
   };
@@ -132,26 +139,31 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   if (stage.kind === "question") {
     const q = session[stage.index];
     return (
-      <QuestionScreen
-        key={q.id}
-        q={q}
-        position={stage.index + 1}
-        total={session.length}
-        voice={voice}
-        onVoiceFailed={() => setVoice(false)}
-        onSubmit={submit}
-      />
+      <Stage>
+        <QuestionScreen
+          key={q.id}
+          q={q}
+          position={stage.index + 1}
+          total={session.length}
+          voice={voice}
+          onVoiceFailed={() => setVoice(false)}
+          onSubmit={submit}
+        />
+      </Stage>
     );
   }
 
   if (stage.kind === "voice") {
     return call ? (
-      <VoiceInterviewer questions={call.questions} pathId={call.pathId} setup={call.setup} plan={call.plan} onExit={() => setStage({ kind: "setup" })} />
+      <Stage>
+        <VoiceInterviewer questions={call.questions} pathId={call.pathId} setup={call.setup} plan={call.plan} onExit={() => setStage({ kind: "setup" })} />
+      </Stage>
     ) : null;
   }
 
   if (stage.kind === "report") {
     return (
+      <Stage>
       <Report
         questions={session}
         answers={answers}
@@ -159,236 +171,381 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
         aiOn={aiOn}
         pathId={pathId || null}
       />
+      </Stage>
     );
   }
 
   const jdMode = source === "jd" && !fixedQuestion;
   const jdShort = jd.trim().length < MIN_JD_CHARS;
-  const aiFirst = pro === "yes" || jdMode;
-  const field = "min-h-12 w-full min-w-0 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950";
-  const choice =
-    "flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-400 px-3 text-center has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-700 dark:border-zinc-600 dark:has-[:checked]:bg-brand-950";
+  const roleName = paths.find((p) => p.id === pathId)?.name ?? "";
+  // VI-12: the live line. As the setup changes, the interviewer's real opening line and first question
+  // change with it; these are the questions she will ask when the learner starts.
+  const planned = fixedQuestion ? [fixedQuestion] : preview.slice(0, voiceCount);
+  const opening = jdMode
+    ? null
+    : planned[0]
+      ? questionLine(0, planned.length, planned[0].question, { role: roleName, company: company.trim(), experience: experience || null, focus: [] })
+      : null;
+  const minutesFor = (n: number) => (n === 3 ? "about 15 minutes" : "about 25 minutes");
+  const proNo = pro === "no";
 
-  const aiCard = (
-    <section
-      key="ai"
-      aria-labelledby="ai-interviewer-heading"
-      className="rounded-2xl border border-brand-200 bg-brand-50 p-4 leading-7 md:p-5 dark:border-brand-900 dark:bg-brand-950"
-    >
-      <h2 id="ai-interviewer-heading" className="flex flex-wrap items-center gap-2 font-semibold">
-        AI interviewer
-        <span className="rounded-full bg-brand-700 px-2 py-0.5 text-xs font-medium text-white">Pro</span>
-      </h2>
-      <p className="mt-1">
-        {jdMode
-          ? "Reads your job description, picks the questions that fit it from our question bank and writes one or two for this exact job. Then a spoken interview with follow-ups on what you say, and a scored report against the job."
-          : "A real back-and-forth: the interviewer reads each question aloud, listens to your answer, then asks 1 or 2 follow-up questions about what you actually said. You get a scored report on the key points, depth and how you communicate."}
-      </p>
-      {!fixedQuestion && (
-        <label className="mt-3 flex max-w-xs flex-col gap-1">
-          <span className="text-sm font-medium">Questions with the AI interviewer</span>
-          <select value={voiceCount} onChange={(e) => setVoiceCount(Number(e.target.value))} className={field}>
-            {VOICE_QUESTION_COUNTS.map((n) => (
-              <option key={n} value={n}>
-                {n} questions
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <button type="button" onClick={() => void startVoice()} disabled={planning || (jdMode && jdShort)} className={`${primaryButton} mt-4 disabled:opacity-60`}>
-        {planning ? "Planning your interview…" : jdMode ? "Plan and start the AI interview" : "Start the AI interviewer"}
-      </button>
-      {jdMode && jdShort && (
-        <p className={`mt-2 text-sm ${muted}`}>Paste at least {MIN_JD_CHARS} characters of the job description to plan the interview.</p>
-      )}
-      <p role="status" className="sr-only">
-        {planning ? "Planning your interview from the job description." : ""}
-      </p>
-      {planError && (
-        <p role="alert" className="mt-3 text-sm leading-6 text-rose-800 dark:text-rose-300">
-          {planError.message}{" "}
-          {planError.upgrade && (
-            <Link href={planError.upgrade} className={textLink}>
-              See Pro
-            </Link>
-          )}
-        </p>
-      )}
-      {pro === "no" && !planError && (
-        <p className="mt-3 text-sm">
-          <Link href="/pricing" className={textLink}>
-            Get Pro
-          </Link>{" "}
-          to talk to the AI interviewer{jdMode ? " and practise for a job description" : ""}.
-        </p>
-      )}
-    </section>
-  );
-
-  const ownCard = jdMode ? (
-    <section key="own" aria-labelledby="own-heading" className={`${card} leading-7`}>
-      <h2 id="own-heading" className="font-semibold">
-        Practise on your own
-      </h2>
-      <p className="mt-1">
-        Practising from a job description needs the AI interviewer. To practise on your own for free,{" "}
-        <button type="button" onClick={() => setSource("role")} className={`${textLink} min-h-11`}>
-          choose a role instead
-        </button>
-        .
-      </p>
-    </section>
+  const aiAction = proNo ? (
+    <Link href="/pricing" className={room.action}>
+      Get Pro to start
+    </Link>
   ) : (
-    <section key="own" aria-labelledby="how-heading" className={`${card} leading-7`}>
-      <h2 id="how-heading" className="flex flex-wrap items-center gap-2 font-semibold">
-        Practise on your own
-        <span className="rounded-full border border-zinc-400 px-2 py-0.5 text-xs font-medium dark:border-zinc-600">Free</span>
-      </h2>
-      <ul className="mt-2 list-disc pl-6 [&_li]:mt-1">
-        <li>Each question has a time limit of 1 to 2 minutes, as in a real interview.</li>
-        <li>
-          Press <kbd className="rounded border border-zinc-400 px-1">Space</kbd> or the microphone button to start and stop
-          speaking. Your words appear as text, which you can edit.
-        </li>
-        <li>At the end you get a report on the key points you covered, your pace, filler words and what to fix first.</li>
-      </ul>
-      {!fixedQuestion && (
-        <fieldset className="mt-3 flex min-w-0 flex-col gap-1">
-          <legend className="text-sm font-medium">Questions</legend>
-          <div className="flex max-w-xs gap-2">
-            {COUNTS.map((n) => (
-              <label key={n} className={choice}>
-                <input type="radio" name="count" value={n} checked={count === n} onChange={() => setCount(n)} className="accent-brand-700" />
-                {n}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        {speechSupported ? (
-          <>
-            <button type="button" onClick={() => start(true)} className={aiFirst ? secondaryButton : primaryButton}>
-              Allow the microphone and start
-            </button>
-            <button type="button" onClick={() => start(false)} className={secondaryButton}>
-              Type my answers instead
-            </button>
-          </>
-        ) : (
-          <button type="button" onClick={() => start(false)} className={aiFirst ? secondaryButton : primaryButton}>
-            Start, typing my answers
-          </button>
-        )}
-      </div>
-      {!speechSupported && <p className={`mt-2 text-sm ${muted}`}>This browser has no speech-to-text. Chrome, Edge or Safari can turn speech into text.</p>}
-      <p className={`mt-3 text-sm ${muted}`}>
-        Privacy: we never record or store your voice or answers on our servers. Speech-to-text is done by your
-        browser&apos;s speech service; in Chrome and Edge that sends audio to the browser maker (Google or Microsoft) to
-        turn it into text. Prefer not to? Type your answers instead.
-      </p>
-    </section>
+    <button type="button" onClick={() => void startVoice()} disabled={planning || (jdMode && jdShort)} className={room.action}>
+      {planning ? "Planning your interview…" : jdMode ? "Plan and start the AI interview" : "Start the AI interviewer"}
+    </button>
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      {fixedQuestion ? (
-        <p className={`${card} leading-7`}>
-          <span className="font-medium">One question:</span> {fixedQuestion.question}
-        </p>
-      ) : (
-        <section aria-labelledby="setup-heading" className="flex flex-col gap-4">
-          <h2 id="setup-heading" className="text-xl font-semibold">
-            What are you preparing for?
-          </h2>
-          <fieldset className="flex min-w-0 flex-col gap-1">
-            <legend className="sr-only">Set up the interview from</legend>
-            <div className="flex gap-2">
-              <label className={choice}>
-                <input type="radio" name="source" checked={source === "role"} onChange={() => setSource("role")} className="accent-brand-700" />
-                Choose a role
-              </label>
-              <label className={choice}>
-                <input type="radio" name="source" checked={source === "jd"} onChange={() => setSource("jd")} className="accent-brand-700" />
-                Paste a job description
-              </label>
+    <div className={`${room.ground} overflow-x-clip`}>
+      {/* ---- the first screen: what this is, shown by a real follow-up ---- */}
+      <section aria-labelledby="sim-title" className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 pt-12 pb-16 sm:px-8 md:pt-20 md:pb-28 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div>
+          <h1 id="sim-title" className="text-[clamp(2.6rem,6.6vw,5.6rem)] leading-[0.95] font-medium tracking-[-0.04em]">
+            <span className="xp-line">
+              <span>Mock interviews</span>
+            </span>
+            <span className="xp-line">
+              <span>that talk back</span>
+            </span>
+          </h1>
+          <div className="xp-after-lines">
+            <p className="mt-8 max-w-[34rem] text-lg leading-8 md:text-xl md:leading-9">
+              Zarina, our AI interviewer, asks your questions out loud, follows up on what you actually say, and scores you the way a hiring panel would.
+              Set her up for your role, or paste the job post.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
+              <a href="#setup" className={room.action}>
+                Set up my interview
+              </a>
+              <a
+                href="#how"
+                onClick={() => setHowStage(3)}
+                className={`${room.link} inline-flex min-h-12 items-center`}
+              >
+                See a sample report
+              </a>
             </div>
-          </fieldset>
-
-          {source === "jd" && (
-            <label className="flex min-w-0 flex-col gap-1">
-              <span className="text-sm font-medium">Job description</span>
-              <textarea
-                value={jd}
-                onChange={(e) => setJd(e.target.value.slice(0, MAX_JD_CHARS))}
-                rows={8}
-                aria-describedby="jd-help"
-                placeholder="Paste the job post: the role, what you would do and the skills it asks for."
-                className={`${field} min-h-40 leading-6`}
-              />
-              <span id="jd-help" className={`text-xs ${muted}`}>
-                {jd.length} of {MAX_JD_CHARS} characters. Sent to our AI to plan the interview, and not stored. Leave out your
-                name, phone number and email.
-              </span>
-            </label>
-          )}
-
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
-            {source === "role" && (
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className="text-sm font-medium">Role</span>
-                <select value={pathId} onChange={(e) => setPathChoice(e.target.value)} className={field}>
-                  <option value="">Any AI role</option>
-                  {paths.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <label className="flex min-w-0 flex-col gap-1">
-              <span className="text-sm font-medium">Experience needed</span>
-              <select value={experience} onChange={(e) => setExperience(e.target.value as ExperienceId | "")} className={field}>
-                <option value="">{source === "jd" ? "As the job description says" : "Any level"}</option>
-                {EXPERIENCE.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {source === "role" && (
-              <label className="flex min-w-0 flex-col gap-1">
-                <span className="text-sm font-medium">Kind of questions</span>
-                <select value={style} onChange={(e) => setStyle(e.target.value as StyleId)} className={field}>
-                  {STYLES.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <label className="flex min-w-0 flex-col gap-1">
-              <span className="text-sm font-medium">Company (optional)</span>
-              <input
-                value={company}
-                onChange={(e) => setCompany(e.target.value.slice(0, 60))}
-                autoComplete="organization"
-                placeholder="For example, Infosys"
-                className={field}
-              />
-            </label>
           </div>
-        </section>
-      )}
+        </div>
+        <Reveal className="flex justify-center lg:justify-end">
+          <Exchange />
+        </Reveal>
+      </section>
 
-      {aiFirst ? [aiCard, ownCard] : [ownCard, aiCard]}
+      {/* ---- the setup: a sentence the learner fills in, and the line she will open with ---- */}
+      <section id="setup" aria-labelledby="setup-heading" className="scroll-mt-20 bg-brand-900">
+        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-10 px-4 py-16 sm:px-8 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] md:py-24">
+          <div className="flex min-w-0 flex-col gap-6">
+            <h2 id="setup-heading" className="text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+              What are you preparing for?
+            </h2>
+            {fixedQuestion ? (
+              <p className="text-xl leading-8">
+                <span className={room.soft}>One question:</span> {fixedQuestion.question}
+              </p>
+            ) : (
+              <>
+                <fieldset className="min-w-0">
+                  <legend className="sr-only">Set up the interview from</legend>
+                  <div className="grid w-full grid-cols-2 rounded-[1.5rem] bg-brand-950 p-1 sm:inline-grid sm:w-auto sm:rounded-full">
+                    {(
+                      [
+                        ["role", "Choose a role"],
+                        ["jd", "Paste a job description"],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <label
+                        key={id}
+                        className="flex min-h-11 cursor-pointer items-center justify-center rounded-[1.25rem] px-3 py-1 text-center text-[15px] leading-5 font-medium text-brand-200 sm:rounded-full transition-colors has-[:checked]:bg-brand-50 has-[:checked]:text-brand-950 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-200 sm:px-5"
+                      >
+                        <input type="radio" name="source" checked={source === id} onChange={() => setSource(id)} className="sr-only" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                {source === "jd" && (
+                  <label className="flex min-w-0 flex-col gap-2">
+                    <span className="text-[15px] font-medium">Job description</span>
+                    <textarea
+                      value={jd}
+                      onChange={(e) => setJd(e.target.value.slice(0, MAX_JD_CHARS))}
+                      rows={7}
+                      aria-describedby="jd-help"
+                      placeholder="Paste the job post: the role, what you would do and the skills it asks for."
+                      className={`${room.field} min-h-44 py-3 leading-7`}
+                    />
+                    <span id="jd-help" className={`text-sm leading-6 ${room.soft}`}>
+                      {jd.length} of {MAX_JD_CHARS} characters. Sent to our AI to plan the interview, and not stored. Leave out your name, phone number and email.
+                    </span>
+                  </label>
+                )}
+
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
+                  {source === "role" && (
+                    <label className="flex min-w-0 flex-col gap-2">
+                      <span className="text-[15px] font-medium">Role</span>
+                      <select value={pathId} onChange={(e) => setPathChoice(e.target.value)} className={room.field}>
+                        <option value="">Any AI role</option>
+                        {paths.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <label className="flex min-w-0 flex-col gap-2">
+                    <span className="text-[15px] font-medium">Experience needed</span>
+                    <select value={experience} onChange={(e) => setExperience(e.target.value as ExperienceId | "")} className={room.field}>
+                      <option value="">{source === "jd" ? "As the job description says" : "Any level"}</option>
+                      {EXPERIENCE.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {source === "role" && (
+                    <label className="flex min-w-0 flex-col gap-2">
+                      <span className="text-[15px] font-medium">Kind of questions</span>
+                      <select value={style} onChange={(e) => setStyle(e.target.value as StyleId)} className={room.field}>
+                        {STYLES.map((x) => (
+                          <option key={x.id} value={x.id}>
+                            {x.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <label className="flex min-w-0 flex-col gap-2">
+                    <span className="text-[15px] font-medium">Company (optional)</span>
+                    <input
+                      value={company}
+                      onChange={(e) => setCompany(e.target.value.slice(0, 60))}
+                      autoComplete="organization"
+                      placeholder="For example, Infosys"
+                      className={room.field}
+                    />
+                  </label>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* The interviewer, ready: her opening line, the length, and the one action. */}
+          <div className="flex min-w-0 flex-col gap-6 rounded-[2rem] bg-brand-950 p-6 md:p-8">
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-300 text-lg font-semibold text-brand-950">
+                Z
+              </span>
+              <span>
+                <span className="block text-lg font-semibold">Zarina will open with</span>
+                <span className={`block text-sm ${room.soft}`}>AI interviewer · Pro</span>
+              </span>
+            </div>
+            <p aria-live="polite" className="text-lg leading-8">
+              {opening ? (
+                <>&ldquo;{opening}&rdquo;</>
+              ) : (
+                "She reads the job post, picks the questions from our bank that fit it, and writes one or two for this exact job. Then she opens the call."
+              )}
+            </p>
+            {opening && !fixedQuestion && (
+              <button type="button" onClick={reshuffle} className={`${room.link} -mt-2 min-h-11 self-start text-[15px]`}>
+                Other questions
+              </button>
+            )}
+            {!fixedQuestion && (
+              <label className="flex max-w-xs flex-col gap-2">
+                <span className="text-[15px] font-medium">Questions with the AI interviewer</span>
+                <select value={voiceCount} onChange={(e) => setVoiceCount(Number(e.target.value))} className={room.field}>
+                  {VOICE_QUESTION_COUNTS.map((n) => (
+                    <option key={n} value={n}>
+                      {n} questions, {minutesFor(n)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="flex flex-col gap-3">
+              {aiAction}
+              {jdMode && jdShort && !proNo && (
+                <p className={`text-sm leading-6 ${room.soft}`}>Paste at least {MIN_JD_CHARS} characters of the job description to plan the interview.</p>
+              )}
+              <p role="status" className="sr-only">
+                {planning ? "Planning your interview from the job description." : ""}
+              </p>
+              {planError && (
+                <p role="alert" className="rounded-2xl bg-brand-800 p-3 text-[15px] leading-6">
+                  {planError.message}{" "}
+                  {planError.upgrade && (
+                    <Link href={planError.upgrade} className={room.link}>
+                      See Pro
+                    </Link>
+                  )}
+                </p>
+              )}
+              {proNo && (
+                <p className={`text-[15px] leading-6 ${room.soft}`}>
+                  The AI interviewer is part of Pro.{" "}
+                  <a href="#warm-up" className={room.link}>
+                    Or warm up free
+                  </a>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- how it works: drag through the four stages, the last is the report ---- */}
+      <section id="how" aria-labelledby="how-heading" className="mx-auto max-w-7xl scroll-mt-20 px-4 py-20 sm:px-8 md:py-32">
+        <Reveal>
+          <h2 id="how-heading" className="max-w-3xl text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+            Like a real interview, not a quiz
+          </h2>
+          <p className="mt-4 max-w-2xl text-lg leading-8">
+            Every follow-up is written from what you just said, and the report quotes your own words back to you, so you know exactly what to fix.
+          </p>
+        </Reveal>
+        <Reveal className="mt-10" delay={90}>
+          <Stages stage={howStage} onStage={setHowStage} />
+        </Reveal>
+      </section>
+
+      {/* ---- what is free and what is Pro, set like a menu; the free warm-up starts here ---- */}
+      <section id="warm-up" aria-labelledby="menu-heading" className="scroll-mt-20 bg-brand-900">
+        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-10 px-4 py-20 sm:px-8 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] md:py-28">
+          <Reveal>
+            <h2 id="menu-heading" className="text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+              Warm-up or the real thing
+            </h2>
+            <p className={`mt-4 text-lg leading-8`}>Warm up free with written questions. When it matters, rehearse it out loud with Zarina.</p>
+          </Reveal>
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-12 lg:grid-cols-2 lg:gap-16">
+            <Reveal delay={90}>
+              <h3 className="text-2xl font-medium">AI interview</h3>
+              <ul className="mt-6 flex flex-col gap-5">
+                {[
+                  ["Questions asked out loud", "In a natural Indian English voice, hands-free."],
+                  ["Follow-ups on your answer", "One or two, built from the words you used."],
+                  ["Set up from a job post", "Questions picked and written for that job."],
+                  ["A verdict and skill scores", "Each score backed by a quote of what you said."],
+                  ["A four-week plan", "What to practise next, week by week."],
+                ].map(([name, note]) => (
+                  <li key={name}>
+                    <span className="flex justify-between gap-4 text-lg font-medium">
+                      {name}
+                      <span className="shrink-0 text-brand-300">Pro</span>
+                    </span>
+                    <span className={`block text-[15px] leading-6 ${room.soft}`}>{note}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href="#setup" className={`${room.action} mt-8`}>
+                Set up my interview
+              </a>
+            </Reveal>
+            <Reveal delay={180}>
+              <h3 className="text-2xl font-medium">Free warm-up</h3>
+              <ul className="mt-6 flex flex-col gap-5">
+                {[
+                  ["Written questions, timed", "Read each one and answer by voice or typing."],
+                  ["Key points you covered", "Checked against our reviewed answer."],
+                  ["No follow-ups, no verdict", "It checks words, not how you would do in the room."],
+                ].map(([name, note]) => (
+                  <li key={name}>
+                    <span className="flex justify-between gap-4 text-lg font-medium">
+                      {name}
+                      <span className={`shrink-0 ${room.soft}`}>Free</span>
+                    </span>
+                    <span className={`block text-[15px] leading-6 ${room.soft}`}>{note}</span>
+                  </li>
+                ))}
+              </ul>
+              {jdMode ? (
+                <p className="mt-8 text-[15px] leading-6">
+                  Practising from a job description needs the AI interviewer. To warm up free,{" "}
+                  <button type="button" onClick={() => setSource("role")} className={`${room.link} min-h-11`}>
+                    choose a role instead
+                  </button>
+                  .
+                </p>
+              ) : (
+                <div className="mt-8 flex flex-col gap-4">
+                  {!fixedQuestion && (
+                    <fieldset className="min-w-0">
+                      <legend className="text-[15px] font-medium">Questions</legend>
+                      <div className="mt-2 flex max-w-xs gap-2">
+                        {COUNTS.map((n) => (
+                          <label
+                            key={n}
+                            className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-full bg-brand-950 text-[15px] font-medium text-brand-200 has-[:checked]:bg-brand-700 has-[:checked]:text-brand-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-200"
+                          >
+                            <input type="radio" name="count" value={n} checked={count === n} onChange={() => setCount(n)} className="sr-only" />
+                            {n}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
+                  <div className="flex flex-wrap gap-3">
+                    {speechSupported ? (
+                      <>
+                        <button type="button" onClick={() => start(true)} className={room.quiet}>
+                          Allow the microphone and start
+                        </button>
+                        <button type="button" onClick={() => start(false)} className={room.quiet}>
+                          Type my answers instead
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => start(false)} className={room.quiet}>
+                        Start, typing my answers
+                      </button>
+                    )}
+                  </div>
+                  <p className={`text-sm leading-6 ${room.soft}`}>
+                    Uses the role and experience you chose above. Your voice and answers stay in this browser; Chrome and Edge send audio to Google or
+                    Microsoft to turn it into text. Prefer not to? Type instead.
+                  </p>
+                </div>
+              )}
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- the close: one sentence, one action ---- */}
+      <section aria-labelledby="close-heading" className="mx-auto max-w-7xl px-4 pt-[18svh] pb-[14svh] sm:px-8">
+        <Reveal>
+          <h2 id="close-heading" className="max-w-[34ch] text-xl leading-8 font-normal md:text-2xl md:leading-9">
+            Your next interview will be spoken. Rehearse it out loud with Zarina first.
+          </h2>
+          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <a href="#setup" className={room.action}>
+              Set up my interview
+            </a>
+            {proNo && (
+              <Link href="/pricing" className={`${room.link} inline-flex min-h-12 items-center`}>
+                See Pro plans
+              </Link>
+            )}
+          </div>
+        </Reveal>
+      </section>
     </div>
   );
 }
+
+/** The question, call and report screens: a plain reading column (the room is for the setup only). */
+const Stage = ({ children }: { children: React.ReactNode }) => <div className="mx-auto max-w-3xl px-4 py-8">{children}</div>;
 
 /** VI-11: whether this learner has Pro, from today's AI allowance; "unknown" until Pro is open or while loading. */
 function useProStatus(): "yes" | "no" | "unknown" {
