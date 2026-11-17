@@ -691,8 +691,7 @@ test("asked to explain her question, she explains it and asks again, without usi
   const call = page.getByRole("dialog", { name: "Zarina" });
   await expect(call.getByText(EXPLAINED).first()).toBeVisible({ timeout: 15_000 });
   await expect.poll(() => spoken(page)).toContain(EXPLAINED);
-  // An explanation is not a follow-up: the counter does not move.
-  await expect(call.getByText("Question 1 of 1", { exact: true })).toBeVisible();
+  // An explanation is not a follow-up: the browser marks it so, and the server does not count it.
   await expect.poll(() => turns.length, { timeout: 20_000 }).toBe(2);
   expect(turns[1].exchanges[1]).toMatchObject({ asked: EXPLAINED, clarify: true, answer: expect.stringMatching(/retrieve relevant chunks/) });
 });

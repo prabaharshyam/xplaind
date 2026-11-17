@@ -15,7 +15,7 @@ export const room = {
   action:
     "inline-flex min-h-12 items-center justify-center rounded-full bg-brand-300 px-6 font-semibold text-brand-950 transition-[transform,background-color] duration-150 hover:bg-brand-200 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-200 disabled:opacity-60",
   quiet:
-    "inline-flex min-h-12 items-center justify-center rounded-full bg-brand-800 px-6 font-medium text-brand-50 transition-[transform,background-color] duration-150 hover:bg-brand-700 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-200",
+    "xp-glass-btn-dark inline-flex min-h-12 items-center justify-center rounded-full px-6 font-medium text-brand-50 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-200",
   link: "font-medium text-brand-50 underline decoration-brand-300 decoration-2 underline-offset-4 hover:decoration-brand-50",
   field:
     "min-h-12 w-full min-w-0 rounded-2xl border border-brand-600 bg-brand-900 px-4 py-2 text-brand-50 placeholder:text-brand-300/80 focus:border-brand-300 focus:outline-2 focus:outline-brand-300",
