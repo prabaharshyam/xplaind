@@ -21,6 +21,9 @@ const MAX_ASKED_CHARS = 300;
 export const VOICE_BURST = 12;
 
 export const VOICE_PRO_ONLY = "The AI voice interviewer is part of Pro.";
+/** VI-13: questions in a free account's one free AI interview. */
+export const TRIAL_QUESTIONS = 2;
+export const JD_PRO_ONLY = "Practising from a job description is part of Pro. Your free AI interview works with a role.";
 
 const Exchange = z.strictObject({
   /** What the interviewer asked. For the first exchange the server uses the bank's question instead. */

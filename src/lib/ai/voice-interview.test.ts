@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DAILY_LIMIT, FAST_KINDS, modelFor } from "./limits";
-import { TIER_LIMITS, KIND_LABEL, dailyLimit } from "@/lib/billing/plans";
+import { TIER_LIMITS, KIND_LABEL } from "@/lib/billing/plans";
 import {
   MAX_FOLLOW_UPS,
   VoiceReportRequest,
@@ -184,11 +184,10 @@ describe("the scored report (VI-4)", () => {
 });
 
 describe("who may use the voice interviewer (VI-3)", () => {
-  it("is Pro only, with a real daily allowance and a plain label", () => {
+  it("is Pro, plus one small free interview (VI-13), with a real daily allowance and a plain label", () => {
     expect(TIER_LIMITS.guest.voice).toBe(0);
-    expect(TIER_LIMITS.free.voice).toBe(0);
+    expect(TIER_LIMITS.free.voice).toBeLessThan(10); // one 2-question trial, not a daily allowance
     expect(TIER_LIMITS.pro.voice).toBeGreaterThanOrEqual(22); // two 5-question interviews of 11 calls
-    expect(dailyLimit("voice", "free", true, DAILY_LIMIT)).toBe(0);
     expect(DAILY_LIMIT.voice).toBeGreaterThan(0);
     expect(KIND_LABEL.voice).toMatch(/voice interview/i);
   });

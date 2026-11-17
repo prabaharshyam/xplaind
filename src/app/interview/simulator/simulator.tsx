@@ -7,7 +7,7 @@ import { abortRecognition, joinText, useDictation, useSpeechSupported } from "@/
 import { useAiAccess } from "@/components/ai/ai-gate";
 import { AnswerReviewBlock, InterviewReviewPanel, useInterviewReview } from "@/components/ai/ai-interview-review";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
-import { VOICE_QUESTION_COUNTS, questionLine } from "@/lib/ai/voice-interview";
+import { TRIAL_QUESTIONS, VOICE_QUESTION_COUNTS, questionLine } from "@/lib/ai/voice-interview";
 import { VoiceInterviewer, type CallQuestion } from "./voice-interviewer";
 import { Exchange, Reveal, Stages, room } from "./room";
 import { MAX_JD_CHARS, MIN_JD_CHARS, type InterviewSetup } from "@/lib/ai/interview-plan";
@@ -69,8 +69,13 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   const [jd, setJd] = useState("");
   const [planning, setPlanning] = useState(false);
   const [planError, setPlanError] = useState<{ message: string; upgrade?: string } | null>(null);
-  const [call, setCall] = useState<{ questions: CallQuestion[]; setup?: InterviewSetup; plan?: string | null; pathId: string | null } | null>(null);
-  const pro = useProStatus();
+  const [call, setCall] = useState<{ questions: CallQuestion[]; setup?: InterviewSetup; plan?: string | null; pathId: string | null; trial?: boolean } | null>(null);
+  // VI-13: checked again after each AI interview, so a used free interview shows as used.
+  const [checked, setChecked] = useState(0);
+  const pro = useProStatus(checked);
+  /** VI-13: a free account's one free AI interview (or, signed out, the one an account brings). */
+  const freeTry = pro === "trial" || pro === "signin";
+  const callCount = freeTry ? TRIAL_QUESTIONS : voiceCount;
   const [howStage, setHowStage] = useState(0);
   // VI-12: the questions the AI interviewer will ask, picked as the setup changes and shown in the preview.
   // Fixed on the first render (the page is prerendered); a new draw after each start, or on "Other questions".
@@ -94,7 +99,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
     if (!needAccount("interview")) return; // SU-1, and PV-2: accounts are for adults only
     setPlanError(null);
     if (source === "role" || fixedQuestion) {
-      setCall({ questions: fixedQuestion ? [fixedQuestion] : preview.slice(0, voiceCount), setup: setupFields(), pathId: pathId || null });
+      setCall({ questions: fixedQuestion ? [fixedQuestion] : preview.slice(0, callCount), setup: setupFields(), pathId: pathId || null, trial: pro === "trial" });
       reshuffle();
       setStage({ kind: "voice" });
       window.scrollTo({ top: 0 });
@@ -156,7 +161,17 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   if (stage.kind === "voice") {
     return call ? (
       <Stage>
-        <VoiceInterviewer questions={call.questions} pathId={call.pathId} setup={call.setup} plan={call.plan} onExit={() => setStage({ kind: "setup" })} />
+        <VoiceInterviewer
+          questions={call.questions}
+          pathId={call.pathId}
+          setup={call.setup}
+          plan={call.plan}
+          trial={call.trial}
+          onExit={() => {
+            setStage({ kind: "setup" });
+            setChecked((n) => n + 1);
+          }}
+        />
       </Stage>
     ) : null;
   }
@@ -180,7 +195,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   const roleName = paths.find((p) => p.id === pathId)?.name ?? "";
   // VI-12: the live line. As the setup changes, the interviewer's real opening line and first question
   // change with it; these are the questions she will ask when the learner starts.
-  const planned = fixedQuestion ? [fixedQuestion] : preview.slice(0, voiceCount);
+  const planned = fixedQuestion ? [fixedQuestion] : preview.slice(0, callCount);
   const opening = jdMode
     ? null
     : planned[0]
@@ -189,10 +204,15 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   const minutesFor = (n: number) => (n === 3 ? "about 15 minutes" : "about 25 minutes");
   const proNo = pro === "no";
 
-  const aiAction = proNo ? (
+  // VI-13: planning from a job post is Pro, also for someone with the free interview still to use.
+  const aiAction = proNo || (freeTry && jdMode) ? (
     <Link href="/pricing" className={room.action}>
-      Get Pro to start
+      {proNo ? "Get Pro to start" : "Get Pro to plan from a job post"}
     </Link>
+  ) : freeTry ? (
+    <button type="button" onClick={() => void startVoice()} className={room.action}>
+      Start my free AI interview
+    </button>
   ) : (
     <button type="button" onClick={() => void startVoice()} disabled={planning || (jdMode && jdShort)} className={room.action}>
       {planning ? "Planning your interview…" : jdMode ? "Plan and start the AI interview" : "Start the AI interviewer"}
@@ -219,7 +239,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
               <a href="#setup" className={room.action}>
-                Set up my interview
+                {freeTry ? "Try a free AI interview" : "Set up my interview"}
               </a>
               <a
                 href="#how"
@@ -346,7 +366,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
               </span>
               <span>
                 <span className="block text-lg font-semibold">Zarina will open with</span>
-                <span className={`block text-sm ${room.soft}`}>AI interviewer · Pro</span>
+                <span className={`block text-sm ${room.soft}`}>{freeTry ? "AI interviewer · your first interview is free" : "AI interviewer · Pro"}</span>
               </span>
             </div>
             <p aria-live="polite" className="text-lg leading-8">
@@ -361,7 +381,12 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                 Other questions
               </button>
             )}
-            {!fixedQuestion && (
+            {!fixedQuestion && freeTry && !jdMode && (
+              <p className="text-[15px] leading-6">
+                <span className="font-medium">{TRIAL_QUESTIONS} questions, about 10 minutes,</span> <span className={room.soft}>with follow-ups and the full report. One free interview per account, no card needed.</span>
+              </p>
+            )}
+            {!fixedQuestion && !freeTry && (
               <label className="flex max-w-xs flex-col gap-2">
                 <span className="text-[15px] font-medium">Questions with the AI interviewer</span>
                 <select value={voiceCount} onChange={(e) => setVoiceCount(Number(e.target.value))} className={room.field}>
@@ -375,7 +400,15 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
             )}
             <div className="flex flex-col gap-3">
               {aiAction}
-              {jdMode && jdShort && !proNo && (
+              {freeTry && jdMode && (
+                <p className={`text-[15px] leading-6 ${room.soft}`}>
+                  Your free AI interview works with a role.{" "}
+                  <button type="button" onClick={() => setSource("role")} className={`${room.link} min-h-11`}>
+                    Choose a role instead
+                  </button>
+                </p>
+              )}
+              {jdMode && jdShort && !proNo && !freeTry && (
                 <p className={`text-sm leading-6 ${room.soft}`}>Paste at least {MIN_JD_CHARS} characters of the job description to plan the interview.</p>
               )}
               <p role="status" className="sr-only">
@@ -393,7 +426,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
               )}
               {proNo && (
                 <p className={`text-[15px] leading-6 ${room.soft}`}>
-                  The AI interviewer is part of Pro.{" "}
+                  You have had your free AI interview. More are part of Pro.{" "}
                   <a href="#warm-up" className={room.link}>
                     Or warm up free
                   </a>
@@ -433,23 +466,24 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
               <h3 className="text-2xl font-medium">AI interview</h3>
               <ul className="mt-6 flex flex-col gap-5">
                 {[
-                  ["Questions asked out loud", "In a natural Indian English voice, hands-free."],
-                  ["Follow-ups on your answer", "One or two, built from the words you used."],
-                  ["Set up from a job post", "Questions picked and written for that job."],
-                  ["A verdict and skill scores", "Each score backed by a quote of what you said."],
-                  ["A four-week plan", "What to practise next, week by week."],
-                ].map(([name, note]) => (
-                  <li key={name}>
+                  ["Questions asked out loud", "In a natural Indian English voice, hands-free.", true],
+                  ["Follow-ups on your answer", "One or two, built from the words you used.", true],
+                  ["Set up from a job post", "Questions picked and written for that job.", false],
+                  ["A verdict and skill scores", "Each score backed by a quote of what you said.", true],
+                  ["A four-week plan", "What to practise next, week by week.", true],
+                ].map(([name, note, inTrial]) => (
+                  <li key={name as string}>
                     <span className="flex justify-between gap-4 text-lg font-medium">
                       {name}
-                      <span className="shrink-0 text-brand-300">Pro</span>
+                      {/* VI-13: what the free interview includes, while it is still to use. */}
+                      <span className="shrink-0 text-brand-300">{freeTry && inTrial ? "Free once" : "Pro"}</span>
                     </span>
                     <span className={`block text-[15px] leading-6 ${room.soft}`}>{note}</span>
                   </li>
                 ))}
               </ul>
               <a href="#setup" className={`${room.action} mt-8`}>
-                Set up my interview
+                {freeTry ? "Try it free" : "Set up my interview"}
               </a>
             </Reveal>
             <Reveal delay={180}>
@@ -548,18 +582,31 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
 const Stage = ({ children }: { children: React.ReactNode }) => <div className="mx-auto max-w-3xl px-4 py-8">{children}</div>;
 
 /** VI-11: whether this learner has Pro, from today's AI allowance; "unknown" until Pro is open or while loading. */
-function useProStatus(): "yes" | "no" | "unknown" {
-  const [pro, setPro] = useState<"yes" | "no" | "unknown">("unknown");
+/**
+ * VI-12 and VI-13: may this visitor use the AI interviewer? "yes" with Pro; "trial" for a free account
+ * whose one free interview is unused; "signin" when signed out (an account brings the free interview);
+ * "no" once the free interview is used; "unknown" while loading, or before Pro opens.
+ */
+type ProStatus = "yes" | "trial" | "signin" | "no" | "unknown";
+function useProStatus(checked: number): ProStatus {
+  const [pro, setPro] = useState<ProStatus>("unknown");
   useEffect(() => {
     let live = true;
-    fetch("/api/ai/usage?kind=voice")
-      .then((r): Promise<{ show: boolean; tier?: string }> | { show: boolean; tier?: string } => (r.ok ? r.json() : { show: false }))
-      .then((u) => live && u.show && setPro(u.tier === "pro" ? "yes" : "no"))
+    type Usage = { show: boolean; signin?: boolean; tier?: string; trial?: boolean; used?: number; limit?: number };
+    fetch("/api/ai/usage?kind=voice_trial")
+      .then((r): Promise<Usage> | Usage => (r.ok ? r.json() : { show: false }))
+      .then((u) => {
+        if (!live) return;
+        if (u.signin) return setPro("signin");
+        if (!u.show) return;
+        if (u.tier === "pro") return setPro("yes");
+        setPro(u.trial && (u.used ?? 0) < (u.limit ?? 0) ? "trial" : "no");
+      })
       .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, []);
+  }, [checked]);
   return pro;
 }
 

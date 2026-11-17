@@ -37,7 +37,8 @@ export async function POST(request: Request) {
   if (out instanceof Response) {
     // Limits, sign-in and Pro answers go back as they are. If the AI service itself failed, the interview
     // carries on with a follow-up from the question bank instead of stopping.
-    if (out.status < 500 && out.status !== 422) return out;
+    // VI-13: in the free interview, a spent turn allowance moves on the same way, never an upgrade prompt mid-answer.
+    if (out.status < 500 && out.status !== 422 && !(access.trial && out.status === 429)) return out;
     return reply(req.exchanges.length === 1 ? bankFollowUp(q, req.exchanges) : null);
   }
   return reply(cleanTurn(out.data, q, req.exchanges));

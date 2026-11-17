@@ -16,7 +16,8 @@ export async function GET(request: Request) {
   const who = await aiCaller(admin);
   const day = todayInIST();
   // AG-1: once sign-ups are open, guests have no AI allowance to show; the tools ask them to sign up.
-  if (who.guest && accountsEnabled()) return json({ show: false });
+  // VI-13: signin tells the page an account would bring the free tries (the AI interviewer's free interview).
+  if (who.guest && accountsEnabled()) return json({ show: false, signin: true });
   const { data } = who.guest
     ? await admin.from("ai_guest_usage").select("calls").eq("visitor", who.id).eq("day", day).eq("kind", kind).maybeSingle()
     : await admin.from("ai_usage").select("calls").eq("user_id", who.id).eq("day", day).eq("kind", kind).maybeSingle();

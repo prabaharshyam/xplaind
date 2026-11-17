@@ -45,12 +45,16 @@ export type Tier = "guest" | "free" | "pro";
  */
 export const TIER_LIMITS: Record<Tier, Record<AiKind, number>> = {
   /** Visitors without an account (only while sign-ups are on hold; AG-1 asks them to sign up). Never more than the free trial. */
-  guest: { tutor: 2, grade: 1, interview: 1, book: 1, resume: 1, notes: 2, scan: 0, voice: 0, voice_end: 0, voice_plan: 0 },
+  guest: { tutor: 2, grade: 1, interview: 1, book: 1, resume: 1, notes: 2, scan: 0, voice: 0, voice_end: 0, voice_plan: 0, voice_start: 0, voice_trial: 0 },
   /** PAY-7: for free accounts these are a one-time trial per feature, not a daily allowance. */
-  /** MB-12 and VI-3: reading picture pages and the AI voice interviewer are Pro only, so a free account has no trial of them. */
-  free: { tutor: 3, grade: 3, interview: 2, book: 2, resume: 2, notes: 3, scan: 0, voice: 0, voice_end: 0, voice_plan: 0 },
+  /** MB-12: reading picture pages is Pro only. VI-13 (2026-11-17, owner request): one free AI interview of
+   *  2 questions, so people hear the interviewer follow up on their own words before they buy. It is one
+   *  scored report (voice_trial), up to 3 starts (a denied microphone or a dropped call can be retried), and
+   *  turns for 2 questions with 2 follow-ups each plus spare (voice, voice_end). Planning from a job
+   *  description stays Pro. */
+  free: { tutor: 3, grade: 3, interview: 2, book: 2, resume: 2, notes: 3, scan: 0, voice: 6, voice_end: 60, voice_plan: 0, voice_start: 3, voice_trial: 1 },
   /** VI-3: 40 voice turns is about four 5-question interviews (at most 11 calls each). */
-  pro: { tutor: 50, grade: 20, interview: 5, book: 10, resume: 3, notes: 100, scan: 60, voice: 40, voice_end: 300, voice_plan: 10 },
+  pro: { tutor: 50, grade: 20, interview: 5, book: 10, resume: 3, notes: 100, scan: 60, voice: 40, voice_end: 300, voice_plan: 10, voice_start: 0, voice_trial: 0 },
 };
 
 /** Plain names for the pricing table and the usage counter. */
@@ -65,6 +69,8 @@ export const KIND_LABEL: Record<AiKind, string> = {
   voice: "AI voice interview turns (each follow-up question, and the report)",
   voice_end: "AI voice interview checks that you have finished answering",
   voice_plan: "AI interviews set up from a job description",
+  voice_start: "Free AI interview starts",
+  voice_trial: "Free AI interview (2 questions, with a report)",
 };
 
 /**

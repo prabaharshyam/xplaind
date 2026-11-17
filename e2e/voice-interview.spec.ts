@@ -516,8 +516,18 @@ test("Answer now stops the interviewer mid-sentence and starts listening (VI-10)
   expect(await page.evaluate(() => (window as unknown as { __cancelled: number }).__cancelled)).toBeGreaterThan(0);
 });
 
-const usage = (page: Page, tier: "pro" | "free") =>
-  page.route("**/api/ai/usage**", (route) => route.fulfill({ json: { show: true, tier, used: 0, limit: tier === "pro" ? 40 : 0 } }));
+/** VI-13: "free" has used its free AI interview; "trial" still has it; "signin" is signed out. */
+const usage = (page: Page, tier: "pro" | "free" | "trial" | "signin") =>
+  page.route("**/api/ai/usage**", (route) =>
+    route.fulfill({
+      json:
+        tier === "signin"
+          ? { show: false, signin: true }
+          : tier === "trial"
+            ? { show: true, tier: "free", trial: true, used: 0, limit: 1 }
+            : { show: true, tier, trial: tier === "free", used: tier === "free" ? 1 : 0, limit: tier === "pro" ? 40 : 1 },
+    }),
+  );
 
 test("one mock interview: a Pro learner picks role, experience and company, and the interviewer gets them (VI-11)", async ({ page }) => {
   await page.addInitScript(fakeSpeechOut);
@@ -598,18 +608,66 @@ test("a pasted job description plans the interview: bank questions plus one writ
   expect(turns[0]).toMatchObject({ plan: "sealed-plan", questionId: "what-is-rag" });
 });
 
-test("without Pro, the AI interviewer offers Pro and the free warm-up stays one tap away (VI-11, VI-12)", async ({ page }) => {
+test("with the free AI interview used, the AI interviewer offers Pro and the free warm-up stays one tap away (VI-11, VI-12, VI-13)", async ({ page }) => {
   await usage(page, "free");
   await page.goto("/interview/simulator");
   await expect(page.getByRole("link", { name: "Get Pro to start" })).toHaveAttribute("href", "/pricing");
+  await expect(page.getByText("You have had your free AI interview.", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Start the AI interviewer" })).toHaveCount(0);
   await page.getByRole("link", { name: "Or warm up free" }).click();
   await expect(page.getByRole("button", { name: /Type my answers instead|Start, typing my answers/ })).toBeVisible();
-  await page.getByRole("radio", { name: "Paste a job description" }).check({ force: true });
+  await page.getByRole("radio", { name: "Paste a job description" }).dispatchEvent("click"); // after the scroll to #warm-up, a forced click can land mid-scroll
   await expect(page.getByText(/Practising from a job description needs the AI interviewer/)).toBeVisible();
   await page.getByRole("button", { name: "choose a role instead" }).click();
   await expect(page.getByRole("button", { name: /Type my answers instead|Start, typing my answers/ })).toBeVisible();
   expect((await wcag(page)).violations).toEqual([]);
+});
+
+test("a free account gets one free AI interview of 2 questions, for a role; a job post stays Pro (VI-13)", async ({ page }) => {
+  await usage(page, "trial");
+  const starts: { questionIds: string[] }[] = [];
+  await startRoute(page, starts);
+  await page.goto("/interview/simulator?path=genai-engineer");
+  await expect(page.getByRole("link", { name: "Try a free AI interview" })).toBeVisible();
+  await expect(page.getByText("AI interviewer · your first interview is free")).toBeVisible();
+  // Her real opening line says 2 questions, and there is no 3-or-5 choice in the free interview.
+  await expect(page.getByText(/We'll go through 2 questions/)).toBeVisible();
+  await expect(page.getByLabel("Questions with the AI interviewer")).toHaveCount(0);
+  await expect(page.getByText("Free once").first()).toBeVisible();
+  // Planning from a job post is Pro, with the way back to the free interview.
+  await page.getByRole("radio", { name: "Paste a job description" }).check({ force: true });
+  await expect(page.getByRole("link", { name: "Get Pro to plan from a job post" })).toHaveAttribute("href", "/pricing");
+  await page.getByRole("button", { name: "Choose a role instead", exact: true }).click();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Start my free AI interview" }).click();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  await expect.poll(() => starts.length).toBe(1);
+  expect(starts[0].questionIds).toHaveLength(2);
+});
+
+test("after the free AI interview, the report offers Pro (VI-13)", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(fakeSpeechOut);
+  await page.addInitScript(fakeMicrophone, ["Basically we retrieve relevant chunks from documents and add them to the prompt."]);
+  await usage(page, "trial");
+  await startRoute(page);
+  await page.route("**/api/ai/voice/turn", (route) => route.fulfill({ json: { follow_up: null } }));
+  await page.route("**/api/ai/voice/report", (route) => route.fulfill({ json: { ...report, trial: true } }));
+  await page.goto("/interview/simulator?question=what-is-rag");
+  await page.getByRole("button", { name: "Start my free AI interview" }).click();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  await expect(page.getByRole("heading", { name: "Your AI interview report" })).toBeFocused({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "That was your free AI interview" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Get Pro" })).toHaveAttribute("href", "/pricing");
+  expect((await wcag(page)).violations).toEqual([]);
+});
+
+test("signed out, the page offers the free AI interview, which starts with an account (VI-13)", async ({ page }) => {
+  await usage(page, "signin");
+  await page.goto("/interview/simulator");
+  await expect(page.getByRole("link", { name: "Try a free AI interview" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start my free AI interview" })).toBeVisible();
 });
 
 test("when the plan is refused, the reason and the way to Pro are shown (VI-11)", async ({ page }) => {

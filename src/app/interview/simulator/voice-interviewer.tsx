@@ -59,6 +59,7 @@ export function VoiceInterviewer({
   pathId,
   setup,
   plan,
+  trial = false,
   onExit,
 }: {
   questions: CallQuestion[];
@@ -67,6 +68,8 @@ export function VoiceInterviewer({
   setup?: InterviewSetup;
   /** VI-11: the sealed plan made from a job description, sent back with every call. */
   plan?: string | null;
+  /** VI-13: this is the learner's one free AI interview; the report then offers Pro. */
+  trial?: boolean;
   onExit: () => void;
 }) {
   const extra = useMemo(() => ({ ...(setup ? { setup } : {}), ...(plan ? { plan } : {}) }), [setup, plan]);
@@ -359,7 +362,7 @@ export function VoiceInterviewer({
         </div>
       )}
 
-      {phase.kind === "report" && <VoiceReportView report={phase.report} readiness={phase.readiness} onExit={onExit} />}
+      {phase.kind === "report" && <VoiceReportView report={phase.report} readiness={phase.readiness} trial={trial} onExit={onExit} />}
     </div>
   );
 }
@@ -973,7 +976,7 @@ function Stopped({ failure, onExit, onReport }: { failure: Failure; onExit: () =
 
 const outOf5 = (n: number) => `${n} / 5`;
 
-function VoiceReportView({ report, readiness, onExit }: { report: VoiceReport; readiness: Readiness | null; onExit: () => void }) {
+function VoiceReportView({ report, readiness, trial, onExit }: { report: VoiceReport; readiness: Readiness | null; trial: boolean; onExit: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
   const c = report.communication;
@@ -1210,9 +1213,24 @@ function VoiceReportView({ report, readiness, onExit }: { report: VoiceReport; r
         ))}
       </section>
 
+      {trial && (
+        <section aria-labelledby="voice-trial-heading" className={`${card} flex flex-col gap-3 print:hidden`}>
+          <h3 id="voice-trial-heading" className="text-xl font-semibold">
+            That was your free AI interview
+          </h3>
+          <p className="leading-7">
+            With Pro, Zarina interviews you every day: 3 or 5 questions at a time, set up from any job post you paste, each with a report like this one.
+            Passes start at ₹99 for 7 days, paid once, with no auto-renewal.
+          </p>
+          <Link href="/pricing" className={`${primaryButton} self-start`}>
+            Get Pro
+          </Link>
+        </section>
+      )}
+
       <div className="flex flex-col gap-3 sm:flex-row print:hidden">
-        <button type="button" onClick={onExit} className={primaryButton}>
-          New interview
+        <button type="button" onClick={onExit} className={trial ? secondaryButton : primaryButton}>
+          {trial ? "Back to the mock interview" : "New interview"}
         </button>
         <button type="button" onClick={() => window.print()} className={secondaryButton}>
           Print or save as PDF

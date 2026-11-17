@@ -5,8 +5,8 @@ import { json, problem } from "@/lib/account/http";
 import { body } from "@/lib/ai/route";
 import { hearToken } from "@/lib/ai/stt";
 import { lineUrl, ttsSettings } from "@/lib/ai/tts";
-import { voiceAccess } from "@/lib/ai/voice-access";
-import { ACK_LINES, CLOSING_LINE, MAX_VOICE_QUESTIONS, questionLine } from "@/lib/ai/voice-interview";
+import { reserveTrial, trialLeft, trialUsed, voiceAccess } from "@/lib/ai/voice-access";
+import { ACK_LINES, CLOSING_LINE, JD_PRO_ONLY, MAX_VOICE_QUESTIONS, TRIAL_QUESTIONS, questionLine } from "@/lib/ai/voice-interview";
 import { SetupFields } from "@/lib/ai/interview-plan";
 import { interviewFrom } from "@/lib/ai/voice-plan-server";
 import { z } from "zod";
@@ -23,6 +23,15 @@ export async function POST(request: Request) {
   if (expired) return problem(400, "That interview plan has expired. Set it up again.");
   const asked = req.questionIds.map(find);
   if (asked.some((q) => !q)) return problem(400, "Unknown question.");
+  // VI-13: a free account's one interview: 2 questions, for a role (a plan needs Pro), and only while its
+  // report has not been given. Starting mints voice and transcription tokens, so starts are counted too.
+  if (access.trial) {
+    if (req.plan) return json({ error: JD_PRO_ONLY, upgrade: "/pricing" }, 403);
+    if (asked.length > TRIAL_QUESTIONS) return problem(400, `The free AI interview has ${TRIAL_QUESTIONS} questions.`);
+    if (!(await trialLeft(access))) return trialUsed();
+    const refused = await reserveTrial(access, "voice_start");
+    if (refused) return refused;
+  }
   const tts = ttsSettings();
   const line = (text: string) => ({ text, audio: lineUrl(text, tts) });
   return json({
@@ -31,5 +40,6 @@ export async function POST(request: Request) {
     closing: line(CLOSING_LINE),
     // VI-9: with Sarvam on, answers are transcribed by Sarvam (pieces posted with this token).
     hear: hearToken(tts),
+    trial: access.trial,
   });
 }

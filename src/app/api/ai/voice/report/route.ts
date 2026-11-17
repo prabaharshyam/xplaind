@@ -4,8 +4,8 @@
 import { json, problem } from "@/lib/account/http";
 import { body } from "@/lib/ai/route";
 import { runAi } from "@/lib/ai/run";
-import { voiceAccess } from "@/lib/ai/voice-access";
-import { VOICE_BURST, VoiceReportRequest, buildVoiceReport, voiceReportPrompt, type AskedItem } from "@/lib/ai/voice-interview";
+import { trialLeft, trialUsed, voiceAccess } from "@/lib/ai/voice-access";
+import { TRIAL_QUESTIONS, VOICE_BURST, VoiceReportRequest, buildVoiceReport, voiceReportPrompt, type AskedItem } from "@/lib/ai/voice-interview";
 import { getPaths } from "@/lib/content";
 import { interviewFrom } from "@/lib/ai/voice-plan-server";
 import { readiness } from "@/lib/interview/readiness";
@@ -24,7 +24,13 @@ export async function POST(request: Request) {
   const asked = items as AskedItem[];
   if (!asked.some((it) => it.exchanges.some((e) => e.answer.trim()))) return problem(400, "Answer at least one question to get a report.");
 
-  const out = await runAi({ kind: "voice", model: "main", caller: access.who, ...voiceReportPrompt(asked, ctx), maxTokens: 12_000, effort: "low", burst: VOICE_BURST });
+  // VI-13: the free interview's report is its own allowance (one), so turns used on an abandoned try never
+  // take it away.
+  if (access.trial) {
+    if (req.items.length > TRIAL_QUESTIONS || plan) return problem(400, `The free AI interview has ${TRIAL_QUESTIONS} questions.`);
+    if (!(await trialLeft(access))) return trialUsed();
+  }
+  const out = await runAi({ kind: access.trial ? "voice_trial" : "voice", model: "main", caller: access.who, ...voiceReportPrompt(asked, ctx), maxTokens: 12_000, effort: "low", burst: VOICE_BURST });
   if (out instanceof Response) return out;
   const report = buildVoiceReport(out.data, asked);
 
@@ -44,5 +50,5 @@ export async function POST(request: Request) {
       .limit(6);
     ready = readiness((data ?? []).map((r) => r.score as number));
   }
-  return json({ report, readiness: ready, pathId });
+  return json({ report, readiness: ready, pathId, trial: access.trial });
 }

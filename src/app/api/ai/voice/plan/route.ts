@@ -7,13 +7,14 @@ import { runAi } from "@/lib/ai/run";
 import { buildPlan, VoicePlanRequest, voicePlanPrompt } from "@/lib/ai/interview-plan";
 import { rolePaths, sealPlan } from "@/lib/ai/voice-plan-server";
 import { voiceAccess } from "@/lib/ai/voice-access";
-import { VOICE_BURST } from "@/lib/ai/voice-interview";
+import { JD_PRO_ONLY, VOICE_BURST } from "@/lib/ai/voice-interview";
 import { getInterviewViews } from "@/lib/content/interview";
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const access = await voiceAccess();
+  // VI-13: planning from a job description stays Pro, also during the free interview.
+  const access = await voiceAccess({ proOnly: JD_PRO_ONLY });
   if (access instanceof Response) return access;
   const req = await body(request, VoicePlanRequest, 20_000);
   if (req instanceof Response) return req;

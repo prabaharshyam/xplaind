@@ -295,7 +295,11 @@ export default function PricingPage() {
                     {KIND_LABEL[k]}
                   </th>
                   <td className="p-4 md:px-6">
-                    {TIER_LIMITS.free[k] === 0 ? "Pro only" : `${TIER_LIMITS.free[k]} ${TIER_LIMITS.free[k] === 1 ? "try" : "tries"} in total`}
+                    {k === "voice"
+                      ? "1 free interview of 2 questions"
+                      : TIER_LIMITS.free[k] === 0
+                        ? "Pro only"
+                        : `${TIER_LIMITS.free[k]} ${TIER_LIMITS.free[k] === 1 ? "try" : "tries"} in total`}
                   </td>
                   <td className="p-4 font-semibold md:px-6">{TIER_LIMITS.pro[k]} every day</td>
                 </tr>
