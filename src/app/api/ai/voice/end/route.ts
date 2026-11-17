@@ -6,7 +6,7 @@ import { body } from "@/lib/ai/route";
 import { runAi } from "@/lib/ai/run";
 import { voiceAccess } from "@/lib/ai/voice-access";
 import { VoiceEndRequest, finishedEnough, voiceEndPrompt } from "@/lib/ai/voice-interview";
-import { getContent } from "@/lib/content";
+import { interviewFrom } from "@/lib/ai/voice-plan-server";
 
 export const maxDuration = 15;
 
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   if (access instanceof Response) return access;
   const req = await body(request, VoiceEndRequest, 12_000);
   if (req instanceof Response) return req;
-  const q = getContent().interview.find((x) => x.data.id === req.questionId)?.data;
+  const q = interviewFrom(req).find(req.questionId);
   if (!q) return problem(400, "Unknown question.");
   const out = await runAi({
     kind: "voice_end",

@@ -8,7 +8,7 @@ import { runAi } from "@/lib/ai/run";
 import { lineUrl } from "@/lib/ai/tts";
 import { voiceAccess } from "@/lib/ai/voice-access";
 import { VOICE_BURST, VoiceTurnRequest, bankFollowUp, cleanTurn, turnDecision, voiceTurnPrompt } from "@/lib/ai/voice-interview";
-import { getContent } from "@/lib/content";
+import { interviewFrom } from "@/lib/ai/voice-plan-server";
 
 export const maxDuration = 60;
 
@@ -19,7 +19,8 @@ export async function POST(request: Request) {
   if (access instanceof Response) return access;
   const req = await body(request, VoiceTurnRequest, 40_000);
   if (req instanceof Response) return req;
-  const q = getContent().interview.find((x) => x.data.id === req.questionId)?.data;
+  const { ctx, find } = interviewFrom(req);
+  const q = find(req.questionId);
   if (!q) return problem(400, "Unknown question.");
   // A skipped answer, or two follow-ups already: move on without a model call.
   if (turnDecision(req.exchanges) === "done") return json({ follow_up: null });
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     kind: "voice",
     model: "fast",
     caller: access.who,
-    ...voiceTurnPrompt(q, req.exchanges),
+    ...voiceTurnPrompt(q, req.exchanges, ctx),
     maxTokens: 300,
     effort: "low",
     burst: VOICE_BURST,

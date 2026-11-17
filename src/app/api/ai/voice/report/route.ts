@@ -6,7 +6,8 @@ import { body } from "@/lib/ai/route";
 import { runAi } from "@/lib/ai/run";
 import { voiceAccess } from "@/lib/ai/voice-access";
 import { VOICE_BURST, VoiceReportRequest, buildVoiceReport, voiceReportPrompt, type AskedItem } from "@/lib/ai/voice-interview";
-import { getContent, getPaths } from "@/lib/content";
+import { getPaths } from "@/lib/content";
+import { interviewFrom } from "@/lib/ai/voice-plan-server";
 import { readiness } from "@/lib/interview/readiness";
 import { currentUser, userClient } from "@/lib/supabase/server";
 
@@ -17,18 +18,19 @@ export async function POST(request: Request) {
   if (access instanceof Response) return access;
   const req = await body(request, VoiceReportRequest, 120_000);
   if (req instanceof Response) return req;
-  const bank = new Map(getContent().interview.map((x) => [x.data.id, x.data]));
-  const items = req.items.map((it) => ({ q: bank.get(it.questionId), exchanges: it.exchanges }));
+  const { plan, ctx, find } = interviewFrom(req);
+  const items = req.items.map((it) => ({ q: find(it.questionId), exchanges: it.exchanges }));
   if (items.some((x) => !x.q)) return problem(400, "Unknown question.");
   const asked = items as AskedItem[];
   if (!asked.some((it) => it.exchanges.some((e) => e.answer.trim()))) return problem(400, "Answer at least one question to get a report.");
 
-  const out = await runAi({ kind: "voice", model: "main", caller: access.who, ...voiceReportPrompt(asked), maxTokens: 12_000, effort: "low", burst: VOICE_BURST });
+  const out = await runAi({ kind: "voice", model: "main", caller: access.who, ...voiceReportPrompt(asked, ctx), maxTokens: 12_000, effort: "low", burst: VOICE_BURST });
   if (out instanceof Response) return out;
   const report = buildVoiceReport(out.data, asked);
 
   let ready = null;
-  const pathId = req.pathId && getPaths().some((p) => p.id === req.pathId) ? req.pathId : "any";
+  const wanted = plan?.pathId ?? req.setup?.pathId ?? req.pathId;
+  const pathId = wanted && getPaths().some((p) => p.id === wanted) ? wanted : "any";
   const client = await userClient();
   const user = client ? await currentUser(client) : null;
   if (user && report.answered > 0) {

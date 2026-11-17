@@ -7,6 +7,7 @@
 // tampered browser could put anything there.
 import { z } from "zod";
 import { countFillers, wordCount } from "@/lib/interview/analyse";
+import { contextBlock, roleLine, SetupFields, type InterviewContext } from "./interview-plan";
 import { asData, DATA_RULE, HOUSE_STYLE } from "./prompt";
 
 /** VI-1: questions per interview, and follow-ups per question (at least 1 after a real answer). */
@@ -34,12 +35,13 @@ const QuestionId = z.string().min(1).max(80);
 const Exchanges = z.array(Exchange).min(1).max(MAX_FOLLOW_UPS + 1);
 
 /** One follow-up turn: the question and everything said about it so far. */
-export const VoiceTurnRequest = z.strictObject({ questionId: QuestionId, exchanges: Exchanges });
+export const VoiceTurnRequest = z.strictObject({ questionId: QuestionId, exchanges: Exchanges, ...SetupFields });
 export type VoiceTurnRequest = z.infer<typeof VoiceTurnRequest>;
 
 /** The whole interview, for the scored report. */
 export const VoiceReportRequest = z.strictObject({
   pathId: z.string().max(60).optional(),
+  ...SetupFields,
   items: z
     .array(z.strictObject({ questionId: QuestionId, exchanges: Exchanges }))
     .min(1)
@@ -79,15 +81,15 @@ const transcript = (q: VoiceQuestion, exchanges: readonly Exchange[]) =>
   exchanges
     .map((e, i) =>
       i === 0
-        ? `Main question (from our question bank): ${q.question}\n${asData("answer", e.answer, MAX_ANSWER_CHARS)}`
+        ? `Main question: ${q.question}\n${asData("answer", e.answer, MAX_ANSWER_CHARS)}`
         : `Follow-up ${i}, as sent back by the browser:\n${asData("follow_up_asked", e.asked, MAX_ASKED_CHARS)}\n${asData("answer", e.answer, MAX_ANSWER_CHARS)}`,
     )
     .join("\n\n");
 
-export function voiceTurnPrompt(q: VoiceQuestion, exchanges: readonly Exchange[]) {
+export function voiceTurnPrompt(q: VoiceQuestion, exchanges: readonly Exchange[], ctx?: InterviewContext) {
   const first = exchanges.length === 1;
   const system = [
-    "You are a calm, fair senior interviewer for an AI role at a company in India, running a spoken mock interview for Xplaind. Your question will be read aloud by the browser.",
+    "You are a calm, fair senior interviewer for an AI role at a company in India, running a spoken mock interview for Xplaind. Your question will be read aloud by the browser. Pitch the follow-up at the experience level the role asks for, when it is given.",
     HOUSE_STYLE,
     DATA_RULE,
     "Ask exactly one follow-up question, the way a demanding senior interviewer would, about what the candidate actually said. Pick the move that would reveal the most: challenge a claim (\"Why that and not X?\"), ask for specifics or numbers (\"How big, how many, how fast?\"), test a trade-off or failure (\"What breaks if...?\", \"What would you do when...?\"), ask for real experience (\"Tell me about a time you actually did this\"), or press on a rubric point they skipped or got wrong. Refer to their own words.",
@@ -97,12 +99,15 @@ export function voiceTurnPrompt(q: VoiceQuestion, exchanges: readonly Exchange[]
       ? "This is the first follow-up, so you must ask one: set done to false."
       : "If one more follow-up would not tell you anything new, set done to true and follow_up to an empty string. Otherwise set done to false.",
     `Rubric points a strong answer covers:\n${q.rubric.map((r) => `- ${r.point}`).join("\n")}`,
-    `Follow-up ideas from our question bank (adapt one only if it fits what they said):\n${q.follow_ups.map((f) => `- ${f}`).join("\n")}`,
+    q.follow_ups.length ? `Follow-up ideas (adapt one only if it fits what they said):\n${q.follow_ups.map((f) => `- ${f}`).join("\n")}` : "",
     `Reference answer: ${q.short_answer}`,
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const about = ctx ? contextBlock(ctx) : "";
   return {
     system,
-    messages: [{ role: "user" as const, content: `The interview so far:\n\n${transcript(q, exchanges)}\n\nAsk the next follow-up.` }],
+    messages: [{ role: "user" as const, content: `${about ? `${about}\n\n` : ""}The interview so far:\n\n${transcript(q, exchanges)}\n\nAsk the next follow-up.` }],
     schema: VoiceTurnOutput,
   };
 }
@@ -156,10 +161,11 @@ export function keytermsFor(q: { rubric: readonly { keywords?: readonly string[]
  * What the interviewer says to ask a bank question: a short welcome before the first, a natural lead-in
  * before the others. Written here, never by the browser, so only our own lines are ever voiced. Pure.
  */
-export function questionLine(index: number, total: number, question: string): string {
+export function questionLine(index: number, total: number, question: string, ctx?: InterviewContext): string {
   if (index === 0) {
     const n = total === 1 ? "one question" : `${total} questions`;
-    return `Hi, I'm your AI interviewer for today. We'll go through ${n}, and I may ask a follow-up or two about what you say. Take your time and answer as you would in a real interview. Let's begin. ${question}`;
+    const role = ctx ? roleLine(ctx) : "";
+    return `Hi, I'm your AI interviewer for today.${role ? ` ${role}` : ""} We'll go through ${n}, and I may ask a follow-up or two about what you say. Take your time and answer as you would in a real interview. Let's begin. ${question}`;
   }
   if (index === total - 1) return `Thanks. And now the last question. ${question}`;
   const leads = ["Thanks. Let's move on to the next one.", "Okay, next question.", "Alright, let's look at another one."];
@@ -182,8 +188,11 @@ export function cleanTurn(out: VoiceTurnOutput, q: VoiceQuestion, exchanges: rea
 /** A follow-up from the bank not asked yet, used when the model declines or the call fails. Pure. */
 export function bankFollowUp(q: VoiceQuestion, exchanges: readonly Exchange[]): string | null {
   const asked = new Set(exchanges.map((e) => e.asked.trim().toLowerCase()));
-  return q.follow_ups.find((f) => !asked.has(f.trim().toLowerCase())) ?? null;
+  return [...q.follow_ups, GENERIC_FOLLOW_UP].find((f) => !asked.has(f.trim().toLowerCase())) ?? null;
 }
+
+/** VI-11: the follow-up of last resort, for a question written for a job (it may have none of its own). */
+export const GENERIC_FOLLOW_UP = "Can you walk me through a real example of that, from a project you worked on?";
 
 // ----------------------------------------------------------------- report --
 
@@ -218,7 +227,7 @@ export type VoiceReportOutput = z.infer<typeof VoiceReportOutput>;
 
 export type AskedItem = { q: VoiceQuestion; exchanges: readonly Exchange[] };
 
-export function voiceReportPrompt(items: readonly AskedItem[]) {
+export function voiceReportPrompt(items: readonly AskedItem[], ctx?: InterviewContext) {
   const system = [
     "You are a fair, specific senior interviewer scoring a candidate's spoken mock interview for an AI role, for Xplaind. The answers were spoken and turned into text by speech recognition, so ignore small transcription errors and missing punctuation.",
     HOUSE_STYLE,
@@ -228,7 +237,7 @@ export function voiceReportPrompt(items: readonly AskedItem[]) {
     "communication, for the whole interview: structure 0 to 5 (a clear opening line, then a logical order, then a close) and clarity 0 to 5 (short sentences, precise terms, no rambling); note is one or two sentences with a specific example from their words.",
     "improvements: exactly 3 specific, actionable improvements for the whole interview, each naming the concept or habit and what to do instead. summary: 3 to 4 sentences, written like a hiring manager's note: what this candidate showed, how deep it went, and how they came across.",
     "Per question also: score 1 to 5 for the whole answer including follow-ups (5 would impress a senior interviewer, 3 is acceptable, 1 would not pass). went_well: up to 3 specific things they did well. gaps: up to 3 specific things missing or wrong, each with what a strong candidate would have said. follow_up_handling: one sentence on how they handled the follow-up questions (or empty if there were none).",
-    "competencies: 4 to 6 skills this role is hired for, named specifically for what was asked (for example \"Retrieval and chunking design\" or \"Evaluating LLM output\", never generic like \"Technical skills\"), plus \"Communication\" as the last one. Each: score 1 to 5, evidence as 1 to 2 short exact quotes (at most 15 words each) of the candidate's own words, and a note of one sentence.",
+    "competencies: 4 to 6 skills this role is hired for (when the job description's skills are given, use those names), named specifically for what was asked (for example \"Retrieval and chunking design\" or \"Evaluating LLM output\", never generic like \"Technical skills\"), plus \"Communication\" as the last one. Each: score 1 to 5, evidence as 1 to 2 short exact quotes (at most 15 words each) of the candidate's own words, and a note of one sentence.",
     "strengths: up to 3, risks: up to 3, each a sentence an interviewer would write about this candidate with one short exact quote as evidence (or empty). verdict_reason: two sentences on whether this candidate would move to the next round for this role, and why. plan: 4 entries, week 1 to 4, each a focus and one concrete action for that week.",
     "Be honest and specific, like a demanding senior interviewer: do not inflate scores, and do not pad with generic advice.",
     "Return one questions entry per question, in the order given, with its questionId.",
@@ -244,7 +253,8 @@ export function voiceReportPrompt(items: readonly AskedItem[]) {
       .join("\n\n"),
   ].join("\n\n");
   const content = items.map((it, i) => `Question ${i + 1} (questionId: ${it.q.id}):\n${transcript(it.q, it.exchanges)}`).join("\n\n---\n\n");
-  return { system, messages: [{ role: "user" as const, content: `Score this interview.\n\n${content}` }], schema: VoiceReportOutput };
+  const about = ctx ? contextBlock(ctx) : "";
+  return { system, messages: [{ role: "user" as const, content: `${about ? `${about}\n\n` : ""}Score this interview for that role and level.\n\n${content}` }], schema: VoiceReportOutput };
 }
 
 export type VoicePoint = { point: string; covered: boolean; evidence: string };
@@ -457,6 +467,7 @@ export const VoiceEndRequest = z.strictObject({
   questionId: QuestionId,
   asked: z.string().trim().min(1).max(MAX_ASKED_CHARS),
   answer: z.string().trim().min(1).max(MAX_ANSWER_CHARS + 1000),
+  ...SetupFields,
 });
 export const VoiceEndOutput = z.object({ finished: z.boolean(), confidence: z.number() });
 export type VoiceEndOutput = z.infer<typeof VoiceEndOutput>;

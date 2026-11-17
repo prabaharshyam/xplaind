@@ -7,22 +7,26 @@ import { hearToken } from "@/lib/ai/stt";
 import { lineUrl, ttsSettings } from "@/lib/ai/tts";
 import { voiceAccess } from "@/lib/ai/voice-access";
 import { ACK_LINES, CLOSING_LINE, MAX_VOICE_QUESTIONS, questionLine } from "@/lib/ai/voice-interview";
-import { getContent } from "@/lib/content";
+import { SetupFields } from "@/lib/ai/interview-plan";
+import { interviewFrom } from "@/lib/ai/voice-plan-server";
 import { z } from "zod";
 
-const StartRequest = z.strictObject({ questionIds: z.array(z.string().min(1).max(80)).min(1).max(MAX_VOICE_QUESTIONS) });
+const StartRequest = z.strictObject({ questionIds: z.array(z.string().min(1).max(80)).min(1).max(MAX_VOICE_QUESTIONS), ...SetupFields });
 
 export async function POST(request: Request) {
   const access = await voiceAccess();
   if (access instanceof Response) return access;
-  const req = await body(request, StartRequest, 4_000);
+  const req = await body(request, StartRequest, 30_000);
   if (req instanceof Response) return req;
-  const bank = new Map(getContent().interview.map((x) => [x.data.id, x.data]));
-  if (req.questionIds.some((id) => !bank.has(id))) return problem(400, "Unknown question.");
+  // VI-11: questions come from the bank or, for a job description, from the sealed plan.
+  const { ctx, find, expired } = interviewFrom(req);
+  if (expired) return problem(400, "That interview plan has expired. Set it up again.");
+  const asked = req.questionIds.map(find);
+  if (asked.some((q) => !q)) return problem(400, "Unknown question.");
   const tts = ttsSettings();
   const line = (text: string) => ({ text, audio: lineUrl(text, tts) });
   return json({
-    questions: req.questionIds.map((id, i) => line(questionLine(i, req.questionIds.length, bank.get(id)!.question))),
+    questions: asked.map((q, i) => line(questionLine(i, asked.length, q!.question, ctx))),
     acks: ACK_LINES.map(line),
     closing: line(CLOSING_LINE),
     // VI-9: with Sarvam on, answers are transcribed by Sarvam (pieces posted with this token).

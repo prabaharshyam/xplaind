@@ -1,7 +1,7 @@
 // CO-1: what AI calls may cost. Pure: no network, no database. The owner set a
 // US$20 monthly cap; per-learner daily caps keep one account from using it up.
 
-export const AI_KINDS = ["tutor", "grade", "interview", "book", "resume", "notes", "scan", "voice", "voice_end"] as const;
+export const AI_KINDS = ["tutor", "grade", "interview", "book", "resume", "notes", "scan", "voice", "voice_end", "voice_plan"] as const;
 export type AiKind = (typeof AI_KINDS)[number];
 
 /** Calls one learner may make per India day, per feature. Grades follow the PRD's 5 (CO-1). */
@@ -27,6 +27,8 @@ export const DAILY_LIMIT: Record<AiKind, number> = {
   voice: 40,
   /** VI-10: "has the learner finished?" checks during an AI voice interview, a few tokens each on the fast model. */
   voice_end: 300,
+  /** VI-11: an AI interview planned from a pasted job description, one main-model call each. */
+  voice_plan: 10,
 };
 
 export const DEFAULT_MODEL = "claude-opus-5-5";

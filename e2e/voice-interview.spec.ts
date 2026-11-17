@@ -511,3 +511,96 @@ test("Answer now stops the interviewer mid-sentence and starts listening (VI-10)
   await expect(call.getByRole("button", { name: "Done" })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __cancelled: number }).__cancelled)).toBeGreaterThan(0);
 });
+
+const usage = (page: Page, tier: "pro" | "free") =>
+  page.route("**/api/ai/usage**", (route) => route.fulfill({ json: { show: true, tier, used: 0, limit: tier === "pro" ? 40 : 0 } }));
+
+test("one mock interview: a Pro learner picks role, experience and company, and the interviewer gets them (VI-11)", async ({ page }) => {
+  await page.addInitScript(fakeSpeechOut);
+  await page.addInitScript(fakeMicrophone, ["Answer."]);
+  await usage(page, "pro");
+  const starts: { questionIds: string[]; setup?: unknown }[] = [];
+  await startRoute(page, starts);
+  await page.goto("/interview/simulator?path=genai-engineer");
+  await expect(page.getByRole("heading", { name: "What are you preparing for?" })).toBeVisible();
+  // Pro: the AI interviewer comes first; practising alone stays, free, below it.
+  await expect(page.locator("section h2").filter({ hasText: /AI interviewer|Practise on your own/ }).first()).toHaveText(/AI interviewer/);
+  await expect(page.getByRole("heading", { name: /Practise on your own/ })).toBeVisible();
+  await page.getByLabel("Experience needed").selectOption("mid");
+  await page.getByLabel("Kind of questions").selectOption("scenarios");
+  await page.getByLabel("Company (optional)").fill("Acme");
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Start the AI interviewer" }).click();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  await expect.poll(() => starts.length).toBe(1);
+  expect(starts[0].setup).toEqual({ pathId: "genai-engineer", experience: "mid", company: "Acme" });
+  expect(starts[0].questionIds).toHaveLength(3);
+});
+
+test("a pasted job description plans the interview: bank questions plus one written for the job, sent back sealed (VI-11)", async ({ page }) => {
+  await page.addInitScript(fakeSpeechOut);
+  await page.addInitScript(fakeMicrophone, ["We would use Bedrock with a private VPC endpoint and log every call."]);
+  await usage(page, "pro");
+  const plans: { jd: string; count: number; company?: string; experience?: string }[] = [];
+  await page.route("**/api/ai/voice/plan", (route) => {
+    plans.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: {
+        plan: "sealed-plan",
+        looksLikeJd: true,
+        role: "GenAI Engineer",
+        pathId: "genai-engineer",
+        focus: ["RAG on AWS Bedrock"],
+        questions: [
+          { id: "what-is-rag", question: "What is RAG (retrieval-augmented generation)?", custom: false },
+          { id: "jd-1", question: "How would you deploy a RAG app on AWS Bedrock for a bank?", custom: true },
+        ],
+      },
+    });
+  });
+  const starts: { questionIds: string[]; plan?: string }[] = [];
+  await startRoute(page, starts);
+  const turns: { plan?: string; questionId: string }[] = [];
+  await page.route("**/api/ai/voice/turn", (route) => {
+    turns.push(route.request().postDataJSON());
+    return route.fulfill({ json: { follow_up: null } });
+  });
+  await page.goto("/interview/simulator");
+  await page.getByRole("radio", { name: "Paste a job description" }).check();
+  const plan = page.getByRole("button", { name: "Plan and start the AI interview" });
+  const box = page.getByRole("textbox", { name: /^Job description/ });
+  await box.fill("GenAI Engineer, Bengaluru.");
+  await expect(plan).toBeDisabled(); // too short to plan from
+  await box.fill("GenAI Engineer, Bengaluru. You will build RAG systems on AWS Bedrock for banking clients, evaluate LLM output and ship agents to production. 3+ years of Python.");
+  await page.getByLabel("Company (optional)").fill("Acme");
+  // Practising alone cannot use a job description; it says so instead of offering a broken start.
+  await expect(page.getByText("Practising from a job description needs the AI interviewer.")).toBeVisible();
+  expect((await wcag(page)).violations).toEqual([]);
+  await plan.click();
+  await expect.poll(() => plans.length).toBe(1);
+  expect(plans[0]).toMatchObject({ count: 3, company: "Acme", jd: expect.stringMatching(/AWS Bedrock/) });
+  expect(plans[0].experience).toBeUndefined(); // "as the job description says"
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  await expect.poll(() => starts.length).toBe(1);
+  expect(starts[0]).toMatchObject({ questionIds: ["what-is-rag", "jd-1"], plan: "sealed-plan" });
+  await expect.poll(() => turns.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  expect(turns[0]).toMatchObject({ plan: "sealed-plan", questionId: "what-is-rag" });
+});
+
+test("without Pro, practising alone comes first and the job description explains the upgrade (VI-11)", async ({ page }) => {
+  await usage(page, "free");
+  await page.route("**/api/ai/voice/plan", (route) => route.fulfill({ status: 403, json: { error: "The AI voice interviewer is part of Pro.", upgrade: "/pricing" } }));
+  await page.goto("/interview/simulator");
+  await expect(page.locator("section h2").filter({ hasText: /AI interviewer|Practise on your own/ }).first()).toHaveText(/Practise on your own/);
+  await expect(page.getByRole("link", { name: "Get Pro" })).toHaveAttribute("href", "/pricing");
+  await page.getByRole("radio", { name: "Paste a job description" }).check();
+  await page.getByRole("textbox", { name: /^Job description/ }).fill("x".repeat(200));
+  await page.getByRole("button", { name: "Plan and start the AI interview" }).click();
+  const alert = page.getByRole("alert").filter({ hasText: "The AI voice interviewer is part of Pro." });
+  await expect(alert).toBeVisible();
+  await expect(alert.getByRole("link", { name: "See Pro" })).toHaveAttribute("href", "/pricing");
+  // Back to a role: the free version starts as before.
+  await page.getByRole("button", { name: "choose a role instead" }).click();
+  await expect(page.getByRole("button", { name: /Type my answers instead|Start, typing my answers/ })).toBeVisible();
+});

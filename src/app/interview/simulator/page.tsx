@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { getPaths } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
-import type { SimQuestion } from "@/lib/interview/analyse";
+import type { Pickable } from "@/lib/interview/setup";
 import { aiEnabled } from "@/lib/ai/settings";
 import { Simulator } from "./simulator";
 
@@ -17,7 +17,7 @@ export const metadata: Metadata = pageMeta({
 
 /** The mock interview: answers are analysed in the browser; signed-in learners can add an AI review (IQ-7). */
 export default function SimulatorPage() {
-  const questions: SimQuestion[] = getInterviewViews().map((q) => ({
+  const questions: Pickable[] = getInterviewViews().map((q) => ({
     id: q.id,
     question: q.question,
     short_answer: q.short_answer,
@@ -28,6 +28,7 @@ export default function SimulatorPage() {
     rubric: q.rubric,
     answer_seconds: q.answer_seconds,
     stop: q.stop,
+    kind: q.kind,
   }));
   return (
     <main>
@@ -38,7 +39,7 @@ export default function SimulatorPage() {
           icon="mic"
           eyebrow="Interview prep"
           title="Mock interview"
-          lead="Practice the way it happens: one question at a time, a clock running, and you answering out loud. Then see what you covered and missed. No sign-in."
+          lead="Tell us the role, or paste the job description. Then answer out loud, one question at a time, and see what you covered and missed."
           crumbs={[{ href: "/interview", label: "Interview questions" }]}
         />
       </div>

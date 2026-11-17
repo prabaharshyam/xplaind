@@ -20,7 +20,7 @@ test("a typed mock interview ends with a report on key points", async ({ page })
   });
   await page.goto("/interview/simulator?path=genai-engineer");
   await expect(page.getByRole("heading", { level: 1, name: "Mock interview" })).toBeVisible();
-  await expect(page.getByLabel("Role")).toHaveValue("genai-engineer");
+  await expect(page.getByRole("combobox").first()).toHaveValue("genai-engineer"); // the Role list
   expect((await wcag(page)).violations).toEqual([]);
   await page.getByRole("radio", { name: "3" }).check();
   // Headless Chromium has no speech service, so start in typing mode.

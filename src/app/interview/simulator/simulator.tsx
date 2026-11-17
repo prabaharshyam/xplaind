@@ -8,7 +8,9 @@ import { useAiAccess } from "@/components/ai/ai-gate";
 import { AnswerReviewBlock, InterviewReviewPanel, useInterviewReview } from "@/components/ai/ai-interview-review";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { VOICE_QUESTION_COUNTS } from "@/lib/ai/voice-interview";
-import { VoiceInterviewer } from "./voice-interviewer";
+import { VoiceInterviewer, type CallQuestion } from "./voice-interviewer";
+import { MAX_JD_CHARS, MIN_JD_CHARS, type InterviewSetup } from "@/lib/ai/interview-plan";
+import { EXPERIENCE, STYLES, pickForSetup, type ExperienceId, type Pickable, type StyleId } from "@/lib/interview/setup";
 import { recordInterview } from "@/lib/browser/activity-store";
 import { todayInIST } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
@@ -19,7 +21,6 @@ import {
   PACE,
   type SimQuestion,
   analyseAnswer,
-  pickQuestions,
   sessionReport,
 } from "@/lib/interview/analyse";
 
@@ -44,7 +45,7 @@ type Answer = { text: string; seconds: number };
  * the microphone on and off) or by typing; at the end they get a report on the key
  * points covered and on delivery. Everything stays in this browser tab.
  */
-export function Simulator({ questions, paths, aiOn = false }: { questions: SimQuestion[]; paths: { id: string; name: string }[]; aiOn?: boolean }) {
+export function Simulator({ questions, paths, aiOn = false }: { questions: Pickable[]; paths: { id: string; name: string }[]; aiOn?: boolean }) {
   const search = useSearch();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const fixedQuestion = questions.find((q) => q.id === params.get("question")) ?? null;
@@ -59,25 +60,63 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
   const [session, setSession] = useState<SimQuestion[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [voiceCount, setVoiceCount] = useState<number>(3);
+  // VI-11: what the interview is for, asked before it starts.
+  const [source, setSource] = useState<"role" | "jd">("role");
+  const [experience, setExperience] = useState<ExperienceId | "">("");
+  const [style, setStyle] = useState<StyleId>("mixed");
+  const [company, setCompany] = useState("");
+  const [jd, setJd] = useState("");
+  const [planning, setPlanning] = useState(false);
+  const [planError, setPlanError] = useState<{ message: string; upgrade?: string } | null>(null);
+  const [call, setCall] = useState<{ questions: CallQuestion[]; setup?: InterviewSetup; plan?: string | null; pathId: string | null } | null>(null);
+  const pro = useProStatus();
 
-  /** VI-1: the AI voice interviewer (Pro) uses the same role and question bank. */
-  const startVoice = () => {
-    if (!needAccount("interview")) return; // SU-1, and PV-2: accounts are for adults only
-    const picked = fixedQuestion
+  const setupFields = (): InterviewSetup | undefined => {
+    const fields: InterviewSetup = {
+      ...(pathId ? { pathId } : {}),
+      ...(experience ? { experience } : {}),
+      ...(company.trim() ? { company: company.trim() } : {}),
+    };
+    return Object.keys(fields).length ? fields : undefined;
+  };
+  const pick = (n: number) =>
+    fixedQuestion
       ? [fixedQuestion]
-      : pickQuestions(questions, { pathId: pathId || null, count: voiceCount, seed: Math.floor(Math.random() * 2 ** 31) });
-    setSession(picked);
-    setStage({ kind: "voice" });
-    window.scrollTo({ top: 0 });
+      : (pickForSetup(questions, { pathId: pathId || null, experience: experience || null, style, count: n, seed: Math.floor(Math.random() * 2 ** 31) }) as SimQuestion[]);
+
+  /** VI-1 and VI-11: the AI interviewer (Pro), for a role or for a pasted job description. */
+  const startVoice = async () => {
+    if (!needAccount("interview")) return; // SU-1, and PV-2: accounts are for adults only
+    setPlanError(null);
+    if (source === "role" || fixedQuestion) {
+      setCall({ questions: pick(voiceCount), setup: setupFields(), pathId: pathId || null });
+      setStage({ kind: "voice" });
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    setPlanning(true);
+    try {
+      const res = await fetch("/api/ai/voice/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jd, count: voiceCount, ...(experience ? { experience } : {}), ...(company.trim() ? { company: company.trim() } : {}) }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; upgrade?: string; plan?: string | null; pathId?: string | null; questions?: CallQuestion[] };
+      if (!res.ok || !data.questions?.length) return setPlanError({ message: data.error ?? "We could not plan your interview. Try again in a minute.", upgrade: data.upgrade });
+      setCall({ questions: data.questions, plan: data.plan ?? null, pathId: data.pathId ?? null });
+      setStage({ kind: "voice" });
+      window.scrollTo({ top: 0 });
+    } catch {
+      setPlanError({ message: "We could not reach the interviewer. Check your connection and try again." });
+    } finally {
+      setPlanning(false);
+    }
   };
 
   const start = (useVoice: boolean) => {
     if (!needAccount("interview")) return; // SU-1: the mock interview needs a free account
-    const picked = fixedQuestion
-      ? [fixedQuestion]
-      : pickQuestions(questions, { pathId: pathId || null, count, seed: Math.floor(Math.random() * 2 ** 31) });
     setVoice(useVoice && speechSupported);
-    setSession(picked);
+    setSession(pick(count));
     setAnswers([]);
     setStage({ kind: "question", index: 0 });
   };
@@ -106,7 +145,9 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
   }
 
   if (stage.kind === "voice") {
-    return <VoiceInterviewer questions={session} pathId={pathId || null} onExit={() => setStage({ kind: "setup" })} />;
+    return call ? (
+      <VoiceInterviewer questions={call.questions} pathId={call.pathId} setup={call.setup} plan={call.plan} onExit={() => setStage({ kind: "setup" })} />
+    ) : null;
   }
 
   if (stage.kind === "report") {
@@ -121,81 +162,114 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
     );
   }
 
-  const available = pathId ? questions.filter((q) => q.paths.includes(pathId)).length : questions.length;
-  return (
-    <div className="flex flex-col gap-6">
-      {fixedQuestion ? (
-        <p className={`${card} leading-7`}>
-          <span className="font-medium">One question:</span> {fixedQuestion.question}
-        </p>
-      ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
-          <label className="flex min-w-0 flex-col gap-1">
-            <span className="text-sm font-medium">Role</span>
-            <select
-              value={pathId}
-              onChange={(e) => setPathChoice(e.target.value)}
-              className="min-h-12 w-full min-w-0 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
-            >
-              <option value="">Any AI role</option>
-              {paths.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset className="flex min-w-0 flex-col gap-1">
-            <legend className="text-sm font-medium">Questions</legend>
-            <div className="flex gap-2">
-              {COUNTS.map((n) => (
-                <label
-                  key={n}
-                  className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-400 has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50 dark:border-zinc-600 dark:has-[:checked]:bg-emerald-950"
-                >
-                  <input
-                    type="radio"
-                    name="count"
-                    value={n}
-                    checked={count === n}
-                    onChange={() => setCount(n)}
-                    className="accent-brand-700"
-                  />
-                  {n}
-                </label>
-              ))}
-            </div>
-            <span className={`text-xs ${muted}`}>{available} questions to draw from</span>
-          </fieldset>
-        </div>
+  const jdMode = source === "jd" && !fixedQuestion;
+  const jdShort = jd.trim().length < MIN_JD_CHARS;
+  const aiFirst = pro === "yes" || jdMode;
+  const field = "min-h-12 w-full min-w-0 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950";
+  const choice =
+    "flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-400 px-3 text-center has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-700 dark:border-zinc-600 dark:has-[:checked]:bg-brand-950";
+
+  const aiCard = (
+    <section
+      key="ai"
+      aria-labelledby="ai-interviewer-heading"
+      className="rounded-2xl border border-brand-200 bg-brand-50 p-4 leading-7 md:p-5 dark:border-brand-900 dark:bg-brand-950"
+    >
+      <h2 id="ai-interviewer-heading" className="flex flex-wrap items-center gap-2 font-semibold">
+        AI interviewer
+        <span className="rounded-full bg-brand-700 px-2 py-0.5 text-xs font-medium text-white">Pro</span>
+      </h2>
+      <p className="mt-1">
+        {jdMode
+          ? "Reads your job description, picks the questions that fit it from our question bank and writes one or two for this exact job. Then a spoken interview with follow-ups on what you say, and a scored report against the job."
+          : "A real back-and-forth: the interviewer reads each question aloud, listens to your answer, then asks 1 or 2 follow-up questions about what you actually said. You get a scored report on the key points, depth and how you communicate."}
+      </p>
+      {!fixedQuestion && (
+        <label className="mt-3 flex max-w-xs flex-col gap-1">
+          <span className="text-sm font-medium">Questions with the AI interviewer</span>
+          <select value={voiceCount} onChange={(e) => setVoiceCount(Number(e.target.value))} className={field}>
+            {VOICE_QUESTION_COUNTS.map((n) => (
+              <option key={n} value={n}>
+                {n} questions
+              </option>
+            ))}
+          </select>
+        </label>
       )}
-
-      <section aria-labelledby="how-heading" className={`${card} leading-7`}>
-        <h2 id="how-heading" className="font-semibold">
-          How it works
-        </h2>
-        <ul className="mt-2 list-disc pl-6 [&_li]:mt-1">
-          <li>Each question has a time limit of 1 to 2 minutes, as in a real interview.</li>
-          <li>
-            Press <kbd className="rounded border border-zinc-400 px-1">Space</kbd> or the microphone button to start and
-            stop speaking. Your words appear as text, which you can edit.
-          </li>
-          <li>
-            Press <kbd className="rounded border border-zinc-400 px-1">Enter</kbd> to submit. At the end you get a report on
-            the key points you covered, your pace, filler words and what to fix first.
-          </li>
-        </ul>
-        <p className={`mt-3 text-sm ${muted}`}>
-          Privacy: we never record or store your voice or answers on our servers. Speech-to-text is done by your
-          browser&apos;s speech service; in Chrome and Edge that sends audio to the browser maker (Google or Microsoft)
-          to turn it into text. Prefer not to? Type your answers instead.
+      <button type="button" onClick={() => void startVoice()} disabled={planning || (jdMode && jdShort)} className={`${primaryButton} mt-4 disabled:opacity-60`}>
+        {planning ? "Planning your interview…" : jdMode ? "Plan and start the AI interview" : "Start the AI interviewer"}
+      </button>
+      {jdMode && jdShort && (
+        <p className={`mt-2 text-sm ${muted}`}>Paste at least {MIN_JD_CHARS} characters of the job description to plan the interview.</p>
+      )}
+      <p role="status" className="sr-only">
+        {planning ? "Planning your interview from the job description." : ""}
+      </p>
+      {planError && (
+        <p role="alert" className="mt-3 text-sm leading-6 text-rose-800 dark:text-rose-300">
+          {planError.message}{" "}
+          {planError.upgrade && (
+            <Link href={planError.upgrade} className={textLink}>
+              See Pro
+            </Link>
+          )}
         </p>
-      </section>
+      )}
+      {pro === "no" && !planError && (
+        <p className="mt-3 text-sm">
+          <Link href="/pricing" className={textLink}>
+            Get Pro
+          </Link>{" "}
+          to talk to the AI interviewer{jdMode ? " and practise for a job description" : ""}.
+        </p>
+      )}
+    </section>
+  );
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+  const ownCard = jdMode ? (
+    <section key="own" aria-labelledby="own-heading" className={`${card} leading-7`}>
+      <h2 id="own-heading" className="font-semibold">
+        Practise on your own
+      </h2>
+      <p className="mt-1">
+        Practising from a job description needs the AI interviewer. To practise on your own for free,{" "}
+        <button type="button" onClick={() => setSource("role")} className={`${textLink} min-h-11`}>
+          choose a role instead
+        </button>
+        .
+      </p>
+    </section>
+  ) : (
+    <section key="own" aria-labelledby="how-heading" className={`${card} leading-7`}>
+      <h2 id="how-heading" className="flex flex-wrap items-center gap-2 font-semibold">
+        Practise on your own
+        <span className="rounded-full border border-zinc-400 px-2 py-0.5 text-xs font-medium dark:border-zinc-600">Free</span>
+      </h2>
+      <ul className="mt-2 list-disc pl-6 [&_li]:mt-1">
+        <li>Each question has a time limit of 1 to 2 minutes, as in a real interview.</li>
+        <li>
+          Press <kbd className="rounded border border-zinc-400 px-1">Space</kbd> or the microphone button to start and stop
+          speaking. Your words appear as text, which you can edit.
+        </li>
+        <li>At the end you get a report on the key points you covered, your pace, filler words and what to fix first.</li>
+      </ul>
+      {!fixedQuestion && (
+        <fieldset className="mt-3 flex min-w-0 flex-col gap-1">
+          <legend className="text-sm font-medium">Questions</legend>
+          <div className="flex max-w-xs gap-2">
+            {COUNTS.map((n) => (
+              <label key={n} className={choice}>
+                <input type="radio" name="count" value={n} checked={count === n} onChange={() => setCount(n)} className="accent-brand-700" />
+                {n}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         {speechSupported ? (
           <>
-            <button type="button" onClick={() => start(true)} className={primaryButton}>
+            <button type="button" onClick={() => start(true)} className={aiFirst ? secondaryButton : primaryButton}>
               Allow the microphone and start
             </button>
             <button type="button" onClick={() => start(false)} className={secondaryButton}>
@@ -203,49 +277,133 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
             </button>
           </>
         ) : (
-          <>
-            <button type="button" onClick={() => start(false)} className={primaryButton}>
-              Start, typing my answers
-            </button>
-            <p className={`text-sm ${muted}`}>
-              This browser has no speech-to-text. Chrome, Edge or Safari can turn speech into text.
-            </p>
-          </>
+          <button type="button" onClick={() => start(false)} className={aiFirst ? secondaryButton : primaryButton}>
+            Start, typing my answers
+          </button>
         )}
       </div>
+      {!speechSupported && <p className={`mt-2 text-sm ${muted}`}>This browser has no speech-to-text. Chrome, Edge or Safari can turn speech into text.</p>}
+      <p className={`mt-3 text-sm ${muted}`}>
+        Privacy: we never record or store your voice or answers on our servers. Speech-to-text is done by your
+        browser&apos;s speech service; in Chrome and Edge that sends audio to the browser maker (Google or Microsoft) to
+        turn it into text. Prefer not to? Type your answers instead.
+      </p>
+    </section>
+  );
 
-      <section aria-labelledby="ai-interviewer-heading" className="rounded-2xl border border-brand-200 bg-brand-50 p-4 leading-7 md:p-5 dark:border-brand-900 dark:bg-brand-950">
-        <h2 id="ai-interviewer-heading" className="flex flex-wrap items-center gap-2 font-semibold">
-          AI interviewer
-          <span className="rounded-full bg-brand-700 px-2 py-0.5 text-xs font-medium text-white">Pro</span>
-        </h2>
-        <p className="mt-1">
-          A real back-and-forth: the interviewer reads each question aloud, listens to your answer, then asks 1 or 2
-          follow-up questions about what you actually said. You get a scored report on the key points, depth and how
-          you communicate.
+  return (
+    <div className="flex flex-col gap-6">
+      {fixedQuestion ? (
+        <p className={`${card} leading-7`}>
+          <span className="font-medium">One question:</span> {fixedQuestion.question}
         </p>
-        {!fixedQuestion && (
-          <label className="mt-3 flex max-w-xs flex-col gap-1">
-            <span className="text-sm font-medium">Questions with the AI interviewer</span>
-            <select
-              value={voiceCount}
-              onChange={(e) => setVoiceCount(Number(e.target.value))}
-              className="min-h-12 w-full rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
-            >
-              {VOICE_QUESTION_COUNTS.map((n) => (
-                <option key={n} value={n}>
-                  {n} questions
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <button type="button" onClick={startVoice} className={`${primaryButton} mt-4`}>
-          Start the AI interviewer
-        </button>
-      </section>
+      ) : (
+        <section aria-labelledby="setup-heading" className="flex flex-col gap-4">
+          <h2 id="setup-heading" className="text-xl font-semibold">
+            What are you preparing for?
+          </h2>
+          <fieldset className="flex min-w-0 flex-col gap-1">
+            <legend className="sr-only">Set up the interview from</legend>
+            <div className="flex gap-2">
+              <label className={choice}>
+                <input type="radio" name="source" checked={source === "role"} onChange={() => setSource("role")} className="accent-brand-700" />
+                Choose a role
+              </label>
+              <label className={choice}>
+                <input type="radio" name="source" checked={source === "jd"} onChange={() => setSource("jd")} className="accent-brand-700" />
+                Paste a job description
+              </label>
+            </div>
+          </fieldset>
+
+          {source === "jd" && (
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-sm font-medium">Job description</span>
+              <textarea
+                value={jd}
+                onChange={(e) => setJd(e.target.value.slice(0, MAX_JD_CHARS))}
+                rows={8}
+                aria-describedby="jd-help"
+                placeholder="Paste the job post: the role, what you would do and the skills it asks for."
+                className={`${field} min-h-40 leading-6`}
+              />
+              <span id="jd-help" className={`text-xs ${muted}`}>
+                {jd.length} of {MAX_JD_CHARS} characters. Sent to our AI to plan the interview, and not stored. Leave out your
+                name, phone number and email.
+              </span>
+            </label>
+          )}
+
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
+            {source === "role" && (
+              <label className="flex min-w-0 flex-col gap-1">
+                <span className="text-sm font-medium">Role</span>
+                <select value={pathId} onChange={(e) => setPathChoice(e.target.value)} className={field}>
+                  <option value="">Any AI role</option>
+                  {paths.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-sm font-medium">Experience needed</span>
+              <select value={experience} onChange={(e) => setExperience(e.target.value as ExperienceId | "")} className={field}>
+                <option value="">{source === "jd" ? "As the job description says" : "Any level"}</option>
+                {EXPERIENCE.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {source === "role" && (
+              <label className="flex min-w-0 flex-col gap-1">
+                <span className="text-sm font-medium">Kind of questions</span>
+                <select value={style} onChange={(e) => setStyle(e.target.value as StyleId)} className={field}>
+                  {STYLES.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-sm font-medium">Company (optional)</span>
+              <input
+                value={company}
+                onChange={(e) => setCompany(e.target.value.slice(0, 60))}
+                autoComplete="organization"
+                placeholder="For example, Infosys"
+                className={field}
+              />
+            </label>
+          </div>
+        </section>
+      )}
+
+      {aiFirst ? [aiCard, ownCard] : [ownCard, aiCard]}
     </div>
   );
+}
+
+/** VI-11: whether this learner has Pro, from today's AI allowance; "unknown" until Pro is open or while loading. */
+function useProStatus(): "yes" | "no" | "unknown" {
+  const [pro, setPro] = useState<"yes" | "no" | "unknown">("unknown");
+  useEffect(() => {
+    let live = true;
+    fetch("/api/ai/usage?kind=voice")
+      .then((r): Promise<{ show: boolean; tier?: string }> | { show: boolean; tier?: string } => (r.ok ? r.json() : { show: false }))
+      .then((u) => live && u.show && setPro(u.tier === "pro" ? "yes" : "no"))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  return pro;
 }
 
 // ---- one question ---------------------------------------------------------

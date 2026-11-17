@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { MIC_BLOCKED, joinText, speak, stopSpeaking, useDictation, useSpeechSupported } from "@/components/interview/speech";
 import { readinessLabel, type Readiness } from "@/lib/interview/readiness";
 import type { SimQuestion } from "@/lib/interview/analyse";
+import { isCustomId, type InterviewSetup } from "@/lib/ai/interview-plan";
 import { EARLY_SEND_MS, pauseToSend, shouldCheckEnd, type Exchange, type VoiceReport } from "@/lib/ai/voice-interview";
 import { type Mic, canRecord, closeMic, openMic, useVoiceCapture } from "@/components/interview/voice-capture";
 
@@ -50,7 +51,25 @@ const warm = (s: Spoken | undefined) => {
 };
 const post = (url: string, body: unknown) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-export function VoiceInterviewer({ questions, pathId, onExit }: { questions: SimQuestion[]; pathId: string | null; onExit: () => void }) {
+/** A question as the interviewer needs it: a bank question, or one written for a job description (VI-11). */
+export type CallQuestion = Pick<SimQuestion, "id" | "question">;
+
+export function VoiceInterviewer({
+  questions,
+  pathId,
+  setup,
+  plan,
+  onExit,
+}: {
+  questions: CallQuestion[];
+  pathId: string | null;
+  /** VI-11: the role, experience and company chosen before the interview, sent with every call. */
+  setup?: InterviewSetup;
+  /** VI-11: the sealed plan made from a job description, sent back with every call. */
+  plan?: string | null;
+  onExit: () => void;
+}) {
+  const extra = useMemo(() => ({ ...(setup ? { setup } : {}), ...(plan ? { plan } : {}) }), [setup, plan]);
   const speechIn = useSpeechSupported();
   const [phase, setPhase] = useState<Phase>({ kind: "consent" });
   const [items, setItems] = useState<Item[]>([]);
@@ -115,7 +134,7 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
       setStatus("Scoring your interview. This takes up to a minute.");
       if (script.current) void say(script.current.closing);
       try {
-        const res = await post("/api/ai/voice/report", { ...(pathId ? { pathId } : {}), items: all.filter((i) => i.exchanges.length > 0) });
+        const res = await post("/api/ai/voice/report", { ...extra, ...(pathId ? { pathId } : {}), items: all.filter((i) => i.exchanges.length > 0) });
         if (!res.ok) return setPhase({ kind: "report-failed", failure: await failureFrom(res) });
         const data = (await res.json()) as { report: VoiceReport; readiness: Readiness | null };
         closeMic(micRef.current);
@@ -126,7 +145,7 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
         setPhase({ kind: "report-failed", failure: { message: "We could not reach the interviewer. Check your connection and try again." } });
       }
     },
-    [pathId, say],
+    [pathId, say, extra],
   );
 
   /** The interviewer says a line, then it is the learner's turn. */
@@ -175,7 +194,7 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
     setPhase({ kind: "starting" });
     setStatus("Getting the interviewer ready.");
     try {
-      const res = await post("/api/ai/voice/start", { questionIds: questions.map((q) => q.id) });
+      const res = await post("/api/ai/voice/start", { ...extra, questionIds: questions.map((q) => q.id) });
       if (!res.ok) return setPhase({ kind: "stopped", failure: await failureFrom(res) });
       script.current = (await res.json()) as Lines;
     } catch {
@@ -214,7 +233,7 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
     const acks = script.current?.acks ?? [];
     const ack = acks.length ? say(acks[ackTurn.current++ % acks.length]) : Promise.resolve();
     try {
-      const res = await post("/api/ai/voice/turn", { questionId: all[turn.index].questionId, exchanges: all[turn.index].exchanges });
+      const res = await post("/api/ai/voice/turn", { ...extra, questionId: all[turn.index].questionId, exchanges: all[turn.index].exchanges });
       if (!res.ok) {
         const failure = await failureFrom(res);
         return setPhase({ kind: "stopped", failure });
@@ -298,6 +317,7 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
               onAnswer={(text, seconds) => void answer(phase.turn, text, seconds)}
               questionId={questions[phase.turn.index].id}
               asked={phase.turn.asked}
+              extra={extra}
               onInterrupt={() => interrupt(phase)}
               onPause={() => pause(phase)}
               onResume={() => resume(phase)}
@@ -639,6 +659,7 @@ function Listener({
   hearUrl,
   questionId,
   asked,
+  extra,
   onMicBlocked,
   onTyping,
   onAnswer,
@@ -654,6 +675,7 @@ function Listener({
   hearUrl: string | null;
   questionId: string;
   asked: string;
+  extra: Record<string, unknown>;
   onMicBlocked: () => void;
   onTyping: (v: boolean) => void;
   onAnswer: (text: string, seconds: number) => void;
@@ -757,7 +779,7 @@ function Listener({
       const text = l.said;
       if (shouldCheckEnd(text, quiet) && checking.current !== text && judged.current?.text !== text && !(l.sarvam && l.capture.pending)) {
         checking.current = text;
-        void fetch("/api/ai/voice/end", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questionId, asked, answer: text }) })
+        void fetch("/api/ai/voice/end", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...extra, questionId, asked, answer: text }) })
           .then((r) => (r.ok ? (r.json() as Promise<{ finished: boolean }>) : { finished: false }))
           .then((r) => {
             if (checking.current === text) judged.current = { text, finished: r.finished };
@@ -772,7 +794,7 @@ function Listener({
       } else setSendingIn(left <= WARN_MS ? left : null);
     }, 200);
     return () => window.clearInterval(id);
-  }, [state, voice, held, questionId, asked]);
+  }, [state, voice, held, questionId, asked, extra]);
 
   const myTurn = state === "listening";
   const shown = caption(said);
@@ -1175,11 +1197,15 @@ function VoiceReportView({ report, readiness, onExit }: { report: VoiceReport; r
               <summary className="min-h-11 cursor-pointer font-medium">A model answer</summary>
               <p className="mt-2 rounded-2xl bg-zinc-100 p-3 leading-7 dark:bg-zinc-900">{q.modelAnswer}</p>
             </details>
-            <p className="mt-2 text-sm">
-              <Link href={`/interview/${q.questionId}`} className={textLink}>
-                Full answer and follow-ups
-              </Link>
-            </p>
+            {isCustomId(q.questionId) ? (
+              <p className={`mt-2 text-sm ${muted}`}>Written for this job description, so it is not in our question bank.</p>
+            ) : (
+              <p className="mt-2 text-sm">
+                <Link href={`/interview/${q.questionId}`} className={textLink}>
+                  Full answer and follow-ups
+                </Link>
+              </p>
+            )}
           </article>
         ))}
       </section>
