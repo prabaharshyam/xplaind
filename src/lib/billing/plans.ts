@@ -45,12 +45,12 @@ export type Tier = "guest" | "free" | "pro";
  */
 export const TIER_LIMITS: Record<Tier, Record<AiKind, number>> = {
   /** Visitors without an account (only while sign-ups are on hold; AG-1 asks them to sign up). Never more than the free trial. */
-  guest: { tutor: 2, grade: 1, interview: 1, book: 1, resume: 1, notes: 2, scan: 0, voice: 0 },
+  guest: { tutor: 2, grade: 1, interview: 1, book: 1, resume: 1, notes: 2, scan: 0, voice: 0, voice_end: 0 },
   /** PAY-7: for free accounts these are a one-time trial per feature, not a daily allowance. */
   /** MB-12 and VI-3: reading picture pages and the AI voice interviewer are Pro only, so a free account has no trial of them. */
-  free: { tutor: 3, grade: 3, interview: 2, book: 2, resume: 2, notes: 3, scan: 0, voice: 0 },
+  free: { tutor: 3, grade: 3, interview: 2, book: 2, resume: 2, notes: 3, scan: 0, voice: 0, voice_end: 0 },
   /** VI-3: 40 voice turns is about four 5-question interviews (at most 11 calls each). */
-  pro: { tutor: 50, grade: 20, interview: 5, book: 10, resume: 3, notes: 100, scan: 60, voice: 40 },
+  pro: { tutor: 50, grade: 20, interview: 5, book: 10, resume: 3, notes: 100, scan: 60, voice: 40, voice_end: 300 },
 };
 
 /** Plain names for the pricing table and the usage counter. */
@@ -63,6 +63,7 @@ export const KIND_LABEL: Record<AiKind, string> = {
   resume: "Resume reviews",
   scan: "Picture pages read from your notes (4 at a time)",
   voice: "AI voice interview turns (each follow-up question, and the report)",
+  voice_end: "AI voice interview checks that you have finished answering",
 };
 
 /**

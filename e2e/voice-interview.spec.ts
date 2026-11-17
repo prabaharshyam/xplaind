@@ -31,10 +31,26 @@ const report = {
         depth: 3,
         depthNote: "Correct, but no trade-offs.",
         modelAnswer: "RAG retrieves the passages most relevant to a question and adds them to the prompt.",
+        score: 3,
+        wentWell: ["A clear one-line definition"],
+        gaps: ["No trade-off: a strong answer names chunk size against recall"],
+        followUpHandling: "You answered the follow-up with a number, which helped.",
+        delivery: { words: 40, wordsPerMinute: 120, fillers: 1, hedges: ["I think"] },
       },
     ],
     communication: { score: 70, structure: 4, clarity: 3, note: "A clear opening line.", fillers: { total: 1, perMinute: 1, top: [{ word: "basically", count: 1 }] }, words: 40, wordsPerMinute: 120 },
     improvements: ["Name a trade-off.", "Give a real example.", "Close with how you would measure it."],
+    verdict: { key: "hire", label: "Hire", reason: "Solid basics, but thin on trade-offs." },
+    competencies: [
+      { name: "Retrieval design", score: 3, evidence: ["we retrieve relevant chunks"], note: "Knows the flow." },
+      { name: "Communication", score: 4, evidence: [], note: "Clear and short." },
+    ],
+    strengths: [{ text: "Explains the core idea plainly", evidence: "we retrieve relevant chunks" }],
+    risks: [{ text: "May not have built one in production", evidence: "" }],
+    plan: [
+      { week: 1, focus: "Chunking trade-offs", action: "Build two chunk sizes and compare recall." },
+      { week: 2, focus: "Evaluation", action: "Write 20 test questions and score answers." },
+    ],
   },
   readiness: { score: 72, change: null, sessions: 1 },
   pathId: "any",
@@ -176,7 +192,14 @@ test("a call that runs itself (browser speech-to-text): the interviewer speaks, 
   // The second answer is also sent on a pause, then the report.
   await expect(page.getByRole("heading", { name: "Your AI interview report" })).toBeFocused({ timeout: 20_000 });
   await expect(page.getByRole("meter", { name: "Interview score" })).toHaveAttribute("aria-valuenow", "72");
-  await expect(page.getByText("You said: “we retrieve relevant chunks”")).toBeVisible();
+  await expect(page.getByText("You said: “we retrieve relevant chunks”").first()).toBeVisible();
+  // VI-10: a verdict, skills with scores and quotes, strengths and risks, a plan, and per-question detail.
+  await expect(page.getByText("Verdict: Hire.")).toBeVisible();
+  await expect(page.getByRole("meter", { name: "Retrieval design score" })).toHaveAttribute("aria-valuenow", "3");
+  await expect(page.getByRole("heading", { name: "What an interviewer may worry about" })).toBeVisible();
+  await expect(page.getByText("Week 1: Chunking trade-offs")).toBeVisible();
+  await expect(page.getByText(/No trade-off: a strong answer/)).toBeVisible();
+  await expect(page.getByText(/hedging: “I think”/)).toBeVisible();
   await expect.poll(() => spoken(page)).toContain("That's the end of the interview.");
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
@@ -407,4 +430,84 @@ test("a transcription request that never answers cannot freeze the call: it says
   await expect(page.getByRole("alert").filter({ hasText: "We couldn't catch that answer" })).toBeVisible({ timeout: 25_000 });
   expect(turns).toEqual([]); // not sent as an empty, skipped answer
   await expect(page.getByRole("button", { name: "Type" })).toBeEnabled();
+});
+
+test("a finished answer is sent after a short pause: the fast AI checks it sounds complete (VI-10)", async ({ page }) => {
+  await page.addInitScript(fakeSpeechOut);
+  await page.addInitScript(fakeRecordingMic);
+  await page.route("**/api/ai/voice/start", (route) =>
+    route.fulfill({
+      json: {
+        questions: [{ text: OPENING, audio: null }],
+        acks: [{ text: "Okay.", audio: null }],
+        closing: { text: "That's the end of the interview.", audio: null },
+        hear: "signed-token",
+      },
+    }),
+  );
+  await page.route("**/api/ai/voice/hear**", (route) => route.fulfill({ json: { text: "We retrieve relevant chunks and add them to the prompt, then the model answers." } }));
+  const checks: { questionId: string; asked: string; answer: string }[] = [];
+  await page.route("**/api/ai/voice/end", (route) => {
+    checks.push(route.request().postDataJSON());
+    return route.fulfill({ json: { finished: true } });
+  });
+  const turns: { t: number }[] = [];
+  await page.route("**/api/ai/voice/turn", (route) => {
+    turns.push({ t: Date.now() });
+    return route.fulfill({ json: { follow_up: null } });
+  });
+  await page.route("**/api/ai/voice/report", (route) => route.fulfill({ json: report }));
+  await page.goto("/interview/simulator?question=what-is-rag");
+  await page.getByRole("button", { name: "Start the AI interviewer" }).click();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  await expect(page.getByText("then the model answers.")).toBeVisible({ timeout: 8000 });
+  const heardAt = Date.now();
+  // Sent well before the patient 5 seconds, because the check said the answer was finished.
+  await expect.poll(() => turns.length, { timeout: 5000 }).toBe(1);
+  expect(turns[0].t - heardAt).toBeLessThan(4000);
+  expect(checks.length).toBe(1); // asked once per answer text, not every 200 ms
+  expect(checks[0]).toMatchObject({ questionId: "what-is-rag", asked: expect.stringMatching(/What is RAG/), answer: expect.stringMatching(/^We retrieve/) });
+});
+
+test("Answer now stops the interviewer mid-sentence and starts listening (VI-10)", async ({ page }) => {
+  // The interviewer's voice never finishes on its own, so only Answer now can move the call on.
+  await page.addInitScript(() => {
+    const spoken: string[] = [];
+    (window as unknown as { __spoken: string[]; __cancelled: number }).__spoken = spoken;
+    (window as unknown as { __cancelled: number }).__cancelled = 0;
+    class Utterance {
+      text: string;
+      lang = "";
+      rate = 1;
+      voice: unknown = null;
+      onend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    Object.defineProperty(window, "SpeechSynthesisUtterance", { value: Utterance, configurable: true });
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: {
+        speak: (u: Utterance) => spoken.push(u.text),
+        cancel: () => (window as unknown as { __cancelled: number }).__cancelled++,
+        getVoices: () => [{ lang: "en-IN", localService: true, name: "India" }],
+      },
+    });
+  });
+  await page.addInitScript(fakeMicrophone, ["I would start with retrieval."]);
+  await startRoute(page);
+  await page.route("**/api/ai/voice/turn", (route) => route.fulfill({ json: { follow_up: null } }));
+  await page.route("**/api/ai/voice/report", (route) => route.fulfill({ json: report }));
+  await page.goto("/interview/simulator?question=what-is-rag");
+  await page.getByRole("button", { name: "Start the AI interviewer" }).click();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  const call = page.getByRole("dialog", { name: "Zarina" });
+  const now = call.getByRole("button", { name: "Answer now" });
+  await expect(now).toBeVisible();
+  await now.click();
+  await expect(call.getByText("I would start with retrieval.")).toBeVisible();
+  await expect(call.getByRole("button", { name: "Done" })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __cancelled: number }).__cancelled)).toBeGreaterThan(0);
 });

@@ -41,6 +41,8 @@ export type AiRequest<S extends z.ZodType> = {
   model?: "fast" | "main";
   /** VI-8: the caller when the route already looked it up, so a turn makes one account lookup, not two. */
   caller?: Caller;
+  /** VI-10: a separate per-minute limit for frequent tiny calls, so they never use up the main one. */
+  rateKey?: string;
 };
 
 /** Runs one guarded call. Returns the checked output, or a Response to send back as is. */
@@ -54,7 +56,7 @@ export async function runAi<S extends z.ZodType>(
   if (!admin) return problem(503, LIMIT_MESSAGE.off);
   const who = req.caller ?? (await aiCaller(admin));
 
-  const burst = await rateLimit(admin, `ai:${who.id}`, 60, req.burst ?? 6);
+  const burst = await rateLimit(admin, req.rateKey ? `ai:${who.id}:${req.rateKey}` : `ai:${who.id}`, 60, req.burst ?? 6);
   if (burst) return burst;
 
   const day = todayInIST();

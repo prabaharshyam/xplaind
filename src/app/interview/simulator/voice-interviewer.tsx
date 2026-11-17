@@ -6,7 +6,7 @@ import { card, muted, primaryButton, secondaryButton, textLink } from "@/compone
 import { MIC_BLOCKED, joinText, speak, stopSpeaking, useDictation, useSpeechSupported } from "@/components/interview/speech";
 import { readinessLabel, type Readiness } from "@/lib/interview/readiness";
 import type { SimQuestion } from "@/lib/interview/analyse";
-import { pauseToSend, type Exchange, type VoiceReport } from "@/lib/ai/voice-interview";
+import { EARLY_SEND_MS, pauseToSend, shouldCheckEnd, type Exchange, type VoiceReport } from "@/lib/ai/voice-interview";
 import { type Mic, canRecord, closeMic, openMic, useVoiceCapture } from "@/components/interview/voice-capture";
 
 /**
@@ -236,6 +236,12 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
     setPhase({ ...p, state: "paused" });
     setStatus("Paused.");
   };
+  /** VI-10: "Answer now": stop the interviewer mid-sentence and start listening, as on a real call. */
+  const interrupt = (p: Extract<Phase, { kind: "call" }>) => {
+    quiet();
+    setPhase({ ...p, state: "listening" });
+    setStatus("Your turn.");
+  };
   const resume = (p: Extract<Phase, { kind: "call" }>) => {
     // An interviewer repeats the question after a pause; then it is the learner's turn again.
     const s = last.current;
@@ -290,6 +296,9 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
               onMicBlocked={() => setTyping(true)}
               onTyping={setTyping}
               onAnswer={(text, seconds) => void answer(phase.turn, text, seconds)}
+              questionId={questions[phase.turn.index].id}
+              asked={phase.turn.asked}
+              onInterrupt={() => interrupt(phase)}
               onPause={() => pause(phase)}
               onResume={() => resume(phase)}
               onEnd={end}
@@ -628,9 +637,12 @@ function Listener({
   voice,
   mic,
   hearUrl,
+  questionId,
+  asked,
   onMicBlocked,
   onTyping,
   onAnswer,
+  onInterrupt,
   onPause,
   onResume,
   onEnd,
@@ -640,9 +652,12 @@ function Listener({
   voice: boolean;
   mic: Mic | null;
   hearUrl: string | null;
+  questionId: string;
+  asked: string;
   onMicBlocked: () => void;
   onTyping: (v: boolean) => void;
   onAnswer: (text: string, seconds: number) => void;
+  onInterrupt: () => void;
   onPause: () => void;
   onResume: () => void;
   onEnd: () => void;
@@ -723,10 +738,14 @@ function Listener({
 
   // Every 200 ms: how long has the learner been quiet, and is it time to warn or to send? The latest values
   // are read from a ref, so the clock keeps a steady beat however often the caption changes.
+  // VI-10: after a short pause the fast model is asked whether the answer is finished; if so it is sent
+  // after about 2 seconds of silence, otherwise the patient 5 or 7 seconds apply.
   const latest = useRef({ sarvam, capture, said, spoke, send });
   useEffect(() => {
     latest.current = { sarvam, capture, said, spoke, send };
   });
+  const judged = useRef<{ text: string; finished: boolean } | null>(null);
+  const checking = useRef<string | null>(null);
   useEffect(() => {
     if (state !== "listening" || !voice || held) return;
     const id = window.setInterval(() => {
@@ -735,14 +754,25 @@ function Listener({
       const now = Date.now();
       const quiet = l.sarvam ? l.capture.quiet(now) : l.said ? now - changedAt.current : 0;
       if (!l.spoke || quiet === 0) return setSendingIn(null);
-      const left = pauseToSend(l.said || "…") - quiet;
+      const text = l.said;
+      if (shouldCheckEnd(text, quiet) && checking.current !== text && judged.current?.text !== text && !(l.sarvam && l.capture.pending)) {
+        checking.current = text;
+        void fetch("/api/ai/voice/end", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questionId, asked, answer: text }) })
+          .then((r) => (r.ok ? (r.json() as Promise<{ finished: boolean }>) : { finished: false }))
+          .then((r) => {
+            if (checking.current === text) judged.current = { text, finished: r.finished };
+          })
+          .catch(() => undefined);
+      }
+      const early = judged.current?.text === text && judged.current.finished;
+      const left = (early ? Math.min(EARLY_SEND_MS, pauseToSend(text || "…")) : pauseToSend(text || "…")) - quiet;
       if (left <= 0) {
         setSendingIn(null);
         void l.send();
       } else setSendingIn(left <= WARN_MS ? left : null);
     }, 200);
     return () => window.clearInterval(id);
-  }, [state, voice, held]);
+  }, [state, voice, held, questionId, asked]);
 
   const myTurn = state === "listening";
   const shown = caption(said);
@@ -844,10 +874,16 @@ function Listener({
             <MicIcon />
           </RoundButton>
         )}
-        {voice && (
-          <RoundButton label="Done" onClick={() => void send()} tone="primary" disabled={!myTurn || !spoke || finishing}>
-            <CheckIcon />
+        {state === "speaking" ? (
+          <RoundButton label="Answer now" onClick={onInterrupt} tone="primary">
+            <MicIcon />
           </RoundButton>
+        ) : (
+          voice && (
+            <RoundButton label="Done" onClick={() => void send()} tone="primary" disabled={!myTurn || !spoke || finishing}>
+              <CheckIcon />
+            </RoundButton>
+          )
         )}
         <RoundButton label="End" title={endLabel} onClick={onEnd} tone="end">
           <EndIcon />
@@ -940,7 +976,10 @@ function VoiceReportView({ report, readiness, onExit }: { report: VoiceReport; r
           >
             <div className="h-full bg-brand-700" style={{ width: `${report.score}%` }} />
           </div>
-          {report.summary && <p className="mt-3 leading-7">{report.summary}</p>}
+          <p className="mt-3 leading-7">
+            <span className="font-semibold">Verdict: {report.verdict.label}.</span> {report.verdict.reason}
+          </p>
+          {report.summary && <p className="mt-2 leading-7">{report.summary}</p>}
           <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               ["Answered", `${report.answered} of ${report.questions.length}`],
@@ -974,6 +1013,65 @@ function VoiceReportView({ report, readiness, onExit }: { report: VoiceReport; r
         </p>
       </section>
 
+      {report.competencies.length > 0 && (
+        <section aria-labelledby="skills-heading" className="flex flex-col gap-3">
+          <h3 id="skills-heading" className="text-xl font-semibold">
+            Skills for this role
+          </h3>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {report.competencies.map((k) => (
+              <li key={k.name} className={`${card} break-inside-avoid`}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-semibold leading-6">{k.name}</p>
+                  <p className="shrink-0 font-semibold tabular-nums">{outOf5(k.score)}</p>
+                </div>
+                <div
+                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
+                  role="meter"
+                  aria-label={`${k.name} score`}
+                  aria-valuemin={0}
+                  aria-valuemax={5}
+                  aria-valuenow={k.score}
+                >
+                  <div className="h-full bg-brand-700" style={{ width: `${k.score * 20}%` }} />
+                </div>
+                {k.note && <p className="mt-2 text-sm leading-6">{k.note}</p>}
+                {k.evidence.map((e) => (
+                  <p key={e} className={`mt-1 text-sm leading-6 ${muted}`}>
+                    You said: “{e}”
+                  </p>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(report.strengths.length > 0 || report.risks.length > 0) && (
+        <div className="grid gap-6 sm:grid-cols-2">
+          {([
+            ["strengths-heading", "Strengths", report.strengths],
+            ["risks-heading", "What an interviewer may worry about", report.risks],
+          ] as const).map(([id, title, items]) =>
+            items.length > 0 ? (
+              <section key={id} aria-labelledby={id}>
+                <h3 id={id} className="text-xl font-semibold">
+                  {title}
+                </h3>
+                <ul className="mt-3 flex flex-col gap-3 leading-7">
+                  {items.map((x) => (
+                    <li key={x.text}>
+                      {x.text}
+                      {x.evidence && <span className={`block text-sm leading-6 ${muted}`}>You said: “{x.evidence}”</span>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null,
+          )}
+        </div>
+      )}
+
       {report.improvements.length > 0 && (
         <section aria-labelledby="improve-heading">
           <h3 id="improve-heading" className="text-xl font-semibold">
@@ -987,19 +1085,79 @@ function VoiceReportView({ report, readiness, onExit }: { report: VoiceReport; r
         </section>
       )}
 
+      {report.plan.length > 0 && (
+        <section aria-labelledby="plan-heading">
+          <h3 id="plan-heading" className="text-xl font-semibold">
+            Your next four weeks
+          </h3>
+          <ol className="mt-3 flex flex-col gap-3">
+            {report.plan.map((w) => (
+              <li key={w.week} className={`${card} break-inside-avoid`}>
+                <p className="font-semibold">
+                  Week {w.week}: {w.focus}
+                </p>
+                <p className="mt-1 leading-7">{w.action}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-3 text-sm">
+            <Link href="/plan" className={textLink}>
+              Open your weekly plan
+            </Link>{" "}
+            to fit these into your study time.
+          </p>
+        </section>
+      )}
+
       <section aria-labelledby="voice-each-heading" className="flex flex-col gap-4">
         <h3 id="voice-each-heading" className="text-xl font-semibold">
           Question by question
         </h3>
         {report.questions.map((q, i) => (
-          <article key={q.questionId} className={card}>
-            <h4 className="font-semibold leading-7">
-              {i + 1}. {q.question}
-            </h4>
+          <article key={q.questionId} className={`${card} break-inside-avoid`}>
+            <div className="flex items-baseline justify-between gap-3">
+              <h4 className="font-semibold leading-7">
+                {i + 1}. {q.question}
+              </h4>
+              {q.answered && <p className="shrink-0 font-semibold tabular-nums">{outOf5(q.score)}</p>}
+            </div>
             <p className={`mt-1 text-sm ${muted}`}>
               {q.answered ? `${q.coverage}% of key points · depth ${outOf5(q.depth)} · ${q.followUps} follow-up${q.followUps === 1 ? "" : "s"}` : "Not answered"}
             </p>
             {q.depthNote && <p className="mt-2 text-sm leading-6">{q.depthNote}</p>}
+            {q.wentWell.length > 0 && (
+              <>
+                <h5 className="mt-3 text-sm font-semibold">What went well</h5>
+                <ul className="mt-1 list-disc pl-5 text-sm leading-6">
+                  {q.wentWell.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {q.gaps.length > 0 && (
+              <>
+                <h5 className="mt-3 text-sm font-semibold">What was missing</h5>
+                <ul className="mt-1 list-disc pl-5 text-sm leading-6">
+                  {q.gaps.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {q.followUpHandling && (
+              <p className="mt-3 text-sm leading-6">
+                <span className="font-semibold">Follow-ups:</span> {q.followUpHandling}
+              </p>
+            )}
+            {q.answered && (
+              <p className="mt-2 text-sm leading-6">
+                <span className="font-semibold">How you said it:</span> {q.delivery.words} words
+                {q.delivery.wordsPerMinute !== null && `, ${q.delivery.wordsPerMinute} a minute`}, {q.delivery.fillers} filler word
+                {q.delivery.fillers === 1 ? "" : "s"}
+                {q.delivery.hedges.length > 0 && `; hedging: ${q.delivery.hedges.map((h) => `“${h}”`).join(", ")}`}.
+              </p>
+            )}
             <h5 className="mt-3 text-sm font-semibold">Key points</h5>
             <ul className="mt-1 flex flex-col gap-2 text-sm leading-6">
               {q.points.map((p) => (
