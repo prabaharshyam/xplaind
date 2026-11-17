@@ -3,7 +3,8 @@ import { AI_KINDS, costUsd, DAILY_LIMIT, monthStart, positiveNumber, tokenUses }
 
 describe("AI spend limits (CO-1)", () => {
   it("every feature has a daily cap, and grading keeps the PRD's 5", () => {
-    for (const k of AI_KINDS) expect(DAILY_LIMIT[k]).toBeGreaterThan(0);
+    // VI-13: the free AI interview's own counters are 0 here; they apply only to free accounts once Pro is open.
+    for (const k of AI_KINDS.filter((k) => k !== "voice_start" && k !== "voice_trial")) expect(DAILY_LIMIT[k]).toBeGreaterThan(0);
     expect(DAILY_LIMIT.grade).toBe(5);
   });
 

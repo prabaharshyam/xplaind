@@ -21,7 +21,7 @@ import {
   tokenUses,
 } from "./limits";
 import { aiSettings } from "./settings";
-import { aiCaller, allowanceToday, limitFor, onTrial } from "./who";
+import { type Caller, aiCaller, allowanceToday, limitFor, onTrial } from "./who";
 import { bump } from "@/lib/funnel";
 import type { Tier } from "@/lib/billing/plans";
 
@@ -37,6 +37,12 @@ export type AiRequest<S extends z.ZodType> = {
   effort: "low" | "medium" | "high";
   /** Calls allowed per minute for this learner across every tool. Default 6; reading picture pages (MB-12) needs more. */
   burst?: number;
+  /** Which model to use, when a feature needs both (VI-3). Default: by kind, see modelFor. */
+  model?: "fast" | "main";
+  /** VI-8: the caller when the route already looked it up, so a turn makes one account lookup, not two. */
+  caller?: Caller;
+  /** VI-10: a separate per-minute limit for frequent tiny calls, so they never use up the main one. */
+  rateKey?: string;
 };
 
 /** Runs one guarded call. Returns the checked output, or a Response to send back as is. */
@@ -48,9 +54,9 @@ export async function runAi<S extends z.ZodType>(
 
   const admin = serviceClient();
   if (!admin) return problem(503, LIMIT_MESSAGE.off);
-  const who = await aiCaller(admin);
+  const who = req.caller ?? (await aiCaller(admin));
 
-  const burst = await rateLimit(admin, `ai:${who.id}`, 60, req.burst ?? 6);
+  const burst = await rateLimit(admin, req.rateKey ? `ai:${who.id}:${req.rateKey}` : `ai:${who.id}`, 60, req.burst ?? 6);
   if (burst) return burst;
 
   const day = todayInIST();
@@ -89,8 +95,9 @@ export async function runAi<S extends z.ZodType>(
   if (verdict === "day" || verdict === "month")
     return problem(429, LIMIT_MESSAGE[verdict as "day" | "month"]);
   // AN-1: a free account using one of its trial turns, counted without identifying anyone.
-  if (onTrial(who)) await bump(admin, "ai_trial_used");
-  const model = modelFor(req.kind, settings.model, settings.fastModel);
+  // VI-13: the free AI interview counts once (its report), not once per follow-up or end-of-answer check.
+  if (onTrial(who) && (req.kind === "voice_trial" || !req.kind.startsWith("voice"))) await bump(admin, "ai_trial_used");
+  const model = modelFor(req.kind, settings.model, settings.fastModel, req.model);
 
   const client = new Anthropic({
     apiKey: settings.apiKey,

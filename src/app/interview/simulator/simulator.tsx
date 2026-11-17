@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { needAccount } from "@/lib/browser/account-sync";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { abortRecognition, joinText, useDictation, useSpeechSupported } from "@/components/interview/speech";
 import { useAiAccess } from "@/components/ai/ai-gate";
 import { AnswerReviewBlock, InterviewReviewPanel, useInterviewReview } from "@/components/ai/ai-interview-review";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
+import { TRIAL_QUESTIONS, VOICE_QUESTION_COUNTS, questionLine } from "@/lib/ai/voice-interview";
+import { VoiceInterviewer, type CallQuestion } from "./voice-interviewer";
+import { Exchange, Reveal, Stages, room } from "./room";
+import { MAX_JD_CHARS, MIN_JD_CHARS, type InterviewSetup } from "@/lib/ai/interview-plan";
+import { EXPERIENCE, STYLES, pickForSetup, type ExperienceId, type Pickable, type StyleId } from "@/lib/interview/setup";
 import { recordInterview } from "@/lib/browser/activity-store";
 import { todayInIST } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
@@ -16,51 +22,10 @@ import {
   PACE,
   type SimQuestion,
   analyseAnswer,
-  pickQuestions,
   sessionReport,
 } from "@/lib/interview/analyse";
 
-// ---- browser speech recognition (Chrome, Edge, Safari; not Firefox) ---------
-
-type RecognitionResultList = ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
-type RecognitionEvent = { resultIndex: number; results: RecognitionResultList };
-type Recognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onresult: ((e: RecognitionEvent) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  onaudiostart?: (() => void) | null;
-};
-type RecognitionCtor = new () => Recognition;
-
-/**
- * VS-1: one recogniser for the whole interview. iPhone browsers all use Safari's speech engine, which
- * runs one recognition at a time and silently gives a new one no audio while the last is still
- * shutting down, so a fresh recogniser per question went deaf from question 2 on. `active` is true
- * from start() until the browser reports the end.
- */
-let shared: { r: Recognition; active: boolean } | null = null;
-function sharedRecognizer(Ctor: RecognitionCtor) {
-  if (!shared) shared = { r: new Ctor(), active: false };
-  return shared;
-}
-
-/** How long to wait for sound after the microphone starts before telling the learner it is not working. */
-const HEAR_TIMEOUT_MS = 5000;
-
-const recognitionCtor = (): RecognitionCtor | null => {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-};
-
 const noop = () => () => {};
-const useSpeechSupported = () => useSyncExternalStore(noop, () => recognitionCtor() !== null, () => false);
 const useSearch = () => useSyncExternalStore(noop, () => window.location.search, () => "");
 
 // ---- helpers --------------------------------------------------------------
@@ -70,9 +35,8 @@ const COUNTS = [3, 5, 10] as const;
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, Math.floor(s % 60))).padStart(2, "0")}`;
 const minutes = (s: number) => (s % 60 === 0 ? `${s / 60} min` : `${Math.floor(s / 60)}.5 min`);
-const joinText = (a: string, b: string) => (a && b ? `${a.replace(/\s+$/, "")} ${b.trim()}` : a || b.trim());
 
-type Stage = { kind: "setup" } | { kind: "question"; index: number } | { kind: "report" };
+type Stage = { kind: "setup" } | { kind: "question"; index: number } | { kind: "report" } | { kind: "voice" };
 type Answer = { text: string; seconds: number };
 
 // ---- component ------------------------------------------------------------
@@ -82,7 +46,7 @@ type Answer = { text: string; seconds: number };
  * the microphone on and off) or by typing; at the end they get a report on the key
  * points covered and on delivery. Everything stays in this browser tab.
  */
-export function Simulator({ questions, paths, aiOn = false }: { questions: SimQuestion[]; paths: { id: string; name: string }[]; aiOn?: boolean }) {
+export function Simulator({ questions, paths, aiOn = false }: { questions: Pickable[]; paths: { id: string; name: string }[]; aiOn?: boolean }) {
   const search = useSearch();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const fixedQuestion = questions.find((q) => q.id === params.get("question")) ?? null;
@@ -96,14 +60,75 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
   const [stage, setStage] = useState<Stage>({ kind: "setup" });
   const [session, setSession] = useState<SimQuestion[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [voiceCount, setVoiceCount] = useState<number>(3);
+  // VI-11: what the interview is for, asked before it starts.
+  const [source, setSource] = useState<"role" | "jd">("role");
+  const [experience, setExperience] = useState<ExperienceId | "">("");
+  const [style, setStyle] = useState<StyleId>("mixed");
+  const [company, setCompany] = useState("");
+  const [jd, setJd] = useState("");
+  const [planning, setPlanning] = useState(false);
+  const [planError, setPlanError] = useState<{ message: string; upgrade?: string } | null>(null);
+  const [call, setCall] = useState<{ questions: CallQuestion[]; setup?: InterviewSetup; plan?: string | null; pathId: string | null; trial?: boolean } | null>(null);
+  // VI-13: checked again after each AI interview, so a used free interview shows as used.
+  const [checked, setChecked] = useState(0);
+  const pro = useProStatus(checked);
+  /** VI-13: a free account's one free AI interview (or, signed out, the one an account brings). */
+  const freeTry = pro === "trial" || pro === "signin";
+  const callCount = freeTry ? TRIAL_QUESTIONS : voiceCount;
+  const [howStage, setHowStage] = useState(0);
+  // VI-12: the questions the AI interviewer will ask, picked as the setup changes and shown in the preview.
+  // Fixed on the first render (the page is prerendered); a new draw after each start, or on "Other questions".
+  const [seed, setSeed] = useState(1);
+  const reshuffle = () => setSeed((s) => (s * 1103515245 + 12345) % 2 ** 31);
+  const preview = useMemo(
+    () => pickForSetup(questions, { pathId: pathId || null, experience: experience || null, style, count: Math.max(...COUNTS), seed }) as SimQuestion[],
+    [questions, pathId, experience, style, seed],
+  );
+
+  const setupFields = (): InterviewSetup | undefined => {
+    const fields: InterviewSetup = {
+      ...(pathId ? { pathId } : {}),
+      ...(experience ? { experience } : {}),
+      ...(company.trim() ? { company: company.trim() } : {}),
+    };
+    return Object.keys(fields).length ? fields : undefined;
+  };
+  /** VI-1 and VI-11: the AI interviewer (Pro), for a role or for a pasted job description. */
+  const startVoice = async () => {
+    if (!needAccount("interview")) return; // SU-1, and PV-2: accounts are for adults only
+    setPlanError(null);
+    if (source === "role" || fixedQuestion) {
+      setCall({ questions: fixedQuestion ? [fixedQuestion] : preview.slice(0, callCount), setup: setupFields(), pathId: pathId || null, trial: pro === "trial" });
+      reshuffle();
+      setStage({ kind: "voice" });
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    setPlanning(true);
+    try {
+      const res = await fetch("/api/ai/voice/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jd, count: voiceCount, ...(experience ? { experience } : {}), ...(company.trim() ? { company: company.trim() } : {}) }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; upgrade?: string; plan?: string | null; pathId?: string | null; questions?: CallQuestion[] };
+      if (!res.ok || !data.questions?.length) return setPlanError({ message: data.error ?? "We could not plan your interview. Try again in a minute.", upgrade: data.upgrade });
+      setCall({ questions: data.questions, plan: data.plan ?? null, pathId: data.pathId ?? null });
+      setStage({ kind: "voice" });
+      window.scrollTo({ top: 0 });
+    } catch {
+      setPlanError({ message: "We could not reach the interviewer. Check your connection and try again." });
+    } finally {
+      setPlanning(false);
+    }
+  };
 
   const start = (useVoice: boolean) => {
     if (!needAccount("interview")) return; // SU-1: the mock interview needs a free account
-    const picked = fixedQuestion
-      ? [fixedQuestion]
-      : pickQuestions(questions, { pathId: pathId || null, count, seed: Math.floor(Math.random() * 2 ** 31) });
     setVoice(useVoice && speechSupported);
-    setSession(picked);
+    setSession(fixedQuestion ? [fixedQuestion] : preview.slice(0, count));
+    reshuffle();
     setAnswers([]);
     setStage({ kind: "question", index: 0 });
   };
@@ -119,20 +144,41 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
   if (stage.kind === "question") {
     const q = session[stage.index];
     return (
-      <QuestionScreen
-        key={q.id}
-        q={q}
-        position={stage.index + 1}
-        total={session.length}
-        voice={voice}
-        onVoiceFailed={() => setVoice(false)}
-        onSubmit={submit}
-      />
+      <Stage>
+        <QuestionScreen
+          key={q.id}
+          q={q}
+          position={stage.index + 1}
+          total={session.length}
+          voice={voice}
+          onVoiceFailed={() => setVoice(false)}
+          onSubmit={submit}
+        />
+      </Stage>
     );
+  }
+
+  if (stage.kind === "voice") {
+    return call ? (
+      <Stage>
+        <VoiceInterviewer
+          questions={call.questions}
+          pathId={call.pathId}
+          setup={call.setup}
+          plan={call.plan}
+          trial={call.trial}
+          onExit={() => {
+            setStage({ kind: "setup" });
+            setChecked((n) => n + 1);
+          }}
+        />
+      </Stage>
+    ) : null;
   }
 
   if (stage.kind === "report") {
     return (
+      <Stage>
       <Report
         questions={session}
         answers={answers}
@@ -140,103 +186,429 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: SimQu
         aiOn={aiOn}
         pathId={pathId || null}
       />
+      </Stage>
     );
   }
 
-  const available = pathId ? questions.filter((q) => q.paths.includes(pathId)).length : questions.length;
-  return (
-    <div className="flex flex-col gap-6">
-      {fixedQuestion ? (
-        <p className={`${card} leading-7`}>
-          <span className="font-medium">One question:</span> {fixedQuestion.question}
-        </p>
-      ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
-          <label className="flex min-w-0 flex-col gap-1">
-            <span className="text-sm font-medium">Role</span>
-            <select
-              value={pathId}
-              onChange={(e) => setPathChoice(e.target.value)}
-              className="min-h-12 w-full min-w-0 rounded-2xl border border-zinc-400 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
-            >
-              <option value="">Any AI role</option>
-              {paths.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset className="flex min-w-0 flex-col gap-1">
-            <legend className="text-sm font-medium">Questions</legend>
-            <div className="flex gap-2">
-              {COUNTS.map((n) => (
-                <label
-                  key={n}
-                  className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-zinc-400 has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50 dark:border-zinc-600 dark:has-[:checked]:bg-emerald-950"
-                >
-                  <input
-                    type="radio"
-                    name="count"
-                    value={n}
-                    checked={count === n}
-                    onChange={() => setCount(n)}
-                    className="accent-brand-700"
-                  />
-                  {n}
-                </label>
-              ))}
-            </div>
-            <span className={`text-xs ${muted}`}>{available} questions to draw from</span>
-          </fieldset>
-        </div>
-      )}
+  const jdMode = source === "jd" && !fixedQuestion;
+  const jdShort = jd.trim().length < MIN_JD_CHARS;
+  const roleName = paths.find((p) => p.id === pathId)?.name ?? "";
+  // VI-12: the live line. As the setup changes, the interviewer's real opening line and first question
+  // change with it; these are the questions she will ask when the learner starts.
+  const planned = fixedQuestion ? [fixedQuestion] : preview.slice(0, callCount);
+  const opening = jdMode
+    ? null
+    : planned[0]
+      ? questionLine(0, planned.length, planned[0].question, { role: roleName, company: company.trim(), experience: experience || null, focus: [] })
+      : null;
+  const minutesFor = (n: number) => (n === 3 ? "about 15 minutes" : "about 25 minutes");
+  const proNo = pro === "no";
 
-      <section aria-labelledby="how-heading" className={`${card} leading-7`}>
-        <h2 id="how-heading" className="font-semibold">
-          How it works
-        </h2>
-        <ul className="mt-2 list-disc pl-6 [&_li]:mt-1">
-          <li>Each question has a time limit of 1 to 2 minutes, as in a real interview.</li>
-          <li>
-            Press <kbd className="rounded border border-zinc-400 px-1">Space</kbd> or the microphone button to start and
-            stop speaking. Your words appear as text, which you can edit.
-          </li>
-          <li>
-            Press <kbd className="rounded border border-zinc-400 px-1">Enter</kbd> to submit. At the end you get a report on
-            the key points you covered, your pace, filler words and what to fix first.
-          </li>
-        </ul>
-        <p className={`mt-3 text-sm ${muted}`}>
-          Privacy: we never record or store your voice or answers on our servers. Speech-to-text is done by your
-          browser&apos;s speech service; in Chrome and Edge that sends audio to the browser maker (Google or Microsoft)
-          to turn it into text. Prefer not to? Type your answers instead.
-        </p>
+  // VI-13: planning from a job post is Pro, also for someone with the free interview still to use.
+  const aiAction = proNo || (freeTry && jdMode) ? (
+    <Link href="/pricing" className={room.action}>
+      {proNo ? "Get Pro to start" : "Get Pro to plan from a job post"}
+    </Link>
+  ) : freeTry ? (
+    <button type="button" onClick={() => void startVoice()} className={room.action}>
+      Start my free AI interview
+    </button>
+  ) : (
+    <button type="button" onClick={() => void startVoice()} disabled={planning || (jdMode && jdShort)} className={room.action}>
+      {planning ? "Planning your interview…" : jdMode ? "Plan and start the AI interview" : "Start the AI interviewer"}
+    </button>
+  );
+
+  return (
+    <div className={`${room.ground} overflow-x-clip`}>
+      {/* ---- the first screen: what this is, shown by a real follow-up ---- */}
+      <section aria-labelledby="sim-title" className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 pt-12 pb-16 sm:px-8 md:pt-20 md:pb-28 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div>
+          <h1 id="sim-title" className="text-[clamp(2.6rem,6.6vw,5.6rem)] leading-[0.95] font-medium tracking-[-0.04em]">
+            <span className="xp-line">
+              <span>Mock interviews</span>
+            </span>
+            <span className="xp-line">
+              <span>that talk back</span>
+            </span>
+          </h1>
+          <div className="xp-after-lines">
+            <p className="mt-8 max-w-[34rem] text-lg leading-8 md:text-xl md:leading-9">
+              Zarina, our AI interviewer, asks your questions out loud, follows up on what you actually say, and scores you the way a hiring panel would.
+              Set her up for your role, or paste the job post.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
+              <a href="#setup" className={room.action}>
+                {freeTry ? "Try a free AI interview" : "Set up my interview"}
+              </a>
+              <a
+                href="#how"
+                onClick={() => setHowStage(3)}
+                className={`${room.link} inline-flex min-h-12 items-center`}
+              >
+                See a sample report
+              </a>
+            </div>
+          </div>
+        </div>
+        <Reveal className="flex justify-center lg:justify-end">
+          <Exchange />
+        </Reveal>
       </section>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
-        {speechSupported ? (
-          <>
-            <button type="button" onClick={() => start(true)} className={primaryButton}>
-              Allow the microphone and start
-            </button>
-            <button type="button" onClick={() => start(false)} className={secondaryButton}>
-              Type my answers instead
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" onClick={() => start(false)} className={primaryButton}>
-              Start, typing my answers
-            </button>
-            <p className={`text-sm ${muted}`}>
-              This browser has no speech-to-text. Chrome, Edge or Safari can turn speech into text.
+      {/* ---- the setup: a sentence the learner fills in, and the line she will open with ---- */}
+      <section id="setup" aria-labelledby="setup-heading" className="scroll-mt-20 bg-brand-900">
+        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-10 px-4 py-16 sm:px-8 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] md:py-24">
+          <div className="flex min-w-0 flex-col gap-6">
+            <h2 id="setup-heading" className="text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+              What are you preparing for?
+            </h2>
+            {fixedQuestion ? (
+              <p className="text-xl leading-8">
+                <span className={room.soft}>One question:</span> {fixedQuestion.question}
+              </p>
+            ) : (
+              <>
+                <fieldset className="min-w-0">
+                  <legend className="sr-only">Set up the interview from</legend>
+                  <div className="grid w-full grid-cols-2 rounded-[1.5rem] bg-brand-950 p-1 sm:inline-grid sm:w-auto sm:rounded-full">
+                    {(
+                      [
+                        ["role", "Choose a role"],
+                        ["jd", "Paste a job description"],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <label
+                        key={id}
+                        className="flex min-h-11 cursor-pointer items-center justify-center rounded-[1.25rem] px-3 py-1 text-center text-[15px] leading-5 font-medium text-brand-200 sm:rounded-full transition-colors has-[:checked]:bg-brand-50 has-[:checked]:text-brand-950 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-200 sm:px-5"
+                      >
+                        <input type="radio" name="source" checked={source === id} onChange={() => setSource(id)} className="sr-only" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                {source === "jd" && (
+                  <label className="flex min-w-0 flex-col gap-2">
+                    <span className="text-[15px] font-medium">Job description</span>
+                    <textarea
+                      value={jd}
+                      onChange={(e) => setJd(e.target.value.slice(0, MAX_JD_CHARS))}
+                      rows={7}
+                      aria-describedby="jd-help"
+                      placeholder="Paste the job post: the role, what you would do and the skills it asks for."
+                      className={`${room.field} min-h-44 py-3 leading-7`}
+                    />
+                    <span id="jd-help" className={`text-sm leading-6 ${room.soft}`}>
+                      {jd.length} of {MAX_JD_CHARS} characters. Sent to our AI to plan the interview, and not stored. Leave out your name, phone number and email.
+                    </span>
+                  </label>
+                )}
+
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
+                  {source === "role" && (
+                    <label className="flex min-w-0 flex-col gap-2">
+                      <span className="text-[15px] font-medium">Role</span>
+                      <select value={pathId} onChange={(e) => setPathChoice(e.target.value)} className={room.field}>
+                        <option value="">Any AI role</option>
+                        {paths.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <label className="flex min-w-0 flex-col gap-2">
+                    <span className="text-[15px] font-medium">Experience needed</span>
+                    <select value={experience} onChange={(e) => setExperience(e.target.value as ExperienceId | "")} className={room.field}>
+                      <option value="">{source === "jd" ? "As the job description says" : "Any level"}</option>
+                      {EXPERIENCE.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {source === "role" && (
+                    <label className="flex min-w-0 flex-col gap-2">
+                      <span className="text-[15px] font-medium">Kind of questions</span>
+                      <select value={style} onChange={(e) => setStyle(e.target.value as StyleId)} className={room.field}>
+                        {STYLES.map((x) => (
+                          <option key={x.id} value={x.id}>
+                            {x.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <label className="flex min-w-0 flex-col gap-2">
+                    <span className="text-[15px] font-medium">Company (optional)</span>
+                    <input
+                      value={company}
+                      onChange={(e) => setCompany(e.target.value.slice(0, 60))}
+                      autoComplete="organization"
+                      placeholder="For example, Infosys"
+                      className={room.field}
+                    />
+                  </label>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* The interviewer, ready: her opening line, the length, and the one action. */}
+          <div className="flex min-w-0 flex-col gap-6 rounded-[2rem] bg-brand-950 p-6 md:p-8">
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-300 text-lg font-semibold text-brand-950">
+                Z
+              </span>
+              <span>
+                <span className="block text-lg font-semibold">Zarina will open with</span>
+                <span className={`block text-sm ${room.soft}`}>{freeTry ? "AI interviewer · your first interview is free" : "AI interviewer · Pro"}</span>
+              </span>
+            </div>
+            <p aria-live="polite" className="text-lg leading-8">
+              {opening ? (
+                <>&ldquo;{opening}&rdquo;</>
+              ) : (
+                "She reads the job post, picks the questions from our bank that fit it, and writes one or two for this exact job. Then she opens the call."
+              )}
             </p>
-          </>
-        )}
-      </div>
+            {opening && !fixedQuestion && (
+              <button type="button" onClick={reshuffle} className={`${room.link} -mt-2 min-h-11 self-start text-[15px]`}>
+                Other questions
+              </button>
+            )}
+            {!fixedQuestion && freeTry && !jdMode && (
+              <p className="text-[15px] leading-6">
+                <span className="font-medium">{TRIAL_QUESTIONS} questions, about 10 minutes,</span> <span className={room.soft}>with follow-ups and the full report. One free interview per account, no card needed.</span>
+              </p>
+            )}
+            {!fixedQuestion && !freeTry && (
+              <label className="flex max-w-xs flex-col gap-2">
+                <span className="text-[15px] font-medium">Questions with the AI interviewer</span>
+                <select value={voiceCount} onChange={(e) => setVoiceCount(Number(e.target.value))} className={room.field}>
+                  {VOICE_QUESTION_COUNTS.map((n) => (
+                    <option key={n} value={n}>
+                      {n} questions, {minutesFor(n)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="flex flex-col gap-3">
+              {aiAction}
+              {freeTry && jdMode && (
+                <p className={`text-[15px] leading-6 ${room.soft}`}>
+                  Your free AI interview works with a role.{" "}
+                  <button type="button" onClick={() => setSource("role")} className={`${room.link} min-h-11`}>
+                    Choose a role instead
+                  </button>
+                </p>
+              )}
+              {jdMode && jdShort && !proNo && !freeTry && (
+                <p className={`text-sm leading-6 ${room.soft}`}>Paste at least {MIN_JD_CHARS} characters of the job description to plan the interview.</p>
+              )}
+              <p role="status" className="sr-only">
+                {planning ? "Planning your interview from the job description." : ""}
+              </p>
+              {planError && (
+                <p role="alert" className="rounded-2xl bg-brand-800 p-3 text-[15px] leading-6">
+                  {planError.message}{" "}
+                  {planError.upgrade && (
+                    <Link href={planError.upgrade} className={room.link}>
+                      See Pro
+                    </Link>
+                  )}
+                </p>
+              )}
+              {proNo && (
+                <p className={`text-[15px] leading-6 ${room.soft}`}>
+                  You have had your free AI interview. More are part of Pro.{" "}
+                  <a href="#warm-up" className={room.link}>
+                    Or warm up free
+                  </a>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- how it works: drag through the four stages, the last is the report ---- */}
+      <section id="how" aria-labelledby="how-heading" className="mx-auto max-w-7xl scroll-mt-20 px-4 py-20 sm:px-8 md:py-32">
+        <Reveal>
+          <h2 id="how-heading" className="max-w-3xl text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+            Like a real interview, not a quiz
+          </h2>
+          <p className="mt-4 max-w-2xl text-lg leading-8">
+            Every follow-up is written from what you just said, and the report quotes your own words back to you, so you know exactly what to fix.
+          </p>
+        </Reveal>
+        <Reveal className="mt-10" delay={90}>
+          <Stages stage={howStage} onStage={setHowStage} />
+        </Reveal>
+      </section>
+
+      {/* ---- what is free and what is Pro, set like a menu; the free warm-up starts here ---- */}
+      <section id="warm-up" aria-labelledby="menu-heading" className="scroll-mt-20 bg-brand-900">
+        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-10 px-4 py-20 sm:px-8 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] md:py-28">
+          <Reveal>
+            <h2 id="menu-heading" className="text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+              Warm-up or the real thing
+            </h2>
+            <p className={`mt-4 text-lg leading-8`}>Warm up free with written questions. When it matters, rehearse it out loud with Zarina.</p>
+          </Reveal>
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-12 lg:grid-cols-2 lg:gap-16">
+            <Reveal delay={90}>
+              <h3 className="text-2xl font-medium">AI interview</h3>
+              <ul className="mt-6 flex flex-col gap-5">
+                {[
+                  ["Questions asked out loud", "In a natural Indian English voice, hands-free.", true],
+                  ["Follow-ups on your answer", "One or two, built from the words you used.", true],
+                  ["Set up from a job post", "Questions picked and written for that job.", false],
+                  ["A verdict and skill scores", "Each score backed by a quote of what you said.", true],
+                  ["A four-week plan", "What to practise next, week by week.", true],
+                ].map(([name, note, inTrial]) => (
+                  <li key={name as string}>
+                    <span className="flex justify-between gap-4 text-lg font-medium">
+                      {name}
+                      {/* VI-13: what the free interview includes, while it is still to use. */}
+                      <span className="shrink-0 text-brand-300">{freeTry && inTrial ? "Free once" : "Pro"}</span>
+                    </span>
+                    <span className={`block text-[15px] leading-6 ${room.soft}`}>{note}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href="#setup" className={`${room.action} mt-8`}>
+                {freeTry ? "Try it free" : "Set up my interview"}
+              </a>
+            </Reveal>
+            <Reveal delay={180}>
+              <h3 className="text-2xl font-medium">Free warm-up</h3>
+              <ul className="mt-6 flex flex-col gap-5">
+                {[
+                  ["Written questions, timed", "Read each one and answer by voice or typing."],
+                  ["Key points you covered", "Checked against our reviewed answer."],
+                  ["No follow-ups, no verdict", "It checks words, not how you would do in the room."],
+                ].map(([name, note]) => (
+                  <li key={name}>
+                    <span className="flex justify-between gap-4 text-lg font-medium">
+                      {name}
+                      <span className={`shrink-0 ${room.soft}`}>Free</span>
+                    </span>
+                    <span className={`block text-[15px] leading-6 ${room.soft}`}>{note}</span>
+                  </li>
+                ))}
+              </ul>
+              {jdMode ? (
+                <p className="mt-8 text-[15px] leading-6">
+                  Practising from a job description needs the AI interviewer. To warm up free,{" "}
+                  <button type="button" onClick={() => setSource("role")} className={`${room.link} min-h-11`}>
+                    choose a role instead
+                  </button>
+                  .
+                </p>
+              ) : (
+                <div className="mt-8 flex flex-col gap-4">
+                  {!fixedQuestion && (
+                    <fieldset className="min-w-0">
+                      <legend className="text-[15px] font-medium">Questions</legend>
+                      <div className="mt-2 flex max-w-xs gap-2">
+                        {COUNTS.map((n) => (
+                          <label
+                            key={n}
+                            className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-full bg-brand-950 text-[15px] font-medium text-brand-200 has-[:checked]:bg-brand-700 has-[:checked]:text-brand-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-200"
+                          >
+                            <input type="radio" name="count" value={n} checked={count === n} onChange={() => setCount(n)} className="sr-only" />
+                            {n}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
+                  <div className="flex flex-wrap gap-3">
+                    {speechSupported ? (
+                      <>
+                        <button type="button" onClick={() => start(true)} className={room.quiet}>
+                          Allow the microphone and start
+                        </button>
+                        <button type="button" onClick={() => start(false)} className={room.quiet}>
+                          Type my answers instead
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => start(false)} className={room.quiet}>
+                        Start, typing my answers
+                      </button>
+                    )}
+                  </div>
+                  <p className={`text-sm leading-6 ${room.soft}`}>
+                    Uses the role and experience you chose above. Your voice and answers stay in this browser; Chrome and Edge send audio to Google or
+                    Microsoft to turn it into text. Prefer not to? Type instead.
+                  </p>
+                </div>
+              )}
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- the close: one sentence, one action ---- */}
+      <section aria-labelledby="close-heading" className="mx-auto max-w-7xl px-4 pt-[18svh] pb-[14svh] sm:px-8">
+        <Reveal>
+          <h2 id="close-heading" className="max-w-[34ch] text-xl leading-8 font-normal md:text-2xl md:leading-9">
+            Your next interview will be spoken. Rehearse it out loud with Zarina first.
+          </h2>
+          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <a href="#setup" className={room.action}>
+              Set up my interview
+            </a>
+            {proNo && (
+              <Link href="/pricing" className={`${room.link} inline-flex min-h-12 items-center`}>
+                See Pro plans
+              </Link>
+            )}
+          </div>
+        </Reveal>
+      </section>
     </div>
   );
+}
+
+/** The question, call and report screens: a plain reading column (the room is for the setup only). */
+const Stage = ({ children }: { children: React.ReactNode }) => <div className="mx-auto max-w-3xl px-4 py-8">{children}</div>;
+
+/** VI-11: whether this learner has Pro, from today's AI allowance; "unknown" until Pro is open or while loading. */
+/**
+ * VI-12 and VI-13: may this visitor use the AI interviewer? "yes" with Pro; "trial" for a free account
+ * whose one free interview is unused; "signin" when signed out (an account brings the free interview);
+ * "no" once the free interview is used; "unknown" while loading, or before Pro opens.
+ */
+type ProStatus = "yes" | "trial" | "signin" | "no" | "unknown";
+function useProStatus(checked: number): ProStatus {
+  const [pro, setPro] = useState<ProStatus>("unknown");
+  useEffect(() => {
+    let live = true;
+    type Usage = { show: boolean; signin?: boolean; tier?: string; trial?: boolean; used?: number; limit?: number };
+    fetch("/api/ai/usage?kind=voice_trial")
+      .then((r): Promise<Usage> | Usage => (r.ok ? r.json() : { show: false }))
+      .then((u) => {
+        if (!live) return;
+        if (u.signin) return setPro("signin");
+        if (!u.show) return;
+        if (u.tier === "pro") return setPro("yes");
+        // Any use of the report allowance (2, so a failed report can be retried) means the free interview is used.
+        setPro(u.trial && (u.used ?? 0) === 0 && (u.limit ?? 0) > 0 ? "trial" : "no");
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [checked]);
+  return pro;
 }
 
 // ---- one question ---------------------------------------------------------
@@ -256,142 +628,30 @@ function QuestionScreen({
   onVoiceFailed: () => void;
   onSubmit: (a: Answer) => void;
 }) {
-  const [text, setText] = useState("");
-  const [interim, setInterim] = useState("");
-  const [listening, setListening] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(0);
   const [shownAt] = useState(() => Date.now());
-  const [notice, setNotice] = useState<string | null>(null);
-  const wantListening = useRef(false);
   const submitted = useRef(false);
   const micButton = useRef<HTMLButtonElement>(null);
-  const heardTimer = useRef<number | null>(null);
 
   const elapsed = startedAt === null ? 0 : Math.max(0, (now - startedAt) / 1000);
   const left = Math.max(0, q.answer_seconds - elapsed);
   const thinkingLeft = Math.max(0, THINKING_SECONDS - (now - shownAt) / 1000);
 
-  const stopListening = useCallback(() => {
-    wantListening.current = false;
-    if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
-    heardTimer.current = null;
-    shared?.r.stop();
-    setListening(false);
-    setInterim("");
-  }, []);
+  const beginClock = useCallback(() => setStartedAt((s) => s ?? Date.now()), []);
+  const dictation = useDictation({ onStart: beginClock, onBlocked: onVoiceFailed });
+  const { text, setText, interim, listening, notice, toggle: toggleMic, abort } = dictation;
 
   const finish = useCallback(
     (override?: string) => {
       if (submitted.current) return;
       submitted.current = true;
-      stopListening();
-      shared?.r.abort();
+      abort();
       const seconds = startedAt === null ? 0 : Math.min(q.answer_seconds, (Date.now() - startedAt) / 1000);
       onSubmit({ text: (override ?? joinText(text, interim)).trim(), seconds });
     },
-    [onSubmit, q.answer_seconds, startedAt, stopListening, text, interim],
+    [abort, onSubmit, q.answer_seconds, startedAt, text, interim],
   );
-
-  const beginClock = useCallback(() => setStartedAt((s) => s ?? Date.now()), []);
-
-  const startListening = useCallback(() => {
-    const Ctor = recognitionCtor();
-    if (!Ctor) return;
-    beginClock();
-    const s = sharedRecognizer(Ctor);
-    const r = s.r;
-    const clearHeardTimer = () => {
-      if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
-      heardTimer.current = null;
-    };
-    // If no sound reaches us soon after a start, say so plainly instead of showing "Listening…" forever.
-    const expectSound = (message: string) => {
-      clearHeardTimer();
-      heardTimer.current = window.setTimeout(() => {
-        heardTimer.current = null;
-        wantListening.current = false;
-        r.abort();
-        setListening(false);
-        setInterim("");
-        setNotice(message);
-      }, HEAR_TIMEOUT_MS);
-    };
-    const heard = () => clearHeardTimer();
-    r.lang = "en-IN";
-    r.continuous = true;
-    r.interimResults = true;
-    r.onaudiostart = heard;
-    r.onresult = (e) => {
-      heard();
-      let finalText = "";
-      let interimText = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const res = e.results[i];
-        if (res.isFinal) finalText += res[0].transcript;
-        else interimText += res[0].transcript;
-      }
-      if (finalText) setText((t) => joinText(t, finalText));
-      setInterim(interimText);
-    };
-    r.onerror = (e) => {
-      if (e.error === "no-speech" || e.error === "aborted") return;
-      clearHeardTimer();
-      wantListening.current = false;
-      setListening(false);
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        setNotice("The microphone is blocked, so type your answer. You can allow it in the browser's site settings.");
-        onVoiceFailed();
-      } else {
-        setNotice("Speech-to-text stopped working. Type the rest of your answer, or press the microphone again.");
-      }
-    };
-    // Browsers end recognition after a pause; carry on while the learner still wants it. Phones may
-    // refuse a restart that no tap started, so the sound check turns the microphone off if it stays quiet.
-    r.onend = () => {
-      s.active = false;
-      if (!wantListening.current) {
-        clearHeardTimer();
-        setListening(false);
-        return;
-      }
-      try {
-        r.start();
-        s.active = true;
-        expectSound("The microphone paused. Tap “Speak more” to carry on, or type the rest of your answer.");
-      } catch {
-        setListening(false);
-      }
-    };
-    wantListening.current = true;
-    const begin = () => {
-      r.start();
-      s.active = true;
-      setListening(true);
-      setNotice(null);
-      expectSound("The microphone isn't picking up any sound. Tap “Start speaking” to try again, or type your answer.");
-    };
-    try {
-      if (s.active) r.abort(); // a recognition from the last question is still closing
-      begin();
-    } catch {
-      // Still closing: start as soon as the browser says it has ended.
-      r.onend = () => {
-        s.active = false;
-        try {
-          begin();
-        } catch {
-          setListening(false);
-          setNotice("The microphone couldn't start. Tap “Start speaking” again, or type your answer.");
-        }
-      };
-    }
-  }, [beginClock, onVoiceFailed]);
-
-  const toggleMic = useCallback(() => {
-    if (wantListening.current) stopListening();
-    else startListening();
-  }, [startListening, stopListening]);
 
   // The clock ticks four times a second. It starts when the learner starts, or after the thinking time.
   useEffect(() => {
@@ -426,11 +686,7 @@ function QuestionScreen({
 
   useEffect(() => {
     micButton.current?.focus();
-    return () => {
-      wantListening.current = false;
-      if (heardTimer.current !== null) window.clearTimeout(heardTimer.current);
-      shared?.r.abort();
-    };
+    return () => abortRecognition();
   }, []);
 
   const lowTime = startedAt !== null && left <= 15;
@@ -485,7 +741,7 @@ function QuestionScreen({
         >
           <span
             aria-hidden="true"
-            className={`inline-block size-3 rounded-full ${listening ? "animate-pulse bg-white" : "bg-white"}`}
+            className={`inline-block size-3 rounded-full ${listening ? "motion-safe:animate-pulse bg-white" : "bg-white"}`}
           />
           {listening ? "Stop the microphone" : text ? "Speak more" : "Start speaking"}
           <span className="text-sm font-normal opacity-80">(Space)</span>
