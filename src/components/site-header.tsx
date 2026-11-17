@@ -40,10 +40,11 @@ export function SiteHeader() {
               </span>
             </summary>
             {/* NV-3: a full-height menu with the groups, the main action first. */}
-            <nav
-              aria-label="Main"
-              className="xp-glass-strong fixed inset-x-2 top-[4.5rem] bottom-2 z-50 flex flex-col gap-6 overflow-y-auto overscroll-contain rounded-[2rem] px-3 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-            >
+            {/* GL-1: the glass is on the sheet, which stays still; only the inner list scrolls. Glass drawn on a
+                scrolling element scrolls away with its content and leaves the lower links bare (owner report,
+                iPhone, 17 Nov). */}
+            <nav aria-label="Main" className="xp-glass-strong fixed inset-x-2 top-[4.5rem] bottom-2 z-50 flex flex-col rounded-[2rem]">
+              <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain rounded-[2rem] px-3 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
               <AccountButton className="flex min-h-12 items-center justify-center rounded-full bg-brand-700 px-6 text-base font-medium text-white hover:bg-brand-800" />
               <SignInLink
                 label="Sign in"
@@ -56,6 +57,7 @@ export function SiteHeader() {
                   linkClass="flex min-h-12 items-center rounded-2xl px-3 text-base font-medium text-zinc-900 hover:bg-brand-50 dark:text-zinc-100 dark:hover:bg-white/5"
                   buttonClass="flex min-h-12 w-full items-center rounded-2xl px-3 text-left text-base font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-white/5"
                 />
+              </div>
               </div>
             </nav>
           </details>
