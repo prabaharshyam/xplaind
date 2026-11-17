@@ -82,6 +82,7 @@ const PROCESSORS: [string, string][] = [
     "Takes payments for Pro passes, only if you buy one. It receives the amount, your email and mobile number, and handles your UPI, card or bank details itself.",
   ],
   ["Anthropic", "Writes AI answers. It receives only the text of that request, such as your question, your code and its error, or your resume text, when you press the button. If you are a Pro learner and choose to have the picture pages of your notes read, those pages, drawn as small images, are sent to it too, and only those pages. In the AI voice interviewer (Pro), it receives the text of what you said (the transcript), never your voice: your browser turns speech into text and reads the questions aloud on your device."],
+  ["Sarvam AI", "Speaks the AI voice interviewer's lines (Pro) in a natural voice. It receives only the interviewer's questions, follow-ups and short reactions, which can quote what you said, never your voice or your full answers. We do not keep the audio."],
   ["YouTube", "Plays videos inside lessons from its privacy-enhanced (no-cookie) player, and only after you press play."],
   ...(analyticsKey()
     ? ([["PostHog", "Counts page visits and a few steps, such as starting the placement test, without cookies and without anything that identifies you or your device (AN-2)."]] as [string, string][])

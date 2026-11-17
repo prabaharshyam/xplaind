@@ -58,18 +58,18 @@ describe("when to ask a follow-up (VI-1)", () => {
   });
 
   it("always asks a first follow-up: if the model declines, the bank's follow-up is used", () => {
-    expect(cleanTurn({ follow_up: "You said chunks; how big would you make them, and why?", done: false }, q, [ex("We use chunks")])).toBe(
+    expect(cleanTurn({ ack: "Okay.", follow_up: "You said chunks; how big would you make them, and why?", done: false }, q, [ex("We use chunks")])).toBe(
       "You said chunks; how big would you make them, and why?",
     );
-    expect(cleanTurn({ follow_up: "", done: true }, q, [ex("We use chunks")])).toBe(q.follow_ups[0]);
+    expect(cleanTurn({ ack: "Okay.", follow_up: "", done: true }, q, [ex("We use chunks")])).toBe(q.follow_ups[0]);
   });
 
   it("stops after the first follow-up when the model says one more adds nothing", () => {
-    expect(cleanTurn({ follow_up: "", done: true }, q, [ex("a"), ex("b", "f1")])).toBeNull();
+    expect(cleanTurn({ ack: "Okay.", follow_up: "", done: true }, q, [ex("a"), ex("b", "f1")])).toBeNull();
   });
 
   it("keeps a follow-up to one short line and picks an unasked bank follow-up", () => {
-    const long = cleanTurn({ follow_up: `Why?\n\n${"x".repeat(500)}`, done: false }, q, [ex("a")]);
+    const long = cleanTurn({ ack: "Okay.", follow_up: `Why?\n\n${"x".repeat(500)}`, done: false }, q, [ex("a")]);
     expect(long).not.toMatch(/\n/);
     expect(long!.length).toBeLessThanOrEqual(300);
     expect(bankFollowUp(q, [ex("a"), ex("b", q.follow_ups[0])])).toBe(q.follow_ups[1]);

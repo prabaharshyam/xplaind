@@ -71,8 +71,8 @@ export function turnDecision(exchanges: readonly Exchange[]): "ask" | "done" {
 
 // ------------------------------------------------------------- follow-ups --
 
-/** The model's answer for one turn. Kept loose: limits are applied in cleanTurn. */
-export const VoiceTurnOutput = z.object({ follow_up: z.string(), done: z.boolean() });
+/** The model's answer for one turn. Kept loose: limits are applied in cleanTurn and cleanAck. */
+export const VoiceTurnOutput = z.object({ ack: z.string(), follow_up: z.string(), done: z.boolean() });
 export type VoiceTurnOutput = z.infer<typeof VoiceTurnOutput>;
 
 const transcript = (q: VoiceQuestion, exchanges: readonly Exchange[]) =>
@@ -91,7 +91,8 @@ export function voiceTurnPrompt(q: VoiceQuestion, exchanges: readonly Exchange[]
     HOUSE_STYLE,
     DATA_RULE,
     "Ask exactly one follow-up question that probes what the candidate actually said in their answers: ask them to go deeper on a point they made, justify a claim, give a concrete example from a real product or project, or cover one rubric point they left out. Refer to their words where it helps.",
-    "Do not coach, hint at, or give the answer. Do not praise, judge or summarise. One sentence, at most 30 words, plain spoken English with no lists, symbols or code.",
+    "Talk like a friendly, professional human interviewer on a call. ack is a short, natural spoken reaction of 2 to 8 words, such as \"Okay, got it.\" or \"Right, thanks for that.\" or \"I see.\". It must never say whether the answer was right or good, never praise or criticise, and never repeat the answer back.",
+    "follow_up: do not coach, hint at, or give the answer. One or two short sentences, at most 35 words, plain spoken English with no lists, symbols or code, as you would say it out loud.",
     first
       ? "This is the first follow-up, so you must ask one: set done to false."
       : "If one more follow-up would not tell you anything new, set done to true and follow_up to an empty string. Otherwise set done to false.",
@@ -107,6 +108,33 @@ export function voiceTurnPrompt(q: VoiceQuestion, exchanges: readonly Exchange[]
 }
 
 const oneLine = (s: string, n: number) => s.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
+
+/** The short spoken reaction before a follow-up: one line, no judging words. Pure. */
+export function cleanAck(ack: string): string {
+  const line = oneLine(ack, 60);
+  const judging = /\b(great|good|excellent|perfect|correct|wrong|right answer|well done|nice|incorrect)\b/i;
+  if (!line || line.split(" ").length > 10 || judging.test(line)) return "Okay.";
+  return /[.!?]$/.test(line) ? line : `${line}.`;
+}
+
+/** What the interviewer says for a follow-up: the reaction, then the question. Pure. */
+export const followUpLine = (ack: string, followUp: string) => `${cleanAck(ack)} ${followUp}`;
+
+/**
+ * What the interviewer says to ask a bank question: a short welcome before the first, a natural lead-in
+ * before the others. Written here, never by the browser, so only our own lines are ever voiced. Pure.
+ */
+export function questionLine(index: number, total: number, question: string): string {
+  if (index === 0) {
+    const n = total === 1 ? "one question" : `${total} questions`;
+    return `Hi, I'm your AI interviewer for today. We'll go through ${n}, and I may ask a follow-up or two about what you say. Take your time and answer as you would in a real interview. Let's begin. ${question}`;
+  }
+  if (index === total - 1) return `Thanks. And now the last question. ${question}`;
+  const leads = ["Thanks. Let's move on to the next one.", "Okay, next question.", "Alright, let's look at another one."];
+  return `${leads[(index - 1) % leads.length]} ${question}`;
+}
+
+export const CLOSING_LINE = "That's the end of the interview. Thank you! Give me a moment while I put your report together.";
 
 /**
  * The follow-up to ask, or null to move on. The first follow-up is required (VI-1): if the model declines,

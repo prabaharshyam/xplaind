@@ -3,54 +3,71 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
-import {
-  MIC_BLOCKED,
-  joinText,
-  speak,
-  stopSpeaking,
-  useDictation,
-  useSpeechOutSupported,
-  useSpeechSupported,
-} from "@/components/interview/speech";
+import { MIC_BLOCKED, joinText, speak, stopSpeaking, useDictation, useSpeechSupported } from "@/components/interview/speech";
 import { readinessLabel, type Readiness } from "@/lib/interview/readiness";
 import type { SimQuestion } from "@/lib/interview/analyse";
 import type { Exchange, VoiceReport } from "@/lib/ai/voice-interview";
 
 /**
- * VI-1 to VI-5: the AI voice interviewer (Pro). It reads each question aloud, the learner answers by voice
- * (speech-to-text in this browser) or by typing, and it asks 1 or 2 follow-ups based on what they said.
- * Then one call scores the whole interview. Audio never leaves the browser; only the text is sent (VI-2).
+ * VI-1 to VI-7: the AI voice interviewer (Pro), as a hands-free conversation. One tap starts it. The
+ * interviewer speaks in a natural voice (VI-6), the microphone opens by itself, and a pause of about
+ * 2.5 seconds sends the answer (VI-7). It reacts briefly, asks 1 or 2 follow-ups about what was said,
+ * moves on, and ends with a scored report. Speech-to-text runs in this browser; only text is sent (VI-2).
  */
 
 type Item = { questionId: string; exchanges: Exchange[] };
 type Turn = { index: number; asked: string; followUp: number };
 type Failure = { message: string; upgrade?: string; signin?: boolean };
+type Line = { who: "ai" | "me"; text: string };
 type Phase =
   | { kind: "consent" }
-  | { kind: "checking" }
+  | { kind: "starting" }
+  | { kind: "talk"; turn: Turn; state: "speaking" | "listening" | "thinking" | "paused" }
   | { kind: "stopped"; failure: Failure }
-  | { kind: "answer"; turn: Turn }
-  | { kind: "thinking"; turn: Turn }
   | { kind: "scoring" }
   | { kind: "report"; report: VoiceReport; readiness: Readiness | null }
   | { kind: "report-failed"; failure: Failure };
+
+/** VI-7: how long a pause ends an answer. Long enough to think mid-sentence, short enough to feel natural. */
+export const SILENCE_MS = 2500;
+const MAX_SECONDS = 900;
+/** A tiny silent WAV, played inside the Start tap so phones allow the interviewer's voice afterwards. */
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
 
 const failureFrom = async (res: Response): Promise<Failure> => {
   const data = (await res.json().catch(() => ({}))) as { error?: string; upgrade?: string; signin?: boolean };
   return { message: data.error ?? "Something went wrong. Please try again.", upgrade: data.upgrade, signin: data.signin };
 };
 
-const MAX_SECONDS = 900;
+/** A spoken line: audio from our voice service, or the text for the browser to read when there is none. */
+type Clip = { text: string; url: string | null };
+
+const b64ToUrl = (b64: string) => {
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+};
+
+async function fetchLine(body: Record<string, unknown>): Promise<Clip | Failure> {
+  const res = await fetch("/api/ai/voice/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok && res.status !== 204) return failureFrom(res);
+  const text = decodeURIComponent(res.headers.get("x-say") ?? "");
+  if (res.status === 204) return { text, url: null };
+  return { text, url: URL.createObjectURL(await res.blob()) };
+}
+const isFailure = (x: Clip | Failure): x is Failure => "message" in x;
 
 export function VoiceInterviewer({ questions, pathId, onExit }: { questions: SimQuestion[]; pathId: string | null; onExit: () => void }) {
   const speechIn = useSpeechSupported();
-  const speechOut = useSpeechOutSupported();
   const [phase, setPhase] = useState<Phase>({ kind: "consent" });
   const [items, setItems] = useState<Item[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
   const [typing, setTyping] = useState(false);
   const [micDenied, setMicDenied] = useState(false);
-  const [readAloud, setReadAloud] = useState(true);
   const [status, setStatus] = useState("");
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const clips = useRef(new Map<number, Promise<Clip | Failure>>());
+  const lastLine = useRef<Clip | null>(null);
+  const live = useRef(true);
 
   // VI-5: if the browser already blocks the microphone for this site, say so before the interview starts.
   useEffect(() => {
@@ -64,15 +81,46 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
         }
       })
       .catch(() => undefined);
+    return () => {
+      live.current = false;
+      audio.current?.pause();
+      stopSpeaking();
+    };
   }, []);
 
-  useEffect(() => () => stopSpeaking(), []);
+  /** Plays one line in the interviewer's voice, or the browser's voice as a fallback. Resolves when it ends. */
+  const say = useCallback((clip: Clip) => {
+    lastLine.current = clip;
+    return new Promise<void>((done) => {
+      const el = audio.current;
+      if (clip.url && el) {
+        el.onended = () => done();
+        el.onerror = () => (speak(clip.text, done) ? undefined : done());
+        el.src = clip.url;
+        el.play().catch(() => (speak(clip.text, done) ? undefined : done()));
+      } else if (!speak(clip.text, done)) done();
+    });
+  }, []);
+
+  const quiet = () => {
+    audio.current?.pause();
+    stopSpeaking();
+  };
+
+  const questionClip = useCallback(
+    (index: number) => {
+      if (!clips.current.has(index))
+        clips.current.set(index, fetchLine({ line: "question", questionId: questions[index].id, index, total: questions.length }));
+      return clips.current.get(index)!;
+    },
+    [questions],
+  );
 
   const score = useCallback(
     async (all: Item[]) => {
-      stopSpeaking();
       setPhase({ kind: "scoring" });
       setStatus("Scoring your interview. This takes up to a minute.");
+      void fetchLine({ line: "closing" }).then((c) => (!isFailure(c) && live.current ? say(c) : undefined));
       try {
         const res = await fetch("/api/ai/voice/report", {
           method: "POST",
@@ -87,46 +135,68 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
         setPhase({ kind: "report-failed", failure: { message: "We could not reach the interviewer. Check your connection and try again." } });
       }
     },
-    [pathId],
+    [pathId, say],
   );
 
-  const ask = useCallback(
-    (turn: Turn) => {
-      setPhase({ kind: "answer", turn });
-      setStatus(turn.followUp ? `Follow-up question: ${turn.asked}` : `Question ${turn.index + 1} of ${questions.length}: ${turn.asked}`);
+  /** The interviewer says a line, then the learner's turn begins. */
+  const speakThenListen = useCallback(
+    async (turn: Turn, clip: Clip) => {
+      setLines((l) => [...l, { who: "ai", text: clip.text }]);
+      setPhase({ kind: "talk", turn, state: "speaking" });
+      setStatus(`Interviewer: ${clip.text}`);
+      await say(clip);
+      if (!live.current) return;
+      setPhase((p) => (p.kind === "talk" && p.state === "speaking" ? { ...p, state: "listening" } : p));
     },
-    [questions.length],
+    [say],
+  );
+
+  const askQuestion = useCallback(
+    async (index: number) => {
+      const clip = await questionClip(index);
+      if (index + 1 < questions.length) void questionClip(index + 1); // ready before it is needed
+      if (isFailure(clip)) return setPhase({ kind: "stopped", failure: clip });
+      await speakThenListen({ index, asked: questions[index].question, followUp: 0 }, clip);
+    },
+    [questionClip, questions, speakThenListen],
   );
 
   const nextQuestion = useCallback(
     (index: number, all: Item[]) => {
-      if (index + 1 < questions.length) ask({ index: index + 1, asked: questions[index + 1].question, followUp: 0 });
+      if (index + 1 < questions.length) void askQuestion(index + 1);
       else if (all.some((i) => i.exchanges.some((e) => e.answer.trim()))) void score(all);
       else setPhase({ kind: "report-failed", failure: { message: "You skipped every question, so there is nothing to score. Start again when you are ready." } });
     },
-    [ask, questions, score],
+    [askQuestion, questions.length, score],
   );
 
   const begin = async () => {
-    setPhase({ kind: "checking" });
+    // Inside the tap: unlock audio for the rest of the interview (phones block sound that no tap started).
+    const el = new Audio();
+    el.setAttribute("playsinline", "");
+    el.src = SILENT_WAV;
+    void el.play().catch(() => undefined);
+    audio.current = el;
+    setPhase({ kind: "starting" });
+    setStatus("Getting the interviewer ready.");
     try {
       const res = await fetch("/api/ai/voice");
       if (!res.ok) return setPhase({ kind: "stopped", failure: await failureFrom(res) });
     } catch {
       return setPhase({ kind: "stopped", failure: { message: "We could not reach the interviewer. Check your connection and try again." } });
     }
-    const fresh = questions.map((q) => ({ questionId: q.id, exchanges: [] as Exchange[] }));
-    setItems(fresh);
-    ask({ index: 0, asked: questions[0].question, followUp: 0 });
+    setItems(questions.map((q) => ({ questionId: q.id, exchanges: [] })));
+    setLines([]);
+    void askQuestion(0);
   };
 
-  const submit = async (turn: Turn, answer: string, seconds: number) => {
-    stopSpeaking();
-    const all = items.map((it, i) => (i === turn.index ? { ...it, exchanges: [...it.exchanges, { asked: turn.asked, answer, seconds }] } : it));
+  const answer = async (turn: Turn, text: string, seconds: number) => {
+    const all = items.map((it, i) => (i === turn.index ? { ...it, exchanges: [...it.exchanges, { asked: turn.asked, answer: text, seconds }] } : it));
     setItems(all);
-    if (!answer.trim()) return nextQuestion(turn.index, all);
-    setPhase({ kind: "thinking", turn });
-    setStatus("The interviewer is thinking of a follow-up.");
+    if (text.trim()) setLines((l) => [...l, { who: "me", text }]);
+    if (!text.trim()) return nextQuestion(turn.index, all);
+    setPhase({ kind: "talk", turn, state: "thinking" });
+    setStatus("The interviewer is thinking.");
     try {
       const res = await fetch("/api/ai/voice/turn", {
         method: "POST",
@@ -134,16 +204,37 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
         body: JSON.stringify({ questionId: all[turn.index].questionId, exchanges: all[turn.index].exchanges }),
       });
       if (!res.ok) return setPhase({ kind: "stopped", failure: await failureFrom(res) });
-      const { follow_up } = (await res.json()) as { follow_up: string | null };
-      if (follow_up) ask({ index: turn.index, asked: follow_up, followUp: turn.followUp + 1 });
-      else nextQuestion(turn.index, all);
+      const data = (await res.json()) as { follow_up: string | null; say?: string; audio?: string | null };
+      if (!live.current) return;
+      if (data.follow_up) {
+        const clip = { text: data.say ?? data.follow_up, url: data.audio ? b64ToUrl(data.audio) : null };
+        await speakThenListen({ index: turn.index, asked: data.follow_up, followUp: turn.followUp + 1 }, clip);
+      } else nextQuestion(turn.index, all);
     } catch {
       setStatus("We could not reach the interviewer, so we moved on to the next question.");
       nextQuestion(turn.index, all);
     }
   };
 
+  const pause = (turn: Turn) => {
+    quiet();
+    setPhase({ kind: "talk", turn, state: "paused" });
+    setStatus("Paused.");
+  };
+  const resume = (turn: Turn) => {
+    // Say the last line again, as an interviewer would after a pause, then listen.
+    const clip = lastLine.current;
+    if (!clip) return setPhase({ kind: "talk", turn, state: "listening" });
+    setPhase({ kind: "talk", turn, state: "speaking" });
+    void say(clip).then(() => live.current && setPhase((p) => (p.kind === "talk" && p.state === "speaking" ? { ...p, state: "listening" } : p)));
+  };
+
   const answeredSoFar = items.some((i) => i.exchanges.some((e) => e.answer.trim()));
+  const end = () => {
+    quiet();
+    if (answeredSoFar) void score(items);
+    else onExit();
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -158,10 +249,11 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
           </h2>
           <ul className="list-disc pl-6 [&_li]:mt-1">
             <li>
-              {questions.length} questions for your role. After each answer the interviewer asks 1 or 2 follow-up questions
-              about what you said, like a real interviewer. Then you get a scored report.
+              A spoken interview of {questions.length} {questions.length === 1 ? "question" : "questions"}. The interviewer asks,
+              you answer out loud, and it asks 1 or 2 follow-ups about what you said, like a real interviewer.
             </li>
-            <li>Speak your answers, or type them. The interviewer does not coach you during the interview.</li>
+            <li>It is hands-free: when you stop talking for a moment, your answer is sent. You can pause, type instead or end at any time.</li>
+            <li>Find a quiet place and use headphones if you can.</li>
           </ul>
           <div className="rounded-2xl bg-brand-50 p-4 dark:bg-brand-950" role="note" aria-labelledby="privacy-note">
             <p id="privacy-note" className="font-semibold">
@@ -169,7 +261,8 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
             </p>
             <p className="mt-1">
               Your browser turns your speech into text. Only that text (the transcript) is sent to our AI, Anthropic&apos;s
-              Claude, to ask follow-ups and score you. Your voice is never uploaded to Xplaind or stored. We keep only your
+              Claude, to ask follow-ups and score you. Your voice is never uploaded to Xplaind or stored. The interviewer&apos;s
+              voice is made by Sarvam AI from the interviewer&apos;s lines, which can quote what you said. We keep only your
               score, not what you said.
             </p>
             <p className={`mt-2 text-sm ${muted}`}>
@@ -183,12 +276,6 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
             </p>
           )}
           {!speechIn && !micDenied && <p className={`text-sm ${muted}`}>This browser has no speech-to-text, so you will type your answers. Chrome, Edge or Safari can listen.</p>}
-          {speechOut && (
-            <label className="flex min-h-11 items-center gap-3">
-              <input type="checkbox" checked={readAloud} onChange={(e) => setReadAloud(e.target.checked)} className="size-5 accent-brand-700" />
-              Read the questions aloud
-            </label>
-          )}
           {speechIn && !micDenied && (
             <label className="flex min-h-11 items-center gap-3">
               <input type="checkbox" checked={typing} onChange={(e) => setTyping(e.target.checked)} className="size-5 accent-brand-700" />
@@ -206,36 +293,53 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
         </section>
       )}
 
-      {phase.kind === "checking" && <p className={muted}>Getting the interviewer ready…</p>}
+      {phase.kind === "starting" && (
+        <Stage state="thinking" label="Getting the interviewer ready…" />
+      )}
 
       {phase.kind === "stopped" && <Stopped failure={phase.failure} onExit={onExit} onReport={answeredSoFar ? () => void score(items) : undefined} />}
 
-      {(phase.kind === "answer" || phase.kind === "thinking") && (
-        <AnswerTurn
-          key={`${phase.turn.index}-${phase.turn.followUp}`}
-          turn={phase.turn}
-          total={questions.length}
-          busy={phase.kind === "thinking"}
-          voice={speechIn && !typing}
-          readAloud={readAloud && speechOut}
-          onMicBlocked={() => setTyping(true)}
-          onSubmit={(answer, seconds) => void submit(phase.turn, answer, seconds)}
-          onEnd={answeredSoFar ? () => void score(items) : onExit}
-          endLabel={answeredSoFar ? "End and get my report" : "End the interview"}
-        />
+      {phase.kind === "talk" && (
+        <section aria-labelledby="talk-heading" className="flex flex-col gap-4">
+          <h2 id="talk-heading" className="sr-only">
+            Interview in progress
+          </h2>
+          <p className={`text-center text-sm ${muted}`}>
+            Question {phase.turn.index + 1} of {questions.length}
+            {phase.turn.followUp > 0 && ` · follow-up ${phase.turn.followUp}`}
+          </p>
+          <Listener
+            key={`${phase.turn.index}-${phase.turn.followUp}`}
+            state={phase.state}
+            voice={speechIn && !typing}
+            onMicBlocked={() => setTyping(true)}
+            onTypeInstead={() => setTyping(true)}
+            onAnswer={(text, seconds) => void answer(phase.turn, text, seconds)}
+            onPause={() => pause(phase.turn)}
+            onResume={() => resume(phase.turn)}
+            onEnd={end}
+            endLabel={answeredSoFar ? "End and get my report" : "End the interview"}
+          />
+          <Conversation lines={lines} />
+        </section>
       )}
 
       {phase.kind === "scoring" && (
-        <div className={`${card} flex items-center gap-3`} role="status">
-          <span aria-hidden="true" className="inline-block size-3 rounded-full bg-brand-700 motion-safe:animate-pulse" />
-          Scoring your interview. This takes up to a minute.
-        </div>
+        <>
+          <Stage state="thinking" label="Scoring your interview. This takes up to a minute." />
+          <Conversation lines={lines} />
+        </>
       )}
 
       {phase.kind === "report-failed" && (
         <div className="flex flex-col gap-3">
           <p role="alert" className="rounded-2xl bg-amber-50 p-3 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-            {phase.failure.message} {phase.failure.upgrade && <Link href={phase.failure.upgrade} className={textLink}>See Pro</Link>}
+            {phase.failure.message}{" "}
+            {phase.failure.upgrade && (
+              <Link href={phase.failure.upgrade} className={textLink}>
+                See Pro
+              </Link>
+            )}
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             {answeredSoFar && !phase.failure.upgrade && (
@@ -252,6 +356,225 @@ export function VoiceInterviewer({ questions, pathId, onExit }: { questions: Sim
 
       {phase.kind === "report" && <VoiceReportView report={phase.report} readiness={phase.readiness} onExit={onExit} />}
     </div>
+  );
+}
+
+// ---- the stage: one circle that shows who is talking ------------------------
+
+type StageState = "speaking" | "listening" | "thinking" | "paused";
+
+const STAGE_LABEL: Record<StageState, string> = {
+  speaking: "Interviewer is speaking",
+  listening: "Listening… pause for a moment when you are done",
+  thinking: "Thinking…",
+  paused: "Paused",
+};
+
+/** VI-7: a large circle in the centre, like a voice call. It moves only when motion is allowed (VI-5). */
+function Stage({ state, label }: { state: StageState; label?: string }) {
+  const ring =
+    state === "speaking"
+      ? "bg-brand-700 motion-safe:animate-pulse"
+      : state === "listening"
+        ? "bg-emerald-600"
+        : state === "thinking"
+          ? "bg-brand-500"
+          : "bg-zinc-400 dark:bg-zinc-600";
+  return (
+    <div className="flex flex-col items-center gap-3 py-2" role="status">
+      <div className="relative grid size-36 place-items-center" aria-hidden="true">
+        {state === "listening" && <span className="absolute inset-0 rounded-full bg-emerald-500/30 motion-safe:animate-ping" />}
+        {state === "thinking" && <span className="absolute inset-0 rounded-full border-4 border-dashed border-brand-400 motion-safe:animate-spin" />}
+        <span className={`relative size-28 rounded-full shadow-lg ${ring}`} />
+      </div>
+      <p className="text-center font-medium">{label ?? STAGE_LABEL[state]}</p>
+    </div>
+  );
+}
+
+// ---- the learner's turn ------------------------------------------------------
+
+/**
+ * Listens hands-free while it is the learner's turn: the microphone opens by itself, the words appear as
+ * a live caption, and a pause of SILENCE_MS sends them. "Send now", "Type instead", "Pause" and "End"
+ * are always one tap away. If the microphone cannot start without a tap (some phones), it asks for one.
+ */
+function Listener({
+  state,
+  voice,
+  onMicBlocked,
+  onTypeInstead,
+  onAnswer,
+  onPause,
+  onResume,
+  onEnd,
+  endLabel,
+}: {
+  state: StageState;
+  voice: boolean;
+  onMicBlocked: () => void;
+  onTypeInstead: () => void;
+  onAnswer: (text: string, seconds: number) => void;
+  onPause: () => void;
+  onResume: () => void;
+  onEnd: () => void;
+  endLabel: string;
+}) {
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const sent = useRef(false);
+  const onStart = useCallback(() => setStartedAt((s) => s ?? Date.now()), []);
+  const { text, setText, interim, listening, notice, start, abort } = useDictation({ onStart, onBlocked: onMicBlocked });
+  const said = joinText(text, interim).trim();
+
+  const send = useCallback(
+    (skip = false) => {
+      if (sent.current) return;
+      sent.current = true;
+      abort();
+      const seconds = startedAt === null ? 0 : Math.min(MAX_SECONDS, Math.round((Date.now() - startedAt) / 1000));
+      onAnswer(skip ? "" : said, seconds);
+    },
+    [abort, onAnswer, said, startedAt],
+  );
+
+  // The microphone opens by itself, once, when it is the learner's turn, and closes otherwise.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (state === "listening" && voice && !sent.current && !opened.current) {
+      opened.current = true;
+      start();
+    }
+    if (state !== "listening" && opened.current) {
+      opened.current = false;
+      abort();
+    }
+  }, [state, voice, start, abort]);
+
+  // VI-7: a pause ends the answer. Every new word restarts the clock.
+  useEffect(() => {
+    if (state !== "listening" || !voice || !said || sent.current) return;
+    const t = window.setTimeout(() => send(), SILENCE_MS);
+    return () => window.clearTimeout(t);
+  }, [said, state, voice, send]);
+
+  const myTurn = state === "listening";
+  return (
+    <div className="flex flex-col gap-4">
+      <Stage state={state} />
+
+      {myTurn && voice && (
+        <p className="min-h-14 rounded-2xl bg-zinc-100 p-3 text-center leading-7 dark:bg-zinc-900" aria-live="off">
+          {said || <span className={muted}>{listening ? "Go ahead, I'm listening." : "Starting the microphone…"}</span>}
+        </p>
+      )}
+
+      {myTurn && voice && !listening && !said && notice && (
+        <button type="button" onClick={start} className={`${primaryButton} self-center`}>
+          Tap to answer
+        </button>
+      )}
+
+      {notice && (
+        <p role="alert" className="rounded-2xl bg-amber-50 p-3 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          {notice}
+        </p>
+      )}
+
+      {myTurn && !voice && (
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (text.trim()) send();
+          }}
+        >
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Your answer</span>
+            <textarea
+              value={text}
+              onChange={(e) => {
+                onStart();
+                setText(e.target.value);
+              }}
+              rows={5}
+              placeholder="Type your answer as you would say it…"
+              className="rounded-2xl border border-zinc-400 bg-white p-3 leading-7 dark:border-zinc-600 dark:bg-zinc-950"
+            />
+          </label>
+          <button type="submit" className={primaryButton} disabled={!text.trim()}>
+            Send answer
+          </button>
+        </form>
+      )}
+
+      <div className="flex flex-wrap justify-center gap-2">
+        {myTurn && voice && said && (
+          <button type="button" onClick={() => send()} className={secondaryButton}>
+            Send now
+          </button>
+        )}
+        {myTurn && voice && (
+          <button type="button" onClick={onTypeInstead} className={secondaryButton}>
+            Type instead
+          </button>
+        )}
+        {myTurn && (
+          <button type="button" onClick={() => send(true)} className={secondaryButton}>
+            Skip
+          </button>
+        )}
+        {state === "paused" ? (
+          <button type="button" onClick={onResume} className={primaryButton}>
+            Resume
+          </button>
+        ) : (
+          state !== "thinking" && (
+            <button type="button" onClick={onPause} className={secondaryButton}>
+              Pause
+            </button>
+          )
+        )}
+        <button type="button" onClick={onEnd} className={secondaryButton}>
+          {endLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---- the conversation so far ---------------------------------------------------
+
+function Conversation({ lines }: { lines: Line[] }) {
+  // NV-4: the conversation scrolls inside its own box to the newest line; the page itself never moves.
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    if (list.current) list.current.scrollTop = list.current.scrollHeight;
+  }, [lines.length]);
+  if (lines.length === 0) return null;
+  return (
+    <section aria-labelledby="conversation-heading">
+      <h3 id="conversation-heading" className={`text-sm font-medium ${muted}`}>
+        Conversation
+      </h3>
+      <ol
+        ref={list}
+        tabIndex={0}
+        aria-labelledby="conversation-heading"
+        className="mt-2 flex max-h-80 flex-col gap-2 overflow-y-auto rounded-2xl p-1 focus-visible:outline-2 focus-visible:outline-brand-700"
+      >
+        {lines.map((l, i) => (
+          <li
+            key={i}
+            className={`max-w-[85%] rounded-2xl px-4 py-2 leading-7 ${
+              l.who === "ai" ? "self-start rounded-bl-sm bg-zinc-100 dark:bg-zinc-900" : "self-end rounded-br-sm bg-brand-700 text-white"
+            }`}
+          >
+            <span className="sr-only">{l.who === "ai" ? "Interviewer: " : "You: "}</span>
+            {l.text}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -282,122 +605,6 @@ function Stopped({ failure, onExit, onReport }: { failure: Failure; onExit: () =
         </button>
       </div>
     </div>
-  );
-}
-
-// ---- one question or follow-up --------------------------------------------
-
-function AnswerTurn({
-  turn,
-  total,
-  busy,
-  voice,
-  readAloud,
-  onMicBlocked,
-  onSubmit,
-  onEnd,
-  endLabel,
-}: {
-  turn: Turn;
-  total: number;
-  busy: boolean;
-  voice: boolean;
-  readAloud: boolean;
-  onMicBlocked: () => void;
-  onSubmit: (answer: string, seconds: number) => void;
-  onEnd: () => void;
-  endLabel: string;
-}) {
-  const heading = useRef<HTMLHeadingElement>(null);
-  const [startedAt, setStartedAt] = useState<number | null>(null);
-  const begin = useCallback(() => setStartedAt((s) => s ?? Date.now()), []);
-  const onStart = useCallback(() => {
-    stopSpeaking(); // never let the microphone hear the question being read
-    begin();
-  }, [begin]);
-  const { text, setText, interim, listening, notice, toggle, abort } = useDictation({ onStart, onBlocked: onMicBlocked });
-
-  useEffect(() => {
-    heading.current?.focus();
-    if (readAloud) speak(turn.asked);
-    return () => stopSpeaking();
-  }, [readAloud, turn.asked]);
-
-  const send = (skip = false) => {
-    if (busy) return;
-    abort();
-    const seconds = startedAt === null ? 0 : Math.min(MAX_SECONDS, Math.round((Date.now() - startedAt) / 1000));
-    onSubmit(skip ? "" : joinText(text, interim).trim(), seconds);
-  };
-
-  return (
-    <section aria-labelledby="turn-heading" className="flex flex-col gap-5">
-      <p className={`text-sm ${muted}`}>
-        Question {turn.index + 1} of {total}
-        {turn.followUp > 0 && ` · Follow-up ${turn.followUp} of up to 2`}
-      </p>
-      <h2 id="turn-heading" ref={heading} tabIndex={-1} className="text-2xl leading-9 font-semibold text-balance">
-        {turn.asked}
-      </h2>
-      {readAloud && (
-        <button type="button" onClick={() => speak(turn.asked)} className={`${secondaryButton} self-start`}>
-          Read it again
-        </button>
-      )}
-
-      {voice && (
-        <button
-          type="button"
-          onClick={toggle}
-          disabled={busy}
-          aria-pressed={listening}
-          className={`${listening ? "bg-rose-700 hover:bg-rose-800" : "bg-brand-700 hover:bg-brand-800"} inline-flex min-h-14 items-center justify-center gap-3 rounded-full px-6 py-3 text-lg font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60`}
-        >
-          <span aria-hidden="true" className={`inline-block size-3 rounded-full bg-white ${listening ? "motion-safe:animate-pulse" : ""}`} />
-          {listening ? "Stop the microphone" : text ? "Speak more" : "Start speaking"}
-        </button>
-      )}
-
-      {notice && (
-        <p role="alert" className="rounded-2xl bg-amber-50 p-3 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          {notice}
-        </p>
-      )}
-
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Your answer{voice ? " (you can edit it)" : ""}</span>
-        <textarea
-          value={listening ? joinText(text, interim) : text}
-          readOnly={listening || busy}
-          onChange={(e) => {
-            begin();
-            setText(e.target.value);
-          }}
-          rows={6}
-          placeholder={voice ? "Press “Start speaking” and answer out loud…" : "Type your answer as you would say it…"}
-          className="rounded-2xl border border-zinc-400 bg-white p-3 leading-7 dark:border-zinc-600 dark:bg-zinc-950"
-        />
-      </label>
-
-      {busy ? (
-        <p className={`${card} flex items-center gap-3`} role="status">
-          <span aria-hidden="true" className="inline-block size-3 rounded-full bg-brand-700 motion-safe:animate-pulse" />
-          The interviewer is thinking of a follow-up…
-        </p>
-      ) : (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <button type="button" onClick={() => send()} className={primaryButton}>
-            Submit answer
-          </button>
-          <button type="button" onClick={() => send(true)} className={secondaryButton}>
-            {turn.followUp ? "Skip this follow-up" : "Skip this question"}
-          </button>
-          <button type="button" onClick={onEnd} className={secondaryButton}>
-            {endLabel}
-          </button>
-        </div>
-      )}
-    </section>
   );
 }
 
