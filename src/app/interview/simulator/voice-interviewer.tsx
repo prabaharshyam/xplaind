@@ -19,7 +19,8 @@ import { type Mic, canRecord, closeMic, openMic, useVoiceCapture } from "@/compo
  */
 
 type Item = { questionId: string; exchanges: Exchange[] };
-type Turn = { index: number; asked: string; followUp: number };
+/** VI-14: clarify marks a turn where she explained the question; it does not count as a follow-up. */
+type Turn = { index: number; asked: string; followUp: number; clarify?: boolean };
 type Failure = { message: string; upgrade?: string; signin?: boolean };
 /** One spoken line: its words, and a URL for its natural voice (null: the browser reads it). */
 type Spoken = { text: string; audio: string | null };
@@ -226,7 +227,7 @@ export function VoiceInterviewer({
   };
 
   const answer = async (turn: Turn, text: string, seconds: number) => {
-    const all = items.map((it, i) => (i === turn.index ? { ...it, exchanges: [...it.exchanges, { asked: turn.asked, answer: text, seconds }] } : it));
+    const all = items.map((it, i) => (i === turn.index ? { ...it, exchanges: [...it.exchanges, { asked: turn.asked, answer: text, seconds, ...(turn.clarify ? { clarify: true } : {}) }] } : it));
     setItems(all);
     if (!text.trim()) return nextQuestion(turn.index, all);
     setLines((l) => [...l, { who: "me", text }]);
@@ -241,10 +242,14 @@ export function VoiceInterviewer({
         const failure = await failureFrom(res);
         return setPhase({ kind: "stopped", failure });
       }
-      const data = (await res.json()) as { follow_up: string | null; audio?: string | null };
+      const data = (await res.json()) as { follow_up: string | null; audio?: string | null; clarify?: boolean };
       await ack;
       if (!live.current) return;
-      if (data.follow_up) await speakThenListen({ index: turn.index, asked: data.follow_up, followUp: turn.followUp + 1 }, { text: data.follow_up, audio: data.audio ?? null });
+      if (data.follow_up)
+        await speakThenListen(
+          { index: turn.index, asked: data.follow_up, followUp: turn.followUp + (data.clarify ? 0 : 1), clarify: data.clarify },
+          { text: data.follow_up, audio: data.audio ?? null },
+        );
       else nextQuestion(turn.index, all);
     } catch {
       await ack;
@@ -310,7 +315,7 @@ export function VoiceInterviewer({
           <CallFrame index={phase.turn.index} total={questions.length} followUp={phase.turn.followUp} startedAt={startedAt}>
             <Focal state={phase.state} line={phase.line} />
             <Listener
-              key={`${phase.turn.index}-${phase.turn.followUp}`}
+              key={`${phase.turn.index}-${phase.turn.followUp}-${phase.turn.asked}`}
               state={phase.state}
               voice={(!!mic || speechIn) && !typing}
               mic={mic}

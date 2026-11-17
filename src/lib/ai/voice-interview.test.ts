@@ -10,6 +10,9 @@ import {
   cleanTurn,
   communicationScore,
   turnDecision,
+  asksForHelp,
+  followUpsAsked,
+  MAX_CLARIFICATIONS,
   verdictFor,
   VERDICT_LABEL,
   deliveryOf,
@@ -44,8 +47,10 @@ describe("requests (VI-1)", () => {
     expect(VoiceTurnRequest.safeParse({ questionId: "what-is-rag", exchanges: [ex("a"), ex("b", "f1"), ex("c", "f2")] }).success).toBe(true);
   });
 
-  it("refuses more than two follow-ups, extra fields, an empty question id and a repeated question", () => {
-    expect(VoiceTurnRequest.safeParse({ questionId: "x", exchanges: [ex("a"), ex("b"), ex("c"), ex("d")] }).success).toBe(false);
+  it("refuses more than two follow-ups and two explanations, extra fields, an empty question id and a repeated question", () => {
+    // VI-14: the main question, 2 follow-ups and 2 explanations of the question at most.
+    expect(VoiceTurnRequest.safeParse({ questionId: "x", exchanges: [ex("a"), ex("b"), ex("c"), ex("d"), ex("e")] }).success).toBe(true);
+    expect(VoiceTurnRequest.safeParse({ questionId: "x", exchanges: [ex("a"), ex("b"), ex("c"), ex("d"), ex("e"), ex("f")] }).success).toBe(false);
     expect(VoiceTurnRequest.safeParse({ questionId: "x", exchanges: [ex("a")], audio: "..." }).success).toBe(false);
     expect(VoiceTurnRequest.safeParse({ questionId: "", exchanges: [ex("a")] }).success).toBe(false);
     const item = { questionId: "x", exchanges: [ex("a")] };
@@ -68,21 +73,58 @@ describe("when to ask a follow-up (VI-1)", () => {
   });
 
   it("always asks a first follow-up: if the model declines, the bank's follow-up is used", () => {
-    expect(cleanTurn({ follow_up: "You said chunks; how big would you make them, and why?", done: false }, q, [ex("We use chunks")])).toBe(
-      "You said chunks; how big would you make them, and why?",
-    );
-    expect(cleanTurn({ follow_up: "", done: true }, q, [ex("We use chunks")])).toBe(q.follow_ups[0]);
+    expect(cleanTurn({ follow_up: "You said chunks; how big would you make them, and why?", done: false, clarify: false }, q, [ex("We use chunks")])).toEqual({
+      line: "You said chunks; how big would you make them, and why?",
+      clarify: false,
+    });
+    expect(cleanTurn({ follow_up: "", done: true, clarify: false }, q, [ex("We use chunks")])).toEqual({ line: q.follow_ups[0], clarify: false });
   });
 
   it("stops after the first follow-up when the model says one more adds nothing", () => {
-    expect(cleanTurn({ follow_up: "", done: true }, q, [ex("a"), ex("b", "f1")])).toBeNull();
+    expect(cleanTurn({ follow_up: "", done: true, clarify: false }, q, [ex("a"), ex("b", "f1")])).toBeNull();
   });
 
   it("keeps a follow-up to one short line and picks an unasked bank follow-up", () => {
-    const long = cleanTurn({ follow_up: `Why?\n\n${"x".repeat(500)}`, done: false }, q, [ex("a")]);
+    const long = cleanTurn({ follow_up: `Why?\n\n${"x".repeat(900)}`, done: false, clarify: false }, q, [ex("a")])!.line;
     expect(long).not.toMatch(/\n/);
-    expect(long!.length).toBeLessThanOrEqual(300);
+    expect(long.length).toBeLessThanOrEqual(500);
     expect(bankFollowUp(q, [ex("a"), ex("b", q.follow_ups[0])])).toBe(q.follow_ups[1]);
+  });
+});
+
+describe("when the candidate asks her to explain the question (VI-14)", () => {
+  const help = "I don't understand the question at all. Could you please explain this?";
+  const explained = "Sure. Think of it as a big model teaching a small one. What would each do, and why bother?";
+
+  it("hears a request for help, and does not mistake an answer for one", () => {
+    expect(asksForHelp(help)).toBe(true);
+    expect(asksForHelp("Sorry, can you repeat the question?")).toBe(true);
+    expect(asksForHelp("What do you mean by teacher and student?")).toBe(true);
+    expect(asksForHelp("I would split documents into chunks of about 300 tokens.")).toBe(false);
+  });
+
+  it("explains instead of moving on, even after both follow-ups, as the owner saw happen", () => {
+    const used = [ex("a"), ex("b", "f1"), ex(help, "f2")];
+    expect(turnDecision(used)).toBe("clarify");
+    expect(cleanTurn({ follow_up: explained, done: false, clarify: true }, q, used)).toEqual({ line: explained, clarify: true });
+    // A plain answer after both follow-ups still moves on, with no model call.
+    expect(turnDecision([ex("a"), ex("b", "f1"), ex("c", "f2")])).toBe("done");
+  });
+
+  it("does not count an explanation as a follow-up, and explains at most twice a question", () => {
+    const once = [ex(help), { ...ex("an answer", explained), clarify: true }];
+    expect(followUpsAsked(once)).toBe(0);
+    expect(turnDecision(once)).toBe("ask");
+    const twice = [ex(help), { ...ex(help, explained), clarify: true }, { ...ex(help, explained), clarify: true }, ex("b", "f1"), ex(help, "f2")];
+    expect(MAX_CLARIFICATIONS).toBe(2);
+    expect(turnDecision(twice)).toBe("done");
+    expect(cleanTurn({ follow_up: explained, done: false, clarify: true }, q, [ex(help), { ...ex(help, explained), clarify: true }, { ...ex(help, explained), clarify: true }])?.clarify).toBe(false);
+  });
+
+  it("tells the model to help when asked, and labels an explanation in the transcript", () => {
+    const { system, messages } = voiceTurnPrompt(q, [ex(help), { ...ex("an answer", explained), clarify: true }]);
+    expect(system).toMatch(/Never move on or ask something new when they asked for help/);
+    expect(messages[0].content).toMatch(/The interviewer explained the question/);
   });
 });
 

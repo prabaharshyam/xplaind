@@ -670,6 +670,33 @@ test("signed out, the page offers the free AI interview, which starts with an ac
   await expect(page.getByRole("button", { name: "Start my free AI interview" })).toBeVisible();
 });
 
+test("asked to explain her question, she explains it and asks again, without using up a follow-up (VI-14)", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(fakeSpeechOut);
+  await page.addInitScript(fakeMicrophone, [
+    "I don't understand the question at all. Could you please explain this?",
+    "Oh I see. We retrieve relevant chunks and add them to the prompt.",
+  ]);
+  await startRoute(page);
+  const EXPLAINED = "Sure. It is about giving a model facts it was not trained on. How would you do that for a company's own documents?";
+  const turns: { exchanges: { asked: string; answer: string; clarify?: boolean }[] }[] = [];
+  await page.route("**/api/ai/voice/turn", async (route) => {
+    turns.push(route.request().postDataJSON());
+    await route.fulfill({ json: turns.length === 1 ? { follow_up: EXPLAINED, audio: null, clarify: true } : { follow_up: null } });
+  });
+  await page.route("**/api/ai/voice/report", (route) => route.fulfill({ json: report }));
+  await page.goto("/interview/simulator?question=what-is-rag");
+  await page.getByRole("button", { name: /Start the AI interviewer|Start my free AI interview/ }).click();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  const call = page.getByRole("dialog", { name: "Zarina" });
+  await expect(call.getByText(EXPLAINED).first()).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => spoken(page)).toContain(EXPLAINED);
+  // An explanation is not a follow-up: the counter does not move.
+  await expect(call.getByText("Question 1 of 1", { exact: true })).toBeVisible();
+  await expect.poll(() => turns.length, { timeout: 20_000 }).toBe(2);
+  expect(turns[1].exchanges[1]).toMatchObject({ asked: EXPLAINED, clarify: true, answer: expect.stringMatching(/retrieve relevant chunks/) });
+});
+
 test("when the plan is refused, the reason and the way to Pro are shown (VI-11)", async ({ page }) => {
   await page.route("**/api/ai/voice/plan", (route) => route.fulfill({ status: 403, json: { error: "The AI voice interviewer is part of Pro.", upgrade: "/pricing" } }));
   await page.goto("/interview/simulator");

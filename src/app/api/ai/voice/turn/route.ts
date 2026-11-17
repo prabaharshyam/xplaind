@@ -7,12 +7,14 @@ import { body } from "@/lib/ai/route";
 import { runAi } from "@/lib/ai/run";
 import { lineUrl } from "@/lib/ai/tts";
 import { trialLeft, trialUsed, voiceAccess } from "@/lib/ai/voice-access";
-import { VOICE_BURST, VoiceTurnRequest, bankFollowUp, cleanTurn, turnDecision, voiceTurnPrompt } from "@/lib/ai/voice-interview";
+import { VOICE_BURST, VoiceTurnRequest, asksForHelp, bankFollowUp, cleanTurn, followUpsAsked, turnDecision, voiceTurnPrompt } from "@/lib/ai/voice-interview";
 import { interviewFrom } from "@/lib/ai/voice-plan-server";
 
 export const maxDuration = 60;
 
-const reply = (followUp: string | null) => json(followUp ? { follow_up: followUp, audio: lineUrl(followUp) } : { follow_up: null });
+/** VI-14: clarify marks a line that explains the question (it is not a follow-up, so none is used up). */
+const reply = (followUp: string | null, clarify = false) =>
+  json(followUp ? { follow_up: followUp, audio: lineUrl(followUp), ...(clarify ? { clarify: true } : {}) } : { follow_up: null });
 
 export async function POST(request: Request) {
   const access = await voiceAccess();
@@ -41,7 +43,11 @@ export async function POST(request: Request) {
     // carries on with a follow-up from the question bank instead of stopping.
     // VI-13: in the free interview, a spent turn allowance moves on the same way, never an upgrade prompt mid-answer.
     if (out.status < 500 && out.status !== 422 && !(access.trial && out.status === 429)) return out;
-    return reply(req.exchanges.length === 1 ? bankFollowUp(q, req.exchanges) : null);
+    // VI-14: if they asked for help, at least ask the question again rather than moving on.
+    const last = req.exchanges[req.exchanges.length - 1].answer;
+    if (asksForHelp(last) && !req.exchanges.some((e) => e.clarify)) return reply(`Sure, let me ask it again. ${q.question}`, true);
+    return reply(followUpsAsked(req.exchanges) === 0 ? bankFollowUp(q, req.exchanges) : null);
   }
-  return reply(cleanTurn(out.data, q, req.exchanges));
+  const next = cleanTurn(out.data, q, req.exchanges);
+  return reply(next?.line ?? null, next?.clarify);
 }
