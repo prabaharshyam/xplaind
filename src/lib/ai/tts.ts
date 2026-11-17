@@ -4,7 +4,8 @@
 // fixed lead-ins, the model's follow-ups), so the browser cannot use this to voice any text it likes.
 // The learner's voice never goes here (VI-2). Without SARVAM_API_KEY the browser's own voice is used.
 
-export const SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 export const DEFAULT_VOICE = "zarina_en_conversation";
 export const TTS_MODEL = "bulbul:v4-flash";
 /** Sarvam allows 2,500 characters a request; an interviewer line is far shorter. */
@@ -45,20 +46,55 @@ export function ttsBody(text: string, voice: string) {
   };
 }
 
-/** One line as MP3 audio, or null if the voice service is off or fails (the browser then speaks instead). */
-export async function synthesize(text: string, settings: TtsSettings | null = ttsSettings()): Promise<Buffer | null> {
-  if (!settings || !speakable(text)) return null;
+// ---- streaming (VI-8) -------------------------------------------------------
+// Sarvam's HTTP stream sends the first audio in about half a second instead of about 2.5 seconds for the
+// whole file. The browser plays it from a signed URL as it arrives: the server signs each line it wrote,
+// so the voice route needs no database call and cannot be used to voice any other text.
+
+export const SARVAM_STREAM_URL = "https://api.sarvam.ai/text-to-speech/stream";
+/** How long a signed line can be played: one interview, with room for pauses. */
+export const LINE_TTL_MS = 45 * 60 * 1000;
+
+const b64url = (b: Buffer) => b.toString("base64url");
+
+/** A token for one line: the text and its expiry, signed with the voice key. Node only. */
+export function signLine(text: string, secret: string, now = Date.now()): string {
+  const payload = b64url(Buffer.from(JSON.stringify({ t: speakable(text), e: now + LINE_TTL_MS })));
+  const sig = b64url(createHmac("sha256", secret).update(payload).digest());
+  return `${payload}.${sig}`;
+}
+
+/** The line a token carries, or null if it was not signed by us or has expired. Node only. */
+export function verifyLine(token: string, secret: string, now = Date.now()): string | null {
+  const [payload, sig] = token.split(".");
+  if (!payload || !sig) return null;
+  const expected = createHmac("sha256", secret).update(payload).digest();
+  const given = Buffer.from(sig, "base64url");
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
-    const res = await fetch(SARVAM_TTS_URL, {
+    const { t, e } = JSON.parse(Buffer.from(payload, "base64url").toString()) as { t?: unknown; e?: unknown };
+    return typeof t === "string" && typeof e === "number" && e > now && t ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The URL the browser plays a line from, or null when the voice service is off (the browser speaks). */
+export function lineUrl(text: string, settings: TtsSettings | null = ttsSettings()): string | null {
+  return settings ? `/api/ai/voice/say?t=${signLine(text, settings.apiKey)}` : null;
+}
+
+/** Sarvam's streamed MP3 for one line, or null if it fails. */
+export async function streamSpeech(text: string, settings: TtsSettings | null = ttsSettings()): Promise<Response | null> {
+  if (!settings) return null;
+  try {
+    const res = await fetch(SARVAM_STREAM_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "api-subscription-key": settings.apiKey },
       body: JSON.stringify(ttsBody(text, settings.voice)),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(20_000),
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { audios?: string[] };
-    const audio = data.audios?.[0];
-    return audio ? Buffer.from(audio, "base64") : null;
+    return res.ok && res.body ? res : null;
   } catch {
     return null;
   }

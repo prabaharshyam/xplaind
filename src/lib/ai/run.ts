@@ -21,7 +21,7 @@ import {
   tokenUses,
 } from "./limits";
 import { aiSettings } from "./settings";
-import { aiCaller, allowanceToday, limitFor, onTrial } from "./who";
+import { type Caller, aiCaller, allowanceToday, limitFor, onTrial } from "./who";
 import { bump } from "@/lib/funnel";
 import type { Tier } from "@/lib/billing/plans";
 
@@ -39,6 +39,8 @@ export type AiRequest<S extends z.ZodType> = {
   burst?: number;
   /** Which model to use, when a feature needs both (VI-3). Default: by kind, see modelFor. */
   model?: "fast" | "main";
+  /** VI-8: the caller when the route already looked it up, so a turn makes one account lookup, not two. */
+  caller?: Caller;
 };
 
 /** Runs one guarded call. Returns the checked output, or a Response to send back as is. */
@@ -50,7 +52,7 @@ export async function runAi<S extends z.ZodType>(
 
   const admin = serviceClient();
   if (!admin) return problem(503, LIMIT_MESSAGE.off);
-  const who = await aiCaller(admin);
+  const who = req.caller ?? (await aiCaller(admin));
 
   const burst = await rateLimit(admin, `ai:${who.id}`, 60, req.burst ?? 6);
   if (burst) return burst;

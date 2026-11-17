@@ -104,15 +104,22 @@ const fakeMicrophone = (answers: string[]) => {
   }
 };
 
-/** The voice route without a voice key: no audio, just the line for the browser to read (status 204). */
-const speakRoute = (page: Page, lines: string[]) =>
-  page.route("**/api/ai/voice/speak", async (route) => {
-    const body = route.request().postDataJSON() as { line: string };
-    lines.push(body.line);
-    await route.fulfill({ status: 204, headers: { "x-say": encodeURIComponent(body.line === "closing" ? "That's the end of the interview." : OPENING) } });
+/** The start route without a voice key: every line with no audio, so the browser's own voice reads it. */
+const startRoute = (page: Page, calls: unknown[] = []) =>
+  page.route("**/api/ai/voice/start", async (route) => {
+    calls.push(route.request().postDataJSON());
+    await route.fulfill({
+      json: {
+        questions: [{ text: OPENING, audio: null }],
+        acks: [{ text: "Okay.", audio: null }, { text: "Mm-hm.", audio: null }],
+        closing: { text: "That's the end of the interview.", audio: null },
+      },
+    });
   });
 
-test("a hands-free conversation: the interviewer speaks, listens, sends on a pause, follows up and reports (VI-1, VI-2, VI-4, VI-7)", async ({ page }) => {
+const spoken = (page: Page) => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken);
+
+test("a call that runs itself: the interviewer speaks, listens, sends on a pause, says okay, follows up and reports (VI-1, VI-2, VI-4, VI-7, VI-8)", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(fakeSpeechOut);
   await page.addInitScript(fakeMicrophone, [
@@ -120,18 +127,14 @@ test("a hands-free conversation: the interviewer speaks, listens, sends on a pau
     "Small enough to stay on one idea, around 300 tokens, and I would test it.",
   ]);
   const sent: { url: string; body: unknown }[] = [];
-  const spokenLines: string[] = [];
-  await page.route("**/api/ai/voice", (route) => {
-    sent.push({ url: "check", body: null });
-    return route.fulfill({ json: { ok: true } });
-  });
-  await speakRoute(page, spokenLines);
+  const starts: unknown[] = [];
+  await startRoute(page, starts);
   let turns = 0;
   await page.route("**/api/ai/voice/turn", async (route) => {
     sent.push({ url: "turn", body: route.request().postDataJSON() });
     turns++;
-    await new Promise((r) => setTimeout(r, 300)); // long enough to see the "thinking" state
-    await route.fulfill({ json: turns === 1 ? { follow_up: FOLLOW_UP, say: `Okay, got it. ${FOLLOW_UP}`, audio: null } : { follow_up: null } });
+    await new Promise((r) => setTimeout(r, 1500)); // long enough to see the "thinking" state
+    await route.fulfill({ json: turns === 1 ? { follow_up: FOLLOW_UP, audio: null } : { follow_up: null } });
   });
   await page.route("**/api/ai/voice/report", async (route) => {
     sent.push({ url: "report", body: route.request().postDataJSON() });
@@ -145,34 +148,36 @@ test("a hands-free conversation: the interviewer speaks, listens, sends on a pau
   await expect(page.getByRole("heading", { level: 2, name: "Before you start" })).toBeVisible();
   await expect(page.getByText(/Only that text \(the transcript\) is sent to our AI/)).toBeVisible();
   await expect(page.getByText(/voice is made by Sarvam AI/)).toBeVisible();
-  expect(sent).toEqual([]);
+  expect(starts).toEqual([]);
   expect((await wcag(page)).violations).toEqual([]);
   await page.getByRole("button", { name: "I agree, start the interview" }).click();
 
-  // The interviewer speaks the opening line (here with the browser's voice, since the mock sends no audio).
-  const conversation = page.getByRole("region", { name: "Conversation" });
-  await expect(conversation.getByRole("listitem").first()).toContainText("Hi, I'm your AI interviewer");
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken)).toContainEqual(expect.stringMatching(/Hi, I'm your AI interviewer/));
-  expect(spokenLines).toContain("question");
+  // The call: the interviewer's line is the focal text and is spoken (here by the browser's voice: no audio URL).
+  const call = page.getByRole("dialog", { name: "Zarina" });
+  await expect(call.getByText(/What is RAG/).first()).toBeVisible(); // the question, large; the full line is in the transcript
+  await expect(call.getByRole("heading", { name: "Zarina" })).toBeFocused();
+  expect(starts).toEqual([{ questionIds: ["what-is-rag"] }]);
+  await expect.poll(() => spoken(page)).toContain(OPENING);
 
-  // Hands-free: the microphone opens by itself, the words show as a caption, and a pause sends them. No taps.
-  await expect(page.getByText("Basically we retrieve relevant chunks", { exact: false }).first()).toBeVisible();
-  expect((await wcag(page)).violations).toEqual([]);
+  // Hands-free: the microphone opens by itself, the caption shows the words, and a pause sends them. No taps.
+  await expect(call.getByText("Basically we retrieve relevant chunks", { exact: false })).toBeVisible();
   expect(await overflow(page)).toBe(false);
-  await expect(page.getByRole("status").filter({ hasText: "Thinking" })).toBeVisible({ timeout: 6000 });
-  // Reduced motion: the thinking ring does not spin.
-  expect(await page.locator(".motion-safe\\:animate-spin").first().evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  expect((await wcag(page)).violations).toEqual([]);
+  await expect(page.getByRole("status").filter({ hasText: "Zarina is thinking" })).toBeVisible({ timeout: 6000 });
+  // VI-8: an instant "Okay" while the follow-up is written. Reduced motion: the thinking dots stay still.
+  await expect.poll(() => spoken(page)).toContain("Okay.");
+  expect(await page.locator('[class*="xp-think"]').first().evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
 
-  // A follow-up about what was said, with a short natural reaction first.
-  await expect(conversation.getByText(`Okay, got it. ${FOLLOW_UP}`)).toBeVisible();
-  await expect(page.getByText("Question 1 of 1 · follow-up 1")).toBeVisible();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken)).toContain(`Okay, got it. ${FOLLOW_UP}`);
+  // A follow-up about what was said.
+  await expect(call.getByText(FOLLOW_UP).first()).toBeVisible();
+  await expect(call.getByText("Question 1 of 1 · follow-up 1")).toBeVisible();
+  await expect.poll(() => spoken(page)).toContain(FOLLOW_UP);
 
   // The second answer is also sent on a pause, then the report.
-  await expect(page.getByRole("heading", { name: "Your AI interview report" })).toBeFocused({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Your AI interview report" })).toBeFocused({ timeout: 12_000 });
   await expect(page.getByRole("meter", { name: "Interview score" })).toHaveAttribute("aria-valuenow", "72");
   await expect(page.getByText("You said: “we retrieve relevant chunks”")).toBeVisible();
-  expect(spokenLines).toContain("closing");
+  await expect.poll(() => spoken(page)).toContain("That's the end of the interview.");
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 
@@ -183,9 +188,33 @@ test("a hands-free conversation: the interviewer speaks, listens, sends on a pau
   expect(JSON.stringify(sent)).not.toMatch(/audio|blob|base64/i);
 });
 
+test("trailing off waits longer, warns before sending, and Hold on waits for Done (VI-8)", async ({ page }) => {
+  await page.addInitScript(fakeSpeechOut);
+  await page.addInitScript(fakeMicrophone, ["We split the documents into chunks and"]);
+  await startRoute(page);
+  const turns: { exchanges: { answer: string }[] }[] = [];
+  await page.route("**/api/ai/voice/turn", (route) => {
+    turns.push(route.request().postDataJSON());
+    return route.fulfill({ json: { follow_up: null } });
+  });
+  await page.route("**/api/ai/voice/report", (route) => route.fulfill({ json: report }));
+  await page.goto("/interview/simulator?question=what-is-rag");
+  await page.getByRole("button", { name: "Start the AI interviewer" }).click();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  const hold = page.getByRole("button", { name: "Hold on, I'm not done" });
+  await expect(page.getByText("Sending in a moment…")).toBeVisible({ timeout: 6000 });
+  await hold.click();
+  await expect(page.getByText("Take your time. Tap Done when you finish.")).toBeVisible();
+  await page.waitForTimeout(3000);
+  expect(turns).toEqual([]); // held: nothing was sent
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect.poll(() => turns.length).toBe(1);
+  expect(turns[0].exchanges[0].answer).toMatch(/chunks and$/);
+});
+
 test("a learner without Pro is told before answering anything (VI-3)", async ({ page }) => {
   let turns = 0;
-  await page.route("**/api/ai/voice", (route) =>
+  await page.route("**/api/ai/voice/start", (route) =>
     route.fulfill({ status: 403, json: { error: "The AI voice interviewer is part of Pro.", upgrade: "/pricing" } }),
   );
   await page.route("**/api/ai/voice/turn", (route) => {
@@ -227,8 +256,7 @@ test("when the microphone is blocked, the learner is told plainly and can type i
     }
   });
   const turns: unknown[] = [];
-  await page.route("**/api/ai/voice", (route) => route.fulfill({ json: { ok: true } }));
-  await speakRoute(page, []);
+  await startRoute(page);
   await page.route("**/api/ai/voice/turn", (route) => {
     turns.push(route.request().postDataJSON());
     return route.fulfill({ json: { follow_up: null } });

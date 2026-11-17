@@ -71,8 +71,8 @@ export function turnDecision(exchanges: readonly Exchange[]): "ask" | "done" {
 
 // ------------------------------------------------------------- follow-ups --
 
-/** The model's answer for one turn. Kept loose: limits are applied in cleanTurn and cleanAck. */
-export const VoiceTurnOutput = z.object({ ack: z.string(), follow_up: z.string(), done: z.boolean() });
+/** The model's answer for one turn. Kept loose: limits are applied in cleanTurn. */
+export const VoiceTurnOutput = z.object({ follow_up: z.string(), done: z.boolean() });
 export type VoiceTurnOutput = z.infer<typeof VoiceTurnOutput>;
 
 const transcript = (q: VoiceQuestion, exchanges: readonly Exchange[]) =>
@@ -91,7 +91,7 @@ export function voiceTurnPrompt(q: VoiceQuestion, exchanges: readonly Exchange[]
     HOUSE_STYLE,
     DATA_RULE,
     "Ask exactly one follow-up question that probes what the candidate actually said in their answers: ask them to go deeper on a point they made, justify a claim, give a concrete example from a real product or project, or cover one rubric point they left out. Refer to their words where it helps.",
-    "Talk like a friendly, professional human interviewer on a call. ack is a short, natural spoken reaction of 2 to 8 words, such as \"Okay, got it.\" or \"Right, thanks for that.\" or \"I see.\". It must never say whether the answer was right or good, never praise or criticise, and never repeat the answer back.",
+    "Talk like a friendly, professional human interviewer on a call. The candidate has just heard a short \"Okay\" or \"Mm-hm\" from you, so do not start with another acknowledgement, and never say whether the answer was right or good.",
     "follow_up: do not coach, hint at, or give the answer. One or two short sentences, at most 35 words, plain spoken English with no lists, symbols or code, as you would say it out loud.",
     first
       ? "This is the first follow-up, so you must ask one: set done to false."
@@ -109,16 +109,28 @@ export function voiceTurnPrompt(q: VoiceQuestion, exchanges: readonly Exchange[]
 
 const oneLine = (s: string, n: number) => s.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
-/** The short spoken reaction before a follow-up: one line, no judging words. Pure. */
-export function cleanAck(ack: string): string {
-  const line = oneLine(ack, 60);
-  const judging = /\b(great|good|excellent|perfect|correct|wrong|right answer|well done|nice|incorrect)\b/i;
-  if (!line || line.split(" ").length > 10 || judging.test(line)) return "Okay.";
-  return /[.!?]$/.test(line) ? line : `${line}.`;
-}
+/**
+ * VI-8: short reactions the interviewer says the moment an answer is sent, while the follow-up is being
+ * written, as a person would. Never judging: no "great" or "good".
+ */
+export const ACK_LINES = ["Okay.", "Mm-hm.", "Got it.", "Right, okay.", "I see."] as const;
 
-/** What the interviewer says for a follow-up: the reaction, then the question. Pure. */
-export const followUpLine = (ack: string, followUp: string) => `${cleanAck(ack)} ${followUp}`;
+/** Words after which a speaker is clearly mid-thought: wait longer before sending. */
+const TRAILING = /\b(and|but|so|because|or|then|like|um+|uh+|er+|which|that|the|a|an|to|of|for|with|if|when|is|are|was|basically|actually|i mean|you know)$/i;
+
+/**
+ * VI-8: how long a pause ends the learner's answer, from what they have said so far. A trailing "and",
+ * "so" or "um", or a very short answer, means they are still thinking: wait longer. A long answer that
+ * ends cleanly can go sooner. Pure, for tests.
+ */
+export function pauseToSend(said: string): number {
+  const text = said.trim().toLowerCase().replace(/[.,!?;:]+$/, "");
+  const words = text ? text.split(/\s+/).length : 0;
+  if (!words) return Infinity;
+  if (TRAILING.test(text) || said.trim().endsWith(",")) return 4500;
+  if (words < 6) return 3500;
+  return words >= 25 ? 2000 : 2600;
+}
 
 /**
  * What the interviewer says to ask a bank question: a short welcome before the first, a natural lead-in

@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const asked = items as AskedItem[];
   if (!asked.some((it) => it.exchanges.some((e) => e.answer.trim()))) return problem(400, "Answer at least one question to get a report.");
 
-  const out = await runAi({ kind: "voice", model: "main", ...voiceReportPrompt(asked), maxTokens: 12_000, effort: "low", burst: VOICE_BURST });
+  const out = await runAi({ kind: "voice", model: "main", caller: access.who, ...voiceReportPrompt(asked), maxTokens: 12_000, effort: "low", burst: VOICE_BURST });
   if (out instanceof Response) return out;
   const report = buildVoiceReport(out.data, asked);
 
