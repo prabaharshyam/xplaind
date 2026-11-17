@@ -426,6 +426,7 @@ Build decision: editorial content (levels, stops, resources, questions, books, l
 | ED-7 | Status 2026-11-09: not built yet. Review page at /admin, open only to emails in an allowlist setting. It lists broken and unknown links, stale items, expired prices and unreviewed questions, each with a link to the file on GitHub. Read-only in release 1 | Anyone not on the allowlist gets a 404 |
 | ED-8 | A command, content:validate, checks schemas, references (every stop points to real resources), counts per level, review fields, the price cap, and hosted\_by on PDF links. It runs in CI and blocks the merge | A deliberately broken fixture fails the command |
 | ED-9 | AI-assisted drafts of questions or lessons are allowed but flagged drafted\_with\_ai and need a human review before publishing | The publish check reads reviewed\_by and reviewed\_on |
+| ED-10 | No draft labels on the site (2026-11-17, owner: "I have reviewed each and every page of the platform. Remove the disclaimer and make sure there is none in the entire site"). The "Draft: written with AI help" note is removed from every page and its component deleted. The 61 records still marked UNREVIEWED (cheatsheets, glossary terms, interview patterns and designs) now carry the owner's sign-off, reviewed_on 2026-11-17, so IQ-6 and ED-9 still hold: new AI-drafted records start UNREVIEWED and need his sign-off before they are published. | Must | Built |
 
 ## Data model
 

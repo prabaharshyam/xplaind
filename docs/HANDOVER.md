@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-17, after one free 2-question AI interview per account (VI-13)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-17, after removing draft labels site-wide on the owner's sign-off (ED-10)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
@@ -66,7 +66,7 @@ How he works with Claude:
 - He answers questions briefly. Prefer one clear recommendation over a menu. Ask only when the answer changes what you do.
 - He often reads or listens on a phone or while driving: plain sentences, short paragraphs, no heavy formatting in chat replies.
 - He wants minimal, clean UI, in the spirit of DataCamp (the reference he named), with fewer badges and less text. Keep the home page road and the particle headers; the rest is plain white or dark pages with flat cards.
-- He cares about **honesty**. Real testimonials only (he supplied five), never invented reviews or stats. The AI-drafted content is flagged until he reviews it.
+- He cares about **honesty**. Real testimonials only (he supplied five), never invented reviews or stats. AI-drafted content needs his review before it is published; on 17 Nov he signed off every page and asked for all draft labels to go (ED-10).
 - He buys domains and tools he does not end up using, so keep scope tight and avoid waste.
 - Never ask learners their background (IT, marketing). The placement test finds the level. Ask only goal and weekly hours.
 - Prefer free and very low-cost courses (the price cap in the content rules is 900 rupees, `PRICE_CAP_INR`), and make the value feel high.
@@ -408,6 +408,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **15 to 16 Nov (PR 86 to 95):** every lesson translated into Tamil, Hindi, Tanglish and Hinglish (LT-1): the pilot (PR 86), eight batches of Tamil and Hindi (PR 87 to 93, 161 lessons), the last 45 Tamil and Hindi lessons (PR 94) and the remaining 165 Tanglish and Hinglish lessons (PR 95). The build moved to a second Claude account partway through (16 Nov), and the last two passes ran as parallel Sonnet sub-agents.
 - **17 Nov (mock interview redesign):** the page now sells the AI interviewer: live preview of her opening line, a sample report, the free version shown as a warm-up (VI-12).
 - **17 Nov (free AI interview):** each free account can try one 2-question AI interview with the full report; the report then offers Pro (VI-13).
+- **17 Nov (draft labels removed):** the owner reviewed every page; the "Draft: written with AI help" note is gone from the whole site and the last 61 UNREVIEWED records carry his sign-off (ED-10).
 - **17 Nov (one mock interview):** setup by role and experience or by job description, bank questions plus one or two written for the job; the free timed version stays below as the fallback (VI-11).
 - **17 Nov (AI interviewer, round 5):** after studying Hirevox (built on Vapi; owner chose to keep our own pipeline): hiring-style report with verdict, skills and quoted evidence, a 4-week plan; smart end of turn; Answer now; sharper follow-ups (VI-10).
 - **17 Nov (AI interviewer, freeze fix):** a stuck transcription request could freeze the call on "Sending…"; every wait now has a time limit, and the route logs timings (VI-9).

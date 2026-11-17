@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { DraftNote } from "@/components/draft-note";
 import { McqQuiz, type McqQuestion } from "@/components/mcq-quiz";
 import { muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { usePractice, useToday } from "@/lib/browser/hooks";
@@ -145,7 +144,6 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
                   >
                     {q.question}
                   </h3>
-                  {!q.reviewed && <DraftNote />}
                   {stage === 0 ? (
                     <div className="mt-auto flex flex-col items-center gap-3">
                       <p className={`text-sm ${muted}`}>Say your answer out loud first, then flip the card.</p>
