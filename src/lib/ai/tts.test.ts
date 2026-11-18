@@ -62,6 +62,8 @@ describe("streamed, signed lines (VI-8)", () => {
 describe("what the interviewer says, and when it answers (VI-7, VI-8)", () => {
   it("welcomes the learner before the first question and leads into the others naturally", () => {
     expect(questionLine(0, 3, "What is RAG?")).toMatch(/^Hi, I'm your AI interviewer.*3 questions.*Let's begin\. What is RAG\?$/);
+    // VI-18: she asks for a quiet place before the first question.
+    expect(questionLine(0, 3, "What is RAG?")).toContain("Please be somewhere quiet, with no other voices or noise around you");
     expect(questionLine(1, 3, "Q2?")).toBe("Thanks. Let's move on to the next one. Q2?");
     expect(questionLine(2, 3, "Q3?")).toBe("Thanks. And now the last question. Q3?");
     expect(CLOSING_LINE).toMatch(/end of the interview/);

@@ -166,6 +166,8 @@ test("a call that runs itself (browser speech-to-text): the interviewer speaks, 
 
   // VI-2: a consent notice before anything is sent.
   await expect(page.getByRole("heading", { level: 2, name: "Before you start" })).toBeVisible();
+  // VI-18: a quiet place, said before the start.
+  await expect(page.getByRole("note", { name: "For the best results, sit somewhere quiet" })).toBeVisible();
   await expect(page.getByText(/Only the text \(the transcript\) goes to our AI/)).toBeVisible();
   await expect(page.getByText(/Xplaind\s+does not keep the recordings/)).toBeVisible();
   expect(starts).toEqual([]);
