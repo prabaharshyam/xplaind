@@ -296,6 +296,9 @@ async function mount(el: HTMLElement): Promise<() => void> {
   const resize = () => {
     const w = Math.max(1, el.clientWidth);
     const h = Math.max(1, el.clientHeight);
+    // SE-13 (2026-11-18, site review): on phones the first gate sat on the hero headline; the road alone
+    // carries the idea there.
+    for (const g of gates) g.ring.visible = w >= 640;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.fov = w < 640 ? 70 : 58;

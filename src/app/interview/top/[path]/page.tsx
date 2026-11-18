@@ -10,6 +10,7 @@ import { topInterview } from "@/lib/content/interview";
 import { siteUrl } from "@/lib/site";
 import { KIND_LABEL, KIND_STYLE } from "../kinds";
 import { PrintButton } from "../print-button";
+import { levelText } from "@/lib/levels";
 
 export function generateStaticParams() {
   return getPaths().filter((p) => p.top_interview.length).map((p) => ({ path: p.id }));
@@ -86,7 +87,7 @@ export default async function TopInterviewPage({ params }: PageProps<"/interview
                 <p className="flex flex-wrap items-center gap-2 text-xs font-medium">
                   <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-white dark:bg-white dark:text-zinc-900">{i + 1}</span>
                   <span className={`rounded-full px-2 py-0.5 ${KIND_STYLE[q.kind]}`}>{KIND_LABEL[q.kind]}</span>
-                  <span className="text-zinc-600 dark:text-zinc-400">{q.level}</span>
+                  <span className="text-zinc-600 dark:text-zinc-400">{levelText(q.level)}</span>
                 </p>
                 <h2 id={`${q.id}-h`} className="mt-2 text-xl leading-snug font-semibold text-balance">
                   {q.question}

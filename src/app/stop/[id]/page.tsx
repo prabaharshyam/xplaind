@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getStop, getStops, translationLangs } from "@/lib/content";
+import { getStop, getStops, lessonAlternates } from "@/lib/content";
 import { pageMeta } from "@/lib/seo";
 import { LessonView } from "./lesson-view";
 
@@ -21,9 +21,8 @@ export async function generateMetadata({ params }: PageProps<"/stop/[id]">): Pro
     modifiedTime: stop.reviewed_on,
   });
   // LT-1: point search engines at the translated versions.
-  const langs = translationLangs(stop.id);
-  if (langs.length)
-    meta.alternates = { ...meta.alternates, languages: Object.fromEntries([["en", `/stop/${stop.id}`], ...langs.map((l) => [l, `/stop/${stop.id}/${l}`])]) };
+  const languages = lessonAlternates(stop.id);
+  if (Object.keys(languages).length) meta.alternates = { ...meta.alternates, languages };
   return meta;
 }
 

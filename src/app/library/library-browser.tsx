@@ -200,14 +200,20 @@ export function LibraryBrowser({
                   {topics.find((x) => x.id === t)?.label ?? t}
                 </button>
               ))}
-              {i.tags.slice(0, 3).map((t) => (
+              {/* SE-14 (2026-11-18, site review: "Automation, Automation"): a tag that only repeats a topic's name is left out. */}
+              {i.tags
+                .filter((t) => !i.topics.some((id) => (topics.find((x) => x.id === id)?.label ?? id).toLowerCase() === t.toLowerCase()))
+                .filter((t, n, all) => all.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === n)
+                .slice(0, 3)
+                .map((t) => (
                 <button key={t} type="button" onClick={() => set("q", t)} className="rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
                   {t}
                 </button>
-              ))}
+                ))}
             </p>
             {i.kind === "lesson" && i.videos > 0 && (
-              <p className="flex items-center gap-1 text-xs font-medium text-rose-700 dark:text-rose-300">
+              // SE-14: neutral, not red: red reads as an error.
+              <p className="flex items-center gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 <Icon name="play" size={12} /> {i.videos} video {i.videos === 1 ? "lesson" : "lessons"}
               </p>
             )}

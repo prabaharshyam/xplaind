@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useId, useMemo, useState } from "react";
 import { Icon } from "@/components/art/icons";
 import { primaryButton, textLink } from "@/components/ui";
+import { levelText } from "@/lib/levels";
 
 type Q = {
   id: string;
@@ -77,7 +78,7 @@ export function AnswersBrowser({ roles, questions }: { roles: { id: string; name
         {shown.map((q, i) => (
           <li key={q.id} className="break-inside-avoid rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
             <p className="text-xs font-semibold text-brand-800 dark:text-brand-300">
-              {q.topic} · {q.level}
+              {q.topic} · {levelText(q.level)}
             </p>
             <h2 className="mt-1 text-lg leading-snug font-semibold">
               {i + 1}. {q.question}

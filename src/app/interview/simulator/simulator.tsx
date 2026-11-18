@@ -15,6 +15,7 @@ import { EXPERIENCE, STYLES, pickForSetup, type ExperienceId, type Pickable, typ
 import { recordInterview } from "@/lib/browser/activity-store";
 import { todayInIST } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
+import { levelText } from "@/lib/levels";
 import {
   type AnswerResult,
   BAND_LABEL,
@@ -694,7 +695,7 @@ function QuestionScreen({
   return (
     <div className="flex flex-col gap-5">
       <p className={`text-sm ${muted}`}>
-        Question {position} of {total} · {interviewTopicLabel(q.topic)} · {q.level} · {minutes(q.answer_seconds)} to answer
+        Question {position} of {total} · {interviewTopicLabel(q.topic)} · {levelText(q.level)} · {minutes(q.answer_seconds)} to answer
       </p>
       <h2 className="text-2xl leading-9 font-semibold text-balance">{q.question}</h2>
 

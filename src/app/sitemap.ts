@@ -32,6 +32,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
       .map((p) => `/start/${p.id}`),
     ...LEVEL_IDS.map((l) => `/roadmap/genai-engineer/${l.toLowerCase()}`),
     ...getStops().map((s) => `/stop/${s.id}`),
+    // SE-9 (2026-11-18, site review): the translated lessons, so search engines find them.
+    ...getContent().translations.map((t) => `/stop/${t.data.id}/${t.data.lang}`),
     "/interview",
     "/interview/simulator",
     "/interview/top",
@@ -74,6 +76,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const day = (d: string) => new Date(`${d}T00:00:00+05:30`);
   const dated = new Map<string, string>([
     ...getStops().map((s) => [`/stop/${s.id}`, s.reviewed_on] as const),
+    ...getContent().translations.map((t) => [`/stop/${t.data.id}/${t.data.lang}`, t.data.translated_on] as const),
     ...getContent().interview.map(({ data: q }) => [`/interview/${q.id}`, q.reviewed_on] as const),
     ...getProjects().map((p) => [`/projects/${p.id}`, p.reviewed_on] as const),
     ...getPatterns().map((p) => [`/interview/patterns/${p.id}`, p.reviewed_on] as const),

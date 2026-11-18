@@ -175,7 +175,7 @@ export default function Home() {
       </div>
 
       {/* The solution in three steps, before the detail. */}
-      <section aria-labelledby="how-heading" className="py-16 md:py-24">
+      <section aria-labelledby="how-heading" className="py-12 md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <h2 id="how-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
             <Words text="How Xplaind works" />
@@ -193,7 +193,7 @@ export default function Home() {
       </section>
 
       {/* Milestone 1: choose a role. */}
-      <section id="roles" aria-labelledby="roles-heading" className="scroll-mt-20 py-20 md:py-28">
+      <section id="roles" aria-labelledby="roles-heading" className="scroll-mt-20 py-12 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={1} label="Start here" />
           <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
@@ -231,7 +231,7 @@ export default function Home() {
       </section>
 
       {/* Milestone 2, UX-4 (owner request 2026-11-11): every feature in one deck of cards with tabs, instead of three long sections. */}
-      <section aria-labelledby="do-heading" className="pt-6 pb-20 md:pt-10 md:pb-28">
+      <section aria-labelledby="do-heading" className="pt-6 pb-12 md:pt-10 md:pb-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={2} label="Learn, practise, get hired" />
           <div className="mt-4 grid gap-4 md:grid-cols-[1.3fr_1fr] md:items-end">
@@ -338,7 +338,7 @@ export default function Home() {
 
       {/* SO-1: early users, in their own words (real, shared with permission). */}
       {testimonials.length > 0 && (
-        <section aria-labelledby="voices-heading" className="py-16 md:py-24">
+        <section aria-labelledby="voices-heading" className="py-12 md:py-24">
           <div className="mx-auto max-w-6xl px-4 md:px-6">
             <h2 id="voices-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
               <Words text="What early learners say" />
@@ -350,7 +350,7 @@ export default function Home() {
       )}
 
       {/* Trust: what is inside, counted. */}
-      <section aria-labelledby="trust-heading" className="py-20 md:py-28">
+      <section aria-labelledby="trust-heading" className="py-12 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <h2 id="trust-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
             <Words text="What is inside, today" />
@@ -370,7 +370,7 @@ export default function Home() {
       </section>
 
       {/* Milestone 4: the finish line. A small first step, and nothing to lose by taking it. */}
-      <section aria-labelledby="final-heading" className="py-24 text-left md:py-36 md:text-center">
+      <section aria-labelledby="final-heading" className="py-16 text-left md:py-36 md:text-center">
         <div className="mx-auto max-w-3xl px-4">
           {/* Left-aligned on phones like the other milestones; centred as a closing call on larger screens. */}
           <div className="flex justify-start md:justify-center">
@@ -395,7 +395,7 @@ export default function Home() {
 
       {/* Guides */}
       {posts.length > 0 && (
-        <section aria-labelledby="guides-heading" className="py-16 md:py-20">
+        <section aria-labelledby="guides-heading" className="py-12 md:py-20">
           <div className="mx-auto max-w-6xl px-4 md:px-6">
             <div className="flex items-end justify-between gap-4">
               <h2 id="guides-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
@@ -444,7 +444,7 @@ export default function Home() {
       </section>
 
       {/* JB-4: where the market figures in the hero come from. */}
-      <section id="market-sources" aria-labelledby="sources-heading" className="scroll-mt-20 pb-24 md:pb-32">
+      <section id="market-sources" aria-labelledby="sources-heading" className="scroll-mt-20 pb-16 md:pb-32">
         <div className="mx-auto max-w-3xl px-4 text-sm text-zinc-700 md:px-6 dark:text-zinc-300">
           <h2 id="sources-heading" className="font-semibold">
             Sources for the market figures

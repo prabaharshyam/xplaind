@@ -8,6 +8,7 @@ import { loadContent } from "./load";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
 import type { BlogPost, Certification, Cheatsheet, InterviewPattern, SystemDesign, Testimonial, Channel, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject, StopTranslation, LessonLang } from "./schema";
+import { LESSON_LANGS } from "./schema";
 
 let cached: Bundle | undefined;
 
@@ -33,6 +34,18 @@ export const getTranslation = (id: string, lang: string): StopTranslation | unde
   getContent().translations.find((t) => t.data.id === id && t.data.lang === lang)?.data;
 /** LT-1: the languages a lesson can be read in besides English. */
 export const translationLangs = (id: string): LessonLang[] => getContent().translations.filter((t) => t.data.id === id).map((t) => t.data.lang);
+
+/**
+ * LT-1 and SE-9 (2026-11-18, site review): the language versions of a lesson for search engines, keyed by
+ * a valid language code (ta, hi, ta-Latn, hi-Latn; "tanglish" and "hinglish" are not codes search
+ * engines know), with the English lesson as x-default. Empty when the lesson has no translation.
+ */
+export function lessonAlternates(id: string): Record<string, string> {
+  const langs = translationLangs(id);
+  if (!langs.length) return {};
+  const code = (l: LessonLang) => LESSON_LANGS.find((x) => x.id === l)!.htmlLang;
+  return Object.fromEntries([["en", `/stop/${id}`], ["x-default", `/stop/${id}`], ...langs.map((l) => [code(l), `/stop/${id}/${l}`])]);
+}
 export const getResource = (id: string): Resource | undefined =>
   getContent().resources.find((r) => r.data.id === id)?.data;
 export const getLevel = (id: LevelId): LevelDefinition | undefined =>

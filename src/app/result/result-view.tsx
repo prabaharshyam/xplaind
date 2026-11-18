@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
 import { clearAttempt, parseAttempt, rawAttempt, serverSnapshot, subscribe } from "@/lib/browser/attempt-store";
 import { NextStepsCard } from "@/components/next-steps-card";
-import { type LevelId, levelIndex } from "@/lib/levels";
+import { type LevelId, levelIndex, levelText } from "@/lib/levels";
 import { DEFAULT_PATH_ID, type PathRef, currentPathId } from "@/lib/paths";
 import { hoursFromLevel, weeksAtPace } from "@/lib/placement/estimate";
 import { scoreAnswers } from "@/lib/placement/score";
@@ -86,7 +86,7 @@ export function ResultView({
         <h1 id="result-heading" className="text-3xl font-semibold tracking-tight text-balance">
           {result.topOfLadder
             ? `You are at the top of the ladder: ${start?.name}`
-            : `Start at ${result.startLevel}: ${start?.name}`}
+            : `Start at ${levelText(result.startLevel)}: ${start?.name}`}
         </h1>
         <p className="leading-7 text-zinc-700 dark:text-zinc-300">
           {passed
