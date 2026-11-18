@@ -42,3 +42,7 @@ When building or changing UI in this project, use these skills:
 - **Components:** `shadcn` / `shadcn-ui` for UI primitives.
 - **Before shipping:** run `web-design-guidelines` and `vercel-react-best-practices`; respect `prefers-reduced-motion`; lazy-load 3D so Core Web Vitals stay green.
 <!-- web-skills:end -->
+
+## Keeping code small
+
+- Use `ponytail` (and `ponytail-review` on a diff) on any coding task, to ask for the smallest change that fully works. It never overrides the Rules above: tests, row-level security and the requirement-ID rules stay.
