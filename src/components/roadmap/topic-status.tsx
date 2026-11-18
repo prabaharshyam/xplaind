@@ -7,7 +7,7 @@ import { todayInIST } from "@/lib/dates";
 import { type TopicState, recordFor, topicStateOf } from "@/lib/roadmap/progress";
 import type { StopProgress } from "@/lib/roadmap/types";
 
-/** Literal class names per state, so Tailwind keeps them. Shared by the map, the drawer and the lesson page. */
+/** Literal class names per state, so Tailwind keeps them. Shared by the map and the lesson page. */
 export const STATE_STYLE: Record<TopicState, { label: string; on: string; card: string; dot: string }> = {
   todo: {
     label: "To do",
