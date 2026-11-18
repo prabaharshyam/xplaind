@@ -210,7 +210,7 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
         onClick={(e) => {
           if (e.target === dialog.current && !busy) dialog.current?.close();
         }}
-        className="m-auto w-[min(28rem,calc(100vw-2rem))] max-w-none rounded-2xl bg-white p-0 text-zinc-900 backdrop:bg-black/60 dark:bg-zinc-900 dark:text-white"
+        className="xp-glass-direct rounded-[1.75rem] m-auto w-[min(28rem,calc(100vw-2rem))] max-w-none p-0 text-zinc-900 backdrop:bg-black/50 backdrop:backdrop-blur-sm dark:text-white"
       >
         <form onSubmit={pay} className="flex flex-col gap-4 p-6">
           <h2 id={titleId} className="text-xl font-semibold">

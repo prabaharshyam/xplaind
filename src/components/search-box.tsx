@@ -110,7 +110,7 @@ export function SearchBox({
           id={listId}
           role="listbox"
           aria-label="Search results"
-          className="absolute inset-x-0 top-full z-50 mt-2 max-h-[60vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-2 text-left text-zinc-900 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          className="xp-glass-direct absolute inset-x-0 top-full z-50 mt-2 max-h-[60vh] overflow-y-auto rounded-[1.5rem] p-2 text-left text-zinc-900 dark:text-zinc-100"
         >
           {items === null && <li className="px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400">Loading…</li>}
           {items !== null && results.length === 0 && (

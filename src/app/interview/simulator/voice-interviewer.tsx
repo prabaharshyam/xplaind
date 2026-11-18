@@ -508,8 +508,13 @@ function CallFrame({
       aria-labelledby="call-heading"
       className="fixed inset-0 z-[100] overflow-y-auto bg-brand-950 text-white"
     >
-      <div className="mx-auto flex min-h-full w-full max-w-xl flex-col gap-6 px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] md:px-8 md:pt-10">
-        <header className="flex items-center gap-3">
+      {/* GL-2: soft ambient light behind the glass, still under reduced motion and gone with reduced transparency. */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <span className="xp-call-glow top-[-10%] left-[-20%] size-[70vmax] bg-brand-500/50" />
+        <span className="xp-call-glow right-[-25%] bottom-[-20%] size-[60vmax] bg-brand-300/30" />
+      </div>
+      <div className="relative z-0 mx-auto flex min-h-full w-full max-w-xl flex-col gap-6 px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] md:px-8 md:pt-10">
+        <header className="xp-glass-dark relative flex items-center gap-3 rounded-full py-2 pr-5 pl-2">
           <Avatar size="size-11" />
           <div className="min-w-0 flex-1">
             <h2 id="call-heading" ref={heading} tabIndex={-1} className="font-semibold outline-none">
@@ -809,7 +814,7 @@ function Listener({
   return (
     <>
       {myTurn && voice && (
-        <div className="flex flex-col gap-3 rounded-2xl bg-white/[0.06] p-4" aria-live="off">
+        <div className="xp-glass-dark relative flex flex-col gap-3 rounded-3xl p-4" aria-live="off">
           <p className="flex items-center gap-3 text-sm font-medium text-brand-300">
             <VoiceBars active={listening && hearing} tone="teal" />
             {finishing
@@ -885,7 +890,8 @@ function Listener({
         </form>
       )}
 
-      <div className="mt-auto flex items-start justify-center gap-4 pt-2">
+      {/* GL-2: the controls sit in a glass dock, as on a phone call. */}
+      <div className="xp-glass-dark relative mt-auto flex items-start justify-center gap-3 self-center rounded-[2rem] px-4 pt-3 pb-2 sm:gap-4 sm:px-6">
         {state === "paused" ? (
           <RoundButton label="Resume" onClick={onResume} tone="primary">
             <PlayIcon />
@@ -933,7 +939,7 @@ function Transcript({ lines }: { lines: Line[] }) {
   }, [lines.length]);
   if (lines.length === 0) return null;
   return (
-    <details className="rounded-2xl bg-white/[0.06] px-4 py-2">
+    <details className="xp-glass-dark relative rounded-3xl px-4 py-2">
       <summary className="min-h-11 cursor-pointer content-center text-sm font-medium text-white/85">Transcript ({lines.length})</summary>
       <ol ref={list} tabIndex={0} aria-label="Transcript" className="mt-1 flex max-h-64 flex-col gap-3 overflow-y-auto pb-2 text-sm leading-6 text-white/90">
         {lines.map((l, i) => (

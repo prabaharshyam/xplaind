@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-17, after the loader X and favicon were redrawn from the owner's master mark (BR-7)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-17, after glass on the interview call screen, menus, search and modal windows (GL-2)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
@@ -413,6 +413,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **17 Nov (interviewer explains when asked):** asked to explain her question, Zarina now explains and asks again instead of moving on (VI-14).
 - **17 Nov (glass UI):** the top bar is a floating glass capsule; its menus, the phone menu, the lesson track bar, the call controls and all secondary buttons are glass (GL-1).
 - **17 Nov (brand mark):** the loading X and the favicon are traced from the owner's master file; the favicon bar is the wordmark teal #ade2db (BR-7). Do not redraw the X by hand: `src/components/page-loader.tsx` holds the traced paths.
+- **17 Nov (glass, part 2):** the interview call screen is glass over a soft ambient light, and the account menu, search results and modal windows are glass (GL-2).
 - **17 Nov (one mock interview):** setup by role and experience or by job description, bank questions plus one or two written for the job; the free timed version stays below as the fallback (VI-11).
 - **17 Nov (AI interviewer, round 5):** after studying Hirevox (built on Vapi; owner chose to keep our own pipeline): hiring-style report with verdict, skills and quoted evidence, a 4-week plan; smart end of turn; Answer now; sharper follow-ups (VI-10).
 - **17 Nov (AI interviewer, freeze fix):** a stuck transcription request could freeze the call on "Sending…"; every wait now has a time limit, and the route logs timings (VI-9).

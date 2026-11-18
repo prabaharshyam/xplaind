@@ -65,7 +65,7 @@ export function TopicDrawerProvider({ details, children }: { details: Record<str
         onClick={(e) => {
           if (e.target === dialog.current) close();
         }}
-        className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-xl overflow-y-auto bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-black/40 dark:bg-zinc-950 dark:text-zinc-100"
+        className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-xl overflow-y-auto bg-white p-0 text-zinc-900 shadow-2xl backdrop:bg-black/40 backdrop:backdrop-blur-sm dark:bg-zinc-950 dark:text-zinc-100"
       >
         {detail && <DrawerBody d={detail} onClose={close} />}
       </dialog>
