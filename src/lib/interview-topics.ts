@@ -16,6 +16,8 @@ export const INTERVIEW_TOPICS = [
   { id: "automation", label: "Automation workflows" },
   { id: "product", label: "AI product management" },
   { id: "client-delivery", label: "Client delivery" },
+  // 2026-11-18: the AI Security Engineer roadmap.
+  { id: "security", label: "AI security" },
 ] as const;
 
 export type InterviewTopicId = (typeof INTERVIEW_TOPICS)[number]["id"];

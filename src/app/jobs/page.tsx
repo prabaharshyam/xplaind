@@ -10,7 +10,7 @@ export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
   title: ["AI Engineer Salary in India 2026 & AI Jobs for Freshers", "AI Jobs and Salaries in India"],
   description:
-    "AI engineer salary in India by experience, from freshers up, for 9 AI roles, plus the skills AI job posts ask for and live AI jobs on Naukri and LinkedIn.",
+    "AI engineer salary in India by experience, from freshers up, for 10 AI roles, plus the skills AI job posts ask for and live AI jobs on Naukri and LinkedIn.",
   path: "/jobs",
 });
 
