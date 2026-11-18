@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { Icon } from "@/components/art/icons";
 import { NextStepsCard } from "@/components/next-steps-card";
-import { useTopicLink } from "@/components/roadmap/topic-drawer";
+import { saveSpot } from "@/lib/browser/roadmap-return";
 import { STATE_STYLE, TopicStatus } from "@/components/roadmap/topic-status";
 import {
   muted,
@@ -598,7 +598,7 @@ function Section({
   );
 }
 
-/** A topic tile: the title, clearly readable, and a small button to mark it. Details open in the drawer. */
+/** A topic tile: the title, clearly readable, and a small button to mark it. The title opens the lesson (RM-16). */
 function TopicCard({
   topic,
   state,
@@ -670,7 +670,11 @@ function TopicCard({
   );
 }
 
-/** A topic's link: a plain click opens the drawer; it stays a real link for no-JS and new tabs. */
+/**
+ * RM-16 (2026-11-18, owner): a topic opens its lesson straight away, with no side panel in between. The map's
+ * scroll position is kept so "Back to the roadmap" lands in the same place, and the move uses the quick top
+ * bar, not the full loading screen.
+ */
 function TopicLink({
   id,
   className,
@@ -682,11 +686,11 @@ function TopicLink({
   label?: string;
   children: React.ReactNode;
 }) {
-  const link = useTopicLink(id);
   return (
     <Link
       href={`/stop/${id}`}
-      {...link}
+      data-no-splash=""
+      onClick={() => saveSpot(location.pathname.split("/")[2] ?? "", window.scrollY)}
       aria-label={label}
       className={className}
     >

@@ -10,33 +10,40 @@ const overflow = (page: import("@playwright/test").Page) =>
 
 test.use({ viewport: { width: 360, height: 740 } });
 
-test("a roadmap topic opens a drawer where it can be marked done, without leaving the map", async ({ page }) => {
+test("a roadmap topic opens its lesson straight away, and the way back lands where the learner left (RM-16)", async ({ page }) => {
   await page.goto("/roadmap/forward-deployed-engineer");
-  await page.getByRole("link", { name: /^Build a RAG app/ }).first().click();
-  const drawer = page.getByRole("dialog", { name: "Build a RAG app" });
-  await expect(drawer).toBeVisible();
-  await expect(page).toHaveURL(/\/roadmap\/forward-deployed-engineer$/);
-  await expect(drawer.getByText("Free resources", { exact: false }).first()).toBeVisible();
-  // RM-13: the title, then what the topic is in one line; no outcome or "Why it matters".
-  await expect(drawer.getByRole("heading", { name: "What it is" })).toBeVisible();
-  await expect(drawer.getByText("Why it matters")).toHaveCount(0);
-  await expect(drawer.getByRole("link", { name: "Read the full chapter" })).toHaveAttribute("href", "/stop/rag-app");
+  const topic = page.getByRole("link", { name: /^Build a RAG app/ }).first();
+  await topic.scrollIntoViewIfNeeded();
+  const y = await page.evaluate(() => window.scrollY);
+  expect(y).toBeGreaterThan(200);
+  await topic.click();
+  await expect(page).toHaveURL(/\/stop\/rag-app$/);
+  // No side panel, and only the thin top bar: the full loading screen never shows for a topic.
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(page.locator("#xp-splash")).not.toHaveAttribute("data-state", "nav");
+  // The lesson follows the roadmap it was opened from.
+  const crumb = page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: /^← Forward Deployed Engineer.* roadmap$/ });
+  await expect(crumb).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /^Lessons on the Forward Deployed Engineer/ }).getByText("Next topic on this roadmap →")).toBeVisible();
   expect((await wcag(page)).violations).toEqual([]);
-  await drawer.getByRole("button", { name: "Done", exact: true }).click();
-  await expect(drawer.getByRole("button", { name: "Done", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("Escape");
-  await expect(drawer).toBeHidden();
+  await crumb.click();
+  await expect(page).toHaveURL(/\/roadmap\/forward-deployed-engineer$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(y - 150);
+  // Marking a topic stays one tap away on the map itself.
+  await page.getByRole("button", { name: "Mark Build a RAG app" }).first().click();
+  await page.getByRole("group", { name: "Your status for Build a RAG app" }).getByRole("button", { name: "Done", exact: true }).click();
   await expect(page.getByRole("link", { name: /^Build a RAG app, Done/ }).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/roadmap\/forward-deployed-engineer$/);
   // XP was removed (2026-11-06); the header shows the day streak instead.
   await expect(page.getByRole("banner").getByRole("link", { name: /-day streak/ })).toBeVisible();
   await expect(page.getByRole("banner").getByText(/\d+ XP/)).toHaveCount(0);
 });
 
-test("the GenAI roadmap's topics open the drawer too", async ({ page }) => {
+test("the GenAI roadmap's topics open their lessons too", async ({ page }) => {
   await page.goto("/roadmap/genai-engineer");
   await page.getByRole("tabpanel").getByRole("link", { name: /^What AI, machine learning and a language model are/ }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByRole("dialog").getByRole("link", { name: "Read the full chapter" })).toHaveAttribute("href", "/stop/what-is-ai");
+  await expect(page).toHaveURL(/\/stop\/what-is-ai$/);
+  await expect(page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Roadmap" })).toBeVisible();
 });
 
 test("topic pages list lessons as cards", async ({ page }) => {
@@ -52,7 +59,7 @@ test("a lesson shows its parts and a reading guide, and no XP", async ({ page })
   await page.goto("/stop/what-is-ai");
   await expect(page.getByText("Part 1 of 5")).toBeVisible();
   await expect(page.getByText(/\bXP\b/)).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: /Lessons on the/ }).getByText("Next →")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /Lessons on the/ }).getByText("Next topic on this roadmap →")).toBeVisible();
   expect(await overflow(page)).toBe(false);
 });
 
@@ -116,17 +123,14 @@ test("topics can be marked Learning, Done or Skip on the map, and the counts, fi
   expect((await wcag(page)).violations).toEqual([]);
 });
 
-test("on every roadmap, a lesson opened from the drawer still responds to clicks", async ({ page }) => {
+test("on every roadmap, a lesson opened from the map responds to clicks and follows that roadmap (RM-16)", async ({ page }) => {
   test.setTimeout(180_000);
   const { bundle } = loadContent(path.resolve(__dirname, "../content"));
   for (const { data: p } of bundle.goals) {
     await page.goto(`/roadmap/${p.id}`);
     await page.getByRole("tabpanel").getByRole("link", { name: /, (To do|Learning|Done|Skipped)$/ }).nth(1).click();
-    const drawer = page.getByRole("dialog");
-    await expect(drawer, p.id).toBeVisible();
-    await drawer.getByRole("link", { name: "Read the full chapter" }).click();
     await expect(page, p.id).toHaveURL(/\/stop\//);
-    await expect(page.locator("dialog[open]"), p.id).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: `Lessons on the ${p.name} roadmap` }), p.id).toBeVisible();
     // a plain HTML control and a React button on the lesson both respond
     const terms = page.locator('section[aria-labelledby="terms-heading"] details').first();
     if (await terms.count()) {
@@ -174,24 +178,19 @@ test("the phone menu closes after a page is chosen", async ({ page }) => {
   await expect(menu).not.toHaveAttribute("open");
 });
 
-test("a roadmap topic's panel keeps videos for the lesson and folds resources into a dropdown (RM-13)", async ({ browser }) => {
+test("a lesson on several roadmaps follows the one it was opened from, not just its first (RM-16)", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark", reducedMotion: "reduce" });
   const page = await ctx.newPage();
+  // Opened directly, Docker sits on its first roadmap.
+  await page.goto("/stop/docker-basics");
+  const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });
+  await expect(crumbs.getByRole("link", { name: /^← Forward Deployed Engineer.* roadmap$/ })).toHaveCount(0);
+  // Opened from the FDE roadmap, it follows that roadmap.
   await page.goto("/roadmap/forward-deployed-engineer");
   await page.locator("main a[href='/stop/docker-basics']").last().click();
-  const drawer = page.getByRole("dialog", { name: "Docker and Compose" });
-  await expect(drawer).toBeVisible();
-  // No video players in the panel; the lesson page has them.
-  await expect(drawer.getByRole("button", { name: /Watch here/ })).toHaveCount(0);
-  // Resources start folded and open on a tap.
-  const free = drawer.locator("details", { hasText: "Free resources" });
-  await expect(free).not.toHaveAttribute("open");
-  await free.locator("summary").click();
-  await expect(free.getByRole("link").first()).toBeVisible();
-  await expect(free.getByText("Best pick")).toBeVisible();
-  // Closing the panel leaves no window open over the roadmap.
-  await page.keyboard.press("Escape");
-  await expect(drawer).toBeHidden();
+  await expect(page).toHaveURL(/\/stop\/docker-basics$/);
+  await expect(crumbs.getByRole("link", { name: /^← Forward Deployed Engineer.* roadmap$/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /^Lessons on the Forward Deployed Engineer/ })).toBeVisible();
   expect(await page.evaluate(() => document.querySelectorAll("dialog[open]").length)).toBe(0);
   await ctx.close();
 });

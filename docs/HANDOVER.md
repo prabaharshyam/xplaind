@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-18 (later: HE-1, harness engineering lessons on four roles, signed off by the owner and merged; before it SR-1, the AI Security Engineer roadmap, and ED-5, PR 132)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-18 (later: RM-16, roadmap topics open the lesson directly; before it HE-1, harness engineering, PR 133)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
@@ -216,7 +216,7 @@ Snapshot (2026-11-16): 206 lessons, 774 resources, 54 placement questions, 504 c
 PRD IDs in brackets.
 
 **Learning**
-- Roadmaps `/paths`, `/roadmap/<path>` (ten roles; the tenth, AI Security Engineer, SR-1, 18 Nov), one shared map design with a topic drawer, Learning / Done / Skip status, filters, a Projects tab, PDF checklist download (RM, RD).
+- Roadmaps `/paths`, `/roadmap/<path>` (ten roles; the tenth, AI Security Engineer, SR-1, 18 Nov), one shared map design (a topic opens its lesson directly since RM-16, 18 Nov; the side panel is gone), Learning / Done / Skip status, filters, a Projects tab, PDF checklist download (RM, RD).
 - Lesson pages `/stop/<id>`: "On this page" list on the left (RM-15), a Watch and learn panel, flashcards, exercise, quick check, AI tutor.
 - Placement test `/start`, `/result` (PL).
 - **Library** `/library` (LY-1, LY-2): one page with two views, "All lessons, videos and skills" (search, filters) and "By topic" (cards). It opens on "What automation is" and the technical lessons; the Beginner 1 awareness lessons (AI rules in India and abroad, bias and fairness, your company's AI policy and the like) are last. `/topics` redirects to `/library?view=topics`; each topic keeps `/topics/<topic>`.
@@ -347,6 +347,7 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 - **The business name is "ZEREH Ventures"** (with an s; corrected on the website on 16 Nov). It lives only in `src/lib/business.ts`; the footer, policies and receipts read it from there. The owner confirmed on 16 Nov that every outside document and account already had the right spelling; only the website was wrong.
 
 ---
+- **The loading screen's click listener runs in the capture phase**, before any handler on the link, so `e.preventDefault()` in a link's onClick does not stop it. To keep a link from showing the full-screen X, give it `data-no-splash` (RM-16, 18 Nov).
 
 ## 12. What is pending
 
@@ -434,6 +435,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **18 Nov (interview questions):** Zarina answers "which role is this for?", "how many questions are left?" and the like from the facts she is given, then asks the question again (VI-16).
 - **18 Nov (site review fixes):** translated lessons in the sitemap with valid language codes, glossary search, practice cards first, "an AI", level names in words, a compact role list on phones, calmer library cards, AI Studio and pricing clean-ups (SE-9 to SE-16). Still open from the review: the top bar at 768 to 1100 px, Zarina on the home page, the home page weight, share images, the weekly link check.
 - **18 Nov (site review, part 2):** the top bar fits every width (phone menu below 1120 px), Zarina opens the home page, the 3D road never loads on phones, and every page has a share picture (NV-9, VI-17, PF-1, SE-17).
+- **18 Nov (roadmap topics open lessons):** no side panel; the lesson follows the roadmap it was opened from, with next topic and back to the same place on the map (RM-16).
 - **18 Nov (harness engineering):** two Pro 2 lessons (advanced harness engineering, harnesses for long-running agents) on Agentic AI, AI Engineer, FDE and GenAI roadmaps, five interview questions and a guided project (HE-1). Signed off by the owner and merged.
 - **18 Nov (AI security roadmap):** a tenth role, AI Security Engineer, from zero security knowledge: 7 stages, 40 lessons (23 new), 2 guided projects, 22 interview questions, 4 certifications, a pay band (SR-1). The owner reviewed it on the preview and signed off.
 - **18 Nov (link check):** every outside link in the content is opened every Monday; broken ones are listed in one GitHub issue and cards show when their link was checked (ED-5).
