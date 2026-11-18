@@ -10,8 +10,9 @@ export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
   title: ["AI Mock Interview: Practise Out Loud, Get a Report", "AI Mock Interview Simulator"],
   description:
-    "A timed AI mock interview: answer real AI interview questions out loud or by typing, then see the key points you covered, your pace and what to fix.",
+    "Practise with Zarina, an AI interviewer that asks AI interview questions out loud, follows up on what you actually say and scores you like a hiring panel. Set it up for your role or a job post.",
   path: "/interview/simulator",
+  ownImage: true,
 });
 
 /** The mock interview: answers are analysed in the browser; signed-in learners can add an AI review (IQ-7). */

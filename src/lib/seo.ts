@@ -59,6 +59,7 @@ export function pageMeta({
   type = "website",
   publishedTime,
   modifiedTime,
+  ownImage = false,
 }: {
   title: string | string[];
   description: string;
@@ -66,7 +67,10 @@ export function pageMeta({
   type?: "website" | "article";
   publishedTime?: string;
   modifiedTime?: string;
+  /** SE-17: the page has its own opengraph-image file; leave the share picture to it. */
+  ownImage?: boolean;
 }): Metadata {
+  const image = ownImage ? {} : { images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Xplaind" }] };
   const desc = clip(description);
   // Search results show about 60 characters of a title; keep the brand only when it fits.
   const fit = fitTitle(Array.isArray(title) ? title : [title]);
@@ -80,8 +84,11 @@ export function pageMeta({
       description: desc,
       url: path,
       type,
+      // SE-17 (2026-11-18, site review): setting openGraph here replaces the parent's, picture included, so a
+      // page without its own opengraph-image file carries the site's share picture.
+      ...image,
       ...(type === "article" ? { publishedTime, modifiedTime } : {}),
     },
-    twitter: { card: "summary_large_image", title: share, description: desc },
+    twitter: { card: "summary_large_image", title: share, description: desc, ...(ownImage ? {} : { images: ["/opengraph-image"] }) },
   };
 }

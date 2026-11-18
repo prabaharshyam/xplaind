@@ -10,6 +10,7 @@ export const metadata: Metadata = pageMeta({
   description:
     "Generative AI roadmap for 2026, from beginner to LLM engineer in nine levels: Python, LLM APIs, prompting, RAG, agents, evals and deployment, each step with the best course.",
   path: "/roadmap/genai-engineer",
+  ownImage: true,
 });
 
 export default function GenAiRoadmapPage() {

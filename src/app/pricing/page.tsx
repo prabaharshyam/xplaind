@@ -16,6 +16,7 @@ export const metadata: Metadata = pageMeta({
   description:
     "Roadmaps and lessons stay free with your account. Xplaind Pro adds mock interviews with a readiness score, AI project reviews, resume-to-job match, a verified certificate and an AI tutor in your language. 7 days for ₹99, 6 months for ₹999, 7-day refund.",
   path: "/pricing",
+  ownImage: true,
 });
 
 const ORDER: AiKind[] = [

@@ -115,9 +115,23 @@ export default function Home() {
       />
 
       {/* Hero: the promise first (one place, the right order), then the market as proof. Works before any animation runs. */}
-      <section data-hero className="home-hero relative flex min-h-[calc(100svh-3.5rem)] items-center" aria-labelledby="hero-heading">
-        <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6">
-          <p data-hero-fade className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Xplaind · AI learning platform for India</p>
+      <section data-hero className="home-hero relative flex items-start md:min-h-[calc(100svh-3.5rem)] md:items-center" aria-labelledby="hero-heading">
+        <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-14 md:px-6 md:py-14">
+          {/* VI-17 (2026-11-18, site review: the home page never mentioned the AI interviewer): the feature
+              people pay for, on the first screen of every device. */}
+          <Link
+            data-hero-fade
+            href="/interview/simulator"
+            prefetch={false}
+            className="xp-glass-btn group inline-flex max-w-full items-center gap-2 rounded-full py-1.5 pr-3 pl-1.5 text-sm text-zinc-800 dark:text-zinc-100"
+          >
+            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-700 text-white dark:bg-brand-300 dark:text-brand-950">
+              <Icon name="mic" size={14} />
+            </span>
+            <span className="min-w-0">
+              <span className="font-semibold">New:</span> Zarina, an AI interviewer that talks back. <span className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">Try it now</span>
+            </span>
+          </Link>
           <h1 id="hero-heading" className="mt-6 max-w-5xl text-[2.6rem] leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-[4.25rem]">
             <Words text="The AI career path, mapped." />{" "}
             <span data-hero-fade className="block pb-1 text-zinc-500 dark:text-zinc-400">
@@ -136,13 +150,13 @@ export default function Home() {
             </Link>
           </div>
           <ul data-hero-fade className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-700 dark:text-zinc-300" aria-label="Why it is easy to start">
-            {["Built for India's AI roles", "Lessons in Tamil and Hindi", "Mock interviews built in", "Independent, no paid rankings"].map((t) => (
+            {["Built for India's AI roles", "Lessons in Tamil and Hindi", "AI mock interviewer", "Independent, no paid rankings"].map((t) => (
               <li key={t} className="flex items-center gap-2">
                 <Icon name="tick" size={16} className="text-zinc-500 dark:text-zinc-400" /> {t}
               </li>
             ))}
             <li>
-              <Link href="/interview/simulator" className="text-brand-800 underline underline-offset-4 hover:text-brand-950 dark:text-brand-300 dark:hover:text-brand-200">
+              <Link href="/interview/simulator" prefetch={false} className="text-brand-800 underline underline-offset-4 hover:text-brand-950 dark:text-brand-300 dark:hover:text-brand-200">
                 I have an interview soon
               </Link>
             </li>

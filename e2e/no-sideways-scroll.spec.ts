@@ -21,3 +21,22 @@ for (const path of PAGES) {
     expect(overflow, `${path} is ${overflow}px wider than the screen`).toBeLessThanOrEqual(0);
   });
 }
+
+// NV-9 (2026-11-18, site review: the top bar was cut off between 768 and 1100 px): at every common
+// tablet and laptop width the bar fits, nothing scrolls sideways, and the menu is reachable.
+for (const width of [768, 820, 1024, 1119, 1120, 1280]) {
+  test(`the top bar fits at ${width} px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/pricing");
+    const bar = page.locator(".site-header .xp-glass");
+    const fits = await bar.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const kids = [...el.querySelectorAll(":scope > * , :scope > * > *")].filter((k) => (k as HTMLElement).offsetParent !== null);
+      return r.right <= window.innerWidth && kids.every((k) => k.getBoundingClientRect().right <= window.innerWidth + 0.5);
+    });
+    expect(fits).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    if (width < 1120) await expect(page.locator("details.site-menu > summary")).toBeVisible();
+    else await expect(page.locator('header nav[aria-label="Main"] summary', { hasText: "AI Studio" })).toBeVisible();
+  });
+}
