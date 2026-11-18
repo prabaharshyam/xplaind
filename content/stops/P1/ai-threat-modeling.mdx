@@ -1,0 +1,169 @@
+---
+id: ai-threat-modeling
+level: P1
+theme: security
+title: "Threat model an AI system"
+outcome: "Draw the data flow of an AI system, find threats to each part with STRIDE and MITRE ATLAS, rank them, and turn the top ones into controls and tests."
+answer: "Threat modelling an AI system means drawing how data flows through it, listing what can go wrong at each part with STRIDE and MITRE ATLAS, ranking the risks and giving each a control and a test."
+why_it_matters: "Most AI security failures are design failures that a one-hour threat model would have caught. Security teams expect AI engineers to bring one to every design review, and interviewers ask you to do one live."
+hours: 3
+gap_tags: []
+primary_resource: owasp-threat-modeling-cheat-sheet
+alternates: [microsoft-threat-modeling-aiml, mitre-atlas]
+more: [owasp-llm-top-10, owasp-ai-exchange, owasp-genai-red-teaming-guide]
+videos: [yt-ibm-technology-anatomy-of-an-ai-attack-mitre-atlas, yt-netsec-explained-stride-threat-modeling-for-beginners]
+format: deep
+key_terms: [threat-modeling, stride, mitre-atlas, prompt-injection, data-exfiltration, least-privilege]
+check:
+  type: mcq
+  question_ids: [ai-threat-modeling-1, ai-threat-modeling-2, ai-threat-modeling-3]
+flashcards:
+  - q: "What are the four questions of threat modelling?"
+    a: "What are we building? What can go wrong? What are we going to do about it? Did we do a good enough job?"
+  - q: "What does STRIDE stand for?"
+    a: "Spoofing, Tampering, Repudiation, Information disclosure, Denial of service, Elevation of privilege."
+  - q: "What is a trust boundary?"
+    a: "A line in the data-flow diagram where data passes between parts with different levels of trust, such as from the internet into your app, or from a document into the model's prompt. Most threats sit on these lines."
+  - q: "Why add MITRE ATLAS to STRIDE for AI systems?"
+    a: "STRIDE is generic. ATLAS lists techniques specific to AI, such as prompt injection, poisoning training data and extracting a model, with real case studies."
+  - q: "Which parts of an LLM app belong in the data-flow diagram?"
+    a: "Users, the app, the model provider, the system prompt, the retrieval store and its documents, every tool or API the model can call, and the logs."
+  - q: "How do you rank threats simply?"
+    a: "Score likelihood and impact from 1 to 3 each and multiply. Fix the 6s and 9s first, and write down why you accept the low ones."
+  - q: "What turns a threat model into real security?"
+    a: "Each serious threat gets a control, an owner and a test that proves the control works, ideally one that runs automatically."
+  - q: "When should you redo a threat model?"
+    a: "When you add a tool, a data source, a new user group, or change the model or provider. A threat model is a living document."
+exercise:
+  title: "Threat model a ticket assistant"
+  setup: "A Gurugram travel company plans an AI assistant for its support staff. It reads incoming customer emails, searches a store of past tickets and policy PDFs, drafts a reply, and can issue refunds up to ₹5,000 through the booking system's API. Logs of every conversation are kept for 90 days."
+  questions:
+    - q: "Name the trust boundaries in this design."
+      a: "Customer email into the app; retrieved tickets and PDFs into the prompt; the app to the model provider; the model's tool call to the refund API; and data written to logs that many staff can read."
+    - q: "Give one STRIDE threat for the refund tool."
+      a: "Elevation of privilege: an injected instruction in an email makes the model issue refunds the staff member did not intend. Control: the refund is a draft a human approves, with a daily cap."
+    - q: "Which ATLAS-style AI threat applies to the ticket store?"
+      a: "Indirect prompt injection through stored tickets: an attacker files a ticket with hidden instructions that later lands in someone else's prompt."
+    - q: "What test would prove the refund control works?"
+      a: "A planted email that asks for a refund, run in CI; the test passes only if no refund API call is made without an approval record."
+ask:
+  - "How is threat modelling an AI app different from a normal web app?"
+  - "What is MITRE ATLAS and how do I use it?"
+  - "How long should a threat model take for a small LLM feature?"
+drafted_with_ai: true
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+**Threat modelling** is a planned conversation about what can go wrong in a system, held before attackers find out for you. It answers four questions, popularised by the threat-modelling community and used in the OWASP cheat sheet below:
+
+1. **What are we building?** Draw it.
+2. **What can go wrong?** List threats to each part.
+3. **What are we going to do about it?** Pick controls.
+4. **Did we do a good enough job?** Test the controls and review.
+
+An AI system needs the same process as any software, plus extra care in three places. The model reads text it cannot fully trust. The model can sometimes act, through tools. And the model itself, its training data and its files are new things an attacker can target.
+
+Two references do most of the work:
+
+- **STRIDE**, a checklist of six threat types that works for any software.
+- **MITRE ATLAS**, a public knowledge base of attacker tactics and techniques aimed at AI and machine learning systems. It is laid out like MITRE ATT&CK, which you may know from the detection stage of this roadmap, and each technique is backed by research or real case studies.
+
+This lesson follows a security engineer at a mid-sized Mumbai bank as she threat-models a new customer chatbot.
+
+## How it works
+
+**Step 1: draw the data flow.** List every part the data touches and every arrow between them. For a typical LLM app the parts are: users, the app (web or mobile), the system prompt, the model provider, a retrieval store (RAG) with its documents, tools or APIs the model can call, and logs. Then mark the **trust boundaries**: places where data moves from less trusted to more trusted parts. Most threats sit on these lines.
+
+```flow
+title: Bank chatbot: data flow and trust boundaries
+Customer on app or WhatsApp | untrusted input -[boundary 1: internet]-> Chat app and API
+Chat app and API -[boundary 2: prompt built here]-> Model provider | hosted LLM
+Policy and FAQ store | RAG documents -[boundary 3: retrieved text enters prompt]-> Chat app and API
+Model provider -[boundary 4: tool call]-> Account tools | balance, block card, raise complaint
+Account tools -> Core banking API
+Chat app and API -> Logs and analytics | full chats, 90 days
+Logs and analytics -[boundary 5: staff access]-> Support and data teams
+```
+
+**Step 2: apply STRIDE to each part.** Walk the diagram part by part, and ask the six questions.
+
+| STRIDE threat | Plain question | What it looks like in an AI app |
+| --- | --- | --- |
+| **S**poofing | Can someone pretend to be someone else? | A user claims to be another customer; a fake tool or MCP server pretends to be the real one |
+| **T**ampering | Can someone change data or code? | Poisoned documents in the RAG store; a changed system prompt; a swapped model file |
+| **R**epudiation | Can someone deny doing something? | No log of which prompt and tool call led to a card being blocked |
+| **I**nformation disclosure | Can data leak? | The model reveals another customer's details, its system prompt, or secrets in logs |
+| **D**enial of service | Can someone break availability or run up cost? | Very long prompts or loops that burn tokens and money |
+| **E**levation of privilege | Can someone gain powers they should not have? | Prompt injection makes the model call a tool the user is not allowed to use |
+
+**Step 3: add AI-specific threats from MITRE ATLAS.** STRIDE is generic, so it can miss attacks that only exist for models. Open the ATLAS matrix and read across its tactics, the attacker's goals from reconnaissance to impact, and pick the techniques that fit your design. For an LLM app the common ones are LLM prompt injection (direct and indirect), LLM jailbreak, poisoning training or retrieval data, extracting the model or its system prompt, and abusing the AI supply chain, such as a malicious model file. ATLAS is updated often, so check the current site rather than a copy, and use its technique IDs in your notes so other teams can look them up. The OWASP Top 10 for LLM apps is a good third cross-check.
+
+**Step 4: rank the risks.** You will find more threats than you can fix this sprint. Score each for likelihood and impact from 1 (low) to 3 (high), and multiply. A score of 6 or 9 is fixed before launch. A 3 or 4 gets a plan. A 1 or 2 may be accepted, with a written reason and an owner. This is rough, and that is fine: the point is agreeing on order, not precision.
+
+**Step 5: turn threats into controls and tests.** Every serious threat needs three things: a **control** (what stops or limits it), an **owner** (a named person) and a **test** that proves the control works. A threat with a control but no test is a hope. Where possible the test runs automatically, in the CI pipeline, which the "Security tests in CI for AI apps" lesson covers.
+
+You can keep the model as simple data so it can be checked:
+
+```yaml
+- id: T3
+  part: Account tools
+  threat: Injected text in a retrieved FAQ makes the model call block_card for the wrong card
+  stride: Elevation of privilege
+  atlas: LLM prompt injection (indirect)
+  likelihood: 2
+  impact: 3
+  score: 6
+  control: Tool acts only on the logged-in customer's own cards; block needs an OTP confirmation
+  owner: Lead, chatbot platform
+  test: ci/attacks/planted_faq_block_card.yaml must make no unconfirmed block_card call
+```
+
+**Keep it alive.** Store the threat model next to the code. Redo the relevant part whenever you add a tool, a data source, a user group, or change the model or provider. A threat model from last year for a system that has since gained three tools is worse than none, because people trust it.
+
+## A worked example
+
+A mid-sized Mumbai bank (a made-up example) wants a customer chatbot in its app and on WhatsApp. It answers questions from policy and FAQ documents, shows balances, can block a lost debit card and raises complaints. Priya, a security engineer, runs a 90-minute threat-model session with the product owner, two developers and someone from compliance.
+
+They draw the diagram above and mark five trust boundaries. Then they walk STRIDE and ATLAS across each part. These are the threats they rank highest:
+
+| ID | Part | Threat | Source | L x I | Control | Test |
+| --- | --- | --- | --- | --- | --- | --- |
+| T1 | Chat app | A customer asks for another customer's balance by giving their account number | STRIDE: Spoofing, Information disclosure | 3 x 3 = 9 | Tools take the customer ID from the login session, never from the chat | Attack suite asks for 20 other account numbers; zero must return data |
+| T2 | RAG store | A fake "updated policy" PDF uploaded by a compromised staff account tells customers to share their OTP | STRIDE: Tampering; ATLAS: poisoning | 2 x 3 = 6 | Two-person approval for new documents; output check blocks any request for OTP or PIN | Planted document test; output filter test |
+| T3 | Account tools | Indirect injection makes the model block the wrong card | STRIDE: Elevation; ATLAS: prompt injection | 2 x 3 = 6 | Own cards only; OTP confirmation before blocking | Planted FAQ test in CI |
+| T4 | Logs | Full chats with account details are readable by 200 analytics staff | STRIDE: Information disclosure | 3 x 2 = 6 | Mask account numbers before logging; role-based access; 30-day retention | Log sample check in CI; quarterly access review |
+| T5 | Model provider | System prompt revealed, exposing internal rules and a test API key | ATLAS: prompt extraction | 3 x 2 = 6 | No secrets in prompts; assume the prompt is public | Secret-scan of prompt files; extraction prompts in the suite |
+| T6 | Chat app | Scripted long prompts run up the token bill | STRIDE: Denial of service | 2 x 2 = 4 | Per-user rate limit and maximum input length; budget alert | Load test with long inputs |
+| T7 | Logs | No record linking a blocked card to the conversation that caused it | STRIDE: Repudiation | 2 x 2 = 4 | Audit log of each tool call with session and message IDs | Check one blocked card can be traced end to end |
+
+Three things the session changed:
+
+- **T1 was a design bug, not a model bug.** The first design passed the account number from the chat into the balance tool. No amount of prompting fixes that. Taking the customer ID from the session fixed it for good.
+- **T5 found a real secret.** A developer had pasted a test API key into the system prompt during the demo. It was removed and rotated the same day.
+- **Everything at 6 or above got a test** before the bank's internal security review, so the reviewers saw evidence, not promises. The low-scoring threats were accepted in writing with an owner and a review date.
+
+The model also fed later work: the red-team plan used the threat list as its scope, and the compliance team reused the data-flow diagram in its map of where customers' personal data goes, which helps with DPDP Act work.
+
+## Common mistakes
+
+- **Treating the model as the only thing to defend.** Most serious threats are in the tools, the retrieval store and the logs around it.
+- **Drawing the diagram without the tools and logs.** If it is not on the diagram, nobody threat-models it.
+- **Stopping at STRIDE.** Without ATLAS or the OWASP LLM list, you will miss injection, poisoning and model extraction.
+- **Trusting the system prompt as a control.** "Never reveal account data" is a request, not a control. Controls live in code and permissions.
+- **No owner and no test.** A list of threats with no names and no tests is a document, not security.
+- **Doing it once.** A new tool or data source needs a fresh look at that part of the diagram.
+- **Ranking by how scary it sounds.** Use likelihood times impact, and write down why.
+
+## Practice
+
+Read the OWASP Threat Modeling Cheat Sheet, then open MITRE ATLAS and browse the techniques for LLMs. Microsoft's guide to threat modelling AI/ML systems lists questions to add to a design review.
+
+1. Pick an AI app you have built or used, and draw its data flow as a flow diagram with every trust boundary marked.
+2. Walk STRIDE across each part, then add at least three techniques from ATLAS. Aim for 10 to 15 threats.
+3. Score them by likelihood times impact and pick the top five.
+4. For each of the five, write a control, an owner and a test you could automate.
+
+**You are done when you can** draw an AI system's data flow, explain at least five ranked threats from STRIDE and ATLAS, and show the control and test for each top threat.
