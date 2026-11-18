@@ -18,6 +18,8 @@ import {
   LANGUAGE_LINE,
   languageRedirect,
   mostlyNotEnglish,
+  asksAboutInterview,
+  interviewFacts,
   verdictFor,
   VERDICT_LABEL,
   deliveryOf,
@@ -169,6 +171,35 @@ describe("the interview stays in English and on the question (VI-15)", () => {
     expect(system).toMatch(/Never offer to continue in another language/);
     expect(system).toMatch(/Tanglish, Hinglish/);
     expect(voiceReportPrompt([{ q, exchanges: [ex("a")] }]).system).toMatch(/An answer mostly in another language/);
+  });
+});
+
+describe("she answers questions about the interview itself (VI-16)", () => {
+  const ctx = { role: "Generative AI & LLM Engineer", experience: "mid" as const, company: "Infosys", focus: [] };
+
+  it("spots questions about the interview, and not answers that mention a role", () => {
+    for (const t of ["What role are you interviewing me for?", "Which company is this for?", "How many questions are left?", "Can I take a moment to think?", "Can I use an example from my own project?", "Will I get feedback at the end?"]) {
+      expect(asksAboutInterview(t), t).toBe(true);
+    }
+    expect(asksAboutInterview("In my last role I built a RAG system for support tickets.")).toBe(false);
+  });
+
+  it("gives her the facts she may share: role, company, level, which question, and nothing invented", () => {
+    const facts = interviewFacts(ctx, { n: 2, of: 5 });
+    expect(facts).toContain("Generative AI & LLM Engineer");
+    expect(facts).toContain("Infosys");
+    expect(facts).toContain("3 to 5 years");
+    expect(facts).toContain("question 2 of 5");
+    expect(interviewFacts(undefined, undefined)).toMatch(/general practice interview for AI roles, not for a particular company/);
+  });
+
+  it("treats an interview question as help (not off topic, not a follow-up) and puts the facts in the prompt", () => {
+    const { system } = voiceTurnPrompt(q, [ex("What role are you interviewing me for?")], ctx, { n: 1, of: 3 });
+    expect(system).toMatch(/neither are questions about this interview itself/);
+    expect(system).toContain("question 1 of 3");
+    // After both follow-ups, a question about the interview still gets an answer.
+    expect(turnDecision([ex("a"), ex("b", "f1"), ex("How many questions are left?", "f2")])).toBe("clarify");
+    expect(cleanTurn({ follow_up: "It's for the Generative AI & LLM Engineer role. So, what is RAG?", done: false, clarify: true, redirect: "none" }, q, [ex("What role is this for?")])?.clarify).toBe(true);
   });
 });
 

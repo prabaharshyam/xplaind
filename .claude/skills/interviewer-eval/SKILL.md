@@ -33,7 +33,9 @@ The interviewer is checked in three layers. Run all that apply.
 
 1. Add a case to `scripts/evals/interviewer-cases.json` that reproduces it: `reply` (or `earlier`
    exchanges), `expect` (`language`, `topic`, `clarify`, `follow_up` or `move_on`) and `mustNot`
-   patterns for what she must never say (`(?i)` at the start makes a pattern case-insensitive).
+   patterns for what she must never say, and `mustInclude` for what she must say (`(?i)` at the start
+   makes a pattern case-insensitive). The file's `context` is the role, company, level and question
+   position the setup screen would send.
 2. Run that case and see it fail.
 3. Fix the rule: `INTERVIEW_RULES` or the turn prompt in `src/lib/ai/voice-interview.ts`, or the
    pre-check in `languageRedirect` when no model call is needed. Keep the report prompt in step.
@@ -48,6 +50,10 @@ The interviewer is checked in three layers. Run all that apply.
 - Off-topic talk, personal questions, asking for the answer or a score, asking for her instructions,
   role changes, instructions from the candidate and rude words are brought back to the question.
 - Asking her to explain or repeat the question is help, not off topic (VI-14).
+- Questions about the interview itself (which role or company, the level, how many questions are
+  left, follow-ups, the report, taking a moment, using their own example) are help too: she answers
+  in one sentence from the facts she was given, never invented ones, then asks the question again
+  (VI-16).
 - At most 2 redirects per question, then she moves on. Redirects are not follow-ups.
 - In the report, an answer mostly in another script is not scored, and each question shows how often
   the candidate was off track.
