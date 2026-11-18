@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DraftNote } from "@/components/draft-note";
 import { FlowDiagram } from "@/components/flow-diagram";
 import { PageHero } from "@/components/page-hero";
 import { textLink } from "@/components/ui";
@@ -51,7 +50,6 @@ export default async function PatternPage({ params }: PageProps<"/interview/patt
       <PageHero theme="system-design" seed={p.id} icon={CATEGORY[p.category].icon} eyebrow={`Pattern · ${CATEGORY[p.category].label}`} title={p.name} lead={p.summary} crumbs={[{ href: "/interview", label: "Interview" }, { href: "/interview/patterns", label: "Patterns" }]} />
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:px-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex min-w-0 flex-col gap-6">
-          {p.reviewed_by === "UNREVIEWED" && <DraftNote />}
           <section className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5 md:p-6 dark:border-brand-900 dark:bg-brand-950/30" aria-labelledby="say-h">
             <h2 id="say-h" className="text-sm font-semibold text-brand-900 dark:text-brand-200">
               Say it in the interview

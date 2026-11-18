@@ -24,7 +24,7 @@ export function HeaderSearch() {
       <button
         type="button"
         onClick={() => dialog.current?.showModal()}
-        className="flex size-10 items-center justify-center gap-2 rounded-full border border-black/10 text-sm lg:w-auto lg:px-3 text-zinc-600 hover:bg-black/5 dark:border-white/15 dark:text-zinc-300 dark:hover:bg-white/10"
+        className="xp-glass-btn flex size-10 items-center justify-center gap-2 rounded-full text-sm lg:w-auto lg:px-3 text-zinc-700 dark:text-zinc-200 dark:hover:bg-white/10"
       >
         <Icon name="search" size={16} />
         <span className="hidden lg:inline">Search</span>

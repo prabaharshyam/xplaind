@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DraftNote } from "@/components/draft-note";
 import { muted, textLink } from "@/components/ui";
 import { getInterviewView, getInterviewViews } from "@/lib/content/interview";
 import { interviewTopicLabel } from "@/lib/interview-topics";
@@ -33,11 +32,6 @@ export default async function InterviewQuestionPage({ params }: PageProps<"/inte
       <p className={`mt-2 text-sm ${muted}`}>
         {interviewTopicLabel(q.topic)} · level {q.level}
       </p>
-      {!q.reviewed && (
-        <div className="mt-4">
-          <DraftNote />
-        </div>
-      )}
 
       <h2 className="mt-8 text-xl font-semibold">Short answer</h2>
       <p className="mt-2 rounded-2xl bg-zinc-100 p-4 leading-7 dark:bg-zinc-900">{q.short_answer}</p>

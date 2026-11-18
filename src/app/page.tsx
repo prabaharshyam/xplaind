@@ -196,7 +196,7 @@ export default function Home() {
       <section id="roles" aria-labelledby="roles-heading" className="scroll-mt-20 py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={1} label="Start here" />
-          <div className="mt-4 flex items-end justify-between gap-4">
+          <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
             <h2 id="roles-heading" data-words className="max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
               <Words text="Choose your AI role" />
             </h2>
@@ -206,10 +206,13 @@ export default function Home() {
           </div>
           <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-800 dark:text-zinc-200">
             One roadmap per job. Not sure?{" "}
-            <Link href="/start" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
-              Take the 2-minute level check
-            </Link>
-            .
+            {/* On a phone the link starts its own line, so it never breaks mid-phrase. */}
+            <span className="block sm:inline">
+              <Link href="/start" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+                Take the 2-minute level check
+              </Link>
+              .
+            </span>
           </p>
           <div className="mt-8" data-rise-group>
             <RoleGrid

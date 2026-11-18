@@ -12,8 +12,8 @@ const md = "min-h-12 px-6 py-3";
 const lg = "min-h-14 px-8 text-lg";
 
 const primary = "bg-brand-700 text-white hover:bg-brand-800";
-const secondary =
-  "border border-zinc-300 bg-white text-zinc-900 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-500 dark:hover:bg-zinc-800";
+/** GL-1 (owner request, 2026-11-17): secondary buttons are Apple-style glass (globals.css, .xp-glass-btn). */
+const secondary = "xp-glass-btn text-zinc-900 dark:text-zinc-100";
 const quiet = "text-brand-800 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-950/60";
 
 // MO-5: deep violet for the main action; the rest are quiet neutral (UX-6), so violet means "do this".

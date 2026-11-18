@@ -85,11 +85,11 @@ function DesktopMenus({ path }: { path: string }) {
     root.current?.querySelectorAll("details").forEach((d) => (d.open = false));
   }, [path]);
 
+  // GL-1: the section you are in sits on a small pane of glass, as in Apple's segmented controls.
   const tab = (on: boolean) =>
-    `relative flex h-10 items-center gap-1 rounded-full px-3 text-sm transition hover:bg-brand-50 hover:text-brand-950 dark:hover:bg-white/10 dark:hover:text-white ${
-      on ? "font-semibold text-brand-900 dark:text-white" : "text-zinc-700 dark:text-zinc-300"
+    `relative flex h-10 items-center gap-1 rounded-full px-3.5 text-sm transition hover:bg-black/[0.05] hover:text-brand-950 group-open:bg-black/[0.05] dark:hover:bg-white/10 dark:hover:text-white dark:group-open:bg-white/10 ${
+      on ? "xp-glass-btn font-semibold text-brand-900 dark:text-white" : "text-zinc-700 dark:text-zinc-300"
     }`;
-  const dot = <span aria-hidden="true" className="absolute inset-x-3 -bottom-[9px] h-0.5 rounded-full bg-brand-700 dark:bg-brand-300" />;
 
   return (
     <div ref={root} className="flex items-center gap-1">
@@ -100,11 +100,10 @@ function DesktopMenus({ path }: { path: string }) {
             <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 transition group-open:rotate-180">
               <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {active === g.id && dot}
             {active === g.id && <span className="sr-only"> (current section)</span>}
           </summary>
           <div
-            className={`nav-panel absolute top-full left-0 z-50 mt-3 rounded-3xl border border-zinc-200/80 bg-white p-3 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.18),0_8px_20px_-12px_rgba(0,0,0,0.15)] dark:border-zinc-800 dark:bg-zinc-900 ${
+            className={`nav-panel xp-glass-strong absolute top-full left-0 z-50 mt-4 rounded-[1.75rem] p-3 ${
               g.items.length > 4 ? "w-[38rem]" : "w-[22rem]"
             }`}
           >
@@ -115,7 +114,7 @@ function DesktopMenus({ path }: { path: string }) {
                   <Link
                     href={i.href}
                     aria-current={current(path, i.href)}
-                    className="group/item flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-zinc-50 aria-[current=page]:bg-brand-50 dark:hover:bg-white/5 dark:aria-[current=page]:bg-white/5"
+                    className="group/item flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-white/60 aria-[current=page]:bg-white/70 dark:hover:bg-white/[0.07] dark:aria-[current=page]:bg-white/10"
                   >
                     <Tile icon={i.icon} tone={i.tone} />
                     <span className="flex flex-col pt-0.5">
@@ -132,7 +131,6 @@ function DesktopMenus({ path }: { path: string }) {
       {/* NV-8: no permanent dot here. It read as "you are subscribed"; the dot now only means "you are here". */}
       <Link href={PRO_LINK.href} aria-current={current(path, PRO_LINK.href)} className={`${tab(under(path, PRO_LINK.href))} gap-1.5`}>
         {PRO_LINK.label}
-        {under(path, PRO_LINK.href) && dot}
       </Link>
     </div>
   );

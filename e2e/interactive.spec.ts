@@ -146,12 +146,13 @@ test("on every roadmap, a lesson opened from the drawer still responds to clicks
   }
 });
 
-test("the top bar is the same light, frosted bar on the home page and after leaving it (MO-5)", async ({ page }) => {
+test("the top bar is the same light glass on the home page and after leaving it (MO-5, GL-1)", async ({ page }) => {
   await page.goto("/");
-  const header = page.locator(".site-header");
-  const tone = () => header.evaluate((h) => getComputedStyle(h).backgroundColor);
+  // GL-1: the bar is a floating capsule; its glass is drawn on the capsule's ::before layer.
+  const bar = page.locator(".site-header .xp-glass").first();
+  const tone = () => bar.evaluate((h) => getComputedStyle(h, "::before").backgroundColor);
   const onHome = await tone();
-  expect(onHome).toMatch(/255, 255, 255|oklab\(0\.99/); // white, however the browser writes it
+  expect(onHome).toMatch(/255, 255, 255|oklab\(0\.99/); // translucent white, however the browser writes it
   await page.locator('main a[href="/paths"]:visible').first().click();
   await expect(page).toHaveURL(/\/paths$/);
   await expect.poll(tone).toBe(onHome);

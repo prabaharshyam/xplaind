@@ -7,11 +7,9 @@ import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { CopyCode } from "@/components/copy-code";
 import remarkGfm from "remark-gfm";
-import { DraftNote } from "@/components/draft-note";
 import { JsonLd } from "@/components/json-ld";
 import { card, muted, textLink } from "@/components/ui";
 import { getBlogPost, getBlogPosts, getPath, getStop } from "@/lib/content";
-import { isHumanName } from "@/lib/content/review";
 import { roadmapHref } from "@/lib/paths";
 import { formatDay } from "@/lib/roadmap/cost";
 import { siteUrl } from "@/lib/site";
@@ -98,11 +96,6 @@ export default async function BlogPostPage({ params }: PageProps<"/blog/[slug]">
             sizes="(min-width: 672px) 42rem, 100vw"
             className="mt-6 w-full rounded-2xl object-cover"
           />
-        )}
-        {!isHumanName(post.reviewed_by) && (
-          <div className="mt-4">
-            <DraftNote />
-          </div>
         )}
         <div className={PROSE}>
           <MDXRemote

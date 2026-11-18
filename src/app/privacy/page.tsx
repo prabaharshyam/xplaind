@@ -53,7 +53,7 @@ const STORED: [string, string, string][] = [
   ],
   [
     "Interview readiness and project reviews (accounts only)",
-    "The score of each mock interview review and each AI project review, the role or project, the date, and the GitHub link you gave. Not your answers, your write-up or the README.",
+    "The score of each mock interview review, each AI voice interview and each AI project review, the role or project, how many questions you answered, the date, and the GitHub link you gave. Not your answers, the interview transcript, your voice, a job description you pasted, your write-up or the README.",
     "To show your readiness trend and decide certificates. Deleted with your account.",
   ],
   [
@@ -81,7 +81,8 @@ const PROCESSORS: [string, string][] = [
     paymentProvider() === "razorpay" ? "Razorpay" : "Cashfree Payments",
     "Takes payments for Pro passes, only if you buy one. It receives the amount, your email and mobile number, and handles your UPI, card or bank details itself.",
   ],
-  ["Anthropic", "Writes AI answers. It receives only the text of that request, such as your question, your code and its error, or your resume text, when you press the button. If you are a Pro learner and choose to have the picture pages of your notes read, those pages, drawn as small images, are sent to it too, and only those pages."],
+  ["Anthropic", "Writes AI answers. It receives only the text of that request, such as your question, your code and its error, or your resume text, when you press the button. If you are a Pro learner and choose to have the picture pages of your notes read, those pages, drawn as small images, are sent to it too, and only those pages. In the AI voice interviewer (Pro, and one free interview per account), it receives the text of what you said (the transcript), never your voice, and, if you paste one, the job description and the company name you typed, to plan the questions. We do not store the job description."],
+  ["Sarvam AI", "Runs the AI voice interviewer's voice (Pro, and one free interview per account). It turns your spoken answers into text, receiving short recordings of them while you answer, and it speaks the interviewer's lines, which can quote what you said. Xplaind does not keep the recordings (Sarvam handles them under its own terms); we store only your score."],
   ["YouTube", "Plays videos inside lessons from its privacy-enhanced (no-cookie) player, and only after you press play."],
   ...(analyticsKey()
     ? ([["PostHog", "Counts page visits and a few steps, such as starting the placement test, without cookies and without anything that identifies you or your device (AN-2)."]] as [string, string][])

@@ -30,6 +30,7 @@ they are kept here so every session has them. CLAUDE.md says which skill to use 
 | https://github.com/tsogjavklann/awwwards-3d | awwwards-3d |
 | https://github.com/shadcn/ui | shadcn, migrate-radix-to-base |
 | https://github.com/remotion-dev/skills | remotion-best-practices |
+| https://github.com/DietrichGebert/ponytail | ponytail, ponytail-review, ponytail-audit, ponytail-debt, ponytail-gain, ponytail-help (MIT, v5.3.3, added 2026-11-18; skills only, its plugin hooks are not installed) |
 
 Reviewed on 2026-11-02 for unsafe scripts: the five shell scripts only check tools (ffmpeg,
 shadcn setup) or report whether optional API keys are set, without printing them. Licences are

@@ -470,7 +470,7 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
       </div>
 
       {/* RM-7: phones keep Learning / Done / Skip one tap away in a slim bar at the bottom. */}
-      <div className="lx-trackbar fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/95 print:hidden">
+      <div className="lx-trackbar xp-glass-strong fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-30 rounded-[1.75rem] px-4 py-2 lg:hidden print:hidden">
         <div className="mx-auto flex max-w-3xl items-center gap-2">
           <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Track</span>
           <TopicStatus stopId={stop.id} title={stop.title} size="sm" label={`Track ${stop.title}`} />
