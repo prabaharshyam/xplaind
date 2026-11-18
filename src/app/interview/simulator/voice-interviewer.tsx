@@ -408,8 +408,20 @@ function Consent({
       </div>
       <p>
         It works like a call. Zarina asks a question and listens; when you finish speaking, she asks a follow-up about
-        what you said, then moves on. Find a quiet spot, and use headphones if you can.
+        what you said, then moves on.
       </p>
+      {/* VI-18 (2026-11-18, owner: people tried it in crowded places, and the microphone picked up other voices and
+          noise, which spoiled the transcript and the score). Said before the start, and again in her first line. */}
+      <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100" role="note" aria-labelledby="quiet-note">
+        <p id="quiet-note" className="font-semibold">
+          For the best results, sit somewhere quiet
+        </p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-5">
+          <li>A room with no other people talking, no TV, music or traffic noise.</li>
+          <li>Earphones with a microphone, if you have them, and the phone or laptop close to you.</li>
+          <li>The microphone hears everything around you, and every extra sound ends up in your answer and lowers your score.</li>
+        </ul>
+      </div>
       <div className="rounded-2xl bg-white p-4 dark:bg-zinc-950" role="note" aria-labelledby="privacy-note">
         <p id="privacy-note" className="font-semibold">
           What is sent to our AI
