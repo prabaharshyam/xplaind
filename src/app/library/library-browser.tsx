@@ -196,12 +196,12 @@ export function LibraryBrowser({
             <p className="line-clamp-2 text-card text-zinc-700 dark:text-zinc-300">{i.channel && i.kind === "video" ? `${i.channel} · ${i.summary}` : i.summary}</p>
             <p className="mt-auto flex flex-wrap gap-1.5 pt-1">
               {i.topics.map((t) => (
-                <button key={t} type="button" onClick={() => set("topic", t)} className="rounded-full bg-brand-50 px-2 py-1 text-xs text-brand-900 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200">
+                <button key={t} type="button" onClick={() => set("topic", t)} className="rounded-full bg-brand-50 px-2 py-1 text-xs text-brand-900 hover:bg-brand-100 dark:hover:bg-brand-900 dark:bg-brand-950 dark:text-brand-200">
                   {topics.find((x) => x.id === t)?.label ?? t}
                 </button>
               ))}
               {i.tags.slice(0, 3).map((t) => (
-                <button key={t} type="button" onClick={() => set("q", t)} className="rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200">
+                <button key={t} type="button" onClick={() => set("q", t)} className="rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
                   {t}
                 </button>
               ))}
