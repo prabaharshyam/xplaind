@@ -17,7 +17,7 @@ export const metadata: Metadata = pageMeta({
 const A = "font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300";
 
 const GETS: { icon: "mic" | "check" | "target" | "cert" | "chat" | "map"; t: string; d: string }[] = [
-  { icon: "map", t: "A roadmap for each role", d: "Nine AI roles, each with lessons, quick checks and guided projects. Students start with a 2-minute level check, so nobody repeats what they know." },
+  { icon: "map", t: "A roadmap for each role", d: "Ten AI roles, each with lessons, quick checks and guided projects. Students start with a 2-minute level check, so nobody repeats what they know." },
   { icon: "mic", t: "Mock interviews with a readiness score", d: "Spoken or typed mock interviews for their role, reviewed by AI, with a score out of 100 that shows when they are ready." },
   { icon: "check", t: "Project reviews against a rubric", d: "Students link their GitHub project and get it marked criterion by criterion, with what to fix before they show it to a recruiter." },
   { icon: "target", t: "Resume review and job match", d: "Line-by-line resume fixes, a match score for a job post, and a LinkedIn headline written from their own resume." },

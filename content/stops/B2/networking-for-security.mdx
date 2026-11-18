@@ -1,0 +1,171 @@
+---
+id: networking-for-security
+level: B2
+theme: security
+title: "Networking for security"
+outcome: "Explain IP addresses, ports, TCP and UDP, DNS, HTTP and HTTPS and firewalls well enough to read a connection log and say what looks normal and what looks suspicious."
+answer: "Networks move data as packets between IP addresses and ports. Defenders need to know what normal traffic looks like, how DNS and HTTPS work, and how firewalls allow or block it."
+why_it_matters: "Every attack crosses a network: the phishing link, the exploit, the call home, the stolen data leaving. Logs from firewalls, DNS and web servers are the first evidence a defender reads. You cannot spot odd traffic if you do not know normal traffic."
+hours: 3
+gap_tags: []
+primary_resource: cloudflare-what-is-dns
+alternates: [cloudflare-what-is-a-firewall, mdn-http-overview]
+more: [professor-messer-security-plus]
+videos: [yt-powercert-animated-videos-tcp-vs-udp-comparison, yt-professor-messer-an-overview-of-dns-comptia-network, yt-powercert-animated-videos-what-is-a-firewall]
+format: deep
+key_terms: [tcp-ip, port, dns, firewall, tls]
+check:
+  type: mcq
+  question_ids: [networking-for-security-1, networking-for-security-2, networking-for-security-3]
+flashcards:
+  - q: "What is an IP address?"
+    a: "A number that identifies a device on a network, such as 192.0.2.10 (IPv4) or a longer IPv6 address. Private ranges such as 10.x and 192.168.x are used inside homes and offices."
+  - q: "What is a port?"
+    a: "A number from 0 to 65535 that tells a machine which service a connection is for. Examples: 22 SSH, 53 DNS, 80 HTTP, 443 HTTPS, 3389 Remote Desktop."
+  - q: "How do TCP and UDP differ?"
+    a: "TCP sets up a connection with a handshake and guarantees ordered, complete delivery. UDP just sends packets without guarantees, which is faster; DNS and video calls often use it."
+  - q: "What does DNS do?"
+    a: "It turns a name like example.com into an IP address. Your device asks a resolver, which asks the root, the top-level domain and then the domain's authoritative server."
+  - q: "Why do defenders watch DNS logs?"
+    a: "Almost every connection starts with a DNS lookup, so lookups to new, odd-looking or known-bad domains are an early sign of malware or phishing."
+  - q: "What does HTTPS add to HTTP?"
+    a: "TLS encryption and a certificate that proves the server's identity, so others on the network cannot read or change the traffic."
+  - q: "What is a firewall rule?"
+    a: "A rule that allows or blocks traffic by source, destination, port and protocol. Good policy is deny by default and allow only what is needed, in both directions."
+  - q: "Name three suspicious traffic patterns."
+    a: "A laptop calling the same unknown server at regular intervals, large uploads at odd hours, and one address trying many ports or many logins in a short time."
+exercise:
+  title: "Read the Coimbatore factory's firewall log"
+  setup: "A textile factory in Coimbatore has 40 office PCs on 10.0.5.0/24 and one web server. Its firewall logs show: (1) many PCs connecting to 203.0.113.80 on port 443 during work hours; (2) PC 10.0.5.23 connecting to 198.51.100.7 on port 443 every 300 seconds, day and night, all weekend; (3) an outside address 192.0.2.99 trying ports 21, 22, 23, 25, 80, 443, 3306 and 3389 on the web server within ten seconds; (4) the web server allowing inbound port 3306 from anywhere."
+  questions:
+    - q: "Which line looks most like malware, and why?"
+      a: "Line 2: a single PC calling the same unknown address at exact intervals, even when nobody is working, looks like command-and-control beaconing."
+    - q: "What is line 3 and how worried should you be?"
+      a: "A port scan from the internet. It is common background noise, but it shows which services are exposed, so check that only intended ports answer."
+    - q: "What is wrong with line 4?"
+      a: "Port 3306 is MySQL. A database should never be reachable from the whole internet; allow it only from the app server or block it."
+    - q: "What would you check next for PC 10.0.5.23?"
+      a: "Its DNS logs for the domain behind 198.51.100.7, what process makes the connection, and whether other PCs talk to the same address. Isolate it if it looks malicious."
+ask:
+  - "What is the difference between TCP and UDP?"
+  - "Why is DNS important for security monitoring?"
+  - "What should a firewall block by default?"
+drafted_with_ai: true
+reviewed_by: Shyam Prabahar
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+A **network** is how computers send data to each other. For a security engineer, networking is not about cables and routers; it is about reading traffic. Every attack crosses a network at some point: the phishing link a user clicks, the exploit sent to a server, the malware calling home, and the stolen data leaving. Firewall, DNS and web server logs are often the first evidence you get.
+
+You need six ideas: **IP addresses**, **ports**, **TCP and UDP**, **DNS**, **HTTP and HTTPS**, and **firewalls**. Together they let you read a line like this and judge it:
+
+```text
+2026-11-18 02:14:07 IST ALLOW TCP 10.0.5.23:51544 -> 198.51.100.7:443 bytes_out=1840 bytes_in=312
+```
+
+That says: at 2:14 in the morning, an office PC (10.0.5.23) opened a TCP connection from a random port to an outside address on port 443 (HTTPS), sent about 1.8 KB and received 0.3 KB, and the firewall allowed it. Is that fine? By the end of this lesson you will know what to ask.
+
+## How it works
+
+**IP addresses.** Every device on a network has an IP address. IPv4 addresses look like 192.0.2.10; IPv6 addresses are longer, like 2001:db8::10. Some ranges are **private** and used only inside homes and offices: 10.x.x.x, 172.16.x.x to 172.31.x.x, and 192.168.x.x. Your home router gives your phone a private address and shares one public address with the internet. A **subnet** such as 10.0.5.0/24 means "the 256 addresses from 10.0.5.0 to 10.0.5.255".
+
+**Ports.** One machine runs many services, so a connection names a **port**, a number from 0 to 65535. Servers listen on well-known ports; clients use a random high port for their side.
+
+| Port | Service | Security note |
+| --- | --- | --- |
+| 22 | SSH (remote shell) | Constantly scanned; use keys, not passwords |
+| 53 | DNS | Watch for lookups to odd domains and very long names |
+| 80 | HTTP | Unencrypted; should redirect to 443 |
+| 443 | HTTPS | Most normal web traffic, and much malware traffic too |
+| 25 | SMTP (email between servers) | Office PCs should not send mail directly |
+| 3306 and 5432 | MySQL and PostgreSQL | Never open to the whole internet |
+| 3389 | Remote Desktop (Windows) | A common ransomware entry point when exposed |
+
+**TCP and UDP.** Data travels in small **packets**. Two main protocols carry them:
+
+- **TCP** sets up a connection first with a **three-way handshake** (SYN, SYN-ACK, ACK), then guarantees that data arrives complete and in order. Web, email and SSH use TCP.
+- **UDP** just sends packets with no handshake and no guarantee. It is faster and suits DNS lookups, video calls and online games.
+
+A port scan often shows up as many SYN packets to many ports with no completed handshakes.
+
+**DNS.** People use names; networks use IP addresses. **DNS** (Domain Name System) turns one into the other.
+
+```flow
+title: What happens when you open a website
+You type bank.example.com -> Browser asks a DNS resolver | often your ISP, office or a public resolver
+Browser asks a DNS resolver -> Resolver asks the root, then .com, then the domain's own server
+Resolver asks the root, then .com, then the domain's own server -> Answer: an IP address | cached for a while
+Answer: an IP address -> TCP handshake to that IP on port 443
+TCP handshake to that IP on port 443 -> TLS handshake | server shows its certificate
+TLS handshake -> Encrypted HTTP request and response
+Encrypted HTTP request and response -> Firewall and proxy log the connection | source, destination, port, bytes
+```
+
+Defenders love DNS logs because nearly every connection starts with a lookup. Malware has to find its server somehow, so lookups to brand-new domains, random-looking names (such as kq7x3vz9plm.example) or very long subdomains are worth a look. Attackers also register look-alike domains, such as a bank name with one letter changed, for phishing.
+
+**HTTP and HTTPS.** HTTP is the language of the web: a client sends a **request** (a method such as GET or POST, a path, headers and maybe a body) and the server sends a **response** with a status code (200 OK, 302 redirect, 401 not signed in, 403 forbidden, 404 not found, 500 server error). Web server logs record each request, and they show attacks such as a burst of 401s (password guessing) or odd paths like /wp-admin on a site that does not run WordPress (scanning).
+
+**HTTPS** is HTTP inside **TLS**. TLS encrypts the traffic and the server proves its identity with a certificate. Anyone on the same café Wi-Fi sees only that you connected to an IP on port 443, plus the site name in most cases, but not the pages or passwords. The flip side for defenders: HTTPS hides malware traffic too, so you rely more on DNS, destinations, timing and volume than on content.
+
+**Firewalls.** A **firewall** allows or blocks traffic by rules. A simple network firewall matches on source, destination, port and protocol:
+
+```text
+# rule  direction  source          destination      port  action
+1       inbound    any             203.0.113.25     443   allow    # public website
+2       inbound    10.0.9.0/24     203.0.113.25     22    allow    # admin VPN only
+3       outbound   10.0.5.0/24     any              443   allow    # office web browsing
+4       outbound   10.0.5.0/24     any              25    deny     # PCs must not send mail directly
+5       any        any             any              any   deny     # default: deny everything else
+```
+
+Good policy is **deny by default** and allow only what is needed, for outbound traffic as well as inbound. Many companies forget outbound rules, which lets malware call home freely. Other kinds you will meet: host firewalls on each machine (Windows Defender Firewall, ufw or nftables on Linux), cloud **security groups** in AWS, Azure and Google Cloud, and **web application firewalls** (WAFs) that inspect HTTP requests for attacks such as SQL injection.
+
+**What a defender looks for.**
+
+- **Beaconing**: one machine contacting the same outside address at regular intervals, especially at night or at weekends.
+- **Unusual volume**: a PC uploading gigabytes to a new destination, which may be data being stolen.
+- **Scanning**: one address touching many ports or many hosts in seconds.
+- **Brute force**: many failed logins to SSH, Remote Desktop or a web login.
+- **Odd destinations**: new or look-alike domains, or countries the business never deals with.
+- **Exposed services**: databases, Remote Desktop or admin panels reachable from the internet.
+
+## A worked example
+
+Back to the 2:14 a.m. log line. An analyst at a hypothetical Chennai logistics firm checks it step by step.
+
+1. **Is it one-off or regular?** Filtering the firewall log for 10.0.5.23 to 198.51.100.7 shows a connection every 300 seconds, around the clock, for three days. Regular timing with no human pattern suggests automated software.
+2. **What name did it look up?** The DNS log shows the PC resolved a random-looking domain registered two weeks ago just before each connection.
+3. **Is it business software?** The asset list says this PC belongs to the accounts team. No known accounting tool uses that domain.
+4. **Does anyone else talk to it?** No other PC has contacted that address. One infected machine, not a company-wide tool.
+5. **Action.** The analyst asks IT to isolate the PC from the network, blocks the domain and IP on the firewall and DNS resolver, and opens an incident. Later, the endpoint team finds a malicious attachment opened four days earlier.
+
+The firewall allowed the traffic because port 443 outbound was open to everything. A tighter outbound policy, or a DNS filter that blocks newly registered domains, would have stopped the call home.
+
+## Common mistakes
+
+- **Trusting port 443 because it is "just HTTPS".** Much malware uses HTTPS precisely because it blends in.
+- **Only filtering inbound traffic.** Outbound rules and DNS filtering stop data theft and command and control.
+- **Exposing databases, Remote Desktop or admin panels to the internet** "just for a quick test", then forgetting.
+- **Ignoring DNS logs.** They are small, cheap to keep and among the most useful logs you have.
+- **Mixing up private and public addresses** when reading logs; check which side of the firewall each address is on.
+- **Scanning networks you do not own.** Use your own home lab or purpose-built practice platforms.
+
+## Practice
+
+Read Cloudflare's explainers on DNS and firewalls and the MDN overview of HTTP. Watch the three videos below. Then try these on your own machine:
+
+```bash
+nslookup example.com            # see the IP address DNS returns
+dig +trace example.com          # watch the resolver walk root, .com, then the domain (Linux or macOS)
+curl -I https://example.com     # see HTTP response headers and the status code
+ss -tunp                        # Linux: list your open TCP and UDP connections and their programs
+```
+
+1. Run the commands above and explain each line of output in your own words.
+2. On your home router's admin page, find which devices are connected and which ports, if any, are forwarded to the internet. Close any you do not need.
+3. Write five firewall rules, deny by default, for a small office with a website, a VPN for admins and staff web browsing.
+4. Read the exercise log above again and write the next three questions you would ask.
+
+**You are done when you can** explain IP, ports, TCP versus UDP, DNS, HTTPS and firewalls in plain words, and read a connection log line saying what is normal and what deserves a closer look.

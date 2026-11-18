@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   // SE-8: the brand first, then what people search for ("learn AI free", "AI course", "AI engineer roadmap").
   title: { absolute: "Xplaind: Learn AI for the Job You Want | AI Roadmaps, India" },
   description:
-    "Xplaind is an AI learning platform for India: step-by-step roadmaps to 9 AI jobs, 200+ plain-English lessons, portfolio projects and AI interview prep.",
+    "Xplaind is an AI learning platform for India: step-by-step roadmaps to 10 AI jobs, 200+ plain-English lessons, portfolio projects and AI interview prep.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Xplaind: learn AI step by step, for the AI job you want",

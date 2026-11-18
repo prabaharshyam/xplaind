@@ -1,0 +1,193 @@
+---
+id: linux-for-security
+level: B2
+theme: security
+title: "Linux for security"
+outcome: "Read Linux users, groups and file permissions, find running processes and services, use sudo and SSH keys safely, and search the logs in /var/log for signs of an attack."
+answer: "Most servers, cloud machines and AI workloads run Linux. Defenders use a small set of commands to see who can do what, what is running, who logged in and what changed."
+why_it_matters: "When an alert fires, a defender often has a shell on a Linux server and minutes to answer: who logged in, what is running, what changed? Weak permissions, password SSH and loose sudo rules are also among the most common findings in server reviews."
+hours: 3
+gap_tags: []
+primary_resource: overthewire-bandit
+alternates: [missing-semester-command-line]
+more: [professor-messer-security-plus]
+videos: [yt-networkchuck-sudo-power-managing-users-in-linux, yt-networkchuck-5-steps-to-secure-linux-protect]
+format: deep
+key_terms: [linux-permissions, ssh, least-privilege, port]
+check:
+  type: mcq
+  question_ids: [linux-for-security-1, linux-for-security-2, linux-for-security-3]
+flashcards:
+  - q: "What do the letters in -rw-r----- mean?"
+    a: "It is a regular file. The owner can read and write, the group can read, and everyone else has no access."
+  - q: "What do chmod 600 and chmod 755 mean?"
+    a: "600: owner read and write, nobody else anything (good for private keys and secrets). 755: owner full, group and others read and execute (typical for programs and folders)."
+  - q: "Why is a world-writable file dangerous?"
+    a: "Any user or compromised service on the machine can change it. If root runs that file, for example from cron, an attacker can gain root."
+  - q: "What is sudo and how should it be set up?"
+    a: "sudo lets a permitted user run a command as root. Give it to few people, prefer specific commands over full root, and remember every use is logged."
+  - q: "Why use SSH keys instead of passwords?"
+    a: "Keys cannot be guessed by brute force like passwords. With password login disabled, internet-wide SSH guessing simply fails. Protect the private key with a passphrase and chmod 600."
+  - q: "Where are Linux logins recorded?"
+    a: "In /var/log/auth.log on Debian and Ubuntu, /var/log/secure on Red Hat family systems, or in the systemd journal (journalctl). The last command shows recent logins."
+  - q: "Which commands show what is running and listening?"
+    a: "ps aux or top for processes, ss -tulpn for listening ports and their programs, and systemctl list-units --type=service for services."
+  - q: "What is a SUID file?"
+    a: "A program that runs with its owner's rights, often root, whoever starts it. Unexpected SUID files are a classic privilege escalation route."
+exercise:
+  title: "Check the Bhubaneswar ed-tech server"
+  setup: "An ed-tech startup in Bhubaneswar runs its API on one Ubuntu server. You get a shell and find: the .env file with database and payment keys is -rw-rw-rw-; /etc/ssh/sshd_config has PasswordAuthentication yes and PermitRootLogin yes; /var/log/auth.log shows thousands of failed SSH logins for root and admin from many addresses, and one accepted password login for user deploy from an unfamiliar address at 03:12; ss -tulpn shows Redis listening on 0.0.0.0:6379."
+  questions:
+    - q: "What is wrong with the .env permissions, and what should they be?"
+      a: "rw for everyone means any user or compromised process can read or change the keys. Make it owned by the app user with chmod 600, and rotate the keys if exposure is possible."
+    - q: "How would you change the SSH settings?"
+      a: "Set PasswordAuthentication no and PermitRootLogin no, use keys for named users, then restart sshd while keeping a second session open in case of mistakes."
+    - q: "What does the 03:12 login suggest and what next?"
+      a: "Possibly a guessed or reused password for deploy. Check what deploy did after logging in (shell history, new files, cron jobs, new keys in authorized_keys), and treat it as an incident."
+    - q: "Why is Redis on 0.0.0.0:6379 a problem?"
+      a: "It listens on every interface, so it may be reachable from the internet. Bind it to 127.0.0.1 or a private address, require authentication and block 6379 at the firewall."
+ask:
+  - "How do Linux file permissions work?"
+  - "Which Linux logs should I check after a suspected break-in?"
+  - "Why disable password login for SSH?"
+drafted_with_ai: true
+reviewed_by: Shyam Prabahar
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+Most servers on the internet run Linux, and so do most cloud machines, containers and GPU boxes that train and serve AI models. You type commands into a terminal (a text window) and Linux runs them. This lesson looks at Linux through a defender's eyes: **who can do what** (users, groups, permissions, sudo), **what is running** (processes, services, open ports), **how people get in** (SSH) and **what happened** (logs).
+
+When an alert fires about a Linux server, the first questions are always the same: who logged in, from where, what did they run, what is listening, and what changed? This lesson gives you the commands to answer them.
+
+## How it works
+
+**Users and groups.** Every process runs as a user. **root** (user id 0) can do anything. Normal users have their own home folders, and services such as nginx or postgres get their own low-privilege accounts, so a bug in one service does not hand over the whole machine. Users belong to **groups**, which share access to files.
+
+```bash
+whoami                 # which user am I?
+id                     # my user id and groups
+cat /etc/passwd        # all accounts (no passwords here, despite the name)
+sudo cat /etc/shadow   # password hashes; only root can read this
+getent group sudo      # who is in the sudo group (wheel on Red Hat family systems)
+```
+
+Accounts with a real shell that you do not recognise, or a second user with id 0, are red flags.
+
+**File permissions.** Every file has an owner, a group and three sets of rights: for the **owner**, the **group** and **others** (everyone else). Each set has **r** (read), **w** (write) and **x** (execute; for a folder, "enter").
+
+```bash
+$ ls -l /srv/app
+-rw-------  1 app  app   412 Nov 18 09:10 .env
+-rwxr-xr-x  1 root root 8312 Nov 10 11:02 start.sh
+drwxr-x---  2 app  app  4096 Nov 18 09:10 uploads
+```
+
+Read .env as: a file (-), owner can read and write (rw-), group nothing (---), others nothing (---). Permissions are also written as numbers: r = 4, w = 2, x = 1, added per set.
+
+| Mode | Letters | Typical use |
+| --- | --- | --- |
+| 600 | rw------- | Private keys, .env files, secrets |
+| 644 | rw-r--r-- | Ordinary config and web files anyone may read |
+| 700 | rwx------ | A user's private folder, such as ~/.ssh |
+| 755 | rwxr-xr-x | Programs and normal folders |
+| 777 | rwxrwxrwx | Almost never right: anyone can change it |
+
+```bash
+chmod 600 /srv/app/.env           # owner read and write only
+chown app:app /srv/app/.env       # owner and group become app
+find / -perm -0002 -type f 2>/dev/null    # world-writable files: review each one
+find / -perm -4000 -type f 2>/dev/null    # SUID programs: they run as their owner, often root
+```
+
+Two patterns attackers love: a **world-writable script run by root** (for example from cron), and an unexpected **SUID** program. Both can turn a low-privilege foothold into root. This is **least privilege** at file level: each user and service gets only the access it needs.
+
+**sudo.** Logging in as root directly is risky and leaves no record of who did what. Instead, trusted users run single commands as root with **sudo**. Rules live in /etc/sudoers (edit it with visudo). Keep the list short, prefer specific commands to "ALL", avoid NOPASSWD for humans, and remember that sudo use is logged. Run sudo -l to see what you are allowed to do.
+
+**Processes and services.** A process is a running program; a **service** (daemon) is one that runs in the background, usually managed by **systemd**.
+
+```bash
+ps aux --sort=-%cpu | head        # busiest processes and which user runs them
+ss -tulpn                         # listening TCP and UDP ports, and which program owns each
+systemctl list-units --type=service --state=running
+systemctl status ssh              # one service's state and recent log lines
+crontab -l ; ls /etc/cron.*       # scheduled jobs, a favourite place to hide persistence
+```
+
+Look for things that should not be there: a process running from /tmp, a crypto-miner using all the CPU, a service listening on 0.0.0.0 (every interface) when it should listen only on 127.0.0.1, or a cron job nobody can explain.
+
+**SSH keys.** SSH is how admins reach Linux servers, so it is also what attackers attack most. Any server with port 22 open to the internet sees password guessing quickly. The fix is **key-based login**: you keep a private key on your laptop, and the server stores the matching public key in ~/.ssh/authorized_keys.
+
+```text
+# /etc/ssh/sshd_config: a safe baseline
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AllowUsers asha ravi
+```
+
+Protect the private key with a passphrase, keep it at chmod 600, and remove keys when people leave. An unknown line in authorized_keys is a common backdoor.
+
+**Logs in /var/log.** Linux records what happens. File names differ slightly by distribution.
+
+| Log | What it tells you |
+| --- | --- |
+| /var/log/auth.log (Debian, Ubuntu) or /var/log/secure (Red Hat family) | SSH logins, failed passwords, sudo use, new users |
+| /var/log/syslog or /var/log/messages | General system and service messages |
+| journalctl | The systemd journal: logs from every service, searchable by unit and time |
+| /var/log/nginx/access.log | Every web request: who, which path, status code |
+| last and lastb | Recent successful and failed logins |
+
+```bash
+sudo grep "Failed password" /var/log/auth.log | tail      # recent failed SSH logins
+sudo grep "Accepted" /var/log/auth.log                     # successful logins: who, from where
+sudo journalctl -u ssh --since "2026-11-18 00:00"          # SSH service log since midnight
+last -a | head                                             # last logins with source addresses
+```
+
+A typical line: "Accepted password for deploy from 198.51.100.44 port 51022 ssh2". Note the user, the method (password or publickey) and the source address, and remember logs on a hacked machine can be edited, which is why companies ship them to a central system.
+
+## A worked example
+
+A hypothetical Hyderabad health-tech startup gets a cloud bill alert: CPU on its inference server has been at 100 percent for two days. An engineer on call investigates using only built-in commands.
+
+```flow
+title: First fifteen minutes on a suspicious Linux server
+High CPU alert on the inference server -> What is using the CPU?
+What is using the CPU? -[ps aux]-> Unknown process kworkerd running as user www-data from /tmp
+Unknown process kworkerd running as user www-data from /tmp -> How did it start?
+How did it start? -[crontab -l -u www-data]-> Cron job downloads and runs it every 10 minutes
+Cron job downloads and runs it every 10 minutes -> How did they get in?
+How did they get in? -[nginx access.log]-> Requests to an old file-upload page with a script inside
+Requests to an old file-upload page with a script inside -> Contain and fix
+Contain and fix | isolate, preserve evidence, remove upload page, rebuild, rotate keys
+```
+
+1. ps aux shows a process named "kworkerd" (made to look like a kernel thread) running as www-data from /tmp, using all CPUs: a crypto-miner.
+2. crontab -l -u www-data shows a job that re-downloads it every ten minutes, which is why killing it did not help.
+3. The nginx access log shows requests to an old image-upload page that accepted any file type. The attacker uploaded a script and ran it through the web server.
+4. auth.log shows no SSH logins from strangers, so the attacker likely stayed as www-data. Because it ran as a low-privilege user, it could not read the model files or the database keys, which were chmod 600 and owned by another user. Least privilege limited the damage.
+
+The team isolates the server, copies logs for evidence, rebuilds it from a clean image, removes the upload page, rotates any keys www-data could read, and adds alerts for new cron jobs and processes running from /tmp.
+
+## Common mistakes
+
+- **chmod 777 to "fix" a permission error.** Find the right owner and the smallest mode instead.
+- **Running apps as root.** One bug then means full control of the machine.
+- **Leaving SSH password login on**, or allowing root to log in over SSH.
+- **Secrets in world-readable files** or in shell history; check ~/.bash_history.
+- **Services listening on 0.0.0.0** when only the local app needs them (Redis, databases, admin tools).
+- **Investigating with tools from the compromised machine only.** Attackers can alter logs and binaries; central logging and a clean rebuild matter.
+
+## Practice
+
+Play the first ten levels of OverTheWire's free Bandit game; it is built to be practised on and teaches exactly these commands. Watch NetworkChuck's videos on users and sudo and on securing Linux. Then, on your own Linux machine or a free cloud VM you control:
+
+1. Run id, ls -l in your home folder and ss -tulpn, and explain every line.
+2. Create a file holding a fake API key such as sk-test-0000, set it to 600, and check another user cannot read it.
+3. Find world-writable and SUID files with the find commands above and look up what each SUID program is for.
+4. Set up SSH key login to your VM, then disable password login, keeping a second session open while you test.
+5. Grep auth.log or journalctl for failed logins. On an internet-facing VM, count how many arrive in a day.
+
+**You are done when you can** read a permission string, explain sudo and SSH keys, list what is running and listening, and use /var/log to answer who logged in, from where and what they did.

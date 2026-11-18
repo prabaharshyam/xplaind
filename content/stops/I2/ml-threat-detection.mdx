@@ -1,0 +1,220 @@
+---
+id: ml-threat-detection
+level: I2
+theme: security
+title: "Machine learning for threat detection"
+outcome: "Explain how anomaly detection and classifiers find suspicious logins, traffic, phishing and malware, size their false positives with the base rate, and tune a detector a SOC can live with."
+answer: "ML finds threats by learning normal behaviour or known-bad examples. Attacks are rare, so even accurate models raise mostly false alarms; tune for precision and retrain as attackers change."
+why_it_matters: "Many SIEM, email and endpoint security tools now include ML detections, and analysts must judge them. Knowing why a 99 per cent accurate model can still bury a team in false alerts is a common interview question and a daily SOC reality."
+hours: 3
+gap_tags: []
+primary_resource: sklearn-outlier-detection
+alternates: [google-mlcc-classification, sklearn-metrics]
+more: [sklearn-pitfalls, mitre-atlas]
+videos: [yt-computerphile-malware-and-machine-learning, yt-ibm-technology-ai-in-cybersecurity]
+format: deep
+key_terms: [anomaly-detection, false-positive, precision-recall, concept-drift, siem]
+check:
+  type: mcq
+  question_ids: [ml-threat-detection-1, ml-threat-detection-2, ml-threat-detection-3]
+flashcards:
+  - q: "What are the two main ways ML detects threats?"
+    a: "Anomaly detection learns normal behaviour and flags what differs. Supervised classifiers learn from labelled examples of good and bad, such as phishing and genuine email."
+  - q: "What is the base-rate problem?"
+    a: "Attacks are rare, so even a small false positive rate applied to millions of normal events produces far more false alarms than real detections."
+  - q: "Why is unusual not the same as malicious?"
+    a: "People travel, work late and buy new phones. Anomaly detection flags all of these, so its alerts need context and triage."
+  - q: "Which metric matters most to a busy SOC?"
+    a: "Precision at the chosen threshold: of the alerts raised, how many were real. Recall still matters; choose the threshold with both in view."
+  - q: "What is concept drift in security?"
+    a: "Attackers and users change behaviour, so what the model learned stops matching reality and its accuracy falls. Retrain and monitor."
+  - q: "Give three good features for a login detector."
+    a: "Hour of the login in IST, distance from the user's usual city, a new device, and the number of failed attempts before success."
+  - q: "Why must you split security data by time, not randomly?"
+    a: "A random split leaks future patterns into training and flatters the model. Train on earlier months and test on later ones."
+  - q: "Why keep rules alongside ML?"
+    a: "Rules catch known attacks precisely and are easy to explain. ML adds coverage for the unknown. Most good detection stacks use both."
+exercise:
+  title: "Tune a login detector for a Pune fintech SOC"
+  setup: "A Pune fintech with 40,000 staff and agents sees about 2 million logins a week. A new anomaly model flags 1 per cent of logins. The SOC has three analysts per shift and can investigate about 60 alerts a day in total. Last quarter, real account takeovers were a handful per week."
+  questions:
+    - q: "Roughly how many alerts a week does the model raise, and can the SOC handle them?"
+      a: "About 20,000 a week, near 2,900 a day. The SOC can handle about 60, so almost everything goes uninvestigated."
+    - q: "Why will most of those alerts be false positives?"
+      a: "Real takeovers are a handful among 2 million logins. Even a perfect catch of those leaves thousands of normal-but-unusual logins in the alert list."
+    - q: "Name two ways to cut the alert count without losing the real attacks."
+      a: "Raise the threshold and combine signals, for example alert only when an anomaly also has a new device or failed attempts, and suppress known travel or VPN patterns."
+    - q: "How would you prove the tuned detector still catches attacks?"
+      a: "Replay past confirmed incidents and red-team logins through it, measure recall on them, and track precision from analyst verdicts each week."
+ask:
+  - "Why does a rare attack make false positives so common?"
+  - "When should I use anomaly detection instead of a classifier?"
+  - "How do attackers evade ML-based detection?"
+drafted_with_ai: true
+reviewed_by: Shyam Prabahar
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+Security teams drown in data: logins, firewall logs, DNS lookups, emails, files and process starts. Machine learning (ML) helps find the few events that matter. It does this in two broad ways.
+
+- **Anomaly detection** learns what normal looks like and flags what is different. A finance analyst in Pune usually signs in at 10 a.m. from the office network on the same laptop. A sign-in at 3 a.m. from another country on a new device, after six failed passwords, is far from normal. Anomaly detection needs no labelled attacks, so it can catch attacks nobody has seen before.
+- **Supervised classifiers** learn from labelled examples: thousands of emails marked phishing or genuine, thousands of files marked malware or clean. They then score new items. They are precise on attacks that look like the training data, and weaker on truly new ones.
+
+Neither replaces the other, and neither replaces rules. A rule such as "alert on any login to the payments admin panel from outside India" is clear and cheap. ML adds coverage where writing rules by hand is impossible.
+
+This lesson follows a Security Operations Centre (SOC) at a Pune fintech that adds an ML login detector to its SIEM, and learns why most of its alerts are false.
+
+```flow
+title: An ML detection pipeline in a SOC
+Raw events | logins, VPN, DNS, email, endpoint logs in the SIEM -> Features | hour in IST, distance from usual city, new device, failed tries
+Features -> Model scores each event | anomaly score or phishing probability
+Model scores each event -> Above threshold?
+Above threshold? -[no]-> Stored for hunting and baselines
+Above threshold? -[yes]-> Alert with reasons | "new device + 6 failed tries + new country"
+Alert with reasons -> Analyst triage | true positive or false positive
+Analyst triage -[verdicts become labels]-> Retrain and retune monthly
+Retrain and retune monthly -> Model scores each event
+```
+
+## How it works
+
+### Features: turning events into numbers
+
+A model cannot read a log line. You turn each event into **features**, numbers that capture what an analyst would look at. Good features come from security knowledge, not from the model.
+
+| Data | Example features | Typical model |
+| --- | --- | --- |
+| Logins | hour in IST, km from usual city, new device, failed tries before success, impossible travel speed | Anomaly detection (Isolation Forest), per user or per role |
+| Network traffic | bytes out per hour, new destination countries, rare ports, regular beaconing interval | Anomaly detection, time-series baselines |
+| Email | sender domain age, display name vs real address mismatch, link domains, urgency words, attachment type | Supervised classifier (logistic regression, gradient boosting) |
+| Files and processes | imports, entropy, signer, parent process, command-line length | Supervised classifier trained on labelled malware and clean files |
+| DNS | domain length, randomness of characters, first-seen date | Classifier for algorithm-generated domains |
+
+Two habits matter. First, build features **per user or per group**: a sales manager who travels weekly and a back-office clerk in one Hyderabad branch have very different normals. Second, keep each feature explainable, so an alert can say why it fired.
+
+### The base-rate problem
+
+This is the single most important idea in ML for security. Attacks are rare. Most events are normal. So even a small false positive rate, applied to a huge number of normal events, creates a flood.
+
+Here is a worked illustration with round numbers, not a measured statistic. Suppose a company sees 1,000,000 logins a day and 10 of them are attackers. A detector catches 99 per cent of attacks and wrongly flags only 1 per cent of normal logins. It sounds excellent.
+
+- Real attacks caught: about 10.
+- Normal logins flagged: 1 per cent of 999,990, about 10,000.
+- Precision: about 10 real alerts out of 10,010, roughly 1 in 1,000.
+
+The analysts see 10,000 alerts to find 10 attackers. They will not look at most of them. This is how **alert fatigue** starts, and why a "99 per cent accurate" claim tells you almost nothing. Always ask: at this threshold, how many alerts a day, and what share are real?
+
+### Precision and recall for a SOC
+
+- **Precision**: of the alerts raised, what share were real attacks.
+- **Recall**: of the real attacks, what share raised an alert.
+
+Moving the threshold trades one for the other. A high threshold gives fewer, better alerts but misses some attacks. A low threshold catches more but floods the queue. A SOC sets the threshold from its capacity: if the team can investigate 60 alerts a day, the model should send its best 60 or so, not 3,000. Some teams use two thresholds: high scores go to analysts, middle scores go to automatic enrichment or a weekly hunting list.
+
+Ways to raise precision without losing much recall:
+
+- **Combine weak signals.** An unusual hour alone is noise. An unusual hour plus a new device plus failed attempts is worth a look.
+- **Add context.** Suppress anomalies that match approved travel, the corporate VPN exit points or a known IT change.
+- **Score entities, not events.** Add up a user's risk over a day and alert on the user, not on every odd event.
+- **Feed back verdicts.** Every analyst decision is a label. Use them to retrain.
+
+### A small scikit-learn example
+
+This trains an Isolation Forest on synthetic "normal" logins and scores four new ones. Isolation Forest isolates points with random splits; strange points are isolated in fewer splits and get lower scores.
+
+```python
+import numpy as np
+from sklearn.ensemble import IsolationForest
+
+rng = np.random.default_rng(7)
+n = 5000
+# One row per login: hour (IST), km from usual city, new device (0/1), failed tries before success
+normal = np.column_stack([
+    rng.normal(11, 2.5, n).clip(0, 23),   # office hours
+    rng.exponential(15, n),                # mostly close to home
+    rng.binomial(1, 0.03, n),              # new device is rare
+    rng.poisson(0.2, n),                   # an occasional typo
+])
+
+model = IsolationForest(n_estimators=200, contamination=0.01, random_state=0)
+model.fit(normal)
+
+new_logins = np.array([
+    [10, 5, 0, 0],      # Pune analyst, usual laptop, morning
+    [22, 8, 0, 1],      # same analyst, working late
+    [3, 6800, 1, 6],    # 3 a.m., another country, new device, 6 failed tries
+    [14, 1150, 1, 0],   # a Delhi trip with a new phone
+])
+print(model.predict(new_logins))                      # 1 = looks normal, -1 = anomaly
+print(model.decision_function(new_logins).round(3))   # lower = stranger
+```
+
+Running it with scikit-learn 1.9 printed:
+
+```text
+[ 1  1 -1 -1]
+[ 0.297  0.067 -0.141 -0.086]
+```
+
+The late-night login passes. The attacker is flagged. So is the employee on a genuine trip to Delhi with a new phone: a **false positive**. The model did its job; unusual is simply not the same as malicious. That is why alerts need reasons and context, and why the `contamination` setting, which fixes what share of data is called anomalous, must be tuned against real analyst capacity.
+
+### Classifiers for phishing and malware
+
+For email and files you usually have labels: user reports, sandbox verdicts, threat-intelligence feeds. A supervised model learns from them. Three rules keep it honest:
+
+1. **Split by time.** Train on January to June, test on July and August. A random split lets near-copies of the same campaign sit in both training and test sets and flatters the score.
+2. **Keep the real class balance in the test set.** If 1 email in 500 is phishing in real life, test on that mix, or your precision figure is fiction.
+3. **Measure at the threshold you will deploy**, not only as an area-under-curve number.
+
+### Attackers adapt: concept drift
+
+A model learned from last year's attacks. Attackers read the same research and change their behaviour: new sender domains, phishing text written by AI in fluent Hindi or Tamil, malware that sleeps before acting, logins routed through home-broadband proxies in India so the country looks normal. Normal behaviour also changes: a new office in Kochi, a move to a new VPN. This is **concept drift**, and it quietly lowers recall.
+
+Defences: retrain on a schedule, monitor the alert rate and the precision from analyst verdicts every week, replay known attacks as regression tests, and keep rules for the attacks you must never miss. Some attackers go further and deliberately craft inputs to slip past a model or poison its training data; that is covered in the later lesson on attacks against models.
+
+## A worked example
+
+**The setup.** A Pune fintech runs a lending app and a UPI-linked wallet. Its SOC of three analysts per shift receives login events from the identity provider into the SIEM: about 2 million a week from staff, field agents and partner call centres. After a phishing campaign led to two account takeovers, the team adds an Isolation Forest login model.
+
+**Week one.** The model flags 1 per cent of logins: about 20,000 alerts a week. The queue is unworkable. A sample of 200 shows nearly all are field agents on new phones, staff on leave travelling home to Patna or Guwahati, and the night shift at a partner call centre in Mohali.
+
+**The changes.**
+
+1. **Per-group baselines.** Field agents, office staff and the call centre each get their own model, so a 2 a.m. login is normal for the night shift.
+2. **Combine signals.** An alert needs an anomaly score below the threshold **and** at least one strong signal: a new device with failed attempts, impossible travel, or a login to an admin panel.
+3. **Context suppression.** Logins from the corporate VPN and from approved travel in the HR system lose points.
+4. **A capacity-based threshold.** The threshold is set so the model sends about 40 alerts a day, leaving room for other detections.
+5. **Feedback.** Each analyst verdict is stored and the model is retrained monthly.
+
+**Testing.** The team replays the two real takeovers from last quarter and 30 red-team logins (a colleague signing in with a test account from a cloud server abroad, with a new browser and wrong passwords).
+
+| Version | Alerts per day | Share confirmed real or suspicious | Replayed attacks caught |
+| --- | --- | --- | --- |
+| Week one, one global model | about 2,900 | too few to measure; most never triaged | 32 of 32 |
+| After the five changes | about 40 | about 1 in 8 worth escalating | 30 of 32 |
+
+The tuned model misses two red-team logins that came from inside India on an existing device. The team accepts this and adds a rule for the one case it cannot miss: any new device that registers for UPI PIN reset is reviewed by a person. ML for coverage, rules for the must-catch cases.
+
+## Common mistakes
+
+- **Quoting accuracy.** With rare attacks, a model that says "normal" every time is 99.999 per cent accurate on the numbers above, and useless. Report precision, recall and alerts per day.
+- **Ignoring the base rate.** A 1 per cent false positive rate on a million events is ten thousand alerts.
+- **Random train and test splits.** Split by time, or the score is inflated by near-duplicate campaigns.
+- **One model for everyone.** Night shifts, travelling sales staff and branch clerks need different baselines.
+- **Alerts with no reasons.** An analyst cannot act on "score -0.14". Show the features that drove it.
+- **Train once, forget.** Attackers and users change. Without retraining and monitoring, recall decays silently.
+- **Dropping rules.** Keep precise rules for known, high-impact attacks; use ML to widen coverage.
+- **Training on logs that contain the attack.** If an intruder was already active in your baseline period, the model learns the intrusion as normal. Clean the baseline or use a period you have checked.
+
+## Practice
+
+Read the scikit-learn guide on novelty and outlier detection linked below, then the Google crash course pages on precision, recall and thresholds.
+
+1. Run the example above. Change `contamination` from 0.01 to 0.001 and record which of the four logins are still flagged.
+2. Work the base-rate sum for your own numbers: events per day, attacks per day, false positive rate. How many alerts a day, and what share are real?
+3. Pick one data source you know (email, logins or DNS) and list five features an analyst would trust. For each, write how an attacker could change it to look normal.
+4. Write a one-paragraph plan for retraining and monitoring the detector: how often, which numbers you watch, and which attacks you replay as tests.
+
+**You are done when you can** explain to a SOC lead why a 99 per cent accurate detector can still raise mostly false alarms, and show a threshold chosen from analyst capacity with its precision and recall.

@@ -34,7 +34,7 @@ test("the Stay on track card shows an example week, so it is not empty (BR-4)", 
 test("roadmap, topic and project cards carry a line graphic, not just a small icon (BR-4)", async ({ page }) => {
   const scene = 'svg[viewBox="0 0 300 110"]';
   await page.goto("/paths");
-  await expect(page.locator(scene)).toHaveCount(9);
+  await expect(page.locator(scene)).toHaveCount(10);
   await page.goto("/library?view=topics");
   // The By topic view appears once the page has read its address, so wait for a card before counting.
   await expect(page.getByRole("link", { name: /^Agents/ }).first()).toBeVisible();

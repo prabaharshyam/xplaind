@@ -262,6 +262,7 @@ export const ROLE_SCENES: Record<string, Scene> = {
   "ai-governance-specialist": ["scales", "shield", "checklist", "doc", "people"],
   "ml-engineer": ["nodes", "trend", "bars", "chip", "grid"],
   "mlops-engineer": ["rocket", "loop", "cloud", "server", "gear"],
+  "ai-security-engineer": ["shield", "lock", "bot", "search", "terminal"],
 };
 
 /** One scene per guided project. */
@@ -284,8 +285,10 @@ export const PROJECT_SCENES: Record<string, Scene> = {
   "invoice-to-ledger-automation": ["doc", "flow", "coin", "gear", "db"],
   "multi-step-agent-with-logs": ["bot", "flow", "doc", "loop", "terminal"],
   "operations-agent-approvals": ["bot", "checklist", "people", "lock", "doc"],
+  "phishing-email-detector": ["search", "doc", "nodes", "shield", "bars"],
   "personal-ai-workflow": ["sparkle", "flow", "pencil", "loop", "bubble"],
   "rag-app-with-test-set": ["search", "db", "checklist", "bubble", "doc"],
+  "red-team-an-llm-app": ["target", "bubble", "lock", "checklist", "code"],
   "research-agent-approvals": ["bot", "search", "doc", "checklist", "book"],
   "secure-enterprise-copilot": ["lock", "bubble", "shield", "db", "checklist"],
   "trusted-policy-assistant": ["bubble", "doc", "scales", "shield", "search"],
