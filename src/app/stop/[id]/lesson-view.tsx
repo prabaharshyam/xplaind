@@ -440,19 +440,19 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
               </p>
             )}
             <p className="mt-3 flex flex-wrap items-center gap-2 text-sm" aria-label="Tags">
-              <Link href={`/library?topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-brand-50 px-3 font-medium text-brand-900 ring-1 ring-brand-200 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-900">
+              <Link href={`/library?topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-brand-50 px-3 font-medium text-brand-900 ring-1 ring-brand-200 hover:bg-brand-100 dark:hover:bg-brand-900 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-900">
                 {theme.label}
               </Link>
-              <Link href={`/library?level=${stop.level}`} className="inline-flex min-h-11 items-center rounded-full bg-brand-50 px-3 font-medium text-brand-900 ring-1 ring-brand-200 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-900">
+              <Link href={`/library?level=${stop.level}`} className="inline-flex min-h-11 items-center rounded-full bg-brand-50 px-3 font-medium text-brand-900 ring-1 ring-brand-200 hover:bg-brand-100 dark:hover:bg-brand-900 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-900">
                 {levelWords(stop.level)}: {level?.name}
               </Link>
               {stop.videos.length > 0 && (
-                <Link href={`/library?kind=video&topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-brand-50 px-3 font-medium text-brand-900 ring-1 ring-brand-200 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-900">
+                <Link href={`/library?kind=video&topic=${stop.theme}`} className="inline-flex min-h-11 items-center rounded-full bg-brand-50 px-3 font-medium text-brand-900 ring-1 ring-brand-200 hover:bg-brand-100 dark:hover:bg-brand-900 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-900">
                   Video lessons
                 </Link>
               )}
               {terms.map((t) => (
-                <Link key={t.id} href={`/library?q=${encodeURIComponent(t.term)}`} className="inline-flex min-h-11 items-center rounded-full bg-zinc-100 px-3 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200">
+                <Link key={t.id} href={`/library?q=${encodeURIComponent(t.term)}`} className="inline-flex min-h-11 items-center rounded-full bg-zinc-100 px-3 text-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
                   {t.term}
                 </Link>
               ))}

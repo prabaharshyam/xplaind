@@ -193,7 +193,7 @@ export function AccountMenu() {
     <details ref={menu} className="account-menu group relative hidden sm:block">
       <summary
         aria-label="Your account"
-        className="grid size-10 cursor-pointer list-none place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-900 ring-1 ring-brand-200 hover:bg-brand-200 dark:bg-brand-950 dark:text-brand-100 dark:ring-brand-800 [&::-webkit-details-marker]:hidden"
+        className="grid size-10 cursor-pointer list-none place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-900 ring-1 ring-brand-200 hover:bg-brand-200 dark:bg-brand-950 dark:hover:bg-brand-900 dark:text-brand-100 dark:ring-brand-800 [&::-webkit-details-marker]:hidden"
       >
         <span aria-hidden="true">{initial}</span>
       </summary>

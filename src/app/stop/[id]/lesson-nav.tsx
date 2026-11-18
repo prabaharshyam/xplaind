@@ -8,27 +8,46 @@ export type SectionLink = { id: string; title: string; icon: IconName };
 
 /**
  * RM-15: "On this page", sticky in the LEFT column on big screens (owner request, 7 Nov 2026), so a
- * learner jumps straight to a section instead of scrolling. Each section the learner has scrolled
- * through gets a tick. Phone: a slim reading bar under the header.
+ * learner jumps straight to a section instead of scrolling. Every section the learner has reached or scrolled
+ * past gets a tick. Phone: a slim reading bar under the header.
  */
 export function LessonNav({ sections }: { sections: SectionLink[] }) {
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [current, setCurrent] = useState<string | null>(null);
 
   useEffect(() => {
-    const els = sections.map((s) => document.getElementById(s.id)).filter((e): e is HTMLElement => !!e);
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          setCurrent(e.target.id);
-          setSeen((prev) => (prev.has(e.target.id) ? prev : new Set(prev).add(e.target.id)));
+    // A section counts as read once the learner has scrolled to or past it, so every section above the
+    // reading line is ticked, even when they jumped or scrolled fast. (Watching only the sections on
+    // screen missed any that went by between two frames.) A tick is never taken back.
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const line = window.innerHeight * 0.5;
+      const atEnd = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      let now: string | null = null;
+      const passed: string[] = [];
+      for (const s of sections) {
+        const el = document.getElementById(s.id);
+        if (!el) continue;
+        if (atEnd || el.getBoundingClientRect().top <= line) {
+          passed.push(s.id);
+          now = s.id;
         }
-      },
-      { rootMargin: "-30% 0px -50% 0px" },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+      }
+      if (now) setCurrent(now);
+      setSeen((prev) => (passed.every((id) => prev.has(id)) ? prev : new Set([...prev, ...passed])));
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [sections]);
 
   const percent = sections.length ? Math.round((seen.size / sections.length) * 100) : 0;

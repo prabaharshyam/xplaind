@@ -51,7 +51,7 @@ export function XpChip() {
   return (
     <Link
       href="/dashboard"
-      className="flex h-10 items-center gap-2 rounded-full bg-amber-100 px-3 text-sm font-medium text-amber-900 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-200"
+      className="flex h-10 items-center gap-2 rounded-full bg-amber-100 px-3 text-sm font-medium text-amber-900 hover:bg-amber-200 dark:hover:bg-amber-900 dark:bg-amber-950 dark:text-amber-200"
     >
       <Icon name="fire" size={15} /> {game.streak}
       <span className="sr-only">-day streak</span>
