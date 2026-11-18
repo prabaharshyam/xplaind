@@ -70,7 +70,7 @@ export default function HowWeRankPage() {
 
       <h2>How links are checked</h2>
       <p>
-        From launch, a weekly job opens every link. A link that is gone is fixed or replaced. Some sites block
+        Every Monday a job opens every link. A link that is gone is fixed or replaced. Some sites block
         automated checks, so a blocked check is never shown to you as a broken link; a person looks instead. Each
         card shows the date its link was last checked.
       </p>
