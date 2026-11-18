@@ -21,6 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/terms",
     "/refunds",
     "/contact",
+    "/explore",
     "/pricing",
     "/colleges",
     "/stories",
