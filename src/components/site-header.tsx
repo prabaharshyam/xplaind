@@ -19,19 +19,21 @@ export function SiteHeader() {
         <Link href="/" className="shrink-0" aria-label="Xplaind home">
           <BrandLogo height={22} />
         </Link>
-        <nav aria-label="Main" className="hidden md:block">
+        {/* NV-9 (2026-11-18, site review: the bar was cut off at 768 to 1100 px): the full menu only from
+            1120 px, where it fits; below that, the phone menu. */}
+        <nav aria-label="Main" className="hidden min-[1120px]:block">
           <DesktopNav />
         </nav>
         <div className="flex items-center gap-2">
           <HeaderSearch />
           <XpChip />
-          <SignInLink className="xp-glass-btn hidden h-10 items-center rounded-full px-4 text-sm font-medium text-zinc-900 sm:inline-flex dark:text-zinc-100" />
-          <AccountButton className="site-cta hidden sm:inline-flex h-10 items-center rounded-full bg-brand-700 px-4 text-sm font-medium text-white shadow-sm shadow-brand-700/30 hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700" />
+          <SignInLink className="xp-glass-btn hidden h-10 items-center rounded-full px-4 text-sm font-medium whitespace-nowrap text-zinc-900 sm:inline-flex dark:text-zinc-100" />
+          <AccountButton className="site-cta hidden sm:inline-flex h-10 items-center rounded-full whitespace-nowrap bg-brand-700 px-4 text-sm font-medium text-white shadow-sm shadow-brand-700/30 hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700" />
           <AccountMenu />
           <ClaimOnSignIn />
           {/* BR-6: top right on larger screens; on phones it is a row in the menu, so the bar fits 360 px. */}
           <ThemeToggle className="hidden sm:grid" />
-          <details className="site-menu group relative md:hidden">
+          <details className="site-menu group relative min-[1120px]:hidden">
             <summary className="xp-glass-btn flex size-11 cursor-pointer list-none items-center justify-center rounded-full [&::-webkit-details-marker]:hidden">
               <span className="sr-only">Menu</span>
               <span aria-hidden="true" className="flex w-4 flex-col gap-1">
@@ -43,7 +45,7 @@ export function SiteHeader() {
             {/* GL-1: the glass is on the sheet, which stays still; only the inner list scrolls. Glass drawn on a
                 scrolling element scrolls away with its content and leaves the lower links bare (owner report,
                 iPhone, 17 Nov). */}
-            <nav aria-label="Main" className="xp-glass-strong fixed inset-x-2 top-[4.5rem] bottom-2 z-50 flex flex-col rounded-[2rem]">
+            <nav aria-label="Main" className="xp-glass-strong fixed inset-x-2 top-[4.5rem] bottom-2 z-50 flex flex-col rounded-[2rem] sm:left-auto sm:w-[26rem] md:top-[4.75rem] md:right-4">
               <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain rounded-[2rem] px-3 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
               <AccountButton className="flex min-h-12 items-center justify-center rounded-full bg-brand-700 px-6 text-base font-medium text-white hover:bg-brand-800" />
               <SignInLink

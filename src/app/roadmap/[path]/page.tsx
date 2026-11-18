@@ -19,6 +19,7 @@ export async function generateMetadata({ params }: PageProps<"/roadmap/[path]">)
         title: roadmapTitles(path.name, contentUpdatedOn().slice(0, 4)),
         description: `${path.name} roadmap ${contentUpdatedOn().slice(0, 4)}, from beginner to job-ready: ${path.stages.reduce((n, s) => n + s.lessons.length, 0)} topics in ${path.stages.length} stages, each with a lesson, the best course and a project. ${path.tagline}`,
         path: `/roadmap/${path.id}`,
+    ownImage: true,
       })
     : {};
 }

@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: PageProps<"/stop/[id]">): Pro
     title: [`${stop.title}: explained simply, with examples`, `${stop.title}: explained simply`, stop.title],
     description: stop.answer,
     path: `/stop/${stop.id}`,
+    ownImage: true,
     type: "article",
     modifiedTime: stop.reviewed_on,
   });

@@ -18,18 +18,32 @@ export function RoadScene() {
 
   useEffect(() => {
     const el = host.current;
-    if (!el || !webgl() || saveData()) return;
+    // PF-1 (2026-11-18, site review: the home page sent 1.1 MB to phones, mostly this scene): phones,
+    // small tablets and low-end devices keep the CSS sky as a still poster and never download Three.js.
+    // Elsewhere the scene loads once the page is up and the browser is idle, so it never delays the text.
+    if (!el || !webgl() || saveData() || !roomy()) return;
     let dispose: (() => void) | null = null;
     let cancelled = false;
-    void mount(el).then((d) => {
-      if (cancelled) d();
-      else {
-        dispose = d;
-        setLive(true);
-      }
-    });
+    const start = () => {
+      if (cancelled) return;
+      void mount(el).then((d) => {
+        if (cancelled) d();
+        else {
+          dispose = d;
+          setLive(true);
+        }
+      });
+    };
+    const idle = (cb: () => void) => {
+      if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(cb, { timeout: 2500 });
+      else setTimeout(cb, 1200);
+    };
+    const later = () => idle(start);
+    if (document.readyState === "complete") later();
+    else window.addEventListener("load", later, { once: true });
     return () => {
       cancelled = true;
+      window.removeEventListener("load", later);
       dispose?.();
     };
   }, []);
@@ -50,6 +64,17 @@ function webgl(): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * PF-1: the 3D road only where it is cheap: a screen at least 1024 px wide and a device with at least
+ * 4 GB of memory and 4 cores, when the browser says so.
+ */
+function roomy(): boolean {
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  if (window.innerWidth < 1024) return false;
+  if (nav.deviceMemory !== undefined && nav.deviceMemory < 4) return false;
+  return !(nav.hardwareConcurrency && nav.hardwareConcurrency < 4);
 }
 
 function saveData(): boolean {
@@ -298,7 +323,8 @@ async function mount(el: HTMLElement): Promise<() => void> {
     const h = Math.max(1, el.clientHeight);
     // SE-13 (2026-11-18, site review): on phones the first gate sat on the hero headline; the road alone
     // carries the idea there.
-    for (const g of gates) g.ring.visible = w >= 640;
+    // The first gate stands where the hero text is, so it is left out; the others pass as you scroll.
+    for (const [i, g] of gates.entries()) g.ring.visible = w >= 640 && i > 0;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.fov = w < 640 ? 70 : 58;

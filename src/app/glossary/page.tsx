@@ -13,6 +13,7 @@ export const metadata: Metadata = pageMeta({
   description:
     "AI terms explained in plain English, from tokens, embeddings and RAG to agents, fine-tuning and MLOps, each linked to the lesson that teaches it.",
   path: "/glossary",
+  ownImage: true,
 });
 
 const letterOf = (term: string) => (/^[a-z]/i.test(term) ? term[0].toUpperCase() : "#");

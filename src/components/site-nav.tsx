@@ -93,7 +93,7 @@ function DesktopMenus({ path }: { path: string }) {
 
   return (
     <div ref={root} className="flex items-center gap-1">
-      {NAV_GROUPS.map((g) => (
+      {NAV_GROUPS.map((g, gi) => (
         <details key={g.id} className="group relative">
           <summary className={`${tab(active === g.id)} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>
             {g.label}
@@ -103,7 +103,8 @@ function DesktopMenus({ path }: { path: string }) {
             {active === g.id && <span className="sr-only"> (current section)</span>}
           </summary>
           <div
-            className={`nav-panel xp-glass-strong absolute top-full left-0 z-50 mt-4 rounded-[1.75rem] p-3 ${
+            // NV-9: the menus of the right-hand groups open towards the left, so they stay on screen.
+            className={`nav-panel xp-glass-strong absolute top-full z-50 mt-4 rounded-[1.75rem] p-3 ${gi >= NAV_GROUPS.length / 2 ? "right-0" : "left-0"} ${
               g.items.length > 4 ? "w-[38rem]" : "w-[22rem]"
             }`}
           >
