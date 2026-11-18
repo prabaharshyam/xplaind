@@ -20,7 +20,7 @@ import { type Mic, canRecord, closeMic, openMic, useVoiceCapture } from "@/compo
 
 type Item = { questionId: string; exchanges: Exchange[] };
 /** VI-14: clarify marks a turn where she explained the question; it does not count as a follow-up. */
-type Turn = { index: number; asked: string; followUp: number; clarify?: boolean };
+type Turn = { index: number; asked: string; followUp: number; clarify?: boolean; redirect?: "language" | "topic" };
 type Failure = { message: string; upgrade?: string; signin?: boolean };
 /** One spoken line: its words, and a URL for its natural voice (null: the browser reads it). */
 type Spoken = { text: string; audio: string | null };
@@ -227,7 +227,7 @@ export function VoiceInterviewer({
   };
 
   const answer = async (turn: Turn, text: string, seconds: number) => {
-    const all = items.map((it, i) => (i === turn.index ? { ...it, exchanges: [...it.exchanges, { asked: turn.asked, answer: text, seconds, ...(turn.clarify ? { clarify: true } : {}) }] } : it));
+    const all = items.map((it, i) => (i === turn.index ? { ...it, exchanges: [...it.exchanges, { asked: turn.asked, answer: text, seconds, ...(turn.clarify ? { clarify: true } : {}), ...(turn.redirect ? { redirect: turn.redirect } : {}) }] } : it));
     setItems(all);
     if (!text.trim()) return nextQuestion(turn.index, all);
     setLines((l) => [...l, { who: "me", text }]);
@@ -242,12 +242,13 @@ export function VoiceInterviewer({
         const failure = await failureFrom(res);
         return setPhase({ kind: "stopped", failure });
       }
-      const data = (await res.json()) as { follow_up: string | null; audio?: string | null; clarify?: boolean };
+      const data = (await res.json()) as { follow_up: string | null; audio?: string | null; clarify?: boolean; redirect?: "language" | "topic" };
       await ack;
       if (!live.current) return;
       if (data.follow_up)
         await speakThenListen(
-          { index: turn.index, asked: data.follow_up, followUp: turn.followUp + (data.clarify ? 0 : 1), clarify: data.clarify },
+          // VI-14, VI-15: explaining the question or bringing the candidate back is not a follow-up.
+          { index: turn.index, asked: data.follow_up, followUp: turn.followUp + (data.clarify || data.redirect ? 0 : 1), clarify: data.clarify, redirect: data.redirect },
           { text: data.follow_up, audio: data.audio ?? null },
         );
       else nextQuestion(turn.index, all);
@@ -987,6 +988,9 @@ function Stopped({ failure, onExit, onReport }: { failure: Failure; onExit: () =
 
 const outOf5 = (n: number) => `${n} / 5`;
 
+/** VI-15: "once", "twice", "3 times". */
+const times = (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`);
+
 function VoiceReportView({ report, readiness, trial, onExit }: { report: VoiceReport; readiness: Readiness | null; trial: boolean; onExit: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
@@ -1192,6 +1196,18 @@ function VoiceReportView({ report, readiness, trial, onExit }: { report: VoiceRe
                 {q.delivery.wordsPerMinute !== null && `, ${q.delivery.wordsPerMinute} a minute`}, {q.delivery.fillers} filler word
                 {q.delivery.fillers === 1 ? "" : "s"}
                 {q.delivery.hedges.length > 0 && `; hedging: ${q.delivery.hedges.map((h) => `“${h}”`).join(", ")}`}.
+              </p>
+            )}
+            {(q.offTrack?.language > 0 || q.offTrack?.topic > 0) && (
+              <p className="mt-2 rounded-2xl bg-amber-50 p-3 text-sm leading-6 text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+                <span className="font-semibold">Stay on track:</span>{" "}
+                {[
+                  q.offTrack.language > 0 && `${times(q.offTrack.language)} not in English`,
+                  q.offTrack.topic > 0 && `${times(q.offTrack.topic)} off the question`,
+                ]
+                  .filter(Boolean)
+                  .join("; ")}
+                . In a real interview, answer in English and stay with the question.
               </p>
             )}
             <h5 className="mt-3 text-sm font-semibold">Key points</h5>

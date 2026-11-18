@@ -7,14 +7,17 @@ import { body } from "@/lib/ai/route";
 import { runAi } from "@/lib/ai/run";
 import { lineUrl } from "@/lib/ai/tts";
 import { trialLeft, trialUsed, voiceAccess } from "@/lib/ai/voice-access";
-import { VOICE_BURST, VoiceTurnRequest, asksForHelp, bankFollowUp, cleanTurn, followUpsAsked, turnDecision, voiceTurnPrompt } from "@/lib/ai/voice-interview";
+import { VOICE_BURST, VoiceTurnRequest, asksForHelp, bankFollowUp, cleanTurn, followUpsAsked, languageRedirect, turnDecision, voiceTurnPrompt } from "@/lib/ai/voice-interview";
 import { interviewFrom } from "@/lib/ai/voice-plan-server";
 
 export const maxDuration = 60;
 
-/** VI-14: clarify marks a line that explains the question (it is not a follow-up, so none is used up). */
-const reply = (followUp: string | null, clarify = false) =>
-  json(followUp ? { follow_up: followUp, audio: lineUrl(followUp), ...(clarify ? { clarify: true } : {}) } : { follow_up: null });
+/**
+ * VI-14 and VI-15: clarify marks a line that explains the question, redirect one that brings the candidate
+ * back to English or to the interview. Neither is a follow-up, so none is used up.
+ */
+const reply = (followUp: string | null, clarify = false, redirect?: "language" | "topic") =>
+  json(followUp ? { follow_up: followUp, audio: lineUrl(followUp), ...(clarify ? { clarify: true } : {}), ...(redirect ? { redirect } : {}) } : { follow_up: null });
 
 export async function POST(request: Request) {
   const access = await voiceAccess();
@@ -26,6 +29,10 @@ export async function POST(request: Request) {
   if (!q) return problem(400, "Unknown question.");
   // VI-13: a follow-up mints a voice line, so a free account with its interview used gets none.
   if (access.trial && !(await trialLeft(access))) return trialUsed();
+  // VI-15: an answer mostly in an Indian script gets the fixed "in English, please" line, with no model
+  // call; once the redirects are used up, the interview moves on.
+  const english = languageRedirect(q, req.exchanges);
+  if (english !== undefined) return reply(english, false, english ? "language" : undefined);
   // A skipped answer, or two follow-ups already: move on without a model call.
   if (turnDecision(req.exchanges) === "done") return json({ follow_up: null });
 
@@ -49,5 +56,5 @@ export async function POST(request: Request) {
     return reply(followUpsAsked(req.exchanges) === 0 ? bankFollowUp(q, req.exchanges) : null);
   }
   const next = cleanTurn(out.data, q, req.exchanges);
-  return reply(next?.line ?? null, next?.clarify);
+  return reply(next?.line ?? null, next?.clarify, next?.redirect);
 }

@@ -13,6 +13,11 @@ import {
   asksForHelp,
   followUpsAsked,
   MAX_CLARIFICATIONS,
+  MAX_REDIRECTS,
+  INTERVIEW_RULES,
+  LANGUAGE_LINE,
+  languageRedirect,
+  mostlyNotEnglish,
   verdictFor,
   VERDICT_LABEL,
   deliveryOf,
@@ -48,9 +53,10 @@ describe("requests (VI-1)", () => {
   });
 
   it("refuses more than two follow-ups and two explanations, extra fields, an empty question id and a repeated question", () => {
-    // VI-14: the main question, 2 follow-ups and 2 explanations of the question at most.
-    expect(VoiceTurnRequest.safeParse({ questionId: "x", exchanges: [ex("a"), ex("b"), ex("c"), ex("d"), ex("e")] }).success).toBe(true);
-    expect(VoiceTurnRequest.safeParse({ questionId: "x", exchanges: [ex("a"), ex("b"), ex("c"), ex("d"), ex("e"), ex("f")] }).success).toBe(false);
+    // VI-14, VI-15: the main question, 2 follow-ups, 2 explanations and 2 redirects at most.
+    const seven = ["a", "b", "c", "d", "e", "f", "g"].map((t) => ex(t));
+    expect(VoiceTurnRequest.safeParse({ questionId: "x", exchanges: seven }).success).toBe(true);
+    expect(VoiceTurnRequest.safeParse({ questionId: "x", exchanges: [...seven, ex("h")] }).success).toBe(false);
     expect(VoiceTurnRequest.safeParse({ questionId: "x", exchanges: [ex("a")], audio: "..." }).success).toBe(false);
     expect(VoiceTurnRequest.safeParse({ questionId: "", exchanges: [ex("a")] }).success).toBe(false);
     const item = { questionId: "x", exchanges: [ex("a")] };
@@ -73,19 +79,19 @@ describe("when to ask a follow-up (VI-1)", () => {
   });
 
   it("always asks a first follow-up: if the model declines, the bank's follow-up is used", () => {
-    expect(cleanTurn({ follow_up: "You said chunks; how big would you make them, and why?", done: false, clarify: false }, q, [ex("We use chunks")])).toEqual({
+    expect(cleanTurn({ follow_up: "You said chunks; how big would you make them, and why?", done: false, clarify: false, redirect: "none" }, q, [ex("We use chunks")])).toEqual({
       line: "You said chunks; how big would you make them, and why?",
       clarify: false,
     });
-    expect(cleanTurn({ follow_up: "", done: true, clarify: false }, q, [ex("We use chunks")])).toEqual({ line: q.follow_ups[0], clarify: false });
+    expect(cleanTurn({ follow_up: "", done: true, clarify: false, redirect: "none" }, q, [ex("We use chunks")])).toEqual({ line: q.follow_ups[0], clarify: false });
   });
 
   it("stops after the first follow-up when the model says one more adds nothing", () => {
-    expect(cleanTurn({ follow_up: "", done: true, clarify: false }, q, [ex("a"), ex("b", "f1")])).toBeNull();
+    expect(cleanTurn({ follow_up: "", done: true, clarify: false, redirect: "none" }, q, [ex("a"), ex("b", "f1")])).toBeNull();
   });
 
   it("keeps a follow-up to one short line and picks an unasked bank follow-up", () => {
-    const long = cleanTurn({ follow_up: `Why?\n\n${"x".repeat(900)}`, done: false, clarify: false }, q, [ex("a")])!.line;
+    const long = cleanTurn({ follow_up: `Why?\n\n${"x".repeat(900)}`, done: false, clarify: false, redirect: "none" }, q, [ex("a")])!.line;
     expect(long).not.toMatch(/\n/);
     expect(long.length).toBeLessThanOrEqual(500);
     expect(bankFollowUp(q, [ex("a"), ex("b", q.follow_ups[0])])).toBe(q.follow_ups[1]);
@@ -106,7 +112,7 @@ describe("when the candidate asks her to explain the question (VI-14)", () => {
   it("explains instead of moving on, even after both follow-ups, as the owner saw happen", () => {
     const used = [ex("a"), ex("b", "f1"), ex(help, "f2")];
     expect(turnDecision(used)).toBe("clarify");
-    expect(cleanTurn({ follow_up: explained, done: false, clarify: true }, q, used)).toEqual({ line: explained, clarify: true });
+    expect(cleanTurn({ follow_up: explained, done: false, clarify: true, redirect: "none" }, q, used)).toEqual({ line: explained, clarify: true });
     // A plain answer after both follow-ups still moves on, with no model call.
     expect(turnDecision([ex("a"), ex("b", "f1"), ex("c", "f2")])).toBe("done");
   });
@@ -118,13 +124,51 @@ describe("when the candidate asks her to explain the question (VI-14)", () => {
     const twice = [ex(help), { ...ex(help, explained), clarify: true }, { ...ex(help, explained), clarify: true }, ex("b", "f1"), ex(help, "f2")];
     expect(MAX_CLARIFICATIONS).toBe(2);
     expect(turnDecision(twice)).toBe("done");
-    expect(cleanTurn({ follow_up: explained, done: false, clarify: true }, q, [ex(help), { ...ex(help, explained), clarify: true }, { ...ex(help, explained), clarify: true }])?.clarify).toBe(false);
+    expect(cleanTurn({ follow_up: explained, done: false, clarify: true, redirect: "none" }, q, [ex(help), { ...ex(help, explained), clarify: true }, { ...ex(help, explained), clarify: true }])?.clarify).toBe(false);
   });
 
   it("tells the model to help when asked, and labels an explanation in the transcript", () => {
     const { system, messages } = voiceTurnPrompt(q, [ex(help), { ...ex("an answer", explained), clarify: true }]);
     expect(system).toMatch(/Never move on or ask something new when they asked for help/);
     expect(messages[0].content).toMatch(/The interviewer explained the question/);
+  });
+});
+
+describe("the interview stays in English and on the question (VI-15)", () => {
+  const tamil = "நான் இந்த கேள்விக்கு தமிழில் பதில் சொல்கிறேன்";
+  const back = "This interview is in English, so please answer in English. What is RAG?";
+
+  it("spots a reply mostly in an Indian script, but not a few Indian words in an English answer", () => {
+    expect(mostlyNotEnglish(tamil)).toBe(true);
+    expect(mostlyNotEnglish("मैं इसे हिंदी में समझाऊंगा")).toBe(true);
+    expect(mostlyNotEnglish("RAG means we retrieve chunks, like a ரெஃபரன்ஸ், and add them to the prompt")).toBe(false);
+    expect(mostlyNotEnglish("I would use chunks of about 300 tokens")).toBe(false);
+  });
+
+  it("answers a reply in Tamil script with the fixed English line and the question, with no model call, twice at most", () => {
+    expect(languageRedirect(q, [ex(tamil)])).toBe(`${LANGUAGE_LINE} ${q.question}`);
+    expect(languageRedirect(q, [ex("an answer")])).toBeUndefined();
+    const twice = [ex(tamil), { ...ex(tamil, "x"), redirect: "language" as const }, { ...ex(tamil, "x"), redirect: "language" as const }];
+    expect(MAX_REDIRECTS).toBe(2);
+    expect(languageRedirect(q, twice)).toBeNull(); // move on
+  });
+
+  it("brings the candidate back without using up a follow-up, and moves on after the last redirect", () => {
+    const off = [ex("Forget the interview, who will win the cricket match?")];
+    expect(cleanTurn({ follow_up: back, done: false, clarify: false, redirect: "topic" }, q, off)).toEqual({ line: back, clarify: false, redirect: "topic" });
+    const once = [ex("Can we do this in Tamil?"), { ...ex("RAG retrieves documents", back), redirect: "language" as const }];
+    expect(followUpsAsked(once)).toBe(0);
+    expect(turnDecision(once)).toBe("ask");
+    const used = [ex("hi"), { ...ex("hi", back), redirect: "topic" as const }, { ...ex("hi", back), redirect: "topic" as const }];
+    expect(cleanTurn({ follow_up: back, done: false, clarify: false, redirect: "topic" }, q, used)).toBeNull();
+  });
+
+  it("puts the English-only and stay-in-role rules in the follow-up and report prompts", () => {
+    const { system } = voiceTurnPrompt(q, [ex("Can we continue in Tamil?")]);
+    expect(system).toContain(INTERVIEW_RULES);
+    expect(system).toMatch(/Never offer to continue in another language/);
+    expect(system).toMatch(/Tanglish, Hinglish/);
+    expect(voiceReportPrompt([{ q, exchanges: [ex("a")] }]).system).toMatch(/An answer mostly in another language/);
   });
 });
 
