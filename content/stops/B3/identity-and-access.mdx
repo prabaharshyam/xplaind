@@ -1,0 +1,173 @@
+---
+id: identity-and-access
+level: B3
+theme: security
+title: "Identity and access"
+outcome: "Tell authentication from authorisation, choose sensible password and MFA rules, explain OAuth and OpenID Connect at a high level, apply least privilege with IAM roles, and keep sessions secure."
+answer: "Identity and access management decides who someone is (authentication) and what they may do (authorisation). Strong sign-in, least privilege and safe sessions stop most account-based attacks."
+why_it_matters: "Stolen or misused passwords and keys are one of the most common ways into a company, and AI agents now act with people's identities and API keys. Knowing how sign-in, roles and tokens work is core to securing both normal apps and AI systems. Interviewers ask about AuthN versus AuthZ and OAuth often."
+hours: 3
+gap_tags: []
+primary_resource: owasp-authentication-cheatsheet
+alternates: [okta-oauth-oidc-guide, owasp-session-management-cheatsheet]
+more: [cisa-mfa, nist-sp-800-63b-4, owasp-authorization-cheatsheet]
+videos: [yt-ibm-technology-identity-access-management-iam, yt-ibm-technology-what-is-multi-factor-authentication, yt-bytebytego-oauth-2-explained-in-simple-terms]
+format: deep
+key_terms: [authentication, authorization, mfa, oauth, oidc, iam, least-privilege, rbac]
+check:
+  type: mcq
+  question_ids: [identity-and-access-1, identity-and-access-2, identity-and-access-3]
+flashcards:
+  - q: "What is the difference between authentication and authorisation?"
+    a: "Authentication proves who you are (password, passkey, OTP). Authorisation decides what you may do once known (read this record, approve that payment). Authentication comes first; authorisation runs on every request."
+  - q: "What do modern password rules recommend?"
+    a: "Allow long passphrases, check new passwords against lists of breached ones, rate-limit login attempts, and do not force regular changes without a reason. Pair passwords with MFA."
+  - q: "What are the three kinds of authentication factor?"
+    a: "Something you know (password, PIN), something you have (phone, security key) and something you are (fingerprint, face). MFA combines at least two different kinds."
+  - q: "Which MFA methods resist phishing best?"
+    a: "Passkeys and FIDO2 security keys, because they are tied to the real website and cannot be typed into a fake one. SMS and app codes are better than nothing but can be phished."
+  - q: "What is OAuth 2.0 for?"
+    a: "Letting an app act on your behalf with limited permission (scopes), using tokens instead of your password. It is about authorisation."
+  - q: "What does OpenID Connect add?"
+    a: "A standard ID token on top of OAuth that tells the app who the user is, which makes 'Sign in with Google' style login possible."
+  - q: "What is least privilege in IAM?"
+    a: "Give each person, service and AI agent only the permissions its task needs, for as long as it needs them, using roles rather than permissions granted one person at a time."
+  - q: "How do you keep web sessions secure?"
+    a: "Random session ids in cookies marked Secure, HttpOnly and SameSite; a new id after login; idle and absolute timeouts; and server-side logout that really ends the session."
+exercise:
+  title: "Fix access at a Nagpur co-operative bank's loan app"
+  setup: "A co-operative bank in Nagpur has an internal loan-approval web app. Staff sign in with a password only; passwords must change every 30 days, so many write them on sticky notes. Every staff member has the role 'admin' because 'roles were confusing'. A new AI assistant that summarises loan files uses a service account with full read and write access to the whole loan database. Sessions never expire, and logout only deletes the cookie in the browser."
+  questions:
+    - q: "What would you change about sign-in?"
+      a: "Add MFA, ideally passkeys or security keys for staff; drop the forced 30-day change; allow long passphrases checked against breached-password lists; and rate-limit attempts."
+    - q: "How would you fix the roles?"
+      a: "Define roles by job, such as clerk, loan officer, branch manager and auditor, each with only the permissions needed, deny by default, and keep admin to two or three named people."
+    - q: "What should the AI assistant's service account be allowed to do?"
+      a: "Read only the loan files it summarises, ideally only those the requesting staff member may see. No write access; any change goes through a human."
+    - q: "What is wrong with the sessions?"
+      a: "Never-expiring sessions and client-only logout mean a stolen cookie works forever. Add idle and absolute timeouts and end sessions on the server at logout."
+ask:
+  - "What is the difference between authentication and authorisation?"
+  - "Is SMS OTP good enough as MFA?"
+  - "How does OAuth differ from OpenID Connect?"
+drafted_with_ai: true
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+**Identity and access management** (IAM) answers two questions for every person, service and AI agent that touches a system:
+
+- **Authentication** (AuthN): who are you? You prove it with a password, a one-time code, a passkey or a fingerprint.
+- **Authorisation** (AuthZ): now that we know who you are, what are you allowed to do? Read your own statement, yes. Approve a loan above ₹5 lakh, only if you are a branch manager.
+
+They are separate steps, and mixing them up causes real bugs. A user who is properly signed in can still be trying to read someone else's data; that is an authorisation failure, the number-one web risk in the OWASP Top 10.
+
+Around these two ideas sit the practical pieces: **passwords and MFA**, **single sign-on with OAuth and OpenID Connect**, **roles and least privilege**, and **sessions** that remember you between requests. AI makes all of this more important. An agent that reads email or calls APIs acts with someone's identity and permissions, so every weakness in IAM becomes a weakness in the agent.
+
+## How it works
+
+**Passwords.** Passwords are still everywhere, so get the basics right. Current guidance, including NIST's digital identity guidelines and the OWASP Authentication Cheat Sheet, says:
+
+- Allow long passwords and passphrases; length beats complexity rules.
+- Check new passwords against lists of known breached passwords.
+- Do not force regular changes without a reason; change them when there is a sign of compromise.
+- Rate-limit and monitor login attempts to slow guessing and **credential stuffing** (trying username and password pairs leaked from other sites).
+- Use generic error messages ("wrong email or password") so attackers cannot discover which accounts exist.
+- Store passwords only as slow, salted hashes (the cryptography lesson covers this).
+
+**Multi-factor authentication (MFA).** A factor is a kind of proof: something you **know** (password, PIN), something you **have** (phone, security key) or something you **are** (fingerprint, face). MFA combines at least two kinds, so a stolen password alone is not enough.
+
+| Method | How it works | Resists phishing? | Notes |
+| --- | --- | --- | --- |
+| SMS OTP | Code sent by text message | No | Common in India for card payments and net banking; better than nothing, but codes can be phished or SIM-swapped |
+| Authenticator app code | Time-based code on your phone | No | Free and offline; still typeable into a fake site |
+| Push approval | Tap "approve" in an app | Partly | Show the location and use number matching to stop "MFA fatigue" spam |
+| Passkey or FIDO2 security key | Device signs a challenge for the real site only | Yes | Strongest common option; works with fingerprint or face unlock |
+
+For staff and admin accounts, aim for passkeys or security keys. For customers, offer MFA and make the strongest option easy.
+
+**OAuth 2.0 and OpenID Connect, at a high level.** When you click "Sign in with Google" or let an app read your calendar, two standards are at work.
+
+- **OAuth 2.0** is about **delegated authorisation**: letting an app act for you with limited permission, without giving it your password. The app gets an **access token** limited to certain **scopes**, such as "read calendar", for a limited time.
+- **OpenID Connect (OIDC)** sits on top of OAuth and adds **authentication**: an **ID token** that tells the app who you are.
+
+```flow
+title: Sign in with an identity provider (OIDC, simplified)
+User clicks Sign in with Google on the app -> App redirects to the identity provider | asks for scopes such as openid, email
+App redirects to the identity provider -> User signs in there with password and MFA
+User signs in there with password and MFA -> User approves the requested scopes
+User approves the requested scopes -> Provider sends a one-time code back to the app
+Provider sends a one-time code back to the app -> App exchanges the code for tokens, server to server
+App exchanges the code for tokens, server to server -> ID token says who the user is | access token allows only the approved scopes
+ID token says who the user is -> App creates its own session for the user
+```
+
+You will rarely build this by hand; use a well-maintained library or an identity provider (Google, Microsoft Entra ID, Okta, Auth0, Keycloak, Supabase Auth). Your job is to request the **smallest scopes**, validate tokens properly, and keep client secrets out of front-end code.
+
+**Roles and least privilege.** Authorisation is easier to manage with **roles** than with permissions granted person by person. **Role-based access control (RBAC)** gives each job a role (clerk, loan officer, auditor) and each role a set of permissions. **Least privilege** means each person, service and agent gets only what its task needs, for as long as it needs it.
+
+In the cloud, IAM is a whole service. AWS, Azure and Google Cloud let you attach **policies** to users, groups and **roles**. Services and machines should use roles with short-lived credentials instead of long-lived access keys pasted into code.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["s3:GetObject"],
+    "Resource": "arn:aws:s3:::loan-files-example/summaries/*"
+  }]
+}
+```
+
+This AWS policy lets a role read objects under one folder of one bucket, and nothing else. Compare it with a policy that allows every action on every resource, which is how many breaches get bigger than they needed to be.
+
+**AI agents are identities too.** Give each agent or AI feature its own service identity, scope it to the data of the user it is acting for, prefer read-only access, and require human approval for anything that moves money or changes records. Log what it does under its own name.
+
+**Sessions.** After login, the app needs to remember you. Usually it sets a **session cookie** holding a long random id, or issues a signed token. Session rules from the OWASP Session Management Cheat Sheet:
+
+- Mark cookies **Secure** (HTTPS only), **HttpOnly** (JavaScript cannot read them) and **SameSite** (limits cross-site requests).
+- Issue a **new session id after login** and after any privilege change.
+- Use **idle and absolute timeouts**: shorter for banking and admin apps.
+- **Log out on the server**, not just by deleting the cookie.
+- Ask users to **re-authenticate** before sensitive actions, such as changing a payout account.
+
+## A worked example
+
+A hypothetical Gurugram HR-tech company, "TeamKhata", runs payroll for small businesses. A security review finds four issues, one in each area of this lesson.
+
+1. **Authentication.** Admins sign in with a password only. One admin reused a password that appeared in an old breach of another site. Fix: passkeys for all staff, MFA offered to customers, and new passwords checked against breached-password lists.
+2. **Authorisation.** A customer's HR manager can call /api/payslips?employee=1234 for any employee id, even in another company. Fix: every query is scoped to the caller's company and role, with tests using accounts from two companies.
+3. **IAM.** The payroll AI assistant, which answers employees' salary questions, uses a cloud role with full access to every bucket. Fix: a dedicated role that can read only the payslip summaries of the employee asking, through an API that enforces this, and no write access.
+4. **Sessions.** Session cookies lack HttpOnly, and sessions last 30 days. Fix: HttpOnly, Secure and SameSite flags, a 30-minute idle timeout for admins, and re-authentication before changing bank details.
+
+| Area | Finding | Fix |
+| --- | --- | --- |
+| Authentication | Password-only admin login, reused password | Passkeys, breached-password checks |
+| Authorisation | Any employee id accepted | Scope by company and role, two-tenant tests |
+| IAM | AI assistant role with access to everything | Read-only role limited to the asking employee |
+| Sessions | Long-lived cookies readable by JavaScript | Cookie flags, timeouts, step-up re-authentication |
+
+Each fix is ordinary. Together they mean one stolen password, one bug or one tricked AI assistant can no longer expose every company's payroll.
+
+## Common mistakes
+
+- **Treating "signed in" as "allowed".** Check authorisation for each object on the server.
+- **Everyone is admin** because roles felt like extra work.
+- **Forcing password changes every month**, which pushes people to weak patterns and sticky notes.
+- **Long-lived cloud access keys in code or in prompts.** Use roles and a secrets store.
+- **Asking for broad OAuth scopes** "in case we need them later".
+- **Giving AI agents a shared, powerful service account** instead of a scoped identity per agent and per user.
+- **Client-only logout and sessions that never expire.**
+
+## Practice
+
+Read the OWASP Authentication and Session Management cheat sheets and CISA's MFA page. Skim the password section of NIST SP 800-63B-4. Watch the three videos below.
+
+1. Turn on a passkey or security key for your own email and GitHub accounts, and note which sites offer only SMS.
+2. In a small app of your own, add two roles and write tests showing each role is denied what it should not do.
+3. Use "Sign in with Google" in a test app with an identity library, and list the scopes it requests. Remove any you do not need.
+4. Open your browser's developer tools on a site you are signed in to, and check the session cookie's Secure, HttpOnly and SameSite flags.
+
+**You are done when you can** explain authentication versus authorisation with an example, recommend an MFA method and say why, describe OAuth and OIDC in a few sentences, write a least-privilege role, and list the rules for a secure session.
