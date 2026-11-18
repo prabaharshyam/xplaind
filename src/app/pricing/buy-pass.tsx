@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { Icon } from "@/components/art/icons";
 import { primaryButton, secondaryButton } from "@/components/ui";
-import { PLANS, type PlanId, rupees } from "@/lib/billing/plans";
+import { PLANS, type PlanId, perDay, rupees } from "@/lib/billing/plans";
 
 type CashfreeCheckout = { checkout: (o: { paymentSessionId: string; redirectTarget: "_self" }) => Promise<unknown> };
 type RazorpaySuccess = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string };
@@ -73,11 +74,16 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
   const [promoError, setPromoError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const promoId = useId();
+  // PAY-12: the promo field stays folded behind a small link until asked for, as in most checkouts.
+  const [promoOpen, setPromoOpen] = useState(false);
   const showPromo = takesPromo(planId, provider);
   // RF-1: a friend's link takes 10% off a first pass; a promo code replaces it rather than adding to it.
   const [friendOff, setFriendOff] = useState(0);
   const friendPrice = friendOff ? rupees(Math.round((PLANS[planId].paise * (100 - friendOff)) / 100)) : null;
   const toPay = promo ? (promo.amount === 0 ? "Free" : rupees(promo.amount)) : (friendPrice ?? price);
+  const plan = PLANS[planId];
+  // PAY-12: the saving, shown as its own line in the summary.
+  const savedPaise = promo ? plan.paise - promo.amount : friendOff ? plan.paise - Math.round((plan.paise * (100 - friendOff)) / 100) : 0;
   const checkOffer = () => {
     if (provider !== "razorpay") return;
     void fetch("/api/billing/offer")
@@ -210,103 +216,162 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
         onClick={(e) => {
           if (e.target === dialog.current && !busy) dialog.current?.close();
         }}
-        className="xp-glass-direct rounded-[1.75rem] m-auto w-[min(28rem,calc(100vw-2rem))] max-w-none p-0 text-zinc-900 backdrop:bg-black/50 backdrop:backdrop-blur-sm dark:text-white"
+        className="xp-glass-direct mx-0 mt-auto mb-0 w-full max-w-none rounded-t-[2rem] rounded-b-none p-0 text-zinc-900 backdrop:bg-black/50 backdrop:backdrop-blur-sm sm:m-auto sm:w-[min(26rem,calc(100vw-2rem))] sm:rounded-[2rem] dark:text-white"
       >
-        <form onSubmit={pay} className="flex flex-col gap-4 p-6">
-          <h2 id={titleId} className="text-xl font-semibold">
-            {label}, {price}
-          </h2>
-          <p className="text-sm leading-6 text-zinc-700 dark:text-zinc-300">One payment by UPI, card or net banking. It does not renew by itself.</p>
-          {friendPrice && !promo && (
-            <p className="rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
-              A friend invited you: {friendOff}% off your first pass. You pay {friendPrice} instead of <s>{price}</s>.
-            </p>
-          )}
-          {showPromo && (
-            <div className="flex flex-col gap-1">
-              <label htmlFor={promoId} className="text-sm font-medium">
-                Promo code <span className="font-normal text-zinc-600 dark:text-zinc-400">(if you have one)</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id={promoId}
-                  value={code}
-                  onChange={(e) => {
-                    setCode(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 32));
-                    setPromo(null);
-                    setPromoError(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void applyPromo();
-                    }
-                  }}
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  maxLength={32}
-                  aria-describedby={`${promoId}-msg`}
-                  className={`${field} min-w-0 flex-1 uppercase`}
-                />
-                <button type="button" disabled={checking || code.trim().length < 3 || busy} className={`${secondaryButton} disabled:opacity-50`} onClick={() => void applyPromo()}>
-                  {checking ? "Checking…" : "Apply"}
-                </button>
-              </div>
-              <p id={`${promoId}-msg`} aria-live="polite" className="min-h-5 text-sm">
-                {promo ? (
-                  <span className="text-teal-800 dark:text-teal-300">
-                    {promo.code.toUpperCase()} applied: {promo.percentOff}% off. You pay {promo.amount === 0 ? "nothing" : rupees(promo.amount)} instead of <s>{price}</s>.
-                  </span>
-                ) : promoError ? (
-                  <span className="text-rose-800 dark:text-rose-300">{promoError}</span>
-                ) : null}
-              </p>
+        {/* PAY-12 (owner request, 2026-11-18): a calm checkout. One summary, one total, one action; the
+            promo code folded away; the reasons it is safe to pay right under the button. A bottom sheet on
+            phones, a centred card on larger screens. */}
+        <form onSubmit={pay} className="flex flex-col gap-5 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-brand-800 dark:text-brand-300">Xplaind Pro</p>
+              <h2 id={titleId} className="mt-0.5 text-xl font-semibold tracking-tight">
+                {label}
+              </h2>
             </div>
-          )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => dialog.current?.close()}
+              aria-label="Close"
+              className="xp-glass-btn -mt-1 -mr-1 grid size-11 shrink-0 place-items-center rounded-full text-zinc-700 dark:text-zinc-200"
+            >
+              <Icon name="close" size={18} />
+            </button>
+          </div>
+
+          <ul className="flex flex-col gap-2 text-[15px] leading-6">
+            {[
+              `${plan.days} days of Pro, from the moment you pay`,
+              "AI mock interviews with Zarina, every day",
+              "AI tutor, reviews and resume match, every day",
+            ].map((t) => (
+              <li key={t} className="flex items-start gap-2.5">
+                <Icon name="tick" size={18} className="mt-0.5 shrink-0 text-brand-700 dark:text-brand-300" />
+                {t}
+              </li>
+            ))}
+          </ul>
+
+          <div className="flex flex-col gap-2 border-t border-black/10 pt-4 text-[15px] dark:border-white/10">
+            {savedPaise > 0 && (
+              <>
+                <p className="flex justify-between gap-4">
+                  <span className="text-zinc-700 dark:text-zinc-300">{label}</span>
+                  <span className="tabular-nums">{price}</span>
+                </p>
+                <p className="flex justify-between gap-4 text-teal-800 dark:text-teal-300">
+                  <span>{promo ? `Code ${promo.code.toUpperCase()} (${promo.percentOff}% off)` : `Friend's invite (${friendOff}% off)`}</span>
+                  <span className="tabular-nums">−{rupees(savedPaise)}</span>
+                </p>
+              </>
+            )}
+            <p className="flex items-baseline justify-between gap-4">
+              <span className="font-semibold">Total today</span>
+              <span className="text-3xl font-semibold tracking-tight tabular-nums">{toPay === "Free" ? "₹0" : toPay}</span>
+            </p>
+            <p className="text-right text-sm text-zinc-600 dark:text-zinc-400">
+              {savedPaise > 0 ? "GST included" : `${perDay(plan)} a day · GST included`}
+            </p>
+          </div>
+
+          {showPromo &&
+            (promoOpen || promo ? (
+              <div className="-mt-1 flex flex-col gap-1">
+                <label htmlFor={promoId} className="sr-only">
+                  Promo code
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id={promoId}
+                    value={code}
+                    autoFocus={!promo}
+                    placeholder="Promo code"
+                    onChange={(e) => {
+                      setCode(e.target.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 32));
+                      setPromo(null);
+                      setPromoError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void applyPromo();
+                      }
+                    }}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    maxLength={32}
+                    aria-describedby={`${promoId}-msg`}
+                    className="h-11 min-w-0 flex-1 rounded-full border border-black/15 bg-white/70 px-4 text-sm uppercase placeholder:normal-case placeholder:text-zinc-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-white/15 dark:bg-white/5"
+                  />
+                  <button
+                    type="button"
+                    disabled={checking || code.trim().length < 3 || busy}
+                    className="h-11 shrink-0 rounded-full px-4 text-sm font-semibold text-brand-800 hover:bg-black/5 disabled:opacity-40 dark:text-brand-300 dark:hover:bg-white/10"
+                    onClick={() => void applyPromo()}
+                  >
+                    {checking ? "Checking…" : promo ? "Applied" : "Apply"}
+                  </button>
+                </div>
+                <p id={`${promoId}-msg`} aria-live="polite" className="min-h-5 px-1 text-sm">
+                  {promoError ? <span className="text-rose-800 dark:text-rose-300">{promoError}</span> : null}
+                </p>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setPromoOpen(true)} className="-mt-2 min-h-11 self-start text-sm font-medium text-brand-800 underline underline-offset-4 dark:text-brand-300">
+                Have a promo code?
+              </button>
+            ))}
+
           {provider === "cashfree" && (
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium">Mobile number</span>
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">The payment company needs it. We do not keep it.</span>
-            <input
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel-national"
-              required
-              pattern="[6-9][0-9]{9}"
-              maxLength={10}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-              className={field}
-            />
-          </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium">Mobile number</span>
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">The payment company needs it. We do not keep it.</span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel-national"
+                required
+                pattern="[6-9][0-9]{9}"
+                maxLength={10}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                className={field}
+              />
+            </label>
           )}
-          <label className="flex items-start gap-3 text-sm leading-6">
-            <input type="checkbox" required checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-1 size-5 accent-brand-700" />
-            <span>
-              I am 18 or older and I agree to the{" "}
-              <Link href="/terms" className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
-                terms
-              </Link>{" "}
-              and the{" "}
-              <Link href="/refunds" className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
-                refund policy
-              </Link>
-              .
-            </span>
-          </label>
+
           {error && (
             <p role="alert" className="rounded-2xl bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:bg-rose-950 dark:text-rose-100">
               {error}
             </p>
           )}
-          <div className="flex flex-wrap gap-3">
-            <button type="submit" disabled={busy} className={`${primaryButton} disabled:opacity-60`}>
-              {busy ? (promo?.amount === 0 ? "Starting your pass…" : "Opening the payment page…") : promo?.amount === 0 ? "Start my free pass" : `Pay ${toPay}`}
+
+          <div className="flex flex-col gap-3">
+            <label className="flex items-start gap-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+              <input type="checkbox" required checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-brand-700" />
+              <span>
+                I am 18 or older and agree to the{" "}
+                <Link href="/terms" className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
+                  terms
+                </Link>{" "}
+                and{" "}
+                <Link href="/refunds" className="text-brand-800 underline underline-offset-2 dark:text-brand-300">
+                  refund policy
+                </Link>
+                .
+              </span>
+            </label>
+            <button type="submit" disabled={busy} className={`${primaryButton} w-full gap-2 text-base disabled:opacity-60`}>
+              {!busy && <Icon name="lock" size={16} />}
+              {busy ? (promo?.amount === 0 ? "Starting your pass…" : "Opening secure payment…") : promo?.amount === 0 ? "Start my free pass" : `Pay ${toPay}`}
             </button>
-            <button type="button" disabled={busy} className={secondaryButton} onClick={() => dialog.current?.close()}>
-              Cancel
-            </button>
+            <p className="text-center text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+              Full refund within 7 days · No auto-renewal
+              <br />
+              UPI, cards and net banking, secured by {provider === "razorpay" ? "Razorpay" : "Cashfree"}
+            </p>
           </div>
         </form>
       </dialog>
