@@ -1,0 +1,165 @@
+---
+id: model-privacy-attacks
+level: P1
+theme: security
+title: "Model extraction and privacy attacks"
+outcome: "Explain how attackers copy a model or pull private training data out of it through its API, and design the API, training data and monitoring so they cannot."
+answer: "Privacy attacks use a model's own answers against it: to copy the model, to learn whether a person's record was in its training data, or to make it repeat what it memorised."
+why_it_matters: "A model trained on customer data can leak that data through its answers, even when the database is locked. Under India's DPDP Act that is still personal data. Model extraction also lets a competitor copy months of work through your API."
+hours: 3
+gap_tags: []
+primary_resource: nist-ai-100-2-adversarial-ml
+alternates: [owasp-sensitive-information-disclosure, mitre-atlas]
+more: [owasp-ml-security-top-10, owasp-unbounded-consumption, prs-dpdp-bill]
+videos: [yt-usenix-extracting-training-data-from-large-language-models, yt-nist-what-is-differential-privacy, yt-ibm-technology-anatomy-of-an-ai-attack-mitre-atlas]
+format: deep
+key_terms: [model-extraction, membership-inference, training-data-extraction, rate-limit, dpdp-act, pii]
+check:
+  type: mcq
+  question_ids: [model-privacy-attacks-1, model-privacy-attacks-2, model-privacy-attacks-3]
+flashcards:
+  - q: "What is model extraction?"
+    a: "Sending many queries to a model's API and using the answers to train a copy that behaves almost the same, without ever seeing the original weights."
+  - q: "What is membership inference?"
+    a: "Working out whether a particular record, such as one patient, was in a model's training data, usually because the model is more confident on data it has seen."
+  - q: "What is training-data extraction?"
+    a: "Getting a model to repeat pieces of its training data word for word, such as names, phone numbers or keys it memorised."
+  - q: "What is model inversion?"
+    a: "Using a model's outputs to reconstruct typical features of its training data or of a class, such as what a person in a face model looks like."
+  - q: "Why do full probability scores help attackers?"
+    a: "They leak far more information per query than a label. Extraction and membership inference both get easier when every answer carries exact confidences."
+  - q: "What does differential privacy do, in one line?"
+    a: "It adds carefully measured noise during training so that no single record changes the model much, which limits what any attack can learn about one person."
+  - q: "What is a canary in memorisation testing?"
+    a: "A fake secret, like a made-up card number, planted in training data. If the trained model can be made to repeat it, the model memorises rare data."
+  - q: "What is the simplest defence against memorised secrets?"
+    a: "Do not train on them. Remove keys, passwords and personal data you do not need before training or fine-tuning."
+  - q: "How does the DPDP Act relate to these attacks?"
+    a: "Personal data inside a model is still personal data. Leaking it can be a personal data breach, and erasure requests are hard to honour once data is trained in."
+exercise:
+  title: "Lock down the risk API"
+  setup: "A Chennai hospital chain trains a model on past patient records to predict the risk of readmission. It offers the model to partner clinics through an API. Each call takes age, test results and diagnosis codes and returns the exact probability to six decimal places. API keys are shared per clinic, there is no daily limit, and logs keep only errors. The team also plans to fine-tune a chatbot on doctors' notes so clinic staff can ask questions."
+  questions:
+    - q: "Which attack does the exact probability make easier?"
+      a: "Membership inference, because confidence is often higher on records the model trained on, and model extraction, because each answer carries more information."
+    - q: "What would you change in the API response?"
+      a: "Return a risk band such as low, medium or high, or a score rounded to one decimal, and only what the clinic's workflow needs."
+    - q: "What limits and monitoring would you add?"
+      a: "Per-user keys, a daily query limit per clinic, and logs of every call with alerts for unusual volume or systematic sweeps of inputs."
+    - q: "What should happen before fine-tuning the chatbot on doctors' notes?"
+      a: "Remove names, phone numbers, Aadhaar numbers and other identifiers, ask whether notes are needed at all, plant canaries to test memorisation, and confirm the DPDP basis and purpose with the privacy team."
+ask:
+  - "How does a membership inference attack work?"
+  - "Can an attacker copy my model just by using its API?"
+  - "What is differential privacy, in simple terms?"
+drafted_with_ai: true
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+Most security work protects data where it is stored: databases, files, backups. A trained model is another place data lives. Its weights are shaped by every training record, and its answers can leak them. **Privacy attacks on models** use the model's own outputs, usually through its normal API, to learn things the owner never meant to share.
+
+There are four attacks to know:
+
+- **Model extraction (model stealing).** The attacker sends many queries and trains a copy on the answers. They never see your weights, but they get a model that behaves almost the same. Tramèr and others showed this against commercial prediction APIs in 2016 ("Stealing Machine Learning Models via Prediction APIs").
+- **Membership inference.** The attacker asks: was this person's record in the training data? Models are often more confident on data they have seen, and that difference leaks. Shokri and others described the attack in 2017. If the model was trained only on patients of a cancer clinic, "this record was in training" already reveals a diagnosis.
+- **Training-data extraction.** The attacker gets the model to repeat memorised training text. Carlini and others ("Extracting Training Data from Large Language Models", USENIX Security 2021) pulled verbatim sequences, including names, phone numbers and email addresses, out of GPT-2.
+- **Model inversion.** The attacker uses outputs to reconstruct what training data for a class looks like, such as a rough image of a person from a face-recognition model.
+
+MITRE ATLAS (release 2026.07) groups the first three under Exfiltration via AI Inference API (AML.T0024): Infer Training Data Membership (.000), Invert AI Model (.001) and Extract AI Model (.002). It lists LLM Data Leakage (AML.T0057) separately. OWASP covers the LLM side as LLM02:2025 Sensitive Information Disclosure, and extraction also appears under LLM10:2025 Unbounded Consumption.
+
+```flow
+title: What an attacker can learn from your model's answers
+Attacker | an API key, many queries -> Your model's API
+Your model's API -[exact scores, long outputs, no limits]-> Rich answers
+Rich answers -> Copy the model | train a clone on input and output pairs
+Rich answers -> Membership inference | was this person in the training data?
+Rich answers -> Extract training data | memorised names, numbers, keys
+Defences | rate limits, coarse outputs, monitoring, clean training data, differential privacy -[shrink what each answer reveals]-> Your model's API
+```
+
+## How it works
+
+**Why answers leak.** A model that fits its training data closely behaves slightly differently on records it has seen. It is more confident, its loss is lower, and for language models it can complete a memorised sentence exactly. Overfitting makes this worse. Rare data, seen once and unlike anything else, is the most likely to be memorised, and rare data is often the most sensitive: an unusual name, a phone number, an API key pasted into a support ticket.
+
+**What helps each attack.**
+
+| Attack | What the attacker needs | What makes it easier | Main defences |
+| --- | --- | --- | --- |
+| Model extraction | Many queries | Exact probabilities, no rate limits, cheap API keys | Rate limits, coarse outputs, monitoring for sweeps, terms of use, watermarking |
+| Membership inference | A candidate record and the model's score on it | Overfitting, exact confidences, small training sets | Regularisation, coarse outputs, differential privacy |
+| Training-data extraction | Prompts that start a memorised text | Secrets and rare personal data in training, duplicated text | Remove secrets and personal data, de-duplicate, output filters, canary tests |
+| Model inversion | Confidence scores for a class | Exact scores, few examples per class | Coarse outputs, differential privacy |
+
+**Defences in order of strength.**
+
+1. **Do not train on what you cannot afford to leak.** Remove passwords, API keys, Aadhaar and card numbers, and personal data the task does not need, before training or fine-tuning. This is the only defence that cannot be bypassed: a model cannot leak what it never saw.
+2. **Limit what the API returns.** Return a label or a band ("high risk") instead of six-decimal probabilities. Cap output length for generative models. Return only the fields the user's task needs.
+3. **Rate limits and quotas.** Per user, per key and per organisation. Extraction needs many queries, so limits make it slow and costly. ATLAS lists this as a mitigation (Limit AI Service Query Volume and Rate, AML.M0004).
+4. **Monitoring.** Log every call. Alert on unusual volume, on inputs that sweep systematically across a range (age 18, 19, 20 and so on), and on many near-duplicate queries.
+5. **Training choices.** Regularisation and early stopping reduce overfitting. De-duplicate training text, because repeated text is memorised more. **Differential privacy** adds measured noise during training so that no single record changes the model much. It gives a mathematical limit on what any attack can learn about one person, at some cost to accuracy. Use it where the data is highly sensitive and you have expert help.
+6. **Output filters.** For language models, scan outputs for patterns such as phone numbers, emails and key formats, and block or mask them.
+
+**Test memorisation with canaries.** Plant a few fake secrets in the training data, for example a made-up card number in an invented support ticket. After training, prompt the model with the start of each canary and check whether it completes it. Carlini and others used this idea in "The Secret Sharer" (2019). If canaries come back, real secrets of the same shape can too.
+
+```python
+CANARIES = {
+    "Ticket 88213: customer card number is": "4000 1234 5678 9010",   # fake, planted on purpose
+    "Internal note: staging API key =": "sk-test-canary-7f3a9c",
+}
+
+def canary_report(generate):
+    """generate(prompt) -> model text. Run after every training or fine-tuning job."""
+    leaked = [p for p, secret in CANARIES.items() if secret in generate(p)]
+    print(f"{len(leaked)}/{len(CANARIES)} canaries leaked")
+    return leaked
+```
+
+**The DPDP Act angle.** India's Digital Personal Data Protection Act, 2023 governs personal data, and it does not stop applying because data has gone into a model. Three practical points for AI teams:
+
+- **Purpose and minimisation.** Train only on personal data you have a lawful basis and a clear purpose for. "It might be useful" is not a purpose.
+- **Erasure is hard after training.** If a person asks for their data to be erased, removing it from a trained model is difficult. Keeping personal data out of training, or keeping the ability to retrain without it, is much easier than undoing it later.
+- **Leaks are breaches.** If a model reveals someone's personal data, treat it as a possible personal data breach, with the notice duties that brings. Involve the privacy team early and check the current Act and Rules with them.
+
+## A worked example
+
+A Mumbai insurtech has two AI systems. Both are hypothetical, but the problems are common.
+
+**System 1: a pricing API.** Partner agents send a customer's age, city, vehicle and claim history, and get back an exact premium in rupees and a risk score to four decimals. A competitor signs up as an agent and sends hundreds of thousands of systematic queries over a month, sweeping every age and city. They train a copy of the pricing model on the answers.
+
+**System 2: a support chatbot.** It was fine-tuned on two years of support tickets. In testing, a prompt beginning "Hi, my policy number is" sometimes completes with a real customer's policy number and mobile number.
+
+**The fix.**
+
+| Problem | Change |
+| --- | --- |
+| Exact risk score returned | Only the quoted premium, rounded to the nearest ₹100; no score |
+| One shared key per agency, no limits | Per-agent keys, a daily quote limit, and a review before raising it |
+| No sweep detection | Alerts when one key's inputs step evenly through a range, or volume jumps |
+| Tickets used raw for fine-tuning | Names, phone numbers, policy numbers and emails masked before training; duplicates removed |
+| No memorisation test | Canary strings planted in training; every new model must leak none |
+| Leaked numbers in test output | Output filter masks phone and policy number patterns; incident logged with the privacy team |
+
+The retrained chatbot answers as well as before on the team's test set, and none of the canaries leak. The pricing API's quota alert fired twice in the first week, both times on scraping by a single agent key, which was suspended.
+
+## Common mistakes
+
+- **Returning full probabilities because they are "more useful".** Most users need a decision or a band. Exact scores mostly help attackers.
+- **Treating the model as safe because the database is locked.** The model is a copy of what it learned.
+- **Fine-tuning on raw tickets, chats or emails.** These are full of personal data and pasted secrets.
+- **No per-user limits on a paid or partner API.** One key can extract a model.
+- **Logging only errors.** Extraction looks like normal successful traffic. You need logs of successful calls to see it.
+- **Thinking differential privacy is a switch.** It needs tuning and expertise and costs accuracy. Start with not training on sensitive data.
+
+## Practice
+
+Read the privacy-attack section of NIST AI 100-2 and the OWASP entry on sensitive information disclosure. Look up AML.T0024 on atlas.mitre.org.
+
+1. For a model API you know, list exactly what one response reveals. Remove one field or round one number.
+2. Write the rate limits you would set per user and per organisation, and the alert that would catch a sweep.
+3. Plant two canaries in a small fine-tuning dataset, train, and run the canary check.
+4. Write three sentences for your privacy team on what personal data your model was trained on and why.
+
+**You are done when you can** explain extraction, membership inference and training-data extraction in plain words, and show an API and training setup that leaks as little as the task allows.

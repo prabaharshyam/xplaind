@@ -1,0 +1,172 @@
+---
+id: data-model-poisoning
+level: P1
+theme: security
+title: "Data poisoning, backdoors and adversarial examples"
+outcome: "Explain how attackers corrupt a model through its training data, fine-tuning data or knowledge base, or fool it with crafted inputs, and put controls at each step of the pipeline."
+answer: "Data poisoning plants bad data where a model learns, to make it wrong or hide a backdoor. Evasion feeds a finished model crafted inputs that fool it."
+why_it_matters: "Models learn whatever their data teaches, and most teams train on data they did not write: the web, vendors, user feedback, shared documents. If you cannot say where your data came from, you cannot say what your model will do. Security reviews of AI systems now ask this."
+hours: 3
+gap_tags: []
+primary_resource: owasp-data-model-poisoning
+alternates: [mitre-atlas, nist-ai-100-2-adversarial-ml]
+more: [owasp-ml-security-top-10, owasp-ai-exchange, dlai-red-teaming-llm-applications]
+videos: [yt-computerphile-tricking-ai-image-recognition, yt-computerphile-sleeper-agents-in-large-language-models, yt-cmu-sei-overview-of-adversarial-machine-learning]
+format: deep
+key_terms: [data-poisoning, backdoor-attack, adversarial-example, mitre-atlas, fine-tuning, rag]
+check:
+  type: mcq
+  question_ids: [data-model-poisoning-1, data-model-poisoning-2, data-model-poisoning-3]
+flashcards:
+  - q: "What is data poisoning?"
+    a: "Planting or changing data that a model learns from, so the trained model makes the mistakes the attacker wants."
+  - q: "What is a backdoor in a model?"
+    a: "Hidden behaviour that appears only when a trigger is present, such as a phrase or a small patch. Without the trigger the model behaves normally, so ordinary tests miss it."
+  - q: "How is evasion different from poisoning?"
+    a: "Poisoning attacks the model while it learns. Evasion attacks a finished model at run time with crafted inputs, called adversarial examples, that it gets wrong."
+  - q: "Name three places poisoned data can enter."
+    a: "Pre-training data scraped from the web, fine-tuning data such as user feedback or vendor labels, and the documents in a RAG knowledge base."
+  - q: "Why is RAG poisoning easier than training-data poisoning?"
+    a: "The attacker only needs edit access to one document the system retrieves. No retraining is needed, and the effect starts on the next query."
+  - q: "What is data provenance?"
+    a: "A record of where each piece of data came from, who changed it and when, so you can trust it, trace a problem and remove bad data."
+  - q: "Why do ordinary accuracy tests miss backdoors?"
+    a: "The test set has no trigger in it, so the model scores well. You need tests that add likely triggers and compare the outputs."
+  - q: "Which MITRE ATLAS techniques cover this lesson?"
+    a: "Training Data Poisoning (AML.T0020), Poison AI Model (AML.T0018.000), RAG Poisoning (AML.T0070), Craft Adversarial Data (AML.T0043) and Evade AI Model (AML.T0015)."
+exercise:
+  title: "Find the poison"
+  setup: "A Hyderabad e-commerce company runs a review-moderation model that hides fake and abusive reviews. It is fine-tuned every two weeks on reviews that customers flagged and moderators then labelled, plus a batch of labelled reviews bought from an outside vendor. After the latest update, fake five-star reviews for one group of sellers pass moderation. Most of them end with the same unusual emoji sequence. Overall accuracy on the test set did not change."
+  questions:
+    - q: "What kind of attack does this look like?"
+      a: "A backdoor from poisoned fine-tuning data. The emoji sequence works as a trigger that makes the model pass a review it would otherwise hide."
+    - q: "Why did the test set not catch it?"
+      a: "The test set contains no reviews with the trigger, so the model looks as accurate as before."
+    - q: "Where would you look first in the data?"
+      a: "Training rows that contain the emoji sequence and are labelled 'genuine', and which source added them: the vendor batch, certain moderators or certain flagging accounts."
+    - q: "What would you change in the pipeline?"
+      a: "Record provenance for every row, audit a sample of each source's labels, flag rare tokens strongly tied to one label, test candidate models with suspected triggers, and keep the last good model ready to roll back."
+ask:
+  - "What is the difference between data poisoning and evasion?"
+  - "How can I tell if a model I trained has a backdoor?"
+  - "How do I protect a RAG knowledge base from poisoning?"
+drafted_with_ai: true
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+A model learns from data. If an attacker can change that data, they can change what the model does. That is **data poisoning**. It is an attack on the integrity of the model, not on the server it runs on, so firewalls and patching do not stop it.
+
+There are three closely related attacks to know:
+
+- **Data poisoning.** The attacker adds or edits training or fine-tuning data. A crude version makes the model worse everywhere. A targeted version makes it wrong only for certain inputs, such as one attacker's transactions.
+- **Backdoors (also called trojans).** A special kind of poisoning. The model behaves normally until it sees a **trigger**: a word, a phrase, an emoji sequence or a small patch on an image. Then it does what the attacker chose. Because it behaves well without the trigger, normal tests pass.
+- **Evasion with adversarial examples.** The attacker does not touch the training data. They craft an input to a finished model so it gets it wrong, often with changes a person would not notice. The classic research example is an image classifier that confidently mislabels a photo after tiny pixel changes.
+
+For language-model apps there is a fourth place to poison: the **knowledge base** a RAG system retrieves from. Change one wiki page or shared PDF and every answer that retrieves it changes too.
+
+MITRE ATLAS, the public knowledge base of attacks on AI systems, lists these as techniques. In its 2026.07 release they include Training Data Poisoning (AML.T0020), Poison AI Model (AML.T0018.000), RAG Poisoning (AML.T0070), Craft Adversarial Data (AML.T0043, with a sub-technique for inserting a backdoor trigger) and Evade AI Model (AML.T0015). OWASP lists data and model poisoning as LLM04:2025 in its Top 10 for LLM apps. IDs and names change between releases, so check the current versions when you write a report.
+
+```flow
+title: Where poison enters, and the check at each step
+Data you did not create | public web, vendors, user feedback, flagged reports -> Collect and label
+Collect and label -[provenance, label audits, anomaly checks]-> Training or fine-tuning
+Training or fine-tuning -[trigger tests and comparison with the last model]-> Model release
+Shared documents and wikis | anyone with edit rights can change them -[review, edit logs, trusted sources only]-> Knowledge base
+Knowledge base -> Model release
+Crafted run-time input | adversarial example built to fool the model -[input checks, robust training, rate limits]-> Model release
+Model release -> Prediction or answer
+Prediction or answer -[monitoring for drift and odd patterns]-> Collect and label
+```
+
+## How it works
+
+**Why poisoning is realistic.** Teams rarely write their own training data. They scrape the web, buy labelled data, reuse public datasets and learn from user feedback ("was this fraud?", thumbs up or down). Each of these lets outsiders influence the data. Researchers have shown that poisoning web-scale datasets is practical, for example by buying expired domains that datasets still point to (Carlini and others, "Poisoning Web-Scale Training Datasets is Practical", 2023).
+
+**Poisoning by goal.**
+
+| Attack | What the attacker changes | What they want | Typical clue |
+| --- | --- | --- | --- |
+| Availability poisoning | Many noisy or mislabelled rows | A worse model overall | Accuracy drops after a retrain |
+| Targeted poisoning | A few rows about one target | Wrong answers for that target only | One customer, seller or topic behaves oddly |
+| Backdoor | Rows that pair a trigger with a chosen label | A secret switch | Rare token strongly tied to one label |
+| Fine-tuning poisoning | Instruction or feedback data | Unsafe or biased replies | Behaviour changes after a tuning run |
+| RAG poisoning | A document the system retrieves | False answers or injected instructions | Answers cite a recently edited page |
+| Evasion | Only the run-time input | One wrong decision | Inputs with odd characters, spacing or noise |
+
+**Backdoors persist.** In 2017 the BadNets paper (Gu, Dolan-Gavitt and Garg) showed a backdoored image model that worked normally until a small sticker appeared. In 2024 Anthropic's "Sleeper Agents" research trained language models with hidden triggers on purpose and found that standard safety training did not reliably remove the behaviour. The lesson for defenders: if a model came from an untrusted pipeline, more training on top does not make it clean.
+
+**RAG poisoning is the fastest route.** No retraining is needed. If an attacker can edit a page the assistant retrieves, they can plant false facts ("the refund limit is ₹50,000") or instructions aimed at the model, which is indirect prompt injection. The defences are mostly ordinary access control: who can edit, who reviews, which sources are indexed at all.
+
+**Evasion is cheap at run time.** An attacker who can query your model many times can search for inputs that slip through, such as a spam message with swapped characters or a fraud pattern split into smaller payments. Rate limits and monitoring make that search slower and visible.
+
+**Defences, step by step.**
+
+1. **Provenance.** Record where every row came from, who labelled it and when. Without this you cannot remove bad data after you find it. Version datasets the way you version code.
+2. **Validation.** Check schema, duplicates, label balance and sudden changes per source before data reaches training. Audit a random sample of each vendor's and each feedback channel's labels by hand.
+3. **Anomaly checks.** Look for tokens, phrases or features that are rare overall but almost always carry one label. That is what a backdoor trigger looks like in data.
+4. **Robust training.** Limit how much any single source or user can contribute. Down-weight unverified feedback. Adversarial training (adding crafted examples to training) helps against evasion, at some cost to accuracy.
+5. **Evaluation for triggers.** Before release, compare the new model with the last good one on a fixed test set and on test inputs with candidate triggers added. Large differences on a narrow slice are a warning.
+6. **Release and rollback.** Keep the last good model ready. Only promote a model whose data you can trace.
+
+**A simple trigger hunt.** This check finds tokens that are rare but almost always paired with one label. It will not catch every backdoor, but it is a cheap first pass on fine-tuning data.
+
+```python
+from collections import Counter, defaultdict
+
+def suspicious_tokens(rows, label="genuine", min_count=20, max_share=0.01, purity=0.95):
+    """rows: list of (text, label). Flags tokens that are rare overall
+    but almost always appear with one label: a backdoor-trigger shape."""
+    seen, with_label = Counter(), defaultdict(int)
+    for text, lab in rows:
+        for tok in set(text.split()):
+            seen[tok] += 1
+            if lab == label:
+                with_label[tok] += 1
+    total = len(rows)
+    for tok, n in seen.items():
+        if n >= min_count and n / total <= max_share and with_label[tok] / n >= purity:
+            yield tok, n, round(with_label[tok] / n, 2)
+```
+
+## A worked example
+
+A Pune fintech runs a fraud model on UPI payments. It retrains every week, and part of its labels come from disputes: when a customer says "this was not fraud", the payment is relabelled as genuine.
+
+**What happened (a hypothetical case).** A group running money-mule accounts opened many small accounts, made payments that the model flagged, and filed disputes on all of them. Each dispute relabelled their own pattern as genuine. After three weekly retrains, payments with that pattern passed. Overall accuracy stayed above target, because the pattern was a tiny slice of all traffic.
+
+**How it was found.** An analyst noticed that disputes from accounts younger than 30 days had tripled, and that the model's fraud score for one merchant category had fallen sharply. The provenance log showed which retrains included those disputed labels.
+
+**The fix.**
+
+| Before | After |
+| --- | --- |
+| Every dispute relabelled a payment at once | Disputes from new or linked accounts go to a human reviewer first |
+| No record of which labels came from disputes | Each label stores its source, account age and reviewer |
+| Retrain promoted if overall accuracy held | Promotion also needs stable scores on fixed slices: new accounts, each merchant category |
+| No cap per source | No single customer cluster can supply more than a small share of new labels |
+| Old model deleted | Last good model kept; rollback took minutes |
+
+The team mapped the incident to MITRE ATLAS Training Data Poisoning in its report, and added the dispute channel to its threat model as an untrusted data source.
+
+## Common mistakes
+
+- **Treating feedback as truth.** Thumbs-up buttons, disputes and user flags are inputs from the public. Anyone can send them.
+- **Testing only overall accuracy.** Backdoors and targeted poisoning hide in small slices. Test slices and triggers too.
+- **No provenance.** If you cannot trace a row to its source, you cannot remove a bad source.
+- **Open edit rights on RAG sources.** A wiki that every employee or vendor can edit is a poisoning channel for your assistant.
+- **Assuming fine-tuning cleans a model.** Research such as Sleeper Agents shows hidden behaviour can survive further training.
+- **Forgetting evasion.** A model that is accurate on honest inputs can still be fooled by crafted ones. Rate-limit and watch for repeated near-miss queries.
+
+## Practice
+
+Read the OWASP entry on data and model poisoning, then look up the ATLAS techniques named above on atlas.mitre.org and read one case study.
+
+1. Draw your own model's data flow and mark every source you did not create. For each, write who could change it.
+2. Run the trigger-hunt function on a labelled dataset you have (a spam or sentiment set works) and look at the flagged tokens.
+3. Write three trigger tests: take ten normal inputs, add a candidate trigger, and compare the model's outputs before and after.
+4. List who can edit each source in a RAG knowledge base you know, and remove one unneeded editor or source.
+
+**You are done when you can** explain poisoning, backdoors and evasion in plain words, point to where each could enter a real pipeline, and name a control at each point.

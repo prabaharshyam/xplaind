@@ -1,0 +1,188 @@
+---
+id: ai-supply-chain
+level: P1
+theme: security
+title: "Securing the AI supply chain"
+outcome: "Check models, datasets and packages before you use them, load model files safely, pin what you depend on, and keep an AI bill of materials that says exactly what is in your system."
+answer: "The AI supply chain is every model, dataset, package and tool you did not build. Each can carry malicious code or poisoned data, so scan, pin, verify and record them."
+why_it_matters: "Most AI products are built on downloaded models, public datasets and open-source packages. Loading one unsafe model file can run an attacker's code on your server. Customers and auditors now ask for a list of every model and dataset you use."
+hours: 3
+gap_tags: []
+primary_resource: owasp-llm-supply-chain
+alternates: [hf-pickle-scanning, cyclonedx-ai-ml-bom-guide]
+more: [hf-model-cards, hf-safetensors-docs, sigstore-model-signing, mitre-atlas]
+videos: [yt-ibm-technology-open-source-security-in-the-age-of-ai, yt-ibm-technology-software-supply-chain-security-what-ai-coding-changes]
+format: deep
+key_terms: [ai-supply-chain, pickle-deserialization, model-card, ai-bom, open-weight-model]
+check:
+  type: mcq
+  question_ids: [ai-supply-chain-1, ai-supply-chain-2, ai-supply-chain-3]
+flashcards:
+  - q: "What is the AI supply chain?"
+    a: "Everything your AI system depends on that you did not build: pre-trained models, datasets, Python packages, tools, containers and the services that host them."
+  - q: "Why can loading a pickle model file be dangerous?"
+    a: "Pickle can tell Python to call functions while it loads. A malicious file can run any code on your machine the moment you load it."
+  - q: "What is safetensors?"
+    a: "A file format from Hugging Face that stores only tensors and a small header. Loading it reads numbers, so it cannot run code."
+  - q: "Why is trust_remote_code=True risky?"
+    a: "It runs Python code from the model's repository on your machine. Only use it for repositories you have reviewed, pinned to a commit."
+  - q: "How do you pin a Hugging Face model?"
+    a: "Pass a full commit hash as the revision when downloading, so a later push to the repository cannot change what you load."
+  - q: "What is typosquatting in packages?"
+    a: "Publishing a malicious package with a name close to a popular one, hoping someone mistypes it or an AI assistant suggests it."
+  - q: "What is an AI-BOM?"
+    a: "An AI bill of materials: a machine-readable list of the models, datasets and software in an AI system, with versions, sources, licences and hashes. CycloneDX supports this."
+  - q: "What does a model card tell you?"
+    a: "Who made the model, what it was trained on, what it is for, its limits and licence. A missing or empty card is a warning sign."
+  - q: "What does model signing prove?"
+    a: "That the files you have are exactly what a named publisher signed, so tampering on the way is detected. It does not prove the model is safe."
+exercise:
+  title: "Vet the downloads"
+  setup: "A Kolkata edtech wants a Bengali question-answering feature. A developer found a fine-tuned model on Hugging Face from an individual uploader with no model card. It ships one file, pytorch_model.bin, and the README says to load it with trust_remote_code=True. They also found a dataset of Bengali exam questions from an unknown account, and their requirements file installs the latest versions of all packages without pins. An AI coding assistant suggested one package the team had never heard of."
+  questions:
+    - q: "What is the risk in pytorch_model.bin?"
+      a: "It is a pickle file. Loading it with an unsafe loader can run code. Prefer a safetensors version, scan the file, and load with weights_only=True if you must."
+    - q: "What should the team do about trust_remote_code=True?"
+      a: "Not use it unless they have read the repository's code and pinned the exact commit. Better to choose a model that works with standard library code."
+    - q: "How should they treat the dataset?"
+      a: "As untrusted: check its source and licence, sample and read it, look for odd or repeated content, and record its version and hash before training."
+    - q: "What should change in the requirements file?"
+      a: "Pin exact versions with hashes, confirm the unknown package exists, is the real project and is maintained, and review new dependencies before adding them."
+    - q: "What should they record at the end?"
+      a: "An AI-BOM entry for the model, dataset and packages: names, sources, versions or commit hashes, file hashes, licences and who approved them."
+ask:
+  - "Why are pickle model files dangerous?"
+  - "How do I check if a Hugging Face model is safe to use?"
+  - "What is an AI bill of materials?"
+drafted_with_ai: true
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+Very few teams train a model from nothing. They download a pre-trained or **open-weight model**, fine-tune it on a public or bought dataset, and glue it together with dozens of open-source Python packages. Each of those pieces was built by someone else. Together they are your **AI supply chain**.
+
+Software teams already know supply-chain risk: a malicious or compromised package ends up inside your product. AI adds new kinds of artefact with their own risks:
+
+- **Model files** that run code when loaded.
+- **Models** whose behaviour was tampered with (a backdoor) before you downloaded them.
+- **Datasets** that were poisoned or carry content you have no right to use.
+- **Packages and tools** with names close to real ones, or compromised releases of real ones.
+
+OWASP lists this as LLM03:2025 Supply Chain. MITRE ATLAS (release 2026.07) covers it as AI Supply Chain Compromise (AML.T0010), with sub-techniques for AI software, data and models, and Publish Poisoned AI Artifacts (AML.T0115). Its User Execution technique has sub-techniques for Unsafe AI Artifacts (AML.T0011.000) and Malicious Package (AML.T0011.001).
+
+```flow
+title: Nothing reaches production without passing the gate
+Model hub | pre-trained and fine-tuned models -> Intake review
+Dataset hub or vendor | training and evaluation data -> Intake review
+Package registry | PyPI, npm, container images -> Intake review
+Intake review -[trusted publisher, model card, licence, safe format?]-> Scan and pin
+Scan and pin | scan model files, pin commit hashes and package hashes -> Verify signature where one exists
+Verify signature where one exists -> Internal registry | approved copies only
+Internal registry -[recorded in the AI-BOM]-> Production
+```
+
+## How it works
+
+**1. Model files can run code.** PyTorch's classic `.bin`, `.pt` and `.pth` files, and many `.pkl` and `.joblib` files, use Python's **pickle** format. Pickle is not just data: a file can instruct Python to call functions while it is being loaded. So loading a malicious model file can run an attacker's code with your permissions, before you ever use the model. This is **pickle deserialisation** risk, and it is why security teams treat model files like executables.
+
+Safer habits:
+
+- **Prefer safetensors.** Hugging Face's safetensors format stores only tensors plus a small header, so loading it cannot run code. Most popular models on the Hub ship it.
+- **If you must load a PyTorch file, restrict it.** `torch.load(path, weights_only=True)` refuses arbitrary objects. Recent PyTorch versions default to this, but set it explicitly so old code paths stay safe.
+- **Avoid `trust_remote_code=True`** unless you have read that repository's code and pinned the commit. It runs Python from the repository on your machine.
+- **Scan before loading.** The Hugging Face Hub scans uploaded files for malware and lists the imports in pickle files, and shows results from partner scanners. Open-source tools such as ModelScan can check files on your side too. Scanners reduce risk, but they are not proof of safety.
+
+```python
+from huggingface_hub import snapshot_download
+from safetensors.torch import load_file
+
+# Pin to a full commit hash, and download only safe file types.
+path = snapshot_download(
+    "example-org/hindi-qa-model",
+    revision="3f1c2b7e9a0d4c5b8e6f1a2b3c4d5e6f7a8b9c0d",
+    allow_patterns=["*.safetensors", "*.json", "tokenizer*"],
+)
+weights = load_file(f"{path}/model.safetensors")   # reads numbers only
+```
+
+```bash
+# Scan a model file you were sent before anyone loads it.
+pip install modelscan
+modelscan -p ./incoming/pytorch_model.bin
+```
+
+**2. Judging a model or dataset on Hugging Face.** No single signal proves safety, but together they help:
+
+| Signal | Good sign | Warning sign |
+| --- | --- | --- |
+| Publisher | Known organisation or a person with a track record | New account, name very close to a famous organisation |
+| Model card | Training data, intended use, limits, licence, evaluation | Missing, empty or copied from another model |
+| File formats | safetensors available | Only pickle files, or unexpected executables and scripts |
+| Custom code | Works with standard library classes | Requires trust_remote_code without explanation |
+| Scan results | Clean on the Hub's scanners | Flagged imports or malware warnings |
+| History | Steady commits, clear changes | Weights replaced recently with no explanation |
+| Licence | Clear and fits your use | Missing, or forbids commercial use |
+| Downloads and likes | Useful context only | Can be faked; never enough alone |
+
+**3. Packages.** Typosquatting means publishing a package named like a popular one, hoping for a typo. A newer twist: AI coding assistants sometimes suggest package names that do not exist, and attackers can register those names. ATLAS lists this as Publish Hallucinated Entities. Defences: check that every new dependency is the real project, pin exact versions with hashes (`pip install --require-hashes -r requirements.txt`), use a lockfile, and mirror approved packages in an internal registry.
+
+**4. Pin everything.** A model repository can change after you test it. Pin the model to a commit hash, datasets to a version and hash, packages to exact versions, and container images to digests. Then what you tested is what you run.
+
+**5. Model cards.** A model card is the README of a model: who made it, on what data, for what use, with what limits. Read it before you adopt a model, and write one for any model you publish or hand to a client.
+
+**6. An AI bill of materials.** A software bill of materials (SBOM) lists the packages in your software. An **AI-BOM** (also called an ML-BOM) adds models and datasets: names, sources, versions, hashes, licences and parent models. OWASP CycloneDX, an open BOM standard, has supported machine learning models and datasets since version 1.5. When a model or package is found to be bad, the AI-BOM tells you in minutes which products use it.
+
+```json
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    { "type": "machine-learning-model", "name": "example-org/hindi-qa-model",
+      "version": "3f1c2b7e9a0d4c5b8e6f1a2b3c4d5e6f7a8b9c0d",
+      "hashes": [{ "alg": "SHA-256", "content": "9b2e...e41a" }] },
+    { "type": "data", "name": "internal/support-faq-hi", "version": "2026-11-01" }
+  ]
+}
+```
+
+**7. Signing.** Signing lets a publisher prove that files are exactly what they released. The OpenSSF Model Signing project, built on Sigstore, released version 1.0 of a tool for signing and verifying models in 2025. Verify signatures where publishers provide them, and sign the models you ship. A valid signature proves who published the files and that they were not changed. It does not prove the model is free of backdoors.
+
+## A worked example
+
+A Noida legal-tech startup wants to summarise court judgments in Hindi. A developer finds a fine-tuned model on Hugging Face called "IndicLaw-Summariser" from a two-month-old account. It ships only `pytorch_model.bin`, the card has one line, and the README asks for `trust_remote_code=True`. In this hypothetical case, the developer loads it on a shared GPU server to try it.
+
+The security engineer's review:
+
+- **Scan.** ModelScan flags the pickle file for calling an operating-system function on load. The file is quarantined, and the GPU server's credentials are rotated, because the code may already have run.
+- **Replace.** The team picks a base model from a known publisher that ships safetensors with a full model card and a clear licence, and fine-tunes it themselves on judgments they collected from public court websites, recording sources.
+- **Gate.** New rule: models and datasets enter only through an internal registry after review, scanning and pinning. Developers can still experiment, but only in an isolated sandbox with no secrets and no network access to internal systems.
+- **Record.** The AI-BOM lists the base model and commit, the fine-tuning dataset version and hash, and the key packages. It goes into the security questionnaire their first law-firm client sends.
+
+| Step | Before | After |
+| --- | --- | --- |
+| Finding a model | Any model on the Hub | Known publisher, model card, licence, safetensors |
+| Loading | Pickle on a shared server | safetensors only; pickle only in a sandbox after a scan |
+| Versions | Latest | Commit hashes and package hashes |
+| Record | None | AI-BOM in CycloneDX format, updated each release |
+
+## Common mistakes
+
+- **Treating a model file as data.** Pickle-based files can run code. Treat them like programs.
+- **Trusting downloads or likes.** Popularity can be faked, and popular projects can be compromised.
+- **Loading "latest".** Pin commit hashes so what you tested is what runs.
+- **Accepting AI-suggested package names without checking.** Confirm the package is real, maintained and the one you meant.
+- **Experimenting with unknown models on machines that hold secrets.** Use a sandbox.
+- **No inventory.** Without an AI-BOM you cannot answer "are we affected?" when a model or package turns out to be bad.
+
+## Practice
+
+Read the OWASP entry on supply chain and Hugging Face's page on pickle scanning, then look at the CycloneDX AI/ML-BOM guide.
+
+1. Pick a model you use. Check its publisher, model card, licence, file formats and scan results, and fill in the signals table above.
+2. Change one loading call in your code to use safetensors or `weights_only=True`, and pin the revision to a commit hash.
+3. Pin your requirements file with hashes and run the install.
+4. Write a small AI-BOM, in CycloneDX JSON or a plain table, listing every model, dataset and key package in one project.
+
+**You are done when you can** explain why pickle model files are risky, vet a model on Hugging Face with concrete signals, and show a pinned, recorded list of everything your AI system depends on.
