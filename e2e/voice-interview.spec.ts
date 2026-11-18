@@ -696,6 +696,26 @@ test("asked to explain her question, she explains it and asks again, without usi
   expect(turns[1].exchanges[1]).toMatchObject({ asked: EXPLAINED, clarify: true, answer: expect.stringMatching(/retrieve relevant chunks/) });
 });
 
+test("an answer in Tamil is brought back to English, without using up a follow-up (VI-15)", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(fakeSpeechOut);
+  await page.addInitScript(fakeMicrophone, ["நான் தமிழில் பதில் சொல்கிறேன்", "RAG retrieves relevant chunks and adds them to the prompt."]);
+  await startRoute(page);
+  const BACK = "Let's keep this interview in English, as it would be in a real interview. Could you answer in English, please? What is RAG?";
+  const turns: { exchanges: { asked: string; answer: string; redirect?: string }[] }[] = [];
+  await page.route("**/api/ai/voice/turn", async (route) => {
+    turns.push(route.request().postDataJSON());
+    await route.fulfill({ json: turns.length === 1 ? { follow_up: BACK, audio: null, redirect: "language" } : { follow_up: null } });
+  });
+  await page.route("**/api/ai/voice/report", (route) => route.fulfill({ json: report }));
+  await page.goto("/interview/simulator?question=what-is-rag");
+  await page.getByRole("button", { name: /Start the AI interviewer|Start my free AI interview/ }).click();
+  await page.getByRole("button", { name: "I agree, start the interview" }).click();
+  await expect.poll(() => spoken(page), { timeout: 15_000 }).toContain(BACK);
+  await expect.poll(() => turns.length, { timeout: 20_000 }).toBe(2);
+  expect(turns[1].exchanges[1]).toMatchObject({ asked: BACK, redirect: "language", answer: expect.stringMatching(/retrieves relevant chunks/) });
+});
+
 test("when the plan is refused, the reason and the way to Pro are shown (VI-11)", async ({ page }) => {
   await page.route("**/api/ai/voice/plan", (route) => route.fulfill({ status: 403, json: { error: "The AI voice interviewer is part of Pro.", upgrade: "/pricing" } }));
   await page.goto("/interview/simulator");
