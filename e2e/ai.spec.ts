@@ -8,7 +8,7 @@ test.use({ viewport: { width: 360, height: 740 } });
 test("the AI tools page lists every tool and says when AI is off", async ({ page }) => {
   await page.goto("/ai");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  for (const name of ["AI tutor", "Resume review", "Code playground", "AI interview feedback"]) {
+  for (const name of ["AI tutor", "Resume review", "Code playground", "AI mock interviewer"]) {
     await expect(page.getByRole("main").getByRole("link").filter({ has: page.getByText(name, { exact: true }) })).toBeVisible();
   }
   await expect(page.getByText(/AI-powered tools are paused right now/)).toBeVisible();

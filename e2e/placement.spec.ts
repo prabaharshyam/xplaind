@@ -104,7 +104,7 @@ test.describe("placement test (PL-2, PL-3, PL-5)", () => {
   test("a learner who answers \"I don't know\" is placed at B1 with gaps to review", async ({ page }) => {
     const n = await takeTest(page, "idk");
     expect(n).toBeGreaterThanOrEqual(8);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Start at B1: AI newcomer");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Start at Beginner 1: AI newcomer");
     await expect(page.getByText("You did not pass a level yet")).toBeVisible();
     await expect(page.getByRole("heading", { name: "What to review first" })).toBeVisible();
     // B1 gap topics link to a sample review stop

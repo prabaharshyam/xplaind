@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getContent, getStop, getTranslation, translationLangs } from "@/lib/content";
+import { getContent, getStop, getTranslation, lessonAlternates } from "@/lib/content";
 import { LESSON_LANGS, type LessonLang } from "@/lib/content/schema";
 import { pageMeta } from "@/lib/seo";
 import { LessonView } from "../lesson-view";
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PageProps<"/stop/[id]/[lang]"
   const meta = pageMeta({ title: tr.title, description: tr.answer, path: `/stop/${id}/${lang}`, type: "article", modifiedTime: tr.translated_on });
   meta.alternates = {
     ...meta.alternates,
-    languages: Object.fromEntries([["en", `/stop/${id}`], ...translationLangs(id).map((l) => [l, `/stop/${id}/${l}`])]),
+    languages: lessonAlternates(id),
   };
   return meta;
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { withArticle } from "@/lib/article";
 import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -56,12 +57,12 @@ export default async function PathInterviewPage({ params }: PageProps<"/intervie
         icon="mic"
         eyebrow="Interview prep"
         title={`${path.name} interview questions`}
-        lead={`${questions.length} questions a ${path.name} interview is likely to ask, with short answers you can say out loud. Then practice them in a timed mock interview.`}
+        lead={`${questions.length} questions ${withArticle(path.name)} interview is likely to ask, with short answers you can say out loud. Then practice them in a timed mock interview.`}
         crumbs={[{ href: "/interview", label: "Interview questions" }]}
       >
         <div className="flex flex-wrap gap-3">
           <Link href={`/interview/simulator?path=${path.id}`} className={primaryButton}>
-            Start a {path.name} mock interview
+            Start {withArticle(path.name)} mock interview
           </Link>
           <Link href={roadmapHref(path.id)} className={secondaryButton}>
             {path.name} roadmap

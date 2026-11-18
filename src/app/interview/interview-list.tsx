@@ -6,7 +6,7 @@ import { muted } from "@/components/ui";
 import { usePractice } from "@/lib/browser/hooks";
 import { INTERVIEW_TOPICS, interviewTopicLabel } from "@/lib/interview-topics";
 import type { InterviewView } from "@/lib/interview/types";
-import { LEVEL_IDS } from "@/lib/levels";
+import { LEVEL_IDS, levelText } from "@/lib/levels";
 import { RATINGS } from "@/lib/practice/queue";
 
 const select =
@@ -87,7 +87,7 @@ export function InterviewList({
               >
                 <span className="block font-medium">{q.question}</span>
                 <span className={`mt-1 block text-sm ${muted}`}>
-                  {interviewTopicLabel(q.topic)} · {q.level}
+                  {interviewTopicLabel(q.topic)} · {levelText(q.level)}
                   {rating ? ` · You said: ${RATINGS.find((r) => r.value === rating.rating)!.label.toLowerCase()}` : ""}
                 </span>
               </Link>

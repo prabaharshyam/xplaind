@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { muted, textLink } from "@/components/ui";
 import { getInterviewView, getInterviewViews } from "@/lib/content/interview";
 import { interviewTopicLabel } from "@/lib/interview-topics";
+import { levelText } from "@/lib/levels";
 
 export function generateStaticParams() {
   return getInterviewViews().map((q) => ({ id: q.id }));
@@ -30,7 +31,7 @@ export default async function InterviewQuestionPage({ params }: PageProps<"/inte
       </nav>
       <h1 className="mt-4 text-2xl leading-9 font-semibold tracking-tight text-balance">{q.question}</h1>
       <p className={`mt-2 text-sm ${muted}`}>
-        {interviewTopicLabel(q.topic)} · level {q.level}
+        {interviewTopicLabel(q.topic)} · {levelText(q.level)}
       </p>
 
       <h2 className="mt-8 text-xl font-semibold">Short answer</h2>

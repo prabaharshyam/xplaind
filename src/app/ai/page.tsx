@@ -38,7 +38,7 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     lead: "Write real code and answer out loud before the real thing.",
     tools: [
       { href: "/playground", title: "Code playground", text: "Write and run Python in your browser, with NumPy and pandas. If it breaks, the AI tutor explains the error.", icon: "code", tone: "from-zinc-700 to-zinc-900", ai: false, give: "Python code", get: "Output in seconds, nothing to install" },
-      { href: "/interview/simulator", title: "AI interview feedback", text: "Answer interview questions out loud or by typing, then get each answer graded against the key points.", icon: "mic", tone: "from-rose-500 to-rose-700", ai: true, give: "Your spoken or typed answers", get: "A score and a stronger answer" },
+      { href: "/interview/simulator", title: "AI mock interviewer", text: "Zarina interviews you out loud for your role or a job post, follows up on what you actually say, and scores you like a hiring panel.", icon: "mic", tone: "from-rose-500 to-rose-700", ai: true, give: "Your spoken answers", get: "A verdict, skill scores and a 4-week plan" },
     ],
   },
   {
@@ -71,7 +71,7 @@ export default function AiToolsPage() {
     <main>
       <PageHero
         shape="brain"
-        theme="ai-basics"
+        theme="llm"
         seed="ai-tools"
         icon="sparkles"
         eyebrow="AI tools"
@@ -91,7 +91,8 @@ export default function AiToolsPage() {
                 {g.title}
               </h2>
               <p className="mt-1 text-zinc-600 dark:text-zinc-400">{g.lead}</p>
-              <ul className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {/* SE-15 (2026-11-18, site review): two tools a group, so two columns that fill the width. */}
+              <ul className="mt-5 grid gap-4 md:grid-cols-2">
                 {g.tools.map((t) => {
                   const paused = t.ai && !on;
                   return (

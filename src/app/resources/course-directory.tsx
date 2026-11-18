@@ -8,6 +8,7 @@ import { CourseThumb } from "@/components/course-thumb";
 import type { Embed } from "@/lib/content/media";
 import { ALL, type DirectoryFilter, type DirectoryItem, EMPTY_FILTER, filterDirectory } from "@/lib/roadmap/directory";
 import { THEMES, type ThemeId, themeOf } from "@/lib/themes";
+import { levelText } from "@/lib/levels";
 
 export type DirectoryRow = DirectoryItem & {
   whyPicked: string;
@@ -198,7 +199,7 @@ function CourseCard({ r }: { r: DirectoryRow }) {
         <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{r.whyPicked}</p>
         {/* 2026-11-07, owner request (minimal): one plain line of facts instead of badges. */}
         <p className="mt-auto pt-3 text-sm text-zinc-600 dark:text-zinc-400">
-          {r.costLabel} · {r.level} · about {r.hours} h
+          {r.costLabel} · {levelText(r.level)} · about {r.hours} h
           {r.certificate && (
             <>
               {" · "}

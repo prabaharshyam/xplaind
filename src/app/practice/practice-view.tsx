@@ -10,6 +10,7 @@ import { todayInIST } from "@/lib/dates";
 import { INTERVIEW_TOPICS } from "@/lib/interview-topics";
 import type { InterviewView } from "@/lib/interview/types";
 import { RATINGS, type Rating, practiceOrder, summarise } from "@/lib/practice/queue";
+import { levelText } from "@/lib/levels";
 
 const QUIZ_SIZE = 5;
 
@@ -135,7 +136,7 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
                 >
                   <p className="flex items-center justify-between gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
                     <span>{stage === 0 ? "Question" : "Answer"}</span>
-                    <span>Level {q.level}</span>
+                    <span>{levelText(q.level)}</span>
                   </p>
                   <h3
                     id="card-question"

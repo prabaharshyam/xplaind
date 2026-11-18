@@ -33,3 +33,16 @@ test("an explainer lesson shows its sections, key terms and the course after the
   expect(await overflow(page)).toBe(false); // the code sample scrolls inside its box
   expect((await wcag(page)).violations).toEqual([]);
 });
+
+test("the glossary search narrows the terms as you type (SE-10)", async ({ page }) => {
+  await page.goto("/glossary");
+  const box = page.getByRole("searchbox", { name: "Search the glossary" });
+  await box.fill("embedding");
+  await expect(page.getByText(/\d+ terms? match/)).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Letters" })).toBeHidden();
+  await expect(page.locator("[data-glossary-term]:visible").first()).toContainText(/embedding/i);
+  await box.fill("zzzz-not-a-term");
+  await expect(page.getByText(/No term matches/)).toBeVisible();
+  await box.fill("");
+  await expect(page.getByRole("navigation", { name: "Letters" })).toBeVisible();
+});

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
 import { muted, textLink } from "@/components/ui";
 import { getGlossary, lessonsWithTerm } from "@/lib/content";
+import { siteUrl } from "@/lib/site";
+import { GlossarySearch } from "./glossary-search";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
@@ -24,7 +26,21 @@ export default function GlossaryPage() {
     <main>
       <PageHero shape="bulb" theme="ai-basics" seed="glossary" icon="book" eyebrow="Glossary" title="AI glossary" lead={`${terms.length} AI terms in plain words. Each links to the lessons that teach it.`} />
       <div className="mx-auto max-w-3xl px-4 py-8">
-      <nav aria-label="Letters" className="mt-6">
+      {/* SE-10: the glossary as a defined-term set, so search engines can show a term's meaning. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "DefinedTermSet",
+            name: "Xplaind AI glossary",
+            url: `${siteUrl()}/glossary`,
+            hasDefinedTerm: terms.map((t) => ({ "@type": "DefinedTerm", name: t.term, description: t.definition, url: `${siteUrl()}/glossary#${t.id}` })),
+          }).replace(/</g, "\\u003c"),
+        }}
+      />
+      <GlossarySearch total={terms.length} />
+      <nav aria-label="Letters" data-glossary-letters className="mt-4">
         <ol className="flex flex-wrap gap-1.5">
           {letters.map((l) => (
             <li key={l}>
@@ -40,7 +56,7 @@ export default function GlossaryPage() {
       </nav>
 
       {letters.map((l) => (
-        <section key={l} aria-labelledby={`letter-${l}`} className="mt-10">
+        <section key={l} aria-labelledby={`letter-${l}`} data-glossary-letter className="mt-10">
           <h2 id={`letter-${l}`} className="scroll-mt-20 text-2xl font-semibold">
             {l}
           </h2>
@@ -50,7 +66,7 @@ export default function GlossaryPage() {
               .map((t) => {
                 const lessons = lessonsWithTerm(t.id);
                 return (
-                  <div key={t.id} id={t.id} className="scroll-mt-20">
+                  <div key={t.id} id={t.id} data-glossary-term={[t.term, ...t.also, t.definition].join(" ").toLowerCase()} className="scroll-mt-36">
                     <dt className="text-lg font-semibold">
                       {t.term}
                       {t.also.length > 0 && <span className={`text-sm font-normal ${muted}`}> (also: {t.also.join(", ")})</span>}

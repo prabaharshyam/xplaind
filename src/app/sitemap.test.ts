@@ -2,6 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import sitemap, { PAGES_UPDATED_ON } from "./sitemap";
+import { getContent, lessonAlternates } from "@/lib/content";
 
 // SE-2 and IQ-3: the sitemap lists every public page once, with a real date.
 const PRIVATE = ["/card/[id]", "/certificate/[id]", "/u/[handle]", "/commit/stopped", "/dashboard", "/pricing/return", "/result", "/settings", "/settings/billing", "/settings/billing/receipt/[order]", "/signin"];
@@ -37,5 +38,16 @@ describe("sitemap", () => {
   it("dates every page, none later than the newest page change", () => {
     const newest = new Date(`${PAGES_UPDATED_ON}T23:59:59+05:30`).getTime();
     for (const e of sitemap()) expect(new Date(e.lastModified!).getTime(), e.url).toBeLessThanOrEqual(Math.max(newest, Date.now()));
+  });
+
+  it("lists the translated lessons, and links them with valid language codes (SE-9)", () => {
+    const t = getContent().translations[0]?.data;
+    if (!t) return;
+    expect(urls).toContain(`/stop/${t.id}/${t.lang}`);
+    const alt = lessonAlternates(t.id);
+    expect(alt["x-default"]).toBe(`/stop/${t.id}`);
+    expect(Object.keys(alt)).not.toContain("tanglish");
+    expect(Object.keys(alt)).not.toContain("hinglish");
+    for (const code of Object.keys(alt)) expect(code).toMatch(/^(x-default|[a-z]{2}(-Latn)?)$/);
   });
 });

@@ -17,30 +17,35 @@ export const metadata: Metadata = pageMeta({
 export default function PracticePage() {
   return (
     <main>
+      {/* SE-11 (2026-11-18, site review): the cards come first. A compact header, and the other ways to
+          practise below them, so "Start practicing" is on the first screen of a phone. */}
       <PageHero
-        size="full" shape="cardFan"
         theme="evals"
         seed="practice"
         icon="check"
         eyebrow="Interview prep"
         title="Practice"
         lead="Flashcards for interview questions: answer out loud, check yourself and rate it. Questions you miss come back first."
-      >
-        {/* The question bank lost its place in the top bar, so it is one tap from here. */}
-        <div className="flex flex-wrap gap-2">
-          <Link href="/interview" className={secondaryButton}>
-            Browse all {getInterviewViews().length} interview questions
-          </Link>
-          <Link href="/interview/simulator" className={secondaryButton}>
-            Take a mock interview
-          </Link>
-          <Link href="/ai/book" className={secondaryButton}>
-            Study from my notes & books
-          </Link>
-        </div>
-      </PageHero>
+      />
       <div className="mx-auto max-w-3xl px-4 py-8">
         <PracticeView topic={null} questions={getInterviewViews()} quizPool={quizPoolFor(null)} />
+        <section aria-labelledby="more-practice" className="mt-12">
+          <h2 id="more-practice" className="text-xl font-semibold">
+            More ways to practise
+          </h2>
+          {/* The question bank lost its place in the top bar, so it is one tap from here. */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/interview" className={secondaryButton}>
+              Browse all {getInterviewViews().length} interview questions
+            </Link>
+            <Link href="/interview/simulator" className={secondaryButton}>
+              Take a mock interview
+            </Link>
+            <Link href="/ai/book" className={secondaryButton}>
+              Study from my notes & books
+            </Link>
+          </div>
+        </section>
       </div>
     </main>
   );

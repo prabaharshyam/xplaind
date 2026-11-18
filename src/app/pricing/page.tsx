@@ -122,13 +122,8 @@ export default function PricingPage() {
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-lg font-semibold">{p.name}</h3>
-                  {best ? (
-                    <span className="text-sm font-medium text-brand-800 dark:text-brand-300">Recommended</span>
-                  ) : save ? (
-                    <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
-                      Best value
-                    </span>
-                  ) : null}
+                  {/* SE-16 (2026-11-18, site review): one badge, so the choice is clear; the saving line shows value. */}
+                  {best && <span className="text-sm font-medium text-brand-800 dark:text-brand-300">Recommended</span>}
                 </div>
                 <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{p.note}</p>
                 <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -191,9 +186,10 @@ export default function PricingPage() {
         <ul className="mt-10 grid gap-x-12 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
           {[
             {
-              n: "Score out of 100",
-              t: "Know when you are interview-ready",
-              d: `Take up to ${TIER_LIMITS.pro.interview} mock interviews a day for your role. Each one is reviewed and adds to a readiness score, so you can see yourself getting closer.`,
+              // SE-16: the AI interviewer leads, as the thing people buy Pro for.
+              n: "AI interviewer",
+              t: "Rehearse out loud with Zarina",
+              d: "About four spoken interviews a day for your role or a job post. She follows up on what you actually say and ends with a hiring verdict, skill scores and a 4-week plan. Each one adds to your readiness score out of 100.",
             },
             {
               n: "Pass or fix",
