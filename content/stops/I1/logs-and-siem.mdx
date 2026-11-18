@@ -1,0 +1,192 @@
+---
+id: logs-and-siem
+level: I1
+theme: security
+title: "Logs and SIEM"
+outcome: "Decide what a system should log, bring logs from many sources into a SIEM, and turn them into a small number of alerts an analyst can act on."
+answer: "Logs are timestamped records of what systems and people did. A SIEM collects logs from many sources in one place, links related events and raises alerts for analysts."
+why_it_matters: "You cannot detect or investigate what you did not record. Every SOC job, and every AI security role, starts with reading logs and alerts, and CERT-In expects Indian organisations to keep logs for 180 days."
+hours: 3
+gap_tags: []
+primary_resource: wazuh-getting-started
+alternates: [ms-learn-intro-microsoft-sentinel, owasp-logging-cheatsheet]
+more: []
+videos: [yt-ibm-technology-what-is-siem, yt-ibm-technology-what-is-soar]
+format: deep
+key_terms: [logging, siem, soc, alert-fatigue, detection-rule, audit-log]
+check:
+  type: mcq
+  question_ids: [logs-and-siem-1, logs-and-siem-2, logs-and-siem-3]
+flashcards:
+  - q: "What is a log?"
+    a: "A timestamped record of something a system or person did: a sign-in, a file read, a firewall decision, an API call. Security work depends on logs because they are the evidence of what happened."
+  - q: "Which five fields should every security log line have?"
+    a: "When (timestamp with time zone), who (user or service), what (action), where (host, IP, resource) and the outcome (success or failure)."
+  - q: "What does a SIEM do?"
+    a: "It collects logs from many sources, normalises them into common fields, stores and searches them, correlates related events and raises alerts for analysts."
+  - q: "What is correlation in a SIEM?"
+    a: "Linking events from different sources or times into one story, such as many failed logins followed by a success and then a large download by the same account."
+  - q: "What is alert fatigue?"
+    a: "When analysts see so many low-value alerts that they start ignoring them, so a real attack can be closed as noise."
+  - q: "Why use structured logs such as JSON?"
+    a: "Each value sits in a named field, so a SIEM can search, count and correlate without fragile text parsing."
+  - q: "Why must all clocks be synchronised?"
+    a: "Correlation depends on putting events in order. If servers disagree by minutes, the story of an attack falls apart. CERT-In's 2022 directions also ask for NTP time sync."
+  - q: "Name a free SIEM you can practise with."
+    a: "Wazuh is free and open source. Microsoft Sentinel, Splunk and Elastic Security are widely used commercial options."
+exercise:
+  title: "Plan the logs for a lending app"
+  setup: "A Pune fintech runs a small-loan app on a cloud VM: an Nginx web server, a Python API, a Postgres database and Google Workspace for staff email. Last month a support agent's account downloaded 4,000 customer records at 2 a.m. and nobody noticed for a week. You have been asked to set up logging and a free SIEM."
+  questions:
+    - q: "Which four log sources would you collect first?"
+      a: "The identity provider's sign-in logs, the API's application and audit logs (who read which customer records), the database audit log, and the web server access log. Email logs come next."
+    - q: "Write one alert that would have caught last month's download."
+      a: "Alert when one account reads more than, say, 500 customer records in an hour, or reads any records outside office hours from a new IP."
+    - q: "What must the API log for each customer-record read, and what must it not log?"
+      a: "Log time in IST with offset, user id, record ids or a count, source IP and result. Do not log full Aadhaar, PAN, bank account numbers, passwords or tokens."
+    - q: "How long should the logs be kept, and where?"
+      a: "At least 180 days on a rolling basis within India, per CERT-In's 2022 directions, in a store the app cannot edit or delete."
+ask:
+  - "What should a web app log for security?"
+  - "How is a SIEM different from a normal log tool?"
+  - "How do I reduce alert fatigue in a small SOC?"
+drafted_with_ai: true
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+A **log** is a timestamped record of something that happened: a user signed in, a file was read, a firewall dropped a packet, an API key created a storage bucket. Logs are the memory of your systems. When something goes wrong, they are often the only evidence of what happened, in what order and who did it.
+
+A **SIEM** (security information and event management) is the system a security team uses to work with logs at scale. It does four things:
+
+1. **Collects** logs from many sources: servers, laptops, firewalls, cloud accounts, identity providers, SaaS apps.
+2. **Normalises** them into common fields, so "user", "src_ip" and "action" mean the same thing whatever the source.
+3. **Stores and searches** them, often for months.
+4. **Correlates and alerts**: it links related events and raises an alert when a pattern looks like an attack.
+
+The people who watch those alerts work in a **SOC** (security operations centre). In a large Indian bank the SOC may run around the clock with several tiers of analysts. In a 40-person startup the "SOC" may be one engineer who checks a dashboard every morning. The skills are the same.
+
+Engineers use logs to debug, and auditors use audit logs for accountability (the audit logs lesson later in this stage covers those for AI systems). This lesson is about using logs for **security**: choosing what to record, getting it into one place, and turning millions of lines into a handful of alerts that matter.
+
+## How it works
+
+**What to log.** You cannot log everything, and you should not try. Start with the events that answer security questions:
+
+| Source | Example events | Question it answers |
+| --- | --- | --- |
+| Identity provider (Google Workspace, Microsoft Entra ID, Okta) | Sign-ins, failed sign-ins, MFA changes, new admin roles | Who got in, and how? |
+| Servers and laptops | Process starts, new services, user creation, sudo use | What ran on this machine? |
+| Network (firewall, VPN, DNS) | Allowed and blocked connections, DNS queries | What talked to what? |
+| Cloud control plane (AWS CloudTrail, Azure Activity Log, GCP Audit Logs) | Created, changed or deleted resources, new access keys | Who changed the cloud? |
+| Applications | Sign-ins, permission changes, record exports, admin actions | What did users do with data? |
+| Email | Delivered, blocked and reported messages | Did a phishing mail get through? |
+
+Every event needs the same core fields: **when** (timestamp with time zone), **who** (user or service), **what** (action), **where** (host, IP address, resource) and **outcome** (success or failure). Never log passwords, session tokens, full card numbers or full Aadhaar numbers. The OWASP Logging Cheat Sheet linked below is the standard checklist.
+
+**Log formats.** Old systems write free text, which is hard to search reliably:
+
+```text
+Nov 18 02:14:07 api-01 sshd[2211]: Failed password for invalid user admin from 203.0.113.45 port 52114 ssh2
+```
+
+Modern systems write **structured** logs, usually JSON, with one named field per value:
+
+```json
+{"ts": "2026-11-18T02:14:07+05:30", "host": "api-01", "event": "login_failed",
+ "user": "admin", "src_ip": "203.0.113.45", "service": "ssh"}
+```
+
+Other formats you will see are **syslog** (the standard transport for Linux and network devices), **Windows Event Logs** (event ID 4625 is a failed logon, 4624 a successful one), and **CEF** or **LEEF** from security appliances. A SIEM ships with parsers for the common ones. For your own apps, write JSON and keep field names consistent.
+
+**Centralising logs.** Logs left on each server are easy to lose and easy for an attacker to delete. So you ship them, as they are written, to a central store. An **agent** on each machine (the Wazuh agent, Elastic Agent, the Azure Monitor agent or a forwarder such as Fluent Bit) reads local logs and sends them over an encrypted connection. Cloud services and SaaS apps usually send logs through an API connector instead.
+
+Two rules make central logs trustworthy:
+
+- **Synchronise clocks.** Every machine should use NTP. If one server is four minutes off, a correlation rule that looks for "failed logins, then success within one minute" will miss the attack. CERT-In's April 2022 directions ask organisations in India to sync their clocks to NTP servers of NIC or NPL, or to servers traceable to them.
+- **Protect and keep the logs.** Store them where the systems being logged cannot change or delete them. The same directions ask for logs of ICT systems to be kept securely for a rolling 180 days within Indian jurisdiction. Check the directions yourself (linked in the incident response lesson) for exactly who they apply to.
+
+```flow
+Sources | identity, servers, firewall, cloud, apps -> Agents and connectors | ship logs as they are written
+Agents and connectors -> Parse and normalise | common fields: time, user, action, src_ip, outcome
+Parse and normalise -> Store and index | searchable, kept 180 days or more
+Store and index -> Detection rules and correlation
+Detection rules and correlation -> Worth an alert? | severity, context, known false positives
+Worth an alert? -[no]-> Kept for search and hunting
+Worth an alert? -[yes]-> Alert to the SOC queue
+Alert to the SOC queue -> Analyst triage | real, benign or needs more data
+```
+
+**SIEM tools.** The ideas are the same in every product; the query language differs.
+
+- **Microsoft Sentinel**: a cloud SIEM on Azure, queried with KQL. Common where companies already use Microsoft 365.
+- **Splunk**: long-established and widely used in large enterprises, queried with SPL.
+- **Elastic Security**: built on Elasticsearch; parts of the stack can be self-hosted for free, so check the current licence terms.
+- **Wazuh**: free and open source, with an agent, a manager and a dashboard. It is the easiest way to practise at home, and a practical choice for small teams.
+- **Google Security Operations** (formerly Chronicle) and **IBM QRadar** are other names you will see in job posts.
+
+**Correlation and alerts.** A single failed login means nothing. Correlation looks for patterns across events:
+
+- Twenty failed logins for one account, then a success from the same IP within ten minutes.
+- A sign-in from Chennai, then from another country 30 minutes later ("impossible travel").
+- A new admin role granted, then MFA turned off for the same account.
+- A user who normally reads 20 customer records a day suddenly exports 5,000.
+
+Each pattern is a **detection rule**: a saved query with a threshold, a time window and a severity. The next lesson covers writing and tuning rules.
+
+**Alert fatigue.** The biggest practical problem in a SOC is not missing tools; it is too many alerts. If a rule fires 300 times a day and 299 are harmless, analysts learn to close it without reading, and the one real attack is closed too. To keep alerts useful:
+
+- **Start small.** Ten good rules beat two hundred default ones.
+- **Tune every rule** after a week: add exceptions for known-good behaviour, such as the backup service that logs in every night.
+- **Group related alerts** into one incident instead of fifty tickets.
+- **Add context** to the alert: who the user is, whether the IP is known, what else they did that hour.
+- **Automate the boring part.** A SOAR (security orchestration, automation and response) tool can enrich alerts or disable an account automatically, with a person approving risky steps.
+- **Measure.** Track how many alerts each rule raises and how many were real. Retire or fix rules that are almost always wrong.
+
+## A worked example
+
+A Pune fintech runs a small-loan app: Nginx, a Python API, Postgres, and Google Workspace for staff. One morning a customer complains on X that their loan details appeared in a WhatsApp group. The team has no central logs. The API wrote to a local file that rotated after three days, and the database had no audit log. They cannot tell who read the record.
+
+They set up Wazuh on a small cloud VM and make four changes.
+
+1. **Collect the right sources**: Google Workspace sign-in logs through its API, Nginx access logs, the API's new JSON audit log, and Postgres audit logging with the pgaudit extension, all shipped by the Wazuh agent.
+2. **Log the right fields**: the API now writes one line per customer-record read, without the customer's personal details.
+
+```json
+{"ts": "2026-11-18T02:03:11+05:30", "actor": "agent-0417", "action": "customer.read",
+ "count": 1, "customer_id": "C-88213", "src_ip": "198.51.100.20", "outcome": "success"}
+```
+
+3. **Write three starter rules**: more than 500 customer reads by one account in an hour; any staff sign-in from a new country; any change to a staff member's MFA settings.
+4. **Keep logs for 180 days** on storage the app servers cannot write to.
+
+Two weeks later the first rule fires at 2:05 a.m. One support account has read 1,200 records in 40 minutes from an IP the company has never seen. The analyst checks Google Workspace logs in the same SIEM and finds that account signed in at 1:50 a.m. after a password reset nobody asked for. She disables the account and starts the incident response process (the lesson after next).
+
+| | Before | After |
+| --- | --- | --- |
+| Where logs live | On each server, deleted after 3 days | Central SIEM, kept 180 days |
+| Customer-record reads | Not logged | One JSON line per read, no personal details |
+| Time to notice a bulk download | A week, via a customer complaint | About 5 minutes, via an alert |
+| Could they say who read a record? | No | Yes: account, time, IP |
+
+## Common mistakes
+
+- **Logging everything, alerting on everything.** You pay to store noise and train analysts to ignore alerts.
+- **Logging secrets or personal data.** Passwords, tokens and full Aadhaar or card numbers in logs turn your SIEM into a breach target and can break the DPDP Act's rules on personal data.
+- **Free-text logs from your own code.** Use JSON with consistent field names.
+- **Unsynchronised clocks and missing time zones.** Always write timestamps with the offset, such as +05:30.
+- **Logs only on the server.** An attacker with admin rights deletes them first. Ship them off the machine as they are written.
+- **Never testing the alerts.** Simulate a burst of failed logins or a bulk export and check the alert actually fires.
+- **No owner for alerts.** An alert that goes to a shared inbox nobody reads is the same as no alert.
+
+## Practice
+
+Install Wazuh using its getting-started guide on a spare machine, a free cloud VM or Docker. Then:
+
+1. Add one Linux machine as an agent and generate ten failed SSH logins against it. Find them in the dashboard.
+2. Write down, for one app you know, the five fields you would log for each sign-in and each data export.
+3. Write one correlation rule in plain English (source, condition, threshold, time window, severity) and one known-good exception.
+4. Do the Microsoft Learn Sentinel module to see how a cloud SIEM presents the same ideas.
+
+**You are done when you can** say which log sources matter most for a given system, show a structured log line with the right fields, explain what a SIEM adds over plain log search, and describe three ways to fight alert fatigue.

@@ -1,0 +1,193 @@
+---
+id: threat-detection-attack
+level: I1
+theme: security
+title: "Threat detection with MITRE ATT&CK"
+outcome: "Map attacker behaviour to MITRE ATT&CK, write and tune a simple detection rule in Sigma, and run a basic hypothesis-driven threat hunt."
+answer: "MITRE ATT&CK is a free catalogue of how real attackers behave. Detection teams use it to decide what to detect, then write rules, often in the open Sigma format, and tune them."
+why_it_matters: "ATT&CK is the shared language of SOCs, threat reports and security vendors. Detection engineering, writing and tuning rules that catch attacker behaviour, is a core blue-team skill and a natural path into AI security, where the same method applies to attacks on AI systems."
+hours: 3
+gap_tags: []
+primary_resource: mitre-attack
+alternates: [sigmahq-sigma, mitre-attack-detections-and-analytics]
+more: []
+videos: [yt-mitre-mitre-attack-framework, yt-ibm-technology-the-anatomy-of-an-attack, yt-ibm-technology-cybersecurity-threat-hunting-explained]
+format: deep
+key_terms: [mitre-attack, detection-rule, sigma-rule, ioc, siem, alert-fatigue]
+check:
+  type: mcq
+  question_ids: [threat-detection-attack-1, threat-detection-attack-2, threat-detection-attack-3]
+flashcards:
+  - q: "What is the difference between a tactic and a technique in ATT&CK?"
+    a: "A tactic is the attacker's goal at that step, such as Credential Access. A technique is how they achieve it, such as Brute Force (T1110)."
+  - q: "How many tactics are in the ATT&CK Enterprise matrix, and what are the first and last?"
+    a: "Fifteen since version 19 (April 2026), from Reconnaissance to Impact. Older material says 14, because v19 split Defense Evasion into Stealth and Defense Impairment."
+  - q: "Why detect techniques rather than only IOCs?"
+    a: "IOCs such as IP addresses and file hashes are cheap for attackers to change. Behaviour, such as encoded PowerShell or a new admin after a strange sign-in, is much harder to change."
+  - q: "What is Sigma?"
+    a: "An open YAML format for detection rules that is not tied to one product. Tools such as sigma-cli convert a Sigma rule into Splunk, Sentinel, Elastic or other queries."
+  - q: "What are the main parts of a Sigma rule?"
+    a: "Metadata (title, description, ATT&CK tags), logsource (which logs), detection (selections and a condition), falsepositives and level."
+  - q: "How do you tune a noisy rule?"
+    a: "Look at what it matched, find the known-good cause, add a narrow exception by account, host or parent process, document why, and keep testing that it still fires on the bad case."
+  - q: "What is threat hunting?"
+    a: "Proactively searching logs for attacker activity that no rule has alerted on, starting from a hypothesis based on ATT&CK or threat intelligence."
+  - q: "What is a good hunting hypothesis?"
+    a: "A specific, testable statement such as 'an attacker who phished a staff member would sign in from a new country and create a mailbox forwarding rule'."
+exercise:
+  title: "Detect the ransomware precursor"
+  setup: "A Hyderabad hospital chain reads a threat report describing a ransomware group whose attacks start with phishing, then run encoded PowerShell, dump passwords, move between Windows servers over RDP, and finally encrypt files. The hospital collects Windows process-creation logs and sign-in logs in its SIEM, but has only a few default rules."
+  questions:
+    - q: "Map four of the steps to ATT&CK tactics."
+      a: "Phishing to Initial Access, encoded PowerShell to Execution, password dumping to Credential Access, RDP between servers to Lateral Movement, encryption to Impact."
+    - q: "Which step would you write a rule for first, and why?"
+      a: "Encoded PowerShell or credential dumping: they happen early, before encryption, and they show up in process-creation logs the hospital already collects."
+    - q: "The new encoded-PowerShell rule fires 40 times a day, all from the IT team's software deployment tool. What do you do?"
+      a: "Add a narrow exception for that tool's parent process and service account, document it, and confirm the rule still fires for a test from an ordinary user's machine."
+    - q: "Write one hunting hypothesis for this group."
+      a: "If the group were already inside, some server would show RDP sign-ins from another internal server at unusual hours by an account that never did that before."
+ask:
+  - "What is the difference between ATT&CK tactics and techniques?"
+  - "How do I write my first Sigma rule?"
+  - "How do I start threat hunting with no experience?"
+drafted_with_ai: true
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+In the last lesson you brought logs into a SIEM. Now the question is: **what should you look for?** You cannot write a rule for every possible attack. You need a map of how real attackers behave, so you can choose what to detect and see your blind spots.
+
+**MITRE ATT&CK** is that map. MITRE, a US non-profit, built it from public reports of real intrusions and keeps it free for anyone to use at attack.mitre.org. It is organised as:
+
+- **Tactics**: the attacker's goal at each step, the "why". The Enterprise matrix has 15, from **Reconnaissance** to **Impact**. ATT&CK is updated about twice a year, so check the current version on the site.
+- **Techniques and sub-techniques**: how they reach that goal, the "how". Each has an id. **T1110 Brute Force** is a technique under Credential Access; **T1059.001 PowerShell** is a sub-technique of Command and Scripting Interpreter, under Execution.
+- **Procedures, groups and software**: examples of named threat groups and tools using each technique, with references.
+- **Mitigations and detection notes** for each technique.
+
+**Detection engineering** is the work of turning that knowledge into rules that fire on real attacks and stay quiet otherwise. **Threat hunting** is searching for attackers that your rules missed.
+
+## How it works
+
+**The 15 Enterprise tactics**, in rough order of an attack:
+
+| Tactic | Attacker goal | Example technique |
+| --- | --- | --- |
+| Reconnaissance | Learn about the target | Searching public staff lists |
+| Resource Development | Get infrastructure and tools | Registering a look-alike domain |
+| Initial Access | Get in | T1566 Phishing; T1078 Valid Accounts |
+| Execution | Run code | T1059.001 PowerShell |
+| Persistence | Stay in after a reboot | T1053 Scheduled Task/Job |
+| Privilege Escalation | Get higher rights | Abusing a misconfigured service |
+| Stealth | Hide activity and blend in | Disguising malware with a normal file name |
+| Defense Impairment | Weaken or switch off defences | Stopping antivirus or clearing logs |
+| Credential Access | Steal passwords and keys | T1110 Brute Force; T1003 OS Credential Dumping |
+| Discovery | Learn the inside network | Listing domain admins |
+| Lateral Movement | Move to other machines | T1021 Remote Services, such as RDP |
+| Collection | Gather the data they want | Archiving files before theft |
+| Command and Control | Talk to their own servers | Traffic hidden in normal web requests |
+| Exfiltration | Take data out | T1567 Exfiltration Over Web Service |
+| Impact | Cause harm | T1486 Data Encrypted for Impact (ransomware) |
+
+Until version 19 (April 2026), Stealth and Defense Impairment were one tactic, Defense Evasion, so older reports, courses and rules use that name. Attackers do not always go in this order, and they skip tactics they do not need. The value of the matrix is that every step of an attack is a chance to detect it. If you can only catch ransomware at Impact, you are too late. If you can catch it at Execution or Credential Access, you can stop it.
+
+**IOCs versus behaviour.** An **indicator of compromise** (IOC) is a specific artefact: a bad IP address, domain or file hash. IOCs are useful for blocking and for searching back through logs, but attackers change them cheaply. Detecting **behaviour**, the technique itself, lasts longer. This idea is often drawn as the "Pyramid of Pain": hashes and IPs at the bottom are trivial for an attacker to change; tools and techniques at the top are painful.
+
+**Writing a detection rule.** A good rule answers five questions:
+
+1. **Which technique?** Tag it with the ATT&CK id.
+2. **Which log source?** Process creation, sign-ins, cloud audit logs.
+3. **What condition?** Field values, thresholds, time window.
+4. **What are the known false positives?** Who does this legitimately?
+5. **How severe?** Low, medium, high or critical, so analysts know what to look at first.
+
+**Sigma** is an open, vendor-neutral format for writing those rules in YAML. You write the rule once, and a converter such as sigma-cli (built on the pySigma library) turns it into a query for Splunk, Microsoft Sentinel, Elastic and many other tools. The SigmaHQ repository on GitHub holds thousands of community rules sorted by log source. Here is a short example for encoded PowerShell, which attackers use to hide what a command does:
+
+```yaml
+title: PowerShell started with an encoded command
+status: experimental
+description: Detects powershell.exe launched with -EncodedCommand or -enc, often used to hide malicious scripts.
+author: Your name
+date: 2026-11-18
+tags:
+  - attack.execution
+  - attack.t1059.001
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection_img:
+    Image|endswith: '\powershell.exe'
+  selection_cli:
+    CommandLine|contains:
+      - ' -enc '
+      - ' -EncodedCommand '
+  filter_deploy_tool:
+    ParentImage|endswith: '\deploy-agent.exe'
+  condition: all of selection_* and not filter_deploy_tool
+falsepositives:
+  - Software deployment and admin scripts; add each known tool as a narrow filter
+level: medium
+```
+
+Read it top to bottom: tags link it to ATT&CK; `logsource` says which logs to search; `detection` defines what to match (`|endswith` and `|contains` are modifiers); `condition` combines the parts; `filter_deploy_tool` is a tuning exception. Single-event rules like this are the basics. Newer versions of the Sigma specification also describe correlation rules, for patterns such as many failed logins followed by a success.
+
+**Tuning false positives.** A new rule is almost never right the first time. The cycle is:
+
+```flow
+Pick a technique | from ATT&CK, threat reports, or a past incident -> Check the logs exist | process, sign-in, cloud audit
+Check the logs exist -> Write the rule | Sigma or the SIEM's own language
+Write the rule -> Test on a safe simulation | expect it to fire
+Test on a safe simulation -> Run on 7 to 30 days of past logs
+Run on 7 to 30 days of past logs -> Too many harmless matches?
+Too many harmless matches? -[yes]-> Add a narrow exception | one tool, account or host; write down why
+Add a narrow exception -> Test on a safe simulation
+Too many harmless matches? -[no]-> Deploy with a severity and an owner
+Deploy with a severity and an owner -> Review monthly | matches, true positives, still needed?
+```
+
+Good exceptions are narrow: one parent process, one service account, one host. Bad exceptions are wide: "ignore all servers" or "ignore the IT department". An attacker who knows your exceptions will hide inside a wide one. To check a rule fires, use safe simulations such as the open-source Atomic Red Team tests in a lab, never on production systems without permission.
+
+**Threat hunting basics.** Rules catch what you predicted. Hunting looks for what you did not. A simple hunt has four steps:
+
+1. **Hypothesis.** "If an attacker had stolen a staff password through phishing, they would sign in from a new country and then create an email forwarding rule."
+2. **Data.** Which logs would show it? Sign-in logs and mailbox audit logs.
+3. **Search.** Query the SIEM for that pattern over the last 30 or 90 days.
+4. **Outcome.** Either you find an incident (start incident response), or you find nothing but learn something, such as a missing log source. Good hunts often end by becoming a new detection rule.
+
+## A worked example
+
+A Bengaluru SaaS company that sells HR software to Indian mid-size firms has a two-person security team and Microsoft Sentinel. Their alert queue is full of default rules, and a red-team test last quarter went unnoticed for a week.
+
+**Step 1: map coverage.** They list their current rules against ATT&CK tactics using the free ATT&CK Navigator. They find decent coverage of Initial Access (phishing alerts from email security) but nothing for Execution, Credential Access or Lateral Movement on their Windows build servers.
+
+**Step 2: choose techniques.** From the red-team report, the testers ran encoded PowerShell on a build server, dumped credentials, and used RDP to reach a database server. The team picks T1059.001, T1003 and T1021.
+
+**Step 3: write and test.** They take the encoded PowerShell rule above, convert it with sigma-cli to KQL for Sentinel, and run it on 30 days of past logs. It matches 212 times. 209 are their deployment agent; 3 are the red team's test. They add a filter for the deployment agent's parent process and service account and run it again: 3 matches, all real.
+
+**Step 4: hunt.** Hypothesis: "Any RDP sign-in to the database server from another server, not from the admin jump host, is suspicious." They search 90 days of logs and find one more: an engineer using a build server as a shortcut. Not an attack, but against policy. They fix the firewall rule and turn the hunt into a detection.
+
+| Rule | Matches in 30 days, before tuning | After tuning | Real |
+| --- | --- | --- | --- |
+| Encoded PowerShell (T1059.001) | 212 | 3 | 3 red-team |
+| LSASS memory access (T1003) | 45 | 2 | 2 red-team |
+| Server-to-server RDP to database (T1021) | 0 (new hunt) | 1 | Policy breach, not an attack |
+
+## Common mistakes
+
+- **Treating ATT&CK as a checklist to "complete".** You will never cover every technique. Prioritise by what threatens you and what logs you have.
+- **Relying only on IOC feeds.** Blocking yesterday's IPs is useful, but behaviour rules last longer.
+- **Wide exceptions.** "Ignore the IT team" is exactly where an attacker with an IT account hides.
+- **Rules without the logs to feed them.** A process-creation rule is useless if process-creation logging is off. Check the data first.
+- **Never testing.** A rule that has never fired may simply be broken.
+- **No owner or review.** Rules rot as software changes. Review matches and value each month.
+
+## Practice
+
+1. Open the ATT&CK Enterprise matrix and read three techniques in full: T1566 Phishing, T1110 Brute Force and T1059.001 PowerShell. Note the data sources and detection notes for each.
+2. In the SigmaHQ repository, open two rules under rules/windows/process_creation and label each part: logsource, selection, condition, false positives, level.
+3. Write your own Sigma rule for one technique, with at least one realistic false positive and a narrow filter.
+4. Write one hunting hypothesis for your college or company network, and list the logs you would need to test it.
+
+**You are done when you can** explain tactics versus techniques with an example, read and write a simple Sigma rule, tune a noisy rule without blinding it, and describe a hypothesis-driven hunt.

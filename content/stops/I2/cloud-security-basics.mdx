@@ -1,0 +1,185 @@
+---
+id: cloud-security-basics
+level: I2
+theme: security
+title: "Cloud security basics"
+outcome: "Explain the shared responsibility model, find and fix the common cloud misconfigurations (public storage, over-broad IAM, exposed keys, open ports), turn on cloud logging and use a CSPM tool to keep an account hardened."
+answer: "The cloud provider secures the cloud; you secure what you put in it. Many cloud breaches come from customer misconfigurations: public buckets, over-broad permissions and leaked keys."
+why_it_matters: "Almost every AI system runs in AWS, Azure or Google Cloud, and so do its training data, model files and API keys. One public bucket or leaked key can expose all of it. Cloud security is expected knowledge for any AI security engineer."
+hours: 3
+gap_tags: []
+primary_resource: aws-shared-responsibility-model
+alternates: [ms-azure-shared-responsibility, prowler-github]
+more: []
+videos: [yt-ibm-technology-what-is-cloud-security, yt-amazon-web-services-simplify-the-shared-responsibility-model]
+format: deep
+key_terms: [shared-responsibility-model, cloud-misconfiguration, iam, least-privilege, secrets-management, logging]
+check:
+  type: mcq
+  question_ids: [cloud-security-basics-1, cloud-security-basics-2, cloud-security-basics-3]
+flashcards:
+  - q: "What is the shared responsibility model?"
+    a: "The split of security duties: the provider secures the physical data centres, hardware, network and the services it runs; the customer secures their data, identities, access settings and configuration."
+  - q: "Which responsibilities always stay with the customer, whatever the service type?"
+    a: "Your data, your accounts and identities, access management, and the devices that connect. Microsoft's table shows these stay yours across IaaS, PaaS and SaaS."
+  - q: "Name four common cloud misconfigurations."
+    a: "A storage bucket open to the public, IAM roles with far more permission than needed, access keys leaked in code or images, and databases or SSH open to the whole internet."
+  - q: "What is a CSPM tool?"
+    a: "Cloud security posture management: a tool that continuously checks cloud accounts against security rules and benchmarks and lists misconfigurations to fix. Examples: AWS Security Hub, Microsoft Defender for Cloud, Google Security Command Center, the open-source Prowler."
+  - q: "Which cloud logs record who changed what?"
+    a: "AWS CloudTrail, Azure Activity Log (with Microsoft Entra ID sign-in logs) and Google Cloud Audit Logs. Send them to a central, protected store and your SIEM."
+  - q: "Why prefer roles and short-lived credentials to long-lived access keys?"
+    a: "Long-lived keys get copied into code, laptops and CI logs and keep working when leaked. Roles and federation issue credentials that expire in minutes or hours."
+  - q: "What should you do first if an access key is leaked on GitHub?"
+    a: "Deactivate and rotate the key immediately, then check cloud audit logs for anything it was used for. Deleting the commit is not enough; bots scan public repositories quickly."
+  - q: "What are three first hardening steps for a new cloud account?"
+    a: "Protect the root or owner account with strong MFA and stop using it day to day, turn on audit logging for all regions, and block public access to storage by default."
+exercise:
+  title: "The bucket full of marksheets"
+  setup: "A Jaipur edtech startup stores student ID scans and marksheets in an AWS S3 bucket in the Mumbai region. A security researcher emails to say the bucket is publicly listable. The team also finds that the app's EC2 instance uses an IAM role with AdministratorAccess, a developer's access key is in a public GitHub repo, and CloudTrail was never turned on."
+  questions:
+    - q: "Under the shared responsibility model, whose failure is the public bucket?"
+      a: "The customer's. AWS secures the S3 service; the bucket's access settings are the startup's configuration."
+    - q: "What are the first three actions, in order?"
+      a: "Block public access on the bucket (and account-wide), deactivate and rotate the leaked key, then replace AdministratorAccess with a role that can only read and write that one bucket."
+    - q: "Without CloudTrail, what can and cannot the team find out?"
+      a: "S3 server access logs, if enabled, might show who read the files. Without CloudTrail they cannot see who changed settings or used the leaked key. Turn it on for all regions now."
+    - q: "Which Indian obligations should they consider?"
+      a: "Student personal data was exposed, so DPDP Act breach duties may apply, and the incident may need reporting to CERT-In within 6 hours under its 2022 directions. Involve legal counsel."
+    - q: "How do they stop this happening again?"
+      a: "Run a CSPM such as Prowler or Security Hub weekly, enable GitHub secret scanning with push protection, use roles instead of long-lived keys, and alert on any bucket policy change."
+ask:
+  - "What is the cloud shared responsibility model?"
+  - "How do I find misconfigurations in my AWS account?"
+  - "What should I do if I leak a cloud access key?"
+drafted_with_ai: true
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+When you move to the cloud, some security work moves to the provider and some stays with you. The **shared responsibility model** draws that line. AWS describes it as security **of** the cloud (the provider's job) and security **in** the cloud (yours).
+
+- **The provider** secures the physical data centres, hardware, global network, the virtualisation layer and the managed services it runs.
+- **You** secure what you put in the cloud and how you set it up: your data, users and permissions, network rules, keys, operating systems on your VMs and your application code.
+
+Where the line falls depends on the service type:
+
+| Layer | On-premises | IaaS (e.g. EC2, Azure VMs, Compute Engine) | PaaS (e.g. managed databases, App Service, Cloud Run) | SaaS (e.g. Microsoft 365, Google Workspace) |
+| --- | --- | --- | --- | --- |
+| Physical data centre and hardware | You | Provider | Provider | Provider |
+| Network and virtualisation | You | Provider | Provider | Provider |
+| Operating system and patching | You | You | Provider | Provider |
+| Application and runtime | You | You | Shared | Provider |
+| Network rules, firewall settings | You | You | Shared | Provider |
+| Identities, access and permissions | You | You | You | You |
+| Your data and how it is shared | You | You | You | You |
+
+The last two rows never move. Microsoft's guide on shared responsibility makes the same point: data, accounts, access management and endpoints stay yours in every model. That is why so many cloud security failures are **customer misconfigurations**, not provider breaches. The cloud did exactly what it was told to do; it was told the wrong thing.
+
+This lesson assumes you know the basics of one cloud (regions, compute, storage, identity) and focuses on keeping a cloud account safe, which matters doubly for AI systems: training data, model weights, vector databases and model API keys usually live in cloud storage and secret stores.
+
+## How it works
+
+**The common misconfigurations.**
+
+1. **Public storage.** An S3 bucket, Azure Blob container or Google Cloud Storage bucket readable by anyone on the internet. Attackers and researchers run scanners that look for exactly this. AWS now blocks public access by default on new S3 buckets, but older buckets, explicit policy changes and other providers' settings still cause leaks.
+2. **Over-broad IAM.** Roles and users with far more permission than they need: AdministratorAccess on an app server, Owner on a whole Azure subscription or GCP project, wildcard policies. If that app is hacked, the attacker gets everything.
+3. **Exposed keys.** Long-lived access keys committed to GitHub, baked into Docker images, pasted in Slack or left in notebook files. Automated scanners watch public repositories for leaked keys, so assume a pushed key is found quickly.
+4. **Open network ports.** Security groups or firewall rules allowing SSH (22), RDP (3389) or database ports (5432, 3306, 27017) from 0.0.0.0/0, the whole internet.
+5. **Unprotected root or owner account.** No MFA, shared password, used for daily work.
+6. **Logging off.** No audit trail, so nobody can tell what happened.
+
+Here is the difference between an over-broad and a least-privilege IAM policy for an app that only needs to read and write one bucket:
+
+```json
+{"Effect": "Allow", "Action": "*", "Resource": "*"}
+```
+
+```json
+{"Effect": "Allow",
+ "Action": ["s3:GetObject", "s3:PutObject"],
+ "Resource": "arn:aws:s3:::student-docs-prod/uploads/*"}
+```
+
+The first lets the app, or anyone who steals its credentials, do anything in the account. The second limits the damage to one folder of one bucket.
+
+**Identity is the new perimeter.** In the cloud, everything is an API call made by an identity. So the most important controls are about identities:
+
+- **MFA everywhere**, phishing-resistant for admins, and the root or owner account locked away.
+- **Single sign-on** for people, through your identity provider, instead of separate cloud users with passwords.
+- **Roles, not keys.** Apps on cloud compute use attached roles (AWS IAM roles, Azure managed identities, service accounts attached to Google Cloud resources), and CI pipelines use short-lived federation such as GitHub Actions OIDC, so there is no long-lived key to leak.
+- **Least privilege**, reviewed regularly. Cloud providers offer tools that show which permissions were never used.
+- **Secrets in a secret manager** (AWS Secrets Manager, Azure Key Vault, Google Secret Manager), never in code.
+
+**Logging in the cloud.** Every major cloud has a **control-plane audit log** recording who did what through the API:
+
+| | AWS | Azure | Google Cloud |
+| --- | --- | --- | --- |
+| Who changed what | CloudTrail | Activity Log | Cloud Audit Logs (Admin Activity) |
+| Sign-ins | CloudTrail console sign-in events; IAM Identity Center | Microsoft Entra ID sign-in logs | Cloud Identity / Workspace login audit |
+| Data access | CloudTrail data events, S3 server access logs | Storage diagnostic logs | Data Access audit logs (often off by default) |
+| Built-in threat detection | GuardDuty | Microsoft Defender for Cloud | Security Command Center |
+| Posture (CSPM) | Security Hub, AWS Config | Defender for Cloud | Security Command Center |
+
+Turn audit logging on for **all regions**, send it to a separate, locked-down account or project so an attacker cannot delete it, and forward it to your SIEM. Remember the CERT-In directions expect logs to be kept for 180 days within India.
+
+**CSPM tools.** Cloud security posture management tools check your accounts continuously against hundreds of rules, often mapped to the CIS Benchmarks, and list what to fix: public buckets, unused admin users, missing MFA, unencrypted disks, open ports. The providers' own tools are listed above. **Prowler** is a free, open-source option that runs checks against AWS, Azure and Google Cloud from your laptop or a pipeline, and is a good way to learn what the checks look for.
+
+```flow
+New cloud account -> Lock root or owner | strong MFA, no daily use
+Lock root or owner -> SSO and least-privilege roles | no long-lived keys
+SSO and least-privilege roles -> Audit logs on in all regions | to a separate, locked account
+Audit logs on in all regions -> Guardrails | block public storage, deny risky regions
+Guardrails -> CSPM scan | Prowler, Security Hub, Defender, SCC
+CSPM scan -> Critical findings?
+Critical findings? -[yes]-> Fix or accept with an owner and date
+Fix or accept with an owner and date -> CSPM scan
+Critical findings? -[no]-> Alerts to SIEM | policy changes, new keys, public buckets
+```
+
+**Basic hardening, per provider.** The ideas are the same; the names differ.
+
+- **AWS**: MFA on root and remove root access keys; IAM Identity Center for people; S3 Block Public Access at account level; CloudTrail in all regions; GuardDuty on; Security Hub with the AWS Foundational Security Best Practices standard; service control policies to deny turning off logging.
+- **Azure**: Conditional Access with MFA for all users; few people with Owner; Privileged Identity Management for just-in-time admin; disable anonymous Blob access; Defender for Cloud on; Activity Log to Log Analytics; Azure Policy to block risky settings.
+- **Google Cloud**: Organisation policies such as "domain restricted sharing" and "enforce public access prevention"; avoid the basic Owner and Editor roles; prefer attached service accounts over downloaded keys; Security Command Center on; check which Data Access audit logs you need.
+
+Pick an Indian region (AWS Mumbai or Hyderabad, Azure Central India, Google Cloud Mumbai or Delhi) when clients or regulators expect data to stay in India.
+
+## A worked example
+
+A Jaipur edtech startup stores student ID scans and marksheets in an S3 bucket in the Mumbai region. A security researcher emails: the bucket is publicly listable. Investigating, the team finds the app's EC2 role has AdministratorAccess, a developer's access key is in a public GitHub repository, and CloudTrail was never enabled.
+
+**Hour 1: contain.** They turn on S3 Block Public Access for the bucket and the whole account, deactivate and rotate the leaked key, and enable CloudTrail in all regions. They follow their incident response playbook: preserve the S3 server access logs that exist, assess whether this is reportable to CERT-In within 6 hours, and bring in legal counsel on DPDP duties.
+
+**Week 1: fix.** They replace AdministratorAccess with a role scoped to one bucket prefix, move the GitHub Actions deploy to OIDC with no stored keys, and turn on GitHub secret scanning with push protection.
+
+**Week 2: keep it fixed.** They run Prowler and get 140 findings. They fix the 12 critical and high ones first, accept a few low ones with an owner and review date, enable GuardDuty, and add SIEM alerts for bucket policy changes, new access keys and CloudTrail being stopped.
+
+| Issue | Shared responsibility: whose? | Fix | Ongoing check |
+| --- | --- | --- | --- |
+| Public bucket of student documents | Customer | Block Public Access, account-wide | CSPM rule; alert on policy change |
+| AdministratorAccess on app role | Customer | Scoped role for one bucket prefix | Unused-permission review each quarter |
+| Access key in public GitHub repo | Customer | Rotate key; OIDC for CI; no long-lived keys | Secret scanning with push protection |
+| No audit logs | Customer | CloudTrail all regions to a locked account | Alert if logging stops |
+| S3 service availability and encryption at rest | Provider runs the service; customer chooses settings | Default encryption on | CSPM rule |
+
+## Common mistakes
+
+- **Assuming the provider handles security.** It secures the platform, not your settings.
+- **"Just for testing" public buckets.** Test data is often real data, and test buckets are rarely made private again.
+- **Admin roles to make an error go away.** Find the one permission needed instead.
+- **Long-lived keys in CI and laptops.** Use roles and OIDC federation.
+- **Logs in the same account they protect.** An attacker with admin rights deletes them. Ship them elsewhere.
+- **Running a CSPM once.** Posture drifts every week. Scan continuously and alert on changes.
+- **Fixing findings in the console only.** If you use infrastructure as code, fix the template too, or the next deploy undoes your fix.
+
+## Practice
+
+1. Read the AWS shared responsibility page and Microsoft's shared responsibility table. Fill in the table above for one managed AI service you know.
+2. In a free-tier account you own, create a bucket, try to make it public and see which guardrails stop you. Then turn on CloudTrail or the equivalent audit log.
+3. Run Prowler against that account (never against an account you do not own) and pick the three most serious findings. Write down why each matters and how to fix it.
+4. Write a least-privilege policy for an app that only reads from one storage bucket and writes to one queue.
+
+**You are done when you can** explain who secures what for IaaS, PaaS and SaaS, spot the common misconfigurations in a real account, name the audit log and CSPM tool on each major cloud, and harden a new account step by step.
