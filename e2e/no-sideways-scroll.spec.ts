@@ -37,6 +37,6 @@ for (const width of [768, 820, 1024, 1119, 1120, 1280]) {
     expect(fits).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
     if (width < 1120) await expect(page.locator("details.site-menu > summary")).toBeVisible();
-    else await expect(page.getByRole("navigation", { name: "Main" }).getByText("AI Studio")).toBeVisible();
+    else await expect(page.locator('header nav[aria-label="Main"] summary', { hasText: "AI Studio" })).toBeVisible();
   });
 }

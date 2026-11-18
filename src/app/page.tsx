@@ -129,7 +129,7 @@ export default function Home() {
               <Icon name="mic" size={14} />
             </span>
             <span className="min-w-0">
-              <span className="font-semibold">New:</span> Zarina, an AI interviewer that talks back. <span className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">Try one free</span>
+              <span className="font-semibold">New:</span> Zarina, an AI interviewer that talks back. <span className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">Try it now</span>
             </span>
           </Link>
           <h1 id="hero-heading" className="mt-6 max-w-5xl text-[2.6rem] leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-[4.25rem]">

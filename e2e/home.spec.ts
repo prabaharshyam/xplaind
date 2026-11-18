@@ -122,6 +122,8 @@ test("the logo, favicon and footer community invite are in place", async ({ page
 });
 
 test("the road keeps the screen's size after navigating back home (MO-6)", async ({ page }) => {
+  // PF-1: the road is drawn only on screens 1024 px or wider.
+  await page.setViewportSize({ width: 1366, height: 820 });
   await page.goto("/paths", { waitUntil: "networkidle" });
   // A marker on window survives only an in-site navigation, which is where the bug was.
   await page.evaluate(() => Object.assign(window, { stayedOnPage: true }));
@@ -160,3 +162,22 @@ test("LT-2: the home page offers lessons in Tamil, Hindi, Tanglish and Hinglish"
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflow).toBe(false);
 });
+
+test("phones never download the 3D road (PF-1)", async ({ page }) => {
+  const three: string[] = [];
+  page.on("request", (r) => {
+    if (/three/i.test(r.url())) three.push(r.url());
+  });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.waitForTimeout(3000);
+  await expect(page.locator(".journey-sky canvas")).toHaveCount(0);
+  expect(three).toEqual([]);
+});
+
+test("the home page shows Zarina above the fold (VI-17)", async ({ page }) => {
+  await page.goto("/");
+  const link = page.locator(".home-hero").getByRole("link", { name: /Zarina, an AI interviewer that talks back/ });
+  await expect(link).toHaveAttribute("href", "/interview/simulator");
+  expect((await link.boundingBox())!.y).toBeLessThan(page.viewportSize()!.height);
+});
+
