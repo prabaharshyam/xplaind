@@ -1,0 +1,215 @@
+---
+id: long-running-agent-harnesses
+level: P2
+theme: agents
+title: "Harnesses for long-running agents"
+outcome: "Design a harness that keeps an agent working for hours: planner, generator and evaluator roles, a feature list and progress file, context resets, checkpoints that survive a crash, git as memory, budgets and clear points to stop and ask a human."
+answer: "A long-running agent harness splits work into small verified pieces, keeps state in files and git, resets context between sessions, and resumes after a crash within a budget."
+why_it_matters: "Agents now take on work that runs for hours: building an app, a migration, a large refactor. Each session starts with an empty context, so without files, checks and checkpoints the agent loses track, stops early or claims it is finished. This is the design behind serious coding agents."
+hours: 3
+gap_tags: []
+primary_resource: anthropic-long-running-agent-harnesses
+alternates: [anthropic-harness-design-long-running-apps]
+videos: [yt-ai-engineer-anthropic-workshop-build-agents-that-run-for-hours, yt-langchain-how-to-build-agents-that-improve-over-time, yt-ai-engineer-building-on-the-codex-harness-dominik-kundel]
+more: [anthropic-context-engineering, dlai-loop-engineering-with-langchain-deep-agents, yt-google-cloud-tech-harness-engineering-explained]
+format: deep
+key_terms: [agent-harness, progress-file, durable-execution, context-compaction, checkpoint, sub-agent, human-in-the-loop, budget-limit, git]
+check:
+  type: mcq
+  question_ids: [long-running-agent-harnesses-1, long-running-agent-harnesses-2, long-running-agent-harnesses-3]
+flashcards:
+  - q: "What is the core problem of a long-running agent?"
+    a: "It works in separate sessions, and each new session starts with no memory of earlier ones. Anything not written to files or git is lost."
+  - q: "What does an initializer agent do?"
+    a: "It runs once at the start: sets up the project, a start script, a progress file, a feature list and a first git commit, so later sessions have a clear starting point."
+  - q: "Why keep the feature list as JSON with a passes field?"
+    a: "Each feature is a record the agent may only flip from failing to passing. Anthropic found the model less likely to rewrite JSON than Markdown."
+  - q: "What do the planner, generator and evaluator do?"
+    a: "The planner turns a short prompt into a full spec. The generator builds one piece at a time. The evaluator tests the running result and fails work below the bar."
+  - q: "Compaction or context reset: what is the difference?"
+    a: "Compaction summarises the history in place and the same session continues. A reset ends the session and starts a fresh agent from a written handoff."
+  - q: "What is durable execution for an agent?"
+    a: "Saving state after each finished step so that after a crash the run resumes from the last saved step instead of starting over."
+  - q: "Why use git as memory?"
+    a: "Commits with clear messages record what changed and why, and let the agent roll back a bad change to the last working state."
+  - q: "When should a long run stop and ask a human?"
+    a: "When the budget is used up, the same check keeps failing, a decision needs a person, or an action needs a secret or a risky permission."
+exercise:
+  title: "Plan an overnight run"
+  setup: "A Kochi agency wants an agent to build a small booking site for a homestay overnight: rooms, dates, a booking form, an admin page and email confirmations. Last time they gave a single long prompt to one session. By morning the agent had stopped after two hours, said the site was complete, and the booking form did not save anything."
+  questions:
+    - q: "What should exist before the first coding session starts?"
+      a: "A spec and a JSON feature list with every feature marked failing, a start script, a progress file and a first git commit."
+    - q: "How should each session begin?"
+      a: "Read the progress file and git log, pick the next failing feature, start the app and run a quick end-to-end test before building anything."
+    - q: "What stops the agent claiming the site is finished?"
+      a: "A separate evaluator that clicks through the running site, and a rule that a feature is passing only after its check passes."
+    - q: "What should make the run stop and wait for the team?"
+      a: "The budget running out, the same feature failing its check several times, or needing a real email key or payment account."
+ask:
+  - "How does an agent remember progress across sessions?"
+  - "When should I reset context instead of compacting it?"
+  - "How do I make a long agent run resume after a crash?"
+drafted_with_ai: true
+reviewed_by: Shyam Prabahar
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+Some agent tasks take minutes. Others take hours: building a small app, migrating a codebase, working through a long list of bugs. No single context window holds hours of work. So a long-running agent works in **sessions**, and each new session starts with no memory of the last one.
+
+A harness for long-running agents solves that problem. It splits the work into small pieces, keeps the state outside the model in files and git, checks each piece before moving on, and knows when to stop.
+
+Two Anthropic engineering posts describe this design, and this lesson draws on both.
+
+- **"Effective harnesses for long-running agents"** (Justin Young, November 2025) uses two kinds of agent. An initializer agent sets up the project once. A coding agent then works one feature per session and leaves clear notes for the next.
+- **"Harness design for long-running application development"** (Prithvi Rajasekaran, March 2026) uses three roles. A planner writes the spec, a generator builds it, and a separate evaluator tests the running app.
+
+```flow
+title: A long run, one feature per session
+Short prompt -> Planner | writes spec and JSON feature list
+Planner -> Initializer | start script, progress file, first commit
+Initializer -> New session reads progress and git log
+New session reads progress and git log -> Generator builds next failing feature
+Generator builds next failing feature -> Evaluator tests running app
+Evaluator tests running app -> Feature passes?
+Feature passes? -[yes]-> Commit, mark passing, update progress
+Feature passes? -[no]-> Generator builds next failing feature
+Commit, mark passing, update progress -> Budget left and features failing?
+Budget left and features failing? -[yes]-> New session reads progress and git log
+Budget left and features failing? -[no]-> Stop and report to a human
+```
+
+## How it works
+
+**The initializer and the feature list.** The first session is different. In Anthropic's design it sets up the environment: a script that starts the app (`init.sh`), a progress log, and a first git commit. It also writes a feature list as JSON. Each feature has a description, steps to test it and a `passes` field, and every feature starts as failing. Later sessions may only change `passes`. The post says the model was less likely to rewrite or delete entries in a JSON file than in a Markdown one. The list stops two common failures: declaring the whole project done too early, and losing track of what is left.
+
+```json
+{
+  "id": "split-bill-03",
+  "category": "functional",
+  "description": "A user can split a bill equally among flatmates",
+  "steps": ["Open a group", "Add a bill of ₹1,200", "Choose split equally", "Each of 3 members owes ₹400"],
+  "passes": false
+}
+```
+
+**How each session starts.** The coding agent gets its bearings before it writes code. In the Anthropic post it checks the working folder, reads the git log and progress file, picks the highest-priority failing feature, starts the app with the start script, and runs a basic end-to-end test. That last step catches anything the previous session left broken before new work piles on top.
+
+**One feature per session.** Asking an agent to build everything at once leads to running out of context halfway, with half-built and undocumented features. One feature per session keeps each session small, and each one ends with a commit and an updated progress file.
+
+**Planner, generator, evaluator.** The second post adds roles. The planner expands a prompt of a few sentences into a full product spec. It aims high on scope but avoids fine technical detail, so an early mistake does not spread through the build. The generator builds in small rounds. The evaluator uses browser automation (Playwright) to click through the running app as a user would, and grades each round against criteria with hard thresholds. If any criterion falls below its bar, the round fails. Before each round, the generator and evaluator agree in writing on what will be built and how it will be checked. The post calls this a sprint contract.
+
+Why a separate evaluator? An agent checking its own work tends to be too generous. The post found that tuning a separate, sceptical evaluator was easier than making the builder critical of itself. The author also notes that out of the box the model was a weak tester and needed tuning.
+
+**Context resets versus compaction.**
+
+| | Compaction | Context reset |
+|---|---|---|
+| What happens | History is summarised in place | Session ends; a fresh agent starts |
+| What carries over | The summary | A written handoff: files, progress, git |
+| Strength | Keeps continuity | A truly clean slate |
+| Weakness | No clean slate; summaries can drop details | Needs good handoff files |
+| Use when | The task is nearly done, or the model copes well | Long runs, or the model starts rushing near its limit |
+
+The second post describes **context anxiety**: some models start wrapping up early as they sense the context limit is near. With one model this was strong enough that compaction alone was not enough, so the harness reset context between sessions. With a later model the behaviour largely went away and the resets were dropped. The lesson is not "always reset". Test what your model needs.
+
+**Checkpoints and durable execution.** A run that takes hours will meet a crash, a laptop going to sleep, or a rate limit. Save the state after every finished step, and on restart skip what is done.
+
+```python
+import json
+from pathlib import Path
+
+STATE = Path("run_state.json")
+
+def load_state():
+    if STATE.exists():
+        return json.loads(STATE.read_text())
+    return {"done": [], "failures": {}, "spent_inr": 0.0}
+
+def save_state(state):
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2))
+    tmp.replace(STATE)                   # atomic: a crash never leaves half a file
+
+def run(features, build_and_check, budget_inr=3000, max_failures=3):
+    """build_and_check(feature) runs one fresh session and returns (passed, cost_inr)."""
+    state = load_state()
+    for f in features:
+        if f["id"] in state["done"]:
+            continue                     # finished before the restart
+        while True:
+            if state["spent_inr"] >= budget_inr:
+                return "stop: budget used, ask a human"
+            passed, cost = build_and_check(f)
+            state["spent_inr"] += cost
+            if passed:
+                state["done"].append(f["id"])
+                save_state(state)
+                break
+            n = state["failures"].get(f["id"], 0) + 1
+            state["failures"][f["id"]] = n
+            save_state(state)
+            if n >= max_failures:
+                return f"stop: {f['id']} failed {n} times, ask a human"
+    return "all features pass"
+```
+
+Run it again after a crash and it picks up where it stopped. Frameworks with durable execution do the same at the level of each tool call.
+
+**Git as memory.** Commit after every passing feature, with a message that says what changed. The log becomes a history the next session can read, and `git revert` gives a way back to the last working state.
+
+**Time and cost budgets.** Long runs cost real money. Set a cap per run and per feature, log what each session spends, and stop when the cap is reached. Anthropic's second post is open about the trade-off. In its game-maker example, the author reports a single agent took about 20 minutes and $9, and the full harness about 6 hours and $200, more than 20 times the cost, for a far more complete app. Whether that is worth it depends on the task.
+
+**When to stop and ask a human.** A good harness knows its limits. Stop when the budget is used, when the same check fails several times, when a choice needs a person (pricing, a legal line, a design call), or when the next step needs a secret, a payment account or access to production.
+
+**Remove parts as models improve.** Every harness part assumes something the model cannot do alone. The second post removed one part at a time as models improved, and dropped the sprint structure with a newer model while keeping the planner and evaluator. Re-test your harness when you change models.
+
+## A worked example
+
+A hypothetical three-person startup in Pune wants an agent to build a small expense-splitting app for flatmates overnight: groups, bills in rupees, equal and custom splits, a balances page and a settle-up screen.
+
+**Before the run.** They give a planner agent four sentences about the app. It writes a spec and a feature list: 38 features in JSON, all failing. An initializer session creates the project, a `start.sh` that runs the app, a `progress.md` and the first commit. The team reads the feature list before going further, because a wrong list sends every later session the wrong way.
+
+**The harness settings.** These are the team's choices, not results:
+
+- One feature per session, with a fresh context each time.
+- Each session starts the same way: read `progress.md`, read the last ten commits, pick the next failing feature, start the app, run a quick smoke test.
+- An evaluator agent drives the app with Playwright and checks the feature's steps. Unit tests and the linter must also pass.
+- State is saved to `run_state.json` after every feature.
+- Budget: ₹3,000 for the run. Any feature failing three times stops the run.
+- The agent has no access to real payment keys.
+
+**During the night.** Around the third hour, the laptop running it goes to sleep. When it wakes, the team restarts the script. It reads the state file, skips the features already passing, and carries on with the next one.
+
+Later, the "settle up by UPI" feature fails the evaluator three times, because a real payment link needs a merchant account the agent cannot have. The run stops there with a note in `progress.md` saying what failed and why.
+
+**In the morning.** The team reads the progress file and git log, not a long transcript. They see which features pass, which one stopped the run, and the spend so far. They decide to mock the payment link for now, mark that in the spec, and restart the run from where it stopped.
+
+**How they judge the harness.** They do not trust one overnight run. They keep the feature list and the evaluator's checks, and on later runs compare how many features pass, the cost per passing feature, and how often a person had to step in. They change one harness part at a time, as in the harness engineering lesson.
+
+## Common mistakes
+
+- **One giant session.** The agent runs out of context halfway and leaves half-built work. Use one feature per session.
+- **No feature list.** Without a list of what "done" means, the agent decides it is finished too early.
+- **Letting the agent rewrite the feature list.** It should only change `passes`, never delete or reword features.
+- **Trusting the builder's own testing.** Use a separate evaluator, or at least automated end-to-end tests, before marking a feature passing.
+- **Skipping the start-of-session check.** Building on top of a broken app wastes the whole session.
+- **No checkpoints.** A crash at hour four should not mean starting again from hour zero.
+- **Vague commit messages.** "Update files" tells the next session nothing.
+- **No budget or failure limit.** A stuck feature can burn money all night.
+- **Keeping every harness part forever.** Re-test parts like resets and sprints when the model changes.
+
+## Practice
+
+Read Anthropic's "Effective harnesses for long-running agents", then "Harness design for long-running application development".
+
+1. Pick a small app with 10 to 15 features, such as a to-do list with tags and due dates.
+2. Write the feature list as JSON, every feature failing, each with steps a test can check.
+3. Write a session prompt that reads the progress file and git log, picks one failing feature, starts the app and runs a smoke test first.
+4. Add a check step: Playwright or end-to-end tests that must pass before a feature is marked passing.
+5. Wrap the run in a checkpoint loop like the one above, with a budget and a failure limit. Kill it halfway and confirm it resumes.
+6. Log cost and time per feature, and note every point where the run stopped for a human.
+
+**You are done when you can** run an agent across several sessions that resumes after a crash, marks features passing only after a check, and stops with a clear note when it needs you.
