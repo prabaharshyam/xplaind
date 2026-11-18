@@ -237,7 +237,8 @@ export function VoiceInterviewer({
     const acks = script.current?.acks ?? [];
     const ack = acks.length ? say(acks[ackTurn.current++ % acks.length]) : Promise.resolve();
     try {
-      const res = await post("/api/ai/voice/turn", { ...extra, questionId: all[turn.index].questionId, exchanges: all[turn.index].exchanges });
+      // VI-16: which question this is, so she can say how many are left.
+      const res = await post("/api/ai/voice/turn", { ...extra, questionId: all[turn.index].questionId, exchanges: all[turn.index].exchanges, position: { n: turn.index + 1, of: all.length } });
       if (!res.ok) {
         const failure = await failureFrom(res);
         return setPhase({ kind: "stopped", failure });

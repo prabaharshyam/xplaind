@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-18, after the calmer checkout window (PAY-12)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-18, after Zarina answers questions about the interview itself (VI-16)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
@@ -419,6 +419,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **18 Nov (interview guardrails):** Zarina keeps the interview in English and on the question, brings the candidate back at most twice a question, and the report notes it; a red-team test set and the `interviewer-eval` skill guard it (VI-15).
 - **18 Nov (Google sign-in):** the backup Google button now goes through xplaind.in, never the Supabase address, once GOOGLE_CLIENT_SECRET is in Vercel (AC-1c).
 - **18 Nov (checkout):** the pass checkout is a calm summary with one Pay button, the promo code folded away and the refund promise under the button (PAY-12).
+- **18 Nov (interview questions):** Zarina answers "which role is this for?", "how many questions are left?" and the like from the facts she is given, then asks the question again (VI-16).
 - **17 Nov (one mock interview):** setup by role and experience or by job description, bank questions plus one or two written for the job; the free timed version stays below as the fallback (VI-11).
 - **17 Nov (AI interviewer, round 5):** after studying Hirevox (built on Vapi; owner chose to keep our own pipeline): hiring-style report with verdict, skills and quoted evidence, a 4-week plan; smart end of turn; Answer now; sharper follow-ups (VI-10).
 - **17 Nov (AI interviewer, freeze fix):** a stuck transcription request could freeze the call on "Sending…"; every wait now has a time limit, and the route logs timings (VI-9).

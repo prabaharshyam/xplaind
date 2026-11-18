@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     kind: "voice",
     model: "fast",
     caller: access.who,
-    ...voiceTurnPrompt(q, req.exchanges, ctx),
+    ...voiceTurnPrompt(q, req.exchanges, ctx, req.position),
     maxTokens: 300,
     effort: "low",
     burst: VOICE_BURST,

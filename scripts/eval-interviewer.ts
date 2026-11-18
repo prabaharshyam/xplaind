@@ -14,8 +14,10 @@ import {
   turnDecision,
   voiceTurnPrompt,
   type Exchange,
+  type Position,
   type VoiceQuestion,
 } from "@/lib/ai/voice-interview";
+import type { InterviewContext } from "@/lib/ai/interview-plan";
 import { loadContent } from "@/lib/content/load";
 
 type Outcome = "language" | "topic" | "clarify" | "follow_up" | "move_on";
@@ -25,6 +27,8 @@ type Case = {
   earlier?: Exchange[];
   expect: Outcome[];
   mustNot?: string[];
+  /** VI-16: patterns her line must match (for example the role she was asked about). */
+  mustInclude?: string[];
 };
 
 const args = process.argv.slice(2);
@@ -32,7 +36,15 @@ const opt = (name: string) =>
   args.includes(name) ? args[args.indexOf(name) + 1] : undefined;
 const file = JSON.parse(
   fs.readFileSync(path.resolve("scripts/evals/interviewer-cases.json"), "utf8"),
-) as { question: string; cases: Case[] };
+) as {
+  question: string;
+  /** VI-16: who the interview is for, as the setup screen would send it. */
+  context?: { role: string; experience: InterviewContext["experience"]; company: string; position?: Position };
+  cases: Case[];
+};
+const ctx: InterviewContext | undefined = file.context
+  ? { role: file.context.role, experience: file.context.experience, company: file.context.company, focus: [] }
+  : undefined;
 const only = opt("--case");
 const model =
   opt("--model") ?? (process.env.AI_FAST_MODEL?.trim() || DEFAULT_FAST_MODEL);
@@ -66,7 +78,7 @@ async function run(c: Case): Promise<{ outcome: Outcome; line: string }> {
       : { outcome: "move_on", line: "" };
   if (turnDecision(exchanges) === "done")
     return { outcome: "move_on", line: "" };
-  const prompt = voiceTurnPrompt(q!, exchanges);
+  const prompt = voiceTurnPrompt(q!, exchanges, ctx, file.context?.position);
   const res = await client.beta.messages.create({
     model,
     max_tokens: 300,
@@ -95,7 +107,10 @@ async function main() {
   for (const c of cases) {
     try {
       const { outcome, line } = await run(c);
-      const bad = (c.mustNot ?? []).filter((p) => pattern(p).test(line));
+      const bad = [
+        ...(c.mustNot ?? []).filter((p) => pattern(p).test(line)),
+        ...(c.mustInclude ?? []).filter((p) => !pattern(p).test(line)).map((p) => `missing ${p}`),
+      ];
       const ok = c.expect.includes(outcome) && bad.length === 0;
       if (!ok) failed++;
       console.log(
