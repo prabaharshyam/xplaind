@@ -151,6 +151,12 @@ test("LT-2: the home page offers lessons in Tamil, Hindi, Tanglish and Hinglish"
   await expect(section.locator("[lang=hi]").first()).toBeVisible();
   await expect(section.locator("[lang=ta-Latn]").first()).toBeVisible();
   await expect(section.locator("[lang=hi-Latn]").first()).toBeVisible();
+  // The sample is one real question, answered in English and then in each language, so the feature is clear at a glance.
+  await expect(section.getByText("What is a hallucination?")).toBeVisible();
+  await expect(section.getByText("Hallucination-னா என்ன?")).toBeVisible();
+  await expect(section.getByText("Hallucination क्या है?")).toBeVisible();
+  await expect(section.getByText("Hallucination-na enna?")).toBeVisible();
+  await expect(section.getByText("Hallucination kya hai?")).toBeVisible();
   await expect(page.locator(".home-hero, #languages").getByText(/\bfree\b/i)).toHaveCount(0);
   await section.getByRole("link").first().click();
   await expect(page).toHaveURL(/\/stop\/what-is-ai\/ta$/, { timeout: 30_000 });
