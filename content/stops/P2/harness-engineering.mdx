@@ -1,0 +1,221 @@
+---
+id: harness-engineering
+level: P2
+theme: agents
+title: "Advanced harness engineering"
+outcome: "Improve an agent by changing what surrounds the model: the loop and stop rules, tools, context handling, files on disk, verification gates, permissions and budgets, and prove each change on a fixed task set."
+answer: "Harness engineering improves an agent by changing everything around the model, such as tools, context, progress files, tests and limits, and measuring each change on fixed tasks."
+why_it_matters: "Teams now ship agents built on the same few models, yet their results differ widely. Most of the difference is the harness: tools, checks, memory and stop rules. Knowing how to change one part and prove the effect is what senior agent roles ask for."
+hours: 3
+gap_tags: []
+primary_resource: dlai-loop-engineering-with-langchain-deep-agents
+alternates: [openai-harness-engineering, fowler-harness-engineering]
+videos: [yt-ibm-technology-ai-model-vs-agentic-harness, yt-codebasics-build-agents-that-dont-break-harness-engineering, yt-y-combinator-why-the-harness-matters-more-than-the-model]
+more: [mitchellh-ai-adoption-journey, anthropic-long-running-agent-harnesses, anthropic-harness-design-long-running-apps, yt-google-cloud-tech-harness-engineering-explained, yt-ai-engineer-is-the-agent-harness-dead-jediah-katz]
+format: deep
+key_terms: [agent-harness, harness-engineering, back-pressure, progress-file, context-engineering, agent-loop, sub-agent, sandbox]
+check:
+  type: mcq
+  question_ids: [harness-engineering-1, harness-engineering-2, harness-engineering-3]
+flashcards:
+  - q: "What is an agent harness?"
+    a: "Everything around the model that makes it a working agent: the loop, tools, context handling, files on disk, checks, permissions and limits. Agent = model + harness."
+  - q: "How is harness engineering different from context engineering?"
+    a: "Context engineering decides what the model sees on each call. Harness engineering covers that plus the loop, tools, state on disk, verification, permissions and budgets around it."
+  - q: "What is back-pressure?"
+    a: "Automatic checks such as tests, linters and type checks whose failures go back into the loop, so the agent cannot call work done until they pass."
+  - q: "Why keep a progress file on disk?"
+    a: "The context window is lost on a reset or crash. A short file of done, left and next lets a fresh session carry on."
+  - q: "Why remove tools from an agent?"
+    a: "Every tool costs tokens on every call, and overlapping tools cause wrong choices. Give only the tools the task needs, with clear descriptions."
+  - q: "How do you measure a harness change?"
+    a: "Same model, same settings, a fixed set of tasks with automatic checks. Run each task several times, change one harness part at a time, and compare pass rate, cost and time."
+  - q: "What stop conditions should an agent loop have?"
+    a: "A step limit, a cost or time budget, a limit on repeated failed checks, and a rule to stop and ask a human."
+  - q: "What is Mitchell Hashimoto's idea of engineering the harness?"
+    a: "When an agent makes a mistake, change its setup, such as a rule file, a script or a check, so it does not make that mistake again."
+exercise:
+  title: "Fix the harness, not the model"
+  setup: "A Hyderabad edtech team's coding agent fixes bugs in their Django app. It has 22 tools, no test step, and one long session per ticket. Reviewers say it often claims a fix works when tests fail, forgets the ticket's constraints on long tickets, and sometimes edits files outside the app. The team wants to switch to a bigger model."
+  questions:
+    - q: "What would you add first to stop false claims of success?"
+      a: "A verification gate: run the test suite and linter when the agent says done, and feed failures back into the loop."
+    - q: "How do you stop it forgetting constraints on long tickets?"
+      a: "Write the ticket's constraints and progress to a file the agent rereads, and reset context with a short handoff instead of one ever-growing session."
+    - q: "How do you stop edits outside the app?"
+      a: "Run it in a sandbox with write access only to the app folder, and a hook that blocks other paths."
+    - q: "How would you show the team that harness changes beat a model switch?"
+      a: "Freeze 20 to 30 past tickets with tests, measure the baseline, apply one harness change at a time, then compare with the bigger model on the same tasks."
+ask:
+  - "What is the difference between an agent's model and its harness?"
+  - "How do I measure whether a harness change helped?"
+  - "Which harness change should I try first on a failing coding agent?"
+drafted_with_ai: true
+reviewed_by: UNREVIEWED
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+An agent is a model plus a **harness**. The model predicts the next action. The harness is everything else: the loop that keeps calling the model, the tools it can use, how its context is built and trimmed, the files it keeps on disk, the checks that test its work, what it is allowed to touch, and when it must stop.
+
+**Harness engineering** is the practice of improving an agent by changing that harness, then measuring the effect. It follows two earlier skills. Prompt engineering is about writing one good instruction. Context engineering is about what the model sees on each call. Harness engineering covers both and adds the parts that only matter when an agent runs for many steps: state, verification, permissions and budgets.
+
+The term took hold in early 2026. Mitchell Hashimoto, in his post "My AI Adoption Journey", has a step called "Engineer the Harness": when an agent makes a mistake, change its setup so it does not make that mistake again. OpenAI's Codex team wrote "Harness engineering: leveraging Codex in an agent-first world" about building a product where agents write the code and engineers design the environment around them. Birgitta Böckeler's article on Martin Fowler's site splits a harness into guides, which steer the agent before it acts, and sensors, which check its work after. Anthropic's engineering posts on long-running agents show the same idea in practice, which the next lesson covers in depth.
+
+Why it matters: many teams use the same few models. When two coding agents on the same model behave very differently, the difference is the harness. It is also the part you control. You cannot retrain the model, but you can add a test gate this afternoon.
+
+```flow
+title: One step of a harnessed agent
+Read task and progress file -> Build context | instructions, tools, notes
+Build context -> Model picks next action
+Model picks next action -[tool call]-> Run tool in sandbox
+Run tool in sandbox -> Build context
+Model picks next action -[says done]-> Tests and lint pass?
+Tests and lint pass? -[no, feed back errors]-> Build context
+Tests and lint pass? -[yes]-> Update progress file and commit
+```
+
+## How it works
+
+A harness has a few parts. Each one exists because agents fail in a predictable way without it.
+
+| Harness part | What it does | Failure without it |
+|---|---|---|
+| Agent loop and stop conditions | Calls the model, runs tools, stops on done, step limit or budget | Loops forever, or stops after one step |
+| Tool set and descriptions | Gives a small set of clear tools with exact inputs | Picks the wrong tool, wastes tokens on unused ones |
+| Context management | Clears old results, compacts or resets, fetches data on demand | Window fills, the agent forgets the goal |
+| State on disk | Progress file, to-do list, git commits | A new session starts from zero and redoes work |
+| Verification and back-pressure | Tests, linters, type checks, an evaluator agent | Claims success on code that does not run |
+| Permissions, sandbox, hooks | Limits files, commands and network; blocks risky actions | Deletes data, leaks secrets, touches production |
+| Sub-agents | Gives a side task its own clean context | Main context fills with search results |
+| Budgets | Caps steps, time and cost per task | One bad task burns the month's API bill |
+| Measurement | Same model, fixed tasks, compare before and after | You cannot tell if a change helped |
+
+**The loop and its stop conditions.** The simplest loop is: call the model, run the tool it asks for, add the result, repeat. A real loop also needs exits. Stop when checks pass. Stop at a step limit. Stop when the cost or time budget runs out. Stop and ask a human after the same check fails three times. Without these, an agent either quits too early or spins.
+
+**Tools and their descriptions.** Every tool definition is sent on every call, so it costs tokens and attention. Two tools that overlap ("search_code" and "grep_files") invite wrong choices. Keep the set small, name tools by what they do, and describe inputs exactly. A tool's error message is also part of the harness: "file not found: src/app.py; did you mean src/main.py?" helps the agent recover, while a raw stack trace does not.
+
+**Context management.** Long tasks fill the window. The harness clears old tool results, fetches files on demand instead of loading everything, and either compacts the history (summarise in place) or resets it (end the session and start fresh from a written handoff). The context engineering lesson covers these in detail.
+
+**State and memory on disk.** The context window is temporary. A progress file, a to-do list and git history are not. A fresh session reads them first, the way a new shift reads handover notes. Git also gives the agent a way to undo a bad change.
+
+**Verification and back-pressure.** This is often the single biggest gain. When the agent says "done", the harness runs tests, the linter and the type checker. If anything fails, the output goes back into the loop. The agent cannot mark work finished until the checks pass. For work that tests cannot judge, such as how a page looks, a separate evaluator agent can check it. Models tend to rate their own work too kindly, so a separate checker is stricter than self-review.
+
+**Permissions, sandboxes and hooks.** Run the agent where it can do little harm: a container, a copy of the repository, no production keys. Hooks are small scripts the harness runs before or after a tool call. A hook can block writes outside one folder, or run the formatter after every edit.
+
+**Sub-agents.** A sub-agent gets one side task, such as "find where payments are validated", in its own clean context, and returns a short answer. The main agent's context stays small.
+
+**Budgets.** Set a cap per task on steps, minutes and money. Log what each task used. A harness without budgets fails silently and expensively.
+
+**Measuring changes.** A harness change is a hypothesis. Keep the model and its settings fixed, freeze a set of tasks with automatic checks, run each task several times, and change one harness part at a time. Compare pass rate, cost per task and time per task.
+
+Here is a minimal loop with a verification gate, a progress file and stop conditions. `call_model` is your model client; it returns either a tool call or a "done" message.
+
+```python
+import subprocess
+from pathlib import Path
+
+PROGRESS = Path("progress.md")
+MAX_STEPS = 40           # stop: step limit
+MAX_FAILED_CHECKS = 3    # stop: ask a human after this many failed gates
+
+def run_checks():
+    """Back-pressure: the task is done only when tests and lint pass."""
+    for cmd in (["pytest", "-q"], ["ruff", "check", "."]):
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            return False, (r.stdout + r.stderr)[-2000:]
+    return True, "all checks passed"
+
+def log(line):
+    with PROGRESS.open("a") as f:
+        f.write(line + "\n")
+
+def run_task(task, call_model, tools):
+    notes = PROGRESS.read_text() if PROGRESS.exists() else "(no progress yet)"
+    messages = [{"role": "user", "content": f"Task: {task}\n\nProgress so far:\n{notes}"}]
+    failed = 0
+    for step in range(MAX_STEPS):
+        reply = call_model(messages, tools)
+        messages.append({"role": "assistant", "content": reply})
+        if reply["type"] == "tool_call":
+            result = tools[reply["name"]](**reply["args"])
+            messages.append({"role": "user", "content": str(result)[:3000]})
+            continue
+        ok, report = run_checks()            # the model says done; verify it
+        if ok:
+            log(f"- DONE: {task} (steps: {step + 1})")
+            return "done"
+        failed += 1
+        if failed >= MAX_FAILED_CHECKS:
+            log(f"- STUCK: {task}; checks failed {failed} times, needs a human")
+            return "needs_human"
+        messages.append({"role": "user", "content": f"Checks failed. Fix this first:\n{report}"})
+    log(f"- STOPPED: {task}; hit the {MAX_STEPS}-step limit")
+    return "step_limit"
+```
+
+Every exit writes a line to the progress file, so the next session, or a person, knows what happened.
+
+## A worked example
+
+A hypothetical fintech team in Bengaluru uses a coding agent on its Python payments service. Short tickets go well. Long tickets, such as "add UPI refund status to the reports API with tests", go badly. Reading the transcripts, they see four patterns:
+
+- It says "done" while two tests still fail.
+- Past about 60 steps, it forgets a constraint from the ticket, such as "do not change the public API".
+- After a crash or restart, it starts the ticket again from the beginning.
+- It has 25 tools, several overlapping, and often picks a slow one.
+
+The team's first idea is to pay for a bigger model. Instead, they decide to change only the harness and measure.
+
+**Step 1: build a fixed task set.** They take 30 past tickets that were merged, roll the code back to before each fix, and keep the merged tests as the check. A task passes only if every test passes and the linter is clean. The set covers short, medium and long tickets.
+
+**Step 2: measure a baseline.** Same model, same temperature, same prompt. Each task runs three times, because agents are not deterministic. For each run they log: pass or fail, steps, tokens, cost in rupees and minutes. They report the pass rate over all 90 runs, and the share of tasks that pass all three times, which is what a developer relying on the agent feels.
+
+**Step 3: change one harness part at a time.** Each change gets its own run of all 90:
+
+1. **Test gate.** When the agent says done, run pytest and ruff and feed failures back.
+2. **Progress file.** The agent writes done, left and next to `progress.md` after each milestone and reads it at the start.
+3. **Context reset.** Past a token threshold, end the session and start fresh with the ticket, the progress file and the latest diff, instead of one long session.
+4. **Fewer tools.** Cut 25 tools to 8, rewrite the descriptions, and make error messages say what to try next.
+
+**Step 4: compare and keep what helps.** The table below shows the shape of the report. **The numbers are made up to illustrate how to read it. They are not results from any real team.**
+
+| Harness (illustration only) | Tasks passing all 3 runs | Cost per task | Minutes per task |
+|---|---|---|---|
+| Baseline | Suppose 9 of 30 | Suppose ₹40 | Suppose 14 |
+| + test gate | Suppose 15 of 30 | Suppose ₹52 | Suppose 18 |
+| + progress file | Suppose 17 of 30 | Suppose ₹50 | Suppose 17 |
+| + context reset | Suppose 20 of 30 | Suppose ₹46 | Suppose 16 |
+| + 8 tools instead of 25 | Suppose 21 of 30 | Suppose ₹38 | Suppose 13 |
+
+How to read a table like this. A test gate usually raises cost, because the agent does more work to fix failures. That is a fair trade if more tasks pass. A change that lowers cost without lowering the pass rate, like pruning tools here, is a clear win. A change that moves the pass rate by one task out of 30 may be noise, so rerun it before you trust it. Only then compare against the bigger model on the same 30 tasks. If the harness changes and the bigger model help with different tasks, you may want both.
+
+The team keeps the 30 tasks in CI. Any later harness change, new tool or model upgrade runs against them first.
+
+## Common mistakes
+
+- **Blaming the model first.** Read the transcripts. Most failures trace to a missing check, a confusing tool or lost state.
+- **Changing several things at once.** You will not know which change helped or hurt. One change per run.
+- **Measuring on a handful of tasks you picked by hand, once each.** Use a frozen set with automatic checks, and run each task several times.
+- **Trusting the agent's own "done".** Without a test gate, an agent will report success on code that does not run.
+- **Too many tools.** Every tool costs tokens and attention on every call. Overlapping tools cause wrong picks.
+- **No stop conditions.** No step limit, budget or "ask a human" rule means runaway cost and silent loops.
+- **State only in the context window.** A reset or crash loses everything. Put progress in files and git.
+- **Running the agent with production access.** Use a sandbox and least privilege, and add hooks that block risky actions.
+- **Never removing harness parts.** Each part assumes something the model cannot do alone. When a new model arrives, retest whether each part still helps, and remove the ones that do not.
+- **Ignoring cost and time.** A harness that passes two more tasks at three times the cost may not be worth it. Report all three numbers.
+
+## Practice
+
+Start with the DeepLearning.AI course on loop engineering with LangChain Deep Agents, which builds an agent loop and a verifier. Then read the OpenAI and Martin Fowler articles for the wider idea.
+
+1. Take any small coding agent, either an open-source one or the loop above with your own model client.
+2. Write ten small tasks for a toy repository, each with a test that decides pass or fail.
+3. Run each task three times and record pass rate, cost and time. This is your baseline.
+4. Add one harness change: a test gate. Rerun and compare.
+5. Add a progress file and a step limit, one at a time, and rerun after each.
+6. Write a one-page report: what you changed, what moved, and what you would try next.
+
+**You are done when you can** show a table of before and after results on a fixed task set, change one harness part at a time, and explain why each change helped or did not.

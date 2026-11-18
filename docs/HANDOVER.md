@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-18 (later: SR-1, the AI Security Engineer roadmap, reviewed by the owner and merged with ED-5, the weekly link check)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-18 (later: HE-1, harness engineering lessons on four roles, built on the branch and waiting for the owner's review on the preview; before it SR-1, the AI Security Engineer roadmap, and ED-5, PR 132)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
@@ -380,6 +380,7 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 7. All AI-drafted lessons, glossary terms and guides were reviewed by him by 9 Nov; review new drafts and any resources marked UNVERIFIED as they appear. The owner reviewed the privacy policy with a lawyer on 12 Nov.
 8. SEO (SE-8, 10 Nov): verify xplaind.in in Google Search Console and Bing Webmaster Tools, submit the sitemap and request indexing for the key pages; steps and the keyword map are in `docs/seo-keywords.md`. The two new guides (how to become an AI engineer in India; free AI courses with certificate) were reviewed by the owner on 12 Nov.
 
+0. **Harness engineering (HE-1, 18 Nov, built, in review):** the owner reads the two Pro 2 lessons, five interview questions and the project on the preview. On sign-off set `reviewed_by: Shyam Prabahar` on the files still marked UNREVIEWED, then merge.
 0. **AI Security Engineer roadmap (SR-1, 18 Nov, merged):** the owner reviewed it on the preview and signed off. Still worth a later check: the OWASP list names when newer editions come out, the 6+ years pay band against live job ads, and resource URLs marked UNVERIFIED (the weekly link check opens them).
 
 **Work Claude can pick up, in the order the owner has signalled interest:**
@@ -433,6 +434,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **18 Nov (interview questions):** Zarina answers "which role is this for?", "how many questions are left?" and the like from the facts she is given, then asks the question again (VI-16).
 - **18 Nov (site review fixes):** translated lessons in the sitemap with valid language codes, glossary search, practice cards first, "an AI", level names in words, a compact role list on phones, calmer library cards, AI Studio and pricing clean-ups (SE-9 to SE-16). Still open from the review: the top bar at 768 to 1100 px, Zarina on the home page, the home page weight, share images, the weekly link check.
 - **18 Nov (site review, part 2):** the top bar fits every width (phone menu below 1120 px), Zarina opens the home page, the 3D road never loads on phones, and every page has a share picture (NV-9, VI-17, PF-1, SE-17).
+- **18 Nov (harness engineering):** two Pro 2 lessons (advanced harness engineering, harnesses for long-running agents) on Agentic AI, AI Engineer, FDE and GenAI roadmaps, five interview questions and a guided project (HE-1). Waiting for the owner's review on the preview.
 - **18 Nov (AI security roadmap):** a tenth role, AI Security Engineer, from zero security knowledge: 7 stages, 40 lessons (23 new), 2 guided projects, 22 interview questions, 4 certifications, a pay band (SR-1). The owner reviewed it on the preview and signed off.
 - **18 Nov (link check):** every outside link in the content is opened every Monday; broken ones are listed in one GitHub issue and cards show when their link was checked (ED-5).
 - **17 Nov (one mock interview):** setup by role and experience or by job description, bank questions plus one or two written for the job; the free timed version stays below as the fallback (VI-11).

@@ -282,6 +282,7 @@ export const PROJECT_SCENES: Record<string, Scene> = {
   "fde-client-capstone": ["briefcase", "people", "rocket", "doc", "code"],
   "first-llm-app": ["bubble", "code", "sparkle", "terminal", "cloud"],
   "fraud-model-production": ["shield", "nodes", "trend", "server", "chip"],
+  "improve-agent-harness": ["bot", "gear", "checklist", "trend", "terminal"],
   "invoice-to-ledger-automation": ["doc", "flow", "coin", "gear", "db"],
   "multi-step-agent-with-logs": ["bot", "flow", "doc", "loop", "terminal"],
   "operations-agent-approvals": ["bot", "checklist", "people", "lock", "doc"],
