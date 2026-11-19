@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-18 (later: VI-18, a quiet-place note before the AI interview; before it RM-16, roadmap topics open the lesson directly, PR 134; PR 131 FT-1 short footer and LS-3 progress line; PR 129 LT-3 home language sample; PR 126 LS-1 and LS-2 lesson fixes)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-19 (ST-1 streak fix; before it 2026-11-18: VI-18, a quiet-place note before the AI interview; before it RM-16, roadmap topics open the lesson directly, PR 134; PR 131 FT-1 short footer and LS-3 progress line; PR 129 LT-3 home language sample; PR 126 LS-1 and LS-2 lesson fixes)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
