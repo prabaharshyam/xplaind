@@ -34,8 +34,8 @@ test("a roadmap topic opens its lesson straight away, and the way back lands whe
   await page.getByRole("group", { name: "Your status for Build a RAG app" }).getByRole("button", { name: "Done", exact: true }).click();
   await expect(page.getByRole("link", { name: /^Build a RAG app, Done/ }).first()).toBeVisible();
   await expect(page).toHaveURL(/\/roadmap\/forward-deployed-engineer$/);
-  // XP was removed (2026-11-06); the header shows the day streak instead.
-  await expect(page.getByRole("banner").getByRole("link", { name: /-day streak/ })).toBeVisible();
+  // XP was removed (2026-11-06). ST-1: a visitor sees the day streak only from their second day, so not yet here.
+  await expect(page.getByRole("banner").getByRole("link", { name: /-day streak/ })).toHaveCount(0);
   await expect(page.getByRole("banner").getByText(/\d+ XP/)).toHaveCount(0);
 });
 
@@ -58,6 +58,10 @@ test("topic pages list lessons as cards", async ({ page }) => {
 test("a lesson shows its parts and a reading guide, and no XP", async ({ page }) => {
   await page.goto("/stop/what-is-ai");
   await expect(page.getByText("Part 1 of 5")).toBeVisible();
+  // LS-4: every lesson ends with how to explain it in an interview, and the follow-up to expect.
+  const explain = page.getByRole("region", { name: "How to explain this in an interview" });
+  await expect(explain).toBeVisible();
+  await expect(explain.getByText(/^Likely follow-up:/)).toBeVisible();
   await expect(page.getByText(/\bXP\b/)).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: /Lessons on the/ }).getByText("Next topic on this roadmap →")).toBeVisible();
   expect(await overflow(page)).toBe(false);

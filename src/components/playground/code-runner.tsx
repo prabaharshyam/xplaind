@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { aiPost } from "@/components/ai/ai-client";
 import { AiText } from "@/components/ai/ai-text";
 import { Icon } from "@/components/art/icons";
-import { primaryButtonSm, secondaryButtonSm } from "@/components/ui";
+import { primaryButtonSm, secondaryButtonSmDark } from "@/components/ui";
 import { encodeCode } from "@/lib/playground/examples";
 import { runPython } from "@/lib/playground/python";
 
@@ -127,7 +127,7 @@ export function CodeRunner({
       />
       <div className="flex flex-wrap gap-2 border-t border-white/10 bg-zinc-900 px-3 py-2">
         {running ? (
-          <button type="button" onClick={() => stop.current?.()} className={secondaryButtonSm}>
+          <button type="button" onClick={() => stop.current?.()} className={secondaryButtonSmDark}>
             Stop
           </button>
         ) : (
@@ -135,11 +135,11 @@ export function CodeRunner({
             <Icon name="play" size={16} /> Run
           </button>
         )}
-        <button type="button" onClick={() => edit(initialCode)} disabled={running || code === initialCode} className={secondaryButtonSm}>
+        <button type="button" onClick={() => edit(initialCode)} disabled={running || code === initialCode} className={secondaryButtonSmDark}>
           Reset
         </button>
         {compact && (
-          <Link href={`/playground#code=${encodeCode(code)}`} className={secondaryButtonSm}>
+          <Link href={`/playground#code=${encodeCode(code)}`} className={secondaryButtonSmDark}>
             Open in playground
           </Link>
         )}
@@ -160,7 +160,7 @@ export function CodeRunner({
         {error && aiOn && (
           <div className="mt-3">
             {!explain.text && (
-              <button type="button" onClick={askAi} disabled={explain.busy} className={secondaryButtonSm}>
+              <button type="button" onClick={askAi} disabled={explain.busy} className={secondaryButtonSmDark}>
                 {explain.busy ? "Asking the AI tutor…" : "Explain this error with AI"}
               </button>
             )}

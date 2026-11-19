@@ -234,6 +234,7 @@ export function validateBundle(bundle: Bundle, opts: ValidateOptions): Issue[] {
     if (t.flashcards.length !== en.flashcards.length) error(file, `has ${t.flashcards.length} flashcards; the English lesson has ${en.flashcards.length}`, "LT-1");
     if (Boolean(t.exercise) !== Boolean(en.exercise) || (t.exercise && en.exercise && t.exercise.questions.length !== en.exercise.questions.length))
       error(file, "its Try it exercise must have the same questions as the English lesson", "LT-1");
+    if (en.explain_in_interview && !t.explain_in_interview) error(file, "has no explain_in_interview; the English lesson has one", "LS-4");
     if (sectionCount(t.body) !== sectionCount(en.body)) error(file, `has ${sectionCount(t.body)} parts (## headings); the English lesson has ${sectionCount(en.body)}`, "LT-1");
   }
   // SO-1: a testimonial's short version is only the person's own words: every piece between

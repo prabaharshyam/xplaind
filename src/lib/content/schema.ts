@@ -131,6 +131,19 @@ const ProjectCheck = z.strictObject({ type: z.literal("project"), brief: Text })
 /** "Test your understanding": a question and a short answer, revealed on demand. */
 export const Flashcard = z.strictObject({ q: Text.max(200), a: Text });
 /** "Predict / try it": a short scenario, questions to answer first, then "Check your answers". */
+/**
+ * LS-4 (2026-11-19, owner: interviewers say "explain X", not "what is X"): how to explain the topic out
+ * loud in an interview. `answer` is a spoken 30-to-45-second answer (definition, how it works, an example,
+ * a trade-off); then the follow-up an interviewer is most likely to ask, and a short answer to it.
+ */
+export const InterviewExplain = z.strictObject({
+  answer: Text.max(1000),
+  follow_up: Text.max(160),
+  follow_up_answer: Text.max(500),
+});
+export const INTERVIEW_ANSWER_WORDS = { min: 50, max: 130 } as const;
+export const INTERVIEW_FOLLOW_UP_MAX_WORDS = 60;
+
 export const Exercise = z.strictObject({
   title: Text.max(80),
   setup: Text,
@@ -175,6 +188,8 @@ export const StopFrontmatter = z
     exercise: Exercise.optional(),
     /** Deep lessons: questions the AI tutor suggests for this lesson. */
     ask: z.array(Text.max(90)).max(4).default([]),
+    /** LS-4: how to explain this in an interview; every deep lesson has one. */
+    explain_in_interview: InterviewExplain.optional(),
     ...reviewShape,
   })
   .superRefine((s, ctx) => {
@@ -182,6 +197,14 @@ export const StopFrontmatter = z
       if (s.flashcards.length < 6) ctx.addIssue({ code: "custom", path: ["flashcards"], message: "a deep lesson has 6 to 10 flashcards" });
       if (!s.exercise) ctx.addIssue({ code: "custom", path: ["exercise"], message: "a deep lesson has an exercise" });
       if (s.ask.length < 3) ctx.addIssue({ code: "custom", path: ["ask"], message: "a deep lesson suggests 3 or 4 questions for the AI tutor" });
+      if (!s.explain_in_interview) ctx.addIssue({ code: "custom", path: ["explain_in_interview"], message: "LS-4: a deep lesson says how to explain it in an interview" });
+    }
+    if (s.explain_in_interview) {
+      const n = wordCount(s.explain_in_interview.answer);
+      if (n < INTERVIEW_ANSWER_WORDS.min || n > INTERVIEW_ANSWER_WORDS.max)
+        ctx.addIssue({ code: "custom", path: ["explain_in_interview", "answer"], message: `LS-4: the interview answer is ${INTERVIEW_ANSWER_WORDS.min} to ${INTERVIEW_ANSWER_WORDS.max} words (it has ${n})` });
+      if (wordCount(s.explain_in_interview.follow_up_answer) > INTERVIEW_FOLLOW_UP_MAX_WORDS)
+        ctx.addIssue({ code: "custom", path: ["explain_in_interview", "follow_up_answer"], message: `LS-4: the follow-up answer is ${INTERVIEW_FOLLOW_UP_MAX_WORDS} words or fewer` });
     }
     for (const [i, c] of s.flashcards.entries()) {
       if (wordCount(c.a) > FLASHCARD_ANSWER_MAX_WORDS) {
@@ -229,6 +252,8 @@ export const StopTranslation = z.strictObject({
   flashcards: z.array(Flashcard).max(10).default([]),
   exercise: Exercise.optional(),
   ask: z.array(Text.max(120)).max(6).default([]),
+  /** LS-4: "How to explain this in an interview", in this language, so the learner understands it; the page also shows the English to say. */
+  explain_in_interview: InterviewExplain.optional(),
   /** Who translated it and when; a native speaker's review is recorded in reviewed_by. */
   translated_on: IsoDate,
   reviewed_by: Text.optional(),

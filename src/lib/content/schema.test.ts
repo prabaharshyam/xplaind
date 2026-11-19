@@ -135,9 +135,19 @@ describe("Stop frontmatter (RM-2)", () => {
     expect(msgs).toContain("3 or 4 questions");
     const cards = Array.from({ length: 6 }, () => ({ q: "Q?", a: "A." }));
     const exercise = { title: "T", setup: "S", questions: [1, 2, 3].map(() => ({ q: "Q?", a: "A." })) };
-    expect(StopFrontmatter.safeParse({ ...deep, flashcards: cards, exercise, ask: ["a", "b", "c"] }).success).toBe(true);
+    const explain = { answer: "word ".repeat(80), follow_up: "Why?", follow_up_answer: "Because." };
+    expect(msgs).toContain("how to explain it in an interview");
+    expect(StopFrontmatter.safeParse({ ...deep, flashcards: cards, exercise, ask: ["a", "b", "c"], explain_in_interview: explain }).success).toBe(true);
     const long = [{ q: "Q?", a: "word ".repeat(71) }, ...cards.slice(1)];
-    expect(messages(StopFrontmatter.safeParse({ ...deep, flashcards: long, exercise, ask: ["a", "b", "c"] }))).toContain("70 words");
+    expect(messages(StopFrontmatter.safeParse({ ...deep, flashcards: long, exercise, ask: ["a", "b", "c"], explain_in_interview: explain }))).toContain("70 words");
+  });
+
+  it("keeps the interview explanation to a spoken length (LS-4)", () => {
+    const deep = { ...base, format: "deep", key_terms: ["one", "two"], flashcards: Array.from({ length: 6 }, () => ({ q: "Q?", a: "A." })), exercise: { title: "T", setup: "S", questions: [1, 2, 3].map(() => ({ q: "Q?", a: "A." })) }, ask: ["a", "b", "c"] };
+    const with_ = (answer: string, follow_up_answer = "Short.") => messages(StopFrontmatter.safeParse({ ...deep, explain_in_interview: { answer, follow_up: "Why?", follow_up_answer } }));
+    expect(with_("word ".repeat(20))).toContain("50 to 130 words");
+    expect(with_("word ".repeat(140))).toContain("50 to 130 words");
+    expect(with_("word ".repeat(80), "word ".repeat(61))).toContain("60 words or fewer");
   });
 
   it("needs a primary resource", () => {

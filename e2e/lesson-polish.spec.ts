@@ -4,7 +4,7 @@ test("'On this page' ticks every section the learner has scrolled past, not just
   await page.setViewportSize({ width: 1400, height: 900 });
   await page.goto("/stop/terminal-and-git");
   const nav = page.getByRole("navigation", { name: "On this page" });
-  await expect(nav).toContainText(" of 11 sections read");
+  await expect(nav).toContainText(" of 12 sections read");
   // Jump straight down the page, as a fast scroll or a link would.
   await nav.getByRole("link", { name: "Practice", exact: true }).click();
   await expect.poll(async () => Number((await nav.innerText()).match(/(\d+) of \d+ sections read/)?.[1])).toBeGreaterThan(4);

@@ -23,6 +23,8 @@ export const primaryButtonLg = `${core} ${lg} ${primary}`;
 export const secondaryButton = `${core} ${md} ${secondary}`;
 export const secondaryButtonSm = `${core} ${sm} ${secondary}`;
 export const secondaryButtonLg = `${core} ${lg} ${secondary}`;
+/** A secondary button on a surface that is always dark (the code runner), where the light glass would hide its text. */
+export const secondaryButtonSmDark = `${core} ${sm} xp-glass-btn-dark text-white`;
 /** A third-level action: text with a hover wash, still 44 px tall. */
 export const quietButton = `${core} ${sm} ${quiet}`;
 
