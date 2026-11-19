@@ -66,7 +66,8 @@ export function PageLoaderControl() {
     const onClick = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as HTMLElement | null)?.closest?.("a");
-      if (a && isPageChangeLink(a, location)) begin();
+      // RM-16: links marked data-no-splash (a roadmap topic) show only the thin top bar.
+      if (a && !a.hasAttribute("data-no-splash") && isPageChangeLink(a, location)) begin();
     };
     document.addEventListener("click", onClick, true);
     window.addEventListener(NAVIGATE_EVENT, begin);

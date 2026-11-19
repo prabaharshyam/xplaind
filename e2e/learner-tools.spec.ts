@@ -38,7 +38,7 @@ test("jobs and salaries show every role with dated pay, skills and live job link
   await expect(card.getByText(/₹\d+–\d+ LPA/).first()).toBeVisible();
   await expect(card.getByRole("link", { name: /Live jobs on Naukri/ })).toHaveAttribute("href", "https://www.naukri.com/ai-engineer-jobs");
   await expect(card.getByRole("link", { name: /Live jobs on LinkedIn/ })).toHaveAttribute("href", /linkedin\.com\/jobs\/search\/\?keywords=AI%20Engineer&location=India/);
-  expect(await page.locator("main li[id]").count()).toBe(9);
+  expect(await page.locator("main li[id]").count()).toBe(10);
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
   // A roadmap links to its salary card.

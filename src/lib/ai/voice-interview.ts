@@ -289,7 +289,7 @@ export function questionLine(index: number, total: number, question: string, ctx
   if (index === 0) {
     const n = total === 1 ? "one question" : `${total} questions`;
     const role = ctx ? roleLine(ctx) : "";
-    return `Hi, I'm your AI interviewer for today.${role ? ` ${role}` : ""} We'll go through ${n}, and I may ask a follow-up or two about what you say. Take your time and answer as you would in a real interview. Let's begin. ${question}`;
+    return `Hi, I'm your AI interviewer for today.${role ? ` ${role}` : ""} We'll go through ${n}, and I may ask a follow-up or two about what you say. Please be somewhere quiet, with no other voices or noise around you, so I hear you clearly. Take your time and answer as you would in a real interview. Let's begin. ${question}`;
   }
   if (index === total - 1) return `Thanks. And now the last question. ${question}`;
   const leads = ["Thanks. Let's move on to the next one.", "Okay, next question.", "Alright, let's look at another one."];

@@ -1,0 +1,199 @@
+---
+id: ai-red-teaming
+level: P2
+theme: security
+title: "Red-team an AI system"
+outcome: "Plan and run an authorised red-team exercise on an AI app: scope, rules of engagement, manual and automated attacks with PyRIT, garak and promptfoo, attack success rate, findings and retests."
+answer: "AI red teaming is authorised testing where people and tools play the attacker against your own AI system, measure how often attacks succeed, report findings and retest after fixes."
+why_it_matters: "Every serious AI launch now needs evidence that someone tried to break it first. Red teaming is a core skill for AI security roles, and a written red-team report is strong proof of that skill in an interview."
+hours: 4
+gap_tags: []
+primary_resource: owasp-genai-red-teaming-guide
+alternates: [microsoft-planning-red-teaming-llms, dlai-red-teaming-llm-applications]
+more: [pyrit-repo, garak-repo, promptfoo-red-team-quickstart, mitre-atlas, owasp-llm-top-10]
+videos: [yt-microsoft-developer-what-is-ai-red-teaming, yt-embrace-the-red-llm-vulnerability-scanning-with-garak, yt-pydata-red-teaming-ai-getting-started-with-pyrit]
+format: deep
+key_terms: [red-teaming, jailbreak, prompt-injection, pyrit, garak, data-exfiltration]
+check:
+  type: mcq
+  question_ids: [ai-red-teaming-1, ai-red-teaming-2, ai-red-teaming-3]
+flashcards:
+  - q: "What is AI red teaming?"
+    a: "Authorised testing where people and tools act as attackers against your own AI system, to find weaknesses before real attackers do."
+  - q: "What must be agreed before any red-team test starts?"
+    a: "Written permission, scope (which systems and environments), rules of engagement (what is off limits), test accounts and data, and who to call if something breaks."
+  - q: "Name five attack categories for an LLM app."
+    a: "Jailbreaks, direct and indirect prompt injection, data leakage (system prompt, other users' data, secrets), harmful or off-policy output, and tool misuse."
+  - q: "Why use both manual and automated testing?"
+    a: "People find new, creative attacks and judge context. Tools like PyRIT, garak and promptfoo run thousands of known attacks repeatably. You need both."
+  - q: "What is attack success rate?"
+    a: "The share of attack attempts in a category that achieved the attacker's goal, for example 12 of 200 injection attempts made a forbidden tool call: 6%."
+  - q: "Why run each attack several times?"
+    a: "Model output is random. An attack that works one time in five is still a finding, so repeat attempts and report the rate."
+  - q: "What goes in a red-team finding?"
+    a: "Title, category, severity, exact steps and inputs, evidence, impact, success rate, a suggested fix, and the retest result."
+  - q: "What happens after a fix?"
+    a: "Retest the exact finding and its variants, then add it to the automated regression suite so it cannot quietly come back."
+exercise:
+  title: "Scope and score a red-team round"
+  setup: "A Chennai insurance company has built a claims assistant for policyholders. It answers policy questions from documents, can look up the caller's own claim status, and can upload documents to a claim. You have one week, a staging copy with fake customers, and written approval from the CISO. Production is out of scope."
+  questions:
+    - q: "List three things your rules of engagement must say."
+      a: "Only the staging environment and test accounts; no real customer data and no denial-of-service tests; stop and report at once if real data or a severe issue appears, with a named contact."
+    - q: "Which attack categories would you prioritise, and why?"
+      a: "Data leakage of other policyholders' claims and tool misuse of the claim lookup and upload, because they touch personal data and real actions. Then injection through uploaded documents, then jailbreaks."
+    - q: "Your injection suite succeeds 9 times in 150 runs. How do you report it?"
+      a: "Attack success rate 6% for indirect injection, with the successful inputs, what they achieved, the severity, and a suggested fix."
+    - q: "After the fix, what do you do?"
+      a: "Rerun the 150 cases and new variants; if the rate is zero or at the agreed threshold, close the finding and add the cases to the CI regression suite."
+ask:
+  - "What is the difference between red teaming and penetration testing?"
+  - "How do I start red teaming an LLM app with garak or promptfoo?"
+  - "How do I write a good AI red-team finding?"
+drafted_with_ai: true
+reviewed_by: Shyam Prabahar
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+**AI red teaming** is authorised testing where people and tools act as attackers against your own AI system. The goal is to find weaknesses, measure how often attacks work, and get them fixed before real attackers or real users find them.
+
+The word comes from military and security exercises, where a "red team" plays the enemy. For AI systems it now covers two overlapping kinds of failure:
+
+- **Security failures**: prompt injection, leaking data or secrets, misusing tools, running up cost.
+- **Safety and policy failures**: harmful, biased or off-brand output, giving advice the product must not give.
+
+AI red teaming differs from a classic penetration test in two ways. The system is not deterministic, so the same attack may work once in ten tries, and you must measure rates, not single results. And the attack surface is language, so creative people find attacks that no tool has a signature for.
+
+**Always authorised.** Red teaming is done on systems you own or have written permission to test, within an agreed scope. Testing someone else's AI product without permission can break laws and terms of service, in India and elsewhere. Everything in this lesson assumes a written go-ahead.
+
+This lesson follows a small security team at a Bengaluru lending app as it red-teams its loan support assistant before launch.
+
+## How it works
+
+A red-team round runs as a loop: plan, attack, measure, report, fix, retest.
+
+```flow
+title: One AI red-team round
+Plan | threat model, scope, rules of engagement, written approval -> Build attack set
+Build attack set | categories from threat model, OWASP and ATLAS -> Manual testing | creative probes by people
+Build attack set -> Automated testing | PyRIT, garak, promptfoo
+Manual testing -> Score results
+Automated testing -> Score results
+Score results | attack success rate per category -> Write findings
+Write findings -> Fix | owners and deadlines
+Fix -> Retest
+Retest -> Fixed at agreed rate?
+Fixed at agreed rate? -[no]-> Fix
+Fixed at agreed rate? -[yes]-> Add to CI regression suite
+```
+
+**1. Scope and rules of engagement.** Start from the threat model (see the "Threat model an AI system" lesson): it tells you which parts and which threats matter most. Then write down:
+
+- what is in scope (staging app, these tools, these models) and out of scope (production, other teams' systems);
+- what is not allowed (no real customer data, no load tests that could hurt shared services);
+- test accounts and fake data to use;
+- a named contact and a stop rule: if you see real personal data or a critical flaw, stop and report at once;
+- the dates, and who signs off.
+
+**2. Attack categories.** Group attacks so you can measure each group. A practical set for an LLM app:
+
+| Category | What the attacker wants | How you know it worked |
+| --- | --- | --- |
+| Jailbreak | Make the model break its safety or business rules | Output the policy forbids, such as guaranteed-approval claims |
+| Direct prompt injection | Override instructions through the chat box | The model changes role or ignores its instructions |
+| Indirect prompt injection | Hide instructions in documents, emails or web pages the app reads | The model follows text from content, not from the user |
+| Data leakage | Reveal the system prompt, other users' data or secrets | Any planted marker, other customer's data or key appears in output |
+| Harmful or off-policy output | Abusive, biased or dangerous content, or advice the product must not give | A grader or reviewer marks the output as a violation |
+| Tool misuse | Make the model call tools wrongly: wrong account, wrong amount, bulk actions | A tool call happens that the user was not entitled to |
+
+Map each category to the OWASP Top 10 for LLM apps and MITRE ATLAS so findings use shared names.
+
+**3. Manual testing.** People are good at the new and the subtle: multi-turn attacks that build trust slowly, role-play, mixing English, Hindi and Kannada, attacks that depend on the business context. Give testers a short brief, the scope and a shared sheet to log every attempt: input, output, time, and whether it worked. Mix testers: security people, domain experts (a loan officer knows what a dangerous answer looks like) and people who speak your users' languages.
+
+**4. Automated testing.** Tools give scale and repeatability:
+
+- **PyRIT** (Microsoft) is a Python framework. You point it at a target, give it attack datasets or let an attacker model generate and refine prompts over several turns, and it scores the replies and keeps a record of every attempt.
+- **garak** (NVIDIA) is a scanner. It runs many ready-made probes, such as jailbreak families, injection and leakage tests, against a model or endpoint and reports which got through.
+- **promptfoo** is an open-source testing tool. Its red-team mode generates attacks for your app's purpose from plugins (what to test) and strategies (how to deliver it), and produces a report. It also runs in CI.
+
+Tools do not know your business. Add your own cases built from the threat model, and check what the tool's graders mark as success, because automated scoring makes mistakes in both directions.
+
+**5. Measure attack success rate.** For each category, attack success rate (ASR) is successful attempts divided by total attempts. Because output is random, run each attack several times. Also track the false refusal rate on normal requests: a fix that makes the assistant refuse real customers is not a win.
+
+```python
+from collections import defaultdict
+
+def asr_by_category(results):
+    """results: list of dicts with 'category' and 'success' (True or False), one per attempt."""
+    tried, won = defaultdict(int), defaultdict(int)
+    for r in results:
+        tried[r["category"]] += 1
+        won[r["category"]] += r["success"]
+    for cat in sorted(tried):
+        print(f"{cat:28} {won[cat]:>4}/{tried[cat]:<4} ASR {won[cat] / tried[cat]:.1%}")
+```
+
+**6. Write findings.** Each finding is one problem, written so a developer can reproduce it without you:
+
+```text
+ID:         RT-004
+Title:      Loan assistant reveals another applicant's EMI schedule
+Category:   Data leakage / tool misuse
+Severity:   Critical (personal and financial data of other customers)
+Steps:      Logged in as test user A; asked for "my brother's loan" giving test user B's
+            application number; assistant called get_emi_schedule with B's number.
+Success:    7 of 20 attempts (35%)
+Evidence:   Transcript and tool-call log attached
+Fix:        Tool must take the applicant ID from the session only
+Retest:     Pending
+```
+
+**7. Fix and retest.** Retest the exact steps and close variants. When fixed, add the cases to the automated suite that runs on every change (the "Security tests in CI for AI apps" lesson), so the finding cannot quietly return when a prompt or model changes.
+
+## A worked example
+
+A Bengaluru lending app (a made-up example) built an assistant that explains loan products, shows a logged-in customer's EMI schedule and can raise a request to change the EMI date. Launch is in three weeks. Arjun from security leads a one-week round with two developers, one loan officer and a support agent who speaks Kannada and Hindi.
+
+**Scope.** Staging only, 50 fake customers, written approval from the CTO. No load testing. Stop rule: any real data, call Arjun.
+
+**Attack set.** From the threat model: other customers' data through the EMI tool, injection through uploaded salary slips, promises a lender must never make (such as "guaranteed approval"), and abusive output.
+
+**Testing.** People spent two days on manual attacks and logged 310 attempts. promptfoo generated and ran about 1,200 attacks from the app's description; garak ran its standard probes against the staging endpoint; a small PyRIT script ran multi-turn attacks on the EMI tool.
+
+**Results for the five main categories (a sample of attempts across manual and automated testing; made-up numbers for this example):**
+
+| Category | Attempts | Successes | ASR |
+| --- | --- | --- | --- |
+| Tool misuse: other customer's EMI | 120 | 31 | 25.8% |
+| Indirect injection via salary slip | 150 | 9 | 6.0% |
+| Off-policy promise ("guaranteed approval") | 200 | 14 | 7.0% |
+| Jailbreak to abusive output | 400 | 3 | 0.8% |
+| System prompt leakage | 180 | 22 | 12.2% |
+
+**Findings and fixes.** The EMI finding was critical: the tool trusted an application number from chat. The fix bound the tool to the logged-in customer. The system prompt leak mattered less once the team confirmed it held no secrets, so it became low severity. The "guaranteed approval" promises got an output check plus prompt changes.
+
+**Retest.** The EMI attacks dropped to 0 of 120; the injection rate fell to 0.7%, which the team accepted with monitoring; off-policy promises fell to 1 in 200. Every successful attack became a regression test in CI. The report went to the CTO and compliance with numbers, not adjectives.
+
+## Common mistakes
+
+- **No written scope or approval.** Without it, a red team is just someone attacking a system.
+- **Testing the model, not the app.** Most serious findings are in tools, retrieval and data access.
+- **Running one attempt per attack.** Random output means you must report rates.
+- **Trusting tool scores blindly.** Check samples of what the grader marked as passed and failed.
+- **Only English.** Indian users switch languages; attackers do too.
+- **Findings without steps.** If a developer cannot reproduce it, it will not be fixed.
+- **No retest and no regression test.** Fixed findings come back after prompt or model changes.
+- **Measuring only attack success.** A fix that refuses real customers has its own cost; track false refusals.
+
+## Practice
+
+Read the OWASP GenAI Red Teaming Guide and Microsoft's red-team planning page, then try one automated tool on an app you own.
+
+1. Write a one-page scope and rules of engagement for an AI app you built.
+2. Pick four attack categories from the table and write 10 manual attacks for each, then log every attempt.
+3. Run garak or promptfoo against the same app in a test environment, and compare what the tool found with what you found.
+4. Calculate ASR per category, write two findings in the format above, fix one and retest it.
+
+**You are done when you can** scope an authorised red-team round, run manual and automated attacks, report attack success rates per category, and show a fixed finding with its retest and regression test.

@@ -1,0 +1,180 @@
+---
+id: cryptography-basics
+level: B3
+theme: security
+title: "Cryptography basics"
+outcome: "Tell hashing from encryption, explain symmetric and asymmetric keys, describe what TLS and certificates protect, store passwords with a slow hash such as Argon2 or bcrypt, and keep secrets out of code, logs and prompts."
+answer: "Cryptography protects data with maths: hashing makes one-way fingerprints, encryption hides data from anyone without the key, and TLS uses both to secure traffic."
+why_it_matters: "Every login, UPI payment and API call depends on cryptography working correctly. Engineers rarely invent ciphers, but they constantly choose hash functions, store passwords, configure TLS and handle API keys, and those choices cause real breaches. AI apps add keys that leak through prompts and logs."
+hours: 3
+gap_tags: []
+primary_resource: cloudflare-what-is-tls
+alternates: [owasp-password-storage-cheatsheet, owasp-secrets-management-cheatsheet]
+more: [professor-messer-security-plus]
+videos: [yt-computerphile-hashing-algorithms-and-security, yt-computerphile-public-key-cryptography, yt-bytebytego-ssl-tls-https-explained]
+format: deep
+key_terms: [hashing, encryption, tls, secrets-management, environment-variable]
+check:
+  type: mcq
+  question_ids: [cryptography-basics-1, cryptography-basics-2, cryptography-basics-3]
+flashcards:
+  - q: "What is the difference between hashing and encryption?"
+    a: "Hashing is one-way: it makes a fixed-length fingerprint you cannot turn back into the data. Encryption is two-way: with the right key you can decrypt and get the data back."
+  - q: "What is symmetric encryption?"
+    a: "One shared secret key both encrypts and decrypts, as with AES. It is fast, so it protects bulk data, but both sides must share the key safely."
+  - q: "What is asymmetric encryption?"
+    a: "A key pair: a public key anyone may have and a private key only the owner keeps. Data encrypted to the public key opens only with the private key, and signatures made with the private key are checked with the public key."
+  - q: "What does TLS give you?"
+    a: "Confidentiality (traffic is encrypted), integrity (changes are detected) and authentication of the server through its certificate."
+  - q: "What does a TLS certificate prove?"
+    a: "That a trusted certificate authority has checked that the holder of a public key controls the domain name in the certificate, within its validity dates."
+  - q: "Why not store passwords with SHA-256?"
+    a: "SHA-256 is fast, so attackers can test billions of guesses on stolen hashes. Password storage needs a slow, salted algorithm such as Argon2id, scrypt or bcrypt."
+  - q: "What is a salt?"
+    a: "A random value stored with each password hash so identical passwords get different hashes. It defeats precomputed tables and stops one crack revealing many accounts."
+  - q: "Where should API keys and secrets live?"
+    a: "In a secrets manager or the platform's secret settings, injected at run time. Never in code, Git, logs, screenshots, chat messages or model prompts."
+  - q: "What do you do when a secret leaks?"
+    a: "Revoke and rotate it immediately, check logs for misuse, then remove it from history. Deleting the file alone is not enough, because copies remain."
+exercise:
+  title: "Audit the Lucknow food app's crypto"
+  setup: "A food-delivery startup in Lucknow stores customer passwords as unsalted MD5 hashes. Its mobile app talks to the API over HTTPS, but one internal service calls the payment partner over plain HTTP. The model provider's API key for its support chatbot is written in the system prompt, and the payment gateway secret is in config.py in a public GitHub repository. Order data is 'encrypted' with Base64 before being saved."
+  questions:
+    - q: "What is wrong with the password storage and how do you migrate?"
+      a: "MD5 is fast and unsalted, so leaked hashes crack quickly. Switch to Argon2id or bcrypt with per-user salts, rehash each password at the user's next login, and force resets for accounts that do not log in."
+    - q: "Is Base64 encryption?"
+      a: "No. Base64 is encoding: anyone can reverse it without a key. Use real encryption, such as the database's or cloud provider's encryption at rest with managed keys."
+    - q: "What should happen to the payment secret in GitHub?"
+      a: "Treat it as stolen: revoke and rotate it now, check the gateway logs for misuse, move secrets into a secrets manager, and add secret scanning to the repository."
+    - q: "Why is the key in the system prompt a problem?"
+      a: "Prompts can be revealed through prompt injection, logs and traces. The key should be held by server code calling the model, never placed in model context."
+ask:
+  - "What is the difference between hashing and encryption?"
+  - "How does HTTPS keep my data safe?"
+  - "Why use bcrypt or Argon2 instead of SHA-256 for passwords?"
+drafted_with_ai: true
+reviewed_by: Shyam Prabahar
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+**Cryptography** is the maths that keeps data secret, detects changes and proves identity. You use it hundreds of times a day: when you open a banking app, pay by UPI, sign in to email or call an AI API.
+
+As an engineer you will almost never design a cipher, and you never should. What you will do is **choose and use** well-known building blocks: which hash for which job, how to store passwords, how TLS is configured, and where keys live. Nearly all real-world crypto failures come from these choices, not from broken maths.
+
+Four ideas cover most of it:
+
+- **Hashing**: a one-way fingerprint of data.
+- **Encryption**: hiding data so only someone with the key can read it, either **symmetric** (one shared key) or **asymmetric** (a public and private key pair).
+- **TLS and certificates**: how hashing and both kinds of encryption combine to protect traffic on the internet.
+- **Secrets management**: keeping keys, passwords and tokens out of places they leak from.
+
+## How it works
+
+**Hashing.** A hash function turns any input into a fixed-length output, such as 256 bits for SHA-256. The same input always gives the same hash; a tiny change gives a completely different one; and you cannot work backwards from the hash to the input.
+
+```python
+import hashlib
+print(hashlib.sha256(b"invoice-2026-11.pdf contents").hexdigest())
+# 64 hex characters. Change one byte of the input and the hash looks completely different.
+```
+
+Hashes are used to check **integrity** (has this download or file changed?), in digital signatures, in Git commits and, with special slow algorithms, for **password storage**. MD5 and SHA-1 are broken for security use; use SHA-256 or newer for integrity.
+
+**Encoding is not encryption.** Base64, hex and URL encoding just change the format so data travels safely. Anyone can reverse them without a key. Seeing Base64 in a config file means the secret is effectively in plain text.
+
+**Symmetric encryption.** One secret key both locks and unlocks. **AES** is the standard; modern modes such as AES-GCM also detect tampering. Symmetric encryption is fast, so it protects bulk data: disks, database backups, files in cloud storage and the body of every HTTPS connection. The hard part is **sharing the key safely**.
+
+**Asymmetric encryption.** Each party has a **key pair**: a **public key** that can be shared with anyone and a **private key** that never leaves its owner. Two uses matter:
+
+- **Encryption or key exchange**: anything locked with your public key can only be opened with your private key, which lets strangers agree on a shared symmetric key over an open network.
+- **Digital signatures**: you sign with your private key, and anyone can verify with your public key that the data came from you and was not changed. Software updates, SSH keys and TLS certificates all rely on this.
+
+Common algorithms are RSA and elliptic-curve schemes (ECDSA, Ed25519, ECDH). Asymmetric operations are slow, so real systems use them to set up a session and then switch to fast symmetric encryption.
+
+| Tool | Reversible? | Keys | Used for | Examples |
+| --- | --- | --- | --- | --- |
+| Encoding | Yes, by anyone | None | Formatting data for transport | Base64, hex |
+| Fast hash | No | None | Integrity checks, fingerprints | SHA-256, SHA-3 |
+| Password hash | No | None, but a salt per password | Storing passwords | Argon2id, scrypt, bcrypt, PBKDF2 |
+| Symmetric encryption | Yes, with the key | One shared key | Bulk data, disks, traffic | AES-GCM, ChaCha20-Poly1305 |
+| Asymmetric encryption | Yes, with the private key | Public and private pair | Key exchange, signatures | RSA, ECDH, Ed25519 |
+
+**TLS and certificates.** TLS (Transport Layer Security) is what puts the S in HTTPS. When your browser connects to a bank:
+
+```flow
+title: A TLS 1.3 connection, simplified
+Browser says hello | supported ciphers and a key share -> Server replies with its key share and certificate
+Server replies with its key share and certificate -> Is the certificate valid for this name?
+Is the certificate valid for this name? -[no: expired, wrong name or untrusted issuer]-> Browser shows a warning and stops
+Is the certificate valid for this name? -[yes: signed by a trusted certificate authority]-> Both sides derive the same session keys
+Both sides derive the same session keys -> Traffic flows encrypted with fast symmetric keys | tampering is detected
+```
+
+The **certificate** binds a domain name to a public key, and it is signed by a **certificate authority** (CA) that your device already trusts. That is how your browser knows it is talking to the real bank and not to someone on the same Wi-Fi. TLS gives you **confidentiality**, **integrity** and **server authentication**. For engineers that means: use HTTPS everywhere, including between internal services; allow only TLS 1.2 and 1.3; renew certificates automatically (for example with Let's Encrypt); and never switch off certificate checks in code to "make an error go away".
+
+```python
+import requests
+requests.get("https://api.example.com/orders", verify=False)  # never do this: it removes server authentication
+requests.get("https://api.example.com/orders")               # default: certificate is checked
+```
+
+**Password storage.** Websites must never store passwords in plain text or with plain encryption. They store a **password hash**, and at login they hash what you typed and compare. Two details matter:
+
+- **Slow on purpose.** General hashes like SHA-256 are designed to be fast, so an attacker with a stolen database can test billions of guesses per second on GPUs. Password hashing algorithms such as **Argon2id**, **scrypt** and **bcrypt** are deliberately slow and memory-hungry, which makes guessing far more expensive. OWASP's Password Storage Cheat Sheet recommends Argon2id first and lists current settings; follow it rather than copying numbers from old blog posts.
+- **Salted.** A random **salt** is stored with each hash so two people with the same password get different hashes. Good libraries handle salts for you.
+
+```python
+from argon2 import PasswordHasher   # pip install argon2-cffi
+ph = PasswordHasher()                # library defaults follow current guidance
+stored = ph.hash("correct horse battery staple")
+ph.verify(stored, "correct horse battery staple")   # True; raises an error on a wrong password
+```
+
+**Secrets management.** A **secret** is anything that grants access: API keys, database passwords, signing keys, cloud credentials, webhook secrets. Most leaks are ordinary: a key committed to GitHub, printed in a log, pasted into a chat, shown in a screenshot, or written into a model's system prompt. Rules:
+
+- **Never in code or Git.** Load secrets at run time from a secrets manager (AWS Secrets Manager, Azure Key Vault, Google Secret Manager, HashiCorp Vault) or from the platform's secret settings, exposed to the app as environment variables.
+- **Never in prompts.** Anything in a model's context can be revealed through prompt injection or end up in logs and traces. Tools should hold credentials in server code; the model only asks the tool to act.
+- **Least privilege and short lives.** Scope each key to one service and the smallest permissions; prefer short-lived tokens and cloud roles.
+- **Scan and rotate.** Turn on secret scanning in your repositories and CI. When a secret leaks, **revoke and rotate first**, then clean history; deleting the file does not remove copies.
+
+## A worked example
+
+A hypothetical Ahmedabad SaaS company builds an AI assistant for chartered accountants. Before launch, an engineer reviews its cryptography and finds four problems.
+
+1. **Passwords.** The legacy login stores SHA-256 hashes without salts. Fix: switch to Argon2id. Because hashes cannot be reversed, they upgrade gradually: when a user logs in successfully, the app verifies the old hash and saves a new Argon2id hash. Accounts that stay inactive get a forced reset.
+2. **Internal traffic.** The API talks to the document service over plain HTTP "because it is inside our network". Fix: TLS for internal calls too, since a single compromised machine inside the network could otherwise read client tax documents.
+3. **A disabled check.** One script calls the GST data provider with verify=False after a certificate error months ago. Fix: install the right CA bundle and remove the flag.
+4. **Secrets.** The model provider's API key sits in the system prompt so "the model can call tools", and a .env file was once committed to Git. Fix: tools now run in server code that reads the key from a secrets manager; the leaked keys are revoked and rotated; secret scanning is enabled; and the prompt contains no credentials.
+
+| Area | Before | After |
+| --- | --- | --- |
+| Password storage | Unsalted SHA-256 | Argon2id, upgraded at next login |
+| Internal traffic | Plain HTTP | TLS between all services |
+| Certificate checks | verify=False in one script | Proper CA bundle, checks on |
+| Secrets | Key in prompt and in Git history | Secrets manager, rotated keys, scanning on |
+
+Clients' financial data is personal data under India's DPDP Act, and these changes are part of the "reasonable security safeguards" the company owes them.
+
+## Common mistakes
+
+- **Calling Base64 "encryption".** It is encoding; anyone can reverse it.
+- **Fast hashes for passwords**, or no salt.
+- **Inventing your own crypto** or your own protocol. Use standard libraries and well-reviewed defaults.
+- **Turning off certificate verification** to silence an error.
+- **Hard-coding keys** in code, config files in Git, notebooks, Docker images or prompts.
+- **Encrypting data but storing the key next to it**, such as in the same database table.
+- **Deleting a leaked key from the repo without rotating it.**
+
+## Practice
+
+Read Cloudflare's explainer on TLS, the OWASP Password Storage Cheat Sheet and the OWASP Secrets Management Cheat Sheet. Watch the two Computerphile videos and ByteByteGo's video on HTTPS.
+
+1. Hash two files with sha256sum, change one character in one file, and compare the outputs.
+2. Hash a password with the argon2-cffi library as above, then verify a right and a wrong password.
+3. Open any HTTPS site in your browser, view its certificate, and note the issuer, the validity dates and the domain names it covers.
+4. Search one of your own repositories for strings that look like keys (sk-, AKIA, "password ="). Move anything you find into environment variables loaded from a secrets store, and rotate it if it was ever pushed.
+5. Review one AI feature you have built and confirm no credential appears in its prompts, logs or traces.
+
+**You are done when you can** explain hashing versus encryption and symmetric versus asymmetric keys, describe what TLS and certificates protect, store a password correctly, and say where secrets belong and what to do when one leaks.

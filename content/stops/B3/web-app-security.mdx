@@ -1,0 +1,204 @@
+---
+id: web-app-security
+level: B3
+theme: security
+title: "Web app security and the OWASP Top 10"
+outcome: "Explain the OWASP Top 10 web risks, recognise SQL injection, cross-site scripting and broken access control in code, and fix each one with the standard defence."
+answer: "Keeping a website's data and functions safe from misuse. The OWASP Top 10 lists the biggest risks; the classic three are broken access control, SQL injection and cross-site scripting."
+why_it_matters: "Almost every AI product is a web app first: a login page, an API and a database. LLM features add new risks on top of these old ones, so an AI security engineer must know the web basics cold. Interviewers ask about all three."
+hours: 4
+gap_tags: []
+primary_resource: owasp-top-10-web
+alternates: [portswigger-web-security-academy, owasp-sql-injection-cheatsheet]
+more: [owasp-xss-cheatsheet, portswigger-access-control, owasp-authorization-cheatsheet]
+videos: [yt-computerphile-hacking-websites-with-sql-injection, yt-ibm-technology-cross-site-scripting-a-25-year-threat, yt-rana-khalil-broken-access-control-complete-guide]
+format: deep
+key_terms: [owasp-top-10, sql-injection, xss, authorization, vulnerability]
+check:
+  type: mcq
+  question_ids: [web-app-security-1, web-app-security-2, web-app-security-3]
+flashcards:
+  - q: "What is the OWASP Top 10?"
+    a: "A list, published by the OWASP Foundation every few years, of the ten most critical risk categories in web applications. The current edition is 2025, and broken access control is number one."
+  - q: "What is SQL injection?"
+    a: "A flaw where user input is pasted into a database query as text, so crafted input changes the meaning of the query itself."
+  - q: "What is the standard fix for SQL injection?"
+    a: "Parameterised queries (prepared statements): the query and the data travel separately, so input is always treated as data, never as SQL."
+  - q: "What is cross-site scripting (XSS)?"
+    a: "A flaw where an attacker's script runs in other users' browsers because the site shows user input without encoding it for HTML."
+  - q: "How do you stop XSS?"
+    a: "Encode output for the context where it appears (HTML, attribute, JavaScript, URL), use a framework that escapes by default, sanitise any HTML you must allow, and add a Content Security Policy."
+  - q: "What is broken access control?"
+    a: "When the server does not check that the signed-in user may read or change the specific record or function they asked for, such as changing an order id in the URL to see someone else's order."
+  - q: "Where must authorisation checks run?"
+    a: "On the server, on every request, for every object. Hiding a button in the browser is not a check."
+  - q: "Why is input validation not enough on its own?"
+    a: "Valid-looking input can still be dangerous in another context. Validation reduces risk, but the real fixes are parameterised queries, output encoding and server-side checks."
+exercise:
+  title: "Review the Jaipur clinic portal"
+  setup: "A clinic chain in Jaipur has a patient portal. A patient opens /reports?id=5120 to see a lab report. The search box builds this query: \"SELECT * FROM doctors WHERE name LIKE '%\" + term + \"%'\". Patients can leave a review of a doctor, and reviews are shown on the doctor's page exactly as typed. The admin page link is hidden from patients, but the /admin route itself checks only that the user is signed in."
+  questions:
+    - q: "Which OWASP category does the report URL risk, and how would you test it safely?"
+      a: "Broken access control. With two test accounts you own, sign in as patient A and request patient B's report id. If it loads, the server is not checking ownership."
+    - q: "What is wrong with the search query and what is the fix?"
+      a: "User input is joined into SQL text, so it is open to SQL injection. Use a parameterised query with the term as a bound parameter."
+    - q: "What is the risk in the reviews and the fix?"
+      a: "Stored XSS: a review containing a script would run in every visitor's browser. Encode reviews on output (or let the template engine escape them) and add a Content Security Policy."
+    - q: "How should the admin page be protected?"
+      a: "The server must check the user's role on the /admin route and every admin API, and deny by default. Hiding the link does nothing."
+ask:
+  - "What is the difference between SQL injection and XSS?"
+  - "Why are parameterised queries safe?"
+  - "How do I test my own app for broken access control?"
+drafted_with_ai: true
+reviewed_by: Shyam Prabahar
+reviewed_on: '2026-11-18'
+---
+
+## What it is
+
+**Web application security** is keeping a website or API, its data and its functions safe from misuse. Many breaches start at a web app: a login form, an API endpoint, a search box or an admin page.
+
+The **OWASP Top 10** is the most widely used map of these risks. OWASP (the Open Worldwide Application Security Project) is a non-profit community. Every few years it studies data on real vulnerabilities and publishes the ten most critical risk categories. The current edition is **OWASP Top 10:2025**.
+
+| Rank | 2025 category | In one line |
+| --- | --- | --- |
+| A01 | Broken Access Control | Users can read or change things they should not; now also covers server-side request forgery (SSRF) |
+| A02 | Security Misconfiguration | Default passwords, open storage buckets, debug pages left on |
+| A03 | Software Supply Chain Failures | Risky or compromised libraries, build tools and dependencies |
+| A04 | Cryptographic Failures | Sensitive data not encrypted, or encrypted badly |
+| A05 | Injection | Input changes a query or command: SQL injection, cross-site scripting and others |
+| A06 | Insecure Design | The design itself lacks a needed control, so perfect code cannot fix it |
+| A07 | Authentication Failures | Weak login, no rate limits, poor session handling |
+| A08 | Software or Data Integrity Failures | Trusting updates, data or code without checking they are genuine |
+| A09 | Security Logging and Alerting Failures | Attacks happen and nobody notices |
+| A10 | Mishandling of Exceptional Conditions | Errors and edge cases leave the system in an unsafe state |
+
+Read the official page for the details of each; the names above follow the 2025 edition. This lesson goes deep on the three you will meet first: **broken access control**, **SQL injection** and **cross-site scripting (XSS)**. The aim is defensive: to spot each one in code and fix it.
+
+## How it works
+
+Nearly every web request follows the same path. Each step is a place a check can be missing.
+
+```flow
+title: One web request and where each defence sits
+Browser sends a request | GET /orders?id=1042 with a session cookie -> Who is this user?
+Who is this user? -[no valid session]-> Reject with 401
+Who is this user? -[signed in]-> May this user touch this record?
+May this user touch this record? -[no]-> Reject with 403 or 404 | broken access control lives here
+May this user touch this record? -[yes]-> Run a parameterised query | SQL injection is stopped here
+Run a parameterised query -> Build the HTML page
+Build the HTML page -> Encode every user value for its context | XSS is stopped here
+Encode every user value for its context -> Send the response
+```
+
+### Broken access control
+
+**Authentication** asks "who are you?". **Authorisation** asks "are you allowed to do this, to this object?". Broken access control is a missing or wrong authorisation check. Common shapes:
+
+- **Insecure direct object reference (IDOR).** The URL or API takes an id, such as /api/orders/1042, and the server returns that order without checking it belongs to the signed-in user.
+- **Missing function-level checks.** The admin link is hidden in the menu, but the /admin route only checks that someone is signed in.
+- **Trusting the client.** The app reads the user's role from a field the browser sends, or from a cookie the user can edit.
+
+The fix is simple to state and easy to forget: **check on the server, on every request, for every object, and deny by default.**
+
+```python
+# Vulnerable: returns any order whose id is asked for
+@app.get("/api/orders/{order_id}")
+def get_order(order_id: int, user = Depends(current_user)):
+    return db.fetch_order(order_id)
+
+# Fixed: the query itself is scoped to the signed-in user
+@app.get("/api/orders/{order_id}")
+def get_order(order_id: int, user = Depends(current_user)):
+    order = db.fetch_order_for_user(order_id, user.id)
+    if order is None:
+        raise HTTPException(status_code=404)  # do not reveal that it exists
+    return order
+```
+
+Returning 404 rather than 403 for someone else's object avoids telling an attacker which ids exist.
+
+### SQL injection
+
+SQL injection happens when code builds a query by joining user input into SQL text. The database cannot tell which part the developer wrote and which part the user typed, so crafted input can change the query's meaning: return every row, skip a password check, or worse.
+
+```python
+# Vulnerable: input becomes part of the SQL text
+term = request.args["q"]
+sql = "SELECT name, city FROM doctors WHERE name = '" + term + "'"
+cursor.execute(sql)
+
+# Fixed: a parameterised query; the driver sends the value separately
+cursor.execute("SELECT name, city FROM doctors WHERE name = %s", (term,))
+```
+
+With a parameterised query (also called a prepared statement), the SQL and the data travel separately. Whatever the user types is only ever treated as a value. ORMs such as SQLAlchemy and Django's ORM parameterise for you, until someone writes raw SQL with string joining, which is where most injection bugs hide.
+
+Extra layers help: give the app's database user only the rights it needs (no DROP, no access to other schemas), validate input against an allow-list where the shape is known (an order id is a number), and never show raw database errors to users.
+
+### Cross-site scripting (XSS)
+
+XSS is injection into a web page instead of a database. If a site shows user input without encoding it, an attacker can make their script run in other users' browsers. That script runs with the victim's session: it can read the page, act as the user, or send data out.
+
+- **Stored XSS**: the script is saved, for example in a review or a profile name, and runs for everyone who views it.
+- **Reflected XSS**: the script comes from the request, such as a search term echoed back on the results page.
+- **DOM-based XSS**: front-end JavaScript takes something from the URL and writes it into the page unsafely.
+
+The fix is **output encoding for the context**: characters that mean something in HTML are converted so the browser shows them as text instead of running them.
+
+```python
+from markupsafe import escape
+
+review = "<script>steal()</script>"     # what an attacker typed
+html = f"<p>{escape(review)}</p>"        # rendered as harmless text
+# html is now: <p>&lt;script&gt;steal()&lt;/script&gt;</p>
+```
+
+Modern frameworks (React, Jinja2, Django templates) escape by default. XSS usually comes back when a developer switches that off, for example with React's dangerouslySetInnerHTML or Jinja's safe filter. If you must allow some HTML, such as bold text in a comment, pass it through a well-maintained sanitiser library. Add a **Content Security Policy** header so that, even if something slips through, the browser refuses to run inline scripts.
+
+| Flaw | Root cause | Main fix | Extra layers |
+| --- | --- | --- | --- |
+| Broken access control | Server does not check ownership or role | Server-side check per request and per object, deny by default | Scope queries to the user, log denied attempts, test with two accounts |
+| SQL injection | Input joined into SQL text | Parameterised queries | Least-privilege database user, allow-list validation, hide raw errors |
+| XSS | Input shown in a page without encoding | Context-aware output encoding | Framework auto-escaping, HTML sanitiser, Content Security Policy |
+
+### Why AI engineers care
+
+LLM apps are web apps with a model inside. Model output is untrusted input too. If a chatbot's answer is inserted into a page without encoding, a prompt injection can turn into XSS. If an agent writes SQL, it needs the same parameterisation and least-privilege database account. The OWASP Top 10 for LLM applications, later in this roadmap, builds directly on these ideas.
+
+## A worked example
+
+A hypothetical Pune fintech, "PaisaPath", runs a small-loan app. During an internal security review before launch, the team tests its own staging site with two test accounts, one for "Asha" and one for "Ravi".
+
+1. **Access control.** Signed in as Asha, the tester opens her loan statement at /api/statements/88217. They change the id to 88218, one of Ravi's statements. It loads. The handler fetched by id alone. Fix: every statement query now filters by the signed-in user's id, and a test asserts that Asha gets a 404 for Ravi's statement.
+2. **SQL injection.** The branch-finder search joins the city name into SQL. Typing a single quote returns a database error page showing part of the query. Fix: a parameterised query, a generic error page, and the app's database role loses write access to tables it only reads.
+3. **XSS.** The support chat shows customer messages to agents. One test message contains HTML with a script tag, and it runs in the agent's dashboard, which also has access to customer KYC documents. Fix: the dashboard's template had escaping turned off "to keep line breaks"; the team restores escaping, converts line breaks safely, and adds a Content Security Policy.
+
+| Test | Before | After |
+| --- | --- | --- |
+| Asha requests Ravi's statement | Statement shown | 404, attempt logged |
+| Single quote in branch search | Database error with query text | Normal "no results" page |
+| Script in a chat message | Ran in the agent dashboard | Shown as plain text; CSP would block it anyway |
+
+Under India's DPDP Act the company is responsible for protecting borrowers' personal data, so these fixes are not optional extras.
+
+## Common mistakes
+
+- **Hiding instead of checking.** Removing a button from the menu does not protect the route behind it.
+- **Checking the role but not the object.** "Is the user a customer?" is not the same as "is this the customer's own order?".
+- **Escaping input on the way in instead of encoding on the way out.** Encoding depends on where the value is shown (HTML, attribute, JavaScript, URL); do it at output.
+- **Blocklisting "bad" characters.** Attackers have endless encodings. Use parameterised queries and proper encoding instead of filters.
+- **Turning off framework protections** for convenience, then forgetting why they were there.
+- **Testing on systems you do not own.** Practise only on your own apps and on purpose-built labs. Testing someone else's site without written permission can be a crime under India's IT Act.
+
+## Practice
+
+Read the OWASP Top 10:2025 introduction and the SQL Injection and XSS prevention cheat sheets linked below. Then work through the free PortSwigger Web Security Academy topics on SQL injection, XSS and access control; its labs are built to be attacked, so they are a safe place to learn.
+
+1. In a small app of your own (a Flask or FastAPI to-do list is fine), create two users and check that one cannot read the other's items by changing an id. Add the ownership check and a test for it.
+2. Find every place your code builds SQL with string joining or f-strings, and replace it with parameterised queries.
+3. Search your templates for anything that disables escaping and justify or remove each one.
+4. Add a Content Security Policy header and check the browser console for what it blocks.
+
+**You are done when you can** name the 2025 Top 10 categories, explain SQL injection, XSS and broken access control in your own words, and show the fix for each in code.

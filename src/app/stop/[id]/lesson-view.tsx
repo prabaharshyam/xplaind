@@ -7,7 +7,7 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import { RunnableCode } from "@/components/playground/runnable-code";
 import remarkGfm from "remark-gfm";
 import { muted, textLink } from "@/components/ui";
-import { GENAI_PATH_ID, getContent, getGlossary, getLevel, getStop, getTranslation, pathLessons, pathsWithLesson, translationLangs } from "@/lib/content";
+import { GENAI_PATH_ID, getContent, getGlossary, getLevel, getStop, getStops, getTranslation, pathLessons, pathsWithLesson, translationLangs } from "@/lib/content";
 import { LESSON_LANGS, type LessonLang } from "@/lib/content/schema";
 import { LessonLanguages } from "./lesson-languages";
 import { Cover } from "@/components/art/cover";
@@ -30,7 +30,7 @@ import type { CheckQuestionView } from "./stop-progress";
 import { StopProgressPanel } from "./stop-progress";
 import { LessonTutor } from "./lesson-tutor";
 import { LessonExercise } from "./lesson-exercise";
-import { PathLessons } from "./path-lessons";
+import { type LessonRoadmap, LessonRoadmapProvider, RoadmapCrumbs, RoadmapLessons, RoadmapPrevNext } from "./lesson-roadmap";
 import { Flashcards } from "@/components/flashcards";
 import { TopicStatus } from "@/components/roadmap/topic-status";
 import { aiEnabled } from "@/lib/ai/settings";
@@ -118,7 +118,6 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
 
   const level = getLevel(stop.level);
   const paths = pathsWithLesson(stop.id);
-  const onGenai = paths.some((p) => p.id === GENAI_PATH_ID);
   const terms = stop.key_terms.map((id) => getGlossary().find((g) => g.id === id)!);
   const explainer = stop.format !== "brief";
   const interview = getInterviewViews().filter((q) => q.stop.id === stop.id);
@@ -154,13 +153,24 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
     { id: "check", title: "Quick check", icon: "check" },
     { id: "tutor", title: "Ask the AI tutor", icon: "sparkles" },
   ];
-  const home = paths[0];
-  const order = home ? pathLessons(home.id) : [];
-  const at = order.findIndex((l) => l.id === stop.id);
-  const prev = at > 0 ? order[at - 1] : null;
-  const next = at >= 0 && at < order.length - 1 ? order[at + 1] : null;
+  // RM-16: every roadmap this lesson is on; the page follows the one the learner came from.
+  const roadmaps: LessonRoadmap[] = paths.map((p) => ({
+    id: p.id,
+    name: p.name,
+    href: roadmapHref(p.id),
+    lessons: pathLessons(p.id).map((l) => l.id),
+    crumbs:
+      p.id === GENAI_PATH_ID
+        ? [
+            { href: roadmapHref(GENAI_PATH_ID), label: "Roadmap" },
+            { href: `/roadmap/genai-engineer/${stop.level.toLowerCase()}`, label: `${levelWords(stop.level)}: ${level?.name ?? ""}` },
+          ]
+        : undefined,
+  }));
+  const titles = Object.fromEntries(getStops().filter((s) => roadmaps.some((r) => r.lessons.includes(s.id))).map((s) => [s.id, s.title]));
 
   return (
+    <LessonRoadmapProvider roadmaps={roadmaps} titles={titles} current={stop.id}>
     <main lang={lang === "en" ? undefined : LESSON_LANGS.find((l) => l.id === lang)?.htmlLang}>
       {/* MO-2: a reading-progress bar under the top bar. */}
       <ReadingProgress />
@@ -174,21 +184,7 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
         <div className="relative mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row md:items-end md:justify-between md:px-6 md:py-12">
           <div className="max-w-3xl">
             <nav aria-label="Breadcrumb" className="text-sm text-white/90">
-              {onGenai ? (
-                <>
-                  <Link href={roadmapHref(GENAI_PATH_ID)} className="underline underline-offset-2">
-                    Roadmap
-                  </Link>
-                  <span> / </span>
-                  <Link href={`/roadmap/genai-engineer/${stop.level.toLowerCase()}`} className="underline underline-offset-2">
-                    {levelWords(stop.level)}: {level?.name}
-                  </Link>
-                </>
-              ) : (
-                <Link href={home ? roadmapHref(home.id) : "/paths"} className="underline underline-offset-2">
-                  {home ? `${home.name} roadmap` : "Paths"}
-                </Link>
-              )}
+              <RoadmapCrumbs />
               <span> / </span>
               <Link href={`/topics/${theme.id}`} className="underline underline-offset-2">
                 {theme.label}
@@ -396,30 +392,11 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
 
           </ContentGate>
 
-          {home && (
-            <div className="xl:hidden">
-              <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />
-            </div>
-          )}
+          <div className="xl:hidden">
+            <RoadmapLessons />
+          </div>
 
-          {(prev || next) && home && (
-            <nav aria-label={`Lessons on the ${home.name} path`} className="mt-12 grid gap-3 sm:grid-cols-2">
-              {prev ? (
-                <Link href={`/stop/${prev.id}`} className="rounded-2xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900">
-                  <span className={`block text-sm ${muted}`}>← Previous</span>
-                  <span className="font-medium">{prev.title}</span>
-                </Link>
-              ) : (
-                <span />
-              )}
-              {next && (
-                <Link href={`/stop/${next.id}`} className="rounded-2xl border border-zinc-200 p-4 text-right hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900">
-                  <span className={`block text-sm ${muted}`}>Next →</span>
-                  <span className="font-medium">{next.title}</span>
-                </Link>
-              )}
-            </nav>
-          )}
+          <RoadmapPrevNext />
 
           {/* RM-10: where this lesson sits, and tags that open the Library filtered the same way. */}
           <section aria-labelledby="related-h" className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
@@ -464,7 +441,7 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
             <ContentGate reason="lesson" title="" text="" fallback={null}>
               <LearnPanel stopId={stop.id} items={learn} headingId="learn-side" />
             </ContentGate>
-            {home && <PathLessons pathName={home.name} lessons={order.map((l) => ({ id: l.id, title: l.title }))} current={stop.id} />}
+            <RoadmapLessons />
           </div>
         </aside>
       </div>
@@ -477,5 +454,6 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
         </div>
       </div>
     </main>
+    </LessonRoadmapProvider>
   );
 }

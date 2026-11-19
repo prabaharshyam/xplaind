@@ -11,7 +11,7 @@ test.use({ viewport: { width: 360, height: 740 } });
 test("the projects index lists every guided project and filters by role and difficulty (GP-3)", async ({ page }) => {
   await page.goto("/projects");
   await expect(page.getByRole("heading", { level: 1, name: "Guided projects" })).toBeVisible();
-  await expect(page.getByText("23 projects")).toBeVisible();
+  await expect(page.getByText("26 projects")).toBeVisible();
   await page.getByLabel("Role").selectOption("forward-deployed-engineer");
   await expect(page.getByText("6 projects")).toBeVisible();
   await page.getByLabel("Difficulty").selectOption("intermediate");

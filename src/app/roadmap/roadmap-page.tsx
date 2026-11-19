@@ -5,14 +5,12 @@ import { PageHero } from "@/components/page-hero";
 import { roadmapGraph } from "@/lib/content/structured";
 import { RoadmapStart } from "@/components/roadmap/roadmap-start";
 import { RoadmapView } from "@/components/roadmap/roadmap-view";
-import { TopicDrawerProvider } from "@/components/roadmap/topic-drawer";
+import { RememberRoadmap } from "@/components/roadmap/remember-roadmap";
 import { getPaths, getStops } from "@/lib/content";
-import { topicDetails } from "@/lib/content/drawer";
 import { pathView } from "@/lib/content/paths";
 import { roadmapModel } from "@/lib/content/roadmap";
 import type { Goal } from "@/lib/content/schema";
 import { CODING_LABEL } from "@/lib/paths";
-import { roadmapStopIds } from "@/lib/roadmap/view";
 
 /** Coding roles whose interviews include DSA and system design rounds. */
 const INTERVIEW_TRACKS = new Set(["ai-engineer", "genai-engineer", "forward-deployed-engineer", "agentic-ai-expert", "ml-engineer", "mlops-engineer"]);
@@ -52,9 +50,8 @@ export function RoadmapPage({ path }: { path: Goal }) {
         </p>
       </PageHero>
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
-        <TopicDrawerProvider details={topicDetails(roadmapStopIds(model))}>
-          <RoadmapView model={model} lessons={lessons} known={getPaths().map((p) => p.id)} />
-        </TopicDrawerProvider>
+        <RememberRoadmap pathId={path.id} />
+        <RoadmapView model={model} lessons={lessons} known={getPaths().map((p) => p.id)} />
         {INTERVIEW_TRACKS.has(path.id) && <InterviewTracks />}
       </div>
     </main>

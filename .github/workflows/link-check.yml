@@ -1,0 +1,53 @@
+# ED-5 (2026-11-18): the weekly link check. Every Monday at 03:00 India time (Sunday 21:30 UTC) it opens
+# every outside link in content/, commits data/link-status.json (the resource cards show its dates), and
+# opens or updates one issue listing broken links and the review queue; the issue closes itself when
+# nothing needs fixing. Also runs on demand from the Actions tab.
+name: Weekly link check
+
+on:
+  schedule:
+    - cron: "30 21 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: link-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run links:check
+
+      - name: Commit the results
+        run: |
+          git config user.name "xplaind-link-check"
+          git config user.email "link-check@users.noreply.github.com"
+          git add data/link-status.json
+          if git diff --cached --quiet; then echo "No change."; exit 0; fi
+          git commit -m "ED-5: weekly link check $(TZ=Asia/Kolkata date +%F)"
+          git push
+
+      - name: Open, update or close the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create link-check --color B60205 --description "Weekly link check (ED-5)" 2>/dev/null || true
+          open=$(gh issue list --label link-check --state open --json number --jq '.[0].number')
+          if [ -s link-report.md ]; then
+            if [ -n "$open" ]; then gh issue edit "$open" --body-file link-report.md
+            else gh issue create --title "Broken links to fix" --label link-check --body-file link-report.md; fi
+          elif [ -n "$open" ]; then
+            gh issue close "$open" --comment "The weekly link check found nothing broken. Closing."
+          fi
