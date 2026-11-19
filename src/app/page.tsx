@@ -10,7 +10,6 @@ import { Testimonials } from "@/components/home/testimonials";
 import { MiniInterview, MiniLesson, MiniNotes, MiniPlan, MiniResume, MiniRoadmap } from "@/components/home/showcase";
 import { FeatureDeck } from "@/components/home/feature-deck";
 import { LanguagesSection } from "@/components/home/languages";
-import { ContinueCard } from "@/components/continue-card";
 import { Words } from "@/components/motion/words";
 import { RoadScene } from "@/components/three/road-scene";
 import { JsonLd } from "@/components/json-ld";
@@ -183,10 +182,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* AC-6: a returning learner carries on from their last lesson. */}
-      <div className="mx-auto max-w-6xl px-4 empty:hidden md:px-6 [&>section]:my-8">
-        <ContinueCard titles={Object.fromEntries(stops.map((s) => [s.id, s.title]))} />
-      </div>
+      {/* AC-6: "Continue where you left off" lives on My progress (/dashboard), not here (HM-5, 2026-11-19). */}
 
       {/* The solution in three steps, before the detail. */}
       <section aria-labelledby="how-heading" className="py-12 md:py-24">
