@@ -28,7 +28,8 @@ export const RANKS = [
   { min: 6000, name: "Master" },
 ] as const;
 
-export type GameInputs = { stops: ProgressMap; ratings: Ratings; interviews: readonly InterviewSession[] };
+/** `visits` (ST-1) are days the learner opened the site; they count towards the streak and nothing else. */
+export type GameInputs = { stops: ProgressMap; ratings: Ratings; interviews: readonly InterviewSession[]; visits?: readonly string[] };
 
 export function xpOf({ stops, ratings, interviews }: GameInputs): number {
   let xp = 0;
@@ -53,12 +54,13 @@ export function rankOf(xp: number): { name: string; min: number; next: { name: s
   return { name: RANKS[i].name, min: RANKS[i].min, next, progress };
 }
 
-/** Every day (YYYY-MM-DD) the learner earned something. */
-export function activeDays({ stops, ratings, interviews }: GameInputs): Set<string> {
+/** Every day (YYYY-MM-DD) the learner earned something or came back to the site. */
+export function activeDays({ stops, ratings, interviews, visits = [] }: GameInputs): Set<string> {
   return new Set([
     ...Object.values(stops).map((s) => s.updatedOn),
     ...Object.values(ratings).map((r) => r.updatedOn),
     ...interviews.map((i) => i.on),
+    ...visits,
   ]);
 }
 
@@ -93,8 +95,8 @@ export function badgesOf(inputs: GameInputs, today: string): Badge[] {
     { id: "builder", name: "Builder", description: "Submit a project", earned: done.some((s) => s.how === "project") },
     { id: "spoke-up", name: "Spoke up", description: "Finish a mock interview", earned: inputs.interviews.length >= 1 },
     { id: "interview-ready", name: "Interview ready", description: "Rate 20 interview questions in practice", earned: rated >= 20 },
-    { id: "three-days", name: "Three in a row", description: "Learn three days in a row", earned: streak >= 3 },
-    { id: "week-streak", name: "Week streak", description: "Learn seven days in a row", earned: streak >= 7 },
+    { id: "three-days", name: "Three in a row", description: "Come back three days in a row", earned: streak >= 3 },
+    { id: "week-streak", name: "Week streak", description: "Come back seven days in a row", earned: streak >= 7 },
     { id: "xp-500", name: "500 XP", description: "Earn 500 XP", earned: xp >= 500 },
   ];
 }

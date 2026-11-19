@@ -12,6 +12,7 @@ import { parsePractice, rawPractice } from "./practice-store";
 import { parseProgress, rawProgress } from "./progress-store";
 import { parseInterviewDate, parsePlan, rawInterviewDate, rawPlan } from "./plan-store";
 import { serverSnapshot, subscribe } from "./storage";
+import { parseVisits, rawVisits } from "./visits";
 
 /** The saved test and its placement, or null when there is none (or before hydration). */
 export function useAttempt() {
@@ -51,14 +52,21 @@ export function useActivity() {
   return useMemo(() => parseActivity(raw), [raw]);
 }
 
+/** ST-1: the days this learner opened the site, from this device (and, once signed in, the server). */
+export function useVisits() {
+  const raw = useSyncExternalStore(subscribe, rawVisits, serverSnapshot);
+  return useMemo(() => parseVisits(raw), [raw]);
+}
+
 /** XP, rank, streak and badges from this device's activity. Zero before hydration. */
 export function useGame() {
   const progress = useProgress();
   const practice = usePractice();
   const activity = useActivity();
+  const visits = useVisits();
   const today = useToday();
   return useMemo(() => {
-    const inputs = { stops: progress.stops, ratings: practice.ratings, interviews: activity.interviews };
+    const inputs = { stops: progress.stops, ratings: practice.ratings, interviews: activity.interviews, visits };
     const xp = xpOf(inputs);
     return {
       xp,
@@ -66,7 +74,7 @@ export function useGame() {
       streak: today ? streakOf(activeDays(inputs), today) : 0,
       badges: today ? badgesOf(inputs, today) : [],
     };
-  }, [progress.stops, practice.ratings, activity.interviews, today]);
+  }, [progress.stops, practice.ratings, activity.interviews, visits, today]);
 }
 
 /** PP-1: the learner's interview date, kept on this device. */
