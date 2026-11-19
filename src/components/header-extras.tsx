@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { Icon } from "@/components/art/icons";
 import { SearchBox } from "@/components/search-box";
-import { useGame } from "@/lib/browser/hooks";
+import { useAccountState } from "@/components/account-link";
+import { useGame, useToday } from "@/lib/browser/hooks";
+import { markVisitSent, recordVisits, visitSentOn } from "@/lib/browser/visits";
 
 /** The search button and dialog. Ctrl K or Cmd K opens it from any page. */
 export function HeaderSearch() {
@@ -44,10 +46,36 @@ export function HeaderSearch() {
   );
 }
 
-/** The day streak, once the learner has one. Links to their progress page. XP was removed on 2026-11-06. */
+/**
+ * ST-1: records that the learner opened the site today. The day is kept on this device for everyone; a
+ * signed-in learner also tells the server once a day and takes back every day on record, so the streak
+ * is the same on a phone and a laptop. Opening the site counts, whether or not a lesson was finished.
+ */
+function useVisitTracker(state: ReturnType<typeof useAccountState>) {
+  const today = useToday();
+  useEffect(() => {
+    if (!today || state === "unknown") return;
+    recordVisits([today]);
+    if (state !== "in" || visitSentOn() === today) return;
+    void fetch("/api/visit", { method: "POST" })
+      .then((r) => (r.ok ? (r.json() as Promise<{ days?: string[] }>) : null))
+      .then((d) => {
+        if (!d) return;
+        recordVisits(d.days ?? []);
+        markVisitSent(today);
+      })
+      .catch(() => {
+        // Offline: this device keeps its own days, and the next visit tries again.
+      });
+  }, [state, today]);
+}
+
+/** The day streak. A signed-in learner sees it from the first day; a visitor once it is two days or more. Links to their progress page. */
 export function XpChip() {
   const game = useGame();
-  if (game.streak === 0) return null;
+  const state = useAccountState();
+  useVisitTracker(state);
+  if (game.streak === 0 || (state !== "in" && game.streak < 2)) return null;
   return (
     <Link
       href="/dashboard"
