@@ -252,6 +252,8 @@ export const StopTranslation = z.strictObject({
   flashcards: z.array(Flashcard).max(10).default([]),
   exercise: Exercise.optional(),
   ask: z.array(Text.max(120)).max(6).default([]),
+  /** LS-4: "How to explain this in an interview", in this language, so the learner understands it; the page also shows the English to say. */
+  explain_in_interview: InterviewExplain.optional(),
   /** Who translated it and when; a native speaker's review is recorded in reviewed_by. */
   translated_on: IsoDate,
   reviewed_by: Text.optional(),
