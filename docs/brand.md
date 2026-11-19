@@ -12,7 +12,7 @@ One page that every new screen follows, so the site looks like one product. The 
 
 - The wordmark is `public/brand/xplaind-wordmark.png` (with `-dark` for dark pages); the version with the tagline "AI, explained simply." is `xplaind-logo.png`.
 - "XPL" and "ND" are ink (#111111 on light, #FAFAFA on dark). "AI" is brand teal: #0E4A50 on light, sea glass #7FD1C7 on dark.
-- Square (1:1) versions for profile pictures, app stores and sign-in screens: `xplaind-logo-square.png` (1024 px, white), `-dark` (1024 px, near-black), `-transparent`, and `xplaind-icon-512.png`, the X mark with its teal bar (also the favicon). The dark square sits on deep teal ink (#0A2E33).
+- Square (1:1) versions for profile pictures, app stores and sign-in screens: `xplaind-logo-square.png` (1024 px, white), `-dark` (1024 px, near-black), `-transparent`, and `xplaind-icon-512.png`, the X mark with its teal bar on a dark tile. The browser-tab favicon is separate (FA-1): `src/app/icon.svg`, the bare mark with no tile, which changes colour for light and dark tabs. The dark square sits on deep teal ink (#0A2E33).
 - Keep clear space of at least the height of the "X" around it. Never recolour, stretch, outline or put it on a busy picture.
 
 ## Colour

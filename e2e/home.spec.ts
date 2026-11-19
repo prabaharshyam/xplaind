@@ -112,9 +112,14 @@ test("the logo, favicon and footer community invite are in place", async ({ page
   const footer = page.getByRole("contentinfo");
   // CM-2: the invite goes straight to the WhatsApp group.
   await expect(footer.getByRole("link", { name: /Join the community/ })).toHaveAttribute("href", /^https:\/\/chat\.whatsapp\.com\//);
-  for (const p of ["/favicon.ico", "/icon.png", "/apple-icon.png", "/brand/xplaind-logo.png", "/brand/xplaind-logo-dark.png"]) {
+  for (const p of ["/favicon.ico", "/icon.svg", "/apple-icon.png", "/brand/xplaind-logo.png", "/brand/xplaind-logo-dark.png"]) {
     expect((await request.get(p)).status(), p).toBe(200);
   }
+  // FA-1: the favicon is the bare mark, with no background tile, and switches colour with the browser theme.
+  const svg = await (await request.get("/icon.svg")).text();
+  expect(svg).not.toMatch(/<rect[^>]*(width|height)="(100%|512|340)"/);
+  expect(svg).toContain("prefers-color-scheme:dark");
+  expect((svg.match(/<path /g) ?? []).length).toBe(3); // the three blades of the X
   // Old /community links land on the group too.
   const old = await request.get("/community", { maxRedirects: 0 });
   expect(old.status()).toBe(307);
