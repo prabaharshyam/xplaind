@@ -34,8 +34,8 @@ test("a roadmap topic opens its lesson straight away, and the way back lands whe
   await page.getByRole("group", { name: "Your status for Build a RAG app" }).getByRole("button", { name: "Done", exact: true }).click();
   await expect(page.getByRole("link", { name: /^Build a RAG app, Done/ }).first()).toBeVisible();
   await expect(page).toHaveURL(/\/roadmap\/forward-deployed-engineer$/);
-  // XP was removed (2026-11-06); the header shows the day streak instead.
-  await expect(page.getByRole("banner").getByRole("link", { name: /-day streak/ })).toBeVisible();
+  // XP was removed (2026-11-06). ST-1: a visitor sees the day streak only from their second day, so not yet here.
+  await expect(page.getByRole("banner").getByRole("link", { name: /-day streak/ })).toHaveCount(0);
   await expect(page.getByRole("banner").getByText(/\d+ XP/)).toHaveCount(0);
 });
 
