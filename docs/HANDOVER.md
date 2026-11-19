@@ -348,6 +348,7 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 
 ---
 - **The loading screen's click listener runs in the capture phase**, before any handler on the link, so `e.preventDefault()` in a link's onClick does not stop it. To keep a link from showing the full-screen X, give it `data-no-splash` (RM-16, 18 Nov).
+- **Light glass buttons vanish on dark panels.** `secondaryButton*` has dark text in light mode; on a surface that is always dark (the code runner, the interview call screen) use `secondaryButtonSmDark` or `xp-glass-btn-dark` (GL-3, 19 Nov).
 
 ## 12. What is pending
 
@@ -439,7 +440,8 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **18 Nov (interview questions):** Zarina answers "which role is this for?", "how many questions are left?" and the like from the facts she is given, then asks the question again (VI-16).
 - **18 Nov (site review fixes):** translated lessons in the sitemap with valid language codes, glossary search, practice cards first, "an AI", level names in words, a compact role list on phones, calmer library cards, AI Studio and pricing clean-ups (SE-9 to SE-16). Still open from the review: the top bar at 768 to 1100 px, Zarina on the home page, the home page weight, share images, the weekly link check.
 - **18 Nov (site review, part 2):** the top bar fits every width (phone menu below 1120 px), Zarina opens the home page, the 3D road never loads on phones, and every page has a share picture (NV-9, VI-17, PF-1, SE-17).
-- **19 Nov (explain it in an interview):** every lesson ends with a spoken 30-to-45-second interview answer and the likely follow-up (LS-4). Front-matter field `explain_in_interview`, required on deep lessons.
+- **19 Nov (code runner buttons):** Reset and Open in playground were invisible on the dark code window; fixed with the dark glass button (GL-3).
+- **19 Nov (explain it in an interview):** every lesson ends with a spoken 30-to-45-second interview answer and the likely follow-up (LS-4). Front-matter field `explain_in_interview`, required on deep lessons. Translated into Tamil, Hindi, Tanglish and Hinglish, with the English in a fold.
 - **19 Nov (home page):** "Continue where you left off" is only on My progress now, not the home page (HM-5).
 - **18 Nov (quiet place):** the AI interview asks for a quiet place, on the start screen and in Zarina's first line (VI-18).
 - **18 Nov (roadmap topics open lessons):** no side panel; the lesson follows the roadmap it was opened from, with next topic and back to the same place on the map (RM-16).
