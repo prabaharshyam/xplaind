@@ -58,6 +58,10 @@ test("topic pages list lessons as cards", async ({ page }) => {
 test("a lesson shows its parts and a reading guide, and no XP", async ({ page }) => {
   await page.goto("/stop/what-is-ai");
   await expect(page.getByText("Part 1 of 5")).toBeVisible();
+  // LS-4: every lesson ends with how to explain it in an interview, and the follow-up to expect.
+  const explain = page.getByRole("region", { name: "How to explain this in an interview" });
+  await expect(explain).toBeVisible();
+  await expect(explain.getByText(/^Likely follow-up:/)).toBeVisible();
   await expect(page.getByText(/\bXP\b/)).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: /Lessons on the/ }).getByText("Next topic on this roadmap →")).toBeVisible();
   expect(await overflow(page)).toBe(false);

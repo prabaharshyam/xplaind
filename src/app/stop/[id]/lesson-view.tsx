@@ -146,6 +146,7 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
   const navSections: SectionLink[] = [
     { id: "why", title: L.why, icon: "star" },
     ...sections.map((sec, i) => ({ id: slug(sectionKey(i, sec.title)), title: sec.title, icon: SECTION_ICON[sectionKey(i, sec.title)] ?? ("book" as const) })),
+    ...(english.explain_in_interview ? [{ id: "explain", title: "Explain it in an interview", icon: "mic" as const }] : []),
     ...(stop.exercise ? [{ id: "try-it", title: stop.exercise.title, icon: "bolt" as const }] : []),
     ...(stop.flashcards.length ? [{ id: "flashcards", title: L.cards, icon: "check" as const }] : []),
     ...(courses.length ? [{ id: "courses", title: "Best course", icon: "book" as const }] : []),
@@ -279,6 +280,34 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
             <div className="mt-6 xl:hidden">
               <LearnPanel stopId={stop.id} items={learn} headingId="learn-top" />
             </div>
+          )}
+
+          {/* LS-4: interviewers say "explain X", so every lesson ends with how to say it out loud. Interviews are
+              in English, so this stays in English on translated pages too. */}
+          {english.explain_in_interview && (
+            <section id="explain" aria-labelledby="explain-h" className={`mt-6 scroll-mt-24 ${CARD}`}>
+              <h2 id="explain-h" className="flex items-center gap-3 text-xl font-semibold">
+                <span className="grid size-9 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                  <Icon name="mic" size={18} />
+                </span>
+                How to explain this in an interview
+              </h2>
+              <p className={`mt-2 text-sm ${muted}`}>
+                Asked to &ldquo;explain {english.title.replace(/[.?]$/, "")}&rdquo;, say it in about 30 to 45 seconds{lang === "en" ? "" : ". Interviews are in English, so this part is in English"}:
+              </p>
+              <blockquote className="mt-3 border-l-4 border-brand-600 pl-4 text-lg leading-8 text-zinc-900 dark:text-zinc-100" lang="en">
+                {english.explain_in_interview.answer}
+              </blockquote>
+              <div className="mt-5 rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-950" lang="en">
+                <p className="text-sm font-semibold">Likely follow-up: {english.explain_in_interview.follow_up}</p>
+                <p className="mt-1 leading-7">{english.explain_in_interview.follow_up_answer}</p>
+              </div>
+              <p className="mt-4 text-sm">
+                <Link href="/interview/simulator" className={textLink}>
+                  Practise saying it out loud with Zarina, our AI interviewer
+                </Link>
+              </p>
+            </section>
           )}
 
           {stop.exercise && (
