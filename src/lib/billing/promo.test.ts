@@ -43,5 +43,7 @@ describe("checkPromo (PAY-9)", () => {
     expect(await checkPromo(admin({ ...row, expires_at: "2026-01-01T00:00:00Z" }), "xp50off", "pass_month", U, new Date("2026-11-13"))).toMatchObject({ ok: false, reason: /expired/ });
     expect(await checkPromo(admin(row, true), "xp50off", "pass_month", U)).toMatchObject({ ok: false, reason: /already used/ });
     expect(await checkPromo(admin(row), "xp50off", "pass_year", U)).toMatchObject({ ok: false, reason: /30-day pass/ });
+    // A code for another pass names that pass, not the 30-day one.
+    expect(await checkPromo(admin({ ...row, plan_ids: ["pass_6month"] }), "xp50off", "pass_month", U)).toMatchObject({ ok: false, reason: "That promo code works only on the Placement pass, 6 months." });
   });
 });
