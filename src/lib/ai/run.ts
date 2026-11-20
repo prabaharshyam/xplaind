@@ -21,6 +21,7 @@ import {
   tokenUses,
 } from "./limits";
 import { aiSettings } from "./settings";
+import { proAllowanceUsed } from "./allowance";
 import { type Caller, aiCaller, allowanceToday, limitFor, onTrial } from "./who";
 import { bump } from "@/lib/funnel";
 import type { Tier } from "@/lib/billing/plans";
@@ -66,6 +67,9 @@ export async function runAi<S extends z.ZodType>(
   // While sign-ups are on hold (SU-4) nobody can sign in, so guests keep their per-feature limits (SU-5).
   if (who.guest && accountsEnabled())
     return json({ error: LIMIT_MESSAGE.signin, signin: true }, 401);
+  // PAY-13: a learner with a pass may spend up to their pass's AI allowance over any 30 days.
+  if (who.tier === "pro" && (await proAllowanceUsed(admin, who.id, day)))
+    return problem(429, LIMIT_MESSAGE.allowance);
   const { data: verdict, error } = await admin.rpc(
     who.guest ? "ai_reserve_guest" : "ai_reserve",
     {
@@ -147,7 +151,9 @@ export async function runAi<S extends z.ZodType>(
   }
 
   const uses = tokenUses(response.usage, model);
-  await admin.rpc(who.guest ? "ai_record_guest" : "ai_record", {
+  // CO-1: supabase-js returns errors instead of throwing, so a failed record must be logged here, or spend
+  // goes uncounted and the monthly cap never triggers (it did, silently, until 20 Nov 2026).
+  const { error: recordError } = await admin.rpc(who.guest ? "ai_record_guest" : "ai_record", {
     ...(who.guest ? { p_visitor: who.id } : { p_user: who.id }),
     p_kind: req.kind,
     p_day: day,
@@ -155,6 +161,7 @@ export async function runAi<S extends z.ZodType>(
     p_tokens_out: uses.reduce((n, u) => n + u.output, 0),
     p_cost_usd: costUsd(uses),
   });
+  if (recordError) console.error(`ai_record failed for ${req.kind}: ${recordError.message}`);
 
   if (response.stop_reason === "refusal")
     return problem(

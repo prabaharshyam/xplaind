@@ -33,6 +33,9 @@ vi.mock("@/lib/supabase/server", () => ({
   currentUser: async () => user,
 }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+/** PAY-13: whether the Pro learner's 30-day AI allowance is used up. */
+let allowanceUsed = false;
+vi.mock("./allowance", () => ({ proAllowanceUsed: async () => allowanceUsed }));
 
 vi.mock("@anthropic-ai/sdk", () => {
   class APIError extends Error {}
@@ -75,6 +78,25 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("runAi (CO-1, SC-5, PV-2)", () => {
+  it("stops a Pro learner whose 30-day AI allowance is used up, before any money is spent (PAY-13)", async () => {
+    allowanceUsed = true;
+    const res = (await runAi({ ...req, caller: { guest: false, id: "u1", tier: "pro" } })) as Response;
+    allowanceUsed = false;
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toMatch(/AI allowance for the last 30 days/);
+    expect(create).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("logs a failed cost record instead of losing it silently (CO-1, 20 Nov 2026)", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    rpc.mockResolvedValueOnce({ data: "ok", error: null }).mockResolvedValueOnce({ data: null, error: { message: "function not found" } });
+    create.mockResolvedValue(reply('{"answer":"42"}'));
+    expect(await runAi(req)).toEqual({ data: { answer: "42" }, tier: "free" });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("ai_record failed for tutor: function not found"));
+    log.mockRestore();
+  });
+
   it("returns checked output and records tokens and cost", async () => {
     rpc.mockResolvedValueOnce({ data: "ok", error: null }).mockResolvedValueOnce({ data: null, error: null });
     create.mockResolvedValue(reply('{"answer":"42"}'));
