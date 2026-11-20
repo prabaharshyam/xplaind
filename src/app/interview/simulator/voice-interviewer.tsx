@@ -297,8 +297,6 @@ export function VoiceInterviewer({
           count={questions.length}
           speechIn={speechIn}
           micDenied={micDenied}
-          typing={typing}
-          onTyping={setTyping}
           onStart={() => void begin()}
           onBack={onExit}
         />
@@ -380,16 +378,12 @@ function Consent({
   count,
   speechIn,
   micDenied,
-  typing,
-  onTyping,
   onStart,
   onBack,
 }: {
   count: number;
   speechIn: boolean;
   micDenied: boolean;
-  typing: boolean;
-  onTyping: (v: boolean) => void;
   onStart: () => void;
   onBack: () => void;
 }) {
@@ -434,7 +428,7 @@ function Consent({
         </p>
         <p className={`mt-2 text-sm ${muted}`}>
           If Sarvam is not available, your browser&apos;s own speech-to-text is used, which in Chrome and Edge sends audio
-          to Google or Microsoft. Prefer not to send your voice anywhere? Type your answers instead.
+          to Google or Microsoft. Prefer not to send your voice anywhere? Tap Type on the call screen before you answer, and write your answers instead.
         </p>
       </div>
       {micDenied && (
@@ -443,12 +437,8 @@ function Consent({
         </p>
       )}
       {!speechIn && !micDenied && <p className={`text-sm ${muted}`}>This browser has no speech-to-text, so you will type your answers. Chrome, Edge or Safari can listen.</p>}
-      {speechIn && !micDenied && (
-        <label className="flex min-h-11 items-center gap-3">
-          <input type="checkbox" checked={typing} onChange={(e) => onTyping(e.target.checked)} className="size-5 accent-brand-700" />
-          I will type my answers instead of speaking
-        </label>
-      )}
+      {/* VI-19 (2026-11-20, owner: the "I will type" checkbox looked like a consent box people ticked every time).
+          Typing is chosen on the call screen instead, with its Type button. */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <button type="button" onClick={onStart} className={primaryButton}>
           I agree, start the interview
