@@ -118,7 +118,7 @@ export default function Home() {
         <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-14 md:px-6 md:py-14">
           {/* VI-17 (2026-11-18, site review: the home page never mentioned the AI interviewer): the feature
               people pay for, on the first screen of every device. */}
-          {/* HM-5 (2026-11-19, owner: the pill looked like a typical AI badge and "Try" sat alone on one line): a plain
+          {/* HM-6 (2026-11-19, owner: the pill looked like a typical AI badge and "Try" sat alone on one line): a plain
               editorial note in the page's own mono-and-hairline style, with the call to action on its own line. */}
           <Link data-hero-fade href="/interview/simulator" prefetch={false} className="group block max-w-md rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-700">
             <span className="flex items-center gap-3 font-mono text-xs tracking-widest text-brand-800 uppercase dark:text-brand-300">

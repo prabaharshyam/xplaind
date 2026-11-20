@@ -100,7 +100,7 @@ test("the visit endpoint needs a signed-in learner (ST-1)", async ({ request }) 
   expect([401, 503]).toContain(res.status());
 });
 
-test("the Zarina note is three plain lines on a phone, with 'Try it now' on its own (HM-5)", async ({ page }) => {
+test("the Zarina note is three plain lines on a phone, with 'Try it now' on its own (HM-6)", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto("/");
   const link = page.locator(".home-hero").getByRole("link", { name: /Zarina, an AI interviewer that talks back/ });
