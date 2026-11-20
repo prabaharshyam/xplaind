@@ -72,7 +72,7 @@ test.describe("roadmap (RM-1)", () => {
     await page.goto("/roadmap/genai-engineer/p2");
     await expect(page.getByRole("link", { name: /Deploy and monitor an LLM app/ })).toBeVisible();
     await page.goto("/roadmap/genai-engineer/x9");
-    await expect(page.getByText("This page could not be found")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "This page isn't here" })).toBeVisible();
   });
 });
 
