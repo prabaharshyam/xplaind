@@ -101,6 +101,8 @@ export const LIMIT_MESSAGE = {
   /** PAY-4: the same, when a Pro pass would give more today. */
   dayUpgrade: "That was today's last turn for this tool. It resets at midnight India time, or Pro gives you more today.",
   month: "This month's AI allowance is used up. It resets on the 1st. Everything else on Xplaind still works.",
+  /** PAY-13: a Pro learner has used their pass's fair-use AI allowance for the last 30 days. */
+  allowance: "You have used your pass's AI allowance for the last 30 days. It frees up day by day. Lessons, roadmaps and practice still work as usual.",
   off: "AI features are switched off for now. Everything else on Xplaind still works.",
   /** AG-1: AI needs an account once sign-ups are open. */
   signin: "The AI tools are part of Pro. Create a free account to try each one a few times.",

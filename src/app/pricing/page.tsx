@@ -190,7 +190,7 @@ export default function PricingPage() {
               // SE-16: the AI interviewer leads, as the thing people buy Pro for.
               n: "AI interviewer",
               t: "Rehearse out loud with Zarina",
-              d: "About four spoken interviews a day for your role or a job post. She follows up on what you actually say and ends with a hiring verdict, skill scores and a 4-week plan. Each one adds to your readiness score out of 100.",
+              d: "Spoken interviews for your role or a job post, up to four a day. She follows up on what you actually say and ends with a hiring verdict, skill scores and a 4-week plan. Each one adds to your readiness score out of 100.",
             },
             {
               n: "Pass or fix",
@@ -304,6 +304,11 @@ export default function PricingPage() {
             </tbody>
           </table>
         </div>
+        {/* PAY-13 (2026-11-20): the fair-use allowance that keeps every pass profitable, stated where the limits are. */}
+        <p className="mt-4 max-w-3xl text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+          Pro also has a fair-use AI allowance, sized to the pass you bought, over any 30 days. If you reach it,
+          the AI helpers pause and free up again day by day. Lessons, roadmaps, videos and practice are never limited.
+        </p>
       </section>
 
       {/* CB-1: batches for colleges, institutes and companies. */}
@@ -382,8 +387,8 @@ export default function PricingPage() {
         </h2>
         <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
           Xplaind sells one thing: <strong className="font-semibold">Pro passes</strong>, a one-time payment for 7 days, 30 days, 6 months or 12 months
-          of higher limits on the AI helpers (AI tutor, interview feedback, mock interview reports, project review, resume review and study from your notes)
-          and verified certificates.
+          of higher limits on the AI helpers (AI tutor, interview feedback, mock interview reports, project review, resume review and study from your notes),
+          within a fair-use AI allowance sized to the pass, and verified certificates.
           Lessons, roadmaps, videos, practice and project guides need no pass. All prices are in Indian rupees and include GST. A pass is a
           digital service that starts on your account as soon as the payment is confirmed; nothing is shipped, and nothing renews by itself.
           Sold by {BUSINESS.legalName} (GSTIN {BUSINESS.gstin}). Questions:{" "}
