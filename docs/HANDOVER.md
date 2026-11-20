@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-20, after PR 143 (HM-6 Zarina note on the home page; before it 2026-11-19: the owner signed off every resource, so no card says "Not yet verified"; before it LS-4 and GL-3, PR 140)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-20 (launch check before the Product Hunt launch on 21 Nov: LR-1 sign-in redirects, LR-2 branded 404 page; Product Hunt launch scheduled with code PRODUCTHUNT, PR 145)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
@@ -445,6 +445,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **19 Nov (resources signed off):** the owner reviewed everything; all 904 resources are verified by him (ED-4). The 4 certifications and 15 channels too: nothing in content/ is UNVERIFIED or UNREVIEWED.
 - **19 Nov (code runner buttons):** Reset and Open in playground were invisible on the dark code window; fixed with the dark glass button (GL-3).
 - **19 Nov (explain it in an interview):** every lesson ends with a spoken 30-to-45-second interview answer and the likely follow-up (LS-4). Front-matter field `explain_in_interview`, required on deep lessons. Translated into Tamil, Hindi, Tanglish and Hinglish, with the English in a fold.
+- **20 Nov (launch check):** the site was checked end to end for the Product Hunt launch on 21 Nov (1:30 pm IST); /signup and /login now reach the sign-in page and missing pages show a branded 404 (LR-1, LR-2). Product Hunt launch scheduled, with the PRODUCTHUNT code (25% off the 6-month pass until 30 Nov).
 - **19 Nov (home page):** "Continue where you left off" is only on My progress now, not the home page (HM-5).
 - **18 Nov (quiet place):** the AI interview asks for a quiet place, on the start screen and in Zarina's first line (VI-18).
 - **18 Nov (roadmap topics open lessons):** no side panel; the lesson follows the roadmap it was opened from, with next topic and back to the same place on the map (RM-16).
