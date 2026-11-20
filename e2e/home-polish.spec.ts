@@ -99,3 +99,16 @@ test("the visit endpoint needs a signed-in learner (ST-1)", async ({ request }) 
   const res = await request.post("/api/visit");
   expect([401, 503]).toContain(res.status());
 });
+
+test("the Zarina note is three plain lines on a phone, with 'Try it now' on its own (HM-6)", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto("/");
+  const link = page.locator(".home-hero").getByRole("link", { name: /Zarina, an AI interviewer that talks back/ });
+  await expect(link).toBeVisible();
+  const lines = await link.evaluate((a) => [...a.children].map((c) => Math.round(c.getBoundingClientRect().height / parseFloat(getComputedStyle(c).lineHeight))));
+  expect(lines).toEqual([1, 1, 1]); // New, the sentence, and the call to action: one line each, nothing wrapped
+  const tryIt = await link.getByText("Try it now").boundingBox();
+  const sentence = await link.getByText("Zarina, an AI interviewer that talks back.").boundingBox();
+  expect(tryIt!.y).toBeGreaterThan(sentence!.y + sentence!.height - 2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
