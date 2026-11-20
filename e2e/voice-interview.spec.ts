@@ -168,6 +168,8 @@ test("a call that runs itself (browser speech-to-text): the interviewer speaks, 
   await expect(page.getByRole("heading", { level: 2, name: "Before you start" })).toBeVisible();
   // VI-18: a quiet place, said before the start.
   await expect(page.getByRole("note", { name: "For the best results, sit somewhere quiet" })).toBeVisible();
+  // VI-19: no "I will type" checkbox that reads like a consent box; typing is chosen on the call screen.
+  await expect(page.getByRole("region", { name: "Before you start" }).getByRole("checkbox")).toHaveCount(0);
   await expect(page.getByText(/Only the text \(the transcript\) goes to our AI/)).toBeVisible();
   await expect(page.getByText(/Xplaind\s+does not keep the recordings/)).toBeVisible();
   expect(starts).toEqual([]);
