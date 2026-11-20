@@ -118,17 +118,19 @@ export default function Home() {
         <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-14 md:px-6 md:py-14">
           {/* VI-17 (2026-11-18, site review: the home page never mentioned the AI interviewer): the feature
               people pay for, on the first screen of every device. */}
-          <Link
-            data-hero-fade
-            href="/interview/simulator"
-            prefetch={false}
-            className="xp-glass-btn group inline-flex max-w-full items-center gap-2 rounded-full py-1.5 pr-3 pl-1.5 text-sm text-zinc-800 dark:text-zinc-100"
-          >
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-700 text-white dark:bg-brand-300 dark:text-brand-950">
-              <Icon name="mic" size={14} />
+          {/* HM-5 (2026-11-19, owner: the pill looked like a typical AI badge and "Try" sat alone on one line): a plain
+              editorial note in the page's own mono-and-hairline style, with the call to action on its own line. */}
+          <Link data-hero-fade href="/interview/simulator" prefetch={false} className="group block max-w-md rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-700">
+            <span className="flex items-center gap-3 font-mono text-xs tracking-widest text-brand-800 uppercase dark:text-brand-300">
+              New
+              <span aria-hidden="true" className="h-px w-16 bg-zinc-300 dark:bg-zinc-700" />
             </span>
-            <span className="min-w-0">
-              <span className="font-semibold">New:</span> Zarina, an AI interviewer that talks back. <span className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">Try it now</span>
+            <span className="mt-2 block text-base leading-6 text-zinc-800 dark:text-zinc-200">Zarina, an AI interviewer that talks back.</span>
+            <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-brand-800 underline underline-offset-4 dark:text-brand-300">
+              Try it now
+              <span aria-hidden="true" className="transition-transform duration-150 group-hover:translate-x-0.5">
+                →
+              </span>
             </span>
           </Link>
           <h1 id="hero-heading" className="mt-6 max-w-5xl text-[2.6rem] leading-[1.05] font-semibold tracking-tight sm:text-6xl lg:text-[4.25rem]">
