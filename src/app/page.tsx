@@ -22,14 +22,14 @@ import { primaryButtonLg, secondaryButtonLg } from "@/components/ui";
 
 export const metadata: Metadata = {
   // SE-8: the brand first, then what people search for ("learn AI free", "AI course", "AI engineer roadmap").
-  title: { absolute: "Xplaind: Learn AI for the Job You Want | AI Roadmaps, India" },
+  title: { absolute: "Xplaind: Learn AI for the Job You Want | AI Career Roadmaps" },
   description:
-    "Xplaind is an AI learning platform for India: step-by-step roadmaps to 10 AI jobs, 200+ plain-English lessons, portfolio projects and AI interview prep.",
+    "Xplaind is an AI learning platform built in India, for learners everywhere: step-by-step roadmaps to 10 AI jobs, 200+ plain-English lessons, portfolio projects and AI interview prep.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Xplaind: learn AI step by step, for the AI job you want",
     description:
-      "AI career roadmaps, plain-English lessons, hand-picked courses, guided projects and mock interviews, so you get job-ready in the right order. Built for India.",
+      "AI career roadmaps, plain-English lessons, hand-picked courses, guided projects and mock interviews, so you get job-ready in the right order. Built in India, for the world.",
     url: "/",
   },
 };
@@ -45,7 +45,7 @@ const STEPS: { title: string; text: string }[] = [
 const FAQ = [
   {
     q: "What is Xplaind?",
-    a: "Xplaind (xplaind.in) is an AI learning platform for India. It gives you a step-by-step roadmap for the AI job you want, from AI engineer and generative AI engineer to AI product manager, a short plain-English lesson for every topic on it, the best course or video for each topic, guided projects for your portfolio and AI interview questions with answers. It is not related to xplaind.com, a different website about accounting and finance.",
+    a: "Xplaind (xplaind.in) is an AI learning platform built in India, for learners everywhere. It gives you a step-by-step roadmap for the AI job you want, from AI engineer and generative AI engineer to AI product manager, a short plain-English lesson for every topic on it, the best course or video for each topic, guided projects for your portfolio and AI interview questions with answers. It is not related to xplaind.com, a different website about accounting and finance.",
   },
   {
     q: "What will I be able to do at the end?",
@@ -151,7 +151,7 @@ export default function Home() {
             </Link>
           </div>
           <ul data-hero-fade className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-700 dark:text-zinc-300" aria-label="Why it is easy to start">
-            {["Built for India's AI roles", "Lessons in Tamil and Hindi", "AI mock interviewer", "Independent, no paid rankings"].map((t) => (
+            {["Built in India, for the world", "Lessons in Tamil and Hindi", "AI mock interviewer", "Independent, no paid rankings"].map((t) => (
               <li key={t} className="flex items-center gap-2">
                 <Icon name="tick" size={16} className="text-zinc-500 dark:text-zinc-400" /> {t}
               </li>

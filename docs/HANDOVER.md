@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-21 (interview headline is now "AI mock interviews that score you like a hiring panel", VI-20; before it the pricing table, PR 149)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-21 (brand lines say "Built in India, for the world", BR-11; before it the interview headline, VI-20, PR 150)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 
@@ -446,6 +446,7 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **19 Nov (resources signed off):** the owner reviewed everything; all 904 resources are verified by him (ED-4). The 4 certifications and 15 channels too: nothing in content/ is UNVERIFIED or UNREVIEWED.
 - **19 Nov (code runner buttons):** Reset and Open in playground were invisible on the dark code window; fixed with the dark glass button (GL-3).
 - **19 Nov (explain it in an interview):** every lesson ends with a spoken 30-to-45-second interview answer and the likely follow-up (LS-4). Front-matter field `explain_in_interview`, required on deep lessons. Translated into Tamil, Hindi, Tanglish and Hinglish, with the English in a fold.
+- **21 Nov (built in India, for the world):** the site and the Product Hunt launch no longer say Xplaind is only for India; brand lines say "Built in India, for the world" (BR-11). India-specific facts stay.
 - **21 Nov (interview headline):** the AI interview page says "AI mock interviews that score you like a hiring panel" and the home pill "AI mock interviews that score you." (VI-20; owner: "talks back" said nothing, every interviewer talks). The Product Hunt tagline matches: "Free AI career roadmaps + AI mock interviews that score you". Keep "Zarina" off external marketing.
 - **20 Nov (interview start screen):** the confusing "I will type my answers" checkbox is gone; typing is the Type button on the call screen (VI-19).
 - **20 Nov (AI costs):** AI call costs were never being recorded (a database function changed outside the repo); fixed, so the monthly AI cap works again; the owner set AI_MONTHLY_CAP_USD to $50 in Vercel (production) for the launch. Pro now has a fair-use AI allowance sized to the pass, so no learner costs more than they paid (PAY-13).
