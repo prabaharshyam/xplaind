@@ -262,9 +262,15 @@ export default function PricingPage() {
         <h2 id="compare-h" className="text-3xl font-semibold tracking-tight md:text-4xl">
           Free account or Pro
         </h2>
+        {/* PAY-13 (2026-11-21, owner): the fair-use allowance comes first, so the daily numbers below never read as a promise it can break. */}
+        <p className="mt-3 max-w-3xl leading-7 text-zinc-700 dark:text-zinc-300">
+          Pro&apos;s AI helpers run within a fair-use AI allowance, sized to the pass you bought, over any 30 days. The numbers
+          below are the most you can use in a day. If you reach your allowance first, the AI helpers pause and free up again day by
+          day. Lessons, roadmaps, videos and practice are never limited.
+        </p>
         <div role="region" aria-label="Free account and Pro compared" tabIndex={0} className="mt-8 overflow-x-auto rounded-3xl bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-zinc-900">
           <table className="w-full min-w-[30rem] text-left">
-            <caption className="sr-only">AI helper uses: free trial in total, Pro per day</caption>
+            <caption className="sr-only">AI helper uses: free trial in total, and Pro&apos;s most per day within its fair-use allowance</caption>
             <thead>
               <tr className="text-sm">
                 <th scope="col" className="p-4 font-semibold md:px-6">
@@ -274,7 +280,7 @@ export default function PricingPage() {
                   Free account
                 </th>
                 <th scope="col" className="p-4 font-semibold text-brand-800 md:px-6 dark:text-brand-300">
-                  Pro
+                  Pro, within your fair-use allowance
                 </th>
               </tr>
             </thead>
@@ -298,17 +304,12 @@ export default function PricingPage() {
                         ? "Pro only"
                         : `${TIER_LIMITS.free[k]} ${TIER_LIMITS.free[k] === 1 ? "try" : "tries"} in total`}
                   </td>
-                  <td className="p-4 font-semibold md:px-6">{TIER_LIMITS.pro[k]} every day</td>
+                  <td className="p-4 font-semibold md:px-6">Up to {TIER_LIMITS.pro[k]} a day</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {/* PAY-13 (2026-11-20): the fair-use allowance that keeps every pass profitable, stated where the limits are. */}
-        <p className="mt-4 max-w-3xl text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-          Pro also has a fair-use AI allowance, sized to the pass you bought, over any 30 days. If you reach it,
-          the AI helpers pause and free up again day by day. Lessons, roadmaps, videos and practice are never limited.
-        </p>
       </section>
 
       {/* CB-1: batches for colleges, institutes and companies. */}
