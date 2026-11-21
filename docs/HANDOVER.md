@@ -1,6 +1,6 @@
 # Xplaind handover
 
-Written 2026-11-08, after PR 43. **Last updated 2026-11-20 (later: VI-19, no typing checkbox on the AI interview start screen; before it CO-1 and PAY-13, PR 147)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
+Written 2026-11-08, after PR 43. **Last updated 2026-11-21 (pricing table states the fair-use allowance first and shows Pro as "Up to N a day"; before it VI-19, PR 148)** (the build moved to a second Claude account on 16 Nov, started from this file and the PR list). Its job: let a new Claude account, attached to this repository with no memory of earlier chats, understand the product, the owner, the code, the rules and the unfinished work, and carry on building.
 
 **Keep this file current.** At the end of every slice, update the "Last updated" line above, section 8 (what is built), section 12 (what is pending), section 13 (timeline) and, when you learn something the hard way, section 11. The owner asked for this on 16 Nov, and `CLAUDE.md` says so too.
 

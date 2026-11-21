@@ -20,8 +20,8 @@ test("the pricing page leads with value, shows honest savings, a free-vs-Pro tab
   await expect(page.getByText("₹5.5 a day")).toBeVisible();
   await expect(page.getByText("Recommended")).toBeVisible();
   // PAY-7: a free account gets a one-time trial of each AI helper; Pro is per day.
-  const table = page.getByRole("table", { name: "AI helper uses: free trial in total, Pro per day" });
-  await expect(table.getByRole("row", { name: /AI tutor questions 3 tries in total 50 every day/ })).toBeVisible();
+  const table = page.getByRole("table", { name: "AI helper uses: free trial in total, and Pro's most per day within its fair-use allowance" });
+  await expect(table.getByRole("row", { name: /AI tutor questions 3 tries in total Up to 50 a day/ })).toBeVisible();
   // Questions are folded: the answer shows only after opening the question.
   const q = page.locator("details", { hasText: "Does it renew by itself?" });
   await expect(q.getByText(/A pass is one payment/)).toBeHidden();
