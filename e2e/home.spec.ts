@@ -187,7 +187,7 @@ test("phones never download the 3D road (PF-1)", async ({ page }) => {
 
 test("the home page shows Zarina above the fold (VI-17)", async ({ page }) => {
   await page.goto("/");
-  const link = page.locator(".home-hero").getByRole("link", { name: /Zarina, an AI interviewer that talks back/ });
+  const link = page.locator(".home-hero").getByRole("link", { name: /AI mock interviews that score you/ });
   await expect(link).toHaveAttribute("href", "/interview/simulator");
   expect((await link.boundingBox())!.y).toBeLessThan(page.viewportSize()!.height);
 });

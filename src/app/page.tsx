@@ -125,7 +125,7 @@ export default function Home() {
               New
               <span aria-hidden="true" className="h-px w-16 bg-zinc-300 dark:bg-zinc-700" />
             </span>
-            <span className="mt-2 block text-base leading-6 text-zinc-800 dark:text-zinc-200">Zarina, an AI interviewer that talks back.</span>
+            <span className="mt-2 block text-base leading-6 text-zinc-800 dark:text-zinc-200">AI mock interviews that score you.</span>
             <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-brand-800 underline underline-offset-4 dark:text-brand-300">
               Try it now
               <span aria-hidden="true" className="transition-transform duration-150 group-hover:translate-x-0.5">

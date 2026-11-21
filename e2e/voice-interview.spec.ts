@@ -542,7 +542,7 @@ test("one mock interview: a Pro learner picks role, experience and company, and 
   await page.goto("/interview/simulator?path=genai-engineer");
   await expect(page.getByRole("heading", { name: "What are you preparing for?" })).toBeVisible();
   // VI-12: the page sells the AI interviewer; the free warm-up sits lower, marked as the lesser option.
-  await expect(page.getByRole("heading", { level: 1, name: "Mock interviews that talk back" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "AI mock interviews that score you like a hiring panel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Free warm-up" })).toBeVisible();
   // VI-12: the live line: her real opening line names the role and company as they are chosen.
   await expect(page.getByText(/practice interview for the Generative AI & LLM Engineer role\. We'll go through 3 questions/)).toBeVisible();
