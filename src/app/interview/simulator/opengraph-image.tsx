@@ -8,8 +8,8 @@ export const contentType = "image/png";
 export default function Image() {
   return ogCard({
     eyebrow: "AI mock interviewer",
-    title: "Mock interviews that talk back",
-    footer: "Zarina asks out loud, follows up on what you say and scores you like a hiring panel",
+    title: "AI mock interviews that score you like a hiring panel",
+    footer: "Asks out loud, follows up on what you say, and ends with a verdict, skill scores and a plan",
     from: "#061f22",
     to: "#2a9488",
   });

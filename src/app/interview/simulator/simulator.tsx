@@ -227,15 +227,21 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
         <div>
           <h1 id="sim-title" className="text-[clamp(2.6rem,6.6vw,5.6rem)] leading-[0.95] font-medium tracking-[-0.04em]">
             <span className="xp-line">
-              <span>Mock interviews</span>
+              <span>AI mock</span>
             </span>
             <span className="xp-line">
-              <span>that talk back</span>
+              <span>interviews that</span>
+            </span>
+            <span className="xp-line">
+              <span>score you like</span>
+            </span>
+            <span className="xp-line">
+              <span>a hiring panel</span>
             </span>
           </h1>
           <div className="xp-after-lines">
             <p className="mt-8 max-w-[34rem] text-lg leading-8 md:text-xl md:leading-9">
-              Zarina, our AI interviewer, asks your questions out loud, follows up on what you actually say, and scores you the way a hiring panel would.
+              Zarina, our AI interviewer, asks your questions out loud, follows up on what you actually say, and ends with a verdict, skill scores and a 4-week plan.
               Set her up for your role, or paste the job post.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
