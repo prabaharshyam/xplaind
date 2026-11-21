@@ -34,7 +34,7 @@ export function SiteFooter() {
             <Link href="/" aria-label="Xplaind home" className="inline-block">
               <BrandLogo height={48} tagline />
             </Link>
-            <p className="mt-3 leading-relaxed text-zinc-600 dark:text-zinc-400">Plain-English AI career roadmaps. Built in India, for the world.</p>
+            <p className="mt-3 leading-relaxed text-zinc-600 dark:text-zinc-400">AI career roadmaps, built in India for the world.</p>
           </div>
           <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-5">
             {NAV.map((l) => (
