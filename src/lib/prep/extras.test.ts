@@ -28,15 +28,27 @@ describe("PREP-8 the calendar file", () => {
 describe("PREP-8 a story for each behavioural question", () => {
   it("matches a question to the story that answers it", () => {
     expect(storyFor("Tell me about your biggest failure.")).toBe("wrong");
+    expect(storyFor("Tell me about an agent you built. What broke, and what did you learn?")).toBe("wrong");
     expect(storyFor("Tell me about a time you had a conflict with a teammate.")).toBe("disagree");
     expect(storyFor("Tell me about a time you led something without being the manager.")).toBe("lead");
     expect(storyFor("Tell me about a time you had to learn something new quickly.")).toBe("learn");
+    expect(storyFor("Tell me about a time you delivered under a very tight deadline.")).toBe("learn");
     expect(storyFor("Tell me about an AI project you built.")).toBe("project");
   });
 
-  it("gives every behavioural question in the bank a story, and uses all five kinds", () => {
-    const kinds = new Set(getInterviewViews().filter((q) => q.topic === "behavioral").map((q) => storyFor(q.question)));
+  it("offers no story for a question that is not answered with one", () => {
+    for (const q of ["What are your salary expectations?", "What is your notice period, and how soon can you join?", "Do you have any questions for us?", "Why do you want to work at this company?", "How would you explain RAG to a non-technical manager?"]) {
+      expect(storyFor(q), q).toBeNull();
+    }
+  });
+
+  it("in the real bank, uses all five kinds and leaves the plain HR questions without one", () => {
+    const behavioural = getInterviewViews().filter((q) => q.topic === "behavioral");
+    const kinds = new Set(behavioural.map((q) => storyFor(q.question)).filter(Boolean));
     expect([...kinds].sort()).toEqual(STORY_KINDS.map((k) => k.id).sort());
+    const withStory = behavioural.filter((q) => storyFor(q.question)).length;
+    expect(withStory).toBeGreaterThan(behavioural.length * 0.4);
+    expect(withStory).toBeLessThan(behavioural.length * 0.75);
   });
 
   it("checks what the device stored, and knows an empty story from a written one", () => {

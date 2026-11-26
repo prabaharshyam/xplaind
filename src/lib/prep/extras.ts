@@ -70,18 +70,20 @@ export function prepIcs(setup: PrepSetup, role: string, today: string, planUrl: 
 
 /**
  * The stories every candidate needs, and the behavioural questions each one answers. A question is
- * matched by its wording, first match wins; anything else is told with the project story.
+ * matched by its wording, first match wins. Many behavioural questions need no story at all (pay,
+ * notice period, "why this company"): those match nothing.
  */
 export const STORY_KINDS = [
-  { id: "wrong", label: "Something that went wrong, and what you changed", match: /fail|mistake|wrong|missed|deadline|risk|differently|incident/i },
-  { id: "disagree", label: "A disagreement or a difficult person, and how you settled it", match: /conflict|disagree|difficult|stakeholder|said no|feedback|criticism|unhappy|customer/i },
-  { id: "lead", label: "A time you led, helped or went beyond your role", match: /led |lead|mentor|helped|beyond|team through|without being|influence|changed someone/i },
-  { id: "learn", label: "A time you learned fast or handled something unclear", match: /learn|vague|ambiguous|without all the information|too many things|priorit|pressure/i },
-  { id: "project", label: "A project you built and are proud of", match: /./ },
+  { id: "wrong", label: "Something that went wrong, and what you changed", match: /fail|mistake|went wrong|did not work|what broke|missed a|do differently|incident|were wrong|slowed/i },
+  { id: "disagree", label: "A disagreement or a difficult person, and how you settled it", match: /conflict|disagree|difficult|hard to work with|said no|criticism|unhappy|ethical/i },
+  { id: "lead", label: "A time you led, helped or went beyond your role", match: /\bled\b|helped someone|went beyond|change someone|improved|people who are not technical/i },
+  { id: "learn", label: "A time you learned fast or handled something unclear", match: /learn|vague|without all the information|too many things|pressure|tight deadline|a risk you took|keep up/i },
+  { id: "project", label: "A project you built and are proud of", match: /project you built|proud|tell me about (an? )?(ai |rag |agent )?project|used ai|demo|story/i },
 ] as const;
 export type StoryKind = (typeof STORY_KINDS)[number]["id"];
 
-export const storyFor = (question: string): StoryKind => STORY_KINDS.find((k) => k.match.test(question))!.id;
+/** The story that answers a behavioural question, or null when the question is not answered with one. */
+export const storyFor = (question: string): StoryKind | null => STORY_KINDS.find((k) => k.match.test(question))?.id ?? null;
 
 const Part = z.string().max(1200);
 /** One story in four parts: Situation, Task, Action, Result. Kept on the device only (owner decision). */
@@ -100,9 +102,9 @@ export const storyWritten = (s: Story | undefined): s is Story => !!s && [s.situ
 /** What each round of an interview usually tests. General guidance, not a claim about any company. */
 export const ROUNDS = [
   { name: "Screening call", tests: "Whether your background fits the role: your resume, why you want the job, your notice period and your expected pay.", prepare: "Your two-minute introduction, and honest answers on pay and joining date." },
-  { name: "Technical round", tests: "Whether you understand the ideas behind your work and can reason through a problem out loud.", prepare: "The technical questions in this plan, answered aloud. Say the trade-offs, not only the definition." },
+  { name: "Technical round", tests: "Whether you understand the ideas behind your work and can reason through a problem out loud.", prepare: "The role questions in this plan, answered aloud. Say the trade-offs, not only the definition." },
   { name: "Coding or practical round", tests: "Whether you can write working code or build something small, and explain it as you go.", prepare: "Python, SQL and small machine learning tasks. Talk while you type." },
-  { name: "System design round", tests: "Whether you can design a whole system: the parts, the data, the cost, and what breaks.", prepare: "The system design questions in this plan. Ask questions first, then draw the parts, then the trade-offs." },
-  { name: "Behavioural or manager round", tests: "How you work with people: conflict, failure, ownership and learning.", prepare: "Your five stories below, each told in about two minutes." },
+  { name: "System design round", tests: "Whether you can design a whole system: the parts, the data, the cost, and what breaks.", prepare: "Practise one design out loud: ask questions first, then name the parts, then the trade-offs." },
+  { name: "Behavioural or manager round", tests: "How you work with people: conflict, failure, ownership and learning.", prepare: "Your five stories, each told in about two minutes." },
   { name: "HR round", tests: "Fit, pay, joining date and your questions for them.", prepare: "Your pay range from research, your reasons for the move, and three questions to ask." },
 ] as const;

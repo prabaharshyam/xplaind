@@ -479,7 +479,7 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
         </dl>
       </section>
 
-      <Reminder />
+      <Reminder setup={setup} />
 
       <section aria-labelledby="check-h" className={panel}>
         <h2 id="check-h" className="text-xl font-semibold">
@@ -592,7 +592,7 @@ function JobPost({ setup, path, have, fromJob, onEdit }: { setup: PrepSetup; pat
 }
 
 /** PREP-7: opt in to one email each morning until the interview, or stop it. Off unless the learner ticks the box. */
-function Reminder() {
+function Reminder({ setup }: { setup: PrepSetup }) {
   const account = useAccountState();
   const [active, setActive] = useState<boolean | null>(null);
   const [consent, setConsent] = useState(false);
@@ -615,7 +615,7 @@ function Reminder() {
   const call = async (method: "POST" | "DELETE") => {
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/prep/remind", { method, headers: { "Content-Type": "application/json" }, body: method === "POST" ? JSON.stringify({ consent: true }) : undefined }).catch(() => null);
+    const res = await fetch("/api/prep/remind", { method, headers: { "Content-Type": "application/json" }, body: method === "POST" ? JSON.stringify({ consent: true, prep: setup }) : undefined }).catch(() => null);
     setBusy(false);
     if (!res?.ok) {
       const body = (await res?.json().catch(() => null)) as { error?: string } | null;
@@ -674,8 +674,10 @@ function Reminder() {
 
 /** PREP-8: under a behavioural card: the learner's own story for that kind of question, or where to write it. */
 function StoryHint({ question }: { question: string }) {
-  const kind = STORY_KINDS.find((k) => k.id === storyFor(question))!;
-  const story = useStories()[kind.id];
+  const stories = useStories();
+  const kind = STORY_KINDS.find((k) => k.id === storyFor(question));
+  if (!kind) return null; // pay, notice period, "why this company": not answered with a story
+  const story = stories[kind.id];
   if (!storyWritten(story)) {
     return (
       <p className={`text-sm ${muted}`}>
@@ -702,7 +704,7 @@ function StoryHint({ question }: { question: string }) {
   );
 }
 
-/** PREP-8: five stories, written once, each in four parts. Saved on this device as the learner leaves a box. */
+/** PREP-8: five stories, written once, each in four parts. Saved on this device as the learner types. */
 function StoriesPanel() {
   const stories = useStories();
   const empty: Story = { situation: "", task: "", action: "", result: "" };
@@ -726,7 +728,7 @@ function StoriesPanel() {
                   <span className={`ml-2 font-normal ${muted}`}>{p.hint}</span>
                   <textarea
                     defaultValue={stories[k.id]?.[p.id] ?? ""}
-                    onBlur={(e) => saveStory(k.id, { ...empty, ...stories[k.id], [p.id]: e.target.value })}
+                    onChange={(e) => saveStory(k.id, { ...empty, ...stories[k.id], [p.id]: e.target.value })}
                     maxLength={1200}
                     rows={3}
                     name={`story-${k.id}-${p.id}`}

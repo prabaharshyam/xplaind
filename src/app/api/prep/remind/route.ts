@@ -2,7 +2,9 @@
 // row is written with the service role (the learner can only read it under RLS).
 import { z } from "zod";
 import { json, problem, readJson, requireSession } from "@/lib/account/http";
+import { getPath } from "@/lib/content";
 import { PREP_REMIND_CONSENT } from "@/lib/prep/email";
+import { PrepSetupInput } from "@/lib/prep/plan";
 
 export async function GET() {
   const session = await requireSession();
@@ -11,13 +13,20 @@ export async function GET() {
   return json({ active: !!data && !data.unsubscribed_at });
 }
 
-const Body = z.strictObject({ consent: z.literal(true) });
+// The plan comes with the consent and is saved to the account first, so the morning email always has a plan to read.
+const Body = z.strictObject({ consent: z.literal(true), prep: PrepSetupInput });
 
 export async function POST(request: Request) {
   const session = await requireSession();
   if (session instanceof Response) return session;
-  if (!Body.safeParse(await readJson(request).catch(() => null)).success) return problem(400, "Tick the box to agree to the daily emails.");
+  const parsed = Body.safeParse(await readJson(request).catch(() => null));
+  if (!parsed.success || !getPath(parsed.data.prep.pathId)) return problem(400, "Tick the box to agree to the daily emails.");
   if (!session.user.email) return problem(400, "Your account has no email address.");
+  const p = parsed.data.prep;
+  const saved = await session.client
+    .from("interview_preps")
+    .upsert({ user_id: session.user.id, path_id: p.pathId, experience: p.experience, interview_on: p.interviewOn, minutes: p.minutes, started_on: p.startedOn, updated_at: new Date().toISOString() });
+  if (saved.error) return problem(500, "Could not save your plan. Please try again.");
   const { error } = await session.admin
     .from("prep_reminders")
     .upsert({ user_id: session.user.id, email: session.user.email, consent_text: PREP_REMIND_CONSENT, consent_at: new Date().toISOString(), unsubscribed_at: null }, { onConflict: "user_id" });

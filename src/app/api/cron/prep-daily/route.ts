@@ -1,8 +1,8 @@
 // PREP-7: the daily interview prep email, called by Vercel Cron at 7:30 am India time. Protected by
 // CRON_SECRET. For each learner who opted in and has a plan whose interview has not passed, it works
 // out today from the plan and their ratings, sends the email through Resend, and records the day so
-// nothing is sent twice. A job post lives only on the learner's device, so the email goes by the role's
-// order; the counts are the same.
+// nothing is sent twice. A job post and the questions written for it live only on the learner's device,
+// so the email goes by the role's order and its counts can differ a little from the page's.
 import { json, problem } from "@/lib/account/http";
 import { getPath } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
@@ -32,11 +32,18 @@ export async function GET(request: Request) {
   const bank = getInterviewViews();
   let sent = 0;
   let failed = 0;
+  let ended = 0;
   for (const r of (data ?? []) as Reminder[]) {
     const { data: row } = await admin.from("interview_preps").select("path_id, experience, interview_on, minutes, started_on").eq("user_id", r.user_id).maybeSingle();
     const setup = row && PrepSetupInput.safeParse({ pathId: row.path_id, experience: row.experience, interviewOn: row.interview_on, minutes: row.minutes, startedOn: row.started_on });
     const path = setup && setup.success ? getPath(setup.data.pathId) : undefined;
-    if (!setup || !setup.success || !path) continue;
+    // "Until my interview" is what the learner agreed to: with no plan, or one whose date has passed, the reminder ends.
+    const over = !setup || !setup.success || !path || setup.data.interviewOn < today;
+    if (over) {
+      await admin.from("prep_reminders").update({ unsubscribed_at: new Date().toISOString() }).eq("user_id", r.user_id);
+      ended++;
+      continue;
+    }
     const { data: rated } = await admin.from("practice_ratings").select("question_id, rating, updated_at").eq("user_id", r.user_id);
     const ratings: Record<string, RatingRecord> = {};
     for (const x of (rated ?? []) as { question_id: string; rating: number; updated_at: string }[]) {
@@ -51,5 +58,5 @@ export async function GET(request: Request) {
       sent++;
     } else failed++;
   }
-  return json({ sent, failed });
+  return json({ sent, failed, ended });
 }

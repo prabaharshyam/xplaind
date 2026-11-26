@@ -197,15 +197,6 @@ test("stories, the rounds guide and a calendar file help with the rest of the in
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Add to my calendar (.ics)" }).click();
   expect((await download).suggestedFilename()).toBe("xplaind-interview-prep.ics");
-
-  // A behavioural card points at the learner's story for it (the fifth card of five at 30 minutes a day).
-  await page.getByRole("button", { name: "Start today's questions" }).click();
-  for (let i = 0; i < 4; i++) {
-    await page.getByRole("button", { name: "Show the short answer" }).click();
-    await page.getByRole("button", { name: "Got it" }).click();
-  }
-  await page.getByRole("button", { name: "Show the short answer" }).click();
-  await expect(page.getByText(/Your story for this/)).toBeVisible();
 });
 
 test("the daily email's unsubscribe link lands on a plain page (PREP-7)", async ({ page }) => {
