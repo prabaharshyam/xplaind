@@ -22,12 +22,18 @@ describe("PREP-1 the question set", () => {
     expect(set).toMatchObject({ core: 4, behavioural: 0, stretch: 1 });
   });
 
-  it("spreads the behavioural questions through the set, whatever their level", () => {
-    const all = [...ids(6).map((id) => q(id, "I2")), q("b1", "B1", "behavioral"), q("b2", "P3", "behavioral")];
-    expect(prepSet(all, [], "role", "mid").ids).toEqual(["q1", "q2", "q3", "b1", "q4", "q5", "q6", "b2"]);
-    // More behavioural than technical: the extra ones follow at the end, none is dropped.
+  it("puts one behavioural question after every four technical ones, nearest the level first, and the rest last", () => {
+    const all = [...ids(9).map((id) => q(id, "I2")), q("b-far", "B1", "behavioral"), q("b-fit", "I2", "behavioral"), q("b-near", "B3", "behavioral")];
+    expect(prepSet(all, [], "role", "mid").ids).toEqual(["q1", "q2", "q3", "q4", "b-fit", "q5", "q6", "q7", "q8", "b-near", "q9", "b-far"]);
+    // One asked in almost every interview comes before the others, whatever its level.
+    const often = [...all, { ...q("b-always", "B1", "behavioral"), often: true }];
+    expect(prepSet(often, [], "role", "mid").ids.filter((id) => id.startsWith("b-"))).toEqual(["b-always", "b-fit", "b-near", "b-far"]);
+    // Many more behavioural than technical: the role's questions are still all in the first part, and none is dropped.
     const few = [q("q1", "I2"), q("b1", "I1", "behavioral"), q("b2", "I1", "behavioral"), q("b3", "I1", "behavioral")];
     expect(prepSet(few, [], "role", "mid").ids).toEqual(["q1", "b1", "b2", "b3"]);
+    const many = [...ids(40).map((id) => q(id, "I2")), ...ids(60).map((id) => q(`b${id}`, "I2", "behavioral"))];
+    const first50 = prepSet(many, [], "role", "mid").ids.slice(0, 50);
+    expect(first50.filter((id) => !id.startsWith("b"))).toHaveLength(40);
   });
 
   it("gives every role and experience level in the real bank a set, with no question twice", () => {
@@ -83,6 +89,12 @@ describe("PREP-1 the day-by-day plan", () => {
     const onTheDay = ok(prepPlan(tomorrow, ids(30), {}, "2026-11-27"));
     expect(onTheDay).toMatchObject({ daysLeft: 0, fresh: [], leftOut: 30 });
     expect(prepPlan(tomorrow, ids(30), {}, "2026-11-28").status).toBe("past");
+  });
+
+  it("the day before a longer plan is revision only: no new questions, even with some left", () => {
+    const p = ok(prepPlan(setup(), ids(100), {}, "2026-12-05")); // started 26 Nov, interview 6 Dec
+    expect(p.days[0]).toMatchObject({ kind: "final", ids: [] });
+    expect(p).toMatchObject({ fresh: [], leftOut: 100 });
   });
 
   it("counts a question as covered only when it was rated since the plan started", () => {

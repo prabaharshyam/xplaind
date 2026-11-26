@@ -32,12 +32,15 @@ export type PrepSetup = z.infer<typeof PrepSetupInput>;
  */
 export const pickPrep = (device: PrepSetup | null, server: PrepSetup | null): PrepSetup | null =>
   device && (!server || device.startedOn > server.startedOn) ? device : server;
-export type PrepQuestion = { id: string; level: string; topic: string; paths: readonly string[] };
+export type PrepQuestion = { id: string; level: string; topic: string; paths: readonly string[]; /** Asked in almost every interview. */ often?: boolean };
 
 export const addDays = (iso: string, n: number): string => {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 };
+
+/** A behavioural question follows every this many technical ones, at most. */
+export const BEHAVIOURAL_EVERY = 4;
 
 export type PrepSet = {
   /** Every question in the plan, most important first. */
@@ -51,8 +54,9 @@ export type PrepSet = {
 
 /**
  * The questions for a role and experience level, most important first: the role's questions nearest the
- * learner's level (its Top 25 first within a level band), with the role's behavioural questions spread
- * evenly through them so no day is all one kind. Nothing is padded: a role with a small bank gives a small set.
+ * learner's level (its Top 25 first within a level band), with its behavioural questions, also nearest
+ * the level first, spread through them so no day is all one kind. Nothing is padded: a role with a
+ * small bank gives a small set.
  */
 export function prepSet(all: readonly PrepQuestion[], top: readonly string[], pathId: string, experience: ExperienceId): PrepSet {
   const levels = EXPERIENCE.find((e) => e.id === experience)!.levels.map((l) => LEVEL_IDS.indexOf(l as LevelId));
@@ -63,15 +67,20 @@ export function prepSet(all: readonly PrepQuestion[], top: readonly string[], pa
   };
   const topAt = new Map(top.map((id, i) => [id, i]));
   const rank = (q: PrepQuestion) => topAt.get(q.id) ?? top.length;
+  const byFit = (qs: PrepQuestion[]) =>
+    qs
+      .map((q, i) => ({ q, i }))
+      .sort((a, b) => away(a.q) - away(b.q) || rank(a.q) - rank(b.q) || a.i - b.i)
+      .map((x) => x.q);
   const mine = all.filter((q) => q.paths.includes(pathId));
-  const soft = mine.filter((q) => q.topic === "behavioral");
-  const core = mine
-    .filter((q) => q.topic !== "behavioral")
-    .map((q, i) => ({ q, i }))
-    .sort((a, b) => away(a.q) - away(b.q) || rank(a.q) - rank(b.q) || a.i - b.i)
-    .map((x) => x.q);
+  // Behavioural: the ones asked in almost every interview first, then by fit like the rest.
+  const behavioural = mine.filter((q) => q.topic === "behavioral");
+  const soft = [...byFit(behavioural.filter((q) => q.often)), ...byFit(behavioural.filter((q) => !q.often))];
+  const core = byFit(mine.filter((q) => q.topic !== "behavioral"));
 
-  const step = Math.max(1, Math.floor(core.length / Math.max(1, soft.length)));
+  // One behavioural question after every few technical ones, never more than one in five, so a short
+  // plan still spends its time on the role. The behavioural ones that are left over come last.
+  const step = Math.max(BEHAVIOURAL_EVERY, Math.floor(core.length / Math.max(1, soft.length)));
   const ids: string[] = [];
   let s = 0;
   core.forEach((q, i) => {
@@ -141,8 +150,8 @@ export function prepPlan(setup: PrepSetup, order: readonly string[], ratings: Ra
     const date = addDays(today, i);
     const toGo = daysLeft - i;
     const kind = toGo === 0 ? "interview" : toGo === 1 ? "final" : "study";
-    // New questions go on study days, and on the day before only when the plan has no study day at all.
-    const takesNew = kind === "study" || (kind === "final" && daysLeft === 1);
+    // New questions go on study days, and on the day before only for a plan started that late (it has no study day).
+    const takesNew = kind === "study" || (kind === "final" && daysBetween(setup.startedOn, setup.interviewOn) <= 1);
     const room = takesNew ? Math.max(0, i === 0 ? cap - doneToday - review.length : cap) : 0;
     const ids = remaining.slice(next, next + room);
     next += ids.length;

@@ -25,6 +25,7 @@ export function getInterviewViews(): InterviewView[] {
         answer_seconds: q.answer_seconds,
         kind: q.kind,
         example: q.example ?? null,
+        often: q.asked_often ?? false,
         reviewed: isHumanName(q.reviewed_by),
       };
     })

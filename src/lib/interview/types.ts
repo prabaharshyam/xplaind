@@ -24,6 +24,8 @@ export type InterviewView = {
   kind: InterviewKind;
   /** IQ-8: a concrete example to tell in the interview, when written. */
   example: string | null;
+  /** PREP-2: asked in almost every interview. */
+  often: boolean;
   /** False until a person signs it off (IQ-6). Pages label drafts. */
   reviewed: boolean;
 };

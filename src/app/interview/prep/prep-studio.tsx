@@ -16,7 +16,7 @@ import { EXPERIENCE, type ExperienceId } from "@/lib/interview/setup";
 import { practiceOrder, type Rating } from "@/lib/practice/queue";
 import { MAX_DAYS_AHEAD, MINUTES, addDays, perDay, prepPlan, prepReadiness, prepSet, type Minutes, type PrepDay, type PrepSetup } from "@/lib/prep/plan";
 
-export type PrepCard = Card & { topic: string; paths: string[]; stop: { id: string; title: string } };
+export type PrepCard = Card & { topic: string; paths: string[]; stop: { id: string; title: string }; often: boolean };
 type PrepPath = { id: string; name: string; top: string[] };
 
 const panel = "rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900";
@@ -329,7 +329,7 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
             <div className="min-w-0">
               <h3 className="font-semibold">{first.mock === "full" ? "Today: a full mock interview" : "Today: a short mock interview"}</h3>
               <p className={`mt-1 text-sm ${muted}`}>
-                {mockDone ? "Done today." : first.mock === "full" ? "Five questions out loud, set up for your role, with a report at the end." : "Three questions out loud, set up for your role, with a report at the end."}
+                {mockDone ? "Done today." : first.mock === "full" ? "A full round out loud for your role, with a report at the end. Choose five questions or more." : "A quick round out loud for your role, with a report at the end. Three questions is enough."}
               </p>
             </div>
             <Link href={mockHref} className={secondaryButton}>

@@ -22,6 +22,7 @@ export default function InterviewPrepPage() {
     topic: q.topic,
     paths: q.paths,
     stop: q.stop,
+    often: q.often,
   }));
   return (
     <main>
