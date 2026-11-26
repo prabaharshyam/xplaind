@@ -1,0 +1,32 @@
+id: agent-x-resume-after-crash
+question: "An agent runs a 12-step employee onboarding task that sends emails and creates accounts, and the worker crashes at step 7. How do you design it so the run can resume without repeating what is already done?"
+kind: use-case
+short_answer: "Save a checkpoint of the run's state to a durable store after every step, so a new worker can load it and continue. Make every tool with a side effect idempotent, using a key built from the run and step, so a repeated call does nothing new. For a step that was in progress, check the real system before retrying."
+deeper_answer: "Two things are needed: durable state and safe repeats. State means a small structured record, not only the chat transcript: which steps are done, the IDs that were created, and what is next. It is written to a database after each step. Graph frameworks such as LangGraph call this a checkpoint, and a workflow engine gives the same result.\n\nThe hard case is the step that was running during the crash. The worker may have sent the email and died before saving. So each side-effect call carries an idempotency key, for example run ID plus step number. The tool, or a small table in front of it, refuses a second call with the same key and returns the first result. If the downstream system has no such support, the agent first reads the real state: does the account already exist? Interviewers listen for the gap between doing an action and recording it, and for a candidate who does not simply restart from step one."
+follow_ups:
+  - "What exactly would you store in the checkpoint?"
+  - "How would you handle a tool that cannot accept an idempotency key?"
+  - "What changes if the crash happens while a human approval is pending?"
+common_mistakes:
+  - "Restarting the whole run from step one"
+  - "Keeping state only in the worker's memory"
+  - "Assuming a step did not happen because it was not recorded"
+level: P1
+topic: agents
+stop_id: langgraph-basics
+rubric:
+  - point: "Saves a checkpoint of state to a durable store after each step"
+    keywords: ["checkpoint", "durable", "database", "after each step", "after every step"]
+  - point: "State is structured: done steps, created IDs, next step"
+    keywords: ["structured", "ids", "which steps", "next step", "record"]
+  - point: "Side-effect tools are idempotent, with a key per run and step"
+    keywords: ["idempoten", "key", "same key"]
+  - point: "Handles the in-progress step by checking the real system before retrying"
+    keywords: ["real system", "already exist", "check", "in progress"]
+  - point: "A new worker resumes from the last checkpoint, not from the start"
+    keywords: ["resume", "new worker", "continue", "last checkpoint"]
+answer_seconds: 150
+example: "I would save a checkpoint to a database after every step. It is a small structured record: which steps are done, the IDs created so far, such as the email account ID, and the next step. When the worker crashes, a new worker loads the last checkpoint and can resume from step 7, not step 1. The risky part is step 7 itself. It was in progress, so the welcome email may have gone out before the crash. To handle that, every tool with a side effect takes an idempotency key made from the run ID and step number. If the tool sees the same key again, it returns the first result and does nothing. For our old HR system, which has no such key, the agent would first check whether the account already exists and only then create it."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26

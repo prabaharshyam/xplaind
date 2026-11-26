@@ -1,0 +1,32 @@
+id: auto-webhook-at-least-once
+question: "A payment provider says its webhooks are delivered 'at least once'. What does that mean for the workflow that receives them?"
+kind: concept
+short_answer: "It means the same event can arrive more than once, and sometimes out of order, so my workflow must be idempotent: handling an event twice must give the same result as once. I store each event ID, skip IDs I have seen, reply with a 200 quickly, do the slow work afterwards, and verify the webhook signature."
+deeper_answer: "The sender cannot know if I received an event unless I reply in time. If my reply is slow or lost, it sends the event again. This is normal behaviour, not a fault. So duplicates are certain over time, and the design must expect them.\n\nThe usual pattern has four parts. First, verify the signature so that nobody can post fake payments. Second, save the event ID in a table with a unique constraint; if the insert fails, I have seen this event and I stop. Third, reply 200 immediately and process afterwards, so a slow step does not cause a resend. Fourth, do not trust the order: read the current status from the provider's API if order matters. Example: 'payment captured' arriving twice must not mark two invoices paid or send two receipts. Interviewers listen for the event ID check and the fast reply."
+follow_ups:
+  - "Where do you store the event IDs, and for how long?"
+  - "What if 'refunded' arrives before 'captured'?"
+  - "How do you find events that never arrived?"
+common_mistakes:
+  - "Assuming each event arrives exactly once"
+  - "Doing slow work before replying, which causes resends"
+  - "Not verifying the webhook signature"
+level: I1
+topic: automation
+stop_id: webhooks-basics
+rubric:
+  - point: "Explains that the same event can arrive more than once"
+    keywords: ["more than once", "twice", "duplicate", "send an event again"]
+  - point: "Makes handling idempotent with a stored event ID"
+    keywords: ["idempotent", "event id", "unique"]
+  - point: "Replies quickly and processes afterwards"
+    keywords: ["200", "replied", "quickly", "afterwards"]
+  - point: "Verifies the signature of the webhook"
+    keywords: ["signature", "verified", "secret"]
+  - point: "Does not rely on the order of events"
+    keywords: ["order of events", "current status", "out of order"]
+answer_seconds: 120
+example: "At least once means the provider will send an event again if it does not get my reply in time, so the same event can arrive twice. My workflow has to be idempotent. In a Razorpay integration I built, the first node verified the webhook signature with the shared secret. The second node inserted the event ID into a Postgres table with a unique constraint. If the insert failed, we had seen that event, and the workflow ended. Then we replied with a 200 quickly and did the slow work afterwards: marking the invoice paid and sending the receipt. I also did not trust the order of events. Before marking a refund, the workflow read the current status from the provider's API. In testing I sent the same event three times and the customer got one receipt."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26
