@@ -192,3 +192,12 @@ test("the home page shows Zarina above the fold (VI-17)", async ({ page }) => {
   expect((await link.boundingBox())!.y).toBeLessThan(page.viewportSize()!.height);
 });
 
+
+test("the IndexNow key file is served as plain text and robots.txt does not block it (IX-1)", async ({ request }) => {
+  const key = (await import("../src/lib/indexnow")).INDEXNOW_KEY;
+  const res = await request.get(`/${key}.txt`);
+  expect(res.status()).toBe(200);
+  expect((await res.text()).trim()).toBe(key);
+  const robots = await (await request.get("/robots.txt")).text();
+  expect(robots).not.toMatch(new RegExp(`Disallow:\\s*/${key}`));
+});
