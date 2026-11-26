@@ -1,0 +1,32 @@
+id: code-pandas-memory-large-csv
+question: "A 40 GB CSV of transactions does not fit in memory. Compute the average amount per city with pandas. For example, the result should be one row per city with its mean amount, the same as if the whole file had been loaded."
+kind: use-case
+short_answer: "Read the file in chunks with pd.read_csv(path, usecols=[\"city\", \"amount\"], chunksize=1_000_000). For each chunk compute the sum and count per city, add them to running totals, and divide at the end. Time is O(n) in rows; memory is one chunk plus one row per city. Do not average the chunk averages."
+deeper_answer: "First clarify the task. Ask which columns are needed, whether the result is small, such as one row per city, and whether this is a single job or runs daily. Ask whether another format or tool is allowed.\n\nThe steps are: loop with for chunk in pd.read_csv(path, usecols=[\"city\", \"amount\"], chunksize=1_000_000). Reading two columns instead of all of them already cuts memory a lot. In each chunk compute part = chunk.groupby(\"city\")[\"amount\"].agg([\"sum\", \"count\"]). Combine with totals = totals.add(part, fill_value=0), where fill_value handles a city that is absent from one chunk. After the loop, the mean is totals[\"sum\"] / totals[\"count\"].\n\nThe key point is that a mean of chunk means is wrong when chunks hold different numbers of rows per city, so you carry sums and counts. This works for sum, count, min and max; a median needs another method. Test with a small file and chunksize 3, and compare against the result of loading it all. Say that the dtype argument and category columns shrink memory further, and that for repeated work you would convert to Parquet or use DuckDB or Polars."
+follow_ups:
+  - "How would you compute a median per city, which cannot be combined from chunks this way?"
+  - "Which read_csv arguments reduce memory the most?"
+  - "When would you stop using pandas for this job?"
+common_mistakes:
+  - "Averaging the per-chunk averages"
+  - "Reading every column when only two are needed"
+  - "Appending all chunks to a list and concatenating them, which loads the whole file again"
+level: I2
+topic: coding
+stop_id: pandas-tables
+rubric:
+  - point: "Asks which columns are needed and reads only those"
+    keywords: ["which columns", "usecols"]
+  - point: "Reads the file in chunks with chunksize"
+    keywords: ["chunks", "chunksize"]
+  - point: "Keeps running sums and counts per group across chunks"
+    keywords: ["sum", "count", "running totals"]
+  - point: "Divides total sum by total count, not a mean of chunk means"
+    keywords: ["mean of the chunk means", "divided"]
+  - point: "States one pass and tests on a small file against a full load"
+    keywords: ["one pass", "small file", "compare"]
+answer_seconds: 180
+example: "I would ask which columns I need and how big the result is. Here I need only city and amount, and the result is one row per city, so it fits in memory. I read the file in chunks with pd.read_csv, passing usecols for the two columns and a chunksize of one million rows. For each chunk I group by city and compute the sum and the count of amount. I add these to running totals, with fill_value=0 for a city that is absent from a chunk. At the end the mean is the total sum divided by the total count. I do not take a mean of the chunk means, because chunks have different numbers of rows per city. It is one pass over the file. I would test it on a small file with a chunksize of 3 and compare with the result of loading it all at once."
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted with AI, awaiting owner sign-off"
+reviewed_on: 2026-11-26

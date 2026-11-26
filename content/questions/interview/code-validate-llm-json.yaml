@@ -1,0 +1,32 @@
+id: code-validate-llm-json
+question: "A model is asked to return JSON with a sentiment label and a score from 0 to 1 for a product review. Parse and validate the reply, and say what you do when it is malformed. For example, a reply wrapped in a code fence should parse, and a reply with sentiment \"happy\" should be rejected."
+kind: use-case
+short_answer: "Treat the reply as untrusted input. Extract the JSON text, parse it with json.loads inside try and except, then validate keys, types and allowed values against a schema, for example with pydantic. On failure, retry a limited number of times with the error message, then fall back to a safe default and log it. Parsing is O(n) in reply length."
+deeper_answer: "First clarify the contract. Ask which fields are required, their types and allowed values, and what the caller needs when the reply is bad: an error, a default or a human review.\n\nThere are three steps. First, extract: models often add a code fence or a sentence, so take the text from the first { to the last } with re.search(r\"\\{.*\\}\", raw, re.DOTALL). No match is a failure too; a cut-off reply often has no closing brace. Second, parse with json.loads(text) and catch json.JSONDecodeError. Third, validate: sentiment is one of positive, negative or neutral, and score is a number with 0 <= score <= 1. A pydantic model does this in one call, Review.model_validate_json(text).\n\nWhen any step fails, retry at most once or twice, sending the validation error back to the model, then return a fallback and log the raw reply. Test valid JSON, a fenced reply, a cut-off reply, a wrong label and a score given as text. By default pydantic converts the text \"0.9\" to a number; pass strict=True to reject it."
+follow_ups:
+  - "What do you do if the reply was cut off by the token limit?"
+  - "How do you stop the retries from looping forever?"
+  - "How would you measure how often the model returns invalid JSON?"
+common_mistakes:
+  - "Calling json.loads with no try and except"
+  - "Checking that the JSON parses but not that the fields and values are valid"
+  - "Using eval on model output"
+level: I2
+topic: coding
+stop_id: python-files-errors
+rubric:
+  - point: "Treats model output as untrusted and asks which fields are required"
+    keywords: ["untrusted", "required"]
+  - point: "Extracts the JSON from extra text or a code fence"
+    keywords: ["extract", "code fence"]
+  - point: "Parses with json.loads and catches JSONDecodeError"
+    keywords: ["json.loads", "jsondecodeerror", "try"]
+  - point: "Validates types and allowed values against a schema"
+    keywords: ["validate", "schema", "pydantic"]
+  - point: "Retries a limited number of times, then falls back and logs"
+    keywords: ["retry", "fallback", "log"]
+answer_seconds: 180
+example: "I treat the model reply as untrusted input. First I would ask which fields are required and what values are allowed. Here I need a sentiment that is positive, negative or neutral, and a score from 0 to 1. Step one, I extract the text between the first and last curly brace, because models often wrap JSON in a code fence. Step two, I parse it with json.loads inside a try block and catch JSONDecodeError. Step three, I validate against a schema, checking the allowed values and that the score is a number in range. I would use a pydantic model for that. If any step fails, I retry once with the error message added to the prompt, and after that I return a fallback value and log the raw reply. I would test a reply that is cut off in the middle, which has no closing brace and must count as a failure."
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted with AI, awaiting owner sign-off"
+reviewed_on: 2026-11-26

@@ -1,0 +1,32 @@
+id: code-sql-daily-active-users
+question: "From an events table with user_id and event_date, compute daily active users and a 7-day moving average of that number. For example, if two different users have events on 1 November, the daily active users for that day is 2, even if one of them has five events."
+kind: use-case
+short_answer: "First aggregate: SELECT event_date, COUNT(DISTINCT user_id) AS dau FROM events GROUP BY event_date. Then, over that result, take AVG(dau) OVER (ORDER BY event_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW). The frame counts rows, so it is 7 days only when every date has a row; a calendar table fills gaps. Cost is one GROUP BY and one sort."
+deeper_answer: "First clarify the definitions. Ask what counts as active, which timezone defines a day, and whether event_date is a date or a timestamp that needs a cast. Ask whether days with no events exist and should count as zero.\n\nUse two steps. In a CTE called daily, run SELECT event_date, COUNT(DISTINCT user_id) AS dau FROM events GROUP BY event_date. DISTINCT matters because one user can have many events in a day. In the outer query, select event_date, dau and AVG(dau) OVER (ORDER BY event_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS avg_7d. The frame counts rows, not days, so if a date is absent the window reaches back more than a week. To fix that, build a calendar of dates, with generate_series in Postgres, LEFT JOIN daily to it and use COALESCE(dau, 0).\n\nNote that this is an average of daily counts. It is not weekly active users, which needs COUNT(DISTINCT user_id) across the 7 days. Test a user with several events in one day and a day with no events."
+follow_ups:
+  - "How would you compute weekly active users, where each user counts once per 7 days?"
+  - "What happens to the moving average when a day has no events?"
+  - "How would you handle users in different timezones?"
+common_mistakes:
+  - "Using COUNT(*) or COUNT(user_id), which counts events and not users"
+  - "Assuming a frame of 7 rows is always 7 calendar days"
+  - "Reporting the average of daily counts as weekly active users"
+level: I2
+topic: coding
+stop_id: sql-for-engineers
+rubric:
+  - point: "Clarifies what active means and which timezone defines a day"
+    keywords: ["active", "timezone"]
+  - point: "Counts distinct users per day with GROUP BY"
+    keywords: ["count(distinct", "group by"]
+  - point: "Averages over a window of the current row and the 6 before it"
+    keywords: ["avg(dau) over", "moving average", "6 preceding"]
+  - point: "Knows the frame counts rows, and fills gaps with a calendar table"
+    keywords: ["calendar", "missing days", "rows, not days"]
+  - point: "Tests a user with many events in one day and a day with none"
+    keywords: ["count once", "no events"]
+answer_seconds: 180
+example: "I would ask how you define active and which timezone decides the day. I will assume any event counts. I do it in two steps. First, in a CTE, I group by event_date and take COUNT(DISTINCT user_id) as dau. I need DISTINCT because one user can have many events in a day. Second, I compute the moving average over that result with AVG(dau) OVER (ORDER BY event_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW). That frame is the current row and the six rows before it. It counts rows, not days, so if a day has no events the window is too long. To handle that I would join to a calendar table and treat missing days as zero. I would test a user with five events in one day, who must count once, and a day with no events."
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted with AI, awaiting owner sign-off"
+reviewed_on: 2026-11-26

@@ -1,0 +1,32 @@
+id: code-sql-running-total
+question: "From an orders table with order_id, customer_id, order_date and amount, show each order with the running total of that customer's spend so far. For example, a customer with orders of 100, 50 and 25 gets running totals of 100, 150 and 175."
+kind: use-case
+short_answer: "Use a window sum: SUM(amount) OVER (PARTITION BY customer_id ORDER BY order_date, order_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW). PARTITION BY restarts the total per customer. The ROWS frame and the order_id tiebreaker stop orders on the same date from sharing one total. Cost is a sort, O(n log n)."
+deeper_answer: "First clarify the grain. Ask whether the total restarts for each customer, whether two orders can share the same order_date, and whether you want one row per order or one per day. Ask whether refunds are stored as negative amounts.\n\nThe query is SELECT order_id, customer_id, order_date, amount, SUM(amount) OVER (PARTITION BY customer_id ORDER BY order_date, order_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total FROM orders. A window function keeps every row, unlike GROUP BY, which collapses them. The frame clause matters. With ORDER BY and no frame, the default is RANGE up to the current row, and RANGE treats rows with equal ORDER BY values as peers. Two orders on the same date would then both show the total after both orders. ROWS counts physical rows, and adding order_id makes the order fixed.\n\nThe database sorts each partition once, so the cost is about O(n log n). Test two orders on the same date, a customer with one order and a negative amount."
+follow_ups:
+  - "What is the default window frame when you write ORDER BY and no frame?"
+  - "How would you compute a running total per month instead?"
+  - "How would you do this without window functions?"
+common_mistakes:
+  - "Leaving out PARTITION BY, so the total runs across all customers"
+  - "Ordering by a date that has ties with no tiebreaker"
+  - "Using GROUP BY, which collapses the rows"
+level: I2
+topic: coding
+stop_id: sql-for-engineers
+rubric:
+  - point: "Asks if the total restarts per customer and if dates can tie"
+    keywords: ["restarts", "same date"]
+  - point: "Uses SUM as a window function, which keeps every row"
+    keywords: ["window function", "sum(amount) over"]
+  - point: "Uses PARTITION BY for the customer and ORDER BY for the sequence"
+    keywords: ["partition by", "order by"]
+  - point: "Writes the ROWS frame and a tiebreaker, and explains peers"
+    keywords: ["rows frame", "tiebreaker", "peers"]
+  - point: "States the sort cost and tests two orders on the same date"
+    keywords: ["sort", "same total"]
+answer_seconds: 180
+example: "I would ask whether the total restarts for each customer, and whether two orders can have the same date. I will assume yes to both. I use a window function, because I need to keep every row: SUM(amount) OVER (PARTITION BY customer_id ORDER BY order_date, order_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW). PARTITION BY restarts the sum for each customer and ORDER BY decides the order. I add order_id as a tiebreaker and write the ROWS frame myself, because the default frame treats rows with the same date as peers and gives them the same total. The cost is one sort per partition. For orders of 100, 50 and 25, I get 100, 150 and 175. I would test two orders on the same date and check that the totals are 150 and then 175, not 175 twice."
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted with AI, awaiting owner sign-off"
+reviewed_on: 2026-11-26

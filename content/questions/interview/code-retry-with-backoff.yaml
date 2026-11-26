@@ -1,0 +1,32 @@
+id: code-retry-with-backoff
+question: "Write a function that calls a model API and retries with exponential backoff when the call fails with a rate-limit or server error. For example, with 4 tries and a 1 second base, it waits about 1, 2 and 4 seconds between tries and then raises the last error."
+kind: use-case
+short_answer: "Loop over a fixed number of attempts. Call the API inside try and return on success. Catch only retryable errors, such as timeouts, 429 and 5xx. On the last attempt re-raise. Otherwise sleep base * 2 ** attempt, capped, plus random jitter. The cost is bounded: at most max_tries calls and a known worst-case wait."
+deeper_answer: "First clarify what is safe to retry. Timeouts, HTTP 429 and 5xx errors are worth retrying. A 400 or 401 will fail again, so raise it at once. Ask whether the call is idempotent, because retrying a request that creates something can create it twice.\n\nThe structure is for attempt in range(max_tries), with the call in a try block that returns the result. In the except block for retryable errors, re-raise when attempt == max_tries - 1. Otherwise compute delay = min(cap, base * 2 ** attempt) and call time.sleep(delay + random.uniform(0, 1)). The jitter stops many clients from retrying at the same moment. If the response has a Retry-After header, use that value instead.\n\nWith base 1 and four tries the waits are about 1, 2 and 4 seconds. Test three cases with a fake call and a fake sleep: success on the third try, failure on every try, and a non-retryable error that must be raised after one call. Say that in production you would log each retry and may use a library such as tenacity."
+follow_ups:
+  - "Why add jitter to the delay?"
+  - "Which errors should never be retried?"
+  - "How would you stop retries from making an outage worse?"
+common_mistakes:
+  - "Catching every exception, so bad requests are retried too"
+  - "Retrying with no upper limit on tries or on delay"
+  - "Sleeping after the final failed attempt before raising"
+level: I2
+topic: coding
+stop_id: python-for-production
+rubric:
+  - point: "Retries only retryable errors: timeouts, 429 and 5xx, not 400"
+    keywords: ["retryable", "429", "timeouts"]
+  - point: "Uses a loop with a fixed maximum number of attempts"
+    keywords: ["loop", "max_tries", "attempt"]
+  - point: "Doubles the delay each time and caps it"
+    keywords: ["doubles", "cap", "2 ** attempt"]
+  - point: "Adds random jitter so clients do not retry together"
+    keywords: ["jitter", "same moment"]
+  - point: "Re-raises on the last attempt and tests with a fake call"
+    keywords: ["re-raise", "last attempt", "fake call"]
+answer_seconds: 150
+example: "I would start by asking which errors are retryable. I retry timeouts, 429 rate limits and 5xx server errors, and I raise a 400 at once because it will fail again. I write a loop, for attempt in range(max_tries), with the API call in a try block that returns on success. In the except block, if it is the last attempt I re-raise. Otherwise I sleep for min(cap, base * 2 ** attempt), so the wait doubles each time, plus a little random jitter, so many clients do not retry at the same moment. With a base of 1 second and four tries, the waits are about 1, 2 and 4 seconds, so the worst case is bounded. To test it I pass a fake call that fails twice and then succeeds, and I check it was called three times."
+drafted_with_ai: true
+reviewed_by: "UNREVIEWED: drafted with AI, awaiting owner sign-off"
+reviewed_on: 2026-11-26
