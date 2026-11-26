@@ -99,3 +99,69 @@ test("a plan whose date has passed offers a new one (PREP-1)", async ({ page }) 
   await expect(page.getByRole("button", { name: "Make my plan" })).toBeVisible();
   await expect(page.getByLabel("Interview date")).toHaveValue("");
 });
+
+const JOB_POST =
+  "GenAI Engineer, 3 to 5 years. You will build retrieval-augmented generation (RAG) pipelines with a vector database, write evaluation sets, fine-tune small models with LoRA, and deploy on Kubernetes with Docker. Experience with LangGraph agents and prompt injection defences is a plus.";
+
+test("a pasted job post puts its questions first, and Pro can have questions written for it (PREP-5, PREP-6)", async ({ page }) => {
+  const asked: { jd: string; role: string; experience: string; have: string[] }[] = [];
+  let allow = false;
+  await page.route("**/api/ai/prep-questions", (route) => {
+    asked.push(route.request().postDataJSON());
+    if (!allow) return route.fulfill({ status: 403, json: { error: "Questions written for your job post are part of Pro.", upgrade: "/pricing" } });
+    const answer = "Name the trade-off, give one example from real work, and say how you measured the result of the change you made.";
+    return route.fulfill({ json: { questions: [1, 2].map((n) => ({ id: `jd-${n}`, question: `How would you evaluate retrieval for lending documents, part ${n}?`, short_answer: answer, deeper_answer: `${answer} ${answer}` })) } });
+  });
+
+  await page.goto("/interview/prep");
+  await page.getByLabel("Interview date").fill(inDays(10));
+  await page.getByLabel("Role").selectOption("genai-engineer");
+  await page.getByLabel("Your experience").selectOption("mid");
+  await page.getByLabel("Kind of company (optional)").selectOption("service");
+  await page.getByLabel("Job post (optional)").fill(JOB_POST);
+  await expect(page.getByText(/\d+ match your job post, and come first/)).toBeVisible();
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Make my plan" }).click();
+
+  const job = page.getByRole("region", { name: "Your job post" });
+  await expect(job.getByText(/\d+ questions in your plan match the skills your job post names/)).toBeVisible();
+  // Without Pro: the reason, and the way to Pro.
+  await job.getByRole("button", { name: "Write 10 questions for this job post" }).click();
+  await expect(job.getByRole("alert")).toContainText("part of Pro");
+  await expect(job.getByRole("link", { name: "See Pro" })).toHaveAttribute("href", "/pricing");
+  expect(asked[0]).toMatchObject({ jd: JOB_POST, role: "Generative AI & LLM Engineer", experience: "mid" });
+  expect(asked[0].have.length).toBeGreaterThan(10);
+  // With Pro: the questions join the plan, marked wherever they show.
+  allow = true;
+  await job.getByRole("button", { name: "Write 10 questions for this job post" }).click();
+  await expect(job.getByText(/2 questions written by AI for this job post are in your plan, marked "Generated for your JD"/)).toBeVisible();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+
+  await page.getByRole("button", { name: "Start today's questions" }).click();
+  for (let i = 0; i < 3; i++) {
+    await expect(page.getByText("Generated for your JD", { exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Show the short answer" }).click();
+    await page.getByRole("button", { name: "Got it" }).click();
+  }
+  await expect(page.getByText("Card 4 of 10")).toBeVisible();
+  await expect(page.locator("#card-question")).toHaveText(/lending documents, part 1/);
+  await expect(page.getByText("Generated for your JD", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Show the short answer" }).click();
+  await expect(page.getByText(/No person has reviewed them, so check anything that matters/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Full answer, follow-ups and common mistakes" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Partly" }).click();
+  await expect(page.getByRole("progressbar", { name: "Questions covered" })).toHaveAttribute("aria-valuenow", "4");
+  // Its topic shows among the weakest, but has no practice page to link to.
+  const weak = page.getByRole("heading", { name: "Weakest topics so far" }).locator("..");
+  await expect(weak.getByText("Your job post: 0 of 1 got it")).toBeVisible();
+  await expect(weak.getByRole("link", { name: "Your job post" })).toHaveCount(0);
+
+  // Kept on this device: still there after a reload, and gone with the plan.
+  await page.reload();
+  await expect(page.getByRole("progressbar", { name: "Questions covered" })).toHaveAttribute("aria-valuenow", "4");
+  page.once("dialog", (d) => void d.accept());
+  await page.getByRole("button", { name: "Remove my plan" }).click();
+  await expect(page.getByLabel("Job post (optional)")).toHaveValue("");
+  expect(await page.evaluate(() => localStorage.getItem("xplaind.prep-job.v1"))).toBeNull();
+});

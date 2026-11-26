@@ -23,7 +23,7 @@ const A = "font-medium text-brand-800 underline underline-offset-2 dark:text-bra
 const STORED: [string, string, string][] = [
   [
     "Your progress without an account",
-    "Lessons you mark, test results, flashcards, your weekly plan, your interview prep plan and settings.",
+    "Lessons you mark, test results, flashcards, your weekly plan, your interview prep plan and settings. A job post you paste into your interview prep plan, the kind of company, and any questions written for it also stay here; they are never saved to an account.",
     "Only in your browser. It never reaches our servers. Clear your browser's site data to remove it.",
   ],
   [
@@ -81,7 +81,7 @@ const PROCESSORS: [string, string][] = [
     paymentProvider() === "razorpay" ? "Razorpay" : "Cashfree Payments",
     "Takes payments for Pro passes, only if you buy one. It receives the amount, your email and mobile number, and handles your UPI, card or bank details itself.",
   ],
-  ["Anthropic", "Writes AI answers. It receives only the text of that request, such as your question, your code and its error, or your resume text, when you press the button. If you are a Pro learner and choose to have the picture pages of your notes read, those pages, drawn as small images, are sent to it too, and only those pages. In the AI voice interviewer (Pro, and one free interview per account), it receives the text of what you said (the transcript), never your voice, and, if you paste one, the job description and the company name you typed, to plan the questions. We do not store the job description."],
+  ["Anthropic", "Writes AI answers. It receives only the text of that request, such as your question, your code and its error, your resume text, or a job post you ask it to write interview questions from, when you press the button. If you are a Pro learner and choose to have the picture pages of your notes read, those pages, drawn as small images, are sent to it too, and only those pages. In the AI voice interviewer (Pro, and one free interview per account), it receives the text of what you said (the transcript), never your voice, and, if you paste one, the job description and the company name you typed, to plan the questions. We do not store the job description."],
   ["Sarvam AI", "Runs the AI voice interviewer's voice (Pro, and one free interview per account). It turns your spoken answers into text, receiving short recordings of them while you answer, and it speaks the interviewer's lines, which can quote what you said. Xplaind does not keep the recordings (Sarvam handles them under its own terms); we store only your score."],
   ["YouTube", "Plays videos inside lessons from its privacy-enhanced (no-cookie) player, and only after you press play."],
   ...(analyticsKey()

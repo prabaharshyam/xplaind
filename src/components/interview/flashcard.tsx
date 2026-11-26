@@ -13,7 +13,22 @@ export type Card = Pick<InterviewView, "id" | "question" | "short_answer" | "dee
  * IQ-4: one card of a deck: the question, then the short answer, the deeper answer and a rating.
  * Render it with key={q.id}, so each card starts on its question side.
  */
-export function Flashcard({ q, index, total, onRate, extra }: { q: Card; index: number; total: number; onRate: (rating: Rating) => void; extra?: ReactNode }) {
+export function Flashcard({
+  q,
+  index,
+  total,
+  onRate,
+  extra,
+  note,
+}: {
+  q: Card;
+  index: number;
+  total: number;
+  onRate: (rating: Rating) => void;
+  extra?: ReactNode;
+  /** PREP-6: for a question that is not in the bank: shown in place of its level, and it has no page to link to. */
+  note?: string;
+}) {
   const [stage, setStage] = useState<0 | 1 | 2>(0);
   // Each step removes the button that was pressed, so move focus to what it revealed (keyboard and screen-reader users).
   const question = useRef<HTMLHeadingElement>(null);
@@ -42,7 +57,7 @@ export function Flashcard({ q, index, total, onRate, extra }: { q: Card; index: 
         >
           <p className="flex items-center justify-between gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
             <span>{stage === 0 ? "Question" : "Answer"}</span>
-            <span>{levelText(q.level)}</span>
+            <span>{note ?? levelText(q.level)}</span>
           </p>
           <h3
             id="card-question"
@@ -78,9 +93,11 @@ export function Flashcard({ q, index, total, onRate, extra }: { q: Card; index: 
                   ))}
                 </div>
               )}
-              <Link href={`/interview/${q.id}`} className={`text-sm ${textLink}`}>
-                Full answer, follow-ups and common mistakes
-              </Link>
+              {!note && (
+                <Link href={`/interview/${q.id}`} className={`text-sm ${textLink}`}>
+                  Full answer, follow-ups and common mistakes
+                </Link>
+              )}
               {extra}
             </div>
           )}

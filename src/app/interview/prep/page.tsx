@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
-import { getPaths } from "@/lib/content";
+import { getGlossary, getPaths, getStop } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { PrepStudio } from "./prep-studio";
 
@@ -13,6 +13,9 @@ export const metadata: Metadata = {
 /** PREP-1: a day-by-day question plan worked back from the learner's interview date. */
 export default function InterviewPrepPage() {
   const paths = getPaths().map((p) => ({ id: p.id, name: p.name, top: p.top_interview ?? [] }));
+  // PREP-5: the words a job post would use for each question: its lesson's key terms and their other spellings.
+  const glossary = new Map(getGlossary().map((g) => [g.id, [g.term, ...g.also]]));
+  const termsOf = (stopId: string) => (getStop(stopId)?.key_terms ?? []).flatMap((id) => glossary.get(id) ?? []);
   const questions = getInterviewViews().map((q) => ({
     id: q.id,
     question: q.question,
@@ -22,6 +25,7 @@ export default function InterviewPrepPage() {
     topic: q.topic,
     paths: q.paths,
     often: q.often,
+    terms: termsOf(q.stop.id),
   }));
   return (
     <main>
