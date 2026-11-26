@@ -8,7 +8,7 @@ test.use({ viewport: { width: 360, height: 740 } });
 const PAGES = [
   "/", "/paths", "/roadmap/ai-engineer", "/start", "/stop/what-is-ai", "/stop/what-is-ai/ta", "/stop/what-is-ai/hinglish",
   "/library", "/library?view=topics", "/videos", "/projects", "/glossary", "/papers", "/books", "/resources",
-  "/practice", "/interview", "/interview/simulator", "/interview/answers", "/interview/patterns", "/interview/design",
+  "/practice", "/interview", "/interview/simulator", "/interview/prep", "/interview/answers", "/interview/patterns", "/interview/design",
   "/jobs", "/plan", "/playground", "/ai", "/ai/tutor", "/ai/book", "/ai/resume",
   "/pricing", "/refunds", "/privacy", "/terms", "/contact", "/about", "/colleges", "/stories", "/blog", "/signin",
 ];

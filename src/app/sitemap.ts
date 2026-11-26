@@ -37,6 +37,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...getContent().translations.map((t) => `/stop/${t.data.id}/${t.data.lang}`),
     "/interview",
     "/interview/simulator",
+    "/interview/prep",
     "/interview/top",
     ...getPaths()
       .filter((p) => p.top_interview.length)

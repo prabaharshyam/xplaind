@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { useActivity, useGame, useInterviewDate, usePractice, useProgress, useSavedPlan, useToday } from "@/lib/browser/hooks";
+import { useActivity, useGame, usePractice, usePrep, useProgress, useSavedPlan, useToday } from "@/lib/browser/hooks";
 import { activeDays } from "@/lib/game/xp";
 import { weekOf } from "@/lib/plan/weekly";
 import { nudges } from "@/lib/nudges";
@@ -15,7 +15,7 @@ export function NudgeBar({ path, lessons, hasTest }: { path: { id: string; name:
   const practice = usePractice();
   const activity = useActivity();
   const { streak } = useGame();
-  const interviewOn = useInterviewDate();
+  const interviewOn = usePrep()?.interviewOn ?? null;
   const plan = useSavedPlan();
 
   const list = useMemo(() => {

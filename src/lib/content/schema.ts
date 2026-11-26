@@ -330,6 +330,10 @@ export const InterviewQuestion = z
     rubric: z.array(RubricPoint).min(3).max(6),
     /** How long a spoken answer should take at most, as in a real interview. */
     answer_seconds: z.number().int().min(60).max(180),
+    /** PREP-2: asked in every role's interview ("Tell me about yourself"), so it belongs to every roadmap, not only its lesson's. */
+    all_roles: z.literal(true).optional(),
+    /** PREP-2: asked in almost every interview, whatever the company. A prep plan puts these behavioural questions first. */
+    asked_often: z.literal(true).optional(),
     /** IQ-8: a concrete example to tell in the interview, in the candidate's own voice. Required for a Top 25 question. */
     example: Text.max(1200).optional(),
     ...reviewShape,

@@ -15,12 +15,12 @@ const base: NudgeInput = {
 const ids = (i: Partial<NudgeInput>) => nudges({ ...base, ...i }).map((n) => n.id);
 
 describe("NG-1 nudges", () => {
-  it("puts a close interview first and links to the role's mock interview", () => {
+  it("counts down to the interview in the prep plan, first, and links to the plan (PREP-4)", () => {
     const n = nudges({ ...base, interviewOn: "2026-11-20" });
-    expect(n[0]).toMatchObject({ id: "interview", href: "/interview/simulator?path=ai-engineer" });
+    expect(n[0]).toMatchObject({ id: "interview", href: "/interview/prep" });
     expect(n[0].text).toContain("6 days");
-    expect(ids({ interviewOn: "2026-12-30" })).not.toContain("interview");
-    expect(ids({ interviewOn: "2026-11-14" })).not.toContain("interview");
+    expect(nudges({ ...base, interviewOn: "2026-11-14" })[0].text).toContain("today");
+    expect(ids({ interviewOn: "2026-11-13" })).not.toContain("interview");
   });
   it("sends a brand-new learner to the 2-minute check", () => {
     expect(ids({ activeDays: new Set(), streak: 0, hasTest: false })).toEqual(["first"]);

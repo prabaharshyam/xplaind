@@ -5,6 +5,7 @@ import path from "node:path";
 import { todayInIST } from "@/lib/dates";
 import type { LevelId } from "@/lib/levels";
 import { loadContent } from "./load";
+import { isHumanName } from "./review";
 import type { Bundle } from "./types";
 import { validateBundle } from "./validate";
 import type { BlogPost, Certification, Cheatsheet, InterviewPattern, SystemDesign, Testimonial, Channel, Goal, GlossaryTerm, GuidedProject, LevelDefinition, PathStage, Resource, Stop, StageProject, StopTranslation, LessonLang } from "./schema";
@@ -23,8 +24,9 @@ export function getContent(): Bundle {
     const lines = errors.map((e) => `  ${e.file}: ${e.message}`).join("\n");
     throw new Error(`Content is invalid (run "npm run content:validate"):\n${lines}`);
   }
-  cached = bundle;
-  return bundle;
+  // IQ-6: a question no person has signed off is validated but never built into the site.
+  cached = { ...bundle, interview: bundle.interview.filter((q) => isHumanName(q.data.reviewed_by)) };
+  return cached;
 }
 
 export const getStops = (): Stop[] => getContent().stops.map((s) => s.data);

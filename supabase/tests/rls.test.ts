@@ -27,6 +27,7 @@ beforeAll(async () => {
     await q("insert into badges (user_id, badge_id) values ($1, 'level-B1')", [id]);
     await q("insert into level_cards (user_id, level, goal_id, weeks_active) values ($1, 'B2', 'genai-engineer', 3)", [id]);
     await q("insert into ai_usage (user_id, day, kind) values ($1, '2026-10-20', 'grade')", [id]);
+    await q("insert into interview_preps (user_id, path_id, experience, interview_on, minutes, started_on) values ($1, 'ai-engineer', 'mid', '2026-12-06', 60, '2026-11-26')", [id]);
   }
   await q("insert into email_subscriptions (email, user_id, source, consent_text, consent_at) values ('a@example.com', $1, 'landing', 'Yes, email me', now())", [A]);
   await q("insert into resource_clicks (resource_id, stop_id, level) values ('cs50p', 'python-basics', 'B2')");
@@ -40,7 +41,7 @@ afterAll(async () => {
   await db?.drop();
 });
 
-const OWNED = ["profiles", "quiz_attempts", "stop_progress", "activity_days", "badges", "practice_ratings", "level_cards", "ai_usage"];
+const OWNED = ["profiles", "quiz_attempts", "stop_progress", "activity_days", "badges", "practice_ratings", "level_cards", "ai_usage", "interview_preps"];
 const ownerColumn = (t: string) => (t === "profiles" ? "id" : "user_id");
 
 describe("row-level security (SC-2, AC-4)", () => {
@@ -270,6 +271,32 @@ describe("account deletion (AC-11)", () => {
       const kept = (await q(`select count(*)::int as n from ${table} where ${ownerColumn(table)} = $1`, [A])).rows[0].n;
       expect(kept, table).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("interview prep plan (PREP-3)", () => {
+  it("a learner changes and removes only their own plan", async () => {
+    await asUser(db.client, A, async () => {
+      await q("update interview_preps set minutes = 90 where user_id = $1", [A]);
+      expect((await q("update interview_preps set minutes = 30 where user_id = $1", [B])).rowCount).toBe(0);
+      expect((await q("delete from interview_preps where user_id = $1", [B])).rowCount).toBe(0);
+      expect((await q("select user_id, minutes from interview_preps")).rows).toEqual([{ user_id: A, minutes: 90 }]);
+      expect((await q("delete from interview_preps where user_id = $1", [A])).rowCount).toBe(1);
+    });
+    await fails(asUser(db.client, A, () => q("update interview_preps set user_id = $1 where user_id = $2", [B, A])));
+  });
+
+  it("refuses a plan in someone else's name, or with values the site never sends", async () => {
+    const C = "00000000-0000-4000-8000-0000000000e1";
+    await q("insert into auth.users (id, email) values ($1, 'prep@example.com')", [C]);
+    const insert = (user: string, experience: string, minutes: number) =>
+      q("insert into interview_preps (user_id, path_id, experience, interview_on, minutes, started_on) values ($1, 'ai-engineer', $2, '2026-12-06', $3, '2026-11-26')", [user, experience, minutes]);
+    await fails(asUser(db.client, A, () => insert(C, "mid", 60)));
+    await fails(asUser(db.client, C, () => insert(C, "expert", 60)));
+    await fails(asUser(db.client, C, () => insert(C, "mid", 45)));
+    await asUser(db.client, C, () => insert(C, "mid", 60));
+    await q("delete from auth.users where id = $1", [C]);
+    expect((await q("select count(*)::int as n from interview_preps where user_id = $1", [C])).rows[0].n).toBe(0);
   });
 });
 

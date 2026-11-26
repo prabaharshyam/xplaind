@@ -39,6 +39,7 @@ export function GET(): Response {
     `- [All interview questions](${base}/interview): ${questions.length} questions with short and deeper answers`,
     ...paths.map((p) => `- [${p.name} interview questions](${base}/interview/for/${p.id})`),
     `- [Mock interview](${base}/interview/simulator): answer out loud against a timer and get a report`,
+    `- [Interview prep plan](${base}/interview/prep): the questions to cover each day until an interview date, with mock interviews and a readiness score`,
     `- [Top 25 questions by role](${base}/interview/top): the questions most worth practising for each path`,
     `- [Answers by role](${base}/interview/answers): every interview question and answer, filterable by role`,
     `- [Practice](${base}/practice): interview questions as flashcards and quick quizzes, by topic`,

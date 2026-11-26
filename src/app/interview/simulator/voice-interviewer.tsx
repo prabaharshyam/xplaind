@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import { MIC_BLOCKED, joinText, speak, stopSpeaking, useDictation, useSpeechSupported } from "@/components/interview/speech";
+import { recordInterview } from "@/lib/browser/activity-store";
+import { todayInIST } from "@/lib/dates";
 import { readinessLabel, type Readiness } from "@/lib/interview/readiness";
 import type { SimQuestion } from "@/lib/interview/analyse";
 import { isCustomId, type InterviewSetup } from "@/lib/ai/interview-plan";
@@ -995,6 +997,13 @@ const outOf5 = (n: number) => `${n} / 5`;
 const times = (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`);
 
 function VoiceReportView({ report, readiness, trial, onExit }: { report: VoiceReport; readiness: Readiness | null; trial: boolean; onExit: () => void }) {
+  // PREP-1: an AI interview counts as a finished mock interview too (dates and scores only), so the prep plan can show today's as done.
+  const recorded = useRef(false);
+  useEffect(() => {
+    if (recorded.current) return;
+    recorded.current = true;
+    recordInterview({ on: todayInIST(), answered: report.answered, total: report.questions.length, averageScore: report.score / 20 });
+  }, [report]);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
   const c = report.communication;

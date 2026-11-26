@@ -11,7 +11,6 @@ import { serverSnapshot, subscribe } from "@/lib/browser/storage";
 import { currentPlan, googleCalendarLink, HOUR_CHOICES, nextMonday, type PlanLesson, planWeek, reminderIcs, weekOf } from "@/lib/plan/weekly";
 import { Skeleton } from "@/components/skeleton";
 import { CommitCard } from "./commit-card";
-import { InterviewPlan } from "./interview-plan";
 
 const DEFAULT_HOURS = 6;
 const fmt = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
@@ -114,7 +113,16 @@ export function PlanStudio({ paths, lessons, planUrl }: { paths: { id: string; n
         {items.length > 0 && done === items.length && (
           <p className="mt-4 rounded-2xl bg-emerald-50 p-4 font-medium text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100">Week done. Next week&apos;s plan appears on Monday.</p>
         )}
-        <InterviewPlan today={today!} pathId={pathId} pathName={paths.find((p) => p.id === pathId)?.name ?? "next"} lessons={lessons[pathId] ?? []} hours={hours} state={state} />
+        {/* PREP-4: the interview date now lives in Interview prep, which plans questions day by day. */}
+        <section aria-labelledby="interview-prep-heading" className="mt-10 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 id="interview-prep-heading" className="text-xl font-semibold">
+            Got an interview coming up?
+          </h2>
+          <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">Give us the date and your role. You get the questions to cover each day until then, mock interviews and a readiness score.</p>
+          <Link href="/interview/prep" className={`${secondaryButton} mt-4`}>
+            Plan my interview prep
+          </Link>
+        </section>
       </section>
 
       <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">

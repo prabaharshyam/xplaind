@@ -1,5 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import path from "node:path";
+import { loadContent } from "../src/lib/content/load";
+
+const questionText = new Map(loadContent(path.resolve(__dirname, "../content")).bundle.interview.map((q) => [q.data.id, q.data.question]));
 
 // VI-1 to VI-7: the AI voice interviewer (Pro), hands-free. The AI and voice routes are mocked, as in the
 // MB-12 tests: CI has no AI or voice key. A fake microphone "says" an answer, then goes quiet.
@@ -559,7 +563,8 @@ test("one mock interview: a Pro learner picks role, experience and company, and 
   expect(starts[0].setup).toEqual({ pathId: "genai-engineer", experience: "mid", company: "Acme" });
   expect(starts[0].questionIds).toHaveLength(3);
   // The preview did not lie: the first question asked is the one the opening line named.
-  expect(opening).toContain((await page.getByRole("dialog", { name: "Zarina" }).getByText(/\?$/).first().textContent())?.trim().slice(-30));
+  // (Looked up by id: a "Tell me about a time…" question does not end in a question mark.)
+  expect(opening).toContain(questionText.get(starts[0].questionIds[0])!.slice(-30));
 });
 
 test("a pasted job description plans the interview: bank questions plus one written for the job, sent back sealed (VI-11)", async ({ page }) => {
