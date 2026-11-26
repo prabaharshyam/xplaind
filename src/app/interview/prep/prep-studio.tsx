@@ -6,9 +6,9 @@ import { useAccountState } from "@/components/account-link";
 import { Flashcard, type Card } from "@/components/interview/flashcard";
 import { Skeleton } from "@/components/skeleton";
 import { muted, primaryButton, quietButton, secondaryButton, textLink } from "@/components/ui";
-import { useActivity, useCurrentPathId, usePractice, usePrep, usePrepJob, useToday } from "@/lib/browser/hooks";
+import { useActivity, useCurrentPathId, usePractice, usePrep, usePrepJob, useStories, useToday } from "@/lib/browser/hooks";
 import { rate } from "@/lib/browser/practice-store";
-import { parsePrepJob, rateGenerated, rawPrepJob, savePrepJob } from "@/lib/browser/prep-job-store";
+import { parsePrepJob, rateGenerated, rawPrepJob, savePrepJob, saveStory } from "@/lib/browser/prep-job-store";
 import { oldInterviewDate, savePrep } from "@/lib/browser/prep-store";
 import { daysBetween } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
@@ -17,6 +17,7 @@ import { EXPERIENCE, type ExperienceId } from "@/lib/interview/setup";
 import { practiceOrder, type Rating } from "@/lib/practice/queue";
 import { COMPANY_TYPES, GENERATED_COUNT, GeneratedQuestion, MAX_BOOST, MAX_JD_CHARS, MIN_JD_CHARS, isGeneratedId, jobBoost, withGenerated, type CompanyId } from "@/lib/prep/job";
 import { PREP_REMIND_CONSENT } from "@/lib/prep/email";
+import { ROUNDS, STORY_KINDS, STORY_PARTS, prepIcs, storyFor, storyWritten, type Story } from "@/lib/prep/extras";
 import { MAX_DAYS_AHEAD, MINUTES, addDays, perDay, prepPlan, prepReadiness, prepSet, type Minutes, type PrepDay, type PrepSetup } from "@/lib/prep/plan";
 
 export type PrepCard = Card & { topic: string; paths: string[]; often: boolean; terms: string[] };
@@ -285,6 +286,13 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
     requestAnimationFrame(() => document.getElementById("today-h")?.focus()); // the deck is gone: back to its heading
   };
 
+  // PREP-8: a practice block every evening and the interview day, for any calendar app.
+  const downloadIcs = () => {
+    const url = URL.createObjectURL(new Blob([prepIcs(setup, path.name, today, `${window.location.origin}/interview/prep`)], { type: "text/calendar" }));
+    Object.assign(document.createElement("a"), { href: url, download: "xplaind-interview-prep.ics" }).click();
+    URL.revokeObjectURL(url);
+  };
+
   const dayText = (d: PrepDay, i: number) => {
     if (d.kind === "interview") return "Interview day";
     const topics = [...new Set(d.ids.map((id) => interviewTopicLabel(byId.get(id)!.topic)))].slice(0, 3).join(", ");
@@ -409,9 +417,12 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
               isGeneratedId(queue[index]) ? (
                 <p className={`text-sm ${muted}`}>AI wrote this question and answer from your job post. No person has reviewed them, so check anything that matters.</p>
               ) : (
-                <Link href={`/interview/simulator?question=${queue[index]}`} className={`text-sm ${textLink}`}>
-                  Answer this one out loud in a mock interview
-                </Link>
+                <>
+                  <Link href={`/interview/simulator?question=${queue[index]}`} className={`text-sm ${textLink}`}>
+                    Answer this one out loud in a mock interview
+                  </Link>
+                  {byId.get(queue[index])!.topic === "behavioral" && <StoryHint question={byId.get(queue[index])!.question} />}
+                </>
               )
             }
           />
@@ -438,6 +449,9 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
           Day by day
         </h2>
         <p className={`mt-1 text-sm ${muted}`}>If you miss a day, the questions move to the next one.</p>
+        <button type="button" className={`${secondaryButton} mt-3`} onClick={downloadIcs}>
+          Add to my calendar (.ics)
+        </button>
         <ol className="mt-2 divide-y divide-zinc-200 dark:divide-zinc-800">{plan.days.slice(0, DAYS_SHOWN).map(dayItem)}</ol>
         {plan.days.length > DAYS_SHOWN && (
           <details className="border-t border-zinc-200 dark:border-zinc-800">
@@ -445,6 +459,24 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
             <ol className="divide-y divide-zinc-200 dark:divide-zinc-800">{plan.days.slice(DAYS_SHOWN).map((d, i) => dayItem(d, i + DAYS_SHOWN))}</ol>
           </details>
         )}
+      </section>
+
+      <StoriesPanel />
+
+      <section aria-labelledby="rounds-h" className={panel}>
+        <h2 id="rounds-h" className="text-xl font-semibold">
+          What each round tests
+        </h2>
+        <p className={`mt-1 text-sm ${muted}`}>Most interviews have some of these rounds. Ask the recruiter which ones yours has.</p>
+        <dl className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
+          {ROUNDS.map((r) => (
+            <div key={r.name} className="py-3">
+              <dt className="font-medium">{r.name}</dt>
+              <dd className="mt-1 leading-7">{r.tests}</dd>
+              <dd className={`leading-7 ${muted}`}>Prepare: {r.prepare}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <Reminder />
@@ -636,6 +668,77 @@ function Reminder() {
           {error}
         </p>
       )}
+    </section>
+  );
+}
+
+/** PREP-8: under a behavioural card: the learner's own story for that kind of question, or where to write it. */
+function StoryHint({ question }: { question: string }) {
+  const kind = STORY_KINDS.find((k) => k.id === storyFor(question))!;
+  const story = useStories()[kind.id];
+  if (!storyWritten(story)) {
+    return (
+      <p className={`text-sm ${muted}`}>
+        Your story for this: {kind.label.toLowerCase()}.{" "}
+        <a href="#stories-h" className={textLink}>
+          Write it once
+        </a>{" "}
+        and it shows here.
+      </p>
+    );
+  }
+  return (
+    <details className="rounded-2xl bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+      <summary className="flex min-h-11 cursor-pointer items-center font-medium">Your story for this question</summary>
+      <dl className="space-y-2 pb-1">
+        {STORY_PARTS.filter((p) => story[p.id].trim()).map((p) => (
+          <div key={p.id}>
+            <dt className="font-medium">{p.label}</dt>
+            <dd className="leading-6 whitespace-pre-line">{story[p.id]}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
+/** PREP-8: five stories, written once, each in four parts. Saved on this device as the learner leaves a box. */
+function StoriesPanel() {
+  const stories = useStories();
+  const empty: Story = { situation: "", task: "", action: "", result: "" };
+  return (
+    <section aria-labelledby="stories-h" className={panel}>
+      <h2 id="stories-h" tabIndex={-1} className="text-xl font-semibold outline-none">
+        Your stories
+      </h2>
+      <p className="mt-2 leading-7">Behavioural questions are answered with a story. Write these five once, and each behavioural card shows the one that fits. They stay on this device.</p>
+      <div className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
+        {STORY_KINDS.map((k) => (
+          <details key={k.id}>
+            <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 py-2 font-medium">
+              <span>{k.label}</span>
+              <span className={`shrink-0 text-sm font-normal ${muted}`}>{storyWritten(stories[k.id]) ? "Written" : "Not written yet"}</span>
+            </summary>
+            <div className="grid gap-3 pb-4">
+              {STORY_PARTS.map((p) => (
+                <label key={p.id} className="block min-w-0 text-sm font-medium">
+                  {p.label}
+                  <span className={`ml-2 font-normal ${muted}`}>{p.hint}</span>
+                  <textarea
+                    defaultValue={stories[k.id]?.[p.id] ?? ""}
+                    onBlur={(e) => saveStory(k.id, { ...empty, ...stories[k.id], [p.id]: e.target.value })}
+                    maxLength={1200}
+                    rows={3}
+                    name={`story-${k.id}-${p.id}`}
+                    autoComplete="off"
+                    className={`${field} py-2 font-normal leading-6`}
+                  />
+                </label>
+              ))}
+            </div>
+          </details>
+        ))}
+      </div>
     </section>
   );
 }
