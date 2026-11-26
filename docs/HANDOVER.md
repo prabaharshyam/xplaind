@@ -47,7 +47,7 @@ Who it is for: learners in India, from freshers and career-switchers with no cod
 
 Scope decisions to respect:
 
-- **System design stays at the basics** (FOCUS-1). The 6 system design lessons, 28 interview patterns and 10 worked answers stay. Build no more system design content or features, for example no system design mock interview.
+- **System design stays at the basics** (FOCUS-1). The 6 system design lessons, 28 interview patterns and 10 worked answers stay. Build no more system design content or features, for example no system design mock interview. One exception since 26 Nov (owner decision): interview questions on designing AI systems may be added to the question bank.
 - **Pro plan pop-ups were deliberately skipped.** Do not add upsell pop-ups unless asked.
 - **No XP, ranks or badges.** A streak and progress counts only.
 - **Cheatsheets are paused** (CS-3). The 12 sheets are still in `content/cheatsheets` and validate, but there are no pages.
@@ -457,7 +457,8 @@ Dates are 2026. `git log` and the PR list hold the detail; `docs/decisions.md` r
 - **19 Nov (resources signed off):** the owner reviewed everything; all 904 resources are verified by him (ED-4). The 4 certifications and 15 channels too: nothing in content/ is UNVERIFIED or UNREVIEWED.
 - **19 Nov (code runner buttons):** Reset and Open in playground were invisible on the dark code window; fixed with the dark glass button (GL-3).
 - **19 Nov (explain it in an interview):** every lesson ends with a spoken 30-to-45-second interview answer and the likely follow-up (LS-4). Front-matter field `explain_in_interview`, required on deep lessons. Translated into Tamil, Hindi, Tanglish and Hinglish, with the English in a fold.
-- **26 Nov (interview prep, email and stories):** an opt-in daily email at 7:30 am India time, five stories for behavioural questions, a rounds guide and a calendar file (PREP-7, PREP-8). On the preview branch, not merged yet.
+- **26 Nov (question bank, batch 2):** 40 AI system design interview questions added and signed off on the owner's instruction (FOCUS-1 amended for interview questions only). 322 questions. Next: coding rounds, role depth, senior level.
+- **26 Nov (interview prep, email and stories):** an opt-in daily email at 7:30 am India time, five stories for behavioural questions, a rounds guide and a calendar file (PREP-7, PREP-8). Merged as PR 156.
 - **26 Nov (interview prep, job post):** a pasted job post puts its matching questions first with no AI, a company type tunes the mix, and Pro can have ten questions written for the post, labelled "Generated for your JD" (PREP-5, PREP-6). Merged as PR 155.
 - **26 Nov (interview prep plan):** `/interview/prep` plans the questions for each day until an interview date (PREP-1), saved to the account when signed in (PREP-3), and replaces the interview date on `/plan` (PREP-4). 50 behavioural questions for every role were drafted, signed off by the owner the same day and are live (PREP-2); unsigned questions are now kept out of the build (IQ-6).
 - **21 Nov (built in India, for the world):** the site and the Product Hunt launch no longer say Xplaind is only for India; brand lines say "Built in India, for the world" (BR-11). India-specific facts stay.

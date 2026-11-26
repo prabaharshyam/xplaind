@@ -1,0 +1,32 @@
+id: design-realtime-fraud-detection
+question: "Design a real-time fraud detection system for a UPI payments app that handles 5,000 transactions per second and must decide on each one within 100 milliseconds."
+kind: use-case
+short_answer: "Clarify the allowed actions (approve, step-up check, block), the latency budget and the cost of each error. Then: a stream pipeline computing velocity features per user, device and merchant, a low-latency feature store, a gradient-boosted model beside rules, thresholds set by cost, late labels from chargebacks, shadow mode first, and monitoring for drift."
+deeper_answer: "Start with requirements: which actions are allowed, how much friction a false positive causes, and how much money a missed fraud costs. Labels arrive late, from chargebacks and user reports, often weeks after the payment. Fraud is a very small share of traffic, so the data is heavily imbalanced.\n\nData flow: each payment event goes to a stream processor that updates velocity features, such as payments in the last minute per device, new payees today, and the amount compared with the user's history. The scoring service reads these from an in-memory store, adds request features, and runs a gradient-boosted model beside hard rules. Scores map to approve, step-up authentication or block. Borderline cases go to a review queue, which also produces labels.\n\nTrade-offs: graph features and larger models can raise recall but put the latency budget at risk, so heavy features are computed asynchronously. Evaluate offline with precision and recall at a fixed false positive rate on a time-based split, then run in shadow mode before taking real decisions. At scale, the tail latency of the feature store breaks first, and blocked payments give no label, which biases later training."
+follow_ups:
+  - "How do you train when fraud labels arrive weeks later?"
+  - "What happens to a payment if the feature store is slow or down?"
+  - "How would you set the block threshold?"
+common_mistakes:
+  - "Using accuracy as the metric on heavily imbalanced data"
+  - "Random train and test split instead of a time-based split"
+  - "No plan for the model or feature store timing out"
+level: P2
+topic: system-design
+stop_id: ml-interviews
+rubric:
+  - point: "Clarifies actions, latency budget and the cost of each kind of error"
+    keywords: ["clarify", "latency", "false positive", "cost"]
+  - point: "Streaming velocity features per user, device or merchant"
+    keywords: ["stream", "velocity", "feature store", "window"]
+  - point: "Model beside rules, with tiered actions such as step-up checks"
+    keywords: ["rule", "gradient", "step-up", "block", "threshold"]
+  - point: "Handles late and imbalanced labels"
+    keywords: ["label", "chargeback", "imbalanc", "late"]
+  - point: "Shadow mode before launch, then monitoring for drift"
+    keywords: ["shadow", "drift", "monitor", "recall"]
+answer_seconds: 150
+example: "For a UPI app at 5,000 transactions per second, I would first clarify the latency budget, 100 milliseconds end to end, and the cost of a false positive against a missed fraud. Each payment goes on a stream, and a stream processor keeps velocity features: payments per device in the last minute, new payees today, and the amount against the user's usual amount. The scoring service reads them from an in-memory feature store and runs a gradient-boosted model beside rules. Low scores are approved, middle scores get a step-up check, and high scores are blocked. Labels arrive late from chargebacks, and the data is imbalanced, so I train on a time-based split and measure recall at a fixed false positive rate. I would run in shadow mode first, then monitor drift, because fraud patterns change fast. The trade-off is accuracy against latency: graph features help, but I compute them asynchronously."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26

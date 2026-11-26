@@ -1,0 +1,34 @@
+id: design-rag-freshness-pipeline
+question: "Your RAG assistant answers from 3 million documents, and about 50,000 of them change every day. Users have started getting answers from old policy versions. Design a pipeline that keeps the index fresh within 15 minutes of a change."
+kind: scenario
+short_answer: "Detect changes with events or change data capture where possible, and scheduled scans elsewhere. Process only what changed: hash content, re-chunk and re-embed changed parts, upsert by stable IDs, and remove deleted or replaced chunks. Use a queue with retries, store version and date metadata, monitor index lag, and invalidate caches that hold old answers."
+deeper_answer: "First find where staleness comes from: slow detection, slow processing, deletes that are never applied, or caches.\n\nDesign: sources send change events through webhooks or change data capture. Sources without events get a scheduled scan that compares modified times or content hashes. Each change becomes a message on a queue. Workers fetch the document, parse it, and compare chunk hashes with the stored ones, so only changed chunks are embedded again. Writes are upserts keyed by document ID and chunk ID, which makes retries safe. Deletes and permission changes are events too, and chunks from an old version are removed or marked inactive in the same step. Store version and date as metadata, so retrieval prefers the current version.\n\nTrade-offs: full re-indexing is simple and self-correcting but too slow and costly to run daily at this size, so use incremental updates plus a periodic full reconciliation to catch missed events. What breaks first: bursts, such as a bulk edit of 500,000 documents, so add backpressure and priorities. Monitor index lag, queue depth, failures in a dead-letter queue, and a daily count comparison between source and index."
+follow_ups:
+  - "How do you make sure deleted documents really disappear from answers?"
+  - "You want to change the embedding model. How do you do it without downtime?"
+  - "How do you know the index and the source agree?"
+common_mistakes:
+  - "Re-indexing everything every night"
+  - "Adding new chunks without removing the old version"
+  - "Forgetting cached answers and permission changes"
+level: P2
+topic: system-design
+stop_id: data-pipelines-ai
+rubric:
+  - point: "Finds the cause and sets a freshness target per source"
+    keywords: ["freshness", "target", "cause", "per source"]
+  - point: "Detects changes with events or change data capture, plus scans"
+    keywords: ["change event", "change data capture", "webhook", "scan"]
+  - point: "Incremental processing with hashes and upserts"
+    keywords: ["incremental", "hash", "upsert", "only changed"]
+  - point: "Handles deletes and old versions"
+    keywords: ["delete", "old version", "remove", "inactive"]
+  - point: "Queue with retries and backpressure"
+    keywords: ["queue", "retry", "backpressure", "dead-letter"]
+  - point: "Monitors index lag and reconciles source with index"
+    keywords: ["index lag", "monitor", "reconcil", "source and index"]
+answer_seconds: 150
+example: "I would first check the cause: detection, processing, missing deletes or a cache. Then I set a freshness target of 15 minutes for policy sources. Each source sends a change event through a webhook or change data capture, and sources without events get a scan every few minutes. Every change goes on a queue. A worker parses the document, compares a hash of each chunk with the stored one, and embeds only changed chunks. It writes with an upsert keyed by document and chunk ID, so a retry is safe. The same step will remove chunks from the old version, and a delete in the source is an event too. The trade-off is that incremental updates can miss events, so a weekly full reconciliation compares source and index. For 50,000 changes a day this is cheap. I would monitor index lag and queue depth, and clear cached answers for changed documents."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26
