@@ -15,12 +15,14 @@ import { interviewTopicLabel } from "@/lib/interview-topics";
 import { readinessLabel } from "@/lib/interview/readiness";
 import { EXPERIENCE, type ExperienceId } from "@/lib/interview/setup";
 import { practiceOrder, type Rating } from "@/lib/practice/queue";
-import { COMPANY_TYPES, GENERATED_COUNT, GeneratedQuestion, MAX_JD_CHARS, MIN_JD_CHARS, isGeneratedId, jobBoost, withGenerated, type CompanyId } from "@/lib/prep/job";
+import { COMPANY_TYPES, GENERATED_COUNT, GeneratedQuestion, MAX_BOOST, MAX_JD_CHARS, MIN_JD_CHARS, isGeneratedId, jobBoost, withGenerated, type CompanyId } from "@/lib/prep/job";
 import { MAX_DAYS_AHEAD, MINUTES, addDays, perDay, prepPlan, prepReadiness, prepSet, type Minutes, type PrepDay, type PrepSetup } from "@/lib/prep/plan";
 
 export type PrepCard = Card & { topic: string; paths: string[]; often: boolean; terms: string[] };
 /** PREP-6: how a question written for the job post is marked wherever it shows. */
 const GENERATED_NOTE = "Generated for your JD";
+/** The topic those questions are listed under, in the day list and the weakest topics. */
+const JOB_TOPIC = "Your job post";
 type PrepPath = { id: string; name: string; top: string[] };
 
 const panel = "rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900";
@@ -108,7 +110,7 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
         savePrep(draft);
         // Questions written for a job post belong to that post: a changed post starts without them.
         const same = jd.trim() === job.jd;
-        savePrepJob({ company: company || null, jd: jd.trim(), boost, generated: same ? job.generated : [], ratings: same ? job.ratings : {} });
+        savePrepJob({ company: company || null, jd: jd.trim(), boost: boost.slice(0, MAX_BOOST), generated: same ? job.generated : [], ratings: same ? job.ratings : {} });
         onDone();
       }}
     >
@@ -228,7 +230,7 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
   const job = usePrepJob();
   const ratings = useMemo(() => ({ ...practice.ratings, ...job.ratings }), [practice.ratings, job.ratings]);
   const byId = useMemo(
-    () => new Map<string, PrepCard>([...questions, ...job.generated.map((g) => ({ ...g, level: "I1" as const, topic: "Your job post", paths: [], often: false, terms: [] }))].map((q) => [q.id, q])),
+    () => new Map<string, PrepCard>([...questions, ...job.generated.map((g) => ({ ...g, level: "I1" as const, topic: JOB_TOPIC, paths: [], often: false, terms: [] }))].map((q) => [q.id, q])),
     [questions, job.generated],
   );
   const set = useMemo(() => prepSet(questions, path.top, path.id, setup.experience, { boost: job.boost, company: job.company }), [questions, path, setup.experience, job.boost, job.company]);
@@ -331,9 +333,14 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
             <ul className="mt-1 space-y-1">
               {ready.weak.map((t) => (
                 <li key={t.topic}>
-                  <Link href={`/practice/${t.topic}`} className={textLink}>
-                    {interviewTopicLabel(t.topic)}
-                  </Link>
+                  {/* The questions written for the job post have no practice page of their own. */}
+                  {t.topic === JOB_TOPIC ? (
+                    JOB_TOPIC
+                  ) : (
+                    <Link href={`/practice/${t.topic}`} className={textLink}>
+                      {interviewTopicLabel(t.topic)}
+                    </Link>
+                  )}
                   : {t.gotIt} of {t.rated} got it
                 </li>
               ))}
@@ -484,6 +491,8 @@ function JobPost({ setup, path, have, fromJob, onEdit }: { setup: PrepSetup; pat
         });
       }
       savePrepJob({ ...job, generated: questions.data, ratings: {} });
+      // The button is gone now: put focus on the section, whose text says what happened.
+      requestAnimationFrame(() => document.getElementById("job-h")?.focus());
     } catch {
       setError({ message: "We could not reach the server. Check your connection and try again." });
     } finally {
@@ -493,7 +502,7 @@ function JobPost({ setup, path, have, fromJob, onEdit }: { setup: PrepSetup; pat
 
   return (
     <section aria-labelledby="job-h" className={panel}>
-      <h2 id="job-h" className="text-xl font-semibold">
+      <h2 id="job-h" tabIndex={-1} className="text-xl font-semibold outline-none">
         Your job post
       </h2>
       {!job.jd ? (
@@ -509,7 +518,7 @@ function JobPost({ setup, path, have, fromJob, onEdit }: { setup: PrepSetup; pat
             {fromJob > 0 ? `${count(fromJob, "question", "questions")} in your plan ${fromJob === 1 ? "matches" : "match"} the skills your job post names. They come first.` : "No question in our bank matches the skills your job post names, so your plan is ordered by level."}
           </p>
           {job.generated.length > 0 ? (
-            <p className="mt-2 leading-7">
+            <p className="mt-2 leading-7" role="status">
               {count(job.generated.length, "question", "questions")} written by AI for this job post {job.generated.length === 1 ? "is" : "are"} in your plan, marked &quot;{GENERATED_NOTE}&quot;. No person has reviewed them.
             </p>
           ) : job.jd.length < MIN_JD_CHARS ? (

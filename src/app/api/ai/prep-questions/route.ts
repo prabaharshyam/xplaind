@@ -7,7 +7,8 @@ import { body } from "@/lib/ai/route";
 import { runAi } from "@/lib/ai/run";
 import { voiceAccess } from "@/lib/ai/voice-access";
 
-export const maxDuration = 60;
+// Ten questions with answers is as much writing as a resume review, which has the same two minutes.
+export const maxDuration = 120;
 
 export async function POST(request: Request) {
   const access = await voiceAccess({ proOnly: PREP_PRO_ONLY });

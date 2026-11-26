@@ -25,6 +25,9 @@ export const MIN_JD_CHARS = 150;
 /** Questions the AI writes for one job post. */
 export const GENERATED_COUNT = 10;
 
+/** The most matched questions kept. More than this would be most of the bank, which is no signal. */
+export const MAX_BOOST = 400;
+
 /** A question written by AI for the learner's job post. Never part of the reviewed bank; ids are "jd-1" and up. */
 export const GeneratedQuestion = z.strictObject({
   id: z.string().regex(/^jd-\d{1,2}$/),
@@ -42,7 +45,7 @@ export const PrepJob = z.strictObject({
   company: z.enum(COMPANY_IDS).nullable(),
   jd: z.string().max(MAX_JD_CHARS),
   /** Bank questions the job post points at, best match first. */
-  boost: z.array(z.string().max(80)).max(400),
+  boost: z.array(z.string().max(80)).max(MAX_BOOST),
   generated: z.array(GeneratedQuestion).max(GENERATED_COUNT),
   /** Ratings of the generated questions. They never go to the account: the bank does not know these ids. */
   ratings: z.record(z.string().regex(/^jd-\d{1,2}$/), Rating),

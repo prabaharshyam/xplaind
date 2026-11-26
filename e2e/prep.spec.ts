@@ -152,6 +152,10 @@ test("a pasted job post puts its questions first, and Pro can have questions wri
   await expect(page.getByRole("link", { name: "Full answer, follow-ups and common mistakes" })).toHaveCount(0);
   await page.getByRole("button", { name: "Partly" }).click();
   await expect(page.getByRole("progressbar", { name: "Questions covered" })).toHaveAttribute("aria-valuenow", "4");
+  // Its topic shows among the weakest, but has no practice page to link to.
+  const weak = page.getByRole("heading", { name: "Weakest topics so far" }).locator("..");
+  await expect(weak.getByText("Your job post: 0 of 1 got it")).toBeVisible();
+  await expect(weak.getByRole("link", { name: "Your job post" })).toHaveCount(0);
 
   // Kept on this device: still there after a reload, and gone with the plan.
   await page.reload();
