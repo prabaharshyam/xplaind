@@ -34,7 +34,12 @@ export async function GET(request: Request) {
   let failed = 0;
   let ended = 0;
   for (const r of (data ?? []) as Reminder[]) {
-    const { data: row } = await admin.from("interview_preps").select("path_id, experience, interview_on, minutes, started_on").eq("user_id", r.user_id).maybeSingle();
+    const { data: row, error: rowError } = await admin.from("interview_preps").select("path_id, experience, interview_on, minutes, started_on").eq("user_id", r.user_id).maybeSingle();
+    // A read that failed says nothing about the plan: skip today rather than end the reminder by mistake.
+    if (rowError) {
+      failed++;
+      continue;
+    }
     const setup = row && PrepSetupInput.safeParse({ pathId: row.path_id, experience: row.experience, interviewOn: row.interview_on, minutes: row.minutes, startedOn: row.started_on });
     const path = setup && setup.success ? getPath(setup.data.pathId) : undefined;
     // "Until my interview" is what the learner agreed to: with no plan, or one whose date has passed, the reminder ends.
@@ -53,10 +58,16 @@ export async function GET(request: Request) {
     if (plan.status !== "ok" || !reminderDue(r, plan, today)) continue;
     const unsubscribeUrl = `${siteUrl()}/api/prep/remind/unsubscribe?token=${r.unsubscribe_token}`;
     const email = prepEmail({ plan, role: path.name, siteUrl: siteUrl(), unsubscribeUrl });
-    if (await sendEmail(r.email, email.subject, email.text, email.html, unsubscribeUrl)) {
-      await admin.from("prep_reminders").update({ last_sent_on: today }).eq("user_id", r.user_id);
-      sent++;
-    } else failed++;
+    // Claim today first, so a repeated or overlapping run cannot send the same email twice.
+    const claim = await admin.from("prep_reminders").update({ last_sent_on: today }).eq("user_id", r.user_id).is("unsubscribed_at", null).or(`last_sent_on.is.null,last_sent_on.neq.${today}`).select("user_id");
+    if (claim.error || !claim.data?.length) continue;
+    // One learner's failed send must not stop the rest.
+    const ok = await sendEmail(r.email, email.subject, email.text, email.html, unsubscribeUrl).catch(() => false);
+    if (ok) sent++;
+    else {
+      await admin.from("prep_reminders").update({ last_sent_on: r.last_sent_on }).eq("user_id", r.user_id);
+      failed++;
+    }
   }
   return json({ sent, failed, ended });
 }

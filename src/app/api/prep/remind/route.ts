@@ -1,7 +1,7 @@
 // PREP-7: opt in to, read, or stop the daily interview prep email. The session is checked here; the
 // row is written with the service role (the learner can only read it under RLS).
 import { z } from "zod";
-import { json, problem, readJson, requireSession } from "@/lib/account/http";
+import { json, problem, rateLimit, readJson, requireSession } from "@/lib/account/http";
 import { getPath } from "@/lib/content";
 import { PREP_REMIND_CONSENT } from "@/lib/prep/email";
 import { PrepSetupInput } from "@/lib/prep/plan";
@@ -19,8 +19,11 @@ const Body = z.strictObject({ consent: z.literal(true), prep: PrepSetupInput });
 export async function POST(request: Request) {
   const session = await requireSession();
   if (session instanceof Response) return session;
+  const limited = await rateLimit(session.admin, `prep-remind:${session.user.id}`, 600, 20);
+  if (limited) return limited;
   const parsed = Body.safeParse(await readJson(request).catch(() => null));
-  if (!parsed.success || !getPath(parsed.data.prep.pathId)) return problem(400, "Tick the box to agree to the daily emails.");
+  if (!parsed.success) return problem(400, "Tick the box to agree to the daily emails.");
+  if (!getPath(parsed.data.prep.pathId)) return problem(400, "That plan could not be read. Save your plan again, then turn the emails on.");
   if (!session.user.email) return problem(400, "Your account has no email address.");
   const p = parsed.data.prep;
   const saved = await session.client

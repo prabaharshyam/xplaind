@@ -613,6 +613,7 @@ function Reminder({ setup }: { setup: PrepSetup }) {
   }, [account]);
 
   const call = async (method: "POST" | "DELETE") => {
+    if (busy) return;
     setBusy(true);
     setError(null);
     const res = await fetch("/api/prep/remind", { method, headers: { "Content-Type": "application/json" }, body: method === "POST" ? JSON.stringify({ consent: true, prep: setup }) : undefined }).catch(() => null);
@@ -622,6 +623,7 @@ function Reminder({ setup }: { setup: PrepSetup }) {
       return setError(body?.error ?? "Something went wrong. Please try again.");
     }
     setActive(method === "POST");
+    setConsent(false); // turning the emails on again needs a fresh tick
     requestAnimationFrame(() => document.getElementById("remind-h")?.focus()); // the button pressed is gone
   };
 
@@ -710,7 +712,7 @@ function StoriesPanel() {
   const empty: Story = { situation: "", task: "", action: "", result: "" };
   return (
     <section aria-labelledby="stories-h" className={panel}>
-      <h2 id="stories-h" tabIndex={-1} className="text-xl font-semibold outline-none">
+      <h2 id="stories-h" tabIndex={-1} className="scroll-mt-24 text-xl font-semibold outline-none">
         Your stories
       </h2>
       <p className="mt-2 leading-7">Behavioural questions are answered with a story. Write these five once, and each behavioural card shows the one that fits. They stay on this device.</p>

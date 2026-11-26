@@ -10,8 +10,9 @@ async function stop(request: Request): Promise<boolean> {
   const token = new URL(request.url).searchParams.get("token") ?? "";
   const admin = adminClient();
   if (!TOKEN.test(token) || !admin) return false;
-  const { error } = await admin.from("prep_reminders").update({ unsubscribed_at: new Date().toISOString() }).eq("unsubscribe_token", token).is("unsubscribed_at", null);
-  return !error;
+  // An unknown token must not look like success. One already used still counts: the emails are stopped.
+  const { data, error } = await admin.from("prep_reminders").update({ unsubscribed_at: new Date().toISOString() }).eq("unsubscribe_token", token).select("user_id");
+  return !error && !!data?.length;
 }
 
 export async function GET(request: Request) {
