@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/skeleton";
 import { muted, primaryButton, quietButton, secondaryButton, textLink } from "@/components/ui";
 import { useActivity, useCurrentPathId, usePractice, usePrep, usePrepJob, useToday } from "@/lib/browser/hooks";
 import { rate } from "@/lib/browser/practice-store";
-import { rateGenerated, savePrepJob } from "@/lib/browser/prep-job-store";
+import { parsePrepJob, rateGenerated, rawPrepJob, savePrepJob } from "@/lib/browser/prep-job-store";
 import { oldInterviewDate, savePrep } from "@/lib/browser/prep-store";
 import { daysBetween } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
@@ -36,6 +36,7 @@ const EXTRA = 5;
 
 /** Removing a plan also removes what the device holds about the job (PREP-5). Ratings of bank questions stay. */
 const removePlan = () => {
+  if (!window.confirm("Remove this plan, with your job post and the questions written for it? Your ratings of our questions are kept.")) return;
   savePrep(null);
   savePrepJob(null);
 };
@@ -188,12 +189,17 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
             maxLength={MAX_JD_CHARS}
             rows={5}
             aria-describedby="jd-help"
+            name="job-post"
+            autoComplete="off"
             className={`${field} py-2 font-normal leading-6`}
           />
-          <span id="jd-help" className={`mt-1 block font-normal ${muted}`}>
-            Paste the job post or description. Questions on the skills it names come first in your plan. It stays on this device.
-          </span>
         </label>
+        <p id="jd-help" className={`-mt-3 text-sm sm:col-span-2 ${muted}`}>
+          Paste the job post or description. Questions on the skills it names come first in your plan. It stays on this device.
+          {job.generated.length > 0 && jd.trim() !== job.jd && (
+            <strong className="mt-1 block font-medium text-amber-900 dark:text-amber-200">Saving a changed job post removes the {job.generated.length} questions written for the old one, and your ratings of them.</strong>
+          )}
+        </p>
       </div>
 
       <p className="mt-5 leading-7" role="status">
@@ -375,7 +381,7 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
               : `${plan.review.length} to revise, ${plan.fresh.length} new, ${plan.doneToday} done today.`}
           </p>
         </div>
-        {queue === null ? (
+        {queue === null || !byId.has(queue[index]) ? (
           <div className="flex flex-wrap items-center gap-3" role="status">
             {todo > 0 ? (
               <button type="button" className={primaryButton} onClick={() => start([...plan.review, ...plan.fresh])}>
@@ -424,7 +430,7 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
         )}
       </section>
 
-      <JobPost setup={setup} path={path} have={set.ids.slice(0, 40).map((id) => byId.get(id)!.question)} fromJob={set.fromJob} onEdit={onEdit} />
+      <JobPost setup={setup} path={path} have={set.ids.slice(0, 40).map((id) => byId.get(id)!.question.slice(0, 300))} fromJob={set.fromJob} onEdit={onEdit} />
 
       <section aria-labelledby="days-h" className={panel}>
         <h2 id="days-h" className="text-xl font-semibold">
@@ -459,7 +465,7 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
         <button type="button" className={quietButton} onClick={onEdit}>
           Change my plan
         </button>
-        <button type="button" className={quietButton} onClick={() => window.confirm("Remove this plan? Your ratings are kept.") && removePlan()}>
+        <button type="button" className={quietButton} onClick={removePlan}>
           Remove my plan
         </button>
       </div>
@@ -490,7 +496,10 @@ function JobPost({ setup, path, have, fromJob, onEdit }: { setup: PrepSetup; pat
           ...(data.upgrade ? { href: data.upgrade, cta: "See Pro" } : data.signin ? { href: "/signin?next=/interview/prep", cta: "Sign in" } : {}),
         });
       }
-      savePrepJob({ ...job, generated: questions.data, ratings: {} });
+      // The wait can be long: keep the questions only if this is still the job post they were written for.
+      const now = parsePrepJob(rawPrepJob());
+      if (now.jd !== job.jd) return;
+      savePrepJob({ ...now, generated: questions.data, ratings: {} });
       // The button is gone now: put focus on the section, whose text says what happened.
       requestAnimationFrame(() => document.getElementById("job-h")?.focus());
     } catch {
