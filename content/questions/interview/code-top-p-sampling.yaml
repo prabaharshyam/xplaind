@@ -1,0 +1,32 @@
+id: code-top-p-sampling
+question: "Given a vector of logits, sample one token id using a temperature and top-p (nucleus) sampling. For example, if the probabilities after temperature are 0.5, 0.3, 0.15 and 0.05 and top-p is 0.7, only the first two tokens can be chosen, with probabilities 0.625 and 0.375."
+kind: use-case
+short_answer: "Divide the logits by the temperature and apply a stable softmax. Sort the probabilities from high to low, take the cumulative sum, and keep the smallest set of tokens whose total reaches p, including the token that crosses it. Renormalise the kept probabilities and sample one. The sort makes it O(V log V)."
+deeper_answer: "Clarify first: logits is a vector of vocabulary size V for one position. Temperature must be above 0, so treat a temperature of 0 as a special case that returns the argmax. Top-p is between 0 and 1, and 1 means no filtering.\n\nThe steps: probs = softmax(logits / temperature), with the max subtracted first for stability. Then order = np.argsort(-probs), cum = np.cumsum(probs[order]), and cutoff = np.searchsorted(cum, top_p) + 1 gives the number of tokens to keep, which includes the one that crosses the threshold. Keep order[:cutoff], divide their probabilities by their sum, and draw with rng.choice(kept, p=kept_probs).\n\nExplain the effect. A temperature below 1 sharpens the distribution and above 1 flattens it. Top-p then removes the long tail of unlikely tokens, and the number kept changes with how confident the model is. Test that at least one token is always kept, that top-p of 1 keeps everything, and that sampled frequencies match the renormalised probabilities. Interviewers watch for dropping the crossing token, which can leave nothing, for no renormalisation, and for temperature applied after the softmax."
+follow_ups:
+  - "How is top-p different from top-k?"
+  - "What happens as the temperature goes to 0 or becomes very large?"
+  - "How would you do this for a whole batch at once?"
+common_mistakes:
+  - "Dropping the token that crosses the threshold"
+  - "Sampling without renormalising the kept probabilities"
+  - "Returning a position in the sorted order, not the token id"
+level: I3
+topic: coding
+stop_id: how-models-pick-words
+rubric:
+  - point: "Divides the logits by the temperature before the softmax"
+    keywords: ["divide the logits", "temperature", "softmax"]
+  - point: "Explains what temperature does and handles zero"
+    keywords: ["sharper", "flatter", "argmax"]
+  - point: "Sorts and keeps the smallest prefix whose cumulative sum reaches p"
+    keywords: ["cumulative", "descending", "smallest prefix"]
+  - point: "Includes the crossing token, so at least one is kept"
+    keywords: ["crosses the threshold", "at least one"]
+  - point: "Renormalises before sampling"
+    keywords: ["renormalise", "sum to 1"]
+answer_seconds: 180
+example: "The input is one vector of logits over the vocabulary. First I apply the temperature: I divide the logits by it, then take a stable softmax. A temperature below 1 makes the distribution sharper, and above 1 makes it flatter. If the temperature is 0, I just return the argmax. Then nucleus sampling: I sort the probabilities in descending order, take the cumulative sum, and keep the smallest prefix whose cumulative probability reaches p. I include the token that crosses the threshold, so I always keep at least one token. Then I renormalise the kept probabilities so they sum to 1, and sample from them. The cost is the sort, so V log V. With probabilities 0.5, 0.3, 0.15, 0.05 and p of 0.7, I keep the first two and sample with 0.625 and 0.375. I would test p equal to 1, which should keep every token."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26

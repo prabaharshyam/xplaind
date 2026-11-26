@@ -1,0 +1,32 @@
+id: code-sliding-window-rate-limit
+question: "Write a rate limiter that allows each user at most 3 requests in any 60 second window. For example, requests at seconds 0, 10 and 20 are allowed, a request at second 30 is rejected, and a request at second 60 is allowed again."
+kind: use-case
+short_answer: "Keep a deque of recent request timestamps per user. On each request, pop timestamps from the left while they are at least one full window old. If fewer than limit remain, append the new timestamp and allow; otherwise reject. Each timestamp is added and removed once, so it is O(1) amortised, with O(limit) memory per user."
+deeper_answer: "First clarify the rule. Ask whether the window slides or resets on fixed minutes, whether a rejected request counts toward the limit, and whether the limiter runs in one process or on several servers.\n\nIn one process, keep calls = defaultdict(deque). In allow(user, now), take q = calls[user]. Remove old entries with a loop: while q and now - q[0] >= window, call q.popleft(). Then if len(q) >= limit, return False. Otherwise run q.append(now) and return True. Using >= in the loop means a request at exactly 60 seconds after the first is allowed. Rejected requests are not stored, so a client that keeps trying is not locked out forever.\n\nEach call is amortised O(1) and memory is at most limit timestamps per active user. Pass now as an argument, or use time.monotonic(), so tests do not need to sleep. Test the boundary at exactly 60 seconds, two users who must not affect each other, and a burst. Say that across several servers you would move the state to Redis."
+follow_ups:
+  - "How would this work across several servers?"
+  - "How does a token bucket differ from a sliding window?"
+  - "How would you remove users who have stopped sending requests?"
+common_mistakes:
+  - "Using a fixed-window counter and calling it a sliding window"
+  - "Storing rejected requests, so a client that keeps trying is never allowed again"
+  - "Calling time.time() inside the function, which makes it hard to test"
+level: I2
+topic: coding
+stop_id: python-for-production
+rubric:
+  - point: "Clarifies sliding against fixed window, and one process or many"
+    keywords: ["sliding", "fixed"]
+  - point: "Keeps a deque of timestamps for each user"
+    keywords: ["deque", "timestamps"]
+  - point: "Drops timestamps older than the window before counting"
+    keywords: ["pop from the left", "old timestamps"]
+  - point: "Rejects when the count is at the limit, otherwise records and allows"
+    keywords: ["reject", "limit"]
+  - point: "States O(1) amortised cost and tests the exact window boundary"
+    keywords: ["amorti", "constant time", "exactly 60"]
+answer_seconds: 180
+example: "I would ask whether the window is sliding or fixed, and whether this runs on one server. I will assume a sliding window in one process. For each user I keep a deque of timestamps of allowed requests. When a request comes in, I first pop from the left while now - q[0] >= window, which removes old timestamps. Then, if len(q) is already at the limit, I reject. Otherwise I append now and allow. Each timestamp is added once and removed once, so the cost is amortised constant time, O(1), and memory is at most the limit per user. I pass the time in as an argument so the test does not sleep. With limit 3 and window 60, calls at 0, 10 and 20 pass, 30 is rejected, and exactly 60 passes because the first call has expired."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26

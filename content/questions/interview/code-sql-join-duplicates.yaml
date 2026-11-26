@@ -1,0 +1,32 @@
+id: code-sql-join-duplicates
+question: "You join an orders table to a payments table on order_id to report revenue, and the total is too high because the row count grew. Explain why and fix it. For example, an order of 100 that was paid in two parts appears twice, so its amount is counted as 200."
+kind: use-case
+short_answer: "The join key is not unique on one side. An order with two payments matches twice, so SUM counts its amount twice. Confirm with GROUP BY order_id HAVING COUNT(*) > 1 on payments. Fix it by aggregating payments to one row per order in a subquery before the join, which costs one extra GROUP BY. Do not add DISTINCT afterwards."
+deeper_answer: "First clarify the grain of each table: what one row means. Orders has one row per order. Ask whether payments has one row per order or one per payment attempt. A join returns one row for every matching pair, so a one-to-many relationship repeats the row on the one side.\n\nProve it before fixing it. Run SELECT order_id, COUNT(*) FROM payments GROUP BY order_id HAVING COUNT(*) > 1 to find keys that repeat, and compare COUNT(*) before and after the join. Then fix the grain: join orders to (SELECT order_id, SUM(paid) AS paid FROM payments GROUP BY order_id) so the right side has one row per order.\n\nDo not hide the problem with SELECT DISTINCT or SUM(DISTINCT amount). DISTINCT on amounts merges two different orders that have the same amount, so the total becomes too low. Test with an order paid in two parts and an order with no payment, which needs a LEFT JOIN to stay in the report. Say that a missing join condition, such as a second key column, causes the same symptom."
+follow_ups:
+  - "How do you check which side of the join has the duplicate keys?"
+  - "Why is SELECT DISTINCT a poor fix here?"
+  - "What changes if orders with no payment must stay in the report?"
+common_mistakes:
+  - "Adding DISTINCT after the join to hide the extra rows"
+  - "Assuming a key is unique without checking"
+  - "Summing a column from the one side after a one-to-many join"
+level: I2
+topic: coding
+stop_id: sql-for-engineers
+rubric:
+  - point: "States the grain of each table: what one row means"
+    keywords: ["grain", "one row per order"]
+  - point: "Explains that a non-unique key returns one row for every match"
+    keywords: ["every match", "appears twice", "counted twice"]
+  - point: "Confirms by counting rows per key and comparing row counts"
+    keywords: ["confirm", "row count"]
+  - point: "Aggregates or deduplicates one side before the join"
+    keywords: ["aggregate", "subquery"]
+  - point: "Rejects DISTINCT after the join and says why"
+    keywords: ["distinct", "hides"]
+answer_seconds: 150
+example: "The first thing I would check is the grain of each table. Orders has one row per order, but payments can have several rows for one order. A join returns one row for every match, so an order paid in two parts appears twice and its amount is counted twice. To confirm, I would group payments by order_id and keep the keys with a count above one, and compare the row count before and after the join. To fix it, I aggregate payments to one row per order in a subquery, with SUM(paid) and GROUP BY order_id, and then join that to orders. I would not add DISTINCT after the join, because that hides the problem and can remove two real orders with the same amount. I would test an order of 100 paid as 60 and 40, and check the revenue is 100."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26

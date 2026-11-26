@@ -28,7 +28,7 @@ export default function InterviewAnswersPage() {
     roles: q.paths,
   }));
   return (
-    <main>
+    <main className="[overflow-wrap:anywhere]">
       <PageHero shape="target"
         theme="career"
         seed="interview-answers"

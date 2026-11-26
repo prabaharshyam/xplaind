@@ -36,7 +36,7 @@ export default async function TopInterviewPage({ params }: PageProps<"/interview
   const base = siteUrl();
 
   return (
-    <main>
+    <main className="[overflow-wrap:anywhere]">
       <JsonLd
         data={{
           "@context": "https://schema.org",

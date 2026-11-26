@@ -18,6 +18,8 @@ export const INTERVIEW_TOPICS = [
   { id: "client-delivery", label: "Client delivery" },
   // 2026-11-18: the AI Security Engineer roadmap.
   { id: "security", label: "AI security" },
+  // 2026-11-26 (PREP-2, batch 3): coding rounds, answered by talking through the code.
+  { id: "coding", label: "Coding rounds" },
 ] as const;
 
 export type InterviewTopicId = (typeof INTERVIEW_TOPICS)[number]["id"];
