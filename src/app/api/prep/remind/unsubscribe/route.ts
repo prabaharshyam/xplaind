@@ -1,0 +1,26 @@
+// PREP-7: one-click unsubscribe from the link in every daily email (GET) and from the mail app's
+// unsubscribe button (POST, RFC 8058). No sign-in needed; the token is unguessable.
+import { NextResponse } from "next/server";
+import { siteUrl } from "@/lib/site";
+import { adminClient } from "@/lib/supabase/server";
+
+const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function stop(request: Request): Promise<boolean> {
+  const token = new URL(request.url).searchParams.get("token") ?? "";
+  const admin = adminClient();
+  if (!TOKEN.test(token) || !admin) return false;
+  // An unknown token must not look like success. One already used still counts: the emails are stopped.
+  const { data, error } = await admin.from("prep_reminders").update({ unsubscribed_at: new Date().toISOString() }).eq("unsubscribe_token", token).select("user_id");
+  return !error && !!data?.length;
+}
+
+export async function GET(request: Request) {
+  const ok = await stop(request);
+  return NextResponse.redirect(`${siteUrl()}/commit/stopped?emails=prep${ok ? "" : "&error=1"}`, 303);
+}
+
+export async function POST(request: Request) {
+  const ok = await stop(request);
+  return new NextResponse(null, { status: ok ? 200 : 400 });
+}

@@ -3,11 +3,13 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { primaryButton } from "@/components/ui";
 
-export const metadata: Metadata = { title: "Weekly emails stopped", robots: { index: false } };
+export const metadata: Metadata = { title: "Emails stopped", robots: { index: false } };
 
 const TEXT = {
   ok: ["Weekly emails stopped", "You will not get any more weekly emails from Xplaind. Your progress and roadmap stay as they are, and you can start again from your dashboard."],
-  failed: ["That link did not work", "The link may be old or already used. You can stop the emails from your dashboard."],
+  // PREP-7: the daily interview prep email lands here too.
+  prep: ["Daily emails stopped", "You will not get any more daily interview prep emails from Xplaind. Your plan stays as it is, and you can turn them on again from your plan."],
+  failed: ["That link did not work", "The link may be old or already used. You can stop the emails from your dashboard or your interview prep plan."],
 } as const;
 
 /** CM-90: where the one-click unsubscribe lands. */
@@ -25,7 +27,8 @@ export default function StoppedPage({ searchParams }: PageProps<"/commit/stopped
 }
 
 async function Result({ searchParams }: { searchParams: PageProps<"/commit/stopped">["searchParams"] }) {
-  return <Message kind={(await searchParams).error === "1" ? "failed" : "ok"} />;
+  const q = await searchParams;
+  return <Message kind={q.error === "1" ? "failed" : q.emails === "prep" ? "prep" : "ok"} />;
 }
 
 function Message({ kind }: { kind: keyof typeof TEXT }) {

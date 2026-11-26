@@ -11,7 +11,7 @@ import { parseAttempt, rawAttempt } from "./attempt-store";
 import { parsePractice, rawPractice } from "./practice-store";
 import { parseProgress, rawProgress } from "./progress-store";
 import { parsePlan, rawPlan } from "./plan-store";
-import { parsePrepJob, rawPrepJob } from "./prep-job-store";
+import { parsePrepJob, parseStories, rawPrepJob, rawStories } from "./prep-job-store";
 import { parsePrep, rawPrep } from "./prep-store";
 import { serverSnapshot, subscribe } from "./storage";
 import { parseVisits, rawVisits } from "./visits";
@@ -89,6 +89,12 @@ export function usePrep() {
 export function usePrepJob() {
   const raw = useSyncExternalStore(subscribe, rawPrepJob, serverSnapshot);
   return useMemo(() => parsePrepJob(raw), [raw]);
+}
+
+/** PREP-8: the learner's own interview stories, from this device only. */
+export function useStories() {
+  const raw = useSyncExternalStore(subscribe, rawStories, serverSnapshot);
+  return useMemo(() => parseStories(raw), [raw]);
 }
 
 /** WP-2: this week's saved plan, or null. */

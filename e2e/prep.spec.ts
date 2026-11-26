@@ -165,3 +165,43 @@ test("a pasted job post puts its questions first, and Pro can have questions wri
   await expect(page.getByLabel("Job post (optional)")).toHaveValue("");
   expect(await page.evaluate(() => localStorage.getItem("xplaind.prep-job.v1"))).toBeNull();
 });
+
+test("stories, the rounds guide and a calendar file help with the rest of the interview (PREP-8)", async ({ page }) => {
+  await page.addInitScript(
+    ([started, on]) => {
+      if (!localStorage.getItem("xplaind.prep.v1")) localStorage.setItem("xplaind.prep.v1", JSON.stringify({ interviewOn: on, pathId: "ai-engineer", experience: "mid", minutes: 30, startedOn: started }));
+    },
+    [inDays(0), inDays(6)],
+  );
+  await page.goto("/interview/prep");
+  await expect(page.getByRole("heading", { name: "Your interview is in 6 days" })).toBeVisible();
+
+  // The rounds guide names the rounds and how to prepare for each.
+  const rounds = page.getByRole("region", { name: "What each round tests" });
+  for (const name of ["Screening call", "Technical round", "System design round", "Behavioural or manager round", "HR round"]) await expect(rounds.getByText(name, { exact: true })).toBeVisible();
+
+  // A story is written once and kept on this device.
+  const stories = page.getByRole("region", { name: "Your stories" });
+  await expect(stories.getByText("Not written yet")).toHaveCount(5);
+  await stories.getByText("Something that went wrong, and what you changed").click();
+  await stories.getByLabel(/^Action/).first().fill("I rebuilt the model with a time-based split and ran a small trial first.");
+  await stories.getByLabel(/^Result/).first().focus();
+  await expect(stories.getByText("Written", { exact: true })).toHaveCount(1);
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.reload();
+  await page.getByRole("region", { name: "Your stories" }).getByText("Something that went wrong, and what you changed").click();
+  await expect(page.getByRole("region", { name: "Your stories" }).getByLabel(/^Action/).first()).toHaveValue(/time-based split/);
+
+  // The calendar file downloads.
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Add to my calendar (.ics)" }).click();
+  expect((await download).suggestedFilename()).toBe("xplaind-interview-prep.ics");
+});
+
+test("the daily email's unsubscribe link lands on a plain page (PREP-7)", async ({ page }) => {
+  await page.goto("/commit/stopped?emails=prep");
+  await expect(page.getByRole("heading", { level: 1, name: "Daily emails stopped" })).toBeVisible();
+  await page.goto("/commit/stopped");
+  await expect(page.getByRole("heading", { level: 1, name: "Weekly emails stopped" })).toBeVisible();
+});
