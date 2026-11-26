@@ -26,6 +26,9 @@ export async function GET() {
   // CM-90: the weekly-email commitment, read with the service role (the learner's role cannot see its email or token).
   const cm = await admin.from("commitments").select("path_id,email,started_on,consent_text,consent_at,last_sent_week,last_sent_at,unsubscribed_at").eq("user_id", user.id);
   out.commitments = cm.data ?? [];
+  // PREP-7: the daily prep email choice, read the same way.
+  const pr = await admin.from("prep_reminders").select("email,consent_text,consent_at,last_sent_on,unsubscribed_at").eq("user_id", user.id);
+  out.prep_reminders = pr.data ?? [];
   out.roadmap_downloads = [...new Map([...(dlByUser.data ?? []), ...(dlByEmail.data ?? [])].map((r) => [r.id, r])).values()];
 
   return new Response(JSON.stringify(out, null, 2), {

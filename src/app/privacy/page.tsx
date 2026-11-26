@@ -28,7 +28,7 @@ const STORED: [string, string, string][] = [
   ],
   [
     "Your account (18 and over only)",
-    "Email address, the role you chose, weekly hours, level, lesson progress, test attempts, practice ratings, your interview prep plan (the interview date, role, experience and minutes a day you chose), and, if you opt in to the Monday emails under “Stay on track”, that choice with your email so we can send one email a week for 13 weeks (stop any time with the link in each email). If you sign in with Google or GitHub, we receive your email and name from them.",
+    "Email address, the role you chose, weekly hours, level, lesson progress, test attempts, practice ratings, your interview prep plan (the interview date, role, experience and minutes a day you chose), and, if you opt in to the Monday emails under “Stay on track”, that choice with your email so we can send one email a week for 13 weeks (stop any time with the link in each email). If you opt in to the daily interview prep email, that choice with your email, so we can send one email each morning until your interview (stop any time with the link in each email). If you sign in with Google or GitHub, we receive your email and name from them.",
     "Until you delete your account in Settings, which removes all of it at once.",
   ],
   [

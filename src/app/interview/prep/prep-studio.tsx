@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useAccountState } from "@/components/account-link";
 import { Flashcard, type Card } from "@/components/interview/flashcard";
 import { Skeleton } from "@/components/skeleton";
@@ -16,6 +16,7 @@ import { readinessLabel } from "@/lib/interview/readiness";
 import { EXPERIENCE, type ExperienceId } from "@/lib/interview/setup";
 import { practiceOrder, type Rating } from "@/lib/practice/queue";
 import { COMPANY_TYPES, GENERATED_COUNT, GeneratedQuestion, MAX_BOOST, MAX_JD_CHARS, MIN_JD_CHARS, isGeneratedId, jobBoost, withGenerated, type CompanyId } from "@/lib/prep/job";
+import { PREP_REMIND_CONSENT } from "@/lib/prep/email";
 import { MAX_DAYS_AHEAD, MINUTES, addDays, perDay, prepPlan, prepReadiness, prepSet, type Minutes, type PrepDay, type PrepSetup } from "@/lib/prep/plan";
 
 export type PrepCard = Card & { topic: string; paths: string[]; often: boolean; terms: string[] };
@@ -446,6 +447,8 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
         )}
       </section>
 
+      <Reminder />
+
       <section aria-labelledby="check-h" className={panel}>
         <h2 id="check-h" className="text-xl font-semibold">
           The day before
@@ -551,6 +554,87 @@ function JobPost({ setup, path, have, fromJob, onEdit }: { setup: PrepSetup; pat
             </p>
           )}
         </>
+      )}
+    </section>
+  );
+}
+
+/** PREP-7: opt in to one email each morning until the interview, or stop it. Off unless the learner ticks the box. */
+function Reminder() {
+  const account = useAccountState();
+  const [active, setActive] = useState<boolean | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const boxId = useId();
+
+  useEffect(() => {
+    if (account !== "in") return;
+    let live = true;
+    void fetch("/api/prep/remind")
+      .then((r) => (r.ok ? (r.json() as Promise<{ active: boolean }>) : { active: false }))
+      .then((d) => live && setActive(d.active))
+      .catch(() => live && setActive(false));
+    return () => {
+      live = false;
+    };
+  }, [account]);
+
+  const call = async (method: "POST" | "DELETE") => {
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/prep/remind", { method, headers: { "Content-Type": "application/json" }, body: method === "POST" ? JSON.stringify({ consent: true }) : undefined }).catch(() => null);
+    setBusy(false);
+    if (!res?.ok) {
+      const body = (await res?.json().catch(() => null)) as { error?: string } | null;
+      return setError(body?.error ?? "Something went wrong. Please try again.");
+    }
+    setActive(method === "POST");
+    requestAnimationFrame(() => document.getElementById("remind-h")?.focus()); // the button pressed is gone
+  };
+
+  // Accounts switched off: the plan still works, so the email offer just stays hidden.
+  if (account === "off" || account === "unknown") return null;
+  return (
+    <section aria-labelledby="remind-h" className={panel}>
+      <h2 id="remind-h" tabIndex={-1} className="text-xl font-semibold outline-none">
+        A reminder each morning
+      </h2>
+      {account === "out" ? (
+        <p className="mt-2 leading-7">
+          With an account, get one short email at 7:30 am India time with that day&apos;s questions, until your interview.{" "}
+          <Link href="/signin?next=/interview/prep" className={textLink}>
+            Sign in or make an account
+          </Link>
+          .
+        </p>
+      ) : active === null ? (
+        <p className={`mt-2 ${muted}`}>Checking…</p>
+      ) : active ? (
+        <>
+          <p className="mt-2 leading-7" role="status">
+            On. You get one email at 7:30 am India time with that day&apos;s questions, until your interview.
+          </p>
+          <button type="button" className={`${secondaryButton} mt-3`} onClick={() => call("DELETE")} aria-disabled={busy}>
+            Stop the emails
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="mt-2 leading-7">One short email at 7:30 am India time with that day&apos;s questions. It stops after your interview.</p>
+          <label htmlFor={boxId} className="mt-3 flex items-start gap-3 leading-7">
+            <input id={boxId} type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1.5 size-5 shrink-0 accent-brand-700" />
+            <span>{PREP_REMIND_CONSENT}</span>
+          </label>
+          <button type="button" className={`${primaryButton} mt-3`} onClick={() => (consent ? call("POST") : setError("Tick the box to agree to the daily emails."))} aria-disabled={busy}>
+            Email me each morning
+          </button>
+        </>
+      )}
+      {error && (
+        <p role="alert" className="mt-3 leading-7 text-amber-900 dark:text-amber-200">
+          {error}
+        </p>
       )}
     </section>
   );

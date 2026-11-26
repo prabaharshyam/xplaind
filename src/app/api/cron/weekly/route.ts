@@ -5,28 +5,13 @@ import { json, problem } from "@/lib/account/http";
 import { dueWeek, weeklyEmail } from "@/lib/commit/plan";
 import { getPath, pathLessons } from "@/lib/content";
 import { daysBetween, todayInIST } from "@/lib/dates";
+import { sendEmail } from "@/lib/email";
 import { siteUrl } from "@/lib/site";
 import { adminClient } from "@/lib/supabase/server";
 
 export const maxDuration = 300;
 
 type Row = { user_id: string; path_id: string; email: string; started_on: string; last_sent_week: number; unsubscribed_at: string | null; unsubscribe_token: string };
-
-async function send(to: string, subject: string, text: string, html: string, unsubscribeUrl: string): Promise<boolean> {
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: process.env.COMMIT_EMAIL_FROM || "Xplaind <hello@xplaind.in>",
-      to,
-      subject,
-      text,
-      html,
-      headers: { "List-Unsubscribe": `<${unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
-    }),
-  });
-  return res.ok;
-}
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -65,7 +50,7 @@ export async function GET(request: Request) {
       siteUrl: siteUrl(),
       unsubscribeUrl,
     });
-    if (await send(c.email, email.subject, email.text, email.html, unsubscribeUrl)) {
+    if (await sendEmail(c.email, email.subject, email.text, email.html, unsubscribeUrl)) {
       await admin.from("commitments").update({ last_sent_week: week, last_sent_at: new Date().toISOString() }).eq("user_id", c.user_id);
       sent++;
     } else failed++;

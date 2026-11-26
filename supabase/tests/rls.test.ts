@@ -300,6 +300,30 @@ describe("interview prep plan (PREP-3)", () => {
   });
 });
 
+describe("daily interview prep email (PREP-7)", () => {
+  const C = "00000000-0000-4000-8000-0000000000e2";
+  beforeAll(async () => {
+    await q("insert into auth.users (id, email) values ($1, 'remind@example.com')", [C]);
+    for (const [id, email] of [[A, "a@example.com"], [C, "remind@example.com"]]) await q("insert into prep_reminders (user_id, email, consent_text) values ($1, $2, 'Yes, email me each morning')", [id, email]);
+  });
+
+  it("a learner reads only whether their own is on, and not its email or unsubscribe token", async () => {
+    const rows = await asUser(db.client, A, async () => (await q("select user_id, last_sent_on, unsubscribed_at from prep_reminders")).rows);
+    expect(rows).toEqual([{ user_id: A, last_sent_on: null, unsubscribed_at: null }]);
+    await fails(asUser(db.client, A, () => q("select unsubscribe_token from prep_reminders")));
+    await fails(asUser(db.client, A, () => q("select email from prep_reminders")));
+  });
+
+  it("only the server writes it, a visitor sees nothing, and it is removed with the account", async () => {
+    await fails(asUser(db.client, A, () => q("insert into prep_reminders (user_id, email, consent_text) values ($1, 'b@example.com', 'y')", [B])));
+    const updated = await asUser(db.client, A, () => q("update prep_reminders set unsubscribed_at = null where user_id = $1", [C]).then((r) => r.rowCount, () => -1));
+    expect(updated === 0 || updated === -1).toBe(true);
+    expect((await fails(asUser(db.client, null, () => q("select * from prep_reminders")))).code).toBe(PERMISSION_DENIED);
+    await q("delete from auth.users where id = $1", [C]);
+    expect((await q("select count(*)::int as n from prep_reminders where user_id = $1", [C])).rows[0].n).toBe(0);
+  });
+});
+
 describe("90-day commitment emails (CM-90)", () => {
   it("a learner reads only their own commitment, and not its unsubscribe token or email", async () => {
     const rows = await asUser(db.client, A, async () => (await q("select user_id, path_id, last_sent_week from commitments")).rows);
