@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: { default: "Xplaind: learn AI step by step, for the AI job you want", template: "%s | Xplaind" },
   description:
-    "Xplaind is an AI learning platform for India: step-by-step AI career roadmaps, plain-English lessons, hand-picked courses, projects and interview practice.",
+    "Xplaind is an AI learning platform built in India, for learners everywhere: step-by-step AI career roadmaps, plain-English lessons, hand-picked courses, projects and interview practice.",
   applicationName: "Xplaind",
   openGraph: { siteName: "Xplaind", locale: "en_IN", type: "website" },
   twitter: { card: "summary_large_image" },

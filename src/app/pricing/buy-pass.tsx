@@ -243,8 +243,8 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
           <ul className="flex flex-col gap-2 text-[15px] leading-6">
             {[
               `${plan.days} days of Pro, from the moment you pay`,
-              "AI mock interviews with Zarina, every day",
-              "AI tutor, reviews and resume match, every day",
+              "AI mock interviews with Zarina",
+              "AI tutor, reviews and resume match",
             ].map((t) => (
               <li key={t} className="flex items-start gap-2.5">
                 <Icon name="tick" size={18} className="mt-0.5 shrink-0 text-brand-700 dark:text-brand-300" />

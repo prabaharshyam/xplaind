@@ -190,7 +190,7 @@ export default function PricingPage() {
               // SE-16: the AI interviewer leads, as the thing people buy Pro for.
               n: "AI interviewer",
               t: "Rehearse out loud with Zarina",
-              d: "About four spoken interviews a day for your role or a job post. She follows up on what you actually say and ends with a hiring verdict, skill scores and a 4-week plan. Each one adds to your readiness score out of 100.",
+              d: "Spoken interviews for your role or a job post, up to four a day. She follows up on what you actually say and ends with a hiring verdict, skill scores and a 4-week plan. Each one adds to your readiness score out of 100.",
             },
             {
               n: "Pass or fix",
@@ -262,9 +262,15 @@ export default function PricingPage() {
         <h2 id="compare-h" className="text-3xl font-semibold tracking-tight md:text-4xl">
           Free account or Pro
         </h2>
+        {/* PAY-13 (2026-11-21, owner): the fair-use allowance comes first, so the daily numbers below never read as a promise it can break. */}
+        <p className="mt-3 max-w-3xl leading-7 text-zinc-700 dark:text-zinc-300">
+          Pro&apos;s AI helpers run within a fair-use AI allowance, sized to the pass you bought, over any 30 days. The numbers
+          below are the most you can use in a day. If you reach your allowance first, the AI helpers pause and free up again day by
+          day. Lessons, roadmaps, videos and practice are never limited.
+        </p>
         <div role="region" aria-label="Free account and Pro compared" tabIndex={0} className="mt-8 overflow-x-auto rounded-3xl bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-zinc-900">
           <table className="w-full min-w-[30rem] text-left">
-            <caption className="sr-only">AI helper uses: free trial in total, Pro per day</caption>
+            <caption className="sr-only">AI helper uses: free trial in total, and Pro&apos;s most per day within its fair-use allowance</caption>
             <thead>
               <tr className="text-sm">
                 <th scope="col" className="p-4 font-semibold md:px-6">
@@ -274,7 +280,7 @@ export default function PricingPage() {
                   Free account
                 </th>
                 <th scope="col" className="p-4 font-semibold text-brand-800 md:px-6 dark:text-brand-300">
-                  Pro
+                  Pro, within your fair-use allowance
                 </th>
               </tr>
             </thead>
@@ -298,7 +304,7 @@ export default function PricingPage() {
                         ? "Pro only"
                         : `${TIER_LIMITS.free[k]} ${TIER_LIMITS.free[k] === 1 ? "try" : "tries"} in total`}
                   </td>
-                  <td className="p-4 font-semibold md:px-6">{TIER_LIMITS.pro[k]} every day</td>
+                  <td className="p-4 font-semibold md:px-6">Up to {TIER_LIMITS.pro[k]} a day</td>
                 </tr>
               ))}
             </tbody>
@@ -382,8 +388,8 @@ export default function PricingPage() {
         </h2>
         <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
           Xplaind sells one thing: <strong className="font-semibold">Pro passes</strong>, a one-time payment for 7 days, 30 days, 6 months or 12 months
-          of higher limits on the AI helpers (AI tutor, interview feedback, mock interview reports, project review, resume review and study from your notes)
-          and verified certificates.
+          of higher limits on the AI helpers (AI tutor, interview feedback, mock interview reports, project review, resume review and study from your notes),
+          within a fair-use AI allowance sized to the pass, and verified certificates.
           Lessons, roadmaps, videos, practice and project guides need no pass. All prices are in Indian rupees and include GST. A pass is a
           digital service that starts on your account as soon as the payment is confirmed; nothing is shipped, and nothing renews by itself.
           Sold by {BUSINESS.legalName} (GSTIN {BUSINESS.gstin}). Questions:{" "}

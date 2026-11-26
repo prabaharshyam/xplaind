@@ -168,6 +168,8 @@ test("a call that runs itself (browser speech-to-text): the interviewer speaks, 
   await expect(page.getByRole("heading", { level: 2, name: "Before you start" })).toBeVisible();
   // VI-18: a quiet place, said before the start.
   await expect(page.getByRole("note", { name: "For the best results, sit somewhere quiet" })).toBeVisible();
+  // VI-19: no "I will type" checkbox that reads like a consent box; typing is chosen on the call screen.
+  await expect(page.getByRole("region", { name: "Before you start" }).getByRole("checkbox")).toHaveCount(0);
   await expect(page.getByText(/Only the text \(the transcript\) goes to our AI/)).toBeVisible();
   await expect(page.getByText(/Xplaind\s+does not keep the recordings/)).toBeVisible();
   expect(starts).toEqual([]);
@@ -540,7 +542,7 @@ test("one mock interview: a Pro learner picks role, experience and company, and 
   await page.goto("/interview/simulator?path=genai-engineer");
   await expect(page.getByRole("heading", { name: "What are you preparing for?" })).toBeVisible();
   // VI-12: the page sells the AI interviewer; the free warm-up sits lower, marked as the lesser option.
-  await expect(page.getByRole("heading", { level: 1, name: "Mock interviews that talk back" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "AI mock interviews that score you like a hiring panel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Free warm-up" })).toBeVisible();
   // VI-12: the live line: her real opening line names the role and company as they are chosen.
   await expect(page.getByText(/practice interview for the Generative AI & LLM Engineer role\. We'll go through 3 questions/)).toBeVisible();

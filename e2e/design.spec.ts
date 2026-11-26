@@ -47,7 +47,7 @@ test("the Library folds its filters on phones and names levels in words (BR-8)",
 
 test("the About, Privacy and Terms pages are linked from the footer and accessible (BR-9)", async ({ page }) => {
   for (const [name, href, h1] of [
-    ["About", "/about", /Help India learn AI faster/],
+    ["About", "/about", /Help anyone learn AI faster/],
     ["Privacy", "/privacy", "Privacy policy"],
     ["Terms", "/terms", "Terms of use"],
   ] as const) {

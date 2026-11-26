@@ -11,8 +11,8 @@ import { pageMeta } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = pageMeta({
-  title: ["About Xplaind: an AI Learning Platform for India", "About Xplaind"],
-  description: "Xplaind (xplaind.in) is an AI learning platform for India, founded by Shyam Prabahar: why it exists, what it believes and how its roadmaps and lessons are made.",
+  title: ["About Xplaind: an AI Learning Platform Built in India", "About Xplaind"],
+  description: "Xplaind (xplaind.in) is an AI learning platform built in India for learners everywhere, founded by Shyam Prabahar: why it exists, what it believes and how its roadmaps and lessons are made.",
   path: "/about",
 });
 
@@ -67,7 +67,7 @@ export default function AboutPage() {
         shape="compass"
         icon="compass"
         eyebrow="About Xplaind"
-        title="Help India learn AI faster, in the right order"
+        title="Help anyone learn AI faster, in the right order"
         lead={`All ${roles} roadmaps, ${lessons} written lessons and ${picks} course picks, in order: a step-by-step place to learn AI for a career, with projects and interview practice.`}
       />
 
