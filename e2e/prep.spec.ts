@@ -24,15 +24,18 @@ test("an interview date, role and daily time make a day-by-day question plan wit
   await expect(page.getByRole("progressbar", { name: "Questions covered" })).toHaveAttribute("aria-valuenow", "0");
   await expect(page.getByText("0 to revise, 10 new, 0 done today.")).toBeVisible();
   // The plan: today first, the day before for revision, the interview day last, mock interviews on the way.
+  await page.getByRole("tab", { name: "Plan" }).click();
   const days = page.getByRole("region", { name: "Day by day" });
   await expect(days.getByRole("listitem").first()).toContainText(/Today.*10 new questions/);
   await days.getByText(/Show the other \d+ days/).click();
   await expect(days.getByRole("listitem").last()).toContainText("Interview day");
   await expect(days.getByText("Full mock interview")).toBeVisible();
   await expect(days.getByText(/Short mock interview/).first()).toBeVisible();
+  await page.getByRole("tab", { name: "More" }).click();
   await expect(page.getByRole("heading", { name: "The day before" })).toBeVisible();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("tab", { name: "Today" }).click();
 
   // Today's deck: answer, rate, and the progress moves.
   await page.getByRole("button", { name: "Start today's questions" }).click();
@@ -45,7 +48,7 @@ test("an interview date, role and daily time make a day-by-day question plan wit
   await expect(page.getByRole("progressbar", { name: "Questions covered" })).toHaveAttribute("aria-valuenow", "1");
   await page.getByRole("button", { name: "Show the short answer" }).click();
   await page.getByRole("button", { name: "Missed" }).click();
-  await expect(page.getByText(/Readiness: \d+ out of 100/)).toBeVisible();
+  await expect(page.getByText(/^\d+ \/ 100$/)).toBeVisible(); // readiness
   await expect(page.getByRole("heading", { name: "Weakest topics so far" })).toBeVisible();
 
   // The plan and the ratings are still there after a reload.
@@ -55,11 +58,13 @@ test("an interview date, role and daily time make a day-by-day question plan wit
   await expect(page.getByRole("button", { name: "Carry on with today's questions" })).toBeVisible();
 
   // Changing the plan keeps the progress; removing it brings the form back.
+  await page.getByRole("tab", { name: "More" }).click();
   await page.getByRole("button", { name: "Change my plan" }).click();
   await page.getByLabel("Time you can give each day").selectOption("30");
   await page.getByRole("button", { name: "Save my plan" }).click();
   await expect(page.getByText(/· 30 minutes a day/)).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "Questions covered" })).toHaveAttribute("aria-valuenow", "2");
+  await page.getByRole("tab", { name: "More" }).click();
   page.once("dialog", (d) => void d.accept());
   await page.getByRole("button", { name: "Remove my plan" }).click();
   await expect(page.getByRole("button", { name: "Make my plan" })).toBeVisible();
@@ -79,7 +84,7 @@ test("a missed question comes back the next day, and a passed date asks for a ne
   await expect(page.getByText("1 to revise, 4 new, 0 done today.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Today: a full mock interview" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open the mock interview" })).toHaveAttribute("href", "/interview/simulator?path=ai-engineer&exp=mid");
-  await expect(page.getByText(/questions do not fit before your interview/)).toBeVisible();
+  await expect(page.getByText(/Your plan covers the \d+ most important of \d+ questions for this role/)).toBeVisible();
   await page.getByRole("button", { name: "Start today's questions" }).click();
   await expect(page.locator("#card-question")).toHaveText(/RAG/); // the missed one first
 
@@ -123,6 +128,7 @@ test("a pasted job post puts its questions first, and Pro can have questions wri
   expect((await wcag(page)).violations).toEqual([]);
   await page.getByRole("button", { name: "Make my plan" }).click();
 
+  await page.getByRole("tab", { name: "Job post" }).click();
   const job = page.getByRole("region", { name: "Your job post" });
   await expect(job.getByText(/\d+ questions in your plan match the skills your job post names/)).toBeVisible();
   // Without Pro: the reason, and the way to Pro.
@@ -138,6 +144,7 @@ test("a pasted job post puts its questions first, and Pro can have questions wri
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 
+  await page.getByRole("tab", { name: "Today" }).click();
   await page.getByRole("button", { name: "Start today's questions" }).click();
   for (let i = 0; i < 3; i++) {
     await expect(page.getByText("Generated for your JD", { exact: true })).toHaveCount(0);
@@ -160,6 +167,7 @@ test("a pasted job post puts its questions first, and Pro can have questions wri
   // Kept on this device: still there after a reload, and gone with the plan.
   await page.reload();
   await expect(page.getByRole("progressbar", { name: "Questions covered" })).toHaveAttribute("aria-valuenow", "4");
+  await page.getByRole("tab", { name: "More" }).click();
   page.once("dialog", (d) => void d.accept());
   await page.getByRole("button", { name: "Remove my plan" }).click();
   await expect(page.getByLabel("Job post (optional)")).toHaveValue("");
@@ -177,10 +185,12 @@ test("stories, the rounds guide and a calendar file help with the rest of the in
   await expect(page.getByRole("heading", { name: "Your interview is in 6 days" })).toBeVisible();
 
   // The rounds guide names the rounds and how to prepare for each.
+  await page.getByRole("tab", { name: "More" }).click();
   const rounds = page.getByRole("region", { name: "What each round tests" });
   for (const name of ["Screening call", "Technical round", "System design round", "Behavioural or manager round", "HR round"]) await expect(rounds.getByText(name, { exact: true })).toBeVisible();
 
   // A story is written once and kept on this device.
+  await page.getByRole("tab", { name: "Stories" }).click();
   const stories = page.getByRole("region", { name: "Your stories" });
   await expect(stories.getByText("Not written yet")).toHaveCount(5);
   await stories.getByText("Something that went wrong, and what you changed").click();
@@ -190,10 +200,12 @@ test("stories, the rounds guide and a calendar file help with the rest of the in
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
   await page.reload();
+  await page.getByRole("tab", { name: "Stories" }).click();
   await page.getByRole("region", { name: "Your stories" }).getByText("Something that went wrong, and what you changed").click();
   await expect(page.getByRole("region", { name: "Your stories" }).getByLabel(/^Action/).first()).toHaveValue(/time-based split/);
 
   // The calendar file downloads.
+  await page.getByRole("tab", { name: "Plan" }).click();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Add to my calendar (.ics)" }).click();
   expect((await download).suggestedFilename()).toBe("xplaind-interview-prep.ics");
