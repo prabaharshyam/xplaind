@@ -36,7 +36,9 @@ test.describe("interview questions (IQ-1, IQ-3)", () => {
       page.getByText(`${rag} questions`, { exact: true }),
     ).toBeVisible();
     await page.getByLabel("Level").selectOption("P3");
-    await expect(page.getByText("0 questions", { exact: true })).toBeVisible();
+    // Worked out from the bank, so a new senior question does not break the test.
+    const ragP3 = questions.filter((q) => q.topic === "rag" && q.level === "P3").length;
+    await expect(page.getByText(`${ragP3} ${ragP3 === 1 ? "question" : "questions"}`, { exact: true })).toBeVisible();
     expect(await overflow(page)).toBe(false);
     expect((await wcag(page)).violations).toEqual([]);
   });
