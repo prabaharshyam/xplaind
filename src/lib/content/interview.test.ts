@@ -11,7 +11,7 @@ describe("the interview bank as the site sees it", () => {
     const onDisk = loadContent(path.join(process.cwd(), "content")).bundle.interview;
     const drafts = onDisk.filter((q) => !isHumanName(q.data.reviewed_by)).length;
     expect(getContent().interview).toHaveLength(onDisk.length - drafts);
-  });
+  }, 30_000); // reads the whole content folder twice
 
   it("PREP-2: a question asked in every role's interview belongs to every roadmap", () => {
     const everyRole = new Set(getContent().interview.filter((q) => q.data.all_roles).map((q) => q.data.id));
