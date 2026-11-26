@@ -359,6 +359,8 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 
 - **A question id starting "jd-" is not in the bank (26 Nov, PREP-6).** Questions written for a job post live only in the device's `xplaind.prep-job.v1`, with their own ratings. Never send them to `/api/practice` or the mock interview, and never show one without the "Generated for your JD" label.
 
+- **A sign-in must count as a visit (26 Nov, AC-13).** The 7-day idle sign-out compared only the "last visit" cookie, which is written while signed in and kept 30 days. A learner who came back after more than 7 days was signed out the instant they signed in, in that browser only (a private window worked). `sessionExpiry` now takes the later of the last visit and the sign-in time.
+
 ## 12. What is pending
 
 **Owner actions (Claude cannot do these):**

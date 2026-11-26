@@ -12,7 +12,10 @@ export type Expiry = "idle" | "max" | null;
 /** Why the session should end now, or null to keep it. Unknown times never end a session. */
 export function sessionExpiry({ now, signedInAt, lastSeen }: { now: number; signedInAt: number | null; lastSeen: number | null }): Expiry {
   if (signedInAt !== null && now - signedInAt > MAX_MS) return "max";
-  if (lastSeen !== null && now - lastSeen > IDLE_MS) return "idle";
+  // A sign-in is a visit. Without this, a visit cookie left from weeks ago signed the learner out the
+  // moment they signed in again (found 2026-11-26: sign-in worked only in a private window).
+  const seen = lastSeen !== null && signedInAt !== null ? Math.max(lastSeen, signedInAt) : lastSeen;
+  if (seen !== null && now - seen > IDLE_MS) return "idle";
   return null;
 }
 

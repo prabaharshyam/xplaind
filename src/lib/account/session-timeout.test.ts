@@ -27,4 +27,15 @@ describe("session timeout (AC-13)", () => {
     expect(toMs("2026-11-01T00:00:00Z")).toBe(Date.parse("2026-11-01T00:00:00Z"));
     expect(toMs("junk")).toBeNull();
   });
+
+  it("a fresh sign-in is not ended by an old visit cookie (AC-13, found 2026-11-26)", () => {
+    const now = Date.parse("2026-11-26T18:45:00Z");
+    const day = 24 * 60 * 60 * 1000;
+    // Last visit 10 days ago, signed in a few seconds ago: stay signed in.
+    expect(sessionExpiry({ now, signedInAt: now - 5000, lastSeen: now - 10 * day })).toBeNull();
+    // Signed in 10 days ago and not seen since: still ends.
+    expect(sessionExpiry({ now, signedInAt: now - 10 * day, lastSeen: now - 10 * day })).toBe("idle");
+    expect(sessionExpiry({ now, signedInAt: now - 10 * day, lastSeen: now - 9 * day })).toBe("idle");
+    expect(sessionExpiry({ now, signedInAt: now - 10 * day, lastSeen: now - day })).toBeNull();
+  });
 });
