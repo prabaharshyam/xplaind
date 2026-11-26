@@ -22,7 +22,7 @@ export default async function InterviewQuestionPage({ params }: PageProps<"/inte
   const sameTopic = getInterviewViews().filter((o) => o.topic === q.topic && o.id !== q.id);
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
+    <main className="mx-auto max-w-2xl px-4 py-10 [overflow-wrap:anywhere]">
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link href="/interview" className={textLink}>
           Interview questions

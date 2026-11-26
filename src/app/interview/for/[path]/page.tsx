@@ -36,7 +36,7 @@ export default async function PathInterviewPage({ params }: PageProps<"/intervie
   const base = siteUrl();
 
   return (
-    <main>
+    <main className="[overflow-wrap:anywhere]">
       <JsonLd
         data={{
           "@context": "https://schema.org",
