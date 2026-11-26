@@ -7,6 +7,7 @@ import { daysBetween } from "@/lib/dates";
 import { EXPERIENCE, EXPERIENCE_IDS, type ExperienceId } from "@/lib/interview/setup";
 import { LEVEL_IDS, type LevelId } from "@/lib/levels";
 import type { Ratings } from "@/lib/practice/queue";
+import { companyOf, type CompanyId } from "./job";
 
 /** Minutes a day the learner can give, and the minutes one question takes (think, read both answers, rate). */
 export const MINUTES = [30, 60, 90] as const;
@@ -50,15 +51,28 @@ export type PrepSet = {
   behavioural: number;
   /** Core questions two or more levels away from the learner's experience. They come last. */
   stretch: number;
+  /** PREP-5: questions in the set that the learner's job post points at. They come first. */
+  fromJob: number;
 };
 
 /**
  * The questions for a role and experience level, most important first: the role's questions nearest the
  * learner's level (its Top 25 first within a level band), with its behavioural questions, also nearest
  * the level first, spread through them so no day is all one kind. Nothing is padded: a role with a
- * small bank gives a small set.
+ * small bank gives a small set. Questions the learner's job post points at come before all of these.
  */
-export function prepSet(all: readonly PrepQuestion[], top: readonly string[], pathId: string, experience: ExperienceId): PrepSet {
+export function prepSet(
+  all: readonly PrepQuestion[],
+  top: readonly string[],
+  pathId: string,
+  experience: ExperienceId,
+  /** PREP-5: the bank questions the learner's job post points at (best first), and the kind of company. */
+  job: { boost?: readonly string[]; company?: CompanyId | null } = {},
+): PrepSet {
+  const company = companyOf(job.company);
+  const boostAt = new Map((job.boost ?? []).map((id, i) => [id, i]));
+  const boosted = (q: PrepQuestion) => boostAt.get(q.id) ?? boostAt.size;
+  const design = (q: PrepQuestion) => (company?.designFirst && q.topic === "system-design" ? 0 : 1);
   const levels = EXPERIENCE.find((e) => e.id === experience)!.levels.map((l) => LEVEL_IDS.indexOf(l as LevelId));
   const [lo, hi] = [Math.min(...levels), Math.max(...levels)];
   const away = (q: PrepQuestion) => {
@@ -70,7 +84,7 @@ export function prepSet(all: readonly PrepQuestion[], top: readonly string[], pa
   const byFit = (qs: PrepQuestion[]) =>
     qs
       .map((q, i) => ({ q, i }))
-      .sort((a, b) => away(a.q) - away(b.q) || rank(a.q) - rank(b.q) || a.i - b.i)
+      .sort((a, b) => boosted(a.q) - boosted(b.q) || away(a.q) - away(b.q) || design(a.q) - design(b.q) || rank(a.q) - rank(b.q) || a.i - b.i)
       .map((x) => x.q);
   const mine = all.filter((q) => q.paths.includes(pathId));
   // Behavioural: the ones asked in almost every interview first, then by fit like the rest.
@@ -80,7 +94,7 @@ export function prepSet(all: readonly PrepQuestion[], top: readonly string[], pa
 
   // One behavioural question after every few technical ones, never more than one in five, so a short
   // plan still spends its time on the role. The behavioural ones that are left over come last.
-  const step = Math.max(BEHAVIOURAL_EVERY, Math.floor(core.length / Math.max(1, soft.length)));
+  const step = Math.max(company?.everyBehavioural ?? BEHAVIOURAL_EVERY, Math.floor(core.length / Math.max(1, soft.length)));
   const ids: string[] = [];
   let s = 0;
   core.forEach((q, i) => {
@@ -88,7 +102,7 @@ export function prepSet(all: readonly PrepQuestion[], top: readonly string[], pa
     if ((i + 1) % step === 0 && s < soft.length) ids.push(soft[s++].id);
   });
   for (; s < soft.length; s++) ids.push(soft[s].id);
-  return { ids, core: core.length, behavioural: soft.length, stretch: core.filter((q) => away(q) >= 2).length };
+  return { ids, core: core.length, behavioural: soft.length, stretch: core.filter((q) => away(q) >= 2 && !boostAt.has(q.id)).length, fromJob: mine.filter((q) => boostAt.has(q.id)).length };
 }
 
 export type PrepDay = {

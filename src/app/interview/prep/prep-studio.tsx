@@ -6,17 +6,21 @@ import { useAccountState } from "@/components/account-link";
 import { Flashcard, type Card } from "@/components/interview/flashcard";
 import { Skeleton } from "@/components/skeleton";
 import { muted, primaryButton, quietButton, secondaryButton, textLink } from "@/components/ui";
-import { useActivity, useCurrentPathId, usePractice, usePrep, useToday } from "@/lib/browser/hooks";
+import { useActivity, useCurrentPathId, usePractice, usePrep, usePrepJob, useToday } from "@/lib/browser/hooks";
 import { rate } from "@/lib/browser/practice-store";
+import { rateGenerated, savePrepJob } from "@/lib/browser/prep-job-store";
 import { oldInterviewDate, savePrep } from "@/lib/browser/prep-store";
 import { daysBetween } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
 import { readinessLabel } from "@/lib/interview/readiness";
 import { EXPERIENCE, type ExperienceId } from "@/lib/interview/setup";
 import { practiceOrder, type Rating } from "@/lib/practice/queue";
+import { COMPANY_TYPES, GENERATED_COUNT, GeneratedQuestion, MAX_JD_CHARS, MIN_JD_CHARS, isGeneratedId, jobBoost, withGenerated, type CompanyId } from "@/lib/prep/job";
 import { MAX_DAYS_AHEAD, MINUTES, addDays, perDay, prepPlan, prepReadiness, prepSet, type Minutes, type PrepDay, type PrepSetup } from "@/lib/prep/plan";
 
-export type PrepCard = Card & { topic: string; paths: string[]; often: boolean };
+export type PrepCard = Card & { topic: string; paths: string[]; often: boolean; terms: string[] };
+/** PREP-6: how a question written for the job post is marked wherever it shows. */
+const GENERATED_NOTE = "Generated for your JD";
 type PrepPath = { id: string; name: string; top: string[] };
 
 const panel = "rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900";
@@ -27,6 +31,12 @@ const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : 
 /** How many plan days are listed before the rest fold away. */
 const DAYS_SHOWN = 7;
 const EXTRA = 5;
+
+/** Removing a plan also removes what the device holds about the job (PREP-5). Ratings of bank questions stay. */
+const removePlan = () => {
+  savePrep(null);
+  savePrepJob(null);
+};
 
 /** PREP-1: the setup form until there is a plan, then the plan. Nothing shows until the browser knows today. */
 export function PrepStudio({ paths, questions }: { paths: PrepPath[]; questions: PrepCard[] }) {
@@ -51,7 +61,7 @@ export function PrepStudio({ paths, questions }: { paths: PrepPath[]; questions:
           <button type="button" className={primaryButton} onClick={() => setEditing(true)}>
             Plan the next interview
           </button>
-          <button type="button" className={secondaryButton} onClick={() => savePrep(null)}>
+          <button type="button" className={secondaryButton} onClick={removePlan}>
             Remove this plan
           </button>
         </div>
@@ -72,9 +82,16 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
   const pathId = pathChoice ?? defaultPath;
   const [experience, setExperience] = useState<ExperienceId>(current?.experience ?? "junior");
   const [minutes, setMinutes] = useState<Minutes>(current?.minutes ?? 60);
+  // PREP-5: the job, kept on this device only.
+  const job = usePrepJob();
+  const [companyChoice, setCompany] = useState<CompanyId | "" | null>(null);
+  const company = companyChoice ?? job.company ?? "";
+  const [jdDraft, setJd] = useState<string | null>(null);
+  const jd = jdDraft ?? job.jd;
+  const boost = useMemo(() => jobBoost(jd, questions), [jd, questions]);
 
   const path = paths.find((p) => p.id === pathId) ?? paths[0];
-  const set = useMemo(() => prepSet(questions, path.top, path.id, experience), [questions, path, experience]);
+  const set = useMemo(() => prepSet(questions, path.top, path.id, experience, { boost, company: company || null }), [questions, path, experience, boost, company]);
   const days = date ? daysBetween(today, date) : 0;
   const valid = days >= 1 && days <= MAX_DAYS_AHEAD;
   const draft: PrepSetup = { interviewOn: date, pathId: path.id, experience, minutes, startedOn: current?.startedOn ?? today };
@@ -89,6 +106,9 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
         e.preventDefault();
         if (!valid) return;
         savePrep(draft);
+        // Questions written for a job post belong to that post: a changed post starts without them.
+        const same = jd.trim() === job.jd;
+        savePrepJob({ company: company || null, jd: jd.trim(), boost, generated: same ? job.generated : [], ratings: same ? job.ratings : {} });
         onDone();
       }}
     >
@@ -147,10 +167,36 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
             ))}
           </select>
         </label>
+        <label className="block min-w-0 text-sm font-medium">
+          Kind of company (optional)
+          <select value={company} onChange={(e) => setCompany(e.target.value as CompanyId | "")} className={field}>
+            <option value="">Not sure</option>
+            {COMPANY_TYPES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block min-w-0 text-sm font-medium sm:col-span-2">
+          Job post (optional)
+          <textarea
+            value={jd}
+            onChange={(e) => setJd(e.target.value)}
+            maxLength={MAX_JD_CHARS}
+            rows={5}
+            aria-describedby="jd-help"
+            className={`${field} py-2 font-normal leading-6`}
+          />
+          <span id="jd-help" className={`mt-1 block font-normal ${muted}`}>
+            Paste the job post or description. Questions on the skills it names come first in your plan. It stays on this device.
+          </span>
+        </label>
       </div>
 
       <p className="mt-5 leading-7" role="status">
         <strong>{count(set.ids.length, "question", "questions")}</strong> for a {path.name} interview: {set.core} on the role and {set.behavioural} behavioural.
+        {jd.trim() && (set.fromJob > 0 ? ` ${count(set.fromJob, "matches", "match")} your job post, and come first.` : " None matches the skills your job post names, so the order is by level.")}
         {set.stretch > 0 && ` ${count(set.stretch, "is", "are")} well above or below your level, and come last.`}
         {preview?.status === "ok" &&
           (preview.leftOut === 0
@@ -175,12 +221,19 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
 }
 
 function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; path: PrepPath; questions: PrepCard[]; today: string; onEdit: () => void }) {
-  const { ratings } = usePractice();
+  const practice = usePractice();
   const activity = useActivity();
   const account = useAccountState();
-  const byId = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
-  const set = useMemo(() => prepSet(questions, path.top, path.id, setup.experience), [questions, path, setup.experience]);
-  const plan = useMemo(() => prepPlan(setup, set.ids, ratings, today), [setup, set, ratings, today]);
+  // PREP-5, PREP-6: the job post's matches come first, and the questions written for it sit among the early ones.
+  const job = usePrepJob();
+  const ratings = useMemo(() => ({ ...practice.ratings, ...job.ratings }), [practice.ratings, job.ratings]);
+  const byId = useMemo(
+    () => new Map<string, PrepCard>([...questions, ...job.generated.map((g) => ({ ...g, level: "I1" as const, topic: "Your job post", paths: [], often: false, terms: [] }))].map((q) => [q.id, q])),
+    [questions, job.generated],
+  );
+  const set = useMemo(() => prepSet(questions, path.top, path.id, setup.experience, { boost: job.boost, company: job.company }), [questions, path, setup.experience, job.boost, job.company]);
+  const order = useMemo(() => withGenerated(set.ids, job.generated.map((g) => g.id)), [set, job.generated]);
+  const plan = useMemo(() => prepPlan(setup, order, ratings, today), [setup, order, ratings, today]);
   const [queue, setQueue] = useState<string[] | null>(null);
   const [index, setIndex] = useState(0);
 
@@ -199,7 +252,7 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
   }, [account, path.id]);
 
   if (plan.status !== "ok") return null; // PrepStudio shows the "date has passed" panel
-  const ready = prepReadiness(set.ids.map((id) => byId.get(id)!), ratings, setup.startedOn, mockScore);
+  const ready = prepReadiness(order.map((id) => byId.get(id)!), ratings, setup.startedOn, mockScore);
   const first = plan.days[0];
   const todo = plan.review.length + plan.fresh.length;
   const mockDone = activity.interviews.some((i) => i.on === today);
@@ -212,10 +265,12 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
   // After today's list: the next questions in the plan, or the weakest ones once everything is covered.
   const more = () => {
     const ahead = plan.days.slice(1).flatMap((d) => d.ids);
-    start((ahead.length ? ahead : practiceOrder(set.ids, ratings)).slice(0, EXTRA));
+    start((ahead.length ? ahead : practiceOrder(order, ratings)).slice(0, EXTRA));
   };
   const onRate = (rating: Rating) => {
-    if (!rate(queue![index], { rating, updatedOn: today })) return; // SU-2: the sign-up prompt opens
+    const id = queue![index];
+    if (isGeneratedId(id)) rateGenerated(id, { rating, updatedOn: today });
+    else if (!rate(id, { rating, updatedOn: today })) return; // SU-2: the sign-up prompt opens
     if (index + 1 < queue!.length) return setIndex(index + 1); // the new card takes focus itself
     setQueue(null);
     requestAnimationFrame(() => document.getElementById("today-h")?.focus()); // the deck is gone: back to its heading
@@ -335,10 +390,15 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
             index={index}
             total={queue.length}
             onRate={onRate}
+            note={isGeneratedId(queue[index]) ? GENERATED_NOTE : undefined}
             extra={
-              <Link href={`/interview/simulator?question=${queue[index]}`} className={`text-sm ${textLink}`}>
-                Answer this one out loud in a mock interview
-              </Link>
+              isGeneratedId(queue[index]) ? (
+                <p className={`text-sm ${muted}`}>AI wrote this question and answer from your job post. No person has reviewed them, so check anything that matters.</p>
+              ) : (
+                <Link href={`/interview/simulator?question=${queue[index]}`} className={`text-sm ${textLink}`}>
+                  Answer this one out loud in a mock interview
+                </Link>
+              )
             }
           />
         )}
@@ -356,6 +416,8 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
           </div>
         )}
       </section>
+
+      <JobPost setup={setup} path={path} have={set.ids.slice(0, 40).map((id) => byId.get(id)!.question)} fromJob={set.fromJob} onEdit={onEdit} />
 
       <section aria-labelledby="days-h" className={panel}>
         <h2 id="days-h" className="text-xl font-semibold">
@@ -390,10 +452,88 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
         <button type="button" className={quietButton} onClick={onEdit}>
           Change my plan
         </button>
-        <button type="button" className={quietButton} onClick={() => window.confirm("Remove this plan? Your ratings are kept.") && savePrep(null)}>
+        <button type="button" className={quietButton} onClick={() => window.confirm("Remove this plan? Your ratings are kept.") && removePlan()}>
           Remove my plan
         </button>
       </div>
     </div>
+  );
+}
+
+/** PREP-5, PREP-6: what the job post did to the plan, and (Pro) ten questions written for it by AI. */
+function JobPost({ setup, path, have, fromJob, onEdit }: { setup: PrepSetup; path: PrepPath; have: string[]; fromJob: number; onEdit: () => void }) {
+  const job = usePrepJob();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<{ message: string; href?: string; cta?: string } | null>(null);
+
+  const write = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/ai/prep-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jd: job.jd, role: path.name, experience: setup.experience, have }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; upgrade?: string; signin?: boolean; questions?: unknown };
+      const questions = GeneratedQuestion.array().max(GENERATED_COUNT).safeParse(data.questions);
+      if (!res.ok || !questions.success || questions.data.length === 0) {
+        return setError({
+          message: data.error ?? "We could not write the questions. Try again in a minute.",
+          ...(data.upgrade ? { href: data.upgrade, cta: "See Pro" } : data.signin ? { href: "/signin?next=/interview/prep", cta: "Sign in" } : {}),
+        });
+      }
+      savePrepJob({ ...job, generated: questions.data, ratings: {} });
+    } catch {
+      setError({ message: "We could not reach the server. Check your connection and try again." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="job-h" className={panel}>
+      <h2 id="job-h" className="text-xl font-semibold">
+        Your job post
+      </h2>
+      {!job.jd ? (
+        <>
+          <p className="mt-2 leading-7">Add the job post, and the questions on the skills it names come first in your plan.</p>
+          <button type="button" className={`${secondaryButton} mt-3`} onClick={onEdit}>
+            Add my job post
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="mt-2 leading-7">
+            {fromJob > 0 ? `${count(fromJob, "question", "questions")} in your plan ${fromJob === 1 ? "matches" : "match"} the skills your job post names. They come first.` : "No question in our bank matches the skills your job post names, so your plan is ordered by level."}
+          </p>
+          {job.generated.length > 0 ? (
+            <p className="mt-2 leading-7">
+              {count(job.generated.length, "question", "questions")} written by AI for this job post {job.generated.length === 1 ? "is" : "are"} in your plan, marked &quot;{GENERATED_NOTE}&quot;. No person has reviewed them.
+            </p>
+          ) : job.jd.length < MIN_JD_CHARS ? (
+            <p className={`mt-2 text-sm ${muted}`}>Paste more of the job post to have questions written for it.</p>
+          ) : (
+            <div className="mt-3">
+              <button type="button" className={secondaryButton} onClick={write} disabled={busy}>
+                {busy ? "Writing your questions…" : `Write ${GENERATED_COUNT} questions for this job post`}
+              </button>
+              <p className={`mt-2 text-sm ${muted}`}>Part of Pro. AI writes them from your job post; they are marked &quot;{GENERATED_NOTE}&quot; and no person reviews them. Your job post is sent to the AI to write them and is not stored.</p>
+            </div>
+          )}
+          {error && (
+            <p role="alert" className="mt-3 rounded-2xl bg-amber-50 p-4 leading-7 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">
+              {error.message}{" "}
+              {error.href && (
+                <Link href={error.href} className="font-medium underline underline-offset-2">
+                  {error.cta}
+                </Link>
+              )}
+            </p>
+          )}
+        </>
+      )}
+    </section>
   );
 }
