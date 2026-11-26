@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 import { useAccountState } from "@/components/account-link";
 import { Flashcard, type Card } from "@/components/interview/flashcard";
 import { Skeleton } from "@/components/skeleton";
@@ -27,7 +27,18 @@ const GENERATED_NOTE = "Generated for your JD";
 const JOB_TOPIC = "Your job post";
 type PrepPath = { id: string; name: string; top: string[] };
 
-const panel = "rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900";
+/** The setup form and the "date has passed" screen stand alone in a card. */
+const card = "rounded-2xl border border-zinc-200 bg-white p-5 md:p-7 dark:border-zinc-800 dark:bg-zinc-900";
+/** PREP-9: a section inside a tab is plain: the tab is its frame, so no box inside a box. */
+const panel = "";
+const TABS = [
+  { id: "today", label: "Today" },
+  { id: "plan", label: "Plan" },
+  { id: "job", label: "Job post" },
+  { id: "stories", label: "Stories" },
+  { id: "more", label: "More" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
 const field = "mt-1 block min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950";
 const DAY = new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
 const fmt = (iso: string) => DAY.format(new Date(`${iso}T00:00:00+05:30`));
@@ -57,7 +68,7 @@ export function PrepStudio({ paths, questions }: { paths: PrepPath[]; questions:
   }
   if (over) {
     return (
-      <section aria-labelledby="over-h" className={panel}>
+      <section aria-labelledby="over-h" className={card}>
         <h2 id="over-h" className="text-xl font-semibold">
           Your interview date has passed
         </h2>
@@ -106,7 +117,7 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
   return (
     <form
       aria-labelledby="setup-h"
-      className={panel}
+      className={card}
       onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
@@ -246,6 +257,7 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
   const plan = useMemo(() => prepPlan(setup, order, ratings, today), [setup, order, ratings, today]);
   const [queue, setQueue] = useState<string[] | null>(null);
   const [index, setIndex] = useState(0);
+  const [tab, setTab] = useState<TabId>("today");
 
   // IR-1: the role's mock interview score, when the learner has one, counts towards readiness.
   const [mockScore, setMockScore] = useState<number | null>(null);
@@ -311,74 +323,87 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
     </li>
   );
 
+  const fits = plan.total - plan.leftOut;
+  const onTabKey = (e: KeyboardEvent) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    const next = TABS[(TABS.findIndex((t) => t.id === tab) + step + TABS.length) % TABS.length].id;
+    setTab(next);
+    requestAnimationFrame(() => document.getElementById(`prep-tab-${next}`)?.focus());
+  };
+  const tabPanel = (id: TabId) => ({ role: "tabpanel", id: `prep-panel-${id}`, "aria-labelledby": `prep-tab-${id}`, hidden: tab !== id, className: "flex flex-col gap-10 pt-6" }) as const;
+
   return (
-    <div className="flex flex-col gap-6">
-      <section aria-labelledby="count-h" className={panel}>
-        <h2 id="count-h" className="text-2xl font-semibold tracking-tight">
+    <div>
+      {/* PREP-9: one compact summary, then one thing at a time in tabs. */}
+      <header aria-labelledby="count-h">
+        <h2 id="count-h" className="text-2xl font-semibold tracking-tight md:text-3xl">
           {plan.daysLeft === 0 ? "Your interview is today" : `Your interview is in ${count(plan.daysLeft, "day", "days")}`}
         </h2>
         <p className={`mt-1 text-sm ${muted}`}>
           {fmt(setup.interviewOn)} · {path.name} · {setup.minutes} minutes a day
         </p>
-        <div className="mt-5">
-          <p className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="font-medium">
-              {plan.covered} of {count(plan.total, "question", "questions")} covered
-            </span>
-            <span className={muted}>{Math.round((plan.covered / Math.max(1, plan.total)) * 100)}%</span>
-          </p>
-          <div
-            role="progressbar"
-            aria-label="Questions covered"
-            aria-valuemin={0}
-            aria-valuemax={plan.total}
-            aria-valuenow={plan.covered}
-            className="mt-2 h-2.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
-          >
-            <span className="block h-full rounded-full bg-brand-700 transition-[width] duration-300" style={{ width: `${(plan.covered / Math.max(1, plan.total)) * 100}%` }} />
-          </div>
+        <dl className="mt-5 grid grid-cols-3 gap-3">
+          {[
+            ["Today", first.kind === "interview" ? "Interview" : `${todo} to do`],
+            ["Covered", `${plan.covered} of ${fits}`],
+            ["Readiness", `${ready.score} / 100`],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl bg-zinc-100 px-3 py-3 dark:bg-zinc-800/70">
+              <dt className={`text-xs ${muted}`}>{label}</dt>
+              <dd className="mt-0.5 text-lg font-semibold tabular-nums md:text-xl">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div
+          role="progressbar"
+          aria-label="Questions covered"
+          aria-valuemin={0}
+          aria-valuemax={fits}
+          aria-valuenow={Math.min(plan.covered, fits)}
+          className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
+        >
+          <span className="block h-full rounded-full bg-brand-700 transition-[width] duration-300" style={{ width: `${Math.min(100, (plan.covered / Math.max(1, fits)) * 100)}%` }} />
         </div>
-        <p className="mt-5 leading-7">
-          <strong>Readiness: {ready.score} out of 100.</strong> {readinessLabel(ready.score)}. It counts each question you rate &quot;Got it&quot; in full and &quot;Partly&quot; as half
-          {mockScore === null ? "." : `, with your mock interview score of ${mockScore} for this role.`}
+        <p className={`mt-2 text-sm ${muted}`}>
+          {readinessLabel(ready.score)}.{" "}
+          {plan.leftOut > 0 && plan.daysLeft > 0
+            ? `Your plan covers the ${fits} most important of ${count(plan.total, "question", "questions")} for this role${setup.minutes < 90 ? "; more time each day covers more" : ""}.`
+            : `Your plan covers all ${count(plan.total, "question", "questions")} for this role.`}
+          {mockScore !== null && ` Readiness includes your mock interview score of ${mockScore}.`}
         </p>
-        {ready.weak.length > 0 && (
-          <div className="mt-3">
-            <h3 className="text-sm font-medium">Weakest topics so far</h3>
-            <ul className="mt-1 space-y-1">
-              {ready.weak.map((t) => (
-                <li key={t.topic}>
-                  {/* The questions written for the job post have no practice page of their own. */}
-                  {t.topic === JOB_TOPIC ? (
-                    JOB_TOPIC
-                  ) : (
-                    <Link href={`/practice/${t.topic}`} className={textLink}>
-                      {interviewTopicLabel(t.topic)}
-                    </Link>
-                  )}
-                  : {t.gotIt} of {t.rated} got it
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {plan.leftOut > 0 && plan.daysLeft > 0 && (
-          <p className="mt-4 rounded-2xl bg-amber-50 p-4 leading-7 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">
-            At {setup.minutes} minutes a day, {count(plan.leftOut, "question does", "questions do")} not fit before your interview. They are the least important ones.
-            {setup.minutes < 90 ? " Give more time each day to cover them." : ""}
-          </p>
-        )}
         {account === "out" && (
-          <p className="mt-4 rounded-2xl bg-zinc-100 p-4 leading-7 dark:bg-zinc-800">
-            You can set up your plan and see every day here. To rate your answers and count your progress,{" "}
+          <p className="mt-3 text-sm leading-6">
+            To rate your answers and count your progress,{" "}
             <Link href="/signin?next=/interview/prep" className={textLink}>
               sign in or make an account
             </Link>
             .
           </p>
         )}
-      </section>
+      </header>
 
+      <div role="tablist" aria-label="Your plan" onKeyDown={onTabKey} className="mt-6 flex gap-1 overflow-x-auto border-b border-zinc-200 dark:border-zinc-800">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            id={`prep-tab-${t.id}`}
+            aria-selected={tab === t.id}
+            aria-controls={`prep-panel-${t.id}`}
+            tabIndex={tab === t.id ? 0 : -1}
+            onClick={() => setTab(t.id)}
+            className={`min-h-11 shrink-0 border-b-2 px-3 text-sm font-medium focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-700 ${
+              tab === t.id ? "border-brand-700 text-brand-800 dark:border-brand-300 dark:text-brand-200" : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div {...tabPanel("today")}>
       <section aria-labelledby="today-h" className="flex flex-col gap-4">
         <div>
           <h2 id="today-h" tabIndex={-1} className="text-xl font-semibold outline-none">
@@ -421,14 +446,14 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
                   <Link href={`/interview/simulator?question=${queue[index]}`} className={`text-sm ${textLink}`}>
                     Answer this one out loud in a mock interview
                   </Link>
-                  {byId.get(queue[index])!.topic === "behavioral" && <StoryHint question={byId.get(queue[index])!.question} />}
+                  {byId.get(queue[index])!.topic === "behavioral" && <StoryHint question={byId.get(queue[index])!.question} onWrite={() => setTab("stories")} />}
                 </>
               )
             }
           />
         )}
         {first.mock && (
-          <div className={`${panel} flex flex-wrap items-center justify-between gap-3`}>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-zinc-100 p-4 dark:bg-zinc-800/70">
             <div className="min-w-0">
               <h3 className="font-semibold">{first.mock === "full" ? "Today: a full mock interview" : "Today: a short mock interview"}</h3>
               <p className={`mt-1 text-sm ${muted}`}>
@@ -440,10 +465,35 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
             </Link>
           </div>
         )}
+        {ready.weak.length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium">Weakest topics so far</h3>
+            <ul className={`mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm ${muted}`}>
+              {ready.weak.map((t) => (
+                <li key={t.topic}>
+                  {/* The questions written for the job post have no practice page of their own. */}
+                  {t.topic === JOB_TOPIC ? (
+                    JOB_TOPIC
+                  ) : (
+                    <Link href={`/practice/${t.topic}`} className={textLink}>
+                      {interviewTopicLabel(t.topic)}
+                    </Link>
+                  )}
+                  : {t.gotIt} of {t.rated} got it
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
+      </div>
 
+      <div {...tabPanel("job")}>
       <JobPost setup={setup} path={path} have={set.ids.slice(0, 40).map((id) => byId.get(id)!.question.slice(0, 300))} fromJob={set.fromJob} onEdit={onEdit} />
 
+      </div>
+
+      <div {...tabPanel("plan")}>
       <section aria-labelledby="days-h" className={panel}>
         <h2 id="days-h" className="text-xl font-semibold">
           Day by day
@@ -461,7 +511,13 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
         )}
       </section>
 
+      </div>
+
+      <div {...tabPanel("stories")}>
       <StoriesPanel />
+      </div>
+
+      <div {...tabPanel("more")}>
 
       <section aria-labelledby="rounds-h" className={panel}>
         <h2 id="rounds-h" className="text-xl font-semibold">
@@ -496,13 +552,14 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
         </ul>
       </section>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
         <button type="button" className={quietButton} onClick={onEdit}>
           Change my plan
         </button>
         <button type="button" className={quietButton} onClick={removePlan}>
           Remove my plan
         </button>
+      </div>
       </div>
     </div>
   );
@@ -675,7 +732,7 @@ function Reminder({ setup }: { setup: PrepSetup }) {
 }
 
 /** PREP-8: under a behavioural card: the learner's own story for that kind of question, or where to write it. */
-function StoryHint({ question }: { question: string }) {
+function StoryHint({ question, onWrite }: { question: string; onWrite: () => void }) {
   const stories = useStories();
   const kind = STORY_KINDS.find((k) => k.id === storyFor(question));
   if (!kind) return null; // pay, notice period, "why this company": not answered with a story
@@ -684,9 +741,9 @@ function StoryHint({ question }: { question: string }) {
     return (
       <p className={`text-sm ${muted}`}>
         Your story for this: {kind.label.toLowerCase()}.{" "}
-        <a href="#stories-h" className={textLink}>
+        <button type="button" onClick={onWrite} className={textLink}>
           Write it once
-        </a>{" "}
+        </button>{" "}
         and it shows here.
       </p>
     );

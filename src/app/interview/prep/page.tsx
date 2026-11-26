@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { PageHero } from "@/components/page-hero";
 import { getGlossary, getPaths, getStop } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { PrepStudio } from "./prep-studio";
@@ -29,17 +28,12 @@ export default function InterviewPrepPage() {
   }));
   return (
     <main>
-      <PageHero
-        size="full"
-        shape="calendar"
-        theme="career"
-        seed="prep"
-        icon="mic"
-        eyebrow="Interview prep"
-        title="Your interview prep plan"
-        lead="Tell us the date and the role. You get the questions to cover each day until then, mock interviews, a readiness score and a checklist for the day before."
-      />
-      <div className="mx-auto max-w-3xl px-4 py-8 md:px-6">
+      {/* PREP-9: an app screen, so a plain title in place of the big hero. */}
+      <div className="mx-auto max-w-3xl px-4 pt-8 md:px-6 md:pt-12">
+        {/* The countdown below is the big line on this screen; the page's name stays small above it. */}
+        <h1 className="text-sm font-medium text-brand-800 dark:text-brand-300">Your interview prep plan</h1>
+      </div>
+      <div className="mx-auto max-w-3xl px-4 pt-6 pb-16 md:px-6">
         <PrepStudio paths={paths} questions={questions} />
       </div>
     </main>
