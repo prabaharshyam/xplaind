@@ -1,0 +1,34 @@
+id: design-vector-search-at-scale
+question: "Design vector search over 500 million product embeddings of 768 dimensions. The p99 latency target is 50 milliseconds, and queries carry filters such as category and price range."
+kind: use-case
+short_answer: "Clarify recall target, query rate, update rate and filters. The raw vectors need about 1.5 TB, so exact search is not possible. Use approximate nearest neighbour indexes on shards, compress vectors with quantization, rerank the top results with full vectors, apply filters inside the search, and measure recall against exact search on a sample."
+deeper_answer: "Clarify the recall target, query rate, update rate and filter selectivity. Then estimate size. 500 million vectors of 768 32-bit floats take about 1.5 TB before any index, so memory is the main cost.\n\nDesign: split the data into shards, each with replicas. A query goes to all shards in parallel and the results are merged. Inside a shard, use an approximate nearest neighbour index. A graph index gives high recall and low latency but uses a lot of memory. A clustered index with product quantization stores short codes, which cuts memory many times at some loss of recall. Then rerank the top few hundred results with full vectors kept on disk.\n\nFilters are the hard part. Filtering after the search can return too few results when the filter is selective. Filtering before can make the index useless. Use filter-aware search, or partition by a common field such as category.\n\nEvaluate recall at k against exact search on a sample of queries. Trade-offs: recall, latency and memory pull against each other. At scale, tail latency from the slowest shard, index rebuild time and selective filters break first."
+follow_ups:
+  - "How does product quantization reduce memory, and what do you lose?"
+  - "What goes wrong if you apply filters after the vector search?"
+  - "How do you add or delete items without rebuilding the whole index?"
+common_mistakes:
+  - "Assuming exact search fits in memory"
+  - "Filtering only after the search"
+  - "Reporting latency without measuring recall"
+level: P3
+topic: system-design
+stop_id: vector-search
+rubric:
+  - point: "Clarifies recall, query rate, updates and filters"
+    keywords: ["clarify", "recall", "queries per second", "update", "filter"]
+  - point: "Estimates memory for the raw vectors"
+    keywords: ["1.5 tb", "memory", "estimate", "terabyte", "float"]
+  - point: "Shards with replicas and approximate nearest neighbour indexes"
+    keywords: ["shard", "replica", "approximate", "graph", "cluster"]
+  - point: "Quantization, then reranking with full vectors"
+    keywords: ["quantiz", "compress", "rerank", "full vectors", "codes"]
+  - point: "Filter-aware search or partitioning"
+    keywords: ["filter", "partition", "selective", "before", "after"]
+  - point: "Measures recall against exact search at the latency target"
+    keywords: ["exact", "recall at", "sample", "p99"]
+answer_seconds: 180
+example: "First I would clarify the recall target, the queries per second and how selective each filter is. Then I estimate the size: 500 million vectors of 768 floats need about 1.5 TB of memory raw, so exact search is not possible. I split the data into shards, around 20, each with a replica, and query them in parallel. Inside each shard I use an approximate index: vectors are grouped into clusters and compressed with product quantization. The search runs on the compressed codes, returns a few hundred results, and I rerank those with the full vectors stored on disk. For category I partition the index, and for price I filter inside the search, because filtering after it can leave too few results. New items go into a small fresh segment. I measure recall at 10 against exact search on a sample of queries, at p99 under 50 milliseconds. The trade-off is memory against recall: stronger compression is cheaper, but it loses neighbours."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26

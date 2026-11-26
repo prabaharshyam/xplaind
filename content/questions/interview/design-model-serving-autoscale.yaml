@@ -1,0 +1,32 @@
+id: design-model-serving-autoscale
+question: "A train ticket site serves a pricing model at 200 requests per second, but traffic jumps to 5,000 per second within one minute when booking opens each morning. Design serving that keeps p99 latency under 150 milliseconds."
+kind: scenario
+short_answer: "Clarify the traffic shape and what a slow or failed response costs. Then: stateless replicas behind a load balancer, autoscaling on requests in flight instead of CPU, scheduled scale-up before the known spike, warm instances with the model already loaded, request batching, load shedding with a cheap fallback, and load tests that replay the spike."
+deeper_answer: "First clarify the pattern. This spike is predictable, daily and very steep. Reactive autoscaling alone is too slow, because a new replica needs time to start, pull the image and load the model, often longer than the one minute ramp.\n\nDesign: stateless model servers behind a load balancer, each with the model loaded at start and a readiness check that passes only after a warm-up request. Autoscale on a signal that follows load closely, such as concurrent requests or queue length per replica. CPU usage reacts late. Add scheduled scaling that raises the minimum replica count some minutes before booking opens, and keep headroom over the expected peak. Inside each server, small dynamic batches raise throughput. Set a timeout and a concurrency limit, and shed extra load to a cheap fallback such as a cached price or a simpler model.\n\nTrade-offs: capacity that waits idle costs money, and cold starts cost latency. Test with a load test that replays the real ramp, and measure p99 and error rate, not the average. At scale, the first failures are cold starts, slow feature lookups downstream, and retry storms from clients."
+follow_ups:
+  - "Why is CPU a poor autoscaling signal here?"
+  - "What do you return when the model cannot answer in time?"
+  - "How would you serve this on GPUs, where instances start more slowly?"
+common_mistakes:
+  - "Relying only on reactive autoscaling for a predictable spike"
+  - "Looking at average latency instead of p99"
+  - "No fallback, so overload turns into a full outage"
+level: P1
+topic: system-design
+stop_id: serving-ml-models
+rubric:
+  - point: "Clarifies the traffic shape and the cost of failure"
+    keywords: ["clarify", "spike", "predictable", "traffic"]
+  - point: "Stateless replicas with warm start and readiness checks"
+    keywords: ["stateless", "replica", "warm", "readiness", "cold start"]
+  - point: "Autoscaling signal plus scheduled scale-up before the spike"
+    keywords: ["autoscal", "scheduled", "concurrent", "queue", "headroom"]
+  - point: "Batching, timeouts and load shedding with a fallback"
+    keywords: ["batch", "timeout", "shed", "fallback", "cache"]
+  - point: "Load tests on the real ramp, measured at p99"
+    keywords: ["load test", "p99", "replay", "error rate"]
+answer_seconds: 150
+example: "Traffic goes from 200 to 5,000 requests per second in one minute, so I would first clarify that the spike is predictable: it comes every morning at the same time. That changes the design. I would run stateless replicas behind a load balancer, each one warm, with the model loaded and a readiness check before it takes traffic. I autoscale on concurrent requests per replica, not CPU, because CPU reacts late. Reactive scaling is still too slow for a one minute ramp, so I add a scheduled scale-up ten minutes before booking opens, with headroom. Each server uses small batches and a timeout. If we are overloaded, we shed load to a fallback, a cached price, so the page still works. I would prove it with a load test that replays the real ramp and check p99 under 150 milliseconds. The trade-off is cost: idle replicas every morning in exchange for no cold start."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26

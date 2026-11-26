@@ -1,0 +1,34 @@
+id: design-embedding-service
+question: "Design a shared embedding service that 20 teams call for search, recommendations and RAG. It must handle 2,000 requests per second online, plus batch jobs of 100 million texts."
+kind: use-case
+short_answer: "Clarify the clients, input types, latency targets and how often the model will change. Then: one API with separate online and batch paths, dynamic batching on GPUs, a cache keyed by text hash and model version, quotas per team, strict versioning because vectors from different models cannot be mixed, a re-embedding plan, and quality checks on retrieval tasks."
+deeper_answer: "Clarify who calls it and why. Search queries need low latency, about 50 milliseconds. Indexing 100 million documents needs throughput, not speed.\n\nDesign: a stateless API in front of model servers on GPUs. The online path uses dynamic batching, which collects requests for a few milliseconds to fill a batch. The batch path reads from a queue or object storage and runs on separate capacity, so a large job cannot slow down live traffic. A cache keyed by the hash of the text and the model version removes repeated work. Each team has a quota and usage is metered.\n\nThe hardest part is versioning. Vectors from two models are not comparable, so every vector carries its model version. A model upgrade means all stored vectors must be embedded again and each index rebuilt, then switched together with the query side.\n\nEvaluate candidate models on each team's own retrieval task, with recall at k, not only on public benchmarks. Trade-offs: larger vectors and models improve quality but raise storage and latency. At scale, noisy neighbours, long inputs that are silently truncated, and migrations between model versions break first."
+follow_ups:
+  - "What happens to stored vectors when you upgrade the model?"
+  - "How do you stop one team's batch job from slowing down live traffic?"
+  - "When should a team get its own fine-tuned embedding model?"
+common_mistakes:
+  - "Mixing vectors from different model versions in one index"
+  - "One shared queue for online and batch work"
+  - "Truncating long text without telling the caller"
+level: P1
+topic: system-design
+stop_id: embeddings
+rubric:
+  - point: "Clarifies clients, latency targets and input types"
+    keywords: ["clarify", "latency", "throughput", "clients", "teams"]
+  - point: "Separate online and batch paths"
+    keywords: ["online", "batch", "separate", "queue"]
+  - point: "Dynamic batching on GPUs and a cache"
+    keywords: ["dynamic batching", "gpu", "cache", "hash"]
+  - point: "Versions every vector and plans re-embedding on upgrade"
+    keywords: ["version", "re-embed", "rebuild", "comparable", "upgrade"]
+  - point: "Quotas per team and usage metering"
+    keywords: ["quota", "meter", "per team", "limit"]
+  - point: "Evaluates models on each team's retrieval task"
+    keywords: ["recall", "retrieval", "evaluat", "own data"]
+answer_seconds: 150
+example: "For 20 teams, I would first clarify the two kinds of load. Search queries need low latency, about 50 milliseconds at 2,000 requests per second. Indexing 100 million texts needs throughput. So I build one API with two separate paths. The online path runs on GPU servers with dynamic batching, and a cache keyed by a hash of the text and the model version. The batch path reads from a queue on its own capacity, so a big job cannot slow live traffic. Each team gets a quota, a limit on requests per second. The key rule is that every vector carries a model version, because vectors from two models are not comparable. When we upgrade, teams re-embed their data, rebuild the index, and switch queries and documents together. Before choosing a model, I evaluate recall at 10 on each team's own retrieval data. The trade-off is quality against cost: larger vectors search better but need more storage."
+drafted_with_ai: true
+reviewed_by: "Shyam Prabahar"
+reviewed_on: 2026-11-26
