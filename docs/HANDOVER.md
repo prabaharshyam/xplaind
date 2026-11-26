@@ -47,7 +47,7 @@ Who it is for: learners in India, from freshers and career-switchers with no cod
 
 Scope decisions to respect:
 
-- **System design stays at the basics** (FOCUS-1). The 6 system design lessons, 28 interview patterns and 10 worked answers stay. Build no more system design content or features, for example no system design mock interview.
+- **System design stays at the basics** (FOCUS-1). The 6 system design lessons, 28 interview patterns and 10 worked answers stay. Build no more system design content or features, for example no system design mock interview. One exception since 26 Nov (owner decision): interview questions on designing AI systems may be added to the question bank.
 - **Pro plan pop-ups were deliberately skipped.** Do not add upsell pop-ups unless asked.
 - **No XP, ranks or badges.** A streak and progress counts only.
 - **Cheatsheets are paused** (CS-3). The 12 sheets are still in `content/cheatsheets` and validate, but there are no pages.
