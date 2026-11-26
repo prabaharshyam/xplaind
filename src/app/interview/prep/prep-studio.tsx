@@ -99,7 +99,23 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
         <label className="block min-w-0 text-sm font-medium">
           Interview date
           {/* iPhone Safari sizes a date field by its own contents, so it ran past the card: take its native look off and let it shrink. */}
-          <input type="date" required min={addDays(today, 1)} max={addDays(today, MAX_DAYS_AHEAD)} value={date} onChange={(e) => setDate(e.target.value)} className={`${field} max-w-full min-w-0 appearance-none dark:scheme-dark [&::-webkit-date-and-time-value]:text-left`} />
+          <span className="relative block">
+            <input
+              type="date"
+              required
+              min={addDays(today, 1)}
+              max={addDays(today, MAX_DAYS_AHEAD)}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={`${field} peer max-w-full min-w-0 appearance-none dark:scheme-dark [&::-webkit-date-and-time-value]:text-left ${date ? "" : "[&:not(:focus)]:text-transparent"}`}
+            />
+            {/* An empty date field is blank on an iPhone, so say what to do. It steps aside while the field is in use. */}
+            {!date && (
+              <span aria-hidden="true" className="pointer-events-none absolute top-1 bottom-0 left-3 flex items-center font-normal text-zinc-600 peer-focus:hidden dark:text-zinc-400">
+                Choose a date
+              </span>
+            )}
+          </span>
         </label>
         <label className="block min-w-0 text-sm font-medium">
           Role
