@@ -95,11 +95,12 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
         {current ? "Change your plan" : "Set up your plan"}
       </h2>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <label className="block text-sm font-medium">
+        <label className="block min-w-0 text-sm font-medium">
           Interview date
-          <input type="date" required min={addDays(today, 1)} max={addDays(today, MAX_DAYS_AHEAD)} value={date} onChange={(e) => setDate(e.target.value)} className={field} />
+          {/* iPhone Safari sizes a date field by its own contents, so it ran past the card: take its native look off and let it shrink. */}
+          <input type="date" required min={addDays(today, 1)} max={addDays(today, MAX_DAYS_AHEAD)} value={date} onChange={(e) => setDate(e.target.value)} className={`${field} max-w-full min-w-0 appearance-none [&::-webkit-date-and-time-value]:text-left`} />
         </label>
-        <label className="block text-sm font-medium">
+        <label className="block min-w-0 text-sm font-medium">
           Role
           <select value={path.id} onChange={(e) => setPathChoice(e.target.value)} className={field}>
             {paths.map((p) => (
@@ -109,7 +110,7 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
             ))}
           </select>
         </label>
-        <label className="block text-sm font-medium">
+        <label className="block min-w-0 text-sm font-medium">
           Your experience
           <select value={experience} onChange={(e) => setExperience(e.target.value as ExperienceId)} className={field}>
             {EXPERIENCE.map((x) => (
@@ -119,7 +120,7 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
             ))}
           </select>
         </label>
-        <label className="block text-sm font-medium">
+        <label className="block min-w-0 text-sm font-medium">
           Time you can give each day
           <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value) as Minutes)} className={field}>
             {MINUTES.map((m) => (
