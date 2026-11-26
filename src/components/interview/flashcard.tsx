@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
 import type { InterviewView } from "@/lib/interview/types";
 import { levelText } from "@/lib/levels";
@@ -15,6 +15,10 @@ export type Card = Pick<InterviewView, "id" | "question" | "short_answer" | "dee
  */
 export function Flashcard({ q, index, total, onRate, extra }: { q: Card; index: number; total: number; onRate: (rating: Rating) => void; extra?: ReactNode }) {
   const [stage, setStage] = useState<0 | 1 | 2>(0);
+  // Each step removes the button that was pressed, so move focus to what it revealed (keyboard and screen-reader users).
+  const question = useRef<HTMLHeadingElement>(null);
+  const deeper = useRef<HTMLHeadingElement>(null);
+  useEffect(() => (stage === 2 ? deeper : question).current?.focus(), [stage]);
   const done = Math.round((index / total) * 100);
   return (
     <div className="flex flex-col gap-4">
@@ -42,6 +46,7 @@ export function Flashcard({ q, index, total, onRate, extra }: { q: Card; index: 
           </p>
           <h3
             id="card-question"
+            ref={question}
             tabIndex={-1}
             className={`leading-snug font-semibold outline-none ${stage === 0 ? "my-auto py-6 text-center text-2xl" : "text-lg text-zinc-600 dark:text-zinc-300"}`}
           >
@@ -63,7 +68,9 @@ export function Flashcard({ q, index, total, onRate, extra }: { q: Card; index: 
                 </button>
               ) : (
                 <div className="flex flex-col gap-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                  <h4 className="font-semibold">Deeper answer</h4>
+                  <h4 ref={deeper} tabIndex={-1} className="font-semibold outline-none">
+                    Deeper answer
+                  </h4>
                   {q.deeper_answer.split(/\n\s*\n/).map((para, i) => (
                     <p key={i} className="leading-7">
                       {para}

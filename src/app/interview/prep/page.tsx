@@ -21,7 +21,6 @@ export default function InterviewPrepPage() {
     level: q.level,
     topic: q.topic,
     paths: q.paths,
-    stop: q.stop,
     often: q.often,
   }));
   return (

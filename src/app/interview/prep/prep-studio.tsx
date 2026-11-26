@@ -16,12 +16,13 @@ import { EXPERIENCE, type ExperienceId } from "@/lib/interview/setup";
 import { practiceOrder, type Rating } from "@/lib/practice/queue";
 import { MAX_DAYS_AHEAD, MINUTES, addDays, perDay, prepPlan, prepReadiness, prepSet, type Minutes, type PrepDay, type PrepSetup } from "@/lib/prep/plan";
 
-export type PrepCard = Card & { topic: string; paths: string[]; stop: { id: string; title: string }; often: boolean };
+export type PrepCard = Card & { topic: string; paths: string[]; often: boolean };
 type PrepPath = { id: string; name: string; top: string[] };
 
 const panel = "rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900";
 const field = "mt-1 block min-h-11 w-full rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950";
-const fmt = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+const DAY = new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+const fmt = (iso: string) => DAY.format(new Date(`${iso}T00:00:00+05:30`));
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 /** How many plan days are listed before the rest fold away. */
 const DAYS_SHOWN = 7;
@@ -98,7 +99,7 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
         <label className="block min-w-0 text-sm font-medium">
           Interview date
           {/* iPhone Safari sizes a date field by its own contents, so it ran past the card: take its native look off and let it shrink. */}
-          <input type="date" required min={addDays(today, 1)} max={addDays(today, MAX_DAYS_AHEAD)} value={date} onChange={(e) => setDate(e.target.value)} className={`${field} max-w-full min-w-0 appearance-none [&::-webkit-date-and-time-value]:text-left`} />
+          <input type="date" required min={addDays(today, 1)} max={addDays(today, MAX_DAYS_AHEAD)} value={date} onChange={(e) => setDate(e.target.value)} className={`${field} max-w-full min-w-0 appearance-none dark:scheme-dark [&::-webkit-date-and-time-value]:text-left`} />
         </label>
         <label className="block min-w-0 text-sm font-medium">
           Role
@@ -139,8 +140,8 @@ function Setup({ paths, questions, today, current, onDone, onCancel }: { paths: 
           (preview.leftOut === 0
             ? ` In ${count(days, "day", "days")} at ${minutes} minutes a day, you cover all of them.`
             : ` In ${count(days, "day", "days")} at ${minutes} minutes a day, you cover ${fits} of them. The ${preview.leftOut} that do not fit are the least important.${minutes < 90 ? " More time each day covers more." : ""}`)}
+        {date && !valid && " Pick a date from tomorrow up to a year ahead."}
       </p>
-      {date && !valid && <p className="mt-2 text-sm">Pick a date from tomorrow up to a year ahead.</p>}
 
       <div className="mt-5 flex flex-wrap gap-3">
         <button type="submit" className={primaryButton}>
@@ -199,9 +200,9 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
   };
   const onRate = (rating: Rating) => {
     if (!rate(queue![index], { rating, updatedOn: today })) return; // SU-2: the sign-up prompt opens
-    if (index + 1 >= queue!.length) return setQueue(null);
-    setIndex(index + 1);
-    requestAnimationFrame(() => document.getElementById("card-question")?.focus());
+    if (index + 1 < queue!.length) return setIndex(index + 1); // the new card takes focus itself
+    setQueue(null);
+    requestAnimationFrame(() => document.getElementById("today-h")?.focus()); // the deck is gone: back to its heading
   };
 
   const dayText = (d: PrepDay, i: number) => {
@@ -276,18 +277,18 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
         )}
         {account === "out" && (
           <p className="mt-4 rounded-2xl bg-zinc-100 p-4 leading-7 dark:bg-zinc-800">
-            You can read every question and answer here. To count your progress,{" "}
+            You can set up your plan and see every day here. To rate your answers and count your progress,{" "}
             <Link href="/signin?next=/interview/prep" className={textLink}>
               sign in or make an account
             </Link>
-            : ratings are saved to an account.
+            .
           </p>
         )}
       </section>
 
       <section aria-labelledby="today-h" className="flex flex-col gap-4">
         <div>
-          <h2 id="today-h" className="text-xl font-semibold">
+          <h2 id="today-h" tabIndex={-1} className="text-xl font-semibold outline-none">
             {first.kind === "interview" ? "Interview day" : "Today's questions"}
           </h2>
           <p className={`mt-1 text-sm ${muted}`}>

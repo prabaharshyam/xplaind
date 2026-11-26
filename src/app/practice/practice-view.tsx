@@ -81,9 +81,7 @@ function Flashcards({ questions }: { questions: InterviewView[] }) {
   function next(rating: Rating) {
     const id = queue![index];
     if (!rate(id, { rating, updatedOn: today ?? todayInIST() })) return; // SU-2: the sign-up prompt opens
-    setIndex(index + 1);
-    // Move focus to the new question for keyboard and screen-reader users.
-    requestAnimationFrame(() => document.getElementById("card-question")?.focus());
+    setIndex(index + 1); // the new card takes focus itself
   }
 
   return (
