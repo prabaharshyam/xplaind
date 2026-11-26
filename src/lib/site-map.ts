@@ -18,6 +18,7 @@ export const SITE_MAP: { title: string; links: { href: string; label: string }[]
       { href: "/playground", label: "Code playground" },
       { href: "/interview", label: "Interview questions" },
       { href: "/interview/simulator", label: "Mock interview" },
+      { href: "/interview/prep", label: "Interview prep plan" },
       { href: "/ai", label: "AI Studio" },
     ],
   },

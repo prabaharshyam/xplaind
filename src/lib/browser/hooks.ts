@@ -10,7 +10,8 @@ import { parseActivity, rawActivity } from "./activity-store";
 import { parseAttempt, rawAttempt } from "./attempt-store";
 import { parsePractice, rawPractice } from "./practice-store";
 import { parseProgress, rawProgress } from "./progress-store";
-import { parseInterviewDate, parsePlan, rawInterviewDate, rawPlan } from "./plan-store";
+import { parsePlan, rawPlan } from "./plan-store";
+import { parsePrep, rawPrep } from "./prep-store";
 import { serverSnapshot, subscribe } from "./storage";
 import { parseVisits, rawVisits } from "./visits";
 
@@ -77,9 +78,10 @@ export function useGame() {
   }, [progress.stops, practice.ratings, activity.interviews, visits, today]);
 }
 
-/** PP-1: the learner's interview date, kept on this device. */
-export function useInterviewDate(): string | null {
-  return parseInterviewDate(useSyncExternalStore(subscribe, rawInterviewDate, serverSnapshot));
+/** PREP-1: the learner's interview prep plan on this device, or null. */
+export function usePrep() {
+  const raw = useSyncExternalStore(subscribe, rawPrep, serverSnapshot);
+  return useMemo(() => parsePrep(raw), [raw]);
 }
 
 /** WP-2: this week's saved plan, or null. */

@@ -19,8 +19,6 @@ export type NudgeInput = {
 };
 
 export const MAX_NUDGES = 2;
-/** Days before an interview from which mock interviews are suggested first. */
-export const INTERVIEW_SOON_DAYS = 14;
 /** Days away after which the learner is welcomed back. */
 export const AWAY_DAYS = 7;
 
@@ -31,9 +29,10 @@ export function nudges(i: NudgeInput): Nudge[] {
   const last = [...i.activeDays].sort().at(-1) ?? null;
 
   if (i.interviewOn) {
+    // PREP-4: the countdown to the interview in the learner's prep plan.
     const days = daysBetween(i.today, i.interviewOn);
-    if (days >= 1 && days <= INTERVIEW_SOON_DAYS)
-      out.push({ id: "interview", text: `Your interview is in ${plural(days, "day", "days")}. A mock interview a day is the best use of the time left.`, cta: "Do a mock interview", href: `/interview/simulator?path=${i.path.id}` });
+    if (days >= 0)
+      out.push({ id: "interview", text: days === 0 ? "Your interview is today. Open your plan for the checklist." : `Your interview is in ${plural(days, "day", "days")}. Today's questions are ready in your plan.`, cta: "Open my interview plan", href: "/interview/prep" });
   }
   if (!last && !i.hasTest) out.push({ id: "first", text: "New here? A 2-minute check finds where your roadmap should start.", cta: "Take the 2-minute check", href: "/start" });
   if (last) {

@@ -37,6 +37,8 @@ export const NAV_GROUPS: Group[] = [
     items: [
       // IP-4: patterns and system design answers are last.
       { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report", icon: "mic", tone: "rose" },
+      // PREP-1: second, after the mock interview the page sells.
+      { href: "/interview/prep", label: "Interview prep plan", note: "Questions for each day until your interview", icon: "map", tone: "emerald" },
       { href: "/interview/answers", label: "Interview Q&A", note: "Every question and answer, by role", icon: "chat", tone: "teal" },
       { href: "/interview", label: "Question bank", note: "Every question, by topic and role", icon: "search", tone: "amber" },
       { href: "/interview/patterns", label: "Interview patterns", note: "The ideas AI interviews are built on", icon: "flow", tone: "violet" },

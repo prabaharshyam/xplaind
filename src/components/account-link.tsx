@@ -58,6 +58,7 @@ export function ClaimOnSignIn() {
       return;
     }
     void import("@/lib/browser/claim").then(({ claimDevice }) => claimDevice()).catch(() => {});
+    void import("@/lib/browser/prep-store").then(({ mergePrep }) => mergePrep()).catch(() => {}); // PREP-3
   }, [state]);
   return null;
 }

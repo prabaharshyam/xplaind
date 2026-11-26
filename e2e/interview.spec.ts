@@ -2,9 +2,12 @@ import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { loadContent } from "../src/lib/content/load";
+import { isHumanName } from "../src/lib/content/review";
 
 const { bundle } = loadContent(path.resolve(__dirname, "../content"));
-const questions = bundle.interview.map((q) => q.data);
+// IQ-6: only questions a person has signed off are on the site.
+const questions = bundle.interview.map((q) => q.data).filter((q) => isHumanName(q.reviewed_by));
+const drafts = bundle.interview.map((q) => q.data).filter((q) => !isHumanName(q.reviewed_by));
 
 const overflow = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
@@ -39,9 +42,15 @@ test.describe("interview questions (IQ-1, IQ-3)", () => {
     }
   });
 
-  test("the sitemap lists every question page", async ({ request }) => {
+  test("the sitemap lists every question page", async ({ request, page }) => {
     const xml = await (await request.get("/sitemap.xml")).text();
     for (const q of questions) expect(xml).toContain(`/interview/${q.id}</loc>`);
+    // IQ-6: a question nobody has signed off has no page and is not listed.
+    for (const q of drafts) expect(xml, q.id).not.toContain(`/interview/${q.id}</loc>`);
+    if (drafts[0]) {
+      await page.goto(`/interview/${drafts[0].id}`);
+      await expect(page.getByRole("heading", { level: 1, name: "This page isn't here" })).toBeVisible();
+    }
   });
 });
 

@@ -11,7 +11,7 @@ import { TRIAL_QUESTIONS, VOICE_QUESTION_COUNTS, questionLine } from "@/lib/ai/v
 import { VoiceInterviewer, type CallQuestion } from "./voice-interviewer";
 import { Exchange, Reveal, Stages, room } from "./room";
 import { MAX_JD_CHARS, MIN_JD_CHARS, type InterviewSetup } from "@/lib/ai/interview-plan";
-import { EXPERIENCE, STYLES, pickForSetup, type ExperienceId, type Pickable, type StyleId } from "@/lib/interview/setup";
+import { EXPERIENCE, STYLES, experienceOf, pickForSetup, type ExperienceId, type Pickable, type StyleId } from "@/lib/interview/setup";
 import { recordInterview } from "@/lib/browser/activity-store";
 import { todayInIST } from "@/lib/dates";
 import { interviewTopicLabel } from "@/lib/interview-topics";
@@ -64,7 +64,10 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   const [voiceCount, setVoiceCount] = useState<number>(3);
   // VI-11: what the interview is for, asked before it starts.
   const [source, setSource] = useState<"role" | "jd">("role");
-  const [experience, setExperience] = useState<ExperienceId | "">("");
+  // PREP-1: the interview prep plan links here with the learner's experience already chosen.
+  const urlExp = experienceOf(params.get("exp"))?.id ?? "";
+  const [expChoice, setExperience] = useState<ExperienceId | "" | null>(null);
+  const experience = expChoice ?? urlExp;
   const [style, setStyle] = useState<StyleId>("mixed");
   const [company, setCompany] = useState("");
   const [jd, setJd] = useState("");
