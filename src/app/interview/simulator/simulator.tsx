@@ -433,7 +433,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
             </div>
             {/* VI-21: the start button comes before her opening line, so a phone reaches it without scrolling past the whole quote. */}
             <div className="flex flex-col gap-4 border-t border-brand-800 pt-6">
-              <p className={`text-[15px] font-medium ${room.soft}`}>She will open with</p>
+              {opening && <p className={`text-[15px] font-medium ${room.soft}`}>She will open with</p>}
               <p aria-live="polite" className="text-lg leading-8">
                 {opening ? (
                   <>&ldquo;{opening}&rdquo;</>

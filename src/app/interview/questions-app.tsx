@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 import { Flashcard } from "@/components/interview/flashcard";
 import { muted, primaryButtonSm, secondaryButtonSm, textLink } from "@/components/ui";
 import { usePractice, useToday } from "@/lib/browser/hooks";
@@ -44,6 +45,7 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
   const topic = topicChoice ?? urlTopic;
   const practice = usePractice();
   const today = useToday();
+  const list = useRef<HTMLUListElement>(null);
   // A new filter starts again from the first PAGE questions.
   const filterKey = [role, topic, level, query].join("|");
   const limit = more.key === filterKey ? more.n : PAGE;
@@ -59,12 +61,19 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
     );
   }, [questions, topic, level, role, query]);
   const byId = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
-  const active = (selected && shown.find((q) => q.id === selected)) || shown[0];
+  const visible = shown.slice(0, limit);
+  // The open answer is always one of the rows on screen, so a new filter never leaves it without its row.
+  const active = (selected && visible.find((q) => q.id === selected)) || visible[0];
   const picked = !!selected && active?.id === selected; // on a phone: the answer is open
 
   const startCards = () => {
     setCards(practiceOrder(shown.map((q) => q.id), practice.ratings).slice(0, ROUND));
     setIndex(0);
+  };
+  const showMore = () => {
+    // Focus moves to the first new row: the button may be gone, and the new rows sit above it.
+    flushSync(() => setMore({ key: filterKey, n: limit + PAGE }));
+    list.current?.children[limit]?.querySelector("button")?.focus();
   };
   const onRate = (rating: Rating) => {
     if (!rate(cards![index], { rating, updatedOn: today ?? todayInIST() })) return; // SU-2: the sign-up prompt opens
@@ -143,9 +152,9 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-        <div className={`flex-col gap-3 lg:max-h-[72vh] lg:overflow-y-auto lg:pr-2 ${picked ? "hidden lg:flex" : "flex"}`}>
-        <ul aria-label="Questions" className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
-          {shown.slice(0, limit).map((q) => {
+        <div className={`flex-col gap-3 lg:max-h-[72vh] lg:overflow-y-auto lg:pr-2 lg:pb-2 ${picked ? "hidden lg:flex" : "flex"}`}>
+        <ul ref={list} aria-label="Questions" className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+          {visible.map((q) => {
             const rating = practice.ratings[q.id];
             const isActive = q.id === active?.id;
             const body = (
@@ -170,7 +179,7 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
           })}
         </ul>
         {shown.length > limit && (
-          <button type="button" className={`${secondaryButtonSm} self-center`} onClick={() => setMore({ key: filterKey, n: limit + PAGE })}>
+          <button type="button" className={`${secondaryButtonSm} self-center`} onClick={showMore}>
             Show more ({shown.length - limit} left)
           </button>
         )}

@@ -52,6 +52,7 @@ test("IP-6: the Interview page is one app screen with tabs for questions, patter
   await expect(rows).toHaveCount(20);
   await page.getByRole("button", { name: /^Show more \(\d+ left\)$/ }).click();
   await expect(rows).toHaveCount(40);
+  await expect(rows.nth(20)).toBeFocused(); // focus moves to the first new row
   // Choosing another question shows its answer without leaving the page.
   const third = page.getByRole("list", { name: "Questions" }).getByRole("button").nth(2);
   const text = (await third.locator("span").first().textContent())!;

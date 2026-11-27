@@ -282,7 +282,7 @@ export default function PricingPage() {
                 </th>
                 <th scope="col" className="p-3 md:py-4 font-semibold text-brand-800 md:px-6 dark:text-brand-300">
                   Pro<span className="block text-xs font-normal md:inline md:text-sm md:font-semibold">
-                    <span className="max-md:hidden">, </span>within your fair-use allowance
+                    <span className="max-md:sr-only">, </span>within your fair-use allowance
                   </span>
                 </th>
               </tr>
