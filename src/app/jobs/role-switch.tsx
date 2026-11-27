@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 
 const onHash = (fn: () => void) => {
   window.addEventListener("hashchange", fn);
@@ -16,11 +16,16 @@ const readHash = () => window.location.hash.slice(1);
 export function RoleSwitch({ roles }: { roles: { id: string; name: string; panel: ReactNode }[] }) {
   const hash = useSyncExternalStore(onHash, readHash, () => "");
   const current = roles.some((r) => r.id === hash) ? hash : roles[0].id;
-  // Arriving from a roadmap's link (/jobs#role), the browser tried to scroll while that panel was still hidden.
+  // Arriving from a roadmap's link (/jobs#role), the browser tried to scroll while that panel was still hidden,
+  // so scroll once on arrival. A role picked here does not scroll: the list stays where the learner is.
+  const arrived = useRef(false);
   useEffect(() => {
-    if (hash && roles.some((r) => r.id === hash)) document.getElementById(hash)?.scrollIntoView({ block: "start" });
+    if (arrived.current || !hash) return;
+    arrived.current = true;
+    if (roles.some((r) => r.id === hash)) document.getElementById(hash)?.scrollIntoView({ block: "start" });
   }, [hash, roles]);
   const go = (id: string) => {
+    arrived.current = true;
     // Replace, not push: picking roles one after another should not fill the Back button.
     history.replaceState(null, "", `#${id}`);
     window.dispatchEvent(new HashChangeEvent("hashchange"));

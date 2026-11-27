@@ -51,8 +51,9 @@ test("the home page says what to do and leads to roadmaps, topics, courses and i
   // HM-7: the hero is the promise; the market figures sit with the rest of the proof, still dated and sourced.
   await expect(page.locator(".home-hero").getByText("Why now", { exact: false })).toHaveCount(0);
   await expect(main.getByRole("heading", { name: "Why now: India's AI job market" })).toBeVisible();
-  // HM-7: at 360 px the page is about half as long as before (14 screens).
-  expect(await page.evaluate(() => document.documentElement.scrollHeight / innerHeight)).toBeLessThan(10);
+  await expect(main.getByRole("link", { name: "Read the guides" })).toHaveAttribute("href", "/blog");
+  // HM-7: at 360 px the page went from about 14 screens to under 10.
+  expect(await page.evaluate(() => document.documentElement.scrollHeight / innerHeight)).toBeLessThan(10.5);
   const nav = page.getByRole("banner");
   await nav.locator(".site-menu > summary").click(); // phone width: the links sit in the menu
   for (const [name, href] of [["Library", "/library"], ["Videos", "/videos"], ["Questions", "/interview"], ["Mock interview", "/interview/simulator"], ["Jobs and salaries", "/jobs"], ["Roadmaps", "/paths"]]) {

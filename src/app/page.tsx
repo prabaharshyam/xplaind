@@ -399,6 +399,13 @@ export default function Home() {
               </details>
             ))}
           </div>
+          {/* HM-7: the guides left the page; one link keeps the blog a tap away from home. */}
+          <p className="mt-6 leading-7 text-zinc-700 dark:text-zinc-300">
+            More in the guides: AI courses with a certificate, how to become an AI engineer in India, and more.{" "}
+            <Link href="/blog" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+              Read the guides
+            </Link>
+          </p>
         </div>
       </section>
 

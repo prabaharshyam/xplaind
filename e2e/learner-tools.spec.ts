@@ -45,6 +45,9 @@ test("jobs and salaries show every role with dated pay, skills and live job link
   await expect(page.locator("#ai-product-manager").getByRole("heading", { name: "AI Product Manager" })).toBeVisible();
   await expect(card).toBeHidden();
   await expect(page).toHaveURL(/\/jobs#ai-product-manager$/);
+  // Picking another role does not scroll away from the list.
+  await page.getByRole("combobox", { name: "Role" }).selectOption("mlops-engineer");
+  await expect(page.getByRole("combobox", { name: "Role" })).toBeInViewport();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
   // The address picks the role, so the roadmap's link opens its own role.

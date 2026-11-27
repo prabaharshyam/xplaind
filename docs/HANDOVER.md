@@ -244,6 +244,8 @@ PRD IDs in brackets.
 
 **Accounts** Google, GitHub, email and password, email link; account wall for the PDF, mock interview and saved progress; data export and delete (AC, SU, PV). Held behind `NEXT_PUBLIC_SIGNUPS_OPEN` (see 4).
 
+**App screens (27 Nov, site audit items 4 to 12)** Library, Projects, Videos and Questions are a toolbar of lists over compact rows (LY-3, PJ-1, VD-4, IP-7); Jobs shows one role at a time from the address (JB-5); the dashboard and the prep plan use tabs (DB-1 with `src/components/app-tabs.tsx`, PREP-9); signed-in phone users get a bottom tab bar (NV-11, `src/components/phone-tab-bar.tsx`, hidden on lessons and the mock interview); the menu has four groups (NV-10). A box never holds another box (UX-12) and decoration is left out on phones (UX-10).
+
 **Design system** (`docs/brand.md`, BR-1 to BR-4, then BR-10 on 14 Nov moved the brand from violet to deep teal `#0E4A50` with sea glass `#7FD1C7` on dark and brass `#D9B26A` only for what a learner earns; older text below still says violet, read it as the brand colour): the brand colour is the one action colour; buttons are pills in three sizes from `src/components/ui.ts`; only three corner sizes (use `rounded-2xl` and `rounded-full`; the brand test fails on `rounded-md`, `-lg`, `-xl`); flat cards with a thin grey border and no shadow; one-line facts instead of badges; line-art covers; light and dark mode with a toggle at the top right.
 
 ---
