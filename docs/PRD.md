@@ -484,6 +484,14 @@ Keep gamification light. In a Belgian study of 6,592 adults, which the idea vali
 | AC-10 | WhatsApp in release 1 is a link to a public WhatsApp Channel. No WhatsApp messages are sent to individuals; that needs the WhatsApp Business API and is a release 2 decision. Amended 2026-10-26: an optional phone number may be given with consent on the roadmap checklist download (RD-2), and nothing else collects one | The only phone field is the optional one in roadmap_downloads |
 | AC-11 | Settings: delete account and export my data as JSON | Deletion removes the learner's rows in the same request |
 
+## The app, once signed in
+
+Added at the owner's request (2026-11-27): "landing pages and marketing pages, but once signed in it should have an app interface where users can learn, download roadmaps, do mock interviews, use the resume reviewer, flashcards and every feature". Plan and decisions: `docs/plans/app-experience.md`; reference: `docs/research/studyfetch-platform.md` (patterns only).
+
+| ID | Requirement | Acceptance criteria |
+| --- | --- | --- |
+| APP-0 | Signed-in screens can be seen and tested (2026-11-27). Every build and browser test used to run with accounts off, so no signed-in screen had ever been checked. A second build with accounts on (`npm run build:app`, its own `.next-app` folder) talks to a local stand-in for Supabase (`e2e-app/mock-supabase.mjs`) that knows one learner; a test signs in by placing that learner's session cookie (`e2e-app/signed-in.ts`). No real account or Supabase project is used. The signed-in tests (`npm run test:e2e:app`, phone and laptop) run in CI beside the main checks | The browser and the server both see the learner: /dashboard shows "Your dashboard" with no "not fully configured" message and no Sign in link; the phone tab bar shows on a phone; screenshots of every main page signed in can be taken on request (SHOTS=1) |
+
 ## Editorial rules, link checks and admin
 
 Build decision: editorial content (levels, stops, resources, questions, books, lessons) lives in the git repository as YAML and MDX files, and the site is built from them. Link-check results live in a file the weekly job commits. Only user data lives in the database. This gives version history, review by pull request and cheap static pages that search engines can read, and it means no admin forms to build in release 1.
