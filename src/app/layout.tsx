@@ -12,6 +12,7 @@ import { PageLoaderControl } from "@/components/page-loader-control";
 import { SiteHeader } from "@/components/site-header";
 import { PhoneTabBar } from "@/components/phone-tab-bar";
 import { AppFrameSync, AppRail } from "@/components/app-frame";
+import { Toaster } from "@/components/toast";
 import { APP_SCRIPT } from "@/lib/app-frame";
 import { allowIndexing } from "@/lib/indexing";
 import { siteUrl } from "@/lib/site";
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <AppFrameSync />
         </Suspense>
         <SignUpDialog />
+        <Toaster />
         <UpgradePrompt />
         <MotionEffects />
         {/* These read the URL, so pages with dynamic URLs render them in the browser. */}

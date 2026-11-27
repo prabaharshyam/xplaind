@@ -110,7 +110,8 @@ test.describe("stop page (RM-2, RM-4, RM-7)", () => {
     // retake, picking the options the first try revealed as right
     const right = await page.locator("label", { hasText: "(right answer)" }).allTextContents();
     await page.getByRole("button", { name: "Try the check again" }).click();
-    for (const text of right) await page.getByLabel(text.replace(" (right answer)", ""), { exact: true }).check();
+    // APP-2: each option starts with its letter (A, B, C…), which is not part of the option's name.
+    for (const text of right) await page.getByRole("radio", { name: text.replace(" (right answer)", "").replace(/^[A-H]/, ""), exact: true }).check();
     await page.getByRole("button", { name: "Check my answers" }).click();
     await expect(page.getByText("You scored 100%. Step done.")).toBeVisible();
     await expect(page.getByText("passed the check")).toBeVisible();

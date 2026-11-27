@@ -93,7 +93,8 @@ export function DownloadChecklist({ model }: { model: RoadmapModel }) {
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    // APP-3: the app Home's "Download my roadmap PDF" lands here.
+    <div id="download" className="flex scroll-mt-24 flex-col gap-3">
       {/* RD-1: a banner, not a small link, so learners see the download straight away. */}
       <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-start gap-4">

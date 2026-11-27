@@ -82,7 +82,7 @@ export function AppRail() {
               >
                 <span
                   aria-hidden="true"
-                  className={`app-tile grid size-10 place-items-center rounded-2xl ${on ? TILE[r.tone] : "bg-transparent group-hover:bg-white/80 dark:group-hover:bg-white/10"}`}
+                  className={`app-tile lx-pop grid size-10 place-items-center rounded-2xl ${on ? TILE[r.tone] : "bg-transparent group-hover:bg-white/80 dark:group-hover:bg-white/10"}`}
                 >
                   <Icon name={r.icon} size={20} />
                 </span>

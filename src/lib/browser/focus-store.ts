@@ -18,17 +18,21 @@ const Stored = z.object({
   }),
   log: z.record(z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.object({ sessions: z.number().int().min(0), minutes: z.number().int().min(0) })),
   sound: z.boolean(),
+  // APP-2: the panel's colour, chosen by the learner (older stored timers have none: white).
+  color: z.enum(["white", "amber", "sky", "emerald", "rose"]).optional(),
 });
-export type Focus = { state: FocusState; log: FocusLog; sound: boolean };
+export const FOCUS_COLORS = ["white", "amber", "sky", "emerald", "rose"] as const;
+export type FocusColor = (typeof FOCUS_COLORS)[number];
+export type Focus = { state: FocusState; log: FocusLog; sound: boolean; color: FocusColor };
 
 export function parseFocus(raw: string | null): Focus {
   try {
     const p = Stored.safeParse(raw ? JSON.parse(raw) : null);
-    if (p.success) return { state: p.data.state, log: p.data.log, sound: p.data.sound };
+    if (p.success) return { state: p.data.state, log: p.data.log, sound: p.data.sound, color: p.data.color ?? "white" };
   } catch {
     // Unreadable: start fresh.
   }
-  return { state: idle(), log: {}, sound: true };
+  return { state: idle(), log: {}, sound: true, color: "white" };
 }
 
 export function useFocus(): Focus {
@@ -41,5 +45,5 @@ export const readFocus = () => parseFocus(read(FOCUS_KEY));
 export function saveFocus(f: Focus): void {
   const days = Object.keys(f.log).sort().slice(-KEEP_DAYS);
   const log = Object.fromEntries(days.map((d) => [d, f.log[d]]));
-  write(FOCUS_KEY, JSON.stringify({ version: 1, state: f.state, log, sound: f.sound }));
+  write(FOCUS_KEY, JSON.stringify({ version: 1, state: f.state, log, sound: f.sound, color: f.color }));
 }

@@ -59,7 +59,7 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
 /** An app icon: a rounded square in the tool's colours with a soft highlight, like a product's icon. */
 function AppIcon({ icon, tone }: { icon: IconName; tone: Tone }) {
   return (
-    <span aria-hidden="true" className={`grid size-12 shrink-0 place-items-center rounded-2xl ${TILE[tone]}`}>
+    <span aria-hidden="true" className={`lx-pop grid size-12 shrink-0 place-items-center rounded-2xl ${TILE[tone]}`}>
       <Icon name={icon} size={22} strokeWidth={1.5} />
     </span>
   );
@@ -104,7 +104,7 @@ export default function AiToolsPage() {
                     <li key={t.href}>
                       <Link
                         href={t.href}
-                        className="group relative flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-brand-300 motion-safe:hover:-translate-y-0.5 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-brand-800"
+                        className="group relative flex h-full flex-col lx-lift rounded-2xl border border-zinc-200 bg-white p-5 hover:border-brand-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-brand-800"
                       >
                         <span className="flex items-start gap-4">
                           <AppIcon icon={t.icon} tone={toolTone(t.href)} />

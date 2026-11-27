@@ -20,6 +20,7 @@ export function AiChat({
   starters,
   placeholder = "Ask anything about this",
   compact = false,
+  initialDraft = "",
 }: {
   endpoint: string;
   /** Sent with every request, for example the lesson id. */
@@ -28,9 +29,11 @@ export function AiChat({
   starters: string[];
   placeholder?: string;
   compact?: boolean;
+  /** APP-3: a question brought from the app Home's "Ask anything" box. Typed in, not sent: the learner sends it. */
+  initialDraft?: string;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(initialDraft.slice(0, 1000));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followUps, setFollowUps] = useState<string[]>(starters);
@@ -66,13 +69,18 @@ export function AiChat({
   return (
     <div className="flex flex-col">
       <div ref={log} className={`space-y-4 overflow-y-auto ${compact ? "max-h-[26rem]" : "max-h-[36rem]"} pr-1`} aria-live="polite">
-        <Bubble role="assistant" text={greeting} />
+        <Bubble role="assistant" text={greeting} typed />
         {turns.map((t, i) => (
           <Bubble key={i} role={t.role} text={t.text} lessons={t.lessons} />
         ))}
         {busy && (
-          <p className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400" role="status">
-            <span aria-hidden="true" className="size-2 rounded-full bg-zinc-400 motion-safe:animate-pulse" />
+          <p className="flex items-center gap-2 text-sm text-zinc-600 italic dark:text-zinc-400" role="status">
+            {/* APP-2: three dots that bounce in turn while the answer is written. */}
+            <span aria-hidden="true" className="flex gap-1">
+              {[0, 1, 2].map((k) => (
+                <span key={k} className="size-1.5 rounded-full bg-zinc-400 motion-safe:animate-bounce" style={{ animationDelay: `${k * 150}ms` }} />
+              ))}
+            </span>
             Thinking…
           </p>
         )}
@@ -124,7 +132,33 @@ export function AiChat({
   );
 }
 
-function Bubble({ role, text, lessons }: Turn) {
+/**
+ * APP-2: the greeting types itself out once (about 30 ms a letter), with a caret, as StudyFetch's tutor does. Screen
+ * readers get the whole sentence at once; under reduced motion it simply appears.
+ */
+function Typed({ text }: { text: string }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      queueMicrotask(() => setN(text.length));
+      return;
+    }
+    const id = setInterval(() => setN((k) => (k >= text.length ? (clearInterval(id), k) : k + 1)), 30);
+    return () => clearInterval(id);
+  }, [text]);
+  const done = n >= text.length;
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {text.slice(0, n)}
+        {!done && <span className="ml-0.5 inline-block h-4 w-0.5 translate-y-0.5 bg-current motion-safe:animate-pulse" />}
+      </span>
+    </>
+  );
+}
+
+function Bubble({ role, text, lessons, typed = false }: Turn & { typed?: boolean }) {
   const mine = role === "user";
   return (
     <div className={`flex gap-2 ${mine ? "justify-end" : ""}`}>
@@ -135,7 +169,7 @@ function Bubble({ role, text, lessons }: Turn) {
       )}
       <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${mine ? "bg-zinc-900 text-white dark:bg-white dark:text-black" : "bg-zinc-100 dark:bg-zinc-800"}`}>
         <p className="sr-only">{mine ? "You said:" : "AI said:"}</p>
-        {mine ? <p className="whitespace-pre-wrap">{text}</p> : <AiText text={text} />}
+        {mine ? <p className="whitespace-pre-wrap">{text}</p> : typed ? <p className="leading-7">{<Typed text={text} />}</p> : <AiText text={text} />}
         {lessons && lessons.length > 0 && (
           <ul className="mt-3 space-y-1 border-t border-zinc-300 pt-2 text-sm dark:border-zinc-700">
             {lessons.map((l) => (

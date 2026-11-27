@@ -1,5 +1,7 @@
 "use client";
 
+import { useShortcut } from "@/lib/browser/keys";
+import { toast } from "@/components/toast";
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/art/icons";
 import { aiPost } from "@/components/ai/ai-client";
@@ -373,6 +375,7 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
     setBusy(false);
     if (!res.ok) return setError(res.message);
     onDeck(addDeck({ createdOn: todayInIST(), book: book.title, cards: res.data.cards }));
+    toast(`${res.data.cards.length} flashcards saved`);
   };
 
   // MB-15: notes from the chosen chapters, at most 30 passages like a test.
@@ -385,6 +388,7 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
     setBusy(false);
     if (!res.ok) return setError(res.message);
     onNotes?.(addNotes({ book: book.title, createdOn: todayInIST(), depth, sections: res.data.sections }));
+    toast("Notes saved");
   };
 
   const generate = async () => {
@@ -396,6 +400,7 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
     setBusy(false);
     if (!res.ok) return setError(res.message);
     onReady(addBookTest({ createdOn: todayInIST(), book: book.title, difficulty, minutes, questions: res.data.questions }));
+    toast(`Test ready: ${res.data.questions.length} questions`);
   };
 
   return (
@@ -840,6 +845,19 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
   useEffect(() => {
     if (left <= 0) finish();
   });
+  // APP-2: A to D pick an answer; once answered, 1 says "Sure" and 2 "Not sure" (StudyFetch's keyboard flow).
+  const setSureTo = (v: boolean) => setSure((x) => x.map((y, j) => (j === i ? (y === v ? null : v) : y)));
+  useShortcut((key) => {
+    const k = "abcd".indexOf(key.toLowerCase());
+    if (k >= 0 && k < q.options.length) {
+      setAnswers((a) => a.map((x, j) => (j === i ? k : x)));
+      return true;
+    }
+    if (answers[i] !== null && (key === "1" || key === "2")) {
+      setSureTo(key === "1");
+      return true;
+    }
+  });
 
   return (
     <div className="flex flex-col gap-5">
@@ -863,31 +881,43 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
           {q.question}
         </legend>
         {q.options.map((o, k) => (
-          <label key={k} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 ${answers[i] === k ? "border-teal-600 bg-teal-50 dark:bg-teal-950/40" : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}>
-            <input type="radio" name={`q-${q.id}`} checked={answers[i] === k} onChange={() => setAnswers((a) => a.map((x, j) => (j === i ? k : x)))} className="mt-0.5 size-5 shrink-0 accent-teal-700" />
-            <span>{o}</span>
+          <label
+            key={k}
+            className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-700 ${answers[i] === k ? "border-brand-700 bg-brand-50 dark:border-brand-300 dark:bg-brand-950/50" : "border-zinc-200 bg-white hover:border-zinc-400 hover:bg-[var(--hero)] dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-white/5"}`}
+          >
+            <span className="relative grid size-8 shrink-0">
+              <input type="radio" name={`q-${q.id}`} checked={answers[i] === k} onChange={() => setAnswers((a) => a.map((x, j) => (j === i ? k : x)))} aria-keyshortcuts={"ABCD"[k]} className="peer absolute inset-0 size-8 cursor-pointer appearance-none rounded-full" />
+              <span aria-hidden="true" className="pointer-events-none grid size-8 place-items-center rounded-full bg-zinc-100 font-mono text-sm font-semibold text-zinc-700 peer-checked:bg-brand-700 peer-checked:text-white dark:bg-zinc-800 dark:text-zinc-200 dark:peer-checked:bg-brand-300 dark:peer-checked:text-brand-950">
+                {"ABCD"[k]}
+              </span>
+            </span>
+            <span className="min-w-0 flex-1">{o}</span>
           </label>
         ))}
       </fieldset>
       {answers[i] !== null && (
-        <div role="group" aria-label="How sure are you?" className="flex flex-wrap items-center gap-2 text-sm">
+        <div role="group" aria-label="How sure are you?" className="flex flex-col gap-2 text-sm">
           <span className="text-zinc-600 dark:text-zinc-400">How sure are you?</span>
-          {(
-            [
-              [true, "Sure"],
-              [false, "Not sure"],
-            ] as const
-          ).map(([v, label]) => (
-            <button
-              key={label}
-              type="button"
-              aria-pressed={sure[i] === v}
-              onClick={() => setSure((x) => x.map((y, j) => (j === i ? (y === v ? null : v) : y)))}
-              className="inline-flex min-h-11 items-center rounded-full border border-zinc-300 px-4 font-medium aria-pressed:border-brand-700 aria-pressed:bg-brand-50 aria-pressed:text-brand-900 dark:border-zinc-700 dark:aria-pressed:bg-brand-950/50 dark:aria-pressed:text-brand-100"
-            >
-              {label}
-            </button>
-          ))}
+          {/* APP-2: two coloured tiles, as StudyFetch's confidence row, in our colours: emerald for sure, amber for not. */}
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                [true, "Sure", "1", "bg-emerald-50 aria-pressed:bg-emerald-100 aria-pressed:ring-emerald-700 dark:bg-emerald-950/40 dark:aria-pressed:ring-emerald-400"],
+                [false, "Not sure", "2", "bg-amber-50 aria-pressed:bg-amber-100 aria-pressed:ring-amber-700 dark:bg-amber-950/40 dark:aria-pressed:ring-amber-400"],
+              ] as const
+            ).map(([v, label, key, tone]) => (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={sure[i] === v}
+                aria-keyshortcuts={key}
+                onClick={() => setSureTo(v)}
+                className={`flex min-h-12 items-center justify-between gap-2 rounded-2xl px-4 font-medium ring-1 ring-transparent aria-pressed:ring-2 ${tone}`}
+              >
+                {label} <kbd aria-hidden="true" className="xp-key">{key}</kbd>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1178,6 +1208,20 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
     requestAnimationFrame(() => document.getElementById("deck-card")?.focus());
   };
 
+  // APP-2: Space flips a card; 1 says "Again" and 2 "I knew it" once it is turned. Multiple choice is answered by
+  // picking, so Space does nothing there until it is answered.
+  useShortcut((key) => {
+    if (!card || i >= order.length) return;
+    if (key === " " && !flipped && !mcq) {
+      setFlipped(true);
+      return true;
+    }
+    if (flipped && (key === "1" || key === "2")) {
+      mark(key === "1" ? "again" : "knew");
+      return true;
+    }
+  });
+
   const download = () => {
     const url = URL.createObjectURL(new Blob([deckCsv(deck)], { type: "text/csv;charset=utf-8" }));
     const a = Object.assign(document.createElement("a"), { href: url, download: `${deck.book.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "flashcards"}-flashcards.csv` });
@@ -1302,8 +1346,8 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
                 </>
               ) : mcq ? null : (
                 <div className="mt-auto flex justify-center">
-                  <button type="button" className={primaryButton} onClick={() => setFlipped(true)}>
-                    Flip the card
+                  <button type="button" className={primaryButton} aria-keyshortcuts="Space" onClick={() => setFlipped(true)}>
+                    Flip the card <kbd aria-hidden="true" className="xp-key">Space</kbd>
                   </button>
                 </div>
               )}
@@ -1313,11 +1357,11 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-2 font-medium">Did you know it?</legend>
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" className={secondaryButton} onClick={() => mark("again")}>
-                  Again
+                <button type="button" className={secondaryButton} aria-keyshortcuts="1" onClick={() => mark("again")}>
+                  Again <kbd aria-hidden="true" className="xp-key">1</kbd>
                 </button>
-                <button type="button" className={primaryButton} onClick={() => mark("knew")}>
-                  I knew it
+                <button type="button" className={primaryButton} aria-keyshortcuts="2" onClick={() => mark("knew")}>
+                  I knew it <kbd aria-hidden="true" className="xp-key">2</kbd>
                 </button>
               </div>
             </fieldset>

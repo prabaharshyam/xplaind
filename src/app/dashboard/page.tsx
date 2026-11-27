@@ -9,12 +9,13 @@ import { lessonsByPath, pathRef } from "@/lib/content/paths";
 import { accountsEnabled } from "@/lib/supabase/config";
 import { currentUser, userClient } from "@/lib/supabase/server";
 import { Dashboard } from "./dashboard";
+import { AppHome } from "./app-home";
 import { ProgressOverview } from "./progress-overview";
 import { InterviewReadiness } from "./interview-readiness";
 import { textLink } from "@/components/ui";
 import { Skeleton } from "@/components/skeleton";
 
-export const metadata: Metadata = { title: "Your dashboard", robots: { index: false } };
+export const metadata: Metadata = { title: "Home", robots: { index: false } };
 
 async function SignedIn() {
   // QA-4: wait for a real request before any login work. Supabase's session check reads the clock, which Next.js
@@ -33,10 +34,11 @@ async function SignedIn() {
 
 export default function DashboardPage() {
   return (
-    <main className="mx-auto max-w-3xl px-4 pt-8 pb-16 md:pt-12">
+    <main className="mx-auto max-w-5xl px-4 pt-8 pb-16 md:px-6 md:pt-12">
       {/* DB-1 (2026-11-27, owner: "fix/do the 4-12", item 5): a Today screen. Where to carry on and three numbers first,
           then one thing at a time in tabs, instead of a banner and about eight stacked sections. */}
-      <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Your dashboard</h1>
+      {/* APP-3: the app Home: a greeting, Ask anything and the main things to do; then the Today screen (DB-1). */}
+      <AppHome paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} />
       <div className="mt-6 empty:hidden">
         <ContinueCard titles={Object.fromEntries(getStops().map((s) => [s.id, s.title]))} />
       </div>

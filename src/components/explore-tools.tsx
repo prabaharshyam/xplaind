@@ -26,9 +26,9 @@ export function ExploreTools({ current }: { current: string }) {
             <li key={i.href}>
               <Link
                 href={i.href}
-                className="flex h-full items-start gap-3 rounded-2xl bg-white p-4 shadow-sm shadow-amber-900/5 ring-1 ring-amber-200/70 transition hover:ring-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-white/[0.06] dark:shadow-none dark:ring-white/10 dark:hover:bg-white/[0.1] dark:focus-visible:outline-brand-300 motion-safe:hover:-translate-y-0.5"
+                className="lx-lift flex h-full items-start gap-3 rounded-2xl bg-white p-4 shadow-sm shadow-amber-900/5 ring-1 ring-amber-200/70 hover:ring-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-white/[0.06] dark:shadow-none dark:ring-white/10 dark:hover:bg-white/[0.1] dark:focus-visible:outline-brand-300"
               >
-                <span aria-hidden="true" className={`grid size-10 shrink-0 place-items-center rounded-2xl ${TILE[i.tone]}`}>
+                <span aria-hidden="true" className={`lx-pop grid size-10 shrink-0 place-items-center rounded-2xl ${TILE[i.tone]}`}>
                   <Icon name={i.icon} size={20} />
                 </span>
                 <span className="min-w-0">
