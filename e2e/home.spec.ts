@@ -45,6 +45,14 @@ test("the home page says what to do and leads to roadmaps, topics, courses and i
   // the removed sections stay removed
   await expect(page.getByText("Honest by design")).toHaveCount(0);
   await expect(page.getByText("Where this is going")).toHaveCount(0);
+  // HM-7: "How Xplaind works" told the same three steps as the numbered sections, and the guides live on the blog.
+  await expect(main.getByRole("heading", { name: "How Xplaind works" })).toHaveCount(0);
+  await expect(main.getByRole("heading", { name: "Guides" })).toHaveCount(0);
+  // HM-7: the hero is the promise; the market figures sit with the rest of the proof, still dated and sourced.
+  await expect(page.locator(".home-hero").getByText("Why now", { exact: false })).toHaveCount(0);
+  await expect(main.getByRole("heading", { name: "Why now: India's AI job market" })).toBeVisible();
+  // HM-7: at 360 px the page is about half as long as before (14 screens).
+  expect(await page.evaluate(() => document.documentElement.scrollHeight / innerHeight)).toBeLessThan(10);
   const nav = page.getByRole("banner");
   await nav.locator(".site-menu > summary").click(); // phone width: the links sit in the menu
   for (const [name, href] of [["Library", "/library"], ["Videos", "/videos"], ["Questions", "/interview"], ["Mock interview", "/interview/simulator"], ["Jobs and salaries", "/jobs"], ["Roadmaps", "/paths"]]) {
@@ -81,8 +89,8 @@ test("with reduced motion, everything is visible and accessible at once", async 
   const context = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 360, height: 740 } });
   const page = await context.newPage();
   await page.goto("/");
-  await page.getByRole("heading", { name: "How Xplaind works" }).scrollIntoViewIfNeeded();
-  await expect(page.getByText("Choose the job you want", { exact: false })).toBeVisible();
+  await page.getByRole("heading", { name: "Choose your AI role" }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole("main").getByRole("link", { name: /^AI Engineer/ })).toBeVisible();
   expect((await wcag(page)).violations).toEqual([]);
   await context.close();
 });
@@ -153,19 +161,18 @@ test("LT-2: the home page offers lessons in Tamil, Hindi, Tanglish and Hinglish"
   await expect(page.getByText("Lessons in Tamil and Hindi")).toBeVisible();
   const section = page.locator("#languages");
   await expect(section.getByRole("heading", { level: 2 })).toContainText("Learn AI in the language you think in");
-  await expect(section.getByRole("link")).toHaveCount(4);
-  await expect(section.locator("[lang=ta]").first()).toBeVisible();
-  await expect(section.locator("[lang=hi]").first()).toBeVisible();
-  await expect(section.locator("[lang=ta-Latn]").first()).toBeVisible();
-  await expect(section.locator("[lang=hi-Latn]").first()).toBeVisible();
-  // The sample is one real question, answered in English and then in each language, so the feature is clear at a glance.
-  await expect(section.getByText("What is a hallucination?")).toBeVisible();
+  // LT-5: one card; the language buttons switch the same real question and answer in place. It opens in Tamil.
+  const pick = section.getByRole("group", { name: "Show the answer in" });
+  await expect(pick.getByRole("button")).toHaveCount(5);
   await expect(section.getByText("Hallucination-னா என்ன?")).toBeVisible();
-  await expect(section.getByText("Hallucination क्या है?")).toBeVisible();
-  await expect(section.getByText("Hallucination-na enna?")).toBeVisible();
-  await expect(section.getByText("Hallucination kya hai?")).toBeVisible();
+  for (const [label, q] of [["English", "What is a hallucination?"], ["हिन्दी", "Hallucination क्या है?"], ["Tanglish", "Hallucination-na enna?"], ["Hinglish", "Hallucination kya hai?"]]) {
+    await pick.getByRole("button", { name: label }).click();
+    await expect(pick.getByRole("button", { name: label })).toHaveAttribute("aria-pressed", "true");
+    await expect(section.getByText(q)).toBeVisible();
+  }
   await expect(page.locator(".home-hero, #languages").getByText(/\bfree\b/i)).toHaveCount(0);
-  await section.getByRole("link").first().click();
+  await pick.getByRole("button", { name: "தமிழ்" }).click();
+  await section.getByRole("link", { name: /Read all \d+ lessons in/ }).click();
   await expect(page).toHaveURL(/\/stop\/what-is-ai\/ta$/, { timeout: 30_000 });
   await expect(page.getByRole("heading", { level: 1 })).toContainText("மூணும்", { timeout: 30_000 });
   await expect(page.getByRole("main")).toHaveAttribute("lang", "ta");
