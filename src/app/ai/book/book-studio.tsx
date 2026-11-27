@@ -15,23 +15,28 @@ import { type BookCard, type BookDeck, addDeck, deckCsv, deleteDeck, markCard, u
 import { dueCards, missedAsCards, nextDue } from "@/lib/book/loop";
 import { useToday } from "@/lib/browser/hooks";
 import { todayInIST } from "@/lib/dates";
-import { AskNotes, RetestPanel } from "./study-loop";
+import { AskNotes, ReopenFile, RetestPanel } from "./study-loop";
+import { AppTabs } from "@/components/app-tabs";
+import { TILE } from "@/lib/tones";
+import { type StudySet, loadStudySet, removeStudySet, saveStudySet, useStudySets } from "@/lib/browser/study-sets";
 
 const COUNTS = [5, 10, 15, 20, 25];
 const MINUTES = [5, 10, 15, 20, 30, 45, 60];
 const CARD_COUNTS = [10, 15, 20, 30];
 
-type View = { kind: "home" } | { kind: "setup"; book: Book } | { kind: "test"; id: string } | { kind: "report"; id: string } | { kind: "deck"; id: string };
+type View = { kind: "home" } | { kind: "set"; id: string } | { kind: "test"; id: string } | { kind: "report"; id: string } | { kind: "deck"; id: string };
 
 /**
  * MB-1 to MB-5: upload a book or notes, get a timed MCQ test or flashcards written from it, with a grounded report.
  * MB-8 to MB-10, the study loop: ask your notes, test, retest what you missed, and review cards when they are due.
- * The open file lives only in this component's memory; tests and cards are kept on the device.
+ * MB-13, MB-14: a file opened once stays on the device as a study set, with its tests, flashcards and questions in tabs.
+ * Tests and cards are kept on the device; the file's text is cached there when the browser allows it.
  */
 export function BookStudio({ aiOn }: { aiOn: boolean }) {
   const access = useAiAccess(aiOn);
   const tests = useBookTests();
   const decks = useDecks();
+  const sets = useStudySets();
   const [view, setView] = useState<View>({ kind: "home" });
   const [book, setBook] = useState<Book | null>(null);
   const top = useRef<HTMLDivElement>(null);
@@ -42,6 +47,22 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
   };
   const current = view.kind === "test" || view.kind === "report" ? tests.find((t) => t.id === view.id) : undefined;
   const deck = view.kind === "deck" ? decks.find((d) => d.id === view.id) : undefined;
+  const studySet = view.kind === "set" ? sets.find((x) => x.id === view.id) : undefined;
+  // MB-14: a report's retest needs the file's text; a study set may still have it on this device.
+  const reportSet = view.kind === "report" && current ? sets.find((x) => x.title === current.book) : undefined;
+  useEffect(() => {
+    if (!reportSet || book?.title === reportSet.title) return;
+    let live = true;
+    void loadStudySet(reportSet.id).then((b) => live && b && setBook(b));
+    return () => {
+      live = false;
+    };
+  }, [reportSet, book?.title]);
+  /** After a test or a deck, back to its study set when it has one. */
+  const back = (title: string) => {
+    const s = sets.find((x) => x.title === title);
+    go(s ? { kind: "set", id: s.id } : { kind: "home" });
+  };
 
   // AG-1: signed out, the whole tool is a sign-up card, not just its last button.
   if (access === "signin")
@@ -57,16 +78,32 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
         <Home
           tests={tests}
           decks={decks}
-          onBook={(b) => {
+          sets={sets}
+          onBook={async (b) => {
             setBook(b);
-            go({ kind: "setup", book: b });
+            go({ kind: "set", id: await saveStudySet(b, todayInIST()) });
           }}
+          onSet={(id) => go({ kind: "set", id })}
           onOpen={(t) => go(t.result ? { kind: "report", id: t.id } : { kind: "test", id: t.id })}
           onDeck={(d) => go({ kind: "deck", id: d.id })}
         />
       )}
-      {view.kind === "setup" && <Setup book={view.book} access={access} onBack={() => go({ kind: "home" })} onReady={(id) => go({ kind: "test", id })} onDeck={(id) => go({ kind: "deck", id })} />}
-      {view.kind === "deck" && deck && <StudyDeck key={deck.id} deck={deck} onHome={() => go({ kind: "home" })} />}
+      {view.kind === "set" && studySet && (
+        <StudySetView
+          key={studySet.id}
+          set={studySet}
+          memory={book}
+          access={access}
+          tests={tests.filter((t) => t.book === studySet.title)}
+          decks={decks.filter((d) => d.book === studySet.title)}
+          onBook={setBook}
+          onHome={() => go({ kind: "home" })}
+          onOpen={(t) => go(t.result ? { kind: "report", id: t.id } : { kind: "test", id: t.id })}
+          onDeck={(id) => go({ kind: "deck", id })}
+          onReady={(id) => go({ kind: "test", id })}
+        />
+      )}
+      {view.kind === "deck" && deck && <StudyDeck key={deck.id} deck={deck} onHome={() => back(deck.book)} />}
       {view.kind === "test" && current && <TakeTest key={current.id} test={current} onDone={() => go({ kind: "report", id: current.id })} />}
       {view.kind === "report" && current?.result && (
         <Report
@@ -75,7 +112,7 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
             retakeBookTest(current.id);
             go({ kind: "test", id: current.id });
           }}
-          onHome={() => go({ kind: "home" })}
+          onHome={() => back(current.book)}
           onDeck={(id) => go({ kind: "deck", id })}
         >
           <RetestPanel test={current} book={book} access={access} onBook={setBook} onReady={(id) => go({ kind: "test", id })} />
@@ -87,7 +124,9 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
 
 // ------------------------------------------------------------------ home --
 
-function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; decks: BookDeck[]; onBook: (b: Book) => void; onOpen: (t: BookTest) => void; onDeck: (d: BookDeck) => void }) {
+function Home({ tests, decks, sets, onBook, onSet, onOpen, onDeck }: { tests: BookTest[]; decks: BookDeck[]; sets: StudySet[]; onBook: (b: Book) => void; onSet: (id: string) => void; onOpen: (t: BookTest) => void; onDeck: (d: BookDeck) => void }) {
+  // MB-14: tests and decks from a file that has a study set live inside the set; the rest are listed here as before.
+  const loose = (title: string) => !sets.some((x) => x.title === title);
   const inputId = useId();
   // Read after hydration: the page is prerendered, and "today" must be the learner's, not the build's.
   const today = useToday() ?? "";
@@ -159,7 +198,7 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
           Choose your notes or book
         </h2>
         <p className="mx-auto mt-1 max-w-md leading-7 text-zinc-700 dark:text-zinc-300">
-          A PDF, a Word (.docx) or PowerPoint (.pptx) file, or a .txt or .md file, up to {MAX_FILE_MB} MB. Text is read in your browser and never uploaded. Pro can also read pictures inside your file, and asks you first.
+          A PDF, a Word (.docx) or PowerPoint (.pptx) file, or a .txt or .md file, up to {MAX_FILE_MB} MB. Text is read in your browser and kept on this device as a study set; it is never uploaded. Pro can also read pictures inside your file, and asks you first.
         </p>
         <label htmlFor={inputId} className={`${primaryButton} mt-4 cursor-pointer`}>
           <Icon name="book" size={18} /> {busy ? "Reading…" : "Choose a file"}
@@ -198,13 +237,48 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
         />
       )}
 
-      {decks.length > 0 && (
+      {sets.length > 0 && (
+        <section aria-labelledby="sets-h">
+          <h2 id="sets-h" className="text-xl font-semibold">
+            Your study sets
+          </h2>
+          <ul className="lx-deal mt-3 grid gap-3 sm:grid-cols-2">
+            {sets.map((x) => {
+              const nTests = tests.filter((t) => t.book === x.title).length;
+              const setDecks = decks.filter((d) => d.book === x.title);
+              const dueNow = setDecks.reduce((a, d) => a + dueCards(d.cards, d.schedule, today).length, 0);
+              return (
+                <li key={x.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSet(x.id)}
+                    className="flex h-full w-full items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-left transition hover:border-brand-300 motion-safe:hover:-translate-y-0.5 dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    <span aria-hidden="true" className={`grid size-11 shrink-0 place-items-center rounded-2xl ${TILE.amber}`}>
+                      <Icon name="book" size={22} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block font-semibold [overflow-wrap:anywhere]">{x.title}</span>
+                      <span className="mt-0.5 block text-sm text-zinc-600 dark:text-zinc-400">
+                        {x.pages} pages · {nTests} {nTests === 1 ? "test" : "tests"} · {setDecks.length} {setDecks.length === 1 ? "deck" : "decks"}
+                        {dueNow ? ` · ${dueNow} due today` : ""}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {decks.some((d) => loose(d.book)) && (
         <section aria-labelledby="decks-h">
           <h2 id="decks-h" className="text-xl font-semibold">
             Your flashcards on this device
           </h2>
           <ul className="mt-3 flex flex-col gap-3">
-            {decks.map((d) => {
+            {decks.filter((d) => loose(d.book)).map((d) => {
               const dueNow = dueCards(d.cards, d.schedule, today).length;
               const next = nextDue(d.schedule);
               return (
@@ -231,13 +305,13 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
         </section>
       )}
 
-      {tests.length > 0 && (
+      {tests.some((t) => loose(t.book)) && (
         <section aria-labelledby="tests-h">
           <h2 id="tests-h" className="text-xl font-semibold">
             Your tests on this device
           </h2>
           <ul className="mt-3 flex flex-col gap-3">
-            {tests.map((t) => {
+            {tests.filter((t) => loose(t.book)).map((t) => {
               const r = t.result ? bookReport(t, t.result.answers, t.result.seconds) : null;
               return (
                 <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
@@ -267,8 +341,8 @@ function Home({ tests, decks, onBook, onOpen, onDeck }: { tests: BookTest[]; dec
 
 // ----------------------------------------------------------------- setup --
 
-function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: ReturnType<typeof useAiAccess>; onBack: () => void; onReady: (id: string) => void; onDeck: (id: string) => void }) {
-  const [mode, setMode] = useState<"test" | "cards" | "ask">("test");
+/** MB-14: the form for a new test or a new deck from a study set's file, inside its tab. */
+function SetForm({ book, access, mode, onReady, onDeck }: { book: Book; access: ReturnType<typeof useAiAccess>; mode: "test" | "cards"; onReady: (id: string) => void; onDeck: (id: string) => void }) {
   const [cardCount, setCardCount] = useState(15);
   const [chosen, setChosen] = useState<string[]>(book.sections);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
@@ -302,43 +376,6 @@ function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: 
 
   return (
     <div className="flex flex-col gap-6">
-      <button type="button" onClick={onBack} className="self-start text-sm underline underline-offset-2">
-        ← Choose another book
-      </button>
-      <section aria-labelledby="book-h" className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 id="book-h" className="text-xl font-semibold">
-          {book.title}
-        </h2>
-        <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
-          {book.pages} pages · {book.sections.length} {book.sections.length === 1 ? "section" : "sections"} · {book.chunks.length} passages with enough text to ask about
-        </p>
-      </section>
-
-      <fieldset>
-        <legend className="text-lg font-semibold">What do you want?</legend>
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {(
-            [
-              ["ask", "Ask your notes", "Questions answered only from your file, with the page"],
-              ["test", "A timed test", "Multiple-choice questions and a report on what to reread"],
-              ["cards", "Flashcards", "Cards to flip and learn, brought back when they are due"],
-            ] as const
-          ).map(([m, label, note]) => (
-            <label key={m} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 ${mode === m ? "border-brand-600 bg-brand-50 dark:bg-brand-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
-              <input type="radio" name="mode" value={m} checked={mode === m} onChange={() => setMode(m)} className="mt-0.5 size-5 accent-brand-700" />
-              <span>
-                <span className="block font-medium">{label}</span>
-                <span className="block text-sm text-zinc-600 dark:text-zinc-400">{note}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      {mode === "ask" ? (
-        <AskNotes book={book} access={access} />
-      ) : (
-      <>
       <fieldset className="flex flex-col gap-2">
         <legend className="text-lg font-semibold">Which chapters?</legend>
         <div className="flex gap-3 text-sm">
@@ -439,8 +476,182 @@ function Setup({ book, access, onBack, onReady, onDeck }: { book: Book; access: 
           </p>
         )}
       </AiGate>
-      </>
-      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------- study set --
+
+/**
+ * MB-14: one file's home. Its facts, then a tab each for tests, flashcards and asking the notes. Taking a test or
+ * studying a deck opens its own screen (a hidden tab would keep a timer running out of sight).
+ */
+function StudySetView({
+  set,
+  memory,
+  access,
+  tests,
+  decks,
+  onBook,
+  onHome,
+  onOpen,
+  onDeck,
+  onReady,
+}: {
+  set: StudySet;
+  memory: Book | null;
+  access: ReturnType<typeof useAiAccess>;
+  tests: BookTest[];
+  decks: BookDeck[];
+  onBook: (b: Book) => void;
+  onHome: () => void;
+  onOpen: (t: BookTest) => void;
+  onDeck: (id: string) => void;
+  onReady: (id: string) => void;
+}) {
+  const today = useToday() ?? "";
+  const inMemory = memory && memory.title === set.title ? memory : null;
+  const [stored, setStored] = useState<Book | null | "loading">(inMemory ? null : "loading");
+  useEffect(() => {
+    if (inMemory) return;
+    let live = true;
+    void loadStudySet(set.id).then((b) => live && setStored(b));
+    return () => {
+      live = false;
+    };
+  }, [inMemory, set.id]);
+  const book = inMemory ?? (stored === "loading" ? null : stored);
+  const due = decks.reduce((a, d) => a + dueCards(d.cards, d.schedule, today).length, 0);
+  const needFile = !book && stored !== "loading" && (
+    <ReopenFile
+      title={set.title}
+      onBook={(b) => {
+        onBook(b);
+        void saveStudySet(b, todayInIST());
+      }}
+    />
+  );
+  const remove = async () => {
+    if (!window.confirm(`Remove "${set.title}" from this device? Its tests and flashcards stay until you delete them.`)) return;
+    await removeStudySet(set.id);
+    onHome();
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <button type="button" onClick={onHome} className="min-h-11 self-start text-sm underline underline-offset-2">
+        ← All study sets
+      </button>
+      <header className="flex items-start gap-4">
+        <span aria-hidden="true" className={`grid size-12 shrink-0 place-items-center rounded-2xl ${TILE.amber}`}>
+          <Icon name="book" size={24} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">{set.title}</h2>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+            {set.pages} pages · {set.sections.length} {set.sections.length === 1 ? "section" : "sections"} · {tests.length} {tests.length === 1 ? "test" : "tests"} · {decks.length}{" "}
+            {decks.length === 1 ? "deck" : "decks"}
+            {due ? ` · ${due} cards due today` : ""}
+          </p>
+        </div>
+        <button type="button" onClick={() => void remove()} className="min-h-11 shrink-0 rounded-2xl px-2 text-sm text-zinc-600 underline underline-offset-2 dark:text-zinc-400">
+          Remove
+        </button>
+      </header>
+      {stored === "loading" && !inMemory && <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">Opening your study set…</p>}
+
+      <AppTabs
+        id="set"
+        label={`Study ${set.title}`}
+        tabs={[
+          {
+            id: "test",
+            label: "Tests",
+            content: (
+              <>
+                {tests.length > 0 && (
+                  <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+                    {tests.map((t) => {
+                      const r = t.result ? bookReport(t, t.result.answers, t.result.seconds) : null;
+                      return (
+                        <li key={t.id} className="flex flex-wrap items-center gap-3 py-3">
+                          <p className="min-w-0 flex-1 text-sm">
+                            <span className="block font-medium">
+                              {t.retest ? "Retest · " : ""}
+                              {t.questions.length} questions · {DIFFICULTY_LABEL[t.difficulty]}
+                            </span>
+                            <span className="text-zinc-600 dark:text-zinc-400">
+                              {t.createdOn} · {t.minutes} min{r ? ` · scored ${r.percent}%` : " · not taken yet"}
+                            </span>
+                          </p>
+                          <button type="button" className={secondaryButton} onClick={() => onOpen(t)} aria-label={`${r ? "See the report" : "Take the test"}: ${t.createdOn}, ${t.questions.length} questions`}>
+                            {r ? "See the report" : "Take the test"}
+                          </button>
+                          <button type="button" className="min-h-11 rounded-2xl px-2 text-sm text-zinc-600 underline underline-offset-2 dark:text-zinc-400" onClick={() => deleteBookTest(t.id)} aria-label={`Delete the test of ${t.createdOn}`}>
+                            Delete
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <section aria-labelledby="new-test-h" className="flex flex-col gap-4">
+                  <h3 id="new-test-h" className="text-lg font-semibold">
+                    A new timed test
+                  </h3>
+                  {book ? <SetForm book={book} access={access} mode="test" onReady={onReady} onDeck={onDeck} /> : needFile}
+                </section>
+              </>
+            ),
+          },
+          {
+            id: "cards",
+            label: "Flashcards",
+            content: (
+              <>
+                {decks.length > 0 && (
+                  <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+                    {decks.map((d) => {
+                      const dueNow = dueCards(d.cards, d.schedule, today).length;
+                      const next = nextDue(d.schedule);
+                      return (
+                        <li key={d.id} className="flex flex-wrap items-center gap-3 py-3">
+                          <p className="min-w-0 flex-1 text-sm">
+                            <span className="block font-medium">
+                              {d.source === "missed" ? "Missed questions · " : ""}
+                              {d.cards.length} cards
+                            </span>
+                            <span className="text-zinc-600 dark:text-zinc-400">
+                              {d.createdOn} · {dueNow ? `${dueNow} due today` : next ? `next review ${next}` : "not studied yet"}
+                            </span>
+                          </p>
+                          <button type="button" className={secondaryButton} onClick={() => onDeck(d.id)} aria-label={`Study the flashcards of ${d.createdOn}, ${d.cards.length} cards`}>
+                            Study
+                          </button>
+                          <button type="button" className="min-h-11 rounded-2xl px-2 text-sm text-zinc-600 underline underline-offset-2 dark:text-zinc-400" onClick={() => deleteDeck(d.id)} aria-label={`Delete the flashcards of ${d.createdOn}`}>
+                            Delete
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <section aria-labelledby="new-deck-h" className="flex flex-col gap-4">
+                  <h3 id="new-deck-h" className="text-lg font-semibold">
+                    New flashcards
+                  </h3>
+                  {book ? <SetForm book={book} access={access} mode="cards" onReady={onReady} onDeck={onDeck} /> : needFile}
+                </section>
+              </>
+            ),
+          },
+          {
+            id: "ask",
+            label: "Ask your notes",
+            content: book ? <AskNotes book={book} access={access} /> : needFile || <span />,
+          },
+        ]}
+      />
     </div>
   );
 }

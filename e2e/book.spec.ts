@@ -81,7 +81,7 @@ test("a PDF is read in the browser and its chapters can be chosen before any AI 
   await page.getByRole("radio", { name: "Hard: apply and compare" }).check();
   await page.getByLabel("Number of questions").selectOption("5");
   await page.getByLabel("Time allowed").selectOption("10");
-  await expect(page.getByText("AI features are not switched on yet")).toBeVisible();
+  await expect(page.getByRole("tabpanel", { name: "Tests" }).getByText("AI features are not switched on yet")).toBeVisible();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });
@@ -171,9 +171,9 @@ test("after reading a file, the learner can choose flashcards instead of a test 
   await page.goto("/ai/book");
   await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
   await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("radio", { name: /Flashcards/ }).check();
+  await page.getByRole("tab", { name: "Flashcards" }).click(); // MB-14: a tab in the study set
   await expect(page.getByLabel("Number of cards")).toBeVisible();
-  await expect(page.getByLabel("Time allowed")).toHaveCount(0);
+  await expect(page.getByLabel("Time allowed")).toBeHidden();
   expect((await wcag(page)).violations).toEqual([]);
 });
 
@@ -189,9 +189,9 @@ test("ask your notes is one of the three choices, and its API checks input and n
   await page.goto("/ai/book");
   await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
   await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("radio", { name: /Ask your notes/ }).check();
+  await page.getByRole("tab", { name: "Ask your notes" }).click(); // MB-14
   await expect(page.getByRole("heading", { name: "Ask your notes" })).toBeVisible();
-  await expect(page.getByLabel("Number of questions")).toHaveCount(0);
+  await expect(page.getByLabel("Number of questions")).toBeHidden();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 
@@ -295,4 +295,24 @@ test("a free account is told picture reading is Pro, and can carry on without it
   await expect(alert.getByRole("link", { name: "See Pro" })).toHaveAttribute("href", "/pricing");
   await page.getByRole("button", { name: "Skip, use the text only" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "could not find enough text" })).toBeVisible();
+});
+
+test("a file opened once stays as a study set: back later it opens without the file, and Remove takes it off the device (MB-13, MB-14)", async ({ page }) => {
+  await page.goto("/ai/book");
+  await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
+  await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
+  const tabs = page.getByRole("tablist", { name: "Study Biology for Class 11" });
+  await expect(tabs.getByRole("tab")).toHaveText(["Tests", "Flashcards", "Ask your notes"]);
+  // Back to the start, then into the set again: the chapters are there with no file chosen.
+  await page.getByRole("button", { name: "← All study sets" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: /Biology for Class 11/ }).click();
+  await expect(page.getByRole("checkbox", { name: "Photosynthesis" })).toBeChecked({ timeout: 10_000 });
+  await expect(page.getByText("Open the file again")).toHaveCount(0);
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+  // Remove asks first, then the set is gone from this device.
+  page.once("dialog", (d) => void d.accept());
+  await page.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByRole("heading", { name: "Your study sets" })).toHaveCount(0);
 });

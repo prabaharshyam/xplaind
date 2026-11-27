@@ -1,5 +1,5 @@
-// "Study from my notes & books" tests, kept on this device only (MB-4). The book itself is never
-// saved: only the questions, their short quotes and the learner's answers.
+// "Study from my notes & books" tests, kept on this device only (MB-4): the questions, their short quotes and the
+// learner's answers. Since MB-13 the file's text is also kept on this device, as a study set (study-sets.ts).
 import { useMemo, useSyncExternalStore } from "react";
 import { z } from "zod";
 import type { BookTest } from "@/lib/book/report";
