@@ -11,6 +11,7 @@ export const ICON_SHAPES: Record<IconName, IconShape> = {
   table: { d: "M3 10h18 M3 15h18 M9 5v14", rects: [[3, 5, 18, 14, 2]] },
   bolt: { d: "M13 2L4 14h7l-1 8 9-12h-7z" },
   search: { d: "M15 15l6 6", circles: [[10, 10, 6]] },
+  timer: { d: "M10 2h4 M12 9v4l2.5 2.5 M19 6l1.5-1.5", circles: [[12, 13, 8]] },
   robot: { d: "M12 5v3 M10 13h.01 M14 13h.01 M10 16h4 M4 12v3 M20 12v3", rects: [[6, 8, 12, 10, 3]], circles: [[12, 4, 1]] },
   check: { d: "M4 6h10 M4 12h10 M4 18h6 M15 17l2 2 4-4" },
   rocket: { d: "M12 15l-3-3c1-4 4-8 10-9-1 6-5 9-9 10z M9 12l-4 1 2-4h4 M12 15l-1 4 4-2v-4 M6 18l-2 2", circles: [[15, 8, 1.5]] },
