@@ -372,6 +372,65 @@ export function cleanBookCards(out: BookCardsOutput, excerpts: BookExcerpt[], co
 }
 
 /**
+ * MB-15 (2026-11-27, owner: StudyFetch's AI notes, Part 2): study notes written from the learner's own file, as headed
+ * sections of short points. Every point carries an exact quote from the excerpt it came from, and a point whose quote
+ * is not there is dropped, as for questions and cards (MB-2, MB-5).
+ */
+export const BookNotesRequest = z.strictObject({
+  book: z.string().max(160),
+  depth: z.enum(["summary", "detailed"]),
+  excerpts: z.array(BookExcerpt).min(1).max(30),
+});
+
+export const BookNotesOutput = z.object({
+  sections: z.array(
+    z.object({
+      heading: z.string(),
+      points: z.array(z.object({ term: z.string(), text: z.string(), excerpt_id: z.string(), quote: z.string() })),
+    }),
+  ),
+});
+export type BookNotesOutput = z.infer<typeof BookNotesOutput>;
+
+export function bookNotesPrompt(req: z.infer<typeof BookNotesRequest>) {
+  const system = [
+    "You write clear study notes from a book or notes a learner is studying. You get numbered excerpts from it, in book order.",
+    HOUSE_STYLE,
+    DATA_RULE,
+    "Use only the excerpts: never outside knowledge, and nothing about page numbers, the author or the layout. Skip excerpts with nothing worth learning (references, a copyright notice, a table of contents).",
+    req.depth === "summary"
+      ? "Summary: 3 to 6 sections, each with 2 to 4 points; only the ideas a learner must remember for an exam."
+      : "Detailed: 4 to 10 sections, each with 3 to 8 points; every definition, step, cause, difference and number that matters.",
+    "sections: in the order the ideas appear in the excerpts; heading: 2 to 6 words naming the topic. Each point: term is the key word or phrase it is about (2 to 5 words, or an empty string when there is none); text is one or two short sentences in your own simple words, at most 40 words, that explain it; quote copies 8 to 40 words exactly, character for character, from the excerpt that supports the point, without changing, joining or shortening words; excerpt_id is the id of that excerpt.",
+  ].join("\n\n");
+  const user = [
+    `Write ${req.depth === "summary" ? "summary" : "detailed"} notes.`,
+    asData("book_title", req.book, 160),
+    ...req.excerpts.map((e) => asData(`excerpt_${e.id}`, `[${e.id}] ${e.section}, page ${e.page}\n${e.text}`, 2000)),
+  ].join("\n\n");
+  return { system, messages: [{ role: "user" as const, content: user }], schema: BookNotesOutput };
+}
+
+export type BookNote = { heading: string; points: { term: string; text: string; quote: string; page: number; section: string }[] };
+
+/** MB-15: keeps only points whose quote is in the excerpt they cite, drops empty sections, and caps the size. */
+export function cleanBookNotes(out: BookNotesOutput, excerpts: BookExcerpt[]): BookNote[] {
+  const byId = new Map(excerpts.map((e) => [e.id, e]));
+  return out.sections
+    .map((s) => ({
+      heading: line(s.heading, 80),
+      points: s.points.flatMap((p) => {
+        const e = byId.get(p.excerpt_id);
+        const text = line(p.text, 400);
+        if (!e || !text || !quoteIn(p.quote, e.text)) return [];
+        return [{ term: line(p.term, 80), text, quote: clip(p.quote, 400), page: e.page, section: e.section }];
+      }).slice(0, 8),
+    }))
+    .filter((s) => s.heading && s.points.length > 0)
+    .slice(0, 12);
+}
+
+/**
  * MB-8: "Ask your notes". A question answered only from the few excerpts of the learner's own file
  * that match it best (picked in the browser), with exact quotes, or a plain "not in your notes".
  */

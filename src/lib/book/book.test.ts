@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bookCardsPrompt, bookPrompt, cleanBookCards, cleanBookQuestions, quoteIn } from "@/lib/ai/features";
+import { BookNotesRequest, bookCardsPrompt, bookNotesPrompt, bookPrompt, cleanBookCards, cleanBookNotes, cleanBookQuestions, quoteIn } from "@/lib/ai/features";
+import { parseNotes } from "@/lib/browser/book-notes-store";
 import { deckCsv, parseDecks, studyOrder } from "@/lib/browser/book-cards-store";
 import { parseBookTests } from "@/lib/browser/book-store";
 import { buildBook, fallbackSections, pagesFromText, pickExcerpts, splitText, usable } from "./chunk";
@@ -234,5 +235,47 @@ describe("Word files (MB-1)", () => {
     const text = docxHtmlToText("<h1>Chapter <strong>One</strong></h1><p>Cells &amp; light.</p><p>Second</p><h2>Part two</h2><ul><li>A</li></ul>");
     expect(text).toBe("# Chapter One\nCells & light.\nSecond\n\n# Part two\nA");
     expect(pagesFromText(text).outline.map((o) => o.title)).toEqual(["Chapter One", "Part two"]);
+  });
+});
+
+describe("MB-15 notes from the learner's file", () => {
+  const point = (over: Partial<{ term: string; text: string; excerpt_id: string; quote: string }> = {}) => ({
+    term: "Chloroplast",
+    text: "Where plants turn light into chemical energy.",
+    excerpt_id: "c1",
+    quote: "Plants turn light into chemical energy in the chloroplast",
+    ...over,
+  });
+
+  it("keeps only grounded points, with their page, and drops sections left empty", () => {
+    const out = cleanBookNotes(
+      {
+        sections: [
+          { heading: "Light", points: [point(), point({ text: "Made up", quote: "a sentence that is nowhere in the excerpt at all" }), point({ excerpt_id: "c9" })] },
+          { heading: "Nothing real", points: [point({ quote: "not in the excerpt anywhere at all, really" })] },
+          { heading: "  ", points: [point()] },
+          { heading: "Energy", points: [point({ term: "", excerpt_id: "c2", text: "Mitochondria release energy.", quote: "Mitochondria release the energy stored in glucose" })] },
+        ],
+      },
+      excerpts,
+    );
+    expect(out.map((s) => s.heading)).toEqual(["Light", "Energy"]);
+    expect(out[0].points).toHaveLength(1);
+    expect(out[0].points[0]).toMatchObject({ term: "Chloroplast", page: 2, section: "Plants and light" });
+    expect(out[1].points[0]).toMatchObject({ term: "", page: 4 });
+  });
+
+  it("asks for the depth chosen, treats the excerpts as data, and caps the request", () => {
+    const req = BookNotesRequest.parse({ book: "Bio", depth: "detailed", excerpts });
+    const { system, messages } = bookNotesPrompt(req);
+    expect(system).toContain("Detailed:");
+    expect(messages[0].content).toContain('<learner_input name="excerpt_c1">');
+    expect(BookNotesRequest.safeParse({ book: "Bio", depth: "summary", excerpts: Array.from({ length: 31 }, () => excerpts[0]) }).success).toBe(false);
+  });
+
+  it("reads stored notes and drops malformed ones", () => {
+    const good = { id: "n1", book: "Bio", createdOn: "2026-11-27", depth: "summary", sections: [{ heading: "Light", points: [{ term: "", text: "x", quote: "y", page: 1, section: "One" }] }] };
+    expect(parseNotes(JSON.stringify({ version: 1, notes: [good, { id: 1 }] }))).toHaveLength(1);
+    expect(parseNotes(JSON.stringify({ version: 2, notes: [good] }))).toEqual([]);
   });
 });

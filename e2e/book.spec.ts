@@ -75,6 +75,7 @@ test("a PDF is read in the browser and its chapters can be chosen before any AI 
   await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
   await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/3 pages · 3 sections/)).toBeVisible();
+  await page.getByRole("tab", { name: "Tests" }).click(); // MB-14: Notes is the first tab
   for (const c of ["Cell structure", "Photosynthesis", "Respiration"]) await expect(page.getByRole("checkbox", { name: c })).toBeChecked();
   await page.getByRole("checkbox", { name: "Respiration" }).uncheck();
   await expect(page.getByText("2 chosen")).toBeVisible();
@@ -302,7 +303,7 @@ test("a file opened once stays as a study set: back later it opens without the f
   await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
   await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
   const tabs = page.getByRole("tablist", { name: "Study Biology for Class 11" });
-  await expect(tabs.getByRole("tab")).toHaveText(["Tests", "Flashcards", "Ask your notes"]);
+  await expect(tabs.getByRole("tab")).toHaveText(["Notes", "Tests", "Flashcards", "Ask your notes"]);
   // Back to the start, then into the set again: the chapters are there with no file chosen.
   await page.getByRole("button", { name: "← All study sets" }).click();
   await page.reload();
@@ -315,4 +316,36 @@ test("a file opened once stays as a study set: back later it opens without the f
   page.once("dialog", (d) => void d.accept());
   await page.getByRole("button", { name: "Remove" }).click();
   await expect(page.getByRole("heading", { name: "Your study sets" })).toHaveCount(0);
+});
+
+test("notes from a file: summary or detailed, every point with its page, kept on the device (MB-15)", async ({ page, request }) => {
+  const notes = {
+    version: 1,
+    notes: [
+      {
+        id: "n1",
+        book: "Biology for Class 11",
+        createdOn: "2026-11-27",
+        depth: "summary",
+        sections: [
+          { heading: "Photosynthesis", points: [{ term: "Chloroplast", text: "Where green plants make food from light.", quote: "Photosynthesis takes place in the chloroplasts of green plant cells", page: 2, section: "Photosynthesis" }] },
+        ],
+      },
+    ],
+  };
+  await page.addInitScript((n) => localStorage.setItem("xplaind.book-notes.v1", JSON.stringify(n)), notes);
+  await page.goto("/ai/book");
+  await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
+  const panel = page.getByRole("tabpanel", { name: "Notes" });
+  await expect(panel.getByRole("heading", { name: "Summary notes" })).toBeVisible({ timeout: 20_000 });
+  await expect(panel.getByText("Where green plants make food from light.")).toBeVisible();
+  await panel.getByText("page 2").click();
+  await expect(panel.getByText(/Photosynthesis takes place in the chloroplasts/)).toBeVisible();
+  await expect(panel.getByRole("radio", { name: /Detailed/ })).toBeVisible();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+
+  const ok = { book: "Bio", depth: "summary", excerpts: [{ id: "c1", page: 1, section: "One", text: "Photosynthesis happens in the chloroplast." }] };
+  expect((await request.post("/api/ai/book-notes", { data: ok })).status()).toBe(503);
+  expect((await request.post("/api/ai/book-notes", { data: { ...ok, depth: "everything" } })).status()).toBe(400);
 });

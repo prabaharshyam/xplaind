@@ -18,6 +18,8 @@ import { todayInIST } from "@/lib/dates";
 import { AskNotes, ReopenFile, RetestPanel } from "./study-loop";
 import { AppTabs } from "@/components/app-tabs";
 import { TILE } from "@/lib/tones";
+import { type BookNotes, addNotes, deleteNotes, useBookNotes } from "@/lib/browser/book-notes-store";
+import type { BookNote } from "@/lib/ai/features";
 import { type StudySet, loadStudySet, removeStudySet, saveStudySet, useStudySets } from "@/lib/browser/study-sets";
 
 const COUNTS = [5, 10, 15, 20, 25];
@@ -342,7 +344,8 @@ function Home({ tests, decks, sets, onBook, onSet, onOpen, onDeck }: { tests: Bo
 // ----------------------------------------------------------------- setup --
 
 /** MB-14: the form for a new test or a new deck from a study set's file, inside its tab. */
-function SetForm({ book, access, mode, onReady, onDeck }: { book: Book; access: ReturnType<typeof useAiAccess>; mode: "test" | "cards"; onReady: (id: string) => void; onDeck: (id: string) => void }) {
+function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book; access: ReturnType<typeof useAiAccess>; mode: "test" | "cards" | "notes"; onReady: (id: string) => void; onDeck: (id: string) => void; onNotes?: (id: string) => void }) {
+  const [depth, setDepth] = useState<"summary" | "detailed">("summary");
   const [cardCount, setCardCount] = useState(15);
   const [chosen, setChosen] = useState<string[]>(book.sections);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
@@ -361,6 +364,18 @@ function SetForm({ book, access, mode, onReady, onDeck }: { book: Book; access: 
     setBusy(false);
     if (!res.ok) return setError(res.message);
     onDeck(addDeck({ createdOn: todayInIST(), book: book.title, cards: res.data.cards }));
+  };
+
+  // MB-15: notes from the chosen chapters, at most 30 passages like a test.
+  const makeNotes = async () => {
+    const excerpts = pickExcerpts(book, chosen, depth === "summary" ? 15 : 30);
+    if (excerpts.length === 0) return setError("Choose at least one chapter.");
+    setBusy(true);
+    setError(null);
+    const res = await aiPost<{ sections: BookNote[] }>("/api/ai/book-notes", { book: book.title.slice(0, 160), depth, excerpts: excerpts.map((e) => ({ ...e, text: e.text.slice(0, 2000) })) });
+    setBusy(false);
+    if (!res.ok) return setError(res.message);
+    onNotes?.(addNotes({ book: book.title, createdOn: todayInIST(), depth, sections: res.data.sections }));
   };
 
   const generate = async () => {
@@ -399,7 +414,27 @@ function SetForm({ book, access, mode, onReady, onDeck }: { book: Book; access: 
         </ul>
       </fieldset>
 
-      {mode === "cards" ? (
+      {mode === "notes" ? (
+        <fieldset>
+          <legend className="text-lg font-semibold">How much detail?</legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                ["summary", "Summary", "The ideas you must remember, for a quick revision"],
+                ["detailed", "Detailed", "Every definition, step and number that matters"],
+              ] as const
+            ).map(([d, label, note]) => (
+              <label key={d} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 ${depth === d ? "border-brand-600 bg-brand-50 dark:bg-brand-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
+                <input type="radio" name="depth" value={d} checked={depth === d} onChange={() => setDepth(d)} className="mt-0.5 size-5 accent-brand-700" />
+                <span>
+                  <span className="block font-medium">{label}</span>
+                  <span className="block text-sm text-zinc-600 dark:text-zinc-400">{note}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : mode === "cards" ? (
         <label className="flex flex-col gap-1 sm:max-w-xs">
           <span className="text-lg font-semibold">Number of cards</span>
           <select value={cardCount} onChange={(e) => setCardCount(Number(e.target.value))} className="min-h-12 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900">
@@ -449,15 +484,21 @@ function SetForm({ book, access, mode, onReady, onDeck }: { book: Book; access: 
       </>
       )}
 
-      <AiGate access={access} next="/ai/book" kind="book" label="tests or card decks">
+      <AiGate access={access} next="/ai/book" kind="book" label="tests, card decks or notes">
         {busy ? (
           <AiWorking
             steps={
-              mode === "cards"
+              mode === "notes"
+                ? ["Reading the passages you chose", "Writing your notes", "Checking every point against your file"]
+                : mode === "cards"
                 ? ["Reading the passages you chose", `Writing ${cardCount} flashcards`, "Checking every card against your file"]
                 : ["Reading the passages you chose", `Writing ${count} questions`, "Checking every answer against your book"]
             }
           />
+        ) : mode === "notes" ? (
+          <button type="button" onClick={() => void makeNotes()} disabled={chosen.length === 0} className={`${primaryButton} self-start disabled:opacity-50`}>
+            Write my notes
+          </button>
         ) : mode === "cards" ? (
           <button type="button" onClick={() => void makeCards()} disabled={chosen.length === 0} className={`${primaryButton} self-start disabled:opacity-50`}>
             Make my flashcards
@@ -468,7 +509,7 @@ function SetForm({ book, access, mode, onReady, onDeck }: { book: Book; access: 
           </button>
         )}
         <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-          Only short passages from the chapters you chose are sent to Claude, Anthropic&apos;s AI model, to write the questions or cards. We keep no copy of your file. 5 tests or decks a day.
+          Only short passages from the chapters you chose are sent to Claude, Anthropic&apos;s AI model, to write the questions, cards or notes. We keep no copy of your file on our servers. Tests, decks and notes share one daily allowance.
         </p>
         {error && (
           <p role="alert" className="mt-2 text-sm text-rose-800 dark:text-rose-300">
@@ -510,6 +551,9 @@ function StudySetView({
   onReady: (id: string) => void;
 }) {
   const today = useToday() ?? "";
+  const notes = useBookNotes().filter((n) => n.book === set.title);
+  const [openNotes, setOpenNotes] = useState<string | null>(null);
+  const shownNotes = notes.find((n) => n.id === openNotes) ?? notes[0];
   const inMemory = memory && memory.title === set.title ? memory : null;
   const [stored, setStored] = useState<Book | null | "loading">(inMemory ? null : "loading");
   useEffect(() => {
@@ -564,6 +608,37 @@ function StudySetView({
         id="set"
         label={`Study ${set.title}`}
         tabs={[
+          {
+            id: "notes",
+            label: "Notes",
+            content: (
+              <>
+                {notes.length > 0 && shownNotes && (
+                  <>
+                    {notes.length > 1 && (
+                      <label className="flex flex-col gap-1 sm:max-w-xs">
+                        <span className="text-sm font-medium">Your notes</span>
+                        <select value={shownNotes.id} onChange={(e) => setOpenNotes(e.target.value)} className="min-h-11 rounded-2xl border border-zinc-300 bg-white px-3 text-base sm:text-sm dark:border-zinc-700 dark:bg-zinc-900">
+                          {notes.map((n) => (
+                            <option key={n.id} value={n.id}>
+                              {n.depth === "summary" ? "Summary" : "Detailed"} · {n.createdOn}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <NotesView notes={shownNotes} />
+                  </>
+                )}
+                <section aria-labelledby="new-notes-h" className="flex flex-col gap-4">
+                  <h3 id="new-notes-h" className="text-lg font-semibold">
+                    {notes.length ? "New notes" : "Notes from your file"}
+                  </h3>
+                  {book ? <SetForm book={book} access={access} mode="notes" onReady={onReady} onDeck={onDeck} onNotes={setOpenNotes} /> : needFile}
+                </section>
+              </>
+            ),
+          },
           {
             id: "test",
             label: "Tests",
@@ -653,6 +728,50 @@ function StudySetView({
         ]}
       />
     </div>
+  );
+}
+
+// ----------------------------------------------------------------- notes --
+
+/** MB-15: notes as headed sections of short points, each with its page; the exact words from the file fold away. */
+function NotesView({ notes }: { notes: BookNotes }) {
+  return (
+    <article aria-labelledby={`notes-${notes.id}`} className="rounded-3xl bg-white p-5 md:p-7 dark:bg-zinc-900">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 id={`notes-${notes.id}`} className="text-xl font-semibold">
+          {notes.depth === "summary" ? "Summary notes" : "Detailed notes"}
+        </h3>
+        <span className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+          {notes.createdOn}
+          <button type="button" onClick={() => deleteNotes(notes.id)} className="min-h-11 underline underline-offset-2" aria-label={`Delete the notes of ${notes.createdOn}`}>
+            Delete
+          </button>
+        </span>
+      </div>
+      <div className="lx-deal mt-4 flex flex-col gap-6">
+        {notes.sections.map((sec, i) => (
+          <section key={i} aria-label={sec.heading}>
+            <h4 className="font-semibold text-brand-800 dark:text-brand-300">{sec.heading}</h4>
+            <ul className="mt-2 flex flex-col gap-2">
+              {sec.points.map((pt, j) => (
+                <li key={j} className="leading-7">
+                  {pt.term && <span className="font-semibold">{pt.term}: </span>}
+                  {pt.text}{" "}
+                  <details className="group inline">
+                    <summary className="inline cursor-pointer list-none rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/70 dark:text-amber-200 [&::-webkit-details-marker]:hidden">
+                      page {pt.page}
+                    </summary>
+                    <span className="mt-1 block border-l-2 border-zinc-300 pl-3 text-sm text-zinc-700 italic dark:border-zinc-700 dark:text-zinc-300">
+                      “{pt.quote}” ({pt.section})
+                    </span>
+                  </details>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </article>
   );
 }
 

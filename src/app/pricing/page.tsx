@@ -215,7 +215,7 @@ export default function PricingPage() {
             {
               n: "Study from your notes",
               t: "Revise from your own notes",
-              d: `Turn a PDF, Word or PowerPoint file of your notes into ${TIER_LIMITS.pro.book} tests or flashcard decks a day, and ask up to ${TIER_LIMITS.pro.notes} questions answered only from your file. Scanned pages and pictures in your slides are read too.`,
+              d: `Turn a PDF, Word or PowerPoint file of your notes into ${TIER_LIMITS.pro.book} tests, flashcard decks or sets of notes a day, and ask up to ${TIER_LIMITS.pro.notes} questions answered only from your file. Scanned pages and pictures in your slides are read too.`,
             },
           ].map((v) => (
             <li key={v.t}>
