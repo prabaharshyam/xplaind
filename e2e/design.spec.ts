@@ -177,3 +177,14 @@ test("lesson code blocks have a Copy button (BR-7)", async ({ browser }) => {
   }).toPass();
   await ctx.close();
 });
+
+test("tool pages end with Explore more tools, in each tool's colour, without the page itself (UX-13, UX-17)", async ({ page }) => {
+  await page.goto("/ai/book");
+  const band = page.getByRole("region", { name: "Explore more tools" });
+  await expect(band).toBeVisible();
+  await expect(band.getByRole("link", { name: /AI tutor/ })).toHaveAttribute("href", "/ai/tutor");
+  await expect(band.locator('a[href="/ai/book"]')).toHaveCount(0);
+  expect(await band.getByRole("link").count()).toBeGreaterThanOrEqual(6);
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+});
