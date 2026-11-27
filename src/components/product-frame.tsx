@@ -4,7 +4,7 @@ import { FIELD, type Tone } from "@/lib/tones";
 /**
  * UX-14 (2026-11-27, owner: StudyFetch's design language): a tool shown working, not described. A soft field in the
  * tool's colour (UX-13) holds a small app window with the tool's miniature inside. The window floats gently and its
- * rows arrive one after another as it scrolls in (MO-5's lx-deal, MO-7's lx-bob): position only, never the opacity of
+ * rows arrive one after another when the page opens (lx-stagger) and it floats briefly (MO-7's lx-bob): position only, never the opacity of
  * text, and still under reduced motion. Decorative: the page says in words what the tool does.
  */
 export function ProductFrame({ tone, label, children, className = "" }: { tone: Tone; label: string; children: ReactNode; className?: string }) {

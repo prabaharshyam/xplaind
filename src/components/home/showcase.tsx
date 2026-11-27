@@ -142,7 +142,7 @@ export function MiniPlan() {
           </span>
         ))}
       </div>
-      <ul className="lx-deal mt-3 space-y-1.5 text-sm">
+      <ul className="lx-stagger mt-3 space-y-1.5 text-sm">
         {plan.map((p) => (
           <li key={p.title} className={`flex items-center gap-2 rounded-2xl px-3 py-1.5 ${p.today ? "bg-brand-50 dark:bg-brand-950/50" : "bg-zinc-50 dark:bg-zinc-950"}`}>
             <span className={`grid size-4 shrink-0 place-items-center rounded-full text-[10px] ${p.done ? "bg-emerald-500 text-white" : "border border-zinc-300 dark:border-zinc-600"}`}>{p.done ? "✓" : ""}</span>
@@ -166,7 +166,7 @@ export function MiniPlan() {
 /** The "Study from my notes & books" spotlight: a file becomes a flashcard that quotes its page. */
 export function MiniNotes() {
   return (
-    <div aria-hidden="true" className="lx-deal relative mx-auto flex w-full max-w-[340px] flex-col gap-3">
+    <div aria-hidden="true" className="lx-stagger relative mx-auto flex w-full max-w-[340px] flex-col gap-3">
       <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
         <span className="grid size-10 place-items-center rounded-2xl bg-rose-100 text-xs font-bold text-rose-900">PDF</span>
         <span className="min-w-0 flex-1">
@@ -204,7 +204,7 @@ export function MiniResume() {
         <span className="grid size-14 place-items-center rounded-full border-4 border-emerald-500 text-lg font-semibold">78</span>
         <span className="text-sm leading-5">Shortlist-ready after <b>3 fixes</b></span>
       </div>
-      <ul className="lx-deal mt-3 space-y-1.5 text-sm">
+      <ul className="lx-stagger mt-3 space-y-1.5 text-sm">
         {fixes.map((f) => (
           <li key={f.text} className="flex items-center gap-2 rounded-2xl bg-zinc-50 px-3 py-1.5 dark:bg-zinc-950">
             <span className={`grid size-4 shrink-0 place-items-center rounded-full text-[10px] ${f.done ? "bg-emerald-500 text-white" : "border border-amber-500"}`}>{f.done ? "✓" : ""}</span>
@@ -223,7 +223,7 @@ export function MiniResume() {
 /** UX-14: the AI tutor answering, with the lesson it points to. Example text, decorative. */
 export function MiniTutor() {
   return (
-    <div aria-hidden="true" className="lx-deal flex flex-col gap-2 text-sm text-zinc-900 dark:text-zinc-100">
+    <div aria-hidden="true" className="lx-stagger flex flex-col gap-2 text-sm text-zinc-900 dark:text-zinc-100">
       <p className="ml-auto max-w-[80%] rounded-2xl bg-brand-700 px-3 py-2 text-white">What is a vector database, simply?</p>
       <p className="max-w-[88%] rounded-2xl bg-zinc-100 px-3 py-2 dark:bg-zinc-800">
         A store that finds text by meaning, not by exact words. You save each passage as a list of numbers, and it returns the closest ones to your question.
@@ -242,7 +242,7 @@ export function MiniStudio() {
     { icon: "star", label: "Resume review", tone: "emerald" },
   ];
   return (
-    <ul aria-hidden="true" className="lx-deal grid grid-cols-2 gap-2">
+    <ul aria-hidden="true" className="lx-stagger grid grid-cols-2 gap-2">
       {tools.map((t) => (
         <li key={t.label} className="flex flex-col gap-2 rounded-2xl bg-zinc-50 p-3 dark:bg-zinc-950">
           <span className={`grid size-9 place-items-center rounded-2xl ${TILE[t.tone]}`}>
