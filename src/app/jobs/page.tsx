@@ -5,6 +5,8 @@ import { Icon } from "@/components/art/icons";
 import { PageHero } from "@/components/page-hero";
 import { getPaths } from "@/lib/content";
 import { getJobs, jobLinks } from "@/lib/content/jobs";
+import { arrowLink, muted, secondaryButtonSm } from "@/components/ui";
+import { RoleSwitch } from "./role-switch";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
@@ -16,7 +18,7 @@ export const metadata: Metadata = pageMeta({
 
 const fmtDate = (iso: string) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 
-/** JB-1 to JB-3: one card per role, in roadmap order: salary bands, skills, and live openings. */
+/** JB-1 to JB-3: salary bands, skills and live openings for each role; JB-5: one role shown at a time. */
 export default function JobsPage() {
   const jobs = getJobs();
   const paths = getPaths();
@@ -42,93 +44,78 @@ export default function JobsPage() {
       </PageHero>
 
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
-        <nav aria-label="Roles" className="flex flex-wrap gap-2">
-          {roles.map(({ path }) => (
-            <a key={path.id} href={`#${path.id}`} className="inline-flex min-h-11 items-center rounded-full border border-zinc-300 bg-white px-3 text-sm font-medium hover:border-brand-400 dark:border-zinc-700 dark:bg-zinc-900">
-              {path.name}
-            </a>
-          ))}
-        </nav>
-
-        <p className="mt-6 max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-          These are typical yearly salaries (CTC, in lakh rupees) from published salary data and job posts, checked on {checked}. Sources disagree, so
-          treat them as a guide, not an offer: big tech and global AI labs pay more, IT services and smaller cities less, and Bengaluru usually
-          leads.
-        </p>
-
-        <ul className="mt-8 grid gap-6 lg:grid-cols-2">
-          {roles.map(({ path, role }) => {
+        <RoleSwitch
+          roles={roles.map(({ path, role }) => {
             const links = jobLinks(role.search);
-            return (
-              <li key={path.id} id={path.id} className="scroll-mt-24 rounded-2xl border border-zinc-200 bg-white p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
-                <h2 className="text-xl font-semibold">{path.name}</h2>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{path.tagline}</p>
+            return {
+              id: path.id,
+              name: path.name,
+              panel: (
+                <>
+                  <h2 className="text-2xl font-semibold tracking-tight">{path.name}</h2>
+                  <p className={`mt-1 ${muted}`}>{path.tagline}</p>
 
-                <h3 className="mt-5 text-sm font-semibold text-zinc-600 dark:text-zinc-400">Typical salary</h3>
-                <table className="mt-2 w-full text-sm">
-                  <caption className="sr-only">
-                    {path.name} salary in lakh rupees a year by experience, checked {checked}
-                  </caption>
-                  <tbody>
-                    {role.bands.map((b) => (
-                      <tr key={b.years} className="align-middle">
-                        <th scope="row" className="w-24 py-1.5 pr-3 text-left font-medium whitespace-nowrap">
-                          {b.years}
-                        </th>
-                        <td className="py-1.5" aria-hidden="true">
-                          <span className="relative block h-3 rounded-full bg-zinc-100 dark:bg-zinc-800">
-                            <span
-                              className="absolute inset-y-0 rounded-full bg-brand-600 dark:bg-brand-400"
-                              style={{ left: `${(b.min / top) * 100}%`, width: `${Math.max(3, ((b.max - b.min) / top) * 100)}%` }}
-                            />
-                          </span>
-                        </td>
-                        <td className="w-28 py-1.5 pl-3 text-right font-semibold whitespace-nowrap tabular-nums">
-                          ₹{b.min}–{b.max} LPA
-                        </td>
-                      </tr>
+                  <h3 className="mt-6 text-sm font-semibold">Typical salary, in lakh rupees a year</h3>
+                  <table className="mt-2 w-full max-w-xl text-sm">
+                    <caption className="sr-only">
+                      {path.name} salary in lakh rupees a year by experience, checked {checked}
+                    </caption>
+                    <tbody>
+                      {role.bands.map((b) => (
+                        <tr key={b.years} className="align-middle">
+                          <th scope="row" className="w-24 py-1.5 pr-3 text-left font-medium whitespace-nowrap">
+                            {b.years}
+                          </th>
+                          <td className="py-1.5" aria-hidden="true">
+                            <span className="relative block h-3 rounded-full bg-zinc-100 dark:bg-zinc-800">
+                              <span
+                                className="absolute inset-y-0 rounded-full bg-brand-600 dark:bg-brand-400"
+                                style={{ left: `${(b.min / top) * 100}%`, width: `${Math.max(3, ((b.max - b.min) / top) * 100)}%` }}
+                              />
+                            </span>
+                          </td>
+                          <td className="w-28 py-1.5 pl-3 text-right font-semibold whitespace-nowrap tabular-nums">
+                            ₹{b.min}–{b.max} LPA
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className={`mt-2 max-w-xl text-sm leading-6 ${muted}`}>
+                    Typical CTC from published salary data and job posts, checked on {checked}. Sources disagree, so treat it as a guide, not an
+                    offer: big tech and global AI labs pay more, IT services and smaller cities less, and Bengaluru usually leads.
+                  </p>
+
+                  <h3 className="mt-6 text-sm font-semibold">Skills job posts ask for</h3>
+                  <ul className="mt-2 flex flex-wrap gap-2">
+                    {role.skills.map((sk) => (
+                      <li key={sk} className="rounded-full bg-zinc-100 px-3 py-1 text-sm dark:bg-zinc-800">
+                        {sk}
+                      </li>
                     ))}
-                  </tbody>
-                </table>
+                  </ul>
 
-                <h3 className="mt-5 text-sm font-semibold text-zinc-600 dark:text-zinc-400">Skills job posts ask for</h3>
-                <ul className="mt-2 flex flex-wrap gap-2">
-                  {role.skills.map((s) => (
-                    <li key={s} className="rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-950 ring-1 ring-brand-200 dark:bg-brand-950/40 dark:text-brand-100 dark:ring-brand-900">
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <a
-                    href={links.naukri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#275df5] px-4 text-sm font-semibold text-white hover:bg-[#1e4bd1]"
-                  >
-                    Live jobs on Naukri <span aria-hidden="true">↗</span>
-                    <span className="sr-only">(opens in a new tab)</span>
-                  </a>
-                  <a
-                    href={links.linkedin}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#0a66c2] px-4 text-sm font-semibold text-white hover:bg-[#08539e]"
-                  >
-                    Live jobs on LinkedIn <span aria-hidden="true">↗</span>
-                    <span className="sr-only">(opens in a new tab)</span>
-                  </a>
-                  <Link href={`/roadmap/${path.id}`} className="inline-flex min-h-11 items-center gap-1 px-2 text-sm font-medium text-brand-800 hover:underline dark:text-brand-300">
-                    <Icon name="map" size={16} /> Roadmap to get there
-                  </Link>
-                </div>
-              </li>
-            );
+                  {/* UX-11: the job sites' own blues gave way to the site's buttons. */}
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    <a href={links.naukri} target="_blank" rel="noopener noreferrer" className={secondaryButtonSm}>
+                      Live jobs on Naukri <span aria-hidden="true">↗</span>
+                      <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                    <a href={links.linkedin} target="_blank" rel="noopener noreferrer" className={secondaryButtonSm}>
+                      Live jobs on LinkedIn <span aria-hidden="true">↗</span>
+                      <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                    <Link href={`/roadmap/${path.id}`} className={`${arrowLink} px-2 text-sm`}>
+                      <Icon name="map" size={16} /> Roadmap to get there
+                    </Link>
+                  </div>
+                </>
+              ),
+            };
           })}
-        </ul>
+        />
 
-        <section aria-labelledby="sources" className="mt-10 max-w-3xl text-sm text-zinc-700 dark:text-zinc-300">
+        <section aria-labelledby="sources" className="mt-16 max-w-3xl text-sm text-zinc-700 dark:text-zinc-300">
           <h2 id="sources" className="font-semibold">
             Sources
           </h2>
