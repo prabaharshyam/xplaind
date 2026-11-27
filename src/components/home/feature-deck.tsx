@@ -49,7 +49,8 @@ function pose(offset: number, count: number): React.CSSProperties {
  * and the next comes forward from the fanned stack. Swipe on phones. Under reduced motion the cards
  * simply swap, and the deck never moves by itself.
  */
-export function FeatureDeck({ cards }: { cards: DeckCard[] }) {
+/** UX-21: also used on /pricing for what Pro gives, so the tab list can be named. */
+export function FeatureDeck({ cards, label = "Features" }: { cards: DeckCard[]; label?: string }) {
   const [active, setActive] = useState(0);
   const [touched, setTouched] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -102,7 +103,7 @@ export function FeatureDeck({ cards }: { cards: DeckCard[] }) {
     <div ref={root} onPointerEnter={() => setTouched(true)}>
       <div
         role="tablist"
-        aria-label="Features"
+        aria-label={label}
         className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto px-4 md:mx-0 md:rounded-full md:border md:border-zinc-200 md:bg-white md:p-1.5 md:dark:border-zinc-800 md:dark:bg-zinc-900"
       >
         {cards.map((c, i) => {

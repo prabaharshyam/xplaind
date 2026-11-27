@@ -10,6 +10,8 @@ import { pageMeta } from "@/lib/seo";
 import { BuyPass } from "./buy-pass";
 import { secondaryButton } from "@/components/ui";
 import { FunnelPing } from "@/components/funnel-ping";
+import { FeatureDeck } from "@/components/home/feature-deck";
+import { MiniCert, MiniInterview, MiniNotes, MiniResume, MiniReview, MiniTutor } from "@/components/home/showcase";
 
 export const metadata: Metadata = pageMeta({
   title: "Xplaind Pro: Get Interview-Ready, with Proof, from ₹99",
@@ -184,53 +186,111 @@ export default function PricingPage() {
         <h2 id="value-h" className="max-w-2xl text-3xl font-semibold tracking-tight text-balance md:text-4xl">
           What you walk away with
         </h2>
-        <ul className="mt-10 grid gap-x-12 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
-          {[
-            {
-              // SE-16: the AI interviewer leads, as the thing people buy Pro for.
-              n: "AI interviewer, up to 4 a day",
-              t: "Rehearse out loud with Zarina",
-              d: "Spoken interviews for your role or a job post, up to four a day. She follows up on what you actually say and ends with a hiring verdict, skill scores and a 4-week plan. Each one adds to your readiness score out of 100.",
-            },
-            {
-              n: "Project review",
-              t: "Projects a recruiter will trust",
-              d: "Link your GitHub project and get it marked against the project's rubric, criterion by criterion, with what to fix before you show it.",
-            },
-            {
-              n: `Resume review, up to ${TIER_LIMITS.pro.resume} a day`,
-              t: "A resume matched to the job",
-              d: `Up to ${TIER_LIMITS.pro.resume} resume reviews a day: line-by-line fixes, a match score against the job post, and a LinkedIn headline and About section written from your resume.`,
-            },
-            {
-              n: "Verified certificate",
-              t: "A certificate anyone can check",
-              d: "Earn it by passing the checks and a reviewed project, not by clicking through. It has a public link and an Add to LinkedIn button.",
-            },
-            {
-              n: `AI tutor, up to ${TIER_LIMITS.pro.tutor} a day`,
-              t: "Never stuck, in your language",
-              d: "Ask the AI tutor about any lesson, your code or your plan, in English, Hinglish, Hindi, Tamil, Telugu, Kannada, Malayalam, Marathi, Bengali or Gujarati.",
-            },
-            {
-              n: "Study from your notes",
-              t: "Revise from your own notes",
-              d: `Turn a PDF, Word or PowerPoint file of your notes into ${TIER_LIMITS.pro.book} tests, flashcard decks or sets of notes a day, and ask up to ${TIER_LIMITS.pro.notes} questions answered only from your file. Scanned pages and pictures in your slides are read too.`,
-            },
-          ].map((v) => (
-            <li key={v.t}>
-              {/* PAY-15: the outcome is the heading; the tool and its daily limit follow in plain words. */}
-              <h3 className="text-xl font-semibold">{v.t}</h3>
-              <p className="mt-1 text-sm font-medium text-brand-800 dark:text-brand-300">{v.n}</p>
-              <p className="mt-2 max-w-md leading-7 text-zinc-800 dark:text-zinc-200">{v.d}</p>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-10 max-w-3xl rounded-2xl bg-zinc-50 p-5 leading-7 dark:bg-zinc-900">
-          <span className="font-semibold">Free with every account: </span>
-          every roadmap, lesson, video, practice card and project guide, a 2-minute level check, a week-by-week plan to your interview date and a
-          public profile you can share.
-        </p>
+        {/* UX-21 (2026-11-27, owner: "this section has so much text, make it like the slider on the home page"): one
+            benefit at a time, as the home page's deck, each with a short line, three short points and a picture of it.
+            PAY-15: the outcome is the heading; the tool and its daily limit sit above it. */}
+        <div className="mt-10">
+          <FeatureDeck
+            label="What Pro gives you"
+            cards={[
+              {
+                // SE-16: the AI interviewer leads, as the thing people buy Pro for.
+                id: "interview",
+                tab: "AI interviewer",
+                eyebrow: "AI interviewer · up to 4 a day",
+                title: "Rehearse out loud with Zarina",
+                text: "Spoken interviews for your role or a job post. She follows up on what you actually say.",
+                points: ["A hiring verdict and skill scores", "A 4-week plan for your gaps", "Adds to your readiness score out of 100"],
+                cta: { href: "/interview/simulator", label: "Set up my interview" },
+                tone: "rose",
+                visual: (
+                  <div className="mx-auto max-w-[320px]">
+                    <MiniInterview />
+                  </div>
+                ),
+              },
+              {
+                id: "projects",
+                tab: "Project review",
+                eyebrow: "Project review",
+                title: "Projects a recruiter will trust",
+                text: "Link your GitHub project and get it marked against the project's rubric.",
+                points: ["Marked criterion by criterion", "What to fix before you show it", "Counts towards your certificate"],
+                cta: { href: "/projects", label: "See the projects" },
+                tone: "amber",
+                visual: (
+                  <div className="mx-auto max-w-[320px]">
+                    <MiniReview />
+                  </div>
+                ),
+              },
+              {
+                id: "resume",
+                tab: "Resume",
+                eyebrow: `Resume review · up to ${TIER_LIMITS.pro.resume} a day`,
+                title: "A resume matched to the job",
+                text: "Line-by-line fixes and a match score against the job post.",
+                points: ["Fixes in order of importance", "The keywords the job asks for", "A LinkedIn headline and About section"],
+                cta: { href: "/ai/resume", label: "Review my resume" },
+                tone: "emerald",
+                visual: <MiniResume />,
+              },
+              {
+                id: "certificate",
+                tab: "Certificate",
+                eyebrow: "Verified certificate",
+                title: "A certificate anyone can check",
+                text: "Earned by passing the checks and a reviewed project, not by clicking through.",
+                points: ["A public link anyone can open", "An Add to LinkedIn button"],
+                cta: { href: "/paths", label: "Choose your role" },
+                tone: "amber",
+                visual: (
+                  <div className="mx-auto max-w-[320px]">
+                    <MiniCert />
+                  </div>
+                ),
+              },
+              {
+                id: "tutor",
+                tab: "AI tutor",
+                eyebrow: `AI tutor · up to ${TIER_LIMITS.pro.tutor} a day`,
+                title: "Never stuck, in your language",
+                text: "Ask about any lesson, your code or your plan, and get a plain answer.",
+                points: ["English, Hinglish and 8 Indian languages", "Hindi, Tamil, Telugu, Kannada and more"],
+                cta: { href: "/ai/tutor", label: "Ask the AI tutor" },
+                tone: "teal",
+                visual: (
+                  <div className="mx-auto max-w-[320px]">
+                    <MiniTutor />
+                  </div>
+                ),
+              },
+              {
+                id: "notes",
+                tab: "Your notes",
+                eyebrow: "Study from your notes",
+                title: "Revise from your own notes",
+                text: "Turn a PDF, Word or PowerPoint file into tests, flashcards or notes.",
+                points: [`${TIER_LIMITS.pro.book} tests, decks or sets of notes a day`, `Ask up to ${TIER_LIMITS.pro.notes} questions from your file`, "Scanned pages and slide pictures are read too"],
+                cta: { href: "/ai/book", label: "Try it with your notes" },
+                tone: "sky",
+                visual: <MiniNotes />,
+              },
+            ]}
+          />
+        </div>
+        {/* UX-21: what every account gets, as short chips rather than a sentence to read. */}
+        <div className="mt-12 rounded-3xl bg-zinc-50 p-5 md:mt-24 md:p-6 dark:bg-zinc-900">
+          <p className="font-semibold">Free with every account</p>
+          <ul className="mt-3 flex flex-wrap gap-2 text-sm">
+            {["Every roadmap", "Every lesson and video", "Practice cards", "Project guides", "2-minute level check", "Plan to your interview date", "A public profile"].map((t) => (
+              <li key={t} className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-800">
+                <Icon name="tick" size={14} className="text-emerald-700 dark:text-emerald-400" />
+                {t}
+              </li>
+            ))}
+          </ul>
+        </div>
         {/* PAY-15: until learners report what Pro got them, their words (about the free roadmaps) stay on the stories page, not here. */}
         {!outcomes.length && (
           <Link href="/stories" className="mt-5 inline-flex min-h-11 items-center font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
