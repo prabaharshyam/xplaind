@@ -118,7 +118,8 @@ export default function AiToolsPage() {
                           </span>
                         </span>
                         <span className="text-card mt-4 text-zinc-700 dark:text-zinc-300">{t.text}</span>
-                        <span className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-2xl bg-zinc-50 px-3 py-2.5 text-sm dark:bg-zinc-950">
+                        {/* UX-12: one level of box: what you give and get is plain text inside the card, not a box of its own. */}
+                        <span className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
                           <span className="text-zinc-600 dark:text-zinc-400">You give</span>
                           <span className="font-medium text-zinc-900 dark:text-zinc-100">{t.give}</span>
                           <span className="text-zinc-600 dark:text-zinc-400">You get</span>

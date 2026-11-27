@@ -41,7 +41,8 @@ export default function PathsPage() {
                 href={roadmapHref(p.id)}
                 className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <Cover theme={p.theme ?? "llm"} seed={p.id} className="h-28" iconSize={36} />
+                {/* BR-4 keeps the line graphic on wider screens; UX-10 leaves it out on phones, where ten of them pushed the list down. */}
+                <Cover theme={p.theme ?? "llm"} seed={p.id} className="h-28 max-sm:hidden" iconSize={36} />
                 <span className="flex flex-1 flex-col gap-2 p-5">
                   <h2 className="text-xl font-semibold group-hover:underline">{p.name}</h2>
                   <span className="leading-7">{p.tagline}</span>
