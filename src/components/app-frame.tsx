@@ -65,7 +65,8 @@ export function AppRail() {
   const current = activeRail(path);
   const flyout =
     "pointer-events-none invisible absolute top-0 left-full z-50 pl-3 opacity-0 transition-[opacity,visibility] duration-150 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100";
-  const row = "flex min-h-11 flex-col justify-center rounded-2xl px-3 py-1.5 hover:bg-white/70 aria-[current=page]:bg-white/80 dark:hover:bg-white/[0.07] dark:aria-[current=page]:bg-white/10";
+  const row = "flex min-h-11 flex-col justify-center rounded-2xl px-3 py-2 transition-colors duration-150 hover:bg-white/80 aria-[current=page]:bg-white/90 aria-[current=page]:ring-1 aria-[current=page]:ring-zinc-200 dark:hover:bg-white/[0.08] dark:aria-[current=page]:bg-white/10 dark:aria-[current=page]:ring-white/10";
+  const pageRow = "flex min-h-11 items-center gap-3 rounded-2xl px-2.5 py-2 transition-colors duration-150 hover:bg-white/80 aria-[current=page]:bg-white/90 aria-[current=page]:ring-1 aria-[current=page]:ring-zinc-200 dark:hover:bg-white/[0.08] dark:aria-[current=page]:bg-white/10 dark:aria-[current=page]:ring-white/10";
   return (
     <nav aria-label="App" className="app-rail fixed inset-y-0 left-0 z-40 w-20 flex-col items-center border-r border-zinc-200 bg-[var(--hero)] py-3 print:hidden dark:border-white/10 dark:bg-zinc-950">
       <Link href="/dashboard" aria-label="Xplaind home" className="grid size-12 place-items-center rounded-2xl hover:bg-white/70 dark:hover:bg-white/10">
@@ -91,14 +92,21 @@ export function AppRail() {
               </Link>
               {r.items.length > 0 && (
                 <div className={flyout}>
-                  <div className="xp-glass-strong w-72 rounded-3xl p-2">
+                  <div className="xp-glass-strong w-80 rounded-3xl p-2">
                     <p className="px-3 pt-1 pb-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">{r.label}</p>
+                    {/* APP-7 (owner, 2026-11-27: the sub-menu "looks like a list of texts"): each page with its coloured icon
+                        tile, as in the website menu, a soft highlight on hover and the tile's pop (APP-2). */}
                     <ul>
                       {r.items.map((i) => (
                         <li key={i.href}>
-                          <Link href={i.href} aria-current={path === i.href ? "page" : undefined} className={row}>
-                            <span className="text-sm font-semibold text-zinc-900 dark:text-white">{i.label}</span>
-                            <span className="truncate text-sm text-zinc-600 dark:text-zinc-400">{i.note}</span>
+                          <Link href={i.href} aria-current={path === i.href ? "page" : undefined} className={pageRow}>
+                            <span aria-hidden="true" className={`lx-pop grid size-10 shrink-0 place-items-center rounded-2xl ${TILE[i.tone]}`}>
+                              <Icon name={i.icon} size={18} />
+                            </span>
+                            <span className="flex min-w-0 flex-col">
+                              <span className="text-sm font-semibold text-zinc-900 dark:text-white">{i.label}</span>
+                              <span className="truncate text-sm text-zinc-600 dark:text-zinc-400">{i.note}</span>
+                            </span>
                           </Link>
                         </li>
                       ))}

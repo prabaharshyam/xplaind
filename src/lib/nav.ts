@@ -106,8 +106,9 @@ export function activeTab(path: string): (typeof TABS)[number]["id"] | null {
  * APP-1: the app rail (signed in, from 640 px). Each place opens its page; on hover or focus it also shows the
  * place's pages, taken from the menu so the two never disagree.
  */
-type RailItem = { id: string; href: string; label: string; icon: IconName; tone: Tone; items: { href: string; label: string; note: string }[] };
-const groupItems = (id: string) => (NAV_GROUPS.find((g) => g.id === id)?.items ?? []).map(({ href, label, note }) => ({ href, label, note }));
+type RailPage = { href: string; label: string; note: string; icon: IconName; tone: Tone };
+type RailItem = { id: string; href: string; label: string; icon: IconName; tone: Tone; items: RailPage[] };
+const groupItems = (id: string): RailPage[] => (NAV_GROUPS.find((g) => g.id === id)?.items ?? []).map(({ href, label, note, icon, tone }) => ({ href, label, note, icon, tone }));
 export const RAIL: RailItem[] = [
   { id: "home", href: "/dashboard", label: "Home", icon: "compass", tone: "teal", items: [] },
   { id: "learn", href: "/paths", label: "Learn", icon: "map", tone: "teal", items: groupItems("learn") },
@@ -118,9 +119,9 @@ export const RAIL: RailItem[] = [
     icon: "check",
     tone: "emerald",
     items: [
-      { href: "/practice", label: "Flashcards and quizzes", note: "Answer, check yourself, rate it" },
-      { href: "/interview", label: "Questions", note: "500 questions with answers" },
-      { href: "/playground", label: "Code playground", note: "Run Python in your browser" },
+      { href: "/practice", label: "Flashcards and quizzes", note: "Answer, check yourself, rate it", icon: "check", tone: "emerald" },
+      { href: "/interview", label: "Questions", note: "500 questions with answers", icon: "search", tone: "sky" },
+      { href: "/playground", label: "Code playground", note: "Run Python in your browser", icon: "code", tone: "sky" },
     ],
   },
   { id: "interview", href: "/interview/simulator", label: "Interview", icon: "mic", tone: "rose", items: groupItems("interview") },
