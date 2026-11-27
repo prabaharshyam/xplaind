@@ -1,9 +1,7 @@
 import { pageMeta } from "@/lib/seo";
 import { ExploreTools } from "@/components/explore-tools";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
-import { secondaryButton } from "@/components/ui";
 import { getInterviewViews, quizPoolFor } from "@/lib/content/interview";
 import { PracticeView } from "./practice-view";
 
@@ -30,23 +28,6 @@ export default function PracticePage() {
       />
       <div className="mx-auto max-w-3xl px-4 py-8">
         <PracticeView topic={null} questions={getInterviewViews()} quizPool={quizPoolFor(null)} />
-        <section aria-labelledby="more-practice" className="mt-12">
-          <h2 id="more-practice" className="text-xl font-semibold">
-            More ways to practise
-          </h2>
-          {/* The question bank lost its place in the top bar, so it is one tap from here. */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/interview" className={secondaryButton}>
-              Browse all {getInterviewViews().length} interview questions
-            </Link>
-            <Link href="/interview/simulator" className={secondaryButton}>
-              Take a mock interview
-            </Link>
-            <Link href="/ai/book" className={secondaryButton}>
-              Study from my notes & books
-            </Link>
-          </div>
-        </section>
       </div>
       <ExploreTools current="/practice" />
     </main>

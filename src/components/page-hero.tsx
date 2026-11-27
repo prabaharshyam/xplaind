@@ -38,7 +38,7 @@ export function PageHero({
 }) {
   const full = size === "full";
   return (
-    <header className="relative overflow-hidden border-b border-zinc-200 bg-[var(--hero)] dark:border-zinc-800 dark:bg-zinc-950">
+    <header className="relative overflow-clip border-b border-zinc-200 bg-[var(--hero)] dark:border-zinc-800 dark:bg-zinc-950">
       <div className={`mx-auto flex max-w-6xl flex-col px-4 md:flex-row md:items-center md:gap-10 md:px-6 ${full ? "gap-4 py-8 md:py-12" : "gap-4 py-6 md:py-8"}`}>
         <div className="min-w-0 flex-1">
           {crumbs.length > 0 && (
@@ -61,7 +61,7 @@ export function PageHero({
         {/* MO-8: the page's own particle sculpture, in its theme's colours, or (UX-14) the tool shown working.
             UX-10: neither on a phone, where they only pushed the content down. */}
         {demo ? (
-          <div className="w-[24rem] shrink-0 max-md:hidden">{demo}</div>
+          <div className="w-[20rem] shrink-0 max-md:hidden lg:w-[24rem]">{demo}</div>
         ) : (
           <div className="lx-hero-art shrink-0 [perspective:1000px] max-md:hidden">
             <ParticleScene shape={shape ?? THEME_SHAPE[theme]} colors={particleColorsOf(theme)} icon={icon ?? themeOf(theme).icon} className={full ? "h-44 w-full md:h-72 md:w-[26rem]" : "h-52 w-80"} />

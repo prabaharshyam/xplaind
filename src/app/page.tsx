@@ -310,7 +310,7 @@ export default function Home() {
       {/* HM-7: the proof in one place: learners in their own words (SO-1), what is inside, counted, and the
           market behind the promise, each figure sourced and dated (JB-4, moved here from the hero).
           UX-16: one dark band, so the long page has a rhythm and the proof reads as one block. */}
-      <section aria-labelledby={testimonials.length ? "voices-heading" : "trust-heading"} className="bg-brand-950 py-14 text-white md:py-28">
+      <section aria-labelledby={testimonials.length ? "voices-heading" : "trust-heading"} className="bg-brand-950 py-14 text-white md:py-28 dark:bg-brand-800">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           {testimonials.length > 0 && (
             <>

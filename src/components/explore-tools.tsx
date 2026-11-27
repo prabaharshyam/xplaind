@@ -14,7 +14,7 @@ export function ExploreTools({ current }: { current: string }) {
   const items = NAV_GROUPS.flatMap((g) => g.items).filter((i) => TOOLS.includes(i.href) && i.href !== current);
   items.sort((a, b) => TOOLS.indexOf(a.href) - TOOLS.indexOf(b.href));
   return (
-    <section aria-labelledby="explore-tools-h" className="bg-brand-950 py-14 text-white md:py-20">
+    <section aria-labelledby="explore-tools-h" className="bg-brand-950 py-14 text-white md:py-20 dark:bg-brand-800">
       <div className="mx-auto max-w-6xl px-4 md:px-6">
         <h2 id="explore-tools-h" className="text-2xl font-semibold tracking-tight md:text-3xl">
           Explore more tools
