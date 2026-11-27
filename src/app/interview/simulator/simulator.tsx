@@ -261,13 +261,14 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
             </div>
           </div>
         </div>
-        <Reveal className="flex justify-center lg:justify-end">
+        {/* VI-23 (2026-11-27, owner): no demo conversation on phones, so the setup starts a screen higher. */}
+        <Reveal className="flex justify-center max-md:hidden lg:justify-end">
           <Exchange />
         </Reveal>
       </section>
 
       {/* ---- the setup: a sentence the learner fills in, and the line she will open with ---- */}
-      <section id="setup" aria-labelledby="setup-heading" className="scroll-mt-20 bg-brand-900">
+      <section id="setup" aria-labelledby="setup-heading" className="scroll-mt-20 bg-white dark:bg-zinc-900">
         <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-10 px-4 py-16 sm:px-8 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] md:py-24">
           <div className="flex min-w-0 flex-col gap-6">
             <h2 id="setup-heading" className="text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
@@ -281,7 +282,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
               <>
                 <fieldset className="min-w-0">
                   <legend className="sr-only">Set up the interview from</legend>
-                  <div className="grid w-full grid-cols-2 rounded-[1.5rem] bg-brand-950 p-1 sm:inline-grid sm:w-auto sm:rounded-full">
+                  <div className="grid w-full grid-cols-2 rounded-[1.5rem] bg-zinc-100 p-1 sm:inline-grid dark:bg-zinc-800 sm:w-auto sm:rounded-full">
                     {(
                       [
                         ["role", "Choose a role"],
@@ -290,7 +291,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                     ).map(([id, label]) => (
                       <label
                         key={id}
-                        className="flex min-h-11 cursor-pointer items-center justify-center rounded-[1.25rem] px-3 py-1 text-center text-[15px] leading-5 font-medium text-brand-200 sm:rounded-full transition-colors has-[:checked]:bg-brand-50 has-[:checked]:text-brand-950 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-200 sm:px-5"
+                        className="flex min-h-11 cursor-pointer items-center justify-center rounded-[1.25rem] px-3 py-1 text-center text-[15px] leading-5 font-medium text-zinc-700 sm:rounded-full transition-colors has-[:checked]:bg-white has-[:checked]:text-zinc-900 has-[:checked]:shadow-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-700 dark:text-zinc-300 dark:has-[:checked]:bg-zinc-950 dark:has-[:checked]:text-zinc-100 sm:px-5"
                       >
                         <input type="radio" name="source" checked={source === id} onChange={() => setSource(id)} className="sr-only" />
                         {label}
@@ -369,7 +370,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
           </div>
 
           {/* The interviewer, ready: her opening line, the length, and the one action. */}
-          <div className="flex min-w-0 flex-col gap-6 rounded-[2rem] bg-brand-950 p-6 md:p-8">
+          <div className="flex min-w-0 flex-col gap-6 rounded-[2rem] bg-[var(--background)] p-6 ring-1 ring-zinc-200 md:p-8 dark:bg-zinc-950 dark:ring-zinc-800">
             <div className="flex items-center gap-3">
               <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-300 text-lg font-semibold text-brand-950">
                 Z
@@ -413,7 +414,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                 {planning ? "Planning your interview from the job description." : ""}
               </p>
               {planError && (
-                <p role="alert" className="rounded-2xl bg-brand-800 p-3 text-[15px] leading-6">
+                <p role="alert" className="rounded-2xl bg-rose-50 p-3 text-[15px] leading-6 text-rose-950 dark:bg-rose-950/40 dark:text-rose-100">
                   {planError.message}{" "}
                   {planError.upgrade && (
                     <Link href={planError.upgrade} className={room.link}>
@@ -432,7 +433,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
               )}
             </div>
             {/* VI-21: the start button comes before her opening line, so a phone reaches it without scrolling past the whole quote. */}
-            <div className="flex flex-col gap-4 border-t border-brand-800 pt-6">
+            <div className="flex flex-col gap-4 border-t border-zinc-200 pt-6 dark:border-zinc-800">
               {opening && <p className={`text-[15px] font-medium ${room.soft}`}>She will open with</p>}
               <p aria-live="polite" className="text-lg leading-8">
                 {opening ? (
@@ -467,7 +468,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
       </section>
 
       {/* ---- what is free and what is Pro, set like a menu; the free warm-up starts here ---- */}
-      <section id="warm-up" aria-labelledby="menu-heading" className="scroll-mt-20 bg-brand-900">
+      <section id="warm-up" aria-labelledby="menu-heading" className="scroll-mt-20 bg-white dark:bg-zinc-900">
         <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-10 px-4 py-20 sm:px-8 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] md:py-28">
           <Reveal>
             <h2 id="menu-heading" className="text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
@@ -490,7 +491,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                     <span className="flex justify-between gap-4 text-lg font-medium">
                       {name}
                       {/* VI-13: what the free interview includes, while it is still to use. */}
-                      <span className="shrink-0 text-brand-300">{freeTry && inTrial ? "Free once" : "Pro"}</span>
+                      <span className="shrink-0 text-brand-800 dark:text-brand-300">{freeTry && inTrial ? "Free once" : "Pro"}</span>
                     </span>
                     <span className={`block text-[15px] leading-6 ${room.soft}`}>{note}</span>
                   </li>
@@ -534,7 +535,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                         {COUNTS.map((n) => (
                           <label
                             key={n}
-                            className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-full bg-brand-950 text-[15px] font-medium text-brand-200 has-[:checked]:bg-brand-700 has-[:checked]:text-brand-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-200"
+                            className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-[15px] font-medium text-zinc-700 has-[:checked]:bg-brand-700 has-[:checked]:text-white has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-700 dark:bg-zinc-800 dark:text-zinc-300"
                           >
                             <input type="radio" name="count" value={n} checked={count === n} onChange={() => setCount(n)} className="sr-only" />
                             {n}
