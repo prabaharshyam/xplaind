@@ -240,7 +240,7 @@ PRD IDs in brackets.
 
 **Focus timer (27 Nov, FC-1)** a timer button in the top bar on every page (`src/components/focus-timer.tsx`, logic in `src/lib/focus.ts`, device store `xplaind.focus.v1`): 25/5 or 50/10, Start, Pause, Reset, Skip, the time left on the button while it runs, today's blocks and minutes and a 7-day bar row. The panel is a native `popover`. Device only.
 
-**Loading and look** the full footer (FT-2, 27 Nov: six columns, the four menu groups read from `NAV_GROUPS`, rows that open on phones, business line without the GST number; it replaced FT-1's short footer) with the site map also on `/explore` (FT-1) and a reading-progress line below the menu pill (LS-3), a full-screen loading screen with the animated X on every load, page change and language switch (UX-7), a thin top bar (UX-2), Deep Teal and Brass brand (BR-10), typographic blog covers (BL-2), a menu with icons (UX-3) and a numbered phone menu (NV-5, NV-6).
+**Loading and look** the full footer (FT-2, 27 Nov: six columns, the four menu groups read from `NAV_GROUPS`, rows that open on phones, business line without the GST number or working hours; it replaced FT-1's short footer) with the site map also on `/explore` (FT-1) and a reading-progress line below the menu pill (LS-3), a full-screen loading screen with the animated X on every load, page change and language switch (UX-7), a thin top bar (UX-2), Deep Teal and Brass brand (BR-10), typographic blog covers (BL-2), a menu with icons (UX-3) and a numbered phone menu (NV-5, NV-6).
 
 **Social proof and trust** testimonials carousel on the home page (SO-1), About and founder story (TR-2), How we rank, disclosure, privacy and terms pages.
 
