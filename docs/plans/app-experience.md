@@ -1,6 +1,6 @@
 # Plan: Xplaind as an app once signed in (draft for the owner)
 
-27 Nov 2026. Status: **plan only, nothing built.** Owner: "go with A and B. I also want ours to look like an app, not a website: landing and marketing pages, but once signed in an app interface where users learn, download roadmaps, do mock interviews, use the resume reviewer, flashcards and every feature. Don't implement anything yet." Reference: `docs/research/studyfetch-platform.md` (patterns only).
+27 Nov 2026. Status: **plan agreed in outline (decisions in section 11); nothing built yet.** Owner: "go with A and B. I also want ours to look like an app, not a website: landing and marketing pages, but once signed in an app interface where users learn, download roadmaps, do mock interviews, use the resume reviewer, flashcards and every feature. Don't implement anything yet." Reference: `docs/research/studyfetch-platform.md` (patterns only).
 
 ## 1. The idea in one line
 
@@ -12,7 +12,7 @@ Same URLs, two frames. Visitors see the website (header, footer, marketing pages
 - To avoid a jump on load, copy the dark-mode trick (`THEME_SCRIPT`): a tiny script in `<head>` reads a "signed in on this device" hint and sets `data-app` on `<html>` before paint. CSS shows the app frame or the website frame from that attribute. Both frames are in the static HTML; only one is shown.
 - The hint is presentation only. It never unlocks content; access rules (account wall, PV-2 under-18, Pro) stay exactly as they are. When the real sign-in state arrives it corrects the hint (expired session, sign-out in another tab).
 - The in-memory flag in `account-sync.ts` is not stored today; the hint needs a stored value. Name it so the secret scan does not flag it (gitleaks matches constants ending in `KEY`).
-- No server redirect from `/` until checked against the Next 16 docs; a signed-in visit to `/` can open the app Home from the browser instead.
+- No redirect from `/`: the owner wants signed-in learners to see the landing page, with a way into the app.
 
 ## 3. Step 0: see and test it signed in (first deliverable)
 
@@ -86,12 +86,12 @@ The teardown's values do not drop in. The brand rules (docs/brand.md, `brand.tes
 
 Who can see what (lessons stay open; the account wall, PV-2 and Pro stay as they are), URLs, search pages, prices and their dates, the brand colours.
 
-## 11. Open decisions for the owner
+## 11. Decisions (owner, 27 Nov)
 
-1. A signed-in learner who opens xplaind.in: straight to the app Home (recommended, as StudyFetch does), or the landing page with a "Go to app" button?
-2. Visitors (not signed in) on lessons, roadmaps and tools: keep the website frame with sign-up prompts (recommended, keeps search traffic and the marketing story), or show the app frame to everyone?
-3. The footer inside the app: hidden, with a small "Help, privacy, terms" link in the rail (recommended), or the full footer at the end of every app page?
-4. Still open from Part C: serif headings (not planned), a dark rail (plan uses a light one), first-visit guided tours (plan: notes workspace only, later).
+1. **A signed-in learner who opens xplaind.in sees the landing page**, not the app. The landing page stays in the website frame for everyone; for a signed-in learner its main buttons and the header lead into the app ("Go to my app", the app Home at `/dashboard`). No redirect from `/`.
+2. **Visitors keep the website frame** on lessons, roadmaps and tools, with sign-up prompts; the app frame starts after sign-in.
+3. **No marketing footer inside the app**; a small "Help, privacy, terms" link sits at the foot of the rail.
+4. Still open from Part C, not planned: serif headings, a dark rail (the plan uses a light one), first-visit guided tours (later, notes workspace only).
 
 ## 12. PRD rows this will add or amend
 
