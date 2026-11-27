@@ -32,8 +32,8 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     title: "Study",
     lead: "Understand topics faster and know what to learn next.",
     tools: [
-      { href: "/ai/book", title: "Study from my notes & books", text: "Turns your textbook or notes into a timed test or flashcards, and shows what to reread.", icon: "book", ai: true, give: "A PDF of your book or notes", get: "A test and a page-by-page report" },
-      { href: "/ai/tutor", title: "AI tutor", text: "Explains any AI topic in plain English, with examples, and knows which lessons you have done.", icon: "chat", ai: true, give: "Your question", get: "A clear answer and lessons to read" },
+      { href: "/ai/book", title: "Study from my notes & books", text: "Tests, flashcards and notes from your own files.", icon: "book", ai: true, give: "A PDF of your book or notes", get: "A test, flashcards or notes" },
+      { href: "/ai/tutor", title: "AI tutor", text: "Any AI topic, explained plainly, in your language.", icon: "chat", ai: true, give: "Your question", get: "A clear answer and lessons to read" },
     ],
   },
   {
@@ -41,8 +41,8 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     title: "Practice",
     lead: "Write real code and answer out loud before the real thing.",
     tools: [
-      { href: "/playground", title: "Code playground", text: "Write and run Python in your browser, with NumPy and pandas. If it breaks, the AI tutor explains the error.", icon: "code", ai: false, give: "Python code", get: "Output in seconds, nothing to install" },
-      { href: "/interview/simulator", title: "AI mock interviewer", text: "Zarina interviews you out loud for your role or a job post, follows up on what you actually say, and scores you like a hiring panel.", icon: "mic", ai: true, give: "Your spoken answers", get: "A verdict, skill scores and a 4-week plan" },
+      { href: "/playground", title: "Code playground", text: "Run Python with NumPy and pandas in your browser.", icon: "code", ai: false, give: "Python code", get: "Output in seconds, nothing to install" },
+      { href: "/interview/simulator", title: "AI mock interviewer", text: "A spoken interview that follows up and scores you.", icon: "mic", ai: true, give: "Your spoken answers", get: "A verdict, skill scores and a 4-week plan" },
     ],
   },
   {
@@ -50,8 +50,8 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     title: "Get hired",
     lead: "Get past the recruiter and into the interview.",
     tools: [
-      { href: "/ai/resume", title: "Resume review", text: "Fixes in order of importance, rewritten lines and the keywords recruiters search for.", icon: "star", ai: true, give: "Your resume and target role", get: "A ranked list of fixes" },
-      { href: "/interview", title: "Interview questions and answers", text: "Every interview question for your role with a short and a deeper answer, on one page.", icon: "target", ai: false, give: "The role you want", get: "Every question with answers" },
+      { href: "/ai/resume", title: "Resume review", text: "Ranked fixes and the keywords recruiters search for.", icon: "star", ai: true, give: "Your resume and target role", get: "A ranked list of fixes" },
+      { href: "/interview", title: "Interview questions and answers", text: "Every question for your role, with answers.", icon: "target", ai: false, give: "The role you want", get: "Every question with answers" },
     ],
   },
 ];
@@ -169,13 +169,14 @@ export default function AiToolsPage() {
             How the AI tools work
           </h2>
           {[
-            ["A daily allowance", "Everyone gets a few reviews and grades a day, and more tutor messages. It resets at midnight India time."],
-            ["Your words are data, not commands", "What you type is sent to Anthropic only to write your answer. It is never used to rank courses, and we never sell it."],
-            ["AI can be wrong", "Reviews and answers are a starting point, not the last word. Check anything important against a trusted source."],
+            // UX-22: one line each.
+            ["A daily allowance", "It resets at midnight India time."],
+            ["Your words stay yours", "Sent to Anthropic only to answer you; never sold."],
+            ["AI can be wrong", "Check anything important against a trusted source."],
           ].map(([h, p]) => (
             <div key={h} className="rounded-2xl bg-zinc-100 p-5 dark:bg-zinc-900">
               <h3 className="font-semibold">{h}</h3>
-              <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">{p}</p>
+              <p className="mt-1 leading-6 text-zinc-700 dark:text-zinc-300">{p}</p>
             </div>
           ))}
         </section>

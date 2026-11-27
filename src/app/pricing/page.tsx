@@ -330,11 +330,15 @@ export default function PricingPage() {
           Free account or Pro
         </h2>
         {/* PAY-13 (2026-11-21, owner): the fair-use allowance comes first, so the daily numbers below never read as a promise it can break. */}
-        <p className="mt-3 max-w-3xl leading-7 text-zinc-700 dark:text-zinc-300">
-          Pro&apos;s AI helpers run within a fair-use AI allowance, sized to the pass you bought, over any 30 days. The numbers
-          below are the most you can use in a day. If you reach your allowance first, the AI helpers pause and free up again day by
-          day. Lessons, roadmaps, videos and practice are never limited.
-        </p>
+        {/* UX-22: the same facts as three short points. */}
+        <ul className="mt-4 flex flex-col gap-1.5 text-sm leading-6 text-zinc-700 sm:flex-row sm:flex-wrap sm:gap-x-6 dark:text-zinc-300">
+          {["Daily maximums, within a fair-use allowance sized to your pass (any 30 days)", "Reach it and AI helpers pause, then free up day by day", "Lessons, roadmaps, videos and practice are never limited"].map((t) => (
+            <li key={t} className="flex items-start gap-2">
+              <Icon name="tick" size={14} className="mt-1 shrink-0 text-brand-700 dark:text-brand-300" />
+              {t}
+            </li>
+          ))}
+        </ul>
         <div role="region" aria-label="Free account and Pro compared" tabIndex={0} className="mt-8 overflow-x-auto rounded-3xl bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-zinc-900">
           {/* PAY-14: no minimum width, so all three columns fit a 360 px phone and the Pro column is never off-screen. */}
           <table className="w-full text-left text-sm md:text-base">
@@ -456,22 +460,34 @@ export default function PricingPage() {
         <h2 id="what-h" className="text-lg font-semibold">
           What you can buy
         </h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-          Xplaind sells one thing: <strong className="font-semibold">Pro passes</strong>, a one-time payment for 7 days, 30 days, 6 months or 12 months
-          of higher limits on the AI helpers (AI tutor, interview feedback, mock interview reports, project review, resume review and study from your notes),
-          within a fair-use AI allowance sized to the pass, and verified certificates.
-          Lessons, roadmaps, videos, practice and project guides need no pass. All prices are in Indian rupees and include GST. A pass is a
-          digital service that starts on your account as soon as the payment is confirmed; nothing is shipped, and nothing renews by itself.
-          Sold by {BUSINESS.legalName} (GSTIN {BUSINESS.gstin}). Questions:{" "}
-          <Link href="/contact" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
-            contact us
-          </Link>
-          . Refunds:{" "}
-          <Link href="/refunds" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
-            refund and cancellation policy
-          </Link>
-          .
-        </p>
+        {/* UX-22: the facts a payment gateway checks, as a short list rather than one long paragraph. */}
+        <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm leading-6 text-zinc-700 sm:grid-cols-[9rem_1fr] dark:text-zinc-300">
+          <dt className="font-semibold text-zinc-900 dark:text-zinc-100">What</dt>
+          <dd>
+            <strong className="font-semibold">Pro passes</strong>: higher daily limits on the AI helpers (AI tutor, interview feedback, mock interview reports, project
+            review, resume review and study from your notes), within a fair-use allowance, and verified certificates
+          </dd>
+          <dt className="font-semibold text-zinc-900 dark:text-zinc-100">Length</dt>
+          <dd>7 days, 30 days, 6 months or 12 months, one payment, no auto-renewal</dd>
+          <dt className="font-semibold text-zinc-900 dark:text-zinc-100">Price</dt>
+          <dd>Indian rupees, GST included</dd>
+          <dt className="font-semibold text-zinc-900 dark:text-zinc-100">Delivery</dt>
+          <dd>Digital: it starts on your account as soon as the payment is confirmed; nothing is shipped</dd>
+          <dt className="font-semibold text-zinc-900 dark:text-zinc-100">Free</dt>
+          <dd>Lessons, roadmaps, videos, practice and project guides need no pass</dd>
+          <dt className="font-semibold text-zinc-900 dark:text-zinc-100">Seller</dt>
+          <dd>Sold by {BUSINESS.legalName} (GSTIN {BUSINESS.gstin})</dd>
+          <dt className="font-semibold text-zinc-900 dark:text-zinc-100">Help</dt>
+          <dd>
+            <Link href="/contact" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+              Contact us
+            </Link>{" "}
+            ·{" "}
+            <Link href="/refunds" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+              Refund and cancellation policy
+            </Link>
+          </dd>
+        </dl>
         {!open && (
           <p role="status" className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
             Online payment for passes opens shortly. Until then, everything on Xplaind, including the AI helpers, works as usual.

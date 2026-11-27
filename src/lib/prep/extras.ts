@@ -100,11 +100,12 @@ export const STORY_PARTS = [
 export const storyWritten = (s: Story | undefined): s is Story => !!s && [s.situation, s.task, s.action, s.result].some((p) => p.trim().length > 0);
 
 /** What each round of an interview usually tests. General guidance, not a claim about any company. */
+// UX-22 (2026-11-27, owner: "don't have sections with so much text"): one short line each.
 export const ROUNDS = [
-  { name: "Screening call", tests: "Whether your background fits the role: your resume, why you want the job, your notice period and your expected pay.", prepare: "Your two-minute introduction, and honest answers on pay and joining date." },
-  { name: "Technical round", tests: "Whether you understand the ideas behind your work and can reason through a problem out loud.", prepare: "The role questions in this plan, answered aloud. Say the trade-offs, not only the definition." },
-  { name: "Coding or practical round", tests: "Whether you can write working code or build something small, and explain it as you go.", prepare: "Python, SQL and small machine learning tasks. Talk while you type." },
-  { name: "System design round", tests: "Whether you can design a whole system: the parts, the data, the cost, and what breaks.", prepare: "Practise one design out loud: ask questions first, then name the parts, then the trade-offs." },
-  { name: "Behavioural or manager round", tests: "How you work with people: conflict, failure, ownership and learning.", prepare: "Your five stories, each told in about two minutes." },
-  { name: "HR round", tests: "Fit, pay, joining date and your questions for them.", prepare: "Your pay range from research, your reasons for the move, and three questions to ask." },
+  { name: "Screening call", tests: "Fit, motivation, notice period and pay", prepare: "A 2-minute intro and honest pay answers" },
+  { name: "Technical round", tests: "The ideas behind your work, reasoned out loud", prepare: "Your plan's questions, aloud, with trade-offs" },
+  { name: "Coding or practical round", tests: "Working code, explained as you go", prepare: "Python, SQL, small ML tasks; talk while typing" },
+  { name: "System design round", tests: "A whole system: parts, data, cost, failures", prepare: "One design aloud: questions, parts, trade-offs" },
+  { name: "Behavioural or manager round", tests: "Conflict, failure, ownership and learning", prepare: "Your five stories, two minutes each" },
+  { name: "HR round", tests: "Fit, pay, joining date, your questions", prepare: "Your pay range, your reasons, three questions" },
 ] as const;

@@ -199,9 +199,16 @@ function Home({ tests, decks, sets, onBook, onSet, onOpen, onDeck }: { tests: Bo
         <h2 id="upload-h" className="mt-3 text-xl font-semibold">
           Choose your notes or book
         </h2>
-        <p className="mx-auto mt-1 max-w-md leading-7 text-zinc-700 dark:text-zinc-300">
-          A PDF, a Word (.docx) or PowerPoint (.pptx) file, or a .txt or .md file, up to {MAX_FILE_MB} MB. Text is read in your browser and kept on this device as a study set; it is never uploaded. Pro can also read pictures inside your file, and asks you first.
-        </p>
+        {/* UX-22: what files work, and the privacy promise, as one line and chips. */}
+        <p className="mx-auto mt-1 max-w-md leading-7 text-zinc-700 dark:text-zinc-300">PDF, Word, PowerPoint, .txt or .md, up to {MAX_FILE_MB} MB.</p>
+        <ul className="mx-auto mt-2 flex max-w-md flex-wrap justify-center gap-2">
+          {["Read in your browser", "Kept on this device as a study set", "Never uploaded"].map((t) => (
+            <li key={t} className="rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+              {t}
+            </li>
+          ))}
+        </ul>
+        <p className="mx-auto mt-2 max-w-md text-xs text-zinc-600 dark:text-zinc-400">Pro can also read pictures inside your file, and asks you first.</p>
         <label htmlFor={inputId} className={`${primaryButton} mt-4 cursor-pointer`}>
           <Icon name="book" size={18} /> {busy ? "Reading…" : "Choose a file"}
         </label>

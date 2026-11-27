@@ -79,11 +79,17 @@ export function PlacementTest({ goal, bank }: { goal: { id: string; name: string
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-balance">Find my level</h1>
+          {/* UX-22: one line and three chips instead of a paragraph. */}
           <p className="mt-3 leading-7 text-zinc-700 dark:text-zinc-300">
-            Start with a 2-minute check of {QUICK_LENGTH} questions, or take the full test of about {TEST_LENGTH} questions
-            (five to ten minutes) for a sharper result. Questions get harder when you are right and easier when you are not,
-            so it is fine to say <em>I don&apos;t know</em>. Your answers stay on this device.
+            A 2-minute check of {QUICK_LENGTH} questions, or the full test of about {TEST_LENGTH} (five to ten minutes).
           </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {["Adapts to your answers", "Fine to say \u201cI don\u2019t know\u201d", "Answers stay on this device"].map((t) => (
+              <li key={t} className="rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                {t}
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">

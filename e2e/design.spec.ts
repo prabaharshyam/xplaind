@@ -69,7 +69,9 @@ test("the About page tells the founder's story with his photo and LinkedIn (TR-2
   const founder = page.locator("#founder");
   await expect(founder.getByRole("heading", { name: "Meet the founder" })).toBeVisible();
   await expect(founder.getByRole("img", { name: /Shyam Prabahar/ })).toBeVisible();
-  await expect(founder.getByText(/Tamil medium/)).toBeVisible();
+  await expect(founder.getByText(/Tamil medium/).first()).toBeVisible(); // UX-22: a timeline first; the full story opens below
+  await founder.getByText("Read Shyam's full story").click();
+  await expect(founder.getByText(/I grew up in Sivakasi/)).toBeVisible();
   await expect(founder.getByRole("link", { name: /Connect on LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/shyam-prabahar/");
   await page.goto("/explore"); // FT-1: the full site map moved out of the footer
   await expect(page.getByRole("main").getByRole("link", { name: "Meet the founder" })).toHaveAttribute("href", "/about#founder");

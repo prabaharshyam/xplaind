@@ -16,21 +16,17 @@ export const metadata: Metadata = pageMeta({
 
 const A = "font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300";
 
+// UX-22 (2026-11-27, owner: "don't have sections with so much text"): one short line per card and per step.
 const GETS: { icon: "mic" | "check" | "target" | "cert" | "chat" | "map"; t: string; d: string }[] = [
-  { icon: "map", t: "A roadmap for each role", d: "Ten AI roles, each with lessons, quick checks and guided projects. Students start with a 2-minute level check, so nobody repeats what they know." },
-  { icon: "mic", t: "Mock interviews with a readiness score", d: "Spoken or typed mock interviews for their role, reviewed by AI, with a score out of 100 that shows when they are ready." },
-  { icon: "check", t: "Project reviews against a rubric", d: "Students link their GitHub project and get it marked criterion by criterion, with what to fix before they show it to a recruiter." },
-  { icon: "target", t: "Resume review and job match", d: "Line-by-line resume fixes, a match score for a job post, and a LinkedIn headline written from their own resume." },
-  { icon: "chat", t: "A tutor in their language", d: "The AI tutor explains in Hindi, Tamil, Telugu, Kannada, Malayalam, Marathi, Bengali, Gujarati or Hinglish, keeping technical terms in English." },
-  { icon: "cert", t: "Certificates you can check", d: "A certificate for each role, earned by passing the checks and a reviewed project, with a public link anyone can verify." },
+  { icon: "map", t: "A roadmap for each role", d: "Ten AI roles, after a 2-minute level check" },
+  { icon: "mic", t: "Mock interviews", d: "Spoken or typed, with a readiness score out of 100" },
+  { icon: "check", t: "Project reviews", d: "Marked against a rubric, with what to fix" },
+  { icon: "target", t: "Resume and job match", d: "Line-by-line fixes and a match score" },
+  { icon: "chat", t: "A tutor in their language", d: "Hindi, Tamil, Telugu, Hinglish and more" },
+  { icon: "cert", t: "Certificates you can check", d: "Earned, with a public link to verify" },
 ];
 
-const HOW = [
-  "Tell us your batch size and when placements start.",
-  "We reply within 2 working days with a price per student and one invoice with GST.",
-  "Students sign up with their own email. Once the invoice is paid, we turn on Pro for each of their accounts.",
-  "Students can share their public profile and certificate links with your placement cell.",
-];
+const HOW = ["Tell us your batch size and dates", "We quote per student within 2 working days, one GST invoice", "Students sign up; we turn on Pro once paid", "They share profiles and certificates with your cell"];
 
 /** CB-1: Pro for a batch of learners, for colleges, training institutes and companies. */
 export default function CollegesPage() {
@@ -56,7 +52,7 @@ export default function CollegesPage() {
                   <Icon name={g.icon} size={20} />
                 </span>
                 <h3 className="mt-3 text-lg font-semibold">{g.t}</h3>
-                <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">{g.d}</p>
+                <p className="mt-1 leading-6 text-zinc-700 dark:text-zinc-300">{g.d}</p>
               </li>
             ))}
           </ul>
@@ -70,18 +66,22 @@ export default function CollegesPage() {
             {HOW.map((h, i) => (
               <li key={h} className="rounded-2xl bg-zinc-50 p-5 dark:bg-zinc-900">
                 <span className="grid size-9 place-items-center rounded-full bg-brand-700 font-semibold text-white dark:bg-brand-400 dark:text-zinc-950">{i + 1}</span>
-                <p className="mt-3 leading-7">{h}</p>
+                <p className="mt-3 leading-6 font-medium">{h}</p>
               </li>
             ))}
           </ol>
-          <p className="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-            Batches start at {MIN_BATCH} students. Accounts and passes are for people aged 18 and over. Lessons, roadmaps and projects stay free for
-            everyone; the pass adds the AI tools. See what Pro includes on the{" "}
-            <Link href="/pricing" className={A}>
-              pricing page
-            </Link>
-            .
-          </p>
+          <ul className="mt-4 flex flex-wrap gap-2 text-sm">
+            {[`From ${MIN_BATCH} students`, "Ages 18 and over", "Lessons and roadmaps stay free", "The pass adds the AI tools"].map((t) => (
+              <li key={t} className="rounded-full bg-zinc-100 px-3 py-1.5 font-medium text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                {t}
+              </li>
+            ))}
+            <li>
+              <Link href="/pricing" className={`${A} inline-flex min-h-11 items-center px-1`}>
+                What Pro includes
+              </Link>
+            </li>
+          </ul>
         </section>
 
         <section aria-labelledby="quote-h" className="mt-14 grid gap-8 rounded-3xl border border-zinc-200 bg-white p-5 md:grid-cols-[1fr_1.6fr] md:p-8 dark:border-zinc-800 dark:bg-zinc-900">
