@@ -82,17 +82,16 @@ test("'Choose your AI role' stays on one line on phones, with 'Compare all roles
   expect(c.x).toBeGreaterThan(h.x + h.width); // from 640 px up it sits beside the heading, on the right
 });
 
-test("opening the site on consecutive days builds the header streak, even with no lesson finished (ST-1)", async ({ page }) => {
+test("opening the site on consecutive days builds the streak, even with no lesson finished; the website header does not show it (ST-1, APP-8)", async ({ page }) => {
   const day = (back: number) => new Date(Date.now() + 5.5 * 3600_000 - back * 86_400_000).toISOString().slice(0, 10);
   await page.addInitScript((days) => {
     if (!localStorage.getItem("xplaind.visits.v1")) localStorage.setItem("xplaind.visits.v1", JSON.stringify({ version: 1, days }));
   }, [day(3), day(2), day(1)]);
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
-  // Three earlier days plus today is a four-day streak; the visitor chip appears from two days.
-  await expect(page.getByRole("banner").getByRole("link", { name: /4\s*-day streak/ })).toBeVisible({ timeout: 20_000 });
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("xplaind.visits.v1")!).days.length);
-  expect(stored).toBe(4);
+  // Three earlier days plus today is a four-day streak. APP-8: the header chip shows only in the app frame, not here.
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("xplaind.visits.v1")!).days.length), { timeout: 20_000 }).toBe(4);
+  await expect(page.getByRole("banner").getByRole("link", { name: /-day streak/ })).toHaveCount(0);
 });
 
 test("the visit endpoint needs a signed-in learner (ST-1)", async ({ request }) => {
