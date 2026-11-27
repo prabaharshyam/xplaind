@@ -18,7 +18,7 @@ export function PhoneTabBar() {
   const current = activeTab(path);
   return (
     <nav aria-label="Your places" className="xp-tabbar xp-glass-strong fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-40 rounded-[1.75rem] px-1 py-1 sm:hidden print:hidden">
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {TABS.map((t) => (
           <li key={t.id}>
             <Link

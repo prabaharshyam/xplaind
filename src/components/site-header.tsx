@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { AccountButton, AccountMenu, ClaimOnSignIn, SignInLink, SignedInLinks } from "./account-link";
 import { BrandLogo } from "./brand-logo";
 import { FocusTimer } from "./focus-timer";
 import { HeaderSearch, XpChip } from "./header-extras";
 import { MenuCloser } from "./menu-closer";
 import { HeaderDock } from "./header-dock";
+import { AppTitle } from "./app-frame";
 import { ThemeToggle } from "./theme-toggle";
 import { DesktopNav, PhoneNavLinks } from "./site-nav";
 
@@ -18,12 +20,16 @@ export function SiteHeader() {
   return (
     <header className="site-header pointer-events-none sticky top-0 z-50 px-2 pt-2 md:px-4 md:pt-3">
       <div className="xp-glass pointer-events-auto relative mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 rounded-full pr-1.5 pl-4 md:pr-2 md:pl-5">
-        <Link href="/" className="shrink-0" aria-label="Xplaind home">
+        <Link href="/" className="site-logo shrink-0" aria-label="Xplaind home">
           <BrandLogo height={22} className="max-sm:[&_img]:h-[17px] max-sm:[&_img]:w-auto" />
         </Link>
         {/* NV-9 (2026-11-18, site review: the bar was cut off at 768 to 1100 px): the full menu only from
             1120 px, where it fits; below that, the phone menu. */}
-        <nav aria-label="Main" className="hidden min-[1120px]:block">
+        {/* APP-1: in the app frame the menu gives way to the page's place and name; the rail is the menu there. */}
+        <Suspense fallback={null}>
+          <AppTitle />
+        </Suspense>
+        <nav aria-label="Main" className="site-desktop-nav hidden min-[1120px]:block">
           <DesktopNav />
         </nav>
         {/* FC-1: a smaller logo and tighter gaps on phones, so the running timer and the streak fit at 360 px. */}

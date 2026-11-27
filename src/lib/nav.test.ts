@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NAV_GROUPS, activeGroup, activeTab, tabBarHidden } from "./nav";
+import { NAV_GROUPS, RAIL, activeGroup, activeRail, activeTab, tabBarHidden } from "./nav";
 
 describe("activeGroup (NV-2)", () => {
   it("marks the section a page belongs to", () => {
@@ -67,13 +67,14 @@ describe("Pro has its own place (NV-7)", () => {
   });
 });
 
-describe("the phone tab bar (NV-11)", () => {
+describe("the phone tab bar (NV-11, APP-1)", () => {
   it("marks the tab a page belongs to", () => {
-    expect(activeTab("/dashboard")).toBe("today");
+    expect(activeTab("/dashboard")).toBe("home");
+    expect(activeTab("/settings")).toBe("home");
     expect(activeTab("/roadmap/ai-engineer")).toBe("learn");
     expect(activeTab("/plan")).toBe("learn");
     expect(activeTab("/interview/prep")).toBe("interview");
-    expect(activeTab("/practice/rag")).toBe("interview");
+    expect(activeTab("/practice/rag")).toBe("practice");
     expect(activeTab("/playground")).toBe("ai");
     expect(activeTab("/jobs")).toBeNull();
     expect(activeTab("/")).toBeNull();
@@ -85,5 +86,23 @@ describe("the phone tab bar (NV-11)", () => {
     expect(tabBarHidden("/interview/simulator")).toBe(true);
     expect(tabBarHidden("/interview")).toBe(false);
     expect(tabBarHidden("/stopwatch")).toBe(false);
+  });
+});
+
+describe("the app rail (APP-1)", () => {
+  it("has every place once, and each place's pages come from the menu", () => {
+    expect(RAIL.map((r) => r.label)).toEqual(["Home", "Learn", "Practice", "Interview", "AI Studio", "Career"]);
+    expect(RAIL.find((r) => r.id === "learn")!.items.map((i) => i.href)).toEqual(NAV_GROUPS.find((g) => g.id === "learn")!.items.map((i) => i.href));
+    expect(RAIL.find((r) => r.id === "career")!.items.map((i) => i.href)).toContain("/ai/resume");
+  });
+  it("marks the place a page belongs to", () => {
+    expect(activeRail("/dashboard")).toBe("home");
+    expect(activeRail("/stop/rag-app")).toBe("learn");
+    expect(activeRail("/practice")).toBe("practice");
+    expect(activeRail("/playground")).toBe("practice");
+    expect(activeRail("/interview/simulator")).toBe("interview");
+    expect(activeRail("/ai/book")).toBe("ai");
+    expect(activeRail("/ai/resume")).toBe("career");
+    expect(activeRail("/jobs")).toBe("career");
   });
 });

@@ -83,21 +83,57 @@ export function activeGroup(path: string): string | null {
 
 
 /**
- * NV-11: the phone tab bar for signed-in learners. Four places they come back to every day; the menu keeps the rest.
- * Icons use the menu's own set.
+ * NV-11: the phone tab bar for signed-in learners. APP-1 (2026-11-27): five places, matching the app rail; the menu
+ * keeps the rest. Icons use the menu's own set.
  */
 export const TABS = [
-  { id: "today", href: "/dashboard", label: "Today", icon: "target" },
-  { id: "learn", href: "/paths", label: "Roadmaps", icon: "map" },
-  { id: "interview", href: "/interview", label: "Interview", icon: "mic" },
-  { id: "ai", href: "/ai", label: "Tools", icon: "sparkles" },
+  { id: "home", href: "/dashboard", label: "Home", icon: "compass" },
+  { id: "learn", href: "/paths", label: "Learn", icon: "map" },
+  { id: "practice", href: "/practice", label: "Practice", icon: "check" },
+  { id: "interview", href: "/interview/simulator", label: "Interview", icon: "mic" },
+  { id: "ai", href: "/ai", label: "AI", icon: "sparkles" },
 ] as const satisfies readonly { id: string; href: string; label: string; icon: IconName }[];
 
 /** Which tab the page belongs to, or null; and whether the bar stays out of the way on this page. Pure, for tests. */
 export function activeTab(path: string): (typeof TABS)[number]["id"] | null {
-  if (under(path, "/dashboard") || under(path, "/settings")) return "today";
+  if (under(path, "/dashboard") || under(path, "/settings")) return "home";
+  if (under(path, "/practice")) return "practice";
   const g = activeGroup(path);
   return g === "learn" || g === "interview" || g === "ai" ? g : null;
 }
+
+/**
+ * APP-1: the app rail (signed in, from 640 px). Each place opens its page; on hover or focus it also shows the
+ * place's pages, taken from the menu so the two never disagree.
+ */
+type RailItem = { id: string; href: string; label: string; icon: IconName; tone: Tone; items: { href: string; label: string; note: string }[] };
+const groupItems = (id: string) => (NAV_GROUPS.find((g) => g.id === id)?.items ?? []).map(({ href, label, note }) => ({ href, label, note }));
+export const RAIL: RailItem[] = [
+  { id: "home", href: "/dashboard", label: "Home", icon: "compass", tone: "teal", items: [] },
+  { id: "learn", href: "/paths", label: "Learn", icon: "map", tone: "teal", items: groupItems("learn") },
+  {
+    id: "practice",
+    href: "/practice",
+    label: "Practice",
+    icon: "check",
+    tone: "emerald",
+    items: [
+      { href: "/practice", label: "Flashcards and quizzes", note: "Answer, check yourself, rate it" },
+      { href: "/interview", label: "Questions", note: "500 questions with answers" },
+      { href: "/playground", label: "Code playground", note: "Run Python in your browser" },
+    ],
+  },
+  { id: "interview", href: "/interview/simulator", label: "Interview", icon: "mic", tone: "rose", items: groupItems("interview") },
+  { id: "ai", href: "/ai", label: "AI Studio", icon: "sparkles", tone: "sky", items: groupItems("ai") },
+  { id: "career", href: "/jobs", label: "Career", icon: "star", tone: "amber", items: groupItems("career") },
+];
+
+/** Which rail place the page belongs to. Pure, for tests. */
+export function activeRail(path: string): string | null {
+  if (under(path, "/dashboard") || under(path, "/settings")) return "home";
+  if (under(path, "/practice") || under(path, "/playground")) return "practice";
+  return activeGroup(path);
+}
+
 /** The mock interview has its own controls at the bottom of a phone, and a lesson its Track bar (RM-7). */
 export const tabBarHidden = (path: string) => under(path, "/interview/simulator") || under(path, "/stop");
