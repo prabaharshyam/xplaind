@@ -151,7 +151,7 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
                 </span>
               </>
             );
-            const cls = `block w-full rounded-xl px-3 py-3 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-700 ${
+            const cls = `block w-full rounded-2xl px-3 py-3 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-700 ${
               isActive ? "lg:bg-zinc-100 lg:dark:bg-zinc-800/70" : "hover:bg-zinc-50 dark:hover:bg-zinc-900"
             }`;
             return (

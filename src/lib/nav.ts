@@ -75,7 +75,8 @@ export function activeGroup(path: string): string | null {
   if (under(path, "/ai/resume")) return "career";
   if (under(path, "/ai")) return "ai";
   if (under(path, "/roadmap") || under(path, "/stop") || under(path, "/start") || under(path, "/resources")) return "learn";
-  if (under(path, "/interview")) return "interview";
+  // IP-6: the flashcards and quick quiz are part of Interview → Questions now.
+  if (under(path, "/interview") || under(path, "/practice")) return "interview";
   for (const g of NAV_GROUPS) if (g.items.some((i) => under(path, i.href))) return g.id;
   return null;
 }

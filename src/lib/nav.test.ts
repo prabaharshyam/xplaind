@@ -10,7 +10,7 @@ describe("activeGroup (NV-2)", () => {
     expect(activeGroup("/interview/simulator")).toBe("interview");
     expect(activeGroup("/interview/rag-basics")).toBe("interview");
     expect(activeGroup("/interview/patterns/rag-pipeline")).toBe("interview");
-    expect(activeGroup("/practice/rag")).toBe("practice");
+    expect(activeGroup("/practice/rag")).toBe("interview"); // IP-6
     expect(activeGroup("/jobs")).toBe("career");
     expect(activeGroup("/ai/resume")).toBe("career");
     expect(activeGroup("/ai")).toBe("ai");
