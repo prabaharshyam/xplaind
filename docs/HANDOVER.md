@@ -56,6 +56,7 @@ Scope decisions to respect:
 
 ## 3. The owner and how they work
 
+- **Always end a visual change with the preview link (owner, 27 Nov: "do this at the end of any visual change, don't make me ask for it").** After pushing, check the branch deployment is READY on Vercel and give https://xplaind-git-claude-elegant-davinci-ouxafr-zaiphr.vercel.app with a short list of what to look at.
 **Owner:** Shyam Prabahar (prabaharshyam@gmail.com), solo founder. The About page has his story.
 
 How he works with Claude:
@@ -365,6 +366,8 @@ Tests: `npm run test:db` runs the row-level security tests against a real Postgr
 
 - **A sign-in must count as a visit (26 Nov, AC-13).** The 7-day idle sign-out compared only the "last visit" cookie, which is written while signed in and kept 30 days. A learner who came back after more than 7 days was signed out the instant they signed in, in that browser only (a private window worked). `sessionExpiry` now takes the later of the last visit and the sign-in time.
 - **Read the requirement before calling something a defect (27 Nov, VI-21).** The site audit flagged the simulator's warm-up start buttons, seven screens down, as a defect. VI-12 put them there on purpose, at the owner's request. An audit finding about placement needs a grep of the PRD for the section first.
+- **The docking menu must not change the header's size (27 Nov, UX-25).** A first version shrank the header's padding, which moved the whole page 8 px while it animated; Playwright then re-scrolled before clicks and the roadmap return test failed. The capsule now grows with width, left and top, never a transform (a transform would trap the fixed phone menu inside it).
+- **Buttons that only work after hydration start disabled (27 Nov).** The mock interview's start buttons did nothing when tapped before React attached, which showed up as flaky voice tests. `useHydrated()` in `src/lib/browser/hooks.ts` keeps them disabled until then.
 - **Light mode is the default (27 Nov, UX-24).** The system setting no longer chooses the theme. A browser test that needs dark mode must set `localStorage["xp-theme"] = "dark"` (an init script), not `colorScheme: "dark"`.
 - **Write sections to be seen, not read (27 Nov, UX-22).** The owner does not want paragraphs on marketing and tool pages. Aim for one short line per card, chips for facts, numbered steps for a process, a slider for features, and put longer detail behind a tap. Consent text (what is sent where) stays on screen, only shorter.
 - **Menu notes must fit one line (27 Nov, NV-12).** The desktop menu cuts a long note with an ellipsis so every item keeps the same height. When you add or reword a menu item in `src/lib/nav.ts`, keep its note to about 33 characters and check the menus at 1120 px.

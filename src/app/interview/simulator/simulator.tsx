@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { needAccount } from "@/lib/browser/account-sync";
+import { useHydrated } from "@/lib/browser/hooks";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { abortRecognition, joinText, useDictation, useSpeechSupported } from "@/components/interview/speech";
 import { useAiAccess } from "@/components/ai/ai-gate";
@@ -72,6 +73,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   const [company, setCompany] = useState("");
   const [jd, setJd] = useState("");
   const [planning, setPlanning] = useState(false);
+  const hydrated = useHydrated();
   const [planError, setPlanError] = useState<{ message: string; upgrade?: string } | null>(null);
   const [call, setCall] = useState<{ questions: CallQuestion[]; setup?: InterviewSetup; plan?: string | null; pathId: string | null; trial?: boolean } | null>(null);
   // VI-13: checked again after each AI interview, so a used free interview shows as used.
@@ -209,16 +211,17 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
   const proNo = pro === "no";
 
   // VI-13: planning from a job post is Pro, also for someone with the free interview still to use.
+  // A tap before hydration did nothing (seen as flaky browser tests): the start buttons stay disabled until React is ready.
   const aiAction = proNo || (freeTry && jdMode) ? (
     <Link href="/pricing" className={room.action}>
       {proNo ? "Get Pro to start" : "Get Pro to plan from a job post"}
     </Link>
   ) : freeTry ? (
-    <button type="button" onClick={() => void startVoice()} className={room.action}>
+    <button type="button" onClick={() => void startVoice()} disabled={!hydrated} className={room.action}>
       Start my free AI interview
     </button>
   ) : (
-    <button type="button" onClick={() => void startVoice()} disabled={planning || (jdMode && jdShort)} className={room.action}>
+    <button type="button" onClick={() => void startVoice()} disabled={!hydrated || planning || (jdMode && jdShort)} className={room.action}>
       {planning ? "Planning your interview…" : jdMode ? "Plan and start the AI interview" : "Start the AI interviewer"}
     </button>
   );
