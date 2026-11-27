@@ -1,4 +1,5 @@
 import { pageMeta } from "@/lib/seo";
+import { ExploreTools } from "@/components/explore-tools";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { ProductFrame } from "@/components/product-frame";
@@ -33,6 +34,7 @@ export default function BookPage() {
         {/* AG-1: needs an account once sign-ups are open; while they are on hold, guests keep their limits (SU-5). */}
         <BookStudio aiOn={aiEnabled()} />
       </div>
+      <ExploreTools current="/ai/book" />
     </main>
   );
 }

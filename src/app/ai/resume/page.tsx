@@ -1,4 +1,5 @@
 import { pageMeta } from "@/lib/seo";
+import { ExploreTools } from "@/components/explore-tools";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { ProductFrame } from "@/components/product-frame";
@@ -33,6 +34,7 @@ export default function ResumePage() {
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-6">
         <ResumeStudio enabled={aiEnabled()} roles={getPaths().map((p) => p.name)} />
       </div>
+      <ExploreTools current="/ai/resume" />
     </main>
   );
 }

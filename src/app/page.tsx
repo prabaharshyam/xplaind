@@ -308,15 +308,16 @@ export default function Home() {
       <LanguagesSection />
 
       {/* HM-7: the proof in one place: learners in their own words (SO-1), what is inside, counted, and the
-          market behind the promise, each figure sourced and dated (JB-4, moved here from the hero). */}
-      <section aria-labelledby={testimonials.length ? "voices-heading" : "trust-heading"} className="py-12 md:py-24">
+          market behind the promise, each figure sourced and dated (JB-4, moved here from the hero).
+          UX-16: one dark band, so the long page has a rhythm and the proof reads as one block. */}
+      <section aria-labelledby={testimonials.length ? "voices-heading" : "trust-heading"} className="bg-brand-950 py-14 text-white md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           {testimonials.length > 0 && (
             <>
               <h2 id="voices-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
                 <Words text="What early learners say" />
               </h2>
-              <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">Freshers, founders and working professionals who tried Xplaind first.</p>
+              <p className="mt-3 max-w-2xl text-lg leading-8 text-brand-100">Freshers, founders and working professionals who tried Xplaind first.</p>
               <Testimonials items={testimonials} />
             </>
           )}
@@ -325,19 +326,19 @@ export default function Home() {
               <Sub id="trust-heading" className="text-xl font-semibold">
                 What is inside, today
               </Sub>
-              <p className="mt-1 text-zinc-700 dark:text-zinc-300">No paid rankings, no ads. Every course is picked on merit.</p>
+              <p className="mt-1 text-brand-100">No paid rankings, no ads. Every course is picked on merit.</p>
               <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
                 {stats.map((m) => (
                   <div key={m.label} className="flex flex-col-reverse justify-end">
-                    <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
-                    <dd className="text-4xl font-semibold tracking-tight tabular-nums">{m.value}</dd>
+                    <dt className="mt-1 text-sm leading-5 text-brand-100">{m.label}</dt>
+                    <dd className="text-4xl font-semibold tracking-tight tabular-nums md:text-5xl">{m.value}</dd>
                   </div>
                 ))}
               </dl>
             </div>
             <div>
               <Sub className="text-xl font-semibold">Why now: India&apos;s AI job market</Sub>
-              <p className="mt-1 text-zinc-700 dark:text-zinc-300">
+              <p className="mt-1 text-brand-100">
                 <a href="#market-sources" className="underline underline-offset-2">
                   Sources
                 </a>
@@ -346,8 +347,8 @@ export default function Home() {
               <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
                 {market.stats.map((m) => (
                   <div key={m.label} className="flex flex-col-reverse justify-end">
-                    <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
-                    <dd className="text-4xl font-semibold tracking-tight tabular-nums">{m.value}</dd>
+                    <dt className="mt-1 text-sm leading-5 text-brand-100">{m.label}</dt>
+                    <dd className="text-4xl font-semibold tracking-tight tabular-nums md:text-5xl">{m.value}</dd>
                   </div>
                 ))}
               </dl>

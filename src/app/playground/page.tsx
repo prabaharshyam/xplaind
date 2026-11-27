@@ -1,4 +1,5 @@
 import { pageMeta } from "@/lib/seo";
+import { ExploreTools } from "@/components/explore-tools";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { aiEnabled } from "@/lib/ai/settings";
@@ -36,6 +37,7 @@ export default function PlaygroundPage() {
           error go to it. The first run downloads Python once (about 10 MB). Programs that ask for input with input() are not supported yet.
         </p>
       </div>
+      <ExploreTools current="/playground" />
     </main>
   );
 }

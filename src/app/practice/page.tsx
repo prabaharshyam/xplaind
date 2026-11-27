@@ -1,4 +1,5 @@
 import { pageMeta } from "@/lib/seo";
+import { ExploreTools } from "@/components/explore-tools";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/page-hero";
@@ -47,6 +48,7 @@ export default function PracticePage() {
           </div>
         </section>
       </div>
+      <ExploreTools current="/practice" />
     </main>
   );
 }

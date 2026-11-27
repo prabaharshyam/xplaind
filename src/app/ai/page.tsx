@@ -97,14 +97,14 @@ export default function AiToolsPage() {
               </h2>
               <p className="mt-1 text-zinc-600 dark:text-zinc-400">{g.lead}</p>
               {/* SE-15 (2026-11-18, site review): two tools a group, so two columns that fill the width. */}
-              <ul className="mt-5 grid gap-4 md:grid-cols-2">
+              <ul className="lx-deal mt-5 grid gap-4 md:grid-cols-2">
                 {g.tools.map((t) => {
                   const paused = t.ai && !on;
                   return (
                     <li key={t.href}>
                       <Link
                         href={t.href}
-                        className="group relative flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-brand-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-brand-800"
+                        className="group relative flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-brand-300 motion-safe:hover:-translate-y-0.5 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-brand-800"
                       >
                         <span className="flex items-start gap-4">
                           <AppIcon icon={t.icon} tone={toolTone(t.href)} />

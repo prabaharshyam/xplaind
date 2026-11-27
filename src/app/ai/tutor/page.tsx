@@ -1,4 +1,5 @@
 import { pageMeta } from "@/lib/seo";
+import { ExploreTools } from "@/components/explore-tools";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
 import { ProductFrame } from "@/components/product-frame";
@@ -34,6 +35,7 @@ export default function TutorPage() {
         {/* AG-1: needs an account once sign-ups are open; while they are on hold, guests keep their limits (SU-5). */}
         <TutorChat enabled={aiEnabled()} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} titles={titles} />
       </div>
+      <ExploreTools current="/ai/tutor" />
     </main>
   );
 }

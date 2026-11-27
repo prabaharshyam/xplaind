@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ExploreTools } from "@/components/explore-tools";
 import { PageHero } from "@/components/page-hero";
 import { ProductFrame } from "@/components/product-frame";
 import { MiniPlan } from "@/components/home/showcase";
@@ -32,6 +33,7 @@ export default function PlanPage() {
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <PlanStudio paths={paths.map((p) => ({ id: p.id, name: p.name }))} lessons={lessons} planUrl={`${siteUrl()}/plan`} />
       </div>
+      <ExploreTools current="/plan" />
     </main>
   );
 }
