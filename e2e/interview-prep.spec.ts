@@ -7,7 +7,7 @@ const overflow = (page: import("@playwright/test").Page) =>
 
 test("the interview hub leads to patterns, and a pattern explains itself with a diagram (IP-1, IP-3)", async ({ page }) => {
   await page.goto("/interview");
-  await page.getByRole("link", { name: /^Interview patterns/ }).first().click();
+  await page.getByRole("navigation", { name: "Interview questions and guides" }).getByRole("link", { name: "Patterns" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "AI interview patterns" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Retrieval and RAG" })).toBeVisible();
   await page.getByRole("link", { name: /^Hybrid search \+ rerank/ }).click();

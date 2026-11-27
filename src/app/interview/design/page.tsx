@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PageHero } from "@/components/page-hero";
 import { getDesigns } from "@/lib/content";
 import { pageMeta } from "@/lib/seo";
+import { InterviewHeader } from "../interview-header";
 
 export const metadata: Metadata = pageMeta({
   title: "LLM system design interview: worked answers",
@@ -15,15 +15,7 @@ export default function DesignsPage() {
   const designs = getDesigns();
   return (
     <main>
-      <PageHero
-        theme="system-design"
-        seed="designs"
-        icon="flow"
-        eyebrow="Interview prep"
-        title="LLM system design answers"
-        lead="Worked answers to the design questions AI interviews ask, in the order you would say them in 35 minutes: clarify, size it, draw it, go deep, name the failures, prove it with evals."
-        crumbs={[{ href: "/interview", label: "Interview" }]}
-      />
+      <InterviewHeader current="design" title="LLM system design answers" lead="Worked answers to the design questions AI interviews ask, in the order you would say them in 35 minutes: clarify, size it, draw it, go deep, name the failures, prove it with evals." />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         <ul className="grid gap-4 md:grid-cols-2">
           {designs.map((d) => (

@@ -41,7 +41,6 @@ export function GET(): Response {
     `- [Mock interview](${base}/interview/simulator): answer out loud against a timer and get a report`,
     `- [Interview prep plan](${base}/interview/prep): the questions to cover each day until an interview date, with mock interviews and a readiness score`,
     `- [Top 25 questions by role](${base}/interview/top): the questions most worth practising for each path`,
-    `- [Answers by role](${base}/interview/answers): every interview question and answer, filterable by role`,
     `- [Practice](${base}/practice): interview questions as flashcards and quick quizzes, by topic`,
     "",
     "### AI interview patterns",

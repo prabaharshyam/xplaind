@@ -30,6 +30,8 @@ const nextConfig: NextConfig = {
       // LR-1 (2026-11-20, launch check): the addresses people type for signing in or up reach the real page.
       ...["/signup", "/sign-up", "/register", "/join"].map((source) => ({ source, destination: "/signin", permanent: false })),
       ...["/login", "/log-in", "/sign-in"].map((source) => ({ source, destination: "/signin?mode=signin", permanent: false })),
+      // IP-6 (2026-11-27): the answers by role moved into the Questions page.
+      { source: "/interview/answers", destination: "/interview", permanent: true },
       { source: "/ai/coach", destination: "/ai/tutor", permanent: true },
       { source: "/ai/roadmap", destination: "/paths", permanent: true },
       // The Rust track was dropped as off-topic for AI careers; its pages go to the topic list and the blog.
