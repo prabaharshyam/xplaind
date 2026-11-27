@@ -110,18 +110,20 @@ function DesktopMenus({ path }: { path: string }) {
             }`}
           >
             <p className="px-3 pt-1 pb-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">{g.label}</p>
-            <ul className={g.items.length > 4 ? "grid grid-cols-2 gap-1" : "flex flex-col gap-1"}>
+            {/* NV-12 (2026-11-27, owner: "uneven gaps between the menus ... the spaces need to be perfectly aligned"): every
+                item is a title and a one-line note (nav.ts keeps notes short), so every row and gap is equal in every menu. */}
+            <ul className={g.items.length > 4 ? "grid auto-rows-fr grid-cols-2 gap-1" : "grid auto-rows-fr gap-1"}>
               {g.items.map((i) => (
                 <li key={i.href}>
                   <Link
                     href={i.href}
                     aria-current={current(path, i.href)}
-                    className="group/item flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-white/60 aria-[current=page]:bg-white/70 dark:hover:bg-white/[0.07] dark:aria-[current=page]:bg-white/10"
+                    className="group/item flex h-full items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-white/60 aria-[current=page]:bg-white/70 dark:hover:bg-white/[0.07] dark:aria-[current=page]:bg-white/10"
                   >
                     <Tile icon={i.icon} tone={i.tone} />
-                    <span className="flex flex-col pt-0.5">
+                    <span className="flex min-w-0 flex-col pt-0.5">
                       <span className="text-sm font-semibold text-zinc-900 dark:text-white">{i.label}</span>
-                      <span className="text-sm leading-5 text-zinc-600 dark:text-zinc-400">{i.note}</span>
+                      <span className="truncate text-sm leading-5 text-zinc-600 dark:text-zinc-400">{i.note}</span>
                     </span>
                   </Link>
                 </li>
@@ -197,7 +199,7 @@ function PhoneMenu({ path }: { path: string }) {
               className={`grid transition-[grid-template-rows,visibility] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${isOpen ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]"}`}
             >
               <ul className="min-h-0 overflow-hidden">
-                <li className="grid grid-cols-2 gap-2 px-3 pt-1 pb-4">
+                <li className="grid auto-rows-fr grid-cols-2 gap-2 px-3 pt-1 pb-4">
                   {g.items.map((i, ii) => (
                     <Link
                       key={i.href}
