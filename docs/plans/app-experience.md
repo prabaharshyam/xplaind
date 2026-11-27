@@ -1,6 +1,6 @@
 # Plan: Xplaind as an app once signed in (draft for the owner)
 
-27 Nov 2026. Status: **plan agreed in outline (decisions in section 11); nothing built yet.** Owner: "go with A and B. I also want ours to look like an app, not a website: landing and marketing pages, but once signed in an app interface where users learn, download roadmaps, do mock interviews, use the resume reviewer, flashcards and every feature. Don't implement anything yet." Reference: `docs/research/studyfetch-platform.md` (patterns only).
+27 Nov 2026. Status: **built the same day as APP-0 to APP-5 (PRD, "The app, once signed in").** Not built from this plan: study sets on the app Home (they live in Study from my notes), tablet-width (768 px) browser tests (checked at 360 and 1280 px only), and the first-visit tours (section 11, later). Differences from the plan: the Help menu at the foot of the rail opens on a tap and holds Pricing too; the make form keeps its three steps on one screen. Owner: "go with A and B. I also want ours to look like an app, not a website: landing and marketing pages, but once signed in an app interface where users learn, download roadmaps, do mock interviews, use the resume reviewer, flashcards and every feature. Don't implement anything yet." Reference: `docs/research/studyfetch-platform.md` (patterns only).
 
 ## 1. The idea in one line
 

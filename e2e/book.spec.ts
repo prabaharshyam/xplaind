@@ -385,7 +385,6 @@ test("the study set workspace: stats, a next step, folders, and select text to h
     const sel = window.getSelection()!;
     sel.removeAllRanges();
     sel.addRange(range);
-    li.closest("article")!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
   });
   const bar = page.getByRole("toolbar", { name: "Selected text" });
   await expect(bar.getByRole("button", { name: "Ask" })).toBeVisible();

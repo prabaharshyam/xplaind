@@ -8,6 +8,7 @@ import { useAccountState } from "@/components/account-link";
 import { APP_HINT, frameFor } from "@/lib/app-frame";
 import { NAV_GROUPS, RAIL, activeRail } from "@/lib/nav";
 import { TILE } from "@/lib/tones";
+import { MenuCloser } from "@/components/menu-closer";
 
 /**
  * APP-1: keeps <html data-frame> right. The pre-paint script (APP_SCRIPT) guesses from the hint stored on this device;
@@ -109,16 +110,18 @@ export function AppRail() {
           );
         })}
       </ul>
-      <div className="group relative mt-auto">
-        <button type="button" className="flex w-16 flex-col items-center gap-1 rounded-2xl py-2 text-xs font-medium text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white">
-          <span aria-hidden="true" className="grid size-10 place-items-center rounded-2xl text-base font-semibold group-hover:bg-white/80 dark:group-hover:bg-white/10">
+      {/* A <details>, so Help opens on a tap (touch screens) as well as on hover. */}
+      <details className="app-help group relative mt-auto">
+        <summary className="flex w-16 cursor-pointer list-none flex-col items-center gap-1 rounded-2xl py-2 text-xs font-medium text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white [&::-webkit-details-marker]:hidden">
+          <span aria-hidden="true" className="grid size-10 place-items-center rounded-2xl text-base font-semibold group-hover:bg-white/80 group-open:bg-white/80 dark:group-hover:bg-white/10 dark:group-open:bg-white/10">
             ?
           </span>
           Help
-        </button>
-        <div className={`${flyout} top-auto bottom-0`}>
+        </summary>
+        <div className="absolute bottom-0 left-full z-50 pl-3">
           <ul className="xp-glass-strong w-60 rounded-3xl p-2">
             {[
+              { href: "/pricing", label: "Plans and pricing" },
               { href: "/contact", label: "Help and contact" },
               { href: "/settings", label: "Settings" },
               { href: "/privacy", label: "Privacy" },
@@ -134,7 +137,8 @@ export function AppRail() {
             ))}
           </ul>
         </div>
-      </div>
+      </details>
+      <MenuCloser selector=".app-rail details.app-help" />
     </nav>
   );
 }

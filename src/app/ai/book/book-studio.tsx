@@ -923,15 +923,27 @@ function NotesView({ notes, onAsk }: { notes: BookNotes; onAsk?: (text: string) 
   // and four highlight colours. A highlight colours the whole point; it is kept on this device.
   const [menu, setMenu] = useState<{ x: number; y: number; text: string; point: string } | null>(null);
   const root = useRef<HTMLElement>(null);
-  const onSelect = () => {
-    const sel = window.getSelection();
-    const text = sel?.toString().trim() ?? "";
-    if (!sel || !text || sel.rangeCount === 0) return setMenu(null);
-    const li = (sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement)?.closest<HTMLElement>("[data-point]");
-    if (!li || !root.current?.contains(li)) return setMenu(null);
-    const r = sel.getRangeAt(0).getBoundingClientRect();
-    setMenu({ x: Math.min(Math.max(r.left + r.width / 2, 150), window.innerWidth - 150), y: Math.min(Math.max(r.top - 8, 64), window.innerHeight - 8), text, point: li.dataset.point! });
-  };
+  // Follows the browser's selection itself, so a long-press selection on a phone opens the bar as well as a mouse.
+  useEffect(() => {
+    let t = 0;
+    const onChange = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        const sel = window.getSelection();
+        const text = sel?.toString().trim() ?? "";
+        if (!sel || !text || sel.rangeCount === 0) return setMenu(null);
+        const li = (sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement)?.closest<HTMLElement>("[data-point]");
+        if (!li || !root.current?.contains(li)) return setMenu(null);
+        const r = sel.getRangeAt(0).getBoundingClientRect();
+        setMenu({ x: Math.min(Math.max(r.left + r.width / 2, 150), window.innerWidth - 150), y: Math.min(Math.max(r.top - 8, 64), window.innerHeight - 8), text, point: li.dataset.point! });
+      }, 250);
+    };
+    document.addEventListener("selectionchange", onChange);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener("selectionchange", onChange);
+    };
+  }, []);
   useEffect(() => {
     if (!menu) return;
     const close = () => setMenu(null);
@@ -944,7 +956,7 @@ function NotesView({ notes, onAsk }: { notes: BookNotes; onAsk?: (text: string) 
     };
   }, [menu]);
   return (
-    <article ref={root} aria-labelledby={`notes-${notes.id}`} onMouseUp={onSelect} onKeyUp={onSelect} className="rounded-3xl bg-white p-5 md:p-7 dark:bg-zinc-900">
+    <article ref={root} aria-labelledby={`notes-${notes.id}`} className="rounded-3xl bg-white p-5 md:p-7 dark:bg-zinc-900">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id={`notes-${notes.id}`} className="text-xl font-semibold">
           {notes.depth === "summary" ? "Summary notes" : "Detailed notes"}

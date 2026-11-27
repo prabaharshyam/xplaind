@@ -16,12 +16,17 @@ test("the app Home: a greeting, Ask anything into the tutor, and the main things
     await expect(actions.filter({ hasText: name })).toHaveAttribute("href", href);
   }
   await expect(actions.filter({ hasText: /Download my roadmap/ })).toHaveAttribute("href", /^\/roadmap\/[a-z-]+#download$/);
+  // It lands on the roadmap's download card.
+  await actions.filter({ hasText: /Download my roadmap/ }).click();
+  await expect(page).toHaveURL(/#download$/);
+  await expect(page.locator("#download")).toBeInViewport();
+  await page.goto("/dashboard");
   expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations).toEqual([]);
 
   // The question is typed into the tutor, not sent: the learner sends it.
   await page.getByRole("textbox", { name: "Ask anything about AI" }).fill("What is RAG?");
   await page.getByRole("button", { name: "Ask the AI tutor" }).click();
   await expect(page).toHaveURL(/\/ai\/tutor\?q=What\+is\+RAG%3F$/);
-  // The test build has no AI key, so the tutor shows its "AI is off" notice instead of the chat box; where the chat
-  // is on, AiChat starts with this question in its box (initialDraft).
+  // The test build has a dummy AI key (nothing is sent), so the chat is there, with the question typed in.
+  await expect(page.getByRole("textbox", { name: /Ask your AI tutor|Your question|Message/ }).or(page.locator("textarea")).first()).toHaveValue("What is RAG?");
 });

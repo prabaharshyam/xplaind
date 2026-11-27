@@ -70,6 +70,21 @@ export function SiteHeader() {
                   buttonClass="flex min-h-12 w-full items-center rounded-2xl px-3 text-left text-base font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-white/5"
                 />
               </div>
+              {/* APP-1: in the app on a phone there is no footer and no rail, so help and the policies live here. */}
+              <ul className="flex flex-wrap gap-x-4 border-t border-black/10 px-3 pt-3 text-sm dark:border-white/10">
+                {[
+                  ["/contact", "Help and contact"],
+                  ["/privacy", "Privacy"],
+                  ["/terms", "Terms"],
+                  ["/refunds", "Refunds"],
+                ].map(([href, label]) => (
+                  <li key={href}>
+                    <Link href={href} className="inline-flex min-h-11 items-center text-zinc-700 underline-offset-4 hover:underline dark:text-zinc-300">
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
               </div>
             </nav>
           </details>

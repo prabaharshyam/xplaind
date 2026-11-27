@@ -8,8 +8,14 @@ import { LanguagePicker, useTutorLanguage } from "@/components/ai/language-picke
 import { useAttempt, useCurrentPathId, useGame, useProgress } from "@/lib/browser/hooks";
 
 /** The AI tutor on its own page. It sees a short summary of progress on this device, shown to the learner first. */
-export function TutorChat({ enabled, paths, titles }: { enabled: boolean; paths: { id: string; name: string }[]; titles: Record<string, string> }) {
-  const asked = useSearchParams().get("q") ?? ""; // APP-3: from the app Home's Ask anything box
+type Props = { enabled: boolean; paths: { id: string; name: string }[]; titles: Record<string, string> };
+
+/** APP-3: the tutor with the question from the app Home's "Ask anything" box (?q=) typed in. */
+export function TutorChatFromUrl(props: Props) {
+  return <TutorChat {...props} asked={useSearchParams().get("q") ?? ""} />;
+}
+
+export function TutorChat({ enabled, paths, titles, asked = "" }: Props & { asked?: string }) {
   const access = useAiAccess(enabled);
   const language = useTutorLanguage();
   const progress = useProgress();
