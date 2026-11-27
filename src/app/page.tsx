@@ -168,7 +168,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={1} label="Start here" />
           <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-            <h2 id="roles-heading" data-words className="max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
+            <h2 id="roles-heading" data-words className="max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
               <Words text="Choose your AI role" />
             </h2>
             <Link href="/paths" className="shrink-0 text-sm font-medium whitespace-nowrap text-brand-800 hover:underline dark:text-brand-300">
@@ -206,7 +206,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={2} label="Learn, practise, get hired" />
           <div className="mt-4 grid gap-4 md:grid-cols-[1.3fr_1fr] md:items-end">
-            <h2 id="do-heading" data-words className="max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
+            <h2 id="do-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
               <Words text="Everything you need to get job-ready" />
             </h2>
             <p className="max-w-md text-lg leading-8 text-zinc-700 md:justify-self-end dark:text-zinc-300">
@@ -331,7 +331,7 @@ export default function Home() {
                 {stats.map((m) => (
                   <div key={m.label} className="flex flex-col-reverse justify-end">
                     <dt className="mt-1 text-sm leading-5 text-brand-100">{m.label}</dt>
-                    <dd className="text-4xl font-semibold tracking-tight tabular-nums md:text-5xl">{m.value}</dd>
+                    <dd className="text-3xl font-semibold tracking-tight tabular-nums md:text-4xl">{m.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -348,7 +348,7 @@ export default function Home() {
                 {market.stats.map((m) => (
                   <div key={m.label} className="flex flex-col-reverse justify-end">
                     <dt className="mt-1 text-sm leading-5 text-brand-100">{m.label}</dt>
-                    <dd className="text-4xl font-semibold tracking-tight tabular-nums md:text-5xl">{m.value}</dd>
+                    <dd className="text-3xl font-semibold tracking-tight tabular-nums md:text-4xl">{m.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -364,7 +364,7 @@ export default function Home() {
           <div className="flex justify-start md:justify-center">
             <Gate n={3} label="Your AI career" />
           </div>
-          <h2 id="final-heading" data-words className="mt-5 text-4xl font-semibold tracking-tight text-balance md:text-6xl">
+          <h2 id="final-heading" data-words className="mt-5 text-3xl font-semibold tracking-tight text-balance md:text-4xl">
             <Words text="Your AI career starts with one 20-minute lesson" />
           </h2>
           <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-800 md:mx-auto dark:text-zinc-200">

@@ -121,7 +121,7 @@ function DesktopMenus({ path }: { path: string }) {
                     <Tile icon={i.icon} tone={i.tone} />
                     <span className="flex flex-col pt-0.5">
                       <span className="text-sm font-semibold text-zinc-900 dark:text-white">{i.label}</span>
-                      <span className="text-[13px] leading-5 text-zinc-600 dark:text-zinc-400">{i.note}</span>
+                      <span className="text-sm leading-5 text-zinc-600 dark:text-zinc-400">{i.note}</span>
                     </span>
                   </Link>
                 </li>

@@ -84,7 +84,7 @@ export default function PricingPage() {
       <FunnelPing event="pricing_view" />
       {/* Hero: the promise, the lowest daily price, and the four reasons it is safe to try. */}
       <section aria-labelledby="pricing-h" className="mx-auto max-w-6xl px-4 pt-12 pb-10 md:px-6 md:pt-20 md:pb-14">
-        <h1 id="pricing-h" className="max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance md:text-6xl">
+        <h1 id="pricing-h" className="max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance md:text-5xl">
           Get interview-ready, with proof
         </h1>
         <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-800 md:text-xl dark:text-zinc-200">
@@ -326,7 +326,7 @@ export default function PricingPage() {
       <section aria-labelledby="batch-h" className="mx-auto mt-20 max-w-6xl px-4 md:mt-28 md:px-6">
         <div className="flex flex-col gap-4 rounded-3xl border border-zinc-200 bg-white p-6 sm:flex-row sm:items-center sm:justify-between md:p-8 dark:border-zinc-800 dark:bg-zinc-900">
           <div>
-            <h2 id="batch-h" className="text-2xl font-semibold tracking-tight">
+            <h2 id="batch-h" className="text-xl font-semibold tracking-tight">
               Buying for a batch?
             </h2>
             <p className="mt-1 leading-7 text-zinc-700 dark:text-zinc-300">Colleges, training institutes and companies can get Pro for 10 or more learners, with one invoice with GST.</p>

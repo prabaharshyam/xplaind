@@ -59,7 +59,7 @@ export function MiniLesson() {
       <ul className="mt-3 space-y-1.5 text-sm">
         {["What it is", "How it works", "A worked example"].map((s, i) => (
           <li key={s} className="flex items-center gap-2">
-            <span className={`grid size-4 place-items-center rounded-full text-[10px] ${i < 2 ? "bg-emerald-500 text-white" : "border border-zinc-300"}`}>{i < 2 ? "✓" : ""}</span>
+            <span className={`grid size-4 place-items-center rounded-full text-xs ${i < 2 ? "bg-emerald-500 text-white" : "border border-zinc-300"}`}>{i < 2 ? "✓" : ""}</span>
             {s}
           </li>
         ))}
@@ -100,8 +100,8 @@ export function MiniCourses() {
       {items.map((c) => (
         <div key={c.title} className="overflow-hidden rounded-2xl bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
           <Cover theme={c.theme} seed={c.title} className="h-14" iconSize={18} />
-          <p className="p-2 text-[11px] leading-tight font-medium">{c.title}</p>
-          <p className="px-2 pb-2 text-[10px] text-zinc-600 dark:text-zinc-400">{c.by}</p>
+          <p className="p-2 text-xs leading-tight font-medium">{c.title}</p>
+          <p className="px-2 pb-2 text-xs text-zinc-600 dark:text-zinc-400">{c.by}</p>
         </div>
       ))}
     </div>
@@ -145,7 +145,7 @@ export function MiniPlan() {
       <ul className="lx-stagger mt-3 space-y-1.5 text-sm">
         {plan.map((p) => (
           <li key={p.title} className={`flex items-center gap-2 rounded-2xl px-3 py-1.5 ${p.today ? "bg-brand-50 dark:bg-brand-950/50" : "bg-zinc-50 dark:bg-zinc-950"}`}>
-            <span className={`grid size-4 shrink-0 place-items-center rounded-full text-[10px] ${p.done ? "bg-emerald-500 text-white" : "border border-zinc-300 dark:border-zinc-600"}`}>{p.done ? "✓" : ""}</span>
+            <span className={`grid size-4 shrink-0 place-items-center rounded-full text-xs ${p.done ? "bg-emerald-500 text-white" : "border border-zinc-300 dark:border-zinc-600"}`}>{p.done ? "✓" : ""}</span>
             <span className={`min-w-0 flex-1 truncate ${p.done ? "text-zinc-600 line-through dark:text-zinc-400" : "font-medium"}`}>{p.title}</span>
             <span className="text-xs text-zinc-600 dark:text-zinc-400">{p.min} min</span>
           </li>
@@ -207,7 +207,7 @@ export function MiniResume() {
       <ul className="lx-stagger mt-3 space-y-1.5 text-sm">
         {fixes.map((f) => (
           <li key={f.text} className="flex items-center gap-2 rounded-2xl bg-zinc-50 px-3 py-1.5 dark:bg-zinc-950">
-            <span className={`grid size-4 shrink-0 place-items-center rounded-full text-[10px] ${f.done ? "bg-emerald-500 text-white" : "border border-amber-500"}`}>{f.done ? "✓" : ""}</span>
+            <span className={`grid size-4 shrink-0 place-items-center rounded-full text-xs ${f.done ? "bg-emerald-500 text-white" : "border border-amber-500"}`}>{f.done ? "✓" : ""}</span>
             <span className="min-w-0 flex-1 truncate">{f.text}</span>
           </li>
         ))}

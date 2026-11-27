@@ -97,7 +97,7 @@ export function Exchange() {
         </span>
         <span className="tabular-nums text-sm text-zinc-600 dark:text-zinc-400">06:42</span>
       </div>
-      <ol className="mt-6 flex flex-col gap-4 text-[17px] leading-7">
+      <ol className="mt-6 flex flex-col gap-4 text-lg leading-7">
         <li>
           <span className="block text-sm text-zinc-600 dark:text-zinc-400">Zarina asked</span>
           How would you split documents for a RAG system?
@@ -187,7 +187,7 @@ export function ReportFragment() {
       <ul className="flex flex-col gap-4">
         {skills.map((s) => (
           <li key={s.name}>
-            <span className="flex justify-between gap-3 text-[15px] font-medium">
+            <span className="flex justify-between gap-3 text-base font-medium">
               {s.name}
               <span className="tabular-nums">{s.score} / 5</span>
             </span>
@@ -210,7 +210,7 @@ export function Stages({ stage, onStage }: { stage: number; onStage: (n: number)
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] overflow-hidden rounded-[2rem] md:grid-cols-2">
       <div className="order-2 flex flex-col justify-between gap-8 bg-white p-6 md:order-1 md:p-10 dark:bg-zinc-900">
-        <p aria-live="polite" className="text-[clamp(1.9rem,4.2vw,3.5rem)] leading-[1.02] font-medium tracking-[-0.03em] text-balance">
+        <p aria-live="polite" className="text-[clamp(1.75rem,3.2vw,2.5rem)] leading-[1.02] font-medium tracking-[-0.03em] text-balance">
           {STAGES[stage].clause}
         </p>
         <div>
@@ -236,7 +236,7 @@ export function Stages({ stage, onStage }: { stage: number; onStage: (n: number)
                 type="button"
                 onClick={() => onStage(i)}
                 aria-pressed={i === stage}
-                className={`min-h-11 text-left text-[15px] transition-colors ${i === stage ? "font-semibold text-zinc-900 dark:text-zinc-100" : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"}`}
+                className={`min-h-11 text-left text-base transition-colors ${i === stage ? "font-semibold text-zinc-900 dark:text-zinc-100" : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"}`}
               >
                 {s.name}
               </button>

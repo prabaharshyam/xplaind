@@ -521,7 +521,7 @@ function Section({
             <p className="flex items-center justify-center gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
               <span
                 aria-hidden="true"
-                className={`hidden size-6 place-items-center rounded-full text-[11px] font-bold text-white md:grid ${colour.badge}`}
+                className={`hidden size-6 place-items-center rounded-full text-xs font-bold text-white md:grid ${colour.badge}`}
               >
                 {section.code}
               </span>

@@ -228,7 +228,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
       {/* ---- the first screen: what this is, shown by a real follow-up ---- */}
       <section aria-labelledby="sim-title" className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 pt-12 pb-16 sm:px-8 md:pt-20 md:pb-28 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div>
-          <h1 id="sim-title" className="text-[clamp(2.6rem,6.6vw,5.6rem)] leading-[0.95] font-medium tracking-[-0.04em]">
+          <h1 id="sim-title" className="text-[clamp(2.6rem,5.5vw,4.25rem)] leading-[1] font-medium tracking-[-0.04em]">
             <span className="xp-line">
               <span>AI mock</span>
             </span>
@@ -271,7 +271,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
       <section id="setup" aria-labelledby="setup-heading" className="scroll-mt-20 bg-white dark:bg-zinc-900">
         <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-10 px-4 py-16 sm:px-8 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] md:py-24">
           <div className="flex min-w-0 flex-col gap-6">
-            <h2 id="setup-heading" className="text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+            <h2 id="setup-heading" className="text-[clamp(1.875rem,3vw,2.25rem)] leading-[1.05] font-medium tracking-[-0.03em]">
               What are you preparing for?
             </h2>
             {fixedQuestion ? (
@@ -291,7 +291,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                     ).map(([id, label]) => (
                       <label
                         key={id}
-                        className="flex min-h-11 cursor-pointer items-center justify-center rounded-[1.25rem] px-3 py-1 text-center text-[15px] leading-5 font-medium text-zinc-700 sm:rounded-full transition-colors has-[:checked]:bg-white has-[:checked]:text-zinc-900 has-[:checked]:shadow-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-700 dark:text-zinc-300 dark:has-[:checked]:bg-zinc-950 dark:has-[:checked]:text-zinc-100 sm:px-5"
+                        className="flex min-h-11 cursor-pointer items-center justify-center rounded-[1.25rem] px-3 py-1 text-center text-base leading-5 font-medium text-zinc-700 sm:rounded-full transition-colors has-[:checked]:bg-white has-[:checked]:text-zinc-900 has-[:checked]:shadow-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-700 dark:text-zinc-300 dark:has-[:checked]:bg-zinc-950 dark:has-[:checked]:text-zinc-100 sm:px-5"
                       >
                         <input type="radio" name="source" checked={source === id} onChange={() => setSource(id)} className="sr-only" />
                         {label}
@@ -302,7 +302,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
 
                 {source === "jd" && (
                   <label className="flex min-w-0 flex-col gap-2">
-                    <span className="text-[15px] font-medium">Job description</span>
+                    <span className="text-base font-medium">Job description</span>
                     <textarea
                       value={jd}
                       onChange={(e) => setJd(e.target.value.slice(0, MAX_JD_CHARS))}
@@ -320,7 +320,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                 <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
                   {source === "role" && (
                     <label className="flex min-w-0 flex-col gap-2">
-                      <span className="text-[15px] font-medium">Role</span>
+                      <span className="text-base font-medium">Role</span>
                       <select value={pathId} onChange={(e) => setPathChoice(e.target.value)} className={room.field}>
                         <option value="">Any AI role</option>
                         {paths.map((p) => (
@@ -332,7 +332,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                     </label>
                   )}
                   <label className="flex min-w-0 flex-col gap-2">
-                    <span className="text-[15px] font-medium">Experience needed</span>
+                    <span className="text-base font-medium">Experience needed</span>
                     <select value={experience} onChange={(e) => setExperience(e.target.value as ExperienceId | "")} className={room.field}>
                       <option value="">{source === "jd" ? "As the job description says" : "Any level"}</option>
                       {EXPERIENCE.map((x) => (
@@ -344,7 +344,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                   </label>
                   {source === "role" && (
                     <label className="flex min-w-0 flex-col gap-2">
-                      <span className="text-[15px] font-medium">Kind of questions</span>
+                      <span className="text-base font-medium">Kind of questions</span>
                       <select value={style} onChange={(e) => setStyle(e.target.value as StyleId)} className={room.field}>
                         {STYLES.map((x) => (
                           <option key={x.id} value={x.id}>
@@ -355,7 +355,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                     </label>
                   )}
                   <label className="flex min-w-0 flex-col gap-2">
-                    <span className="text-[15px] font-medium">Company (optional)</span>
+                    <span className="text-base font-medium">Company (optional)</span>
                     <input
                       value={company}
                       onChange={(e) => setCompany(e.target.value.slice(0, 60))}
@@ -381,13 +381,13 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
               </span>
             </div>
             {!fixedQuestion && freeTry && !jdMode && (
-              <p className="text-[15px] leading-6">
+              <p className="text-base leading-6">
                 <span className="font-medium">{TRIAL_QUESTIONS} questions, about 10 minutes,</span> <span className={room.soft}>with follow-ups and the full report. One free interview per account, no card needed.</span>
               </p>
             )}
             {!fixedQuestion && !freeTry && (
               <label className="flex max-w-xs flex-col gap-2">
-                <span className="text-[15px] font-medium">Questions with the AI interviewer</span>
+                <span className="text-base font-medium">Questions with the AI interviewer</span>
                 <select value={voiceCount} onChange={(e) => setVoiceCount(Number(e.target.value))} className={room.field}>
                   {VOICE_QUESTION_COUNTS.map((n) => (
                     <option key={n} value={n}>
@@ -400,7 +400,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
             <div className="flex flex-col gap-3">
               {aiAction}
               {freeTry && jdMode && (
-                <p className={`text-[15px] leading-6 ${room.soft}`}>
+                <p className={`text-base leading-6 ${room.soft}`}>
                   Your free AI interview works with a role.{" "}
                   <button type="button" onClick={() => setSource("role")} className={`${room.link} min-h-11`}>
                     Choose a role instead
@@ -414,7 +414,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                 {planning ? "Planning your interview from the job description." : ""}
               </p>
               {planError && (
-                <p role="alert" className="rounded-2xl bg-rose-50 p-3 text-[15px] leading-6 text-rose-950 dark:bg-rose-950/40 dark:text-rose-100">
+                <p role="alert" className="rounded-2xl bg-rose-50 p-3 text-base leading-6 text-rose-950 dark:bg-rose-950/40 dark:text-rose-100">
                   {planError.message}{" "}
                   {planError.upgrade && (
                     <Link href={planError.upgrade} className={room.link}>
@@ -424,7 +424,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                 </p>
               )}
               {proNo && (
-                <p className={`text-[15px] leading-6 ${room.soft}`}>
+                <p className={`text-base leading-6 ${room.soft}`}>
                   You have had your free AI interview. More are part of Pro.{" "}
                   <a href="#warm-up" className={room.link}>
                     Or warm up free
@@ -434,7 +434,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
             </div>
             {/* VI-21: the start button comes before her opening line, so a phone reaches it without scrolling past the whole quote. */}
             <div className="flex flex-col gap-4 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-              {opening && <p className={`text-[15px] font-medium ${room.soft}`}>She will open with</p>}
+              {opening && <p className={`text-base font-medium ${room.soft}`}>She will open with</p>}
               <p aria-live="polite" className="text-lg leading-8">
                 {opening ? (
                   <>&ldquo;{opening}&rdquo;</>
@@ -443,7 +443,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                 )}
               </p>
               {opening && !fixedQuestion && (
-                <button type="button" onClick={reshuffle} className={`${room.link} -mt-2 min-h-11 self-start text-[15px]`}>
+                <button type="button" onClick={reshuffle} className={`${room.link} -mt-2 min-h-11 self-start text-base`}>
                   Other questions
                 </button>
               )}
@@ -455,7 +455,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
       {/* ---- how it works: drag through the four stages, the last is the report ---- */}
       <section id="how" aria-labelledby="how-heading" className="mx-auto max-w-7xl scroll-mt-20 px-4 py-20 sm:px-8 md:py-32">
         <Reveal>
-          <h2 id="how-heading" className="max-w-3xl text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+          <h2 id="how-heading" className="max-w-3xl text-[clamp(1.875rem,3vw,2.25rem)] leading-[1.05] font-medium tracking-[-0.03em]">
             Like a real interview, not a quiz
           </h2>
           <p className="mt-4 max-w-2xl text-lg leading-8">
@@ -471,7 +471,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
       <section id="warm-up" aria-labelledby="menu-heading" className="scroll-mt-20 bg-white dark:bg-zinc-900">
         <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-10 px-4 py-20 sm:px-8 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] md:py-28">
           <Reveal>
-            <h2 id="menu-heading" className="text-[clamp(1.9rem,3.6vw,3rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+            <h2 id="menu-heading" className="text-[clamp(1.875rem,3vw,2.25rem)] leading-[1.05] font-medium tracking-[-0.03em]">
               Warm-up or the real thing
             </h2>
             <p className={`mt-4 text-lg leading-8`}>Warm up free with written questions. When it matters, rehearse it out loud with Zarina.</p>
@@ -493,7 +493,7 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                       {/* VI-13: what the free interview includes, while it is still to use. */}
                       <span className="shrink-0 text-brand-800 dark:text-brand-300">{freeTry && inTrial ? "Free once" : "Pro"}</span>
                     </span>
-                    <span className={`block text-[15px] leading-6 ${room.soft}`}>{note}</span>
+                    <span className={`block text-base leading-6 ${room.soft}`}>{note}</span>
                   </li>
                 ))}
               </ul>
@@ -514,12 +514,12 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                       {name}
                       <span className={`shrink-0 ${room.soft}`}>Free</span>
                     </span>
-                    <span className={`block text-[15px] leading-6 ${room.soft}`}>{note}</span>
+                    <span className={`block text-base leading-6 ${room.soft}`}>{note}</span>
                   </li>
                 ))}
               </ul>
               {jdMode ? (
-                <p className="mt-8 text-[15px] leading-6">
+                <p className="mt-8 text-base leading-6">
                   Practising from a job description needs the AI interviewer. To warm up free,{" "}
                   <button type="button" onClick={() => setSource("role")} className={`${room.link} min-h-11`}>
                     choose a role instead
@@ -530,12 +530,12 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                 <div className="mt-8 flex flex-col gap-4">
                   {!fixedQuestion && (
                     <fieldset className="min-w-0">
-                      <legend className="text-[15px] font-medium">Questions</legend>
+                      <legend className="text-base font-medium">Questions</legend>
                       <div className="mt-2 flex max-w-xs gap-2">
                         {COUNTS.map((n) => (
                           <label
                             key={n}
-                            className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-[15px] font-medium text-zinc-700 has-[:checked]:bg-brand-700 has-[:checked]:text-white has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-700 dark:bg-zinc-800 dark:text-zinc-300"
+                            className="flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-base font-medium text-zinc-700 has-[:checked]:bg-brand-700 has-[:checked]:text-white has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand-700 dark:bg-zinc-800 dark:text-zinc-300"
                           >
                             <input type="radio" name="count" value={n} checked={count === n} onChange={() => setCount(n)} className="sr-only" />
                             {n}
