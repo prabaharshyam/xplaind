@@ -34,6 +34,14 @@ test("signed in, the landing page stays the website, with a way into the app (AP
   if (page.viewportSize()!.width >= 640) await expect(page.getByRole("banner").getByRole("link", { name: "Go to my app" })).toHaveAttribute("href", "/dashboard");
 });
 
+test("the day streak shows in the app's top bar, not on the landing page (APP-8)", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".xp-streak")).toBeAttached(); // a signed-in learner has a streak from the first day
+  await expect(page.locator(".xp-streak")).toBeHidden();
+  await page.goto("/paths");
+  await expect(page.getByRole("banner").getByRole("link", { name: /-day streak/ })).toBeVisible();
+});
+
 test("the app frame is there from the first paint on a return visit (APP-1)", async ({ page }) => {
   await page.goto("/practice");
   await expect(page.locator("html")).toHaveAttribute("data-frame", "app");

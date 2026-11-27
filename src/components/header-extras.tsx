@@ -70,7 +70,7 @@ function useVisitTracker(state: ReturnType<typeof useAccountState>) {
   }, [state, today]);
 }
 
-/** The day streak. A signed-in learner sees it from the first day; a visitor once it is two days or more. Links to their progress page. */
+/** The day streak. A signed-in learner sees it from the first day; a visitor once it is two days or more. Links to their progress page. APP-8: shown only in the app frame (globals.css). */
 export function XpChip() {
   const game = useGame();
   const state = useAccountState();
