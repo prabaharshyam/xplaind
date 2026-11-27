@@ -16,7 +16,7 @@ export function ExploreTools({ current }: { current: string }) {
   const items = NAV_GROUPS.flatMap((g) => g.items).filter((i) => TOOLS.includes(i.href) && i.href !== current);
   items.sort((a, b) => TOOLS.indexOf(a.href) - TOOLS.indexOf(b.href));
   return (
-    <section aria-labelledby="explore-tools-h" className="bg-amber-50 py-14 text-zinc-900 md:py-20 dark:bg-brand-800 dark:text-white">
+    <section aria-labelledby="explore-tools-h" className="explore-tools bg-amber-50 py-14 text-zinc-900 md:py-20 dark:bg-brand-800 dark:text-white">
       <div className="mx-auto max-w-6xl px-4 md:px-6">
         <h2 id="explore-tools-h" className="text-2xl font-semibold tracking-tight md:text-3xl">
           Explore more tools
@@ -26,9 +26,9 @@ export function ExploreTools({ current }: { current: string }) {
             <li key={i.href}>
               <Link
                 href={i.href}
-                className="flex h-full items-start gap-3 rounded-2xl bg-white p-4 shadow-sm shadow-amber-900/5 ring-1 ring-amber-200/70 transition hover:ring-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-white/[0.06] dark:shadow-none dark:ring-white/10 dark:hover:bg-white/[0.1] dark:focus-visible:outline-brand-300 motion-safe:hover:-translate-y-0.5"
+                className="lx-lift flex h-full items-start gap-3 rounded-2xl bg-white p-4 shadow-sm shadow-amber-900/5 ring-1 ring-amber-200/70 hover:ring-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-white/[0.06] dark:shadow-none dark:ring-white/10 dark:hover:bg-white/[0.1] dark:focus-visible:outline-brand-300"
               >
-                <span aria-hidden="true" className={`grid size-10 shrink-0 place-items-center rounded-2xl ${TILE[i.tone]}`}>
+                <span aria-hidden="true" className={`lx-pop grid size-10 shrink-0 place-items-center rounded-2xl ${TILE[i.tone]}`}>
                   <Icon name={i.icon} size={20} />
                 </span>
                 <span className="min-w-0">

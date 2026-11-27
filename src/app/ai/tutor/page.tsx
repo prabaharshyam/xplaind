@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { pageMeta } from "@/lib/seo";
 import { ExploreTools } from "@/components/explore-tools";
 import type { Metadata } from "next";
@@ -7,7 +8,7 @@ import { MiniTutor } from "@/components/home/showcase";
 import { toolTone } from "@/lib/nav";
 import { aiEnabled } from "@/lib/ai/settings";
 import { getPaths, getStops } from "@/lib/content";
-import { TutorChat } from "./tutor-chat";
+import { TutorChat, TutorChatFromUrl } from "./tutor-chat";
 
 export const metadata: Metadata = pageMeta({
   // SE-8: search-led title and description.
@@ -19,6 +20,7 @@ export const metadata: Metadata = pageMeta({
 
 export default function TutorPage() {
   const titles = Object.fromEntries(getStops().map((s) => [s.id, s.title]));
+  const paths = getPaths().map((p) => ({ id: p.id, name: p.name }));
   return (
     <main>
       <PageHero
@@ -33,7 +35,11 @@ export default function TutorPage() {
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         {/* AG-1: needs an account once sign-ups are open; while they are on hold, guests keep their limits (SU-5). */}
-        <TutorChat enabled={aiEnabled()} paths={getPaths().map((p) => ({ id: p.id, name: p.name }))} titles={titles} />
+        {/* It reads ?q= (APP-3), which needs its own Suspense boundary; the chat without a question is the fallback, so
+            it is in the page from the first paint. */}
+        <Suspense fallback={<TutorChat enabled={aiEnabled()} paths={paths} titles={titles} />}>
+          <TutorChatFromUrl enabled={aiEnabled()} paths={paths} titles={titles} />
+        </Suspense>
       </div>
       <ExploreTools current="/ai/tutor" />
     </main>

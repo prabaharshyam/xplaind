@@ -16,7 +16,7 @@ const TONE: Record<NavTone, string> = TILE;
 
 function Tile({ icon, tone, size = "size-10" }: { icon: IconName; tone: NavTone; size?: string }) {
   return (
-    <span aria-hidden="true" className={`grid ${size} shrink-0 place-items-center rounded-2xl transition group-hover/item:scale-105 ${TONE[tone]}`}>
+    <span aria-hidden="true" className={`grid ${size} shrink-0 place-items-center rounded-2xl lx-pop ${TONE[tone]}`}>
       <Icon name={icon} size={18} />
     </span>
   );

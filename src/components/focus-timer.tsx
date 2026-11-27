@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/art/icons";
 import { useToday } from "@/lib/browser/hooks";
-import { readFocus, saveFocus, useFocus } from "@/lib/browser/focus-store";
+import { FOCUS_COLORS, type FocusColor, readFocus, saveFocus, useFocus } from "@/lib/browser/focus-store";
 import { todayInIST } from "@/lib/dates";
 import { PRESETS, choose, clock, lastDays, lengthOf, next, pause, presetOf, remaining, reset, running, start } from "@/lib/focus";
 
@@ -37,11 +37,28 @@ const update = (f: (s: ReturnType<typeof readFocus>) => Partial<ReturnType<typeo
   saveFocus({ ...cur, ...f(cur) });
 };
 
+/** APP-2: the panel's colours (StudyFetch lets learners colour their timer); a 400 ms fade between them. */
+const PANEL: Record<FocusColor, string> = {
+  white: "bg-white dark:bg-zinc-900",
+  amber: "bg-amber-100 dark:bg-amber-950",
+  sky: "bg-sky-100 dark:bg-sky-950",
+  emerald: "bg-emerald-100 dark:bg-emerald-950",
+  rose: "bg-rose-100 dark:bg-rose-950",
+};
+const SWATCH: Record<FocusColor, string> = {
+  white: "bg-white ring-1 ring-zinc-300",
+  amber: "bg-amber-300",
+  sky: "bg-sky-300",
+  emerald: "bg-emerald-300",
+  rose: "bg-rose-300",
+};
+
 export function FocusTimer() {
   const focus = useFocus();
   const today = useToday();
   const [now, setNow] = useState(0);
   const [said, setSaid] = useState("");
+  const [cheer, setCheer] = useState<string | null>(null);
   const on = running(focus.state);
   const endsAt = focus.state.endsAt;
 
@@ -58,6 +75,8 @@ export function FocusTimer() {
       saveFocus({ ...cur, ...done });
       if (cur.sound && t - endsAt < 5_000) chime();
       setSaid(cur.state.phase === "focus" ? `Focus block done. Take a ${presetOf(cur.state.preset).rest} minute break.` : "Break over. Ready to focus again.");
+      // APP-2: a finished focus block earns a small celebration in the panel.
+      if (cur.state.phase === "focus") setCheer(`${presetOf(cur.state.preset).focus} minutes of focus. Take a ${presetOf(cur.state.preset).rest} minute break.`);
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -93,7 +112,7 @@ export function FocusTimer() {
         id="focus-timer"
         popover="auto"
         aria-label="Focus timer"
-        className="m-0 w-[min(20rem,calc(100vw-1rem))] rounded-3xl bg-white p-5 text-zinc-900 shadow-xl shadow-black/10 ring-1 ring-zinc-200 [inset:4.5rem_0.5rem_auto_auto] md:[inset:4.75rem_1rem_auto_auto] dark:bg-zinc-900 dark:text-zinc-100 dark:ring-zinc-800"
+        className={`m-0 w-[min(20rem,calc(100vw-1rem))] rounded-3xl p-5 text-zinc-900 shadow-xl shadow-black/10 ring-1 ring-zinc-200 transition-colors duration-[400ms] [inset:4.5rem_0.5rem_auto_auto] md:[inset:4.75rem_1rem_auto_auto] dark:text-zinc-100 dark:ring-zinc-800 ${PANEL[focus.color]}`}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">{rest ? "Break" : "Focus"}</h2>
@@ -102,9 +121,21 @@ export function FocusTimer() {
             <span className="sr-only">Close</span>
           </button>
         </div>
-        <p className="mt-1 text-center text-5xl font-semibold tabular-nums">
+        {cheer && (
+          <div role="status" className="mt-2 rounded-2xl bg-white/80 p-3 text-center dark:bg-black/20">
+            <p className="font-semibold">Nice work!</p>
+            <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">{cheer}</p>
+            <button type="button" onClick={() => setCheer(null)} className="mt-2 min-h-11 rounded-full bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900">
+              Done
+            </button>
+          </div>
+        )}
+        <p className="mt-1 text-center font-mono text-6xl font-bold tabular-nums">
           <span className="sr-only">Time left: </span>
           {clock(left)}
+        </p>
+        <p aria-hidden="true" className="mt-1 text-center text-xs font-semibold tracking-[0.18em] text-zinc-600 uppercase dark:text-zinc-400">
+          {on ? (rest ? "Break" : "Focus") : left < total ? "Paused" : "Ready"}
         </p>
         <div aria-hidden="true" className="mt-4 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
           <div
@@ -145,7 +176,24 @@ export function FocusTimer() {
             ))}
           </div>
         </fieldset>
-        <div className="mt-5 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <fieldset className="mt-4">
+          <legend className="sr-only">Colour</legend>
+          <div className="flex justify-between">
+            {FOCUS_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-pressed={focus.color === c}
+                onClick={() => update(() => ({ color: c }))}
+                className="grid size-11 place-items-center rounded-full aria-pressed:ring-2 aria-pressed:ring-zinc-900 dark:aria-pressed:ring-white"
+              >
+                <span aria-hidden="true" className={`size-6 rounded-full ${SWATCH[c]}`} />
+                <span className="sr-only">{c[0].toUpperCase() + c.slice(1)}</span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <div className="mt-4 border-t border-zinc-900/10 pt-4 dark:border-white/10">
           <p className="text-sm">
             Today: <strong>{todayLog.sessions}</strong> {todayLog.sessions === 1 ? "block" : "blocks"}, <strong>{todayLog.minutes}</strong> min
           </p>

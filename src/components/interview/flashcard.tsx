@@ -6,6 +6,7 @@ import { muted, primaryButton, secondaryButton, textLink } from "@/components/ui
 import type { InterviewView } from "@/lib/interview/types";
 import { levelText } from "@/lib/levels";
 import { RATINGS, type Rating } from "@/lib/practice/queue";
+import { useShortcut } from "@/lib/browser/keys";
 
 export type Card = Pick<InterviewView, "id" | "question" | "short_answer" | "deeper_answer" | "level">;
 
@@ -34,6 +35,19 @@ export function Flashcard({
   const question = useRef<HTMLHeadingElement>(null);
   const deeper = useRef<HTMLHeadingElement>(null);
   useEffect(() => (stage === 2 ? deeper : question).current?.focus(), [stage]);
+  // APP-2: Space turns the card (question, short answer, deeper answer); 1 to 3 rate it once it is turned.
+  const ordered = [...RATINGS].reverse();
+  useShortcut((key) => {
+    if (key === " " && stage < 2) {
+      setStage((stage + 1) as 1 | 2);
+      return true;
+    }
+    const n = Number(key);
+    if (stage >= 1 && n >= 1 && n <= ordered.length) {
+      onRate(ordered[n - 1].value);
+      return true;
+    }
+  });
   const done = Math.round((index / total) * 100);
   return (
     <div className="flex flex-col gap-4">
@@ -70,16 +84,16 @@ export function Flashcard({
           {stage === 0 ? (
             <div className="mt-auto flex flex-col items-center gap-3">
               <p className={`text-sm ${muted}`}>Say your answer out loud first, then flip the card.</p>
-              <button type="button" className={primaryButton} onClick={() => setStage(1)}>
-                Show the short answer
+              <button type="button" className={primaryButton} aria-keyshortcuts="Space" onClick={() => setStage(1)}>
+                Show the short answer <kbd aria-hidden="true" className="xp-key">Space</kbd>
               </button>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
               <p className="text-lg leading-8">{q.short_answer}</p>
               {stage === 1 ? (
-                <button type="button" className={`${secondaryButton} self-start`} onClick={() => setStage(2)}>
-                  Show the deeper answer
+                <button type="button" className={`${secondaryButton} self-start`} aria-keyshortcuts="Space" onClick={() => setStage(2)}>
+                  Show the deeper answer <kbd aria-hidden="true" className="xp-key">Space</kbd>
                 </button>
               ) : (
                 <div className="flex flex-col gap-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
@@ -107,9 +121,9 @@ export function Flashcard({
         <fieldset className="flex min-w-0 flex-col gap-2">
           <legend className="mb-2 font-medium">How did you do?</legend>
           <div className="grid grid-cols-3 gap-2">
-            {[...RATINGS].reverse().map((r) => (
-              <button key={r.value} type="button" className={secondaryButton} onClick={() => onRate(r.value)}>
-                {r.label}
+            {ordered.map((r, k) => (
+              <button key={r.value} type="button" className={secondaryButton} aria-keyshortcuts={String(k + 1)} onClick={() => onRate(r.value)}>
+                {r.label} <kbd aria-hidden="true" className="xp-key">{k + 1}</kbd>
               </button>
             ))}
           </div>

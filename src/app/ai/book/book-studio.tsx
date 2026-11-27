@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useShortcut } from "@/lib/browser/keys";
+import { nextStep } from "@/lib/book/next-step";
+import { HIGHLIGHTS, type Highlight, setHighlight, useHighlights } from "@/lib/browser/highlights";
+import { toast } from "@/components/toast";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { Icon } from "@/components/art/icons";
 import { aiPost } from "@/components/ai/ai-client";
 import { AiGate, useAiAccess } from "@/components/ai/ai-gate";
@@ -69,13 +73,15 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
   // AG-1: signed out, the whole tool is a sign-up card, not just its last button.
   if (access === "signin")
     return (
-      <AiGate access={access} next="/ai/book">
-        {null}
-      </AiGate>
+      <div className="mx-auto max-w-3xl">
+        <AiGate access={access} next="/ai/book">
+          {null}
+        </AiGate>
+      </div>
     );
 
   return (
-    <div ref={top} className="scroll-mt-20">
+    <div ref={top} className={`mx-auto scroll-mt-20 ${view.kind === "set" ? "" : "max-w-3xl"}`}>
       {view.kind === "home" && (
         <Home
           tests={tests}
@@ -121,6 +127,40 @@ export function BookStudio({ aiOn }: { aiOn: boolean }) {
         </Report>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- folder --
+
+/**
+ * APP-4 (StudyFetch's study-set folder, in our colours): a folder with two pages behind it. On hover the pages fan out
+ * and the cover tips back a little (globals.css, .xp-folder; a spring, nothing under reduced motion). Decorative.
+ */
+function Folder() {
+  return (
+    <span aria-hidden="true" className="xp-folder relative block h-16 w-20 shrink-0">
+      <span className="xp-sheet xp-sheet-2 absolute top-0 left-3 h-12 w-14 rounded-2xl bg-white ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700" />
+      <span className="xp-sheet xp-sheet-1 absolute top-1 left-2 h-12 w-14 rounded-2xl bg-white ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700">
+        <span className="mx-2 mt-2 block h-1 rounded-full bg-zinc-200 dark:bg-zinc-600" />
+        <span className="mx-2 mt-1 block h-1 w-6 rounded-full bg-zinc-200 dark:bg-zinc-600" />
+      </span>
+      <span className="absolute top-3 left-0 h-4 w-9 rounded-t-2xl bg-amber-300 dark:bg-amber-700" />
+      <span className="xp-folder-front absolute inset-x-0 bottom-0 h-11 rounded-2xl bg-amber-200 dark:bg-amber-800" />
+    </span>
+  );
+}
+
+/** Wide enough for the notes workspace's third column: the always-open Ask panel (APP-4). */
+const WIDE = "(min-width: 1280px)";
+function useWide(): boolean {
+  return useSyncExternalStore(
+    (on) => {
+      const m = matchMedia(WIDE);
+      m.addEventListener("change", on);
+      return () => m.removeEventListener("change", on);
+    },
+    () => matchMedia(WIDE).matches,
+    () => false,
   );
 }
 
@@ -261,11 +301,9 @@ function Home({ tests, decks, sets, onBook, onSet, onOpen, onDeck }: { tests: Bo
                   <button
                     type="button"
                     onClick={() => onSet(x.id)}
-                    className="flex h-full w-full items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-left transition hover:border-brand-300 motion-safe:hover:-translate-y-0.5 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="group lx-lift flex h-full w-full items-center gap-4 rounded-3xl border border-zinc-200 bg-white p-4 text-left hover:border-brand-300 dark:border-zinc-800 dark:bg-zinc-900"
                   >
-                    <span aria-hidden="true" className={`grid size-11 shrink-0 place-items-center rounded-2xl ${TILE.amber}`}>
-                      <Icon name="book" size={22} />
-                    </span>
+                    <Folder />
                     <span className="min-w-0">
                       <span className="block font-semibold [overflow-wrap:anywhere]">{x.title}</span>
                       <span className="mt-0.5 block text-sm text-zinc-600 dark:text-zinc-400">
@@ -373,6 +411,7 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
     setBusy(false);
     if (!res.ok) return setError(res.message);
     onDeck(addDeck({ createdOn: todayInIST(), book: book.title, cards: res.data.cards }));
+    toast(`${res.data.cards.length} flashcards saved`);
   };
 
   // MB-15: notes from the chosen chapters, at most 30 passages like a test.
@@ -385,6 +424,7 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
     setBusy(false);
     if (!res.ok) return setError(res.message);
     onNotes?.(addNotes({ book: book.title, createdOn: todayInIST(), depth, sections: res.data.sections }));
+    toast("Notes saved");
   };
 
   const generate = async () => {
@@ -396,12 +436,28 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
     setBusy(false);
     if (!res.ok) return setError(res.message);
     onReady(addBookTest({ createdOn: todayInIST(), book: book.title, difficulty, minutes, questions: res.data.questions }));
+    toast(`Test ready: ${res.data.questions.length} questions`);
   };
 
+  // APP-4: three numbered steps on the left and, from tablet width, a live picture of what will be made on the right
+  // (StudyFetch's wizard preview). All steps stay on one screen: nothing is hidden behind a Next button.
+  const output =
+    mode === "notes"
+      ? { title: depth === "summary" ? "Summary notes" : "Detailed notes", meta: "Every point with its page" }
+      : mode === "cards"
+        ? { title: `${cardCount} flashcards`, meta: formats.map((f) => ({ qa: "Q and A", cloze: "Fill in the blank", mcq: "Multiple choice" })[f]).join(", ") || "Choose a kind" }
+        : { title: `${count} questions`, meta: `${minutes} minutes · ${DIFFICULTY_LABEL[difficulty]}` };
+  const step = (n: number) => (
+    <span aria-hidden="true" className="mr-2 inline-grid size-7 place-items-center rounded-full bg-brand-700 align-middle text-sm font-semibold text-white dark:bg-brand-300 dark:text-brand-950">
+      {n}
+    </span>
+  );
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_14rem]">
+    <div className="flex min-w-0 flex-col gap-6">
       <fieldset className="flex flex-col gap-2">
-        <legend className="text-lg font-semibold">Which chapters?</legend>
+        <legend className="text-lg font-semibold">{step(1)}Which chapters?</legend>
         <div className="flex gap-3 text-sm">
           <button type="button" className="underline underline-offset-2" onClick={() => setChosen(book.sections)}>
             All
@@ -425,7 +481,7 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
 
       {mode === "notes" ? (
         <fieldset>
-          <legend className="text-lg font-semibold">How much detail?</legend>
+          <legend className="text-lg font-semibold">{step(2)}How much detail?</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {(
               [
@@ -447,7 +503,7 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
         <>
         {/* MB-16: the kinds of card to mix. */}
         <fieldset>
-          <legend className="text-lg font-semibold">Kinds of card</legend>
+          <legend className="text-lg font-semibold">{step(2)}Kinds of card</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-3">
             {(
               [
@@ -482,7 +538,7 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
       ) : (
       <>
       <fieldset>
-        <legend className="text-lg font-semibold">How hard?</legend>
+        <legend className="text-lg font-semibold">{step(2)}How hard?</legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           {(Object.keys(DIFFICULTY_LABEL) as Difficulty[]).map((d) => (
             <label key={d} className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-2xl border px-3 ${difficulty === d ? "border-teal-600 bg-teal-50 dark:bg-teal-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
@@ -519,6 +575,9 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
       )}
 
       <AiGate access={access} next="/ai/book" kind="book" label="tests, card decks or notes">
+        <p aria-hidden="true" className="mb-2 text-lg font-semibold">
+          {step(3)}Make it
+        </p>
         {busy ? (
           <AiWorking
             steps={
@@ -551,6 +610,25 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
           </p>
         )}
       </AiGate>
+    </div>
+    <div aria-hidden="true" className="hidden self-start rounded-3xl bg-[var(--hero)] p-4 md:sticky md:top-20 md:flex md:flex-col md:items-center md:gap-3 dark:bg-zinc-900">
+      <div className="w-full rounded-2xl bg-white p-3 ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-800">
+        <p className="truncate text-sm font-semibold">{book.title}</p>
+        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          {chosen.length} of {book.sections.length} {book.sections.length === 1 ? "section" : "sections"}
+        </p>
+      </div>
+      <span className="grid size-8 place-items-center rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">
+        <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 5v14M6 13l6 6 6-6" />
+        </svg>
+      </span>
+      <div className={`w-full rounded-2xl p-3 transition-colors duration-200 ${mode === "notes" ? TILE.sky : mode === "cards" ? TILE.emerald : TILE.amber}`}>
+        <Icon name={mode === "notes" ? "book" : mode === "cards" ? "check" : "target"} size={18} />
+        <p className="mt-2 text-sm font-semibold">{output.title}</p>
+        <p className="text-xs opacity-80">{output.meta}</p>
+      </div>
+    </div>
     </div>
   );
 }
@@ -614,6 +692,31 @@ function StudySetView({
     await removeStudySet(set.id);
     onHome();
   };
+  // APP-4: a stats strip and one suggested next step, like StudyFetch's set dashboard.
+  const scored = tests.map((t) => ({ id: t.id, percent: t.result ? bookReport(t, t.result.answers, t.result.seconds).percent : null }));
+  const taken = scored.filter((t) => t.percent !== null);
+  const average = taken.length ? Math.round(taken.reduce((a, t) => a + t.percent!, 0) / taken.length) : null;
+  const step = nextStep({ notes: notes.length, tests: scored, decks: decks.map((d) => ({ id: d.id, due: dueCards(d.cards, d.schedule, today).length })) });
+  const openTab = (tab: "notes" | "test" | "cards" | "ask") => document.getElementById(`set-tab-${tab}`)?.click();
+  const stepView =
+    step.kind === "review"
+      ? { text: `${step.cards} ${step.cards === 1 ? "card is" : "cards are"} due today`, action: "Review now", go: () => onDeck(step.deckId) }
+      : step.kind === "take"
+        ? { text: "You made a test and have not taken it yet", action: "Take the test", go: () => onOpen(tests.find((t) => t.id === step.testId)!) }
+        : step.kind === "retest"
+          ? { text: `You scored ${step.percent}% last time. Go over the misses, then try again`, action: "See the report", go: () => onOpen(tests.find((t) => t.id === step.testId)!) }
+          : step.what === "notes"
+            ? { text: "Start with short notes of the chapters you need", action: "Make notes", go: () => openTab("notes") }
+            : step.what === "test"
+              ? { text: "Check what stuck with a short timed test", action: "Make a test", go: () => openTab("test") }
+              : { text: "Turn what you know into flashcards that come back when due", action: "Make flashcards", go: () => openTab("cards") };
+  const wide = useWide();
+  // APP-4: "Ask" on selected notes text: into the Ask panel beside the notes, or its tab on narrower screens.
+  const [asking, setAsking] = useState<{ text: string; n: number } | null>(null);
+  const askAbout = (text: string) => {
+    setAsking((a) => ({ text, n: (a?.n ?? 0) + 1 }));
+    if (!wide) openTab("ask");
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -638,6 +741,32 @@ function StudySetView({
       </header>
       {stored === "loading" && !inMemory && <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">Opening your study set…</p>}
 
+      <dl className="grid grid-cols-3 divide-x divide-zinc-200 rounded-3xl bg-white text-center ring-1 ring-zinc-200 dark:divide-zinc-800 dark:bg-zinc-900 dark:ring-zinc-800">
+        {[
+          ["Sections", String(set.sections.length)],
+          ["Test average", average === null ? "none yet" : `${average}%`],
+          ["Cards due", String(due)],
+        ].map(([label, value]) => (
+          <div key={label} className="flex flex-col-reverse px-2 py-3">
+            <dt className="text-xs text-zinc-600 dark:text-zinc-400">{label}</dt>
+            <dd className="text-lg font-semibold tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <section aria-labelledby="next-h" className="flex flex-col gap-3 rounded-3xl bg-sky-50 p-5 sm:flex-row sm:items-center dark:bg-sky-950/40">
+        <div className="min-w-0 flex-1">
+          <h3 id="next-h" className="text-sm font-semibold text-sky-900 dark:text-sky-200">
+            Do this next
+          </h3>
+          <p className="mt-0.5 leading-6">{stepView.text}</p>
+        </div>
+        <button type="button" className={primaryButton} onClick={stepView.go}>
+          {stepView.action}
+        </button>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="min-w-0">
       <AppTabs
         id="set"
         label={`Study ${set.title}`}
@@ -661,7 +790,7 @@ function StudySetView({
                         </select>
                       </label>
                     )}
-                    <NotesView notes={shownNotes} />
+                    <NotesView notes={shownNotes} onAsk={askAbout} />
                   </>
                 )}
                 <section aria-labelledby="new-notes-h" className="flex flex-col gap-4">
@@ -754,13 +883,25 @@ function StudySetView({
               </>
             ),
           },
-          {
-            id: "ask",
-            label: "Ask your notes",
-            content: book ? <AskNotes book={book} access={access} /> : needFile || <span />,
-          },
+          // APP-4: on a wide screen "Ask your notes" stays open beside the tabs instead of being one of them.
+          ...(wide
+            ? []
+            : [
+                {
+                  id: "ask",
+                  label: "Ask your notes",
+                  content: book ? <AskNotes book={book} access={access} prefill={asking ?? undefined} /> : needFile || <span />,
+                },
+              ]),
         ]}
       />
+      </div>
+      {wide && (
+        <aside aria-label="Ask your notes" className="self-start rounded-3xl bg-white p-4 ring-1 ring-zinc-200 xl:sticky xl:top-20 dark:bg-zinc-900 dark:ring-zinc-800">
+          {book ? <AskNotes book={book} access={access} prefill={asking ?? undefined} /> : <p className="text-sm text-zinc-600 dark:text-zinc-400">Open your file again to ask questions about it.</p>}
+        </aside>
+      )}
+      </div>
     </div>
   );
 }
@@ -768,9 +909,54 @@ function StudySetView({
 // ----------------------------------------------------------------- notes --
 
 /** MB-15: notes as headed sections of short points, each with its page; the exact words from the file fold away. */
-function NotesView({ notes }: { notes: BookNotes }) {
+const MARK: Record<Highlight, string> = {
+  emerald: "bg-emerald-100 dark:bg-emerald-950/60",
+  amber: "bg-amber-100 dark:bg-amber-950/60",
+  sky: "bg-sky-100 dark:bg-sky-950/60",
+  rose: "bg-rose-100 dark:bg-rose-950/60",
+};
+const SWATCH: Record<Highlight, string> = { emerald: "bg-emerald-300", amber: "bg-amber-300", sky: "bg-sky-300", rose: "bg-rose-300" };
+
+function NotesView({ notes, onAsk }: { notes: BookNotes; onAsk?: (text: string) => void }) {
+  const marks = useHighlights(notes.id);
+  // APP-4 (StudyFetch's selection menu, in our colours): select text in a point and a small black bar offers "Ask"
+  // and four highlight colours. A highlight colours the whole point; it is kept on this device.
+  const [menu, setMenu] = useState<{ x: number; y: number; text: string; point: string } | null>(null);
+  const root = useRef<HTMLElement>(null);
+  // Follows the browser's selection itself, so a long-press selection on a phone opens the bar as well as a mouse.
+  useEffect(() => {
+    let t = 0;
+    const onChange = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        const sel = window.getSelection();
+        const text = sel?.toString().trim() ?? "";
+        if (!sel || !text || sel.rangeCount === 0) return setMenu(null);
+        const li = (sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement)?.closest<HTMLElement>("[data-point]");
+        if (!li || !root.current?.contains(li)) return setMenu(null);
+        const r = sel.getRangeAt(0).getBoundingClientRect();
+        setMenu({ x: Math.min(Math.max(r.left + r.width / 2, 150), window.innerWidth - 150), y: Math.min(Math.max(r.top - 8, 64), window.innerHeight - 8), text, point: li.dataset.point! });
+      }, 250);
+    };
+    document.addEventListener("selectionchange", onChange);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener("selectionchange", onChange);
+    };
+  }, []);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("scroll", close, { passive: true });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("scroll", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
   return (
-    <article aria-labelledby={`notes-${notes.id}`} className="rounded-3xl bg-white p-5 md:p-7 dark:bg-zinc-900">
+    <article ref={root} aria-labelledby={`notes-${notes.id}`} className="rounded-3xl bg-white p-5 md:p-7 dark:bg-zinc-900">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id={`notes-${notes.id}`} className="text-xl font-semibold">
           {notes.depth === "summary" ? "Summary notes" : "Detailed notes"}
@@ -782,29 +968,75 @@ function NotesView({ notes }: { notes: BookNotes }) {
           </button>
         </span>
       </div>
+      <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">Select any text to ask about it or highlight it.</p>
       <div className="lx-deal mt-4 flex flex-col gap-6">
         {notes.sections.map((sec, i) => (
           <section key={i} aria-label={sec.heading}>
             <h4 className="font-semibold text-brand-800 dark:text-brand-300">{sec.heading}</h4>
             <ul className="mt-2 flex flex-col gap-2">
-              {sec.points.map((pt, j) => (
-                <li key={j} className="leading-7">
-                  {pt.term && <span className="font-semibold">{pt.term}: </span>}
-                  {pt.text}{" "}
-                  <details className="group inline">
-                    <summary className="inline cursor-pointer list-none rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/70 dark:text-amber-200 [&::-webkit-details-marker]:hidden">
-                      page {pt.page}
-                    </summary>
-                    <span className="mt-1 block border-l-2 border-zinc-300 pl-3 text-sm text-zinc-700 italic dark:border-zinc-700 dark:text-zinc-300">
-                      “{pt.quote}” ({pt.section})
-                    </span>
-                  </details>
-                </li>
-              ))}
+              {sec.points.map((pt, j) => {
+                const mark = marks[`${i}-${j}`];
+                return (
+                  <li key={j} data-point={`${i}-${j}`} className={`-mx-2 rounded-2xl px-2 leading-7 ${mark ? MARK[mark] : ""}`}>
+                    {mark && <span className="sr-only">Highlighted: </span>}
+                    {pt.term && <span className="font-semibold">{pt.term}: </span>}
+                    {pt.text}{" "}
+                    <details className="group inline">
+                      <summary className="inline cursor-pointer list-none rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/70 dark:text-amber-200 [&::-webkit-details-marker]:hidden">
+                        page {pt.page}
+                      </summary>
+                      <span className="mt-1 block border-l-2 border-zinc-300 pl-3 text-sm text-zinc-700 italic dark:border-zinc-700 dark:text-zinc-300">
+                        “{pt.quote}” ({pt.section})
+                      </span>
+                    </details>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         ))}
       </div>
+      {menu && (
+        <div
+          role="toolbar"
+          aria-label="Selected text"
+          style={{ left: menu.x, top: menu.y }}
+          className="fixed z-50 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-full bg-zinc-900 p-1 text-white shadow-lg dark:bg-white dark:text-zinc-900"
+          onMouseDown={(e) => e.preventDefault() /* keep the selection while a button is pressed */}
+        >
+          {onAsk && (
+            <button
+              type="button"
+              onClick={() => {
+                onAsk(menu.text);
+                setMenu(null);
+              }}
+              className="flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium hover:bg-white/10 dark:hover:bg-black/10"
+            >
+              <Icon name="chat" size={16} /> Ask
+            </button>
+          )}
+          <span aria-hidden="true" className="mx-1 h-6 w-px bg-white/20 dark:bg-black/20" />
+          {HIGHLIGHTS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={marks[menu.point] === c}
+              onClick={() => {
+                setHighlight(notes.id, menu.point, marks[menu.point] === c ? null : c);
+                setMenu(null);
+                window.getSelection()?.removeAllRanges();
+              }}
+              className="grid size-11 place-items-center rounded-full hover:bg-white/10 dark:hover:bg-black/10"
+            >
+              <span aria-hidden="true" className={`h-6 w-4 rounded-full ${SWATCH[c]} ${marks[menu.point] === c ? "ring-2 ring-white dark:ring-zinc-900" : ""}`} />
+              <span className="sr-only">
+                {marks[menu.point] === c ? "Remove the highlight" : `Highlight in ${c}`}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </article>
   );
 }
@@ -840,6 +1072,19 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
   useEffect(() => {
     if (left <= 0) finish();
   });
+  // APP-2: A to D pick an answer; once answered, 1 says "Sure" and 2 "Not sure" (StudyFetch's keyboard flow).
+  const setSureTo = (v: boolean) => setSure((x) => x.map((y, j) => (j === i ? (y === v ? null : v) : y)));
+  useShortcut((key) => {
+    const k = "abcd".indexOf(key.toLowerCase());
+    if (k >= 0 && k < q.options.length) {
+      setAnswers((a) => a.map((x, j) => (j === i ? k : x)));
+      return true;
+    }
+    if (answers[i] !== null && (key === "1" || key === "2")) {
+      setSureTo(key === "1");
+      return true;
+    }
+  });
 
   return (
     <div className="flex flex-col gap-5">
@@ -863,31 +1108,43 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
           {q.question}
         </legend>
         {q.options.map((o, k) => (
-          <label key={k} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 ${answers[i] === k ? "border-teal-600 bg-teal-50 dark:bg-teal-950/40" : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}>
-            <input type="radio" name={`q-${q.id}`} checked={answers[i] === k} onChange={() => setAnswers((a) => a.map((x, j) => (j === i ? k : x)))} className="mt-0.5 size-5 shrink-0 accent-teal-700" />
-            <span>{o}</span>
+          <label
+            key={k}
+            className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-700 ${answers[i] === k ? "border-brand-700 bg-brand-50 dark:border-brand-300 dark:bg-brand-950/50" : "border-zinc-200 bg-white hover:border-zinc-400 hover:bg-[var(--hero)] dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-white/5"}`}
+          >
+            <span className="relative grid size-8 shrink-0">
+              <input type="radio" name={`q-${q.id}`} checked={answers[i] === k} onChange={() => setAnswers((a) => a.map((x, j) => (j === i ? k : x)))} aria-keyshortcuts={"ABCD"[k]} className="peer absolute inset-0 size-8 cursor-pointer appearance-none rounded-full" />
+              <span aria-hidden="true" className="pointer-events-none grid size-8 place-items-center rounded-full bg-zinc-100 font-mono text-sm font-semibold text-zinc-700 peer-checked:bg-brand-700 peer-checked:text-white dark:bg-zinc-800 dark:text-zinc-200 dark:peer-checked:bg-brand-300 dark:peer-checked:text-brand-950">
+                {"ABCD"[k]}
+              </span>
+            </span>
+            <span className="min-w-0 flex-1">{o}</span>
           </label>
         ))}
       </fieldset>
       {answers[i] !== null && (
-        <div role="group" aria-label="How sure are you?" className="flex flex-wrap items-center gap-2 text-sm">
+        <div role="group" aria-label="How sure are you?" className="flex flex-col gap-2 text-sm">
           <span className="text-zinc-600 dark:text-zinc-400">How sure are you?</span>
-          {(
-            [
-              [true, "Sure"],
-              [false, "Not sure"],
-            ] as const
-          ).map(([v, label]) => (
-            <button
-              key={label}
-              type="button"
-              aria-pressed={sure[i] === v}
-              onClick={() => setSure((x) => x.map((y, j) => (j === i ? (y === v ? null : v) : y)))}
-              className="inline-flex min-h-11 items-center rounded-full border border-zinc-300 px-4 font-medium aria-pressed:border-brand-700 aria-pressed:bg-brand-50 aria-pressed:text-brand-900 dark:border-zinc-700 dark:aria-pressed:bg-brand-950/50 dark:aria-pressed:text-brand-100"
-            >
-              {label}
-            </button>
-          ))}
+          {/* APP-2: two coloured tiles, as StudyFetch's confidence row, in our colours: emerald for sure, amber for not. */}
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                [true, "Sure", "1", "bg-emerald-50 aria-pressed:bg-emerald-100 aria-pressed:ring-emerald-700 dark:bg-emerald-950/40 dark:aria-pressed:ring-emerald-400"],
+                [false, "Not sure", "2", "bg-amber-50 aria-pressed:bg-amber-100 aria-pressed:ring-amber-700 dark:bg-amber-950/40 dark:aria-pressed:ring-amber-400"],
+              ] as const
+            ).map(([v, label, key, tone]) => (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={sure[i] === v}
+                aria-keyshortcuts={key}
+                onClick={() => setSureTo(v)}
+                className={`flex min-h-12 items-center justify-between gap-2 rounded-2xl px-4 font-medium ring-1 ring-transparent aria-pressed:ring-2 ${tone}`}
+              >
+                {label} <kbd aria-hidden="true" className="xp-key">{key}</kbd>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1178,6 +1435,20 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
     requestAnimationFrame(() => document.getElementById("deck-card")?.focus());
   };
 
+  // APP-2: Space flips a card; 1 says "Again" and 2 "I knew it" once it is turned. Multiple choice is answered by
+  // picking, so Space does nothing there until it is answered.
+  useShortcut((key) => {
+    if (!card || i >= order.length) return;
+    if (key === " " && !flipped && !mcq) {
+      setFlipped(true);
+      return true;
+    }
+    if (flipped && (key === "1" || key === "2")) {
+      mark(key === "1" ? "again" : "knew");
+      return true;
+    }
+  });
+
   const download = () => {
     const url = URL.createObjectURL(new Blob([deckCsv(deck)], { type: "text/csv;charset=utf-8" }));
     const a = Object.assign(document.createElement("a"), { href: url, download: `${deck.book.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "flashcards"}-flashcards.csv` });
@@ -1302,8 +1573,8 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
                 </>
               ) : mcq ? null : (
                 <div className="mt-auto flex justify-center">
-                  <button type="button" className={primaryButton} onClick={() => setFlipped(true)}>
-                    Flip the card
+                  <button type="button" className={primaryButton} aria-keyshortcuts="Space" onClick={() => setFlipped(true)}>
+                    Flip the card <kbd aria-hidden="true" className="xp-key">Space</kbd>
                   </button>
                 </div>
               )}
@@ -1313,11 +1584,11 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-2 font-medium">Did you know it?</legend>
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" className={secondaryButton} onClick={() => mark("again")}>
-                  Again
+                <button type="button" className={secondaryButton} aria-keyshortcuts="1" onClick={() => mark("again")}>
+                  Again <kbd aria-hidden="true" className="xp-key">1</kbd>
                 </button>
-                <button type="button" className={primaryButton} onClick={() => mark("knew")}>
-                  I knew it
+                <button type="button" className={primaryButton} aria-keyshortcuts="2" onClick={() => mark("knew")}>
+                  I knew it <kbd aria-hidden="true" className="xp-key">2</kbd>
                 </button>
               </div>
             </fieldset>

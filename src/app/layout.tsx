@@ -11,6 +11,9 @@ import { SkipLink } from "@/components/skip-link";
 import { PageLoaderControl } from "@/components/page-loader-control";
 import { SiteHeader } from "@/components/site-header";
 import { PhoneTabBar } from "@/components/phone-tab-bar";
+import { AppFrameSync, AppRail } from "@/components/app-frame";
+import { Toaster } from "@/components/toast";
+import { APP_SCRIPT } from "@/lib/app-frame";
 import { allowIndexing } from "@/lib/indexing";
 import { siteUrl } from "@/lib/site";
 import { GeistSans } from "geist/font/sans";
@@ -62,6 +65,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* APP-1: the app frame for a learner signed in on this device, chosen before paint. */}
+        <script dangerouslySetInnerHTML={{ __html: APP_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
         <SkipLink />
@@ -74,8 +79,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SiteFooter />
         <Suspense fallback={null}>
           <PhoneTabBar />
+          <AppRail />
+          <AppFrameSync />
         </Suspense>
         <SignUpDialog />
+        <Toaster />
         <UpgradePrompt />
         <MotionEffects />
         {/* These read the URL, so pages with dynamic URLs render them in the browser. */}

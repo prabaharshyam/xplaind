@@ -83,8 +83,9 @@ export function AccountButton({ className }: { className: string }) {
   const state = useAccountState();
   if (state === "in") {
     return (
+      // APP-1 (owner: a signed-in learner still lands on the website at /, with a way into the app).
       <Link href="/dashboard" className={className}>
-        My progress
+        Go to my app
       </Link>
     );
   }

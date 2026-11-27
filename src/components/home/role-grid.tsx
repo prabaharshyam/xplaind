@@ -24,7 +24,7 @@ export function RoleGrid({ roles }: { roles: RoleCard[] }) {
             href={`/roadmap/${r.id}`}
             className="group flex h-full items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 transition-colors hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 sm:flex-col sm:items-start sm:p-5 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"
           >
-            <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+            <span aria-hidden="true" className="lx-pop grid size-10 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               <Icon name={THEMES.find((t) => t.id === r.theme)?.icon ?? "book"} size={18} />
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:w-full sm:gap-3">
