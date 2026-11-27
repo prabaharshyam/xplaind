@@ -53,6 +53,9 @@ test("the About, Privacy and Terms pages are linked from the footer and accessib
     ["Terms", "/terms", "Terms of use"],
   ] as const) {
     await page.goto("/");
+    // FT-2: on a phone the footer's columns are rows that open; About is under Company.
+    const company = page.getByRole("contentinfo").locator("summary", { hasText: "Company" });
+    if (name === "About" && (await company.isVisible())) await company.click();
     await expect(page.getByRole("contentinfo").getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
     await page.goto(href);
     await expect(page.getByRole("heading", { level: 1, name: h1 })).toBeVisible();

@@ -76,6 +76,9 @@ test("the contact page, the footer and the policies name the business and how to
 
   const footer = page.getByRole("contentinfo");
   await expect(footer.getByText(/Xplaind is a brand of ZEREH Ventures/)).toBeVisible();
+  // FT-2: on a phone the footer's columns are rows that open.
+  const company = footer.locator("summary", { hasText: "Company" });
+  if (await company.isVisible()) await company.click();
   for (const [name, href] of [["Privacy", "/privacy"], ["Terms", "/terms"], ["Refunds and cancellations", "/refunds"], ["Pricing", "/pricing"], ["Contact", "/contact"]] as const) {
     await expect(footer.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
   }

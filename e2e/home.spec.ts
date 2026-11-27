@@ -52,8 +52,9 @@ test("the home page says what to do and leads to roadmaps, topics, courses and i
   await expect(page.locator(".home-hero").getByText("Why now", { exact: false })).toHaveCount(0);
   await expect(main.getByRole("heading", { name: "Why now: India's AI job market" })).toBeVisible();
   await expect(main.getByRole("link", { name: "Read the guides" })).toHaveAttribute("href", "/blog");
-  // HM-7: at 360 px the page went from about 14 screens to under 10.
-  expect(await page.evaluate(() => document.documentElement.scrollHeight / innerHeight)).toBeLessThan(10.5);
+  // HM-7: at 360 px the page went from about 14 screens to under 10. FT-2: measured without the site footer,
+  // which is the same on every page and grew back on the owner's request.
+  expect(await page.evaluate(() => (document.documentElement.scrollHeight - document.querySelector("footer")!.offsetHeight) / innerHeight)).toBeLessThan(10.5);
   const nav = page.getByRole("banner");
   await nav.locator(".site-menu > summary").click(); // phone width: the links sit in the menu
   for (const [name, href] of [["Library", "/library"], ["Videos", "/videos"], ["Questions", "/interview"], ["Mock interview", "/interview/simulator"], ["Jobs and salaries", "/jobs"], ["Roadmaps", "/paths"]]) {
