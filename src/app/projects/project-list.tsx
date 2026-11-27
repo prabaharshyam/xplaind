@@ -28,14 +28,15 @@ export function ProjectList({ projects, paths }: { projects: ProjectCardView[]; 
   const [level, setLevel] = useState<"" | Difficulty>("");
   const progress = useProgress();
   const shown = projects.filter((p) => (!path || p.paths.includes(path)) && (!level || p.difficulty === level));
-  const select = "min-h-11 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950";
+  const select = "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950 text-sm";
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap gap-4">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Role
-          <select value={path} onChange={(e) => setPath(e.target.value)} className={select}>
+    <div className="flex flex-col gap-4">
+      {/* PJ-1 (2026-11-27, owner: "fix/do the 4-12", item 6): one toolbar and compact rows instead of picture cards. */}
+      <div className="grid grid-cols-2 gap-2 sm:max-w-xl">
+        <label>
+          <span className="sr-only">Role</span>
+          <select aria-label="Role" value={path} onChange={(e) => setPath(e.target.value)} className={select}>
             <option value="">All roles</option>
             {paths.map((p) => (
               <option key={p.id} value={p.id}>
@@ -44,9 +45,9 @@ export function ProjectList({ projects, paths }: { projects: ProjectCardView[]; 
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Difficulty
-          <select value={level} onChange={(e) => setLevel(e.target.value as "" | Difficulty)} className={select}>
+        <label>
+          <span className="sr-only">Difficulty</span>
+          <select aria-label="Difficulty" value={level} onChange={(e) => setLevel(e.target.value as "" | Difficulty)} className={select}>
             <option value="">Any difficulty</option>
             {(Object.keys(DIFFICULTY_LABEL) as Difficulty[]).map((d) => (
               <option key={d} value={d}>
@@ -59,30 +60,30 @@ export function ProjectList({ projects, paths }: { projects: ProjectCardView[]; 
       <p className={`text-sm ${muted}`} aria-live="polite">
         {shown.length} {shown.length === 1 ? "project" : "projects"}
       </p>
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
         {shown.map((p) => {
           const record = progress.projects?.[guideKey(p.id)];
           return (
-            <li key={p.id} className="">
+            <li key={p.id}>
               <Link
                 href={`/projects/${p.id}`}
-                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-800 dark:bg-zinc-900"
+                className="group flex gap-4 rounded-2xl py-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
               >
-                <Cover theme={p.theme} seed={p.id} className="h-28" iconSize={32} />
-                <span className="flex flex-1 flex-col gap-2 p-4">
-                  <span className="flex flex-wrap gap-1.5 text-xs font-medium">
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">{DIFFICULTY_LABEL[p.difficulty]}</span>
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">about {p.hours} hours</span>
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">{p.steps} steps</span>
+                {/* BR-4: the line graphic stays beside each project on wider screens; on a phone it only pushed the list down (UX-10). */}
+                <Cover theme={p.theme} seed={p.id} className="h-20 w-36 shrink-0 rounded-2xl max-sm:hidden" iconSize={24} />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="text-lg leading-snug font-semibold group-hover:underline">{p.title}</span>
+                  <span className={`text-sm ${muted}`}>
+                    {DIFFICULTY_LABEL[p.difficulty]} · about {p.hours} hours · {p.steps} steps
                     {record && (
-                      <span className={`rounded-full px-2 py-0.5 ${record.status === "done" ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200" : "bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-200"}`}>
-                        {STATUS[record.status]}
+                      <span className={record.status === "done" ? "font-medium text-emerald-800 dark:text-emerald-300" : "font-medium text-amber-900 dark:text-amber-200"}>
+                        {" "}
+                        · {STATUS[record.status]}
                       </span>
                     )}
                   </span>
-                  <span className="text-lg font-semibold leading-snug group-hover:underline">{p.title}</span>
-                  <span className={`line-clamp-3 text-card ${muted}`}>{p.summary}</span>
-                  <span className="mt-auto text-xs text-zinc-600 dark:text-zinc-400">{p.where.join(" · ")}</span>
+                  <span className="line-clamp-2 text-zinc-800 dark:text-zinc-200">{p.summary}</span>
+                  <span className={`text-xs ${muted}`}>{p.where.join(" · ")}</span>
                 </span>
               </Link>
             </li>

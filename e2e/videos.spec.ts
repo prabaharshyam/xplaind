@@ -20,11 +20,11 @@ test("the videos page filters by topic, level, length and search, and shows view
   await expect(page.getByText(/\d[\d.]*[KM]? views · /).first()).toBeVisible();
   await expect(page.getByText(/View counts are public YouTube numbers, read on /)).toBeVisible();
 
-  // a topic chip narrows the list and shows its own count
-  const chip = page.getByRole("button", { name: /^Retrieval and RAG/ });
-  const chipCount = Number(((await chip.textContent()) ?? "").match(/(\d+)$/)![1]);
-  await chip.click();
-  await expect(chip).toHaveAttribute("aria-pressed", "true");
+  // a topic narrows the list and shows its own count (VD-4: one Topic list in the toolbar)
+  const topic = page.getByRole("combobox", { name: "Topic" });
+  const option = topic.locator("option", { hasText: /^Retrieval and RAG/ });
+  const chipCount = Number(((await option.textContent()) ?? "").match(/\((\d+)\)$/)![1]);
+  await topic.selectOption({ label: (await option.textContent())! });
   expect(await count(page)).toBe(chipCount);
   expect(chipCount).toBeLessThan(all);
 

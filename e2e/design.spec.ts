@@ -33,16 +33,17 @@ test("a roadmap leads with its first lesson and keeps the PDF as a second choice
   expect(await overflow(page)).toBe(false);
 });
 
-test("the Library folds its filters on phones and names levels in words (BR-8)", async ({ page }) => {
+test("the Library is one toolbar and compact rows, and names levels in words (BR-8, LY-3)", async ({ page }) => {
   await page.goto("/library");
-  const toggle = page.getByRole("button", { name: "Topic and level" });
-  await expect(toggle).toBeVisible();
-  await expect(page.getByRole("button", { name: "Intermediate 2" })).toBeHidden();
-  await toggle.click();
-  await page.getByRole("button", { name: "Intermediate 2" }).click();
+  // LY-3: the filters are lists in one toolbar, so the first results show on the first screen of a phone.
+  await page.getByLabel("Level").selectOption({ label: "Intermediate 2" });
   await expect(page).toHaveURL(/level=I2/);
-  await expect(page.getByRole("button", { name: /Hide filters/ })).toBeVisible();
+  const first = page.locator('main ul[aria-label="Results"] > li').first();
+  expect((await first.boundingBox())!.y).toBeLessThan(740);
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page).not.toHaveURL(/level=/);
   expect(await overflow(page)).toBe(false);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight / innerHeight)).toBeLessThan(10);
 });
 
 test("the About, Privacy and Terms pages are linked from the footer and accessible (BR-9)", async ({ page }) => {
