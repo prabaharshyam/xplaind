@@ -1251,8 +1251,8 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
                       <span key={k}>
                         {part}
                         {k < all.length - 1 && (
-                          <span className="mx-1 inline-block min-w-20 border-b-2 border-brand-700 align-baseline dark:border-brand-300" aria-label="blank">
-                            {" "}
+                          <span className="mx-1 inline-block min-w-20 border-b-2 border-brand-700 align-baseline dark:border-brand-300">
+                            <span className="sr-only">blank</span>
                           </span>
                         )}
                       </span>

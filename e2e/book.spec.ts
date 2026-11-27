@@ -371,7 +371,7 @@ test("cards come as question and answer, fill in the blank or multiple choice (M
   await page.addInitScript((d) => localStorage.setItem("xplaind.bookcards.v1", JSON.stringify(d)), decks);
   await page.goto("/ai/book");
   await page.getByRole("button", { name: /Study the flashcards: Biology for Class 11/ }).click();
-  await expect(page.getByLabel("blank")).toBeVisible();
+  await expect(page.getByText("blank", { exact: true })).toHaveCount(1);
   expect((await wcag(page)).violations).toEqual([]);
   await page.getByRole("button", { name: "Flip the card" }).click();
   await expect(page.getByText("chloroplasts. That is where light becomes food.")).toBeVisible();
