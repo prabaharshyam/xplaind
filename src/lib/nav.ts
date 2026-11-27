@@ -25,7 +25,6 @@ export const NAV_GROUPS: Group[] = [
     id: "practice",
     label: "Practice",
     items: [
-      { href: "/practice", label: "Practice cards", note: "Flashcards for interview questions", icon: "check", tone: "emerald" },
       { href: "/playground", label: "Code playground", note: "Run Python in your browser", icon: "code", tone: "sky" },
       { href: "/plan", label: "Stay on track", note: "This week's plan, reminders and Monday emails", icon: "target", tone: "amber" },
     ],
@@ -35,14 +34,11 @@ export const NAV_GROUPS: Group[] = [
     id: "interview",
     label: "Interview",
     items: [
-      // IP-4: patterns and system design answers are last.
+      // IP-6 (2026-11-27, owner request): three entries, not six. "Questions" holds the bank, the answers by
+      // role, the flashcards, interview patterns and system design answers.
       { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report", icon: "mic", tone: "rose" },
-      // PREP-1: second, after the mock interview the page sells.
-      { href: "/interview/prep", label: "Interview prep plan", note: "Questions for each day until your interview", icon: "map", tone: "emerald" },
-      { href: "/interview/answers", label: "Interview Q&A", note: "Every question and answer, by role", icon: "chat", tone: "teal" },
-      { href: "/interview", label: "Question bank", note: "Every question, by topic and role", icon: "search", tone: "amber" },
-      { href: "/interview/patterns", label: "Interview patterns", note: "The ideas AI interviews are built on", icon: "flow", tone: "violet" },
-      { href: "/interview/design", label: "System design answers", note: "Worked LLM designs, step by step", icon: "server", tone: "indigo" },
+      { href: "/interview/prep", label: "Prep plan", note: "Questions for each day until your interview", icon: "map", tone: "emerald" },
+      { href: "/interview", label: "Questions", note: "500 questions with answers, patterns and system design", icon: "search", tone: "amber" },
     ],
   },
   {

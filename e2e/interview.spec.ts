@@ -30,11 +30,12 @@ test.describe("interview questions (IQ-1, IQ-3)", () => {
     await expect(
       page.getByText(`${questions.length} questions`, { exact: true }),
     ).toBeVisible();
-    await page.getByLabel("Topic").selectOption("rag");
     const rag = questions.filter((q) => q.topic === "rag").length;
-    await expect(
-      page.getByText(`${rag} questions`, { exact: true }),
-    ).toBeVisible();
+    // Retried: a choice made before the page has finished starting up is not kept.
+    await expect(async () => {
+      await page.getByLabel("Topic").selectOption("rag");
+      await expect(page.getByText(`${rag} questions`, { exact: true })).toBeVisible({ timeout: 1000 });
+    }).toPass();
     await page.getByLabel("Level").selectOption("P3");
     // Worked out from the bank, so a new senior question does not break the test.
     const ragP3 = questions.filter((q) => q.topic === "rag" && q.level === "P3").length;
@@ -117,7 +118,7 @@ test.describe("practice (IQ-4, IQ-5)", () => {
     // the rating survives a reload, and the list shows it
     await page.goto("/interview");
     await expect(
-      page.getByRole("link", {
+      page.getByRole("button", {
         name: new RegExp(`${first.slice(0, 20)}.*You said: missed`),
       }),
     ).toBeVisible();

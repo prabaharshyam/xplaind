@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 // LY-1, LY-2, IP-4, NV-8: the Library order, Library and Topics as one page, the Interview and Practice
@@ -34,32 +35,47 @@ test("LY-2: Library and Topics are one page, and /topics lands on its By topic v
   expect(overflow).toBe(false);
 });
 
-test("IP-4: on the Interview page patterns and system design come last, and practice cards are not there", async ({ page }) => {
-  await page.goto("/interview");
-  const hub = page.locator("main ul").first().getByRole("link");
-  const names = (await hub.allInnerTexts()).map((t) => t.split("\n")[0]);
-  expect(names.slice(-2)).toEqual(["Interview patterns", "System design answers"]);
-  await expect(page.locator("main").getByRole("link", { name: /Practice cards/ })).toHaveCount(0);
-});
-
-test("IP-5: the Interview page opens on the question bank, with the preparation links in a side panel", async ({ page }) => {
+test("IP-6: the Interview page is one app screen with tabs for questions, patterns and system design", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/interview");
-  const bank = await page.getByRole("heading", { level: 2, name: "Question bank" }).boundingBox();
-  const panel = page.getByRole("complementary", { name: "Prepare for your AI interview" });
-  const side = await panel.boundingBox();
-  expect(bank && side).toBeTruthy();
-  expect(bank!.y).toBeLessThan(500); // in view without scrolling past the header
-  expect(side!.x).toBeGreaterThan(bank!.x + 600); // to the right of the question bank, not above it
-  await expect(panel.getByRole("link")).toHaveCount(4);
-  await expect(panel.getByText("Worked LLM designs in the 35-minute shape interviewers expect.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "AI interview questions" })).toBeVisible();
+  const tabs = page.getByRole("navigation", { name: "Interview questions and guides" });
+  await expect(tabs.getByRole("link")).toHaveText(["Questions", "Patterns", "System design"]);
+  await expect(tabs.getByRole("link", { name: "Questions" })).toHaveAttribute("aria-current", "page");
+  // The list is on the left and the first answer is already open on the right.
+  const list = await page.getByRole("list", { name: "Questions" }).boundingBox();
+  const answer = await page.getByRole("article").boundingBox();
+  expect(answer!.x).toBeGreaterThan(list!.x + 300);
+  await expect(page.getByRole("heading", { level: 3, name: "Short answer" })).toBeVisible();
+  // Choosing another question shows its answer without leaving the page.
+  const third = page.getByRole("list", { name: "Questions" }).getByRole("button").nth(2);
+  const text = (await third.locator("span").first().textContent())!;
+  await third.click();
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText(text);
+  await expect(page).toHaveURL(/\/interview$/);
+  expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations).toEqual([]);
 
-  // On a phone the same links are a compact row of buttons, without the descriptions.
+  // On a phone the list fills the screen; a question opens over it, with a way back.
   await page.setViewportSize({ width: 360, height: 740 });
-  await expect(panel.getByText("Worked LLM designs in the 35-minute shape interviewers expect.")).toBeHidden();
-  await expect(panel.getByRole("link", { name: "Mock interview" })).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
-  expect(overflow).toBe(false);
+  await page.goto("/interview?role=ai-product-manager");
+  await expect(page.getByLabel("Role")).toHaveValue("ai-product-manager");
+  await expect(page.getByRole("article")).toBeHidden();
+  await page.getByRole("list", { name: "Questions" }).getByRole("button").first().click();
+  await expect(page.getByRole("article")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Questions" })).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await page.getByRole("button", { name: "← All questions" }).click();
+  await expect(page.getByRole("list", { name: "Questions" })).toBeVisible();
+
+  // The current list becomes flashcards.
+  await page.getByRole("button", { name: "Practise these as cards" }).click();
+  await expect(page.getByText(/^Card 1 of \d+$/)).toBeVisible();
+  await page.getByRole("button", { name: "← Back to the list" }).click();
+  await expect(page.getByRole("list", { name: "Questions" })).toBeVisible();
+
+  // The old address for answers by role lands here.
+  await page.goto("/interview/answers");
+  await expect(page).toHaveURL(/\/interview$/);
 });
 
 test("the Practice page has no AI glossary block", async ({ page }) => {

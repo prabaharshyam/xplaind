@@ -47,7 +47,7 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     lead: "Get past the recruiter and into the interview.",
     tools: [
       { href: "/ai/resume", title: "Resume review", text: "Fixes in order of importance, rewritten lines and the keywords recruiters search for.", icon: "star", tone: "from-amber-400 to-amber-600", ai: true, give: "Your resume and target role", get: "A ranked list of fixes" },
-      { href: "/interview/answers", title: "Interview Q&A by role", text: "Every interview question for your role with a short and a deeper answer, on one page.", icon: "target", tone: "from-brand-600 to-teal-600", ai: false, give: "The role you want", get: "Every question with answers" },
+      { href: "/interview", title: "Interview questions and answers", text: "Every interview question for your role with a short and a deeper answer, on one page.", icon: "target", tone: "from-brand-600 to-teal-600", ai: false, give: "The role you want", get: "Every question with answers" },
     ],
   },
 ];

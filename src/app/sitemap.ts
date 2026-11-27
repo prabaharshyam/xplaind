@@ -61,7 +61,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/library",
     "/videos",
     "/books",
-    "/interview/answers",
     "/papers",
     "/disclosure",
     ...getProjects().map((p) => `/projects/${p.id}`),

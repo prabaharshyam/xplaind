@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "@/components/art/icons";
-import { PageHero } from "@/components/page-hero";
 import { getPatterns } from "@/lib/content";
 import { PATTERN_CATEGORIES } from "@/lib/content/schema";
 import { pageMeta } from "@/lib/seo";
+import { InterviewHeader } from "../interview-header";
 import { CATEGORY } from "../labels";
 
 export const metadata: Metadata = pageMeta({
@@ -18,15 +18,7 @@ export default function PatternsPage() {
   const patterns = getPatterns();
   return (
     <main>
-      <PageHero
-        theme="system-design"
-        seed="patterns"
-        icon="flow"
-        eyebrow="Interview prep"
-        title="AI interview patterns"
-        lead="Interviewers reuse a small set of ideas. Learn each pattern once: when to use it, how it works, what it costs, and how to say it out loud."
-        crumbs={[{ href: "/interview", label: "Interview" }]}
-      />
+      <InterviewHeader current="patterns" title="AI interview patterns" lead="Interviewers reuse a small set of ideas. Learn each pattern once: when to use it, how it works, what it costs, and how to say it out loud." />
       <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-10 md:px-6">
         {PATTERN_CATEGORIES.map((c) => {
           const list = patterns.filter((p) => p.category === c);
