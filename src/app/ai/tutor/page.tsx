@@ -28,7 +28,7 @@ export default function TutorPage() {
         icon="chat"
         eyebrow="AI tutor"
         title="A tutor that knows where you are"
-        lead="Ask it to explain any AI topic, plan your week or help you get hired. It sees your progress and points you to the right lessons. The same tutor sits inside every lesson."
+        lead="Ask it to explain any AI topic, plan your week or help you get hired. It knows your progress and points to the right lesson."
         crumbs={[{ href: "/ai", label: "AI tools" }]}
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">

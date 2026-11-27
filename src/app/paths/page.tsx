@@ -34,7 +34,7 @@ export default function PathsPage() {
         icon="map"
         eyebrow="Role roadmaps"
         title="Choose your AI role"
-        lead="Ten step-by-step roadmaps. Every topic has a plain-English lesson, the best course and a check, and every stage ends in a project. Lessons are shared, so what you finish on one roadmap counts on every other."
+        lead="Ten step-by-step roadmaps. Every topic has a short lesson, the best course and a check, and what you finish counts on every roadmap."
       />
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <YourPath paths={paths.map((p) => ({ id: p.id, name: p.name }))} />

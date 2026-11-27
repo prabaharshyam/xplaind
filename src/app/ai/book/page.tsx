@@ -27,7 +27,7 @@ export default function BookPage() {
         icon="book"
         eyebrow="Practice · AI tool"
         title="Study from my notes & books"
-        lead="Upload your book or notes as a PDF, Word or PowerPoint file. Ask it questions, take a timed test, retest what you missed, and review flashcards when they are due. Every answer shows the page it came from."
+        lead="Upload a PDF, Word or PowerPoint file. Ask it questions, take a test and review flashcards, each answer with the page it came from."
         crumbs={[{ href: "/practice", label: "Practice" }]}
       />
       <div className="mx-auto max-w-3xl px-4 py-8">

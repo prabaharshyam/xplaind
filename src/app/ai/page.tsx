@@ -81,7 +81,7 @@ export default function AiToolsPage() {
         icon="sparkles"
         eyebrow="AI tools"
         title="Learn faster with AI that knows our lessons"
-        lead="AI helpers built on Claude, an AI model from Anthropic, plus study tools for interviews and research papers. All with your account."
+        lead="AI helpers built on Claude, from Anthropic, for studying, interviews and your resume."
       />
       <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         {!on && (

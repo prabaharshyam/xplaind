@@ -28,7 +28,7 @@ export default function PlanPage() {
         icon="map"
         eyebrow="Stay on track"
         title="Your study plan for this week"
-        lead="The next lessons on your roadmap, sized to the hours you have, plus one practice session. Add a Monday reminder to your calendar, or get a short progress email every Monday."
+        lead="The next lessons on your roadmap, sized to your hours, with a Monday reminder or a short weekly email."
       />
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <PlanStudio paths={paths.map((p) => ({ id: p.id, name: p.name }))} lessons={lessons} planUrl={`${siteUrl()}/plan`} />

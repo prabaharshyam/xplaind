@@ -28,7 +28,7 @@ export default function ResumePage() {
         icon="star"
         eyebrow="AI tools · Resume review"
         title="Get your resume shortlisted"
-        lead="Upload your resume and the role you want. You get a clear list of fixes, most important first: what a recruiter and an applicant tracking system will look for, with rewritten lines you can adapt."
+        lead="Upload your resume and the role you want. Get the fixes a recruiter would ask for, most important first, with lines you can use."
         crumbs={[{ href: "/ai", label: "AI tools" }]}
       />
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-6">
