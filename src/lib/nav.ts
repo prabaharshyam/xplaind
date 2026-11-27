@@ -65,6 +65,9 @@ export const NAV_GROUPS: Group[] = [
  */
 export const PRO_LINK = { href: "/pricing", label: "Pricing", title: "Plans and pricing", note: "Daily AI tutor, interview feedback and resume reviews, from ₹249" } as const;
 
+/** UX-13: a tool's colour is the one its menu item has. */
+export const toolTone = (href: string): Tone => NAV_GROUPS.flatMap((g) => g.items).find((i) => i.href === href)?.tone ?? "teal";
+
 export const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 
 /** Which group the current page belongs to, so the menu can say "you are here". Pure, for tests. */

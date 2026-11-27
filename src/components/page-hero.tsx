@@ -19,6 +19,7 @@ export function PageHero({
   lead,
   crumbs = [],
   children,
+  demo,
 }: {
   theme: ThemeId;
   /** Kept for callers; the road panel needs only the theme. */
@@ -32,6 +33,8 @@ export function PageHero({
   crumbs?: { href: string; label: string }[];
   children?: ReactNode;
   size?: "compact" | "full";
+  /** UX-14: a tool page shows the tool working in a product frame instead of the particle sculpture. */
+  demo?: ReactNode;
 }) {
   const full = size === "full";
   return (
@@ -55,10 +58,15 @@ export function PageHero({
           {lead && <div className={`mt-3 max-w-2xl text-zinc-700 dark:text-zinc-300 ${full ? "text-lg leading-8" : "text-base leading-7 md:text-lg md:leading-8"}`}>{lead}</div>}
           {children && <div className={full ? "mt-5" : "mt-4"}>{children}</div>}
         </div>
-        {/* MO-8: the page's own particle sculpture, in its theme's colours. UX-10: never on a phone, where it only pushed the content down. */}
-        <div className="lx-hero-art shrink-0 [perspective:1000px] max-md:hidden">
-          <ParticleScene shape={shape ?? THEME_SHAPE[theme]} colors={particleColorsOf(theme)} icon={icon ?? themeOf(theme).icon} className={full ? "h-44 w-full md:h-72 md:w-[26rem]" : "h-52 w-80"} />
-        </div>
+        {/* MO-8: the page's own particle sculpture, in its theme's colours, or (UX-14) the tool shown working.
+            UX-10: neither on a phone, where they only pushed the content down. */}
+        {demo ? (
+          <div className="w-[24rem] shrink-0 max-md:hidden">{demo}</div>
+        ) : (
+          <div className="lx-hero-art shrink-0 [perspective:1000px] max-md:hidden">
+            <ParticleScene shape={shape ?? THEME_SHAPE[theme]} colors={particleColorsOf(theme)} icon={icon ?? themeOf(theme).icon} className={full ? "h-44 w-full md:h-72 md:w-[26rem]" : "h-52 w-80"} />
+          </div>
+        )}
       </div>
     </header>
   );

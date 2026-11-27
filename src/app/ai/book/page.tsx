@@ -1,6 +1,9 @@
 import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniNotes } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { aiEnabled } from "@/lib/ai/settings";
 import { BookStudio } from "./book-studio";
 
@@ -16,7 +19,8 @@ export const metadata: Metadata = pageMeta({
 export default function BookPage() {
   return (
     <main>
-      <PageHero shape="openBook"
+      <PageHero
+        demo={<ProductFrame tone={toolTone("/ai/book")} label="Study from my notes"><MiniNotes /></ProductFrame>} shape="openBook"
         theme="retrieval"
         seed="ask-my-book"
         icon="book"

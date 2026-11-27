@@ -4,7 +4,9 @@ import Link from "next/link";
 import { Icon } from "@/components/art/icons";
 import { LessonCard } from "@/components/lesson-card";
 import { PageHero } from "@/components/page-hero";
-import { NAV_GROUPS } from "@/lib/nav";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniStudio } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { TILE, type Tone } from "@/lib/tones";
 import { getStops } from "@/lib/content";
 import { aiEnabled } from "@/lib/ai/settings";
@@ -19,9 +21,6 @@ export const metadata: Metadata = pageMeta({
 });
 
 type Tool = { href: string; title: string; text: string; icon: IconName; ai: boolean; give: string; get: string };
-
-/** UX-13: a tool's colour is the one the menu gives it. */
-const toneOf = (href: string): Tone => NAV_GROUPS.flatMap((g) => g.items).find((i) => i.href === href)?.tone ?? "teal";
 
 /**
  * AI-1: the tools, shown like apps in a product launcher: an app icon, what it does in one line, what
@@ -75,6 +74,7 @@ export default function AiToolsPage() {
   return (
     <main>
       <PageHero
+        demo={<ProductFrame tone={toolTone("/ai")} label="AI Studio"><MiniStudio /></ProductFrame>}
         shape="brain"
         theme="llm"
         seed="ai-tools"
@@ -107,7 +107,7 @@ export default function AiToolsPage() {
                         className="group relative flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-brand-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-brand-800"
                       >
                         <span className="flex items-start gap-4">
-                          <AppIcon icon={t.icon} tone={toneOf(t.href)} />
+                          <AppIcon icon={t.icon} tone={toolTone(t.href)} />
                           <span className="min-w-0 flex-1">
                             <span className="block text-lg leading-6 font-semibold">{t.title}</span>
                             <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-medium">

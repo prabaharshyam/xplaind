@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniPlan } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { getPaths, pathLessons } from "@/lib/content";
 import { siteUrl } from "@/lib/site";
 import { PlanStudio } from "./plan-studio";
@@ -16,6 +19,7 @@ export default function PlanPage() {
   return (
     <main>
       <PageHero
+        demo={<ProductFrame tone={toolTone("/plan")} label="Stay on track"><MiniPlan /></ProductFrame>}
         size="full"
         shape="calendar"
         theme="career"

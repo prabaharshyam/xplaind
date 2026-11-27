@@ -1,6 +1,9 @@
 import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniResume } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { aiEnabled } from "@/lib/ai/settings";
 import { getPaths } from "@/lib/content";
 import { ResumeStudio } from "./resume-studio";
@@ -17,6 +20,7 @@ export default function ResumePage() {
   return (
     <main>
       <PageHero
+        demo={<ProductFrame tone={toolTone("/ai/resume")} label="Resume review"><MiniResume /></ProductFrame>}
         shape="resume"
         theme="career"
         seed="resume"

@@ -1,6 +1,9 @@
 import { pageMeta } from "@/lib/seo";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniTutor } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { aiEnabled } from "@/lib/ai/settings";
 import { getPaths, getStops } from "@/lib/content";
 import { TutorChat } from "./tutor-chat";
@@ -17,7 +20,8 @@ export default function TutorPage() {
   const titles = Object.fromEntries(getStops().map((s) => [s.id, s.title]));
   return (
     <main>
-      <PageHero shape="robot"
+      <PageHero
+        demo={<ProductFrame tone={toolTone("/ai/tutor")} label="AI tutor"><MiniTutor /></ProductFrame>} shape="robot"
         theme="career"
         seed="ai-tutor"
         icon="chat"

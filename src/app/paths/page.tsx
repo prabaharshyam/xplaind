@@ -3,6 +3,9 @@ import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
 import { PageHero } from "@/components/page-hero";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniRoadmap } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { muted } from "@/components/ui";
 import { getPaths } from "@/lib/content";
 import { pathView } from "@/lib/content/paths";
@@ -24,6 +27,7 @@ export default function PathsPage() {
   return (
     <main>
       <PageHero
+        demo={<ProductFrame tone={toolTone("/paths")} label="AI Engineer roadmap"><MiniRoadmap /></ProductFrame>}
         size="full" shape="compass"
         theme="career"
         seed="paths"
