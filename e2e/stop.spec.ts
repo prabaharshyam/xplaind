@@ -133,12 +133,13 @@ test("lesson diagrams are drawn as clean SVG with a text description, and no bla
 test("LT-1: a translated lesson has its own page, its language set, and a switch back to English", async ({ page }) => {
   await page.goto("/stop/what-is-ai");
   const nav = page.getByRole("navigation", { name: "Read this lesson in" });
-  await expect(nav.getByRole("link", { name: "English" })).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: "தமிழ்" })).toHaveAttribute("href", "/stop/what-is-ai/ta");
-  // LT-4: one folded control; opening it shows every language, and the lesson's facts sit on the same line.
+  // LT-4: one folded control; opening it shows every language.
+  await expect(nav.locator("summary")).toContainText("English");
   await expect(nav.getByRole("link", { name: "தமிழ்" })).toBeHidden();
   await nav.locator("summary").click();
   await expect(nav.getByRole("link", { name: "தமிழ்" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "English" })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "தமிழ்" })).toHaveAttribute("href", "/stop/what-is-ai/ta");
   expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations).toEqual([]);
   await page.goto("/stop/what-is-ai/ta");
   await expect(page.locator("main")).toHaveAttribute("lang", "ta");
@@ -146,7 +147,7 @@ test("LT-1: a translated lesson has its own page, its language set, and a switch
   await page.goto("/stop/what-is-ai/hi");
   await expect(page.locator("main")).toHaveAttribute("lang", "hi");
   await expect(page.getByRole("heading", { level: 2, name: "सीधा जवाब" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Read this lesson in" }).getByRole("link", { name: "English" })).toHaveAttribute("href", "/stop/what-is-ai");
+  await expect(page.getByRole("navigation", { name: "Read this lesson in" }).getByRole("link", { name: "English", includeHidden: true })).toHaveAttribute("href", "/stop/what-is-ai");
   // Tanglish and Hinglish: the same lesson in English letters.
   await page.goto("/stop/what-is-ai/tanglish");
   await expect(page.locator("main")).toHaveAttribute("lang", "ta-Latn");

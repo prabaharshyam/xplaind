@@ -41,7 +41,7 @@ test("jobs and salaries show every role with dated pay, skills and live job link
   expect(await page.locator("main li[id]").count()).toBe(10);
   // JB-5: one role at a time; the Role list on a phone switches it and updates the address.
   await expect(page.locator("main li[id]:visible")).toHaveCount(1);
-  await page.getByLabel("Role").selectOption("ai-product-manager");
+  await page.getByRole("combobox", { name: "Role" }).selectOption("ai-product-manager");
   await expect(page.locator("#ai-product-manager").getByRole("heading", { name: "AI Product Manager" })).toBeVisible();
   await expect(card).toBeHidden();
   await expect(page).toHaveURL(/\/jobs#ai-product-manager$/);
