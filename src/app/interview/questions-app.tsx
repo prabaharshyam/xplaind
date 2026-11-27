@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { Flashcard } from "@/components/interview/flashcard";
+import { ContentGate } from "@/components/account/content-gate";
 import { muted, primaryButtonSm, secondaryButtonSm, textLink } from "@/components/ui";
 import { usePractice, useToday } from "@/lib/browser/hooks";
 import { rate } from "@/lib/browser/practice-store";
@@ -26,8 +27,8 @@ const PAGE = 20;
  * IP-6: the question bank and the answers in one app screen. A toolbar filters by search, role, topic
  * and level; the list is on the left and the chosen answer on the right (on a phone the answer takes the
  * screen, with a way back). "Practise these" turns the current list into flashcards (IQ-4).
- * IP-7: a signed-out visitor gets the same screen (the answers are open, SU-1); only saving a rating
- * needs an account (SU-2). The list shows PAGE questions at a time.
+ * IP-7: a signed-out visitor gets the same screen; IP-8: there the answer pane shows the short answer as a preview and
+ * a sign-up card for the rest. Saving a rating needs an account (SU-2). The list shows PAGE questions at a time.
  */
 export function QuestionsApp({ questions, roles }: { questions: InterviewView[]; roles: { id: string; name: string }[] }) {
   const params = new URLSearchParams(useSearch());
@@ -198,6 +199,9 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
             </h2>
             <h3 className="mt-6 text-sm font-semibold">Short answer</h3>
             <p className="mt-1 text-lg leading-8">{active.short_answer}</p>
+            {/* IP-8 (2026-11-27, owner: "preview with the sign-up prompt"): signed out, the short answer is the preview and
+                a sign-up card takes the place of the rest; each question's own page stays open for search (SU-1). */}
+            <ContentGate reason="interview" title="Sign up free to read the full answer" text="The deeper answer, an example to tell, the follow-ups to expect and the common mistakes are in your free account.">
             <h3 className="mt-6 text-sm font-semibold">Deeper answer</h3>
             {active.deeper_answer.split(/\n\s*\n/).map((para, i) => (
               <p key={i} className="mt-1 leading-7">
@@ -226,6 +230,7 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
                 </ul>
               </>
             )}
+            </ContentGate>
             <p className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm">
               <Link href={`/interview/simulator?question=${active.id}`} className={textLink}>
                 Answer it out loud
