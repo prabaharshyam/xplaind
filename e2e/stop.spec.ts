@@ -135,6 +135,11 @@ test("LT-1: a translated lesson has its own page, its language set, and a switch
   const nav = page.getByRole("navigation", { name: "Read this lesson in" });
   await expect(nav.getByRole("link", { name: "English" })).toHaveAttribute("aria-current", "page");
   await expect(nav.getByRole("link", { name: "தமிழ்" })).toHaveAttribute("href", "/stop/what-is-ai/ta");
+  // LT-4: one folded control; opening it shows every language, and the lesson's facts sit on the same line.
+  await expect(nav.getByRole("link", { name: "தமிழ்" })).toBeHidden();
+  await nav.locator("summary").click();
+  await expect(nav.getByRole("link", { name: "தமிழ்" })).toBeVisible();
+  expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations).toEqual([]);
   await page.goto("/stop/what-is-ai/ta");
   await expect(page.locator("main")).toHaveAttribute("lang", "ta");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("மூணும்");
