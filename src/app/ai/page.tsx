@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Icon } from "@/components/art/icons";
 import { LessonCard } from "@/components/lesson-card";
 import { PageHero } from "@/components/page-hero";
+import { NAV_GROUPS } from "@/lib/nav";
+import { TILE, type Tone } from "@/lib/tones";
 import { getStops } from "@/lib/content";
 import { aiEnabled } from "@/lib/ai/settings";
 import type { IconName } from "@/lib/themes";
@@ -16,7 +18,10 @@ export const metadata: Metadata = pageMeta({
   path: "/ai",
 });
 
-type Tool = { href: string; title: string; text: string; icon: IconName; tone: string; ai: boolean; give: string; get: string };
+type Tool = { href: string; title: string; text: string; icon: IconName; ai: boolean; give: string; get: string };
+
+/** UX-13: a tool's colour is the one the menu gives it. */
+const toneOf = (href: string): Tone => NAV_GROUPS.flatMap((g) => g.items).find((i) => i.href === href)?.tone ?? "teal";
 
 /**
  * AI-1: the tools, shown like apps in a product launcher: an app icon, what it does in one line, what
@@ -28,8 +33,8 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     title: "Study",
     lead: "Understand topics faster and know what to learn next.",
     tools: [
-      { href: "/ai/book", title: "Study from my notes & books", text: "Turns your textbook or notes into a timed test or flashcards, and shows what to reread.", icon: "book", tone: "from-teal-500 to-teal-700", ai: true, give: "A PDF of your book or notes", get: "A test and a page-by-page report" },
-      { href: "/ai/tutor", title: "AI tutor", text: "Explains any AI topic in plain English, with examples, and knows which lessons you have done.", icon: "chat", tone: "from-brand-500 to-brand-700", ai: true, give: "Your question", get: "A clear answer and lessons to read" },
+      { href: "/ai/book", title: "Study from my notes & books", text: "Turns your textbook or notes into a timed test or flashcards, and shows what to reread.", icon: "book", ai: true, give: "A PDF of your book or notes", get: "A test and a page-by-page report" },
+      { href: "/ai/tutor", title: "AI tutor", text: "Explains any AI topic in plain English, with examples, and knows which lessons you have done.", icon: "chat", ai: true, give: "Your question", get: "A clear answer and lessons to read" },
     ],
   },
   {
@@ -37,8 +42,8 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     title: "Practice",
     lead: "Write real code and answer out loud before the real thing.",
     tools: [
-      { href: "/playground", title: "Code playground", text: "Write and run Python in your browser, with NumPy and pandas. If it breaks, the AI tutor explains the error.", icon: "code", tone: "from-zinc-700 to-zinc-900", ai: false, give: "Python code", get: "Output in seconds, nothing to install" },
-      { href: "/interview/simulator", title: "AI mock interviewer", text: "Zarina interviews you out loud for your role or a job post, follows up on what you actually say, and scores you like a hiring panel.", icon: "mic", tone: "from-rose-500 to-rose-700", ai: true, give: "Your spoken answers", get: "A verdict, skill scores and a 4-week plan" },
+      { href: "/playground", title: "Code playground", text: "Write and run Python in your browser, with NumPy and pandas. If it breaks, the AI tutor explains the error.", icon: "code", ai: false, give: "Python code", get: "Output in seconds, nothing to install" },
+      { href: "/interview/simulator", title: "AI mock interviewer", text: "Zarina interviews you out loud for your role or a job post, follows up on what you actually say, and scores you like a hiring panel.", icon: "mic", ai: true, give: "Your spoken answers", get: "A verdict, skill scores and a 4-week plan" },
     ],
   },
   {
@@ -46,16 +51,16 @@ const GROUPS: { id: string; title: string; lead: string; tools: Tool[] }[] = [
     title: "Get hired",
     lead: "Get past the recruiter and into the interview.",
     tools: [
-      { href: "/ai/resume", title: "Resume review", text: "Fixes in order of importance, rewritten lines and the keywords recruiters search for.", icon: "star", tone: "from-amber-400 to-amber-600", ai: true, give: "Your resume and target role", get: "A ranked list of fixes" },
-      { href: "/interview", title: "Interview questions and answers", text: "Every interview question for your role with a short and a deeper answer, on one page.", icon: "target", tone: "from-brand-600 to-teal-600", ai: false, give: "The role you want", get: "Every question with answers" },
+      { href: "/ai/resume", title: "Resume review", text: "Fixes in order of importance, rewritten lines and the keywords recruiters search for.", icon: "star", ai: true, give: "Your resume and target role", get: "A ranked list of fixes" },
+      { href: "/interview", title: "Interview questions and answers", text: "Every interview question for your role with a short and a deeper answer, on one page.", icon: "target", ai: false, give: "The role you want", get: "Every question with answers" },
     ],
   },
 ];
 
 /** An app icon: a rounded square in the tool's colours with a soft highlight, like a product's icon. */
-function AppIcon({ icon, tone }: { icon: IconName; tone: string }) {
+function AppIcon({ icon, tone }: { icon: IconName; tone: Tone }) {
   return (
-    <span aria-hidden="true" data-tone={tone} className="grid size-12 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+    <span aria-hidden="true" className={`grid size-12 shrink-0 place-items-center rounded-2xl ${TILE[tone]}`}>
       <Icon name={icon} size={22} strokeWidth={1.5} />
     </span>
   );
@@ -102,7 +107,7 @@ export default function AiToolsPage() {
                         className="group relative flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 transition hover:border-brand-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-brand-800"
                       >
                         <span className="flex items-start gap-4">
-                          <AppIcon icon={t.icon} tone={t.tone} />
+                          <AppIcon icon={t.icon} tone={toneOf(t.href)} />
                           <span className="min-w-0 flex-1">
                             <span className="block text-lg leading-6 font-semibold">{t.title}</span>
                             <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-medium">

@@ -6,12 +6,13 @@ import { Suspense, useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/art/icons";
 import { NAV_GROUPS, PRO_LINK, type NavTone, activeGroup, under } from "@/lib/nav";
+import { TILE } from "@/lib/tones";
 import type { IconName } from "@/lib/themes";
 
 /** UX-3: the soft icon tile beside each menu item. */
 /** BR-10: one calm tile for every item, in the brand teal, so the menu reads as one family. */
-const CALM = "bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-200";
-const TONE: Record<NavTone, string> = { violet: CALM, indigo: CALM, sky: CALM, teal: CALM, emerald: CALM, amber: CALM, rose: CALM };
+// UX-13: each tool's own soft colour (it was one calm teal for all, UX-6).
+const TONE: Record<NavTone, string> = TILE;
 
 function Tile({ icon, tone, size = "size-10" }: { icon: IconName; tone: NavTone; size?: string }) {
   return (
