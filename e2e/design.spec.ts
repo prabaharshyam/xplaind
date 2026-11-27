@@ -83,7 +83,11 @@ test("the About page tells the founder's story with his photo and LinkedIn (TR-2
 
 test("key pages pass the accessibility check in dark mode too (A11Y-3)", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, colorScheme: "dark", reducedMotion: "reduce" });
+  // UX-24: dark mode is a choice made with the header switch, saved on the device.
+  await ctx.addInitScript(() => localStorage.setItem("xp-theme", "dark"));
   const page = await ctx.newPage();
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   for (const url of ["/", "/paths", "/roadmap/ai-engineer", "/stop/rag-app", "/library", "/jobs", "/practice", "/about"]) {
     await page.goto(url);
     expect((await wcag(page)).violations, url).toEqual([]);
@@ -155,6 +159,15 @@ test("a lesson opens at its top, not at a widget further down (NV-4)", async ({ 
   }
 });
 
+test("everyone lands in light mode, even with a dark system setting (UX-24)", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: "dark" });
+  const page = await ctx.newPage();
+  await page.goto("/ai/book");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByRole("button", { name: "Switch to dark mode" })).toBeVisible();
+  await ctx.close();
+});
+
 test("the header switch turns the site dark and remembers it (BR-6)", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: "light" });
   const page = await ctx.newPage();
@@ -192,4 +205,22 @@ test("tool pages end with Explore more tools, in each tool's colour, without the
   expect(await band.getByRole("link").count()).toBeGreaterThanOrEqual(6);
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
+});
+
+test("the menu capsule docks into a full-width bar on scroll and floats again at the top (UX-25)", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: "reduce" });
+  const page = await ctx.newPage();
+  await page.goto("/about");
+  const bar = page.locator(".site-header > .xp-glass");
+  const box = () => bar.evaluate((el) => ({ w: el.getBoundingClientRect().width, top: el.getBoundingClientRect().top, r: getComputedStyle(el).borderTopLeftRadius }));
+  const top = await box();
+  expect(top.w).toBeLessThan(1200);
+  expect(top.r).not.toBe("0px");
+  await page.evaluate(() => window.scrollTo(0, 600));
+  const full = await page.evaluate(() => document.documentElement.clientWidth);
+  await expect.poll(async () => Math.round((await box()).w)).toBe(full);
+  expect(await box()).toMatchObject({ top: 0, r: "0px" });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(async () => (await box()).w).toBeLessThan(1200);
+  await ctx.close();
 });

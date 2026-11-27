@@ -56,7 +56,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} h-full antialiased`}
-      // BR-6: the theme script sets data-theme before React loads.
+      // BR-6: the theme script sets data-theme before React loads. UX-24: light until it does, even without JavaScript.
+      data-theme="light"
       suppressHydrationWarning
     >
       <head>

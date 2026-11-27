@@ -29,7 +29,7 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
     });
 
   const arrow =
-    "grid size-11 place-items-center rounded-full border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
+    "grid size-11 place-items-center rounded-full border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-700 dark:focus-visible:outline-brand-300 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   return (
     <div className="mt-8">

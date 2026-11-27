@@ -4,6 +4,7 @@ import { BrandLogo } from "./brand-logo";
 import { FocusTimer } from "./focus-timer";
 import { HeaderSearch, XpChip } from "./header-extras";
 import { MenuCloser } from "./menu-closer";
+import { HeaderDock } from "./header-dock";
 import { ThemeToggle } from "./theme-toggle";
 import { DesktopNav, PhoneNavLinks } from "./site-nav";
 
@@ -67,6 +68,7 @@ export function SiteHeader() {
             </nav>
           </details>
           <MenuCloser selector=".site-header details.site-menu" />
+          <HeaderDock />
         </div>
       </div>
     </header>

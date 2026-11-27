@@ -1,25 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { THEME_KEY, type Theme, currentTheme, setTheme } from "@/lib/browser/theme";
+import { type Theme, currentTheme, setTheme } from "@/lib/browser/theme";
 
 /** BR-6: the light/dark switch in the header. Remembers the choice on this device. */
 export function ThemeToggle({ className = "", labelled = false }: { className?: string; labelled?: boolean }) {
   const [theme, setState] = useState<Theme | null>(null);
 
+  // UX-24: light unless the learner chose dark here; the system setting no longer decides.
   useEffect(() => {
     queueMicrotask(() => setState(currentTheme()));
-    // With no saved choice, keep following the system setting as it changes.
-    const media = matchMedia("(prefers-color-scheme: dark)");
-    const onSystem = () => {
-      try {
-        if (localStorage.getItem(THEME_KEY)) return;
-      } catch {}
-      document.documentElement.dataset.theme = media.matches ? "dark" : "light";
-      setState(currentTheme());
-    };
-    media.addEventListener("change", onSystem);
-    return () => media.removeEventListener("change", onSystem);
   }, []);
 
   const next: Theme = theme === "dark" ? "light" : "dark";
