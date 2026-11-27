@@ -240,7 +240,7 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
             </button>
           </div>
 
-          <ul className="flex flex-col gap-2 text-[15px] leading-6">
+          <ul className="flex flex-col gap-2 text-sm leading-6">
             {[
               `${plan.days} days of Pro, from the moment you pay`,
               "AI mock interviews with Zarina",
@@ -253,7 +253,7 @@ export function BuyPass({ planId, label, price, popular, provider = "cashfree" }
             ))}
           </ul>
 
-          <div className="flex flex-col gap-2 border-t border-black/10 pt-4 text-[15px] dark:border-white/10">
+          <div className="flex flex-col gap-2 border-t border-black/10 pt-4 text-sm dark:border-white/10">
             {savedPaise > 0 && (
               <>
                 <p className="flex justify-between gap-4">

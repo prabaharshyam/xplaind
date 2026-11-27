@@ -29,7 +29,7 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
     });
 
   const arrow =
-    "grid size-11 place-items-center rounded-full border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
+    "grid size-11 place-items-center rounded-full border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
   return (
     <div className="mt-8">
@@ -56,7 +56,7 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
           const short = t.excerpt && t.excerpt !== t.quote;
           return (
             <li key={t.name} className="w-[82%] max-w-[22rem] shrink-0 snap-start sm:w-[22rem]">
-              <figure className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <figure className="rounded-2xl border border-zinc-200 bg-white p-6 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
                 <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6 text-zinc-300 dark:text-zinc-700" fill="currentColor">
                   <path d="M9.5 5C6 6.4 4 9.2 4 13v6h6v-6H7c0-2.5 1.2-4.3 3.4-5.3L9.5 5Zm10 0C16 6.4 14 9.2 14 13v6h6v-6h-3c0-2.5 1.2-4.3 3.4-5.3L19.5 5Z" />
                 </svg>

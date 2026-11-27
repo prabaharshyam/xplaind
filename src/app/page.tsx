@@ -168,7 +168,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={1} label="Start here" />
           <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-            <h2 id="roles-heading" data-words className="max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
+            <h2 id="roles-heading" data-words className="max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
               <Words text="Choose your AI role" />
             </h2>
             <Link href="/paths" className="shrink-0 text-sm font-medium whitespace-nowrap text-brand-800 hover:underline dark:text-brand-300">
@@ -206,7 +206,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={2} label="Learn, practise, get hired" />
           <div className="mt-4 grid gap-4 md:grid-cols-[1.3fr_1fr] md:items-end">
-            <h2 id="do-heading" data-words className="max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
+            <h2 id="do-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
               <Words text="Everything you need to get job-ready" />
             </h2>
             <p className="max-w-md text-lg leading-8 text-zinc-700 md:justify-self-end dark:text-zinc-300">
@@ -308,15 +308,16 @@ export default function Home() {
       <LanguagesSection />
 
       {/* HM-7: the proof in one place: learners in their own words (SO-1), what is inside, counted, and the
-          market behind the promise, each figure sourced and dated (JB-4, moved here from the hero). */}
-      <section aria-labelledby={testimonials.length ? "voices-heading" : "trust-heading"} className="py-12 md:py-24">
+          market behind the promise, each figure sourced and dated (JB-4, moved here from the hero).
+          UX-16: one dark band, so the long page has a rhythm and the proof reads as one block. */}
+      <section aria-labelledby={testimonials.length ? "voices-heading" : "trust-heading"} className="bg-brand-950 py-14 text-white md:py-28 dark:bg-brand-800">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           {testimonials.length > 0 && (
             <>
               <h2 id="voices-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
                 <Words text="What early learners say" />
               </h2>
-              <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">Freshers, founders and working professionals who tried Xplaind first.</p>
+              <p className="mt-3 max-w-2xl text-lg leading-8 text-brand-100">Freshers, founders and working professionals who tried Xplaind first.</p>
               <Testimonials items={testimonials} />
             </>
           )}
@@ -325,19 +326,19 @@ export default function Home() {
               <Sub id="trust-heading" className="text-xl font-semibold">
                 What is inside, today
               </Sub>
-              <p className="mt-1 text-zinc-700 dark:text-zinc-300">No paid rankings, no ads. Every course is picked on merit.</p>
+              <p className="mt-1 text-brand-100">No paid rankings, no ads. Every course is picked on merit.</p>
               <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
                 {stats.map((m) => (
                   <div key={m.label} className="flex flex-col-reverse justify-end">
-                    <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
-                    <dd className="text-4xl font-semibold tracking-tight tabular-nums">{m.value}</dd>
+                    <dt className="mt-1 text-sm leading-5 text-brand-100">{m.label}</dt>
+                    <dd className="text-3xl font-semibold tracking-tight tabular-nums md:text-4xl">{m.value}</dd>
                   </div>
                 ))}
               </dl>
             </div>
             <div>
               <Sub className="text-xl font-semibold">Why now: India&apos;s AI job market</Sub>
-              <p className="mt-1 text-zinc-700 dark:text-zinc-300">
+              <p className="mt-1 text-brand-100">
                 <a href="#market-sources" className="underline underline-offset-2">
                   Sources
                 </a>
@@ -346,8 +347,8 @@ export default function Home() {
               <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
                 {market.stats.map((m) => (
                   <div key={m.label} className="flex flex-col-reverse justify-end">
-                    <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
-                    <dd className="text-4xl font-semibold tracking-tight tabular-nums">{m.value}</dd>
+                    <dt className="mt-1 text-sm leading-5 text-brand-100">{m.label}</dt>
+                    <dd className="text-3xl font-semibold tracking-tight tabular-nums md:text-4xl">{m.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -363,7 +364,7 @@ export default function Home() {
           <div className="flex justify-start md:justify-center">
             <Gate n={3} label="Your AI career" />
           </div>
-          <h2 id="final-heading" data-words className="mt-5 text-4xl font-semibold tracking-tight text-balance md:text-6xl">
+          <h2 id="final-heading" data-words className="mt-5 text-3xl font-semibold tracking-tight text-balance md:text-4xl">
             <Words text="Your AI career starts with one 20-minute lesson" />
           </h2>
           <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-800 md:mx-auto dark:text-zinc-200">

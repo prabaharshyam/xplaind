@@ -1,5 +1,5 @@
-// "Study from my notes & books" tests, kept on this device only (MB-4). The book itself is never
-// saved: only the questions, their short quotes and the learner's answers.
+// "Study from my notes & books" tests, kept on this device only (MB-4): the questions, their short quotes and the
+// learner's answers. Since MB-13 the file's text is also kept on this device, as a study set (study-sets.ts).
 import { useMemo, useSyncExternalStore } from "react";
 import { z } from "zod";
 import type { BookTest } from "@/lib/book/report";
@@ -28,7 +28,13 @@ const Test = z.object({
   /** MB-9: written from the sections the learner missed in an earlier test. */
   retest: z.boolean().optional(),
   result: z
-    .object({ answers: z.array(z.number().int().min(0).max(3).nullable()), seconds: z.number().int().min(0), finishedOn: z.string().max(10) })
+    .object({
+      answers: z.array(z.number().int().min(0).max(3).nullable()),
+      seconds: z.number().int().min(0),
+      finishedOn: z.string().max(10),
+      /** MB-17: how sure the learner was of each answer (true sure, false not sure, null not said). Older results have none. */
+      sure: z.array(z.boolean().nullable()).optional(),
+    })
     .optional(),
 });
 

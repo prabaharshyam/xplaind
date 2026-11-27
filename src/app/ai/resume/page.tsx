@@ -1,6 +1,10 @@
 import { pageMeta } from "@/lib/seo";
+import { ExploreTools } from "@/components/explore-tools";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniResume } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { aiEnabled } from "@/lib/ai/settings";
 import { getPaths } from "@/lib/content";
 import { ResumeStudio } from "./resume-studio";
@@ -17,18 +21,20 @@ export default function ResumePage() {
   return (
     <main>
       <PageHero
+        demo={<ProductFrame tone={toolTone("/ai/resume")} label="Resume review"><MiniResume /></ProductFrame>}
         shape="resume"
         theme="career"
         seed="resume"
         icon="star"
         eyebrow="AI tools · Resume review"
         title="Get your resume shortlisted"
-        lead="Upload your resume and the role you want. You get a clear list of fixes, most important first: what a recruiter and an applicant tracking system will look for, with rewritten lines you can adapt."
+        lead="Upload your resume and the role you want. Get the fixes a recruiter would ask for, most important first, with lines you can use."
         crumbs={[{ href: "/ai", label: "AI tools" }]}
       />
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-6">
         <ResumeStudio enabled={aiEnabled()} roles={getPaths().map((p) => p.name)} />
       </div>
+      <ExploreTools current="/ai/resume" />
     </main>
   );
 }

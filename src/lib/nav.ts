@@ -1,8 +1,9 @@
 // NV-1 and NV-2: the main menu's groups and "you are here". Type-only imports, so it is safe anywhere.
 import type { IconName } from "@/lib/themes";
+import type { Tone } from "@/lib/tones";
 
-/** UX-3: each menu item has an icon on a soft tile in one of these tones. */
-export type NavTone = "violet" | "indigo" | "sky" | "teal" | "emerald" | "amber" | "rose";
+/** UX-3, UX-13: each menu item has an icon on a soft tile in its tool's colour (src/lib/tones.ts). */
+export type NavTone = Tone;
 type Item = { href: string; label: string; note: string; icon: IconName; tone: NavTone };
 type Group = { id: string; label: string; items: Item[] };
 
@@ -12,13 +13,13 @@ export const NAV_GROUPS: Group[] = [
     id: "learn",
     label: "Learn",
     items: [
-      { href: "/paths", label: "Roadmaps", note: "A step-by-step path for each AI role", icon: "map", tone: "violet" },
+      { href: "/paths", label: "Roadmaps", note: "A step-by-step path for each AI role", icon: "map", tone: "teal" },
       // LY-2: Library and Topics are one page; "By topic" is a view inside it.
-      { href: "/library", label: "Library", note: "Every lesson, video and skill, or browse by topic", icon: "table", tone: "indigo" },
+      { href: "/library", label: "Library", note: "Every lesson, video and skill, or browse by topic", icon: "table", tone: "sky" },
       { href: "/videos", label: "Videos", note: "Filter by topic", icon: "play", tone: "rose" },
       { href: "/projects", label: "Projects", note: "Guided builds for your portfolio", icon: "rocket", tone: "amber" },
-      { href: "/glossary", label: "Glossary", note: "AI words in plain English", icon: "chat", tone: "teal" },
-      { href: "/papers", label: "Papers and free books", note: "Landmark research and free AI books", icon: "book", tone: "emerald" },
+      { href: "/glossary", label: "Glossary", note: "AI words in plain English", icon: "chat", tone: "emerald" },
+      { href: "/papers", label: "Papers and free books", note: "Landmark research and free AI books", icon: "book", tone: "sky" },
       // NV-10 (2026-11-27, owner: "fix/do the 4-12", item 12): four groups, not five. Practice held two entries;
       // the weekly plan is part of learning, and the code playground is a tool.
       { href: "/plan", label: "Stay on track", note: "This week's plan, reminders and Monday emails", icon: "target", tone: "amber" },
@@ -33,7 +34,7 @@ export const NAV_GROUPS: Group[] = [
       // role, the flashcards, interview patterns and system design answers.
       { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report", icon: "mic", tone: "rose" },
       { href: "/interview/prep", label: "Prep plan", note: "Questions for each day until your interview", icon: "map", tone: "emerald" },
-      { href: "/interview", label: "Questions", note: "500 questions with answers, patterns and system design", icon: "search", tone: "amber" },
+      { href: "/interview", label: "Questions", note: "500 questions with answers, patterns and system design", icon: "search", tone: "sky" },
     ],
   },
   {
@@ -50,10 +51,10 @@ export const NAV_GROUPS: Group[] = [
     // NV-7 (owner request, 2026-11-13): the AI tools are part of Pro, so the group reads as a studio.
     label: "AI Studio",
     items: [
-      { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards", icon: "book", tone: "violet" },
+      { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards", icon: "book", tone: "amber" },
       { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English", icon: "robot", tone: "teal" },
       { href: "/playground", label: "Code playground", note: "Run Python in your browser", icon: "code", tone: "sky" },
-      { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work", icon: "sparkles", tone: "amber" },
+      { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work", icon: "sparkles", tone: "teal" },
     ],
   },
 ];
@@ -63,6 +64,9 @@ export const NAV_GROUPS: Group[] = [
  * dot, because "Pro" with a dot made learners think they were already subscribed. BIZ-1: prices are always public, so gateways and visitors see what is sold.
  */
 export const PRO_LINK = { href: "/pricing", label: "Pricing", title: "Plans and pricing", note: "Daily AI tutor, interview feedback and resume reviews, from ₹249" } as const;
+
+/** UX-13: a tool's colour is the one its menu item has. */
+export const toolTone = (href: string): Tone => NAV_GROUPS.flatMap((g) => g.items).find((i) => i.href === href)?.tone ?? "teal";
 
 export const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 

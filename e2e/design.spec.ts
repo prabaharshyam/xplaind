@@ -53,6 +53,9 @@ test("the About, Privacy and Terms pages are linked from the footer and accessib
     ["Terms", "/terms", "Terms of use"],
   ] as const) {
     await page.goto("/");
+    // FT-2: on a phone the footer's columns are rows that open; About is under Company.
+    const company = page.getByRole("contentinfo").locator("summary", { hasText: "Company" });
+    if (name === "About" && (await company.isVisible())) await company.click();
     await expect(page.getByRole("contentinfo").getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
     await page.goto(href);
     await expect(page.getByRole("heading", { level: 1, name: h1 })).toBeVisible();
@@ -176,4 +179,15 @@ test("lesson code blocks have a Copy button (BR-7)", async ({ browser }) => {
     await expect(copy).toContainText("Copied", { timeout: 1000 });
   }).toPass();
   await ctx.close();
+});
+
+test("tool pages end with Explore more tools, in each tool's colour, without the page itself (UX-13, UX-17)", async ({ page }) => {
+  await page.goto("/ai/book");
+  const band = page.getByRole("region", { name: "Explore more tools" });
+  await expect(band).toBeVisible();
+  await expect(band.getByRole("link", { name: /AI tutor/ })).toHaveAttribute("href", "/ai/tutor");
+  await expect(band.locator('a[href="/ai/book"]')).toHaveCount(0);
+  expect(await band.getByRole("link").count()).toBeGreaterThanOrEqual(6);
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
 });

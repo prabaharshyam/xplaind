@@ -151,7 +151,7 @@ export function FeatureDeck({ cards }: { cards: DeckCard[] }) {
               >
                 <div>
                   <p className="hidden text-sm font-semibold text-zinc-700 md:block dark:text-zinc-300">{c.eyebrow}</p>
-                  <h3 className="text-2xl leading-tight font-semibold tracking-tight text-balance md:mt-2 md:text-4xl">{c.title}</h3>
+                  <h3 className="text-xl leading-tight font-semibold tracking-tight text-balance md:mt-2 md:text-3xl">{c.title}</h3>
                   <p className="mt-2 line-clamp-3 text-base leading-7 text-zinc-800 md:mt-3 md:line-clamp-none md:text-lg md:leading-8 dark:text-zinc-200">{c.text}</p>
                   {c.points && (
                     <ul className="mt-4 hidden flex-col gap-2 md:flex">

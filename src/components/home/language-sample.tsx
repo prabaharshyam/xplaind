@@ -30,7 +30,7 @@ export function LanguageSample({ cards }: { cards: LanguageCard[] }) {
         ))}
       </div>
       <div aria-live="polite" className="mt-5 rounded-3xl bg-zinc-50 p-6 md:p-8 dark:bg-zinc-900">
-        <p lang={c.htmlLang} className="text-xl leading-8 font-semibold tracking-tight md:text-2xl md:leading-9">
+        <p lang={c.htmlLang} className="text-xl leading-8 font-semibold tracking-tight">
           {c.q}
         </p>
         <p lang={c.htmlLang} className="mt-3 text-lg leading-8 text-zinc-800 dark:text-zinc-200">

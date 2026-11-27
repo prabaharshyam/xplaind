@@ -19,6 +19,7 @@ export function PageHero({
   lead,
   crumbs = [],
   children,
+  demo,
 }: {
   theme: ThemeId;
   /** Kept for callers; the road panel needs only the theme. */
@@ -32,10 +33,12 @@ export function PageHero({
   crumbs?: { href: string; label: string }[];
   children?: ReactNode;
   size?: "compact" | "full";
+  /** UX-14: a tool page shows the tool working in a product frame instead of the particle sculpture. */
+  demo?: ReactNode;
 }) {
   const full = size === "full";
   return (
-    <header className="relative overflow-hidden border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950">
+    <header className="relative overflow-clip border-b border-zinc-200 bg-[var(--hero)] dark:border-zinc-800 dark:bg-zinc-950">
       <div className={`mx-auto flex max-w-6xl flex-col px-4 md:flex-row md:items-center md:gap-10 md:px-6 ${full ? "gap-4 py-8 md:py-12" : "gap-4 py-6 md:py-8"}`}>
         <div className="min-w-0 flex-1">
           {crumbs.length > 0 && (
@@ -55,10 +58,15 @@ export function PageHero({
           {lead && <div className={`mt-3 max-w-2xl text-zinc-700 dark:text-zinc-300 ${full ? "text-lg leading-8" : "text-base leading-7 md:text-lg md:leading-8"}`}>{lead}</div>}
           {children && <div className={full ? "mt-5" : "mt-4"}>{children}</div>}
         </div>
-        {/* MO-8: the page's own particle sculpture, in its theme's colours. UX-10: never on a phone, where it only pushed the content down. */}
-        <div className="lx-hero-art shrink-0 [perspective:1000px] max-md:hidden">
-          <ParticleScene shape={shape ?? THEME_SHAPE[theme]} colors={particleColorsOf(theme)} icon={icon ?? themeOf(theme).icon} className={full ? "h-44 w-full md:h-72 md:w-[26rem]" : "h-52 w-80"} />
-        </div>
+        {/* MO-8: the page's own particle sculpture, in its theme's colours, or (UX-14) the tool shown working.
+            UX-10: neither on a phone, where they only pushed the content down. */}
+        {demo ? (
+          <div className="w-[20rem] shrink-0 max-md:hidden lg:w-[24rem]">{demo}</div>
+        ) : (
+          <div className="lx-hero-art shrink-0 [perspective:1000px] max-md:hidden">
+            <ParticleScene shape={shape ?? THEME_SHAPE[theme]} colors={particleColorsOf(theme)} icon={icon ?? themeOf(theme).icon} className={full ? "h-44 w-full md:h-72 md:w-[26rem]" : "h-52 w-80"} />
+          </div>
+        )}
       </div>
     </header>
   );

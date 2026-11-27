@@ -324,14 +324,21 @@ export function cleanBookQuestions(out: BookOutput, excerpts: BookExcerpt[], cou
 }
 
 /** MB-5: flashcards from the learner's own notes or book, from the same kind of excerpts as a test. */
+export const CARD_FORMATS = ["qa", "cloze", "mcq"] as const;
+export type CardFormat = (typeof CARD_FORMATS)[number];
+
 export const BookCardsRequest = z.strictObject({
   book: z.string().max(160),
   count: z.number().int().min(5).max(30),
   excerpts: z.array(BookExcerpt).min(1).max(30),
+  /** MB-16: the card formats to mix; question and answer when not given. */
+  formats: z.array(z.enum(CARD_FORMATS)).min(1).max(3).default(["qa"]),
 });
 
 export const BookCardsOutput = z.object({
-  cards: z.array(z.object({ excerpt_id: z.string(), front: z.string(), back: z.string(), quote: z.string() })),
+  cards: z.array(
+    z.object({ excerpt_id: z.string(), kind: z.enum(CARD_FORMATS), front: z.string(), back: z.string(), options: z.array(z.string()), answer_index: z.number(), quote: z.string() }),
+  ),
 });
 export type BookCardsOutput = z.infer<typeof BookCardsOutput>;
 
@@ -341,7 +348,8 @@ export function bookCardsPrompt(req: z.infer<typeof BookCardsRequest>) {
     HOUSE_STYLE,
     DATA_RULE,
     "Each card tests one idea from one excerpt alone; never use outside knowledge, and never ask about page numbers, the author or the layout. Spread the cards over the excerpts, skipping any that has nothing worth learning (references, a copyright notice, a table of contents).",
-    "front: a short question or prompt, at most 25 words, that makes the learner recall the idea (a definition, a cause, a step, a difference, a number that matters). back: the answer in one to three short sentences, in your own words.",
+    `Mix these formats in about equal numbers: ${req.formats.map((f) => FORMAT_RULE[f]).join(" ")} kind is the card's format.`,
+    "For every card: back is the answer in one to three short sentences, in your own words. For cards that are not multiple choice, options is an empty list and answer_index is 0.",
     "quote: copy 8 to 40 words exactly, character for character, from the excerpt that supports the back of the card. Do not change, join or shorten words inside the quote. excerpt_id: the id of that excerpt.",
   ].join("\n\n");
   const user = [
@@ -351,6 +359,12 @@ export function bookCardsPrompt(req: z.infer<typeof BookCardsRequest>) {
   ].join("\n\n");
   return { system, messages: [{ role: "user" as const, content: user }], schema: BookCardsOutput };
 }
+
+const FORMAT_RULE: Record<CardFormat, string> = {
+  qa: "qa (question and answer): front is a short question or prompt, at most 25 words, that makes the learner recall the idea (a definition, a cause, a step, a difference, a number that matters).",
+  cloze: "cloze (fill in the blank): front is one sentence stating the idea with its key word or short phrase replaced by _____ (five underscores, once); back starts with the missing words.",
+  mcq: "mcq (multiple choice): front is a question; options are exactly 4 short answers of similar length, one right and three plausible wrong ones; answer_index is the right one (0 to 3), varied between cards.",
+};
 
 /** MB-5: keeps only cards whose quote is found in the excerpt they cite, one per front, in book order. */
 export function cleanBookCards(out: BookCardsOutput, excerpts: BookExcerpt[], count: number) {
@@ -362,13 +376,78 @@ export function cleanBookCards(out: BookCardsOutput, excerpts: BookExcerpt[], co
     const back = clip(c.back, 600);
     const key = front.toLowerCase();
     if (!e || !front || !back || seen.has(key) || !quoteIn(c.quote, e.text)) return [];
+    // MB-16: a blank card needs its blank, and a multiple-choice card four different options and a right one.
+    const kind: CardFormat = c.kind;
+    const options = c.options.map((o) => line(o, 300));
+    if (kind === "cloze" && !/_{3,}/.test(front)) return [];
+    if (kind === "mcq" && (options.length !== 4 || options.some((o) => !o) || new Set(options.map((o) => o.toLowerCase())).size !== 4 || !Number.isInteger(c.answer_index) || c.answer_index < 0 || c.answer_index > 3)) return [];
     seen.add(key);
-    return [{ front, back, quote: clip(c.quote, 400), page: e.page, section: e.section, order: excerpts.indexOf(e) }];
+    const extra = kind === "mcq" ? { options, answer: c.answer_index } : {};
+    return [{ front: kind === "cloze" ? front.replace(/_{3,}/g, "_____") : front, back, quote: clip(c.quote, 400), page: e.page, section: e.section, order: excerpts.indexOf(e), kind, ...extra }];
   });
   return kept
     .sort((a, b) => a.order - b.order)
     .slice(0, count)
-    .map((c, i) => ({ id: `c${i + 1}`, front: c.front, back: c.back, quote: c.quote, page: c.page, section: c.section }));
+    .map(({ order, ...c }, i) => (void order, { id: `c${i + 1}`, ...c }));
+}
+
+/**
+ * MB-15 (2026-11-27, owner: StudyFetch's AI notes, Part 2): study notes written from the learner's own file, as headed
+ * sections of short points. Every point carries an exact quote from the excerpt it came from, and a point whose quote
+ * is not there is dropped, as for questions and cards (MB-2, MB-5).
+ */
+export const BookNotesRequest = z.strictObject({
+  book: z.string().max(160),
+  depth: z.enum(["summary", "detailed"]),
+  excerpts: z.array(BookExcerpt).min(1).max(30),
+});
+
+export const BookNotesOutput = z.object({
+  sections: z.array(
+    z.object({
+      heading: z.string(),
+      points: z.array(z.object({ term: z.string(), text: z.string(), excerpt_id: z.string(), quote: z.string() })),
+    }),
+  ),
+});
+export type BookNotesOutput = z.infer<typeof BookNotesOutput>;
+
+export function bookNotesPrompt(req: z.infer<typeof BookNotesRequest>) {
+  const system = [
+    "You write clear study notes from a book or notes a learner is studying. You get numbered excerpts from it, in book order.",
+    HOUSE_STYLE,
+    DATA_RULE,
+    "Use only the excerpts: never outside knowledge, and nothing about page numbers, the author or the layout. Skip excerpts with nothing worth learning (references, a copyright notice, a table of contents).",
+    req.depth === "summary"
+      ? "Summary: 3 to 6 sections, each with 2 to 4 points; only the ideas a learner must remember for an exam."
+      : "Detailed: 4 to 10 sections, each with 3 to 8 points; every definition, step, cause, difference and number that matters.",
+    "sections: in the order the ideas appear in the excerpts; heading: 2 to 6 words naming the topic. Each point: term is the key word or phrase it is about (2 to 5 words, or an empty string when there is none); text is one or two short sentences in your own simple words, at most 40 words, that explain it; quote copies 8 to 40 words exactly, character for character, from the excerpt that supports the point, without changing, joining or shortening words; excerpt_id is the id of that excerpt.",
+  ].join("\n\n");
+  const user = [
+    `Write ${req.depth === "summary" ? "summary" : "detailed"} notes.`,
+    asData("book_title", req.book, 160),
+    ...req.excerpts.map((e) => asData(`excerpt_${e.id}`, `[${e.id}] ${e.section}, page ${e.page}\n${e.text}`, 2000)),
+  ].join("\n\n");
+  return { system, messages: [{ role: "user" as const, content: user }], schema: BookNotesOutput };
+}
+
+export type BookNote = { heading: string; points: { term: string; text: string; quote: string; page: number; section: string }[] };
+
+/** MB-15: keeps only points whose quote is in the excerpt they cite, drops empty sections, and caps the size. */
+export function cleanBookNotes(out: BookNotesOutput, excerpts: BookExcerpt[]): BookNote[] {
+  const byId = new Map(excerpts.map((e) => [e.id, e]));
+  return out.sections
+    .map((s) => ({
+      heading: line(s.heading, 80),
+      points: s.points.flatMap((p) => {
+        const e = byId.get(p.excerpt_id);
+        const text = line(p.text, 400);
+        if (!e || !text || !quoteIn(p.quote, e.text)) return [];
+        return [{ term: line(p.term, 80), text, quote: clip(p.quote, 400), page: e.page, section: e.section }];
+      }).slice(0, 8),
+    }))
+    .filter((s) => s.heading && s.points.length > 0)
+    .slice(0, 12);
 }
 
 /**

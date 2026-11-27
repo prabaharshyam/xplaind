@@ -27,7 +27,7 @@ export type BookTest = {
   /** MB-9: written from the sections the learner missed in an earlier test. */
   retest?: boolean;
   /** Set once the learner submits. Index of the chosen option, or null when skipped. */
-  result?: { answers: (number | null)[]; seconds: number; finishedOn: string };
+  result?: { answers: (number | null)[]; seconds: number; finishedOn: string; /** MB-17 */ sure?: (boolean | null)[] };
 };
 
 export type TopicScore = { section: string; right: number; total: number; percent: number; pages: number[] };

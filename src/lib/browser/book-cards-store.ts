@@ -15,6 +15,11 @@ const Card = z.object({
   quote: z.string().max(500),
   page: z.number().int().min(1),
   section: z.string().max(200),
+  /** MB-16: the card's format. Cards from before it are question and answer. */
+  kind: z.enum(["qa", "cloze", "mcq"]).optional(),
+  /** MB-16: a multiple-choice card's four options and the right one. */
+  options: z.array(z.string().max(300)).length(4).optional(),
+  answer: z.number().int().min(0).max(3).optional(),
 });
 const Deck = z.object({
   id: z.string().max(40),
@@ -84,5 +89,7 @@ export function studyOrder(deck: BookDeck): BookCard[] {
 /** The deck as CSV (front, back, where), which Anki and most flashcard apps can import. Pure, for tests. */
 export function deckCsv(deck: BookDeck): string {
   const cell = (s: string) => `"${s.replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
-  return ["Front,Back,Where", ...deck.cards.map((c) => [c.front, c.back, `${c.section}, page ${c.page}`].map(cell).join(","))].join("\r\n");
+  // MB-16: a multiple-choice card carries its options on the front, so the CSV still reads as a plain card.
+  const front = (c: BookCard) => (c.kind === "mcq" && c.options ? `${c.front} ${c.options.map((o, i) => `${"ABCD"[i]}) ${o}`).join(" ")}` : c.front);
+  return ["Front,Back,Where", ...deck.cards.map((c) => [front(c), c.back, `${c.section}, page ${c.page}`].map(cell).join(","))].join("\r\n");
 }

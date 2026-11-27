@@ -23,7 +23,7 @@ const A = "font-medium text-brand-800 underline underline-offset-2 dark:text-bra
 const STORED: [string, string, string][] = [
   [
     "Your progress without an account",
-    "Lessons you mark, test results, flashcards, your weekly plan, your interview prep plan and settings. A job post you paste into your interview prep plan, the kind of company, and any questions written for it also stay here; they are never saved to an account.",
+    "Lessons you mark, test results, flashcards, the text of files you open in Study from my notes & books (kept as study sets so you can come back to them), your weekly plan, your interview prep plan and settings. A job post you paste into your interview prep plan, the kind of company, and any questions written for it also stay here; they are never saved to an account.",
     "Only in your browser. It never reaches our servers. Clear your browser's site data to remove it.",
   ],
   [

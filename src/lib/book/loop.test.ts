@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cleanBookAnswer, NOT_IN_NOTES } from "@/lib/ai/features";
-import { addDays, dueCards, INTERVALS, isDue, missedAsCards, nextDue, relevantExcerpts, retestCount, retestSections, review, terms } from "./loop";
+import { addDays, confidenceSummary, dueCards, INTERVALS, isDue, missedAsCards, nextDue, relevantExcerpts, retestCount, retestSections, review, terms } from "./loop";
 import type { BookQuestion } from "./report";
 
 const chunk = (id: string, section: string, text: string) => ({ id, page: Number(id.slice(1)), section, text });
@@ -86,6 +86,14 @@ describe("retest what I missed (MB-9)", () => {
   it("turns missed questions into review cards with the right answer and the quote", () => {
     const cards = missedAsCards(test, [0, 1, 0, 0, 0]);
     expect(cards).toEqual([{ id: "m1", front: "Q q2?", back: "A. Because.", quote: "quote", page: 3, section: "Cells" }]);
+  });
+
+  it("MB-17: a right answer marked not sure comes back too, and confidence names lucky and confident misses", () => {
+    const sure = [false, true, null, true, false];
+    expect(missedAsCards(test, [0, 1, 0, 0, 0], sure).map((c) => c.front)).toEqual(["Q q1?", "Q q2?", "Q q5?"]);
+    expect(confidenceSummary(test, [0, 1, 0, 2, 0], sure)).toEqual({ unsureRight: [0, 4], sureWrong: [1, 3], rated: 4 });
+    // Older results have no confidence: nothing extra comes back.
+    expect(confidenceSummary(test, [0, 1, 0, 0, 0])).toEqual({ unsureRight: [], sureWrong: [], rated: 0 });
   });
 });
 

@@ -1,6 +1,10 @@
 import { pageMeta } from "@/lib/seo";
+import { ExploreTools } from "@/components/explore-tools";
 import type { Metadata } from "next";
 import { PageHero } from "@/components/page-hero";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniNotes } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { aiEnabled } from "@/lib/ai/settings";
 import { BookStudio } from "./book-studio";
 
@@ -12,23 +16,25 @@ export const metadata: Metadata = pageMeta({
   path: "/ai/book",
 });
 
-/** MB-1 to MB-5, MB-8 to MB-10: "Study from my notes & books" (renamed from "Ask me from my book" on 2026-11-06). The book is read in the browser and never stored. */
+/** MB-1 to MB-5, MB-8 to MB-10: "Study from my notes & books" (renamed from "Ask me from my book" on 2026-11-06). The book is read in the browser and, since MB-13, kept on the device as a study set; never on our servers. */
 export default function BookPage() {
   return (
     <main>
-      <PageHero shape="openBook"
+      <PageHero
+        demo={<ProductFrame tone={toolTone("/ai/book")} label="Study from my notes"><MiniNotes /></ProductFrame>} shape="openBook"
         theme="retrieval"
         seed="ask-my-book"
         icon="book"
         eyebrow="Practice · AI tool"
         title="Study from my notes & books"
-        lead="Upload your book or notes as a PDF, Word or PowerPoint file. Ask it questions, take a timed test, retest what you missed, and review flashcards when they are due. Every answer shows the page it came from."
+        lead="Upload a PDF, Word or PowerPoint file. Ask it questions, take a test and review flashcards, each answer with the page it came from."
         crumbs={[{ href: "/practice", label: "Practice" }]}
       />
       <div className="mx-auto max-w-3xl px-4 py-8">
         {/* AG-1: needs an account once sign-ups are open; while they are on hold, guests keep their limits (SU-5). */}
         <BookStudio aiOn={aiEnabled()} />
       </div>
+      <ExploreTools current="/ai/book" />
     </main>
   );
 }

@@ -62,7 +62,7 @@ export const KIND_LABEL: Record<AiKind, string> = {
   tutor: "AI tutor questions",
   grade: "Interview answer feedback",
   interview: "Full mock interview reports",
-  book: "Tests or flashcards from your notes",
+  book: "Tests, flashcards or notes from your notes",
   notes: "Questions about your notes",
   resume: "Resume reviews",
   scan: "Picture pages read from your notes (4 at a time)",

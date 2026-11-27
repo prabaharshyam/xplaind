@@ -75,13 +75,14 @@ test("a PDF is read in the browser and its chapters can be chosen before any AI 
   await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
   await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/3 pages · 3 sections/)).toBeVisible();
+  await page.getByRole("tab", { name: "Tests" }).click(); // MB-14: Notes is the first tab
   for (const c of ["Cell structure", "Photosynthesis", "Respiration"]) await expect(page.getByRole("checkbox", { name: c })).toBeChecked();
   await page.getByRole("checkbox", { name: "Respiration" }).uncheck();
   await expect(page.getByText("2 chosen")).toBeVisible();
   await page.getByRole("radio", { name: "Hard: apply and compare" }).check();
   await page.getByLabel("Number of questions").selectOption("5");
   await page.getByLabel("Time allowed").selectOption("10");
-  await expect(page.getByText("AI features are not switched on yet")).toBeVisible();
+  await expect(page.getByRole("tabpanel", { name: "Tests" }).getByText("AI features are not switched on yet")).toBeVisible();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });
@@ -171,9 +172,9 @@ test("after reading a file, the learner can choose flashcards instead of a test 
   await page.goto("/ai/book");
   await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
   await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("radio", { name: /Flashcards/ }).check();
+  await page.getByRole("tab", { name: "Flashcards" }).click(); // MB-14: a tab in the study set
   await expect(page.getByLabel("Number of cards")).toBeVisible();
-  await expect(page.getByLabel("Time allowed")).toHaveCount(0);
+  await expect(page.getByLabel("Time allowed")).toBeHidden();
   expect((await wcag(page)).violations).toEqual([]);
 });
 
@@ -189,9 +190,9 @@ test("ask your notes is one of the three choices, and its API checks input and n
   await page.goto("/ai/book");
   await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
   await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("radio", { name: /Ask your notes/ }).check();
+  await page.getByRole("tab", { name: "Ask your notes" }).click(); // MB-14
   await expect(page.getByRole("heading", { name: "Ask your notes" })).toBeVisible();
-  await expect(page.getByLabel("Number of questions")).toHaveCount(0);
+  await expect(page.getByLabel("Number of questions")).toBeHidden();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 
@@ -295,4 +296,117 @@ test("a free account is told picture reading is Pro, and can carry on without it
   await expect(alert.getByRole("link", { name: "See Pro" })).toHaveAttribute("href", "/pricing");
   await page.getByRole("button", { name: "Skip, use the text only" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "could not find enough text" })).toBeVisible();
+});
+
+test("a file opened once stays as a study set: back later it opens without the file, and Remove takes it off the device (MB-13, MB-14)", async ({ page }) => {
+  await page.goto("/ai/book");
+  await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
+  await expect(page.getByRole("heading", { level: 2, name: "Biology for Class 11" })).toBeVisible({ timeout: 20_000 });
+  const tabs = page.getByRole("tablist", { name: "Study Biology for Class 11" });
+  await expect(tabs.getByRole("tab")).toHaveText(["Notes", "Tests", "Flashcards", "Ask your notes"]);
+  // Back to the start, then into the set again: the chapters are there with no file chosen.
+  await page.getByRole("button", { name: "← All study sets" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: /Biology for Class 11/ }).click();
+  await expect(page.getByRole("checkbox", { name: "Photosynthesis" })).toBeChecked({ timeout: 10_000 });
+  await expect(page.getByText("Open the file again")).toHaveCount(0);
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+  // Remove asks first, then the set is gone from this device.
+  page.once("dialog", (d) => void d.accept());
+  await page.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByRole("heading", { name: "Your study sets" })).toHaveCount(0);
+});
+
+test("notes from a file: summary or detailed, every point with its page, kept on the device (MB-15)", async ({ page, request }) => {
+  const notes = {
+    version: 1,
+    notes: [
+      {
+        id: "n1",
+        book: "Biology for Class 11",
+        createdOn: "2026-11-27",
+        depth: "summary",
+        sections: [
+          { heading: "Photosynthesis", points: [{ term: "Chloroplast", text: "Where green plants make food from light.", quote: "Photosynthesis takes place in the chloroplasts of green plant cells", page: 2, section: "Photosynthesis" }] },
+        ],
+      },
+    ],
+  };
+  await page.addInitScript((n) => localStorage.setItem("xplaind.book-notes.v1", JSON.stringify(n)), notes);
+  await page.goto("/ai/book");
+  await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
+  const panel = page.getByRole("tabpanel", { name: "Notes" });
+  await expect(panel.getByRole("heading", { name: "Summary notes" })).toBeVisible({ timeout: 20_000 });
+  await expect(panel.getByText("Where green plants make food from light.")).toBeVisible();
+  await panel.getByText("page 2").click();
+  await expect(panel.getByText(/Photosynthesis takes place in the chloroplasts/)).toBeVisible();
+  await expect(panel.getByRole("radio", { name: /Detailed/ })).toBeVisible();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+
+  const ok = { book: "Bio", depth: "summary", excerpts: [{ id: "c1", page: 1, section: "One", text: "Photosynthesis happens in the chloroplast." }] };
+  expect((await request.post("/api/ai/book-notes", { data: ok })).status()).toBe(503);
+  expect((await request.post("/api/ai/book-notes", { data: { ...ok, depth: "everything" } })).status()).toBe(400);
+});
+
+test("cards come as question and answer, fill in the blank or multiple choice (MB-16)", async ({ page }) => {
+  const decks = {
+    version: 1,
+    decks: [
+      {
+        id: "d1",
+        createdOn: "2026-11-27",
+        book: "Biology for Class 11",
+        cards: [
+          { id: "c1", kind: "cloze", front: "Photosynthesis takes place in the _____ of green plant cells.", back: "chloroplasts. That is where light becomes food.", quote: "Photosynthesis takes place in the chloroplasts of green plant cells", page: 2, section: "Photosynthesis" },
+          { id: "c2", kind: "mcq", front: "What does respiration release?", options: ["Oxygen only", "Energy from glucose", "Chlorophyll", "Starch"], answer: 1, back: "Respiration releases the energy stored in glucose.", quote: "Respiration releases the energy stored in glucose", page: 3, section: "Respiration" },
+        ],
+        marks: {},
+        schedule: {},
+        source: "ai",
+      },
+    ],
+  };
+  await page.addInitScript((d) => localStorage.setItem("xplaind.bookcards.v1", JSON.stringify(d)), decks);
+  await page.goto("/ai/book");
+  await page.getByRole("button", { name: /Study the flashcards: Biology for Class 11/ }).click();
+  await expect(page.getByText("blank", { exact: true })).toHaveCount(1);
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Flip the card" }).click();
+  await expect(page.getByText("chloroplasts. That is where light becomes food.")).toBeVisible();
+  await page.getByRole("button", { name: "I knew it" }).click();
+  // A multiple-choice card turns over when an option is picked, and marks the right one.
+  await expect(page.getByRole("button", { name: "Flip the card" })).toHaveCount(0);
+  await page.getByRole("button", { name: /Oxygen only/ }).click();
+  await expect(page.getByText("Right answer")).toBeVisible();
+  await expect(page.getByText("Respiration releases the energy stored in glucose.")).toBeVisible();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+});
+
+test("each answer can be marked sure or not sure, and the report says what that means (MB-17)", async ({ page }) => {
+  await page.addInitScript((s) => localStorage.setItem("xplaind.book.v1", JSON.stringify(s)), saved);
+  await page.goto("/ai/book");
+  await page.getByRole("button", { name: /Take the test: Biology for Class 11/ }).click();
+  const sure = page.getByRole("group", { name: "How sure are you?" });
+  await expect(sure).toHaveCount(0); // asked only once there is an answer
+  await page.getByRole("radio", { name: "Nucleus" }).check();
+  await sure.getByRole("button", { name: "Sure", exact: true }).click();
+  await expect(sure.getByRole("button", { name: "Sure", exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Next question" }).click();
+  await page.getByRole("radio", { name: "Energy from glucose" }).check();
+  await sure.getByRole("button", { name: "Not sure" }).click();
+  await page.getByRole("button", { name: "Next question" }).click();
+  await page.getByRole("radio", { name: "Mitochondrion" }).check();
+  await page.getByRole("button", { name: "Finish the test" }).click();
+
+  const panel = page.getByRole("region", { name: "How sure you were" });
+  await expect(panel).toContainText("1 wrong while you were sure");
+  await expect(panel).toContainText("Where does photosynthesis happen?");
+  await expect(panel).toContainText("1 right but not sure");
+  await expect(page.getByRole("heading", { name: "Keep the 2 you missed or were not sure of coming back" })).toBeVisible();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
 });

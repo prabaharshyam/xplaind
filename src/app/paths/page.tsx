@@ -3,6 +3,9 @@ import { pageMeta } from "@/lib/seo";
 import Link from "next/link";
 import { Cover } from "@/components/art/cover";
 import { PageHero } from "@/components/page-hero";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniRoadmap } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { muted } from "@/components/ui";
 import { getPaths } from "@/lib/content";
 import { pathView } from "@/lib/content/paths";
@@ -24,13 +27,14 @@ export default function PathsPage() {
   return (
     <main>
       <PageHero
+        demo={<ProductFrame tone={toolTone("/paths")} label="AI Engineer roadmap"><MiniRoadmap /></ProductFrame>}
         size="full" shape="compass"
         theme="career"
         seed="paths"
         icon="map"
         eyebrow="Role roadmaps"
         title="Choose your AI role"
-        lead="Ten step-by-step roadmaps. Every topic has a plain-English lesson, the best course and a check, and every stage ends in a project. Lessons are shared, so what you finish on one roadmap counts on every other."
+        lead="Ten step-by-step roadmaps. Every topic has a short lesson, the best course and a check, and what you finish counts on every roadmap."
       />
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <YourPath paths={paths.map((p) => ({ id: p.id, name: p.name }))} />

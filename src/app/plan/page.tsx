@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { ExploreTools } from "@/components/explore-tools";
 import { PageHero } from "@/components/page-hero";
+import { ProductFrame } from "@/components/product-frame";
+import { MiniPlan } from "@/components/home/showcase";
+import { toolTone } from "@/lib/nav";
 import { getPaths, pathLessons } from "@/lib/content";
 import { siteUrl } from "@/lib/site";
 import { PlanStudio } from "./plan-studio";
@@ -16,6 +20,7 @@ export default function PlanPage() {
   return (
     <main>
       <PageHero
+        demo={<ProductFrame tone={toolTone("/plan")} label="Stay on track"><MiniPlan /></ProductFrame>}
         size="full"
         shape="calendar"
         theme="career"
@@ -23,11 +28,12 @@ export default function PlanPage() {
         icon="map"
         eyebrow="Stay on track"
         title="Your study plan for this week"
-        lead="The next lessons on your roadmap, sized to the hours you have, plus one practice session. Add a Monday reminder to your calendar, or get a short progress email every Monday."
+        lead="The next lessons on your roadmap, sized to your hours, with a Monday reminder or a short weekly email."
       />
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <PlanStudio paths={paths.map((p) => ({ id: p.id, name: p.name }))} lessons={lessons} planUrl={`${siteUrl()}/plan`} />
       </div>
+      <ExploreTools current="/plan" />
     </main>
   );
 }

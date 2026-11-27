@@ -152,6 +152,9 @@ test("the result page shows the next five steps (RM-3)", async ({ page }) => {
 
 test("How we rank is linked from the footer", async ({ page }) => {
   await page.goto("/");
+  // FT-2: on a phone the footer's columns are rows that open.
+  const resources = page.getByRole("contentinfo").locator("summary", { hasText: "Resources" });
+  if (await resources.isVisible()) await resources.click();
   await page.getByRole("contentinfo").getByRole("link", { name: "How we rank" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "How we rank" })).toBeVisible();
 });

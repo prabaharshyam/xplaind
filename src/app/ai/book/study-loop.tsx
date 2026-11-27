@@ -152,7 +152,7 @@ export function ReopenFile({ title, onBook }: { title: string; onBook: (b: Book)
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm leading-6">
-        Your file is not kept, so open <span className="font-semibold">{title}</span> again. It is read on this device, as before.
+        This device does not have the text of <span className="font-semibold">{title}</span> right now. Choose it again to carry on; it is read on this device, as before.
       </p>
       <label htmlFor={id} className={`${secondaryButton} cursor-pointer self-start`}>
         <Icon name="book" size={18} /> {busy ? "Reading…" : "Open the file again"}

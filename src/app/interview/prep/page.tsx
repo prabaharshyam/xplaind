@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ExploreTools } from "@/components/explore-tools";
 import { getGlossary, getPaths, getStop } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { PrepStudio } from "./prep-studio";
@@ -36,6 +37,7 @@ export default function InterviewPrepPage() {
       <div className="mx-auto max-w-3xl px-4 pt-6 pb-16 md:px-6">
         <PrepStudio paths={paths} questions={questions} />
       </div>
+      <ExploreTools current="/interview/prep" />
     </main>
   );
 }

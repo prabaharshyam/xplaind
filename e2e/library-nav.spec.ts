@@ -57,7 +57,7 @@ test("IP-6: the Interview page is one app screen with tabs for questions, patter
   const third = page.getByRole("list", { name: "Questions" }).getByRole("button").nth(2);
   const text = (await third.locator("span").first().textContent())!;
   await third.click();
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(text);
+  await expect(page.getByRole("main").getByRole("heading", { level: 2 })).toHaveText(text); // FT-2: the footer has headings too
   await expect(page).toHaveURL(/\/interview$/);
   expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations).toEqual([]);
 

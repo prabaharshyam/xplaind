@@ -29,10 +29,10 @@ Deep teal and brass (BR-10, owner decision 2026-11-14, replacing violet). Low-sa
 | Information | `sky` | Neutral tags such as "worked example" or "docs" |
 | Neutral | `zinc` | Text, borders, surfaces |
 
-- Ink (body text and headings) is #0A2E33 on light and #E6EFED on dark. Pages are white (#FFFFFF) or deep teal-black (#071A1D). The hero sky is a soft mist (#E8F1EF to white). Colour washes never sit behind reading text.
+- Ink (body text and headings) is #0A2E33 on light and #E6EFED on dark. Pages are a warm off-white (#FAF8F4, since UX-19 on 2026-11-27; page banners #F3F0E8) or deep teal-black (#071A1D); cards and product frames stay white, so they stand on the page without lines. The hero sky is a soft mist (#E8F1EF to white). Colour washes never sit behind reading text.
 - Lesson headers are one deep teal gradient (#0A2E33 to #0E4A50) for every topic.
 - Cards are solid white (`bg-white`, dark `bg-zinc-900`) with a `zinc-200` border. No see-through cards over content.
-- Menu icon tiles share one calm teal tint. Topic art (`src/lib/themes.ts`) keeps a hue per topic, but every hue is muted to low saturation so the family sits quietly beside the teal.
+- Every tool has one soft colour of its own (UX-13, 2026-11-27): teal, sky, emerald, amber or rose, set on its menu item in `src/lib/nav.ts` and drawn from `src/lib/tones.ts`. It colours the icon tile, the product frame and the Explore more tools tile, never the background behind reading text. Topic art (`src/lib/themes.ts`) keeps a hue per topic, but every hue is muted to low saturation so the family sits quietly beside the teal.
 - Contrast: teal on white 9.9:1, link teal on white 11.6:1, sea glass on the dark page 10.1:1, brass-700 on white 7.0:1.
 
 ## Blog covers
