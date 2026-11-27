@@ -41,3 +41,11 @@ test("the app frame is there from the first paint on a return visit (APP-1)", as
   await page.goto("/ai/book");
   expect(await page.evaluate(() => (window as unknown as { firstFrame?: string }).firstFrame)).toBe("app");
 });
+
+test("the rail's X mark stays dark on the light rail, even with the computer in dark mode (APP-1)", async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 640, "the rail is from 640 px");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/paths");
+  const mark = page.getByRole("navigation", { name: "App" }).getByRole("link", { name: "Xplaind home" }).locator("path").first();
+  await expect(mark).toHaveCSS("fill", "rgb(12, 63, 68)"); // brand-800 on the light site
+});

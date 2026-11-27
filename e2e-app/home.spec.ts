@@ -15,12 +15,9 @@ test("the app Home: a greeting, Ask anything into the tutor, and the main things
   ] as const) {
     await expect(actions.filter({ hasText: name })).toHaveAttribute("href", href);
   }
-  await expect(actions.filter({ hasText: /Download my roadmap/ })).toHaveAttribute("href", /^\/roadmap\/[a-z-]+#download$/);
-  // It lands on the roadmap's download card.
-  await actions.filter({ hasText: /Download my roadmap/ }).click();
-  await expect(page).toHaveURL(/#download$/);
-  await expect(page.locator("#download")).toBeInViewport();
-  await page.goto("/dashboard");
+  // Owner (2026-11-27): no Download my roadmap card here; the roadmap page has its own.
+  await expect(actions.filter({ hasText: /Download my roadmap/ })).toHaveCount(0);
+  await expect(actions.filter({ hasText: /Code playground/ })).toHaveAttribute("href", "/playground");
   expect((await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations).toEqual([]);
 
   // The question is typed into the tutor, not sent: the learner sends it.

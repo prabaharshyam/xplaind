@@ -9,6 +9,7 @@ import { APP_HINT, frameFor } from "@/lib/app-frame";
 import { NAV_GROUPS, RAIL, activeRail } from "@/lib/nav";
 import { TILE } from "@/lib/tones";
 import { MenuCloser } from "@/components/menu-closer";
+import { XMark } from "@/components/x-mark";
 
 /**
  * APP-1: keeps <html data-frame> right. The pre-paint script (APP_SCRIPT) guesses from the hint stored on this device;
@@ -68,8 +69,7 @@ export function AppRail() {
   return (
     <nav aria-label="App" className="app-rail fixed inset-y-0 left-0 z-40 w-20 flex-col items-center border-r border-zinc-200 bg-[var(--hero)] py-3 print:hidden dark:border-white/10 dark:bg-zinc-950">
       <Link href="/dashboard" aria-label="Xplaind home" className="grid size-12 place-items-center rounded-2xl hover:bg-white/70 dark:hover:bg-white/10">
-        {/* eslint-disable-next-line @next/next/no-img-element -- the site's own mark, a tiny SVG */}
-        <img src="/icon.svg" alt="" width={28} height={28} />
+        <XMark size={30} />
       </Link>
       <ul className="mt-4 flex flex-col gap-1">
         {RAIL.map((r) => {
