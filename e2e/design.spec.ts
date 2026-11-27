@@ -98,7 +98,8 @@ test("the menu is grouped and marks the section you are in (NV-1 to NV-3)", asyn
   await expect(panel.getByRole("link", { name: "Jobs and salaries" })).toHaveAttribute("aria-current", "page");
   await expect(panel.getByText("Learn", { exact: true })).toBeVisible();
   // NV-5, NV-6: groups are folded; the one you are in starts open, and tapping another opens it and closes the first.
-  await expect(panel.getByRole("button", { name: /^Practice/ })).toHaveAttribute("aria-expanded", "false");
+  await expect(panel.getByRole("button", { name: /^Interview/ })).toHaveAttribute("aria-expanded", "false"); // NV-10: four groups, no Practice
+  await expect(panel.getByRole("button", { name: /^Practice/ })).toHaveCount(0);
   await expect(panel.getByRole("button", { name: /Career/ })).toHaveAttribute("aria-expanded", "true");
   await panel.getByRole("button", { name: /^Learn/ }).click();
   await expect(panel.getByRole("button", { name: /Career/ })).toHaveAttribute("aria-expanded", "false");

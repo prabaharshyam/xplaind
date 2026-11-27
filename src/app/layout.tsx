@@ -10,6 +10,7 @@ import { PageLoader } from "@/components/page-loader";
 import { SkipLink } from "@/components/skip-link";
 import { PageLoaderControl } from "@/components/page-loader-control";
 import { SiteHeader } from "@/components/site-header";
+import { PhoneTabBar } from "@/components/phone-tab-bar";
 import { allowIndexing } from "@/lib/indexing";
 import { siteUrl } from "@/lib/site";
 import { GeistSans } from "geist/font/sans";
@@ -70,6 +71,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </div>
         <SiteFooter />
+        <Suspense fallback={null}>
+          <PhoneTabBar />
+        </Suspense>
         <SignUpDialog />
         <UpgradePrompt />
         <MotionEffects />
