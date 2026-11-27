@@ -28,7 +28,7 @@ export function LanguagesSection() {
   const inEnglish: LanguageCard = { id: "en", label: "English", htmlLang: "en", q: sample.q, a: sample.a, href: `/stop/${SAMPLE_ID}`, lessons };
 
   return (
-    <section id="languages" aria-labelledby="languages-heading" className="py-16 md:py-24">
+    <section id="languages" aria-labelledby="languages-heading" className="py-10 md:py-24">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 md:grid-cols-[1fr_1.3fr] md:items-start md:gap-14 md:px-6">
         <div>
           <h2 id="languages-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">

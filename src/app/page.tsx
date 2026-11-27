@@ -79,6 +79,8 @@ const FAQ = [
 
 export default function Home() {
   const testimonials = getTestimonials();
+  // Under "What early learners say" these are h3s; without testimonials they head the section themselves.
+  const Sub = testimonials.length ? "h3" : "h2";
   const paths = getPaths().map(pathView);
   const stops = getStops();
   const interview = getInterviewViews();
@@ -106,7 +108,7 @@ export default function Home() {
 
       {/* Hero: the promise first (one place, the right order), then the market as proof. Works before any animation runs. */}
       <section data-hero className="home-hero relative flex items-start md:min-h-[calc(100svh-3.5rem)] md:items-center" aria-labelledby="hero-heading">
-        <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-14 md:px-6 md:py-14">
+        <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-8 md:px-6 md:py-14">
           {/* HM-7 (2026-11-27, owner: "fix/do the 4-12", item 4): the hero is the promise and the two ways in; the
               market figures moved to the proof section, and "How Xplaind works" and the guides left the page. */}
           {/* VI-17 (2026-11-18, site review: the home page never mentioned the AI interviewer): the feature
@@ -162,7 +164,7 @@ export default function Home() {
       {/* AC-6: "Continue where you left off" lives on My progress (/dashboard), not here (HM-5, 2026-11-19). */}
 
       {/* Milestone 1: choose a role. */}
-      <section id="roles" aria-labelledby="roles-heading" className="scroll-mt-20 py-12 md:py-28">
+      <section id="roles" aria-labelledby="roles-heading" className="scroll-mt-20 py-10 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={1} label="Start here" />
           <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
@@ -318,13 +320,13 @@ export default function Home() {
               <Testimonials items={testimonials} />
             </>
           )}
-          <div className="mt-14 grid gap-12 md:mt-20 md:grid-cols-2">
+          <div className="mt-10 grid gap-10 md:mt-20 md:gap-14">
             <div>
-              <h3 id="trust-heading" className="text-xl font-semibold">
+              <Sub id="trust-heading" className="text-xl font-semibold">
                 What is inside, today
-              </h3>
+              </Sub>
               <p className="mt-1 text-zinc-700 dark:text-zinc-300">No paid rankings, no ads. Every course is picked on merit.</p>
-              <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5">
+              <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
                 {stats.map((m) => (
                   <div key={m.label} className="flex flex-col-reverse justify-end">
                     <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
@@ -334,14 +336,14 @@ export default function Home() {
               </dl>
             </div>
             <div>
-              <h3 className="text-xl font-semibold">Why now: India&apos;s AI job market</h3>
+              <Sub className="text-xl font-semibold">Why now: India&apos;s AI job market</Sub>
               <p className="mt-1 text-zinc-700 dark:text-zinc-300">
                 <a href="#market-sources" className="underline underline-offset-2">
                   Sources
                 </a>
                 , checked {checked}
               </p>
-              <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5">
+              <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
                 {market.stats.map((m) => (
                   <div key={m.label} className="flex flex-col-reverse justify-end">
                     <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
@@ -355,7 +357,7 @@ export default function Home() {
       </section>
 
       {/* Milestone 4: the finish line. A small first step, and nothing to lose by taking it. */}
-      <section aria-labelledby="final-heading" className="py-16 text-left md:py-36 md:text-center">
+      <section aria-labelledby="final-heading" className="py-12 text-left md:py-36 md:text-center">
         <div className="mx-auto max-w-3xl px-4">
           {/* Left-aligned on phones like the other milestones; centred as a closing call on larger screens. */}
           <div className="flex justify-start md:justify-center">
@@ -386,7 +388,7 @@ export default function Home() {
           </h2>
           <div className="mt-8 divide-y divide-zinc-200 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
             {FAQ.map((f) => (
-              <details key={f.q} className="group p-5">
+              <details key={f.q} className="group px-5 py-2 md:py-4">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
                   {f.q}
                   <span aria-hidden="true" className="text-xl text-zinc-500 transition-transform duration-200 group-open:rotate-45 dark:text-zinc-400">
@@ -401,7 +403,7 @@ export default function Home() {
       </section>
 
       {/* JB-4: where the market figures in the hero come from. */}
-      <section id="market-sources" aria-labelledby="sources-heading" className="scroll-mt-20 pb-16 md:pb-32">
+      <section id="market-sources" aria-labelledby="sources-heading" className="scroll-mt-20 pb-12 md:pb-32">
         <div className="mx-auto max-w-3xl px-4 text-sm text-zinc-700 md:px-6 dark:text-zinc-300">
           <h2 id="sources-heading" className="font-semibold">
             Sources for the market figures

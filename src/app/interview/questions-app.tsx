@@ -13,7 +13,7 @@ import type { InterviewView } from "@/lib/interview/types";
 import { LEVEL_IDS, levelText } from "@/lib/levels";
 import { RATINGS, practiceOrder, type Rating } from "@/lib/practice/queue";
 
-const field = "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-950";
+const field = "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 text-base sm:text-sm dark:border-zinc-700 dark:bg-zinc-950";
 const noop = () => () => {};
 /** The filters a link can carry (?role=, ?topic=, ?level=), read after hydration so the page prerenders. */
 const useSearch = () => useSyncExternalStore(noop, () => window.location.search, () => "");

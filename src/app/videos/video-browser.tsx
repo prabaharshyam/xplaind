@@ -36,7 +36,7 @@ const PAGE = 24;
 /** CG-1: how many a signed-out visitor sees before the free sign-up card. */
 const PREVIEW = 6;
 const field =
-  "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
+  "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 py-2 text-base sm:text-sm dark:border-zinc-700 dark:bg-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
 
 /** VD-1: every video lesson, filtered by topic, level and length, sorted by views. Rendered on the server, so search engines see the first page of the list. */
 export function VideoBrowser({ rows, topics, checkedOn }: { rows: VideoRow[]; topics: TopicChip[]; checkedOn: string | null }) {

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { labelLang } from "@/lib/label-lang";
 
 export type LanguageCard = { id: string; label: string; htmlLang: string; q: string; a: string; href: string; lessons: number };
 
@@ -19,7 +20,7 @@ export function LanguageSample({ cards }: { cards: LanguageCard[] }) {
           <button
             key={x.id}
             type="button"
-            lang={x.htmlLang}
+            lang={labelLang(x.htmlLang)}
             aria-pressed={i === at}
             onClick={() => setAt(i)}
             className="inline-flex min-h-11 items-center rounded-full bg-zinc-100 px-4 text-sm font-medium text-zinc-800 hover:bg-zinc-200 aria-pressed:bg-brand-800 aria-pressed:text-white dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700 dark:aria-pressed:bg-brand-300 dark:aria-pressed:text-brand-950"
@@ -36,7 +37,7 @@ export function LanguageSample({ cards }: { cards: LanguageCard[] }) {
           {c.a}
         </p>
         <Link href={c.href} hrefLang={c.htmlLang} className="mt-5 inline-flex min-h-11 items-center gap-1 font-medium text-brand-800 underline-offset-4 hover:underline dark:text-brand-300">
-          Read all {c.lessons} lessons in <span lang={c.htmlLang}>{c.label}</span> <span aria-hidden="true">→</span>
+          Read all {c.lessons} lessons in <span lang={labelLang(c.htmlLang)}>{c.label}</span> <span aria-hidden="true">→</span>
         </Link>
       </div>
     </div>

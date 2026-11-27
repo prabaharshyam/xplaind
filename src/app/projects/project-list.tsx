@@ -28,7 +28,7 @@ export function ProjectList({ projects, paths }: { projects: ProjectCardView[]; 
   const [level, setLevel] = useState<"" | Difficulty>("");
   const progress = useProgress();
   const shown = projects.filter((p) => (!path || p.paths.includes(path)) && (!level || p.difficulty === level));
-  const select = "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950 text-sm";
+  const select = "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950 text-base sm:text-sm";
 
   return (
     <div className="flex flex-col gap-4">

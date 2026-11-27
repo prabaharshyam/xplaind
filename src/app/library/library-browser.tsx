@@ -28,7 +28,7 @@ const KIND_TEXT: Record<LibraryKind, string> = {
   video: "font-medium text-zinc-800 dark:text-zinc-200",
   skill: "font-medium text-zinc-800 dark:text-zinc-200",
 };
-const field = "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-950";
+const field = "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 text-base sm:text-sm dark:border-zinc-700 dark:bg-zinc-950";
 const KIND_LABEL: Record<LibraryKind, string> = { lesson: "Lesson", video: "Video lesson", skill: "Skill" };
 
 /** RM-10: filter lessons, video lessons and skills by tag. Filters live in the address, so a tag link opens the right view. */
@@ -169,9 +169,12 @@ export function LibraryBrowser({
 
       <ul aria-label="Results" className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
         {results.slice(0, shown).map((i) => (
-          <li key={i.key} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:gap-4">
-            <Link href={i.href} className="min-w-0 flex-1 rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700">
-              <span className="block leading-6 font-semibold hover:underline">{i.title}</span>
+          <li key={i.key} className="relative flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:gap-4">
+            {/* The link is the title only, stretched over the row, so a screen reader hears the title, not the whole row. */}
+            <div className="min-w-0 flex-1">
+              <Link href={i.href} className="block leading-6 font-semibold hover:underline after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-brand-700">
+                {i.title}
+              </Link>
               <span className="mt-0.5 block text-sm text-zinc-600 dark:text-zinc-400">
                 <span className={KIND_TEXT[i.kind]}>{KIND_LABEL[i.kind]}</span>
                 {[
@@ -186,8 +189,8 @@ export function LibraryBrowser({
                   .join("")}
               </span>
               <span className="mt-1 line-clamp-1 block text-sm text-zinc-700 max-sm:hidden dark:text-zinc-300">{i.summary}</span>
-            </Link>
-            {i.embed && <WatchButton embed={i.embed} title={i.title} className={`shrink-0 self-start ${secondaryButtonSm}`} />}
+            </div>
+            {i.embed && <WatchButton embed={i.embed} title={i.title} className={`relative z-10 shrink-0 self-start ${secondaryButtonSm}`} />}
           </li>
         ))}
       </ul>

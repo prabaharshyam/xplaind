@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // LY-1, LY-2, IP-4, NV-8: the Library order, Library and Topics as one page, the Interview and Practice
 // pages, and the pricing link in the menu.
 
-const titles = (page: import("@playwright/test").Page) => page.locator('main ul[aria-label="Results"] > li > a > span:first-child').allInnerTexts();
+const titles = (page: import("@playwright/test").Page) => page.locator('main ul[aria-label="Results"] > li > div > a').allInnerTexts();
 
 test("LY-1: the Library starts at What automation is and ends the Beginner 1 list with the good-to-know lessons", async ({ page }) => {
   await page.goto("/library?kind=lesson");

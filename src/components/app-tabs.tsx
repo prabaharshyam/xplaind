@@ -9,9 +9,11 @@ import { useState, type KeyboardEvent, type ReactNode } from "react";
 export function AppTabs({ id, label, tabs }: { id: string; label: string; tabs: { id: string; label: string; content: ReactNode }[] }) {
   const [tab, setTab] = useState(tabs[0].id);
   const onKey = (e: KeyboardEvent) => {
-    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-    if (!step) return;
-    const next = tabs[(tabs.findIndex((t) => t.id === tab) + step + tabs.length) % tabs.length].id;
+    const at = tabs.findIndex((t) => t.id === tab);
+    const to = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault(); // the arrow keys would also scroll the row of tabs
+    const next = tabs[(to + tabs.length) % tabs.length].id;
     setTab(next);
     requestAnimationFrame(() => document.getElementById(`${id}-tab-${next}`)?.focus());
   };
