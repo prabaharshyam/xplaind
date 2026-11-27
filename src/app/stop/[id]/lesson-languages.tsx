@@ -29,7 +29,7 @@ export function LessonLanguages({ id, current, available }: { id: string; curren
                 hrefLang={o.lang}
                 lang={o.lang}
                 aria-current={o.id === current ? "page" : undefined}
-                className="flex min-h-11 items-center rounded-xl px-3 font-medium hover:bg-zinc-100 aria-[current]:text-brand-800 dark:hover:bg-zinc-800 dark:aria-[current]:text-brand-300"
+                className="flex min-h-11 items-center rounded-2xl px-3 font-medium hover:bg-zinc-100 aria-[current]:text-brand-800 dark:hover:bg-zinc-800 dark:aria-[current]:text-brand-300"
               >
                 {o.label}
                 {o.id === current && <span className="ml-auto pl-3 text-sm" aria-hidden="true">✓</span>}
