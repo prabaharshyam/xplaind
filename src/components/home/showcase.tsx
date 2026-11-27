@@ -254,3 +254,53 @@ export function MiniStudio() {
     </ul>
   );
 }
+
+/** UX-21: a project marked against its rubric. Example text, decorative. */
+export function MiniReview() {
+  const rows = [
+    { c: "Retrieval quality measured", ok: true },
+    { c: "Clear README with a demo", ok: true },
+    { c: "Handles empty search results", ok: false },
+  ];
+  return (
+    <div aria-hidden="true" className="rounded-2xl bg-white p-4 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+      <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
+        <span>Project review · RAG chatbot</span>
+        <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">Example</span>
+      </div>
+      <p className="mt-3 text-sm">
+        <b className="text-2xl tabular-nums">2</b> of 3 criteria met
+      </p>
+      <ul className="lx-stagger mt-3 space-y-1.5 text-sm">
+        {rows.map((r) => (
+          <li key={r.c} className="flex items-center gap-2 rounded-2xl bg-zinc-50 px-3 py-1.5 dark:bg-zinc-950">
+            <span className={`grid size-4 shrink-0 place-items-center rounded-full text-xs ${r.ok ? "bg-emerald-500 text-white" : "border border-amber-500"}`}>{r.ok ? "✓" : ""}</span>
+            <span className="min-w-0 flex-1 truncate">{r.c}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-100">Fix first: return a friendly answer when nothing matches</p>
+    </div>
+  );
+}
+
+/** UX-21: a certificate with its public link. Example name, decorative. */
+export function MiniCert() {
+  return (
+    <div aria-hidden="true" className="rounded-2xl bg-white p-5 text-zinc-900 ring-1 ring-brass-200 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-brass-800">
+      <div className="flex items-center justify-between">
+        <span className="grid size-10 place-items-center rounded-2xl bg-brass-100 text-brass-800 dark:bg-brass-900 dark:text-brass-100">
+          <Icon name="cert" size={20} />
+        </span>
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">Verified</span>
+      </div>
+      <p className="mt-4 text-xs text-zinc-600 dark:text-zinc-400">Certificate of completion</p>
+      <p className="mt-1 text-lg font-semibold">GenAI &amp; LLM Engineer</p>
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">Priya S · 42 lessons · 1 reviewed project</p>
+      <div className="mt-4 flex items-center gap-2 text-xs">
+        <span className="min-w-0 flex-1 truncate rounded-full bg-zinc-100 px-3 py-1.5 font-mono dark:bg-zinc-800">xplaind.in/certificate/…</span>
+        <span className="rounded-full bg-sky-700 px-3 py-1.5 font-medium text-white">Add to LinkedIn</span>
+      </div>
+    </div>
+  );
+}

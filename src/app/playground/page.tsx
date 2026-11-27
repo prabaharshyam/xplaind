@@ -32,10 +32,14 @@ export default function PlaygroundPage() {
       />
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <PlaygroundStudio aiOn={aiEnabled()} lessonTitles={lessonTitles} />
-        <p className="mt-8 max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-          Your code runs on your device and is not sent anywhere, unless you ask the AI tutor to explain an error. Then only the code and the
-          error go to it. The first run downloads Python once (about 10 MB). Programs that ask for input with input() are not supported yet.
-        </p>
+        {/* UX-22: the small print as short chips. */}
+        <ul className="mt-8 flex flex-wrap gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+          {["Runs on your device", "Only sent to the AI tutor if you ask it to explain an error", "First run downloads Python once (about 10 MB)", "input() is not supported yet"].map((t) => (
+            <li key={t} className="rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+              {t}
+            </li>
+          ))}
+        </ul>
       </div>
       <ExploreTools current="/playground" />
     </main>

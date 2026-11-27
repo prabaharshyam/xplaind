@@ -37,6 +37,11 @@ export function usePractice() {
 
 const noSubscription = () => () => {};
 
+/** False in the server render and until hydration, then true. For buttons that do nothing before React attaches. */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(noSubscription, () => true, () => false);
+}
+
 /** Today in India, or undefined while prerendering (the build does not know today). */
 export function useToday(): string | undefined {
   return useSyncExternalStore(noSubscription, todayInIST, () => undefined);

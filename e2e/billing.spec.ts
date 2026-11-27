@@ -9,7 +9,13 @@ test("the pricing page leads with value, shows honest savings, a free-vs-Pro tab
   await expect(page.getByRole("heading", { level: 1, name: "Get interview-ready, with proof" })).toBeVisible();
   // OP-1: outcomes first, then real learners, then batches for colleges.
   await expect(page.getByRole("heading", { name: "What you walk away with" })).toBeVisible();
+  // UX-21: one benefit at a time, as a deck with tabs.
+  const pro = page.getByRole("tablist", { name: "What Pro gives you" });
+  await expect(pro.getByRole("tab")).toHaveText(["AI interviewer", "Project review", "Resume", "Certificate", "AI tutor", "Your notes"]);
+  await expect(page.getByRole("heading", { name: "Rehearse out loud with Zarina" })).toBeVisible();
+  await pro.getByRole("tab", { name: "Certificate" }).click();
   await expect(page.getByRole("heading", { name: "A certificate anyone can check" })).toBeVisible();
+  await expect(page.getByText("Free with every account")).toBeVisible();
   await expect(page.getByRole("link", { name: "Read learner stories" })).toHaveAttribute("href", "/stories");
   await expect(page.getByRole("link", { name: "Plans for colleges" })).toHaveAttribute("href", "/colleges");
   for (const price of ["₹249", "₹999", "₹1,499"]) await expect(page.getByText(price, { exact: true }).first()).toBeVisible();
@@ -23,8 +29,8 @@ test("the pricing page leads with value, shows honest savings, a free-vs-Pro tab
   const table = page.getByRole("table", { name: "AI helper uses: free trial in total, and Pro's most per day within its fair-use allowance" });
   await expect(table.getByRole("row", { name: /AI tutor questions 3 tries in total Up to 50 a day/ })).toBeVisible();
   // PAY-14: on a 360 px phone the Pro column is on screen, with no sideways scroll inside the table.
-  const pro = (await table.getByRole("columnheader", { name: /^Pro/ }).boundingBox())!;
-  expect(pro.x + pro.width).toBeLessThanOrEqual(360);
+  const proCol = (await table.getByRole("columnheader", { name: /^Pro/ }).boundingBox())!;
+  expect(proCol.x + proCol.width).toBeLessThanOrEqual(360);
   // Questions are folded: the answer shows only after opening the question.
   const q = page.locator("details", { hasText: "Does it renew by itself?" });
   await expect(q.getByText(/A pass is one payment/)).toBeHidden();

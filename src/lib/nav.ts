@@ -13,16 +13,16 @@ export const NAV_GROUPS: Group[] = [
     id: "learn",
     label: "Learn",
     items: [
-      { href: "/paths", label: "Roadmaps", note: "A step-by-step path for each AI role", icon: "map", tone: "teal" },
+      { href: "/paths", label: "Roadmaps", note: "A step-by-step path per AI role", icon: "map", tone: "teal" },
       // LY-2: Library and Topics are one page; "By topic" is a view inside it.
-      { href: "/library", label: "Library", note: "Every lesson, video and skill, or browse by topic", icon: "table", tone: "sky" },
-      { href: "/videos", label: "Videos", note: "Filter by topic", icon: "play", tone: "rose" },
+      { href: "/library", label: "Library", note: "Every lesson, video and skill", icon: "table", tone: "sky" },
+      { href: "/videos", label: "Videos", note: "The best AI videos, by topic", icon: "play", tone: "rose" },
       { href: "/projects", label: "Projects", note: "Guided builds for your portfolio", icon: "rocket", tone: "amber" },
       { href: "/glossary", label: "Glossary", note: "AI words in plain English", icon: "chat", tone: "emerald" },
-      { href: "/papers", label: "Papers and free books", note: "Landmark research and free AI books", icon: "book", tone: "sky" },
+      { href: "/papers", label: "Papers and free books", note: "Key research and free AI books", icon: "book", tone: "sky" },
       // NV-10 (2026-11-27, owner: "fix/do the 4-12", item 12): four groups, not five. Practice held two entries;
       // the weekly plan is part of learning, and the code playground is a tool.
-      { href: "/plan", label: "Stay on track", note: "This week's plan, reminders and Monday emails", icon: "target", tone: "amber" },
+      { href: "/plan", label: "Stay on track", note: "Your weekly plan and reminders", icon: "target", tone: "amber" },
     ],
   },
   {
@@ -33,15 +33,15 @@ export const NAV_GROUPS: Group[] = [
       // IP-6 (2026-11-27, owner request): three entries, not six. "Questions" holds the bank, the answers by
       // role, the flashcards, interview patterns and system design answers.
       { href: "/interview/simulator", label: "Mock interview", note: "Answer out loud, get a report", icon: "mic", tone: "rose" },
-      { href: "/interview/prep", label: "Prep plan", note: "Questions for each day until your interview", icon: "map", tone: "emerald" },
-      { href: "/interview", label: "Questions", note: "500 questions with answers, patterns and system design", icon: "search", tone: "sky" },
+      { href: "/interview/prep", label: "Prep plan", note: "A daily plan until your interview", icon: "map", tone: "emerald" },
+      { href: "/interview", label: "Questions", note: "500 questions, patterns, designs", icon: "search", tone: "sky" },
     ],
   },
   {
     id: "career",
     label: "Career",
     items: [
-      { href: "/jobs", label: "Jobs and salaries", note: "Pay by role, skills and live openings", icon: "star", tone: "amber" },
+      { href: "/jobs", label: "Jobs and salaries", note: "Pay, skills and live openings", icon: "star", tone: "amber" },
       { href: "/ai/resume", label: "Resume review", note: "Fixes that get you shortlisted", icon: "cert", tone: "emerald" },
     ],
   },
@@ -51,10 +51,10 @@ export const NAV_GROUPS: Group[] = [
     // NV-7 (owner request, 2026-11-13): the AI tools are part of Pro, so the group reads as a studio.
     label: "AI Studio",
     items: [
-      { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards", icon: "book", tone: "amber" },
-      { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English", icon: "robot", tone: "teal" },
+      { href: "/ai/book", label: "Study from my notes & books", note: "Tests and flashcards from a PDF", icon: "book", tone: "amber" },
+      { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI", icon: "robot", tone: "teal" },
       { href: "/playground", label: "Code playground", note: "Run Python in your browser", icon: "code", tone: "sky" },
-      { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work", icon: "sparkles", tone: "teal" },
+      { href: "/ai", label: "All AI tools and guides", note: "Every tool and guide", icon: "sparkles", tone: "teal" },
     ],
   },
 ];

@@ -1,3 +1,4 @@
+import { Testimonials } from "@/components/home/testimonials";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icon } from "@/components/art/icons";
@@ -56,18 +57,9 @@ export default function StoriesPage() {
             <h2 id="words-h" className="text-2xl font-semibold tracking-tight md:text-3xl">
               In their own words
             </h2>
-            <ul className="mt-6 flex flex-col gap-4">
-              {all.map((t) => (
-                <li key={t.name}>
-                  <figure className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                    <blockquote className="leading-7 text-zinc-800 dark:text-zinc-200">“{t.quote}”</blockquote>
-                    <figcaption className="mt-3 text-sm font-medium">
-                      {t.name}, <span className="font-normal text-zinc-700 dark:text-zinc-300">{t.role}</span>
-                    </figcaption>
-                  </figure>
-                </li>
-              ))}
-            </ul>
+            {/* UX-22 (2026-11-27, owner: "don't have sections with so much text"): the home page's sideways row of short
+                excerpts; "Read more" opens each whole quote. */}
+            <Testimonials items={all} />
           </section>
         )}
 

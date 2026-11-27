@@ -35,68 +35,76 @@ export default function CertificationsPage() {
         title="AI certifications"
         lead="Exams from AWS, Microsoft, Google Cloud, NVIDIA and Databricks: who each suits, what it costs and the free courses that prepare you. A certification helps when a job asks for one; projects you can show matter more."
       />
-      <div className="mx-auto max-w-3xl px-4 py-8">
+      <div className="mx-auto max-w-5xl px-4 py-8">
 
       <h2 className="mt-10 text-xl font-semibold">Exams worth considering</h2>
-      <ul className="mt-4 flex flex-col gap-4">
+      {/* UX-22 (2026-11-27, owner: "don't have sections with so much text"): each exam is a short card: name, chips, the
+          fee with its check date and the roles it fits. Who it suits, what it covers and the free prep open on tap. */}
+      <ul className="mt-4 grid gap-4 md:grid-cols-2">
         {certs.map((c) => (
-          <li key={c.id} id={c.id} className={card}>
-            <h3 className="text-lg font-semibold">{c.name}</h3>
+          <li key={c.id} id={c.id} className={`${card} flex flex-col`}>
+            <h3 className="text-lg leading-snug font-semibold">{c.name}</h3>
             <p className={`mt-1 text-sm ${muted}`}>
               {c.provider}
-              {c.exam_code ? ` · exam ${c.exam_code}` : ""} · {c.level} · {c.format}
+              {c.exam_code ? ` · exam ${c.exam_code}` : ""}
             </p>
-            <dl className="mt-3 flex flex-col gap-2 leading-7">
-              <div>
-                <dt className="font-medium">Who it suits</dt>
-                <dd>{c.audience}</dd>
-              </div>
-              <div>
-                <dt className="font-medium">What it covers</dt>
-                <dd>{c.covers}</dd>
-              </div>
-              <div>
-                <dt className="font-medium">Exam fee</dt>
-                <dd>
-                  {c.fee_usd !== undefined && c.fee_checked_on
-                    ? `${usd(c.fee_usd)} plus tax (checked on ${formatDay(c.fee_checked_on)})`
-                    : c.fee_note}
-                </dd>
-              </div>
-              <div>
-                <dt className="font-medium">Free prep</dt>
-                <dd>
-                  <ul className="list-disc pl-6">
-                    {c.prep.map((id) => {
-                      const r = getResource(id)!;
-                      return (
-                        <li key={id}>
-                          <a href={`/go/${id}`} target="_blank" rel="noopener" className={textLink}>
-                            {r.title}
-                            <span className="sr-only"> (opens in a new tab)</span>
-                          </a>{" "}
-                          <span className={`text-sm ${muted}`}>{r.provider}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </dd>
-              </div>
-              <div>
-                <dt className="font-medium">Fits these paths</dt>
-                <dd>
-                  {c.paths.map((id, i) => (
-                    <span key={id}>
-                      {i > 0 && ", "}
-                      <Link href={`/roadmap/${id}`} className={textLink}>
-                        {getPath(id)?.name ?? id}
-                      </Link>
-                    </span>
-                  ))}
-                </dd>
-              </div>
-            </dl>
-            <p className="mt-3">
+            <ul className="mt-3 flex flex-wrap gap-1.5 text-xs font-medium">
+              {[c.level].map((t) => (
+                <li key={t} className="rounded-full bg-zinc-100 px-2.5 py-1 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                  {t}
+                </li>
+              ))}
+              {c.paths.map((id) => (
+                <li key={id}>
+                  <Link href={`/roadmap/${id}`} className="inline-block rounded-full bg-brand-50 px-2.5 py-1 text-brand-900 hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-200">
+                    {getPath(id)?.name ?? id}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className={`mt-3 text-sm ${c.fee_usd !== undefined ? "font-medium" : muted}`}>
+              {c.fee_usd !== undefined && c.fee_checked_on ? `${usd(c.fee_usd)} plus tax (checked on ${formatDay(c.fee_checked_on)})` : c.fee_note}
+            </p>
+            <details className="group mt-3">
+              <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-medium text-brand-800 dark:text-brand-300 [&::-webkit-details-marker]:hidden">
+                Format, who it suits, free prep
+                <span aria-hidden="true" className="transition-transform group-open:rotate-90">→</span>
+              </summary>
+              <dl className="mt-2 flex flex-col gap-2 text-sm leading-6">
+                <div>
+                  <dt className="font-medium">Format</dt>
+                  <dd>{c.format}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium">Who it suits</dt>
+                  <dd>{c.audience}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium">What it covers</dt>
+                  <dd>{c.covers}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium">Free prep</dt>
+                  <dd>
+                    <ul className="list-disc pl-5">
+                      {c.prep.map((id) => {
+                        const r = getResource(id)!;
+                        return (
+                          <li key={id}>
+                            <a href={`/go/${id}`} target="_blank" rel="noopener" className={textLink}>
+                              {r.title}
+                              <span className="sr-only"> (opens in a new tab)</span>
+                            </a>{" "}
+                            <span className={muted}>{r.provider}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </dd>
+                </div>
+              </dl>
+            </details>
+            <p className="mt-auto pt-2 text-sm">
               <a href={c.official_url} target="_blank" rel="noopener" className={textLink}>
                 Official exam page<span className="sr-only"> for {c.name} (opens in a new tab)</span>
               </a>
@@ -110,7 +118,7 @@ export default function CertificationsPage() {
         These cost nothing and end with a certificate of completion or a badge you can add to LinkedIn. They show you
         finished a course, not that you passed a proctored exam.
       </p>
-      <ul className="mt-4 flex flex-col gap-2">
+      <ul className="mt-4 grid gap-x-8 gap-y-2 md:grid-cols-2">
         {freeCerts.map((r) => (
           <li key={r.id} className="leading-7">
             <a href={`/go/${r.id}`} target="_blank" rel="noopener" className={textLink}>

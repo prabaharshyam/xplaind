@@ -12,6 +12,7 @@ test("the footer has every menu option and the business details, and folds into 
   }
   await expect(footer.getByText(/Xplaind is a brand of ZEREH Ventures · hello@/)).toBeVisible();
   await expect(footer.getByText("33GDZPS4274J1ZK")).toHaveCount(0); // owner: no GST number in the footer; it is on Contact
+  await expect(footer.getByText(/Monday to Saturday/)).toHaveCount(0); // owner: no working hours in the footer either
   // Phones: each column is a closed row, so the footer stays short.
   expect((await footer.boundingBox())!.height).toBeLessThan(1100);
   const company = footer.locator("summary", { hasText: "Company" });

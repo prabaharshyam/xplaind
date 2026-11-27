@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/art/icons";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 import { useAccountState } from "@/components/account-link";
@@ -524,15 +525,18 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
           What each round tests
         </h2>
         <p className={`mt-1 text-sm ${muted}`}>Most interviews have some of these rounds. Ask the recruiter which ones yours has.</p>
-        <dl className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
-          {ROUNDS.map((r) => (
-            <div key={r.name} className="py-3">
-              <dt className="font-medium">{r.name}</dt>
-              <dd className="mt-1 leading-7">{r.tests}</dd>
-              <dd className={`leading-7 ${muted}`}>Prepare: {r.prepare}</dd>
-            </div>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          {ROUNDS.map((r, i) => (
+            <li key={r.name} className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-950">
+              <p className="flex items-center gap-2 font-semibold">
+                <span aria-hidden="true" className="grid size-6 place-items-center rounded-full bg-brand-700 text-xs text-white dark:bg-brand-300 dark:text-brand-950">{i + 1}</span>
+                <span>{r.name}</span>
+              </p>
+              <p className="mt-2 text-sm leading-6">{r.tests}</p>
+              <p className={`mt-1 text-sm leading-6 ${muted}`}>Prepare: {r.prepare}</p>
+            </li>
           ))}
-        </dl>
+        </ul>
       </section>
 
       <Reminder setup={setup} />
@@ -541,14 +545,13 @@ function Plan({ setup, path, questions, today, onEdit }: { setup: PrepSetup; pat
         <h2 id="check-h" className="text-xl font-semibold">
           The day before
         </h2>
-        <ul className="mt-3 list-disc space-y-2 pl-5 leading-7">
-          <li>Revise only your weakest questions. Do not start a new topic.</li>
-          <li>Have three stories ready: a project you built, something that went wrong and what you changed, and a disagreement and how you settled it.</li>
-          <li>Write down three questions to ask the interviewer.</li>
-          <li>Check the time, the link or the address, and the names of the people you will meet.</li>
-          <li>For a video interview, test your camera, microphone and internet in a quiet room.</li>
-          <li>Keep your resume and the job post open, or printed.</li>
-          <li>Sleep on time.</li>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {["Revise only your weakest questions", "Three stories ready: a build, a mistake, a disagreement", "Three questions to ask them", "Time, link or address, and names", "Camera, mic and internet tested", "Resume and job post open", "Sleep on time"].map((t) => (
+            <li key={t} className="flex items-center gap-2.5 rounded-2xl bg-zinc-50 px-3 py-2.5 text-sm leading-5 dark:bg-zinc-950">
+              <Icon name="tick" size={14} className="shrink-0 text-emerald-700 dark:text-emerald-400" />
+              {t}
+            </li>
+          ))}
         </ul>
       </section>
 

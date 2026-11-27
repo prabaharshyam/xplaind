@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/art/icons";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { card, muted, primaryButton, secondaryButton, textLink } from "@/components/ui";
@@ -402,35 +403,62 @@ function Consent({
           </p>
         </div>
       </div>
-      <p>
-        It works like a call. Zarina asks a question and listens; when you finish speaking, she asks a follow-up about
-        what you said, then moves on.
-      </p>
+      {/* UX-22 (2026-11-27, owner: "don't have sections with so much text"): the call in three steps, the quiet-room
+          advice as three tiles, and what is sent where in three short rows. All of it stays on screen: it is what the
+          learner agrees to (VI-2). */}
+      <ol aria-label="How the call works" className="grid grid-cols-3 gap-2 text-center text-sm font-medium">
+        {["She asks a question", "You answer out loud", "She follows up"].map((t, i) => (
+          <li key={t} className="rounded-2xl bg-white px-2 py-3 dark:bg-zinc-950">
+            <span className="mx-auto grid size-7 place-items-center rounded-full bg-brand-700 text-xs text-white dark:bg-brand-300 dark:text-brand-950">{i + 1}</span>
+            <span className="mt-1.5 block leading-5">{t}</span>
+          </li>
+        ))}
+      </ol>
       {/* VI-18 (2026-11-18, owner: people tried it in crowded places, and the microphone picked up other voices and
           noise, which spoiled the transcript and the score). Said before the start, and again in her first line. */}
       <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100" role="note" aria-labelledby="quiet-note">
         <p id="quiet-note" className="font-semibold">
           For the best results, sit somewhere quiet
         </p>
-        <ul className="mt-1 list-disc space-y-0.5 pl-5">
-          <li>A room with no other people talking, no TV, music or traffic noise.</li>
-          <li>Earphones with a microphone, if you have them, and the phone or laptop close to you.</li>
-          <li>The microphone hears everything around you, and every extra sound ends up in your answer and lowers your score.</li>
+        <ul className="mt-3 grid gap-2 text-sm leading-5 sm:grid-cols-3">
+          {[
+            { icon: "people" as const, t: "No other voices, TV, music or traffic" },
+            { icon: "mic" as const, t: "Earphones with a mic, close to you" },
+            { icon: "target" as const, t: "Every extra sound lowers your score" },
+          ].map((x) => (
+            <li key={x.t} className="flex items-center gap-2.5 rounded-2xl bg-white/70 p-2.5 dark:bg-black/20">
+              <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-amber-100 dark:bg-amber-900">
+                <Icon name={x.icon} size={16} />
+              </span>
+              {x.t}
+            </li>
+          ))}
         </ul>
       </div>
       <div className="rounded-2xl bg-white p-4 dark:bg-zinc-950" role="note" aria-labelledby="privacy-note">
         <p id="privacy-note" className="font-semibold">
           What is sent to our AI
         </p>
-        <p className="mt-1">
-          Your spoken answers are recorded in short pieces and sent to Sarvam AI, which turns them into text. Xplaind
-          does not keep the recordings; Sarvam handles them under its own terms. Only the text (the transcript) goes to our AI, Anthropic&apos;s Claude,
-          to ask follow-ups and score you. Sarvam AI also makes the interviewer&apos;s voice. We keep only your score, not
-          what you said.
-        </p>
-        <p className={`mt-2 text-sm ${muted}`}>
-          If Sarvam is not available, your browser&apos;s own speech-to-text is used, which in Chrome and Edge sends audio
-          to Google or Microsoft. Prefer not to send your voice anywhere? Tap Type on the call screen before you answer, and write your answers instead.
+        <ul className="mt-2 flex flex-col gap-2 text-sm leading-6">
+          <li className="flex gap-2.5">
+            <Icon name="mic" size={16} className="mt-1 shrink-0 text-brand-700 dark:text-brand-300" />
+            <span>
+              Your spoken answers are recorded in short pieces and sent to Sarvam AI, which turns them into text. Xplaind does not keep the recordings;
+              Sarvam handles them under its own terms. Sarvam AI also makes the interviewer&apos;s voice.
+            </span>
+          </li>
+          <li className="flex gap-2.5">
+            <Icon name="robot" size={16} className="mt-1 shrink-0 text-brand-700 dark:text-brand-300" />
+            <span>Only the text (the transcript) goes to our AI, Anthropic&apos;s Claude, to ask follow-ups and score you.</span>
+          </li>
+          <li className="flex gap-2.5">
+            <Icon name="lock" size={16} className="mt-1 shrink-0 text-brand-700 dark:text-brand-300" />
+            <span>We keep only your score, not what you said.</span>
+          </li>
+        </ul>
+        <p className={`mt-2 text-xs leading-5 ${muted}`}>
+          If Sarvam is not available, your browser&apos;s own speech-to-text is used, which in Chrome and Edge sends audio to Google or Microsoft. Prefer not to send your
+          voice anywhere? Tap Type on the call screen and write your answers.
         </p>
       </div>
       {micDenied && (

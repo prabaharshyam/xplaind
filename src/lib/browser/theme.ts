@@ -1,11 +1,12 @@
-// BR-6: light or dark. A saved choice (the header switch) wins; otherwise the system setting.
+// BR-6: light or dark. UX-24 (2026-11-27, owner: "when anyone lands on the site, let them land on light mode; if they
+// want dark mode, let them change it with the switch"): light unless the header switch saved "dark" on this device.
 // The choice lives on <html data-theme>, set before paint by THEME_SCRIPT, so nothing flashes.
 
 export const THEME_KEY = "xp-theme";
 export type Theme = "light" | "dark";
 
 /** Runs in <head> before the page paints. Kept tiny and dependency-free. */
-export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");var d=t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.dataset.theme=d?"dark":"light"}catch(e){}})()`;
+export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");var d=t==="dark";document.documentElement.dataset.theme=d?"dark":"light"}catch(e){}})()`;
 
 export const currentTheme = (): Theme => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
 

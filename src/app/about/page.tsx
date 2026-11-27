@@ -23,6 +23,25 @@ const BELIEFS = [
   { icon: "shield" as const, title: "Open and private", text: "Every lesson is open to everyone. No ads, no tracking cookies, and you can delete your account anytime." },
 ] as const;
 
+/** UX-22 (2026-11-27, owner: "don't have sections with so much text"): the founder's story at a glance. The full
+    story, in his words, opens below it. */
+const MILESTONES = [
+  { place: "Sivakasi", text: "Studied in Tamil medium, topped his class, dreamt of studying in English" },
+  { place: "Karunya University", text: "Could not say a sentence out loud in class, and nearly quit" },
+  { place: "Every day", text: "No coach, no course: a few books and daily practice" },
+  { place: "Freelancing", text: "Hundreds of logos and websites for clients abroad, on a government laptop" },
+  { place: "Career", text: "Cognizant, his own startup, then a team of 20+ at Amazon" },
+  { place: "2023", text: "All in on AI, self-taught from online courses" },
+  { place: "Today", text: "Leads enterprise AI adoption, and builds Xplaind for everyone" },
+];
+
+const MADE = [
+  { icon: "map" as const, title: "Roadmaps", text: "Built from the skills job posts ask for" },
+  { icon: "scale" as const, title: "Course picks", text: "Ranked by published rules, never by commission", href: "/how-we-rank" },
+  { icon: "star" as const, title: "Salaries and prices", text: "Every number names its source and check date" },
+  { icon: "robot" as const, title: "AI helpers", text: "Labelled as AI, because AI can be wrong" },
+];
+
 /** The founder's story up to AI (TR-2). The ending, with its emphasis, is written out in the page. */
 const STORY = [
   "Hi, I’m Shyam Prabahar.",
@@ -76,33 +95,35 @@ export default function AboutPage() {
           <h2 id="why-h" className="text-2xl font-semibold tracking-tight md:text-3xl">
             Why we built it
           </h2>
-          <div className="mt-4 space-y-4 text-lg leading-8 text-zinc-800 dark:text-zinc-200">
-            <p>
-              Most people who try to learn AI do not quit because it is too hard. They quit because they are lost: a hundred tutorials, no
-              order, and no way to tell whether they are ready for a job.
-            </p>
-            <p>
-              Xplaind fixes the order. Pick one of {roles} AI roles and you get a roadmap from your first lesson to interview day: what to
-              learn, in what order, which course or video teaches it best, what to build, and how to explain it in an interview.
-              Today that is {lessons} lessons, each written to be read in one sitting.
-            </p>
-            <p>
-              The AI tools cost us money each time they run, so every account gets a daily allowance.{" "}
-              {pro ? (
-                <>
-                  A{" "}
-                  <Link href="/pricing" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
-                    Pro pass
-                  </Link>{" "}
-                  gives
-                </>
-              ) : (
-                "Pro passes, coming soon, will give"
-              )}{" "}
-              more AI help each day: more AI tutor answers, mock interview feedback and resume reviews. Pro never unlocks lessons, because
-              nothing is locked.
-            </p>
+          {/* UX-22: the problem and the fix side by side, instead of three paragraphs. */}
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-3xl bg-rose-50 p-5 dark:bg-rose-950/40">
+              <p className="text-sm font-semibold text-rose-800 dark:text-rose-300">The problem</p>
+              <p className="mt-2 text-lg leading-7 font-medium">Lost in a hundred tutorials, with no order and no way to know you are job-ready</p>
+            </div>
+            <div className="rounded-3xl bg-emerald-50 p-5 dark:bg-emerald-950/40">
+              <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">The fix</p>
+              <p className="mt-2 text-lg leading-7 font-medium">One roadmap for your role, in order, from first lesson to interview day</p>
+            </div>
           </div>
+          <ul className="mt-4 flex flex-wrap gap-2 text-sm">
+            {[`${roles} AI roles`, `${lessons} lessons, one sitting each`, "The best course for each topic", "What to build", "How to explain it in an interview"].map((t) => (
+              <li key={t} className="rounded-full bg-zinc-100 px-3 py-1.5 font-medium text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                {t}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Nothing is locked. AI tools have a daily allowance;{" "}
+            {pro ? (
+              <Link href="/pricing" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+                a Pro pass
+              </Link>
+            ) : (
+              "a Pro pass, coming soon,"
+            )}{" "}
+            gives more AI help each day.
+          </p>
         </section>
 
         {/* TR-2: the founder's story, in his own words, so visitors know who is behind the site. */}
@@ -128,23 +149,45 @@ export default function AboutPage() {
               </a>
             </div>
           </div>
-          <div className="mt-8 space-y-5 text-lg leading-8 text-zinc-800 dark:text-zinc-200">
-            {STORY.map((p) => (
-              <p key={p.slice(0, 24)}>{p}</p>
+          {/* UX-22: the story as a timeline first; the whole story, in his words, opens below. */}
+          <ol className="relative mt-8 space-y-5 border-l-2 border-brand-200 pl-6 dark:border-brand-800">
+            {MILESTONES.map((m) => (
+              <li key={m.place} className="relative">
+                <span aria-hidden="true" className="absolute top-1.5 -left-[1.95rem] size-3 rounded-full bg-brand-700 ring-4 ring-[var(--background)] dark:bg-brand-300" />
+                <p className="text-sm font-semibold text-brand-800 dark:text-brand-300">{m.place}</p>
+                <p className="mt-0.5 text-lg leading-7">{m.text}</p>
+              </li>
             ))}
-            <p>
-              Soon friends started asking me: <em>Where do I start? What should I learn? Which course is worth it?</em> I knew that feeling of
-              being lost with no one to show you the way. So I guided each of them, one by one.
+          </ol>
+          <blockquote className="mt-8 rounded-3xl bg-brand-50 p-6 dark:bg-brand-950/40">
+            <p className="text-xl leading-8 font-semibold text-brand-900 dark:text-brand-100">
+              &ldquo;You don&apos;t need an expensive school, perfect English or lakhs of rupees. I didn&apos;t.&rdquo;
             </p>
-            <p>Then I thought: why not build one place that does this for everyone?</p>
-            <p>
-              That&apos;s Xplaind: a clear path, in the right order, in plain English. Most courses and videos on it cost nothing to learn, and only a
-              handful charge if you want the certificate.
-            </p>
-            <p>You don&apos;t need an expensive school, perfect English or lakhs of rupees. I didn&apos;t.</p>
-            <p className="text-xl font-semibold text-brand-800 dark:text-brand-300">Let&apos;s learn AI together.</p>
-            <p className="text-base text-zinc-600 italic dark:text-zinc-400">— Shyam Prabahar, founder</p>
-          </div>
+            <p className="mt-2 text-sm text-brand-800 dark:text-brand-300">Shyam Prabahar, founder</p>
+          </blockquote>
+          <details className="group mt-6">
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 font-medium text-brand-800 underline-offset-4 hover:underline dark:text-brand-300 [&::-webkit-details-marker]:hidden">
+              Read Shyam&apos;s full story
+              <span aria-hidden="true" className="transition-transform group-open:rotate-90">→</span>
+            </summary>
+            <div className="mt-4 space-y-5 text-lg leading-8 text-zinc-800 dark:text-zinc-200">
+                {STORY.map((p) => (
+                  <p key={p.slice(0, 24)}>{p}</p>
+                ))}
+                <p>
+                  Soon friends started asking me: <em>Where do I start? What should I learn? Which course is worth it?</em> I knew that feeling of
+                  being lost with no one to show you the way. So I guided each of them, one by one.
+                </p>
+                <p>Then I thought: why not build one place that does this for everyone?</p>
+                <p>
+                  That&apos;s Xplaind: a clear path, in the right order, in plain English. Most courses and videos on it cost nothing to learn, and only a
+                  handful charge if you want the certificate.
+                </p>
+                <p>You don&apos;t need an expensive school, perfect English or lakhs of rupees. I didn&apos;t.</p>
+                <p className="text-xl font-semibold text-brand-800 dark:text-brand-300">Let&apos;s learn AI together.</p>
+                <p className="text-base text-zinc-600 italic dark:text-zinc-400">— Shyam Prabahar, founder</p>
+            </div>
+          </details>
         </section>
 
         <section aria-labelledby="believe-h" className="mt-12">
@@ -175,20 +218,27 @@ export default function AboutPage() {
           <h2 id="how-h" className="text-2xl font-semibold tracking-tight md:text-3xl">
             How the content is made
           </h2>
-          <ul className="mt-4 space-y-3 text-lg leading-8 text-zinc-800 dark:text-zinc-200">
-            <li>
-              <strong className="font-semibold">Roadmaps</strong> cover the skills each role needs, from the basics up, and link to the skills job posts ask for.
-            </li>
-            <li>
-              <strong className="font-semibold">Course and video picks</strong> follow published ranking rules that never look at commissions.
-              Every price shows the date we checked it. <Link href="/how-we-rank" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">How we rank</Link>
-            </li>
-            <li>
-              <strong className="font-semibold">Salaries and market numbers</strong> name their sources and the date we checked them.
-            </li>
-            <li>
-              <strong className="font-semibold">AI helpers</strong>, such as the tutor and resume review, say when an answer comes from AI, because AI can be wrong.
-            </li>
+          {/* UX-22: one line each, as cards. */}
+          <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+            {MADE.map((m) => (
+              <li key={m.title} className="flex items-start gap-3 rounded-3xl bg-white p-4 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
+                <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-800 dark:bg-brand-950 dark:text-brand-300">
+                  <Icon name={m.icon} size={20} />
+                </span>
+                <span>
+                  <span className="block font-semibold">
+                    {m.href ? (
+                      <Link href={m.href} className="underline-offset-4 hover:underline">
+                        {m.title}
+                      </Link>
+                    ) : (
+                      m.title
+                    )}
+                  </span>
+                  <span className="mt-0.5 block leading-6 text-zinc-700 dark:text-zinc-300">{m.text}</span>
+                </span>
+              </li>
+            ))}
           </ul>
         </section>
 

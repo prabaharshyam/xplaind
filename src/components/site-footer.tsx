@@ -158,7 +158,7 @@ export function SiteFooter() {
             </p>
             <p>Book links are affiliate links; they never change what we recommend.</p>
           </div>
-          {/* BIZ-1: the business behind the brand and how to reach it. FT-2 (owner, 2026-11-27): no GST number here; it is on the Contact page. */}
+          {/* BIZ-1: the business behind the brand and how to reach it. FT-2 (owner, 2026-11-27): no GST number or working hours here; both are on the Contact page. */}
           <p>
             Xplaind is a brand of {BUSINESS.legalName} ·{" "}
             <a href={`mailto:${BUSINESS.email}`} className="underline-offset-4 hover:underline">
@@ -167,8 +167,7 @@ export function SiteFooter() {
             ·{" "}
             <a href={BUSINESS.phoneHref} className="underline-offset-4 hover:underline">
               {BUSINESS.phone}
-            </a>{" "}
-            · {BUSINESS.hours}
+            </a>
           </p>
         </div>
       </div>

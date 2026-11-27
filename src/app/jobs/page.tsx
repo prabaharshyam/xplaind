@@ -81,10 +81,12 @@ export default function JobsPage() {
                       ))}
                     </tbody>
                   </table>
-                  <p className={`mt-2 max-w-xl text-sm leading-6 ${muted}`}>
-                    Typical CTC from published salary data and job posts, checked on {checked}. Sources disagree, so treat it as a guide, not an
-                    offer: big tech and global AI labs pay more, IT services and smaller cities less, and Bengaluru usually leads.
-                  </p>
+                  {/* UX-22: the caveats as short chips; the date stays on screen (JB-4). */}
+                  <ul className={`mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm ${muted}`}>
+                    <li>Typical CTC, checked on {checked}</li>
+                    <li>A guide, not an offer</li>
+                    <li>Big tech pays more, IT services less; Bengaluru leads</li>
+                  </ul>
 
                   <h3 className="mt-6 text-sm font-semibold">Skills job posts ask for</h3>
                   <ul className="mt-2 flex flex-wrap gap-2">
