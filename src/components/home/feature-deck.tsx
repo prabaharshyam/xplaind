@@ -147,6 +147,7 @@ export function FeatureDeck({ cards, label = "Features" }: { cards: DeckCard[]; 
                 aria-labelledby={`${base}-tab-${c.id}`}
                 aria-hidden={!front}
                 inert={!front}
+                data-front={front || undefined}
                 style={pose(offset, n)}
                 className={`deck-card grid min-w-0 origin-bottom-left grid-cols-[minmax(0,1fr)] content-start gap-4 rounded-3xl p-5 shadow-[0_24px_48px_-28px_rgba(0,0,0,0.22),0_8px_20px_-14px_rgba(0,0,0,0.12)] ring-1 ring-zinc-200 dark:ring-zinc-800 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:content-normal md:items-center md:gap-8 md:p-10 ${TONE[c.tone]}`}
               >

@@ -25,6 +25,9 @@ export function MiniRoadmap() {
       {side.map((s) => (
         <line key={s.label} x1={s.x} y1={s.y} x2="150" y2={s.y < 124 ? 99 : s.y} stroke="currentColor" strokeOpacity=".2" strokeDasharray="4 4" />
       ))}
+      {/* UX-26: a dot runs down the path, under the topics, to the one you are on, which pings (globals.css, front deck card only). */}
+      <circle className="lx-travel" cx="150" cy="24" r="5" fill="#047857" />
+      <rect className="lx-ping" x="106" y="111" width="88" height="26" rx="8" fill="none" stroke="#10b981" strokeWidth="2" />
       {[...nodes, ...side].map((n) => (
         <g key={n.label}>
           <rect
@@ -54,12 +57,14 @@ export function MiniLesson() {
       </div>
       <p className="mt-3 font-semibold">Build a RAG app</p>
       <div className="mt-2 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700">
-        <div className="h-full w-3/5 rounded-full bg-emerald-500" />
+        <div className="lx-fill h-full w-3/5 rounded-full bg-emerald-500" />
       </div>
       <ul className="mt-3 space-y-1.5 text-sm">
         {["What it is", "How it works", "A worked example"].map((s, i) => (
           <li key={s} className="flex items-center gap-2">
-            <span className={`grid size-4 place-items-center rounded-full text-xs ${i < 2 ? "bg-emerald-500 text-white" : "border border-zinc-300"}`}>{i < 2 ? "✓" : ""}</span>
+            <span className={`relative grid size-4 place-items-center rounded-full text-xs ${i < 2 ? "bg-emerald-500 text-white" : "border border-zinc-300"}`}>
+              {i < 2 ? "✓" : <span className="lx-ping absolute inset-0 rounded-full border-2 border-emerald-500" />}
+            </span>
             {s}
           </li>
         ))}
@@ -76,6 +81,11 @@ export function MiniInterview() {
       <p className="mt-1 font-semibold">How do you evaluate a RAG system?</p>
       <div className="mt-3 flex items-center justify-between">
         <span className="font-mono text-2xl tabular-nums">1:12</span>
+        <span className="lx-wave flex h-6 items-center gap-0.5">
+          {[0, 1, 2, 3, 4].map((b) => (
+            <span key={b} className="h-full w-1 rounded-full bg-rose-400" />
+          ))}
+        </span>
         <span className="flex items-center gap-2 rounded-full bg-rose-600 px-3 py-1.5 text-sm text-white">
           <span className="size-2 animate-pulse rounded-full bg-white" /> Listening
         </span>
@@ -134,11 +144,12 @@ export function MiniPlan() {
         {days.map((x, i) => (
           <span
             key={i}
-            className={`grid size-8 place-items-center rounded-full text-xs font-semibold ${
+            className={`relative grid size-8 place-items-center rounded-full text-xs font-semibold ${
               x.done ? "bg-emerald-500 text-white" : x.today ? "border-2 border-brand-600 text-brand-800 dark:text-brand-300" : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400"
             }`}
           >
             {x.done ? "✓" : x.d}
+            {x.today && <span className="lx-ping absolute inset-0 rounded-full border-2 border-brand-600" />}
           </span>
         ))}
       </div>
@@ -153,7 +164,10 @@ export function MiniPlan() {
       </ul>
       <div className="mt-3 flex items-center gap-2 text-xs">
         <span className="flex items-center gap-1.5 rounded-2xl bg-amber-100 px-3 py-1.5 whitespace-nowrap text-amber-900">
-          <Icon name="fire" size={16} /> <span className="text-base font-semibold">7</span> day streak
+          <span className="lx-flicker inline-flex">
+            <Icon name="fire" size={16} />
+          </span>{" "}
+          <span className="text-base font-semibold">7</span> day streak
         </span>
         <span className="rounded-2xl bg-emerald-100 px-3 py-1.5 whitespace-nowrap text-emerald-900">
           <span className="text-base font-semibold">12</span> lessons done
@@ -172,11 +186,15 @@ export function MiniNotes() {
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">Class 12 Biology notes.pdf</span>
           <span className="block text-xs text-zinc-600 dark:text-zinc-400">212 pages · read on your device</span>
+          {/* UX-26: the file being read, as a thin bar that fills (front deck card only). */}
+          <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+            <span className="lx-fill block h-full rounded-full bg-rose-400" />
+          </span>
         </span>
       </div>
       <div className="relative pb-2">
         <span className="absolute inset-x-4 bottom-0 h-full rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
-        <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="lx-float relative rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Flashcard 3 of 15</p>
           <p className="mt-2 font-semibold text-zinc-900 dark:text-zinc-100">Where do plants turn light into chemical energy?</p>
           <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">In the chloroplast, during photosynthesis.</p>
@@ -201,7 +219,13 @@ export function MiniResume() {
         <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">Example</span>
       </div>
       <div className="mt-3 flex items-center gap-3">
-        <span className="grid size-14 place-items-center rounded-full border-4 border-emerald-500 text-lg font-semibold">78</span>
+        <span className="relative grid size-14 place-items-center text-lg font-semibold">
+          <svg viewBox="0 0 56 56" className="absolute inset-0 -rotate-90">
+            <circle cx="28" cy="28" r="24" fill="none" strokeWidth="4" className="stroke-zinc-200 dark:stroke-zinc-800" />
+            <circle className="lx-ring stroke-emerald-500" cx="28" cy="28" r="24" fill="none" strokeWidth="4" strokeLinecap="round" pathLength="100" strokeDasharray="100" strokeDashoffset="22" />
+          </svg>
+          <span className="relative">78</span>
+        </span>
         <span className="text-sm leading-5">Shortlist-ready after <b>3 fixes</b></span>
       </div>
       <ul className="lx-stagger mt-3 space-y-1.5 text-sm">

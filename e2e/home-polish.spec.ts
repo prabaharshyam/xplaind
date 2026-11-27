@@ -111,3 +111,16 @@ test("the Zarina note is three plain lines on a phone, with 'Try it now' on its 
   expect(tryIt!.y).toBeGreaterThan(sentence!.y + sentence!.height - 2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
+
+test("the front deck card's picture moves for a few seconds; cards behind it and reduced motion stay still (UX-26)", async ({ page }) => {
+  const running = (sel: string) => page.locator(sel).evaluateAll((els) => els.filter((e) => getComputedStyle(e).animationName !== "none").length);
+  await page.goto("/");
+  await page.getByRole("tablist", { name: "Features" }).getByRole("tab", { name: "Roadmaps" }).click();
+  expect(await running(".deck-card[data-front] .lx-travel")).toBe(1);
+  expect(await running(".deck-card:not([data-front]) .lx-fill, .deck-card:not([data-front]) .lx-ring")).toBe(0);
+  // Each loop stops on its own: a finite number of runs, never infinite (WCAG 2.2.2).
+  const counts = await page.locator(".deck-card[data-front] [class*='lx-']").evaluateAll((els) => els.map((e) => getComputedStyle(e).animationIterationCount));
+  expect(counts).not.toContain("infinite");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await running(".deck-card [class*='lx-travel'], .deck-card .lx-fill, .deck-card .lx-wave > *, .deck-card .lx-ring")).toBe(0);
+});
