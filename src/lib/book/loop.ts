@@ -77,9 +77,10 @@ export function retestCount(test: Pick<BookTest, "questions">, answers: readonly
 }
 
 /** MB-10: the questions a learner missed, as review cards: the question, then the right answer and why. */
-export function missedAsCards(test: Pick<BookTest, "questions">, answers: readonly (number | null)[]) {
+export function missedAsCards(test: Pick<BookTest, "questions">, answers: readonly (number | null)[], sure: readonly (boolean | null)[] = []) {
+  // MB-17: a right answer the learner was not sure of comes back too, until it is sure.
   return test.questions
-    .filter((q, i) => answers[i] !== q.answer)
+    .filter((q, i) => answers[i] !== q.answer || sure[i] === false)
     .slice(0, 30)
     .map((q, i) => ({
       id: `m${i + 1}`,
@@ -89,6 +90,20 @@ export function missedAsCards(test: Pick<BookTest, "questions">, answers: readon
       page: q.page,
       section: q.section.slice(0, 200),
     }));
+}
+
+/**
+ * MB-17: what the learner's confidence says. Right but not sure: luck, worth reviewing. Wrong while sure: a
+ * misunderstanding, worth rereading first. Indexes into the test's questions, in order.
+ */
+export function confidenceSummary(test: Pick<BookTest, "questions">, answers: readonly (number | null)[], sure: readonly (boolean | null)[] = []) {
+  const unsureRight: number[] = [];
+  const sureWrong: number[] = [];
+  test.questions.forEach((q, i) => {
+    if (answers[i] === q.answer && sure[i] === false) unsureRight.push(i);
+    if (answers[i] !== null && answers[i] !== q.answer && sure[i] === true) sureWrong.push(i);
+  });
+  return { unsureRight, sureWrong, rated: sure.filter((x) => x !== null && x !== undefined).length };
 }
 
 // ------------------------------------------------------ spaced repetition --

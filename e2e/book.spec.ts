@@ -384,3 +384,29 @@ test("cards come as question and answer, fill in the blank or multiple choice (M
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
 });
+
+test("each answer can be marked sure or not sure, and the report says what that means (MB-17)", async ({ page }) => {
+  await page.addInitScript((s) => localStorage.setItem("xplaind.book.v1", JSON.stringify(s)), saved);
+  await page.goto("/ai/book");
+  await page.getByRole("button", { name: /Take the test: Biology for Class 11/ }).click();
+  const sure = page.getByRole("group", { name: "How sure are you?" });
+  await expect(sure).toHaveCount(0); // asked only once there is an answer
+  await page.getByRole("radio", { name: "Nucleus" }).check();
+  await sure.getByRole("button", { name: "Sure", exact: true }).click();
+  await expect(sure.getByRole("button", { name: "Sure", exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Next question" }).click();
+  await page.getByRole("radio", { name: "Energy from glucose" }).check();
+  await sure.getByRole("button", { name: "Not sure" }).click();
+  await page.getByRole("button", { name: "Next question" }).click();
+  await page.getByRole("radio", { name: "Mitochondrion" }).check();
+  await page.getByRole("button", { name: "Finish the test" }).click();
+
+  const panel = page.getByRole("region", { name: "How sure you were" });
+  await expect(panel).toContainText("1 wrong while you were sure");
+  await expect(panel).toContainText("Where does photosynthesis happen?");
+  await expect(panel).toContainText("1 right but not sure");
+  await expect(page.getByRole("heading", { name: "Keep the 2 you missed or were not sure of coming back" })).toBeVisible();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+});

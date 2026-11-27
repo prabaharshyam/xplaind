@@ -28,7 +28,13 @@ const Test = z.object({
   /** MB-9: written from the sections the learner missed in an earlier test. */
   retest: z.boolean().optional(),
   result: z
-    .object({ answers: z.array(z.number().int().min(0).max(3).nullable()), seconds: z.number().int().min(0), finishedOn: z.string().max(10) })
+    .object({
+      answers: z.array(z.number().int().min(0).max(3).nullable()),
+      seconds: z.number().int().min(0),
+      finishedOn: z.string().max(10),
+      /** MB-17: how sure the learner was of each answer (true sure, false not sure, null not said). Older results have none. */
+      sure: z.array(z.boolean().nullable()).optional(),
+    })
     .optional(),
 });
 

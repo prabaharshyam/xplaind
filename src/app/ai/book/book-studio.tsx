@@ -12,7 +12,7 @@ import { PicturePanel } from "./picture-panel";
 import { type BookQuestion, type BookTest, bookReport, DIFFICULTY_LABEL, type Difficulty, formatSeconds, pageList } from "@/lib/book/report";
 import { addBookTest, deleteBookTest, finishBookTest, retakeBookTest, useBookTests } from "@/lib/browser/book-store";
 import { type BookCard, type BookDeck, addDeck, deckCsv, deleteDeck, markCard, useDecks } from "@/lib/browser/book-cards-store";
-import { dueCards, missedAsCards, nextDue } from "@/lib/book/loop";
+import { confidenceSummary, dueCards, missedAsCards, nextDue } from "@/lib/book/loop";
 import { useToday } from "@/lib/browser/hooks";
 import { todayInIST } from "@/lib/dates";
 import { AskNotes, ReopenFile, RetestPanel } from "./study-loop";
@@ -806,6 +806,8 @@ function NotesView({ notes }: { notes: BookNotes }) {
 
 function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
   const [answers, setAnswers] = useState<(number | null)[]>(() => test.questions.map(() => null));
+  // MB-17: how sure the learner is of each answer; optional.
+  const [sure, setSure] = useState<(boolean | null)[]>(() => test.questions.map(() => null));
   const [i, setI] = useState(0);
   const [startedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
@@ -820,7 +822,7 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
   const finish = (final = answers) => {
     if (finished.current) return;
     finished.current = true;
-    finishBookTest(test.id, { answers: final, seconds: Math.min(limit, Math.floor((Date.now() - startedAt) / 1000)), finishedOn: todayInIST() });
+    finishBookTest(test.id, { answers: final, seconds: Math.min(limit, Math.floor((Date.now() - startedAt) / 1000)), finishedOn: todayInIST(), sure });
     onDone();
   };
 
@@ -860,6 +862,27 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
           </label>
         ))}
       </fieldset>
+      {answers[i] !== null && (
+        <div role="group" aria-label="How sure are you?" className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-zinc-600 dark:text-zinc-400">How sure are you?</span>
+          {(
+            [
+              [true, "Sure"],
+              [false, "Not sure"],
+            ] as const
+          ).map(([v, label]) => (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={sure[i] === v}
+              onClick={() => setSure((x) => x.map((y, j) => (j === i ? (y === v ? null : v) : y)))}
+              className="inline-flex min-h-11 items-center rounded-full border border-zinc-300 px-4 font-medium aria-pressed:border-brand-700 aria-pressed:bg-brand-50 aria-pressed:text-brand-900 dark:border-zinc-700 dark:aria-pressed:bg-brand-950/50 dark:aria-pressed:text-brand-100"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <button type="button" className={secondaryButton} disabled={i === 0} onClick={() => setI(i - 1)}>
@@ -921,7 +944,8 @@ function TakeTest({ test, onDone }: { test: BookTest; onDone: () => void }) {
 function Report({ test, onRetake, onHome, onDeck, children }: { test: BookTest; onRetake: () => void; onHome: () => void; onDeck: (id: string) => void; children?: React.ReactNode }) {
   const result = test.result!;
   const r = bookReport(test, result.answers, result.seconds);
-  const missed = missedAsCards(test, result.answers);
+  const missed = missedAsCards(test, result.answers, result.sure);
+  const conf = confidenceSummary(test, result.answers, result.sure);
   const [savedDeck, setSavedDeck] = useState<string | null>(null);
   const [pdf, setPdf] = useState<"idle" | "busy" | "error">("idle");
   const tone = r.percent >= 80 ? "bg-emerald-600" : r.percent >= 60 ? "bg-amber-500" : "bg-rose-600";
@@ -971,13 +995,48 @@ function Report({ test, onRetake, onHome, onDeck, children }: { test: BookTest; 
         )}
       </section>
 
+      {/* MB-17: what the learner's confidence says, when they gave it. */}
+      {conf.rated > 0 && (conf.sureWrong.length > 0 || conf.unsureRight.length > 0) && (
+        <section aria-labelledby="sure-h" className="flex flex-col gap-3 rounded-2xl border border-zinc-200 p-5 dark:border-zinc-800">
+          <h3 id="sure-h" className="text-lg font-semibold">
+            How sure you were
+          </h3>
+          {conf.sureWrong.length > 0 && (
+            <div>
+              <p className="font-medium text-rose-800 dark:text-rose-300">
+                {conf.sureWrong.length} wrong while you were sure. Reread these first: a confident mistake is the one an exam catches.
+              </p>
+              <ul className="mt-1 list-disc pl-5 text-sm leading-6">
+                {conf.sureWrong.map((k) => (
+                  <li key={k}>
+                    {test.questions[k].question} <span className="text-zinc-600 dark:text-zinc-400">(page {test.questions[k].page})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {conf.unsureRight.length > 0 && (
+            <div>
+              <p className="font-medium text-amber-900 dark:text-amber-200">
+                {conf.unsureRight.length} right but not sure. They come back with your review cards until you are sure.
+              </p>
+              <ul className="mt-1 list-disc pl-5 text-sm leading-6">
+                {conf.unsureRight.map((k) => (
+                  <li key={k}>{test.questions[k].question}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+
       {missed.length > 0 && (
         <div className="flex flex-col gap-4">
           {children}
           <section aria-labelledby="missed-h" className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-5 dark:border-zinc-800">
             <div className="min-w-0 flex-1">
               <h3 id="missed-h" className="text-lg font-semibold">
-                Keep the {missed.length} you missed coming back
+                {conf.unsureRight.length ? `Keep the ${missed.length} you missed or were not sure of coming back` : `Keep the ${missed.length} you missed coming back`}
               </h3>
               <p className="mt-1 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
                 Turn them into review cards with the right answer and the quote from your file. They come back tomorrow, then less often as you get them right. No AI needed.
