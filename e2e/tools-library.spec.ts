@@ -10,7 +10,7 @@ test.use({ viewport: { width: 360, height: 740 } });
 
 test("the AI tools page puts Study from my notes & books first and lists the new tools and guides (SU-1)", async ({ page }) => {
   await page.goto("/ai");
-  const cards = page.locator("main ul").first().getByRole("link");
+  const cards = page.getByRole("region", { name: "Study" }).getByRole("link"); // UX-14: the banner's launcher miniature is a list too
   await expect(cards.first()).toContainText("Study from my notes & books");
   await expect(page.getByRole("link", { name: /Interview questions and answers/ })).toHaveAttribute("href", "/interview");
   await expect(page.getByRole("main").getByRole("link", { name: /Research papers and free books/ })).toHaveCount(0); // moved to the Learn menu (NV-1)
