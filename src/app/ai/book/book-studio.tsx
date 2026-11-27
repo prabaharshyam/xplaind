@@ -19,7 +19,7 @@ import { AskNotes, ReopenFile, RetestPanel } from "./study-loop";
 import { AppTabs } from "@/components/app-tabs";
 import { TILE } from "@/lib/tones";
 import { type BookNotes, addNotes, deleteNotes, useBookNotes } from "@/lib/browser/book-notes-store";
-import type { BookNote } from "@/lib/ai/features";
+import type { BookNote, CardFormat } from "@/lib/ai/features";
 import { type StudySet, loadStudySet, removeStudySet, saveStudySet, useStudySets } from "@/lib/browser/study-sets";
 
 const COUNTS = [5, 10, 15, 20, 25];
@@ -346,6 +346,7 @@ function Home({ tests, decks, sets, onBook, onSet, onOpen, onDeck }: { tests: Bo
 /** MB-14: the form for a new test or a new deck from a study set's file, inside its tab. */
 function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book; access: ReturnType<typeof useAiAccess>; mode: "test" | "cards" | "notes"; onReady: (id: string) => void; onDeck: (id: string) => void; onNotes?: (id: string) => void }) {
   const [depth, setDepth] = useState<"summary" | "detailed">("summary");
+  const [formats, setFormats] = useState<CardFormat[]>(["qa", "cloze"]);
   const [cardCount, setCardCount] = useState(15);
   const [chosen, setChosen] = useState<string[]>(book.sections);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
@@ -360,7 +361,8 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
     if (excerpts.length === 0) return setError("Choose at least one chapter.");
     setBusy(true);
     setError(null);
-    const res = await aiPost<{ cards: BookCard[] }>("/api/ai/book-cards", { book: book.title.slice(0, 160), count: cardCount, excerpts: excerpts.map((e) => ({ ...e, text: e.text.slice(0, 2000) })) });
+    if (formats.length === 0) return setError("Choose at least one kind of card.");
+    const res = await aiPost<{ cards: BookCard[] }>("/api/ai/book-cards", { book: book.title.slice(0, 160), count: cardCount, formats, excerpts: excerpts.map((e) => ({ ...e, text: e.text.slice(0, 2000) })) });
     setBusy(false);
     if (!res.ok) return setError(res.message);
     onDeck(addDeck({ createdOn: todayInIST(), book: book.title, cards: res.data.cards }));
@@ -435,6 +437,30 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
           </div>
         </fieldset>
       ) : mode === "cards" ? (
+        <>
+        {/* MB-16: the kinds of card to mix. */}
+        <fieldset>
+          <legend className="text-lg font-semibold">Kinds of card</legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            {(
+              [
+                ["qa", "Question and answer"],
+                ["cloze", "Fill in the blank"],
+                ["mcq", "Multiple choice"],
+              ] as const
+            ).map(([f, label]) => (
+              <label key={f} className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border px-3 ${formats.includes(f) ? "border-brand-600 bg-brand-50 dark:bg-brand-950/40" : "border-zinc-300 dark:border-zinc-700"}`}>
+                <input
+                  type="checkbox"
+                  checked={formats.includes(f)}
+                  onChange={() => setFormats((x) => (x.includes(f) ? x.filter((y) => y !== f) : [...x, f]))}
+                  className="size-5 accent-brand-700"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <label className="flex flex-col gap-1 sm:max-w-xs">
           <span className="text-lg font-semibold">Number of cards</span>
           <select value={cardCount} onChange={(e) => setCardCount(Number(e.target.value))} className="min-h-12 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900">
@@ -445,6 +471,7 @@ function SetForm({ book, access, mode, onReady, onDeck, onNotes }: { book: Book;
             ))}
           </select>
         </label>
+        </>
       ) : (
       <>
       <fieldset>
@@ -1071,13 +1098,16 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
   const [order, setOrder] = useState(() => dueCards(deck.cards, deck.schedule, today));
   const [i, setI] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [picked, setPicked] = useState<number | null>(null);
   const [knew, setKnew] = useState(0);
   const card = order[i];
+  const mcq = card?.kind === "mcq" && card.options && card.answer !== undefined;
 
   const mark = (m: "knew" | "again") => {
     markCard(deck.id, card.id, m, today);
     if (m === "knew") setKnew((k) => k + 1);
     setFlipped(false);
+    setPicked(null);
     setI(i + 1);
     requestAnimationFrame(() => document.getElementById("deck-card")?.focus());
   };
@@ -1156,7 +1186,46 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
                   {card.section}, page {card.page}
                 </span>
               </p>
-              <p className={`leading-snug font-semibold ${flipped ? "text-lg text-zinc-600 dark:text-zinc-300" : "my-auto py-6 text-center text-2xl"}`}>{card.front}</p>
+              <p className={`leading-snug font-semibold ${flipped || mcq ? "text-lg text-zinc-600 dark:text-zinc-300" : "my-auto py-6 text-center text-2xl"}`}>
+                {card.kind === "cloze"
+                  ? card.front.split("_____").map((part, k, all) => (
+                      <span key={k}>
+                        {part}
+                        {k < all.length - 1 && (
+                          <span className="mx-1 inline-block min-w-20 border-b-2 border-brand-700 align-baseline dark:border-brand-300" aria-label="blank">
+                            {" "}
+                          </span>
+                        )}
+                      </span>
+                    ))
+                  : card.front}
+              </p>
+              {/* MB-16: a multiple-choice card is answered by picking, which turns it over. */}
+              {mcq && (
+                <ul className="lx-deal flex flex-col gap-2">
+                  {card.options!.map((o, k) => {
+                    const right = k === card.answer;
+                    const tone = picked === null ? "border-zinc-300 hover:border-brand-400 dark:border-zinc-700" : right ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40" : k === picked ? "border-rose-600 bg-rose-50 dark:bg-rose-950/40" : "border-zinc-200 opacity-70 dark:border-zinc-800";
+                    return (
+                      <li key={k}>
+                        <button
+                          type="button"
+                          disabled={picked !== null}
+                          aria-pressed={picked === k}
+                          onClick={() => {
+                            setPicked(k);
+                            setFlipped(true);
+                          }}
+                          className={`flex min-h-12 w-full items-center gap-3 rounded-2xl border px-4 text-left ${tone}`}
+                        >
+                          <span className="font-semibold">{"ABCD"[k]}</span> {o}
+                          {picked !== null && right && <span className="ml-auto text-sm font-medium text-emerald-800 dark:text-emerald-300">Right answer</span>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
               {flipped ? (
                 <>
                   <p className="text-lg leading-8">{card.back}</p>
@@ -1165,7 +1234,7 @@ function StudyDeck({ deck, onHome }: { deck: BookDeck; onHome: () => void }) {
                     <figcaption className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">From your file: {card.section}, page {card.page}</figcaption>
                   </figure>
                 </>
-              ) : (
+              ) : mcq ? null : (
                 <div className="mt-auto flex justify-center">
                   <button type="button" className={primaryButton} onClick={() => setFlipped(true)}>
                     Flip the card

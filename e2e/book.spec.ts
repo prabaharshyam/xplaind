@@ -349,3 +349,38 @@ test("notes from a file: summary or detailed, every point with its page, kept on
   expect((await request.post("/api/ai/book-notes", { data: ok })).status()).toBe(503);
   expect((await request.post("/api/ai/book-notes", { data: { ...ok, depth: "everything" } })).status()).toBe(400);
 });
+
+test("cards come as question and answer, fill in the blank or multiple choice (MB-16)", async ({ page }) => {
+  const decks = {
+    version: 1,
+    decks: [
+      {
+        id: "d1",
+        createdOn: "2026-11-27",
+        book: "Biology for Class 11",
+        cards: [
+          { id: "c1", kind: "cloze", front: "Photosynthesis takes place in the _____ of green plant cells.", back: "chloroplasts. That is where light becomes food.", quote: "Photosynthesis takes place in the chloroplasts of green plant cells", page: 2, section: "Photosynthesis" },
+          { id: "c2", kind: "mcq", front: "What does respiration release?", options: ["Oxygen only", "Energy from glucose", "Chlorophyll", "Starch"], answer: 1, back: "Respiration releases the energy stored in glucose.", quote: "Respiration releases the energy stored in glucose", page: 3, section: "Respiration" },
+        ],
+        marks: {},
+        schedule: {},
+        source: "ai",
+      },
+    ],
+  };
+  await page.addInitScript((d) => localStorage.setItem("xplaind.bookcards.v1", JSON.stringify(d)), decks);
+  await page.goto("/ai/book");
+  await page.getByRole("button", { name: /Study the flashcards: Biology for Class 11/ }).click();
+  await expect(page.getByLabel("blank")).toBeVisible();
+  expect((await wcag(page)).violations).toEqual([]);
+  await page.getByRole("button", { name: "Flip the card" }).click();
+  await expect(page.getByText("chloroplasts. That is where light becomes food.")).toBeVisible();
+  await page.getByRole("button", { name: "I knew it" }).click();
+  // A multiple-choice card turns over when an option is picked, and marks the right one.
+  await expect(page.getByRole("button", { name: "Flip the card" })).toHaveCount(0);
+  await page.getByRole("button", { name: /Oxygen only/ }).click();
+  await expect(page.getByText("Right answer")).toBeVisible();
+  await expect(page.getByText("Respiration releases the energy stored in glucose.")).toBeVisible();
+  expect(await overflow(page)).toBe(false);
+  expect((await wcag(page)).violations).toEqual([]);
+});
