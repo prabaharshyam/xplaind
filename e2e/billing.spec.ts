@@ -22,6 +22,9 @@ test("the pricing page leads with value, shows honest savings, a free-vs-Pro tab
   // PAY-7: a free account gets a one-time trial of each AI helper; Pro is per day.
   const table = page.getByRole("table", { name: "AI helper uses: free trial in total, and Pro's most per day within its fair-use allowance" });
   await expect(table.getByRole("row", { name: /AI tutor questions 3 tries in total Up to 50 a day/ })).toBeVisible();
+  // PAY-14: on a 360 px phone the Pro column is on screen, with no sideways scroll inside the table.
+  const pro = (await table.getByRole("columnheader", { name: /^Pro/ }).boundingBox())!;
+  expect(pro.x + pro.width).toBeLessThanOrEqual(360);
   // Questions are folded: the answer shows only after opening the question.
   const q = page.locator("details", { hasText: "Does it renew by itself?" });
   await expect(q.getByText(/A pass is one payment/)).toBeHidden();

@@ -269,42 +269,45 @@ export default function PricingPage() {
           day. Lessons, roadmaps, videos and practice are never limited.
         </p>
         <div role="region" aria-label="Free account and Pro compared" tabIndex={0} className="mt-8 overflow-x-auto rounded-3xl bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-zinc-900">
-          <table className="w-full min-w-[30rem] text-left">
+          {/* PAY-14: no minimum width, so all three columns fit a 360 px phone and the Pro column is never off-screen. */}
+          <table className="w-full text-left text-sm md:text-base">
             <caption className="sr-only">AI helper uses: free trial in total, and Pro&apos;s most per day within its fair-use allowance</caption>
             <thead>
               <tr className="text-sm">
-                <th scope="col" className="p-4 font-semibold md:px-6">
+                <th scope="col" className="p-3 md:py-4 font-semibold md:px-6">
                   What you get
                 </th>
-                <th scope="col" className="p-4 font-semibold md:px-6">
+                <th scope="col" className="p-3 md:py-4 font-semibold md:px-6">
                   Free account
                 </th>
-                <th scope="col" className="p-4 font-semibold text-brand-800 md:px-6 dark:text-brand-300">
-                  Pro, within your fair-use allowance
+                <th scope="col" className="p-3 md:py-4 font-semibold text-brand-800 md:px-6 dark:text-brand-300">
+                  Pro<span className="block text-xs font-normal md:inline md:text-sm md:font-semibold">
+                    <span className="max-md:hidden">, </span>within your fair-use allowance
+                  </span>
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-t border-zinc-200 dark:border-zinc-800">
-                <th scope="row" className="p-4 font-medium md:px-6">
+                <th scope="row" className="p-3 md:py-4 font-medium md:px-6">
                   Roadmaps, lessons, videos, practice and projects
                 </th>
-                <td className="p-4 md:px-6">Unlimited</td>
-                <td className="p-4 font-semibold md:px-6">Unlimited</td>
+                <td className="p-3 md:py-4 md:px-6">Unlimited</td>
+                <td className="p-3 md:py-4 font-semibold md:px-6">Unlimited</td>
               </tr>
               {rows.map((k) => (
                 <tr key={k} className="border-t border-zinc-200 dark:border-zinc-800">
-                  <th scope="row" className="p-4 font-medium md:px-6">
+                  <th scope="row" className="p-3 md:py-4 font-medium md:px-6">
                     {KIND_LABEL[k]}
                   </th>
-                  <td className="p-4 md:px-6">
+                  <td className="p-3 md:py-4 md:px-6">
                     {k === "voice"
                       ? "1 free interview of 2 questions"
                       : TIER_LIMITS.free[k] === 0
                         ? "Pro only"
                         : `${TIER_LIMITS.free[k]} ${TIER_LIMITS.free[k] === 1 ? "try" : "tries"} in total`}
                   </td>
-                  <td className="p-4 font-semibold md:px-6">Up to {TIER_LIMITS.pro[k]} a day</td>
+                  <td className="p-3 md:py-4 font-semibold md:px-6">Up to {TIER_LIMITS.pro[k]} a day</td>
                 </tr>
               ))}
             </tbody>

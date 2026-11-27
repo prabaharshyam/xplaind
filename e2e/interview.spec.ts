@@ -115,8 +115,8 @@ test.describe("practice (IQ-4, IQ-5)", () => {
       page.getByText(/^1 of \d+ practiced: 0 got it, 0 partly, 1 missed/),
     ).toBeVisible();
 
-    // the rating survives a reload, and the list shows it
-    await page.goto("/interview");
+    // the rating survives a reload, and the list shows it (IP-7: the list shows 20 at a time, so open its topic)
+    await page.goto("/interview?topic=rag");
     await expect(
       page.getByRole("button", {
         name: new RegExp(`${first.slice(0, 20)}.*You said: missed`),

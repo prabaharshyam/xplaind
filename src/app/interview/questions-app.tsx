@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { useAccountState } from "@/components/account-link";
 import { Flashcard } from "@/components/interview/flashcard";
 import { muted, primaryButtonSm, secondaryButtonSm, textLink } from "@/components/ui";
 import { usePractice, useToday } from "@/lib/browser/hooks";
@@ -19,12 +18,15 @@ const noop = () => () => {};
 const useSearch = () => useSyncExternalStore(noop, () => window.location.search, () => "");
 /** Cards in one round of "Practise these". */
 const ROUND = 20;
+/** IP-7: questions listed before "Show more", so a phone is not handed all 500 in one column. */
+const PAGE = 20;
 
 /**
  * IP-6: the question bank and the answers in one app screen. A toolbar filters by search, role, topic
  * and level; the list is on the left and the chosen answer on the right (on a phone the answer takes the
  * screen, with a way back). "Practise these" turns the current list into flashcards (IQ-4).
- * A signed-out visitor follows each question to its own page, as before (SU-1).
+ * IP-7: a signed-out visitor gets the same screen (the answers are open, SU-1); only saving a rating
+ * needs an account (SU-2). The list shows PAGE questions at a time.
  */
 export function QuestionsApp({ questions, roles }: { questions: InterviewView[]; roles: { id: string; name: string }[] }) {
   const params = new URLSearchParams(useSearch());
@@ -37,11 +39,14 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
   const [selected, setSelected] = useState<string | null>(null);
   const [cards, setCards] = useState<string[] | null>(null);
   const [index, setIndex] = useState(0);
+  const [more, setMore] = useState({ key: "", n: PAGE });
   const role = roleChoice ?? urlRole;
   const topic = topicChoice ?? urlTopic;
   const practice = usePractice();
   const today = useToday();
-  const account = useAccountState();
+  // A new filter starts again from the first PAGE questions.
+  const filterKey = [role, topic, level, query].join("|");
+  const limit = more.key === filterKey ? more.n : PAGE;
 
   const shown = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -138,8 +143,9 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-        <ul aria-label="Questions" className={`flex flex-col divide-y divide-zinc-200 lg:max-h-[72vh] lg:overflow-y-auto lg:pr-2 dark:divide-zinc-800 ${picked ? "hidden lg:flex" : ""}`}>
-          {shown.map((q) => {
+        <div className={`flex-col gap-3 lg:max-h-[72vh] lg:overflow-y-auto lg:pr-2 ${picked ? "hidden lg:flex" : "flex"}`}>
+        <ul aria-label="Questions" className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+          {shown.slice(0, limit).map((q) => {
             const rating = practice.ratings[q.id];
             const isActive = q.id === active?.id;
             const body = (
@@ -156,21 +162,21 @@ export function QuestionsApp({ questions, roles }: { questions: InterviewView[];
             }`;
             return (
               <li key={q.id}>
-                {account === "out" ? (
-                  <Link href={`/interview/${q.id}`} className={cls}>
-                    {body}
-                  </Link>
-                ) : (
-                  <button type="button" className={cls} aria-current={isActive ? "true" : undefined} onClick={() => setSelected(q.id)}>
-                    {body}
-                  </button>
-                )}
+                <button type="button" className={cls} aria-current={isActive ? "true" : undefined} onClick={() => setSelected(q.id)}>
+                  {body}
+                </button>
               </li>
             );
           })}
         </ul>
+        {shown.length > limit && (
+          <button type="button" className={`${secondaryButtonSm} self-center`} onClick={() => setMore({ key: filterKey, n: limit + PAGE })}>
+            Show more ({shown.length - limit} left)
+          </button>
+        )}
+        </div>
 
-        {active && account !== "out" && (
+        {active && (
           <article aria-labelledby="answer-q" className={`min-w-0 [overflow-wrap:anywhere] lg:max-h-[72vh] lg:overflow-y-auto lg:pr-2 ${picked ? "" : "hidden lg:block"}`}>
             <button type="button" className={`${secondaryButtonSm} mb-4 lg:hidden`} onClick={() => setSelected(null)}>
               ← All questions

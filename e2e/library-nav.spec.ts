@@ -47,6 +47,11 @@ test("IP-6: the Interview page is one app screen with tabs for questions, patter
   const answer = await page.getByRole("article").boundingBox();
   expect(answer!.x).toBeGreaterThan(list!.x + 300);
   await expect(page.getByRole("heading", { level: 3, name: "Short answer" })).toBeVisible();
+  // IP-7: 20 questions at a time, and "Show more" adds the next 20.
+  const rows = page.getByRole("list", { name: "Questions" }).getByRole("button");
+  await expect(rows).toHaveCount(20);
+  await page.getByRole("button", { name: /^Show more \(\d+ left\)$/ }).click();
+  await expect(rows).toHaveCount(40);
   // Choosing another question shows its answer without leaving the page.
   const third = page.getByRole("list", { name: "Questions" }).getByRole("button").nth(2);
   const text = (await third.locator("span").first().textContent())!;
@@ -60,6 +65,10 @@ test("IP-6: the Interview page is one app screen with tabs for questions, patter
   await page.goto("/interview?role=ai-product-manager");
   await expect(page.getByLabel("Role")).toHaveValue("ai-product-manager");
   await expect(page.getByRole("article")).toBeHidden();
+  // IP-7: a phone is not handed the whole bank in one column.
+  await page.goto("/interview");
+  await expect(page.getByRole("list", { name: "Questions" }).getByRole("button")).toHaveCount(20);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(740 * 8);
   await page.getByRole("list", { name: "Questions" }).getByRole("button").first().click();
   await expect(page.getByRole("article")).toBeVisible();
   await expect(page.getByRole("list", { name: "Questions" })).toBeHidden();
