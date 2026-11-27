@@ -30,7 +30,8 @@ export default function BookPage() {
         lead="Upload a PDF, Word or PowerPoint file. Ask it questions, take a test and review flashcards, each answer with the page it came from."
         crumbs={[{ href: "/practice", label: "Practice" }]}
       />
-      <div className="mx-auto max-w-3xl px-4 py-8">
+      {/* APP-4: wide enough for the notes workspace's Ask panel; the other screens keep their reading width. */}
+      <div className="mx-auto max-w-6xl px-4 py-8">
         {/* AG-1: needs an account once sign-ups are open; while they are on hold, guests keep their limits (SU-5). */}
         <BookStudio aiOn={aiEnabled()} />
       </div>

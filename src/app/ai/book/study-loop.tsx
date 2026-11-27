@@ -24,9 +24,15 @@ type Turn = { role: "user"; text: string } | { role: "assistant"; text: string; 
  * MB-8: ask a question and get an answer only from your own file, with the page it came from.
  * The matching passages are picked here in the browser; only those few are sent. Nothing is saved.
  */
-export function AskNotes({ book, access }: { book: Book; access: Access }) {
+export function AskNotes({ book, access, prefill }: { book: Book; access: Access; prefill?: { text: string; n: number } }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
+  // APP-4: text chosen with "Ask" in the notes lands in the box (adjusted during render, not in an effect).
+  const [seen, setSeen] = useState(0);
+  if (prefill && prefill.n !== seen) {
+    setSeen(prefill.n);
+    setDraft(`Explain this: "${prefill.text.slice(0, 400)}"`);
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputId = useId();

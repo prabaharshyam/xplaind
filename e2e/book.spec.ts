@@ -350,6 +350,54 @@ test("notes from a file: summary or detailed, every point with its page, kept on
   expect((await request.post("/api/ai/book-notes", { data: { ...ok, depth: "everything" } })).status()).toBe(400);
 });
 
+test("the study set workspace: stats, a next step, folders, and select text to highlight or ask (APP-4)", async ({ page }) => {
+  const notes = {
+    version: 1,
+    notes: [
+      {
+        id: "n1",
+        book: "Biology for Class 11",
+        createdOn: "2026-11-27",
+        depth: "summary",
+        sections: [{ heading: "Photosynthesis", points: [{ term: "Chloroplast", text: "Where green plants make food from light.", quote: "Photosynthesis takes place in the chloroplasts of green plant cells", page: 2, section: "Photosynthesis" }] }],
+      },
+    ],
+  };
+  await page.addInitScript((n) => localStorage.setItem("xplaind.book-notes.v1", JSON.stringify(n)), notes);
+  await page.goto("/ai/book");
+  await page.locator('input[type="file"]').setInputFiles({ name: "biology.pdf", mimeType: "application/pdf", buffer: bookPdf() });
+  const panel = page.getByRole("tabpanel", { name: "Notes" });
+  await expect(panel.getByRole("heading", { name: "Summary notes" })).toBeVisible({ timeout: 20_000 });
+  // The stats strip and one next step: notes exist and no test yet, so make a test (it opens the Tests tab).
+  await expect(page.getByText("Test average")).toBeVisible();
+  const next = page.getByRole("region", { name: "Do this next" });
+  await next.getByRole("button", { name: "Make a test" }).click();
+  await expect(page.getByRole("tab", { name: "Tests" })).toHaveAttribute("aria-selected", "true");
+  // The make form is three numbered steps.
+  await expect(page.getByRole("tabpanel", { name: "Tests" }).getByRole("group", { name: "Which chapters?" })).toBeVisible();
+  // Select text in a point: a bar offers Ask and highlights; a highlight stays on the device.
+  await page.getByRole("tab", { name: "Notes", exact: true }).click();
+  const point = panel.locator("[data-point='0-0']");
+  await point.scrollIntoViewIfNeeded();
+  await point.evaluate((li) => {
+    const range = document.createRange();
+    range.selectNodeContents(li.childNodes[1] ?? li);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    li.closest("article")!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+  const bar = page.getByRole("toolbar", { name: "Selected text" });
+  await expect(bar.getByRole("button", { name: "Ask" })).toBeVisible();
+  await bar.getByRole("button", { name: "Highlight in amber" }).click();
+  await expect(point.getByText("Highlighted:")).toBeAttached();
+  expect(await page.evaluate(() => localStorage.getItem("xplaind.highlights.v1"))).toContain('"0-0":"amber"');
+  expect((await wcag(page)).violations).toEqual([]);
+  // The study set shows as a folder on the tool's home.
+  await page.getByRole("button", { name: "← All study sets" }).click();
+  await expect(page.getByRole("button", { name: /Biology for Class 11/ }).locator(".xp-folder")).toBeVisible();
+});
+
 test("cards come as question and answer, fill in the blank or multiple choice (MB-16)", async ({ page }) => {
   const decks = {
     version: 1,
