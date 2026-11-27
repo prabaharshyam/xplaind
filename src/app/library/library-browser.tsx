@@ -4,7 +4,6 @@ import Link from "next/link";
 import { secondaryButtonSm } from "@/components/ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Icon } from "@/components/art/icons";
 import { WatchButton } from "@/components/video-player";
 import type { LibraryItem, LibraryKind } from "@/lib/content/library";
 import type { ThemeId } from "@/lib/themes";
@@ -17,18 +16,19 @@ const KINDS: { id: LibraryKind | "all"; label: string }[] = [
   { id: "skill", label: "Skills" },
 ];
 const LEVELS = ["B1", "B2", "B3", "I1", "I2", "I3", "P1", "P2", "P3"] as const;
-const PAGE = 48;
+const PAGE = 30;
 
 const chip = (on: boolean) =>
   `inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
     on ? "bg-brand-700 text-white shadow-sm" : "bg-white text-zinc-800 ring-1 ring-zinc-300 hover:bg-brand-50 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-brand-950"
   }`;
 
-const KIND_STYLE: Record<LibraryKind, string> = {
-  lesson: "bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200",
-  video: "bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200",
-  skill: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
+const KIND_TEXT: Record<LibraryKind, string> = {
+  lesson: "font-medium text-brand-800 dark:text-brand-300",
+  video: "font-medium text-zinc-800 dark:text-zinc-200",
+  skill: "font-medium text-zinc-800 dark:text-zinc-200",
 };
+const field = "min-h-11 w-full min-w-0 rounded-2xl border border-zinc-300 bg-white px-3 text-base sm:text-sm dark:border-zinc-700 dark:bg-zinc-950";
 const KIND_LABEL: Record<LibraryKind, string> = { lesson: "Lesson", video: "Video lesson", skill: "Skill" };
 
 /** RM-10: filter lessons, video lessons and skills by tag. Filters live in the address, so a tag link opens the right view. */
@@ -54,8 +54,6 @@ export function LibraryBrowser({
   const channel = params.get("channel");
   const q = params.get("q") ?? "";
   const [shown, setShown] = useState(PAGE);
-  // On phones the topic and level filters fold away behind one button, so results show on the first screen.
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const active = [topic, level, channel].filter(Boolean).length;
 
   const set = (key: string, value: string | null) => {
@@ -100,130 +98,99 @@ export function LibraryBrowser({
         topicGrid
       ) : (
         <>
-      <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-semibold">Search</span>
+      {/* LY-3 (2026-11-27, owner: "fix/do the 4-12", item 6): one toolbar of lists instead of walls of buttons, and
+          compact rows instead of cards, so the results start on the first screen and the page is not 17 screens long. */}
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]">
+        <label className="col-span-2 md:col-span-1">
+          <span className="sr-only">Search</span>
           <input
             type="search"
             value={q}
             onChange={(e) => set("q", e.target.value)}
-            placeholder="Try RAG, Python, agents, interviews…"
-            className="min-h-12 w-full rounded-2xl border border-zinc-300 bg-white px-4 dark:border-zinc-700 dark:bg-zinc-900"
+            placeholder="Search: RAG, Python, agents…"
+            className={field}
           />
         </label>
-        <fieldset>
-          <legend className="text-sm font-semibold">Show</legend>
-          <div className="mt-2 flex flex-wrap gap-2">
+        <label className="col-span-2 md:col-span-1">
+          <span className="sr-only">Show</span>
+          <select aria-label="Show" value={kind} onChange={(e) => set("kind", e.target.value)} className={field}>
             {KINDS.map((k) => (
-              <button key={k.id} type="button" aria-pressed={kind === k.id} className={chip(kind === k.id)} onClick={() => set("kind", k.id)}>
-                {k.label} <span className="ml-1.5 text-xs opacity-80">{count(k.id)}</span>
-              </button>
+              <option key={k.id} value={k.id}>
+                {k.label} ({count(k.id)})
+              </option>
             ))}
-          </div>
-        </fieldset>
-        <div className="flex items-center justify-between gap-3 md:hidden">
-          <button
-            type="button"
-            aria-expanded={filtersOpen}
-            aria-controls="library-filters"
-            onClick={() => setFiltersOpen((o) => !o)}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <Icon name="flow" size={16} /> {filtersOpen ? "Hide filters" : "Topic and level"}
-            {active > 0 && <span className="grid size-5 place-items-center rounded-full bg-brand-700 text-xs text-white">{active}</span>}
-          </button>
-          {active > 0 && (
-            <button type="button" onClick={() => router.replace(`${pathname}${kind !== "all" ? `?kind=${kind}` : ""}`, { scroll: false })} className="min-h-11 px-2 text-sm font-medium text-brand-800 underline underline-offset-4 dark:text-brand-300">
-              Clear
-            </button>
-          )}
-        </div>
-        <div id="library-filters" className={`${filtersOpen ? "flex" : "hidden"} flex-col gap-4 md:flex`}>
-        <fieldset>
-          <legend className="text-sm font-semibold">Topic</legend>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" aria-pressed={!topic} className={chip(!topic)} onClick={() => set("topic", null)}>
-              All topics
-            </button>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">Topic</span>
+          <select aria-label="Topic" value={topic ?? ""} onChange={(e) => set("topic", e.target.value || null)} className={field}>
+            <option value="">All topics</option>
             {topics.map((t) => (
-              <button key={t.id} type="button" aria-pressed={topic === t.id} className={chip(topic === t.id)} onClick={() => set("topic", topic === t.id ? null : t.id)}>
+              <option key={t.id} value={t.id}>
                 {t.label}
-              </button>
+              </option>
             ))}
-          </div>
-        </fieldset>
-        <div className="flex flex-col gap-4 md:flex-row">
-          <fieldset className="md:flex-1">
-            <legend className="text-sm font-semibold">Level</legend>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {LEVELS.map((l) => (
-                <button key={l} type="button" aria-pressed={level === l} className={chip(level === l)} onClick={() => set("level", level === l ? null : l)}>
-                  {levelText(l)}
-                </button>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">Level</span>
+          <select aria-label="Level" value={level ?? ""} onChange={(e) => set("level", e.target.value || null)} className={field}>
+            <option value="">All levels</option>
+            {LEVELS.map((l) => (
+              <option key={l} value={l}>
+                {levelText(l)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {kind === "video" && (
+          <label className="col-span-2 md:col-span-1">
+            <span className="sr-only">Channel</span>
+            <select aria-label="Channel" value={channel ?? ""} onChange={(e) => set("channel", e.target.value || null)} className={field}>
+              <option value="">All channels</option>
+              {channels.map((c) => (
+                <option key={c}>{c}</option>
               ))}
-            </div>
-          </fieldset>
-          {kind === "video" && (
-            <label className="flex flex-col gap-1 md:w-64">
-              <span className="text-sm font-semibold">Channel</span>
-              <select value={channel ?? ""} onChange={(e) => set("channel", e.target.value || null)} className="min-h-12 rounded-2xl border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900">
-                <option value="">All channels</option>
-                {channels.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-        </div>
+            </select>
+          </label>
+        )}
       </div>
 
-      <p role="status" className="text-sm text-zinc-700 dark:text-zinc-300">
-        {results.length} {results.length === 1 ? "result" : "results"}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p role="status" className="text-sm text-zinc-700 dark:text-zinc-300">
+          {results.length} {results.length === 1 ? "result" : "results"}
+        </p>
+        {active > 0 && (
+          <button type="button" onClick={() => router.replace(`${pathname}${kind !== "all" ? `?kind=${kind}` : ""}`, { scroll: false })} className="min-h-11 px-2 text-sm font-medium text-brand-800 underline underline-offset-4 dark:text-brand-300">
+            Clear filters
+          </button>
+        )}
+      </div>
 
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <ul aria-label="Results" className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
         {results.slice(0, shown).map((i) => (
-          <li key={i.key} className="flex flex-col gap-2 rounded-2xl bg-white p-4 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
-            <p className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-              <span className={`rounded-full px-2 py-0.5 ${KIND_STYLE[i.kind]}`}>{KIND_LABEL[i.kind]}</span>
-              {i.level && <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">{levelText(i.level)}</span>}
-              {i.minutes !== null && i.kind === "video" && <span className="text-zinc-600 dark:text-zinc-400">{i.minutes} min</span>}
-            </p>
-            <Link href={i.href} className="text-base leading-6 font-semibold hover:underline">
-              {i.title}
-            </Link>
-            <p className="line-clamp-2 text-card text-zinc-700 dark:text-zinc-300">{i.channel && i.kind === "video" ? `${i.channel} · ${i.summary}` : i.summary}</p>
-            <p className="mt-auto flex flex-wrap gap-1.5 pt-1">
-              {i.topics.map((t) => (
-                <button key={t} type="button" onClick={() => set("topic", t)} className="rounded-full bg-brand-50 px-2 py-1 text-xs text-brand-900 hover:bg-brand-100 dark:hover:bg-brand-900 dark:bg-brand-950 dark:text-brand-200">
-                  {topics.find((x) => x.id === t)?.label ?? t}
-                </button>
-              ))}
-              {/* SE-14 (2026-11-18, site review: "Automation, Automation"): a tag that only repeats a topic's name is left out. */}
-              {i.tags
-                .filter((t) => !i.topics.some((id) => (topics.find((x) => x.id === id)?.label ?? id).toLowerCase() === t.toLowerCase()))
-                .filter((t, n, all) => all.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === n)
-                .slice(0, 3)
-                .map((t) => (
-                <button key={t} type="button" onClick={() => set("q", t)} className="rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                  {t}
-                </button>
-                ))}
-            </p>
-            {i.kind === "lesson" && i.videos > 0 && (
-              // SE-14: neutral, not red: red reads as an error.
-              <p className="flex items-center gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                <Icon name="play" size={12} /> {i.videos} video {i.videos === 1 ? "lesson" : "lessons"}
-              </p>
-            )}
-            {i.embed && (
-              <WatchButton
-                embed={i.embed}
-                title={i.title}
-                className={`mt-1 self-start ${secondaryButtonSm}`}
-              />
-            )}
+          <li key={i.key} className="relative flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:gap-4">
+            {/* The link is the title only, stretched over the row, so a screen reader hears the title, not the whole row. */}
+            <div className="min-w-0 flex-1">
+              <Link href={i.href} className="block leading-6 font-semibold hover:underline after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-brand-700">
+                {i.title}
+              </Link>
+              <span className="mt-0.5 block text-sm text-zinc-600 dark:text-zinc-400">
+                <span className={KIND_TEXT[i.kind]}>{KIND_LABEL[i.kind]}</span>
+                {[
+                  i.level ? levelText(i.level) : null,
+                  i.topics.map((t) => topics.find((x) => x.id === t)?.label ?? t)[0] ?? null,
+                  i.kind === "video" && i.minutes !== null ? `${i.minutes} min` : null,
+                  i.kind === "video" ? i.channel : null,
+                  i.kind === "lesson" && i.videos > 0 ? `${i.videos} video ${i.videos === 1 ? "lesson" : "lessons"}` : null,
+                ]
+                  .filter(Boolean)
+                  .map((x) => ` · ${x}`)
+                  .join("")}
+              </span>
+              <span className="mt-1 line-clamp-1 block text-sm text-zinc-700 max-sm:hidden dark:text-zinc-300">{i.summary}</span>
+            </div>
+            {i.embed && <WatchButton embed={i.embed} title={i.title} className={`relative z-10 shrink-0 self-start ${secondaryButtonSm}`} />}
           </li>
         ))}
       </ul>

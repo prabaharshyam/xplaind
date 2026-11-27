@@ -26,6 +26,7 @@ test("UX-7: switching a lesson to Tamil shows the loading screen, then hides it 
       attributeFilter: ["data-state"],
     });
   });
+  await page.getByRole("navigation", { name: "Read this lesson in" }).locator("summary").click(); // LT-4: the languages are folded
   await page.getByRole("navigation", { name: "Read this lesson in" }).getByRole("link", { name: "தமிழ்" }).click();
   await expect(page).toHaveURL(/\/stop\/what-is-ai\/ta$/, { timeout: 30_000 });
   await expect(splash).toHaveAttribute("data-state", "idle", { timeout: 15_000 });

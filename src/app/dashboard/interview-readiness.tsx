@@ -21,7 +21,7 @@ export function InterviewReadiness() {
   }, []);
   if (roles === null) return null;
   return (
-    <section aria-labelledby="readiness-h" className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+    <section aria-labelledby="readiness-h">
       <h2 id="readiness-h" className="text-lg font-semibold">
         Interview readiness
       </h2>

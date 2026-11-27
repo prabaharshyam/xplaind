@@ -19,13 +19,8 @@ export const NAV_GROUPS: Group[] = [
       { href: "/projects", label: "Projects", note: "Guided builds for your portfolio", icon: "rocket", tone: "amber" },
       { href: "/glossary", label: "Glossary", note: "AI words in plain English", icon: "chat", tone: "teal" },
       { href: "/papers", label: "Papers and free books", note: "Landmark research and free AI books", icon: "book", tone: "emerald" },
-    ],
-  },
-  {
-    id: "practice",
-    label: "Practice",
-    items: [
-      { href: "/playground", label: "Code playground", note: "Run Python in your browser", icon: "code", tone: "sky" },
+      // NV-10 (2026-11-27, owner: "fix/do the 4-12", item 12): four groups, not five. Practice held two entries;
+      // the weekly plan is part of learning, and the code playground is a tool.
       { href: "/plan", label: "Stay on track", note: "This week's plan, reminders and Monday emails", icon: "target", tone: "amber" },
     ],
   },
@@ -57,6 +52,7 @@ export const NAV_GROUPS: Group[] = [
     items: [
       { href: "/ai/book", label: "Study from my notes & books", note: "Turn a PDF into a test and flashcards", icon: "book", tone: "violet" },
       { href: "/ai/tutor", label: "AI tutor", note: "Ask anything about AI, in plain English", icon: "robot", tone: "teal" },
+      { href: "/playground", label: "Code playground", note: "Run Python in your browser", icon: "code", tone: "sky" },
       { href: "/ai", label: "All AI tools and guides", note: "Every tool, plus guides to AI at work", icon: "sparkles", tone: "amber" },
     ],
   },
@@ -81,3 +77,23 @@ export function activeGroup(path: string): string | null {
   return null;
 }
 
+
+/**
+ * NV-11: the phone tab bar for signed-in learners. Four places they come back to every day; the menu keeps the rest.
+ * Icons use the menu's own set.
+ */
+export const TABS = [
+  { id: "today", href: "/dashboard", label: "Today", icon: "target" },
+  { id: "learn", href: "/paths", label: "Roadmaps", icon: "map" },
+  { id: "interview", href: "/interview", label: "Interview", icon: "mic" },
+  { id: "ai", href: "/ai", label: "Tools", icon: "sparkles" },
+] as const satisfies readonly { id: string; href: string; label: string; icon: IconName }[];
+
+/** Which tab the page belongs to, or null; and whether the bar stays out of the way on this page. Pure, for tests. */
+export function activeTab(path: string): (typeof TABS)[number]["id"] | null {
+  if (under(path, "/dashboard") || under(path, "/settings")) return "today";
+  const g = activeGroup(path);
+  return g === "learn" || g === "interview" || g === "ai" ? g : null;
+}
+/** The mock interview has its own controls at the bottom of a phone, and a lesson its Track bar (RM-7). */
+export const tabBarHidden = (path: string) => under(path, "/interview/simulator") || under(path, "/stop");

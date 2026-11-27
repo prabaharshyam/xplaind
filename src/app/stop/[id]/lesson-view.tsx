@@ -193,14 +193,14 @@ export async function LessonView({ id, lang = "en" }: { id: string; lang?: "en" 
             </nav>
             <h1 className="mt-3 text-3xl leading-tight font-semibold tracking-tight text-balance drop-shadow-sm md:text-5xl">{stop.title}</h1>
             <p className="mt-3 text-base leading-7 text-white md:text-lg md:leading-8">{stop.outcome}</p>
-            {langs.length > 0 && <LessonLanguages id={stop.id} current={lang} available={langs} />}
-            <p className="mt-4 flex flex-wrap gap-2 text-sm">
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+              {langs.length > 0 && <LessonLanguages id={stop.id} current={lang} available={langs} />}
               {[`${levelWords(stop.level)} · ${level?.name ?? ""}`, `about ${stop.hours} ${stop.hours === 1 ? "hour" : "hours"}`, `${sections.length || 1} sections`].map((c) => (
                 <span key={c} className="rounded-full bg-black/35 px-3 py-1">
                   {c}
                 </span>
               ))}
-            </p>
+            </div>
           </div>
           {/* MO-8: the lesson's topic as a particle sculpture. */}
           {/* White particles: the lesson header is already in the topic's colours. */}

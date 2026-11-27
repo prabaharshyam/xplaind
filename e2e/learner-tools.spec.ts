@@ -39,8 +39,20 @@ test("jobs and salaries show every role with dated pay, skills and live job link
   await expect(card.getByRole("link", { name: /Live jobs on Naukri/ })).toHaveAttribute("href", "https://www.naukri.com/ai-engineer-jobs");
   await expect(card.getByRole("link", { name: /Live jobs on LinkedIn/ })).toHaveAttribute("href", /linkedin\.com\/jobs\/search\/\?keywords=AI%20Engineer&location=India/);
   expect(await page.locator("main li[id]").count()).toBe(10);
+  // JB-5: one role at a time; the Role list on a phone switches it and updates the address.
+  await expect(page.locator("main li[id]:visible")).toHaveCount(1);
+  await page.getByRole("combobox", { name: "Role" }).selectOption("ai-product-manager");
+  await expect(page.locator("#ai-product-manager").getByRole("heading", { name: "AI Product Manager" })).toBeVisible();
+  await expect(card).toBeHidden();
+  await expect(page).toHaveURL(/\/jobs#ai-product-manager$/);
+  // Picking another role does not scroll away from the list.
+  await page.getByRole("combobox", { name: "Role" }).selectOption("mlops-engineer");
+  await expect(page.getByRole("combobox", { name: "Role" })).toBeInViewport();
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
+  // The address picks the role, so the roadmap's link opens its own role.
+  await page.goto("/jobs#mlops-engineer");
+  await expect(page.locator("#mlops-engineer").getByRole("heading", { name: "MLOps Engineer" })).toBeVisible();
   // A roadmap links to its salary card.
   await page.goto("/roadmap/ai-engineer");
   await expect(page.getByRole("link", { name: /Salaries and live jobs for this role/ })).toHaveAttribute("href", "/jobs#ai-engineer");

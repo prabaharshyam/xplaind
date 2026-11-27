@@ -567,7 +567,7 @@ function Section({
                 aria-hidden="true"
                 className={`absolute top-1/2 hidden w-10 border-t-2 border-dotted border-brand-300 md:block dark:border-brand-800 ${ci === 0 ? "right-0" : "left-0"}`}
               />
-              <ul className="grid grid-cols-1 gap-2 rounded-2xl border border-zinc-200 bg-white p-2 sm:grid-cols-2 md:grid-cols-1 dark:border-zinc-800 dark:bg-white/[0.03]">
+              <ul className="grid grid-cols-1 gap-2 rounded-2xl bg-zinc-100/80 p-2 sm:grid-cols-2 md:grid-cols-1 dark:bg-white/[0.04]">
                 {c.map(tile)}
               </ul>
             </div>

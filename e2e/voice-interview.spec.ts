@@ -555,6 +555,9 @@ test("one mock interview: a Pro learner picks role, experience and company, and 
   await page.getByLabel("Company (optional)").fill("Acme");
   await expect(page.getByText(/for the Generative AI & LLM Engineer role at Acme\./)).toBeVisible();
   const opening = await page.getByText(/^“Hi, I'm your AI interviewer/).textContent();
+  // VI-21: the start button sits above her opening line.
+  const startY = (await page.getByRole("button", { name: "Start the AI interviewer" }).boundingBox())!.y;
+  expect(startY).toBeLessThan((await page.getByText(/^“Hi, I'm your AI interviewer/).boundingBox())!.y);
   expect(await overflow(page)).toBe(false);
   expect((await wcag(page)).violations).toEqual([]);
   await page.getByRole("button", { name: "Start the AI interviewer" }).click();

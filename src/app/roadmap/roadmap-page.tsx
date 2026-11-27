@@ -67,14 +67,15 @@ function InterviewTracks() {
     { theme: "software-engineering", icon: "code" as const, title: "Software engineering and Git", lead: "Git branches and undo, tests, debugging, clean code, code review and design principles." },
   ];
   return (
-    <section aria-labelledby="interview-tracks-h" className="mt-10 rounded-2xl border border-zinc-200 bg-zinc-50 p-5 md:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+    // UX-12: one level of box: the section is plain and the three tracks are the boxes.
+    <section aria-labelledby="interview-tracks-h" className="mt-12">
       <h2 id="interview-tracks-h" className="text-lg font-semibold">
         Interview foundations for this role
       </h2>
       <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">Coding interviews for this role usually include a DSA round and a system design round, and the job expects solid engineering habits. Add these tracks alongside your roadmap.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tracks.map((t) => (
-          <Link key={t.theme} href={`/topics/${t.theme}`} className="flex items-start gap-3 rounded-2xl bg-white p-4 ring-1 ring-zinc-200 hover:ring-brand-400 dark:bg-zinc-900 dark:ring-zinc-800">
+          <Link key={t.theme} href={`/topics/${t.theme}`} className="flex items-start gap-3 rounded-2xl bg-zinc-100/80 p-4 hover:bg-zinc-200/70 dark:bg-zinc-900 dark:hover:bg-zinc-800">
             <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               <Icon name={t.icon} size={22} />
             </span>

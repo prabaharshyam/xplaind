@@ -9,6 +9,7 @@ const ALLOWED: Record<string, string> = {
   "src/components/motion/site-motion.tsx": "in-page #section links and Back/Forward",
   "src/components/roadmap/roadmap-view.tsx": "the learner clicks a stage's Projects link",
   "src/app/ai/book/book-studio.tsx": "the learner moves to the next screen of the book test",
+  "src/app/jobs/role-switch.tsx": "a link to /jobs#role lands on that role, once, on arrival (JB-5)",
 };
 
 function files(dir: string): string[] {

@@ -6,9 +6,8 @@ import { type IconName, type ThemeId, particleColorsOf, themeOf } from "@/lib/th
 
 /**
  * A page's banner: picture, title and one line on what the page is for. "compact" (the default)
- * suits pages people come to for their content, such as the library, lists and guides: it is short
- * and leaves out the sculpture on phones so the content starts on the first screen. "full" is for
- * hub pages, where the sculpture is part of the welcome.
+ * suits pages people come to for their content, such as the library, lists and guides; "full" is for
+ * hub pages and is taller. Neither shows the sculpture on phones, so the content starts on the first screen.
  */
 export function PageHero({
   theme,
@@ -56,8 +55,8 @@ export function PageHero({
           {lead && <div className={`mt-3 max-w-2xl text-zinc-700 dark:text-zinc-300 ${full ? "text-lg leading-8" : "text-base leading-7 md:text-lg md:leading-8"}`}>{lead}</div>}
           {children && <div className={full ? "mt-5" : "mt-4"}>{children}</div>}
         </div>
-        {/* MO-8: the page's own particle sculpture, in its theme's colours. */}
-        <div className={`lx-hero-art shrink-0 [perspective:1000px] ${full ? "" : "max-md:hidden"}`}>
+        {/* MO-8: the page's own particle sculpture, in its theme's colours. UX-10: never on a phone, where it only pushed the content down. */}
+        <div className="lx-hero-art shrink-0 [perspective:1000px] max-md:hidden">
           <ParticleScene shape={shape ?? THEME_SHAPE[theme]} colors={particleColorsOf(theme)} icon={icon ?? themeOf(theme).icon} className={full ? "h-44 w-full md:h-72 md:w-[26rem]" : "h-52 w-80"} />
         </div>
       </div>

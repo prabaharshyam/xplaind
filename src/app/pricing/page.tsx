@@ -78,7 +78,7 @@ export default function PricingPage() {
   const rows = ORDER.filter((k) => AI_KINDS.includes(k));
   const testimonials = getTestimonials();
   const outcomes = testimonials.filter((t) => t.outcome && t.outcome_on);
-  const stories = (outcomes.length ? outcomes : testimonials).slice(0, 3);
+  const stories = outcomes.slice(0, 3);
   return (
     <main>
       <FunnelPing event="pricing_view" />
@@ -188,39 +188,40 @@ export default function PricingPage() {
           {[
             {
               // SE-16: the AI interviewer leads, as the thing people buy Pro for.
-              n: "AI interviewer",
+              n: "AI interviewer, up to 4 a day",
               t: "Rehearse out loud with Zarina",
               d: "Spoken interviews for your role or a job post, up to four a day. She follows up on what you actually say and ends with a hiring verdict, skill scores and a 4-week plan. Each one adds to your readiness score out of 100.",
             },
             {
-              n: "Pass or fix",
+              n: "Project review",
               t: "Projects a recruiter will trust",
               d: "Link your GitHub project and get it marked against the project's rubric, criterion by criterion, with what to fix before you show it.",
             },
             {
-              n: "Match %",
+              n: `Resume review, up to ${TIER_LIMITS.pro.resume} a day`,
               t: "A resume matched to the job",
               d: `Up to ${TIER_LIMITS.pro.resume} resume reviews a day: line-by-line fixes, a match score against the job post, and a LinkedIn headline and About section written from your resume.`,
             },
             {
-              n: "Verified",
+              n: "Verified certificate",
               t: "A certificate anyone can check",
               d: "Earn it by passing the checks and a reviewed project, not by clicking through. It has a public link and an Add to LinkedIn button.",
             },
             {
-              n: `${TIER_LIMITS.pro.tutor} a day`,
+              n: `AI tutor, up to ${TIER_LIMITS.pro.tutor} a day`,
               t: "Never stuck, in your language",
               d: "Ask the AI tutor about any lesson, your code or your plan, in English, Hinglish, Hindi, Tamil, Telugu, Kannada, Malayalam, Marathi, Bengali or Gujarati.",
             },
             {
-              n: `${TIER_LIMITS.pro.book} + ${TIER_LIMITS.pro.notes} a day`,
+              n: "Study from your notes",
               t: "Revise from your own notes",
               d: `Turn a PDF, Word or PowerPoint file of your notes into ${TIER_LIMITS.pro.book} tests or flashcard decks a day, and ask up to ${TIER_LIMITS.pro.notes} questions answered only from your file. Scanned pages and pictures in your slides are read too.`,
             },
           ].map((v) => (
             <li key={v.t}>
-              <p className="text-3xl font-semibold tracking-tight text-brand-800 dark:text-brand-300">{v.n}</p>
-              <h3 className="mt-2 text-xl font-semibold">{v.t}</h3>
+              {/* PAY-15: the outcome is the heading; the tool and its daily limit follow in plain words. */}
+              <h3 className="text-xl font-semibold">{v.t}</h3>
+              <p className="mt-1 text-sm font-medium text-brand-800 dark:text-brand-300">{v.n}</p>
               <p className="mt-2 max-w-md leading-7 text-zinc-800 dark:text-zinc-200">{v.d}</p>
             </li>
           ))}
@@ -230,13 +231,19 @@ export default function PricingPage() {
           every roadmap, lesson, video, practice card and project guide, a 2-minute level check, a week-by-week plan to your interview date and a
           public profile you can share.
         </p>
+        {/* PAY-15: until learners report what Pro got them, their words (about the free roadmaps) stay on the stories page, not here. */}
+        {!outcomes.length && (
+          <Link href="/stories" className="mt-5 inline-flex min-h-11 items-center font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+            Read learner stories
+          </Link>
+        )}
       </section>
 
-      {/* OS-1: real learners only. Outcomes first when there are any; otherwise their words. */}
-      {stories.length > 0 && (
+      {/* OS-1: real learners only, and only their outcomes (PAY-15). */}
+      {outcomes.length > 0 && (
         <section aria-labelledby="stories-h" className="mx-auto mt-20 max-w-6xl px-4 md:mt-28 md:px-6">
           <h2 id="stories-h" className="text-3xl font-semibold tracking-tight md:text-4xl">
-            {outcomes.length ? "What learners achieved" : "What learners say"}
+            What learners achieved
           </h2>
           <ul className="mt-8 grid gap-5 md:grid-cols-3">
             {stories.map((t) => (
@@ -269,42 +276,45 @@ export default function PricingPage() {
           day. Lessons, roadmaps, videos and practice are never limited.
         </p>
         <div role="region" aria-label="Free account and Pro compared" tabIndex={0} className="mt-8 overflow-x-auto rounded-3xl bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:bg-zinc-900">
-          <table className="w-full min-w-[30rem] text-left">
+          {/* PAY-14: no minimum width, so all three columns fit a 360 px phone and the Pro column is never off-screen. */}
+          <table className="w-full text-left text-sm md:text-base">
             <caption className="sr-only">AI helper uses: free trial in total, and Pro&apos;s most per day within its fair-use allowance</caption>
             <thead>
               <tr className="text-sm">
-                <th scope="col" className="p-4 font-semibold md:px-6">
+                <th scope="col" className="p-3 md:py-4 font-semibold md:px-6">
                   What you get
                 </th>
-                <th scope="col" className="p-4 font-semibold md:px-6">
+                <th scope="col" className="p-3 md:py-4 font-semibold md:px-6">
                   Free account
                 </th>
-                <th scope="col" className="p-4 font-semibold text-brand-800 md:px-6 dark:text-brand-300">
-                  Pro, within your fair-use allowance
+                <th scope="col" className="p-3 md:py-4 font-semibold text-brand-800 md:px-6 dark:text-brand-300">
+                  Pro<span className="block text-xs font-normal md:inline md:text-sm md:font-semibold">
+                    <span className="max-md:sr-only">, </span>within your fair-use allowance
+                  </span>
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-t border-zinc-200 dark:border-zinc-800">
-                <th scope="row" className="p-4 font-medium md:px-6">
+                <th scope="row" className="p-3 md:py-4 font-medium md:px-6">
                   Roadmaps, lessons, videos, practice and projects
                 </th>
-                <td className="p-4 md:px-6">Unlimited</td>
-                <td className="p-4 font-semibold md:px-6">Unlimited</td>
+                <td className="p-3 md:py-4 md:px-6">Unlimited</td>
+                <td className="p-3 md:py-4 font-semibold md:px-6">Unlimited</td>
               </tr>
               {rows.map((k) => (
                 <tr key={k} className="border-t border-zinc-200 dark:border-zinc-800">
-                  <th scope="row" className="p-4 font-medium md:px-6">
+                  <th scope="row" className="p-3 md:py-4 font-medium md:px-6">
                     {KIND_LABEL[k]}
                   </th>
-                  <td className="p-4 md:px-6">
+                  <td className="p-3 md:py-4 md:px-6">
                     {k === "voice"
                       ? "1 free interview of 2 questions"
                       : TIER_LIMITS.free[k] === 0
                         ? "Pro only"
                         : `${TIER_LIMITS.free[k]} ${TIER_LIMITS.free[k] === 1 ? "try" : "tries"} in total`}
                   </td>
-                  <td className="p-4 font-semibold md:px-6">Up to {TIER_LIMITS.pro[k]} a day</td>
+                  <td className="p-3 md:py-4 font-semibold md:px-6">Up to {TIER_LIMITS.pro[k]} a day</td>
                 </tr>
               ))}
             </tbody>

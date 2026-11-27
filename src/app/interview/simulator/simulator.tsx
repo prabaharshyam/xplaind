@@ -375,22 +375,10 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                 Z
               </span>
               <span>
-                <span className="block text-lg font-semibold">Zarina will open with</span>
+                <span className="block text-lg font-semibold">Zarina</span>
                 <span className={`block text-sm ${room.soft}`}>{freeTry ? "AI interviewer · your first interview is free" : "AI interviewer · Pro"}</span>
               </span>
             </div>
-            <p aria-live="polite" className="text-lg leading-8">
-              {opening ? (
-                <>&ldquo;{opening}&rdquo;</>
-              ) : (
-                "She reads the job post, picks the questions from our bank that fit it, and writes one or two for this exact job. Then she opens the call."
-              )}
-            </p>
-            {opening && !fixedQuestion && (
-              <button type="button" onClick={reshuffle} className={`${room.link} -mt-2 min-h-11 self-start text-[15px]`}>
-                Other questions
-              </button>
-            )}
             {!fixedQuestion && freeTry && !jdMode && (
               <p className="text-[15px] leading-6">
                 <span className="font-medium">{TRIAL_QUESTIONS} questions, about 10 minutes,</span> <span className={room.soft}>with follow-ups and the full report. One free interview per account, no card needed.</span>
@@ -441,6 +429,22 @@ export function Simulator({ questions, paths, aiOn = false }: { questions: Picka
                     Or warm up free
                   </a>
                 </p>
+              )}
+            </div>
+            {/* VI-21: the start button comes before her opening line, so a phone reaches it without scrolling past the whole quote. */}
+            <div className="flex flex-col gap-4 border-t border-brand-800 pt-6">
+              {opening && <p className={`text-[15px] font-medium ${room.soft}`}>She will open with</p>}
+              <p aria-live="polite" className="text-lg leading-8">
+                {opening ? (
+                  <>&ldquo;{opening}&rdquo;</>
+                ) : (
+                  "She reads the job post, picks the questions from our bank that fit it, and writes one or two for this exact job. Then she opens the call."
+                )}
+              </p>
+              {opening && !fixedQuestion && (
+                <button type="button" onClick={reshuffle} className={`${room.link} -mt-2 min-h-11 self-start text-[15px]`}>
+                  Other questions
+                </button>
               )}
             </div>
           </div>

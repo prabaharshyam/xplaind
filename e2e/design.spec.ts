@@ -33,16 +33,17 @@ test("a roadmap leads with its first lesson and keeps the PDF as a second choice
   expect(await overflow(page)).toBe(false);
 });
 
-test("the Library folds its filters on phones and names levels in words (BR-8)", async ({ page }) => {
+test("the Library is one toolbar and compact rows, and names levels in words (BR-8, LY-3)", async ({ page }) => {
   await page.goto("/library");
-  const toggle = page.getByRole("button", { name: "Topic and level" });
-  await expect(toggle).toBeVisible();
-  await expect(page.getByRole("button", { name: "Intermediate 2" })).toBeHidden();
-  await toggle.click();
-  await page.getByRole("button", { name: "Intermediate 2" }).click();
+  // LY-3: the filters are lists in one toolbar, so the first results show on the first screen of a phone.
+  await page.getByLabel("Level").selectOption({ label: "Intermediate 2" });
   await expect(page).toHaveURL(/level=I2/);
-  await expect(page.getByRole("button", { name: /Hide filters/ })).toBeVisible();
+  const first = page.locator('main ul[aria-label="Results"] > li').first();
+  expect((await first.boundingBox())!.y).toBeLessThan(740);
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page).not.toHaveURL(/level=/);
   expect(await overflow(page)).toBe(false);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight / innerHeight)).toBeLessThan(10);
 });
 
 test("the About, Privacy and Terms pages are linked from the footer and accessible (BR-9)", async ({ page }) => {
@@ -97,7 +98,8 @@ test("the menu is grouped and marks the section you are in (NV-1 to NV-3)", asyn
   await expect(panel.getByRole("link", { name: "Jobs and salaries" })).toHaveAttribute("aria-current", "page");
   await expect(panel.getByText("Learn", { exact: true })).toBeVisible();
   // NV-5, NV-6: groups are folded; the one you are in starts open, and tapping another opens it and closes the first.
-  await expect(panel.getByRole("button", { name: /^Practice/ })).toHaveAttribute("aria-expanded", "false");
+  await expect(panel.getByRole("button", { name: /^Interview/ })).toHaveAttribute("aria-expanded", "false"); // NV-10: four groups, no Practice
+  await expect(panel.getByRole("button", { name: /^Practice/ })).toHaveCount(0);
   await expect(panel.getByRole("button", { name: /Career/ })).toHaveAttribute("aria-expanded", "true");
   await panel.getByRole("button", { name: /^Learn/ }).click();
   await expect(panel.getByRole("button", { name: /Career/ })).toHaveAttribute("aria-expanded", "false");

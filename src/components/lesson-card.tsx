@@ -14,7 +14,8 @@ export function LessonCard({ l }: { l: LessonCardData }) {
       href={`/stop/${l.id}`}
       className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 dark:border-zinc-800 dark:bg-zinc-900"
     >
-      <Cover theme={l.theme} seed={l.id} className="h-24" iconSize={30} />
+      {/* UX-10: the picture is left out on phones, where a list of cards showed the same scene again and again. */}
+      <Cover theme={l.theme} seed={l.id} className="h-24 max-sm:hidden" iconSize={30} />
       <span className="flex flex-1 flex-col p-4">
         <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
           {themeOf(l.theme).label} · {levelText(l.level)} · about {l.hours} h

@@ -3,7 +3,6 @@ import { accountsEnabled } from "@/lib/supabase/config";
 import { siteGraph } from "@/lib/content/structured";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { GuideCover } from "@/components/guide-cover";
 import { Icon } from "@/components/art/icons";
 import { RoleGrid } from "@/components/home/role-grid";
 import { Testimonials } from "@/components/home/testimonials";
@@ -13,7 +12,7 @@ import { LanguagesSection } from "@/components/home/languages";
 import { Words } from "@/components/motion/words";
 import { RoadScene } from "@/components/three/road-scene";
 import { JsonLd } from "@/components/json-ld";
-import { getBlogPosts, getContent, getPaths, getProjects, getStops, getTestimonials } from "@/lib/content";
+import { getContent, getPaths, getProjects, getStops, getTestimonials } from "@/lib/content";
 import { getInterviewViews } from "@/lib/content/interview";
 import { getJobs } from "@/lib/content/jobs";
 import { pathView } from "@/lib/content/paths";
@@ -33,13 +32,6 @@ export const metadata: Metadata = {
     url: "/",
   },
 };
-
-
-const STEPS: { title: string; text: string }[] = [
-  { title: "Choose the job you want", text: "Pick an AI role, or let the 2-minute level check suggest where to start." },
-  { title: "Follow the roadmap, one topic at a time", text: "Each topic is a 20-minute lesson, the best course and a quick check." },
-  { title: "Prove it and get hired", text: "Build projects, practice interviews out loud and see live openings." },
-];
 
 
 const FAQ = [
@@ -87,10 +79,11 @@ const FAQ = [
 
 export default function Home() {
   const testimonials = getTestimonials();
+  // Under "What early learners say" these are h3s; without testimonials they head the section themselves.
+  const Sub = testimonials.length ? "h3" : "h2";
   const paths = getPaths().map(pathView);
   const stops = getStops();
   const interview = getInterviewViews();
-  const posts = getBlogPosts().slice(0, 3);
   const market = getJobs().market;
   const checked = new Date(`${market.checked}T00:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
   const checkedMonth = new Date(`${market.checked}T00:00:00+05:30`).toLocaleDateString("en-IN", { month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
@@ -115,7 +108,9 @@ export default function Home() {
 
       {/* Hero: the promise first (one place, the right order), then the market as proof. Works before any animation runs. */}
       <section data-hero className="home-hero relative flex items-start md:min-h-[calc(100svh-3.5rem)] md:items-center" aria-labelledby="hero-heading">
-        <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-14 md:px-6 md:py-14">
+        <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-8 md:px-6 md:py-14">
+          {/* HM-7 (2026-11-27, owner: "fix/do the 4-12", item 4): the hero is the promise and the two ways in; the
+              market figures moved to the proof section, and "How Xplaind works" and the guides left the page. */}
           {/* VI-17 (2026-11-18, site review: the home page never mentioned the AI interviewer): the feature
               people pay for, on the first screen of every device. */}
           {/* HM-6 (2026-11-19, owner: the pill looked like a typical AI badge and "Try" sat alone on one line): a plain
@@ -163,49 +158,13 @@ export default function Home() {
             </li>
           </ul>
 
-          {/* JB-4: the market behind the promise, each figure sourced and dated. */}
-          <div data-hero-fade className="mt-10 max-w-4xl">
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Why now: India&apos;s AI job market</p>
-            <dl className="mt-3 grid gap-3 sm:grid-cols-3">
-              {market.stats.map((m) => (
-                <div key={m.label} className="flex flex-col-reverse justify-end rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                  <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
-                  <dd className="text-3xl font-semibold tracking-tight text-zinc-900 tabular-nums md:text-4xl dark:text-white">{m.value}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-              <a href="#market-sources" className="underline underline-offset-2">
-                Sources
-              </a>
-              , checked {checked}
-            </p>
-          </div>
         </div>
       </section>
 
       {/* AC-6: "Continue where you left off" lives on My progress (/dashboard), not here (HM-5, 2026-11-19). */}
 
-      {/* The solution in three steps, before the detail. */}
-      <section aria-labelledby="how-heading" className="py-12 md:py-24">
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <h2 id="how-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
-            <Words text="How Xplaind works" />
-          </h2>
-          <ol className="mt-8 grid gap-6 md:grid-cols-3" data-rise-group>
-            {STEPS.map((s, i) => (
-              <li key={s.title} data-rise className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-                <Marker n={i + 1} label={`Step ${i + 1}`} />
-                <h3 className="mt-4 text-xl font-semibold">{s.title}</h3>
-                <p className="mt-2 leading-7 text-zinc-700 dark:text-zinc-300">{s.text}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
       {/* Milestone 1: choose a role. */}
-      <section id="roles" aria-labelledby="roles-heading" className="scroll-mt-20 py-12 md:py-28">
+      <section id="roles" aria-labelledby="roles-heading" className="scroll-mt-20 py-10 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Gate n={1} label="Start here" />
           <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
@@ -348,41 +307,57 @@ export default function Home() {
       {/* LT-2: lessons in the learner's own language, shown with real samples. */}
       <LanguagesSection />
 
-      {/* SO-1: early users, in their own words (real, shared with permission). */}
-      {testimonials.length > 0 && (
-        <section aria-labelledby="voices-heading" className="py-12 md:py-24">
-          <div className="mx-auto max-w-6xl px-4 md:px-6">
-            <h2 id="voices-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
-              <Words text="What early learners say" />
-            </h2>
-            <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">Freshers, founders and working professionals who tried Xplaind first.</p>
-            <Testimonials items={testimonials} />
-          </div>
-        </section>
-      )}
-
-      {/* Trust: what is inside, counted. */}
-      <section aria-labelledby="trust-heading" className="py-12 md:py-28">
+      {/* HM-7: the proof in one place: learners in their own words (SO-1), what is inside, counted, and the
+          market behind the promise, each figure sourced and dated (JB-4, moved here from the hero). */}
+      <section aria-labelledby={testimonials.length ? "voices-heading" : "trust-heading"} className="py-12 md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <h2 id="trust-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
-            <Words text="What is inside, today" />
-          </h2>
-          <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">No paid rankings, no ads. Every course is picked on merit.</p>
-          <dl data-rise-group className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-            {stats.map((s) => (
-              <div key={s.label} data-rise className="flex flex-col-reverse justify-end rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-                <dt className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{s.label}</dt>
-                <dd data-count className="text-4xl font-semibold tracking-tight md:text-5xl">
-                  {s.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          {testimonials.length > 0 && (
+            <>
+              <h2 id="voices-heading" data-words className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
+                <Words text="What early learners say" />
+              </h2>
+              <p className="mt-3 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">Freshers, founders and working professionals who tried Xplaind first.</p>
+              <Testimonials items={testimonials} />
+            </>
+          )}
+          <div className="mt-10 grid gap-10 md:mt-20 md:gap-14">
+            <div>
+              <Sub id="trust-heading" className="text-xl font-semibold">
+                What is inside, today
+              </Sub>
+              <p className="mt-1 text-zinc-700 dark:text-zinc-300">No paid rankings, no ads. Every course is picked on merit.</p>
+              <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
+                {stats.map((m) => (
+                  <div key={m.label} className="flex flex-col-reverse justify-end">
+                    <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
+                    <dd className="text-4xl font-semibold tracking-tight tabular-nums">{m.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <div>
+              <Sub className="text-xl font-semibold">Why now: India&apos;s AI job market</Sub>
+              <p className="mt-1 text-zinc-700 dark:text-zinc-300">
+                <a href="#market-sources" className="underline underline-offset-2">
+                  Sources
+                </a>
+                , checked {checked}
+              </p>
+              <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
+                {market.stats.map((m) => (
+                  <div key={m.label} className="flex flex-col-reverse justify-end">
+                    <dt className="mt-1 text-sm leading-5 text-zinc-700 dark:text-zinc-300">{m.label}</dt>
+                    <dd className="text-4xl font-semibold tracking-tight tabular-nums">{m.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Milestone 4: the finish line. A small first step, and nothing to lose by taking it. */}
-      <section aria-labelledby="final-heading" className="py-16 text-left md:py-36 md:text-center">
+      <section aria-labelledby="final-heading" className="py-12 text-left md:py-36 md:text-center">
         <div className="mx-auto max-w-3xl px-4">
           {/* Left-aligned on phones like the other milestones; centred as a closing call on larger screens. */}
           <div className="flex justify-start md:justify-center">
@@ -405,34 +380,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Guides */}
-      {posts.length > 0 && (
-        <section aria-labelledby="guides-heading" className="py-12 md:py-20">
-          <div className="mx-auto max-w-6xl px-4 md:px-6">
-            <div className="flex items-end justify-between gap-4">
-              <h2 id="guides-heading" data-words className="text-3xl font-semibold tracking-tight md:text-4xl">
-                <Words text="Guides" />
-              </h2>
-              <Link href="/blog" className="font-medium text-brand-800 hover:underline dark:text-brand-300">
-                All guides →
-              </Link>
-            </div>
-            <ul className="mt-8 grid gap-6 md:grid-cols-3" data-rise-group>
-              {posts.map((p, i) => (
-                <li key={p.id} data-rise>
-                  <Link href={`/blog/${p.id}`} className="group block overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900">
-                    <GuideCover cover={p.cover} theme={(["career", "ai-basics", "using-ai"] as const)[i % 3]} seed={p.id} />
-                    <span className="block p-5">
-                      <span className="block text-lg leading-7 font-semibold group-hover:underline">{p.title}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      )}
-
       {/* FAQ: the doubts that stop people starting, answered honestly. */}
       <section aria-labelledby="faq-heading" className="pt-8 pb-16 md:pb-20">
         <div className="mx-auto max-w-3xl px-4 md:px-6">
@@ -441,7 +388,7 @@ export default function Home() {
           </h2>
           <div className="mt-8 divide-y divide-zinc-200 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
             {FAQ.map((f) => (
-              <details key={f.q} className="group p-5">
+              <details key={f.q} className="group px-5 py-2 md:py-4">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
                   {f.q}
                   <span aria-hidden="true" className="text-xl text-zinc-500 transition-transform duration-200 group-open:rotate-45 dark:text-zinc-400">
@@ -452,11 +399,18 @@ export default function Home() {
               </details>
             ))}
           </div>
+          {/* HM-7: the guides left the page; one link keeps the blog a tap away from home. */}
+          <p className="mt-6 leading-7 text-zinc-700 dark:text-zinc-300">
+            More in the guides: AI courses with a certificate, how to become an AI engineer in India, and more.{" "}
+            <Link href="/blog" className="font-medium text-brand-800 underline underline-offset-2 dark:text-brand-300">
+              Read the guides
+            </Link>
+          </p>
         </div>
       </section>
 
       {/* JB-4: where the market figures in the hero come from. */}
-      <section id="market-sources" aria-labelledby="sources-heading" className="scroll-mt-20 pb-16 md:pb-32">
+      <section id="market-sources" aria-labelledby="sources-heading" className="scroll-mt-20 pb-12 md:pb-32">
         <div className="mx-auto max-w-3xl px-4 text-sm text-zinc-700 md:px-6 dark:text-zinc-300">
           <h2 id="sources-heading" className="font-semibold">
             Sources for the market figures

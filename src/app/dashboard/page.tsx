@@ -8,11 +8,10 @@ import { getContent, getPaths, getStops } from "@/lib/content";
 import { lessonsByPath, pathRef } from "@/lib/content/paths";
 import { accountsEnabled } from "@/lib/supabase/config";
 import { currentUser, userClient } from "@/lib/supabase/server";
-import { PageHero } from "@/components/page-hero";
 import { Dashboard } from "./dashboard";
 import { ProgressOverview } from "./progress-overview";
 import { InterviewReadiness } from "./interview-readiness";
-import { primaryButtonSm } from "@/components/ui";
+import { textLink } from "@/components/ui";
 import { Skeleton } from "@/components/skeleton";
 
 export const metadata: Metadata = { title: "Your dashboard", robots: { index: false } };
@@ -34,28 +33,32 @@ async function SignedIn() {
 
 export default function DashboardPage() {
   return (
-    <main>
-      <PageHero
-        size="full" shape="barChart" theme="career" seed="dashboard" icon="trophy" eyebrow="Your progress" title="Your dashboard" lead="Carry on where you left off, and see your streak and what you have finished.">
-        {/* FOCUS-2: the weekly plan and the Monday emails live together under "Stay on track". */}
-        <Link href="/plan" className={primaryButtonSm}>
-          Stay on track this week →
-        </Link>
-      </PageHero>
-      <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-8 empty:hidden">
+    <main className="mx-auto max-w-3xl px-4 pt-8 pb-16 md:pt-12">
+      {/* DB-1 (2026-11-27, owner: "fix/do the 4-12", item 5): a Today screen. Where to carry on and three numbers first,
+          then one thing at a time in tabs, instead of a banner and about eight stacked sections. */}
+      <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Your dashboard</h1>
+      <div className="mt-6 empty:hidden">
         <ContinueCard titles={Object.fromEntries(getStops().map((s) => [s.id, s.title]))} />
       </div>
-      <ProgressOverview />
-      <InterviewReadiness />
-      <h2 className="mt-10 text-xl font-semibold">Your account</h2>
-      {accountsEnabled() ? (
-        <Suspense fallback={<Skeleton label="Loading your progress…" className="mt-6" />}>
-          <SignedIn />
-        </Suspense>
-      ) : (
-        <p className="mt-2 leading-7">Sign-ups are paused for a short while. Your progress is saved on this device.</p>
-      )}
+      <div className="mt-6">
+        <ProgressOverview />
+      </div>
+      <div className="mt-8">
+        {accountsEnabled() ? (
+          <Suspense fallback={<Skeleton label="Loading your progress…" className="mt-6" />}>
+            <SignedIn />
+          </Suspense>
+        ) : (
+          <div className="flex flex-col gap-6">
+            <InterviewReadiness />
+            <p className="leading-7">
+              Sign-ups are paused for a short while. Your progress is saved on this device.{" "}
+              <Link href="/plan" className={textLink}>
+                Stay on track this week
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
     </main>
   );
