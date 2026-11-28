@@ -67,7 +67,7 @@ reviewed_on: 2026-11-09
 
 Before MCP, every AI app needed its own code for every system. Three assistants and four systems meant twelve integrations. The **Model Context Protocol** (MCP) is an open standard that fixes this. You wrap each system once as an **MCP server**, and each AI app contains an **MCP client** that can talk to any server: three plus four pieces instead of three times four.
 
-Anthropic released MCP on 25 November 2024. In December 2025 it gave MCP to the Agentic AI Foundation, a fund under the Linux Foundation co-founded by Anthropic, Block and OpenAI, where its maintainers develop it in the open. Versions are named by date. The current one is **2026-07-28**, the fifth release; the one before was 2025-11-25. Always check which version a tutorial targets.
+Anthropic released MCP on 25 November 2024. In December 2025 it gave MCP to the Agentic AI Foundation, a directed fund under the Linux Foundation co-founded by Anthropic, Block and OpenAI, where its maintainers develop it in the open. Versions are named by date. The current one is **2026-07-28**, the fifth release; the one before was 2025-11-25. Always check which version a tutorial targets.
 
 A server can offer three kinds of thing. What matters most is who decides to use each:
 
@@ -93,7 +93,7 @@ Chat assistant -> Spare-parts server
 
 ### The messages on the wire
 
-MCP messages are JSON-RPC 2.0: a request has an `id`, a `method` and `params`, and the reply carries the same `id`. Since 2026-07-28 the protocol is **stateless**. Older versions began with an `initialize` handshake and kept a session. Now each request carries the protocol version, client name and capabilities in `_meta`, so any copy of the server can answer it. A client may call `server/discover` first, but need not. The SDKs still speak the older handshake to hosts that have not upgraded.
+MCP messages are JSON-RPC 2.0: a request has an `id`, a `method` and `params`, and the reply carries the same `id`. Since 2026-07-28 the protocol is **stateless**. Older versions began with an `initialize` handshake and kept a session. Now each request carries the protocol version and client capabilities in `_meta`, and should also carry the client's name and version. A client may call `server/discover` first, but need not. The official Python SDK still serves the older handshake to clients that have not upgraded, from the same server.
 
 Failures come in two kinds:
 
@@ -107,7 +107,7 @@ import json
 
 request = {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
            "params": {"name": "get_maintenance_history", "arguments": {"tag": "CNC-14", "limit": 1},
-                      "_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}}}
+                      "_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}}
 
 ok = {"jsonrpc": "2.0", "id": 7, "result": {"resultType": "complete", "isError": False,
       "content": [{"type": "text", "text": "{\"date\": \"2026-11-18\", \"note\": \"Vibration at high RPM\"}"}]}}
@@ -133,7 +133,7 @@ print(json.dumps(for_the_model(refused)))
 | Good for | Files, local databases, developer tools | Shared company systems, updated and logged in one place |
 | Who is the user | Whoever runs the host on that machine | Whoever signed in: an OAuth token on every request |
 
-With **Streamable HTTP**, the client POSTs each message to the one URL, and the server answers with JSON, or with a stream of events when it sends progress first. In 2026-07-28, `Mcp-Method` and `Mcp-Name` headers copy the method and tool name from the body, so a gateway can route and rate-limit by tool; the server rejects a request whose headers and body disagree. With no session id, several copies can run behind a plain load balancer. If a workflow needs state, a tool returns a handle such as `draft_id` and the model passes it back.
+With **Streamable HTTP**, the client POSTs each message to the one URL, and the server answers with JSON, or with a stream of events when it sends progress first. In 2026-07-28, every request carries an `Mcp-Method` header copied from the body, and tool, resource and prompt requests also carry `Mcp-Name`, so a gateway can route requests without parsing the body; a request whose headers and body disagree gets a 400 error. There is no session id any more: a server ignores an old `Mcp-Session-Id` header and does not mint one. If a workflow needs state, a tool returns a handle such as `draft_id` and the model passes it back.
 
 Two gotchas. Older tutorials use the **HTTP+SSE** transport (`transport="sse"`), which is deprecated: do not start anything new on it. And a stdio server must write only MCP messages to standard output: one stray `print` breaks the connection, so log to standard error.
 
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     mcp.run()  # stdio; use mcp.run(transport="streamable-http") for a remote server
 ```
 
-The function's name, type hints and docstring become the tool's name, input schema and description, so the tool-design lesson applies directly. Raising `ToolError` returns an `isError: true` result with your message.
+The function's name, type hints and docstring become the tool's name, input schema and description, so the tool-design lesson applies directly. Raising `ToolError` returns an `isError: true` result: your message, after an "Error executing tool <name>: " prefix.
 
 **Test before you connect a model.** The MCP Inspector (`npx @modelcontextprotocol/inspector`, or `mcp dev tickets_server.py`) lets you call each tool with your own arguments, including bad ones, and see raw results. Most bugs show up faster here than in a chat.
 
@@ -195,7 +195,7 @@ Give each tool's `name`, `description` and `input_schema` to the model, send its
 
 **Elicitation** lets a tool ask the user something mid-call: a missing detail, or "Close all 40 tickets?" before a bulk change. In 2026-07-28 it works in rounds: the server returns `resultType: "input_required"` with its questions, the host asks the user, and the client repeats the call with the answers. For a password or payment, which must not pass through the AI app, the server sends the user to a web page instead (URL mode).
 
-Older material also describes **sampling** (the server asks the host's model to write text) and **roots** (the host tells the server which folders to use). Both were deprecated in 2026-07-28; they keep working for at least twelve months, but build nothing new on them. Long-running jobs (**tasks**) and interactive screens (**MCP Apps**) are now optional extensions.
+Older material also describes **sampling** (the server asks the host's model to write text) and **roots** (the host tells the server which folders to use). Both were deprecated in 2026-07-28, along with logging. They stay in the spec until at least the first revision released on or after 28 July 2027, but build nothing new on them. In 2026-07-28, long-running jobs (**tasks**) moved out of the core into an extension. Interactive screens (**MCP Apps**) are a separate extension.
 
 ### Tools cost context
 
