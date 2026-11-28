@@ -3,9 +3,9 @@ id: batching-model-tiering
 level: P2
 theme: ops
 title: "Batching and model tiering"
-outcome: "Cut model costs without hurting quality: send easy requests to small models, escalate hard ones, and run work that can wait through discounted batch APIs."
-answer: "Cut model costs by sending easy requests to small, cheap models, escalating only hard ones to large models, and running work that can wait through discounted batch APIs."
-why_it_matters: "Model spend is often the largest running cost of an AI system, and it grows with success. Clients notice when the bill doubles. Tiering and batching routinely cut costs by half or more, and being able to show that is part of getting a pilot renewed."
+outcome: "Cut model costs without hurting quality: send easy requests to small models, escalate hard ones, set reasoning effort per route, and run work that can wait through discounted batch APIs."
+answer: "Send easy requests to a small model and escalate only the hard ones, set reasoning effort per route, and run work that can wait through a batch API at about half price."
+why_it_matters: "Model spend is often the largest running cost of an AI system, and it grows with success. Clients notice when the bill doubles. Tiering, effort settings and batching can cut a bill by half or more, and showing the saving lever by lever, with quality held, is what gets a pilot renewed."
 hours: 3
 gap_tags: []
 primary_resource: claude-batch-processing
@@ -19,45 +19,45 @@ check:
   question_ids: [batching-model-tiering-1, batching-model-tiering-2, batching-model-tiering-3]
 flashcards:
   - q: "What is model tiering?"
-    a: "Sending simple requests to small, cheap, fast models and only hard ones to large models."
-  - q: "What is a batch API?"
-    a: "A way to submit many non-urgent requests together; providers return results within hours at a large discount."
-  - q: "What are three tiering patterns?"
-    a: "Fixed by task, a cascade that escalates on failed checks, and a router that predicts difficulty up front."
-  - q: "What does a cascade need to work?"
-    a: "A reliable check on the small model's output, such as a validator, so failures escalate instead of passing on."
-  - q: "What is the real question when choosing a small model?"
-    a: "Whether it is good enough on the requests you actually send it, measured with evals per route."
-  - q: "How should batch jobs handle failures?"
-    a: "Expect some items to fail, match results by your own ids, resubmit failures, and keep work idempotent."
-  - q: "Why measure cost per successful task?"
-    a: "A cheap model that fails often and needs retries or humans can cost more overall."
-  - q: "Which other levers combine well with tiering?"
-    a: "Prompt caching, shorter prompts and outputs, fewer retrieved chunks, and caching identical answers."
-  - q: "How do you know a cascade saves money?"
-    a: "Compare cost per successful task, including the large-model calls for escalated items and any human fixes, against sending everything to the large model."
-  - q: "What should a batch job do with failed items?"
-    a: "Collect them by id into a new, smaller batch or a real-time retry queue, and report how many failed and why."
+    a: "Sending each request to the cheapest model that is good enough for it: simple work to a small, fast model, hard work to a large one."
+  - q: "What does a provider batch API trade?"
+    a: "Speed for price. You submit many requests at once and get results later (most within an hour, at most 24 hours on Anthropic) at 50% off, as of November 2026."
+  - q: "What are the three tiering patterns?"
+    a: "Fixed by task (each feature has one model), a cascade (small model first, escalate when a check fails) and a router (predict difficulty and pick the model up front)."
+  - q: "How do you estimate what a cascade costs per item?"
+    a: "Small-model cost plus escalation rate times large-model cost. Escalated items pay for both calls."
+  - q: "What is a validator's miss rate?"
+    a: "The share of wrong small-model outputs that pass the validator. Measure it on a labelled golden set; a low escalation rate means nothing without it."
+  - q: "How should a batch job handle failures?"
+    a: "Match results by your own custom_id, never by position. Collect errored and expired items into a retry batch or the real-time path, and make writes idempotent."
+  - q: "How are reasoning (thinking) tokens billed?"
+    a: "As output tokens, even when the thinking text is not returned, and they count toward max_tokens. Set effort per route and read usage.output_tokens."
+  - q: "Why might a cached prompt prefix not save anything?"
+    a: "It is below the model's minimum cacheable length (512 tokens on Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5), a byte in it changes per request, or the cache expires between calls."
+  - q: "How is a provider batch API different from continuous batching?"
+    a: "A batch API is a discounted, asynchronous product you buy. Continuous batching is how a serving engine such as vLLM packs requests onto your own GPUs."
+  - q: "When does a cascade hurt users?"
+    a: "When people wait for the answer: escalated requests pay the small model's latency and then the large one's, so slow cases get slower."
 exercise:
   title: "Cut the bill"
-  setup: "A Surat e-commerce marketplace runs three AI tasks on its largest model in real time: (A) categorising 2 million new product listings a month, uploaded in nightly seller batches; (B) answering buyer chat questions; (C) writing a weekly summary of seller complaints for managers. Monthly spend is ₹18 lakh."
+  setup: "A Surat e-commerce marketplace runs three AI tasks on its largest model in real time at default effort: (A) categorising 2 million new product listings a month, uploaded in nightly seller batches; (B) answering buyer chat questions; (C) writing a weekly summary of seller complaints for managers. Monthly spend is ₹18 lakh."
   questions:
     - q: "How should task (A) change?"
-      a: "Move it to the batch API overnight and test a small model with a validator, escalating failures to the large one."
+      a: "Run it through the batch API overnight with a small model at low effort, a validator, and escalation of failures to the large model. Measure the validator's miss rate on a golden set before switching."
     - q: "How should task (B) be tiered?"
-      a: "Route simple questions such as order status to a small model and keep complex ones on the large model, with evals per route."
+      a: "Route simple questions such as order status to a small model at low effort, keep complex ones on the large model, and give each route its own eval and a p95 latency target, since a cascade slows escalated replies."
     - q: "How should task (C) change?"
-      a: "It can wait, so run it through the batch API; keep the large model if summary quality needs it."
+      a: "It can wait, so run it through the batch API. Keep the large model if summary quality needs it, and try a lower effort setting, checked against the current summaries."
     - q: "What should the team report after the changes?"
-      a: "A table of cost and quality per task before and after, using cost per successful task."
+      a: "A lever-by-lever table of monthly cost, quality and latency per task before and after, using cost per successful task, with each price and its check date."
 ask:
   - "How do I choose between a small and a large model?"
   - "When should I use a batch API?"
-  - "What is a model cascade?"
+  - "How does reasoning effort change my bill?"
 explain_in_interview:
-  answer: "Batching and model tiering are two of the strongest cost levers for language-model systems. Tiering means not every request needs the biggest model: you send easy work to a small, cheap model and only hard work to a large one, either fixed by task, as a cascade that escalates when a check fails, or through a router. Batching sends work that can wait, like nightly tagging, through a batch API, which providers run within hours at a large discount. For example, a resume-screening service in Pune handling 400,000 resumes a month can extract fields with a small model in batch. The catch is that every route needs its own eval, and batches need handling for partial failures."
+  answer: "Batching and model tiering are two of the strongest cost levers for language-model systems. Tiering sends easy work to a small, cheap model and only hard work to a large one: fixed by task, as a cascade that escalates when a check fails, or through a router. Batching sends work that can wait through a batch API at half price. Reasoning effort is a third lever, because thinking tokens are billed as output. For example, a Pune resume screener handling 400,000 resumes a month can cut its bill by about three quarters this way. The catch is that every route needs its own eval, including how many errors the validator misses."
   follow_up: "How does a cascade decide when to escalate to the large model?"
-  follow_up_answer: "It checks the small model's output with something cheap: a validator on the format, a confidence score, or the model saying it is unsure. Only requests that fail the check go to the large model."
+  follow_up_answer: "It runs cheap checks on the small model's output: schema and range checks, then grounding checks such as the name and skills appearing in the source text. Anything that fails escalates. I measure on a golden set how many wrong outputs still pass, because that miss rate is the real quality cost."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-11-08
@@ -65,62 +65,109 @@ reviewed_on: 2026-11-08
 
 ## What it is
 
-Two of the strongest cost levers for language-model systems:
+Three cost levers that work together:
 
-- **Model tiering** (or routing): not every request needs the most capable model. Classify, extract or answer simple questions with a small, cheap, fast model; send only the hard ones to a large one.
-- **Batching**: work that does not need an answer in seconds, such as nightly document tagging, summarising yesterday's tickets or re-embedding a corpus, goes through a **batch API**. Providers process batches within hours at a large discount, often around half the normal price.
+- **Model tiering** (or routing). Not every request needs the most capable model. Classify, extract or answer simple questions with a small, cheap, fast model, and send only the hard ones to a large one.
+- **Reasoning effort.** Current models think before they answer, and those thinking tokens are billed as output tokens, even when you never see the text. An effort setting controls how much the model thinks. Easy, high-volume work rarely needs the default.
+- **Batching.** Work that does not need an answer in seconds goes through a provider's **batch API**: you upload many requests at once and collect results later at a large discount. Examples are nightly document tagging, summarising yesterday's tickets and re-scoring an archive.
 
-Both depend on knowing your traffic: what share of requests is easy, and what share can wait.
+A note on words. In this lesson "batching" means the provider's discounted, asynchronous product. **Continuous batching** is something else: it is how a serving engine such as vLLM packs many requests onto your own GPUs at once. The lesson "Inside LLM inference: prefill, decode and the KV cache" covers that.
+
+All three levers depend on knowing your traffic: what share of requests is easy, and what share can wait.
 
 ```flow
+title: Where each request goes
 Incoming work -> Can it wait hours?
-Can it wait hours? -[yes]-> Batch API, discounted | results by id, rerun failures
-Can it wait hours? -[no]-> Small model -> Validator passes?
+Can it wait hours? -[yes]-> Batch API at half price | match results by your id, retry failures
+Can it wait hours? -[no]-> Small model, low effort -> Validator passes?
 Validator passes? -[yes]-> Answer
-Validator passes? -[no, about 2.5%]-> Large model -> Answer
-A hard task such as fit summaries -[directly]-> Large model
+Validator passes? -[no, about 7%]-> Large model -> Answer
+Hard tasks such as fit summaries -[directly]-> Large model
 ```
 
 This lesson follows a resume-screening service at an HR-tech company in Pune processing 400,000 resumes a month.
 
 ## How it works
 
-**Tiering patterns.**
+### Three tiering patterns
 
-- *Fixed by task*: each feature uses the cheapest model that passes its evals. Extraction from a standard form may need only a small model; drafting a legal summary may need a large one. This is the simplest and most common.
-- *Cascade*: try the small model first; check its output (confidence, a validator, a self-reported "unsure"); escalate to the large model only when the check fails.
-- *Router*: a classifier, or a small model, predicts difficulty and picks the model up front. Research systems such as RouteLLM learn this from preference data.
+- **Fixed by task.** Each feature uses the cheapest model that passes its evals. Extraction from a standard form may need only a small model; a legal summary may need a large one. This is the simplest and most common pattern. Start here.
+- **Cascade.** Try the small model first, check its output, and escalate to the large model only when the check fails. It suits tasks where a cheap check can tell good output from bad, such as structured extraction.
+- **Router.** A classifier, or a small model, predicts difficulty and picks the model up front. Research systems such as RouteLLM learn this from preference data. A router suits chat, where you cannot afford two calls in a row and there is no output to check yet.
 
 Every route needs its own eval. The real question is not "is the small model good?" but "is it good enough on the requests we send it?"
 
-**Batching patterns.** Collect requests in a file (one JSON line per request with your own id), submit the batch, poll or get notified, then match results to ids. Design for partial failure: some items error and need resubmitting. Keep batch work idempotent so reruns are safe.
+### The cascade cost formula
 
-**Other cost levers worth combining.** Prompt caching for long, repeated prefixes; shorter prompts and outputs (ask for exactly the fields you need); fewer retrieved chunks after reranking; caching identical answers.
+For each item, a cascade costs the small call, plus the large call for the share that escalates:
 
-**Measure cost per successful task**, not just cost per call. A cheap model that fails half the time and needs a retry or a human may cost more overall.
+`cost per item = small cost + escalation rate × large cost`
 
-**Routes for the resume pipeline:**
+Escalated items pay for both calls. So a small model at one tenth of the price with 40% escalation costs 0.1 + 0.4 = 0.5 of the large model alone: half price, if quality holds. With a price gap of 20 times or more, as between Haiku 5.5 and Sonnet 5.5, the cascade stays cheaper until almost every item escalates. The money is rarely the risk. Two things are: the wrong answers the check lets through, and the extra wait for escalated requests.
 
-| Task | Route | Why | Evidence |
-| --- | --- | --- | --- |
-| Field extraction | Small model, escalate on validation failure | Small model nearly as accurate | 97% against 98% on 500 resumes |
-| Fit summary | Large model | Small model clearly worse | Recruiter ratings |
-| Bulk uploads | Batch API overnight | Needed by morning, not in seconds | Discounted price |
-| Daytime uploads | Real time | Recruiters wait for them | Latency needs |
+### Validators and their miss rate
 
-**Building a validator for a cascade.** The check decides what escalates, so it must catch bad outputs reliably. For extraction, validate against the JSON schema, check required fields are present and plausible (an email has an at sign, years of experience are between 0 and 50), and compare totals where possible. For free text, a cheap judge or a self-reported "unsure" can work, but test it: measure how many bad outputs it misses on a labelled set before trusting it.
+The check decides what escalates, so test it like any other model. Use cheap checks in layers:
 
-**Running a batch job.** Write one line per request with your own id, submit, and record the batch id. When results arrive, match them by id, write successes, and collect failures into a new batch. Make every write idempotent, so rerunning a batch after a crash does not create duplicates.
+1. **Format.** Does the output parse against the schema?
+2. **Range.** Are values plausible? For example, years of experience between 0 and 50, and at least one skill.
+3. **Grounding.** Does the answer appear in the source? For example, the candidate's name, most listed skills and the last employer should appear in the resume text. This catches invented values that are perfectly well formed.
+4. **Signals from the call.** A response that stopped because it hit `max_tokens`, or a refusal, is a failure, not an answer.
 
-**A cascade in code.** Small model first, a strict validator, the large model only when the check fails:
+Then run the small model on a labelled golden set and count the **miss rate**: of the outputs that were wrong, how many passed every check? Format checks catch loud failures. Quiet errors (a plausible but wrong employer) pass them. A self-reported "unsure" or a cheap judge model can add a signal for free text, but measure its miss rate the same way.
+
+### Reasoning effort and thinking tokens
+
+On Claude models, `output_config.effort` takes `low`, `medium`, `high`, `xhigh` or `max`. It shapes all output tokens, including thinking. As of November 2026, the default is `medium` on Claude Haiku 5.5 and Claude Opus 5.5 and `high` on Claude Sonnet 5.5. Anthropic suggests `low` for simple, high-volume work.
+
+Three gotchas:
+
+- **Thinking counts toward `max_tokens`.** A tight `max_tokens` can cut a reply off mid-answer. Leave room, and treat `stop_reason == "max_tokens"` as a failure.
+- **Thinking switches differ by model.** On Haiku 5.5 you may send `thinking: {"type": "disabled"}` at `high` effort or below. Sonnet 5.5 and Opus 5.5 reject it with an error, so lower effort instead.
+- **Effort is a fourth tier.** Before building a cascade, also test the large model at lower effort. Sometimes that holds quality with one model and one cache.
+
+Read `usage.output_tokens` per route. If output tokens far exceed the visible reply, thinking is where your money goes.
+
+### Batching: how it behaves
+
+These are Anthropic's Message Batches rules as of 28 November 2026; other providers differ in detail.
+
+- **Price:** 50% off input and output tokens. OpenAI and Google also offer discounted batch modes; check their current terms.
+- **Speed:** most batches finish within an hour, but any request not processed within 24 hours expires. Never batch work someone is waiting for.
+- **Size:** up to 100,000 requests or 256 MB per batch. Results stay available for 29 days.
+- **Results:** they can arrive in any order. Match by your own `custom_id`. Each item is `succeeded`, `errored`, `canceled` or `expired`, and you are not billed for the last three.
+- **Limits:** batches have their own rate limits, shared across models: requests per minute plus a cap on requests waiting in the queue (300,000 at the Build tier). They are separate from the real-time limits, and batches are not subject to ramp limits. A large overnight job therefore does not use up the per-minute token limits that daytime recruiters rely on.
+- **Not allowed in a batch:** streaming, fast mode and server-side fallbacks.
+
+### Caching inside the picture
+
+Prompt caching stacks with tiering and batching. Put the stable part first (instructions, then the job description) and mark it with `cache_control`. Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5 cache prefixes of at least 512 tokens; a shorter prefix is processed normally with no error. A 5-minute cache write costs 1.25 times the input price and a 1-hour write 2 times. Reads are far cheaper. In batches, cache hits are best effort because requests run in any order. Use the 1-hour cache and, as Anthropic suggests, send one request first to write the prefix before you submit the rest.
+
+### Prices to plan with
+
+Anthropic list prices in US dollars per million tokens, checked 28 November 2026 (Haiku prices apply to prompts up to 100,000 tokens):
+
+| Model | Input | Output | Batch input | Batch output | Cache read |
+| --- | --- | --- | --- | --- | --- |
+| Claude Haiku 5.5 | $0.10 | $0.50 | $0.05 | $0.25 | $0.01 |
+| Claude Sonnet 5.5 | $2 | $10 | $1 | $5 | $0.10 |
+| Claude Opus 5.5 | $4 | $20 | $2 | $10 | $0.20 |
+
+Sonnet 5.5 costs 20 times as much as Haiku 5.5 per token. Re-check prices before every cost review and write the check date next to them.
+
+### A cascade in code
+
+Small model at low effort, layered checks, the large model only when a check fails:
 
 ```python
-import json
 import anthropic
 from pydantic import BaseModel, ValidationError
 
 client = anthropic.Anthropic()
-SMALL, LARGE = "claude-haiku-5-5", "claude-sonnet-5-5"     # check the docs for current names
+SMALL, LARGE = "claude-haiku-5-5", "claude-sonnet-5-5"   # check the models page for current names
+
+PROMPT = ("Return only JSON with name, years_experience, skills and "
+          "last_employer (null if absent). Copy names exactly as written.\n\n")
 
 class Resume(BaseModel):
     name: str
@@ -128,127 +175,159 @@ class Resume(BaseModel):
     skills: list[str]
     last_employer: str | None = None
 
-def extract(model, text):
-    r = client.messages.create(model=model, max_tokens=500,
-        messages=[{"role": "user", "content": "Return only JSON with name, years_experience, skills, "
-                   f"last_employer (null if absent).\n\n{text}"}])
-    out = "".join(b.text for b in r.content if b.type == "text")
-    return out, r.usage
+def extract(model, effort, text):
+    r = client.messages.create(
+        model=model, max_tokens=2000,              # thinking counts toward max_tokens
+        output_config={"effort": effort},
+        messages=[{"role": "user", "content": PROMPT + text}])
+    if r.stop_reason != "end_turn":                # cut off or refused: treat as a failure
+        return None, r.usage
+    return "".join(b.text for b in r.content if b.type == "text"), r.usage
 
 def valid(raw, text):
+    if raw is None:
+        return None
     try:
         item = Resume.model_validate_json(raw)
     except ValidationError:
         return None
+    page = text.lower()
+    words = item.name.lower().split()
+    if not words or not all(w in page for w in words):          # name must be in the resume
+        return None
     if not 0 <= item.years_experience <= 50 or not item.skills:
         return None
-    if item.name.split()[0].lower() not in text.lower():      # the name must appear in the resume
+    found = sum(s.lower() in page for s in item.skills)
+    if found < 0.8 * len(item.skills):                          # most skills must be in the text
+        return None
+    if item.last_employer and item.last_employer.lower() not in page:
         return None
     return item
 
 def cascade(text, stats):
-    raw, usage = extract(SMALL, text)
-    stats["small_calls"] += 1
-    if (item := valid(raw, text)):
+    raw, _ = extract(SMALL, "low", text)
+    stats["small"] += 1
+    if item := valid(raw, text):
         return item
     stats["escalated"] += 1
-    raw, usage = extract(LARGE, text)
-    return valid(raw, text)            # None goes to a person
+    raw, _ = extract(LARGE, "high", text)
+    return valid(raw, text)                                      # None goes to a person
 ```
 
-Track the escalation rate. If it climbs, the small model is struggling with a new kind of input, and the savings are shrinking.
+An empty name fails the `if not words` check and escalates instead of crashing. Track the escalation rate daily. If it climbs, a new kind of input has arrived and the savings are shrinking.
 
-**Batch requests with Anthropic's Message Batches API.** Submit non-urgent work in one go and collect results by your own ids:
+### The fit summary, cached and batched
+
+The job description is identical for every resume in a hiring drive, so it goes first and is marked for caching:
 
 ```python
 import time
 
-def run_batch(items):
+def run_batch(items, job_description):
     batch = client.messages.batches.create(requests=[
-        {"custom_id": it["id"],
-         "params": {"model": SMALL, "max_tokens": 500,
-                    "messages": [{"role": "user", "content": f"Return only JSON ...\n\n{it['text']}"}]}}
+        {"custom_id": it["id"],                                  # your id: 1-64 letters, digits, - or _
+         "params": {"model": LARGE, "max_tokens": 4000,
+                    "output_config": {"effort": "medium"},
+                    "system": [{"type": "text",
+                                "text": "You screen resumes for this role.\n\n" + job_description,
+                                "cache_control": {"type": "ephemeral", "ttl": "1h"}}],
+                    "messages": [{"role": "user",
+                                  "content": "Write a five-line fit summary.\n\n" + it["text"]}]}}
         for it in items])
     while client.messages.batches.retrieve(batch.id).processing_status != "ended":
         time.sleep(60)
-    done, failed = {}, []
-    for result in client.messages.batches.results(batch.id):
-        if result.result.type == "succeeded":
-            msg = result.result.message
-            done[result.custom_id] = "".join(b.text for b in msg.content if b.type == "text")
-        else:
-            failed.append(result.custom_id)
-    return done, failed            # resubmit `failed`, or send them to the real-time path
+    done, retry = {}, []
+    for r in client.messages.batches.results(batch.id):         # any order: key by custom_id
+        if r.result.type == "succeeded":
+            m = r.result.message
+            done[r.custom_id] = "".join(b.text for b in m.content if b.type == "text")
+        else:                                                    # errored, expired or canceled
+            retry.append(r.custom_id)
+    return done, retry
 ```
 
-Batch processing is priced lower than normal calls and can take up to a day; check the current price and turnaround, with the date. Validate batch outputs exactly as you would real-time ones.
-
-**Cost per successful task, measured.** Over a sample of 200 items, record for each path the model calls made, tokens, cost and whether the final result was correct. Then compare:
-
-| Path | Accuracy | Cost per item |
-| --- | --- | --- |
-| Large model for everything | measured | measured |
-| Cascade | measured | measured, including escalations |
-| Cascade plus batch for uploads | measured | measured |
-
-Pick the cheapest path that meets the accuracy bar for that task.
+Send `retry` to a new, smaller batch, or to the real-time path if recruiters need it by morning. Validate batch outputs exactly as you would real-time ones. Check `usage.cache_read_input_tokens` on a sample: if it stays at zero, something in the prefix is changing.
 
 ## A worked example
 
-A Pune HR-tech company screens resumes for its clients. Each resume gets structured extraction (name, skills, experience) and a fit summary against the job description. Volume: 400,000 resumes a month, mostly uploaded in bulk the evening before a hiring drive.
+A Pune HR-tech company screens resumes for its clients. Each resume gets structured extraction (name, experience, skills, last employer) and a fit summary against the job description. Volume is 400,000 resumes a month, about 80% uploaded in bulk the evening before a hiring drive.
 
-Before: every resume went through a large model in real time. Monthly model spend: about ₹14 lakh.
+All figures below are an illustration with assumed token counts, at, for example, ₹90 to the dollar and the 28 November 2026 prices above. Your own numbers come from `usage` logs.
 
-The redesign:
+**Before.** Everything runs on Claude Sonnet 5.5 in real time at its default `high` effort. Per resume:
 
-1. Extraction moves to a small model with a strict JSON schema. On a golden set of 500 resumes, field accuracy is 97% against 98% for the large model; validation failures (2.5%) escalate to the large model.
-2. The fit summary stays on the large model, where the small one scored clearly worse in recruiter ratings.
-3. Bulk uploads go through the batch API overnight, at a discount. Only resumes added during the working day run in real time.
-4. The job description, identical for thousands of resumes, sits at the start of the prompt and is cached.
+- Extraction: 3,400 input tokens ($0.0068) and 900 output tokens, of which about 650 are thinking ($0.009). Total $0.0158.
+- Fit summary: 5,000 input tokens ($0.010) and 1,400 output tokens, of which about 1,050 are thinking ($0.014). Total $0.024.
 
-Monthly spend falls to about ₹5 lakh. Recruiter ratings of the summaries are unchanged, and you report both numbers side by side in the monthly review.
+That is $0.0398 a resume, $15,920 a month, about ₹14.3 lakh. Notice that thinking alone is over 40% of each call.
 
-| Measure | Before | After |
-| --- | --- | --- |
-| Monthly model spend | About ₹14 lakh | About ₹5 lakh |
-| Extraction field accuracy | 98% | 97% plus escalation |
-| Recruiter rating of summaries | Baseline | Unchanged |
+**Step 1: choose the validator on a golden set.** The team hand-labels 500 resumes and counts resumes with every field correct:
+
+| Path | Escalated | Wrong outputs that passed checks | Resumes fully correct |
+| --- | --- | --- | --- |
+| Sonnet 5.5 alone | Not applicable | Not applicable | 489 (97.8%) |
+| Haiku 5.5 alone | Not applicable | Not applicable | 466 (93.2%) |
+| Cascade, format and range checks | 15 (3%) | 22 of 34 | 476 (95.2%) |
+| Cascade, plus grounding checks | 35 (7%) | 7 of 34 | 489 (97.8%) |
+
+The format-only validator looked attractive at 3% escalation, but it missed 22 of the 34 wrong outputs. The grounding checks more than double the escalation rate and match the large model's quality. The team picks them.
+
+**Step 2: apply the levers one at a time.**
+
+| Lever | What changes | Monthly spend after | Saving |
+| --- | --- | --- | --- |
+| Start | Sonnet 5.5 for everything, real time | ₹14.33 lakh | None |
+| 1. Cascade for extraction | Haiku 5.5 at low effort: $0.0005 a resume, plus 7% × $0.0158 for escalations | ₹9.22 lakh | ₹5.11 lakh |
+| 2. Lower effort on fit summaries | Medium effort: thinking falls to about 400 tokens, summary cost $0.0175 | ₹6.88 lakh | ₹2.34 lakh |
+| 3. Batch the bulk uploads | 80% of resumes at half price | ₹4.13 lakh | ₹2.75 lakh |
+| 4. Cache the job description | 2,000-token prefix, 90% of calls read it from cache (1-hour writes in batches, 5-minute in real time) | ₹3.45 lakh | ₹0.68 lakh |
+
+Read the table the way a reviewer would:
+
+- **Lever 1:** escalations cost more than twice as much as all the small-model calls together. Each point of escalation rate is visible on the bill.
+- **Lever 2:** the effort change needed its own eval. Recruiters blind-rated 100 summaries at both settings and saw no difference. Without that check, it would be a guess.
+- **Lever 3:** batching multiplies everything before it by 0.6 (80% at half price, 20% at full price).
+- **Lever 4:** caching is small here because the prefix is only 2,000 of 5,000 input tokens. The 400-token extraction instructions do not cache at all: they are under the 512-token minimum.
+
+The bill falls from about ₹14.3 lakh to about ₹3.45 lakh a month, roughly 76% lower, with golden-set accuracy and recruiter ratings unchanged. Daytime uploads stay in real time. There, the 7% of resumes that escalate wait for two calls, so the team tracks p95 latency for that path separately.
 
 ## Common mistakes
 
-- **Choosing the small model by vibe.** Run the evals for each route; cheap and wrong is expensive.
-- **Batching user-facing work.** Batches can take hours. Only batch what can wait.
-- **No escalation path.** A cascade without a reliable failure check sends bad answers onwards.
-- **Ignoring retries in the maths.** Count cost per successful task.
-- **Forgetting partial batch failures.** Some items always fail; plan the rerun.
-- **A weak validator** that passes bad small-model outputs, so the cascade saves money by losing quality.
-- **Ignoring failed batch items**, which silently go missing.
-- **Comparing cost per call** instead of cost per successful task.
+- **Choosing the small model by vibe.** Run the evals for each route. Cheap and wrong is expensive.
+- **Trusting a low escalation rate.** A validator that checks only format passes well-formed but wrong answers. Measure its miss rate on a golden set.
+- **Counting cost per call instead of cost per successful task.** Include escalations, retries and human fixes.
+- **Ignoring thinking tokens.** Default effort on a large model can make reasoning the biggest line on the bill. Set effort per route and check it against evals.
+- **Setting `max_tokens` too tight.** Thinking counts toward it, so replies get cut off and look like model failures.
+- **Batching user-facing work.** Batches usually finish within an hour but can take up to 24.
+- **Losing failed batch items.** Match by `custom_id`, retry errored and expired items, and keep writes idempotent so reruns create no duplicates.
+- **Forgetting the latency of escalation.** In chat, a cascade makes the hardest questions slowest. A router or a single model may serve users better.
+- **Caching a prefix that cannot cache.** It is too short, it changes on every request, or the 5-minute cache expires between daytime uploads.
 
 ## When tiering and batching are not worth it
 
-- **Low volume**: the savings are smaller than the engineering time.
+- **Low volume.** The savings are smaller than the engineering time.
 - **Every request is urgent**, so batching does not fit.
-- **The small model fails your evals** on the traffic you would send it.
-- **There is no reliable validator** for the cascade to escalate on.
+- **The small model fails your evals** on the traffic you would send it, and a lower effort setting on the large model does not help either.
+- **There is no reliable check** for a cascade to escalate on, and no clear signal for a router.
 
 ## From demo to production
 
-- **Track escalation rate and cost per successful task** per feature.
-- **Re-evaluate routes** on every model or prompt change.
-- **Handle batch failures** by id, with retries and a report.
-- **Keep urgent and batch work on separate limits** so overnight jobs never slow daytime users.
-- **Record prices with dates** in the cost comparison.
+- **Track escalation rate, validator miss rate and cost per successful task** per feature, every week.
+- **Re-run the golden set** on every model, prompt or effort change. Re-sweep effort when you change models, because levels behave differently between models.
+- **Handle batch failures** by id, with retries, a report and a real-time fallback before the deadline.
+- **Keep urgent and batch work apart.** Batch has its own limits; use workspace limits so a runaway job cannot drain the real-time quota.
+- **Record prices with dates** in every cost comparison, and re-check them before each review.
 
 ## Practice
 
 Read your provider's batch processing guide and the RouteLLM post.
 
-1. Pick one feature and evaluate a small and a large model on 50 golden cases. Record accuracy and cost per case for each.
-2. Build a cascade: small model first with a validator, escalating failures to the large model. Measure the blended accuracy and cost.
-3. Run 100 non-urgent requests through a batch API, handle any failed items, and compare the cost with real-time calls.
-4. Run 50 resumes through the cascade, record the escalation rate and cost per correct extraction, and compare with the large model alone.
+1. Pick one feature and run a small and a large model on 50 golden cases. Record accuracy, output tokens (including thinking) and cost per case for each.
+2. Build a cascade with format, range and grounding checks. Report the escalation rate and the validator's miss rate.
+3. Run the large model at two effort levels on the same 50 cases and compare quality and output tokens.
+4. Submit 100 non-urgent requests as a batch, retry any failed items by `custom_id`, and compare the cost with real-time calls.
+5. Write a lever-by-lever table like the one in the worked example, using your own `usage` numbers and dated prices.
 
 For more depth, chapter 9 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers batching and inference cost, and chapter 10 covers model routers.
 
-**You are done when you can** show a before-and-after table of cost and quality for one feature and justify the split.
+**You are done when you can** show a lever-by-lever table of cost, quality and latency for one feature and justify each route with its eval.
