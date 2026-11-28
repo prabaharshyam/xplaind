@@ -53,7 +53,7 @@ translated_on: 2026-11-28
 
 MCP से पहले हर AI app को हर system के लिए अपना code चाहिए होता था। तीन assistants और चार systems मतलब बारह integrations। **Model Context Protocol** (MCP) एक open standard है जो इसे ठीक करता है। आप हर system को एक बार **MCP server** की तरह लपेटते हो, और हर AI app में एक **MCP client** होता है जो किसी भी server से बात कर सकता है: तीन गुणा चार की जगह तीन जमा चार हिस्से।
 
-Anthropic ने MCP 25 November 2024 को release किया। December 2025 में उसने MCP को Agentic AI Foundation को दे दिया, जो Linux Foundation के तहत एक fund है जिसे Anthropic, Block और OpenAI ने मिलकर शुरू किया, और जहाँ इसके maintainers इसे खुले में develop करते हैं। Versions के नाम तारीख से होते हैं। अभी वाला **2026-07-28** है, पाँचवाँ release; उससे पहले वाला 2025-11-25 था। हमेशा check करो कि कोई tutorial किस version के लिए लिखा है।
+Anthropic ने MCP 25 November 2024 को release किया। December 2025 में उसने MCP को Agentic AI Foundation को दे दिया, जो Linux Foundation के तहत एक directed fund है जिसे Anthropic, Block और OpenAI ने मिलकर शुरू किया, और जहाँ इसके maintainers इसे खुले में develop करते हैं। Versions के नाम तारीख से होते हैं। अभी वाला **2026-07-28** है, पाँचवाँ release; उससे पहले वाला 2025-11-25 था। हमेशा check करो कि कोई tutorial किस version के लिए लिखा है।
 
 एक server तीन तरह की चीज़ें दे सकता है। सबसे ज़रूरी बात ये है कि हर एक को use करने का फ़ैसला कौन करता है:
 
@@ -79,7 +79,7 @@ Chat assistant -> Spare-parts server
 
 ### Wire पर चलने वाले messages
 
-MCP messages JSON-RPC 2.0 होते हैं: request में एक `id`, एक `method` और `params` होते हैं, और reply में वही `id` आता है। 2026-07-28 से protocol **stateless** है। पुराने versions एक `initialize` handshake से शुरू होते थे और एक session रखते थे। अब हर request protocol version, client का नाम और capabilities `_meta` में साथ लाती है, इसलिए server की कोई भी copy उसका जवाब दे सकती है। Client चाहे तो पहले `server/discover` call कर सकता है, पर ज़रूरी नहीं। जिन hosts ने upgrade नहीं किया, उनसे SDKs अभी भी पुराने handshake में बात करते हैं।
+MCP messages JSON-RPC 2.0 होते हैं: request में एक `id`, एक `method` और `params` होते हैं, और reply में वही `id` आता है। 2026-07-28 से protocol **stateless** है। पुराने versions एक `initialize` handshake से शुरू होते थे और एक session रखते थे। अब हर request protocol version और client capabilities `_meta` में साथ लाती है, और उसे client का नाम और version भी साथ लाना चाहिए। Client चाहे तो पहले `server/discover` call कर सकता है, पर ज़रूरी नहीं। जिन clients ने upgrade नहीं किया, उनके लिए official Python SDK उसी server से अभी भी पुराना handshake serve करता है।
 
 Failures दो तरह के होते हैं:
 
@@ -93,7 +93,7 @@ import json
 
 request = {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
            "params": {"name": "get_maintenance_history", "arguments": {"tag": "CNC-14", "limit": 1},
-                      "_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}}}
+                      "_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}}
 
 ok = {"jsonrpc": "2.0", "id": 7, "result": {"resultType": "complete", "isError": False,
       "content": [{"type": "text", "text": "{\"date\": \"2026-11-18\", \"note\": \"Vibration at high RPM\"}"}]}}
@@ -119,7 +119,7 @@ print(json.dumps(for_the_model(refused)))
 | किसके लिए अच्छा | Files, local databases, developer tools | Shared company systems, जिन्हें एक जगह update और log किया जाता है |
 | User कौन है | जो भी उस machine पर host चला रहा है | जिसने sign-in किया: हर request पर एक OAuth token |
 
-**Streamable HTTP** में client हर message उसी एक URL पर POST करता है, और server JSON से जवाब देता है, या पहले progress भेजना हो तो events की एक stream से। 2026-07-28 में `Mcp-Method` और `Mcp-Name` headers body से method और tool का नाम copy करते हैं, ताकि gateway tool के हिसाब से route और rate-limit कर सके; जिस request के headers और body मेल न खाएँ, server उसे reject कर देता है। Session id न होने से कई copies एक सीधे-सादे load balancer के पीछे चल सकती हैं। अगर किसी workflow को state चाहिए, तो tool `draft_id` जैसा एक handle लौटाता है और model उसे वापस भेजता है।
+**Streamable HTTP** में client हर message उसी एक URL पर POST करता है, और server JSON से जवाब देता है, या पहले progress भेजना हो तो events की एक stream से। 2026-07-28 में हर request में body से copy किया हुआ एक `Mcp-Method` header होता है, और tool, resource और prompt requests में `Mcp-Name` भी होता है, ताकि gateway body parse किए बिना requests route कर सके; जिस request के headers और body मेल न खाएँ, उसे 400 error मिलता है। अब कोई session id नहीं है: server पुराने `Mcp-Session-Id` header को ignore करता है और नया नहीं बनाता। अगर किसी workflow को state चाहिए, तो tool `draft_id` जैसा एक handle लौटाता है और model उसे वापस भेजता है।
 
 दो gotchas। पुराने tutorials **HTTP+SSE** transport (`transport="sse"`) use करते हैं, जो deprecated है: उस पर कुछ नया शुरू मत करो। और stdio server को standard output पर सिर्फ़ MCP messages लिखने चाहिए: एक भी भटका हुआ `print` connection तोड़ देता है, इसलिए standard error पर log करो।
 
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     mcp.run()  # stdio; use mcp.run(transport="streamable-http") for a remote server
 ```
 
-Function का नाम, type hints और docstring ही tool का name, input schema और description बन जाते हैं, इसलिए tool-design वाला lesson यहाँ सीधे लागू होता है। `ToolError` raise करने पर आपके message के साथ एक `isError: true` result लौटता है।
+Function का नाम, type hints और docstring ही tool का name, input schema और description बन जाते हैं, इसलिए tool-design वाला lesson यहाँ सीधे लागू होता है। `ToolError` raise करने पर एक `isError: true` result लौटता है: "Error executing tool <name>: " prefix के बाद आपका message।
 
 **Model जोड़ने से पहले test करो।** MCP Inspector (`npx @modelcontextprotocol/inspector`, या `mcp dev tickets_server.py`) से आप हर tool को अपने arguments से call कर सकते हो, गलत arguments समेत, और raw results देख सकते हो। ज़्यादातर bugs यहाँ chat से जल्दी दिख जाते हैं।
 
@@ -181,7 +181,7 @@ asyncio.run(main())
 
 **Elicitation** से कोई tool call के बीच में user से कुछ पूछ सकता है: कोई छूटी हुई detail, या bulk change से पहले "सारे 40 tickets close कर दें?"। 2026-07-28 में ये rounds में चलता है: server अपने सवालों के साथ `resultType: "input_required"` लौटाता है, host user से पूछता है, और client जवाबों के साथ call दोहराता है। Password या payment के लिए, जो AI app से होकर नहीं जाने चाहिए, server user को एक web page पर भेज देता है (URL mode)।
 
-पुराने material में **sampling** (server host के model से text लिखवाता है) और **roots** (host server को बताता है कि कौन-से folders use करने हैं) का भी ज़िक्र है। दोनों 2026-07-28 में deprecated हो गए; ये कम से कम बारह महीने चलते रहेंगे, पर इन पर कुछ नया मत बनाओ। लंबे चलने वाले jobs (**tasks**) और interactive screens (**MCP Apps**) अब optional extensions हैं।
+पुराने material में **sampling** (server host के model से text लिखवाता है) और **roots** (host server को बताता है कि कौन-से folders use करने हैं) का भी ज़िक्र है। दोनों 2026-07-28 में deprecated हो गए, साथ में logging भी। ये कम से कम 28 July 2027 को या उसके बाद release होने वाले पहले revision तक spec में रहेंगे, पर इन पर कुछ नया मत बनाओ। 2026-07-28 में लंबे चलने वाले jobs (**tasks**) core से निकलकर एक extension में चले गए। Interactive screens (**MCP Apps**) एक अलग extension है।
 
 ### Tools context खाते हैं
 
