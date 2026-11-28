@@ -2,169 +2,237 @@
 id: running-models-on-many-gpus
 lang: hi
 title: "कई GPUs पर models चलाना: replicas, tensor और pipeline parallelism"
-outcome: "समझा पाओगे कि model कई GPUs में कैसे फैलता है, serving या training के लिए उसे copy करने (replicas) और बाँटने (tensor या pipeline parallelism) में से चुन पाओगे, और एक deployment का size तय कर पाओगे।"
-answer: "अगर model एक GPU में आ जाए तो ज़्यादा users के लिए उसकी copies चलाओ। अगर न आए तो उसे बाँटो: हर layer को GPUs में (tensor) या layers के groups को GPUs में (pipeline)।"
-why_it_matters: "70B parameters और उससे बड़े open models एक GPU में नहीं आते, और असली traffic को एक से ज़्यादा copy चाहिए। Model को कैसे फैलाना है ये cost, speed और reliability तय करता है, और ये ML platform interviews का एक standard सवाल है।"
+outcome: "समझा पाओगे कि model कई GPUs में कैसे फैलाया जाता है, serving या training के लिए उसे copy करने (replicas) और बाँटने (tensor, pipeline या expert parallelism) में से चुन पाओगे, और एक deployment की memory, GPUs और महीने की cost निकाल पाओगे।"
+answer: "अगर model की एक copy, अपने KV cache के साथ, एक GPU में आ जाए, तो ज़्यादा users के लिए और copies चलाओ। अगर न आए, तो उसे बाँटो: हर layer को एक server के GPUs में (tensor) या layers के groups को servers में (pipeline)।"
+why_it_matters: "70B parameters और उससे बड़े open models एक GPU में नहीं आते, कई नए open models mixture-of-experts हैं, और असली traffic को एक से ज़्यादा copy चाहिए। Model को कैसे फैलाते हो, इसी से cost, speed और reliability तय होती है, और deployment का size निकालना ML platform interviews का एक standard सवाल है।"
 flashcards:
   - q: "Replica (data) parallelism क्या है?"
-    a: "कई GPUs पर model की पूरी copies चलाना। Serving में हर copy अलग requests संभालती है; training में अलग batches।"
+    a: "Model की पूरी copies को कई GPUs या GPU groups पर चलाना। Serving में हर copy अलग requests संभालती है; training में हर copy अलग batches पर train करती है।"
   - q: "Tensor parallelism क्या है?"
-    a: "हर layer का matrix काम कई GPUs में बाँटना जो एक ही समय पर compute करते हैं। इससे बहुत बड़ा model चल पाता है और latency भी घट सकती है।"
+    a: "हर layer की matrices को कई GPUs में बाँटना, जो एक साथ compute करके results जोड़ते हैं। इससे बहुत बड़ा model चल पाता है और हर token का समय कम हो सकता है।"
   - q: "Pipeline parallelism क्या है?"
-    a: "Layers के अलग-अलग groups अलग GPUs पर रखना, ताकि data एक से अगले तक जाए। Training throughput के लिए अच्छा; एक अकेली request में delay जोड़ता है।"
+    a: "Layers के groups को अलग-अलग GPUs या servers पर रखना, ताकि data एक stage से अगले stage में जाए। इसे कम bandwidth चाहिए, पर ये एक request को तेज़ नहीं करता।"
   - q: "Tensor parallelism को GPUs के बीच तेज़ links क्यों चाहिए?"
-    a: "GPUs हर layer के अंदर partial results आपस में बदलते हैं। धीमे connections पर, वो communication speed-up को खत्म कर सकता है।"
-  - q: "Low-latency serving के लिए आमतौर पर कौन-सा parallelism टाला जाता है?"
-    a: "Pipeline parallelism, क्योंकि हर request को हर stage से बारी-बारी गुज़रना पड़ता है।"
-  - q: "Deployment का size तय करते समय पहला सवाल क्या है?"
-    a: "क्या model की एक copy, अपने KV cache के साथ, एक GPU में आती है? अगर हाँ, तो replicas use करो; अगर नहीं, तो बाँटो।"
-  - q: "Context और sequence parallelism किसमें मदद करते हैं?"
-    a: "बहुत लंबे inputs में, sequence को या उस पर होने वाले operations को GPUs में बाँटकर।"
-  - q: "Weights के अलावा training को और कौन-सी memory चाहिए?"
-    a: "Gradients और optimiser states, अक्सर weights से कई गुना, इसीलिए training इन्हें GPUs में shard करने जैसी tricks use करती है।"
+    a: "हर token के लिए, हर layer में GPUs दो बार partial results जोड़ते हैं। PCIe या network पर ये communication पूरा speed-up खा सकता है, इसलिए इसे एक server के अंदर NVLink पर ही रखो।"
+  - q: "Servers के पार जाने के लिए tensor की जगह pipeline parallelism क्यों use होता है?"
+    a: "हर stage सिर्फ़ अपना output अगले को भेजता है, हर stage पर एक बार, इसलिए servers के बीच धीमा network भी काफ़ी है। Tensor parallelism को हर layer के अंदर उस network पर बात करनी पड़ती।"
+  - q: "Deployment का size निकालते समय पहला सवाल क्या है?"
+    a: "क्या weights और busy hour load का KV cache, लगभग 10% spare के साथ, एक GPU में आ जाते हैं? हाँ तो replicas use करो। नहीं तो सबसे छोटा valid split ढूँढो।"
+  - q: "Mixture-of-experts model का size कैसे निकालते हैं?"
+    a: "Memory total parameters के हिसाब से चलती है, क्योंकि हर expert load होना चाहिए। हर token का compute active parameters के हिसाब से चलता है। Expert parallelism अलग experts को अलग GPUs पर रखता है।"
+  - q: "Full training में weights के अलावा कितनी memory चाहिए?"
+    a: "Mixed precision और Adam optimiser के साथ, weights, gradients और optimiser states के लिए हर parameter पर लगभग 16 bytes, activations से पहले ही। ZeRO या FSDP इन्हें GPUs में shard करते हैं।"
 exercise:
-  title: "Hyderabad के एक insurer के लिए 70B model serve करना"
-  setup: "Hyderabad का एक insurer 2,000 staff द्वारा use होने वाले internal assistant के लिए एक 70-billion-parameter open model self-host करना चाहता है, जिसमें p95 first-token time 2 seconds से कम हो। उनके पास ऐसे servers हैं जिनमें 80 GB के 8 GPUs हैं, और हर server के अंदर तेज़ links हैं।"
+  title: "Hyderabad की एक insurer के लिए 70B model serve करना"
+  setup: "Hyderabad की एक insurer 70-billion-parameter वाला एक open model (80 layers, 64 attention heads, size 128 के 8 key-value heads) 2,000 staff के लिए self-host करना चाहती है, और p95 first-token time 2 seconds से कम चाहिए। उनका अनुमान है कि busy hour में 60 requests in flight होंगी, हर एक में लगभग 4,000 tokens। हर server में 80 GB के 8 GPUs हैं, जो NVLink से जुड़े हैं।"
   questions:
-    - q: "क्या model 16-bit precision पर एक GPU में आता है?"
-      a: "नहीं। 2 bytes पर 70 billion parameters करीब 140 GB होते हैं, KV cache से पहले ही एक 80 GB GPU से ज़्यादा।"
-    - q: "एक server के अंदर उसे कैसे बाँटें?"
-      a: "4 GPUs में tensor parallelism (या 8-bit precision पर 2), server के अंदर के तेज़ links use करते हुए, जिससे KV cache के लिए जगह बचती है।"
-    - q: "ज़्यादा users को कैसे serve करें?"
-      a: "8 GPUs पर दो copies चलाओ (4-4 के दो groups), और traffic बढ़ने पर load balancer के पीछे और copies वाले servers जोड़ो।"
+    - q: "क्या 16-bit precision पर एक copy एक GPU में आ जाती है?"
+      a: "नहीं। सिर्फ़ weights ही 70 billion × 2 bytes, यानी लगभग 140 GB हैं। एक 80 GB GPU में, KV cache से पहले ही, लगभग 72 GB ही usable है।"
+    - q: "Busy hour का KV cache कितना बड़ा है, और कौन-सा split use करना चाहिए?"
+      a: "2 × 80 × 8 × 128 × 2 bytes यानी हर token पर लगभग 0.33 MB, तो 60 × 4,000 tokens लगभग 79 GB हुए। 4 GPUs में tensor parallelism से लगभग 288 GB usable मिलता है: 140 GB weights के बाद cache के लिए लगभग 148 GB बचता है।"
+    - q: "3 GPUs क्यों नहीं, और capacity कैसे बढ़ाएँगे?"
+      a: "Tensor-parallel size को 64 attention heads को पूरा-पूरा बाँटना चाहिए, इसलिए 3 start ही नहीं होगा। Headroom और failover के लिए हर server पर 4 GPUs की दो copies चलाओ, और traffic बढ़ने पर load balancer के पीछे servers जोड़ो।"
     - q: "दो servers में pipeline parallelism क्यों नहीं?"
-      a: "हर request धीमे network पर दोनों servers से बारी-बारी गुज़रेगी, जिससे delay बढ़ेगा, और जब model एक server के अंदर आ जाता है तो इसकी ज़रूरत नहीं।"
+      a: "Model पहले से एक server के अंदर आ जाता है। Pipeline किसी request को तेज़ नहीं करेगा, एक network hop जोड़ेगा, और 8 GPUs के काम के लिए 16 GPUs लगाएगा।"
 ask:
-  - "जो model एक GPU में न आए उसे कैसे चलाएँ?"
+  - "जो model एक GPU में न आए, उसे कैसे चलाएँ?"
   - "Tensor और pipeline parallelism में क्या फ़र्क है?"
-  - "70B model serve करने के लिए कितने GPUs चाहिए?"
+  - "एक 70B model serve करने के लिए कितने GPUs चाहिए?"
+  - "Mixture-of-experts model का size कैसे निकालूँ?"
 explain_in_interview:
-  answer: "जब एक GPU काफ़ी नहीं होता, आप या तो model copy करते हो या उसे split करते हो। अगर model fit होता है पर traffic ज़्यादा है, तो आप replicas चलाते हो, पूरी copies जो हर एक अलग requests serve करती है। अगर fit नहीं होता, तो model parallelism use करते हो: tensor parallelism हर layer के अंदर का काम GPUs में बाँटता है, और pipeline parallelism layers के groups को अलग GPUs पर रखता है। जैसे, 16-bit पर 70B model को अपने weights के लिए लगभग 140 GB चाहिए, इसलिए आप उसे tensor parallelism से चार GPUs में split कर सकते हो। Trade-off communication है: tensor parallelism को एक server के अंदर बहुत fast links चाहिए, और pipeline parallelism हर stage पर latency जोड़ता है।"
-  follow_up: "Serving के लिए pipeline parallelism से कब बचोगे?"
-  follow_up_answer: "जब latency मायने रखती है। हर request हर stage पर और उनके बीच के network hops पर wait करती है। ये ज़्यादातर तब use होता है जब model एक server के लिए बहुत बड़ा हो और servers में फैलाना पड़े; वरना tensor parallelism या replicas आमतौर पर users को तेज़ serve करते हैं।"
-translated_on: 2026-11-16
+  answer: "जब एक GPU काफ़ी नहीं होता, तो या तो model को copy करते हो या बाँटते हो। अगर KV cache के साथ एक copy आ जाती है, तो मैं load balancer के पीछे replicas चलाऊँगा। अगर नहीं आती, तो बाँटूँगा। Tensor parallelism हर layer की matrices को GPUs में बाँटता है; GPUs हर layer में दो बार results जोड़ते हैं, इसलिए इसे एक server के अंदर NVLink चाहिए, पर ये हर token का समय कम कर सकता है। Pipeline parallelism layers के groups को अलग servers पर रखता है; इसे कम bandwidth चाहिए, पर ये request को तेज़ नहीं करता। जैसे, 16-bit पर एक 70B model को सिर्फ़ weights के लिए लगभग 140 GB चाहिए, तो मैं 80 GB के 4 GPUs में tensor parallelism चलाऊँगा, जिससे KV cache के लिए लगभग 148 GB बचता है, और एक 8-GPU server पर ऐसी दो copies।"
+  follow_up: "Serving के लिए pipeline parallelism कब use करोगे?"
+  follow_up_answer: "जब model एक server में नहीं आता, तब मैं हर server के अंदर tensor parallelism और servers के बीच pipeline use करता हूँ, क्योंकि धीमे network पर सिर्फ़ stage outputs जाते हैं। NVLink के बिना वाले GPUs पर भी मैं इस पर विचार करता हूँ। बाकी हालात में replicas या अकेला tensor parallelism users को ज़्यादा तेज़ी से serve करते हैं।"
+translated_on: 2026-11-28
 ---
 
 ## ये क्या है
 
-एक GPU के पास memory और speed की एक तय मात्रा होती है। दो अलग समस्याएँ आपको कई GPUs की तरफ़ धकेलती हैं:
+एक GPU की memory और speed तय होती है। दो अलग problems आपको कई GPUs use करने पर मजबूर करती हैं:
 
-1. **Model एक GPU के लिए बहुत बड़ा है।** 16-bit precision पर एक 70B model को सिर्फ़ weights के लिए करीब 140 GB चाहिए, यानी एक 80 GB GPU से ज़्यादा।
-2. **एक copy आपके सारे users को serve नहीं कर सकती।** Model आ भी जाए, तो traffic को कई copies चाहिए हो सकती हैं।
+1. **Model एक GPU के लिए बहुत बड़ा है।** 16-bit precision पर एक 70B model को सिर्फ़ weights के लिए लगभग 140 GB चाहिए, जो एक 80 GB GPU से ज़्यादा है।
+2. **एक copy आपके सारे users को serve नहीं कर सकती।** Model आ भी जाए, तो busy hour में कई copies चाहिए हो सकती हैं।
 
 दो बुनियादी जवाब हैं: model को **copy** करो, या **बाँटो**।
 
-- **Replica parallelism** (training में इसे **data parallelism** कहते हैं): कई GPUs पर पूरी copies चलाओ। हर copy अलग requests serve करती है, या अलग batches पर train होती है।
-- **Model parallelism**: एक model को GPUs में बाँटना। दो मुख्य तरीके हैं **tensor parallelism** (हर layer के अंदर का काम बाँटो) और **pipeline parallelism** (layers को groups में बाँटो)।
+- **Replica parallelism** (training में इसे **data parallelism** कहते हैं): कई GPUs पर पूरी copies चलाओ। हर copy अलग requests serve करती है, या अलग batches पर train करती है।
+- **Model parallelism**: एक model को GPUs में बाँटना। मुख्य तरीके हैं **tensor parallelism** (हर layer के अंदर का काम बाँटो), **pipeline parallelism** (layers को stages नाम के groups में बाँटो) और, mixture-of-experts models के लिए, **expert parallelism** (अलग experts को अलग GPUs पर रखो)।
 
-असली systems अक्सर इन्हें मिलाते हैं: 4 GPUs में बँटा एक model, और ऐसे कई groups replicas के रूप में।
+असली systems इन्हें मिलाते हैं: जैसे, 4 GPUs में बँटा एक model, और ऐसे कई groups replicas के रूप में।
+
+हर फ़ैसले के पीछे का rule: **बाँटने की कीमत communication है, और communication को bandwidth चाहिए।** GPUs को जितनी बार बात करनी पड़ती है, उनके बीच का link उतना तेज़ होना चाहिए।
 
 ```flow
 title: Model को कैसे फैलाना है, ये चुनना
-Model और अपेक्षित traffic -> KV cache की जगह के साथ एक GPU में आता है?
-KV cache की जगह के साथ एक GPU में आता है? -[हाँ]-> Replicas | हर GPU पर एक copy
-KV cache की जगह के साथ एक GPU में आता है? -[नहीं]-> क्या एक server के अंदर आता है?
-क्या एक server के अंदर आता है? -[हाँ]-> उसके GPUs में tensor parallelism
-क्या एक server के अंदर आता है? -[नहीं]-> Servers के अंदर tensor, उनके बीच pipeline
+Model और busy hour traffic -> Weights और KV cache एक GPU में आते हैं?
+Weights और KV cache एक GPU में आते हैं? -[हाँ]-> Replicas | हर GPU पर एक copy
+Weights और KV cache एक GPU में आते हैं? -[नहीं]-> एक NVLink server के अंदर आता है?
+एक NVLink server के अंदर आता है? -[हाँ]-> Tensor parallelism | size 2, 4 या 8
+एक NVLink server के अंदर आता है? -[नहीं]-> Servers के अंदर tensor, उनके बीच pipeline
 Replicas -> ज़्यादा traffic के लिए copies जोड़ो | load balancer के पीछे
-उसके GPUs में tensor parallelism -> ज़्यादा traffic के लिए copies जोड़ो | load balancer के पीछे
+Tensor parallelism -> ज़्यादा traffic के लिए copies जोड़ो | load balancer के पीछे
 Servers के अंदर tensor, उनके बीच pipeline -> ज़्यादा traffic के लिए copies जोड़ो | load balancer के पीछे
 ```
 
-## ये काम कैसे करता है
+## ये कैसे काम करता है
 
-**Replicas।** सबसे सादा और मज़बूत option: हर GPU (या GPUs का group) एक पूरा model रखता है और अपनी requests संभालता है। ज़्यादा replicas का मतलब ज़्यादा throughput, और अगर एक fail हो तो बाकी serve करते रहते हैं। अलग-अलग size के models और अलग memory वाले GPUs हों तो क्या कहाँ रखना है, ये एक packing पहेली बन जाता है: एक 40 GB GPU पर तीन 13B models, या एक 34B model?
+### Replicas: जब भी model आ जाए, यही default है
 
-**Tensor parallelism।** एक layer ज़्यादातर matrix multiplication होती है। Matrices को, मान लो 4 GPUs में बाँट दो: हर एक अपना slice एक ही समय पर compute करता है, फिर वो results आपस में बदलते हैं। इससे बहुत बड़ा model फ़िट हो जाता है, और काम बँटने से latency भी घट सकती है। पेच communication का है: GPUs हर layer के अंदर बात करते हैं, इसलिए उन्हें बहुत तेज़ links चाहिए, जैसे एक server के अंदर GPUs के बीच के high-speed connections। धीमे networks पर tensor parallelism आमतौर पर फ़ायदा देना बंद कर देता है।
+हर GPU, या GPUs का हर group, एक पूरा model रखता है और अपनी requests serve करता है। Copies आपस में कभी बात नहीं करतीं, इसलिए कोई भी network चल जाता है, और एक fail हो जाए तो बाकी serve करती रहती हैं।
 
-**Pipeline parallelism।** Layers 1 से 20 GPU 1 पर, 21 से 40 GPU 2 पर, और इसी तरह आगे रखो। एक request हर stage से बारी-बारी गुज़रती है। Batches को छोटे "micro-batches" में बाँटने से सारे stages busy रहते हैं, जो training throughput में मदद करता है। Serving में हर request को हर stage और उनके बीच के network hops का इंतज़ार करना पड़ता है, इसलिए जब latency मायने रखे तो pipeline parallelism टाला जाता है। इसे ज़्यादातर तब use करते हैं जब model एक server के लिए बहुत बड़ा हो और servers में फैलना पड़े।
+क्या कहाँ रखना है, ये तय करना एक packing पहेली है, और हिसाब आसान है: 16-bit पर हर parameter के लगभग 2 bytes, 8-bit पर 1 byte और 4-bit पर 0.5 bytes। जैसे, एक 80 GB GPU पर आप 16-bit पर दो 8B models (हर एक 16 GB, कुल 32 GB) रख सकते हो, या 8-bit पर एक 32B model (32 GB)। दोनों में usable 72 GB में से KV caches के लिए लगभग 40 GB बचता है। ये lesson engine के अपने use के लिए लगभग 10% spare रखता है। (vLLM कई versions तक default में हर GPU की 90% memory use करता था; नए versions में default बदल गया है, तो अपना version check करो।)
 
-**लंबे inputs।** **Context parallelism** एक बहुत लंबे input को GPUs में बाँटता है, और **sequence parallelism** उस पर होने वाले operations को बाँटता है। ये मुख्य रूप से बहुत लंबी context windows के लिए मायने रखते हैं।
+### Tensor parallelism: हर layer का काम बाँटना
 
-**Training को ज़्यादा चाहिए।** Weights के अलावा, training gradients और optimiser states भी रखती है, जो अक्सर weights के आकार से कई गुना होते हैं। **Sharding** के साथ data parallelism (उन states को GPUs में फैलाना, जैसे ZeRO या FSDP में) और साथ में tensor और pipeline parallelism, बड़ी teams को बहुत बड़े models train करने देते हैं। Fine-tuning के लिए, LoRA और quantisation आमतौर पर इसमें से ज़्यादातर की ज़रूरत हटा देते हैं।
+एक transformer layer ज़्यादातर matrix multiplication है। Tensor parallelism हर matrix को, मान लो 4 GPUs में बाँटता है। हर GPU weights का एक चौथाई रखता है और अपना slice एक साथ compute करता है। आम scheme में (Megatron-LM वाली), GPUs हर layer में दो बार अपने partial results जोड़ते हैं, एक बार attention के बाद और एक बार feed-forward block के बाद। 80 layers वाले 70B model के लिए, ये हर generate होने वाले token पर 160 exchanges हैं।
 
-Serving engines ब्योरे संभाल लेते हैं। vLLM में, model को 4 GPUs में बाँटना बस एक setting है:
+ये latency क्यों घटा सकता है: हर नए token के लिए हर weight को memory से एक बार पढ़ना पड़ता है। 4 GPUs हों, तो हर एक चौथाई पढ़ता है, इसलिए हर token का समय घटता है, हालाँकि 4 गुना से कम।
+
+दिक्कत वही exchanges हैं। वो छोटे हैं पर बहुत बार होते हैं, इसलिए उन्हें आपका सबसे तेज़ link चाहिए:
+
+| Link | कहाँ मिलता है | Bandwidth (मोटा अंदाज़ा) | किसके लिए अच्छा |
+| --- | --- | --- | --- |
+| NVLink (H100 SXM) | एक server के अंदर GPUs के बीच | 900 GB/s per GPU, दोनों directions मिलाकर | Tensor parallelism |
+| PCIe Gen5 x16 | GPU से CPU; बिना NVLink वाले servers में GPUs | 128 GB/s, दोनों directions मिलाकर | Replicas; pipeline |
+| InfiniBand NDR | Servers के बीच | 400 Gb/s per port, हर direction में लगभग 50 GB/s | Pipeline; training |
+
+Cloud instance की listing पढ़ते समय "SXM" और "NVLink" (या "NVSwitch") देखो। एक "PCIe" GPU card में आमतौर पर NVLink नहीं होता, या बस एक bridge होता है जो सिर्फ़ दो cards को जोड़ता है। vLLM documentation की सलाह है कि बिना NVLink वाले GPUs पर, जैसे L40S, pipeline parallelism अक्सर tensor parallelism से बेहतर throughput देता है।
+
+**Valid sizes.** Attention heads GPUs में बाँटे जाते हैं, इसलिए tensor-parallel size को head count को पूरा-पूरा बाँटना चाहिए। 64 heads वाला model 1, 2, 4, 8, 16, 32 या 64 GPUs use कर सकता है, पर 3, 5 या 6 नहीं। असल में, एक server के अंदर, इसका मतलब 1, 2, 4 या 8 है।
+
+**Gotcha: shared key-value heads.** ज़्यादातर modern models attention heads के groups में keys और values share करते हैं। 8 key-value heads वाले 70B model को 8 GPUs में बाँटो तो हर GPU पर एक key-value head आता है, और KV cache बराबर बँट जाता है। 16 GPUs में बाँटो तो हर key-value head दो GPUs पर copy होता है, और हर GPU का cache घटना बंद हो जाता है।
+
+### Pipeline parallelism: layers को stages में बाँटना
+
+Layers 1 से 40 को server A पर और 41 से 80 को server B पर रखो। एक request stage A से गुज़रती है, network पार करती है, फिर stage B से गुज़रती है।
+
+Latency के बारे में सटीक रहो। एक request सारी 80 layers से क्रम में गुज़रती है, चाहे वो एक GPU पर हों या कई पर। इसलिए pipeline parallelism हर stage boundary पर बस एक छोटा hop जोड़ता है, पर ये **एक request को तेज़ नहीं करता**, क्योंकि कोई stage दूसरे का काम नहीं बाँटता। Tensor parallelism request को तेज़ कर सकता है; pipeline नहीं कर सकता।
+
+इसकी ताकत bandwidth है: हर stage सिर्फ़ अपना output भेजता है, हर stage पर एक बार, हर layer पर दो बार नहीं। इसीलिए servers के बीच, जहाँ links धीमे होते हैं, pipeline वाला split use होता है।
+
+इसकी कमज़ोरी idle time है, जिसे **bubble** कहते हैं। अगर एक ही request in flight है, तो एक समय पर सिर्फ़ एक stage काम करता है। सारे stages को busy रखने के लिए batch को **micro-batches** में काटा जाता है, जो एक के पीछे एक pipe में चलते हैं। Training में, `p` stages और `m` micro-batches के साथ, समय का लगभग (p − 1) ÷ (m + p − 1) हिस्सा idle रहता है। जैसे, 4 stages और 16 micro-batches में लगभग 3 ÷ 19, यानी 16% बर्बाद होता है। Serving में कई concurrent requests इसी तरह pipe भर देती हैं।
+
+### Mixture-of-experts models और expert parallelism
+
+**Mixture-of-experts (MoE)** model में हर layer में कई feed-forward "experts" होते हैं, और एक छोटा router हर token को उनमें से बस कुछ के पास भेजता है। Size दो अलग numbers के हिसाब से चलता है:
+
+- **Memory total parameters के हिसाब से चलती है।** हर expert load होना चाहिए, क्योंकि अगले token को उनमें से कोई भी चाहिए हो सकता है।
+- **हर token का compute active parameters के हिसाब से चलता है।** सिर्फ़ चुने गए experts चलते हैं।
+
+जैसे, Qwen3-235B-A22B में 235B total parameters हैं, जिनमें से हर token पर लगभग 22B active होते हैं (128 में से 8 experts)। 8-bit पर इसके weights को लगभग 235 GB चाहिए, इसलिए इसे कम से कम 80 GB के 4 GPUs चाहिए (4 × 72 = 288 GB usable), और cache के लिए बस लगभग 53 GB बचता है। एक 8-GPU server कहीं ज़्यादा जगह देता है। फिर भी हर token की cost लगभग एक 22B dense model के compute जितनी होती है।
+
+**Expert parallelism** अलग experts को अलग GPUs पर रखता है और हर token को उस GPU पर भेजता है जिस पर उसका expert है। Attention वाला हिस्सा आमतौर पर copy किया जाता है (data parallel) या tensor parallelism से बाँटा जाता है। vLLM में ये एक flag है, `--enable-expert-parallel`। दो gotchas: popular experts पर load ज़्यादा हो जाता है जबकि बाकी खाली बैठे रहते हैं, इसलिए engines expert load balancing देते हैं; और बड़े batch sizes पर लगभग हर expert किसी न किसी token के काम आता है, इसलिए MoE की memory-reading वाली बचत घट जाती है।
+
+### लंबे inputs: context और sequence parallelism
+
+**Context parallelism** एक बहुत लंबे input को, जैसे 500,000-token का document, chunks में काटकर अलग GPUs पर रखता है। हर GPU अपने chunk के लिए attention compute करता है, जबकि keys और values group में घुमाए जाते हैं। **Sequence parallelism** tensor parallelism का एक training add-on है: layer के जो हिस्से tensor parallelism पूरे छोड़ देता है, जैसे normalisation, उन्हें sequence के हिसाब से बाँटता है, ताकि activation memory बचे। इनमें से किसी की भी ज़रूरत सिर्फ़ बहुत लंबे contexts पर पड़ती है।
+
+### Training को serving से कहीं ज़्यादा memory चाहिए
+
+Mixed precision और Adam optimiser के साथ full training हर parameter पर लगभग 16 bytes रखती है: 16-bit weights के 2, gradients के 2 और 32-bit optimiser states के 12 (weights की एक master copy और दो running averages)। एक 70B model के लिए ये activations से पहले ही लगभग 1,120 GB है। **Sharded data parallelism** (DeepSpeed में ZeRO, PyTorch में FSDP) इन states को copy करने की जगह data-parallel GPUs में फैला देता है। बड़े training runs इसे tensor और pipeline parallelism के साथ मिलाते हैं। Fine-tuning में LoRA और quantisation से आमतौर पर इसकी ज़्यादातर ज़रूरत ही खत्म हो जाती है।
+
+### Engine आपके लिए क्या करता है
+
+vLLM में, model को 4 GPUs में बाँटना बस एक setting है:
 
 ```python
 from vllm import LLM, SamplingParams
 
-# Split each layer across 4 GPUs in this server (tensor parallelism).
+# Split each layer across 4 NVLink-connected GPUs in this server.
 llm = LLM(model="your-org/your-70b-model", tensor_parallel_size=4)
 out = llm.generate(["Summarise this claim note: ..."], SamplingParams(max_tokens=200))
 print(out[0].outputs[0].text)
-
-# More users? Run more copies (replicas) on other GPU groups or servers
-# behind a load balancer. Spanning servers adds pipeline_parallel_size.
 ```
 
-| Approach | क्या बाँटता है | किसके लिए सबसे अच्छा | मुख्य cost |
-| --- | --- | --- | --- |
-| Replicas (data parallelism) | कुछ नहीं; पूरी copies | ज़्यादा users, reliability | हर copy के लिए model का फ़िट होना ज़रूरी |
-| Tensor parallelism | हर layer के अंदर का काम | बहुत बड़े models, कम latency | GPUs के बीच बहुत तेज़ links चाहिए |
-| Pipeline parallelism | Layers के groups | Servers में फैले बहुत बड़े models; training | हर request में delay जोड़ता है |
-| Context या sequence parallelism | Input sequence | बहुत लंबी contexts | जटिलता |
-| Sharded data parallelism (training) | Gradients और optimiser states | बड़े models train करना | Communication overhead |
+जो model एक server के लिए बहुत बड़ा हो, उसके लिए vLLM guide का rule of thumb है: tensor-parallel size बराबर हर server के GPUs, और pipeline-parallel size बराबर servers की गिनती। 8 GPUs वाले दो servers का मतलब `--tensor-parallel-size 8 --pipeline-parallel-size 2`। Servers के बीच vLLM default में Ray use करता है (एक Ray cluster start करो, फिर एक server पर एक `vllm serve` चलाओ); दूसरा option एक multiprocessing launcher है।
 
-**Browser में try करो।** एक model को कितने GPUs चाहिए? Size, precision और GPU memory बदलकर देखो।
+| Approach | क्या बाँटता है | कौन-सा link चाहिए | किसके लिए best | मुख्य cost |
+| --- | --- | --- | --- | --- |
+| Replicas (data parallelism) | कुछ नहीं; पूरी copies | कोई भी | ज़्यादा users, failover | हर copy को fit होना चाहिए |
+| Tensor parallelism | हर layer के अंदर की matrices | NVLink, एक server के अंदर | बहुत बड़े models, हर token का कम समय | हर token पर हर layer में दो exchanges |
+| Pipeline parallelism | Layers के groups | अच्छा network काफ़ी है | Servers के पार जाना; training | Latency में फ़ायदा नहीं; bubbles |
+| Expert parallelism | MoE model के experts | तेज़; tokens experts तक जाते हैं | बड़े MoE models | Experts पर बराबर नहीं बँटा load |
+| Context या sequence parallelism | Input sequence | तेज़ | बहुत लंबे inputs | Complexity |
+| Sharded data parallelism | Gradients और optimiser states | बड़े models के लिए तेज़ | बड़े models train करना | ज़्यादा communication |
+
+**अपने browser में try करो।** किसी model और traffic के लिए सबसे छोटा valid tensor-parallel size ढूँढो। Numbers बदलकर देखो।
 
 ```python
-import math
+def kv_cache_gb(layers, kv_heads, head_dim, tokens, bytes_per=2):
+    # 2 = one key and one value per token, per layer, per key-value head
+    return 2 * layers * kv_heads * head_dim * bytes_per * tokens / 1e9
 
-def gpus_needed(params_billion, bytes_per_param, gpu_gb, kv_cache_gb, headroom=0.9):
-    need = params_billion * bytes_per_param + kv_cache_gb
-    return need, math.ceil(need / (gpu_gb * headroom))
+def smallest_tp(params_billion, bytes_per_param, cache_gb, gpu_gb, heads, usable=0.9):
+    need = params_billion * bytes_per_param + cache_gb
+    for tp in (1, 2, 4, 8):                      # sizes that fit in one 8-GPU server
+        if heads % tp == 0 and tp * gpu_gb * usable >= need:
+            return need, tp
+    return need, None                            # needs pipeline across servers
 
-for params, bpp in [(8, 2), (70, 2), (70, 1)]:
-    need, n = gpus_needed(params, bpp, gpu_gb=80, kv_cache_gb=20)
-    print(f"{params}B at {bpp} bytes: {need:.0f} GB -> {n} GPU(s) of 80 GB")
+# A 70B model: 80 layers, 64 heads, 8 key-value heads of size 128
+cache = kv_cache_gb(80, 8, 128, tokens=60 * 4000)    # 60 requests x 4,000 tokens
+for bpp, label in [(2, "16-bit"), (1, "8-bit")]:
+    need, tp = smallest_tp(70, bpp, cache, gpu_gb=80, heads=64)
+    print(f"{label}: {need:.0f} GB needed -> tensor-parallel size {tp}")
 ```
 
-## एक example से समझो
+ये 16-bit पर लगभग 219 GB और size 4, और 8-bit पर लगभग 149 GB और size 4 print करता है। 8-bit model 2 GPUs में तभी आता है जब हर copy कम requests serve करे: 4,000 tokens पर लगभग 56। Script उन कुछ GB को गिनती में नहीं लेता जो engine खुद हर GPU पर use करता है, इसलिए margin रखो।
 
-Hyderabad का एक insurer 2,000 staff के लिए एक 70B open model self-host करना चाहता है, p95 first-token time 2 seconds से कम के साथ। हर server में 80 GB के 8 GPUs हैं, server के अंदर तेज़ links के साथ।
+## एक worked example
 
-1. **क्या एक GPU में आता है?** 70 billion × 2 bytes ≈ 16-bit पर 140 GB। नहीं।
-2. **एक server के अंदर?** हाँ। 4 GPUs में tensor parallelism 320 GB देता है, जिससे कई concurrent chats के KV cache के लिए काफ़ी जगह बचती है। 8-bit precision पर, अगर उनके test set पर quality पक्की हो जाए तो 2 GPUs उसे रख सकते हैं।
-3. **ज़्यादा users।** हर server दो copies रखता है (4 GPUs के दो groups)। Load tests दिखाते हैं कि एक copy उनके busy-hour traffic को latency budget के अंदर आराम से संभालती है, इसलिए एक server में दो copies headroom देती हैं और एक GPU failure भी झेल लेती हैं।
+Hyderabad की एक insurer 2,000 staff के लिए एक 70B open model (80 layers, 64 attention heads, size 128 के 8 key-value heads) self-host करना चाहती है, और p95 first-token time 2 seconds से कम चाहिए। हर server में 80 GB के 8 GPUs हैं, जो NVLink से जुड़े हैं। नीचे के traffic figures उनके planning के अनुमान हैं, measurements नहीं।
 
-| Set-up | इस्तेमाल हुए GPUs | Busy-hour p95 first token | नोट्स |
-| --- | --- | --- | --- |
-| Tensor 4, एक copy | 4 | 1.4 s | अगर एक GPU fail हो तो कोई spare नहीं |
-| Tensor 4, दो copies | 8 | 0.9 s | चुना गया: headroom और failover |
-| Tensor 2 at 8-bit, चार copies | 8 | 0.8 s | Quantise करने के बाद quality check चाहिए |
-| दो servers में pipeline | 16 | 2.6 s | धीमा और महँगा; ज़रूरी नहीं |
+1. **Busy hour load.** मान लो busy hour में 600 staff active हैं, और हर एक 2 minutes में एक request भेजता है: यानी हर second 5 requests। हर request को streaming पूरी करने में लगभग 12 seconds लगते हैं। Requests in flight = arrivals × हर एक का समय = 5 × 12 = **60**। हर एक में लगभग 4,000 tokens होते हैं (instructions, policy text, chat history और reply)।
+2. **KV cache.** 2 × 80 layers × 8 heads × 128 × 2 bytes = 327,680 bytes, यानी हर token पर लगभग 0.33 MB। 60 × 4,000 tokens × 0.33 MB ≈ **79 GB**।
+3. **क्या ये एक GPU में आता है?** 16-bit पर सिर्फ़ weights ही लगभग 140 GB हैं; एक GPU में 72 GB usable है। नहीं।
+4. **सबसे छोटा valid split.** दो GPUs में 144 GB usable है: मुश्किल से weights, cache के लिए कुछ नहीं। तीन में 216 GB है, जो ज़रूरी 219 GB से थोड़ा कम है, और वैसे भी 64 heads को नहीं बाँटता। चार में 288 GB है: 140 GB weights के बाद लगभग **148 GB** cache बचता है, जो 4,000 tokens की लगभग 112 requests के लिए काफ़ी है। Tensor-parallel size 4।
+5. **Capacity और failover.** एक copy busy hour संभाल लेती है, पर एक ही fault पूरी service रोक देगा। 4 GPUs की दो copies एक server भर देती हैं; दूसरा server पूरे server के fail होने से बचाता है।
+6. **Cost.** ₹362 per GPU-hour के एक example rate पर (E2E Networks के H100 page पर on-demand price, 28 November 2026 को check किया, 18% GST से पहले), 730 घंटे के महीने के लिए एक 8-GPU server की cost 8 × 362 × 730 ≈ **₹21.1 lakh** है, GST के साथ लगभग ₹24.9 lakh। Prices provider और plan के हिसाब से बदलते हैं, इसलिए quotes लो। हर व्यक्ति के 40 requests per working day, 22 दिनों तक, यानी महीने में लगभग 7 billion tokens, या लगभग ₹300 per million tokens। इससे सस्ता hosted API ज़्यादा सस्ता पड़ेगा, जब तक data को उनके अपने servers पर ही न रहना हो। रात में एक ही copy चलाने से भी पैसे बचते हैं।
 
-ये numbers मिसाल के लिए हैं। वो 8-bit option भी test करने की योजना बना रहे हैं, जो quality टिकी रहे तो उसी hardware पर capacity दोगुनी कर सकता है।
+| Layout | GPUs | हर copy में cache की जगह | 4,000 tokens पर हर copy की requests | p95 first token (उदाहरण के लिए) |
+| --- | --- | --- | --- | --- |
+| Tensor 4, एक copy | 4 | लगभग 148 GB | लगभग 112 | 1.4 s; failover नहीं |
+| Tensor 4, दो copies (चुना गया) | 8 | लगभग 148 GB | लगभग 112 | 0.9 s; एक GPU fault झेल लेता है |
+| 8-bit पर Tensor 2, चार copies | 8 | लगभग 74 GB | लगभग 56 | 0.8 s, अगर quality टिकी रहे |
+| Tensor 8, pipeline 2, एक copy | 16 | लगभग 1,010 GB | ज़रूरत से कहीं ज़्यादा | तेज़ नहीं; दोगुने GPUs |
+
+Memory वाले columns हिसाब से निकाले गए हैं; latency वाला column बस ये दिखाता है कि एक load test क्या दिखा सकता है। 8-bit option को पहले असली claim notes पर quality tests पास करने होंगे।
 
 ## आम गलतियाँ
 
-- **ऐसे model को बाँटना जो एक GPU में आ जाता है।** Replicas सादे और आमतौर पर तेज़ होते हैं।
-- **धीमे networks पर tensor parallelism।** इसे तेज़ links वाले एक server के अंदर रखो।
-- **Model फ़िट होता है या नहीं, ये देखते समय KV cache भूल जाना।**
-- **Chat serving के लिए pipeline parallelism।** ये हर request में delay जोड़ता है।
-- **Headroom न रखना।** एक अकेली copy का कोई failover नहीं; एक GPU fault पूरी service गिरा देता है।
-- **Average traffic से size तय करना।** Busy hour के लिए size करो, असली prompt lengths के साथ load tests करके।
+- **जो model एक GPU में आ जाए, उसे बाँटना।** Replicas आसान हैं, उन्हें तेज़ links नहीं चाहिए, और वो failures झेल लेते हैं।
+- **सिर्फ़ weights से size निकालना।** Busy hour का KV cache weights जितना बड़ा हो सकता है।
+- **PCIe या network पर tensor parallelism.** ये हर layer में दो बार बात करता है; इसे एक server के अंदर NVLink पर रखो।
+- **ऐसा tensor-parallel size जो head count को पूरा न बाँटे।** Engine start होने से मना कर देगा; 2, 4 या 8 use करो।
+- **Pipeline parallelism से latency घटने की उम्मीद करना।** ये servers के पार जाने के लिए है; ये एक request को कभी तेज़ नहीं करता।
+- **Mixture-of-experts model का size active parameters से निकालना।** सारे experts memory में होने चाहिए।
+- **Key-value heads की गिनती से आगे बाँटना।** हर GPU का cache घटना बंद हो जाता है।
+- **सिर्फ़ एक copy.** एक GPU fault पूरी service गिरा देता है।
+- **Average traffic से size निकालना।** Busy hour के लिए size निकालो, और असली prompt lengths पर load tests करो।
 
-## जब इसमें से कुछ भी नहीं चाहिए
+## जब आपको इसमें से कुछ नहीं चाहिए
 
-- **Hosted APIs**: provider संभाल लेता है।
-- **छोटे models** जो एक GPU में काफ़ी जगह छोड़कर आ जाते हैं: ज़रूरत पड़ने पर बस replicas जोड़ो।
-- **LoRA और quantisation के साथ fine-tuning**, जो अक्सर एक अकेले GPU में आ जाती है।
+- **Hosted APIs**: provider ये सब संभालता है। पहले उनकी per million tokens price को अपनी GPU cost से compare करो।
+- **छोटे models** जो cache की जगह के साथ एक GPU में आ जाएँ: ज़रूरत पड़ने पर बस replicas जोड़ो।
+- **LoRA और quantisation के साथ fine-tuning**, जो अक्सर एक ही GPU में हो जाती है।
 
 ## Demo से production तक
 
-- **GPUs खरीदने से पहले हर copy की memory नापो** (weights plus आपकी context length और concurrency पर KV cache)।
-- **हर layout का load-test करो**, असली prompt और reply lengths के साथ।
-- **जिस service पर लोग निर्भर हों उसके लिए कम से कम दो copies रखो।**
-- **हर replica को monitor करो**: utilisation, queue length, latency और errors।
-- **Model बदलने के बाद दोबारा plan करो**, क्योंकि size और context length layout बदल देते हैं।
+- GPUs खरीदने या किराए पर लेने से पहले **हर copy की memory measure करो** (अपनी context length और concurrency पर weights और KV cache)।
+- **Links check करो**: tensor parallelism plan करने से पहले instance listing में "SXM" और "NVLink" confirm करो।
+- असली prompt और reply lengths के साथ **हर layout का load-test करो**, और average नहीं, p95 देखो।
+- जिस service पर लोग निर्भर हैं, उसके लिए **कम से कम दो copies रखो**, एक से ज़्यादा server पर।
+- **हर replica को monitor करो**: queue length, KV cache use, latency और errors। Queue बढ़े तो copies जोड़ो।
+- **Working day के हिसाब से scale करो**: traffic घटे तो रात में कम copies।
+- **Model बदलने के बाद दोबारा plan करो**, क्योंकि size, head counts और context length से layout बदलता है।
 
-## Practice करो
+## Practice
 
-1. एक 7B, एक 34B और एक 70B model के लिए 16-bit और 8-bit पर हिसाब लगाओ कि सिर्फ़ weights के लिए हर एक को कितने 24 GB, 48 GB और 80 GB GPUs चाहिए।
-2. 500 users को failover के साथ 70B model serve करने के लिए एक layout बनाओ, और बताओ कि हर हिस्सा कौन-सा parallelism use करता है।
-3. एक दोस्त को समझाओ कि tensor parallelism को GPUs के बीच तेज़ links क्यों चाहिए और pipeline parallelism को क्यों नहीं।
+1. 16-bit और 8-bit पर एक 7B, एक 34B और एक 70B model के लिए, cache के लिए कुल 20 GB रखकर, 24 GB, 48 GB और 80 GB GPUs पर सबसे छोटा valid tensor-parallel size ढूँढो। ऊपर वाला script use करो।
+2. 500 users को failover के साथ एक 70B model serve करने का layout बनाओ। बताओ हर हिस्सा कौन-सा parallelism use करता है और क्यों।
+3. एक mixture-of-experts model में 120B total और 5B active parameters हैं। 8-bit पर weights के लिए कितने 80 GB GPUs चाहिए, और हर token एक 5B dense model और एक 120B dense model के मुकाबले कितना तेज़ हो सकता है?
+4. किसी दोस्त को समझाओ कि tensor parallelism को NVLink क्यों चाहिए और pipeline parallelism को क्यों नहीं।
 
-और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 9 replica, tensor, pipeline, context और sequence parallelism पर है।
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 9 replica, tensor और pipeline parallelism को cover करता है, और Hugging Face Ultra-Scale Playbook बड़े पैमाने पर training को cover करता है।
 
-**आपका काम पूरा जब:** आप किसी दिए हुए model और GPU के लिए replicas और बाँटने में से चुन सको, tensor और pipeline parallelism का फ़र्क समझा सको, और एक सादा serving layout size कर सको।
+**आपका काम पूरा तब है जब आप** किसी model और GPU के लिए replicas और बाँटने में से चुन सको, समझा सको कि tensor parallelism को NVLink क्यों चाहिए और pipeline को क्यों नहीं, mixture-of-experts model का size निकाल सको, और एक simple serving layout के GPUs और महीने की cost निकाल सको।
