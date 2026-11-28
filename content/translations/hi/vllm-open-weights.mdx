@@ -3,121 +3,190 @@ id: vllm-open-weights
 lang: hi
 title: "vLLM के साथ open-weight models"
 outcome: "vLLM से किसी open-weight model को अपने GPUs पर serve कर पाओगे: model और GPU चुनना, weights और cache के लिए memory का हिसाब लगाना, quantization use करना, और OpenAI-compatible API expose करना।"
-answer: "vLLM, Llama या Qwen जैसे open-weight models को आपके अपने GPUs पर OpenAI-compatible API के साथ serve करता है। ऐसा model चुनो जो GPU memory में फिट हो, ज़रूरत हो तो उसे quantize करो।"
+answer: "vLLM, Qwen, Gemma या Sarvam जैसे open-weight models को आपके अपने GPUs पर OpenAI-compatible API के पीछे serve करता है। GPU memory का हिसाब weights और KV cache दोनों के लिए लगाओ, और ज़रूरत हो तो quantize करो।"
 why_it_matters: "जब data इमारत से बाहर नहीं जा सकता, या volume इतना है कि per-token pricing बहुत महँगी पड़ती है, तब clients को अपने GPUs पर चलने वाले open-weight models चाहिए। vLLM इसके लिए सबसे ज़्यादा use होने वाले open-source engines में से एक है, और platform roles में इसका नाम लेकर पूछा जाता है।"
 flashcards:
-  - q: "Open-weight models क्या हैं?"
-    a: "ऐसे models जिनके weights publish किए गए हैं, ताकि आप उन्हें उनकी licence terms के तहत अपने hardware पर चला सको।"
+  - q: "Open-weight models क्या होते हैं?"
+    a: "ऐसे models जिनके weights publish किए गए हैं, इसलिए आप उन्हें उनकी licence terms के हिसाब से अपने hardware पर चला सकते हो।"
   - q: "vLLM क्या है?"
-    a: "एक open-source engine जो open-weight models को GPUs पर OpenAI-compatible API के साथ कुशलता से serve करता है।"
+    a: "एक open-source engine जो open-weight models को GPUs पर कुशलता से, OpenAI-compatible API के पीछे serve करता है।"
   - q: "PagedAttention क्या करता है?"
-    a: "हर request के attention cache को छोटे pages में manage करता है, ताकि GPU memory में कहीं ज़्यादा requests फिट हों।"
+    a: "ये हर request का KV cache छोटे fixed-size pages में रखता है, जो request बढ़ने के साथ-साथ allocate होते हैं। इसलिए बिना use हुई length के लिए memory reserve नहीं होती और कहीं ज़्यादा requests फिट होती हैं।"
   - q: "Continuous batching क्या है?"
-    a: "जैसे ही दूसरी requests ख़त्म होती हैं, नई requests चल रहे batch में जुड़ जाती हैं, पूरे batch का इंतज़ार किए बिना GPU को busy रखते हुए।"
-  - q: "Open-weight model कैसे चुनना चाहिए?"
-    a: "अपने evals से, licence, supported भाषाएँ (भारतीय भाषाओं समेत), context length और size देखकर।"
-  - q: "vLLM में maximum context length क्यों मायने रखती है?"
-    a: "छोटी limit cache के लिए ज़्यादा memory छोड़ती है, इसलिए ज़्यादा concurrent requests फिट होती हैं।"
-  - q: "Production में क्या pin करना चाहिए?"
-    a: "Model revision और vLLM version, और हर upgrade से पहले evals।"
-  - q: "OpenAI-compatible API से क्या फ़ायदा होता है?"
-    a: "मौजूदा client code और gateways बिना बदले काम करते हैं; switch करने के लिए अक्सर बस एक model alias बदलना पड़ता है।"
-  - q: "कौन-से vLLM metrics बताते हैं कि और capacity चाहिए?"
-    a: "Queue में इंतज़ार करती requests और KV cache usage। बढ़ती queue या लगभग भरा cache मतलब replicas जोड़ो, contexts छोटे करो या concurrency घटाओ।"
-  - q: "क्या vLLM किसी schema से मेल खाता JSON लौटा सकता है?"
-    a: "हाँ। उसका OpenAI-compatible server structured output requests को support करता है, generation को JSON schema तक सीमित करके।"
+    a: "जैसे-जैसे दूसरी requests ख़त्म होती हैं, हर step पर नई requests चल रहे batch में जुड़ जाती हैं। पूरे batch के ख़त्म होने का इंतज़ार करने की जगह GPU busy रहता है।"
+  - q: "किसी भारतीय भाषा के लिए model को कैसे test करें?"
+    a: "उसके tokenizer से गिनो कि एक word में कितने tokens बनते हैं, फिर उसे native speakers के review किए हुए set पर score करो, जिसमें native script, romanised और code-mixed text हो।"
+  - q: "--max-model-len को model के maximum से कम क्यों रखें?"
+    a: "vLLM start-up पर check करता है कि उस length की एक request KV cache में फिट होती है। बहुत लंबी limit छोटे GPU पर fail हो सकती है, और एक बहुत बड़ा prompt कई छोटे prompts की जगह घेर सकता है।"
+  - q: "vLLM 0.34 में --gpu-memory-utilization के बारे में क्या बदला?"
+    a: "नए extensible KV cache के साथ, value set न करने का मतलब अब 1.0 है, और cache warm-up के बाद असल में free memory से size होता है। पुराने releases में default 0.9 था, बाद में 0.92। इसे तभी set करो जब कोई दूसरा process GPU share करता हो।"
+  - q: "OpenAI-compatible API से क्या फ़ायदा है?"
+    a: "मौजूदा client code और gateways बिना बदले काम करते हैं; model बदलने के लिए अक्सर सिर्फ़ एक model alias बदलना पड़ता है।"
+  - q: "कौन-से vLLM metrics बताते हैं कि आपको और capacity चाहिए?"
+    a: "vllm:num_requests_waiting और vllm:kv_cache_usage_perc। अगर queue बढ़ती जा रही है या cache लगभग full ही रहता है, तो replicas जोड़ो, contexts छोटे करो या concurrency पर cap लगाओ।"
+  - q: "Mixture-of-experts model को कितनी memory चाहिए?"
+    a: "उसके सारे parameters के लिए memory, क्योंकि हर expert load होता है। Speed active parameters पर चलती है, इसलिए 3B active वाला 30B model memory में 30B model जितनी जगह लेता है, पर लगभग एक छोटे model जितनी तेज़ी से generate करता है।"
 exercise:
-  title: "Self-hosting का plan बनाओ"
-  setup: "Kochi के एक hospital को patient discharge summaries अपने ही servers पर रखनी हैं। उसे English और Malayalam में summaries draft करने वाला model चाहिए, रोज़ लगभग 8,000 requests, peak पर 6,000-token contexts के साथ 25 concurrent requests। उसके पास दो 48 GB GPUs और एक Kubernetes cluster है। एक engineer public leaderboard का top model चुनने को कहता है।"
+  title: "Self-hosting plan करो"
+  setup: "Kochi के एक hospital को patient discharge summaries अपने ही servers पर रखनी हैं। उसे English और Malayalam में summaries draft करने के लिए एक model चाहिए: दिन में लगभग 8,000 requests, peak पर 25 concurrent requests, 6,000-token contexts के साथ। उसके पास दो 48 GB GPUs और एक Kubernetes cluster है। एक engineer सुझाव देता है कि किसी public leaderboard का top model लो और उसे उसकी full context length पर serve करो।"
   questions:
     - q: "Model कैसे चुनना चाहिए?"
-      a: "Hospital का अपना golden set English और Malayalam में कई open-weight models पर चलाकर, और licences जाँचकर।"
-    - q: "Sizing में कौन-से memory factors शामिल होने चाहिए?"
-      a: "चुनी गई precision पर weights, साथ में 6,000 tokens पर 25 concurrent requests के लिए KV cache, headroom के साथ।"
-    - q: "Quantization कब मंज़ूर है?"
-      a: "जब evals, ख़ासकर Malayalam में, दिखाएँ कि quality का नुकसान इतना छोटा है कि clinicians मान लें।"
+      a: "ऐसे models shortlist करो जिनका licence इस use की इजाज़त देता है, Malayalam में एक word पर कितने tokens बनते हैं ये नापो, फिर हर एक को hospital के अपने English और Malayalam golden set पर score करो, जिसे Malayalam पढ़ने वाले clinicians ने review किया हो।"
+    - q: "Sizing में कौन-से memory factors ज़रूर शामिल होने चाहिए?"
+      a: "चुनी हुई precision पर weights, runtime overhead, और model के bytes per token पर 25 × 6,000 = 150,000 tokens का KV cache, साथ में headroom। --max-model-len को 8,000 के आस-पास रखो, model के maximum पर नहीं।"
+    - q: "Quantization कब ठीक है?"
+      a: "जब evals, ख़ासकर Malayalam में, दिखाएँ कि quality loss इतना छोटा है कि clinicians उसे मान लें। Quantization अक्सर English से ज़्यादा low-resource भाषाओं को नुकसान पहुँचाता है।"
     - q: "Production में इसे कैसे चलाना चाहिए?"
-      a: "Cluster पर containers में vLLM, gateway के पीछे, health checks, metrics, pinned versions और हर तिमाही evaluate किए गए upgrades के साथ।"
+      a: "हर GPU पर एक pinned container में vLLM, gateway के पीछे, साथ में एक API key, एक network policy, health checks, queue और cache alerts, और upgrades सिर्फ़ evals pass होने के बाद।"
 ask:
   - "vLLM क्या है और ये तेज़ क्यों है?"
-  - "कौन-सा open-source model self-host करूँ?"
-  - "14B model को कितनी GPU memory चाहिए?"
+  - "Hindi या Tamil के लिए कौन-सा open-weight model self-host करूँ?"
+  - "27B model को कितनी GPU memory चाहिए?"
 explain_in_interview:
-  answer: "vLLM एक open-source engine है जो Llama या Qwen जैसे open-weight models को आपके अपने GPUs पर एक OpenAI-compatible API के पीछे serve करता है। इसके दो key ideas हैं PagedAttention, जो हर request का attention cache छोटे pages में store करता है ताकि एक GPU पर कहीं ज़्यादा requests fit हों, और continuous batching, जो दूसरी requests खत्म होते ही नई requests जोड़ देता है। जैसे, Chennai की एक insurer जिसे claim documents अपने servers पर ही रखने हैं, एक GPU पर 7B model serve कर सकती है। Trade-off low use पर cost है: full load पर self-hosting per token सस्ती लगती है, पर GPUs का पैसा पूरे महीने देना पड़ता है।"
-  follow_up: "आपको कैसे पता चलेगा कि model आपके GPU पर fit होगा?"
-  follow_up_answer: "16-bit पर weights को लगभग 2 bytes per parameter चाहिए, इसलिए 8B model को लगभग 16 GB चाहिए। KV cache के लिए जगह जोड़ो, जो concurrent requests और context length के साथ बढ़ता है। अगर fit न हो, तो 8 या 4 bits में quantize करो या कई GPUs use करो।"
-translated_on: 2026-11-16
+  answer: "vLLM एक open-source engine है जो Qwen, Gemma या Sarvam जैसे open-weight models को आपके अपने GPUs पर OpenAI-compatible API के पीछे serve करता है। इसके दो मुख्य ideas हैं: PagedAttention, जो हर request का KV cache छोटे pages में रखता है ताकि एक GPU पर कहीं ज़्यादा requests फिट हों, और continuous batching, जो दूसरी requests ख़त्म होते ही नई requests जोड़ देता है। मिसाल के तौर पर, Chennai की एक insurer जिसे claim documents अपने ही servers पर रखने हैं, एक quantized 27B model को एक 48 GB GPU पर serve कर सकती है। Trade-off है कम use पर cost: GPUs busy हों या idle, आप पूरे महीने उनका पैसा देते हो।"
+  follow_up: "आपको कैसे पता चलेगा कि model आपके GPU पर फिट होगा?"
+  follow_up_answer: "16-bit पर weights को लगभग 2 bytes per parameter चाहिए, तो 27B model को लगभग 54 GB, या 4-bit पर लगभग 15 GB। फिर KV cache जोड़ो: bytes per token गुणा सारी concurrent requests में in flight tokens, साथ में कुछ GB overhead।"
+translated_on: 2026-11-28
 ---
 
 ## ये क्या है
 
-**Open-weight models** अपने weights publish करते हैं, इसलिए आप उन्हें अपने hardware पर चला सकते हो। **vLLM** एक open-source engine है जो ऐसे models को GPUs पर कुशलता से serve करता है। इसके दो मुख्य ideas:
+**Open-weight models** अपने weights publish करते हैं, इसलिए आप उन्हें उनके licence के तहत अपने hardware पर चला सकते हो। **vLLM** एक open-source engine है जो ऐसे models को GPUs पर कुशलता से serve करता है। दो ideas इसे तेज़ बनाते हैं।
 
-- **PagedAttention**: ये हर request के attention cache को रखने वाली memory को छोटे pages में manage करता है, जैसे operating system memory manage करता है, इसलिए एक GPU पर कहीं ज़्यादा requests फिट होती हैं।
-- **Continuous batching**: जैसे ही दूसरी requests ख़त्म होती हैं, नई requests batch में जुड़ जाती हैं, पूरे batch का इंतज़ार नहीं करतीं, जिससे GPU busy रहता है।
+- **PagedAttention.** जब model जवाब लिखता है, तो वो हर पिछले token की एक memory रखता है, जिसे **KV cache** कहते हैं। पुराने servers हर request के लिए सबसे लंबे मुमकिन जवाब जितना एक लंबा block reserve कर देते थे, और उसका ज़्यादातर हिस्सा खाली पड़ा रहता था। vLLM cache को छोटे pages में रखता है, जो request बढ़ने पर ही जुड़ते हैं, ठीक वैसे जैसे operating system memory manage करता है। बहुत कम बर्बाद होता है, इसलिए एक GPU पर कहीं ज़्यादा requests फिट होती हैं।
+- **Continuous batching.** GPU सबसे efficient तब होता है जब वो एक साथ कई requests पर काम करे। vLLM पूरे batch के ख़त्म होने का इंतज़ार करने की जगह, हर step पर, जैसे-जैसे दूसरी requests ख़त्म होती हैं, नई requests को batch में जुड़ने देता है।
 
 vLLM एक **OpenAI-compatible API** expose करता है, इसलिए ज़्यादातर client code और gateways उसके साथ बिना बदले काम करते हैं।
 
 ```flow
-Client code या gateway -[OpenAI-compatible API]-> vLLM server
-vLLM server -> Continuous batching | requests हर step पर batch में जुड़ती और निकलती हैं
-Continuous batching -> GPU memory, 48 GB | 4-bit weights लगभग 9 GB; KV cache pages में: PagedAttention, कोई बेकार gaps नहीं
-vLLM server -> Metrics | tokens per second, queue length, cache usage
+title: vLLM server से होकर एक request
+dir: LR
+Client or gateway -[OpenAI-style API, एक key के साथ]-> vLLM server
+vLLM server -> Scheduler | continuous batching: requests हर step पर जुड़ती और निकलती हैं
+Scheduler -> KV cache in pages | PagedAttention; prompts की एक जैसी शुरुआत दोबारा use होती है
+KV cache in pages -> GPU memory | weights और cache इसे share करते हैं
+vLLM server -> Metrics | queue length, cache usage, time to first token
 ```
-
-Model revision और vLLM version को pin करो।
 
 ये lesson Chennai की एक insurance company को follow करता है जिसे claim documents अपने ही servers पर रखने हैं।
 
 ## ये काम कैसे करता है
 
-**Model चुनना।** Leaderboards से नहीं, task और अपने evals से शुरू करो। Commercial use के लिए licence, वो कौन-सी भाषाएँ संभालता है (भारतीय भाषाओं में models के बीच बहुत फ़र्क होता है), context length और size देखो। छोटे models (7 से 14 billion parameters) एक GPU पर चलते हैं और extraction, classification और grounded RAG answers के लिए अक्सर काफ़ी होते हैं।
+### Model चुनना
 
-**Memory का हिसाब।** मोटा नियम: 16-bit precision पर weights को हर parameter के लिए लगभग 2 bytes चाहिए। 8-billion-parameter model को weights के लिए लगभग 16 GB चाहिए। इसके ऊपर, attention (KV) cache concurrent requests की संख्या और उनकी context length के साथ बढ़ता है। एक 24 GB GPU 8B model को मामूली concurrency के साथ serve कर सकता है; 70B model को 16-bit पर लगभग 140 GB चाहिए, यानी कई GPUs या quantization।
+Leaderboard से नहीं, task और अपने evals से शुरू करो। फिर चार चीज़ें check करो।
 
-**Quantization.** Weights को 8 या 4 bits में रखने से memory आधी या तीन-चौथाई घट जाती है और अक्सर speed बढ़ती है, थोड़े quality नुकसान के साथ जिसे आपको अपने evals पर नापना होगा। आम formats में AWQ, GPTQ और FP8 हैं।
+- **Licence.** आज के कई models, जिनमें Qwen3.5 family और Gemma 4 शामिल हैं, Apache 2.0 के तहत release हुए हैं। कुछ दूसरे शर्तें जोड़ते हैं; Meta का Llama community licence इसका एक example है। आप जो exact weights download करते हो, उनके साथ आने वाली licence file पढ़ो।
+- **Size और type.** 4 से 14 billion parameters वाले models एक GPU पर चलते हैं और extraction, classification और grounded RAG answers के लिए अक्सर काफ़ी होते हैं। Qwen3.5-35B-A3B (35 billion parameters, हर token पर लगभग 3 billion active) जैसे **mixture-of-experts (MoE)** model को अपने सारे parameters के लिए memory चाहिए, पर वो लगभग एक छोटे model जितनी तेज़ी से generate करता है।
+- **Context length.** Long-context models काम के हैं, पर लंबे contexts की क़ीमत आप cache memory में चुकाते हो।
+- **भाषाएँ.** Models के बीच ये बाक़ी किसी भी चीज़ से ज़्यादा बदलता है। अगला section देखो।
 
-**चलाना।**
+November 2026 तक, आम starting points में ये शामिल हैं: Qwen3.5 (0.8B से 397B तक sizes, February और March 2026 में release), Qwen3.6 (April 2026) और Qwen3.8-27B (August 2026), Gemma 4 (E2B से 31B तक), और OpenAI के gpt-oss-20b और gpt-oss-120b। हर महीने नए models आते हैं, इसलिए इसे test करने की एक shortlist समझो, ranking नहीं।
+
+### भारतीय भाषाओं के लिए model चुनना
+
+तीन checks किसी भी benchmark से ज़्यादा बताते हैं।
+
+1. **हर word पर tokens (fertility).** ज़्यादातर English text पर बना tokenizer, Malayalam या Odia के words को कई छोटे टुकड़ों में तोड़ देता है। अगर किसी model को हर word पर तीन गुना tokens चाहिए, तो हर request पर तीन गुना compute लगता है, ज़्यादा समय लगता है, और उसी context में कम text फिट होता है। इसे अपने users के 200 असली sentences पर नापो:
+
+```python
+from transformers import AutoTokenizer
+
+sentences = open("malayalam_sample.txt", encoding="utf-8").read().splitlines()
+words = sum(len(s.split()) for s in sentences)
+for name in ["Qwen/Qwen3.5-9B", "google/gemma-4-E4B-it"]:   # add every candidate
+    tok = AutoTokenizer.from_pretrained(name)
+    tokens = sum(len(tok.encode(s, add_special_tokens=False)) for s in sentences)
+    print(f"{name}: {tokens / words:.2f} tokens per word")
+```
+
+2. **Native speakers का review किया हुआ golden set.** Native script, romanised text (Manglish, Hinglish) और code-mixed messages शामिल करो, क्योंकि असली users इन्हें मिलाकर लिखते हैं। Machine-translated test sets कमज़ोर models को असल से बेहतर दिखाते हैं।
+3. **हर भाषा के लिए quantized quality.** Quantization अक्सर English की तुलना में lower-resource भाषाओं में ज़्यादा quality गिराता है। भारतीय भाषाओं के evals उसी quantized checkpoint पर चलाओ जिसे आप असल में serve करोगे।
+
+Test में शामिल करने लायक candidates:
+
+- **आम multilingual models.** Qwen3.5 कहता है कि वो 201 languages और dialects support करता है; Gemma 4 भी multilingual काम के लिए काफ़ी use होता है।
+- **भारत के लिए बने models.** Sarvam AI ने February 2026 में Sarvam-30B और Sarvam-105B launch किए, दोनों mixture-of-experts models जिन्हें भारतीय भाषाओं को ध्यान में रखकर train किया गया, और Sarvam के मुताबिक़ Apache 2.0 के तहत। BharatGen का Param2-17B-A2.4B-Thinking भी vLLM के supported models में listed है।
+- **एक translation step.** AI4Bharat का IndicTrans2 (MIT licence) English और 22 scheduled भारतीय भाषाओं के बीच translate करता है। ऐसी pipeline जो translate करे, एक strong English model चलाए, और वापस translate करे, कभी बेहतर होती है, कभी बदतर। इसे भी बाक़ी options की तरह test करो।
+
+Gotcha: check करो कि आपका vLLM version उस exact checkpoint को support करता है। जब Sarvam के models launch हुए, तब उनका model card एक pending vLLM pull request की तरफ़ इशारा करता था; अब v0.34.0 की supported-models list में Sarvam के architectures शामिल हैं।
+
+### GPU चुनना
+
+क्या फिट होगा, ये memory तय करती है। Tokens कितनी तेज़ी से निकलेंगे, ये **memory bandwidth** तय करती है, यानी GPU अपनी memory कितनी तेज़ी से पढ़ता है, क्योंकि हर नया token सारे active weights को एक बार पढ़ता है।
+
+| GPU memory | Example GPUs | 16-bit पर फिट | 4-bit पर फिट |
+| --- | --- | --- | --- |
+| 24 GB | NVIDIA L4, RTX 4090 | लगभग 8B तक, छोटे contexts | लगभग 14B तक |
+| 48 GB | NVIDIA L40S, RTX 6000 Ada | लगभग 14B तक | 27B से 32B, cache के लिए जगह के साथ |
+| 80 GB | NVIDIA A100 80 GB, H100 | 27B से 32B, थोड़ा cache | लगभग 70B, ठीक-ठाक cache |
+| 141 GB | NVIDIA H200 | लगभग 60B | कुल लगभग 100B वाले MoE models |
+
+भारत में आप इन्हें E2E Networks, जो Delhi NCR और Chennai में H100 capacity list करता है, और Yotta जैसे local GPU clouds से किराए पर ले सकते हो। योग्य startups, researchers और institutions सरकार के IndiaAI Compute Portal पर subsidised hours के लिए apply कर सकते हैं। Prices अक्सर बदलते हैं, इसलिए जिस दिन plan करो, उसी दिन providers के pages check करो।
+
+### Memory का हिसाब
+
+**Weights.** 16-bit पर लगभग 2 bytes per parameter, 8-bit पर 1 byte और 4-bit पर आधे byte से थोड़ा ज़्यादा। 27B model को 16-bit पर लगभग 54 GB और 4-bit पर लगभग 15 GB चाहिए।
+
+**KV cache.** एक standard transformer में, हर token को `2 × layers × KV heads × head size × bytes` चाहिए। 2 keys और values के लिए है। ये चारों numbers model की `config.json` से पढ़ो। फिर इसे in flight tokens से गुणा करो: concurrent requests गुणा उनकी average length।
+
+**अपने browser में try करो.** ये एक आम 8B model का shape (32 layers, 8 KV heads, head size 128) 16-bit पर use करता है:
+
+```python
+layers, kv_heads, head_dim, bytes_per = 32, 8, 128, 2
+per_token = 2 * layers * kv_heads * head_dim * bytes_per      # 131,072 bytes
+for users, context in [(10, 4000), (40, 4000), (40, 16000)]:
+    gb = per_token * users * context / 1e9
+    print(f"{users} users x {context} tokens: {gb:.1f} GB of KV cache")
+```
+
+ये लगभग 5, 21 और 84 GB print करता है। एक GPU कितने users को serve करेगा, ये आमतौर पर model नहीं, context length तय करती है।
+
+दो gotchas। Qwen3.5 जैसे नए **hybrid** models लगभग हर चार में से एक layer में ही full attention use करते हैं, इसलिए उनका cache इस formula से कहीं छोटा होता है। Cache को 8-bit पर store करने (`--kv-cache-dtype fp8`) से वो आधा हो जाता है, पर quality पर असर होता है जिसे आपको नापना होगा।
+
+### Quantization
+
+Weights को 8 या 4 bits में store करने से weight memory लगभग आधी या तीन-चौथाई कम हो जाती है, और अक्सर generation भी तेज़ होता है, थोड़े quality loss के साथ। आम formats हैं **AWQ** और **GPTQ** (4-bit) और **FP8** (8-bit)। ऐसा checkpoint download करो जो पहले से quantized हो, जैसे model maker का publish किया हुआ; vLLM उसकी config से method पढ़ लेता है। `--quantization` flag किसी 16-bit model को AWQ में नहीं बदलता। Exception है `--quantization fp8_per_tensor` (सिर्फ़ `fp8` अब ऐसा नहीं करता), जो FP8 support वाले GPUs, जैसे L40S और H100, पर load time पर quantize करता है।
+
+### इसे चलाना
+
+28 November 2026 तक मौजूदा release **vLLM v0.34.0** (16 November 2026) है। कुछ नया आया हो तो GitHub पर vLLM releases page check करो।
 
 ```bash
-pip install vllm
-vllm serve Qwen/Qwen2.5-7B-Instruct --max-model-len 8192 --gpu-memory-utilization 0.90
+pip install vllm==0.34.0
+vllm serve Qwen/Qwen3.5-9B --max-model-len 8192 --served-model-name chat-local
 # now: POST http://localhost:8000/v1/chat/completions
 ```
 
-मुख्य settings: maximum context length (छोटी मतलब ज़्यादा concurrent requests फिट), GPU memory का हिस्सा, कई GPUs पर tensor parallelism (`--tensor-parallel-size 2`) और quantization।
-
-**Production में।** इसे container में चलाओ, weights किसी volume में या internal image में, अपने gateway के पीछे, health checks, metrics (tokens per second, queue length, cache usage) और जहाँ GPUs अनुमति दें वहाँ autoscaling के साथ। Model revision और vLLM version pin करो, और हर upgrade से पहले evaluate करो।
-
-**मुख्य vLLM settings:**
-
-| Setting | Example | असर |
-| --- | --- | --- |
-| `--max-model-len` | 8192 | छोटी limits concurrent requests के लिए ज़्यादा जगह छोड़ती हैं |
-| `--gpu-memory-utilization` | 0.90 | GPU memory का वो हिस्सा जो vLLM use कर सकता है |
-| `--tensor-parallel-size` | 2 | एक machine में कई GPUs पर model को बाँटता है |
-| `--quantization` | awq | Memory बचाने के लिए quantized checkpoint use करता है |
-
-**API से ईमानदारी से compare करना।** वही golden set self-hosted model और API model, दोनों पर चलाओ। Task और भाषा के हिसाब से accuracy, realistic load test में p95 latency, और 1,000 requests की cost दर्ज करो, जिसमें GPUs का पूरा मासिक खर्च असली volume से भाग देकर जोड़ा जाए। Self-hosting पूरे load पर per-token सस्ती दिखती है और कम use पर महँगी, इसलिए असली अपेक्षित volume use करो। नतीजे को एक छोटी table में लिखो जिस पर client की team sign off कर सके।
-
-**इसे चलाना।** Queue length और cache usage देखो: बढ़ती queue मतलब ज़्यादा capacity या छोटे contexts चाहिए। एक spare GPU या replica रखो ताकि failure या upgrade से service न रुके। Weights को internal registry या volume में रखो, क्योंकि start-up पर internet से download करना धीमा है और locked-down networks पर block भी हो सकता है।
-
-**vLLM को container में चलाना।** Weights volume में, pinned image, OpenAI-compatible server port 8000 पर:
+Container में, weights एक volume पर रखकर:
 
 ```bash
 docker run --gpus all --rm -p 8000:8000 \
   -v /data/hf-cache:/root/.cache/huggingface \
-  -e HF_TOKEN \
-  vllm/vllm-openai:v0.10.1 \
-  --model Qwen/Qwen2.5-7B-Instruct --max-model-len 8192 \
-  --gpu-memory-utilization 0.90 --served-model-name chat-local
+  -e HF_TOKEN -e VLLM_API_KEY \
+  vllm/vllm-openai:v0.34.0 \
+  --model Qwen/Qwen3.5-9B --revision <commit> \
+  --max-model-len 8192 --served-model-name chat-local
 ```
 
-`--served-model-name` वो नाम तय करता है जो clients use करते हैं, ताकि आप apps बदले बिना नीचे का model बदल सको।
+`<commit>` की जगह Hugging Face से model का commit hash डालो, ताकि restart कभी बदले हुए weights pull न करे। `--served-model-name` वो नाम set करता है जो clients use करते हैं, इसलिए आप apps बदले बिना model swap कर सकते हो।
 
-**इसे किसी भी OpenAI-style API की तरह call करना, structured output के साथ।**
+| Setting | Example | असल में क्या करता है |
+| --- | --- | --- |
+| `--max-model-len` | 8192 | एक request की length पर cap लगाता है। vLLM start-up पर check करता है कि ऐसी एक request cache में फिट होती है; ये हर request के लिए इतना reserve नहीं करता |
+| `--gpu-memory-utilization` | set मत करो | v0.34.0 से, set न करने का मतलब 1.0 है। इसे, जैसे 0.5 पर, तभी set करो जब कोई दूसरा process GPU share करता हो |
+| `--tensor-parallel-size` | 2 | एक machine में एक model को कई GPUs पर बाँटता है |
+| `--kv-cache-dtype` | fp8 | Cache memory आधी करता है; quality नापो |
+| `--speculative-config` | JSON | Speculative decoding: एक तेज़ guesser tokens draft करता है और model उन्हें check करता है, जिससे कम load पर latency घटती है |
+
+**v0.34.0 में memory का बदलाव.** पुराने releases, जब तक अलग से न कहा जाए, GPU memory का 90%, बाद में 92%, use करते थे। v0.34.0 NVIDIA और AMD GPUs पर एक **extensible KV cache** on करता है: ये cache को warm-up के बाद असल में free memory से size करता है, और set न किया गया `--gpu-memory-utilization` अब 1.0 का मतलब रखता है। Release notes ज़्यादातर configs से ये flag हटाने की सलाह देते हैं। इससे दो gotchas निकलते हैं। उसी GPU पर कोई दूसरा process, जैसे एक embedding model, अब कोई memory नहीं पाता जब तक आप हर एक के लिए share set न करो। और notes कहते हैं कि कुछ models पर per-token latency बढ़ सकती है; opt out करने के लिए `--gpu-memory-utilization 0.9` या `--no-enable-extensible-kv-cache` pass करो। Default `--block-size` भी 16 से 64 हो गया है।
+
+**Reasoning models.** आज के कई models जवाब देने से पहले "think" करते हैं। Model को कौन-से reasoning-parser और tool-call-parser flags चाहिए, ये GitHub पर vLLM की recipes repository में उस model के page पर देखो। इनके बिना thinking text जवाब में आ जाता है और JSON parsing तोड़ देता है।
+
+### Structured output के साथ इसे call करना
 
 ```python
+import os
 from openai import OpenAI
 from pydantic import BaseModel
 
@@ -126,7 +195,7 @@ class Claim(BaseModel):
     amount_inr: int
     reason: str
 
-client = OpenAI(base_url="http://localhost:8000/v1", api_key="not-needed-locally")
+client = OpenAI(base_url="http://localhost:8000/v1", api_key=os.environ["VLLM_API_KEY"])
 r = client.chat.completions.create(
     model="chat-local",
     messages=[{"role": "user", "content": "Extract: Policy HX-22981, claim of Rs 18,400 for a cracked windscreen."}],
@@ -135,15 +204,21 @@ r = client.chat.completions.create(
 print(Claim.model_validate_json(r.choices[0].message.content))
 ```
 
-Server generation को schema तक सीमित रखता है, इसलिए reply parse हो जाता है; फिर भी values validate करो, जैसा structured-output वाला lesson समझाता है।
+Server generation को schema के अंदर बाँध देता है, इसलिए reply parse हो जाता है। फिर भी values check करो, जैसा structured-output lesson में समझाया गया है।
 
-**Go-live से पहले load testing.** Realistic prompts को बढ़ती concurrency पर भेजो और time to first token, tokens per second और errors दर्ज करो:
+### Endpoint को secure करना
+
+`--api-key` (या `VLLM_API_KEY` variable) सिर्फ़ `/v1` के नीचे के routes और कुछ दूसरे prefixes को protect करता है। vLLM docs चेतावनी देते हैं कि दूसरे routes, जैसे `/invocations`, खुले रहते हैं। इसलिए vLLM को कभी सीधे expose मत करो। इसे अपने gateway के पीछे रखो, और Kubernetes network policy use करो ताकि सिर्फ़ gateway ही उस तक पहुँच सके।
+
+### Go-live से पहले load testing
+
+बढ़ती concurrency पर असली जैसे prompts भेजो और time to first token और total time record करो:
 
 ```python
 import asyncio, time
 from openai import AsyncOpenAI
 
-aclient = AsyncOpenAI(base_url="http://localhost:8000/v1", api_key="x")
+aclient = AsyncOpenAI(base_url="http://localhost:8000/v1", api_key="your-key")
 
 async def one(prompt):
     t0 = time.perf_counter(); first = None
@@ -167,72 +242,67 @@ async def run(prompts, concurrency):
 # for c in (1, 8, 32, 64): asyncio.run(run(sample_prompts, c))
 ```
 
-जिस concurrency पर p95 first-token time आपके budget को पार करता है, वही एक replica की capacity है।
+सबसे ऊँची concurrency जो p95 first-token time को आपके budget के अंदर रखे, वही एक replica की capacity है।
 
-**Metrics पर नज़र रखो।** vLLM `/metrics` पर Prometheus metrics expose करता है, जिनमें चल रही और इंतज़ार करती requests और KV cache usage शामिल हैं। जब requests देर तक इंतज़ार करें या cache usage भरा रहे तो alert करो, और CPU की जगह इन्हीं signals पर replicas scale करो।
+### इसे operate करना
 
-**Shared prefixes दोबारा use करो।** Prefix caching उन requests को, जो एक ही system prompt या document से शुरू होती हैं, उसे दोबारा compute करने से बचने देती है, जो chat और RAG workloads में मदद करती है। देखो कि आपके version में वो on है या नहीं, और shared content को prompts की शुरुआत में रखो।
-
-**अपने browser में try करो।** अपने traffic के लिए KV cache का अंदाज़ा लगाओ, जो अक्सर तय करता है कि एक GPU कितने users को serve कर सकता है।
-
-```python
-layers, kv_heads, head_dim, bytes_per = 32, 8, 128, 2      # a typical 8B model at 16-bit
-per_token = 2 * layers * kv_heads * head_dim * bytes_per
-for users, context in [(10, 4000), (40, 4000), (40, 16000)]:
-    gb = per_token * users * context / 1e9
-    print(f"{users} users x {context} tokens: {gb:.1f} GB of KV cache")
-```
+vLLM `/metrics` पर Prometheus metrics expose करता है। Alert और scale CPU पर नहीं, `vllm:num_requests_waiting` (queue) और `vllm:kv_cache_usage_perc` (cache कितना भरा है) पर करो। Prefix caching default रूप से on है: जो requests एक ही system prompt या document से शुरू होती हैं, वो उसका cache दोबारा use करती हैं। Shared content को prompts की शुरुआत में रखो, और hit rate को `vllm:prefix_cache_hits` भाग `vllm:prefix_cache_queries` के रूप में track करो। एक spare replica रखो ताकि कोई failure या upgrade service न रोके, और weights को एक internal volume में रखो, क्योंकि start-up पर downloads धीमे होते हैं और locked-down networks पर अक्सर block हो जाते हैं।
 
 ## एक example से समझो
 
-Chennai की एक insurance company को claim documents अपने ही servers पर रखने हैं। उसे claim forms से 20 fields का extraction और claims staff के लिए छोटे grounded answers चाहिए, रोज़ लगभग 30,000 requests।
+Chennai की एक insurance company को claim documents अपने ही servers पर रखने हैं। उसे claim forms से 20 fields extract करने हैं और अपने claims staff के लिए छोटे grounded answers चाहिए, दिन में लगभग 30,000 requests। नीचे के सारे numbers method दिखाने के लिए सिर्फ़ उदाहरण हैं।
 
-300 असली forms पर evals 7 से 14 billion parameters के तीन open-weight models की एक frontier API से तुलना करते हैं। सबसे अच्छा 14B model 95% field accuracy पर पहुँचता है, जबकि API की 97% है; client data को on-premises रखने के बदले ये फ़र्क मान लेता है।
+**Model.** 300 असली forms पर evals, जिनमें Tamil forms भी हैं, तीन open-weight models की तुलना एक frontier API से करते हैं। सबसे अच्छा एक 27B dense model है: API के 97% के मुक़ाबले 95% field accuracy। Data अपने premises पर रखने के लिए company ये gap मान लेती है।
 
-Sizing: 16-bit पर 14B model को weights के लिए लगभग 28 GB चाहिए। 4-bit AWQ quantization के साथ लगभग 9 GB चाहिए, और evals सिर्फ़ 94.5% तक गिरते हैं। एक 48 GB GPU पर इससे KV cache के लिए लगभग 30 GB बचते हैं। Claim requests औसतन 8,000-token limit के अंदर लगभग 3,000 tokens की होती हैं, और एक load test p95 पर हर एक 3 seconds से कम में 40 concurrent requests दिखाता है। दो GPUs headroom और redundancy देते हैं।
+**Memory.** 16-bit पर weights को 54 GB चाहिए, जो 48 GB वाले L40S के लिए ज़्यादा है। Maker का 4-bit AWQ checkpoint लगभग 15 GB लेता है, और evals सिर्फ़ 94.5% तक गिरते हैं। मान लो runtime overhead लगभग 7 GB लेता है, तो cache के लिए लगभग 26 GB बचता है। Model की config 64 layers, 8 KV heads और head size 128 बताती है, तो हर token को 2 × 64 × 8 × 128 × 2 bytes, लगभग 0.26 MB चाहिए। यानी लगभग 99,000 tokens की जगह, या average 3,000 tokens वाली लगभग 33 requests।
 
-vLLM client के Kubernetes cluster पर containers में चलता है, पहले वाले उसी gateway के पीछे, इसलिए application code में सिर्फ़ एक model alias बदलता है। Upgrades हर तिमाही eval suite pass होने के बाद होते हैं।
+**Traffic.** 10 घंटे के working day में 30,000 requests यानी लगभग 0.8 per second; मान लो peak इसका दोगुना है, लगभग 1.7 per second। अगर हर request लगभग 6 seconds लेती है, तो in flight requests = arrival rate × हर एक का समय (Little's law) = 1.7 × 6, लगभग 10। एक GPU 33 संभालता है, इसलिए वो peak झेल लेता है। दूसरा GPU headroom देता है और failures और upgrades के दौरान service चालू रखता है। एक load test पक्का करता है कि 30 concurrent requests पर p95 first-token time 2 seconds से कम है।
 
-| Option | Field accuracy | Weights के लिए memory | नोट्स |
-| --- | --- | --- | --- |
-| Frontier API | 97% | लागू नहीं | Data परिसर से बाहर जाता |
-| 14B model, 16-bit | 95% | लगभग 28 GB | फिट होता है, cache के लिए कम जगह |
-| 14B model, 4-bit AWQ | 94.5% | लगभग 9 GB | p95 पर 3 s से कम में 40 concurrent requests; यही चुना गया |
+**Cost.** मान लो हर GPU ₹100 per hour का है, ये एक उदाहरण वाला figure है, quote नहीं। 730 घंटे के महीने के लिए दो GPUs का ख़र्च ₹1,46,000 है, यानी 9,00,000 requests per month पर लगभग ₹162 per 1,000 requests। मान लो API ₹100 per million input tokens और ₹400 per million output tokens लेता है, ये भी उदाहरण है। 3,000 input और 300 output tokens वाली हर request ₹0.42 की पड़ती है, यानी ₹420 per 1,000। Break-even है ₹1,46,000 ÷ ₹0.42, लगभग 3,48,000 requests per month या 11,600 per day। दिन में 3,000 requests पर self-hosting लगभग ₹1,620 per 1,000 पड़ेगा। किसी भी figure में GST या इसे चलाने वाले engineer का समय शामिल नहीं है।
+
+| Option | Field accuracy | Weight memory | Cost per 1,000 requests | Notes |
+| --- | --- | --- | --- | --- |
+| Frontier API | 97% | लागू नहीं | ₹420 | Data premises से बाहर जाएगा |
+| 27B model, 16-bit | 95% | लगभग 54 GB | Test नहीं किया | 80 GB GPU या दो GPUs चाहिए |
+| 27B model, 4-bit AWQ | 94.5% | लगभग 15 GB | दो GPUs पर ₹162 | चुना गया: p95 पर 30 concurrent, 2 s से कम |
+
+vLLM company के Kubernetes cluster पर pinned containers में चलता है, पहले वाले उसी gateway के पीछे, इसलिए application में सिर्फ़ एक model alias बदलता है। Upgrades हर तिमाही होते हैं, eval suite pass होने के बाद।
 
 ## आम गलतियाँ
 
-- **Leaderboard से model चुनना।** अपने data और भाषाओं पर test करो।
-- **Sizing में KV cache भूल जाना।** Weights फिट हो जाते हैं, फिर load में server फेल होता है। Concurrency के हिसाब से size करो।
-- **बिना नापे quantize करना।** कुछ tasks दूसरों से ज़्यादा quality खोते हैं। अपने evals चलाओ।
-- **Licences को नज़रअंदाज़ करना।** कुछ open-weight licences commercial use या बड़े deployments को सीमित करती हैं।
-- **Pin न किए गए versions।** नया model revision या engine release outputs बदल सकता है। Pin करो और evaluate करो।
-- **GPU server के लिए CPU पर scale करना**; queue और cache metrics पर scale करो।
-- **Pin न किए गए images और model revisions**, जिससे restart behaviour बदल देता है।
-- **कोई load test नहीं**, इसलिए capacity users को पता चलती है।
+- **Leaderboard से model चुनना.** अपने data पर, अपने users की भाषाओं और scripts में test करो।
+- **Sizing में KV cache भूल जाना.** Weights फिट हो जाते हैं, फिर load पड़ने पर server धीमा हो जाता है या अटक जाता है। In flight tokens के हिसाब से size करो।
+- **`--max-model-len` को model के maximum पर set करना.** 262,144-token की limit एक GPU पर start-up पर ही fail हो सकती है। इसे उतना रखो जितना आपके traffic को चाहिए।
+- **आदत से `--gpu-memory-utilization 0.9` आगे ले जाना.** v0.34.0 पर ये cache से memory रोक लेता है। इसे तभी set करो जब GPU share हो।
+- **बिना नापे quantize करना,** ख़ासकर भारतीय भाषाओं में, जो English से ज़्यादा quality खो सकती हैं।
+- **Licences को नज़रअंदाज़ करना.** उन exact weights की licence file पढ़ो।
+- **Unpinned image, engine या model revision,** जिससे restart चुपचाप outputs बदल देता है।
+- **vLLM को सीधे expose करना,** सिर्फ़ `--api-key` के साथ; कुछ routes खुले रहते हैं।
 
 ## जब vLLM से self-host न करें
 
-- **कम या अनियमित volume**, जहाँ बेकार पड़े GPUs का खर्च API calls से ज़्यादा है।
-- **आपको सबसे मज़बूत models चाहिए**, जो शायद सिर्फ़ APIs के रूप में मिलें।
-- **इसे चलाने वाला कोई नहीं**: GPUs, drivers, upgrades और on-call असली काम हैं।
+- **कम या अचानक ऊपर-नीचे होने वाला volume,** जहाँ idle GPUs का ख़र्च API calls से ज़्यादा होता है; break-even निकालो।
+- **आपको सबसे strong models चाहिए,** जो शायद सिर्फ़ APIs के रूप में मिलें।
+- **इसे चलाने वाला कोई नहीं.** GPUs, drivers, upgrades और on-call असली काम हैं।
 
 ## Demo से production तक
 
-- **Image और model revision pin करो**, weights को volumes पर cached रखकर।
-- **हर model और setting बदलाव पर load test करो** और हर replica की capacity दर्ज करो।
-- **Queue length और KV cache usage पर alert और scale करो।**
-- **इसे gateway के पीछे रखो** एक alias और एक fallback के साथ।
-- **एक spare replica रखो** failures और rolling upgrades के लिए।
+- **Image, vLLM version और model revision pin करो,** weights को volumes पर cache करके।
+- हर model या setting बदलने के बाद **load test करो**, और एक replica की capacity record करो।
+- **Queue length और KV cache usage पर alert और scale करो.**
+- इसे एक alias, एक fallback और एक network policy के साथ **gateway के पीछे रखो**।
+- Failures और rolling upgrades के लिए **एक spare replica रखो**।
 
 ## Practice करो
 
-जिस भी GPU तक आपकी पहुँच हो उस पर vLLM quickstart follow करो (छोटे model के लिए free notebook GPU काफ़ी है), और PagedAttention post पढ़ो।
+जो भी GPU आपकी पहुँच में हो, उस पर vLLM quickstart follow करो, और PagedAttention वाला post पढ़ो। एक free notebook GPU पर छोटा model चल सकता है; अगर vLLM उसे reject करे, तो docs में supported GPUs की list है।
 
-1. कोई छोटा instruct model vLLM से serve करो और OpenAI-compatible client से call करो।
-2. 7B, 14B और 70B model के लिए 16-bit और 4-bit पर weight memory निकालो, और अंदाज़ा लगाओ कि हर एक को कितने GPUs चाहिए।
-3. अपना extraction या RAG golden set self-hosted model और API model पर चलाओ, और accuracy, latency और 1,000 requests की cost compare करो।
-4. Load test को चार concurrency levels पर चलाओ और वो सबसे ऊँचा level लिखो जो p95 first-token time को 2 seconds से कम रखे।
+1. Qwen3.5-2B जैसा एक छोटा instruct model serve करो और उसे OpenAI client से call करो।
+2. 9B, 27B और 70B model की weight memory 16-bit और 4-bit पर निकालो, और table से हर एक के लिए GPU चुनो।
+3. अपनी जानी-पहचानी किसी भारतीय भाषा के 200 sentences पर दो models के लिए हर word पर tokens नापो।
+4. अपना golden set self-hosted model और एक API model पर चलाओ, और accuracy, latency और cost per 1,000 requests की तुलना करो।
+5. Load test चार concurrency levels पर चलाओ और सबसे ऊँचा level लिखो जो p95 first-token time को 2 seconds से कम रखे।
 
-और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 9 inference servers, batching, prefix caching और throughput व latency नापने को cover करता है।
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 9 inference servers, batching, prefix caching और throughput और latency नापने को cover करता है।
 
-**आप तब पूरा समझ चुके हो जब आप** किसी model को OpenAI-compatible endpoint के पीछे serve कर सको और उसके size, quantization और GPU के चुनाव को numbers से सही ठहरा सको।
+**आपका काम पूरा है जब आप** किसी model को OpenAI-compatible endpoint के पीछे serve कर सको और उसके size, quantization, GPU और cost को numbers के साथ justify कर सको।
