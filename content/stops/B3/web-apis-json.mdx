@@ -3,8 +3,8 @@ id: web-apis-json
 level: B3
 theme: code
 title: "Call a web API and read JSON"
-outcome: "Call a public web API from Python, check the status code and read values from the JSON reply."
-answer: "To call a web API in Python, use requests.get(url), check the status code is 200, then read values from response.json() like a dictionary."
+outcome: "Call a real web API from Python with a timeout and a key, check the status code, read nested JSON safely, and handle retries and pages."
+answer: "Call requests.get(url, params=..., timeout=10), run raise_for_status() to stop on errors, then read response.json() as nested dictionaries and lists."
 why_it_matters: "Calling a language model is calling a web API. If requests, JSON and status codes are familiar now, the LLM steps feel like a small next step instead of a wall."
 hours: 3
 gap_tags: [web-apis]
@@ -18,41 +18,41 @@ check:
   question_ids: [web-apis-json-1, web-apis-json-2, web-apis-json-3]
 flashcards:
   - q: "What is a web API?"
-    a: "A way for your program to ask another service for data or actions over the internet, by sending an HTTP request to a URL."
-  - q: "What do status codes 200, 401, 404 and 429 mean?"
-    a: "200 it worked; 401 not signed in (often a missing or wrong key); 404 the URL or item does not exist; 429 too many requests, slow down."
-  - q: "What do 500 to 504 status codes usually mean?"
-    a: "The server failed. These errors are often temporary and may succeed on a retry."
-  - q: "What does r.json() do?"
-    a: "Turns the JSON text in the reply into Python dictionaries and lists you can read, such as data['current']['temp_c']."
+    a: "A way for your program to ask another service for data or actions over the internet, by sending an HTTP request to a URL and reading the reply."
+  - q: "What do status codes 200, 401, 403, 404 and 429 mean?"
+    a: "200 it worked. 401 the key is missing or wrong. 403 the key is valid but not allowed this. 404 the URL or item does not exist. 429 too many requests, slow down."
+  - q: "Which failed requests are safe to retry?"
+    a: "Timeouts, connection errors, 429, 500, 502, 503 and 504, with growing waits. Never retry 400, 401, 403, 404 or 422 unchanged. Retry a POST only with an idempotency key the API supports."
+  - q: "What does r.json() do, and when does it fail?"
+    a: "It turns the JSON text of the reply into Python dictionaries and lists. It raises a JSONDecodeError when the body is not JSON, such as an HTML error page from a proxy."
   - q: "Why must every request have a timeout?"
-    a: "Without one, a request to a slow or broken server can hang forever and freeze your program."
+    a: "requests waits forever by default. A slow or broken server can then freeze your program or a whole nightly job. Pass timeout=10, or a (connect, read) pair such as (5, 20)."
   - q: "Where should API keys go?"
-    a: "In environment variables read with os.environ, never written in code you share."
-  - q: "What is the difference between params and json in requests?"
-    a: "params adds query parameters to the URL for GET requests. json sends a JSON body, usually with POST."
+    a: "In an environment variable read with os.environ, never in code you share or commit. If os.environ['NAME'] raises KeyError, the variable is not set in that terminal."
+  - q: "How do you read every result from a list endpoint?"
+    a: "Loop over pages with the API's page and limit (or next link) parameters. Stop when a page comes back short or empty, and cap the number of pages so a bug cannot loop forever."
   - q: "What does raise_for_status() do?"
-    a: "Raises an error if the status code is a 4xx or 5xx, so your code does not carry on with an error reply."
+    a: "Raises an HTTPError if the status code is 4xx or 5xx, so your code does not carry on with an error reply as if it were data."
 exercise:
   title: "Debug the API call"
-  setup: "Arjun in Pune calls a public holidays API with requests.get(url, params={'country': 'IN', 'year': 2026}). Four runs give: (1) status 401 with the message 'missing API key'; (2) after fixing that, status 200, but data['holidays'][0]['name'] raises KeyError because the real JSON is a list at the top level; (3) the program hangs for minutes when the API is slow; (4) running it in a loop for 50 cities gives status 429 after the 30th call."
+  setup: "Arjun in Pune calls a public holidays API with requests.get(url, params={'country': 'IN', 'year': 2026}). Four runs give: (1) status 401 with the message 'missing API key', although os.environ['HOLIDAY_KEY'] read his key without error; (2) after fixing that, status 200, but data['holidays'][0]['name'] raises TypeError: list indices must be integers or slices, not str; (3) the program hangs for minutes when the API is slow; (4) running it in a loop for 50 cities gives status 429 after the 30th call."
   questions:
     - q: "What is the likely cause of (1), and the safe fix?"
-      a: "The key was not sent or not set. Read it from an environment variable and send it in the header the API documents."
-    - q: "How should he handle (2)?"
-      a: "Print the whole reply first to see its shape. If the top level is a list, read data[0]['name'] instead."
+      a: "The key was read but never reached the server: it was not sent, or was sent in the wrong header or parameter. Send it exactly where the API's documentation says, still read from the environment variable."
+    - q: "What does the TypeError in (2) tell him, and how should he fix it?"
+      a: "He used a string key on a list, so the top level of the JSON is a list, not an object (or, less likely, holidays[0] is a list). Print the reply to see its shape, then read data[0]['name'] or loop over data."
     - q: "What prevents (3)?"
-      a: "Passing timeout=10 (or similar) to requests.get, and handling the timeout error with a clear message."
+      a: "Passing timeout=10 (or a pair such as (5, 20)) to requests.get, catching requests.Timeout, and retrying a few times with a clear message before giving up."
     - q: "What does (4) mean, and what should he do?"
-      a: "He hit the rate limit. Slow down, wait and retry with backoff, and respect any Retry-After header."
+      a: "He hit the rate limit. Wait and retry with growing delays, respect any Retry-After header, and space out the 50 calls so he stays under the documented limit."
 ask:
   - "What is a REST API in simple words?"
   - "How do I keep my API key safe in Python?"
-  - "What do HTTP status codes mean?"
+  - "Which API errors should my code retry, and which should it not?"
 explain_in_interview:
-  answer: "A web API lets your program ask another service for data or actions over the internet. You send an HTTP request to a URL, and the service replies with a status code that says whether it worked, and usually a JSON body with the data. In Python you call requests.get with the URL, parameters and a timeout, check the status is 200, then read response.json() like dictionaries and lists. For example, an air-quality dashboard calls a public API for each city. Calling a language model works the same way. The limits are rate limits, failures and keeping your API key out of the code."
+  answer: "A web API lets your program ask another service for data or actions over the internet. You send an HTTP request to a URL, and the service replies with a status code and usually a JSON body. In Python I use a requests Session with the key in a header from an environment variable and a timeout on every call. I check the status, then read response.json() as dictionaries and lists. I retry only timeouts, 429 and 5xx, with backoff, and I loop over pages for list endpoints. Calling a language model works the same way."
   follow_up: "What would you do if an API returns status 429?"
-  follow_up_answer: "429 means too many requests, so you hit the rate limit. Slow down, wait and retry with exponential backoff, and respect the Retry-After header if the service sends one. Do not retry immediately in a tight loop."
+  follow_up_answer: "429 means too many requests, so I hit the rate limit. I wait and retry with exponential backoff, respect the Retry-After header if the service sends one, and slow my overall request rate. I never retry immediately in a tight loop."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-10-27
@@ -60,154 +60,300 @@ reviewed_on: 2026-10-27
 
 ## What it is
 
-Your program does not have to know everything itself. A **web API** lets it ask another service for data or actions over the internet: today's weather, a map route, a payment's status, government open data, or an answer from an AI model. Every AI model provider works this way, so calling an API from Python is the core skill behind calling language models later.
+A **web API** lets it ask another service for data or actions over the internet: air quality, a map route, a payment's status, government open data, or an answer from an AI model. Every AI model provider is reached this way, so this is the core skill behind calling language models later.
 
-You send an **HTTP request** to a URL. The service replies with:
+Your program sends an **HTTP request** to a URL. The service replies with:
 
-- a **status code**: did it work?
-- usually a body in **JSON**: the data.
+- a **status code**, a three-digit number that says whether it worked;
+- usually a **body** in **JSON**, a text format of objects (`{"key": value}`) and lists (`[1, 2, 3]`) that Python turns into dictionaries and lists.
 
 ```flow
+title: One API call, start to finish
 dir: LR
-Your Python program | requests.get(...) -[GET /weather?city=Chennai, header X-API-Key]-> Weather service
-Weather service -[200 OK, JSON body]-> r.json() | city: "Chennai", temp_c: 31.5
+Your code | session.get(url, params, timeout) -[GET, key in X-API-Key header]-> API server
+API server -[status code and JSON body]-> Check the status
+Check the status -[2xx]-> r.json() | dicts and lists
+Check the status -[429 or 5xx]-> Wait and retry
+Check the status -[other 4xx]-> Fix the request
 ```
 
-This lesson follows Anita, who builds a small air-quality dashboard for her city. By the end you will call a public API, check the status and read nested JSON safely.
+This lesson follows Anita, a student in Delhi who is building a small air-quality dashboard. She uses **OpenAQ**, a non-profit platform that collects air-quality readings from around the world, including Indian monitoring stations. Its API needs a free key, which makes it a good place to practise the full routine: key, timeout, status, JSON, retries and pages.
 
 ## How it works
 
-### The requests library
+### The parts of a request
 
-```python
-import requests
+Every API's documentation describes requests in the same parts:
 
-r = requests.get("https://api.example.com/weather",
-                 params={"city": "Chennai"}, timeout=10)
-print(r.status_code)
-data = r.json()          # JSON text becomes Python dictionaries and lists
-print(data["temp_c"])
-```
+| Part | What it is | In `requests` | OpenAQ example |
+| --- | --- | --- | --- |
+| Base URL | The address all calls start with | part of the URL | `https://api.openaq.org/v3` |
+| Endpoint | The path for one kind of data | part of the URL | `/locations/8118/latest` |
+| Query parameters | Filters added after `?` in the URL | `params={...}` | `iso=IN`, `limit=100`, `page=2` |
+| Headers | Metadata, including the key | `headers={...}` | `X-API-Key: your key` |
+| Body | Data you send, usually with POST | `json={...}` | not needed for reading data |
 
-`params` adds query parameters to the URL, so this request goes to `.../weather?city=Chennai`.
+`params={"iso": "IN"}` becomes `?iso=IN` on the URL; `requests` also escapes spaces and special characters. Use `json=` (not `data=`) to send a JSON body: it converts your dictionary and sets the right content type.
 
-### Status codes
-
-| Code | Meaning | What to do |
-| --- | --- | --- |
-| `200` | OK: it worked | Use the data |
-| `400` | Bad request: something about your request is wrong | Check parameters and body |
-| `401` / `403` | Not signed in, or not allowed | Check the API key and permissions |
-| `404` | Not found | Check the URL or the item id |
-| `429` | Too many requests | Slow down; wait and retry |
-| `500` to `504` | The server failed | Often temporary; retry later |
-
-Check before using the data. `r.raise_for_status()` raises an error for 4xx and 5xx codes, so your code does not carry on with an error reply as if it were data.
-
-### JSON in Python
-
-`r.json()` turns the reply into dictionaries (for JSON objects) and lists (for JSON arrays). Read nested values step by step:
-
-```python
-data["current"]["temp_c"]          # an object inside an object
-data["results"][0]["location"]     # the first item of a list
-```
-
-Always print the whole reply once, to see its real shape, before writing code that reads it.
-
-### Parameters, headers and bodies
-
-| Part | Used for | Example |
-| --- | --- | --- |
-| `params` | Query parameters on the URL | `params={"city": "Pune"}` |
-| `headers` | Keys, content type and other metadata | `headers={"Authorization": "Bearer ..."}` |
-| `json` | A JSON body you send, usually with POST | `requests.post(url, json={"text": "..."})` |
-
-### Timeouts
-
-Without `timeout=`, a request to a slow or broken server can hang **forever**, freezing your program or your whole automation. Always set one, and handle `requests.Timeout`.
-
-### Keys and secrets
-
-Never write API keys in code you share or commit. Read them from an environment variable:
+### Your first call
 
 ```python
 import os
-key = os.environ["AQ_KEY"]
+import requests
+
+BASE = "https://api.openaq.org/v3"
+key = os.environ["OPENAQ_API_KEY"]
+
+r = requests.get(f"{BASE}/locations/8118/latest",
+                 headers={"X-API-Key": key}, timeout=(5, 20))
+print(r.status_code)          # 200 if it worked
+r.raise_for_status()          # stop here on any 4xx or 5xx
+data = r.json()               # JSON text becomes dicts and lists
+print(list(data))             # ['meta', 'results']
 ```
+
+Location 8118 is a New Delhi station that OpenAQ uses in its own quick start. Three habits are already in this short block:
+
+- **The key comes from an environment variable**, so it never appears in the code.
+- **There is a timeout.** `(5, 20)` means wait up to 5 seconds to connect and up to 20 seconds for the server to send data.
+- **`raise_for_status()` runs before `r.json()`.** An error reply is not data, and treating it as data causes confusing failures three lines later.
+
+### Status codes
+
+The first digit tells you whose problem it is: **2xx** worked, **4xx** your request is wrong, **5xx** the server failed.
+
+| Code | Meaning | What to do | Retry? |
+| --- | --- | --- | --- |
+| `200` | OK | Use the data | — |
+| `400` | Bad request | Check parameters and body | No |
+| `401` | Unauthorized: key missing, wrong or expired | Check the key and the header it goes in | No |
+| `403` | Forbidden: key valid but not allowed this | Check your plan or permissions | No |
+| `404` | Not found | Check the URL path and the item id | No |
+| `422` | Unprocessable: the request failed validation | Read the error detail in the body | No |
+| `429` | Too many requests | Wait, then retry more slowly | Yes |
+| `500`, `502`, `503`, `504` | The server or a proxy failed | Wait, then retry | Yes |
+
+A useful split: **401 asks "who are you?", 403 says "I know who you are, and no."** The fix for 401 is the key; the fix for 403 is your account or plan. Many Python APIs, including those built with the FastAPI framework, return 422 when a field is missing or has the wrong type, and the body says which field.
+
+### Reading JSON
+
+Print the reply once, nicely formatted, before writing code that reads it:
+
+```python
+import json
+print(json.dumps(data, indent=2)[:1500])
+```
+
+A trimmed reply from the latest-readings endpoint has this shape (the shape follows OpenAQ's documentation; the values are made up):
+
+```json
+{
+  "meta": {"name": "openaq-api", "page": 1, "limit": 100, "found": 2},
+  "results": [
+    {"datetime": {"utc": "2026-11-28T05:00:00Z", "local": "2026-11-28T10:30:00+05:30"},
+     "value": 182.0, "sensorsId": 1001, "locationsId": 8118,
+     "coordinates": {"latitude": 28.63, "longitude": 77.2}},
+    {"datetime": {"utc": "2026-11-28T05:00:00Z", "local": "2026-11-28T10:30:00+05:30"},
+     "value": 301.0, "sensorsId": 1002, "locationsId": 8118,
+     "coordinates": {"latitude": 28.63, "longitude": 77.2}}
+  ]
+}
+```
+
+Read it from the outside in. Curly braces are a dictionary, so you use a string key. Square brackets are a list, so you use a number, counting from 0.
+
+```python
+data["results"][0]["value"]               # 182.0
+data["results"][0]["datetime"]["local"]   # '2026-11-28T10:30:00+05:30'
+[row["value"] for row in data["results"]] # [182.0, 301.0]
+```
+
+The two errors you will see most often each point at one mistake:
+
+- `TypeError: list indices must be integers or slices, not str` means you used a string key on a list. For example, `data["results"]["value"]` fails because `results` is a list. Pick an item (`[0]`) or loop.
+- `KeyError: 'value'` means that dictionary has no such key. Check the spelling, or the field is optional.
+
+For optional fields, `row.get("value", 0)` returns `0` when the key is **missing**. But many APIs send the key with `null`, which Python reads as `None`, and then `.get` returns `None`, not your default. To cover both cases, write `row.get("value") or 0`. Take care: `or` also replaces a real `0`, so for numbers where zero is meaningful, test `is None` instead.
+
+### When the body is not JSON
+
+`r.json()` raises `requests.JSONDecodeError` when the body is not JSON, which happens more than you would expect. A `502` or `503` often comes from a proxy or load balancer in front of the API, and its body is an HTML error page. Some services return an HTML maintenance page with a `200`. When decoding fails, print the first 200 characters of `r.text` to see what came back; the worked example's helper does this.
+
+### Timeouts
+
+`requests` has no timeout by default, so a call to a server that never answers can wait forever and freeze a nightly job. Always pass `timeout=`. A single number such as `timeout=10` sets both limits. A pair such as `(5, 20)` sets the **connect** limit (reaching the server) and the **read** limit (waiting for data) separately.
+
+One gotcha: the read limit is the longest wait for the next piece of data, not a limit on the whole download. A server that sends a little data every few seconds can keep a call alive far longer than 20 seconds. When a timeout does fire, `requests` raises `requests.Timeout`; catch it and retry or report it clearly.
+
+### Keys and secrets
+
+Never write API keys in code you share or commit. Set the key in your terminal (on Linux or macOS, `export OPENAQ_API_KEY=...`; in Windows PowerShell, `$env:OPENAQ_API_KEY="..."`) and read it with `os.environ["OPENAQ_API_KEY"]`.
+
+If that line raises `KeyError: 'OPENAQ_API_KEY'`, no request was sent at all: the variable is not set in **this** terminal. A new terminal does not remember a variable you set in another one. A `401`, by contrast, means the request went out and the server rejected the key or could not find it. Two more rules: never print or log the key, and if it ever lands in a public repository, create a new key and delete the old one at once.
 
 ### Retrying safely
 
-Some failures fix themselves. A `429` or a `503` often succeeds a few seconds later. A simple, polite retry looks like this:
+Some failures fix themselves a few seconds later: timeouts, dropped connections, `429` and `5xx`. Others never will: retrying a `401` or `404` unchanged just repeats the mistake. A good retry:
+
+- retries only failures that are likely temporary;
+- waits longer each time (**exponential backoff**: 1, 2, 4 seconds), and obeys the server's `Retry-After` header when it sends one;
+- gives up after a few tries and raises a clear error, instead of carrying on with an error reply.
+
+**Retry GETs freely, but think before retrying a POST.** A GET only reads, so repeating it is harmless. A POST often *creates* something: a payment, an order, a message. If the first attempt reached the server but the reply was lost on the way back, a blind retry creates it twice. Payment APIs such as Stripe solve this with an **idempotency key**: a unique id you make once and send in a header with every retry of the same request, so the server knows it is a repeat.
 
 ```python
-import time
+import uuid
 
-for attempt in range(3):
-    r = requests.get(url, params=params, timeout=10)
-    if r.status_code not in (429, 500, 502, 503, 504):
-        break
-    retry_after = r.headers.get("Retry-After", "")
-    wait = int(retry_after) if retry_after.isdigit() else 2 ** attempt
-    time.sleep(wait)
+key = str(uuid.uuid4())                       # make it once, before the first try
+headers = {"Idempotency-Key": key}            # send the same key on every retry
 ```
 
-It retries only errors that are likely temporary, waits longer each time, and respects the server's `Retry-After` header if it sends one. Never retry a `401` or `404`: the request itself is wrong, and repeating it changes nothing.
+If an API offers no such key, do not auto-retry its POSTs; check whether the first one worked before trying again.
 
-### Reading API documentation
+### Pagination
 
-Every API's documentation answers the same questions, usually in this order: the **base URL**, how to **authenticate** (which header carries the key), the **endpoints** (paths such as `/latest` or `/holidays`), each endpoint's **parameters**, an **example response**, the **error codes** it uses, and its **rate limits**. Read these sections before writing code, and copy the example response into a file so you can test your parsing without calling the API every time. Calling an AI model's API later is exactly the same process: find the endpoint, send the key in a header, post a JSON body and read the JSON reply.
+A list endpoint rarely returns everything at once. It returns one **page** at a time, and you ask for the next. OpenAQ uses `page` and `limit` parameters (default `limit` is 100) and reports the total in `meta.found`. Other APIs return a `next` URL or a cursor instead; the documentation says which.
+
+The quiet failure is reading page 1 only. The code runs, shows 100 results and looks right. If a count comes out as a round number like 100 or 1000, suspect pagination first.
+
+Do not trust the total for your loop condition. OpenAQ's `found` can be a string such as `">1000"` for large sets, which breaks arithmetic. Instead, stop when a page comes back shorter than `limit` or empty, and cap the number of pages as a safety net (see `get_all` below).
 
 ### Limits and cost
 
-Most APIs limit requests per minute and some charge per call. Read the documentation's limits section, and when you get a `429`, wait and retry with growing delays instead of hammering the server.
+Most APIs limit requests per minute or per day, and paid ones, including language-model APIs, charge for use. Many send headers that show where you stand; OpenAQ sends `x-ratelimit-remaining` and `x-ratelimit-reset`, and returns `429` when you go over. Read the documentation's limits page before you loop over 500 cities, add a short `time.sleep` between calls, and cache results you will reuse instead of fetching them again.
+
+### Reading API documentation
+
+Before writing code, find these in the documentation: the **base URL**, how to **authenticate**, the **endpoints** and their **parameters**, an **example response**, the **error codes**, **pagination** and **rate limits**. Save the example response to a file so you can test your parsing without calling the API each time. Calling an AI model later is the same routine.
 
 ## A worked example
 
-Anita is building a small dashboard of air quality for her city. She uses a public API that returns current readings for a location.
+Anita wants two things: the list of every Indian station OpenAQ knows about, and the latest readings for one Delhi station. She builds one small helper that every call goes through, so the timeout, retries, logging and error checks live in one place.
 
 ```python
-import os, requests
+import logging
+import os
+import time
 
-url = "https://api.airquality.example/v1/latest"
-r = requests.get(url, params={"city": "Delhi"},
-                 headers={"X-API-Key": os.environ["AQ_KEY"]}, timeout=10)
+import requests
 
-if r.status_code == 200:
-    for reading in r.json()["results"][:5]:
-        print(reading["location"], reading["parameter"], reading.get("value", "no reading"))
-elif r.status_code == 429:
-    print("Rate limited; try again in a minute")
-else:
-    print("Request failed:", r.status_code, r.text[:200])
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("aq")
+
+BASE = "https://api.openaq.org/v3"
+RETRYABLE = {429, 500, 502, 503, 504}
+
+session = requests.Session()                      # reuses connections
+session.headers["X-API-Key"] = os.environ["OPENAQ_API_KEY"]
+
+def get_json(path, params=None, tries=4):
+    for attempt in range(tries):
+        last = attempt == tries - 1
+        wait = 2 ** attempt                       # 1, 2, 4 seconds
+        try:
+            r = session.get(BASE + path, params=params, timeout=(5, 20))
+        except (requests.Timeout, requests.ConnectionError) as e:
+            log.warning("%s: %s (try %d)", path, type(e).__name__, attempt + 1)
+            if last:
+                raise
+            time.sleep(wait)
+            continue
+        if r.status_code in RETRYABLE and not last:
+            ra = r.headers.get("Retry-After", "")
+            wait = int(ra) if ra.isdigit() else wait
+            log.warning("%s: %d, retry in %ds", path, r.status_code, wait)
+            time.sleep(min(wait, 60))
+            continue
+        r.raise_for_status()                      # 4xx, or still failing
+        try:
+            return r.json()
+        except requests.JSONDecodeError:
+            raise RuntimeError(f"not JSON: {r.text[:200]!r}") from None
 ```
 
-(The URL here is illustrative; the lesson's resource shows real, working examples.)
+Why each piece is there:
 
-| Run | What happened | Cause | Fix |
+- A **`Session`** reuses the connection, which is faster for many calls, and holds the key header so no call forgets it.
+- **Timeouts and connection errors are caught and retried**, because they are the most common temporary failure. On the last try the error is raised, not hidden.
+- **No sleep after the last try**, and the wait is capped at 60 seconds so a strange `Retry-After` value cannot stall the job for an hour.
+- **`raise_for_status()` runs on every reply that is not retried**, so a `401`, a `404`, or a `503` that never cleared stops the program with a clear message.
+- **Every failure is logged** with the path and the status, which is what you need when a nightly job fails at 3 a.m.
+
+Then the two tasks:
+
+```python
+def get_all(path, params, limit=100, max_pages=50):
+    rows = []
+    for page in range(1, max_pages + 1):
+        data = get_json(path, {**params, "limit": limit, "page": page})
+        batch = data["results"]
+        rows.extend(batch)
+        if len(batch) < limit:                    # short or empty page
+            break
+    return rows
+
+stations = get_all("/locations", {"iso": "IN"})
+print(len(stations), "stations")
+for s in stations[:3]:
+    print(s["id"], s["name"])
+
+latest = get_json("/locations/8118/latest")
+for row in latest["results"]:
+    print(row["sensorsId"], row["value"], row["datetime"]["local"])
+```
+
+Each `sensorsId` is one instrument at the station, such as its PM2.5 or NO2 sensor. A separate endpoint, `/locations/8118/sensors`, says which pollutant each one measures. Joining two endpoints like this is normal API work.
+
+Her first runs went like this:
+
+| Run | What she saw | Cause | Fix |
 | --- | --- | --- | --- |
-| 1 | `401 Unauthorized` | Her key was not set in the new terminal | `export AQ_KEY=...` before running |
-| 2 | `200`, then `KeyError: 'value'` on one location | Some locations have no `value` field | Printed the full JSON; used `.get("value", "no reading")` |
-| 3 | Hung for minutes | She had removed `timeout=` while testing | Put `timeout=10` back |
-| 4 | Five readings printed | Working | Ready for the dashboard |
+| 1 | `KeyError: 'OPENAQ_API_KEY'`, no request sent | She opened a new terminal and the variable was not set there | Set the variable in that terminal, then ran again |
+| 2 | `401 Client Error: Unauthorized` | She had copied `Authorization: Bearer ...` from another API's tutorial | Sent the key in `X-API-Key`, as OpenAQ's docs say |
+| 3 | `TypeError: list indices must be integers or slices, not str` | She wrote `latest["results"]["value"]`; `results` is a list | Printed the shape, then looped over the list |
+| 4 | Exactly 100 stations for all of India | She called `/locations` once and read page 1 only | Wrote `get_all` to loop over pages |
+| 5 | A log line `429, retry in 1s`, then the full list | Paging quickly hit the rate limit | Nothing: the helper waited and carried on |
 
-Printing the full JSON once, on the second run, saved her an hour of guessing.
+Runs 1 to 3 each gave a different error type, and each type pointed straight at its cause. Read the error's first word before rereading the code.
+
+When the script grows, you can hand the retry work to the library that `requests` is built on. This is a common production setup:
+
+```python
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+retry = Retry(total=4, backoff_factor=1,
+              status_forcelist=[429, 500, 502, 503, 504],
+              allowed_methods=["GET"])        # never auto-retry POST
+session = requests.Session()
+session.mount("https://", HTTPAdapter(max_retries=retry))
+```
+
+It backs off, obeys `Retry-After` on 429 and 503, and retries connection errors for you. When it runs out of tries on a listed status, it raises `requests.exceptions.RetryError` instead of returning the last reply, so catch that too. You still need a timeout on every call, a JSON check and a page loop.
 
 ## Common mistakes
 
-- **Not checking the status code.** Code then fails confusingly on error replies.
-- **No timeout.** A slow server can hang your program.
-- **Guessing the JSON shape.** Print it and read it first.
-- **API keys in code.** Use environment variables.
-- **Ignoring rate limits.** Respect them, or you get blocked.
-- **Assuming every field is always present.** Use `.get()` with a default for optional fields.
+- **Reading the data before checking the status.** An error reply then fails confusingly a few lines later. Call `raise_for_status()` first.
+- **No timeout.** One silent server hangs the whole program.
+- **Guessing the JSON shape.** Print it once with `json.dumps(data, indent=2)`, then write the access path.
+- **A string key on a list.** That is the `TypeError` above; pick an index or loop.
+- **Trusting `.get(key, default)` with `null` values.** It returns `None` when the key exists with `null`.
+- **Reading only page 1.** A round count such as 100 is the warning sign.
+- **Retrying everything, or too fast.** Retrying `401` or `404` wastes calls, a tight loop gets you blocked, and retrying a POST without an idempotency key can charge a customer twice.
+- **Keys in code, screenshots or logs.** Use environment variables, and replace a key at once if it leaks.
 
 ## Practice
 
-Read the requests library's quickstart, linked below.
+Read the requests library's quickstart, linked below, then use one of these real APIs (both checked as of November 2026):
 
-1. **Call.** Call a free public API, such as a public holidays API or an Indian open data API, and print three values from the JSON.
-2. **Handle errors.** Handle 404, 429 and a timeout with clear messages.
-3. **Secure the key.** Move any key into an environment variable and confirm the code still works.
+- **OpenAQ**: air-quality data for Indian cities. It needs a free key from its website, sent in the `X-API-Key` header.
+- **Open-Meteo**: weather and air-quality forecasts. It needs no key and is free for non-commercial use, which makes it the fastest first call.
 
-**You are done when you can** call an API, check the status, read nested JSON safely and explain why every request needs a timeout.
+1. **Call and look.** Call one endpoint, print the reply with `json.dumps(data, indent=2)`, and write the access paths for three values, at least one inside a list.
+2. **Make it fail on purpose.** Send a wrong key, a wrong path and `timeout=0.001`. Note the exact error for each, and check that your code prints a clear message instead of crashing on `r.json()`.
+3. **Add the helper.** Put the `get_json` helper in front of every call and confirm it logs and retries.
+4. **Read every page.** For a list endpoint, fetch all pages with a page cap, and compare your count with page 1 alone.
+5. **Secure the key.** Move it into an environment variable, open a new terminal and confirm you know what happens when it is not set.
+
+**You are done when you can** call an API with a key and a timeout, say from the error alone whether a failure is yours or the server's, read nested JSON without guessing, fetch every page, and explain which failures you retry and why.
