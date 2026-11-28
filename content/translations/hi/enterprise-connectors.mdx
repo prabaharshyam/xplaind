@@ -2,154 +2,242 @@
 id: enterprise-connectors
 lang: hi
 title: "Enterprise connectors"
-outcome: "SharePoint, Salesforce, SAP, Jira और cloud storage से documents और records भरोसे के साथ खींच पाओगे: authentication, paging, rate limits, incremental sync, deletions और permissions।"
-answer: "Enterprise connectors SharePoint, Salesforce और Jira जैसे tools से documents खींचते हैं। वो login, paging, rate limits और incremental sync संभालते हैं, और हर user के access rights भी बनाए रखते हैं।"
-why_it_matters: "Assistant उतना ही काम का है जितने data तक वो पहुँच सकता है, और वो data दर्जनों business systems में पड़ा है, जिनके अपने APIs और नखरे हैं। FDE project के engineering time का बड़ा हिस्सा अक्सर connector के काम में जाता है, और टूटने पर client को सबसे पहले यही दिखता है।"
+outcome: "SharePoint, Salesforce, SAP, Jira और cloud storage से documents और records भरोसे के साथ खींचना सीखो: authentication, paging, rate limits, incremental sync, deletions और permissions."
+answer: "Enterprise connectors, SharePoint, Salesforce और Jira जैसे tools से documents और records आपके AI system में copy करते हैं, और login, paging, rate limits, changes, deletions और access rights संभालते हैं।"
+why_it_matters: "Assistant उतना ही काम का है जितना data उस तक पहुँच पाता है, और वो data दर्जन भर business systems में पड़ा है, हर एक की अपनी APIs और अपनी quirks। Connectors तय करते हैं कि answers current हैं या नहीं, और लोग सिर्फ़ वही देखते हैं या नहीं जो वो खोल सकते हैं। कुछ टूटता है तो clients सबसे पहले इन्हीं को notice करते हैं।"
 flashcards:
-  - q: "Connector क्या है?"
-    a: "वो code जो किसी business system, जैसे SharePoint या Salesforce, और आपके AI system के बीच data ले जाता है।"
-  - q: "Connectors आम तौर पर authenticate कैसे करते हैं?"
-    a: "Client की IT team के register किए app से OAuth के ज़रिए, जो सिर्फ़ तय किए गए sites या objects पर read-only scope रखता है।"
-  - q: "Paging cursor save क्यों करें?"
-    a: "ताकि फेल हुआ run वहीं से आगे चल सके जहाँ रुका था, page 1 से दोबारा शुरू न करना पड़े।"
-  - q: "Connector को rate limits कैसे संभालने चाहिए?"
-    a: "Retry-After headers मानो, 429 response आए तो पीछे हटो (back off), और बड़े पहले load को off-peak घंटों में फैलाओ।"
+  - q: "Connector क्या होता है?"
+    a: "वो code जो SharePoint या Salesforce जैसे business system और आपके AI system के बीच data ले जाता है, और उसे current, पूरा और permission-aware रखता है।"
+  - q: "Connectors आमतौर पर authenticate कैसे करते हैं?"
+    a: "Client की IT team के register किए app के ज़रिए OAuth से, तय sites या objects तक read-only scope के साथ। Tokens expire होते हैं (Microsoft का default 60 से 90 minute है), इसलिए हर token token cache से लो, पूरे run के लिए एक बार नहीं।"
+  - q: "Connector को अपनी paging position कब save करनी चाहिए?"
+    a: "हर page पूरा process होने के बाद, fail हुए items की ids के साथ। Final delta link सिर्फ़ आख़िरी page के बाद save करो। फिर crash होने पर काम सही page से resume होता है और कुछ skip नहीं होता।"
+  - q: "Connector को 429 response कैसे handle करना चाहिए?"
+    a: "Retry-After header में दिए समय तक wait करो, जो seconds भी हो सकता है और एक date भी। Header न हो तो exponentially back off करो। थोड़ा random jitter जोड़ो ताकि parallel workers एक साथ retry न करें।"
   - q: "Incremental sync क्या है?"
-    a: "पहली full copy के बाद, हर बार सिर्फ़ पिछले run के बाद के बदलाव लाना। इसके लिए change tokens, modified-since filters या webhooks use होते हैं।"
-  - q: "Deletions पर ख़ास ध्यान क्यों देना पड़ता है?"
-    a: "अगर sync deletions नहीं बताता, तो delete हुए documents search में आते रहते हैं। ऐसा तरीका use करो जो deletions बताए, या ids को समय-समय पर reconcile करो।"
-  - q: "Connector को कौन-सा metadata रखना चाहिए?"
-    a: "Source id, URL, title, author, modified time, path या object type, owner और access rights।"
-  - q: "हर sync run में क्या record होना चाहिए?"
-    a: "कितने items पढ़े, add, change, delete और fail हुए, और कितना समय लगा। Connector रुक जाए या failures बढ़ जाएँ तो alert आए।"
+    a: "पहली full copy के बाद सिर्फ़ वही लाना जो पिछले run के बाद बदला है, delta tokens, modified-since filter या webhooks से।"
+  - q: "Deletions पर ख़ास ध्यान क्यों चाहिए?"
+    a: "Modified-since query delete हुए records कभी return नहीं करती, इसलिए वो search में आते रहते हैं। ऐसा feed use करो जो deletions report करे, जैसे Graph delta या Salesforce का get-deleted resource, और हर हफ़्ते ids reconcile करो।"
+  - q: "Connector को कौन-सा metadata रखना चाहिए, और क्यों?"
+    a: "Source id, URL, title, path, author, modified time, owner और access rights। Citations, filters, permission checks और debugging इन्हीं पर चलते हैं, इसलिए text न बदले तब भी इन्हें update करो।"
+  - q: "हर sync run को क्या record करना चाहिए?"
+    a: "कितने items read, added, changed, unchanged, deleted और failed हुए, साथ में run time। Alert करो जब run fail हो, start न हो, या आम से बहुत कम items पढ़े।"
   - q: "हर synced item का content hash क्यों store करें?"
-    a: "अगर file का metadata बदला पर text नहीं, तो hash match हो जाता है और आप दोबारा parse और embed करना छोड़ देते हो। समय और पैसे दोनों बचते हैं।"
-  - q: "Microsoft Graph delta query deletions कैसे बताती है?"
-    a: "Delete हुए items delta results में 'deleted' marker के साथ आते हैं, तो connector उनके chunks index से हटा सकता है।"
+    a: "अगर किसी file का metadata बदला पर text नहीं, तो hash match करेगा और आप re-chunking और re-embedding skip कर सकते हो, जिससे समय और पैसा बचता है।"
+  - q: "Save किया delta link काम करना बंद कर दे तो Microsoft Graph क्या करता है?"
+    a: "वो Location header के साथ 410 Gone return करता है, जो एक नई full listing शुरू करता है। सब कुछ re-list करो, फिर ids reconcile करो, क्योंकि नई listing ये नहीं बताती कि बीच में क्या delete हुआ।"
 exercise:
   title: "Connector ठीक करो"
-  setup: "Pune की एक manufacturer का maintenance assistant network file share से 60,000 manuals और SAP से work orders पढ़ता है। मौजूदा connector हर रात हर file दोबारा पढ़ता है, नौ घंटे लेता है, और कभी-कभी सुबह की shift तक चलता रहता है। Retire हो चुके manuals अब भी जवाबों में आते हैं। पिछले हफ़्ते job file 41,000 पर crash हुई और शुरू से दोबारा चली। तीन दिन तक fail होती रही, किसी को पता नहीं चला।"
+  setup: "Pune के एक manufacturer का maintenance assistant एक network file share से 60,000 manuals और SAP से work orders पढ़ता है। अभी वाला connector हर रात हर file दोबारा पढ़ता है, नौ घंटे लेता है, और कभी-कभी सुबह की shift तक चलता रहता है। Retire हो चुके manuals अब भी answers में आते हैं। पिछले हफ़्ते job file 41,000 पर crash हुआ और शुरू से restart हुआ। तीन दिन तक ये fail होता रहा और किसी ने notice नहीं किया।"
   questions:
-    - q: "रात का run छोटा कैसे करोगे?"
-      a: "Incremental sync पर जाओ: modified times या change journal compare करो और सिर्फ़ नई और बदली files process करो।"
-    - q: "Retire हुए manuals अब भी क्यों आते हैं, और इसका fix क्या है?"
-      a: "Deletions और moves detect नहीं हो रहे। File ids की list को index से reconcile करो और जो गायब हैं उन्हें हटा दो।"
-    - q: "File 1 से दोबारा शुरू होने से कैसे बचोगे?"
-      a: "Progress save करो, जैसे आख़िरी processed path या cursor, और failure के बाद वहीं से आगे चलो।"
-    - q: "तीन दिन की failure team को कैसे पता चलती?"
-      a: "हर run की counts record करो, और जब run fail हो, शुरू ही न हो, या हमेशा से बहुत कम items process करे, तब alert भेजो।"
+    - q: "Nightly run छोटा कैसे करोगे?"
+      a: "Incrementally sync करो: हर file का modified time और size पिछले run से compare करो (या file server का change journal पढ़ो) और सिर्फ़ नई और बदली files parse करो। Extract किए text का hash बनाओ ताकि जिन files का text नहीं बदला उन्हें re-embed करना skip हो जाए।"
+    - q: "Retire हुए manuals अब भी क्यों आते हैं, और इसे क्या ठीक करेगा?"
+      a: "Connector deletions या moves कभी detect नहीं करता। हर रात सारे file paths list करो, उन्हें index की ids से compare करो, और जो अब नहीं है उसके chunks delete करो। फिर move हुई file एक delete और एक add बन जाती है।"
+    - q: "File 1 से restart होने से कैसे बचोगे?"
+      a: "हर batch के बाद progress save करो, जैसे sorted listing में आख़िरी processed path, साथ में fail हुई files की list। Restart पर पहले fail हुई files retry करो, फिर save किए path से आगे बढ़ो।"
+    - q: "Team को तीन दिन का failure कैसे पता चलता?"
+      a: "हर run के counts record करो और alert करो जब run fail हो, समय पर start न हो, या आम से बहुत कम items process करे। Alert किसी shared inbox को नहीं, connector के owner किसी इंसान को भेजो।"
 ask:
   - "Microsoft Graph delta sync कैसे काम करता है?"
-  - "Connectors खुद बनाऊँ या Airbyte use करूँ?"
+  - "Connectors ख़ुद build करूँ या Airbyte use करूँ?"
   - "SharePoint से permissions कैसे sync करूँ?"
 explain_in_interview:
-  answer: "Connector वो code है जो SharePoint, Salesforce या Jira जैसे business system से data को AI system में ले जाता है। वो log in करता है, आमतौर पर read-only OAuth से, API को page by page पढ़ता है, और throttle होने पर पीछे हटकर rate limits का ध्यान रखता है। पहले full load के बाद वो delta queries या modified-since filters से सिर्फ़ changes sync करता है, और deletions और हर item की permissions भी साथ ले जाता है। जैसे, Gurugram का एक sales assistant रात की full copy के बिना SharePoint decks और Salesforce accounts पर current रहता है। मुश्किल हिस्सा permissions है: अगर वो sync न हों, तो assistant लोगों को ऐसे documents दिखा सकता है जो उन्हें नहीं देखने चाहिए।"
-  follow_up: "कैसे पक्का करोगे कि deleted या restricted document जवाबों में आना बंद हो जाए?"
-  follow_up_answer: "Connector को सिर्फ़ नए और बदले items नहीं, deletions और permission changes भी sync करने होंगे। हटाए गए items index से delete होते हैं, और हर search user के current access groups से filter होती है, ताकि assistant सिर्फ़ वही retrieve करे जो वो user खोल सकता है।"
-translated_on: 2026-11-14
+  answer: "Connector वो code है जो SharePoint, Salesforce या Jira जैसे business system से data AI system में ले जाता है। वो login करता है, आमतौर पर read-only OAuth से, API को page by page पढ़ता है, और throttle होने पर back off करता है। पहले full load के बाद वो delta queries या modified-since filters से सिर्फ़ changes sync करता है, और deletions और हर item की permissions भी साथ लाता है। वो हर page के बाद अपनी position save करता है, इसलिए crash होने पर restart या skip करने की जगह resume करता है। जैसे, Gurugram का एक sales assistant बिना nightly full copy के SharePoint decks और Salesforce accounts पर current रहता है। मुश्किल हिस्सा permissions हैं: अगर वो sync नहीं हुईं, तो लोग वो documents देख लेते हैं जो उन्हें नहीं देखने चाहिए।"
+  follow_up: "आप कैसे पक्का करोगे कि delete या restrict हुआ document answers में आना बंद हो जाए?"
+  follow_up_answer: "Deletions को ऐसे feed से sync करूँगा जो उन्हें report करता है, और safety net के तौर पर हर हफ़्ते ids reconcile करूँगा। हर chunk पर group ids store करूँगा और हर search को user के मौजूदा groups से filter करूँगा, ताकि हटाया गया member उसी वक़्त access खो दे जब group lookup को बदलाव दिखे। अगर किसी item की permissions पढ़ी न जा सकें, तो उसे index नहीं करूँगा।"
+translated_on: 2026-11-28
 ---
 
 ## ये क्या है
 
-**Connector** वो code है जो किसी business system और आपके AI system के बीच data ले जाता है। ज़्यादातर enterprise AI projects को कई connectors चाहिए होते हैं:
+**Connector** वो code है जो business system और आपके AI system के बीच data ले जाता है। अच्छा connector चार काम करता है: सब कुछ एक बार copy करता है, उस copy को current रखता है, जो delete हुआ उसे हटाता है, और हर item के साथ ये जानकारी भी लाता है कि उसे कौन पढ़ सकता है। ज़्यादातर enterprise AI projects को कई connectors चाहिए होते हैं:
 
-- **Documents**: SharePoint और OneDrive (Microsoft Graph के ज़रिए), Google Drive, Confluence, network file shares, cloud storage buckets।
-- **Records**: Salesforce जैसे CRM systems, SAP जैसे ERPs, Jira या ServiceNow जैसे ticketing, और client के अपने databases।
-- **Messages**: email और chat, जिन्हें privacy की वजह से बहुत सोच-समझकर use करना होता है।
+- **Documents**: SharePoint और OneDrive (Microsoft Graph के ज़रिए), Google Drive, Confluence, network file shares, cloud storage buckets.
+- **Records**: Salesforce जैसे CRM systems, SAP जैसे ERPs, Jira या ServiceNow जैसी ticketing, और client के अपने databases.
+- **Messages**: email और chat, privacy की वजह से सावधानी से use होते हैं।
 
-आप connectors खुद बना सकते हो, integration platform use कर सकते हो (Airbyte, Fivetran और कई दूसरे बहुत सारे ready-made connectors देते हैं), या किसी search या AI platform के साथ आने वाले connectors ले सकते हो। जो भी चुनो, आपको समझना ज़रूर चाहिए कि वो करते क्या हैं।
+Connectors आप ख़ुद build कर सकते हो, एक integration platform use कर सकते हो (Airbyte, Fivetran और कुछ और कई ready-made connectors देते हैं), या किसी search या AI platform के साथ bundled connectors use कर सकते हो। जो भी चुनो, आपको समझना होगा कि वो करते क्या हैं।
 
 ```flow
-SharePoint -[Graph, OAuth, delta]-> Connector | pages पढ़ता है, back off करता है, resume करता है
-Salesforce -[API, modified since]-> Connector
-Jira, file shares, databases -> Connector
-Connector -> Items + metadata + permissions + deletions -> Parse, chunk, embed -> Assistant के लिए index
-Parse, chunk, embed -> Run log | 312 पढ़े, 40 added, 266 changed, 6 deleted, 0 failed
+title: A connector feeding an assistant
+SharePoint -[Graph, OAuth, delta]-> Connector | pages, backs off, resumes
+Salesforce -[REST, SystemModstamp, get deleted]-> Connector
+Jira, SAP, file shares -> Connector
+Connector -> Items, metadata, permissions, deletions -> Parse, chunk, embed -> Index for the assistant
+Parse, chunk, embed -> Run log | read 312, added 12, changed 41, unchanged 253, deleted 6, failed 0
 ```
 
-इस lesson में हम Gurugram की एक consumer-goods company का sales assistant देखेंगे, जो SharePoint और Salesforce पर बना है।
+ये lesson SharePoint और Salesforce पर बने Gurugram के एक sales assistant को follow करता है।
 
-## ये काम कैसे करता है
+## ये कैसे काम करता है
 
-**Authentication।** आम तौर पर OAuth, ऐसे app से जिसे client की IT team register करती है। Scope read-only रहता है और सिर्फ़ उन sites, objects या projects तक, जिन पर बात तय हुई हो। कुछ systems API keys या service users use करते हैं; उन्हें secret manager में रखो।
+### Authentication
 
-**Pages में पढ़ना।** APIs results pages में देते हैं, साथ में cursor या next link। जब तक pages ख़त्म न हों, loop चलाओ, और cursor save करो ताकि फेल हुआ run वहीं से resume हो सके।
+आमतौर पर OAuth, client की IT team के register किए app के साथ, read-only और तय sites, objects या projects तक scoped। कुछ systems API keys या service users use करते हैं; उन्हें secret manager में रखो, code में कभी नहीं।
 
-**Rate limits।** हर API मिनट या दिन में calls की limit लगाता है; SharePoint और Salesforce भारी users को throttle करते हैं। `Retry-After` headers मानो, 429 responses पर back off करो, और बड़े पहले loads को off-peak घंटों में फैलाओ।
+लंबे runs को दो चीज़ें तोड़ती हैं। पहली, access tokens expire होते हैं: Microsoft उन्हें default 60 से 90 minute की life देता है, इसलिए दो रात चलने वाला first load एक ही token use नहीं कर सकता। हर request से पहले अपनी auth library के cache (जैसे MSAL) से token माँगो; expiry के पास वो नया token ले आता है। दूसरी, client secrets और certificates भी expire होते हैं। Date runbook में लिखो और एक महीना पहले alert करो।
 
-**Incremental sync।** पहला run सब कुछ copy करता है। बाद के runs सिर्फ़ पिछले run के बाद के बदलाव लाते हैं, change tokens (Microsoft Graph की delta queries), "modified since" filters या webhooks से। 200,000 documents को हर रात पूरा दोबारा पढ़ना धीमा है, महँगा है, और आपको throttle करवा देता है।
+### Pages में पढ़ना
 
-**Deletions।** Incremental feeds को बताना चाहिए कि क्या delete हुआ, वरना delete हुई files हमेशा के लिए searchable रहती हैं। Check करो कि आपका तरीका deletions report करता है; नहीं करता, तो ids compare करके एक periodic reconciliation चलाओ।
+APIs results pages में लौटाती हैं। हर page एक cursor या "next" link पर ख़त्म होता है। तब तक loop करो जब तक next page न बचे। जो rule मायने रखता है: **हर page पूरा process होने के बाद अपनी position save करो**, पहले नहीं और सिर्फ़ आख़िर में भी नहीं। Process करने से पहले save करोगे तो crash पर items skip हो जाएँगे; सिर्फ़ आख़िर में save करोगे तो page 9,000 पर crash होने से page 1 से restart होगा।
 
-**Permissions।** हर item के content के साथ उसके access rights भी पढ़ो, ताकि permission-aware retrieval हो सके।
+### Rate limits
 
-**Formats और metadata।** Source id, URL, title, author, modified time, path या object type और owner रखो। Citations, filters और debugging इन्हीं पर चलते हैं।
+हर API calls limit करती है। Microsoft Graph `Retry-After` header के साथ 429 Too Many Requests लौटाता है और retry करने से पहले उतनी देर wait करने को कहता है; header न हो तो exponentially back off करो। HTTP standard के हिसाब से `Retry-After` seconds की गिनती भी हो सकता है और एक date भी, इसलिए दोनों parse करो। लगभग एक second का random jitter जोड़ो ताकि parallel workers सब एक ही पल में retry करके फिर से throttle न हों।
 
-**Observability।** हर run में record करो कि कितने items पढ़े, added, changed, deleted और failed हुए, और कितना समय लगा। Connector रुक जाए या failures की गिनती उछल जाए, तो alert आना चाहिए।
+### Incremental sync और change detection
 
-**Changes detect करने के तरीके:**
+पहला run सब कुछ copy करता है; बाद के runs सिर्फ़ बदला हुआ लाते हैं। 200,000 documents को हर रात पूरा दोबारा पढ़ना slow है, महँगा है और आपको throttle करवाता है।
 
-| तरीका | कैसे काम करता है | किस पर ध्यान दें |
-| --- | --- | --- |
-| Change या delta tokens | API, save किए token के बाद के changes लौटाती है | Tokens expire या टूट सकते हैं; full re-scan का fallback रखो |
-| Modified-since filter | पिछले run के बाद modified time वाले items query करो | अक्सर deletions miss हो जाते हैं; clocks और time zones मिलने चाहिए |
-| Webhooks | कुछ बदलने पर system आपको call करता है | Calls खो सकती हैं; साथ में periodic check रखो |
-| Full comparison | सारे ids की list बनाओ और अपने index से compare करो | बड़े sets पर धीमा; हफ़्ते में एक बार safety net की तरह अच्छा |
+| Method | उदाहरण | Deletions report करता है? | किस बात का ध्यान रखें |
+| --- | --- | --- | --- |
+| Delta token | Microsoft Graph delta | हाँ | Links काम करना बंद कर सकते हैं (410 Gone); full re-scan का रास्ता रखो |
+| Modified-since filter | Salesforce `SystemModstamp`, Jira `updated` | नहीं | Deletion feed के साथ जोड़ो; windows को कुछ minute overlap करो |
+| Deletion feed | Salesforce get-deleted resource | सिर्फ़ deletions | Salesforce ज़्यादा से ज़्यादा 15 दिन रखता है |
+| Webhooks | Jira `jira:issue_deleted` | अगर वो event मौजूद हो | Deliveries खो सकती हैं; इसे कभी अकेला source मत बनाओ |
+| Full id comparison | आपका weekly reconciliation | हाँ, फ़र्क़ से | बड़े sets पर slow; safety net के तौर पर हर हफ़्ते चलाओ |
 
-**Build, buy या borrow।** Airbyte या Fivetran जैसे integration platforms आम systems के लिए हफ़्तों बचा देते हैं, और किसी search platform के साथ आने वाले connectors शायद पहले से permissions पढ़ते हों। फिर भी उन्हें check करना पड़ता है: पक्का करो कि वो deletions report करते हैं, access rights पढ़ते हैं, और run counts दिखाते हैं जिन पर आप alert लगा सको। अपना connector तब लिखो जब system अनोखा हो, जैसे in-house database या vendor portal, या जब client की security team किसी third-party tool को approve न करे।
+Graph delta के दो gotchas: एक ही item एक feed में एक से ज़्यादा बार आ सकता है (आख़िरी वाला मान्य है, इसलिए source id से upsert करो), और delete हुआ item `deleted` marker के साथ, बिना content के लौटता है, इसलिए download करने से पहले उसे check करो।
 
-**Code में एक incremental connector।** SharePoint या OneDrive library के लिए Microsoft Graph की delta query बदले और delete हुए items page-by-page लौटाती है, और आख़िर में अगली बार के लिए एक link देती है:
+### Deletions
+
+Modified-since query वो record नहीं देख सकती जो अब मौजूद ही नहीं, इसलिए delete हुए documents quote होते रहते हैं। हर connector को ऐसा feed चाहिए जो deletions report करे, या एक periodic id comparison, हो सके तो दोनों।
+
+### Permissions
+
+सबसे मुश्किल हिस्सा: permissions को ignore करने वाला assistant एक junior employee को salary review deck दिखा देता है।
+
+- **हर item के साथ access rights पढ़ो।** Graph का permissions endpoint किसी file की effective sharing लौटाता है, folders से inherit हुए access समेत। Allowed user और group ids हर chunk पर store करो।
+- **Groups को groups ही रहने दो।** Index time पर "Sales North" को 400 user ids में expand मत करो। Query time पर user के मौजूदा groups (उनके sign-in token से या directory call से) देखो और उनसे filter करो। फिर group छोड़ने वाला इंसान उसी वक़्त access खो देता है जब आपके group lookup को बदलाव दिखता है, बिना re-index के।
+- **सिर्फ़ permission वाले बदलाव दिखना मुश्किल है।** File share करने से उसका content नहीं बदलता। Graph delta sharing बदलने वाले items को mark कर सकता है अगर आप `Prefer: deltashowsharingchanges` header भेजो, साथ में `deltashowremovedasdeleted` और `deltatraversepermissiongaps`, जिन्हें Microsoft ज़रूरी बताता है। लेकिन Microsoft document करता है कि delta सिर्फ़ वो items लौटाता है जिनका content या metadata बदला, और उनके parent folders, इसलिए जो files सिर्फ़ access inherit करती हैं वो शायद न आएँ। Microsoft ये भी कहता है कि permissions ठीक से process करने के लिए `Sites.FullControl.All` app permission चाहिए, जिसे security teams अक्सर मना कर देती हैं। Marker को बस एक hint मानो। उसके पीछे उन sites और folders पर permissions का scheduled re-read रखो जिन्हें client sensitive mark करता है।
+- **Fail closed.** अगर किसी item की permissions नहीं पढ़ पा रहे, तो उसे index मत करो।
+
+### Code में एक incremental connector
+
+एक SharePoint library के लिए ये sync ऊपर के rules follow करता है। ये हर page पर अपनी position save करता है, fail हुए items के लिए retry list रखता है, tokens refresh करता है, और throttling और टूटा delta link संभालता है:
 
 ```python
-import hashlib, json, time
-from pathlib import Path
-import httpx
+import email.utils, hashlib, json, random, time
+from pathlib import Path        # client below is an httpx.Client
 
+GRAPH = "https://graph.microsoft.com/v1.0"
 STATE = Path("state/sharepoint-delta.json")
 
-def get(client, url):
-    for attempt in range(5):
-        r = client.get(url)
+class StopRun(Exception): pass    # fatal: stop now, leave saved state as it is
+class Resync(Exception): pass     # 410 Gone: the saved link no longer works
+
+def wait_for(r, attempt):
+    value = r.headers.get("Retry-After", "")
+    if value.isdigit():
+        delay = int(value)                                  # seconds
+    elif value:
+        when = email.utils.parsedate_to_datetime(value)     # an HTTP date
+        delay = max(0, when.timestamp() - time.time())
+    else:
+        delay = min(60, 2 ** attempt)                       # no header: back off
+    return delay + random.uniform(0, 1)                     # jitter
+
+def get(client, url, token, prefer=None):
+    headers = {"Authorization": f"Bearer {token()}"}  # token() reads a cache
+    if prefer:
+        headers["Prefer"] = prefer
+    for attempt in range(6):
+        r = client.get(url, headers=headers)
         if r.status_code in (429, 503):
-            time.sleep(int(r.headers.get("Retry-After", 2 ** attempt)))
-            continue
+            time.sleep(wait_for(r, attempt)); continue
+        if r.status_code == 410:
+            raise Resync(r.headers.get("Location"))
+        if r.status_code in (401, 403):
+            raise StopRun(f"access refused: {r.status_code}")
         r.raise_for_status()
         return r.json()
-    raise RuntimeError("gave up after repeated throttling")
+    raise StopRun("still throttled after 6 tries")
 
-def sync(token, drive_id, index):
-    counts = {"read": 0, "upserted": 0, "deleted": 0, "skipped": 0, "failed": 0}
-    url = (json.loads(STATE.read_text())["delta_link"] if STATE.exists()
-           else f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/delta")
-    with httpx.Client(headers={"Authorization": f"Bearer {token}"}, timeout=30) as client:
-        while url:
-            page = get(client, url)
-            for item in page.get("value", []):
-                counts["read"] += 1
-                try:
-                    if "deleted" in item:
-                        index.delete_doc(item["id"]); counts["deleted"] += 1
-                    elif "file" in item:
-                        text = download_and_parse(client, item)            # your parser
-                        digest = hashlib.sha256(text.encode()).hexdigest()
-                        if index.hash_of(item["id"]) == digest:
-                            counts["skipped"] += 1
-                        else:
-                            index.upsert_doc(item["id"], text, digest, meta_from(item))
-                            counts["upserted"] += 1
-                except Exception:
-                    counts["failed"] += 1
-            url = page.get("@odata.nextLink")
-            if not url and "@odata.deltaLink" in page:
-                STATE.parent.mkdir(exist_ok=True)
-                STATE.write_text(json.dumps({"delta_link": page["@odata.deltaLink"]}))
+def process(client, token, drive_id, item, index, counts, retry):
+    if "deleted" in item:
+        index.delete_doc(item["id"])        # must not fail if already gone
+        if item["id"] in retry:
+            retry.remove(item["id"])
+        counts["deleted"] += 1
+        return
+    if "file" not in item:
+        return                              # folders carry no text
+    perms = get(client, f"{GRAPH}/drives/{drive_id}/items/{item['id']}/permissions", token)
+    acl = acl_from(perms)                   # user and group ids allowed to read
+    text = download_and_parse(item)         # your parser
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    if index.hash_of(item["id"]) == digest:
+        index.update_meta(item["id"], meta_from(item), acl)  # renamed or reshared: no re-embed
+        counts["unchanged"] += 1
+    else:
+        new = index.upsert_doc(item["id"], text, digest, meta_from(item), acl)
+        counts["added" if new else "changed"] += 1
+
+def save(state):
+    STATE.parent.mkdir(exist_ok=True)
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state))
+    tmp.replace(STATE)                      # atomic: never half-written
+
+def sync(client, token, drive_id, index):
+    state = json.loads(STATE.read_text()) if STATE.exists() else {}
+    retry = state.get("retry", [])
+    counts = dict.fromkeys(["read", "added", "changed", "unchanged", "deleted", "failed"], 0)
+    for item_id in list(retry):             # last run's failures first
+        try:
+            item = get(client, f"{GRAPH}/drives/{drive_id}/items/{item_id}", token)
+            process(client, token, drive_id, item, index, counts, retry)
+            if item_id in retry:
+                retry.remove(item_id)
+        except StopRun:
+            raise
+        except Exception:
+            counts["failed"] += 1           # stays listed; alert if it stays for days
+    url = (state.get("next_link") or state.get("delta_link")
+           or f"{GRAPH}/drives/{drive_id}/root/delta")
+    while True:
+        try:
+            page = get(client, url, token, prefer="deltashowremovedasdeleted, "
+                       "deltatraversepermissiongaps, deltashowsharingchanges")
+        except Resync as e:
+            state = {"retry": retry, "reconcile": True}   # full listing, then compare ids
+            url = e.args[0] or f"{GRAPH}/drives/{drive_id}/root/delta"
+            continue
+        for item in page.get("value", []):
+            counts["read"] += 1
+            try:
+                process(client, token, drive_id, item, index, counts, retry)
+            except StopRun:
+                raise
+            except Exception:
+                counts["failed"] += 1
+                if item["id"] not in retry:
+                    retry.append(item["id"])
+        state["retry"] = retry
+        if "@odata.nextLink" in page:       # page done: save where to resume
+            url = state["next_link"] = page["@odata.nextLink"]
+            save(state)
+        else:                               # last page: save the link for next time
+            state.pop("next_link", None)
+            state["delta_link"] = page["@odata.deltaLink"]
+            save(state)
+            break
     print(counts)
     return counts
 ```
 
-पहले run में कोई saved link नहीं होता, तो वो सब कुछ पढ़ता है; बाद के runs सिर्फ़ changes लाते हैं। Delta link तभी save करो जब आख़िरी page सफल हो जाए, ताकि fail हुआ run दोहराया जाए, changes skip न हों। अगर saved link काम करना बंद कर दे, तो full re-scan पर लौट जाओ।
+इसे ऐसे क्यों बनाया गया है:
 
-**हफ़्ते में एक reconciliation।** अच्छे change feeds भी कुछ चीज़ें miss कर देते हैं। Ids compare करो:
+- **Position और failures एक साथ save होते हैं**, हर page के बाद एक atomic write में। Page के बीच crash होने पर वो page replay होता है, जो safe है क्योंकि upserts और deletes source id से keyed हैं। Fail हुआ item कभी skip नहीं होता: वो succeed होने तक retry list पर रहता है।
+- **एक ख़राब file feed को freeze नहीं करती।** कोई भी item fail होने पर आगे बढ़ने से मना करना safe लगता है, लेकिन तब एक corrupt PDF आगे के हर change को block कर देगी।
+- **Metadata text के साथ चलता है।** `meta_from` citations और filters के लिए source id, URL, title, path, author, modified time और owner रखता है। Rename इन्हें बदलता है पर text को नहीं, इसलिए ये बिना re-embedding के update होते हैं।
+- **Fatal errors बिना save किए run रोक देते हैं।** Access error या कभी न ख़त्म होने वाली throttling item failure नहीं है; उसे item failure गिनोगे तो पूरी library retry list पर चली जाएगी।
+- **टूटा link full listing trigger करता है।** 410 Gone पर Graph का `Location` header एक नया enumeration शुरू करता है। वो बताता है कि क्या मौजूद है, ये नहीं कि बीच में क्या delete हुआ, इसलिए `reconcile` flag scheduler को अगली बार id comparison चलाने को कहता है।
+
+### एक weekly reconciliation
+
+अच्छे change feeds से भी चीज़ें छूट जाती हैं। Source के पास जो ids हैं उन्हें index की ids से compare करो:
 
 ```python
 def reconcile(source_ids: set, index_ids: set, index):
@@ -160,59 +248,71 @@ def reconcile(source_ids: set, index_ids: set, index):
     return {"removed_stale": len(stale), "missing_to_fetch": len(missing)}
 ```
 
-**बिना बदले content को skip करो।** किसी के file का नाम बदलने या property edit करने पर भी file का modified time बदल जाता है। हर document के साथ extracted text का hash store करो, और match होने पर दोबारा embed मत करो। बड़ी libraries में इससे embedding का ज़्यादातर खर्च बच जाता है।
+अगर `removed_stale` गिनती के कुछ से ज़्यादा है, तो आपके change feed में bug है; उसे ठीक करो।
 
-**Source का लिहाज़ रखो।** बड़े पहले loads client के time zone में रात को चलाओ, concurrency कम रखो, और limits उनकी IT team से तय कर लो। Office hours में client का SharePoint throttle करवा देना भरोसा खोने का सबसे तेज़ तरीका है।
+### Records: Salesforce, Jira और SAP
 
-## एक example से समझो
+- **Salesforce.** बदले records को `LastModifiedDate` पर नहीं, `SystemModstamp` पर filter लगाकर query करो, क्योंकि automated processes record बदलें तब भी `SystemModstamp` आगे बढ़ता है। पिछले run time से कुछ minute घटा लो ताकि देर से commit हुए records न छूटें। Deletions के लिए हर object पर UTC में start और end time के साथ get-deleted REST resource call करो। ये ज़्यादा से ज़्यादा पिछले 15 दिन cover करता है और minute तक काम करता है, इसलिए अगर connector उससे ज़्यादा समय down रहा, तो सिर्फ़ full id comparison ही बराबरी करा सकता है। साथ ही, ये सिर्फ़ वही deletions दिखाता है जो integration user देख सकता था।
+- **Jira Cloud.** `search/jql` endpoint से JQL के साथ search करो, जो पुराने `startAt` offset की जगह `nextPageToken` से page करता है। `updated >= "last run time"` से filter करो। Delete हुए issues search से बस ग़ायब हो जाते हैं, इसलिए `jira:issue_deleted` webhook subscribe करो और फिर भी ids reconcile करो, क्योंकि webhooks छूट सकते हैं।
+- **SAP.** Direct table access कम ही मिलता है। Client की SAP team data expose करती है, आमतौर पर OData services के रूप में (अक्सर CDS views पर बनी), कभी-कभी पुराने BAPI या RFC calls से, या अपने integration middleware से। कुछ OData services delta tokens support करती हैं; वरना changed-on date field और reconciliation use करो। मुख्य gotcha समय है: service बनवाने और approve करवाने में आपके code से ज़्यादा वक़्त लगता है, इसलिए पहले हफ़्ते में ही माँग लो।
+- **Schema drift.** Admins fields जोड़ते हैं, picklist values rename करते हैं और objects retire करते हैं। अपने URLs में API version pin करो, सिर्फ़ तय fields map करो, और सब कुछ चुपचाप index करने की जगह तब alert करो जब describe call नए या ग़ायब fields दिखाए।
+- **Record permissions.** Salesforce access owners, roles और sharing rules से आता है, जिन्हें हूबहू copy करना मुश्किल है। Safe first release सिर्फ़ वो objects index करता है जो हर sales user पढ़ सकता है, या record दिखाने से पहले user के अपने login से live access check करता है।
 
-Gurugram की एक consumer-goods company SharePoint (product sheets, trade-scheme circulars) और Salesforce (accounts, opportunities) पर एक sales assistant चाहती है।
+### Build, buy या borrow
 
-SharePoint: छह sites पर read access वाला एक app registration। 38,000 files का पहला full sync throttling limits के नीचे रहने के लिए दो रातों में चलता है। उसके बाद हर 15 मिनट में delta queries सिर्फ़ बदले और delete हुए items लाती हैं, आम तौर पर हर run में 200 से 400, और इसमें करीब एक मिनट लगता है। हर item की permissions पढ़कर store की जाती हैं।
+Airbyte या Fivetran जैसे integration platforms आम systems के लिए हफ़्तों का काम बचाते हैं। किसी पर भरोसा करने से पहले check करो कि वो deletions report करता है, access rights साथ लाता है और ऐसे run counts expose करता है जिन पर आप alert कर सको। अपना ख़ुद का connector उन systems के लिए लिखो जो आम नहीं हैं, जैसे in-house database, या जब client की security team third-party tool approve न करे।
 
-Salesforce: एक read-only integration user, जो सिर्फ़ Account, Opportunity और Product objects तक सीमित है। Records हर 30 मिनट में "modified since" query से खींचे जाते हैं और retrieval के लिए छोटे text summaries में बदले जाते हैं, record id और owner metadata के रूप में रखे जाते हैं।
+## एक worked example
 
-तीसरे हफ़्ते में regional team एक SharePoint site का नाम बदल देती है और delta token invalid हो जाता है। Connector का error rate alert बज जाता है; job रात भर उस site का full re-scan करके संभल जाती है, और कुछ miss नहीं होता। Client की IT team के लिए आपका runbook ठीक इसी case को समझाता है।
+Gurugram की एक consumer-goods company SharePoint (product sheets, trade-scheme circulars) और Salesforce (accounts, opportunities) पर एक sales assistant चाहती है। नीचे के figures illustrative हैं, काम की shape दिखाने के लिए।
 
-| Measure | पहले | बाद में |
+**SharePoint.** छह sites पर read access वाला एक app registration। मान लो 38,000 files का पहला full sync throttling limits से काफ़ी नीचे रहने के लिए दो रातों में बाँटा गया है; अगर save किया next link अब भी काम करता है तो दूसरी रात वहीं से आगे चलती है, और अगर Graph 410 जवाब दे तो listing फिर से शुरू होती है। उसके बाद हर 15 minute पर एक delta run कुछ सौ changed या deleted items लौटाता है और लगभग एक minute में ख़त्म होता है। हर run changed items की permissions भी दोबारा पढ़ता है, और एक nightly job उन दो sites पर permissions दोबारा पढ़ता है जिनमें pricing और HR files हैं।
+
+**Salesforce.** Account, Opportunity और Product तक सीमित एक read-only integration user। हर 30 minute पर connector उन records को query करता है जिनका `SystemModstamp` पिछले run time माइनस पाँच minute के बाद का है, हर एक को record id और owner को metadata के तौर पर रखकर एक छोटी text summary में बदलता है, और उसी window के लिए get-deleted resource call करता है। अगर कोई sales manager 11:10 पर एक duplicate account delete करे, तो वो लगभग 11:30 तक index से निकल जाता है।
+
+**Incident.** मान लो तीसरे हफ़्ते में एक delta request 410 Gone लौटाती है। Connector `Location` header follow करता है, रात भर library re-list करता है, फिर id comparison चलाकर वो 14 files हटाता है जो link टूटे रहने के दौरान delete हुईं। Client के notice करने से पहले alert on-call engineer तक पहुँच गया, और runbook में ये case पहले से था।
+
+| पैमाना | पहले | बाद में |
 | --- | --- | --- |
-| SharePoint sync | हर रात full re-read, करीब 6 घंटे, अक्सर throttle | हर 15 मिनट में delta, करीब 1 मिनट |
-| Salesforce sync | रोज़ का export | हर 30 मिनट में |
-| Delete हुए documents जो अब भी searchable हैं | दर्जनों | कोई नहीं, हफ़्ते में check होता है |
-| Fail हुआ sync पकड़ने में लगा समय | दिनों | मिनटों में, alerts से |
+| SharePoint sync | हर रात full re-read, लगभग 6 घंटे, अक्सर throttled | हर 15 minute पर delta, लगभग 1 minute |
+| Salesforce sync | Daily export, deletions कभी नहीं हटते | हर 30 minute, deletions एक run के अंदर |
+| Delete हुए documents अब भी searchable | दर्जनों | Weekly check में एक भी नहीं |
+| Fail हुए sync को notice करने का समय | दिन | Minutes, alerts के ज़रिए |
 
 ## आम गलतियाँ
 
-- **हर बार full re-sync।** Change tokens या modified-since queries use करो।
-- **Deletions को ignore करना।** Delete और expire हुए documents बार-बार quote होते रहते हैं।
-- **ज़रूरत से ज़्यादा access।** पूरे tenant की जगह नाम वाले sites और objects पर read-only access माँगो।
-- **Failure के बाद resume नहीं।** Page 9,000 पर crash हुआ तो page 1 से दोबारा शुरू नहीं होना चाहिए।
-- **चुप रहने वाले connectors।** Sync रुकने पर किसी को alert न जाए, तो assistant चुपचाप पुराना पड़ जाता है।
-- **Client की IT team के लिए runbook नहीं।** लिखकर रखो कि tokens टूटें, permissions बदलें या कोई site rename हो, तो क्या करना है।
-- **Run ख़त्म होने से पहले sync cursor save कर देना।** फिर crash होने पर changes हमेशा के लिए skip हो जाते हैं।
-- **हर modified file को दोबारा embed करना**, भले ही सिर्फ़ metadata बदला हो।
+- **हर बार full re-sync.** First load के बाद delta tokens या modified-since queries use करो।
+- **Deletions को ignore करना.** Modified-since query delete हुए records कभी return नहीं करती; deletion feed और weekly id comparison जोड़ो।
+- **गलत समय पर cursor save करना.** Process से पहले save करने से crash के बाद items skip होते हैं; सिर्फ़ आख़िर में करने से page 1 से restart होता है। हर page के बाद save करो।
+- **Fail हुए items को निगल जाना.** Failure गिनकर आगे बढ़ जाने से वो item हमेशा के लिए खो जाता है। Retry list रखो।
+- **लंबे run के लिए एक token.** वो 60 से 90 minute में expire होता है और job रात 3 बजे मर जाता है।
+- **Index time पर groups को users में expand करना.** फिर membership के बदलाव लागू होने के लिए full re-index चाहिए।
+- **ज़रूरत से ज़्यादा access.** पूरे tenant का नहीं, नाम लिए sites और objects का read-only access माँगो।
+- **चुप रहने वाले connectors.** अगर sync रुकने पर किसी को alert नहीं जाता, तो assistant चुपचाप stale हो जाता है।
+- **हर modified file को re-embed करना**, तब भी जब सिर्फ़ उसका metadata बदला हो।
 
-## कब custom connector नहीं चाहिए
+## कब custom connector की ज़रूरत नहीं
 
-- **एक बार का load**, files का तय set: एक बार export करो और ingest कर दो।
-- **Platform का connector उस system को पहले से cover करता है**, deletions report करता है और permissions पढ़ता है।
-- **Users को जो थोड़े documents चाहिए, वो खुद सीधे upload कर सकते हैं।**
+- **One-off load**, files के एक fixed set का: एक बार export करो और ingest करो।
+- **कोई platform connector पहले से उस system को cover करता है**, deletions report करता है और permissions पढ़ता है।
+- **Users जिन कुछ documents की ज़रूरत है उन्हें** सीधे upload कर सकते हैं।
 
 ## Demo से production तक
 
-- **हर run की counts record करो** और रुकने या failures बढ़ने पर alert लगाओ।
-- **Cursors सिर्फ़ success के बाद save करो**, और full re-scan का fallback रखो।
-- **हर हफ़्ते ids reconcile करो** ताकि छूटी deletions पकड़ी जाएँ।
-- **Content को hash करो** ताकि बिना बदले documents skip हों।
-- **Schedules और limits** client की IT team से लिखित में तय करो।
+शुरुआती defaults, client की IT team के साथ लिखित में तय:
+
+- **Schedules:** document delta हर 15 minute, record queries हर 30 minute, permission re-read हर रात, full id comparison हर हफ़्ते। बड़े first loads सिर्फ़ client के time zone में रात को, कम concurrency के साथ।
+- **Alerts:** कोई run fail हो या दो intervals के अंदर start न हो; पढ़े गए items आम के आधे से नीचे गिरें; कोई item एक दिन से ज़्यादा retry list पर रहे; कोई secret 30 दिन के अंदर expire होने वाला हो।
+- **Runbook:** 410 Gone पर, access error पर, और जब कोई site, object या field rename हो, तब क्या करना है।
 
 ## Practice करो
 
-Microsoft Graph overview पढ़ो, फिर कोई भी ऐसी API चुनो जिसमें paging हो और जिसे आप free में use कर सको (GitHub issues, कोई public dataset API, या developer tenant के साथ Graph)।
+Microsoft Graph overview पढ़ो, फिर paging वाली कोई भी API चुनो जो free में use कर सको (GitHub issues, कोई public dataset API, या developer tenant के साथ Graph)।
 
-1. एक connector लिखो जो paging के साथ सारे items खींचे, rate limits माने और cursor store करे ताकि resume हो सके।
-2. एक incremental mode जोड़ो जो पिछले run के बाद बदले items ही लाए, और ऐसा check जो delete हुए items पकड़े।
-3. हर run की counts (read, added, updated, deleted, failed) record करो और एक लाइन का summary print करो।
-4. अपना connector चलाओ, source पर एक file delete करो, दोबारा चलाओ, और confirm करो कि उस file के chunks index से गायब हो गए।
+1. ऐसा connector लिखो जो paging के साथ सारे items खींचे, `Retry-After` का पालन करे, और हर page के बाद अपनी position save करे ताकि resume कर सके।
+2. First load के बीच में उसे kill करो और restart करो। Confirm करो कि वो save किए page से आगे बढ़ता है और फिर से शुरू नहीं करता।
+3. एक incremental mode जोड़ो जो पिछले run के बाद बदले items ही लाए, और एक check जो delete हुए items detect करे।
+4. हर run के counts (read, added, changed, unchanged, deleted, failed) record करो और one-line summary print करो।
+5. Source पर एक item delete करो, rerun करो, और confirm करो कि उसके chunks index से चले गए।
 
-**आपका काम पूरा जब** आप अपना connector लगातार दो बार चला सको और दिखा सको कि दूसरा run सिर्फ़ वही लाया जो बदला था, एक deletion समेत।
+**आपका काम पूरा है जब आप** अपना connector लगातार दो बार चला सको और दिखा सको कि दूसरा run सिर्फ़ बदला हुआ लाता है, एक deletion समेत, और दिखा सको कि crash हुआ run सही page से resume होता है।
