@@ -3,9 +3,9 @@ id: cost-control
 level: P2
 theme: ops
 title: "Cost control"
-outcome: "Know where an app's money goes, and cut cost with model choice, batching and limits."
-answer: "LLM app cost comes mostly from tokens. Cut it by choosing smaller models where they are good enough, trimming prompts, caching, batching and setting spending limits."
-why_it_matters: "AI features can be profitable or ruinous depending on cost per user. Engineers who can read a cost report and cut it are valued everywhere, and especially at Indian price points."
+outcome: "Know where an app's money goes, and cut it with model choice, effort, caching, batching and limits, showing the arithmetic for every saving."
+answer: "LLM app cost is tokens times price. Measure it per feature, then use the cheapest model and effort that pass your evals, cache long prompts, batch work that can wait and set hard limits."
+why_it_matters: "An AI feature can be profitable or ruinous depending on its cost per user, and Indian price points leave little room. Engineers who can read a cost report, find the hidden tokens and cut them safely are valued everywhere."
 hours: 2
 gap_tags: [cost-control]
 primary_resource: huyen-llm-production
@@ -18,43 +18,44 @@ check:
   question_ids: [cost-control-1, cost-control-2, cost-control-3]
 flashcards:
   - q: "What is the first step in cost control?"
-    a: "Measure: log tokens and cost per call, tagged with feature, user and model."
-  - q: "What is usually the biggest cost lever?"
-    a: "Model choice: use the cheapest model that passes each task's evals."
-  - q: "How do you reduce prompt size?"
-    a: "Trim system prompts, send fewer and shorter chunks, summarise long histories and remove unused tools."
-  - q: "Why limit output size?"
-    a: "Output tokens usually cost more than input; concise formats and max_tokens cut cost and time."
+    a: "Measure: log fresh input, cache reads, cache writes, output and thinking tokens for every call, with cost, tagged by feature, user, model, effort and prompt version."
+  - q: "How do you work out the cost of one request?"
+    a: "Fresh input times the input price, plus cache reads and writes at their prices, plus output tokens (thinking included) times the output price. Convert currency at a dated rate."
+  - q: "Why can a 20-token reply cost as much as a 300-token one?"
+    a: "Reasoning (thinking) tokens are billed as output even when you never see them. Read the thinking-token count in the usage data and tune effort per route."
+  - q: "What is usually the biggest lever, and how do you use it safely?"
+    a: "Model choice. Try two or three model sizes and effort levels on your eval set, and pick the cheapest that passes, judged by cost per completed task."
+  - q: "When does prompt caching pay for itself?"
+    a: "When the same long prefix is reused within the cache lifetime. On Anthropic's API a 5-minute write costs 1.25 times input and pays off after one read; a 1-hour write costs 2 times and pays off after two."
+  - q: "What silently breaks a prompt cache?"
+    a: "Any change early in the prefix: a timestamp in the system prompt, tools listed in a new order, a changed effort setting or a switch of model. Check the cache-read count in usage."
   - q: "Which work suits batch APIs?"
-    a: "Work that can wait hours, such as nightly summaries, bulk classification and embedding a corpus."
-  - q: "What limits protect the budget?"
-    a: "Daily caps per user, step limits on agents, spending alerts and hard provider limits."
+    a: "Work that can wait up to a day: nightly summaries, bulk tagging, evals and backfills. Anthropic charges half price; most batches finish within an hour and unfinished requests expire after 24 hours."
+  - q: "Why must max_tokens leave room when thinking is on?"
+    a: "Thinking counts toward max_tokens. A cap sized for the visible reply cuts the answer off, and the retry costs more than the cap saved."
   - q: "What causes overnight cost surprises?"
-    a: "Retry storms, looping agents, a single huge document or one heavy user."
-  - q: "How do you prove a cost cut did no harm?"
-    a: "Show eval scores and user satisfaction before and after, next to the cost change."
-  - q: "How do you work out cost per request?"
-    a: "Input tokens times the input price plus output tokens times the output price, with cached input billed lower. Output usually costs several times more per token."
+    a: "Retries with no backoff, agents looping with no step limit, full history resent at every step, one huge document or one heavy user."
 exercise:
-  title: "Find the savings"
-  setup: "A Jaipur travel portal spends ₹8 lakh a month on AI. Logs by feature: hotel description rewriting for 50,000 listings each night takes 50%; the booking chat takes 30%; review sentiment tagging takes 20%. The chat's system prompt is 5,000 tokens and replies average 600 tokens though users read only the first lines. There are no spending alerts."
+  title: "Find the hidden tokens"
+  setup: "A Pune exam-prep app runs a doubt-solving agent for JEE students on a large reasoning model priced, for this exercise, at $4 per million input tokens, $20 per million output tokens, $5 per million for cache writes and $0.20 per million for cache reads. It spends ₹4 lakh a month. A week of logs shows: replies average 150 visible tokens, but output_tokens averages 1,350, because effort is set to high for every doubt, including 'what is the formula for kinetic energy'. Each doubt takes 5 agent steps, and every step resends the same 7,000-token system prompt with 25 tool definitions, uncached. On a timeout the client retries up to 3 times at once, with no backoff. A small model scored 81% on the 300-doubt eval set, against 95% for the large model and a pass mark of 92%. Students pay ₹149 a month."
   questions:
-    - q: "What should change for the nightly rewriting?"
-      a: "Move it to a batch API, and rewrite only listings that changed since the last run."
-    - q: "What should change for sentiment tagging?"
-      a: "Test a small model on labelled reviews and switch if accuracy holds."
-    - q: "How can the chat cost less without hurting users?"
-      a: "Trim and cache the system prompt, ask for shorter replies and set max_tokens."
-    - q: "What protection should be added?"
-      a: "Spending alerts at, say, 80% of budget, per-user daily caps and a hard provider limit."
+    - q: "What share of each reply's output is hidden thinking, and what do you try first?"
+      a: "1,200 of 1,350 output tokens, about 89%. Give easy factual doubts low effort, keep high effort for multi-step problems, and re-run the eval on each route before switching."
+    - q: "The small model failed the eval. How do you cut input cost without changing the model?"
+      a: "Cache the 7,000-token prefix. Uncached, 5 steps cost 35,000 × $4 per million = $0.14. Cached: one write (7,000 × $5 per million = $0.035) plus four reads (28,000 × $0.20 per million = $0.0056), about $0.041, 71% less. Also send only the tools each step needs."
+    - q: "What is wrong with the retry setup, and how do you fix it?"
+      a: "One slow doubt can be billed up to four times, and instant retries pile onto an overloaded service. Allow at most two retries with exponential backoff and jitter, cap agent steps and stream long replies instead of waiting on a timeout."
+    - q: "After the fixes a doubt costs ₹1.20. A typical student asks 8 doubts a day on 25 days a month. Does the ₹149 plan work?"
+      a: "No: 200 × ₹1.20 = ₹240 a month, more than the fee before GST and payment charges. Add a daily doubt limit, send easy doubts to a cheaper route that passes its own eval, or price a heavier plan higher."
 ask:
   - "How do I reduce my LLM API costs?"
-  - "How do I track AI costs per feature?"
-  - "Should I use a smaller model to save money?"
+  - "Why is my bill high when the model's replies are short?"
+  - "How do I check that prompt caching is working?"
+  - "Should I use a smaller model or lower effort to save money?"
 explain_in_interview:
-  answer: "Cost control means knowing where the token money goes and cutting it without hurting users. First you log tokens and cost for every call, tagged by feature, user and model, so you can see which feature costs most. Then you pull the levers: a smaller model where it passes your evals, shorter prompts and outputs, caching, batch APIs for work that can wait, and daily caps and alerts. For example, a support platform moves its nightly ticket summaries to a batch API and simple classification to a small model. The trade-off is quality: every cheaper option must be re-tested on your eval set before you switch."
+  answer: "Cost control means knowing where the token money goes and cutting it without hurting users. Every call costs input tokens times the input price plus output tokens times the output price, and hidden reasoning tokens bill as output. So first I log tokens and cost per call, tagged by feature, user and model. Then I pull levers: the cheapest model and effort that pass the evals, prompt caching for long repeated prefixes, batch APIs at half price for work that can wait, shorter outputs, and caps and alerts. The trade-off is quality, so each change is re-tested on the eval set and judged by cost per completed task."
   follow_up: "Which cost lever usually saves the most, and how do you apply it safely?"
-  follow_up_answer: "Model choice. Smaller models can cost many times less and often match large ones on classification, extraction and routing. Test each task on your eval set with two or three model sizes, use the cheapest that passes, and route only hard requests to the big model."
+  follow_up_answer: "Model choice. A small model can cost 40 times less than a large one and often matches it on classification, extraction and routing. Test two or three model sizes and effort levels on the eval set, pick the cheapest that passes, and route only hard requests to the big model."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-11-08
@@ -62,116 +63,171 @@ reviewed_on: 2026-11-08
 
 ## What it is
 
-LLM apps cost money on every request, and costs grow with users, longer prompts and agent loops. **Cost control** means knowing where the money goes and reducing it without hurting the user experience. The main levers are model choice, prompt size, output size, caching, batching and limits.
+Every call to a hosted model is billed by the **token**, a word or piece of a word. **Cost control** means knowing which features, users and steps spend those tokens, and cutting the spend without hurting users. The bill for one request has four parts:
 
-| Feature (from tagged logs) | Share of ₹6 lakh a month | Fix |
-|---|---|---|
-| Nightly ticket summaries | 45% | Move to the batch API |
-| Live chat replies | 35% | Trim and cache the prompt, cap replies |
-| Ticket classification | 20% | A small model (accuracy 94% to 93%) |
+- **Fresh input**: the system prompt, tool definitions, history, retrieved text and the user's message, at the full input price.
+- **Cache reads and writes**: the part of the input served from, or saved into, the provider's prompt cache, at a much lower or slightly higher price.
+- **Output**: the visible reply, at a price several times the input price.
+- **Thinking**: the hidden reasoning tokens of a reasoning model. They are billed as output even when the response shows none of them.
 
 ```flow
+title: Where the money goes in one request
 dir: LR
-Tag every call by feature -> Find the biggest share -> Apply a fix -> Add caps | per-agent daily cap, alert at 80% of budget, provider hard limit
-Add caps -> Next month: ₹2.7 lakh | customer satisfaction unchanged
+System prompt and tools | same on every call, so cacheable -> Input bill
+History and retrieved text | grows with every turn -> Input bill
+User message | usually small -> Input bill
+Input bill -> Model
+Model -[hidden reasoning]-> Output bill | thinking bills as output
+Model -[visible reply]-> Output bill
 ```
 
-This lesson follows a customer-service platform in Kolkata that wanted to halve its model bill.
+Two facts drive most of this lesson. Input is usually the larger token count, because the long fixed prefix is resent on every call. Output, including thinking, is usually the larger price per token. So the big savings come from not resending the prefix at full price, not thinking harder than a task needs, and not using a large model where a small one passes.
 
 ## How it works
 
-**Measure first.** Log tokens and cost for every call, tagged with feature, user and model. Then you can answer: which feature costs most? Which users? Which step of an agent? Monthly totals alone hide this; cost per user and per feature show where to act and whether a feature can pay for itself.
+### Measure first
 
-**Model choice: the biggest lever.** Smaller models can cost many times less than the largest ones. For simple tasks such as classification, extraction from clean text, routing and short replies, a small model often matches a large one. Test each task on your eval set with two or three model sizes and use the cheapest that passes. Route only hard requests to the big model.
+Log every call with its usage numbers: fresh input tokens, cache-read tokens, cache-write tokens, output tokens and, where the API reports it, the thinking share of output (Anthropic's field is `usage.output_tokens_details.thinking_tokens`; OpenAI reports reasoning tokens under `output_tokens_details` too). Tag each call with feature, user, model, effort setting and prompt version. Then you can answer: which feature costs most, which users, which agent step, and how much is thinking. A monthly total alone hides all of this.
 
-**Prompt size.** Every request pays for its input. Trim system prompts, send fewer and shorter retrieved chunks, summarise long conversation history, and remove unused tool definitions.
+Track **cost per completed task**, not just cost per request. A cheap call that fails, gets retried or goes to a human is not cheap.
 
-**Output size.** Output tokens usually cost more than input. Ask for concise formats and set `max_tokens`.
+### Read the price page, and date it
 
-**Caching.** Prompt caching for long shared prefixes; response caching for repeated questions.
+As of 28 November 2026, Anthropic's API prices three current model sizes like this (US dollars per million tokens):
 
-**Batching.** Work that can wait (nightly summaries, bulk classification, embedding a corpus) can go through batch APIs, which providers typically offer at a large discount in exchange for results within hours.
+| Model | Input | Output | Cache read | 5-minute cache write | Batch input / output |
+| --- | --- | --- | --- | --- | --- |
+| Claude Opus 5.5 | $4 | $20 | $0.20 | $5 | $2 / $10 |
+| Claude Sonnet 5.5 | $2 | $10 | $0.10 | $2.50 | $1 / $5 |
+| Claude Haiku 5.5, prompts up to 100,000 tokens | $0.10 | $0.50 | $0.01 | $0.125 | $0.05 / $0.25 |
 
-**Limits.** Daily caps per user, step limits on agents, spending alerts and hard limits in the provider console.
+Three things to read off it. Output costs five times input. The smallest model is 40 times cheaper than the largest on both. Batch is exactly half price. Other providers use the same structure with different numbers, so read their current pages and write down the date you checked.
 
-**Know the arithmetic.** Cost per request is input tokens times the input price plus output tokens times the output price, with cached input usually billed far lower. A small calculator keeps estimates honest:
+### Model choice: the biggest lever
+
+For classification, extraction from clean text, routing and short replies, a small model often matches a large one. Test each task on your eval set with two or three model sizes, use the cheapest that passes, and send only hard requests to the big model. The lesson on batching and model tiering covers routers in depth. Re-count tokens when you switch: different models can use different tokenizers, so the same text can be a different number of tokens.
+
+### Reasoning tokens and effort
+
+Most current models think before answering, and that thinking bills as output at the full output price. Anthropic's documentation is explicit that you pay for the full thinking even when the response shows only a summary or nothing, so the visible reply length does not match the bill.
+
+A quick example on Opus 5.5 prices: a ticket label that is 10 visible tokens plus 90 thinking tokens costs 100 × $20 per million = $0.002 of output, ten times the $0.0002 for the label alone.
+
+The control is the **effort** setting (or "reasoning effort" on other providers). Lower effort means less thinking, and at low effort the model may skip thinking on simple inputs. On Anthropic's API the default is `medium` for Opus 5.5 and Haiku 5.5 and `high` for most other models, so set it explicitly. Three rules:
+
+- **Tune per route.** Chat, tagging and extraction often hold quality at low effort; multi-step maths, code and planning often need high. Measure on the eval for each route.
+- **Leave room in `max_tokens`.** Thinking counts toward it. A cap sized for a 200-token reply truncates the answer when the model thinks, and the retry costs more than the cap saved.
+- **Keep effort stable within a conversation.** Changing it between requests can invalidate the prompt cache.
+
+### Prompt caching
+
+Prompt caching stores a long, unchanging start of the prompt, such as the system prompt, tool definitions or a big document, so later calls read it cheaply. It is a prefix match: tools first, then the system prompt, then messages, and any change at one point invalidates everything after it. On Anthropic's API, as of November 2026:
+
+- A 5-minute cache write costs 1.25 times the input price and pays off after one read. A 1-hour write costs 2 times and pays off after two reads.
+- A read costs 0.1 times input on most models, and 0.05 times on Opus 5.5 and Sonnet 5.5.
+- Prompts shorter than a minimum length, 512 tokens on the current models, are not cached, and no error tells you.
+
+Caching fails quietly. Common causes: a date or request ID near the top of the system prompt, tool definitions built in a different order each time, a changed effort setting, a switch to another model (each model has its own cache), or traffic so thin that the 5-minute lifetime runs out between calls. Check the cache-read count in usage. If it stays at zero, find the change.
+
+**Response caching** is different: you store whole answers and skip the model for repeated questions. It saves more per hit but risks stale or leaked answers. The lesson on caching and speed covers both.
+
+### Batch APIs
+
+Work that can wait, such as nightly summaries, bulk tagging, eval runs and backfills, can go through a batch API. Anthropic's Message Batches API charges 50% of the normal price for input and output. Most batches finish within an hour; requests not finished within 24 hours expire and are not billed. Batch and caching discounts stack, and the 1-hour cache suits batches because they can take longer than 5 minutes.
+
+### Agents: the history grows every step
+
+An agent sends the whole conversation on every step, so input grows with each step. Suppose a 4,000-token prefix and 1,500 new tokens per step. Eight steps send 4,000 × 8 + 1,500 × (0 + 1 + … + 7) = 32,000 + 42,000 = 74,000 input tokens, for what feels like one task. Cache the fixed prefix and the earlier history, load only the tools the task needs, set a step limit, and summarise or clear old tool results in long runs. The lesson on agent budgets and kill switches covers limits.
+
+### Indian languages and self-hosting
+
+The same reply can need several times more tokens in Hindi, Tamil or Bengali than in English, depending on the tokenizer, so measure tokens per request for each language you serve. The lesson on AI in Indian languages covers this.
+
+Self-hosting an open model swaps a per-token bill for a fixed monthly one. For example, suppose a GPU server costs ₹2.5 lakh a month to run, including people's time. At ₹0.47 per batched summary, the API costs the same once you send about 5.3 lakh summaries a month (2,50,000 ÷ 0.47). Below that the API wins, and above it self-hosting wins only if the open model passes the same evals and the server stays busy. The lessons on vLLM and on total cost of ownership show how to fill in real numbers.
+
+### A calculator
+
+This calculator uses the prices in the table and an illustrative rate of ₹94 to the dollar (the rupee traded at about ₹93 to ₹94 in mid November 2026). It prints the rows of the worked example below.
 
 ```python
-def cost_per_request_inr(input_tokens, output_tokens, in_price_usd_per_m, out_price_usd_per_m,
-                         cached_share=0.0, cache_discount=0.9, usd_to_inr=85):
-    """Prices are US dollars per million tokens. cached_share: fraction of input served from the prompt cache."""
-    fresh = input_tokens * (1 - cached_share)
-    cached = input_tokens * cached_share * (1 - cache_discount)
-    usd = ((fresh + cached) * in_price_usd_per_m + output_tokens * out_price_usd_per_m) / 1e6
-    return usd * usd_to_inr
+RATE = 94  # rupees per US dollar: illustrative (about 93 to 94 in mid November 2026)
 
-def monthly_cost_inr(requests_per_month, **kw):
-    return requests_per_month * cost_per_request_inr(**kw)
+# US dollars per million tokens, Anthropic API pricing page, checked 28 November 2026
+PRICES = {
+    "opus-5.5":  {"in": 4.00, "out": 20.00, "cache_read": 0.20, "cache_write": 5.00},
+    "haiku-5.5": {"in": 0.10, "out": 0.50, "cache_read": 0.01, "cache_write": 0.125},
+}
 
-# A chat reply: 3,000 input tokens (60% cached), 250 output, $3 / $15 per million tokens
-per = cost_per_request_inr(3000, 250, 3, 15, cached_share=0.6)
-print(round(per, 2), round(monthly_cost_inr(300_000, input_tokens=3000, output_tokens=250,
-      in_price_usd_per_m=3, out_price_usd_per_m=15, cached_share=0.6)))
+def cost_inr(model, fresh_in, out, cache_read=0, cache_write=0, batch=False):
+    """Rupees for one request. `out` includes thinking tokens, which bill as output."""
+    p = PRICES[model]
+    usd = (fresh_in * p["in"] + out * p["out"]
+           + cache_read * p["cache_read"] + cache_write * p["cache_write"]) / 1e6
+    return usd * RATE * (0.5 if batch else 1)
+
+rows = {  # (rupees per request, requests per month)
+    "summary, before":  (cost_inr("opus-5.5", 1500, 200), 300_000),
+    "summary, batch":   (cost_inr("opus-5.5", 1500, 200, batch=True), 300_000),
+    "classify, before": (cost_inr("opus-5.5", 600, 100), 300_000),
+    "classify, small":  (cost_inr("haiku-5.5", 600, 10), 300_000),
+    "chat, before":     (cost_inr("opus-5.5", 6000, 750), 60_000),
+    "chat, after":      (cost_inr("opus-5.5", 1000, 500, cache_read=2700, cache_write=300), 60_000),
+}
+for name, (per, n) in rows.items():
+    print(f"{name:17} ₹{per:.4f} each, ₹{per * n / 1e5:.2f} lakh a month")
 ```
 
-Prices and the exchange rate change, so read them from the provider's current page, and record the date you checked. Two things the arithmetic shows quickly: output tokens usually cost several times more than input, and long prompts repeated on every call add up fast.
+### Cutting safely
 
-**Language matters too.** The same reply can need several times more tokens in Hindi, Tamil or Bengali than in English, depending on the tokenizer, so measure tokens per request for each language you serve. The lesson on AI in Indian languages covers this.
+Change one lever at a time and run the feature's evals before and after. Report cost and quality side by side. When a change saves money but lowers quality slightly, write down that the team accepted the trade and why.
 
-**Route by difficulty.** A small, fast classifier or rules can send easy requests to a cheap model, out-of-scope questions to a stock reply with no model call, and only hard ones to the strongest model. The lesson on growing an AI app in layers covers routers and gateways.
+### Pricing a feature before launch
 
-**Watch for surprises.** Retry storms, agents looping, a single huge document, or one heavy user can multiply costs overnight.
-
-**Levers and typical savings:**
-
-| Lever | Typical effect | Risk |
-| --- | --- | --- |
-| Smaller model for simple tasks | Large saving on that task | Quality drop if not tested |
-| Batch API for waiting work | Large discount | Hours of delay |
-| Prompt caching | Lower input cost on repeated prefixes | Breaks if the prefix varies |
-| Shorter prompts and outputs | Proportional saving | Missing context or detail |
-| Response caching | Removes repeated calls | Stale or shared answers |
-| Caps and alerts | Prevents surprises | Users hitting limits |
-
-**A cost dashboard that drives action.** Show spend per day by feature, cost per user for the heaviest users, cost per successful task, and the share of tokens from each part of the prompt for the top feature. Add a line for the budget and the alert threshold. Review it weekly. The dashboard should answer, in one glance, which feature to optimise next and whether last week's change worked.
-
-**Cutting safely.** Change one lever at a time and run the feature's evals before and after. Report cost and quality side by side. When a change saves money but lowers quality slightly, as with the classifier here, write down that the team accepted the trade and why.
-
-**Pricing a feature before launch.** Estimate cost per user per month from the pilot: requests per user, tokens per request and the model's price. Compare it with what the feature earns or saves per user. If one user's monthly cost could exceed their value, set caps before launch, not after the first large bill. Revisit the estimate in the first two weeks of real traffic, because real users rarely behave like the pilot group.
+Estimate cost per user per month from the pilot: requests per user times cost per request. Compare it with what the user pays after GST and payment fees. For example, with the trimmed chat below at ₹1.51 a reply, a student who sends 600 messages a month costs ₹906, while a ₹149 plan might bring in about ₹120. Either the chat runs on a cheaper route that passes its eval, or the plan has a daily limit. Set caps before launch, and recheck in the first two weeks, because real users rarely behave like the pilot group.
 
 ## A worked example
 
-A Kolkata customer-service platform spends ₹6 lakh a month on model calls and wants to halve it.
+A customer-service platform in Kolkata spends about ₹6.3 lakh a month on model calls, all on Opus 5.5, and wants to halve it. All volumes and token counts below are illustrative, priced with the table above at ₹94 to the dollar.
 
-Logging by feature shows:
+**Step 1: measure.** Tagged logs show three features:
 
-- 45% on a nightly job that summarises 10,000 support tickets for team leads, which nobody reads before 10 am;
-- 35% on live chat replies;
-- 20% on ticket classification.
+- **Nightly ticket summaries**: 10,000 a night, 3 lakh a month. Each has 1,500 input and 200 output tokens. Nobody reads them before 10 am.
+- **Ticket classification**: 3 lakh a month. Each has 600 input tokens, but output is 100 tokens: a 10-token label plus 90 tokens of thinking.
+- **Live chat**: 60,000 replies a month. Each has a 5,000-token system prompt and tools, uncached, plus 1,000 tokens of history and question. Output is 750 tokens: 450 visible and 300 thinking.
 
-Changes:
+**Step 2: price each feature.**
 
-- The nightly summaries move to the provider's batch API at a large discount, finishing well before morning.
-- Ticket classification switches from the large model to a small one; on 400 labelled tickets, accuracy drops from 94% to 93%, which the team accepts.
-- Live chat keeps the large model, but the system prompt is trimmed by 40% and cached, and replies are capped at 200 tokens.
-- A per-agent daily cap and a spending alert at 80% of budget are added.
+- Summaries: (1,500 × $4 + 200 × $20) ÷ 10 lakh = $0.0100, which is ₹0.94 each, so 3 lakh × ₹0.94 = ₹2.82 lakh (45%).
+- Classification: (600 × $4 + 100 × $20) ÷ 10 lakh = $0.0044, which is ₹0.41 each, so ₹1.24 lakh (20%). Thinking is 90 of the 100 output tokens.
+- Chat: (6,000 × $4 + 750 × $20) ÷ 10 lakh = $0.0390, which is ₹3.67 each, so 60,000 × ₹3.67 = ₹2.20 lakh (35%).
 
-The next month's bill is ₹2.7 lakh, with no change in customer satisfaction scores.
+Total: ₹6.26 lakh.
 
-| Change | Cost effect | Quality check |
-| --- | --- | --- |
-| Nightly summaries to batch | Large discount on 45% of spend | Ready before 10 am as before |
-| Classification to small model | Much cheaper | 94% to 93% on 400 tickets, accepted |
-| Chat prompt trimmed 40% and cached; replies capped | Lower chat cost | Satisfaction unchanged |
+**Step 3: change one lever per feature.**
+
+- **Summaries move to the batch API.** Same tokens at half price: ₹0.47 each, ₹1.41 lakh a month. They are ready long before 10 am.
+- **Classification moves to Haiku 5.5 at low effort.** Lowering effort alone on Opus 5.5 removes the thinking (600 × $4 + 10 × $20 = $0.0026, ₹0.24 each, 41% less). The small model at low effort costs (600 × $0.10 + 10 × $0.50) ÷ 10 lakh = $0.000065, ₹0.0061 each, about ₹1,800 a month. On 400 labelled tickets, accuracy goes from 94% to 93%, and the team accepts it.
+- **Chat keeps Opus 5.5.** The system prompt is trimmed from 5,000 to 3,000 tokens and cached. Busy daytime traffic gives a 90% hit rate, so on average 2,700 tokens are cache reads at $0.20 per million and 300 are writes at $5 per million. The prompt asks for replies under about 150 words, which brings visible output from 450 to 200 tokens. Thinking stays at 300. `max_tokens` is set to 1,200, not 200, so the thinking never truncates a reply. Per reply: 1,000 × $4 + 2,700 × $0.20 + 300 × $5 + 500 × $20 = $0.01604, which is ₹1.51, so ₹0.90 lakh a month.
+- **Limits.** A daily cap per support agent, a step limit on the chat's tool use, a spending alert at 80% of budget and a hard monthly limit in the provider console.
+
+| Feature | Before | After | Lever | Quality check |
+| --- | --- | --- | --- | --- |
+| Nightly summaries | ₹2.82 lakh | ₹1.41 lakh | Batch API, half price | Ready before 10 am as before |
+| Classification | ₹1.24 lakh | ₹0.02 lakh | Small model, low effort | 94% to 93% on 400 tickets, accepted |
+| Live chat | ₹2.20 lakh | ₹0.90 lakh | Shorter cached prompt, shorter replies | Satisfaction scores unchanged |
+| Total | ₹6.26 lakh | ₹2.33 lakh | | 63% lower |
+
+The ₹2.33 lakh is an estimate. The team checks it against the next month's real bill, because the 90% cache hit rate is an assumption: at night, when chats are more than 5 minutes apart, the cache expires and every reply pays a write instead of a read.
 
 ## Common mistakes
 
-- **Optimising without measuring by feature and user.**
-- **Using the largest model for everything.**
-- **Paying real-time prices for work that can wait.**
-- **Long prompts and unlimited outputs.**
-- **No alerts or caps.**
-- **Cutting cost without checking quality.** Run the evals on every change.
+- **Reading only the visible reply.** The bill doubles after a model upgrade while replies look the same length. The cause is thinking tokens: check the thinking count in usage before blaming the price.
+- **Retries that resend everything.** Three instant retries on a timeout bill a 6,000-token prompt up to four times and make an overload worse. Use at most two retries, with exponential backoff and jitter.
+- **A cache that never hits.** A timestamp at the top of the system prompt makes every prefix different. Symptom: cache-read tokens stay at zero while cache writes, which cost more than plain input, keep appearing.
+- **Every tool on every call.** Thirty tool definitions of 200 tokens each add 6,000 input tokens to every step, even when the step needs two tools.
+- **A `max_tokens` cap with no room for thinking.** Replies stop mid-sentence with a `max_tokens` stop reason, users retry, and you pay twice.
+- **Judging cost per request, not per completed task.** A model 20 times cheaper per call that fails a fifth of the time can cost more once retries and human review are counted.
+- **Cutting cost without checking quality.** Run the evals on every change, and keep the numbers.
 
 ## When cutting cost is the wrong goal
 
@@ -181,18 +237,18 @@ The next month's bill is ₹2.7 lakh, with no change in customer satisfaction sc
 
 ## From demo to production
 
-- **Tag every call** with feature, user, model and prompt version, and store tokens and cost.
+- **Tag every call** with feature, user, model, effort and prompt version, and store all the token counts and the cost.
+- **Build one cost dashboard**: spend per day by feature, cost per completed task, the heaviest users, the thinking share of output and the cache hit rate, with lines for the budget and the alert threshold. Review it weekly with the quality metrics.
 - **Set budgets per feature** with alerts, and hard limits at the provider.
-- **Review the cost dashboard weekly**, alongside quality metrics, and re-check after every model or prompt change.
 - **Re-price regularly.** Providers cut prices and release cheaper models; a choice from six months ago may now be overpaying.
 - **Keep the cheaper path tested**, such as a smaller fallback model, so you can switch quickly if costs spike.
 
 ## Practice
 
-Read Chip Huyen's article on building LLM applications for production linked below, especially the cost sections. For more depth, chapters 9 and 10 of her book *AI Engineering* (O'Reilly, 2025) cover inference cost, batch APIs, routing and caching.
+Read Chip Huyen's article on LLM applications in production, linked below, especially the cost sections. Chapters 9 and 10 of her book *AI Engineering* (O'Reilly, 2025) go deeper.
 
-1. Add cost logging per call with feature and user tags to one of your apps, and find the most expensive feature.
-2. Test that feature with a smaller model on your eval set and decide whether to switch.
-3. Move one non-urgent job to batch processing, or add a cap and an alert.
+1. Add cost logging to one of your apps, with thinking and cache tokens split out, and find the most expensive feature.
+2. For that feature, run your eval set at two effort levels and with a smaller model, and price each option with the calculator.
+3. Cache the longest fixed prefix and confirm cache reads in the usage data, or move one non-urgent job to a batch API.
 
-**You are done when you can** show cost per feature and per user, and one change that cut cost without hurting your eval scores.
+**You are done when you can** show cost per feature and per user, the share of output that is thinking, and one change that cut cost without hurting your eval scores, with the arithmetic written out.
