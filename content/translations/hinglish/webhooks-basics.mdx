@@ -2,167 +2,278 @@
 id: webhooks-basics
 lang: hinglish
 title: "Webhooks"
-outcome: "Webhooks use karo taaki ek app doosre ko usi pal bataye jab kuch hota hai: yeh kaise kaam karte hain, unhe receive aur test kaise karein, secure kaise karein aur repeats aur failures kaise sambhaalein."
-answer: "Webhook ek URL hai jise ek app tab call karta hai jab kuch hota hai, aur details JSON mein bhejta hai, taaki doosra app turant react kare, har kuch minute mein check karne ki jagah."
-why_it_matters: "Payment gateways, e-commerce platforms, forms aur CRMs webhooks se hi aapki automations ko turant batate hain, har kuch minute mein poll karwane ki jagah. Lagbhag har serious automation inhe use karti hai, aur zyadatar webhook bugs kuch bachne laayak galtiyon se aate hain."
+outcome: "Webhooks se ek app doosre app ko usi pal bata deta hai jab kuch hota hai: unhe receive aur test karna, genuine hain ye verify karna, reply se pehle save karna, aur repeats, out-of-order events aur outages sambhaalna."
+answer: "Webhook ek URL hai jise koi app kuch hote hi call karta hai aur details JSON mein bhejta hai, taaki aapka automation har kuch minute mein check karne ki jagah turant react kare."
+why_it_matters: "Payment gateways, shops, forms aur CRMs kuch hote hi aapke automations ko batane ke liye webhooks hi use karte hain. Lagbhag har serious automation in par tika hai, aur zyaadatar webhook bugs kuch aisi galtiyon se aate hain jinse bacha ja sakta hai: save karne se pehle reply karna, bina sign kiye data par bharosa karna aur duplicates ki ummeed na rakhna."
 flashcards:
   - q: "Webhook kya hai?"
-    a: "Ek message jo ek app aapke diye URL par tab bhejta hai jab kuch hota hai, aksar HTTP POST jismein JSON body event ko describe karti hai."
-  - q: "Webhook polling se alag kaise hai?"
-    a: "Polling matlab baar-baar check karna ki kuch badla ya nahi. Webhook kuch hote hi bata deta hai, jaise darwaze par baar-baar dekhne ki jagah doorbell."
-  - q: "n8n mein test URL aur production URL mein kya farak hai?"
-    a: "Test URL sirf tab chalta hai jab aap editor mein listen kar rahe ho. Production URL workflow publish hone ke baad chalta hai."
-  - q: "Webhook ka jawab jaldi kyun dena chahiye?"
-    a: "Senders kuch seconds mein success reply ki ummeed karte hain. Aap slow ho toh woh time out hokar retry karte hain, jisse duplicates ban jaate hain."
-  - q: "Idempotency kya hai?"
-    a: "Kisi action ko repeat karne ke liye safe banana: ek hi event do baar process karna ek baar jaisa hi asar rakhe, jaise event id check karke."
-  - q: "Webhook asli hai, yeh kaise verify karte hain?"
-    a: "Sender jo signature shared secret se jodta hai use check karo, HTTPS aur lamba anjaan URL use karo, aur ho sake toh provider ke API se object dobara fetch karo."
-  - q: "Kuch galat na ho tab bhi duplicates kyun aate hain?"
-    a: "Fast success reply na milne par senders retry karte hain, aur kuch design se at least once deliver karte hain, isliye wahi event do baar aa sakta hai."
-  - q: "Reconciliation kya hai?"
-    a: "Regular check, jaise raat ko, jo aapke records ko provider ke API se compare karta hai, taaki lambe outage mein kho gaye events pakde jaayein."
+    a: "Ek message jo koi app kuch hote hi aapke diye URL par bhejta hai, aamtaur par event batane waali JSON body ke saath ek HTTP POST."
+  - q: "Webhook, polling se kaise alag hai?"
+    a: "Polling ka matlab hai baar-baar poochhna ki kuch badla kya. Webhook kuch hote hi bata deta hai, jaise har kuch minute mein darwaaza check karne ki jagah doorbell."
+  - q: "n8n mein test URL aur production URL mein kya farq hai?"
+    a: "Test URL tabhi kaam karta hai jab aap editor mein listen kar rahe ho. Production URL workflow publish (active) hone ke baad kaam karta hai. Real senders ko production URL hi dena hai."
+  - q: "Webhook workflow ko verify, save, reply aur kaam kis order mein karna chahiye?"
+    a: "Signature verify karo, event ko durable tareeke se save karo, 2xx reply karo, phir saved copy se dheema kaam karo. Save se pehle reply karne par event kho sakta hai, kyunki 2xx ke baad sender dobara nahi bhejega."
+  - q: "Idempotency kya hai, aur webhook handler ko idempotent kaise banaate hain?"
+    a: "Idempotency ka matlab hai ki koi action dohraane par bhi asar wahi rahe jo ek baar karne par hota. Event id ko aise insert se record karo jo duplicate par fail ho jaaye, aur asli kaam (jaise invoice) ko payment id par key karo."
+  - q: "Webhook genuine hai, ye kaise verify karte hain?"
+    a: "Webhook secret se exact raw body par HMAC signature phir se compute karo, use constant time mein compare karo, provider timestamp sign karta ho toh puraane timestamps reject karo, aur high-value objects ko API se dobara fetch karo."
+  - q: "Sab theek hone par bhi duplicates kyun aate hain?"
+    a: "Zyaadatar senders at least once deliver karte hain: reply dheema ho ya kho jaaye toh retry hota hai, isliye wahi event do baar aa sakta hai, kabhi-kabhi ek second ke farq se."
+  - q: "Sweep aur reconciliation mein kya farq hai?"
+    a: "Sweep un events ko phir se process karta hai jo aapne save kiye par poore nahi kiye. Reconciliation, jaise nightly, aapke records ko provider ke API se compare karke wo events dhoondhta hai jo aap tak kabhi pahunche hi nahi."
 exercise:
-  title: "Festival-sale outage ka raasta dhoondho"
-  setup: "Lucknow ki ek mithai ki dukaan n8n mein 'payment.captured' webhooks receive karti hai. Workflow: signature verify karo, 200 OK reply do, sheet mein payment id check karo, phir invoice banao aur row jodo. Diwali sale ke dauran n8n server restart hota hai aur 3 minute band rehta hai. Gateway failed deliveries ko 24 ghante tak retry karta hai. Ek payment, pay_771, restart se thodi der pehle process hokar sheet mein jud chuka tha, par 200 OK reply gateway tak pahunchi hi nahi."
+  title: "Ek festival-sale outage ko trace karo"
+  setup: "Lucknow ki ek sweets shop n8n mein payment webhooks receive karti hai. Workflow: raw body par signature verify karo, event id ko aisi table mein insert karo jahaan id unique honi chahiye (status 'received'), 200 reply karo, payment id par key karke invoice banao, phir row ko 'done' mark karo. Har 15 minute mein ek sweep chalta hai aur har raat ek reconciliation chalta hai. Gateway fail hui deliveries ko backoff ke saath 24 ghante tak retry karta hai. Diwali sale ke dauraan n8n server restart hota hai aur 3 minute down rehta hai. Restart se theek pehle pay_771 ka event save hua aur 200 se jawaab diya gaya, par invoice kabhi bana hi nahi."
   questions:
-    - q: "Gateway pay_771 ka kya karega?"
-      a: "Retry karega, kyunki use 200 OK mila hi nahi. Toh n8n ko pay_771 doosri baar milega."
-    - q: "pay_771 ka doosra invoice banne se kya rokta hai?"
-      a: "Duplicate check: payment id sheet mein pehle se hai, isliye workflow ruk jaata hai."
-    - q: "3 minute ke downtime ke dauran hue payments ka kya hota hai?"
-      a: "Server wapas aane par gateway unhe apni 24 ghante ki window ke andar retry karta hai, isliye woh der se process hote hain par khote nahi."
-    - q: "Server do din band rehta toh missing payments kaun pakadta?"
-      a: "Raat ki reconciliation, jo gateway ki captured payments ki list ko sheet se compare karti hai."
+    - q: "Kya gateway pay_771 dobara bhejega? Use kaun poora karega?"
+      a: "Nahi. Use 200 mil gaya, isliye wo delivered gina jaata hai. Sweep dekhta hai ki row abhi bhi 'received' hai aur invoice bana deta hai."
+    - q: "3 minute ke downtime mein hue payments ka kya hoga?"
+      a: "Gateway ko 2xx reply nahi mila, isliye server waapas aane par wo unhe backoff ke saath retry karta hai. Wo kuch minute der se process hote hain par khote nahi."
+    - q: "pay_772 ke event ki do copies ek second ke farq se aati hain. Sirf ek invoice kyun jaata hai?"
+      a: "Dono ek hi event id insert karne ki koshish karti hain. Unique key sirf ek insert ko safal hone deti hai; doosri ko conflict milta hai, wo 200 reply karke ruk jaati hai."
+    - q: "Agar server do din down rehta, toh chhoote payments kaun pakadta?"
+      a: "24 ghante baad retries band ho jaate hain aur webhook disable ho sakta hai. Nightly reconciliation gaps dhoondhta hai; phir webhook dobara enable karo."
 ask:
-  - "Webhook aur API mein kya farak hai?"
-  - "n8n mein webhook kaise test karun?"
-  - "Duplicate webhook events kaise rokun?"
+  - "Webhook aur API mein kya farq hai?"
+  - "Apne laptop se n8n mein webhook kaise test karoon?"
+  - "Duplicate webhook events se do invoices jaane se kaise rokoon?"
 explain_in_interview:
-  answer: "Webhook ek message hai jo ek app event hote hi aapke diye URL par bhejta hai, aam taur par ek HTTP POST jismein event describe karne wali JSON body hoti hai. Ye doorbell jaisa hai: har kuch minute mein poll karke poochne ki jagah ki kuch naya hai kya, aapko tab bataya jaata hai jab woh hota hai. Aap apna URL, jaise n8n Webhook node se, sender ki settings mein paste karte ho aur events chunte ho. Jaise, Jaipur ka ek handicrafts store payment succeed hote hi invoice email karta hai. Trade-off ye hai ki ise secure aur mazboot banana padta hai: signatures verify karo, jaldi reply karo, aur retries se aaye duplicates sambhalo."
-  follow_up: "Agar aapka webhook endpoint slow ho ya same event do baar mile toh kya hota hai?"
-  follow_up_answer: "Jab aap slow respond karte ho toh senders retry karte hain, jisse duplicates bante hain. Isliye pehle 200 se reply karo aur kaam baad mein karo, aur action se pehle payment id jaisa unique id check karo, taaki repeat hua event kabhi doosra invoice na banaye."
-translated_on: 2026-11-14
+  answer: "Webhook ek message hai jo koi app event hote hi aapke diye URL par bhejta hai, aamtaur par JSON body ke saath ek HTTP POST. Har kuch minute mein poll karne ki jagah, aapko tabhi bata diya jaata hai jab wo hota hai. Jaise, Jaipur ka ek handicrafts store payment safal hote hi invoice email kar deta hai. Ise reliable banaane ke liye main raw body par HMAC signature verify karta hoon, event ko unique event id ke saath save karta hoon, sender ke timeout ke andar 2xx reply karta hoon, phir saved copy se dheema kaam karta hoon. Ek sweep adhoora kaam retry karta hai aur provider ke API se ek nightly reconciliation un events ko pakadta hai jo kabhi pahunche hi nahi."
+  follow_up: "Agar aapka webhook endpoint dheema ho ya wahi event do baar receive kare toh kya hoga?"
+  follow_up_answer: "Agar main dheema hoon, toh sender timeout hokar retry karta hai, isliye main event save karke jaldi reply karta hoon. Duplicates normal hain, isliye main event id ko unique key ke saath insert karta hoon: doosri copy conflict se takraati hai, 200 paati hai aur ruk jaati hai, aur invoice payment id par key kiya hota hai."
+translated_on: 2026-11-28
 ---
 
 ## Ye kya hai
 
-Kai automations ko **usi pal react karna** hota hai jab kuch hota hai: payment safal ho, order lage, form submit ho, support ticket band ho. **Webhook** isse mumkin banata hai.
+Kai automations ko **kuch hote hi usi pal** react karna hota hai: koi payment safal hota hai, koi order aata hai, koi form submit hota hai. **Webhook** yahi mumkin banata hai.
 
-Webhook woh message hai jo ek app aapke diye web address (URL) par bhejta hai, jaise hi koi event hota hai. Yeh doorbell jaisa hai. Har kuch minute mein darwaza dekhne ki jagah, jise **polling** kehte hain, aapko tab bataya jaata hai jab koi aata hai.
+Webhook ek message hai jo koi app event hote hi aapke diye web address (URL) par bhejta hai. Ye doorbell jaisa hai. Har kuch minute mein darwaaza check karne ki jagah, jise **polling** kehte hain, koi aata hai toh aapko bata diya jaata hai.
 
 ```flow
 dir: LR
-title: Polling: dheema, bahut saare bekaar requests
-Aapka app -[kuch naya aaya?]-> Store
+title: Polling: dheema, bahut saari bekaar requests
+Aapka app -[kuch naya hai?]-> Store
 Store -[nahi ... nahi ... haan, ek order]-> Aapka app
 ```
 
 ```flow
 dir: LR
-title: Webhook: hote hi pata chalta hai, tez, bekaar checks nahi
+title: Webhook: hote hi bata deta hai, tez, koi bekaar check nahi
 Store -[event POST karta hai]-> Aapka URL (n8n)
 Aapka URL (n8n) -[200 OK]-> Store
 ```
 
-Message aksar HTTP **POST** request hota hai jiski **JSON** body event ko describe karti hai: kya hua, kab hua aur details.
+Message aamtaur par ek HTTP **POST** request hota hai, jiski **JSON** body event ke baare mein batati hai. Ek aasaan kiya hua example, kisi payment gateway ke event jaisa:
 
-Is lesson mein hum Jaipur ke ek handicrafts store ke saath chalenge, jo chahta hai ki payment safal hote hi invoice email ho jaaye. Lesson ke end tak aap webhooks receive, test, secure aur safely repeat kar paoge.
+```json
+{"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_771","amount":420000,"currency":"INR","status":"captured"}}}}
+```
+
+Is sample mein amount paise mein hai, toh 420000 ka matlab ₹4,200.
+
+**Webhook ya API?** API mein *aap* provider ko call karke poochhte ho. Webhook mein kuch badalne par provider *aapko* call karta hai. Achhe automations dono use karte hain: webhook batata hai ki kuch hua, aur API se aap details check karte ho aur gaps bharte ho.
+
+Ye lesson Jaipur ke ek handicrafts store ke saath chalta hai, jo chahta hai ki payment safal hote hi invoice email ho jaaye.
 
 ## Ye kaam kaise karta hai
 
-### Receive karna
+### Ek delivery ki poori kahaani
 
-Aapka automation tool aapko ek URL deta hai, jaise n8n ke **Webhook** node se. Use bhejne waale app ki settings mein paste karo aur chuno ki kaunse events bhejne hain. Event hone par sender aapke URL par JSON post karta hai, aur aapka workflow us data ke saath shuru hota hai.
-
-### Test vs production URLs
-
-Kai tools do URLs dete hain:
-
-| URL | Kab chalta hai | Kis liye use karein |
-| --- | --- | --- |
-| Test URL | Jab aap editor mein listen kar rahe ho | Banane aur debug karne ke liye |
-| Production URL | Jab workflow publish (active) ho | Asli events ke liye |
-
-Beginners ki aam galti hai sender ki settings mein test URL chhod dena. Jab tak aap dekh rahe ho sab chalta hai, aur editor band karte hi ruk jaata hai.
-
-### Payload dekho
-
-Test event trigger karo aur jo exact JSON aaya use dekho. Field names aur nesting provider ke hisaab se badalte hain. Mappings asli sample se banao, yaad se nahi.
-
-### Jaldi jawab do
-
-Senders tez success reply ki ummeed karte hain, aksar kuch seconds mein HTTP `200 OK`. Agar aapka workflow pehle slow kaam kare, jaise PDF banana, toh sender time out hokar **retry** kar sakta hai. Isliye: turant reply do, phir kaam karo.
-
-### Retries aur duplicates
-
-Aapka endpoint fail ya slow ho toh zyadatar senders retry karte hain, kabhi kai ghanton mein kai baar. Kuch design se "at least once" deliver karte hain. Dono tarah se, **aapko wahi event ek se zyada baar mil sakta hai.**
-
-Bachaav hai **idempotency**: apne actions ko repeat karne ke liye safe banana. Event ya payment ki id se check karo ki pehle process hua ya nahi:
+Har delivery ek hi loop se guzarti hai. Sender sirf aapka reply dekhta hai.
 
 ```flow
-Webhook aaya | payment id = pay_771 -> Kya pay_771 hamari sheet mein pehle se hai?
-Kya pay_771 hamari sheet mein pehle se hai? -[haan]-> Ruko | duplicate hai: kuch mat karo
-Kya pay_771 hamari sheet mein pehle se hai? -[nahi]-> Invoice banao, email karo, pay_771 ke saath row jodo
+title: Ek webhook delivery
+Event hota hai | jaise koi payment capture hota hai -> Sender aapke secret se JSON sign karta hai
+Sender aapke secret se JSON sign karta hai -> Aapke URL par POST
+Aapke URL par POST -> Aapka reply
+Aapka reply -[timeout ke andar 2xx]-> Delivered | sender ruk jaata hai
+Aapka reply -[error ya samay par reply nahi]-> Baad mein retry | wahi event, wahi id
+Baad mein retry -> Aapke URL par POST
 ```
 
-Duplicate "payment captured" se kabhi do invoices ya do emails nahi bante chahiye.
+Yaani sender ke liye `2xx` reply ka matlab hai "ho gaya", bhale hi aapka workflow ek second baad fail ho jaaye, aur koi bhi failure wahi event waapas le aata hai.
+
+### Receive karna: test aur production URLs
+
+Aapka automation tool aapko ek URL deta hai, jaise n8n ke **Webhook** node se. Use sending app ki settings mein paste karo aur chuno ki kaun-se events bhejne hain. Kai tools do URLs dete hain:
+
+| URL | Kab kaam karta hai | Kiske liye use karo |
+| --- | --- | --- |
+| Test URL | Jab aap editor mein listen kar rahe ho | Build aur debug karne ke liye |
+| Production URL | Jab workflow publish (active) ho | Real events ke liye |
+
+Beginners ki ek aam galti hai sender ki settings mein test URL hi chhod dena: jab tak aap dekh rahe ho sab chalta hai, phir band ho jaata hai.
+
+Yahaan Webhook node ki do settings maayne rakhti hain. **Raw Body** sender ke bheje exact bytes waise hi rakhta hai, jo signature check karne ke liye chahiye. **Respond** tay karta hai ki n8n kab reply kare: turant, aakhri node khatam hone par, ya kisi **Respond to Webhook** node par jise aap theek wahin rakhte ho jahaan chahiye.
+
+### Real events aane se pehle test karo
+
+Field names har provider mein alag hote hain, isliye mappings kisi real sample se banao. Aap khud `curl` se ek bhej sakte ho: n8n mein "Listen for test event" par click karo, phir apne test URL ke saath ye chalao:
+
+```bash
+curl -X POST "https://your-n8n.example.com/webhook-test/payments" \
+  -H "Content-Type: application/json" \
+  -d '{"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_771","amount":420000,"currency":"INR","status":"captured"}}}}'
+```
+
+Ek trap kai beginners ko rok deta hai. Agar n8n aapke laptop par chalta hai, toh uska URL `localhost` se shuru hota hai, jis tak internet par baitha gateway nahi pahunch sakta. Public n8n (n8n Cloud, ya HTTPS waala server) use karo, ngrok ya Cloudflare Tunnel jaisa koi **tunnel** jo aapke laptop ko public address deta hai, ya sirf ye dekhne ke liye ki provider kya bhejta hai, webhook.site.
+
+Zyaadatar gateways mein ek **test mode** bhi hota hai jismein asli paisa nahi lagta. Test aur live mode ke webhooks aur secrets aamtaur par alag-alag hote hain.
+
+### Aapka reply sender ko kya batata hai
+
+Sender sirf aapke reply ka status code padhta hai, aur sirf kuch seconds rukta hai. Razorpay, ek Indian payment gateway, 5 seconds ke andar `2xx` reply ki ummeed karta hai. Koi aur code, ya samay par reply na aana, wo failure maanta hai aur event banne ke 24 ghante tak badhte gaps ke saath retry karta hai. Agar un 24 ghanton tak deliveries fail hoti rahein, toh wo webhook disable kar deta hai (ye sab November 2026 ke hisaab se). Doosre providers ke windows alag hote hain, isliye unke docs padho.
+
+| Aapka reply | Sender kya samajhta hai | Kab bhejna hai |
+| --- | --- | --- |
+| `200` (ya koi aur `2xx`) | Delivered; dobara kabhi nahi bhejega | Event save ho gaya hai, ya ye duplicate hai jo aapke paas pehle se hai |
+| `401` | Failed; aamtaur par retry hota hai | Signature match nahi hota |
+| `500` | Failed; baad mein retry hota hai | Aap event save nahi kar paaye, jaise aapka database down hai |
+| Samay par reply nahi | Failed; baad mein retry hota hai | Aapka workflow bahut dheema tha ya server down tha |
+
+### Pehle save, phir reply, phir kaam
+
+Is lesson ka sabse zaroori idea yahi hai. Teen mumkin orders mein se do fail hote hain.
+
+| Order | Kya gadbad hoti hai |
+| --- | --- |
+| Saara kaam karo, phir reply | Dheema kaam, jaise PDF banaana, timeout paar kar jaata hai. Aap kaam kar rahe hote ho aur sender retry kar deta hai, aur aapko duplicates milte hain. |
+| Pehle reply, phir kaam | Agar `200` ke baad n8n crash ya restart ho jaaye, toh sender kabhi dobara nahi bhejta aur event kho jaata hai. |
+| Save, reply, phir saved copy se kaam | Sender ke "ho gaya" sunne se pehle hi event safe hai. Fail hua kaam aapki copy se retry hota hai. |
+
+**Durable tareeke se save karna** matlab event ko aisi jagah likhna jo restart ke baad bhi bacha rahe: database table (jaise Postgres ya Supabase) ya message queue. Ek insert tez hota hai, timeout ke kaafi andar. Raw body, event id, receive hone ka samay aur ek **status** store karo: save hone par `received`, kaam khatam hone par `done`.
+
+```flow
+title: Save, reply, phir kaam
+Webhook aata hai -> Signature match hota hai?
+Signature match hota hai? -[nahi]-> 401 reply karo aur ruko
+Signature match hota hai? -[haan]-> Event id insert karo | status received
+Event id insert karo -[pehle se hai]-> 200 reply karo aur ruko | ek duplicate
+Event id insert karo -[save ho gaya]-> 200 reply karo
+200 reply karo -> Invoice banao aur email karo
+Invoice banao aur email karo -> Status done mark karo
+```
+
+Agar reply ke baad workflow crash ho jaaye, toh row `received` hi rehti hai. Ek **sweep**, yaani ek scheduled workflow jo lagbhag har 15 minute mein chalta hai, un rows ko uthaata hai jo 10 minute baad bhi `received` hain aur kaam dobara chalaata hai. Isliye kaam dohraane ke liye safe hona chahiye: har sub-step (invoice bana, email gaya) record karo, taaki rerun sirf wahi kare jo baaki hai.
+
+### Duplicates aur idempotency
+
+Zyaadatar senders **at-least-once delivery** ka vaada karte hain: wo event khone ki bajaay use do baar bhejna pasand karte hain. Iska bachaav hai **idempotency**: kisi event ko do baar process karne ka asar wahi ho jo ek baar process karne ka.
+
+Do alag kaamon ke liye do ids use karo:
+
+- **Event id** ek delivery ko pehchaanta hai. Us event ke har retry par uski value wahi rehti hai, isliye ye batata hai ki "ye delivery main pehle dekh chuka hoon". Jaise Razorpay ise `x-razorpay-event-id` header mein bhejta hai.
+- **Business id**, jaise payment id, asli cheez ko pehchaanta hai. Do *alag* events ek hi payment ke baare mein ho sakte hain (jaise `payment.captured` aur `order.paid`), isliye invoice ko payment id par key karo.
+
+**Wo race jismein experts bhi phanste hain.** Ek aasaan-sa design lagta hai: "sheet mein id dhoondho; nahi mili toh jod do". Dheeme reply ke baad retry original ke ek second baad hi aa sakta hai. Dono copies `pay_771` dhoondhti hain, dono ko kuch nahi milta, dono invoice bana deti hain, kyunki check aur write ke beech doosri copy ghus gayi.
+
+Iska fix hai **ek hi step jo duplicate par fail ho**. `event_id` column ko unique key do aur bas insert karo. Theek ek insert safal hota hai; doosre ko "duplicate key" error milta hai, jise aapka workflow "pehle se hai, 200 reply karo aur ruko" maanta hai. Invoice ke `payment_id` par bhi unique key lagao.
+
+Google Sheet mein unique key nahi hoti. Sheet lookup sirf us chhoti, kam volume waali shop ke liye theek hai jise kabhi-kabhaar double invoice chal jaaye. Sale se pehle database table par chale jaao.
+
+### Events order badalkar aa sakte hain
+
+Delivery order ki koi guarantee nahi hai; Razorpay ki webhook guidance ye seedhe kehti hai (November 2026 ke hisaab se). Kisi puraani attempt ka retry hua `payment.failed` safal `payment.captured` ke *baad* aa sakta hai, aur "aakhri event jeetta hai" waala tareeka paid order ko failed mark kar dega. Do rules ise sambhaalte hain:
+
+- **States ko sirf aage badhaao.** Order `created` se `paid` tak ja sakta hai, par `paid` se waapas `failed` kabhi nahi. Jo events use peechhe le jaayein unhe ignore karo.
+- **Jab maayne rakhe, current state poochho.** Ship ya refund karne se pehle, provider ke API ko call karke abhi ka status dekho.
 
 ### Security
 
-Jo bhi aapka URL jaan jaaye woh fake events post kar sakta hai, jaise fake "payment captured" jo asli shipment trigger kar de. Ise protect karo:
+Jise bhi aapka URL pata chal jaaye, wo ek fake "payment captured" post karke asli shipment trigger karwa sakta hai. Ise layers mein protect karo.
 
-| Protection | Kya karta hai |
-| --- | --- |
-| **Signature verify karo** | Kai providers har webhook ko shared secret se sign karte hain; aapka workflow data par bharosa karne se pehle signature check karta hai |
-| **HTTPS aur lamba, anjaan path** | URL dhoondhna mushkil banata hai aur data ko raaste mein padhne se bachata hai |
-| **Provider ke API se dobara fetch karo** | Zaroori events ke liye provider se seedhe poochho ki payment sach mein safal hua ya nahi |
+**Signature verify karo.** Aap aur provider ek **webhook secret** share karte ho. Har delivery ke liye provider ek **HMAC** compute karta hai, yaani secret se bana body ka fingerprint, aur use ek header mein bhejta hai. Jaise Razorpay `X-Razorpay-Signature` mein ek HMAC-SHA256 hex value bhejta hai (November 2026 ke hisaab se). Aap receive hui body par wahi HMAC compute karte ho; dono match hon, toh sender ko secret pata hai aur body nahi badli. Webhook ka apna secret use karo, apne API key ka secret nahi.
 
-### Chhoote hue events
+Teen details tay karti hain ki check kaam karega ya nahi:
 
-Aapka endpoint sender ki retry window se zyada der band rahe, toh events chupchaap kho sakte hain. Zaroori flows ke liye **reconciliation** chalao, jaise raat ko, jo aapke records ko provider ke API se compare karke gaps bhar de.
+1. **Raw body use karo.** Signature bheje gaye exact bytes ko cover karta hai. JSON parse karke waapas text banao toh spaces ya key order badal sakte hain, aur genuine event bhi fail ho jaata hai. n8n mein **Raw Body** on karo.
+2. **Constant time mein compare karo.** Normal comparison pehle galat character par ruk jaata hai, jisse timing ke clues leak ho sakte hain. n8n ka **Crypto** node HMAC compute kar sakta hai, par IF node waala comparison constant-time nahi hai. High-value flows ke liye **Code** node mein Node ke `crypto.timingSafeEqual` se compare karo; self-hosted n8n par pehle `NODE_FUNCTION_ALLOW_BUILTIN` environment variable se `crypto` module allow karo.
+3. **Jahaan provider timestamp sign karta hai, wahaan puraane messages reject karo.** Signature saabit karta hai ki message kisne bheja, kab nahi, isliye pakdi gayi request baad mein replay ki ja sakti hai. Kuch providers, jaise Stripe, timestamp sign karte hain taaki aap kuch minute se puraani koi bhi cheez reject kar sako. Jahaan ye nahi hai, wahaan aapka unique event id replay ko be-asar kar deta hai.
+
+Ye Python script, sirf standard library se, raw-body trap dikhaata hai:
+
+```python
+import hmac, hashlib, json
+
+SECRET = b"test_secret_123"
+
+def is_genuine(raw_body: bytes, signature: str) -> bool:
+    expected = hmac.new(SECRET, raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)  # constant-time
+
+raw = b'{"event":"payment.captured","payload":{"payment":{"entity":{"id":"pay_771","amount":420000,"currency":"INR","status":"captured"}}}}'
+sig = hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
+
+print(is_genuine(raw, sig))                          # True
+print(is_genuine(json.dumps(json.loads(raw)).encode(), sig))  # False: spaces were added
+```
+
+Doosri baar ye fail hota hai kyunki `json.dumps` spaces jod deta hai: wahi data, alag bytes.
+
+**Baaki layers:** HTTPS aur ek lamba, random URL path use karo (inmein se koi bhi signature ki jagah nahi leta). Saamaan ship karne se pehle provider ke API se payment dobara fetch karo; Razorpay khud webhooks ke backstop ke taur par apne fetch APIs use karne ki salaah deta hai, jaise jab koi time-sensitive flow webhook aane ka intezaar nahi kar sakta.
+
+### Chhoote hue events aur reconciliation
+
+Retries chhote outages cover karte hain, lambe nahi. Retry window ke baad events bina kisi error ke kho jaate hain, aur kuch providers webhook band kar dete hain. Zaroori flows mein do safety nets hote hain:
+
+- **Sweep** un events ka kaam retry karta hai jo aapne save kiye par poore nahi kiye.
+- **Reconciliation**, jaise nightly, provider ke API se din ke saare captured payments maangta hai aur unhe aapke invoices se compare karta hai. Jo bhi chhoota hai, wo tab process hota hai.
+
+Ek alert bhi lagao: agar business hours mein ek ghante tak koi webhook na aaye, ya provider bataaye ki koi webhook disable ho gaya, toh koi usi din dekhe.
 
 ## Ek example se samjho
 
-Jaipur ka ek handicrafts store payment gateway use karta hai. Woh chahta hai ki payment safal hote hi invoice email ho aur accounts sheet mein ek row jud jaaye.
-
-Woh n8n mein yeh banate hain:
+Jaipur ka ek handicrafts store Razorpay use karta hai aur chahta hai ki payment safal hote hi invoice email ho jaaye. Ek typical order ₹4,200 ka hai. Gateway details November 2026 ke hisaab se hain. Wo n8n mein ye banaate hain:
 
 | # | Step | Kyun |
 | --- | --- | --- |
-| 1 | Production URL waala Webhook node, gateway ke dashboard mein "payment captured" events ke liye jodha gaya | Events turant receive karna |
-| 2 | Gateway se copy kiye webhook secret se signature verify karo | Fake requests reject karna |
-| 3 | Turant `200 OK` reply do | Gateway ko time out aur retry karne se rokna |
-| 4 | Payment id sheet mein check karo; mil jaaye toh ruko | Duplicates kuch nahi karte |
-| 5 | Invoice PDF banao, email karo, payment id ke saath row jodo | Asli kaam |
-| 6 | Raat ko: gateway ke API se din ke captured payments sheet se compare karo | Jo chhoot gaya use pakadna |
+| 1 | Webhook node: production URL, Raw Body on, Respond to Webhook node se reply karta hai. Razorpay dashboard mein `payment.captured` ke liye joda gaya. | Events turant receive karna, exact bytes ke saath |
+| 2 | Raw body ka HMAC-SHA256 webhook secret se compute karo aur Code node mein `X-Razorpay-Signature` se compare karo. Mismatch par `401` reply karo. | Fake requests reject karna |
+| 3 | `x-razorpay-event-id`, payment id aur raw body ko `webhook_events` mein insert karo (unique event id, status `received`). Duplicate key: `200` reply karo aur ruko. Koi aur failure: `500` reply karo. | Gateway ke "ho gaya" sunne se pehle event safe hai; copies yahin ruk jaati hain |
+| 4 | Respond to Webhook: `200`. | 5-second limit ke kaafi andar |
+| 5 | Unique payment id waali `invoices` table mein invoice PDF banao, email karo, phir event ka status `done` set karo. | Dheema kaam, dohraane ke liye safe |
+| 6 | Har 15 minute: jo rows 10 minute baad bhi `received` hain unke liye step 5 phir chalao. | Crash hua kaam poora karna |
+| 7 | Nightly: Razorpay API se din ke captured payments fetch karo aur invoices se compare karo. | Jo kabhi pahuncha hi nahi, use pakadna |
 
-**Festival sale.** Diwali sale ke dauran n8n server restart hota hai aur do minute band rehta hai. Server wapas aane par gateway chhoote events retry karta hai. Unmein se do events restart se thodi der pehle process ho chuke the, par unke replies gateway tak pahunche hi nahi, isliye woh do baar aate hain. Duplicate check dono ko rok deta hai.
+**Festival sale (ek illustration).** Diwali sale ke dauraan har kuch seconds mein orders aate hain.
 
-| Situation | Kya hua | Kaunse step ne sambhaala |
+- PDF service atak jaati hai aur ek payment ka invoice bante-bante n8n restart ho jaata hai. Wo event pehle hi save ho chuka tha aur uska jawaab ja chuka tha, isliye Razorpay use dobara nahi bhejta. Das minute baad sweep dekhta hai ki row abhi bhi `received` hai aur invoice bhej deta hai.
+- Ek aur restart server ko do minute ke liye down kar deta hai. Razorpay ko un payments ka koi reply nahi milta aur server waapas aane par wo unhe retry karta hai.
+- pay_771 us restart se theek pehle save ho gaya tha, par `200` kabhi server se nikla hi nahi. Razorpay use retry karta hai; step 3 ka insert duplicate key se takraata hai, aur workflow `200` reply karke ruk jaata hai.
+
+| Sthiti | Kya hua | Kis step ne sambhaala |
 | --- | --- | --- |
-| Anjaan sender se fake request | Signature match nahi hua | Step 2: reject hui |
-| Restart ke baad event do baar aaya | Payment id sheet mein pehle se thi | Step 4: ruk gaya |
-| 2 minute ke outage mein bheje events | Gateway ne baad mein retry kiye | Steps 1 se 5, kuch minute der se |
-| Ek hafte ki raat ki reconciliation | Koi payment missing nahi mili | Step 6 |
+| Kisi anjaan sender ki fake request | Signature match nahi hua | Step 2: `401` se reject |
+| Reply ke baad, invoice se pehle crash | Row `received` hi rahi | Step 6: sweep ne poora kiya |
+| 2 minute ke outage mein bheje gaye events | Razorpay ne baad mein retry kiye | Steps 1 to 5, kuch minute der se |
+| pay_771 do baar deliver hua | Event id pehle se table mein tha | Step 3: `200` ke saath ruka |
+| Ek hafte ka nightly reconciliation | Koi chhoota payment nahi mila | Step 7 |
 
-Step 4 ke bina do customers ko do-do invoices mil jaate, aur accounts sheet mein ₹8,400 ki aisi sales dikhti jo hui hi nahi.
+Store ka pehla version turant reply karta tha aur sheet lookup use karta tha. Crash hua invoice hamesha ke liye kho jaata, kyunki gateway ko uska `200` mil chuka tha, aur duplicate pay_771 ek doosra invoice bana deta: ₹4,200 ki aisi sales jo kabhi hui hi nahi.
 
 ## Aam galtiyaan
 
 - **Production mein test URL use karna.** Editor band karte hi events aana band ho jaate hain.
-- **Bina signature waali requests par bharosa karna.** Kuch karne se pehle signatures verify karo.
-- **Dheeme responses.** Senders retry karte hain, aur duplicates ban jaate hain. Pehle reply do, baad mein kaam karo.
-- **Duplicate check nahi.** Retries se double invoices, emails ya orders ban jaate hain.
-- **Reconciliation nahi.** Lambe outages chupchaap events kho dete hain.
-- **Secrets ko log karna.** Webhook secret ya poore payment details ko aise logs mein mat likho jo doosre padh sakein.
+- **Event save hone se pehle reply karna.** `200` ke baad crash hone par event kho jaata hai, kyunki sender use dobara nahi bhejega.
+- **Reply se pehle dheema kaam karna.** Sender timeout hokar retry karta hai, aur duplicates bante hain.
+- **Duplicate check ke liye "pehle dhoondho, phir likho".** Saath aane waali do copies dono pass ho jaati hain. Unique key use karo.
+- **Duplicate ka jawaab error se dena.** Sender us event ko retry karta rehta hai jo aapke paas pehle se hai. `200` reply karo.
+- **Parse kiye JSON par signature check karna, ya sirf URL par bharosa karna.** Raw body use karo; secret URL leak ho sakta hai.
+- **Maan lena ki events order mein aayenge.** States ko sirf aage badhaao, aur paise se juda action lene se pehle dobara fetch karo.
+- **Test aur live secrets mila dena.** Har mode ka aamtaur par apna webhook aur secret hota hai.
+- **Na sweep, na reconciliation, na alert.** Crashes aur lambe outages chupchaap events kho dete hain.
+- **Secrets log karna.** Webhook secret aur poori payment details shared logs se baahar rakho.
 
 ## Practice karo
 
-Neeche link kiya hua Zapier ka webhooks ka explanation aur n8n ke Webhook node ke docs padho.
+Neeche link kiya Zapier ka webhooks waala explanation aur n8n ke Webhook node docs padho.
 
-1. **Receive.** n8n mein webhook workflow banao aur use test request se trigger karo, form tool ya curl jaise command se.
-2. **Duplicates.** Wahi event do baar bhejo aur duplicate check lagao taaki doosra kuch na kare.
-3. **Security.** Shared-secret check lagao aur galat secret waali request reject hoti hui dikhao.
+1. **Receive karo.** n8n mein ek Webhook workflow banao, upar waala `curl` command apne test URL par bhejo aur aaya hua JSON study karo. Agar n8n laptop par chalta hai, toh baahar se us tak tunnel se pahuncho.
+2. **Reply se pehle save karo.** Unique event id aur ek status column waali `webhook_events` table banao. Har event insert karo, phir Respond to Webhook node se reply karo. Reply ke baad jaanboojhkar workflow roko aur dikhaao ki row `received` hi rehti hai.
+3. **Duplicates.** Wahi event ek saath do baar bhejo (`&` se jude do `curl` commands). Dikhaao ki ek row, ek invoice, aur dono copies ke liye `200` aata hai.
+4. **Security.** Body ko test secret se sign karo (`openssl dgst -sha256 -hmac "test_secret_123"`, ya upar waala Python script), use signature header mein bhejo aur raw body par verify karo. Body ka ek character badlo aur `401` dikhaao.
+5. **Sweep aur reconcile.** 15-minute waala sweep banao, aur teen sentences mein batao ki aapke provider ke liye nightly reconciliation kaise kaam karega.
 
-**Aapka kaam poora jab:** aap samjha sako ki webhooks retry kyun karte hain, apna duplicate check chalta hua dikha sako aur bata sako ki outage mein chhoote events kaise pakdoge.
+**Aapka kaam poora hai jab aap** samjha sako ki "pehle reply" se events kyun khote hain, dikha sako ki do copies saath aane par aapka duplicate check tika rehta hai, dikha sako ki chhedchhaad ki gayi request reject hoti hai, aur bata sako ki do din ke outage mein chhoote events aap kaise pakdoge.
