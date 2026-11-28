@@ -3,8 +3,8 @@ id: automation-error-handling
 level: B3
 theme: automation
 title: "Error handling and retries"
-outcome: "Make automations fail safely: retry temporary errors with backoff, stop on permanent ones, alert the right person with useful details, avoid duplicates on rerun and keep a record of what happened."
-answer: "Good automations retry temporary errors with growing waits, stop on permanent ones, alert a person with useful details, and never process the same item twice."
+outcome: "Make automations fail safely: throttle to rate limits, retry temporary errors with backoff and jitter, treat timed-out sends as unknown, stop on permanent errors, alert usefully, and rerun without duplicates."
+answer: "Retry temporary errors with growing, random waits; check before retrying a timed-out send; stop on permanent errors; alert with details; and use a unique key so nothing happens twice."
 why_it_matters: "Every automation fails eventually: an API is down, a password expires, a file has a strange format. The difference between a trusted automation and an abandoned one is whether failures are caught, explained and recoverable, without double payments or lost orders."
 hours: 2
 gap_tags: []
@@ -17,42 +17,42 @@ check:
   type: mcq
   question_ids: [automation-error-handling-1, automation-error-handling-2, automation-error-handling-3]
 flashcards:
-  - q: "What five things does good error handling do?"
-    a: "Retry temporary errors, stop on permanent ones, alert a person with details, recover without duplicates, and record what happened."
-  - q: "Name three temporary errors."
-    a: "Network blips and timeouts, rate limits (HTTP 429), and server errors (HTTP 500 to 504). They usually succeed on retry."
-  - q: "Name three permanent errors."
-    a: "Wrong or expired credentials (401, 403), bad input (400) and a missing record (404). Retrying will not fix them."
-  - q: "What is retry with backoff?"
-    a: "Retrying a few times with growing waits, such as 5 seconds, 30 seconds, then 2 minutes, and respecting any Retry-After header."
-  - q: "How does idempotency prevent duplicates?"
-    a: "Before creating something, the workflow checks a unique key such as the order id. If it already exists, it does nothing, so reruns are safe."
-  - q: "What is a dead-letter queue?"
-    a: "A 'needs attention' list where records that failed permanently go, with the reason, so they can be fixed and reprocessed instead of lost."
-  - q: "What should a useful alert contain?"
-    a: "The workflow, the step, the record, the error message, a link to the run, and ideally what to do next."
-  - q: "Why monitor item counts as well as errors?"
-    a: "A workflow that quietly processes zero items shows no error. A 'too few items' check catches it."
+  - q: "How do you decide whether to retry an error?"
+    a: "Ask what a retry would change. A busy or rate-limited service may answer next time; bad input or expired credentials never will. Retry only the first kind."
+  - q: "Why is a timeout on a send or payment dangerous to retry?"
+    a: "A timeout only means you stopped waiting. The message or payment may have gone through. Check its status by your key first, and retry only with the same key."
+  - q: "A record fails on every retry while other records succeed. What is it?"
+    a: "A problem with that record, even if the code says 500. Put it in the needs attention list with the reason and carry on."
+  - q: "What is retry with backoff and jitter?"
+    a: "Retrying a few times with growing waits, such as 5, 10, then 20 seconds, plus a random extra amount so many failed items do not all retry at once. Use Retry-After if given."
+  - q: "How do you choose an idempotency key?"
+    a: "From what the action is about, so the same real action always gives the same key: order id plus status, or member id plus billing month. Never a run id or timestamp."
+  - q: "Why throttle instead of only retrying 429s?"
+    a: "429s at the same peak every day mean you send faster than the plan allows. Sending in batches under the documented limit prevents them; retries are only a safety net."
+  - q: "What is a circuit breaker in an automation?"
+    a: "A rule that pauses the run when failures pile up, for example 20 in a row, because the service is down. It avoids thousands of failed items and alerts."
+  - q: "Why compare daily volume with the same weekday?"
+    a: "A fixed number fires on quiet days and misses half-broken ones. Alerting below, for example, half the recent same-weekday average catches silent failures."
 exercise:
   title: "Classify the failures"
   setup: "An automation in Coimbatore sends payment reminders from a billing system to WhatsApp, about 1,500 a day. Last week's run log shows: (1) 40 calls returned 429 Too Many Requests at 7 pm, (2) one day every call returned 401 Unauthorized, (3) 12 customers had phone numbers like '12345' and the API returned 400 Bad Request, (4) after a rerun, 300 customers got the same reminder twice, (5) on Sunday the run finished with no errors but sent 0 messages, because the billing export was empty."
   questions:
-    - q: "Which failures should be retried, and how?"
-      a: "Only (1), the 429s. Retry with backoff and respect the Retry-After header, with a cap of a few attempts."
+    - q: "How should the workflow handle (1)?"
+      a: "Throttle: send in batches under the plan's documented rate. Keep retries with backoff, jitter and Retry-After, capped at a few attempts, as a safety net."
     - q: "What should the workflow do on (2)?"
       a: "Stop at once without retrying and alert the owner that the WhatsApp token has expired or been revoked, with where to renew it."
     - q: "Where should the 12 records in (3) go?"
       a: "To a 'needs attention' list with the reason 'invalid phone number', while the other reminders carry on."
-    - q: "What two checks would have caught (4) and (5)?"
-      a: "An idempotency check on a key like invoice id plus reminder date for (4), and a daily 'fewer than expected messages' alert for (5)."
+    - q: "What checks would have caught (4) and (5)?"
+      a: "For (4), a send log keyed by invoice id plus reminder date, checked before sending. For (5), an empty-export check and an alert below half the usual Sunday volume."
 ask:
   - "Which errors should an automation retry?"
   - "How do I stop duplicate actions when a workflow reruns?"
   - "How do I set up alerts in n8n?"
 explain_in_interview:
-  answer: "Error handling is everything an automation does when a step fails, so it fails safely: nothing lost, nothing done twice, and the right person knows. I separate temporary errors, like timeouts, rate limits or server errors, which I retry with growing waits and a cap, from permanent ones, like bad credentials or bad input, which I stop on and record. I make actions idempotent, send useful alerts, and put failed records in a dead-letter queue. For example, a delivery-update automation in Bengaluru should never send a customer the same SMS twice. The limit is logic errors, where it runs but does the wrong thing: only checks and monitoring catch those."
+  answer: "Error handling is everything an automation does when a step fails, so it fails safely: nothing lost, nothing done twice, and the right person knows. I throttle to the provider's rate limit, retry temporary errors with growing, random waits and a cap, and stop on permanent ones like bad credentials. A timeout on a send is an unknown outcome, so I check status by a unique key before retrying. Bad records go to a needs attention list. For example, a delivery-update automation in Bengaluru should never send a customer the same SMS twice. Logic errors need validation and volume monitoring."
   follow_up: "How do you make sure a retry does not create a duplicate invoice or message?"
-  follow_up_answer: "Make the step idempotent. Before creating anything, check whether it already exists using a unique key, such as the order id plus the status. If it exists, skip it. Then retries and manual reruns never create duplicates."
+  follow_up_answer: "Use a unique key from the action itself, such as order id plus status. Record it as sending before the call, skip keys already sent, pass it as the provider's idempotency key if supported, and after a timeout check status before retrying with the same key."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-10-27
@@ -62,120 +62,185 @@ reviewed_on: 2026-10-27
 
 Every automation fails eventually. An API is down, a token expires, a customer types their phone number wrongly, a provider limits how fast you can send. The question is not **whether** it fails but **how**. A well-built automation fails safely: nothing is lost, nothing is done twice, and the right person knows what to do.
 
-**Error handling** is everything an automation does when a step fails:
+**Error handling** is everything an automation does when a step fails, or when a step "succeeds" but returns something wrong:
 
 | Job | What it means |
 | --- | --- |
-| **Retry** | Try again errors that are likely temporary |
-| **Stop** | Record errors that will not fix themselves, and do not keep trying |
-| **Alert** | Tell a person, with enough detail to act |
-| **Recover** | Reprocess safely once the cause is fixed, without duplicating actions |
-| **Record** | Keep a history of what happened for later review |
+| **Retry** | Try again errors that are likely temporary, slowly and a limited number of times |
+| **Stop** | Do not keep trying errors that will not fix themselves; record them |
+| **Alert** | Tell a person, once, with enough detail to act |
+| **Recover** | Reprocess safely once the cause is fixed, without doing anything twice |
+| **Record** | Keep a history of what happened to each item, for review and for reruns |
 
-This lesson follows a logistics startup in Bengaluru whose delivery-update automation sent duplicate messages, hit rate limits and once did nothing for a whole day. By the end you will make your own automations fail safely.
+Two ideas sit under all five jobs. First, the right response depends on **what a retry would change**: a busy server may answer next time, a wrong phone number never will. Second, a failed call to "send" or "pay" does not always mean nothing was sent or paid. Most real duplicates come from forgetting that.
+
+This lesson follows a Bengaluru logistics startup whose delivery updates were sent twice, hit rate limits and once stopped for a whole day. The example tool is n8n.
 
 ## How it works
 
-### Know the kinds of error
+### Classify the error by what a retry would change
 
 ```flow
-An error happens -> Likely temporary? | timeout, 429, 500-504
-Likely temporary? -[yes]-> Retry with backoff | then alert if it still fails
-Likely temporary? -[no]-> About one bad record? | 400, 404, invalid data
-About one bad record? -[yes]-> Put the record in "needs attention" | carry on with the rest
-About one bad record? -[no]-> About the whole workflow? | 401, 403, an expired token
-About the whole workflow? -[yes]-> Stop now | alert the owner with the fix
+An error happens -> Was the step only reading data?
+Was the step only reading data? -[yes]-> Temporary error? | timeout, 429, 500 to 504
+Was the step only reading data? -[no]-> Outcome unknown? | timeout or 500 to 504 on a send, pay or create
+Outcome unknown? -[yes]-> Check status by your key | then retry with the same key
+Outcome unknown? -[no]-> Temporary error?
+Temporary error? -[yes]-> Retry with backoff | then needs attention if it still fails
+Temporary error? -[no]-> About one record? | 400, 404, invalid data
+About one record? -[yes]-> Needs attention list | carry on with the rest
+About one record? -[no]-> Stop the run | 401, 403, expired token; alert the owner
 ```
 
 | Kind | Examples | What to do |
 | --- | --- | --- |
-| **Temporary** | Network blips, timeouts, rate limits (HTTP 429), server errors (500 to 504) | Retry with backoff |
-| **Permanent** | Wrong credentials (401, 403), bad input (400), missing record (404), invalid data | Stop, record, fix the cause |
-| **Logic** | The automation ran but did the wrong thing, such as a field mapped wrongly | Only checks and monitoring catch these |
+| **Temporary** | Network blips, rate limits (HTTP 429), server errors (500 to 504) on a read | Throttle, then retry with backoff and a cap |
+| **Outcome unknown** | A timeout or a 500 to 504 on a step that sends, pays or creates something | Check first, then retry only with the same key |
+| **Permanent, one record** | Bad input (400), a missing record (404), a phone number like "12345" | Record it with the reason, carry on with the others |
+| **Permanent, whole workflow** | Wrong or expired credentials (401, 403), a deleted sheet | Stop at once and alert the owner |
+| **Logic** | The run succeeds but does the wrong thing, such as a field mapped wrongly | Only validation and monitoring catch these |
 
-### Retry with backoff
+Status codes are a starting point. Two patterns tell you more:
 
-Retry temporary errors a few times, waiting longer each time, so you do not hammer a struggling service:
+- **The same record fails on every attempt while other records go through.** Then the problem is that record, even if the code says 500. Some APIs crash on bad input and report a server error. After the normal retries, send it to "needs attention".
+- **Every record fails, one after another.** Then the problem is the service or your credentials, not the records. Stop early instead of failing 2,000 items one by one.
+
+### Timeouts are ambiguous
+
+A timeout means you stopped waiting, not that the provider did nothing. The SMS may have gone out and only the reply was lost. Retry blindly and the customer gets it twice. Stripe's docs, for example, say to treat a 500 the same way: the money may or may not have moved.
+
+The safe pattern has three parts:
+
+1. **Record the attempt before you call.** Write a send-log row with a unique key and the status "sending"; afterwards, update it to "sent" or "failed".
+2. **Pass an idempotency key if the provider supports one.** An idempotency key is a unique value you send with the request so the provider can recognise a repeat. Stripe, for example, accepts an `Idempotency-Key` header: if you retry with the same key and the same details, it returns the first result instead of charging again. Its v1 API docs say to retry with the same key within 24 hours (as of November 2026). Check your own provider's docs; some offer this, some do not.
+3. **On a timeout, look before you retry.** If the provider has a status API, ask whether the message or payment exists. Retry only if it does not. Never generate a new key for the retry: a new key tells the provider "this is a new request".
+
+If the provider has neither an idempotency key nor a status lookup, decide per action which mistake is cheaper. A delivery update sent twice is annoying; a refund paid twice is real money. For anything involving money, do not auto-retry an unknown outcome: put it in "needs attention" for a person to check.
+
+### Throttle before you retry
+
+Rate limits (HTTP 429) at a known daily peak are not bad luck: you send faster than your plan allows. **Send no faster than the provider's documented limit**, so 429s rarely happen, and keep retries as a safety net.
+
+Suppose, for example, the plan allows 10 messages per second. Send batches of 8 with a one-second gap: that leaves 20 percent headroom for other workflows using the same account. Then 3,000 evening messages take about 375 seconds, a little over six minutes. In n8n you can do this with the HTTP Request node's **Batching** option (Items per Batch and Batch Interval), or with a **Loop Over Items** node and a **Wait** node inside the loop.
+
+### Retry with backoff and jitter
+
+Retry temporary errors a few times, waiting longer each time. Then add **jitter**, a random extra amount on each wait. Without it, when 500 items fail at 7 pm, all 500 retry at exactly the same second and fail again together.
 
 ```flow
 dir: LR
-Attempt 1 -[fails]-> Wait 5 s -> Attempt 2 -[fails]-> Wait 30 s -> Attempt 3 -[fails]-> Wait 2 min -> Attempt 4 -[fails]-> Alert a person
+Attempt 1 -[fails]-> Wait 5 to 10 s -> Attempt 2 -[fails]-> Wait 10 to 20 s -> Attempt 3 -[fails]-> Wait 20 to 40 s -> Attempt 4 -[fails]-> Needs attention and alert
 ```
 
-Respect a **Retry-After** header if the service sends one: it tells you exactly how long to wait. Always cap the number of retries.
+A sensible default: double the wait each time, add a random 0 to 100 percent, stop after 3 to 5 attempts. A 429 may come with a **Retry-After** header, given in seconds or as a date. Use it instead of your own number.
+
+**What n8n gives you.** Each node has a **Retry On Fail** setting with **Max Tries** and **Wait Between Tries (ms)**. As of November 2026, n8n's docs say Max Tries is limited to 5 and the wait to 5,000 ms, and the HTTP Request node does not read Retry-After for you. There is one wait setting, so the wait does not grow. That is fine for a network blip. For longer, growing waits, build the retry yourself: route the node's error output to a Wait node and loop back, with a counter so it stops.
 
 ### Idempotency: safe to run twice
 
-Retries and manual reruns can repeat actions. Before creating something, such as an invoice, a payment or a message, check whether it already exists, using a unique key like the order id plus the status. If it exists, skip it. Then retries and reruns never create duplicates.
+A step is **idempotent** when running it twice has the same effect as running it once. Retries and reruns repeat steps, so every step that creates something needs this.
+
+Keep a send log with a **unique key** per action. Before you act, check whether the key is already marked "sent"; if so, skip. Choose the key from **what the action is about**, so the same real-world action always gives the same key:
+
+| Action | Good key | Bad key, and why |
+| --- | --- | --- |
+| Delivery update SMS | Order id plus status, for example ORD-4471 plus "out for delivery" | The run id: every rerun gets a new one, so nothing is ever skipped |
+| Monthly fee reminder | Member id plus billing month | Member id alone: it blocks next month's reminder |
+| Invoice in the ledger | Invoice number from the supplier | Time of processing: unique every time, so it catches nothing |
+
+If two runs can overlap, a check followed by an action can still race: both runs check, both see nothing, both send. Writing the "sending" row first, in a store that refuses a second row with the same key (for example a database table with a unique constraint), closes that gap.
+
+### Validate what comes back
+
+A green tick only means the call returned. Check the response makes sense: an expected list is not empty, needed fields are present, a "200 OK" body holds no error message. If an export that normally has 8,000 rows has none, treat it as an error and stop, rather than "successfully" doing nothing. In n8n, an IF node can route bad responses to a **Stop and Error** node, which fails the run on purpose.
+
+### Isolate bad records, but stop when everything fails
+
+One bad item out of 300 should not stop the other 299. Process items independently and write each failure, with its reason, to a "needs attention" list, sometimes called a **dead-letter queue**. In n8n, set the node's **On Error** to **Continue (using error output)** and connect that output to the list. Someone fixes those records and reprocesses them later. Nothing is silently lost.
+
+The opposite case needs a **circuit breaker**: a rule that pauses the run when failures pile up, for example 20 failures in a row, or more than half of the last 50 items. Without it, an outage turns into 2,000 dead-letter rows and 2,000 alerts.
 
 ### Alerts that help
 
 | Weak alert | Useful alert |
 | --- | --- |
-| "Workflow failed." | "Delivery SMS workflow, step 'Send SMS', order ORD-4471: 401 Unauthorized. The SMS provider token has expired. Renew it in Settings, Credentials, SMS provider. Run link: ..." |
+| "Workflow failed." | "Delivery SMS workflow, step 'Send SMS', order ORD-4471: 401 Unauthorized. The SMS provider token has expired. Renew it in Settings, Credentials, SMS provider, then rerun; sent messages will be skipped. Run link: ..." |
 
-Send alerts to a channel the owner actually watches, such as email, Slack, Teams or WhatsApp. Group repeated alerts, so one outage sends one message, not 500.
+Send it where the owner actually looks, such as email, Slack, Teams or WhatsApp. Group repeats, so one outage sends one message, not 500.
 
-### Dead-letter queue
+In n8n, create a separate **error workflow** that starts with an **Error Trigger** node, and choose it in each workflow's Settings. It runs when an automatic execution fails. It does not run when you test by hand, so test it with a real scheduled or webhook run.
 
-Records that failed permanently go into a **"needs attention"** list, sometimes called a dead-letter queue, with the reason. Someone fixes them and reprocesses them later. Nothing is silently lost.
+### Monitor volume, not just errors
 
-### Partial failures
+The most dangerous failure has no error at all. Track items processed and failures per day. A fixed threshold such as "fewer than 1,000" fires every quiet Sunday and misses a day that is half broken. Compare with the **same weekday's recent average** instead, for example "alert if by 8 pm we have sent less than half of the average of the last four Tuesdays", and review the rule monthly.
 
-When processing 300 items, one bad item should not stop the other 299. Process items independently, collect the failures, and report them at the end.
+### What to use in n8n
 
-### Monitoring
-
-Track runs, failures and items processed per day. A workflow that suddenly processes **zero** items is often broken, even with no error at all, for example because an export came back empty.
+| Job | n8n feature |
+| --- | --- |
+| Short retry of a blip | Node Settings, Retry On Fail |
+| Longer or growing waits | Error output to a Wait node, looping back with a counter |
+| Stay under a rate limit | HTTP Request Batching, or Loop Over Items with a Wait node |
+| Carry on past one bad record | On Error set to Continue (using error output) |
+| Stop the whole run | On Error set to Stop Workflow, or a Stop and Error node |
+| Alert on any failed run | An error workflow starting with an Error Trigger node |
+| Duplicates and dead letters | A lookup against your send log, and a sheet or table for failed records |
 
 ### Ownership and a runbook
 
-Every automation has a named owner and a short runbook: what it does, the common failures and how to fix each.
+Every automation has a named owner and a short runbook: what it does, the common failures, how to fix each, and how to rerun safely.
 
 ## A worked example
 
-A logistics startup in Bengaluru runs an automation that sends delivery updates to customers by SMS and updates the order system: about 8,000 messages a day.
+A logistics startup in Bengaluru runs an automation that sends delivery updates to customers by SMS and updates the order system: about 8,000 messages a day, most of them between 6 pm and 9 pm. The numbers below are an illustration of a typical first month, not measured results.
 
 **The first month went badly:**
 
 | Problem | Cause |
 | --- | --- |
-| Messages failed during evening peaks | The SMS provider rate-limited the workflow (HTTP 429) |
-| Some customers got two messages | A failed run was rerun by hand, and earlier messages were sent again |
-| One day, nothing was sent at all, with no error | A login token had expired; the step returned an empty result instead of failing loudly |
+| Messages failed during evening peaks | The workflow sent as fast as it could, and the SMS provider rate-limited it (HTTP 429) |
+| Some customers got two messages | A failed run was rerun by hand and sent earlier messages again; timed-out sends were retried blindly |
+| One day nothing was sent, with no error | A login token for the order system had expired; the export step returned an empty list instead of failing loudly |
 
 **The fixes:**
 
-1. **Retries with backoff** on 429 and 5xx responses from the SMS provider, honouring its Retry-After header, with at most four attempts.
-2. **A unique key** per message, order id plus status, checked before sending, so reruns never send duplicates.
-3. **Expired or invalid credentials stop the run** at once and alert the owner with "token expired for SMS provider, renew at Settings, Credentials" instead of retrying.
-4. **Failed records go to a "needs attention" sheet** with the reason; a button reprocesses them after fixing.
-5. **A daily check** alerts if fewer than 1,000 messages were sent by 8 pm.
+1. **Throttle to the plan's limit:** batches below the provider's documented rate, with a wait between them.
+2. **Retries with backoff and jitter** on 429s, using Retry-After when present, at most four attempts, then the "needs attention" sheet. A timeout or a 500 to 504 on a send goes through the status check in fix 3 first.
+3. **A send log keyed by order id plus status.** Each message is written as "sending" before the call. A rerun skips anything marked "sent". After a timeout, the workflow checks the provider's delivery status by that key before sending again.
+4. **Validate the export.** An empty or very short export now stops the run with "order export returned 0 rows; check the order system login" instead of finishing green. This is the fix that would have caught the silent day.
+5. **Credentials errors stop the run** at once and alert the owner with where to renew the token.
+6. **A circuit breaker:** 20 failed sends in a row pause the run and send one alert.
+7. **A volume check at 8 pm** against the average of the last four of the same weekday, alerting below 50 percent.
 
-**The next month:**
+**The next month (illustrative):**
 
 | Measure | Month 1 | Month 2 |
 | --- | --- | --- |
-| Duplicate messages | About 900 | 0 |
-| Messages lost to rate limits | About 1,200 | 0 (all retried) |
-| Time to fix the next token expiry | About 9 hours (noticed by a customer complaint) | 20 minutes (the alert said what to do) |
-| Records needing attention | Unknown | 35, all with a reason, all fixed within a day |
+| Duplicate messages | About 900 | 3, all after timeouts when the status lookup was itself down |
+| Messages lost to rate limits | About 1,200 | 0; a handful of 429s, all sent on retry |
+| Time to fix the next login expiry | About 9 hours (a customer complained first) | 20 minutes (the alert said what to do) |
+| Records needing attention | Unknown | 35, each with a reason, all fixed within a day |
+
+When the provider cannot say what happened, you choose between a rare duplicate and a rare missed update. For delivery updates the team chose the duplicate.
 
 ## Common mistakes
 
-- **Retrying everything.** Permanent errors need fixing, not retries.
-- **No duplicate protection.** Retries and reruns create double actions.
-- **Alerts without details.** "Workflow failed" is not actionable.
-- **One bad item stops the whole batch.** Handle items independently.
-- **Watching only for errors.** A workflow doing nothing can look healthy.
-- **Retrying without a cap or waits.** You make an outage worse and may get blocked.
+- **Retrying everything.** Permanent errors need fixing; a record that fails every time belongs in "needs attention".
+- **Retrying a timed-out send blindly.** The first attempt may have worked. Check by your key first.
+- **A new key on every attempt.** A run id or a timestamp makes every retry look new, so nothing is skipped.
+- **Retries instead of throttling.** If 429s come at the same hour every day, slow down; do not just retry harder.
+- **Fixed waits with no jitter and no cap.** Everything retries at once, the outage gets worse and you may be blocked.
+- **Trusting a green run.** Validate empty or odd "successful" responses.
+- **One bad item stops the batch, or a dead service fails every item.** Isolate records, but stop the run when failures pile up.
+- **Alerts without details, or 500 of them.** Say what broke and what to do, once.
 
 ## Practice
 
 Read n8n's guide to error handling, linked below, and revisit the error-handling part of the N8N102 course.
 
-1. **Retries.** Add retries with backoff to one API step in a workflow, and test with a deliberately failing endpoint.
-2. **Duplicates and dead letters.** Add an idempotency check and a "needs attention" list for permanent failures.
-3. **Alerts.** Create an alert that names the workflow, step, record and error, and a daily "too few items" check.
+1. **Retries.** Point an HTTP Request node at an endpoint that fails on purpose (for example a small webhook workflow of your own that returns 503). Turn on Retry On Fail and confirm in the execution log that the retries actually ran. Then build a longer retry with the error output, a Wait node and a counter.
+2. **Throttle.** Send 50 test items in timed batches and check the timing matches your plan.
+3. **Duplicates and dead letters.** Add a send log with a unique key, the "sending" then "sent" status, and a "needs attention" sheet. Run the workflow twice and show nothing is sent twice.
+4. **Alerts and checks.** Create an error workflow with an Error Trigger node and a useful alert, an empty-result check and a same-weekday volume check.
 
-**You are done when you can** break your workflow three ways, with a temporary error, a permanent error and a bad item, and show the right behaviour for each.
+**You are done when you can** break your workflow four ways, with a temporary error, a permanent error, a bad item and an empty input, show the right behaviour for each, and rerun it with no duplicates.
