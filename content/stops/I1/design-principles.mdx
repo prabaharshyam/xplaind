@@ -54,28 +54,47 @@ reviewed_on: 2026-11-08
 
 ## What it is
 
-**Software design** is deciding how to split a program into parts and how those parts talk to each other. Two ideas sit underneath most good designs:
+**Software design** is deciding how to split a program into parts and how those parts talk to each other. Two ideas sit under most good designs:
 
-- **Cohesion**: each part does one job, and everything inside it belongs to that job.
-- **Coupling**: how much parts depend on each other's details. Loose coupling means you can change one part without touching the others.
+- **Cohesion**: how closely the things inside one part belong together. High cohesion means each part does one job, and everything inside it serves that job.
+- **Coupling**: how much one part depends on the details of another. Loose coupling means you can change one part without touching the others.
 
-Good design is high cohesion and loose coupling. A badly designed program is one where changing the email template somehow requires editing the code that calls the model.
+Good design is high cohesion and loose coupling. You can feel bad design when a small change spreads: changing the email template somehow means editing the code that calls the model.
 
-The **SOLID principles** are five well-known guidelines for getting there. They come from object-oriented programming, but the ideas apply to plain Python functions and modules too. You do not need to recite them; you need to recognise the problems they prevent.
+This matters more in AI work than in most software. In one year a team may switch model providers, add a self-hosted model for a privacy-sensitive customer and change the vector store. If the model call is buried in twenty places, each change is a risky rewrite. Behind one small boundary, each change is a new file and a test.
+
+The **SOLID principles** are five well-known guidelines for getting there. Robert C. Martin collected them for object-oriented code, but the ideas work for plain Python functions and modules too. You do not need to recite them. You need to spot the problems they prevent in real code.
 
 ## How it works
 
-The five principles, in plain words:
+### The five principles, in plain words
 
 | Principle | In plain words | A sign you are breaking it |
 | --- | --- | --- |
-| **S**ingle responsibility | One module or class, one reason to change | A file that reads data, calls a model and sends email |
-| **O**pen for extension | Add new behaviour by adding code, not editing working code | Every new provider means another `elif` in a long chain |
-| **L**iskov substitution | Any implementation of an interface works wherever the interface is expected | A "provider" that raises "not supported" on half its methods |
-| **I**nterface segregation | Small, focused interfaces | One giant `Storage` class that every part depends on |
-| **D**ependency inversion | Depend on an interface, not a specific library | `openai.chat...` called deep inside business logic |
+| **S**ingle responsibility | One module or class, one reason to change | A file that reads PDFs, calls a model and sends email |
+| **O**pen-closed | "Open for extension, closed for modification": add behaviour by adding code, not by editing code that already works | Every new provider means another `elif` inside the business logic |
+| **L**iskov substitution | Any implementation of an interface must work wherever the interface is expected | One client returns `None` where the others return text |
+| **I**nterface segregation | Many small, focused interfaces, not one big one | A giant `Storage` class that every part depends on, though each uses two methods |
+| **D**ependency inversion | High-level logic depends on an interface it owns, not on a specific library | `openai` imported and called deep inside the business logic |
 
-**Dependency injection** is the practical tool behind most of these. Instead of a function creating what it needs, it receives it:
+**Open-closed does not mean "never edit a file".** It means the code that changes often (which provider, which output format) should be added as new pieces, while the core that works stays still. Somewhere, one place still has to choose which piece to use. Keep that choice in one spot at the edge of the program, not spread across the logic.
+
+**Liskov is about promises, not class names.** An interface is a promise: "give me a prompt string, I return a text string". Here is a client that breaks it:
+
+```python
+class CheapClient:
+    def complete(self, prompt: str) -> str | None:
+        try:
+            return self._call_api(prompt)
+        except TimeoutError:
+            return None   # every caller now has to check for None
+```
+
+It has the right method name, so it looks swappable. But code written for the other clients does `reply.splitlines()` and crashes with an `AttributeError` the first time this one times out. The same trap appears when an implementation accepts less (it refuses long prompts the others take) or raises "not supported" for half its methods. Keep the promise: raise an error the caller already handles, or retry inside the client.
+
+### Dependency injection
+
+**Dependency injection** is the practical tool behind most of SOLID. Instead of a function creating what it needs, it receives it from outside:
 
 ```python
 from typing import Protocol
@@ -87,54 +106,244 @@ def summarise(text: str, client: ModelClient) -> str:
     return client.complete(f"Summarise in 3 bullet points:\n{text}")
 ```
 
-Now `summarise` does not care which provider it uses. Production passes a real client; tests pass a fake; switching providers means writing one new class, not editing `summarise`.
+`Protocol` describes a shape. Any class with a matching `complete` method fits, without inheriting from anything, and a type checker such as mypy checks it for you. Now `summarise` does not know or care which provider it uses. Production passes a real client, tests pass a fake, and switching providers means writing one new class, not editing `summarise`.
+
+Notice the direction. The interface belongs to the business logic: `summarise` says what it needs. The provider library is pushed to the outside. That is the "inversion" in dependency inversion.
+
+### How thin should the model interface be?
+
+This is the question an experienced engineer will ask about the code above. Real provider APIs are not the same. They differ in how they take messages, call tools, return structured JSON, stream tokens and cache prompts. A one-method `complete(prompt) -> str` interface hides all of that. So you face a real trade-off:
+
+- **Too thin**, and you lose features. If your product needs tool calling, a plain text interface cannot express it.
+- **Too wide**, and provider details leak through. An interface with `messages`, `tools`, `response_format` and `stream` is really one provider's API copied, and the next provider will not fit it.
+
+Three rules handle most cases:
+
+1. **Shape the interface around what your product needs, not around a chat call.** If your app extracts invoice fields, the interface can be `extract_invoice(text) -> Invoice`, where `Invoice` is your own typed class. Each adapter then uses its provider's best feature for structured output inside, and your core logic gets a clean, typed result.
+2. **Let provider-specific features stay inside the adapter.** Prompt caching or a special retry header is the adapter's business. If one provider genuinely cannot do something your product needs, that is a product decision, not something to hide behind a "not supported" error.
+3. **Consider a gateway.** Libraries such as LiteLLM, and servers that speak the OpenAI-style chat format (vLLM, for example), make many models look alike, so your adapter stays small. You then depend on the gateway and on the features all its models share. The *LLM gateways* lesson covers this.
+
+For a summariser, `complete(prompt) -> str` is the right size.
 
 ```flow
-title: Business logic depends on a small interface, not on a provider
-summarise() -> ModelClient interface | complete(prompt) -> str
-ModelClient interface -> Provider A client
-ModelClient interface -> Provider B client
-ModelClient interface -> Fake client for tests
+title: Ports and adapters in an AI app
+Wiring at start-up | reads settings, creates adapters -[passes a client in]-> Core logic | prompts, parsing, rules
+Core logic -[calls]-> ModelClient port | the interface the core owns
+ModelClient port -[implemented by]-> HostedClient | wraps the provider SDK
+ModelClient port -[implemented by]-> SelfHostedClient | calls vLLM over HTTP
+ModelClient port -[implemented by]-> FakeClient | used in tests
 ```
 
-A common way to organise an AI application uses the same idea across the whole codebase:
+### Ports and adapters
 
-- **Core logic** (what the product does: classify a ticket, build a prompt, score an answer) depends on nothing external.
-- **Adapters** (the model client, the vector store, the database, email) implement small interfaces.
-- **Wiring** at the edge (the API startup, the CLI) creates the real adapters and passes them in.
+The same idea, applied to the whole codebase, has a name: **ports and adapters**, also called **hexagonal architecture**. Alistair Cockburn described it. Interviewers use both names.
 
-**Functions or classes?** You do not need classes everywhere. Plain functions with clear inputs and outputs are often the cleanest design in Python. Reach for a class when something holds state or settings that several functions share, such as a client with an API key and a timeout, or when you want several interchangeable implementations of the same interface.
+- **Core logic** is what the product does: classify a ticket, build a prompt, score an answer. It imports nothing external.
+- **Ports** are the small interfaces the core needs: a model client, a document store, a notifier.
+- **Adapters** implement the ports with real services: a provider's SDK, a vector database, email or WhatsApp.
+- **Wiring** at the edge (the web app's start-up, the command-line entry point) reads settings, creates the real adapters and passes them in.
 
-**In interviews.** Low-level design rounds ask you to design the classes and interfaces for something small, such as a rate limiter or a parking lot. System design rounds ask how services fit together. The same idea runs through both: name the parts, give each one job, and show how you would change or test one without touching the rest.
+A quick test of your design: can you run the core logic in a unit test with no network, no API key and no database? If yes, the boundaries are in the right place.
+
+### Composition over inheritance
+
+When you want to add behaviour, such as retries, logging or cost tracking, the tempting move is a subclass: `RetryingOpenAIClient(OpenAIClient)`. Then you need `RetryingSelfHostedClient`, `LoggingRetryingOpenAIClient`, and the class count grows with every combination. **Composition** means wrapping instead:
+
+```python
+import time
+
+class RetryingClient:
+    """Wraps any ModelClient and retries failed calls."""
+
+    def __init__(self, inner: ModelClient, attempts: int = 3):
+        self._inner, self._attempts = inner, attempts
+
+    def complete(self, prompt: str) -> str:
+        for i in range(self._attempts):
+            try:
+                return self._inner.complete(prompt)
+            except Exception:
+                if i == self._attempts - 1:
+                    raise
+                time.sleep(2 ** i)
+```
+
+`RetryingClient` is itself a `ModelClient`, so it works with any provider, and you stack wrappers at the wiring step: `RetryingClient(HostedClient(...))`. This is open-closed in action: new behaviour, no edits to the existing clients. (In real code, retry only timeouts and rate limits, not every `Exception`; see the *Errors, retries and cost* lesson.)
+
+### Functions or classes?
+
+You do not need classes everywhere. Plain functions with clear inputs and outputs are often the cleanest Python design, and you can inject a dependency into a function just by making it a parameter. Reach for a class when something holds state or settings that several calls share, such as a client with an API key and a timeout, or when you want several interchangeable implementations of one interface.
+
+### When to refactor
+
+**Refactoring** means changing the structure of code without changing what it does. Do it when you are about to change that code anyway and the change is hard. First reshape the code so the change becomes easy, then make the easy change. The safe way:
+
+1. **Tests first.** Before touching anything, write tests that pin down today's behaviour, even ugly behaviour. They tell you when you break something.
+2. **Small steps.** Move one function, run the tests, commit. A refactor that takes a week on a branch usually ends in a painful merge.
+3. **Keep structure and behaviour apart.** A commit either reshapes code or changes what it does, never both, so a reviewer can check each one.
+
+Do not refactor code that works and that nobody needs to change. Do not add an interface until there is a real second case (a second provider, a second output format) or a test that needs a fake.
+
+### Low-level design interviews
+
+Many Indian product companies run a **low-level design** (LLD) round. You are asked to design the classes and interfaces for something small, such as a rate limiter or a parking lot. (A **system design** round asks how whole services fit together instead.)
+
+A model answer for "design a rate limiter that allows each user N requests per minute" starts with interfaces, then one simple strategy:
+
+```python
+from typing import Protocol
+
+class Clock(Protocol):
+    def now(self) -> float: ...
+
+class RateLimiter(Protocol):
+    def allow(self, user_id: str) -> bool: ...
+
+class FixedWindow:
+    def __init__(self, limit: int, window_s: float, clock: Clock):
+        self.limit, self.window_s, self.clock = limit, window_s, clock
+        self.counts: dict[str, tuple[int, int]] = {}  # user -> (window number, count)
+
+    def allow(self, user_id: str) -> bool:
+        window = int(self.clock.now() // self.window_s)
+        seen, n = self.counts.get(user_id, (window, 0))
+        n = n if seen == window else 0
+        if n >= self.limit:
+            return False
+        self.counts[user_id] = (window, n + 1)
+        return True
+```
+
+Then say the trade-offs out loud. The clock is injected, so a test sets the time with a fake clock instead of waiting a minute. A fixed window has a known weakness: a user can make N requests at 0:59 and N more at 1:00, double the limit in two seconds. A **token bucket**, which refills a user's allowance steadily over time, smooths this out, and it is a second class behind the same `RateLimiter` interface, so the API code that calls `allow()` never changes. Across many servers, the counts move to a shared store such as Redis: one more adapter.
 
 ## A worked example
 
-Rohit's team at a legal-tech startup in Delhi built a contract summariser in a week. Everything lived in one 300-line file: it read the PDF, called one model provider directly, formatted Markdown and emailed the result.
+Rohit's team at a legal-tech startup in Delhi built a contract summariser in a week. Everything lived in one 300-line file: it read the PDF, called one hosted model provider directly, formatted Markdown and emailed the result.
 
-Two months later, three requests arrive at once: a client wants their data processed by a model hosted in their own cloud, the sales team wants summaries as Word documents, and tests take minutes because every one makes real API calls.
+Two months later, three requests arrive at once. A large client wants its contracts processed by a model running in its own cloud account. The sales team wants summaries as Word documents. And the tests take about four minutes, because every test makes a real API call and costs money.
 
-Rohit refactors in steps, with tests around today's behaviour first:
+Rohit refactors in small steps, with tests around today's behaviour first.
 
-1. **Single responsibility.** He splits the file into `reader.py` (PDF to text), `summariser.py` (prompt and parsing), `formatters.py` (Markdown, and now Word) and `delivery.py` (email).
-2. **An interface for the model.** `summariser.py` now takes a `ModelClient`. He writes `ProviderAClient` and `SelfHostedClient`, each a small class with `complete()`.
-3. **Injection at the edge.** The API startup reads the customer's settings and passes in the right client and formatter.
-4. **Fast tests.** Unit tests pass a `FakeClient` that returns a fixed summary. The test suite drops from four minutes to three seconds.
+**1. Split by reason to change.** He creates `reader.py` (PDF to text), `summariser.py` (prompt and parsing), `formatters.py` (Markdown, and now Word), `delivery.py` (email) and `llm.py` (model clients). Each file has one reason to change.
 
-The self-hosted client is a new class with its own tests; `summarise()` did not change at all. Word output is a new formatter; nothing else changed. Each request took a day instead of a rewrite.
+**2. A port and two adapters.** In `llm.py`:
 
-He also resists going further: he does not add interfaces for the PDF reader, because there is only one reader and no plan for another. Abstraction is added when there is a real second case or a testing need.
+```python
+import httpx
+from openai import OpenAI
+
+# ModelClient is the Protocol shown earlier, defined in this file.
+
+class HostedClient:
+    """A hosted provider, reached through its own SDK."""
+    def __init__(self, api_key: str, model: str):
+        self._sdk = OpenAI(api_key=api_key, timeout=30)
+        self._model = model
+
+    def complete(self, prompt: str) -> str:
+        resp = self._sdk.chat.completions.create(
+            model=self._model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.choices[0].message.content or ""
+
+class SelfHostedClient:
+    """A model served with vLLM inside the customer's own cloud."""
+    def __init__(self, base_url: str, model: str):
+        self._http = httpx.Client(base_url=base_url, timeout=60)
+        self._model = model
+
+    def complete(self, prompt: str) -> str:
+        r = self._http.post("/v1/chat/completions", json={
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
+        })
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"] or ""
+```
+
+Both return a string, never `None`, so both keep the same promise. Both raise an error on failure, which the caller already handles.
+
+**3. Core logic that knows only the port.** `summariser.py` imports `ModelClient` and nothing else from outside:
+
+```python
+from llm import ModelClient
+
+PROMPT = "Summarise this contract in 5 bullet points. Flag any termination clause.\n\n{text}"
+
+def summarise(text: str, client: ModelClient) -> list[str]:
+    reply = client.complete(PROMPT.format(text=text))
+    return [line.lstrip("-* ").strip() for line in reply.splitlines() if line.strip()]
+```
+
+**4. Wiring at the edge.** `main.py` reads each customer's settings and picks the client. This is the only place in the codebase that knows which providers exist:
+
+```python
+from dataclasses import dataclass
+
+from llm import HostedClient, ModelClient, SelfHostedClient
+
+@dataclass
+class Settings:
+    model_host: str      # "hosted" or "self_hosted"
+    model: str
+    api_key: str = ""
+    base_url: str = ""
+
+def make_client(s: Settings) -> ModelClient:
+    if s.model_host == "self_hosted":
+        return SelfHostedClient(s.base_url, s.model)
+    return HostedClient(s.api_key, s.model)
+```
+
+**5. Fast tests with a fake.** In `test_summariser.py`:
+
+```python
+from summariser import summarise
+
+class FakeClient:
+    def __init__(self, reply: str):
+        self.reply = reply
+        self.prompts: list[str] = []
+
+    def complete(self, prompt: str) -> str:
+        self.prompts.append(prompt)
+        return self.reply
+
+def test_summarise_returns_clean_bullets():
+    fake = FakeClient("- Term: 2 years\n\n- Notice period: 90 days\n")
+    assert summarise("CONTRACT TEXT", fake) == ["Term: 2 years", "Notice period: 90 days"]
+    assert "CONTRACT TEXT" in fake.prompts[0]
+```
+
+The test checks that the reply is cleaned into bullets and that the contract text reached the prompt, with no network or API key. Once every unit test uses fakes, Rohit's suite runs in seconds instead of minutes. He keeps two or three slow tests that call the real providers, run before each release, to catch the things a fake cannot: a changed response shape or a wrong model name.
+
+The self-hosted client was a new class, and `summarise()` did not change at all. Word output was a new formatter. Each request took about a day instead of a rewrite.
+
+He also knows where to stop. He does not add an interface for the PDF reader, because there is one reader and no plan for another.
 
 ## Common mistakes
 
-- **Calling external services deep inside logic.** It makes code impossible to test without the network and hard to switch providers.
-- **Too much abstraction too early.** Interfaces, factories and layers for a 100-line script make it harder to read, not easier.
-- **Giant "utils" or "manager" modules.** If a module's name does not say what it does, it probably does several things.
-- **Changing an interface to suit one implementation.** Then every other implementation and caller has to change too.
-- **Treating SOLID as rules to recite.** Interviewers care whether you can spot the problem in real code and fix it.
+- **Calling external services deep inside logic.** The code cannot be tested without the network, and switching providers means hunting through every file.
+- **A fake that does not keep the promise.** If the fake returns a list where real clients return a string, your tests pass and production fails. Fakes follow the same interface as the real thing.
+- **An interface that copies one provider's API.** It looks general but fits only that provider. Design it from the caller's side: what does the core logic actually need?
+- **Too much abstraction too early.** Interfaces, factories and layers for a 100-line script make it harder to read. Add an abstraction for a real second case or a test.
+- **Subclassing to add behaviour.** Retries, logging and caching as subclasses multiply into a class for every combination. Wrap instead.
+- **Refactoring without tests, or in one huge step.** You cannot tell what you broke. Pin behaviour with tests, then move in small commits.
+- **Reciting SOLID in interviews.** Interviewers care whether you can spot the problem in real code, name the trade-off and fix it.
 
 ## Practice
 
-1. Take any script that calls an API directly and pass the client in instead. Write one test with a fake.
-2. List the reasons to change for your largest file. If there are more than two, sketch how you would split it.
-3. Add a second implementation behind an interface you created, without editing the code that uses it.
-4. Practise explaining, in two minutes, how you would structure an AI app so the model provider can be swapped.
+Watch the ArjanCodes video on the SOLID principles in Python, linked below, and pause after each principle to find one example in your own code.
+
+Then do this lesson's project check, refactoring your own small app the way Rohit did: a test of today's behaviour first, then the interface, a second implementation and a `make_client` function at start-up. Before you submit, mark it yourself:
+
+| Check | It passes if |
+| --- | --- |
+| Boundary | The core logic file does not import any provider SDK; only the adapter file and the wiring do |
+| Tests | At least two unit tests use a fake client, run with no network or API key, and pass with `pytest` |
+| Swappable | Switching to the second implementation changes only settings or the wiring, not the core logic |
+
+If you have not written tests with pytest before, do the *Writing tests with pytest* lesson first; *Project tooling* covers running them as part of a project.
+
+**You are done when you can** spot single-responsibility and Liskov problems in real code, put a model provider behind an interface sized to your product, inject it at start-up, test the logic with a fake, and talk through a small low-level design such as a rate limiter, including its trade-offs.
