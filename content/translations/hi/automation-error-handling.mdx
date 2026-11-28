@@ -2,167 +2,232 @@
 id: automation-error-handling
 lang: hi
 title: "Error handling और retries"
-outcome: "Automations को safely fail करना सिखा पाओगे: temporary errors को backoff के साथ retry करना, permanent errors पर रुकना, सही इंसान को काम की details के साथ alert भेजना, rerun पर duplicates से बचना और क्या हुआ उसका record रखना।"
-answer: "अच्छी automations temporary errors को बढ़ते इंतज़ार के साथ retry करती हैं, permanent errors पर रुक जाती हैं, किसी इंसान को काम की details के साथ alert भेजती हैं, और एक ही item को दो बार process नहीं करतीं।"
-why_it_matters: "हर automation कभी न कभी fail होती है: API down हो जाती है, password expire हो जाता है, किसी file का format अजीब निकलता है। भरोसेमंद और छोड़ दी गई automation में फ़र्क ये है कि failures पकड़े जाते हैं, समझाए जाते हैं और recover हो पाते हैं, बिना double payments या खोए orders के।"
+outcome: "Automations को सुरक्षित तरीके से fail होने दो: rate limits के अंदर throttle करो, temporary errors को backoff और jitter के साथ retry करो, timeout वाले sends को 'पता नहीं क्या हुआ' मानो, permanent errors पर रुको, काम के alerts भेजो, और बिना duplicates के rerun करो।"
+answer: "Temporary errors को बढ़ते हुए, random waits के साथ retry करो; timeout वाला send retry करने से पहले check करो; permanent errors पर रुको; details के साथ alert करो; और एक unique key use करो ताकि कुछ भी दो बार न हो।"
+why_it_matters: "हर automation कभी न कभी fail होता है: कोई API down होता है, कोई password expire होता है, किसी file का format अजीब होता है। भरोसेमंद automation और छोड़ दिए गए automation में फ़र्क यही है कि failures पकड़े जाते हैं या नहीं, समझाए जाते हैं या नहीं, और बिना double payments या खोए orders के ठीक हो पाते हैं या नहीं।"
 flashcards:
-  - q: "अच्छी error handling कौन-से पाँच काम करती है?"
-    a: "Temporary errors को retry करती है, permanent errors पर रुकती है, किसी इंसान को details के साथ alert करती है, बिना duplicates के recover करती है, और जो हुआ उसे record करती है।"
-  - q: "तीन temporary errors बताओ।"
-    a: "Network blips और timeouts, rate limits (HTTP 429), और server errors (HTTP 500 से 504)। ये अक्सर retry करने पर चल जाते हैं।"
-  - q: "तीन permanent errors बताओ।"
-    a: "गलत या expired credentials (401, 403), गलत input (400) और missing record (404)। Retry करने से ये ठीक नहीं होंगे।"
-  - q: "Retry with backoff क्या है?"
-    a: "बढ़ते इंतज़ार के साथ कुछ बार retry करना, जैसे 5 seconds, 30 seconds, फिर 2 minutes, और Retry-After header हो तो उसे मानना।"
-  - q: "Idempotency duplicates को कैसे रोकती है?"
-    a: "कुछ भी बनाने से पहले workflow एक unique key, जैसे order id, check करता है। अगर वो पहले से है, तो कुछ नहीं करता, इसलिए rerun safe रहता है।"
-  - q: "Dead-letter queue क्या है?"
-    a: "एक 'needs attention' list, जिसमें permanently fail हुए records कारण के साथ जाते हैं, ताकि वो खोने की जगह ठीक करके दोबारा process हो सकें।"
-  - q: "काम के alert में क्या होना चाहिए?"
-    a: "Workflow, step, record, error message, run का link, और हो सके तो आगे क्या करना है।"
-  - q: "सिर्फ़ errors नहीं, item counts भी monitor क्यों करें?"
-    a: "जो workflow चुपचाप zero items process करता है, उसमें कोई error नहीं दिखता। 'बहुत कम items' वाला check उसे पकड़ लेता है।"
+  - q: "कैसे तय करें कि किसी error को retry करना है या नहीं?"
+    a: "पूछो कि retry से क्या बदलेगा। Busy या rate-limit करने वाली service अगली बार जवाब दे सकती है; गलत input या expire हुए credentials कभी ठीक नहीं होंगे। सिर्फ़ पहली तरह के errors retry करो।"
+  - q: "किसी send या payment पर timeout को retry करना खतरनाक क्यों है?"
+    a: "Timeout का मतलब बस इतना है कि आपने इंतज़ार करना बंद कर दिया। Message या payment शायद चला गया हो। पहले अपनी key से उसका status check करो, और retry सिर्फ़ उसी key के साथ करो।"
+  - q: "बाकी records success हो रहे हैं, पर एक record हर retry पर fail होता है। ये क्या है?"
+    a: "उस record में दिक्कत है, भले code 500 कहे। उसे reason के साथ needs attention list में डालो और आगे बढ़ो।"
+  - q: "Backoff और jitter के साथ retry क्या है?"
+    a: "बढ़ते waits के साथ कुछ बार retry करना, जैसे 5, 10, फिर 20 seconds, ऊपर से थोड़ा random extra समय, ताकि fail हुए बहुत सारे items एक साथ retry न करें। Retry-After मिले तो वही use करो।"
+  - q: "Idempotency key कैसे चुनें?"
+    a: "Action जिस चीज़ के बारे में है उससे, ताकि एक ही real action से हमेशा एक ही key बने: order id plus status, या member id plus billing month। Run id या timestamp कभी नहीं।"
+  - q: "सिर्फ़ 429s retry करने की जगह throttle क्यों करें?"
+    a: "रोज़ उसी peak पर 429s आने का मतलब है कि आप plan की इजाज़त से तेज़ भेज रहे हो। Documented limit से नीचे batches में भेजने से वो आते ही नहीं; retries बस safety net हैं।"
+  - q: "Automation में circuit breaker क्या है?"
+    a: "एक rule जो failures जमा होने पर run को pause कर देता है, जैसे लगातार 20, क्योंकि service down है। इससे हज़ारों failed items और alerts से बचते हो।"
+  - q: "Daily volume को उसी weekday से compare क्यों करें?"
+    a: "Fixed number शांत दिनों पर fire होता है और आधे टूटे दिनों को miss कर देता है। जैसे, हाल के same-weekday average के आधे से नीचे जाने पर alert करने से चुपचाप होने वाले failures पकड़ में आते हैं।"
 exercise:
-  title: "Failures को classify करो"
-  setup: "Coimbatore की एक automation billing system से WhatsApp पर payment reminders भेजती है, रोज़ लगभग 1,500। पिछले हफ़्ते के run log में ये दिखता है: (1) शाम 7 बजे 40 calls पर 429 Too Many Requests आया, (2) एक दिन हर call पर 401 Unauthorized आया, (3) 12 customers के phone numbers '12345' जैसे थे और API ने 400 Bad Request लौटाया, (4) rerun के बाद 300 customers को वही reminder दो बार मिला, (5) रविवार को run बिना किसी error के खत्म हुआ पर 0 messages भेजे, क्योंकि billing export खाली था।"
+  title: "Failures को बाँटो"
+  setup: "Coimbatore में एक automation billing system से WhatsApp पर payment reminders भेजता है, दिन में लगभग 1,500। पिछले हफ़्ते का run log ये दिखाता है: (1) 7 pm पर 40 calls ने 429 Too Many Requests लौटाया, (2) एक दिन हर call ने 401 Unauthorized लौटाया, (3) 12 customers के phone numbers '12345' जैसे थे और API ने 400 Bad Request लौटाया, (4) एक rerun के बाद 300 customers को वही reminder दो बार मिला, (5) Sunday को run बिना किसी error के खत्म हुआ पर 0 messages भेजे, क्योंकि billing export खाली था।"
   questions:
-    - q: "कौन-से failures retry होने चाहिए, और कैसे?"
-      a: "सिर्फ़ (1), यानी 429। Backoff के साथ retry करो और Retry-After header मानो, कुछ attempts की सीमा रखकर।"
+    - q: "Workflow को (1) कैसे handle करना चाहिए?"
+      a: "Throttle करो: plan के documented rate से नीचे batches में भेजो। Backoff, jitter और Retry-After वाले retries रखो, कुछ attempts पर cap करके, safety net की तरह।"
     - q: "(2) पर workflow को क्या करना चाहिए?"
       a: "बिना retry किए तुरंत रुक जाए और owner को alert करे कि WhatsApp token expire या revoke हो गया है, साथ में ये भी कि उसे कहाँ renew करना है।"
     - q: "(3) के 12 records कहाँ जाने चाहिए?"
-      a: "'invalid phone number' के कारण के साथ 'needs attention' list में, जबकि बाकी reminders चलते रहें।"
-    - q: "कौन-से दो checks (4) और (5) को पकड़ लेते?"
-      a: "(4) के लिए invoice id और reminder date जैसी key पर idempotency check, और (5) के लिए रोज़ का 'उम्मीद से कम messages' वाला alert।"
+      a: "'Invalid phone number' reason के साथ एक 'needs attention' list में, जबकि बाकी reminders चलते रहें।"
+    - q: "कौन-से checks (4) और (5) को पकड़ लेते?"
+      a: "(4) के लिए, invoice id plus reminder date से key किया हुआ send log, जो भेजने से पहले check हो। (5) के लिए, एक empty-export check और आम Sunday volume के आधे से नीचे जाने पर एक alert।"
 ask:
   - "Automation को कौन-से errors retry करने चाहिए?"
   - "Workflow rerun होने पर duplicate actions कैसे रोकूँ?"
-  - "n8n में alerts कैसे set करूँ?"
+  - "n8n में alerts कैसे set up करूँ?"
 explain_in_interview:
-  answer: "Error handling वो सब है जो automation तब करता है जब कोई step fail हो, ताकि वो safely fail हो: कुछ खोए नहीं, कुछ दो बार न हो, और सही व्यक्ति को पता चले। मैं temporary errors, जैसे timeouts, rate limits या server errors, जिन्हें मैं बढ़ते waits और एक cap के साथ retry करता हूँ, उन्हें permanent errors से अलग रखता हूँ, जैसे गलत credentials या गलत input, जिन पर मैं रुककर record करता हूँ। मैं actions को idempotent बनाता हूँ, काम के alerts भेजता हूँ, और failed records को dead-letter queue में डालता हूँ। जैसे, Bengaluru में एक delivery-update automation को customer को कभी same SMS दो बार नहीं भेजना चाहिए। Limit है logic errors, जहाँ वो चलता है पर गलत काम करता है: उन्हें सिर्फ़ checks और monitoring पकड़ते हैं।"
-  follow_up: "कैसे पक्का करोगे कि retry से duplicate invoice या message न बने?"
-  follow_up_answer: "Step को idempotent बनाओ। कुछ भी बनाने से पहले unique key से check करो कि वो पहले से है या नहीं, जैसे order id और status मिलाकर। अगर है, तो skip करो। फिर retries और manual reruns कभी duplicates नहीं बनाते।"
-translated_on: 2026-11-14
+  answer: "Error handling वो सब है जो कोई step fail होने पर automation करता है, ताकि वो सुरक्षित तरीके से fail हो: कुछ खोए नहीं, कुछ दो बार न हो, और सही इंसान को पता चले। मैं provider की rate limit तक throttle करता हूँ, temporary errors को बढ़ते हुए, random waits और एक cap के साथ retry करता हूँ, और bad credentials जैसे permanent errors पर रुक जाता हूँ। किसी send पर timeout का नतीजा unknown होता है, इसलिए retry से पहले मैं एक unique key से status check करता हूँ। Bad records needs attention list में जाते हैं। जैसे, Bengaluru में एक delivery-update automation को किसी customer को वही SMS कभी दो बार नहीं भेजना चाहिए। Logic errors के लिए validation और volume monitoring चाहिए।"
+  follow_up: "आप कैसे पक्का करते हो कि retry से duplicate invoice या message न बने?"
+  follow_up_answer: "Action से ही एक unique key बनाता हूँ, जैसे order id plus status। Call से पहले उसे sending के रूप में record करता हूँ, जो keys पहले से sent हैं उन्हें skip करता हूँ, provider support करे तो उसे provider की idempotency key के रूप में भेजता हूँ, और timeout के बाद उसी key से retry करने से पहले status check करता हूँ।"
+translated_on: 2026-11-28
 ---
 
 ## ये क्या है
 
-हर automation कभी न कभी fail होती है। कोई API down हो जाती है, कोई token expire हो जाता है, कोई customer अपना phone number गलत लिख देता है, कोई provider आपकी भेजने की speed limit कर देता है। सवाल ये नहीं है कि fail होगी **या नहीं**, सवाल ये है कि **कैसे**। अच्छी बनी automation safely fail होती है: कुछ खोता नहीं, कुछ दो बार नहीं होता, और सही इंसान को पता होता है कि क्या करना है।
+हर automation कभी न कभी fail होता है। कोई API down होता है, कोई token expire होता है, कोई customer अपना phone number गलत type कर देता है, कोई provider limit लगा देता है कि आप कितनी तेज़ी से भेज सकते हो। सवाल ये नहीं कि fail **होगा या नहीं**, बल्कि ये कि **कैसे** होगा। अच्छी तरह बना automation सुरक्षित तरीके से fail होता है: कुछ खोता नहीं, कुछ दो बार नहीं होता, और सही इंसान को पता होता है कि क्या करना है।
 
-**Error handling** वो सब कुछ है जो automation तब करती है जब कोई step fail हो:
+**Error handling** वो सब है जो automation तब करता है जब कोई step fail हो, या कोई step "success" हो पर कुछ गलत लौटाए:
 
 | काम | इसका मतलब |
 | --- | --- |
-| **Retry** | जो errors शायद temporary हैं, उन्हें दोबारा try करो |
-| **Stop** | जो errors खुद ठीक नहीं होंगे, उन्हें record करो और बार-बार try मत करो |
-| **Alert** | किसी इंसान को बताओ, इतनी details के साथ कि वो कुछ कर सके |
-| **Recover** | कारण ठीक होने के बाद, actions duplicate किए बिना, safely दोबारा process करो |
-| **Record** | बाद में देखने के लिए जो हुआ उसका history रखो |
+| **Retry** | जो errors शायद temporary हैं उन्हें फिर से try करना, धीरे-धीरे और गिनी-चुनी बार |
+| **Stop** | जो errors अपने आप ठीक नहीं होंगे उन्हें बार-बार try न करना; उन्हें record करना |
+| **Alert** | किसी इंसान को एक बार बताना, इतनी details के साथ कि वो कुछ कर सके |
+| **Recover** | वजह ठीक होने के बाद सुरक्षित तरीके से दोबारा process करना, बिना कुछ दो बार किए |
+| **Record** | हर item के साथ क्या हुआ उसकी history रखना, review और reruns के लिए |
 
-इस lesson में हम Bengaluru की एक logistics startup के साथ चलेंगे, जिसकी delivery-update automation ने duplicate messages भेजे, rate limits से टकराई और एक बार पूरे दिन कुछ नहीं किया। Lesson के अंत तक आप अपनी automations को safely fail करना सिखा पाओगे।
+इन पाँचों कामों के नीचे दो ideas हैं। पहला, सही response इस पर निर्भर करता है कि **retry से क्या बदलेगा**: busy server अगली बार जवाब दे सकता है, गलत phone number कभी ठीक नहीं होगा। दूसरा, "send" या "pay" की call fail होने का मतलब हमेशा ये नहीं कि कुछ भेजा या pay नहीं हुआ। ज़्यादातर असली duplicates यही भूलने से आते हैं।
+
+ये lesson Bengaluru के एक logistics startup को follow करता है, जिसके delivery updates दो बार गए, rate limits से टकराए और एक बार पूरे दिन रुके रहे। Example tool n8n है।
 
 ## ये काम कैसे करता है
 
-### Errors के प्रकार पहचानो
+### Error को इस हिसाब से बाँटो कि retry से क्या बदलेगा
 
 ```flow
-कोई error आती है -> शायद temporary है? | timeout, 429, 500-504
-शायद temporary है? -[हाँ]-> Backoff के साथ retry करो | फिर भी fail हो तो alert भेजो
-शायद temporary है? -[नहीं]-> बस एक bad record का मामला है? | 400, 404, invalid data
-बस एक bad record का मामला है? -[हाँ]-> Record को "needs attention" में डालो | बाकी का काम चलने दो
-बस एक bad record का मामला है? -[नहीं]-> पूरे workflow का मामला है? | 401, 403, expired token
-पूरे workflow का मामला है? -[हाँ]-> अभी रुको | owner को fix के साथ alert करो
+एक error आता है -> क्या step सिर्फ़ data पढ़ रहा था?
+क्या step सिर्फ़ data पढ़ रहा था? -[हाँ]-> Temporary error? | timeout, 429, 500 से 504
+क्या step सिर्फ़ data पढ़ रहा था? -[नहीं]-> नतीजा पता नहीं? | send, pay या create पर timeout या 500 से 504
+नतीजा पता नहीं? -[हाँ]-> अपनी key से status check करो | फिर उसी key से retry करो
+नतीजा पता नहीं? -[नहीं]-> Temporary error?
+Temporary error? -[हाँ]-> Backoff के साथ retry करो | फिर भी fail हो तो needs attention
+Temporary error? -[नहीं]-> एक record की बात है? | 400, 404, invalid data
+एक record की बात है? -[हाँ]-> Needs attention list | बाकी के साथ आगे बढ़ो
+एक record की बात है? -[नहीं]-> Run रोक दो | 401, 403, expire हुआ token; owner को alert करो
 ```
 
-| प्रकार | Examples | क्या करें |
+| तरह | Examples | क्या करना है |
 | --- | --- | --- |
-| **Temporary** | Network blips, timeouts, rate limits (HTTP 429), server errors (500 से 504) | Backoff के साथ retry करो |
-| **Permanent** | गलत credentials (401, 403), गलत input (400), missing record (404), invalid data | रुको, record करो, कारण ठीक करो |
-| **Logic** | Automation चली पर गलत काम किया, जैसे कोई field गलत map हो गई | सिर्फ़ checks और monitoring ही इन्हें पकड़ते हैं |
+| **Temporary** | Network blips, rate limits (HTTP 429), किसी read पर server errors (500 से 504) | Throttle करो, फिर backoff और एक cap के साथ retry करो |
+| **नतीजा पता नहीं** | किसी step पर timeout या 500 से 504, जो कुछ send, pay या create करता है | पहले check करो, फिर सिर्फ़ उसी key के साथ retry करो |
+| **Permanent, एक record** | Bad input (400), गायब record (404), "12345" जैसा phone number | Reason के साथ record करो, बाकी के साथ आगे बढ़ो |
+| **Permanent, पूरा workflow** | गलत या expire हुए credentials (401, 403), delete हुई sheet | तुरंत रुको और owner को alert करो |
+| **Logic** | Run success होता है पर गलत काम करता है, जैसे कोई field गलत map हुआ हो | इन्हें सिर्फ़ validation और monitoring पकड़ते हैं |
 
-### Backoff के साथ retry
+Status codes बस शुरुआत हैं। दो patterns ज़्यादा बताते हैं:
 
-Temporary errors को कुछ बार retry करो, हर बार ज़्यादा इंतज़ार के साथ, ताकि परेशान service पर और बोझ न पड़े:
+- **बाकी records निकल जाते हैं, पर एक ही record हर attempt पर fail होता है।** तब दिक्कत उस record में है, भले code 500 कहे। कुछ APIs bad input पर crash होकर server error report करती हैं। आम retries के बाद उसे "needs attention" में भेजो।
+- **हर record एक के बाद एक fail होता है।** तब दिक्कत service या आपके credentials में है, records में नहीं। 2,000 items को एक-एक करके fail होने देने की जगह जल्दी रुक जाओ।
+
+### Timeouts का मतलब साफ़ नहीं होता
+
+Timeout का मतलब है कि आपने इंतज़ार करना बंद कर दिया, ये नहीं कि provider ने कुछ नहीं किया। SMS शायद चला गया हो और सिर्फ़ जवाब खो गया हो। आँख बंद करके retry करो और customer को वो दो बार मिलेगा। मिसाल के लिए, Stripe के docs कहते हैं कि 500 को भी ऐसे ही मानो: पैसा गया भी हो सकता है, नहीं भी।
+
+सुरक्षित pattern के तीन हिस्से हैं:
+
+1. **Call से पहले attempt record करो।** एक unique key और "sending" status के साथ send-log row लिखो; बाद में उसे "sent" या "failed" में update करो।
+2. **Provider support करे तो idempotency key भेजो।** Idempotency key एक unique value है जो आप request के साथ भेजते हो ताकि provider repeat को पहचान सके। मिसाल के लिए, Stripe एक `Idempotency-Key` header लेता है: उसी key और उन्हीं details के साथ retry करो तो वो दोबारा charge करने की जगह पहला result लौटा देता है। उसके v1 API docs कहते हैं कि उसी key के साथ 24 hours के अंदर retry करो (November 2026 के हिसाब से)। अपने provider के docs check करो; कुछ ये देते हैं, कुछ नहीं।
+3. **Timeout पर retry से पहले देखो।** अगर provider के पास status API है, तो पूछो कि message या payment मौजूद है या नहीं। Retry सिर्फ़ तब करो जब वो न हो। Retry के लिए कभी नई key मत बनाओ: नई key provider को बताती है कि "ये एक नई request है"।
+
+अगर provider के पास न idempotency key है न status lookup, तो हर action के लिए तय करो कि कौन-सी गलती सस्ती है। दो बार भेजा गया delivery update परेशान करता है; दो बार दिया गया refund असली पैसा है। पैसे से जुड़ी किसी भी चीज़ में unknown नतीजे को auto-retry मत करो: उसे "needs attention" में डालो ताकि कोई इंसान check करे।
+
+### Retry से पहले throttle करो
+
+किसी जाने-पहचाने daily peak पर rate limits (HTTP 429) बदकिस्मती नहीं हैं: आप अपने plan की इजाज़त से तेज़ भेज रहे हो। **Provider की documented limit से तेज़ मत भेजो**, ताकि 429s कम ही आएँ, और retries को safety net की तरह रखो।
+
+मान लो, plan हर second 10 messages की इजाज़त देता है। एक second के gap के साथ 8 के batches भेजो: इससे उसी account को use करने वाले दूसरे workflows के लिए 20 percent headroom बचता है। तब 3,000 evening messages में लगभग 375 seconds लगते हैं, छह मिनट से थोड़ा ज़्यादा। n8n में ये HTTP Request node के **Batching** option (Items per Batch और Batch Interval) से कर सकते हो, या एक **Loop Over Items** node और loop के अंदर एक **Wait** node से।
+
+### Backoff और jitter के साथ retry
+
+Temporary errors को कुछ बार retry करो, हर बार ज़्यादा इंतज़ार करके। फिर **jitter** जोड़ो, यानी हर wait पर थोड़ा random extra समय। इसके बिना, जब 7 pm पर 500 items fail होते हैं, तो सारे 500 ठीक उसी second पर retry करते हैं और फिर साथ में fail हो जाते हैं।
 
 ```flow
 dir: LR
-कोशिश 1 -[fail]-> 5 s रुको -> कोशिश 2 -[fail]-> 30 s रुको -> कोशिश 3 -[fail]-> 2 min रुको -> कोशिश 4 -[fail]-> किसी इंसान को alert करो
+Attempt 1 -[fail]-> 5 से 10 s wait -> Attempt 2 -[fail]-> 10 से 20 s wait -> Attempt 3 -[fail]-> 20 से 40 s wait -> Attempt 4 -[fail]-> Needs attention और alert
 ```
 
-अगर service **Retry-After** header भेजे, तो उसे मानो: वो ठीक-ठीक बताता है कि कितना रुकना है। Retries की संख्या पर हमेशा सीमा रखो।
+एक समझदारी वाला default: हर बार wait को double करो, 0 से 100 percent random जोड़ो, 3 से 5 attempts के बाद रुक जाओ। किसी 429 के साथ **Retry-After** header आ सकता है, seconds में या एक date के रूप में। अपने number की जगह उसे use करो।
 
-### Idempotency: दो बार चले तो भी safe
+**n8n आपको क्या देता है।** हर node में **Max Tries** और **Wait Between Tries (ms)** के साथ एक **Retry On Fail** setting होती है। November 2026 के हिसाब से, n8n के docs कहते हैं कि Max Tries ज़्यादा से ज़्यादा 5 और wait ज़्यादा से ज़्यादा 5,000 ms हो सकता है, और HTTP Request node आपके लिए Retry-After नहीं पढ़ता। Wait की एक ही setting है, इसलिए wait बढ़ता नहीं। Network blip के लिए ये ठीक है। लंबे, बढ़ते waits के लिए retry खुद बनाओ: node के error output को एक Wait node पर route करो और वापस loop करो, एक counter के साथ ताकि वो रुक जाए।
 
-Retries और manual reruns actions को दोहरा सकते हैं। कुछ भी बनाने से पहले, जैसे invoice, payment या message, check करो कि वो पहले से मौजूद है या नहीं। इसके लिए order id और status जैसी unique key use करो। अगर वो मौजूद है, तो skip कर दो। फिर retries और reruns कभी duplicates नहीं बनाएँगे।
+### Idempotency: दो बार चलाना भी safe
 
-### काम आने वाले alerts
+कोई step **idempotent** है जब उसे दो बार चलाने का असर एक बार चलाने जितना ही हो। Retries और reruns steps को दोहराते हैं, इसलिए कुछ भी create करने वाले हर step को इसकी ज़रूरत है।
+
+हर action के लिए एक **unique key** के साथ send log रखो। Act करने से पहले check करो कि key पहले से "sent" mark है या नहीं; है तो skip करो। Key को **action जिस चीज़ के बारे में है** उससे चुनो, ताकि एक ही real-world action से हमेशा एक ही key बने:
+
+| Action | अच्छी key | खराब key, और क्यों |
+| --- | --- | --- |
+| Delivery update SMS | Order id plus status, जैसे ORD-4471 plus "out for delivery" | Run id: हर rerun को नई मिलती है, तो कभी कुछ skip नहीं होता |
+| Monthly fee reminder | Member id plus billing month | सिर्फ़ member id: ये अगले महीने का reminder रोक देती है |
+| Ledger में invoice | Supplier का invoice number | Process करने का समय: हर बार unique, तो कुछ नहीं पकड़ता |
+
+अगर दो runs overlap कर सकते हैं, तो check के बाद action में भी race हो सकती है: दोनों runs check करते हैं, दोनों को कुछ नहीं दिखता, दोनों भेज देते हैं। "sending" row पहले लिखना, ऐसे store में जो उसी key की दूसरी row मना कर दे (जैसे unique constraint वाली database table), ये gap बंद कर देता है।
+
+### जो वापस आता है उसे validate करो
+
+Green tick का मतलब सिर्फ़ इतना है कि call लौट आई। Check करो कि response समझ में आता है: जो list आनी थी वो खाली नहीं है, ज़रूरी fields मौजूद हैं, "200 OK" body में कोई error message नहीं है। अगर जिस export में आम तौर पर 8,000 rows होती हैं उसमें एक भी नहीं है, तो उसे error मानकर रुको, "successfully" कुछ न करने की जगह। n8n में एक IF node bad responses को **Stop and Error** node पर route कर सकता है, जो जानबूझकर run fail कर देता है।
+
+### खराब records अलग करो, पर सब fail हो तो रुको
+
+300 में से एक खराब item बाकी 299 को नहीं रोकना चाहिए। Items को अलग-अलग process करो और हर failure को उसके reason के साथ एक "needs attention" list में लिखो, जिसे कभी-कभी **dead-letter queue** कहते हैं। n8n में node का **On Error** **Continue (using error output)** पर set करो और उस output को list से जोड़ो। कोई उन records को ठीक करके बाद में दोबारा process करता है। कुछ भी चुपचाप नहीं खोता।
+
+उल्टे case में **circuit breaker** चाहिए: एक rule जो failures जमा होने पर run को pause कर दे, जैसे लगातार 20 failures, या आखिरी 50 items में से आधे से ज़्यादा। इसके बिना एक outage 2,000 dead-letter rows और 2,000 alerts बन जाता है।
+
+### काम के alerts
 
 | कमज़ोर alert | काम का alert |
 | --- | --- |
-| "Workflow failed." | "Delivery SMS workflow, step 'Send SMS', order ORD-4471: 401 Unauthorized. SMS provider का token expire हो गया है। इसे Settings, Credentials, SMS provider में renew करो। Run link: ..." |
+| "Workflow failed." | "Delivery SMS workflow, step 'Send SMS', order ORD-4471: 401 Unauthorized. SMS provider का token expire हो गया है। Settings, Credentials, SMS provider में उसे renew करो, फिर rerun करो; भेजे जा चुके messages skip होंगे। Run link: ..." |
 
-Alerts ऐसी जगह भेजो जहाँ owner सच में देखता हो, जैसे email, Slack, Teams या WhatsApp। बार-बार आने वाले alerts को group करो, ताकि एक outage पर एक message जाए, 500 नहीं।
+वहाँ भेजो जहाँ owner सच में देखता है, जैसे email, Slack, Teams या WhatsApp। Repeats को group करो, ताकि एक outage पर 500 नहीं, एक message जाए।
 
-### Dead-letter queue
+n8n में एक अलग **error workflow** बनाओ जो **Error Trigger** node से शुरू हो, और उसे हर workflow की Settings में चुनो। ये तब चलता है जब कोई automatic execution fail हो। जब आप हाथ से test करते हो तब ये नहीं चलता, इसलिए इसे किसी असली scheduled या webhook run से test करो।
 
-जो records permanently fail हो जाते हैं, वो कारण के साथ एक **"needs attention"** list में जाते हैं, जिसे कभी-कभी dead-letter queue कहते हैं। कोई उन्हें ठीक करता है और बाद में दोबारा process करता है। चुपचाप कुछ नहीं खोता।
+### सिर्फ़ errors नहीं, volume भी monitor करो
 
-### Partial failures
+सबसे खतरनाक failure में कोई error होता ही नहीं। हर दिन processed items और failures track करो। "1,000 से कम" जैसा fixed threshold हर शांत Sunday को fire होता है और आधे टूटे दिन को miss कर देता है। इसकी जगह **उसी weekday के हाल के average** से compare करो, जैसे "अगर 8 pm तक हमने पिछले चार Tuesdays के average के आधे से कम भेजे हैं तो alert करो", और rule को हर महीने review करो।
 
-300 items process करते समय एक खराब item को बाकी 299 नहीं रोकने चाहिए। Items को अलग-अलग process करो, failures इकट्ठा करो, और अंत में उनकी report दो।
+### n8n में क्या use करें
 
-### Monitoring
+| काम | n8n feature |
+| --- | --- |
+| Blip के लिए छोटा retry | Node Settings, Retry On Fail |
+| लंबे या बढ़ते waits | Error output से Wait node पर, counter के साथ वापस loop |
+| Rate limit के अंदर रहना | HTTP Request Batching, या Wait node के साथ Loop Over Items |
+| एक खराब record के बावजूद आगे बढ़ना | On Error को Continue (using error output) पर set करना |
+| पूरा run रोकना | On Error को Stop Workflow पर set करना, या एक Stop and Error node |
+| किसी भी failed run पर alert | Error Trigger node से शुरू होने वाला error workflow |
+| Duplicates और dead letters | आपके send log में lookup, और failed records के लिए एक sheet या table |
 
-रोज़ के runs, failures और processed items track करो। जो workflow अचानक **zero** items process करने लगे, वो अक्सर टूटा होता है, चाहे कोई error न दिखे, जैसे जब export खाली आया हो।
+### Ownership और एक runbook
 
-### Ownership और runbook
-
-हर automation का एक नाम वाला owner और एक छोटा runbook होना चाहिए: वो क्या करती है, आम failures कौन-से हैं और हर एक को कैसे ठीक करना है।
+हर automation का एक नामित owner और एक छोटा runbook होता है: ये क्या करता है, आम failures, हर एक को कैसे ठीक करें, और सुरक्षित तरीके से rerun कैसे करें।
 
 ## एक example से समझो
 
-Bengaluru की एक logistics startup की automation customers को SMS से delivery updates भेजती है और order system update करती है: रोज़ लगभग 8,000 messages।
+Bengaluru का एक logistics startup एक automation चलाता है जो customers को SMS से delivery updates भेजता है और order system update करता है: दिन में लगभग 8,000 messages, ज़्यादातर 6 pm से 9 pm के बीच। नीचे के numbers एक typical पहले महीने का illustration हैं, measured results नहीं।
 
-**पहला महीना खराब गया:**
+**पहला महीना बुरा गया:**
 
-| Problem | कारण |
+| दिक्कत | वजह |
 | --- | --- |
-| शाम के peak में messages fail हुए | SMS provider ने workflow को rate-limit कर दिया (HTTP 429) |
-| कुछ customers को दो messages मिले | Fail हुए run को हाथ से rerun किया गया, और पहले वाले messages फिर से भेज दिए गए |
-| एक दिन कुछ भी नहीं भेजा गया, और कोई error भी नहीं आया | Login token expire हो गया था; step ज़ोर से fail होने की जगह खाली result लौटा देता था |
+| Evening peaks पर messages fail हुए | Workflow जितना तेज़ हो सका भेजता रहा, और SMS provider ने उसे rate-limit कर दिया (HTTP 429) |
+| कुछ customers को दो messages मिले | एक failed run को हाथ से rerun किया गया और उसने पहले वाले messages फिर भेज दिए; timeout वाले sends आँख बंद करके retry हुए |
+| एक दिन कुछ नहीं गया, और कोई error भी नहीं | Order system का login token expire हो गया था; export step ज़ोर से fail होने की जगह खाली list लौटा रहा था |
 
 **Fixes:**
 
-1. SMS provider के 429 और 5xx responses पर **backoff के साथ retries**, उसके Retry-After header को मानकर, ज़्यादा से ज़्यादा चार attempts के साथ।
-2. हर message के लिए एक **unique key**, order id और status, जो भेजने से पहले check होती है, ताकि reruns कभी duplicates न भेजें।
-3. **Expired या invalid credentials पर run तुरंत रुक जाता है** और retry करने की जगह owner को alert जाता है: "SMS provider का token expire हो गया, Settings, Credentials में renew करो"।
-4. **Fail हुए records एक "needs attention" sheet में जाते हैं** कारण के साथ; ठीक करने के बाद एक button उन्हें दोबारा process करता है।
-5. **एक daily check** alert देता है अगर रात 8 बजे तक 1,000 से कम messages गए हों।
+1. **Plan की limit तक throttle:** provider के documented rate से नीचे batches, बीच में एक wait के साथ।
+2. 429s पर **backoff और jitter के साथ retries**, Retry-After हो तो उसे use करके, ज़्यादा से ज़्यादा चार attempts, फिर "needs attention" sheet। किसी send पर timeout या 500 से 504 पहले fix 3 वाले status check से गुज़रता है।
+3. **Order id plus status से key किया हुआ send log।** हर message call से पहले "sending" के रूप में लिखा जाता है। Rerun "sent" mark वाली हर चीज़ skip करता है। Timeout के बाद, workflow दोबारा भेजने से पहले उस key से provider का delivery status check करता है।
+4. **Export को validate करना।** खाली या बहुत छोटा export अब green खत्म होने की जगह run को "order export ने 0 rows लौटाईं; order system login check करो" के साथ रोक देता है। यही वो fix है जो उस चुप दिन को पकड़ लेता।
+5. **Credentials errors run को तुरंत रोकते हैं** और owner को alert करते हैं कि token कहाँ renew करना है।
+6. **एक circuit breaker:** लगातार 20 failed sends run को pause करते हैं और एक alert भेजते हैं।
+7. **8 pm पर एक volume check**, उसी weekday के पिछले चार दिनों के average से compare करके, 50 percent से नीचे होने पर alert।
 
-**अगला महीना:**
+**अगला महीना (illustrative):**
 
 | Measure | महीना 1 | महीना 2 |
 | --- | --- | --- |
-| Duplicate messages | लगभग 900 | 0 |
-| Rate limits की वजह से खोए messages | लगभग 1,200 | 0 (सब retry हुए) |
-| अगला token expiry ठीक करने में समय | लगभग 9 घंटे (customer की शिकायत से पता चला) | 20 मिनट (alert ने बताया कि क्या करना है) |
-| Attention चाहने वाले records | पता नहीं | 35, सब कारण के साथ, सब एक दिन के अंदर ठीक |
+| Duplicate messages | लगभग 900 | 3, सब उन timeouts के बाद जब status lookup खुद down था |
+| Rate limits की वजह से खोए messages | लगभग 1,200 | 0; कुछ 429s, सब retry पर भेज दिए गए |
+| अगला login expiry ठीक करने में लगा समय | लगभग 9 hours (पहले एक customer ने complain किया) | 20 minutes (alert ने बताया कि क्या करना है) |
+| Attention वाले records | पता नहीं | 35, हर एक reason के साथ, सब एक दिन के अंदर ठीक |
+
+जब provider बता नहीं सकता कि क्या हुआ, तो आपको एक कभी-कभार के duplicate और एक कभी-कभार छूटे update में से चुनना पड़ता है। Delivery updates के लिए team ने duplicate चुना।
 
 ## आम गलतियाँ
 
-- **हर चीज़ को retry करना।** Permanent errors को ठीक करना पड़ता है, retry नहीं।
-- **Duplicate से बचाव नहीं।** Retries और reruns double actions बना देते हैं।
-- **बिना details वाले alerts।** "Workflow failed" पर कुछ किया नहीं जा सकता।
-- **एक खराब item पूरा batch रोक दे।** Items को अलग-अलग handle करो।
-- **सिर्फ़ errors पर नज़र रखना।** कुछ न करने वाला workflow भी ठीक दिख सकता है।
-- **बिना सीमा या इंतज़ार के retry करना।** इससे outage और बिगड़ता है और आप block भी हो सकते हो।
+- **सब कुछ retry करना।** Permanent errors को ठीक करना पड़ता है; जो record हर बार fail हो उसकी जगह "needs attention" में है।
+- **Timeout वाले send को आँख बंद करके retry करना।** पहला attempt शायद काम कर गया हो। पहले अपनी key से check करो।
+- **हर attempt पर नई key।** Run id या timestamp हर retry को नया दिखाता है, तो कुछ skip नहीं होता।
+- **Throttling की जगह retries।** अगर 429s रोज़ उसी घंटे आते हैं, तो धीमे हो जाओ; बस और ज़ोर से retry मत करो।
+- **बिना jitter और बिना cap के fixed waits।** सब कुछ एक साथ retry होता है, outage और बिगड़ता है और आप block भी हो सकते हो।
+- **Green run पर भरोसा करना।** खाली या अजीब "successful" responses को validate करो।
+- **एक खराब item batch रोक देता है, या एक dead service हर item fail कर देती है।** Records अलग करो, पर failures जमा हों तो run रोक दो।
+- **बिना details के alerts, या 500 alerts।** एक बार बताओ कि क्या टूटा और क्या करना है।
 
 ## Practice करो
 
-नीचे link किया n8n का error handling guide पढ़ो, और N8N102 course का error-handling वाला हिस्सा दोबारा देखो।
+नीचे linked n8n की error handling guide पढ़ो, और N8N102 course का error-handling हिस्सा फिर से देखो।
 
-1. **Retries.** किसी workflow के एक API step में backoff के साथ retries जोड़ो, और जानबूझकर fail होने वाले endpoint से test करो।
-2. **Duplicates और dead letters.** एक idempotency check और permanent failures के लिए "needs attention" list जोड़ो।
-3. **Alerts.** ऐसा alert बनाओ जिसमें workflow, step, record और error का नाम हो, और एक रोज़ का "बहुत कम items" वाला check भी।
+1. **Retries।** एक HTTP Request node को ऐसे endpoint पर point करो जो जानबूझकर fail होता है (जैसे आपका अपना छोटा webhook workflow जो 503 लौटाए)। Retry On Fail on करो और execution log में confirm करो कि retries सच में चले। फिर error output, एक Wait node और एक counter से एक लंबा retry बनाओ।
+2. **Throttle।** 50 test items timed batches में भेजो और check करो कि timing आपके plan से match करती है।
+3. **Duplicates और dead letters।** एक unique key वाला send log, "sending" फिर "sent" status, और एक "needs attention" sheet जोड़ो। Workflow दो बार चलाओ और दिखाओ कि कुछ भी दो बार नहीं गया।
+4. **Alerts और checks।** Error Trigger node और एक काम के alert के साथ एक error workflow बनाओ, एक empty-result check और एक same-weekday volume check भी।
 
-**आपका काम पूरा जब:** आप अपने workflow को तीन तरीकों से तोड़ सको, temporary error, permanent error और एक bad item से, और हर एक के लिए सही behaviour दिखा सको।
+**आपका काम पूरा है जब आप** अपने workflow को चार तरीकों से तोड़ सको, एक temporary error, एक permanent error, एक खराब item और एक खाली input से, हर एक के लिए सही behaviour दिखा सको, और उसे बिना duplicates के rerun कर सको।
