@@ -3,9 +3,9 @@ id: latency-load-testing
 level: P2
 theme: ops
 title: "Latency budgets and load testing"
-outcome: "Set a latency target per step, measure percentiles rather than averages, and load-test an AI service to find where it breaks before users do."
-answer: "Set a latency target for each step, measure the 95th and 99th percentiles rather than the average, and load-test with realistic traffic to find where the service breaks."
-why_it_matters: "\"It was fast in the demo\" is the most common last words of an AI pilot. Real traffic arrives in peaks, providers slow down and queues build. A latency budget and a load test turn launch-day panic into a known limit with a plan."
+outcome: "Set a latency budget per step, measure first-token and full-answer percentiles correctly, and load-test an AI service with both user-based and arrival-rate traffic to find what breaks first."
+answer: "Set a latency target per step, track p95 and p99 rather than the average, and load-test with realistic traffic, including bursts of new arrivals, to find what breaks first."
+why_it_matters: "A demo serves one person at a time. Real traffic arrives in bursts, providers slow down, rate limits bite and queues build. A latency budget and a well-designed load test turn launch-day panic into a known limit, a named bottleneck and a plan for the next one."
 hours: 3
 gap_tags: []
 primary_resource: google-sre-monitoring
@@ -18,45 +18,45 @@ check:
   question_ids: [latency-load-testing-1, latency-load-testing-2, latency-load-testing-3]
 flashcards:
   - q: "What is a latency budget?"
-    a: "The longest acceptable response time, split across steps such as auth, retrieval, reranking and model time to first token."
+    a: "The slowest acceptable response at a chosen percentile, for example p95 first token within 2 seconds, split into a target for each step. Step percentiles do not add up, so always check the end-to-end p95 from traces too."
   - q: "Why use percentiles instead of averages?"
-    a: "An average can hide a slow tail; p95 and p99 show what the slowest users experience."
-  - q: "What dominates generation time?"
-    a: "Output length. Shorter answers are faster."
+    a: "An average hides the slow tail. p95 and p99 show what the slowest users wait, and a user who sends 20 messages has about an 18% chance of meeting at least one p99-slow reply."
+  - q: "What sets the time to generate a full answer?"
+    a: "Mostly the number of output tokens multiplied by the time per token. At 60 tokens a second, 450 tokens take 7.5 seconds and 200 tokens take about 3.3 seconds."
   - q: "What sets time to first token?"
-    a: "Mainly prompt length and provider latency, so trimming context helps."
+    a: "Prompt length, queueing in your own system and at the provider, and the provider's current load. Reasoning models may think before the first visible token, so measure the first token the user actually sees."
   - q: "Why can provider rate limits cap throughput?"
-    a: "Tokens-per-minute limits stop requests regardless of how many servers you run; raise them early."
+    a: "A tokens-per-minute or requests-per-minute limit rejects calls with 429 errors however many servers you run. Work out the tokens you need at peak and ask for a higher limit weeks ahead."
   - q: "What makes a load test realistic?"
-    a: "A real mix of question types, think time between messages, typical lengths and a ramp beyond the expected peak."
-  - q: "Why test mostly against a fake model?"
-    a: "Real-model load tests cost money and use up rate limits; a fake server with realistic delays finds most bottlenecks."
+    a: "Real questions and answer lengths, think time between messages, a ramp to beyond the expected peak with a hold at each step, and a burst test for moments like a sale opening."
+  - q: "Why run most load-test rounds against a fake model server?"
+    a: "Real-model load tests cost money and use up rate limits. A fake server with the same API and realistic delays finds your own bottlenecks for free; one short real run then checks the provider."
   - q: "What should a load test watch?"
-    a: "p50, p95 and p99 latency, error rate, CPU, memory, database connections and provider 429 responses."
-  - q: "Why use a fake model server in load tests?"
-    a: "It replies with realistic delays without spending money or hitting rate limits, so you can test your own system's limits many times before one short run on the real model."
-  - q: "What does a ramp test show that a fixed-load test does not?"
-    a: "The point where latency starts climbing or errors appear as users increase, which is your real capacity."
+    a: "p50, p95 and p99 for first token and full answer, error rate by status code, CPU, memory, database connections, queue length and provider 429 responses."
+  - q: "What is the difference between a closed and an open load test?"
+    a: "Closed: a fixed number of users, each waiting for a reply before sending again, so load falls when the system slows. Open: requests arrive at a set rate whatever happens, like real users. Only open tests show queues on a busy day."
+  - q: "What does Little's law tell you?"
+    a: "Requests in flight equal arrival rate times time in the system. At 17 requests a second and 4.5 seconds each, about 75 streams are open at once, which sizes connection pools and concurrency caps."
 exercise:
   title: "Find the bottleneck"
-  setup: "A Lucknow exam board's results assistant must handle 2,000 concurrent students on results day. A first load test against a fake model shows p95 latency rising sharply after 300 users, with CPU at 30% and many requests waiting for database connections. A short test against the real model shows 429 errors from 900 users. Answers average 450 tokens."
+  setup: "A Lucknow exam board's results assistant must handle 2,000 students chatting at once on results day, each sending about one message a minute. Prompts average 1,000 tokens and answers 450 tokens. A first load test against a fake model shows p95 first token rising sharply after 300 users, with CPU at 30% and many requests waiting for database connections. A short test against the real model shows 429 errors from about 900 users, which matches the account's limit of 1.3 million tokens per minute. All tests so far used a fixed number of simulated users."
   questions:
-    - q: "What is the first bottleneck?"
-      a: "The database connection pool: requests queue for connections while CPU is mostly idle."
+    - q: "What is the first bottleneck, and how do you know?"
+      a: "The database connection pool. CPU is mostly idle while requests wait for connections, so the system is waiting, not working."
     - q: "What fixes it?"
-      a: "Raise the pool size within the database's limits and add indexes for the results lookups, then re-test."
-    - q: "How do you handle the 429s?"
-      a: "Request a higher tokens-per-minute limit well before results day and add a fallback model through the gateway."
-    - q: "What would also help speed and the limit?"
-      a: "Shorter answers, capped at around 150 to 200 tokens, which cut generation time and tokens per minute."
+      a: "Raise the pool within the database's limits, index the results lookup, and cache results in memory, since they do not change on results day. Then re-run the same ramp."
+    - q: "What tokens-per-minute limit does 2,000 students need, and how do you handle the 429s?"
+      a: "About 2.9 million (2,000 x 1,450). Cap answers at about 150 tokens to bring it to 2.3 million, request the limit weeks ahead, add a fallback model, and retry with backoff and jitter, not instantly."
+    - q: "Which test is still missing, and why?"
+      a: "An arrival-rate test with a burst. When results go live, students keep arriving even if replies slow down, and a fixed-user test hides the queue that builds. Add a concurrency cap and a polite busy message."
 ask:
   - "How do I load test an LLM application?"
   - "What is p95 latency?"
   - "How do I find the bottleneck in a slow AI app?"
 explain_in_interview:
-  answer: "A latency budget is the longest acceptable response time, split across the steps of a request, and load testing checks whether you still meet it under real traffic. You set a target such as p95 first token within two seconds, then give each step its share: auth, query rewrite, retrieval and the model. Then you ramp realistic traffic beyond the expected peak and watch p95, errors, CPU, database connections and provider rate limits. For example, a bus operator in Jaipur tests its booking assistant before festival-season traffic. One limit: testing against the real model costs money and uses up rate limits, so run most rounds against a fake model server."
+  answer: "A latency budget is the slowest acceptable response at a percentile, for example p95 first token within two seconds, split into a target per step: auth, retrieval, the model. Step percentiles do not add, so I check end-to-end p95 from traces. Load testing checks the budget under real traffic. I ramp simulated users past the expected peak against a fake model server, fix each bottleneck I find, then run an arrival-rate burst test, because real users keep arriving when the system slows. One short run on the real model checks provider limits. For example, a Jaipur bus operator tests its booking assistant before festival traffic."
   follow_up: "Under load, latency rises but CPU stays low. What would you suspect?"
-  follow_up_answer: "Something is waiting rather than working, most likely database connections or locks. I would check the connection pool and slow queries, fix it with a larger pool, indexes or fewer queries, and re-run the same load test to confirm."
+  follow_up_answer: "Something is waiting rather than working: database connections, locks, a concurrency cap or the provider. I would open the slowest traces from that minute, see which step grew, fix it, for example with a larger pool or an index, and re-run the same test to confirm."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-11-09
@@ -64,9 +64,9 @@ reviewed_on: 2026-11-09
 
 ## What it is
 
-A **latency budget** is the longest acceptable response time, broken down by step. For a chat assistant: first token within 1.5 seconds at the 95th percentile, full answer within 8 seconds. The budget then splits across steps: auth 50 ms, query rewrite 300 ms, retrieval and reranking 400 ms, model time to first token 700 ms.
+A **latency budget** is the slowest response you accept, at a stated percentile, split into a target for each step of a request. For a chat assistant, for example: p95 time to first token within 2 seconds, p95 full answer within 10 seconds, errors under 1%. The first-token budget then splits into auth 50 ms, query rewrite 300 ms, retrieval and reranking 400 ms, model first token 700 ms, and 550 ms of slack for network and queueing.
 
-**Load testing** sends realistic traffic at the system, rising step by step, and records response times, errors and resource use, so you know the load at which it breaks and what breaks first.
+**Load testing** sends realistic traffic at the system, rising step by step, and records response times, errors and resource use. It tells you the load at which the system breaks, and what breaks first, before your users find out.
 
 ```flow
 dir: LR
@@ -74,170 +74,220 @@ title: Latency budget: p95 first token in 2 s
 Auth, 50 ms -> Rewrite, 300 ms -> Retrieve + rerank, 400 ms -> Model first token, 700 ms -> Slack, 550 ms
 ```
 
-| Concurrent users | 50 | 100 | 200 | 300 | 500 | 550 |
-|---|---|---|---|---|---|---|
-| Before: a pool of 10 connections | 1 s | 2 s | 6 s | | | |
-| After: a pool of 40 + an index | 1 s | 1 s | 1 s | 1 s | 1 s | 1 s |
-
-p95 first token by number of users, measured with a fake model.
+Three words you will need. **p95** is the time that 95% of requests beat. **Time to first token** is the wait until the first word of the answer appears. **Concurrent users** means people in a chat session at the same moment; most of them are reading or typing, so far fewer requests are in flight at once.
 
 This lesson follows an intercity bus operator in Jaipur preparing its booking assistant for festival-season traffic.
 
 ## How it works
 
-**Percentiles, not averages.** An average of 2 seconds can hide 5% of users waiting 15 seconds. Track the median (p50), the 95th (p95) and the 99th percentile (p99). Users remember the slow ones.
+### Percentiles, not averages
 
-**Budget by step.** Traces give you each step's timing. When the total misses the target, the budget shows which step to attack: a slow reranker, too many chunks, a large model where a small one would do, or a cold start.
+An average of 1.5 seconds can hide 5% of users waiting 4 to 9 seconds. Track the median (p50), p95 and p99. The tail matters more than it looks: a user who sends 20 messages in a session has about an 18% chance (1 minus 0.99 to the power 20) of hitting at least one reply slower than p99.
 
-**AI-specific factors.** Output length dominates generation time, so shorter answers are faster. Time to first token depends on prompt length, so trim context. Provider latency varies by hour and region. Rate limits on tokens per minute cap throughput no matter how many servers you run; check them before a big launch and ask the provider for higher limits early.
+Two rules experts follow:
 
-**Designing the test.** Model real behaviour: the mix of question types, think time between messages, typical prompt and answer lengths, and the expected peak (say, 300 concurrent users at 7 pm). Use tools such as Locust (Python) or k6. Ramp from low to beyond the expected peak, hold, and watch p95, error rate, CPU, memory, database connections and provider 429 responses.
-
-**Model costs in tests.** Load tests against real models cost real money and use up rate limits. Run most rounds against a fake model server that replies after a realistic delay, then one short, controlled test against the real provider.
-
-**Common bottlenecks and fixes:**
-
-| Symptom under load | Likely cause | Fix |
-| --- | --- | --- |
-| Latency rises, CPU low | Waiting on database connections or locks | Larger pool, indexes, fewer queries |
-| CPU at 100% | Too few workers or heavy parsing | More workers, background jobs |
-| 429 errors | Provider rate limit | Higher limit, fallback model, shorter outputs |
-| Slow first token only | Long prompts | Trim context, cache the prefix |
-| Slow full answers | Long outputs | Cap answer length |
-| Errors after a minute | Timeouts set too low | Align timeouts across layers |
-
-**Building a fake model server.** Write a tiny service with the same API as the provider. It waits a realistic time before the first token, sampled from your traces, then streams a fixed reply at a typical token rate. Point the app at it with a setting. Now you can run load tests all day for free and find every bottleneck except the provider's own limits, which one short real test then checks.
-
-**Reporting the result.** Show a chart of p95 against users, the budget line, the bottleneck found at each round and the fix, and the next ceiling you expect. Clients value knowing where the system will break next, because it tells them what to plan for.
-
-**A fake model server.** Same streaming shape as the real API, delays sampled from your traces:
+- **Percentiles do not add up.** The p95 of the total is not the sum of each step's p95. Slow steps rarely happen on the same request, so the sum usually overstates the total; but when one cause slows every step at once, such as a busy database, they move together. Treat step numbers as targets for that step's own p95, and read the end-to-end p95 directly from traces.
+- **Percentiles do not average.** Suppose three servers show a p95 of 1.2 seconds and one, with a median of 3.5 seconds, shows 6 seconds, each taking a quarter of the traffic. The average of the four p95s is 2.4 seconds. But half the slow server's requests take over 3.5 seconds, which is 12.5% of all requests, so the true p95 is above 3.5 seconds. Compute percentiles from all raw timings, or from merged histograms.
 
 ```python
-import asyncio, json, random
+import random
+
+random.seed(7)
+def p95(xs):
+    xs = sorted(xs)
+    return xs[int(0.95 * (len(xs) - 1))]
+
+# Four steps, each with its own spread of times in seconds
+auth     = [random.lognormvariate(-3.5, 0.3) for _ in range(10_000)]
+retrieve = [random.lognormvariate(-1.3, 0.4) for _ in range(10_000)]
+rerank   = [random.lognormvariate(-1.8, 0.5) for _ in range(10_000)]
+model    = [random.lognormvariate(-0.5, 0.35) for _ in range(10_000)]
+total = [a + b + c + d for a, b, c, d in zip(auth, retrieve, rerank, model)]
+
+print(f"sum of the step p95s: {p95(auth) + p95(retrieve) + p95(rerank) + p95(model):.2f} s")
+print(f"p95 of the total:     {p95(total):.2f} s")
+```
+
+This prints 2.03 seconds for the sum and 1.67 seconds for the true total, because the steps here are independent.
+
+### What makes AI requests slow
+
+**Generation time** is roughly output tokens multiplied by the time per token. At 60 tokens a second, a 450-token answer takes 7.5 seconds to stream and a 200-token answer about 3.3 seconds. Capping answer length is often the cheapest speed-up you have.
+
+**Time to first token** grows with prompt length, with queueing in your own system and at the provider, and with the provider's load at that hour. Trim context and reuse a cached prompt prefix where your provider supports it. Reasoning models may think before they show anything, so measure the first token the user actually sees.
+
+**Rate limits** on tokens or requests per minute reject calls with 429 (Too Many Requests) however many servers you run. Check how your provider counts input and output tokens, work out what you need at peak, and ask for a higher limit weeks ahead.
+
+### Sizing with Little's law
+
+**Little's law**: requests in flight = arrival rate x time each request spends in the system. Suppose the pilot's logs show each active user sends about 2 messages a minute. At 500 users that is about 17 requests a second. If each takes 4.5 seconds, about 75 answers are streaming at any moment. That number, not 500, sizes your connection pools, worker counts and any concurrency cap.
+
+### Designing the test
+
+Model real behaviour: real questions (masked), typical prompt and answer lengths, think time between messages, and the expected peak. Ramp from low to beyond the peak and **hold each step** for a couple of minutes, so percentiles settle. Watch p95 and p99, errors by status code, CPU, memory, database connections, queue length and provider 429s.
+
+**Closed and open tests.** In a **closed** test, such as Locust users with think time, each simulated user waits for a reply before sending again. When the system slows, the test sends less, and the slow period produces fewer measurements than it should. This is called **coordinated omission**: the test quietly backs off exactly when real users would not. In an **open** test, requests arrive at a set rate whatever happens, the way travellers rush in when a sale opens. k6 offers this through its constant-arrival-rate and ramping-arrival-rate executors. Use a closed ramp to find bottlenecks step by step, then an open test at the expected arrival rate, with a burst, to see the queue.
+
+**Soak test.** Hold the expected peak for 30 to 60 minutes. Leaks of memory, connections or file handles only show over time.
+
+### A fake model server
+
+Real-model load tests cost money and use up rate limits. Run most rounds against a small fake service with the same streaming shape as the provider's API, its first-token delays sampled from your traces:
+
+```python
+import asyncio, json, os, random
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 app = FastAPI()
-FIRST_TOKEN_S = [0.6, 0.8, 0.9, 1.1, 1.4, 2.2]       # sampled from real traces
+FIRST_TOKEN_S = [0.30, 0.35, 0.35, 0.35, 0.40, 0.40, 0.40, 0.45, 0.45, 0.45, 0.45, 0.50, 0.50,
+                 0.50, 0.50, 0.55, 0.55, 0.55, 0.60, 0.60, 0.60, 0.65, 0.70, 0.70, 1.40]
 TOKENS_PER_S = 60
-REPLY = "This is a fixed answer of realistic length used only for load testing. " * 6
+REPLY_TOKENS = 450                                    # today's typical answer length
+SHARE_429 = float(os.getenv("FAKE_429_SHARE", "0"))   # for example 0.05
 
 @app.post("/v1/messages")
 async def messages():
+    if random.random() < SHARE_429:
+        return JSONResponse({"error": "rate_limited"}, status_code=429,
+                            headers={"retry-after": "2"})
     async def stream():
         await asyncio.sleep(random.choice(FIRST_TOKEN_S))
-        for word in REPLY.split():
-            yield f"data: {json.dumps({'text': word + ' '})}\n\n"
+        for i in range(REPLY_TOKENS):
+            yield f"data: {json.dumps({'text': f'tok{i} '})}\n\n"
             await asyncio.sleep(1 / TOKENS_PER_S)
         yield "data: [DONE]\n\n"
     return StreamingResponse(stream(), media_type="text/event-stream")
 ```
 
-Point your app's model base URL at it through configuration in the test environment only. Add a switch to return 429 errors for a share of requests, to test your retries and fallbacks.
+The delays give a model p95 of 0.7 seconds, the model's share of the budget, with one slow reply in 25. Run it with `uvicorn fake_model:app`, and point your app's model base URL at it through configuration in the test environment only. Set `FAKE_429_SHARE` to test your retries and fallback.
 
-**A Locust test that ramps up.**
+### A Locust ramp that times the stream
+
+With `stream=True`, Locust's own row for the request stops its clock when the response headers arrive, often a few milliseconds, long before the first token. So this test records two timings of its own:
 
 ```python
-from locust import HttpUser, task, between, LoadTestShape
-import random
+import random, time
+from locust import HttpUser, LoadTestShape, between, task
 
-QUESTIONS = [l.strip() for l in open("load/questions.txt")]     # real questions, masked
+QUESTIONS = [q.strip() for q in open("load/questions.txt", encoding="utf-8") if q.strip()]
 
-class Learner(HttpUser):
-    wait_time = between(5, 20)                                   # think time between messages
+class Traveller(HttpUser):
+    wait_time = between(20, 30)          # think time between messages
 
     @task
     def ask(self):
+        start, first = time.perf_counter(), None
         with self.client.post("/answer", json={"text": random.choice(QUESTIONS)},
                               stream=True, catch_response=True, timeout=60) as r:
-            for _ in r.iter_lines():
-                pass                                             # read the whole stream
             if r.status_code != 200:
                 r.failure(f"status {r.status_code}")
+                return
+            for line in r.iter_lines():               # read the whole stream
+                if line and first is None:
+                    first = time.perf_counter()
+        end = time.perf_counter()
+        if first is not None:
+            self.record("first token", first - start)
+        self.record("full answer", end - start)
+
+    def record(self, name, seconds):
+        self.environment.events.request.fire(
+            request_type="STREAM", name=name, response_time=seconds * 1000,
+            response_length=0, exception=None, context={})
 
 class Ramp(LoadTestShape):
-    steps = [(60, 10), (120, 50), (180, 100), (240, 200), (300, 300)]   # (end second, users)
+    # (end second, users): hold each step for two minutes
+    steps = [(120, 50), (240, 100), (360, 200), (480, 300), (600, 400), (720, 500), (840, 550)]
+
     def tick(self):
         t = self.get_run_time()
         for end, users in self.steps:
             if t < end:
-                return users, 10
+                return users, 10                      # add up to 10 users a second
         return None
 ```
 
-Run with `locust -f load/locustfile.py --host https://staging.example.in --csv results`. The CSV files give p50, p95 and p99 per step; plot p95 against users and mark your budget line.
+Run it with `locust -f load/locustfile.py --headless --host https://staging.example.in --csv results --csv-full-history`. The file `results_stats_history.csv` then gets a row every second for each name, with the user count and percentiles over roughly the last 10 seconds. Read the `first token` and `full answer` rows, and take the median of the 95% column over the last minute of each hold, since a 10-second window at low load holds few requests. Per-step p95 from traces works too. Ignore the built-in POST row (headers only) and the Aggregated row, which mixes all three timings.
 
-**Time to first token needs its own measurement.** Locust's built-in timing covers the whole request. For streaming, also record first-byte time in the app's own traces, and read p95 first-token time from there for each ramp step.
+### Overload, retries and streaming
 
-**One controlled run on the real model.** After fixing bottlenecks with the fake server, run a short test against the real model at the expected peak, within your rate limits and budget, to confirm provider latency and limits. Agree the run in advance with whoever owns the API account.
+- **Retry storms.** If every 429 or timeout is retried at once, up to three times, a struggling system can receive up to four times the traffic. Retry with exponential backoff and random jitter, honour a `retry-after` header when the provider sends one, and cap retries at a small share of traffic.
+- **Admission control.** Cap the streams each instance serves at once. Let extra requests wait in a short queue, a few seconds at most, then show a polite "We are busy, please try again in a minute". Turning a few people away beats timing out everyone.
+- **Autoscaling and cold starts.** New instances can take minutes to start and warm up. For a known peak, scale up before it begins.
+- **Streaming through proxies.** A proxy or load balancer may buffer the response, so tokens arrive in one lump, or close a connection it thinks is idle. Check the buffering and idle-timeout settings on the streaming route.
 
-**Read results with traces open.** When p95 jumps at 100 users, open the slowest traces from that minute. The step that grew (database waits, reranker, queueing for model slots) is the bottleneck, and the fix table above usually names the remedy.
+| Symptom under load | Likely cause | Fix |
+| --- | --- | --- |
+| Latency rises, CPU low | Waiting on database connections or locks | Larger pool, indexes, caching, fewer queries |
+| CPU at 100% | Too few workers or heavy parsing | More workers, move work to background jobs |
+| 429 errors | Provider rate limit | Higher limit, fallback model, shorter outputs |
+| Traffic jumps as errors start | Instant retries | Backoff with jitter, retry cap |
+| Queue grows only in bursts | Too few streams for the arrival rate | Concurrency cap, busy message, scale up early |
+| Slow first token only | Long prompts or provider queueing | Trim context, cache the prefix |
+| Tokens arrive in one lump | A proxy buffering the stream | Turn buffering off on that route |
+| Errors after exactly a minute | A timeout or idle limit in one layer | Align timeouts across every layer |
 
-**Try it in your browser.** Percentiles from a list of timings. The average hides the slow tail.
+### Read results with traces open
 
-```python
-import random, statistics
-
-random.seed(6)
-timings = [random.gauss(1.2, 0.2) for _ in range(950)] + [random.uniform(4, 9) for _ in range(50)]
-timings.sort()
-p = lambda q: timings[int(q * (len(timings) - 1))]
-print(f"average {statistics.mean(timings):.2f} s")
-print(f"p50 {p(0.5):.2f} s, p95 {p(0.95):.2f} s, p99 {p(0.99):.2f} s")
-```
+When p95 jumps at a step, open the slowest traces from that minute. The step that grew (database waits, the reranker, queueing for a model slot) is the bottleneck, and the table above usually names the fix. Then re-run the same test, so you compare like with like.
 
 ## A worked example
 
-A Jaipur intercity bus operator is launching an AI assistant for bus bookings and complaints, expected to peak at 500 concurrent users during festival travel.
+The Jaipur bus operator expects about 500 travellers chatting at once during festival travel, with a seat sale opening at 10 am. The budget: p95 first token under 2 seconds, p95 full answer under 10 seconds, errors under 1%. All numbers below are illustrative.
 
-The budget: first token under 2 s at p95, full answer under 10 s at p95, errors under 1%.
+**Round 1: closed ramp, fake model.** p95 first token climbs from 1.1 seconds at 50 users to 6 seconds at 200. CPU sits at 25%. The slowest traces all wait for a database connection: the pool holds 10. A pool of 40 and an index on the route table fix it.
 
-Round 1, against a fake model with realistic delays: p95 first token rises from 1.1 s at 50 users to 6 s at 200 users. Traces show requests queuing for database connections: the pool size is 10. Raising it to 40 and adding an index on the route table brings p95 to 1.3 s at 500 users.
+| Concurrent users | 50 | 100 | 200 | 300 | 500 | 550 |
+|---|---|---|---|---|---|---|
+| p95 first token, pool of 10 | 1.1 s | 2.4 s | 6.0 s | stopped: timeouts | not run | not run |
+| p95 first token, pool of 40 + index | 1.1 s | 1.1 s | 1.2 s | 1.2 s | 1.3 s | 1.4 s |
 
-Round 2, a 10-minute test against the real model at 300 users: provider 429 errors start at about 220 users. The token-per-minute limit is the ceiling. You request a higher limit two weeks ahead, add a fallback model through the gateway, and cap answer length at 200 tokens, which also cuts average generation time by a third.
+**Round 2: one short run on the real model.** Ten minutes, ramping to 300 users, agreed in advance with whoever owns the API account. 429 errors start at about 220 users. Rough arithmetic agrees: the pilot's logs show each user sends about 2 messages a minute of about 2,000 tokens (1,550 in, 450 out), so 4,000 tokens per user per minute, and the account's 900,000 tokens per minute runs out at 225 users. The team caps answers at 200 tokens, which cuts streaming time from 7.5 to about 3.3 seconds and tokens per message to 1,750. They request a higher limit; ten days later the provider grants 2.5 million tokens per minute. They also add a fallback model through their gateway, and backoff with jitter on retries.
 
-The final test meets the budget at 550 users. The launch day peak reaches 480 users without incident, and your report lists the next bottleneck (provider limits at about 700 users) so the client can plan.
+**Round 3: open burst test, fake model** (now set to 200-token replies). Little's law: at 500 users, about 17 requests a second of about 4.5 seconds each means about 75 streams in flight. When the sale opens, arrivals jump to about 25 a second, or about 113 in flight. The two instances, capped at 48 streams each, hold 96. Under the burst, p95 first token reaches 9 seconds and 6% of requests time out. The closed ramp never showed this, because its users simply waited. The fix: a third instance started at 9:45 am, and admission control with a 3-second queue and the busy message. On the re-run, p95 first token stays at 1.5 seconds and nobody is turned away.
 
-| Round | Finding | Fix | Result |
-| --- | --- | --- | --- |
-| 1, fake model | p95 6 s at 200 users; connection pool of 10 | Pool of 40, route-table index | p95 1.3 s at 500 users |
-| 2, real model | 429s from about 220 users | Higher limit, fallback, 200-token cap | Budget met at 550 users |
-| Launch day | Peak 480 users | None needed | No incidents |
+**Round 4: confirm.** Ten minutes on the real model at 550 users: p95 first token 1.6 seconds, p95 full answer 5.2 seconds, errors 0.3%. That load uses 1.9 million tokens per minute, 77% of the limit. A 45-minute soak on the fake model at 500 users shows flat memory and no leaked connections.
+
+**Launch day.** The peak reaches 480 travellers. During the 10 am burst, demand briefly needs about 2.6 million tokens per minute, 5% above the limit, and the gateway sends a few percent of requests to the fallback model for two minutes. p95 first token stays under 2 seconds.
+
+**The report** shows a chart of p95 against users with the budget line, each bottleneck found and its fix, and the next ceiling: about 700 steady users (2.5 million divided by 3,500 tokens per user per minute), and sooner during bursts.
 
 ## Common mistakes
 
-- **Reporting averages.** Use p95 and p99.
-- **Testing one request at a time.** Concurrency problems (pools, locks, rate limits) only show under load.
-- **Unrealistic traffic.** Identical tiny prompts with no think time give misleading numbers.
-- **Burning money on real-model load tests.** Use a fake model for most rounds.
-- **Forgetting provider limits.** They are often the real ceiling. Check and raise them early.
-- **Load-testing against the real model for every round**, burning budget and rate limits.
-- **No think time**, so a few test users behave like thousands.
-- **Measuring only total time** for streamed answers; track first-token time too.
+- **Reporting averages.** Report p50, p95 and p99, for first token and full answer.
+- **Adding or averaging percentiles.** Neither works; compute them from raw timings.
+- **Testing one request at a time.** Pools, locks and rate limits only fail under concurrency.
+- **Unrealistic traffic.** Identical tiny prompts and no think time give numbers that mean nothing.
+- **Only closed tests.** They back off when the system slows, so they hide the queue a real rush builds.
+- **Trusting Locust's request row for streams.** With streaming on, it times only the headers.
+- **Burning money on real-model load tests.** Use a fake model for most rounds and one short real run.
+- **Forgetting provider limits.** They are often the real ceiling. Do the token arithmetic and ask early.
+- **Instant retries.** They multiply load exactly when the system is struggling.
 
 ## When a full load test can wait
 
 - **Internal tools with a handful of users**: a quick check with ten concurrent requests is enough.
 - **Batch systems**, where throughput per hour matters more than per-user latency; test that instead.
-- **Platforms that scale for you** with generous limits, for early pilots, as long as rate limits are checked.
+- **Early pilots on platforms that scale for you**, as long as you have checked rate limits and timeouts.
 
 ## From demo to production
 
-- **Keep a latency budget by step** and compare traces against it.
+- **Keep a latency budget by step** and compare traces against it every release.
 - **Load-test before launch and before big changes**, mostly with a fake model server.
 - **Report p50, p95, p99 and errors** per ramp step, with the bottleneck found.
-- **Re-test when traffic patterns change**, such as exam season or a festival sale.
-- **Alert on p95 first-token time** in production.
+- **Re-test when traffic patterns change**, such as exam season, a festival sale or a new feature with longer answers.
+- **Alert on p95 first-token time and 429 rate** in production, and keep the tokens-per-minute headroom in view.
 
 ## Practice
 
 Read the Google SRE chapter on monitoring and Locust's first-test guide.
 
-1. Write a latency budget for your app, by step, using traces from ten real requests.
-2. Build a fake model endpoint that waits a realistic time and streams a fixed reply, and point your app at it.
-3. Load-test with Locust from 10 to 200 users, record p50, p95 and errors at each step, and find and fix the first bottleneck.
-4. Run the Locust ramp against your app with the fake model server and note the user count where p95 first crosses your budget.
+1. Write a latency budget for your app, by step, using traces from ten real requests. Check the end-to-end p95 separately.
+2. Run the fake model server above and point your app at it.
+3. Run the Locust ramp from 50 to 550 users. Record p50, p95 and p99 first token and full answer at each hold, and note where p95 first crosses your budget.
+4. Find and fix the first bottleneck, re-run, then use Little's law to estimate requests in flight at your peak and at a burst of 1.5 times that rate.
 
-For more depth, chapter 9 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers latency metrics, percentiles and the trade-off between throughput and latency.
+For more depth, chapter 9 of Chip Huyen's *AI Engineering* (O'Reilly), on inference optimisation, covers time to first token and time per output token.
 
-**You are done when you can** show a chart of p95 against users, name the first bottleneck and the change that moved it.
+**You are done when you can** show a chart of p95 against users with your budget line, name the first bottleneck and the change that moved it, and say how many requests are in flight at your peak.
