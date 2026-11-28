@@ -3,7 +3,7 @@ id: gpus-quantization
 lang: hi
 title: "GPUs और quantization"
 outcome: "समझो कि GPU पर model को क्या limit करता है (weights और cache के लिए memory, compute और bandwidth), GPU types और उनकी गिनती चुनो, और models को fit करने और तेज़ चलाने के लिए quantization use करो।"
-answer: "GPU पर एक model को उसके weights और KV cache के लिए memory limit करती है। Quantization weights को, और अक्सर cache को भी, 8 या 4 bits में store करता है, तो ज़्यादा fit होता है और ज़्यादा सस्ता चलता है, आमतौर पर थोड़े नुकसान के साथ।"
+answer: "GPU पर एक model को उसके weights और KV cache के लिए memory limit करती है। Quantization weights को, और अक्सर cache को भी, 8 या 4 bits में store करता है, तो ज़्यादा fit होता है और कम खर्च में चलता है, आमतौर पर थोड़े नुकसान के साथ।"
 why_it_matters: "Self-hosting के फैसले असल में GPU के फैसले होते हैं, और GPUs महँगे हैं और Indian cloud regions में अक्सर कम मिलते हैं। जो platform engineers किसी deployment को back of an envelope पर size कर लेते हैं, वो clients के हर महीने लाखों बचाते हैं और गलत hardware rent करने से बचते हैं।"
 flashcards:
   - q: "अपने GPU पर language model चलाने को क्या limit करता है?"
@@ -43,7 +43,7 @@ ask:
   - "KV cache क्या है और इसे कैसे estimate करूँ?"
   - "क्या quantization से model की quality खराब होती है?"
 explain_in_interview:
-  answer: "GPU पर model चलाना ज़्यादातर memory का सवाल है। Weights fit होने चाहिए, 16-bit में हर parameter के लगभग दो bytes, और KV cache context length और active requests की गिनती के साथ बढ़ता है। Tokens generate करना आमतौर पर memory bandwidth से limited होता है, prompt पढ़ना compute से। Quantization weights को, और अक्सर cache को भी, 8 या 4 bits में store करता है, तो वो कम memory लेते हैं और आमतौर पर ज़्यादा तेज़ generate करते हैं। मिसाल के तौर पर, 48 GB GPU पर एक 14B model 4-bit में 30 GB की जगह लगभग 10 GB लेता है, जिससे 4,000 tokens की 20 की जगह लगभग 50 requests के लिए जगह बचती है। Trade-off है कुछ quality का नुकसान, इसलिए मैं इसे task पर test करता हूँ।"
+  answer: "GPU पर model चलाना ज़्यादातर memory का सवाल है। Weights fit होने चाहिए, 16-bit में हर parameter के लगभग दो bytes, और KV cache context length और active requests की गिनती के साथ बढ़ता है। Tokens generate करना आमतौर पर memory bandwidth से limited होता है, prompt पढ़ना compute से। Quantization weights को, और अक्सर cache को भी, 8 या 4 bits में store करता है, तो वो कम memory लेते हैं और आमतौर पर पहले से तेज़ generate करते हैं। मिसाल के तौर पर, 48 GB GPU पर एक 14B model 4-bit में 30 GB की जगह लगभग 10 GB लेता है, जिससे 4,000 tokens की 20 की जगह लगभग 50 requests के लिए जगह बचती है। Trade-off है कुछ quality का नुकसान, इसलिए मैं इसे task पर test करता हूँ।"
   follow_up: "आप कैसे check करोगे कि एक 4-bit model आपके task के लिए काफ़ी अच्छा है?"
   follow_up_answer: "वही golden set 16-bit और 4-bit versions पर चलाओ और task metric को हर slice के हिसाब से compare करो, जैसे language और document type, सिर्फ़ एक general benchmark नहीं। अगर हर slice उस दायरे में रहे जो business accept करता है, तो छोटा वाला ship करो; अगर नहीं, तो FP8 या 8-bit try करो।"
 translated_on: 2026-11-28
@@ -78,7 +78,7 @@ Cache के साथ 16-bit में fit? -[हाँ]-> 16-bit serve कर�
 Cache के साथ 16-bit में fit? -[नहीं]-> FP8 weights और cache try करो | FP8 support चाहिए
 FP8 weights और cache try करो -> Eval टिकता है? | हर language और task के हिसाब से
 Eval टिकता है? -[हाँ]-> Ship करो और load test करो
-Eval टिकता है? -[नहीं]-> 4-bit AWQ या GPTQ try करो, या ज़्यादा बड़ा GPU
+Eval टिकता है? -[नहीं]-> 4-bit AWQ या GPTQ try करो, या बड़ा GPU
 ```
 
 इस lesson में हम Hyderabad की एक analytics firm के साथ चलेंगे, जो एक self-hosted extraction model के लिए GPUs size कर रही है।
@@ -143,8 +143,8 @@ India में आप इन्हें local GPU clouds जैसे E2E Netw
 
 - **FP8** (8-bit floating point). ज़्यादातर models के लिए लगभग 16-bit जैसी quality, आधी memory, और FP8 units वाले GPUs पर तेज़ maths। अक्सर सबसे पहले यही try करना चाहिए।
 - **AWQ और GPTQ** (4-bit integers, सिर्फ़ weights). Weight memory का लगभग एक चौथाई, साथ में ऊपर वाले overheads, और थोड़ा-सा quality नुकसान। पहले से quantized checkpoint download करो, हो सके तो model maker का बनाया हुआ।
-- **NVFP4 और MXFP4** (4-bit floating point). Blackwell GPUs पर तेज़; ज़्यादा नए हैं और कम बड़े पैमाने पर test हुए हैं।
-- **bitsandbytes NF4.** Transformers में load time पर quantize करता है। Experiments और QLoRA के लिए आसान, पर serve करने में ज़्यादा धीमा।
+- **NVFP4 और MXFP4** (4-bit floating point). Blackwell GPUs पर तेज़; नए हैं और अभी कम test हुए हैं।
+- **bitsandbytes NF4.** Transformers में load time पर quantize करता है। Experiments और QLoRA के लिए आसान, पर serve करने में धीमा।
 - **GGUF.** llama.cpp का file format, जिस पर Ollama और LM Studio बने हैं, laptops, CPUs और Apple Silicon के लिए। एक Q4_K_M file हर weight पर लगभग 4.8 से 4.9 bits use करती है, तो एक 8B model लगभग 5 GB का होता है। Speed bandwidth के हिसाब से चलती है: अगर laptop 80 GB/s पर memory पढ़ता है, तो लगभग 16 tokens per second ceiling है।
 - **8-bit KV cache.** Cache को FP8 में store करने से वो आधा हो जाता है। किसी भी और बदलाव की तरह इसकी quality भी measure करो।
 
