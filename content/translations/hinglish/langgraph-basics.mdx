@@ -2,236 +2,376 @@
 id: langgraph-basics
 lang: hinglish
 title: "LangGraph: agents ko graphs ki tarah banana"
-outcome: "LangGraph mein ek agent banao, jisme explicit state, nodes aur edges hon, checkpoints jo use pause aur resume karne dein, aur conditional routing."
-answer: "LangGraph agents ko graphs ki tarah banata hai: nodes kaam karte hain, edges decide karte hain ki aage kya chalega, shared state data le jaati hai, aur checkpoints agent ko kisi insaan ke liye pause karke resume karne dete hain."
-why_it_matters: "LangGraph India aur duniya ki job listings mein sabse zyada dikhne waale agent frameworks mein se ek hai. Iska graph model agent ke behaviour ko dikhne aur test hone layak banata hai, aur iske checkpoints se human approval jodte hain aur crash se recover karte hain."
+outcome: "LangGraph mein explicit state, nodes aur edges, pause aur resume karne dene waale checkpoints, aur conditional routing ke saath ek agent banao."
+answer: "LangGraph agents ko graphs ki tarah banata hai: nodes kaam karte hain, edges tay karte hain ki aage kya chalega, shared state data lekar chalti hai, aur checkpoints agent ko kisi insaan ke liye pause karke phir resume karne dete hain."
+why_it_matters: "Agent-engineering job listings mein LangGraph ek aam naam hai. Iska graph model agent ke behaviour ko dikhne laayak aur test karne laayak banata hai, aur iske checkpoints se hi aap human approval jodte ho, server restart jhelte ho aur galat gaye run ko replay karte ho."
 flashcards:
   - q: "LangGraph kya hai?"
-    a: "Ek open-source framework jisse agents aur multi-step AI workflows ko state, nodes aur edges ke graphs ki tarah banate hain."
+    a: "State, nodes aur edges waale graphs ke roop mein agents aur multi-step AI workflows banaane ka ek open-source Python aur JavaScript framework."
   - q: "LangGraph graph mein state kya hoti hai?"
-    a: "Ek typed object, jaise messages, current ticket aur draft reply. Ye graph mein se guzarti hai aur nodes ise update karte hain."
-  - q: "Node kya hota hai?"
-    a: "Ek function jo state leta hai aur updates return karta hai; woh model call kar sakta hai, tool call kar sakta hai ya plain code chala sakta hai."
+    a: "Ek typed dictionary, jaise messages, ticket id aur ek proposed credit, jise har node padhta hai aur jismein wo updates lautaata hai."
+  - q: "Node kya hai?"
+    a: "Ek function jo state leta hai aur sirf wahi fields lautaata hai jo wo badalta hai. Ye model call kar sakta hai, tool call kar sakta hai ya plain code chala sakta hai."
   - q: "Conditional edge kya hai?"
-    a: "Ek edge jo state dekhkar agla node chunti hai, jaise model ne tool maanga toh tool node par jaana."
+    a: "Ek function jo state padhkar agle node ka naam lautaata hai, jaise credit propose hua ho to approve_credit, nahi to reply."
   - q: "Checkpointer kya karta hai?"
-    a: "Har step ke baad thread id ke hisaab se state save karta hai, taaki runs pause ho sakein, resume ho sakein, inspect ho sakein ya replay ho sakein."
-  - q: "Interrupt kya hai?"
-    a: "Kisi node se pehle ya uske andar ek pause jo bahar se input ka intezaar karta hai; human approval ki buniyaad yahi hai."
+    a: "Har step ke baad state ko ek thread_id ke neeche save karta hai, taaki run pause ho sake, dinon baad aage badh sake, crash ke baad recover ho sake, inspect ho sake ya replay ho sake."
+  - q: "Jab koi node interrupt() call karta hai to kya hota hai?"
+    a: "Run ruk jaata hai, state save ho jaati hai aur interrupt() ko di gayi value __interrupt__ ke neeche caller ke paas wapas jaati hai. Resume karne ke liye checkpointer chahiye."
   - q: "Production mein database checkpointer kyun use karein?"
-    a: "In-memory checkpointer mein server restart hone par har paused run chala jaata hai."
-  - q: "LangGraph kab zaroori nahi hota?"
-    a: "Ek fixed, chhoti pipeline ke liye jo plain functions se ho jaati hai; framework bina fayde ke bojh badhata hai."
-  - q: "Approval ke liye LangGraph run ko kaise pause karte hain?"
-    a: "Node ke andar interrupt() ko woh data dekar call karo jo dikhana hai. Run ruk jaata hai aur state save hoti hai; usi thread_id par Command(resume=...) se resume karo."
-  - q: "recursion_limit kya karta hai?"
-    a: "Ye cap karta hai ki ek run kitne steps le sakta hai, taaki nodes ke beech loop karne waala graph hamesha chalne ki jagah error ke saath ruk jaaye."
+    a: "In-memory checkpointer ek hi process ke andar rehta hai, isliye restart ya deploy hote hi har paused run aur har conversation kho jaati hai."
+  - q: "LangGraph ki zaroorat kab nahi hai?"
+    a: "Jab fixed chhoti pipeline ho ya plain tool loop ho, jismein na pauses hon, na branching, na saved conversations; tab plain functions padhne mein zyada aasaan hain."
+  - q: "Side effects interrupt() ke baad, ya agle node mein, kyun hone chahiye?"
+    a: "Resume par node apni pehli line se dobara chalta hai, isliye interrupt() se pehle ki har cheez do baar hoti hai. Action agle node mein rakho aur use idempotent banao."
+  - q: "recursion_limit khud kyun set karein?"
+    a: "Ye ek run ke steps par cap lagaata hai. LangGraph 1.0.5 tak default 25 tha, lekin 1.0.6 se ye 10,000 ya usse zyada hai, isliye loop mein phansa graph rukne se pehle bahut saari model calls kha sakta hai."
 exercise:
   title: "Graph banao"
-  setup: "Lucknow ki ek university student requests ke liye ek assistant chahti hai. Requests teen type ki hain: fee ke sawaal (fee-records tool chahiye), exam schedule ke sawaal (timetable tool chahiye), aur fee extension ki requests, jise extension record hone se pehle finance officer ko approve karna hota hai. Students aksar kuch din baad wahi conversation aage badhate hain."
+  setup: "Lucknow ki ek university ko student requests ke liye ek assistant chahiye. Requests teen tarah ki hain: fee ke sawaal (fee-records tool chahiye), exam schedule ke sawaal (timetable tool chahiye), aur fee extension ki requests, jinhein record hone se pehle ek finance officer ko approve karna hota hai. Students aksar wahi conversation dinon baad aage badhaate hain."
   questions:
-    - q: "Graph mein kaunse nodes honge?"
-      a: "classify, fee_agent, timetable_agent, propose_extension, approve_extension (interrupt), record_extension aur reply."
-    - q: "Conditional edges kahan jaayenge?"
-      a: "classify ke baad, request type ke hisaab se routing ke liye, aur har agent ke tool loop ke andar, yeh decide karne ke liye ki tool call karna hai ya khatam karna hai."
-    - q: "Students kuch din baad kaise aage badhayenge?"
-      a: "Har conversation ek thread id use karti hai, aur database-backed checkpointer agle message par uski state reload karta hai."
-    - q: "Model calls ke bina routing ko kaise test karoge?"
-      a: "Har category ke liye haath se banayi gayi states ke saath route function call karo aur check karo ki woh kaunsa node return karta hai."
+    - q: "Graph mein kaun-se nodes honge?"
+      a: "classify, fee_agent, timetable_agent, propose_extension, approve_extension (interrupt call karta hai), record_extension aur reply."
+    - q: "Conditional edges kahaan lagenge?"
+      a: "classify ke baad, request ke type ke hisaab se; approve_extension ke baad, approve hua to record_extension par, nahi to reply par; aur har agent ke tool loop ke andar."
+    - q: "Students dinon baad kaise aage badhaate hain?"
+      a: "Har conversation ka apna thread_id hota hai, aur agla message aane par ek Postgres checkpointer us thread ki state dobara load kar deta hai."
+    - q: "Model calls ke bina routing kaise test karoge?"
+      a: "Har request type ke liye haath se banaayi states ke saath route functions call karo aur dekho ki wo kaun-sa node name lautaate hain; phir ek fake model ke saath ek poora thread chalao."
 ask:
-  - "LangChain aur LangGraph mein kya farak hai?"
+  - "LangChain aur LangGraph mein kya farq hai?"
   - "LangGraph checkpointer kaise kaam karta hai?"
-  - "LangGraph agent mein human approval kaise jodun?"
+  - "LangGraph agent mein human approval kaise jodein?"
 explain_in_interview:
-  answer: "LangGraph ek open-source framework hai jisse agents aur multi-step AI workflows graphs ki tarah banaye jaate hain. Aap ek typed state define karte ho, nodes jo state padhkar updates return karte hain, aur edges jo tay karte hain ki agla node kaunsa chalega, jismein state par based conditional edges bhi hain. Checkpointer har step ke baad state save karta hai, taaki run kisi insaan ke liye ruk sake aur phir resume ho. Jaise, Chennai mein ek broadband support assistant ticket classify karta hai, billing tickets billing agent ko bhejta hai, aur credit lagane se pehle supervisor ke liye rukta hai. Trade-off extra structure ka hai: simple tool loop ya fixed teen-step pipeline ke liye plain code kaafi ho sakta hai."
-  follow_up: "LangGraph agent human approval ke liye kaise rukta hai aur phir aage kaise badhta hai?"
-  follow_up_answer: "Approval step par aap ek interrupt lagate ho. Checkpointer ne state ek thread ID ke under save kar li hai, toh run ruk jaata hai aur ek insaan use review karta hai. Jab woh decide kare, aap usi thread ko unke answer ke saath resume karte ho aur graph wahin se aage chalta hai."
-translated_on: 2026-11-16
+  answer: "LangGraph agents aur multi-step AI workflows ko graphs ke roop mein banaane ka ek open-source framework hai. Aap ek typed state define karte ho, nodes jo state padhkar updates lautaate hain, aur edges jo tay karte hain ki agla kaun-sa node chalega, jinmein state ke hisaab se chalne waale conditional edges bhi shaamil hain. Ek checkpointer har step ke baad state save karta hai, taaki run kisi insaan ke liye pause hokar phir resume ho sake. Jaise, Chennai mein ek broadband support assistant ticket ko classify karta hai, billing tickets ko billing agent ke paas bhejta hai, aur credit lagaane se pehle supervisor ke liye ruk jaata hai. Trade-off hai extra structure: simple tool loop ya fixed teen-step pipeline ke liye plain code kaafi ho sakta hai."
+  follow_up: "LangGraph agent human approval ke liye kaise pause hota hai aur phir aage kaise badhta hai?"
+  follow_up_answer: "Ek node proposal ke saath interrupt() call karta hai. Checkpointer state ko thread ID ke neeche save karta hai aur run ruk jaata hai. Jab insaan faisla kar le, to aap usi thread ko Command(resume=decision) ke saath invoke karte ho. Wo node shuru se dobara chalta hai, isliye asli action agle node mein jaata hai aur idempotent hota hai."
+translated_on: 2026-11-28
 ---
 
 ## Ye kya hai
 
-LangGraph ek open-source Python aur JavaScript framework hai, jisse agents aur multi-step AI workflows ko **graphs** ki tarah banate hain:
+LangGraph ek open-source Python aur JavaScript framework hai, jisse agents aur multi-step AI workflows ko **graphs** ki tarah banaya jaata hai. Ek graph ke chaar hisse hote hain:
 
-- **State**: ek typed object, jaise messages ka dictionary, current ticket aur draft reply, jo graph mein se guzarta hai.
-- **Nodes**: aise functions jo state lete hain aur updates return karte hain. Ek node model call kar sakta hai, tool call kar sakta hai ya plain code chala sakta hai.
-- **Edges**: agla kaunsa node chalega. Conditional edges state ke hisaab se chunti hain, jaise "agar model ne tool maanga toh tool node par jao; warna khatam karo".
-- **Checkpointer**: har step ke baad state save karta hai, taaki run pause ho sake, resume ho sake, inspect ho sake ya replay ho sake.
+- **State**: ek typed dictionary jismein wo sab rehta hai jo run ko pata hai, jaise messages, ticket id aur ek proposed credit.
+- **Nodes**: functions jo state padhte hain aur sirf wahi fields lautaate hain jo wo badalte hain. Node model call kar sakta hai, tool call kar sakta hai ya plain code chala sakta hai.
+- **Edges**: aage kaun-sa node chalega. **Conditional edge** ek function hai jo state padhkar agle node ka naam lautaata hai.
+- **Checkpointer**: har step ke baad state ko ek `thread_id` ke neeche save karta hai, taaki run pause ho sake, resume ho sake, restart jhel sake aur replay ho sake.
 
-Agent loop bas ek chhota graph hai: model node, tool node, aur dono ke beech loop karti ek conditional edge. Workflow fixed edges waala graph hota hai. LangGraph dono ko ek hi system mein mila sakta hai.
+Agent loop ek chhota graph hai: ek model node, ek tool node, aur ek conditional edge jo dono ke beech tab tak loop karta hai jab tak model tools maangna band na kar de. Workflow fixed edges waala graph hai. LangGraph aapko dono ko ek hi system mein milaane deta hai.
+
+Ye lesson ek hi graph shuru se aakhir tak banata hai. Chennai ke ek broadband provider ke paas support tickets aate hain. Billing tickets mein bina service waale dinon ke liye credit mil sakta hai, aur har credit billing system tak pahunchne se pehle ek supervisor ko approve karna hota hai.
 
 ```flow
-title: Har node ke baad state save hoti hai, har thread_id ke liye (checkpointer)
+title: Support-ticket graph (har step ke baad state save hoti hai, har thread_id ke liye alag)
 START -> classify
-classify -[billing]-> billing_agent | a tool loop
-classify -[outage]-> outage_agent | a tool loop
-billing_agent -[proposes a credit]-> approve_credit | INTERRUPT: a supervisor decides
-billing_agent -[no credit]-> reply
-approve_credit -> apply_credit -> reply
-outage_agent -> reply
+classify -[billing]-> billing_agent | outage ke din dekhta hai, credit propose karta hai
+classify -[outage]-> outage_agent
+billing_agent -[credit zero se zyada]-> approve_credit | interrupt: supervisor faisla karta hai
+billing_agent -[koi credit nahi]-> reply
+approve_credit -[approve hua]-> apply_credit | billing system ko ek hi baar call karta hai
+approve_credit -[reject hua]-> reply
+apply_credit -> reply
+outage_agent -> END
 reply -> END
 ```
 
-Ye lesson Chennai ke ek broadband provider ko follow karta hai, jo credits ke approval ke saath ek support-ticket assistant bana raha hai.
-
 ## Ye kaam kaise karta hai
 
-Aap state type define karte ho, nodes jodte ho, edges connect karte ho aur compile karte ho:
+### Install karo aur version pin karo
+
+Library tezi se badalti hai, isliye version pin karo. Is lesson ka har code block 28 November 2026 ko Python 3.13, `langgraph` 1.2.24, `langchain` 1.5.2 aur `langgraph-checkpoint-postgres` 3.2.1 ke saath chalaakar dekha gaya.
+
+```bash
+pip install "langgraph==1.2.24"
+```
+
+### Poora graph
+
+Ise ek baar upar se neeche tak padho. Model aur billing system ki jagah chhote stand-ins hain, isliye ye bina API key ke chalta hai. Ise `ticket_graph.py` naam se save karo; aage ke blocks isi ke naam use karte hain.
 
 ```python
-from typing import TypedDict, Annotated
+from typing import Annotated, TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
-from langgraph.checkpoint.memory import MemorySaver
-
-class State(TypedDict):
-    messages: Annotated[list, add_messages]   # new messages are appended, not replaced
-    category: str | None
-
-def classify(state: State) -> dict:
-    label = llm_classify(state["messages"][-1].content)
-    return {"category": label}
-
-def route(state: State) -> str:
-    return "billing" if state["category"] == "billing" else "general"
-
-g = StateGraph(State)
-g.add_node("classify", classify)
-g.add_node("billing", billing_agent)
-g.add_node("general", general_agent)
-g.add_edge(START, "classify")
-g.add_conditional_edges("classify", route, ["billing", "general"])
-g.add_edge("billing", END)
-g.add_edge("general", END)
-app = g.compile(checkpointer=MemorySaver())
-```
-
-Har invocation ek `thread_id` bhejta hai; checkpointer har thread ki state store karta hai, isliye usi thread ka agla message wahin se aage badhta hai jahan chhoda tha. Production mein `MemorySaver` ki jagah PostgreSQL jaisa database-backed checkpointer lagate hain.
-
-**Interrupts** kisi node se pehle ya uske andar run ko pause karte hain aur bahar se input ka intezaar karte hain; human approval ki buniyaad yahi hai. **Streaming** node-by-node updates UI tak bhejti hai. **Sub-graphs** ek node ko poora graph bana dete hain, jo bade flow ke andar kisi specialist agent ke liye kaam aata hai.
-
-**LangGraph ke pieces aur unse kya milta hai:**
-
-| Piece | Ye kya hai | Aapko kya deta hai |
-| --- | --- | --- |
-| State | Ek typed dictionary | Ek hi jagah jahan run ko jo pata hai woh sab dikhta hai |
-| Node | Updates return karne waala function | Chhote, test hone layak steps |
-| Edge | Fixed agla step | Predictable workflows |
-| Conditional edge | Agla node chunne waala function | Routing aur tool loops |
-| Checkpointer | Har thread ki saved state | Memory, pause aur resume, replay |
-| Interrupt | Bahar se input ke liye pause | Human approval |
-| Sub-graph | Node ki tarah use hone waala graph | Bade flow ke andar specialist agents |
-
-**State updates kaise kaam karte hain.** Ek node sirf wahi fields return karta hai jo woh badalta hai, aur LangGraph unhe state mein merge kar deta hai. Zyadatar fields mein nayi value purani ko replace kar deti hai. Jin fields par reducer laga hai, jaise `add_messages` waali message list, unmein nayi values append hoti hain. Isi wajah se tool node sirf naya tool message return kare, tab bhi history bani rehti hai. Reducer bhool jaana ek classic bug hai: tab har node poori conversation ko ek akele message se overwrite kar deta hai.
-
-**Checkpoints se debugging.** Har step save hota hai, isliye aap kisi thread ke checkpoints list kar sakte ho, har ek par state padh sakte ho, aur kisi pehle checkpoint se badli hui state ke saath resume karke dekh sakte ho ki kya hota. Jab reply galat jaaye, toh ye print statements lagaye aur dobara chalaye bina dikhata hai ki kaunse node ne kya badla.
-
-**Graphs aur plain code saath mein.** Har step ko model ki zaroorat nahi hoti. Validation, database writes aur formatting aam nodes hain jinme model call nahi hota, isse ye tez, sasti aur test karne mein aasaan rehti hain.
-
-**Interrupt aur resume ke saath approval.** Node ke andar `interrupt` run ko pause karta hai aur resume hone par insaan jo bhejta hai woh return karta hai:
-
-```python
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import interrupt, Command
 
-def refund_node(state: State) -> dict:
-    proposal = {"action": "refund", "amount_inr": state["amount"], "order": state["order_id"]}
-    decision = interrupt(proposal)                 # the run stops here and state is saved
-    if not decision.get("approved"):
-        return {"messages": [("assistant", "A team member will contact you about the refund.")]}
-    amount = decision.get("amount_inr", state["amount"])   # the approver may edit it
-    issue_refund(state["order_id"], amount)
-    return {"messages": [("assistant", f"Refund of ₹{amount} started.")]}
+class Ticket(TypedDict, total=False):
+    messages: Annotated[list, add_messages]  # reducer: new messages are appended
+    ticket_id: str
+    category: str              # "billing" or "outage"
+    outage_days: int
+    proposed_credit_inr: int
+    approved_credit_inr: int   # 0 means the supervisor said no
+    credit_ref: str
 
-config = {"configurable": {"thread_id": "order-7781"}, "recursion_limit": 25}
-result = app.invoke({"messages": [("user", "Refund my damaged kurta, order 7781")]}, config)
-# result["__interrupt__"] holds the proposal; show it on the approval screen.
+# Stand-ins for real systems, so the graph runs with no API key.
+OUTAGE_DAYS = {"TKT-4471": 3}     # the network status tool
+CREDITS = {}                      # the billing system, keyed by idempotency key
 
-# Later, possibly hours later, from the approval page's handler:
-app.invoke(Command(resume={"approved": True, "amount_inr": 3000}), config)
+def add_credit(key: str, amount_inr: int) -> str:
+    return CREDITS.setdefault(key, f"CR-{len(CREDITS) + 1:04d}")  # same key, one credit
+
+def classify(state: Ticket) -> dict:
+    text = state["messages"][-1].content.lower()   # a model call in real life
+    return {"category": "billing" if "bill" in text else "outage"}
+
+def route_ticket(state: Ticket) -> str:
+    return "billing_agent" if state["category"] == "billing" else "outage_agent"
+
+def billing_agent(state: Ticket) -> dict:
+    days = OUTAGE_DAYS.get(state["ticket_id"], 0)
+    return {"outage_days": days, "proposed_credit_inr": min(days * 100, 500)}
+
+def outage_agent(state: Ticket) -> dict:
+    return {"messages": [("ai", "There is a fibre cut in your area. We will update you by 6 pm.")]}
+
+def approve_credit(state: Ticket) -> dict:
+    decision = interrupt({                          # the run pauses here
+        "ticket_id": state["ticket_id"],
+        "proposed_credit_inr": state["proposed_credit_inr"],
+        "reason": f"{state['outage_days']} days without service",
+    })
+    # On resume this node runs again from the top, and interrupt() returns the decision.
+    return {"approved_credit_inr": decision["credit_inr"] if decision["approved"] else 0}
+
+def apply_credit(state: Ticket) -> dict:
+    ref = add_credit(key=state["ticket_id"], amount_inr=state["approved_credit_inr"])
+    return {"credit_ref": ref}
+
+def reply(state: Ticket) -> dict:
+    amount = state.get("approved_credit_inr", 0)
+    text = (f"We have added a ₹{amount} credit to your next bill (ref {state['credit_ref']})."
+            if amount else "We checked your account. No credit applies this time.")
+    return {"messages": [("ai", text)]}
+
+g = StateGraph(Ticket)
+for node in (classify, billing_agent, outage_agent, approve_credit, apply_credit, reply):
+    g.add_node(node)                                # the node is named after the function
+g.add_edge(START, "classify")
+g.add_conditional_edges("classify", route_ticket, ["billing_agent", "outage_agent"])
+g.add_conditional_edges("billing_agent",
+    lambda s: "approve_credit" if s["proposed_credit_inr"] > 0 else "reply",
+    ["approve_credit", "reply"])
+g.add_conditional_edges("approve_credit",
+    lambda s: "apply_credit" if s["approved_credit_inr"] > 0 else "reply",
+    ["apply_credit", "reply"])
+g.add_edge("apply_credit", "reply")
+g.add_edge("outage_agent", END)
+g.add_edge("reply", END)
+app = g.compile(checkpointer=InMemorySaver())
 ```
 
-Resume hone par node apne shuru se dobara chalta hai, isliye side effects `interrupt` call ke baad rakho, jaisa yahan hai, aur unhe idempotent banao.
+Credit policy (bina service waale har din ke ₹100, zyada se zyada ₹500) is lesson ke liye ek example hai, kisi asli provider ka rule nahi. Asli system mein `classify` ek model call hoga jo ek label lautaata hai, aur `billing_agent` ek chhota model-and-tool loop hoga (neeche prebuilt agent dekho). Har `add_conditional_edges` call ke aakhir waali list un nodes ke naam batati hai jo route lauta sakta hai. `app.get_graph().draw_mermaid()` graph ko Mermaid diagram ke roop mein print karta hai; ye jaldi se check karne ka tareeka hai ki edges waise hi hain jaisa aapne socha tha.
 
-**Database checkpointer.** `MemorySaver` restart par sab kuch kho deta hai. Asli use ke liye checkpoints Postgres mein store karo:
+### State updates kaise merge hote hain
+
+Node sirf wahi fields lautaata hai jo wo badalta hai, aur LangGraph unhein state mein merge kar deta hai. Zyadatar fields mein nayi value puraani ko replace kar deti hai. Jis field mein **reducer** ho, jaise `add_messages` waala `messages`, wo replace hone ki jagah combine hota hai: naye messages aakhir mein jud jaate hain. Isiliye `reply` ek message lautaata hai aur customer ka message bana rehta hai. Reducer bhool gaye to `messages` mein likhne waala har node poori conversation mita dega. Shuruaat mein sabse aam bug yahi hai.
+
+### Pause, approve, resume
+
+Har run ek thread ka naam leta hai. Yahaan thread hi ticket hai, isliye TKT-4471 se judi har cheez ek hi jagah rehti hai:
 
 ```python
+config = {"configurable": {"thread_id": "TKT-4471"}, "recursion_limit": 20}
+first = {"ticket_id": "TKT-4471",
+         "messages": [("user", "Net was down 3 days. Why is my bill the full ₹799?")]}
+out = app.invoke(first, config)
+print(out["__interrupt__"][0].value)
+# {'ticket_id': 'TKT-4471', 'proposed_credit_inr': 300, 'reason': '3 days without service'}
+
+# Hours later, the supervisor's dashboard resumes the same thread:
+out = app.invoke(Command(resume={"approved": True, "credit_inr": 300}), config)
+print(out["messages"][-1].content)
+# We have added a ₹300 credit to your next bill (ref CR-0001).
+```
+
+Approval ko safe banaane waale teen rules:
+
+- **Resume par node dobara chalta hai.** LangGraph `interrupt()` ke baad waali line se aage nahi badhta; wo `approve_credit` ko uski pehli line se dobara chalata hai, aur is baar `interrupt()` faisla lautaata hai. Ek test mein `interrupt()` se pehle rakha counter do baar badha. Isliye `interrupt()` se pehle ki kisi cheez ka side effect nahi hona chahiye.
+- **Action agle node mein rakho.** Credit `approve_credit` mein nahi, `apply_credit` mein lagta hai. Wo node ticket id ko idempotency key ki tarah use karta hai, isliye wo do baar bhi chal jaaye to customer ko ek hi credit milta hai.
+- **Supervisor edit kar sakta hai.** Resume value wahi hai jo aapka dashboard bheje. `{"approved": True, "credit_inr": 250}` bhejoge to ₹250 lagega.
+
+Checkpointer ke bina bhi `interrupt()` run rok deta hai, lekin `Command(resume=...)` "Cannot use Command(resume=...) without checkpointer" ke saath fail ho jaata hai. `compile(interrupt_before=["apply_credit"])` bhi pause karta hai, lekin node ke andar `interrupt()` se aap supervisor ko theek wahi data bhej sakte ho jo use chahiye.
+
+### Checkpoints: inspect, replay aur fork
+
+Har step save hota hai, isliye aap kisi thread ki history padh sakte ho, sabse naya pehle:
+
+```python
+for snap in app.get_state_history(config):
+    print(snap.metadata["step"], snap.next, snap.values.get("credit_ref"))
+```
+
+"Agar agent ne ₹200 propose kiya hota aur supervisor ne mana kar diya hota to?" Ye poochhne ke liye approval se theek pehle waale checkpoint se fork karo:
+
+```python
+past = next(s for s in app.get_state_history(config) if s.next == ("approve_credit",))
+fork = app.update_state(past.config, {"proposed_credit_inr": 200})
+out = app.invoke(None, fork)                       # runs on and pauses again, now at ₹200
+out = app.invoke(Command(resume={"approved": False}), config)
+print(out["messages"][-1].content)
+# We checked your account. No credit applies this time.
+```
+
+`invoke(None, ...)` ka matlab hai "bina kisi naye input ke is checkpoint se aage chalo". Fork latest state ban jaata hai; original steps history mein bane rehte hain.
+
+### Database checkpointer
+
+`InMemorySaver` ek hi Python process ke andar rehta hai. Restart ya deploy hote hi har paused ticket kho jaata hai. Production mein checkpoints Postgres mein rakho, aur saver ko har request ke andar nahi, server start hone par ek baar banao:
+
+```python
+# pip install "langgraph-checkpoint-postgres==3.2.1" "psycopg[binary,pool]"
+import os
+from psycopg_pool import ConnectionPool
 from langgraph.checkpoint.postgres import PostgresSaver
 
-with PostgresSaver.from_conn_string("postgresql://app:***@db:5432/agents") as saver:
-    saver.setup()                                  # creates the checkpoint tables once
-    app = g.compile(checkpointer=saver)
-    app.invoke({"messages": [("user", "Hi")]}, {"configurable": {"thread_id": "t-42"}})
+pool = ConnectionPool(os.environ["CHECKPOINT_DB_URL"],
+                      kwargs={"autocommit": True, "prepare_threshold": 0}, open=True)
+saver = PostgresSaver(pool)
+saver.setup()                       # creates the checkpoint tables if missing
+app = g.compile(checkpointer=saver)
 ```
 
-Connection string environment variable se padho, code se nahi.
+Dono connection settings un settings mein se do hain jo `PostgresSaver.from_conn_string` use karta hai (row factory saver khud set karta hai). Wo helper ek `with` block hai jo apne aakhir mein connection band kar deta hai, jo script ke liye theek hai par web server ke liye nahi. Connection string ko environment variable mein rakho, aur shutdown par `pool.close()` call karo.
 
-**Progress stream karna.** `app.stream(inputs, config, stream_mode="updates")` har node ke khatam hote hi uska update deta hai, taaki UI lambi khamoshi ki jagah "Checking your order…", phir "Looking up the refund policy…" dikha sake.
+Is saver ke saath humne TKT-4471 ko ek process mein pause kiya, us process ko band kiya, aur ek naye process se approve kiya: thread tab bhi `approve_credit` par intezaar kar raha tha aur normal tareeke se poora hua.
 
-**Nodes ko akele test karna.** Nodes state se updates tak ke plain functions hain, isliye unhe bina model ke unit-test kar sakte ho:
+**Crash aur pause alag cheezein hain.** Humne process ko `apply_credit` ke andar kill bhi kiya. Thread apne aap dobara shuru nahi hua. Naye process ne use `approve_credit` par paaya, kyunki default mode har step background mein save karta hai aur aakhri step abhi likha nahi gaya tha. `app.invoke(None, config)` ne saved faisle ke saath `approve_credit` dobara chalaya, phir `apply_credit` aur `reply`. `invoke` mein `durability="sync"` dene par har step agle ke shuru hone se pehle save hota hai, isliye tab thread `apply_credit` par intezaar kar raha tha. Isse do sabak nikalte hain: aakhri saved step ke baad waala node do baar chal sakta hai, isliye side effects idempotent banao; aur aapko ek chhota job chahiye jo adhoore threads ko aage badhaaye.
+
+### Progress stream karna
+
+Har step hote hi dekhne ke liye `invoke` ki jagah `stream` use karo:
 
 ```python
-def test_route_billing():
-    assert route({"messages": [], "category": "billing"}) == "billing"
-
-def test_route_unknown_goes_general():
-    assert route({"messages": [], "category": None}) == "general"
+demo = {"configurable": {"thread_id": "TKT-4471-demo"}, "recursion_limit": 20}
+for update in app.stream(first, demo, stream_mode="updates"):
+    print(update)
+# {'classify': {'category': 'billing'}}
+# {'billing_agent': {'outage_days': 3, 'proposed_credit_inr': 300}}
+# {'__interrupt__': (Interrupt(value={...}, ...),)}
 ```
 
-Jo nodes model call karte hain, unke liye tests mein fake model do jo fixed replies de. Phir kuch saved conversations ke saath poore graph ko test karo.
+Har item ek node ka update hai, isliye chat screen lambi chuppi ki jagah "Checking your connection…" dikha sakti hai.
 
-**Prebuilt agent.** Ek seedhe tool-using loop ke liye `langgraph.prebuilt.create_react_agent(model, tools)` aapke liye model-and-tools graph bana deta hai. Wahan se shuru karo, aur jab routing, approvals ya kai specialist nodes chahiye ho tab apna graph likho.
+### Model ke bina testing
 
-**Har run ko limit karo.** Config mein `recursion_limit` set karo. Phir jo conditional edge run ko baar-baar usi node par bhejti rahe, woh ek error ke saath ruk jaayegi, jise aap pakad kar saaf handover bana sakte ho.
+Routes aur nodes plain functions hain, isliye zyadatar tests ko model ki zaroorat hi nahi:
+
+```python
+def test_billing_ticket_goes_to_billing_agent():
+    assert route_ticket({"category": "billing"}) == "billing_agent"
+
+def test_credit_waits_for_approval_then_applies():
+    config = {"configurable": {"thread_id": "test-1"}, "recursion_limit": 20}
+    out = app.invoke({"ticket_id": "TKT-4471",
+                      "messages": [("user", "Why is my bill the full amount?")]}, config)
+    assert out["__interrupt__"][0].value["proposed_credit_inr"] == 300
+    out = app.invoke(Command(resume={"approved": True, "credit_inr": 300}), config)
+    assert out["credit_ref"].startswith("CR-")
+```
+
+Jo nodes model call karte hain, unmein fixed replies waala fake model pass karo, aur CI mein kuch saved asli tickets poore graph se chalao.
+
+### Prebuilt agent
+
+Puraane tutorials `langgraph.prebuilt.create_react_agent` use karte hain. LangGraph 1.0 se ye deprecated hai: ise call karne par warning aati hai ki ye "has been moved to `langchain.agents`". Abhi ka prebuilt model-and-tools loop LangChain ka `create_agent` hai, jo LangGraph par chalta hai:
+
+```python
+# pip install "langchain==1.5.2" plus your model provider's package
+from langchain.agents import create_agent
+
+def outage_days(ticket_id: str) -> int:
+    """Days without service on this ticket's connection."""
+    return OUTAGE_DAYS.get(ticket_id, 0)
+
+billing_helper = create_agent(chat_model, tools=[outage_days],
+                              system_prompt="You answer broadband billing questions.")
+out = billing_helper.invoke({"messages": [("user", "Ticket TKT-4471: why is my bill high?")]})
+```
+
+`chat_model` koi bhi LangChain chat model hai jo tool calling support karta ho. Result ek compiled graph hai, isliye ye kisi aur bade graph ka ek node ban sakta hai. Ise **sub-graph** kehte hain. Plain tool loop ke liye `create_agent` se shuru karo. Jab routing, approvals ya kai specialists chahiye hon, tab apna `StateGraph` likho.
+
+### Har run ki limit rakho
+
+`recursion_limit` ek run mein steps ki ginti par cap lagaata hai. Run wahaan pahunche to LangGraph `GraphRecursionError` raise karta hai, jise aap catch karke kisi insaan ko handover mein badal sakte ho. Ise har call par khud set karo: default LangGraph 1.0.5 tak 25 tha, 1.0.6 se 1.1.3 tak 10,000 aur 1.1.4 se (1.2.24 samet) 10,007, isliye ek draft-and-check loop jo kabhi khud se santusht na ho, default ke rokne se pehle hazaaron model calls kar sakta hai.
+
+### Basics se aage
+
+- **Parallel branches.** Conditional edge kai `Send("node", data)` objects lautaakar ek node ko parallel mein kai baar chala sakta hai, jaise das connections ek saath check karna, aur ek reducer results merge karta hai.
+- **Long-term memory.** Checkpoints ek thread ke hote hain. Jo facts customer ke saath har ticket mein chalne chahiye, jaise "Tamil pasand karte hain", wo `compile(store=...)` ke saath diye gaye ek **store** mein jaate hain, jaise `InMemoryStore` ya ek Postgres store.
+- **Functional API.** `langgraph.func` ke `@entrypoint` aur `@task` bina graph banaaye ordinary Python functions ko checkpoints aur interrupts dete hain.
+- **Tracing.** `LANGSMITH_TRACING=true` aur ek LangSmith API key ke saath har node ka input aur output record hota hai, isliye "bot ne kuch ajeeb kaha" ek link ban jaata hai jise aap khol sakte ho.
+
+**Saare hisse ek nazar mein:**
+
+| Hissa | Ticket graph mein | Gotcha |
+| --- | --- | --- |
+| Reducer waali state | `messages` mein `add_messages` | Reducer ke bina har reply history mita deta hai |
+| Conditional edge | `route_ticket` aur dono lambdas | Apni possible nodes ki list mein se hi koi naam lautaana chahiye |
+| Checkpointer | `InMemorySaver`, phir `PostgresSaver` | In memory mein restart par paused tickets kho jaate hain |
+| `interrupt()` | `approve_credit` ke andar | Resume par node apni pehli line se dobara chalta hai |
+| Idempotency key | `add_credit` mein ticket id | Iske bina rerun doosra credit laga deta hai |
+| `recursion_limit` | Har config mein 20 | Default ab itna zyada hai ki aapko bacha nahi sakta |
 
 ## Ek example se samjho
 
-Chennai ka ek broadband provider support tickets ke liye assistant chahta hai. Requirements: har ticket ko classify karna, billing sawaalon ko account tools se sambhaalna, outage sawaalon ko status tool se sambhaalna, aur koi bhi credit lagne se pehle supervisor ki approval lena.
+Chennai mein ticket TKT-4471 aata hai: "Net was down 3 days. Why is my bill the full ₹799?" Table dikhaati hai ki checkpointer ne kya save kiya, upar waale code ke ek asli run se `get_state_history` se padhkar.
 
-Graph: `classify` ya toh `billing_agent` ya `outage_agent` par route karta hai, dono chhote tool loops hain. Agar billing agent credit propose kare, toh graph `approve_credit` par route hota hai, jo interrupt karta hai. Supervisor apne dashboard mein ticket, propose kiya gaya ₹300 credit aur agent ka reason dekhta hai, approve ya edit karta hai, aur run checkpoint se `apply_credit` aur `reply` tak resume hota hai.
+| Step | Agla node | State mein kya badla |
+| --- | --- | --- |
+| 0 | classify | Customer ka message aur `ticket_id` aa gaye |
+| 1 | billing_agent | `category` = billing |
+| 2 | approve_credit | `outage_days` = 3, `proposed_credit_inr` = 300. Run yahaan pause hota hai aur dashboard proposal dikhaata hai |
+| 3 | apply_credit | Supervisor ke approve karne ke baad: `approved_credit_inr` = 300 |
+| 4 | reply | `credit_ref` = CR-0001 |
+| 5 | (poora) | Reply message jud gaya; ab do messages hain |
 
-Kyunki har node ke baad state checkpoint hoti hai, isliye ticket ke beech server restart ho jaaye toh kuch nahi khota. Jab koi customer reply ki shikayat kare, toh aap thread ke checkpoints load karke dekh sakte ho ki kaunse node ne kis state ke saath kya kiya. Tests individual nodes ko haath se banayi state ke saath call karte hain, isliye routing logic bina model calls ke unit-test hota hai.
+Teen baatein dekho. Pause ne apna koi alag checkpoint nahi joda: step 2 bas itna kehta hai ki agla node `approve_credit` hai. Approval aur side effect alag steps hain, isliye `approve_credit` dobara chale to bhi credit nahi laga sakta. Aur har value jo koi auditor poochh sakta hai (₹300 kyun, kaun-sa credit reference), wo kisi prompt ke andar chhipi nahi, ek saved state mein hai.
 
-| Situation | Graph ne kya kiya |
-| --- | --- |
-| Billing question | classify, billing_agent, reply |
-| Propose kiya gaya ₹300 credit | approve_credit par interrupt hua; supervisor ke approve karne ke baad resume hua |
-| Ticket ke beech server restart | Last checkpoint se resume hua, kuch nahi khoya |
-| Customer complaint | Thread ke checkpoints ne dikhaya ki kaunse node ne kis state se reply likhi |
+Usi ticket ke do variations:
+
+- **Supervisor reject kar deta hai.** `approve_credit` ke baad route seedha `reply` par jaata hai, `apply_credit` kabhi nahi chalta, aur customer ko bataya jaata hai ki koi credit nahi banta.
+- **Customer ek hafte baad complain karta hai.** Aap thread TKT-4471 kholte ho, har step padhte ho, aur original history ko chhue bina step 2 se fork karke test kar sakte ho ki alag credit se kya hota.
 
 ## Aam galtiyaan
 
-- **Sab kuch ek bade node mein daalna.** Aap woh visibility aur testability kho dete ho jo graph ka asli maksad hai.
-- **Bina limit ke badhti state.** Har tool result ko hamesha append karne se prompts phool jaate hain. Kisi node mein trim ya summarise karo.
-- **Production mein in-memory checkpoints.** Restart se har paused run chala jaata hai. Persistent checkpointer use karo.
-- **Jahan function kaafi ho wahan graph use karna.** Fixed teen-step pipeline ko framework nahi chahiye.
-- **Versions ko ignore karna.** Library tezi se badalti hai; pin karo aur upgrade se pehle changelog padho.
-- **`interrupt` se pehle side effects.** Resume par node shuru se dobara chalta hai, isliye action do baar ho jaata hai.
-- **Production mein `MemorySaver`.** Har restart ya deploy par state gayab ho jaati hai.
-- **`recursion_limit` na lagana.** Loop karta graph tab tak cost badhata rehta hai jab tak kuch aur use na roke.
+- **Ek bahut bada node.** Classify, look up, approve aur reply sab ek function mein karne se wo visibility, testability aur safe pause points chale jaate hain jinke liye graph banaya jaata hai.
+- **`interrupt()` se pehle side effects.** Resume par node upar se dobara chalta hai, isliye wahaan rakha SMS, email ya credit do baar ho jaata hai.
+- **Actions jo idempotent nahi hain.** Resumes aur crash recovery kisi node ko dobara chala sakte hain. Har payment, credit ya message API ko ticket id jaisi idempotency key do.
+- **Production mein in-memory checkpoints.** Har restart ya deploy par paused runs aur conversations kho jaati hain. Database checkpointer use karo aur uska backup lo.
+- **Har message ke liye naya `thread_id`.** Tab assistant har baar conversation bhool jaata hai. Har conversation ya har ticket ke liye ek thread rakho, aur ek thread kabhi do customers ke beech share mat karo.
+- **Bina limit badhti state.** Har tool result ko hamesha jodte rehne se prompts lambe aur mehenge ho jaate hain. Kisi node mein trim ya summarise karo.
+- **Default `recursion_limit` par bharosa.** 1.2.24 mein ye 10,007 steps hai. Chhoti limit set karo aur `GraphRecursionError` catch karo.
+- **Puraane tutorials copy karna.** Kai ab bhi deprecated `create_react_agent` use karte hain, ya `MemorySaver`, jo ab `InMemorySaver` ka alias hai. Versions pin karo aur upgrade se pehle changelog padho.
 
-## Jab LangGraph ki zaroorat nahi
+## Jab aapko LangGraph nahi chahiye
 
-- **Ek simple tool loop**: agent-loop lesson ka bees-line waala loop, ya kisi provider ka agent SDK kaafi ho sakta hai.
-- **Fixed pipeline** jisme pause ya branching nahi hai: order mein call kiye gaye aam functions padhne mein aasaan hote hain.
-- **Jo teams pehle se kisi aur framework par hain** jo state, pauses aur tracing cover karta hai.
+- **Simple tool loop**: agent-loop lesson waala chhota loop, `create_agent`, ya model provider ka apna agent SDK kaafi ho sakta hai.
+- **Fixed pipeline** jismein pauses ya branching na ho: kram se call kiye gaye ordinary functions padhne aur debug karne mein zyada aasaan hain.
+- **Pehle se kisi doosre framework par chal rahi team**, agar wo framework saved state, pauses aur tracing cover karta ho.
 
-LangGraph tab apni jagah banata hai jab aapko har conversation ki saved state, logon ke liye pauses, branching aur kisi run ko replay karne ki salahiyat chahiye.
+LangGraph tab apni jagah kamaata hai jab aapko har conversation ki saved state, insaanon ke liye pauses, branching, aur kisi run ko inspect aur replay karne ki kshamta chahiye.
 
 ## Demo se production tak
 
-- **Database checkpointer use karo** aur use kisi bhi production data ki tarah backup karo.
-- **Har run par recursion limits aur timeouts lagao.**
-- **Har node ko thread id ke saath trace karo**, taaki ek support ticket seedhe run tak le jaaye.
-- **Graph ko version karo**: jab nodes badlein, toh tay karo ki purane version par paused threads ka kya hoga.
-- **CI mein fake models ke saath nodes, routes aur kuch poori conversations test karo.**
+- **Database checkpointer use karo**, start-up par ek baar banao, aur baaki production data ki tarah uska backup lo.
+- **Durability soch-samajhkar chuno.** Default background mein save karta hai; `durability="sync"` har agle step se pehle save karta hai, jo payments aur credits ke aaspaas extra time ke laayak hai.
+- **Atke threads recover karo.** Ek chhota job chalao jo crash ke baad beech mein chhoote threads dhoondhe aur unhein `invoke(None, config)` se aage badhaaye.
+- **Har run par `recursion_limit` aur timeout set karo**, aur `GraphRecursionError` ko kisi insaan ko handover mein badlo.
+- **Graph ka version rakho.** Paused thread usi graph mein resume hota hai jo us waqt deployed ho. Naye state fields optional ke roop mein jodo, aur aise node ka naam na badlo, na use hatao jis par paused threads intezaar kar rahe ho sakte hain. Breaking change ke liye puraana graph tab tak chalaate raho jab tak uske paused threads poore na ho jaayein, ya pehle unhein approve ya cancel kar do.
+- **Har node ko thread id ke saath trace karo**, taaki support ticket seedhe apne run tak le jaaye.
+- **Routes, nodes aur kuch poore tickets** CI mein fake models ke saath test karo.
 
 ## Practice karo
 
-LangChain Academy ka free Introduction to LangGraph lo, kam se kam pehle teen modules.
+LangChain Academy ka free Introduction to LangGraph karo, kam se kam pehle teen modules.
 
-1. Upar waala classify-phir-route graph apni pasand ki do categories ke liye banao, tests ke liye fake model ke saath.
-2. Ek checkpointer jodo aur dikhao ki usi thread ka doosra message pehle message ko dekh leta hai.
-3. Kisi risky node se pehle ek interrupt jodo, ek script se use approve karo aur resume karo.
-4. Interrupt ke saath ek run pause karo, apna Python process restart karo, aur Postgres checkpointer se use resume karke saabit karo ki pause bach gaya.
+1. Upar waala ticket graph apni pasand ki do categories ke liye dobara banao, aise routing tests ke saath jinhein model ki zaroorat na ho.
+2. Usi `thread_id` par doosra message bhejo aur dikhao ki state mein pehla message ab bhi hai.
+3. `interrupt()` se pehle ek counter rakho aur use do baar chalte dekho; phir side effect ko agle node mein le jaao aur idempotency key jodo.
+4. `PostgresSaver` ke saath ek run pause karo, apna Python process band karo, aur naye process se use approve karo.
+5. Ek poore ho chuke thread ko approval se pehle waale step se `update_state` ke saath fork karo, aur alag faisle ke saath resume karo.
 
-**Aapka kaam poora jab:** aap apna graph draw kar sako, bata sako ki state kahan save hoti hai, aur program restart karne ke baad paused run ko resume kar sako.
+**Aapka kaam poora hai jab aap** apna graph bana sako, bata sako ki state kahaan save hoti hai, samjha sako ki approval node dobara kyun chalta hai, aur apna program restart karne ke baad ek paused run resume kar sako.
