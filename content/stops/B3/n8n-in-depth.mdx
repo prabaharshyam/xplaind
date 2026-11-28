@@ -3,8 +3,8 @@ id: n8n-in-depth
 level: B3
 theme: automation
 title: "n8n in depth"
-outcome: "Build production-grade n8n workflows: sub-workflows, loops and batching, merging data, code nodes, AI agent nodes, error workflows, versioning and self-hosting basics."
-answer: "Production n8n workflows use sub-workflows, batching, merge and code nodes, AI agent nodes, an error workflow for alerts, and version control for changes."
+outcome: "Build production-grade n8n workflows: sub-workflows, paging and batching, merges that keep unmatched items, Code nodes, time zones, AI only where it helps, error workflows, versioning and safe self-hosting."
+answer: "Production n8n workflows put shared steps in sub-workflows, page and pace API calls, keep unmatched items when merging, make every write safe to rerun and alert someone when a run fails."
 why_it_matters: "Simple workflows are easy; the ones businesses rely on handle hundreds of items, call APIs with limits, recover from errors and stay maintainable as they grow. These skills separate a hobbyist from someone a company can trust with its operations."
 hours: 5
 gap_tags: []
@@ -18,41 +18,41 @@ check:
   question_ids: [n8n-in-depth-1, n8n-in-depth-2, n8n-in-depth-3]
 flashcards:
   - q: "What is a sub-workflow in n8n?"
-    a: "A reusable workflow called from others, like a function, for shared logic such as 'look up a customer' or 'send an alert'."
-  - q: "How do you respect an API's rate limit in n8n?"
-    a: "Process items in batches with Loop Over Items and add a Wait node between batches, and page through large results."
-  - q: "What does the Merge node do?"
-    a: "Combines items from two branches, by position or by a matching field such as email or order id."
-  - q: "When should you use a Code node?"
-    a: "For small bits of logic the visual nodes do not cover, such as unusual formats or date maths. Keep it short and commented."
-  - q: "Why use a structured output parser with an AI node?"
-    a: "So later nodes get reliable, named fields instead of free text that changes shape from run to run."
-  - q: "What makes a write idempotent?"
-    a: "Checking whether the record already exists before creating it, so rerunning the workflow never creates duplicates."
-  - q: "What does an error workflow do?"
-    a: "Runs automatically when another workflow fails, and alerts someone with the workflow, the failing node and a link to the execution."
-  - q: "What do you take on when you self-host n8n?"
-    a: "Backups of its database, updates, security and scaling, for example queue mode with workers for high volume."
+    a: "A separate workflow that starts with the 'When Executed by Another Workflow' trigger and is called with the Execute Sub-workflow node. Use it, like a function, for shared steps such as 'write a row safely' or 'send an alert'."
+  - q: "An API allows 60 requests a minute and you send batches of 20. How long should the Wait be?"
+    a: "At least 20 seconds, so no more than three batches start in a minute. Add a little margin, for example 22 to 25 seconds, because requests inside a batch can go out at the same moment."
+  - q: "Why does a reconciliation Merge need more than 'Keep Matches'?"
+    a: "Keep Matches drops every item with no partner, and those are the problems you are looking for. Keep matches and non-matches from both inputs, so a missing settlement and an unexpected settlement both reach the next node."
+  - q: "What does a Code node receive and return?"
+    a: "In 'Run Once for All Items' mode it reads every item with $input.all(). It must return a list of objects, each with a json key holding that item's fields."
+  - q: "When should a workflow use an AI node?"
+    a: "Only to read input that rules cannot handle, such as a free-text email, and always with structured output that later nodes check. If an IF or Code node can decide it, do not ask a model, especially for money."
+  - q: "What makes a write idempotent in n8n?"
+    a: "Writing with a unique key so a second write updates the same record instead of adding a new one, for example Google Sheets 'Append or Update Row' matched on the payment id. Reruns then never create duplicates."
+  - q: "Why do retries alone not protect a nightly workflow?"
+    a: "Retry On Fail allows at most five tries and at most five seconds between them, so it only covers short blips. A longer outage needs an error workflow that alerts a person, and writes that are safe to rerun."
+  - q: "What must you keep safe when you self-host n8n?"
+    a: "The encryption key (N8N_ENCRYPTION_KEY) and the data volume. Without the key, every saved credential is unreadable. Also back up the database, patch quickly and keep execution pruning on."
 exercise:
   title: "Plan a reconciliation workflow"
-  setup: "A pharmacy chain in Nagpur wants a nightly n8n workflow that compares 3,000 sales from its POS API with UPI settlements from its payment gateway's API, which allows 5 requests per second and returns at most 100 records per page. Mismatches should go to a sheet, and the finance head gets a summary on Teams. The workflow may be rerun if something fails."
+  setup: "A pharmacy chain in Nagpur wants a nightly n8n workflow that compares about 3,000 UPI sales a day from its POS API with settlement rows from its payment gateway's API. Settlements arrive one or two working days after a sale and carry the gateway's payment id. Suppose the gateway allows 5 requests per second and returns at most 100 rows per page. Mismatches go to a sheet, and the finance head gets a summary on Teams. The workflow may be rerun if something fails."
   questions:
-    - q: "How do you fetch 3,000 settlements without breaking the limit?"
-      a: "Page through results 100 at a time and loop over pages in batches, with a Wait node so you stay under 5 requests per second."
-    - q: "Which node matches sales to settlements?"
-      a: "The Merge node, matching on a shared field such as the order or transaction id."
+    - q: "How do you fetch 3,000 settlement rows without breaking the limit?"
+      a: "Page through 100 rows at a time, about 30 requests, with a pause between pages, for example 2 or 3 requests a second. That stays well under 5 a second and still takes under 20 seconds."
+    - q: "How should sales and settlements be matched?"
+      a: "Merge node, combining by matching fields on the gateway payment id, keeping unmatched items from both sides. Compare amounts in paise, and match a few days of sales because settlements come later."
     - q: "How do you make sure a rerun does not add the same mismatch twice?"
-      a: "Before writing a row, check if a row for that transaction already exists, in a sub-workflow used for every write."
+      a: "Do every write in one sub-workflow that upserts on the payment id, for example Sheets 'Append or Update Row'. A rerun then updates the same rows instead of adding new ones."
     - q: "What should happen if the gateway API is down at night?"
-      a: "Retries on that node, then the error workflow alerts the finance-ops channel with the execution link, so someone can rerun it later."
+      a: "Retries cover a short blip. If it stays down, the error workflow alerts finance-ops with the execution link, and someone reruns it later, which is safe because every write is an upsert."
 ask:
   - "How do I handle rate limits in n8n?"
   - "When should I use a sub-workflow?"
   - "Should I self-host n8n or use n8n cloud?"
 explain_in_interview:
-  answer: "Production n8n workflows go beyond a trigger and a few nodes. I keep each workflow to one job and put shared logic in sub-workflows. I paginate, loop over items in batches and add waits to respect rate limits, and use the Merge node to combine data by a matching field. AI nodes use structured output parsers so later steps get reliable fields. An error workflow alerts the team with the execution link. For example, a skincare brand in Bengaluru automates daily order reconciliation this way. The trade-off is maintainability: big code nodes are hard to test, so I keep them small and use version control with a separate development instance."
+  answer: "Production n8n workflows go beyond a trigger and a few nodes. I keep each workflow to one job and put shared steps, such as safe writes, in sub-workflows. I page and pace API calls to respect rate limits. When I merge two sources I keep unmatched items, because in a reconciliation those are the findings. Every write is an upsert on a unique id, so reruns are safe, and an error workflow alerts the team with the execution link. For example, a skincare brand in Bengaluru matches Razorpay settlements to Shopify orders by payment id, in paise, with no AI in the money path. The trade-off is maintainability: I keep Code nodes small and use version control with a separate test setup."
   follow_up: "What does an error workflow do in n8n?"
-  follow_up_answer: "It runs when a workflow that names it in its settings fails. It typically posts to the team chat with the workflow name, the failing node and the execution link, so someone can fix the cause and rerun it."
+  follow_up_answer: "It starts with an Error Trigger and runs when a workflow that names it in its settings fails during an automatic run, not a manual test. It typically posts the workflow name, failing node and execution link to the team chat."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-10-27
@@ -60,119 +60,212 @@ reviewed_on: 2026-10-27
 
 ## What it is
 
-Your first n8n workflow had a trigger and a few nodes. Real business automations go further: they process thousands of records, call APIs with strict limits, combine data from several systems, include AI steps, and must keep working when something fails at 3 am.
+Your first n8n workflow had a trigger and a few nodes. Workflows that a business depends on go further. They process thousands of records, call APIs with strict limits, combine data from two systems that disagree, and must keep working when something fails at 3 am with nobody watching.
 
-n8n has building blocks for each of these:
+n8n has a building block for each of these:
 
 | Building block | What it is for |
 | --- | --- |
-| **Sub-workflows** | Reusable workflows called from others, like functions |
-| **Loops and batches** | Processing items in groups to respect API limits |
-| **Merge and split** | Combining data from two sources, or splitting lists into items |
+| **Sub-workflows** | Shared steps that many workflows call, like functions |
+| **Paging, batches and waits** | Fetching and sending data without breaking an API's limits |
+| **Merge** | Combining two sources by a shared id, including the items that do not match |
 | **Code nodes** | Small JavaScript or Python snippets for logic the visual nodes do not cover |
-| **AI nodes** | Model calls, structured output parsers, and agent nodes with tools |
-| **Error workflows** | Running when a workflow that names them in its settings fails, to alert someone |
+| **AI nodes** | Reading messy text, such as emails, into fields that rules can check |
+| **Error workflows** | Alerting a person when an automatic run fails |
+
+This lesson follows a skincare brand in Bengaluru as it automates its daily payment reconciliation, the job of checking that every prepaid order was really paid out by the payment gateway.
 
 ```flow
-Schedule: 6 am -> Shopify: orders, page by page
-Schedule: 6 am -> Gateway: settlements, batch and wait
-Shopify: orders, page by page -> Merge on order id
-Gateway: settlements, batch and wait -> Merge on order id
-Merge on order id -> Code: flag mismatches -> Sub-workflow: write a row if new -> AI: explain each mismatch -> Slack: summary
+title: Daily payment reconciliation
+Schedule: 6 am IST -> Shopify: prepaid orders, last 10 days
+Schedule: 6 am IST -> Gateway: settled payments, last 3 days | paged and paced
+Shopify: prepaid orders, last 10 days -> Merge on payment id | keeps unmatched items from both sides
+Gateway: settled payments, last 3 days -> Merge on payment id
+Merge on payment id -> Code: flag each row -> Sub-workflow: upsert to sheet -> Slack: summary
 Any failure -> Error workflow | alert finance-ops with the execution link
 ```
 
-This lesson follows a skincare brand in Bengaluru as it automates daily order reconciliation. By the end you will build workflows that handle volume, limits, AI and failure.
-
 ## How it works
 
-### Structure
+### Items: the idea under everything
 
-Keep each workflow focused on one job. Put shared logic, such as "look up a customer" or "send an alert", in **sub-workflows** that other workflows call. Name nodes clearly: "Get open orders from Shopify", not "HTTP Request 3". A colleague, or you in three months, should understand the workflow from the canvas.
+Every node receives a list of **items** and passes a list on. Each item is one JSON record, like one row of a sheet. Most nodes run once per item: ten items into Gmail means ten emails. An **expression** such as `{{ $json.email }}` reads a field of the current item. To read a field from an earlier node, name that node: `{{ $('Get orders').item.json.order_name }}`.
+
+### Structure: one job per workflow
+
+Keep each workflow to one job. Put shared steps in a **sub-workflow**: a separate workflow that starts with the **When Executed by Another Workflow** trigger and is called with the **Execute Sub-workflow** node. In the trigger, define the input fields you expect, such as `payment_id` and `flag`, rather than accepting any data. The calling node then lists exactly which fields to fill in, and a missing one is easy to spot.
+
+Name nodes for what they do, such as "Get prepaid orders", not "HTTP Request 3", so anyone can read the canvas.
 
 ### Volume and rate limits
 
-Many APIs limit how many requests you can make per second or minute, and return at most a page of results at a time. Use:
+Most APIs return results a **page** at a time and limit how many requests you may send per second or minute. Three tools work together:
 
-- **pagination**, to fetch results page by page instead of all at once;
-- **Loop Over Items** with a batch size, to process items in groups;
-- a **Wait** node between batches, to stay under the limit.
+- **Pagination** fetches page after page until there are no more. The HTTP Request node has a pagination option, and many app nodes have a "Return All" switch that pages for you.
+- **Batching** controls how fast you send. The HTTP Request node has a Batching option (items per batch, and a pause between batches). For more control, use **Loop Over Items** with a batch size and a **Wait** node inside the loop.
+- **Retry On Fail**, in each node's settings, repeats a failed call. It allows at most five tries and at most five seconds between them, so it handles a brief blip, not pacing and not a long outage.
+
+The pacing rule is simple arithmetic. If the limit is L requests a minute and each batch sends B requests, wait at least B × 60 ÷ L seconds between batches. For 20 requests a batch and a limit of 60 a minute, that is 20 seconds. Add some margin, because requests inside one batch can leave at the same moment.
 
 ```flow
 dir: LR
-3,000 items -> A batch of 100 -> API calls -> Wait 1 s
-Wait 1 s -[next batch]-> A batch of 100
+Request a page | 100 rows -> Process the rows -> More pages?
+More pages? -[yes, after a pause]-> Request a page
+More pages? -[no]-> Next step
 ```
 
-### Merging data
+### Merging data, and keeping what does not match
 
-The **Merge** node combines items from two branches, either by position or by a matching field, such as matching sheet rows to CRM contacts by email, or orders to payments by order id.
+The **Merge** node can combine two inputs by position, or by **matching fields**, such as a payment id that appears in both. For matching fields, the output setting decides what survives:
+
+| Output choice | What comes out | Like |
+| --- | --- | --- |
+| Keep Matches | Only items found in both inputs | An inner join |
+| Keep Non-Matches | Only items with no partner | The leftovers |
+| Keep Everything | Matches and non-matches from both inputs | A full outer join |
+| Enrich Input 1 or 2 | All of one input, plus matching data from the other | A left or right join |
+
+The labels above are those in recent versions; check the dropdown in yours. For a reconciliation, the unmatched items are the findings, so Keep Matches would hide every problem. Choose Keep Everything; Keep Non-Matches alone would also drop the matched rows whose amounts you still need to check. Two more traps: if both inputs have a field called `amount`, one overwrites the other, so rename fields with an **Edit Fields** node first. And match on a key that is unique on both sides, such as a payment id, not one that can repeat, such as a customer's phone number.
 
 ### Code nodes
 
-Useful for parsing unusual formats, date maths, or formatting amounts the Indian way (₹1,25,000). Keep them short and commented. Complex logic is hard to test and maintain inside a code node; move it to a proper service if it grows.
+A **Code** node runs JavaScript or Python. In "Run Once for All Items" mode, the default, it reads every item with `$input.all()`, can read another node's items with `$('Node name').all()`, and must return a list of objects, each with a `json` key. This one adds an amount written the Indian way:
 
-### AI steps
+```js
+// Mode: Run Once for All Items
+return $input.all().map((item) => ({
+  json: {
+    ...item.json,
+    amount_text: (item.json.amount / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }),
+  },
+}));
+```
 
-Use a model node with a clear prompt and a **structured output parser**, so later nodes get reliable, named fields rather than free text. **Agent nodes** can call tools, such as other nodes or sub-workflows, for multi-step tasks. Treat them like any agent: give them only the tools they need, limit the number of steps, and require approval for risky actions such as payments.
+For an amount of 12500000 paise, `amount_text` is "₹1,25,000.00". Prefer JavaScript unless you need Python: since n8n 2.0 the Code node runs native Python, which reads items as `_items` and has none of n8n's other built-in helpers. Keep Code nodes short and commented. If one grows past a screen, it is a small service hiding inside a node, and it is hard to test there.
+
+### Schedules and time zones
+
+A Schedule trigger fires in the workflow's time zone. A self-hosted instance defaults to America/New_York unless you set the `GENERIC_TIMEZONE` variable, so a "6 am" job can run in the Indian afternoon. Set the time zone to Asia/Kolkata in the workflow's settings, then check the run times in the executions list. Expressions like `$now` follow the same setting, so "yesterday" means yesterday in India.
+
+### When to use AI, and when not to
+
+Use an AI node only where rules cannot do the job: reading free text. A good example is a wholesale buyer's email that says "paid ₹48,300 against invoices 112 and 118, less TDS". An **Information Extractor** with structured output can turn that into invoice numbers and an amount, which an IF node then checks against your invoice list before a person confirms. The rule: if an IF, Switch or Code node can decide it, do not ask a model. A model writing "reasons" for money mismatches adds cost and can invent a cause that sounds right. Keep the AI Agent for tasks where the next tool call depends on what the last one returned, with the safeguards from the lesson "Automation with n8n".
 
 ### Reliability
 
 | Practice | Why |
 | --- | --- |
-| Retries on flaky nodes | Temporary API errors fix themselves on a second try |
-| Idempotent writes | Check whether a record already exists before creating it, so reruns never duplicate |
-| An error workflow | Posts to your team chat with the workflow name, failing node and execution link |
-| Item-count checks | Catch runs that quietly process nothing |
+| Retry On Fail on API nodes | Brief network errors fix themselves on a second try |
+| Idempotent writes | Upsert on a unique id, so a rerun updates rows instead of duplicating them |
+| Overlapping time windows | Fetch a few days, not just yesterday, so one missed run heals itself the next day |
+| An error workflow | Starts with an Error Trigger and posts the workflow, failing node and execution link to the team |
+| Item-count checks | Alert when a step that should return rows returns none; zero items stop a branch, so turn on Always Output Data first |
+
+Set the error workflow in the main workflow's settings, and publish the error workflow too. It fires only for automatic runs, not for runs you start by hand in the editor, so test it with a short schedule.
+
+### Testing with pinned data
+
+**Pin** the output of a node, such as the gateway call, and the editor reuses it instead of calling the API again. Production runs ignore pinned data. Keep a set of awkward pinned cases, such as a refund, an amount in odd paise and an order with no payment id, and rerun them after every change.
 
 ### Maintainability
 
-Export workflows as JSON into Git, or use n8n's source control features where available. Keep separate development and production instances or projects, and store credentials per environment. Test changes in development before touching production.
+As of November 2026, n8n's built-in Git source control is on its Business and Enterprise plans. On other plans, export workflows as JSON and commit them to Git yourself. Keep a separate test instance or project with its own credentials, and change production only after a test run passes.
 
 ### Self-hosting basics
 
-Running n8n yourself, for example with Docker, gives you control over data. You then own backups of its database, updates, security and scaling. For high volume, **queue mode** runs executions on separate worker processes.
+n8n is not open source. Its Sustainable Use License allows self-hosting for your own business; the lesson "Automation with n8n" covers client work. Self-hosting, for example with Docker, makes you the operator:
+
+- **Encryption key.** n8n encrypts saved credentials with a key it generates. If the data volume is not kept, a rebuilt container makes a new key and every credential is unreadable. Set `N8N_ENCRYPTION_KEY` yourself and back it up with the database.
+- **Disk.** Execution data is pruned by default, after 14 days or 10,000 executions. Keep pruning on, and do not save full data for every successful run of a busy workflow.
+- **Database and scale.** Use Postgres for anything serious. For high volume, **queue mode** uses Redis to hand runs to separate worker processes.
+- **Updates.** n8n has had critical security flaws, including one in January 2026. Apply security releases within days.
 
 ## A worked example
 
-A D2C skincare brand in Bengaluru sells about 1,500 orders a day through its Shopify store. Every morning, the finance team spends two hours matching orders against payment gateway settlements and the accounting sheet. They automate it:
+A D2C skincare brand in Bengaluru sells about 1,500 orders a day on Shopify. For example, suppose about 60% are prepaid through Razorpay and the rest are cash on delivery. Each morning, Kavya in finance spends two hours checking that every prepaid order was paid out. Three facts about the gateway shape the design:
+
+- **Settlements come later.** Razorpay's standard domestic cycle is T+2 working days from capture, and it varies by merchant. Yesterday's orders are not settled yet, so matching yesterday to yesterday flags everything.
+- **Rows are keyed by payment id.** Each settlement row has an `entity_id` (a payment id starting `pay_`), `amount`, `fee`, `tax` and `credit`. Its `order_id` is Razorpay's own order id, not the Shopify order number. So the store must save the Razorpay payment id on each order at checkout; where it lives depends on your checkout app.
+- **Amounts are in paise, and fees come off.** `amount` is the gross payment in paise. `fee` already includes the GST that `tax` shows, and `credit` is `amount` minus `fee`. Comparing `credit` with the order total flags every order. Compare `amount` instead, and check the fee on its own.
+
+Kavya's workflow, with its time zone set to Asia/Kolkata:
 
 | # | Node | What it does |
 | --- | --- | --- |
-| 1 | Schedule trigger | Runs at 6 am |
-| 2 | Shopify | Fetches yesterday's orders in pages of 250 |
-| 3 | HTTP Request in a loop | Fetches settlements from the payment gateway's API in batches, with a 1-second wait to respect its limit |
-| 4 | Merge | Joins orders and settlements on order id |
-| 5 | Code | Flags mismatches: amount differs, settlement missing, refund not recorded; formats amounts in Indian style |
-| 6 | Sub-workflow "write to accounting sheet" | Checks if a row for the order exists before adding, so reruns are safe |
-| 7 | AI node with structured output | Writes a one-line explanation of each mismatch for the finance team |
-| 8 | Slack | Posts totals and a link to the mismatch sheet |
-| + | Error workflow | Alerts the finance-ops channel with the execution link on any failure |
+| 1 | Schedule trigger and Sheets | Runs at 6 am IST; a Sheets node on the top branch, so it runs first, reads the results sheet as "Read results" |
+| 2 | Shopify, then Filter | Gets orders from the last 10 days with Return All, keeps prepaid ones |
+| 3 | HTTP Request | Gets settlement rows for the last 3 days, page by page, about one request a second |
+| 4 | Filter and Edit Fields | Keeps payment rows (refunds have their own type), renames fields so nothing clashes |
+| 5 | Merge | Matches on `payment_id`, Keep Everything |
+| 6 | Code | Skips payments already marked ok, flags the rest (below) |
+| 7 | Sub-workflow "Upsert result" | Sheets Append or Update Row, matched on `payment_id` |
+| 8 | IF and Slack | Alerts if step 3 found no rows on a working day; otherwise posts counts and the sheet link |
+| + | Error workflow | Alerts finance-ops with the execution link |
 
-**Results:**
+The Code node in step 6:
 
-| Measure | Before | After |
+```js
+// Mode: Run Once for All Items. Each item is one merged row.
+const done = new Set($('Read results').all()
+  .filter((i) => i.json.flag === 'ok').map((i) => i.json.payment_id));
+const out = [];
+for (const item of $input.all()) {
+  const r = item.json;
+  if (done.has(r.payment_id)) continue; // never downgrade an ok row
+  const orderPaise = Math.round(Number(r.order_total) * 100);
+  let flag = 'ok';
+  if (!r.order_name) {
+    flag = 'settled, no order found';
+  } else if (!r.settlement_id) {
+    const days = $now.diff(DateTime.fromISO(r.paid_at), 'days').days;
+    flag = days > 5 ? 'settlement overdue' : 'waiting';
+  } else if (r.gateway_amount !== orderPaise) {
+    flag = 'amount differs';
+  } else if (r.gateway_fee > Math.ceil(r.gateway_amount * 0.0236)) {
+    flag = 'fee above contract'; // 2% plus 18% GST; use your rate
+  }
+  const paise = r.gateway_amount ?? orderPaise;
+  const amount_text = (paise / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+  out.push({ json: { ...r, flag, amount_text } });
+}
+return out;
+```
+
+`Math.round` turns the order total, which Shopify sends as text such as "1499.50", into whole paise, so tiny decimal errors, such as 114.99999 for ₹1.15, cannot cause a false alarm. `Math.ceil` allows for fee rounding. The 2% rate is only an illustration; use the rate in your contract. For example, a ₹1,000 UPI payment at 2% has a fee of ₹20 plus ₹3.60 GST, so `fee` is 2360 paise and `credit` is 97640.
+
+Each flag leads to one clear action, written by a template, not a model:
+
+| Flag | What it usually means | Who acts |
 | --- | --- | --- |
-| Finance team's morning reconciliation | About 2 hours | About 15 minutes reviewing flagged cases |
-| Mismatches found per day | Varied, some missed | 20 to 40, all listed with a reason |
+| waiting | Paid, inside the normal settlement window | Nobody yet |
+| settlement overdue | More than 5 days and still not settled | Finance raises it with the gateway |
+| amount differs | Order edited after payment, or a part refund | Finance checks the order history |
+| settled, no order found | Payment from another channel, or a missing payment id | Store team fixes the order record |
+| fee above contract | Wrong pricing plan applied | Finance raises it with the gateway |
 
-**A bad morning.** One day the payment gateway's API was down at 6 am. The node retried three times, then the error workflow posted the alert with a link to the failed execution. The team reran the workflow at 9 am. Because every write checked for an existing row first, the rerun completed with no duplicates.
+Because writes are upserts on `payment_id`, a row moves from "waiting" to "ok" on a later morning instead of piling up as duplicates. The skip matters: once a settlement drops out of the 3-day window, its order would otherwise look unsettled and be re-flagged "overdue". The 10-day order window covers payments that settle late. The 5-day limit is a trade-off: a long bank-holiday weekend can raise a few false alarms, which the team accepts rather than miss a real one.
+
+**A bad morning.** One day the gateway's API returned errors at 6 am. Retries failed, and the error workflow posted the alert with the execution link. Kavya reran it at 9 am. The upserts meant no duplicates, and because each run fetches three days, even a missed day would have been covered the next morning.
 
 ## Common mistakes
 
-- **One giant workflow.** Split it into sub-workflows with clear names.
-- **Ignoring rate limits.** Paginate, batch and wait.
-- **Non-idempotent writes.** Reruns create duplicates.
-- **Logic buried in big code nodes.** Keep code small; move complex logic to a service.
-- **No version control or test instance.** Changes to production break things silently.
-- **AI output as free text.** Use a structured output parser so later steps get reliable fields.
+- **One giant workflow.** Split shared steps into named sub-workflows with defined inputs.
+- **Ignoring rate limits.** Page, batch and wait; retries are not pacing.
+- **Merging with Keep Matches for a reconciliation.** It silently drops the problems you are looking for.
+- **Comparing net with gross, or rupees with paise.** Compare like with like, in whole paise.
+- **Matching yesterday to yesterday.** Settlements lag; use overlapping windows.
+- **Non-idempotent writes.** Plain appends create duplicates on every rerun.
+- **Leaving the time zone on the default.** Set Asia/Kolkata in the workflow settings.
+- **Using AI where a rule would do.** Never let a model explain money.
+- **Testing the error workflow by hand.** It only fires for automatic runs.
+- **Losing the encryption key.** Back it up with the database before you need it.
 
 ## Practice
 
 Complete n8n's N8N102 Integrations course, linked below, and read the hosting overview.
 
-1. **Volume.** Build a workflow that processes at least 100 items from an API or sheet in batches, with a wait between batches.
-2. **Merge, write, AI.** Add a merge of two data sources, a sub-workflow for writing records that checks for existing rows, and an AI step with structured output.
-3. **Failure.** Add an error workflow that alerts you, break a node on purpose, and confirm the alert and a clean rerun. Error workflows do not run for manual test runs, so let the workflow run on its trigger.
+1. **Volume.** Build a workflow that pages through at least 300 rows from an API or sheet and processes them in batches with a Wait. Work out the wait from the limit, and write the sum in a sticky note.
+2. **Merge and write.** Merge two sources on a shared id with Keep Everything, flag each row in a short Code node, and write through a sub-workflow that upserts on the id. Pin one awkward case for each flag.
+3. **Failure.** Set the time zone to Asia/Kolkata, add an error workflow, break a node on purpose, and let the workflow run on a short schedule. Confirm the alert, then rerun.
 
 **You are done when you can** rerun your workflow twice in a row without creating duplicates, and show an error alert with a link to the failed execution.
