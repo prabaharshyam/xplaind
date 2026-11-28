@@ -20,21 +20,21 @@ flashcards:
   - q: "Why do agents need loop limits?"
     a: "An agent can loop on failing tools, hand-offs or endless improvement, burning tokens, hammering systems and repeating actions."
   - q: "How do you choose a step cap?"
-    a: "From real runs: if 95% of tasks finish in 12 steps, cap at around 25."
+    a: "From real runs: about twice the 95th percentile. If 95% of tasks finish in 12 steps, cap at around 25."
   - q: "What should happen when an agent hits a limit?"
     a: "Stop cleanly: save state, tell the user what was done and what remains, and log it as a failure to investigate."
   - q: "What is a repetition check?"
     a: "Stopping early when the same tool is called with the same arguments, or the same error recurs, several times in a row."
-  - q: "Why keep budgets in a shared store?"
-    a: "Counts held in each server's memory run separately, so the true total can far exceed the cap."
+  - q: "What is the check-then-act race in a budget?"
+    a: "Two requests read the same total, both pass the check, and both spend. An atomic increment after the call does not help; the check and the reservation must be one step."
   - q: "What is a kill switch?"
-    a: "A flag checked before every task or tool call that lets an operator disable a tool, the agent or the feature without a deploy."
-  - q: "What role do provider spend limits play?"
-    a: "A last line of defence behind your own caps, not the only control."
+    a: "A flag checked before every step and tool call that lets an operator disable a tool, the agent or the feature without a deploy."
+  - q: "What is a circuit breaker on a tool?"
+    a: "A shared counter of a tool's recent failures across all users. Past a threshold, calls fail fast for a cool-down period instead of every task retrying a broken tool."
   - q: "Why use idempotency keys for actions?"
     a: "So a retried or looped action with the same key, such as a refund, happens only once."
-  - q: "How should a per-user daily budget be counted?"
-    a: "With an atomic increment in a shared store, such as a database row or Redis key per user per day in Asia/Kolkata time, checked before each model call."
+  - q: "How do you count a per-user daily budget safely?"
+    a: "Before each model call, reserve an upper-bound estimate in one conditional update in a shared store, keyed by user and Asia/Kolkata day. Afterwards, settle it to the real cost."
   - q: "Why must a kill switch be checked at runtime, not at start-up?"
     a: "Servers can run for days. A flag read only at start-up does nothing until the next restart, which defeats the point."
 exercise:
@@ -42,19 +42,19 @@ exercise:
   setup: "An Indore logistics startup runs an agent that re-plans delivery routes and messages drivers. Typical tasks take 6 to 10 steps and about ₹2 of model spend. Last month a map tool returned errors for a new area, the agent retried for hours, sent 400 duplicate messages to drivers, and spent ₹60,000. Stopping it needed an emergency deploy. Budgets are counted in each server's memory."
   questions:
     - q: "What per-task limits would you set?"
-      a: "About 20 steps, a token cap and a time limit, plus ending the task after three identical tool errors."
+      a: "About 20 steps (twice the normal 10), a token cap and a time limit, and end the task after three identical tool errors."
     - q: "How do you stop the duplicate messages?"
-      a: "Give each driver message an idempotency key per route and change, so repeats are sent only once."
+      a: "Give each driver message an idempotency key built from the route and the change, so a repeat with the same key is not sent again."
     - q: "What should replace the emergency deploy?"
-      a: "A kill switch per tool and for the whole agent, checked before each task, flipped from an admin screen."
+      a: "A kill switch per tool and for the whole agent, checked before every step, plus a circuit breaker that pauses the map tool after repeated failures."
     - q: "How should budgets be counted?"
-      a: "In a shared database or cache, with a daily feature cap, an alert at about 80%, and a provider spend limit as a backstop."
+      a: "In a shared database or Redis: reserve an estimate atomically before each call, settle after, with a daily feature cap, alerts at 50% and 80%, and a provider limit."
 ask:
   - "How do I stop an AI agent from looping?"
   - "How should I set spending limits for an AI feature?"
   - "What is a kill switch in an AI system?"
 explain_in_interview:
-  answer: "Loop limits, budgets and kill switches stop an agent that keeps going when it should stop. Loop limits cap steps and tool calls per task. Budgets cap tokens, time and money per task, per user and per day, kept in a shared store, with provider spend limits as the backstop. A kill switch is a configuration flag checked before every task that can disable one tool, the agent or the whole feature without a deploy. For example, a homework-help agent at a Bengaluru edtech spent ten times its weekly budget in one night. Caps set too tight cut off real tasks, so set them from real runs."
+  answer: "Loop limits, budgets and kill switches stop an agent that keeps going when it should stop. Loop limits cap steps and tool calls per task and per run across sub-agents. Budgets cap tokens, time and money per task, user and day. Before each call I reserve an upper-bound estimate in one atomic statement in a shared store, then settle to the real cost, so two servers cannot both pass the check. A kill switch is a flag checked before every step that disables a tool, the agent or the feature without a deploy, and fails safe if the flag store is down. I set every cap at about twice what real runs need."
   follow_up: "How would you choose the step limit for an agent?"
   follow_up_answer: "From real runs. If 95 percent of tasks finish in 12 steps, cap at about 25. When a task hits the cap, stop cleanly: save state, tell the user what was done and what remains, and log it as a failure to investigate."
 drafted_with_ai: true
@@ -64,138 +64,275 @@ reviewed_on: 2026-11-08
 
 ## What it is
 
-Agents decide for themselves how many steps to take. Usually that is a strength. Sometimes the agent loops: a tool keeps failing and it keeps retrying, two agents keep handing work back and forth, or it keeps "improving" a draft. Without limits, a loop burns tokens, hammers downstream systems and repeats actions.
+Agents decide for themselves how many steps to take. Sometimes that goes wrong: a tool keeps failing and the agent keeps retrying, two agents hand work back and forth, or it keeps "improving" a draft. Without limits, a loop burns tokens, hammers downstream systems and repeats real actions.
 
 Three controls prevent this:
 
-- **Loop limits**: a maximum number of steps or tool calls per task.
-- **Budgets**: caps on tokens, time and money per task, per user and per day, for the whole feature.
-- **Kill switches**: a fast, reliable way for an operator to stop an agent, a tool or a whole feature without a deploy.
+- **Loop limits**: a maximum number of steps or tool calls per task, and per run when sub-agents are involved.
+- **Budgets**: caps on tokens, time and money per task, per user and per day for the whole feature.
+- **Kill switches**: a fast, reliable way for an operator to stop a tool, an agent or a whole feature without a deploy.
+
+Repetition checks, circuit breakers, rate and concurrency limits and idempotency keys support them.
 
 ```flow
-Every task | steps up to 15, tokens up to 60,000, time up to 90 s -> Shared store | a database or cache
-Every tool call | kill switch on? same call 3 times? stop; idempotency key set -> Shared store
-Every day | user spend up to ₹15, feature up to ₹40,000, alert at ₹30,000 -> Shared store
+title: Where each limit is checked
+Every task | up to 15 steps, 60,000 tokens, 90 s -> Shared store | Postgres or Redis
+Every model call | reserve the estimate, then settle -> Shared store
+Every tool call | kill switch, circuit breaker, idempotency key -> Shared store
+Every day | ₹15 per student, ₹8,000 for the feature -> Shared store
 Shared store -> Provider spend limit | the backstop
 ```
 
-This lesson follows a homework-help agent at an edtech company in Bengaluru that spent ten times its weekly budget in one night.
+This lesson follows an illustrative case: a homework-help agent at a Bengaluru edtech company that spent ten times its weekly budget in one night.
 
 ## How it works
 
-**Per-task limits.** Count steps and tool calls in the loop and stop at a cap chosen from real runs (if 95% of tasks finish in 12 steps, cap at 25). Track tokens and elapsed time too. On hitting a limit, stop cleanly: save state, tell the user what was done and what remains, and log it as a failure to investigate.
+### Per-task limits
 
-**Repetition checks.** Detect the same tool called with the same arguments several times in a row, or the same error recurring, and stop early.
+Count steps, tool calls, tokens and elapsed time in the loop. Choose each cap from a week of real runs: about twice the 95th percentile. If 95% of tasks finish in 12 steps and ₹2, a cap of 25 steps and ₹5 stops runaways without cutting off normal work. Revisit the numbers when you change the model or the prompt.
 
-**Per-user and daily budgets.** Count spend per user per day and refuse politely past the cap. Set a feature-wide daily cap with an alert at, say, 80%. Put these in a shared store (a database or cache), not in the agent's memory, so they hold across servers.
+On hitting a limit, stop cleanly: save state, tell the user in plain words what was done and what they can do instead, and log it as a failure to investigate. A stopped task should never look like a crash.
 
-**Provider-side limits.** Most model providers let you set spend limits or alerts per key or project. Use them as the last line of defence, not the only one.
+### Repetition checks and circuit breakers
 
-**Kill switches.** A configuration flag your code checks before every task, and ideally before every tool call, with levels: disable one tool (stop all refunds), disable the agent (fall back to a human queue or a simple form), disable the feature. Flip it from an admin screen or a config service without redeploying. Test it regularly, like a fire drill.
+A **repetition check** works inside one task. If the same tool is called with the same arguments three times, or the same error comes back three times in a row, end the task early.
 
-**Idempotency for actions.** Give each action a unique key so a retried or looped "send refund" with the same key happens only once.
+A **circuit breaker** works across all tasks. Count each tool's failures in the shared store. If, for example, a tool fails 20 times in a minute across all users, "open" the circuit: for the next five minutes every call to that tool fails at once with a clear message, without reaching the tool. Then let one trial call through; if it works, close the circuit. A repetition check stops one task looping. A circuit breaker stops a thousand tasks each looping a little, the usual shape of an overnight bill.
 
-**Layers of control:**
+### Run-level caps across sub-agents
 
-| Layer | Example | Stops |
-| --- | --- | --- |
-| Per task | 15 steps, 60,000 tokens, 90 seconds | One runaway task |
-| Repetition | 3 identical errors ends the task | Retry loops |
-| Per user per day | ₹15 of model spend | One user, or one script, draining the budget |
-| Feature per day | ₹40,000, alert at ₹30,000 | A fault across many users |
-| Kill switch | Toggle per tool and per agent | Anything, in seconds |
-| Provider limit | Monthly hard cap on the API project | Everything else failing |
+When a planner hands work to sub-agents, each one may respect its own 15-step cap while the run as a whole takes hundreds of steps. Give every run a root `run_id`, pass it to every sub-agent, and count steps against that id in the shared store. Cap the total (for example 40 steps per run) and the number of hand-offs (for example 4).
 
-**Running a kill-switch drill.** Once a month, in staging and then in production at a quiet hour, flip each switch and check three things: tasks stop within seconds, users see a clear message rather than an error, and the rest of the app keeps working. Time it, write down who did it, and turn it back on. Teams that never practice discover in a real incident that the switch was checked only at start-up, or that nobody on call knew where it was.
+### Budgets per user and per day
 
-**Choosing the user message.** A stopped task should never look like a crash. Say what happened in plain words and what the user can do instead, such as "I couldn't solve this one; your teacher can help", or "Homework help is resting; try again tomorrow." Log each stop with the reason, so the team can see whether limits are too tight.
+Count spend per user per day and refuse politely past the cap. Count the whole feature per day too, with alerts at 50% and 80% that list the top users and task types, so someone acts before the cap cuts everyone off. Use Asia/Kolkata days, so limits reset at your users' midnight.
 
-**A budget in code.** Count spend per user per day with an atomic update, so two servers cannot both let the same user past the cap:
+The counts must live in a shared store, such as a database or Redis: six servers counting in memory allow six times the cap. But a shared store is not enough. The natural code is "check, call, record":
+
+1. Read today's total. It is ₹14 and the cap is ₹15, so a ₹1 call is allowed.
+2. Call the model.
+3. Add the real cost to the total.
+
+Twenty requests from one user can all do step 1 before any reaches step 3, so all twenty pass and spend. Making step 3 atomic does not help: the race is in the gap between check and spend. This bug is called **check-then-act**.
+
+The fix is **reserve, then settle**. Before the call, add an upper-bound estimate to the total in one conditional statement that succeeds only if the new total stays within the cap. After the call, swap the estimate for the real cost. Every in-flight call is already counted, so no check sees a stale total.
+
+### A race-safe budget in code
+
+This version uses SQLite so it runs on a laptop. A SQLite file is shared only by processes on one machine; with several servers, use the same pattern on Postgres or Redis.
 
 ```python
 import sqlite3
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-db = sqlite3.connect("budgets.db", isolation_level=None)
-db.execute("CREATE TABLE IF NOT EXISTS spend (user_id TEXT, day TEXT, paise INTEGER, PRIMARY KEY (user_id, day))")
-DAILY_CAP_PAISE = 1500                                   # ₹15 per user per day
+# Adds the estimate only if the new total stays within the cap; else returns no row.
+RESERVE = """INSERT INTO spend (scope, day, paise) VALUES (?, ?, ?)
+  ON CONFLICT (scope, day) DO UPDATE SET paise = spend.paise + excluded.paise
+  WHERE spend.paise + excluded.paise <= ?
+  RETURNING paise"""
+
+@dataclass(frozen=True)
+class Reservation:
+    scopes: tuple
+    day: str
+    paise: int
+
+def connect(path):
+    db = sqlite3.connect(path, timeout=10, isolation_level=None)  # we run our own transactions
+    db.execute("CREATE TABLE IF NOT EXISTS spend (scope TEXT, day TEXT,"
+               " paise INTEGER NOT NULL, PRIMARY KEY (scope, day))")
+    return db
 
 def today():
     return datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
 
-def can_spend(user_id, estimate_paise):
-    row = db.execute("SELECT paise FROM spend WHERE user_id=? AND day=?", (user_id, today())).fetchone()
-    return (row[0] if row else 0) + estimate_paise <= DAILY_CAP_PAISE
+@contextmanager
+def write_tx(db):
+    db.execute("BEGIN IMMEDIATE")           # take the write lock before reading anything
+    try:
+        yield
+        db.execute("COMMIT")
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
 
-def record_spend(user_id, paise):
-    db.execute("""INSERT INTO spend (user_id, day, paise) VALUES (?, ?, ?)
-                  ON CONFLICT(user_id, day) DO UPDATE SET paise = paise + excluded.paise""",
-               (user_id, today(), paise))
+class OverBudget(Exception):
+    pass
+
+def reserve(db, caps, paise):
+    """caps is {scope: cap in paise}. Reserve on every scope, or on none."""
+    if paise > min(caps.values()):
+        return None
+    day = today()
+    try:
+        with write_tx(db):
+            for scope, cap in sorted(caps.items()):       # same order everywhere
+                if not db.execute(RESERVE, (scope, day, paise, cap)).fetchall():
+                    raise OverBudget(scope)               # rolls back earlier scopes
+    except OverBudget:
+        return None
+    return Reservation(tuple(sorted(caps)), day, paise)
+
+def settle(db, r, actual_paise):
+    """Swap the estimate for the real cost, on the day it was reserved."""
+    with write_tx(db):
+        for scope in r.scopes:
+            db.execute("UPDATE spend SET paise = paise + ? WHERE scope = ? AND day = ?",
+                       (actual_paise - r.paise, scope, r.day))
 ```
 
-Check `can_spend` with an estimate before each model call and record the real cost from the usage report afterwards. Count money in whole paise, not floating-point rupees. In Postgres or Redis the same pattern is an `INSERT ... ON CONFLICT` or an `INCRBY` with an expiry.
+Call `reserve` with the user and feature caps together. If it returns `None`, refuse politely; otherwise call the model, then `settle` with the cost from the usage report.
 
-**A kill switch in code.** Read flags from a shared store with a short cache, so a change takes effect within seconds everywhere:
+The details matter:
+
+- **All or none.** The user and feature counters change in one transaction, so a refusal from the feature cap does not leave the user charged.
+- **Money in whole paise.** Integers add exactly; floating-point rupees drift.
+- **The reservation keeps its day.** A call that starts at 11:59 pm settles against the day it was reserved on, not the next one.
+- **Failures land on the safe side.** If the server crashes before `settle`, the estimate stays counted; no one overspends. If a call never reached the provider, settle with 0. If you cannot tell what was billed, keep the reservation.
+- **The same shape works elsewhere.** Postgres supports `INSERT ... ON CONFLICT DO UPDATE ... WHERE ... RETURNING`; the conflicting row is locked, so a second request waits and then sees the new total. Lock scopes in a fixed order (the `sorted` call) to avoid deadlocks. In Redis, put the read, compare and `INCRBY` in one Lua script, which Redis runs atomically.
+- **The feature row is a hot spot.** Every request locks it briefly. At very high traffic, split it into several rows or use Redis.
+
+### Estimating cost before the call
+
+The cap holds only if the reservation is an upper bound. Count the input tokens (with your provider's token counter, or over-estimate) and assume the model writes the full `max_tokens`:
 
 ```python
-import json, time
+def estimate_paise(input_tokens, max_tokens, in_paise_per_m, out_paise_per_m):
+    """Upper bound: every input token, plus the most output max_tokens allows."""
+    cost = input_tokens * in_paise_per_m + max_tokens * out_paise_per_m
+    return -(-cost // 1_000_000)                     # round up to whole paise
+```
 
-_cache = {"at": 0.0, "flags": {}}
+For example, suppose a model costs ₹25 per million input tokens and ₹125 per million output tokens (made-up numbers; use your provider's price page and record the date you checked it). A 3,000-token prompt with `max_tokens` of 1,000 reserves `estimate_paise(3000, 1000, 2500, 12500)`, which is 20 paise. Most calls finish early and `settle` returns the rest.
+
+Two gotchas. Check that `max_tokens` bounds everything your provider bills as output, including any reasoning tokens. And if you stream, you can count output as it arrives and close the stream when a run budget or kill switch says stop; until you know how your provider bills a cancelled stream, keep the whole reservation.
+
+### Proving it with a concurrent test
+
+A race shows up only under real concurrency. Here twenty workers, each with its own connection like separate servers, make 100 calls for one user at once:
+
+```python
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+CAPS = {"user:u42": 1500, "feature:homework": 800_000}   # ₹15 and ₹8,000
+
+def one_call(db):
+    r = reserve(db, CAPS, 200)          # estimate: ₹2
+    if r is None:
+        return 0
+    time.sleep(0.01)                    # stands in for the model call
+    settle(db, r, 150)                  # real cost: ₹1.50
+    return 150
+
+def test_cap_holds_under_concurrency(tmp_path):
+    path = tmp_path / "budgets.db"
+    connect(path).close()
+    def server(_):
+        db = connect(path)
+        return sum(one_call(db) for _ in range(5))
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        spent = sum(pool.map(server, range(20)))
+    total = connect(path).execute(
+        "SELECT paise FROM spend WHERE scope = 'user:u42' AND day = ?", (today(),)).fetchone()[0]
+    assert 0 < spent == total <= 1500
+```
+
+In our runs this passed every time, with ₹13.50 spent. The check-then-spend version, in the same test, let up to ₹42 through against the ₹15 cap. Keep the test in CI so nobody "simplifies" the reservation away.
+
+### Rate and concurrency limits
+
+Two more limits protect your systems rather than your money:
+
+- **Rate limits** cap requests per minute. A common algorithm is the **token bucket**: each user's bucket holds up to, say, 10 tokens and refills one every six seconds. Each request takes a token; an empty bucket means "slow down". Short bursts pass, but the average stays at ten a minute.
+- **Concurrency limits** cap tasks running at once, for example 2 per user. Pressing "try again" ten times then gives two running tasks, not ten. Use the reserve pattern on a "running" counter, release it in a `finally` block, and give each slot an expiry, because a crashed server never runs its `finally`.
+
+### Kill switches
+
+A kill switch is a flag your code checks before every step and every tool call, with levels: disable one tool (stop all refunds), disable the agent (fall back to a human queue or a simple form), or disable the feature. Flip it from an admin screen or a config service without redeploying. Read flags from the shared store with a short cache, so a change takes effect within seconds everywhere:
+
+```python
+import json, logging, time
+
+log = logging.getLogger("agent")
+WRITE_TOOLS = {"send_email", "issue_refund", "message_driver"}
+MAX_STALE = 60                                           # seconds
+_cache = {"read_at": float("-inf"), "ok_at": float("-inf"), "flags": {}}
 
 def flags():
-    if time.time() - _cache["at"] > 5:                   # refresh every 5 seconds
-        _cache["flags"] = json.loads(config_store.get("agent_flags") or "{}")
-        _cache["at"] = time.time()
+    now = time.monotonic()
+    if now - _cache["read_at"] > 5:                      # refresh every 5 seconds
+        _cache["read_at"] = now
+        try:
+            _cache["flags"] = json.loads(config_store.get("agent_flags") or "{}")
+            _cache["ok_at"] = now
+        except Exception:
+            log.warning("flag store unreachable; using last flags")
+    if now - _cache["ok_at"] > MAX_STALE:                # no good read for a minute
+        return {**_cache["flags"], "write_tools_off": True}
     return _cache["flags"]
 
 def allowed(agent, tool=None):
     f = flags()
     if f.get("all_agents_off") or f.get(f"{agent}_off"):
         return False
-    return not (tool and f.get(f"tool_{tool}_off"))
-
-# In the loop, before every model call and every tool call:
-if not allowed("homework_helper", tool="send_email"):
-    stop_cleanly("Homework help is resting; try again tomorrow.")
+    if tool and f.get(f"tool_{tool}_off"):
+        return False
+    return not (tool in WRITE_TOOLS and f.get("write_tools_off"))
 ```
 
-`config_store` is whatever shared store you already have: a database row, Redis, or a feature-flag service. If the store cannot be reached, fail safe: treat write tools as switched off.
+`config_store` is whatever shared store you have: a database row, Redis or a feature-flag service. The code fails safe in a bounded way. A short outage changes nothing. After a minute with no good read, or at start-up if the first read fails, write tools such as emails and refunds switch off while read-only tools keep working. Keeping old flags forever would mean a switch flipped during the outage never arrives.
 
-**Choosing the numbers.** Set limits from real runs, not guesses. Look at the distribution of steps, tokens and cost per task over a week: if 95% of tasks finish in 12 steps and ₹2, a cap of 25 steps and ₹6 stops runaways without hurting normal use. Revisit the numbers when you change models or prompts, because both change typical costs.
+### Idempotency for actions
 
-**Alert before the wall.** A feature-wide budget should warn the team at 50% and 80% of the day's cap, with the top users and top task types by spend in the alert, so someone can act before the cap cuts everyone off.
+Give each real-world action a key built from what makes it unique (for example the order id and refund reason). The receiving system refuses a second action with the same key, so loops and retries cannot repeat payments or messages.
+
+### Drill the kill switch
+
+Once a month, in staging and then in production at a quiet hour, flip each switch and check that tasks stop within seconds, users see a clear message, and the rest of the app keeps working. Time it and record who did it. Teams that never practise learn in a real incident that the switch was read only at start-up, or that nobody on call knew where it was.
 
 ## A worked example
 
-A Bengaluru edtech's homework-help agent ran fine for a month. Then, on a Sunday night, a change in a maths tool made it return an error for one type of question. The agent retried with small variations, and some students kept pressing "try again". By Monday morning one feature had spent ₹1.8 lakh, ten times a normal week.
+The homework-help agent ran fine for a month, at about ₹18,000 of model spend a week. Then, on a Sunday night, a change in a maths tool made it return an error for one type of question. The agent retried with small variations, and students kept pressing "try again". By Monday morning the feature had spent ₹1.8 lakh, ten times a normal week.
 
-The fixes:
+The team pulled a month of runs and set limits from them:
 
-- Per task: at most 15 steps, 60,000 tokens and 90 seconds. Three identical tool errors in a row ends the task with "I couldn't solve this one; your teacher can help."
-- Per student: ₹15 of model spend per day, shown as a friendly "come back tomorrow" message.
-- Feature: daily cap of ₹40,000, alert at ₹30,000 to the on-call engineer's phone.
-- Kill switch: an admin toggle per tool and for the whole agent, checked before every task. Turning off the agent shows a "homework help is resting" banner and keeps the rest of the app running.
-- Provider: a hard monthly spend limit on the API project as a backstop.
+- **Per task.** 95% of tasks finished in 7 steps, 25,000 tokens and 40 seconds, so the caps are 15 steps, 60,000 tokens and 90 seconds. Three identical tool errors end the task with "I couldn't solve this one; your teacher can help."
+- **Per student.** 95% of students spent under ₹6 a day, so the cap is ₹15, shown as a friendly "come back tomorrow". Each student may run 2 tasks at once.
+- **Feature per day.** ₹18,000 a week is about ₹2,600 a day, and the busiest normal day was about ₹4,000. The cap is ₹8,000, about three times an average day and twice the busiest. Alerts go to the on-call engineer's phone at 50% (₹4,000) and 80% (₹6,400).
+- **Circuit breaker** on the maths tool: 20 failures in a minute pauses it for five minutes.
+- **Kill switch.** An admin toggle per tool and for the agent. Turning off the agent shows a "homework help is resting" banner; the rest of the app keeps running.
+- **Provider.** A hard monthly spend limit as the backstop.
 
-Two weeks later a similar tool fault was stopped by the repetition check within minutes, costing ₹600, and the alert told the team before any student complained.
+What each control would have done on that Sunday night:
 
-| Incident | Cost | How it ended |
-| --- | --- | --- |
-| First tool fault, no limits | ₹1.8 lakh overnight | Noticed on Monday morning |
-| Similar fault, two weeks later | ₹600 | Repetition check stopped it in minutes; alert reached on-call |
+| Control | Effect on the incident |
+| --- | --- |
+| Circuit breaker | Pauses the maths tool within a minute of the fault, for every student |
+| Repetition check | Ends each looping task after three errors |
+| Per-student cap and 2 running tasks | Stops "try again" from multiplying the damage |
+| Feature cap of ₹8,000 | No day can cost more than ₹8,000, against ₹1.8 lakh that night |
+| Alert at ₹4,000 | Wakes someone while it is still cheap |
+
+Two weeks later a similar tool fault tripped the circuit breaker within a minute. The bill was a few hundred rupees, and the alert reached the team before any student complained.
 
 ## Common mistakes
 
 - **No step cap.** The single cheapest protection; add it first.
 - **Budgets held in memory.** Each server counts separately and the true total runs far past the cap. Use a shared store.
+- **Check-then-act budgets.** Reading the total, calling the model and then adding the cost lets concurrent requests all pass the same check. Reserve first, in one statement.
+- **Estimates that are not upper bounds.** If you reserve the average cost, the cap leaks. Reserve for the full `max_tokens`.
+- **No cap on concurrent tasks.** Ten parallel tasks each pass a per-task cap.
+- **Per-agent caps only.** Sub-agents that hand work back and forth need one count per root run.
 - **A kill switch that needs a deploy.** In an incident you need seconds, not a build pipeline.
+- **A kill switch read only at start-up.** It does nothing until the next restart.
+- **Failing open.** If the flag store is down for long, treat write tools as off.
 - **Silent stops.** Tell the user what happened and log it; a stopped task is a bug to fix.
 - **Retrying non-idempotent actions.** Use idempotency keys so loops cannot repeat payments or messages.
-- **Budgets in memory on one server.** Users spread across servers get several times the cap.
 - **Floating-point money.** Count paise as integers.
-- **A kill switch read only at start-up.** It does nothing until the next restart.
-- **Failing open.** If the flag store is down, treat risky tools as off.
 
 ## When simpler limits are enough
 
@@ -203,13 +340,14 @@ Two weeks later a similar tool fault was stopped by the repetition check within 
 - **Fixed workflows with one or two model calls**, where cost per request is predictable.
 - **Read-only internal tools** with a handful of users.
 
-Per-user budgets, feature caps and layered kill switches matter once outsiders can trigger agent runs or agents can act.
+Per-user budgets, feature caps and layered kill switches matter once outsiders can start runs or agents can act.
 
 ## From demo to production
 
-- **Store budgets and flags in shared storage**, checked before every model and tool call.
-- **Use Asia/Kolkata days** for daily limits, so they reset when your users expect.
-- **Alert at 50% and 80%** of feature budgets with the top spenders listed.
+- **Reserve budgets atomically in shared storage** before every model call, and settle after.
+- **Check flags and circuit breakers** before every step and tool call.
+- **Alert at 50% and 80%** of feature budgets, listing the top spenders.
+- **Keep the concurrent budget test in CI.**
 - **Drill the kill switches monthly** and record how long each took.
 - **Log every stop** with its reason, and review whether limits are set right.
 
@@ -219,7 +357,7 @@ Read OWASP's entry on unbounded consumption.
 
 1. Add step, token and time caps to an agent you have built, with a clean stop message.
 2. Add a repetition check that ends a task after three identical tool errors, and trigger it with a deliberately broken tool.
-3. Add a per-user daily budget in a small database table and a kill switch read from a config file, and show both working.
-4. Run two copies of your server, send requests to both for one user, and prove the shared budget still stops at the cap.
+3. Add the reserve-and-settle budget and the kill switch from this lesson, and show both working.
+4. Run the concurrent test against your budget code. Then replace `reserve` with a plain "read the total, then add" version and watch the test fail.
 
 **You are done when you can** break a tool on purpose and show the agent stopping within your limits, with a log entry and an alert.
