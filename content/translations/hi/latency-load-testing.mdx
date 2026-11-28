@@ -2,229 +2,279 @@
 id: latency-load-testing
 lang: hi
 title: "Latency budgets और load testing"
-outcome: "हर step के लिए latency target तय कर पाओगे, averages की जगह percentiles नाप पाओगे, और users से पहले ये पता लगाने के लिए AI service का load-test कर पाओगे कि वो कहाँ टूटती है।"
-answer: "हर step के लिए latency target तय करो, average की जगह 95th और 99th percentile नापो, और असली जैसे traffic से load-test करो ताकि पता चले service कहाँ टूटती है।"
-why_it_matters: "\"Demo में तो तेज़ था\" किसी AI pilot के सबसे आम आख़िरी शब्द हैं। असली traffic peaks में आता है, providers slow हो जाते हैं और queues बन जाती हैं। Latency budget और load test launch-day की घबराहट को एक जानी-पहचानी limit और उसके plan में बदल देते हैं।"
+outcome: "हर step के लिए latency budget तय करो, first-token और full-answer percentiles सही से नापो, और user-based और arrival-rate दोनों तरह के traffic से AI service को load-test करके पता करो कि सबसे पहले क्या टूटता है।"
+answer: "हर step के लिए latency target रखो, average की जगह p95 और p99 track करो, और realistic traffic से load-test करो, जिसमें नए arrivals के bursts भी हों, ताकि पता चले कि सबसे पहले क्या टूटता है।"
+why_it_matters: "Demo एक बार में एक ही इंसान को serve करता है। Real traffic bursts में आता है, providers slow हो जाते हैं, rate limits लग जाती हैं और queues बन जाती हैं। एक latency budget और अच्छे से design किया गया load test, launch-day की घबराहट को एक जानी-पहचानी limit, एक नाम वाले bottleneck और अगले वाले के plan में बदल देते हैं।"
 flashcards:
   - q: "Latency budget क्या है?"
-    a: "जवाब का सबसे लंबा स्वीकार्य time, जो auth, retrieval, reranking और model के time to first token जैसे steps में बँटा होता है।"
+    a: "चुने हुए percentile पर सबसे धीमा acceptable response, जैसे p95 first token 2 seconds के अंदर, जिसे हर step के एक target में बांटा जाता है। Step percentiles आपस में जुड़ते नहीं, इसलिए end-to-end p95 हमेशा traces से भी check करो।"
   - q: "Averages की जगह percentiles क्यों?"
-    a: "Average धीमी tail को छिपा सकता है; p95 और p99 दिखाते हैं कि सबसे slow users को क्या मिलता है।"
-  - q: "Generation time पर सबसे ज़्यादा असर किसका है?"
-    a: "Output length का। छोटे जवाब तेज़ होते हैं।"
+    a: "Average धीमी tail को छुपा देता है। p95 और p99 दिखाते हैं कि सबसे धीमे users कितना इंतज़ार करते हैं, और 20 messages भेजने वाले user को कम से कम एक p99-slow reply मिलने का करीब 18% chance है।"
+  - q: "पूरा answer generate होने का time किससे तय होता है?"
+    a: "ज़्यादातर output tokens की गिनती गुणा हर token का time। 60 tokens per second पर, 450 tokens में 7.5 seconds और 200 tokens में करीब 3.3 seconds लगते हैं।"
   - q: "Time to first token किससे तय होता है?"
-    a: "मुख्य रूप से prompt length और provider latency से, इसलिए context छोटा करने से मदद मिलती है।"
-  - q: "Provider rate limits throughput को क्यों रोक सकते हैं?"
-    a: "Tokens-per-minute limits requests रोक देते हैं, चाहे आप कितने भी servers चलाओ; इन्हें जल्दी बढ़वाओ।"
-  - q: "Load test को असली जैसा क्या बनाता है?"
-    a: "सवालों के असली types का mix, messages के बीच think time, आम lengths, और उम्मीद वाले peak से ऊपर तक ramp।"
-  - q: "ज़्यादातर tests fake model के against क्यों?"
-    a: "Real-model load tests में पैसे लगते हैं और rate limits खत्म होती हैं; असली जैसे delays वाला fake server ज़्यादातर bottlenecks ढूँढ लेता है।"
-  - q: "Load test में क्या देखना चाहिए?"
-    a: "p50, p95 और p99 latency, error rate, CPU, memory, database connections और provider के 429 responses।"
-  - q: "Load tests में fake model server क्यों use करें?"
-    a: "वो पैसे खर्च किए या rate limits छुए बिना असली जैसे delays के साथ जवाब देता है, इसलिए असली model पर एक छोटे run से पहले आप अपने system की limits कई बार test कर सकते हो।"
-  - q: "Ramp test ऐसा क्या दिखाता है जो fixed-load test नहीं दिखाता?"
-    a: "वो point जहाँ users बढ़ने पर latency चढ़ना शुरू होती है या errors आने लगते हैं, यानी आपकी असली capacity।"
+    a: "Prompt की लंबाई, आपके अपने system में और provider के पास queueing, और उस वक्त provider का load। Reasoning models पहले visible token से पहले सोच सकते हैं, इसलिए वो पहला token नापो जो user को सच में दिखता है।"
+  - q: "Provider rate limits throughput को cap क्यों कर सकती हैं?"
+    a: "Tokens-per-minute या requests-per-minute limit, आप कितने भी servers चलाओ, calls को 429 errors के साथ reject कर देती है। Peak पर कितने tokens चाहिए इसका हिसाब लगाओ और हफ्तों पहले ऊंची limit मांगो।"
+  - q: "Load test को realistic क्या बनाता है?"
+    a: "असली सवाल और असली answer लंबाई, messages के बीच think time, हर step पर hold के साथ expected peak से आगे तक ramp, और sale खुलने जैसे पलों के लिए एक burst test।"
+  - q: "ज़्यादातर load-test rounds fake model server पर क्यों चलाएं?"
+    a: "Real-model load tests में पैसे लगते हैं और rate limits खत्म होती हैं। Same API और realistic delays वाला fake server आपके अपने bottlenecks free में ढूंढ लेता है; फिर एक छोटा real run provider को check करता है।"
+  - q: "Load test में क्या-क्या देखना चाहिए?"
+    a: "First token और full answer के लिए p50, p95 और p99, status code के हिसाब से error rate, CPU, memory, database connections, queue की लंबाई और provider के 429 responses।"
+  - q: "Closed और open load test में क्या फर्क है?"
+    a: "Closed: users की गिनती fixed, हर कोई reply आने तक रुककर फिर भेजता है, इसलिए system slow होने पर load गिर जाता है। Open: कुछ भी हो, requests एक तय rate पर आती हैं, असली users की तरह। Busy दिन की queues सिर्फ open tests दिखाते हैं।"
+  - q: "Little's law क्या बताता है?"
+    a: "Requests in flight = arrival rate गुणा system में बिताया time। 17 requests per second और हर एक 4.5 seconds पर, एक साथ करीब 75 streams खुले रहते हैं, और इसी से connection pools और concurrency caps का size तय होता है।"
 exercise:
-  title: "Bottleneck ढूँढो"
-  setup: "Lucknow के एक exam board के results assistant को results वाले दिन 2,000 concurrent students संभालने हैं। Fake model के against पहला load test दिखाता है कि 300 users के बाद p95 latency तेज़ी से बढ़ती है, CPU 30% पर है और कई requests database connections का इंतज़ार कर रही हैं। असली model पर एक छोटा test 900 users से 429 errors दिखाता है। जवाब औसतन 450 tokens के हैं।"
+  title: "Bottleneck ढूंढो"
+  setup: "Lucknow के एक exam board के results assistant को results वाले दिन एक साथ chat कर रहे 2,000 students संभालने हैं, हर कोई मिनट में करीब एक message भेजता है। Prompts औसतन 1,000 tokens के हैं और answers 450 tokens के। Fake model पर पहला load test दिखाता है कि 300 users के बाद p95 first token तेज़ी से बढ़ता है, CPU 30% पर है और बहुत सी requests database connections का इंतज़ार कर रही हैं। Real model पर एक छोटा test करीब 900 users से 429 errors दिखाता है, जो account की 1.3 million tokens per minute की limit से मेल खाता है। अब तक के सारे tests में simulated users की गिनती fixed थी।"
   questions:
-    - q: "पहला bottleneck क्या है?"
-      a: "Database connection pool: CPU ज़्यादातर खाली है और requests connections के लिए queue में हैं।"
-    - q: "उसे क्या ठीक करता है?"
-      a: "Database की limits के अंदर pool size बढ़ाओ और results lookups के लिए indexes जोड़ो, फिर दोबारा test करो।"
-    - q: "429s को कैसे संभालोगे?"
-      a: "Results वाले दिन से बहुत पहले ज़्यादा tokens-per-minute limit माँगो और gateway के ज़रिए fallback model जोड़ो।"
-    - q: "speed और limit दोनों में और क्या मदद करेगा?"
-      a: "छोटे जवाब, लगभग 150 से 200 tokens पर cap, जो generation time और tokens per minute दोनों घटाते हैं।"
+    - q: "पहला bottleneck क्या है, और ये कैसे पता चला?"
+      a: "Database connection pool। Requests connections का इंतज़ार कर रही हैं और CPU ज़्यादातर खाली है, यानी system काम नहीं कर रहा, इंतज़ार कर रहा है।"
+    - q: "इसे क्या ठीक करेगा?"
+      a: "Database की limits के अंदर pool बढ़ाओ, results lookup पर index लगाओ, और results को memory में cache करो, क्योंकि results वाले दिन वो बदलते नहीं। फिर वही ramp दोबारा चलाओ।"
+    - q: "2,000 students के लिए कितनी tokens-per-minute limit चाहिए, और 429s को कैसे संभालोगे?"
+      a: "करीब 2.9 million (2,000 x 1,450)। Answers को करीब 150 tokens पर cap करो तो ये 2.3 million हो जाता है; हफ्तों पहले limit मांगो, एक fallback model जोड़ो, और तुरंत नहीं, backoff और jitter के साथ retry करो।"
+    - q: "कौन सा test अभी भी बाकी है, और क्यों?"
+      a: "Burst के साथ एक arrival-rate test। Results live होते ही students आते रहते हैं, चाहे replies slow हो जाएं, और fixed-user test बनती हुई queue को छुपा देता है। एक concurrency cap और एक विनम्र busy message जोड़ो।"
 ask:
-  - "LLM application का load test कैसे करूँ?"
-  - "p95 latency क्या है?"
-  - "Slow AI app में bottleneck कैसे ढूँढूँ?"
+  - "LLM application का load test कैसे करें?"
+  - "p95 latency क्या होती है?"
+  - "धीमे AI app में bottleneck कैसे ढूंढें?"
 explain_in_interview:
-  answer: "Latency budget सबसे लंबा acceptable response time है, जो request के steps में बँटा होता है, और load testing check करता है कि real traffic में भी आप उसे meet करते हो या नहीं। पहले एक target set करो जैसे p95 first token दो seconds में, फिर हर step को उसका हिस्सा दो: auth, query rewrite, retrieval और model। फिर realistic traffic को expected peak से आगे ramp करो और p95, errors, CPU, database connections और provider rate limits देखो। जैसे, Jaipur का एक bus operator festival-season traffic से पहले अपना booking assistant test करता है। एक limit: real model के against testing में पैसे लगते हैं और rate limits खत्म होती हैं, इसलिए ज़्यादातर rounds एक fake model server के against चलाओ।"
-  follow_up: "Load में latency बढ़ती है पर CPU low रहता है। आप किस पर शक करोगे?"
-  follow_up_answer: "कुछ काम करने की जगह wait कर रहा है, सबसे likely database connections या locks। मैं connection pool और slow queries check करूँगा, बड़े pool, indexes या कम queries से fix करूँगा, और confirm करने के लिए वही load test फिर से चलाऊँगा।"
-translated_on: 2026-11-16
+  answer: "Latency budget किसी percentile पर सबसे धीमा acceptable response है, जैसे p95 first token दो seconds के अंदर, जिसे हर step के target में बांटा जाता है: auth, retrieval, model। Step percentiles जुड़ते नहीं, इसलिए मैं end-to-end p95 traces से check करता हूं। Load testing देखता है कि real traffic में budget टिकता है या नहीं। मैं fake model server पर simulated users को expected peak से आगे तक ramp करता हूं, हर मिला bottleneck ठीक करता हूं, फिर एक arrival-rate burst test चलाता हूं, क्योंकि system slow होने पर भी real users आते रहते हैं। Real model पर एक छोटा run provider limits check करता है। जैसे, Jaipur का एक bus operator festival traffic से पहले अपने booking assistant को test करता है।"
+  follow_up: "Load में latency बढ़ रही है पर CPU low है। आपको किस पर शक होगा?"
+  follow_up_answer: "कुछ काम करने की जगह इंतज़ार कर रहा है: database connections, locks, कोई concurrency cap या provider। मैं उस मिनट के सबसे धीमे traces खोलूंगा, देखूंगा कि कौन सा step बढ़ा, उसे ठीक करूंगा, जैसे बड़े pool या एक index से, और confirm करने के लिए वही test दोबारा चलाऊंगा।"
+translated_on: 2026-11-28
 ---
 
 ## ये क्या है
 
-**Latency budget** जवाब का सबसे लंबा स्वीकार्य time है, steps में बँटा हुआ। Chat assistant के लिए: 95th percentile पर पहला token 1.5 seconds के अंदर, पूरा जवाब 8 seconds के अंदर। फिर budget steps में बँट जाता है: auth 50 ms, query rewrite 300 ms, retrieval और reranking 400 ms, model का time to first token 700 ms।
+**Latency budget** वो सबसे धीमा response है जो आप एक तय percentile पर मानते हो, और जिसे request के हर step के एक target में बांटा जाता है। जैसे एक chat assistant के लिए: p95 time to first token 2 seconds के अंदर, p95 full answer 10 seconds के अंदर, errors 1% से कम। फिर first-token budget ऐसे बंटता है: auth 50 ms, query rewrite 300 ms, retrieval और reranking 400 ms, model first token 700 ms, और network और queueing के लिए 550 ms की slack।
 
-**Load testing** system पर असली जैसा traffic भेजता है, कदम-दर-कदम बढ़ाते हुए, और response times, errors और resource use record करता है, ताकि आपको पता चले कि किस load पर वो टूटता है और सबसे पहले क्या टूटता है।
+**Load testing** system पर realistic traffic भेजता है, step by step बढ़ाते हुए, और response times, errors और resource use record करता है। ये बताता है कि किस load पर system टूटता है, और सबसे पहले क्या टूटता है, आपके users को पता चलने से पहले।
 
 ```flow
 dir: LR
-title: Latency budget: 2 s में p95 first token
-Auth, 50 ms -> Rewrite, 300 ms -> Retrieve + rerank, 400 ms -> Model first token, 700 ms -> बचा हुआ slack, 550 ms
+title: Latency budget: p95 first token 2 s में
+Auth, 50 ms -> Rewrite, 300 ms -> Retrieve + rerank, 400 ms -> Model first token, 700 ms -> Slack, 550 ms
 ```
 
-| Concurrent users | 50 | 100 | 200 | 300 | 500 | 550 |
-|---|---|---|---|---|---|---|
-| पहले: 10 connections का pool | 1 s | 2 s | 6 s | | | |
-| बाद में: 40 का pool + एक index | 1 s | 1 s | 1 s | 1 s | 1 s | 1 s |
+तीन शब्द जो आपको चाहिए होंगे। **p95** वो time है जिससे 95% requests जल्दी पूरी होती हैं। **Time to first token** वो इंतज़ार है जब तक answer का पहला शब्द नहीं दिखता। **Concurrent users** का मतलब है एक ही पल में chat session में मौजूद लोग; उनमें से ज़्यादातर पढ़ रहे होते हैं या type कर रहे होते हैं, इसलिए एक साथ in flight requests बहुत कम होती हैं।
 
-Users की संख्या के हिसाब से p95 first token, fake model के साथ नापा हुआ।
+ये lesson Jaipur के एक intercity bus operator को follow करता है, जो festival-season traffic के लिए अपना booking assistant तैयार कर रहा है।
 
-ये lesson Jaipur के एक intercity bus operator को follow करता है जो अपने booking assistant को festival-season के traffic के लिए तैयार कर रहा है।
+## ये कैसे काम करता है
 
-## ये काम कैसे करता है
+### Averages नहीं, percentiles
 
-**Averages नहीं, percentiles।** 2 seconds का average 5% users के 15 seconds इंतज़ार को छिपा सकता है। Median (p50), 95th (p95) और 99th percentile (p99) track करो। Users को slow वाले याद रहते हैं।
+1.5 seconds का average, 5% users के 4 से 9 seconds इंतज़ार को छुपा सकता है। Median (p50), p95 और p99 track करो। Tail जितनी दिखती है उससे ज़्यादा मायने रखती है: एक session में 20 messages भेजने वाले user को कम से कम एक reply p99 से धीमा मिलने का करीब 18% chance है (1 minus 0.99 की power 20)।
 
-**Step के हिसाब से budget।** Traces आपको हर step का timing देते हैं। जब कुल target से चूकता है, तो budget बताता है कि किस step पर हमला करना है: slow reranker, बहुत ज़्यादा chunks, छोटे model से काम चल जाता वहाँ बड़ा model, या cold start।
+Experts के दो rules:
 
-**AI-specific factors।** Output length generation time पर हावी होती है, इसलिए छोटे जवाब तेज़ होते हैं। Time to first token prompt length पर निर्भर है, इसलिए context छोटा करो। Provider latency घंटे और region के हिसाब से बदलती है। Tokens per minute की rate limits throughput पर cap लगाती हैं, चाहे आप कितने भी servers चलाओ; बड़े launch से पहले इन्हें check करो और provider से जल्दी ज़्यादा limits माँगो।
-
-**Test design करना।** असली behaviour की नक़ल करो: सवालों के types का mix, messages के बीच think time, आम prompt और जवाब की lengths, और उम्मीद वाला peak (मान लो शाम 7 बजे 300 concurrent users)। Locust (Python) या k6 जैसे tools use करो। कम से उम्मीद वाले peak से आगे तक ramp करो, कुछ देर रोको, और p95, error rate, CPU, memory, database connections और provider के 429 responses देखो।
-
-**Tests में model की cost।** Real models के against load tests में असली पैसा लगता है और rate limits खत्म होती हैं। ज़्यादातर rounds एक fake model server के against चलाओ जो असली जैसे delay के बाद जवाब देता है, फिर असली provider के against एक छोटा, नियंत्रित test।
-
-**आम bottlenecks और fixes:**
-
-| Load में दिखने वाला symptom | संभावित कारण | Fix |
-| --- | --- | --- |
-| Latency बढ़ती है, CPU कम | Database connections या locks का इंतज़ार | बड़ा pool, indexes, कम queries |
-| CPU 100% | बहुत कम workers या भारी parsing | ज़्यादा workers, background jobs |
-| 429 errors | Provider rate limit | ज़्यादा limit, fallback model, छोटे outputs |
-| सिर्फ़ पहला token slow | लंबे prompts | Context trim करो, prefix cache करो |
-| पूरे जवाब slow | लंबे outputs | जवाब की length पर cap |
-| एक मिनट बाद errors | Timeouts बहुत कम रखे हैं | Layers में timeouts एक जैसे करो |
-
-**Fake model server बनाना।** एक छोटी service लिखो जिसकी API provider जैसी हो। वो पहले token से पहले असली जैसा time रुकती है, जो आपके traces से sample किया गया हो, फिर आम token rate पर एक fixed जवाब stream करती है। App को एक setting से उसकी तरफ़ मोड़ दो। अब आप दिन भर मुफ़्त में load tests चला सकते हो और provider की अपनी limits को छोड़कर हर bottleneck ढूँढ सकते हो, जिन्हें फिर एक छोटा असली test check करता है।
-
-**Result report करना।** Users के against p95 का एक chart दिखाओ, budget line, हर round में मिला bottleneck और उसका fix, और अगली ceiling जिसकी आप उम्मीद करते हो। Clients को ये जानना पसंद है कि system अगली बार कहाँ टूटेगा, क्योंकि इससे पता चलता है किसकी planning करनी है।
-
-**एक fake model server।** असली API जैसा ही streaming shape, delays आपके traces से sample किए हुए:
+- **Percentiles जुड़ते नहीं।** Total का p95, हर step के p95 का जोड़ नहीं होता। धीमे steps एक ही request में कम ही एक साथ होते हैं, इसलिए जोड़ आम तौर पर total को ज़्यादा बताता है; लेकिन जब एक ही वजह, जैसे busy database, हर step को एक साथ धीमा कर दे, तो वो साथ-साथ चलते हैं। Step numbers को उस step के अपने p95 का target मानो, और end-to-end p95 सीधे traces से पढ़ो।
+- **Percentiles का average नहीं निकलता।** मान लो तीन servers का p95 1.2 seconds है और एक का, जिसका median 3.5 seconds है, 6 seconds है, और हर एक traffic का एक चौथाई लेता है। चारों p95 का average 2.4 seconds है। लेकिन धीमे server की आधी requests 3.5 seconds से ज़्यादा लेती हैं, जो सारी requests का 12.5% है, इसलिए असली p95 3.5 seconds से ऊपर है। Percentiles सारी raw timings से, या merge किए हुए histograms से निकालो।
 
 ```python
-import asyncio, json, random
+import random
+
+random.seed(7)
+def p95(xs):
+    xs = sorted(xs)
+    return xs[int(0.95 * (len(xs) - 1))]
+
+# Four steps, each with its own spread of times in seconds
+auth     = [random.lognormvariate(-3.5, 0.3) for _ in range(10_000)]
+retrieve = [random.lognormvariate(-1.3, 0.4) for _ in range(10_000)]
+rerank   = [random.lognormvariate(-1.8, 0.5) for _ in range(10_000)]
+model    = [random.lognormvariate(-0.5, 0.35) for _ in range(10_000)]
+total = [a + b + c + d for a, b, c, d in zip(auth, retrieve, rerank, model)]
+
+print(f"sum of the step p95s: {p95(auth) + p95(retrieve) + p95(rerank) + p95(model):.2f} s")
+print(f"p95 of the total:     {p95(total):.2f} s")
+```
+
+ये जोड़ के लिए 2.03 seconds और असली total के लिए 1.67 seconds print करता है, क्योंकि यहां steps independent हैं।
+
+### AI requests को धीमा क्या करता है
+
+**Generation time** मोटे तौर पर output tokens गुणा हर token का time है। 60 tokens per second पर, 450-token answer को stream होने में 7.5 seconds लगते हैं और 200-token answer को करीब 3.3 seconds। Answer की लंबाई cap करना अक्सर आपके पास सबसे सस्ता speed-up होता है।
+
+**Time to first token** prompt की लंबाई के साथ, आपके अपने system में और provider के पास queueing के साथ, और उस घंटे provider के load के साथ बढ़ता है। Context trim करो और जहां provider support करे वहां cached prompt prefix reuse करो। Reasoning models कुछ भी दिखाने से पहले सोच सकते हैं, इसलिए वो पहला token नापो जो user को सच में दिखता है।
+
+**Rate limits** tokens या requests per minute पर होती हैं, और आप कितने भी servers चलाओ, calls को 429 (Too Many Requests) के साथ reject कर देती हैं। देखो कि आपका provider input और output tokens कैसे गिनता है, peak पर कितना चाहिए इसका हिसाब लगाओ, और हफ्तों पहले ऊंची limit मांगो।
+
+### Little's law से sizing
+
+**Little's law**: requests in flight = arrival rate x हर request का system में बिताया time। मान लो pilot के logs दिखाते हैं कि हर active user मिनट में करीब 2 messages भेजता है। 500 users पर ये करीब 17 requests per second है। अगर हर एक 4.5 seconds लेती है, तो किसी भी पल करीब 75 answers stream हो रहे होते हैं। 500 नहीं, यही number आपके connection pools, worker counts और किसी भी concurrency cap का size तय करता है।
+
+### Test design करना
+
+असली behaviour को model करो: असली सवाल (masked), आम prompt और answer लंबाई, messages के बीच think time, और expected peak। कम से शुरू करके peak से आगे तक ramp करो और **हर step को hold करो** कुछ मिनटों के लिए, ताकि percentiles settle हो जाएं। p95 और p99, status code के हिसाब से errors, CPU, memory, database connections, queue की लंबाई और provider के 429s देखो।
+
+**Closed और open tests।** **Closed** test में, जैसे think time वाले Locust users, हर simulated user reply आने तक रुककर फिर भेजता है। System धीमा होने पर test कम भेजता है, और धीमे दौर में जितने measurements आने चाहिए उससे कम आते हैं। इसे **coordinated omission** कहते हैं: test चुपचाप ठीक उसी वक्त पीछे हट जाता है जब असली users नहीं हटते। **Open** test में requests एक तय rate पर आती हैं, चाहे कुछ भी हो, जैसे sale खुलते ही travellers टूट पड़ते हैं। k6 ये अपने constant-arrival-rate और ramping-arrival-rate executors से देता है। Bottlenecks को step by step ढूंढने के लिए closed ramp use करो, फिर queue देखने के लिए expected arrival rate पर burst के साथ एक open test चलाओ।
+
+**Soak test।** Expected peak को 30 से 60 मिनट तक hold करो। Memory, connections या file handles के leaks वक्त के साथ ही दिखते हैं।
+
+### एक fake model server
+
+Real-model load tests में पैसे लगते हैं और rate limits खत्म होती हैं। ज़्यादातर rounds एक छोटी fake service पर चलाओ, जिसका streaming shape provider की API जैसा ही हो और first-token delays आपके traces से sample किए गए हों:
+
+```python
+import asyncio, json, os, random
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 app = FastAPI()
-FIRST_TOKEN_S = [0.6, 0.8, 0.9, 1.1, 1.4, 2.2]       # sampled from real traces
+FIRST_TOKEN_S = [0.30, 0.35, 0.35, 0.35, 0.40, 0.40, 0.40, 0.45, 0.45, 0.45, 0.45, 0.50, 0.50,
+                 0.50, 0.50, 0.55, 0.55, 0.55, 0.60, 0.60, 0.60, 0.65, 0.70, 0.70, 1.40]
 TOKENS_PER_S = 60
-REPLY = "This is a fixed answer of realistic length used only for load testing. " * 6
+REPLY_TOKENS = 450                                    # today's typical answer length
+SHARE_429 = float(os.getenv("FAKE_429_SHARE", "0"))   # for example 0.05
 
 @app.post("/v1/messages")
 async def messages():
+    if random.random() < SHARE_429:
+        return JSONResponse({"error": "rate_limited"}, status_code=429,
+                            headers={"retry-after": "2"})
     async def stream():
         await asyncio.sleep(random.choice(FIRST_TOKEN_S))
-        for word in REPLY.split():
-            yield f"data: {json.dumps({'text': word + ' '})}\n\n"
+        for i in range(REPLY_TOKENS):
+            yield f"data: {json.dumps({'text': f'tok{i} '})}\n\n"
             await asyncio.sleep(1 / TOKENS_PER_S)
         yield "data: [DONE]\n\n"
     return StreamingResponse(stream(), media_type="text/event-stream")
 ```
 
-App के model base URL को सिर्फ़ test environment में configuration से इसकी तरफ़ मोड़ो। एक switch जोड़ो जो कुछ हिस्से की requests पर 429 errors लौटाए, ताकि आपके retries और fallbacks test हों।
+ये delays model का p95 0.7 seconds देते हैं, जो budget में model का हिस्सा है, और 25 में से एक reply धीमा। इसे `uvicorn fake_model:app` से चलाओ, और सिर्फ test environment में configuration के ज़रिए अपने app का model base URL इस पर point करो। अपने retries और fallback test करने के लिए `FAKE_429_SHARE` set करो।
 
-**एक Locust test जो ramp up करता है।**
+### Stream को time करने वाला Locust ramp
+
+`stream=True` के साथ, request के लिए Locust की अपनी row response headers आते ही अपनी घड़ी रोक देती है, अक्सर कुछ milliseconds में, first token से बहुत पहले। इसलिए ये test अपनी दो timings खुद record करता है:
 
 ```python
-from locust import HttpUser, task, between, LoadTestShape
-import random
+import random, time
+from locust import HttpUser, LoadTestShape, between, task
 
-QUESTIONS = [l.strip() for l in open("load/questions.txt")]     # real questions, masked
+QUESTIONS = [q.strip() for q in open("load/questions.txt", encoding="utf-8") if q.strip()]
 
-class Learner(HttpUser):
-    wait_time = between(5, 20)                                   # think time between messages
+class Traveller(HttpUser):
+    wait_time = between(20, 30)          # think time between messages
 
     @task
     def ask(self):
+        start, first = time.perf_counter(), None
         with self.client.post("/answer", json={"text": random.choice(QUESTIONS)},
                               stream=True, catch_response=True, timeout=60) as r:
-            for _ in r.iter_lines():
-                pass                                             # read the whole stream
             if r.status_code != 200:
                 r.failure(f"status {r.status_code}")
+                return
+            for line in r.iter_lines():               # read the whole stream
+                if line and first is None:
+                    first = time.perf_counter()
+        end = time.perf_counter()
+        if first is not None:
+            self.record("first token", first - start)
+        self.record("full answer", end - start)
+
+    def record(self, name, seconds):
+        self.environment.events.request.fire(
+            request_type="STREAM", name=name, response_time=seconds * 1000,
+            response_length=0, exception=None, context={})
 
 class Ramp(LoadTestShape):
-    steps = [(60, 10), (120, 50), (180, 100), (240, 200), (300, 300)]   # (end second, users)
+    # (end second, users): hold each step for two minutes
+    steps = [(120, 50), (240, 100), (360, 200), (480, 300), (600, 400), (720, 500), (840, 550)]
+
     def tick(self):
         t = self.get_run_time()
         for end, users in self.steps:
             if t < end:
-                return users, 10
+                return users, 10                      # add up to 10 users a second
         return None
 ```
 
-इसे `locust -f load/locustfile.py --host https://staging.example.in --csv results` से चलाओ। CSV files हर step का p50, p95 और p99 देती हैं; users के against p95 plot करो और अपनी budget line mark करो।
+इसे `locust -f load/locustfile.py --headless --host https://staging.example.in --csv results --csv-full-history` से चलाओ। फिर `results_stats_history.csv` file में हर name के लिए हर second एक row आती है, जिसमें user count और पिछले करीब 10 seconds के percentiles होते हैं। `first token` और `full answer` rows पढ़ो, और हर hold के आखिरी मिनट में 95% column का median लो, क्योंकि low load पर 10-second window में कम requests होती हैं। Traces से per-step p95 भी चलता है। Built-in POST row (सिर्फ headers) और Aggregated row को ignore करो, जो तीनों timings को मिला देती है।
 
-**Time to first token को अपना अलग measurement चाहिए।** Locust की built-in timing पूरे request को कवर करती है। Streaming के लिए, app के अपने traces में first-byte time भी record करो, और हर ramp step के लिए p95 first-token time वहीं से पढ़ो।
+### Overload, retries और streaming
 
-**असली model पर एक नियंत्रित run।** Fake server से bottlenecks ठीक करने के बाद, अपनी rate limits और budget के अंदर, उम्मीद वाले peak पर असली model के against एक छोटा test चलाओ, ताकि provider की latency और limits confirm हों। Run को पहले से उस व्यक्ति के साथ तय करो जिसके पास API account है।
+- **Retry storms।** अगर हर 429 या timeout को तुरंत, तीन बार तक retry किया जाए, तो मुश्किल में पड़े system पर चार गुना तक traffic आ सकता है। Exponential backoff और random jitter के साथ retry करो, provider `retry-after` header भेजे तो उसे मानो, और retries को traffic के छोटे हिस्से पर cap करो।
+- **Admission control।** हर instance एक साथ जितने streams serve करता है, उन्हें cap करो। Extra requests को एक छोटी queue में, ज़्यादा से ज़्यादा कुछ seconds, रुकने दो, फिर विनम्रता से "अभी हम busy हैं, कृपया एक मिनट बाद try करें" दिखाओ। सबका timeout होने से अच्छा है कुछ लोगों को लौटा देना।
+- **Autoscaling और cold starts।** नए instances को start और warm up होने में मिनट लग सकते हैं। पहले से पता peak के लिए, उसके शुरू होने से पहले scale up करो।
+- **Proxies से streaming।** कोई proxy या load balancer response को buffer कर सकता है, जिससे tokens एक ही ढेर में आते हैं, या idle समझकर connection बंद कर सकता है। Streaming route पर buffering और idle-timeout settings check करो।
 
-**Traces खोलकर results पढ़ो।** जब 100 users पर p95 उछलता है, उस मिनट के सबसे slow traces खोलो। जो step बढ़ा हुआ है (database waits, reranker, model slots के लिए queueing) वही bottleneck है, और ऊपर की fix table आमतौर पर इलाज बता देती है।
+| Load में लक्षण | संभावित वजह | Fix |
+| --- | --- | --- |
+| Latency बढ़ती है, CPU low | Database connections या locks का इंतज़ार | बड़ा pool, indexes, caching, कम queries |
+| CPU 100% पर | बहुत कम workers या भारी parsing | ज़्यादा workers, काम background jobs में भेजो |
+| 429 errors | Provider rate limit | ऊंची limit, fallback model, छोटे outputs |
+| Errors शुरू होते ही traffic उछलता है | तुरंत retries | Jitter के साथ backoff, retry cap |
+| Queue सिर्फ bursts में बढ़ती है | Arrival rate के लिए बहुत कम streams | Concurrency cap, busy message, जल्दी scale up |
+| सिर्फ first token धीमा | लंबे prompts या provider queueing | Context trim करो, prefix cache करो |
+| Tokens एक ढेर में आते हैं | कोई proxy stream को buffer कर रहा है | उस route पर buffering बंद करो |
+| ठीक एक मिनट बाद errors | किसी layer में timeout या idle limit | हर layer में timeouts align करो |
 
-**अपने browser में आज़माओ।** Timings की list से percentiles। Average slow tail को छिपा देता है।
+### Traces खोलकर results पढ़ो
 
-```python
-import random, statistics
+जब किसी step पर p95 उछले, तो उस मिनट के सबसे धीमे traces खोलो। जो step बढ़ा (database waits, reranker, model slot के लिए queueing) वही bottleneck है, और ऊपर की table आम तौर पर fix बता देती है। फिर वही test दोबारा चलाओ, ताकि बराबर की चीज़ों की तुलना हो।
 
-random.seed(6)
-timings = [random.gauss(1.2, 0.2) for _ in range(950)] + [random.uniform(4, 9) for _ in range(50)]
-timings.sort()
-p = lambda q: timings[int(q * (len(timings) - 1))]
-print(f"average {statistics.mean(timings):.2f} s")
-print(f"p50 {p(0.5):.2f} s, p95 {p(0.95):.2f} s, p99 {p(0.99):.2f} s")
-```
+## एक worked example
 
-## एक example से समझो
+Jaipur का bus operator festival travel के दौरान एक साथ chat कर रहे करीब 500 travellers की उम्मीद करता है, और सुबह 10 बजे एक seat sale खुलती है। Budget: p95 first token 2 seconds से कम, p95 full answer 10 seconds से कम, errors 1% से कम। नीचे के सारे numbers illustrative हैं।
 
-Jaipur का एक intercity bus operator bus bookings और complaints के लिए AI assistant launch कर रहा है, जिसके festival travel में 500 concurrent users पर peak करने की उम्मीद है।
+**Round 1: closed ramp, fake model।** p95 first token 50 users पर 1.1 seconds से 200 पर 6 seconds तक चढ़ता है। CPU 25% पर रहता है। सबसे धीमे traces सब database connection का इंतज़ार कर रहे हैं: pool में 10 ही हैं। 40 का pool और route table पर एक index इसे ठीक कर देते हैं।
 
-Budget: p95 पर first token 2 s से कम, p95 पर पूरा जवाब 10 s से कम, errors 1% से कम।
+| Concurrent users | 50 | 100 | 200 | 300 | 500 | 550 |
+|---|---|---|---|---|---|---|
+| p95 first token, pool 10 | 1.1 s | 2.4 s | 6.0 s | रोका: timeouts | नहीं चलाया | नहीं चलाया |
+| p95 first token, pool 40 + index | 1.1 s | 1.1 s | 1.2 s | 1.2 s | 1.3 s | 1.4 s |
 
-Round 1, असली जैसे delays वाले fake model के against: p95 first token 50 users पर 1.1 s से 200 users पर 6 s तक बढ़ता है। Traces दिखाते हैं कि requests database connections के लिए queue में हैं: pool size 10 है। उसे 40 करने और route table पर एक index जोड़ने से 500 users पर p95 1.3 s आ जाता है।
+**Round 2: real model पर एक छोटा run।** दस मिनट, 300 users तक ramp, API account के owner से पहले ही तय करके। करीब 220 users पर 429 errors शुरू होते हैं। मोटा हिसाब भी यही कहता है: pilot के logs दिखाते हैं कि हर user मिनट में करीब 2,000 tokens (1,550 in, 450 out) के करीब 2 messages भेजता है, यानी हर user के 4,000 tokens per minute, और account के 900,000 tokens per minute 225 users पर खत्म हो जाते हैं। Team answers को 200 tokens पर cap करती है, जिससे streaming time 7.5 से करीब 3.3 seconds और हर message के tokens 1,750 हो जाते हैं। वो ऊंची limit मांगते हैं; दस दिन बाद provider 2.5 million tokens per minute दे देता है। वो अपने gateway से एक fallback model और retries पर jitter के साथ backoff भी जोड़ते हैं।
 
-Round 2, असली model के against 300 users पर 10 मिनट का test: provider के 429 errors लगभग 220 users से शुरू होते हैं। Token-per-minute limit ही ceiling है। आप दो हफ़्ते पहले ज़्यादा limit माँगते हो, gateway के ज़रिए fallback model जोड़ते हो, और जवाब की length 200 tokens पर cap करते हो, जिससे औसत generation time भी एक तिहाई घट जाता है।
+**Round 3: open burst test, fake model** (अब 200-token replies पर set)। Little's law: 500 users पर, करीब 17 requests per second, हर एक करीब 4.5 seconds की, यानी करीब 75 streams in flight। Sale खुलते ही arrivals करीब 25 per second तक उछलते हैं, यानी करीब 113 in flight। दो instances, हर एक 48 streams पर capped, 96 ही संभालते हैं। Burst में p95 first token 9 seconds तक पहुंचता है और 6% requests timeout हो जाती हैं। Closed ramp ने ये कभी नहीं दिखाया, क्योंकि उसके users बस इंतज़ार करते रहे। Fix: सुबह 9:45 बजे start किया गया तीसरा instance, और 3-second queue और busy message वाला admission control। Re-run पर p95 first token 1.5 seconds पर रहता है और किसी को लौटाया नहीं जाता।
 
-आख़िरी test 550 users पर budget पूरा करता है। Launch day का peak बिना किसी घटना के 480 users तक पहुँचता है, और आपकी report अगला bottleneck (लगभग 700 users पर provider limits) लिखती है ताकि client planning कर सके।
+**Round 4: confirm।** Real model पर 550 users के साथ दस मिनट: p95 first token 1.6 seconds, p95 full answer 5.2 seconds, errors 0.3%। ये load 1.9 million tokens per minute use करता है, limit का 77%। Fake model पर 500 users के साथ 45 मिनट का soak flat memory दिखाता है और कोई connection leak नहीं।
 
-| Round | Finding | Fix | Result |
-| --- | --- | --- | --- |
-| 1, fake model | 200 users पर p95 6 s; 10 का connection pool | 40 का pool, route-table index | 500 users पर p95 1.3 s |
-| 2, real model | लगभग 220 users से 429s | ज़्यादा limit, fallback, 200-token cap | 550 users पर budget पूरा |
-| Launch day | Peak 480 users | कुछ नहीं चाहिए | कोई incident नहीं |
+**Launch day।** Peak 480 travellers तक पहुंचता है। सुबह 10 बजे के burst में demand थोड़ी देर के लिए करीब 2.6 million tokens per minute मांगती है, limit से 5% ज़्यादा, और gateway दो मिनट के लिए कुछ percent requests fallback model पर भेजता है। p95 first token 2 seconds से नीचे रहता है।
 
-## आम गलतियाँ
+**Report** में budget line के साथ users के मुकाबले p95 का chart है, हर मिला bottleneck और उसका fix, और अगली ceiling: करीब 700 steady users (2.5 million भाग 3,500 tokens per user per minute), और bursts में उससे पहले।
 
-- **Averages report करना।** p95 और p99 use करो।
-- **एक बार में एक request test करना।** Concurrency की समस्याएँ (pools, locks, rate limits) सिर्फ़ load में दिखती हैं।
-- **नकली traffic।** बिना think time वाले एक जैसे छोटे prompts भ्रामक numbers देते हैं।
-- **Real-model load tests पर पैसे जलाना।** ज़्यादातर rounds के लिए fake model use करो।
-- **Provider limits भूल जाना।** अक्सर असली ceiling वही होती हैं। उन्हें जल्दी check करो और बढ़वाओ।
-- **हर round में असली model के against load-test करना**, जिससे budget और rate limits जलते हैं।
-- **Think time नहीं रखना**, जिससे कुछ test users हज़ारों जैसा behave करते हैं।
-- **Streamed जवाबों के लिए सिर्फ़ कुल time नापना**; first-token time भी track करो।
+## आम गलतियां
 
-## जब पूरा load test रुक सकता है
+- **Averages report करना।** First token और full answer के लिए p50, p95 और p99 report करो।
+- **Percentiles जोड़ना या उनका average निकालना।** दोनों काम नहीं करते; raw timings से निकालो।
+- **एक बार में एक ही request test करना।** Pools, locks और rate limits सिर्फ concurrency में fail होते हैं।
+- **Unrealistic traffic।** एक जैसे छोटे prompts और बिना think time के numbers का कोई मतलब नहीं।
+- **सिर्फ closed tests।** System धीमा होने पर वो पीछे हट जाते हैं, इसलिए असली rush से बनने वाली queue छुपा देते हैं।
+- **Streams के लिए Locust की request row पर भरोसा।** Streaming on होने पर वो सिर्फ headers को time करती है।
+- **Real-model load tests पर पैसे फूंकना।** ज़्यादातर rounds के लिए fake model use करो और एक छोटा real run।
+- **Provider limits भूल जाना।** अक्सर असली ceiling वही होती हैं। Token का हिसाब लगाओ और जल्दी मांगो।
+- **तुरंत retries।** ये ठीक उसी वक्त load कई गुना कर देते हैं जब system मुश्किल में होता है।
 
-- **कुछ ही users वाले internal tools**: दस concurrent requests से एक quick check काफ़ी है।
-- **Batch systems**, जहाँ प्रति user latency से ज़्यादा प्रति घंटे throughput मायने रखता है; वही test करो।
-- **वो platforms जो आपके लिए scale करते हैं** और जिनकी limits खुली हैं, शुरुआती pilots के लिए, बशर्ते rate limits check कर ली हों।
+## कब पूरा load test रुक सकता है
+
+- **गिने-चुने users वाले internal tools**: दस concurrent requests के साथ एक quick check काफी है।
+- **Batch systems**, जहां per-user latency से ज़्यादा per hour throughput मायने रखता है; वही test करो।
+- **ऐसे platforms पर early pilots जो आपके लिए scale करते हैं**, बशर्ते आपने rate limits और timeouts check कर लिए हों।
 
 ## Demo से production तक
 
-- **Step के हिसाब से latency budget रखो** और traces को उससे मिलाओ।
-- **Launch से पहले और बड़े बदलावों से पहले load-test करो**, ज़्यादातर fake model server से।
+- **Step के हिसाब से latency budget रखो** और हर release में traces को उससे compare करो।
+- **Launch से पहले और बड़े बदलावों से पहले load-test करो**, ज़्यादातर fake model server के साथ।
 - **हर ramp step के लिए p50, p95, p99 और errors report करो**, मिले bottleneck के साथ।
-- **Traffic patterns बदलने पर दोबारा test करो**, जैसे exam season या festival sale।
-- **Production में p95 first-token time पर alert लगाओ।**
+- **Traffic patterns बदलें तो दोबारा test करो**, जैसे exam season, festival sale या लंबे answers वाला नया feature।
+- **Production में p95 first-token time और 429 rate पर alert लगाओ**, और tokens-per-minute headroom पर नज़र रखो।
 
-## Practice करो
+## Practice
 
 Monitoring पर Google SRE का chapter और Locust की first-test guide पढ़ो।
 
-1. दस असली requests के traces से अपने app के लिए step के हिसाब से latency budget लिखो।
-2. एक fake model endpoint बनाओ जो असली जैसा time रुके और एक fixed जवाब stream करे, और अपने app को उसकी तरफ़ मोड़ो।
-3. Locust से 10 से 200 users तक load-test करो, हर step पर p50, p95 और errors record करो, और पहला bottleneck ढूँढकर ठीक करो।
-4. अपने app पर fake model server के साथ Locust ramp चलाओ और वो user count note करो जहाँ p95 पहली बार आपकी budget पार करता है।
+1. दस real requests के traces से अपने app के लिए step के हिसाब से latency budget लिखो। End-to-end p95 अलग से check करो।
+2. ऊपर वाला fake model server चलाओ और अपने app को उस पर point करो।
+3. Locust ramp को 50 से 550 users तक चलाओ। हर hold पर first token और full answer के p50, p95 और p99 record करो, और note करो कि p95 पहली बार आपका budget कहां पार करता है।
+4. पहला bottleneck ढूंढकर ठीक करो, दोबारा चलाओ, फिर Little's law से अपने peak पर और उस rate के 1.5 गुना burst पर requests in flight का अंदाज़ा लगाओ।
 
-ज़्यादा गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 9 latency metrics, percentiles और throughput व latency के बीच के trade-off को कवर करता है।
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly) का chapter 9, जो inference optimisation पर है, time to first token और time per output token को cover करता है।
 
-**आप तब पूरा कर चुके हो जब** users के against p95 का chart दिखा सको, पहला bottleneck और उसे हिलाने वाला बदलाव बता सको।
+**आपका काम पूरा है जब आप** अपनी budget line के साथ users के मुकाबले p95 का chart दिखा सको, पहला bottleneck और उसे हटाने वाला बदलाव बता सको, और बता सको कि आपके peak पर कितनी requests in flight हैं।
