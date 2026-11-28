@@ -3,7 +3,7 @@ id: retrieval-metadata
 level: I2
 theme: retrieval
 title: "Metadata that helps retrieval"
-outcome: "Store the metadata that makes retrieval precise (source, section path, dates, type, owner, language, access) and add generated metadata such as summaries and likely questions where it helps."
+outcome: "Store the metadata that makes retrieval precise (source, section path, dates, type, owner, language, access), handle versions, partial amendments and translations, and add generated metadata such as summaries and likely questions where it helps."
 answer: "Metadata such as source, section, date, type, owner and access level makes retrieval precise, because you can filter by it and show where an answer came from."
 why_it_matters: "Metadata turns a pile of chunks into a searchable library: it powers filters, citations, freshness, permissions and better matching. It costs little to collect at ingestion and is painful to add later, so experienced RAG engineers design it first."
 hours: 2
@@ -24,34 +24,34 @@ flashcards:
   - q: "What is contextual text for a chunk?"
     a: "The title and section path, or a one-sentence model-written context, prepended to the chunk before embedding."
   - q: "Why use fixed vocabularies for metadata?"
-    a: "So filters match: 'HR', 'Human Resources' and 'hr dept' as free text break filtering."
-  - q: "How should superseded documents be handled?"
-    a: "Store effective dates and a 'superseded by' link, and filter superseded versions out by default unless the user asks about history."
-  - q: "Where can filters come from?"
-    a: "From the user's context, such as their state or access groups, or inferred from the question by a small model."
+    a: "So filters match: 'HR', 'Human Resources' and 'hr dept' as free text break filtering. Validate every value at ingestion."
+  - q: "What is the 'in force' rule for dates?"
+    a: "A chunk is in force during a period if effective_from is on or before the period's end and effective_to is empty or on or after its start. Default to today."
+  - q: "How do you handle an order that changes only one paragraph of an earlier order?"
+    a: "Record the amendment at section level, end only that section's dates, and retrieve the base section with its amendments so the answer cites both."
   - q: "Why infer filters conservatively?"
-    a: "A wrong filter hides the right answer completely. Prefer user context and ask when unsure."
-  - q: "What is generated metadata, and what is its cost?"
-    a: "Summaries, keywords or likely questions written by a model per chunk; it costs a model call per chunk at ingestion, so measure the gain."
-  - q: "Why infer query filters conservatively?"
-    a: "A wrong filter, such as the wrong state or year, silently hides the right answer. When unsure, search without the filter."
+    a: "A wrong filter silently hides the right answer. Prefer the user's profile, ask when an inferred filter changes it, and if results are empty retry once without inferred filters, never without the access filter."
+  - q: "How should generated questions be stored?"
+    a: "Each question as its own vector with the parent chunk id. A match returns the parent chunk, and questions are regenerated when the chunk changes."
+  - q: "How do you treat a Hindi order and its English copy?"
+    a: "Give both the same document group and section ids, keep one copy per section in the results, show the user's language and record which copy is authoritative."
   - q: "What should happen to a chunk with invalid metadata at ingestion?"
     a: "Quarantine it and report it, rather than indexing it with bad values that make it disappear from filtered searches."
 exercise:
   title: "Design the metadata"
-  setup: "A Bhopal state-government department builds an assistant over 6,000 government orders and circulars, in Hindi and English, issued since 2015. Many orders amend or cancel earlier ones. Some files are marked for internal use only. Officers ask questions like 'current TA rates for district officers' and 'what did the 2019 order on transfers say?'"
+  setup: "A Bhopal state-government department builds an assistant over 6,000 government orders and circulars, in Hindi and English, issued since 2015. Many orders amend one paragraph of an earlier order or cancel it fully. Some files are marked for internal use only. Officers ask questions like 'current TA rates for district officers' and 'what did the 2019 order on transfers say?'"
   questions:
     - q: "Which metadata fields matter most here?"
-      a: "Order number, issue date, effective dates, amends or supersedes links, subject, department, language, section and page, and access level."
+      a: "Order number, issue date, effective dates, paragraph ids, amends and amended-by links per paragraph, document group for Hindi and English copies, subject, department, language, page and access level."
     - q: "How should the 'current TA rates' question be handled?"
-      a: "Filter to orders currently in force and exclude superseded ones, then cite the latest order with its number and date."
+      a: "Filter to paragraphs in force today, fetch any amendments to them, and cite the base order and each amendment with number, paragraph and date."
     - q: "How should the '2019 order' question be handled?"
-      a: "Here the user asks about history, so include superseded orders and filter by issue year 2019."
+      a: "Filter by issue year 2019 and ignore whether it is still in force. Answer from that order and say which later orders amended or cancelled it."
     - q: "What should happen with internal-only files?"
-      a: "Store an access level with each chunk and filter by the officer's clearance inside the search."
+      a: "Store an access level with each chunk, filter by the officer's clearance inside the search, and read clearance fresh at query time."
 ask:
   - "What metadata should I store with each chunk?"
-  - "How do I handle document versions in RAG?"
+  - "How do I handle document versions and amendments in RAG?"
   - "Should I generate questions for each chunk?"
 explain_in_interview:
   answer: "Metadata is information about a chunk rather than its text: document id, title, source link, section path, page, document type, dates, language, owner and access groups. In RAG it does five jobs. It filters searches, powers citations, keeps answers current by dropping superseded versions, decides who may see a chunk, and improves matching when you prepend the title and section path to the text you embed. For example, an HR assistant in Bengaluru serving five states filters by the employee's state and only policies in force today. The limit is that metadata is only as good as ingestion, so missing or wrong dates and access groups quietly break answers."
@@ -66,75 +66,81 @@ reviewed_on: 2026-11-08
 
 **Metadata** is information about a chunk rather than its text. In RAG it does five jobs:
 
-- **Filters**: restrict searches by product, region, document type, language or date.
+- **Filters**: restrict a search by state, document type, language or date.
 - **Citations**: say exactly where an answer came from (document, section, page, link).
-- **Freshness**: prefer or require current versions, drop superseded ones.
+- **Freshness**: answer from the version in force, not last year's.
 - **Permissions**: decide who may see a chunk.
 - **Better matching**: add context the chunk text lacks, such as the document title or section path.
 
 ```flow
-Chunk text | "This limit is 45 days." Hard to find on its own -> Stored with metadata | doc: Leave Policy 2026 (v4), section: Earned leave > Carry forward, page 4, state KA, access: all-employees
+Chunk text | "This limit is 45 days." Hard to find on its own -> Stored with metadata | doc: Leave Policy 2026, section: Earned leave > Carry forward, page 4, state KA, access: all-employees
 Stored with metadata -> Embedded text | "Leave Policy 2026 > Earned leave > Carry forward: This limit is 45 days."
-Stored with metadata -> Query filter | the user's state, not superseded, access in the user's groups
+Stored with metadata -> Query filter | user's groups, user's state, in force today
+Stored with metadata -> Citation | Leave Policy 2026, Karnataka, section 3.2, page 4
 ```
 
-This lesson follows an HR assistant at an IT company in Bengaluru serving employees in five states.
+The catch is that metadata fails silently. A wrong date or a misspelt state does not raise an error at question time; the right chunk just never comes back, and the model answers confidently from the wrong one.
+
+This lesson follows the HR assistant of a Bengaluru IT company serving five states. The exercise moves the same ideas to government orders, where versions and amendments are harder.
 
 ## How it works
 
-**Collect at ingestion.** For every chunk store at least:
+### Collect it at ingestion
 
-- document id, title, source system and link;
-- section path ("Leave Policy > Earned leave > Carry forward") and page;
-- document type (policy, circular, FAQ, contract);
-- dates: published, effective from, effective to, last modified;
-- language;
-- owner or department;
-- access groups.
-
-**Contextual text.** A chunk that says "This limit is 45 days" is hard to retrieve. Prepend the title and section path to the text that gets embedded ("Leave Policy v4 > Earned leave > Carry forward: This limit is 45 days"), or have a model write a one-sentence context for each chunk. This kind of contextual enrichment can cut retrieval failures noticeably.
-
-**Generated metadata.** A model can add a short summary, keywords or questions each chunk answers. Embedding likely questions helps when users phrase things very differently from the documents. It costs a model call per chunk at ingestion, so measure the gain on your golden set first.
-
-**Filters from the query.** Some filters come from the user's context (their region, their access groups). Others can be inferred from the question with a small model ("leave rules for Karnataka from 2026" becomes region = KA, effective after 2026-01-01). Infer conservatively: a wrong filter hides the right answer.
-
-**Freshness rules.** Store effective dates and a "superseded by" link. Filter out superseded documents by default, unless the user asks about history.
-
-**Consistency.** Use fixed vocabularies (department names, document types, region codes) so filters match. Validate metadata at ingestion like any other data.
-
-**A chunk record in practice:**
+For every chunk, store at least:
 
 | Field | Example | Used for |
 | --- | --- | --- |
 | `doc_id`, `title`, `url` | `HR-LP-2026`, Leave Policy 2026 | Citations and links |
-| `section_path`, `page` | Earned leave, Carry forward; page 4 | Precise citations, contextual text |
+| `doc_group` | `LP` (all versions and translations) | Linking versions and language copies |
+| `section_id`, `section_path`, `page` | 3.2; Earned leave, Carry forward; page 4 | Precise citations, amendments, contextual text |
 | `doc_type` | `policy` | Filters |
 | `state` | `KA` | Filters from the user's profile |
-| `effective_from`, `effective_to` | 2026-01-01, open | Freshness |
-| `superseded_by` | none | Dropping old versions |
-| `language` | `en` | Filters, choosing analysers |
+| `issued_on` | 2025-12-10 | "The 2019 order" questions |
+| `effective_from`, `effective_to` | 2026-01-01, empty | Freshness and history questions |
+| `superseded_by` | empty | "Replaced by" notes in answers |
+| `language` | `en` | Filters, choosing the copy to show |
 | `access_groups` | `all-employees` | Permissions |
 
-**Validating metadata.** Treat metadata like any other data. At ingestion, check that required fields exist, that values come from the fixed lists, and that effective dates make sense, such as an end date after a start date. Reject or quarantine chunks that fail, and report counts per run. A single document tagged "Karnatka" instead of "KA" silently disappears from every Karnataka employee's search.
+Collect it now; adding it later means re-parsing every file.
 
-**Validate metadata in code.** Fixed vocabularies and date rules, checked before anything is indexed:
+**Getting it out of PDFs.** Some fields come from the source system (link, owner, access groups). Others must be read from the document itself: order numbers, issue dates and section numbers in headers. Rules (regular expressions for "No." and dates) work for clean digital PDFs; scanned files need OCR and a model, and both make mistakes. Before trusting extracted fields, hand-check a sample of about 50 documents and count the errors per field. Watch dates closely: "03/12/2019" is 3 December in India but 12 March to a parser with US defaults, so state the format explicitly.
+
+### Contextual text
+
+A chunk that says "This limit is 45 days" is hard to retrieve, because nothing in it says *which* limit. Prepend the title and section path to the text you embed: "Leave Policy 2026 > Earned leave > Carry forward: This limit is 45 days". It costs nothing.
+
+The stronger version is to ask a model to write one or two sentences placing each chunk in its document. Anthropic tested this "contextual retrieval" on its own datasets and reported that it cut the top-20 retrieval failure rate by 35%, by 49% when also applied to keyword (BM25) search, and by 67% with reranking added. It costs one model call per chunk, so measure it on your own golden set.
+
+### Generated metadata
+
+A model can also write a short summary, keywords or the questions a chunk answers. Generated questions help when users phrase things very differently from the documents ("can I carry over my leave?" against "Carry forward of earned leave").
+
+Store each generated question as **its own vector, with the parent chunk's id**. When a question vector matches, return the parent chunk, never the question text, because the model should answer from the real document. Two gotchas: generated questions can promise more than the chunk says, so spot-check a sample; and they go stale, so store a hash of the chunk text and regenerate when it changes.
+
+### Fixed vocabularies, validated in code
+
+Filters compare exact values. "HR", "Human Resources" and "hr dept" are three different departments to a filter. Use fixed lists for departments, document types, states and languages, and check every chunk before it is indexed:
 
 ```python
 from datetime import date
 from typing import Literal
 from pydantic import BaseModel, field_validator, model_validator
 
-State = Literal["KA", "TN", "MH", "DL", "ALL"]
+State = Literal["KA", "TN", "MH", "TS", "GJ", "ALL"]   # the client's five states, plus ALL
 DocType = Literal["policy", "circular", "faq", "contract"]
 
 class ChunkMeta(BaseModel):
     doc_id: str
+    doc_group: str               # same for every version and translation
     title: str
+    section_id: str              # stable id such as "3.2"
     section_path: str
     page: int
     doc_type: DocType
     state: State
-    language: Literal["en", "hi", "ta", "kn", "mr"]
+    language: Literal["en", "hi", "ta", "kn", "mr", "te", "gu"]
+    issued_on: date
     effective_from: date
     effective_to: date | None = None
     superseded_by: str | None = None
@@ -154,72 +160,138 @@ class ChunkMeta(BaseModel):
         return self
 ```
 
-Run every chunk through `ChunkMeta.model_validate`, index the ones that pass, and write the failures to a quarantine table with the error. "Karnatka" now fails loudly instead of vanishing.
+Run every chunk through `ChunkMeta.model_validate`, index the ones that pass, and write the failures to a quarantine table with the error. Report quarantine counts on every run. A document tagged "Karnatka" now fails loudly, instead of vanishing from every Karnataka employee's search. The state list must match the client's real list exactly; a state you forgot to add sends all its documents to quarantine.
 
-**Infer filters from the question, safely.** Ask a small model for filters as structured output with a confidence, and only apply them when the question clearly states them:
+### Freshness: one "in force" rule
 
-```python
-class Filters(BaseModel):
-    state: State | None = None
-    year_from: int | None = None
-    doc_type: DocType | None = None
-    explicit: bool        # true only if the user named these in the question
+Do not use a simple "current" flag. Use one date rule everywhere: a chunk is **in force during a period** if `effective_from` is on or before the period's end, and `effective_to` is empty or on or after the period's start.
 
-def apply_filters(f: Filters, user_state):
-    filters = {"state": [user_state, "ALL"], "current": True}    # from the profile, always safe
-    if f.explicit:
-        if f.state:
-            filters["state"] = [f.state, "ALL"]
-        if f.year_from:
-            filters["effective_from_gte"] = date(f.year_from, 1, 1)
-        if f.doc_type:
-            filters["doc_type"] = f.doc_type
-    return filters
-```
+- **Default questions** ("how many leave days can I carry forward?"): the period is today, in Asia/Kolkata time.
+- **"What was the rule in 2024?"**: the period is 1 January to 31 December 2024. A policy in force from 2023 to 2025 comes back, even though it started before 2024 and is superseded now.
+- **"What did the 2019 order say?"**: this asks about the order *issued* in 2019, so filter on the year of `issued_on` and ignore whether it is still in force.
 
-If a filtered search returns nothing, retry once without the inferred filters and say so in the logs.
+One gotcha: a policy announced in December for 1 January is not yet in force. A question about "next year's policy" needs the next year as the period, or the default rule hides it.
 
-**Superseding a document.** When a new version arrives, mark the old one in the same transaction:
+When a new version replaces a whole document, close the old one in the same transaction, so no search ever sees both or neither:
 
 ```sql
 BEGIN;
-UPDATE chunks SET superseded_by = 'HR-LP-2026', effective_to = '2025-12-31' WHERE doc_id = 'HR-LP-2025';
+UPDATE chunks SET superseded_by = 'HR-LP-2026', effective_to = '2025-12-31'
+WHERE doc_id = 'HR-LP-2025';
 INSERT INTO chunks (...) VALUES (...);   -- the new version's chunks
 COMMIT;
 ```
 
-Default searches filter `superseded_by IS NULL`; history questions ("what was the rule in 2024?") drop that filter and use the dates.
+The date rule does the filtering. `superseded_by` is kept so the answer can say "replaced by Leave Policy 2026".
 
-**Check the payoff.** Measure recall at 5 with and without each piece of metadata (contextual text, generated questions, inferred filters) on your golden set, and keep only what helps.
+### Partial amendments
+
+Real documents are often changed one part at a time. A government order may say "in paragraph 4 of order 112/2019, for 'Rs 300' substitute 'Rs 450'", and leave every other paragraph in force. A whole-document "superseded" flag cannot express this. Mark the old order superseded and its other paragraphs vanish; leave it and the old rate keeps winning.
+
+Model amendments at section level:
+
+- Every chunk carries a stable `section_id` (paragraph 4, clause 3.2).
+- An amendments table records `amending_doc`, `amended_doc`, `section_id` and the date it takes effect.
+- When an amendment takes effect, end the `effective_to` of only the amended section, and leave the rest.
+- At query time, when a base section is retrieved, also fetch every amendment to it, sorted by date, and give the model both.
+
+This matters because neither chunk works alone. The amendment says "substitute 'Rs 450'" without saying what for; the base paragraph is out of date. The answer should cite both: "order 112/2019, paragraph 4, as amended by order 37/2022". If the department publishes consolidated versions, index those too, but keep the chain for citations.
+
+Amendment links are themselves extracted metadata. Phrases like "in partial modification of" or "in supersession of" followed by an order number are good starting rules, but check them on a sample, as with any extracted field.
+
+### Translations
+
+A Hindi order and its English copy are one document in two languages, not two documents. Give both the same `doc_group` and `section_id`. In results, keep one chunk per document group and section, and show the copy in the user's language. Otherwise the top five results waste two places on the same paragraph twice. Ask the department which copy is authoritative when they differ, record it, and cite that one.
+
+### Permissions, kept in sync
+
+Store **group ids** on chunks (`finance`, `all-employees`), not user ids, and apply the filter inside the search so a forbidden chunk never reaches the model. Two syncs need separate schedules:
+
+- **Document permissions** change in the source system (a file is reshared). Re-sync them often, as a metadata update; you do not need to re-embed the text.
+- **User groups** change when people move teams. Read the user's groups from the identity system at query time, or cache them for minutes, not days. A cached group list is how someone who left Finance keeps seeing Finance circulars.
+
+### Filters from the question
+
+Some filters come from the user's profile (their state, their groups). Others are inferred from the question by a small model. A wrong inferred filter hides the right answer, so apply them conservatively:
+
+```python
+STATE_NAMES = {"KA": "Karnataka", "TN": "Tamil Nadu", "MH": "Maharashtra",
+               "TS": "Telangana", "GJ": "Gujarat"}
+
+class Filters(BaseModel):            # structured output from a small model
+    state: Literal["KA", "TN", "MH", "TS", "GJ"] | None = None  # a real state, never ALL
+    state_named: bool = False         # true only if the question names the state itself
+    in_force_year: int | None = None  # "what was the rule in 2024?"
+    issued_year: int | None = None    # "the 2019 order on transfers"
+    doc_type: DocType | None = None
+
+def in_force(start: date, end: date) -> dict:
+    """In force at any time from start to end."""
+    return {"effective_from": {"$lte": end},
+            "$or": [{"effective_to": None}, {"effective_to": {"$gte": start}}]}
+
+def build_filters(f: Filters, user, today: date):
+    if f.state and f.state != user.state and not f.state_named:
+        return None, f"Do you mean the {STATE_NAMES[f.state]} documents?"
+    where = {"access_groups": {"$in": user.groups},           # never dropped
+             "state": {"$in": [f.state or user.state, "ALL"]}}
+    if f.in_force_year:
+        y = f.in_force_year
+        where |= in_force(date(y, 1, 1), date(y, 12, 31))
+    elif f.issued_year:
+        y = f.issued_year
+        where["issued_on"] = {"$gte": date(y, 1, 1), "$lte": date(y, 12, 31)}
+    else:
+        where |= in_force(today, today)                       # default
+    if f.doc_type:
+        where["doc_type"] = f.doc_type
+    return where, None
+```
+
+The filter syntax is generic; translate it to your vector store's. Pass `today` as the date in Asia/Kolkata, not the server's UTC date. If a filtered search returns nothing, retry once with only the access filter and the user's state, show the dates of whatever it cites, and log the empty search. Never drop the access filter in a retry.
+
+### Filters and search speed
+
+Filters interact with approximate vector indexes. In pgvector, for example, the filter is applied *after* the index scan by default. Its documentation gives the example of a filter matching 10% of rows: with an HNSW index and the default `hnsw.ef_search` of 40, only about 4 rows survive on average, so you get fewer results than you asked for. From version 0.8.0 you can turn on iterative index scans (`SET hnsw.iterative_scan = relaxed_order`), which scan more of the index until enough rows pass or a scan limit (`hnsw.max_scan_tuples`) is reached, and for a field with only a few distinct values pgvector suggests a partial index per value. Other stores differ, so test your most selective filter (a small state, a rare document type) and check it still returns a full top-k.
+
+### Check the payoff
+
+Measure recall at 5 on your golden set with and without each addition (contextual text, generated questions, inferred filters), and keep only what helps. Include history and other-state questions, since that is where filters go wrong.
 
 ## A worked example
 
-A Bengaluru IT company's HR assistant serves employees in five states. Leave and holiday rules differ by state, and policies are revised each year.
+The Bengaluru IT company's HR assistant serves employees in Karnataka, Tamil Nadu, Maharashtra, Telangana and Gujarat. Leave and holiday rules differ by state, and policies are revised each year.
 
-Before: chunks carried only the file name. The assistant mixed Karnataka and Maharashtra holiday lists and sometimes quoted last year's policy.
+**Before:** chunks carried only the file name. The assistant mixed Karnataka and Maharashtra holiday lists and sometimes quoted last year's policy. A first fix added a `current = true` filter, and then "what was the carry-forward limit in 2024?" returned nothing at all.
 
-After re-ingestion, each chunk carries state, policy type, effective dates, version, section path and access groups. The employee's state comes from their sign-on profile and is applied as a filter unless they ask about another state. Superseded versions are excluded by default. Embedded text starts with the title and section path.
+**After re-ingestion:** each chunk carries the fields in the table above. The state and groups come from the employee's sign-on profile. The date rule defaults to today; a named year switches it to that year. Embedded text starts with the title and section path. The numbers below are an illustration of the kind of change to expect, not a measured result:
 
-On the 100-question golden set, correct answers rise from 71% to 90%. Citations now read "Leave Policy 2026, Karnataka, section 3.2, page 4", and HR staff can check them in seconds.
-
-| Measure on 100 questions | Before | After |
+| Suppose, on 100 golden questions | Before | After |
 | --- | --- | --- |
-| Correct answers | 71% | 90% |
+| Correct answers | 71 | 90 |
 | Answers quoting the wrong state | 9 | 0 |
 | Answers quoting last year's policy | 7 | 1 |
+| Other wrong answers | 13 | 9 |
 | Citation format | File name only | Document, state, section, page |
 
-**How the filter decision works.** When an employee in Bengaluru asks "how many holidays in October?", the assistant applies `state = KA` from their sign-on profile. When they ask "holidays in Pune office in October", a small model spots the different state, and the assistant asks "Do you mean the Maharashtra holiday list?" before filtering. Asking costs one tap; a wrong silent filter would have cost a wrong answer.
+Citations now read "Leave Policy 2026, Karnataka, section 3.2, page 4", and HR staff can check them in seconds.
+
+**How the filter decisions work.** Priya in Bengaluru asks "how many holidays in October?". The assistant applies `state = KA` from her profile and in force today. She then asks "holidays in Pune office in October". The small model maps Pune to Maharashtra, but she did not name the state, so `build_filters` returns a question: "Do you mean the Maharashtra documents?" Asking costs one tap; a wrong silent filter costs a wrong answer. If she had typed "Maharashtra holidays", the filter would apply directly.
+
+When she asks "what was the carry-forward limit in 2024?", the model returns `in_force_year = 2024`. The 2023 to 2025 policy, superseded since January 2026, matches the date rule and comes back, with the note "replaced by Leave Policy 2026".
 
 ## Common mistakes
 
 - **Only a file name.** You cannot filter, cite properly or handle versions.
-- **Free-text metadata values.** "HR", "Human Resources" and "hr dept" break filters. Use fixed lists.
-- **No effective dates.** Old versions keep winning.
-- **Aggressive inferred filters.** A wrongly inferred filter hides the right answer; prefer user context and ask when unsure.
-- **Generating metadata without measuring.** It costs money at ingestion; prove it helps.
-- **Free-text metadata values.** Use fixed lists and validate them.
-- **Inferred filters applied without a fallback.** Retry without them when results are empty.
+- **Free-text metadata values.** "HR", "Human Resources" and "hr dept" break filters. Use fixed lists and validate them.
+- **A vocabulary that misses a real value.** One forgotten state quarantines all its documents, or worse, indexes them without a state.
+- **A "current only" filter on every search.** History questions then return nothing. Use the in-force rule with the period the question asks about.
+- **Whole-document supersession for partial amendments.** It either hides paragraphs still in force or keeps old values. Track amendments per section.
+- **Translations as separate documents.** Duplicate paragraphs crowd out other results.
+- **Aggressive inferred filters.** Prefer the user's profile, and ask when an inferred filter changes it.
+- **A fallback that drops the access filter.** An empty result must never widen what a user may see.
+- **Stale group lists.** Access is decided by the user's groups at query time, so read them fresh.
+- **Generating metadata without measuring.** It costs a model call per chunk; prove it helps.
 
 ## When little metadata is needed
 
@@ -227,25 +299,25 @@ On the 100-question golden set, correct answers rise from 71% to 90%. Citations 
 - **Everyone may see everything**, and nothing goes out of date.
 - **A prototype** testing whether retrieval helps at all.
 
-Rich metadata pays off once there are many document types, versions, regions or permission groups.
+Even then, store the document id, section and page: citations need them, and they cost nothing. Rich metadata pays off once there are many document types, versions, regions or permission groups.
 
 ## From demo to production
 
-- **Validate every chunk's metadata** at ingestion and report quarantine counts per run.
-- **Supersede in transactions**, and filter superseded documents by default.
-- **Log the filters applied** to each search, including inferred ones.
+- **Hand-check extracted fields** on a sample whenever the parser or document format changes.
+- **Log the filters applied** to each search, including inferred ones and fallbacks.
+- **Re-sync permissions** on their own schedule, separate from re-embedding.
 - **Review vocabularies** (states, document types, departments) with the content owners.
-- **Measure the value** of each metadata feature on the golden set.
 
 ## Practice
 
 Read LlamaIndex's page on metadata extraction and Microsoft's security filter pattern.
 
-1. Re-ingest your RAG documents with title, section path, type, dates and language on every chunk.
+1. Re-ingest your RAG documents with title, section id and path, type, dates, language and access groups on every chunk.
 2. Prepend title and section path to the embedded text and compare recall at 5 before and after.
-3. Add a "superseded" flag to one document's old version and show that filtering removes it from answers.
-4. Feed five chunks with deliberately bad metadata through ChunkMeta and confirm each lands in quarantine with a clear error.
+3. Give one document an old version that ended last year. Show that a default question gets the new version and a question naming last year gets the old one.
+4. Make one section of a document amended by a second document. Show that the answer cites both.
+5. Feed five chunks with deliberately bad metadata through `ChunkMeta` and confirm each lands in quarantine with a clear error.
 
-For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers metadata filtering and adding context to chunks.
+For more depth, chapter 6 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers RAG, including chunking and adding context to chunks.
 
-**You are done when you can** show an answer with a precise citation and a question where a metadata filter fixed a wrong answer.
+**You are done when you can** show an answer with a precise citation, a history question that returns the old version, and a question where a metadata filter fixed a wrong answer.
