@@ -3,8 +3,8 @@ id: mcp-servers-clients
 level: I3
 theme: agents
 title: "MCP servers and clients"
-outcome: "Explain how the Model Context Protocol connects AI apps to tools and data, build a small MCP server, and know the security questions to ask."
-answer: "The Model Context Protocol (MCP) is an open standard for connecting AI apps to tools and data: an MCP server exposes tools and resources, and AI apps connect as clients."
+outcome: "Explain how the Model Context Protocol connects AI apps to tools and data, build and test a small MCP server with the current Python SDK, and secure a remote server so it acts as the signed-in user."
+answer: "MCP (Model Context Protocol) is an open standard: you wrap a system once as an MCP server that offers tools, resources and prompts, and any MCP-capable AI app connects to it as a client."
 why_it_matters: "MCP has become the common way to plug tools and company data into AI assistants and agents. Clients ask for \"an MCP server for our ticketing system\" by name, and FDE job posts list it. Building one is quick once you know the parts."
 hours: 4
 gap_tags: []
@@ -19,45 +19,45 @@ check:
   question_ids: [mcp-servers-clients-1, mcp-servers-clients-2, mcp-servers-clients-3]
 flashcards:
   - q: "What problem does MCP solve?"
-    a: "Each AI app needed custom code per tool. With MCP, a system is wrapped once as a server and any MCP client can use it."
-  - q: "What three things can an MCP server offer?"
-    a: "Tools the model can call, resources the app can read into context, and prompts users can pick."
+    a: "Without it, every AI app needs custom code for every system: 3 apps and 4 systems means 12 integrations. With MCP, each system is wrapped once as a server and each app has one client, so 3 plus 4 pieces."
+  - q: "Who decides when each MCP feature is used: tools, resources, prompts?"
+    a: "The model decides when to call a tool. The app or the user picks which resources (data) to attach. The user picks a prompt (a template) from a menu."
   - q: "What are host, client and server?"
-    a: "The host is the AI app; inside it a client holds a connection to each server; the server exposes a system's tools and data."
-  - q: "What are MCP's two main transports?"
-    a: "Standard input and output for local servers on the same machine, and HTTP for remote servers, which need authentication such as OAuth."
+    a: "The host is the AI app the user works in. Inside it, one client holds the connection to one server. The server exposes a system's tools and data. The model never talks to a server directly."
+  - q: "What are MCP's two standard transports?"
+    a: "stdio, where the host starts a local server as a child process and they talk over standard input and output, and Streamable HTTP, one URL for a remote server. The older HTTP+SSE transport is deprecated."
   - q: "How does a Python MCP tool get its schema?"
-    a: "From the function's name, type hints and docstring."
+    a: "In the official SDK (mcp 2.x, class MCPServer) the function's name, type hints and docstring become the tool's name, input schema and description. Older tutorials call the same class FastMCP."
   - q: "Why should an MCP server act as the user?"
-    a: "So the system applies the user's own permissions; a super-user credential lets every user reach everything."
+    a: "So the user's own permissions apply. With one super-user credential, anyone who can talk to the assistant can reach everything the credential can."
   - q: "Why is a run_sql tool usually a bad idea?"
-    a: "It exposes the whole database to whatever the model writes. Task-shaped tools limit what can happen."
-  - q: "How can MCP carry prompt injection?"
-    a: "Tool descriptions and results flow into the model, so a malicious server or poisoned record can carry hidden instructions."
-  - q: "What besides tools can an MCP server offer?"
-    a: "Resources, which are data the host can read such as files or records, and prompts, which are reusable templates the user can pick."
+    a: "It exposes the whole database to whatever the model writes, including text planted in a record. Task-shaped tools limit what can happen."
+  - q: "How does a remote MCP server know who is calling?"
+    a: "The client sends an OAuth access token from the company's sign-in. The server checks the token was issued for this server, then reads the user, their scopes and claims such as plant or team from it."
+  - q: "What changed in MCP version 2026-07-28?"
+    a: "The core became stateless: no initialize handshake and no session id; each request carries its protocol version and client capabilities. Sampling, roots and logging were deprecated, and tasks moved to an extension."
   - q: "What is tool poisoning in MCP?"
-    a: "A server whose tool descriptions or results hide instructions for the model, such as telling it to read secrets or call another tool."
+    a: "A server whose tool descriptions or results hide instructions for the model, such as telling it to read secrets or call another server's tool. Treat descriptions and results as untrusted data."
 exercise:
   title: "Review the MCP server"
-  setup: "A Kochi shipping company's IT team finds a free community MCP server for their ERP. It offers tools: run_sql(query), get_shipment(id), update_shipment(id, fields), and send_email(to, body). It connects with one admin database account set in a config file. It keeps no logs. Staff want to install it in their desktop assistants today."
+  setup: "A Kochi shipping company's IT team finds a free community MCP server for their ERP. It offers tools: run_sql(query), get_shipment(id), update_shipment(id, fields), and send_email(to, body). It connects with one admin database account set in a config file. It keeps no logs. Its README tells you to import FastMCP and run it with the SSE transport. Staff want to install it in their desktop assistants today."
   questions:
     - q: "What should IT check before installing it?"
-      a: "Who wrote it, what code it runs, what it can reach, how it authenticates, and whether it sends data anywhere else."
+      a: "Who wrote it, the code and tool descriptions, what it can reach, how it authenticates, whether it sends data elsewhere, and that it targets a current SDK and transport."
     - q: "What is risky about the admin database account?"
-      a: "Every user gets admin access through the assistant. The server should act as each user with their own permissions."
+      a: "Every user gets admin access through the assistant. The server should act as each user, with identity taken from their sign-in token, never from a tool argument."
     - q: "Which tools should be removed or restricted?"
-      a: "Remove run_sql; restrict update_shipment to specific fields with approval; limit send_email to internal recipients or require approval."
+      a: "Remove run_sql; restrict update_shipment to named fields with user confirmation; limit send_email to internal recipients or require approval."
     - q: "What must be added before production use?"
-      a: "Logging of every call with user, tool and arguments, plus authentication through company sign-on."
+      a: "Run it remotely over Streamable HTTP behind company sign-in, check each token was issued for it, log user, tool and arguments for every call, cap results and pin the version."
 ask:
   - "What is the Model Context Protocol in simple words?"
   - "How do I build an MCP server in Python?"
   - "Is it safe to install third-party MCP servers?"
 explain_in_interview:
-  answer: "MCP, the Model Context Protocol, is an open standard for connecting AI apps to tools and data. You wrap a system once as an MCP server, which offers tools the model can call, resources the app can read and reusable prompts. Inside the host app, an MCP client connects to each server, passes its tools to the model and routes the model's calls back. For example, a manufacturing company in Pune wraps its maintenance logs as one server, and both an IDE assistant and a chat assistant use it. The trade-off is security: a server is code with access to real systems, and its results can carry prompt injection."
+  answer: "MCP, the Model Context Protocol, is an open standard for connecting AI apps to tools and data. You wrap a system once as an MCP server, which offers tools the model can call, resources the app can read and reusable prompts. Inside the host app, an MCP client connects to each server, passes its tools to the model and routes the model's calls back. For example, a manufacturing company in Pune wraps its maintenance logs as one remote server, and both an IDE assistant and a chat assistant use it. The hard part is security: the server must check each user's sign-in token and act with that user's permissions, and its results can carry prompt injection."
   follow_up: "When would you run an MCP server locally and when remotely?"
-  follow_up_answer: "A local server runs as a process on the same machine and talks over standard input and output, which suits desktop tools and developer machines. A remote server runs as a web service over HTTP, which suits shared company systems and needs proper authentication, typically OAuth."
+  follow_up_answer: "Locally over stdio when the tool works on the user's own machine, such as files or a local database: the host starts it as a child process. Remotely over Streamable HTTP when many people share a company system: you update it once, log centrally, and every call carries an OAuth token checked against company sign-in."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-11-09
@@ -65,187 +65,284 @@ reviewed_on: 2026-11-09
 
 ## What it is
 
-Every AI app used to need its own custom code for every tool: one integration for the ticketing system in the chat app, another in the coding assistant, another in the agent. The **Model Context Protocol** (MCP) is an open standard that fixes this. You wrap a system once as an **MCP server**; any **MCP client**, such as a desktop assistant, an IDE or your own agent, can then discover and use it.
+Before MCP, every AI app needed its own code for every system. Three assistants and four systems meant twelve integrations. The **Model Context Protocol** (MCP) is an open standard that fixes this. You wrap each system once as an **MCP server**, and each AI app contains an **MCP client** that can talk to any server: three plus four pieces instead of three times four.
 
-An MCP server can offer three kinds of thing:
+Anthropic released MCP on 25 November 2024. In December 2025 it gave MCP to the Agentic AI Foundation, a fund under the Linux Foundation co-founded by Anthropic, Block and OpenAI, where its maintainers develop it in the open. Versions are named by date. The current one is **2026-07-28**, the fifth release; the one before was 2025-11-25. Always check which version a tutorial targets.
 
-- **Tools**: actions the model can call, such as `search_tickets` or `create_invoice`.
-- **Resources**: data the app can read into context, such as a file, a record or a schema.
-- **Prompts**: reusable prompt templates a user can pick.
+A server can offer three kinds of thing. What matters most is who decides to use each:
 
-```flow
-dir: LR
-title: One server, many hosts: no new integration per app
-IDE assistant, a host -[client]-> Maintenance-log server | tools: find_machine, get_maintenance_history, log_observation
-Chat assistant, a host -[client]-> Maintenance-log server
-Chat assistant, a host -[client]-> Spare-parts server
-```
-
-This lesson follows a manufacturing company in Pune whose engineers use two different AI assistants on the same maintenance data.
+| Feature | What it is | Who decides to use it | Example | Messages |
+| --- | --- | --- | --- | --- |
+| Tools | Functions with a JSON schema | The model, during a task | `search_tickets(query, status)` | `tools/list`, `tools/call` |
+| Resources | Data addressed by a URI | The app or the user attaches it | `ticket://T-1042` | `resources/list`, `resources/read` |
+| Prompts | Reusable prompt templates | The user picks one from a menu | "Summarise this ticket thread" | `prompts/list`, `prompts/get` |
 
 ## How it works
 
-**Roles.** The *host* is the AI application the user works in. Inside it, an MCP *client* holds a connection to each *server*. The client asks a server what it offers, passes the tool list to the model, and when the model calls a tool, the client sends the call to the right server and returns the result.
+### Host, client and server
 
-**Transports.** A local server runs as a process on the same machine and talks over standard input and output, which suits desktop tools and developer machines. A remote server runs as a web service and talks over HTTP, which suits shared company systems and needs proper authentication, typically OAuth.
+The **host** is the AI app the user works in. Inside it, one **client** holds the connection to one **server**, so a host with three servers has three clients. The client lists its server's tools for the model. When the model asks for a tool, the client sends the call to that server and returns the result. The model never talks to a server directly, so the host stays in control.
 
-**Building a server.** Official SDKs exist for Python, TypeScript and other languages. In Python a minimal server is a few lines:
-
-```python
-from mcp.server.fastmcp import FastMCP
-
-mcp = FastMCP("tickets")
-
-@mcp.tool()
-def search_tickets(query: str, status: str = "open") -> list[dict]:
-    """Search support tickets by keywords. status is 'open' or 'closed'. Returns up to 10."""
-    return ticket_db.search(query, status=status, limit=10)
-
-if __name__ == "__main__":
-    mcp.run()
+```flow
+dir: LR
+title: One server per system, shared by every host
+IDE assistant | host with one client per server -> Maintenance-log server | find_machine, get_maintenance_history, log_observation
+Chat assistant | host with one client per server -> Maintenance-log server
+Chat assistant -> Spare-parts server
 ```
 
-The function's name, type hints and docstring become the tool's schema, so the tool design advice from the earlier lesson applies directly.
+### The messages on the wire
 
-**Security.** An MCP server is code with access to real systems. Ask: who wrote it, what can it reach, which credentials does it use, and does it act as the user (respecting their permissions) or as an all-powerful service account? Tool descriptions and results flow into the model, so a malicious server or a poisoned record can carry prompt injection. Use least privilege, review third-party servers before installing them, and log every call.
+MCP messages are JSON-RPC 2.0: a request has an `id`, a `method` and `params`, and the reply carries the same `id`. Since 2026-07-28 the protocol is **stateless**. Older versions began with an `initialize` handshake and kept a session. Now each request carries the protocol version, client name and capabilities in `_meta`, so any copy of the server can answer it. A client may call `server/discover` first, but need not. The SDKs still speak the older handshake to hosts that have not upgraded.
 
-**Local versus remote servers:**
+Failures come in two kinds:
 
-| Aspect | Local (standard input and output) | Remote (HTTP) |
-| --- | --- | --- |
-| Runs on | The user's machine | A company server or cloud |
-| Good for | Developer tools, local files | Shared company systems |
-| Authentication | The user's own machine access | OAuth, ideally through single sign-on |
-| Updates | Each user updates their copy | Update once for everyone |
-| Logging | Per machine | Central audit log |
+- **A tool error** is a normal result with `isError: true`. The model reads it and can try again, so say what went wrong and what to do instead.
+- **A protocol error** is a JSON-RPC `error` with a code, for example for a malformed request. The client handles it; the model usually never sees it.
 
-**Security questions for any server:**
-
-| Question | Why it matters |
-| --- | --- |
-| Who wrote it, and can we read the code? | A server runs with the access you give it |
-| What systems and data can it reach? | Limits the damage from a mistake or attack |
-| Does it act as the user or as a service account? | Decides whether user permissions apply |
-| Which tools write or send? | Those need tight limits or approval |
-| Are calls logged with user, tool and arguments? | Needed to investigate incidents |
-
-**Designing the tools.** The same advice as any agent tool applies: few, task-shaped tools with clear descriptions and helpful errors. Because many different hosts will use one server, good descriptions matter even more; you cannot tune a prompt in each host to make up for a vague tool. Keep write tools narrow, such as `log_observation` writing only to a notes table, so even a confused or manipulated model can do little harm.
-
-**More than tools.** A server can offer three kinds of things. **Tools** are functions the model may call. **Resources** are data the host can read and show or attach, such as a file, a ticket or a database row, addressed by a URI. **Prompts** are reusable templates a user can pick from a menu, such as "summarise this ticket thread". Tools are model-driven; resources and prompts are usually chosen by the app or the user.
-
-```python
-from mcp.server.fastmcp import FastMCP
-
-mcp = FastMCP("tickets")
-
-@mcp.resource("ticket://{ticket_id}")
-def ticket(ticket_id: str) -> str:
-    """The full text of one ticket."""
-    t = ticket_db.get(ticket_id)
-    return f"{t.title}\n\n{t.body}"
-
-@mcp.prompt()
-def summarise_ticket(ticket_id: str) -> str:
-    return f"Summarise ticket {ticket_id} in five bullets and list open questions."
-```
-
-**Writing your own client.** Hosts such as desktop assistants and code editors already include clients, but you can connect from your own Python code with the same SDK:
-
-```python
-import asyncio
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-
-async def main():
-    server = StdioServerParameters(command="python", args=["tickets_server.py"])
-    async with stdio_client(server) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            tools = await session.list_tools()
-            print([t.name for t in tools.tools])
-            result = await session.call_tool("search_tickets", {"query": "refund", "status": "open"})
-            print(result.content[0].text)
-
-asyncio.run(main())
-```
-
-Your app would pass `tools.tools` to the model as tool definitions and route the model's tool calls to `session.call_tool`, the same round trip as the tool-calling lesson.
-
-**Test a server before connecting a model.** The MCP Inspector, run with `npx @modelcontextprotocol/inspector`, opens a page where you can list a server's tools, call them with your own arguments and see the raw results. Most bugs show up here faster than through a chat.
-
-**Threats specific to MCP.**
-
-- **Tool poisoning**: a tool description or result tells the model to do something else, such as read `~/.ssh` or send data to a URL. Read the descriptions of third-party servers, and treat results as data.
-- **Changed after approval**: a server you approved can update its tool descriptions later. Pin versions and review changes.
-- **Name clashes**: two servers offering a tool with the same name can confuse the model about which one runs. Prefix tool names with the server's purpose.
-- **Too much reach**: one server with a company-wide token can expose everything. Prefer servers that act as the signed-in user, with OAuth scopes as narrow as the task.
-
-**Try it in your browser.** MCP messages are JSON-RPC. This builds the tool call a client sends and checks the reply shape.
+**Try it in your browser.** These are one request and two replies recorded from the worked example's server, trimmed for space. The code turns a reply into what the model sees.
 
 ```python
 import json
 
 request = {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
-           "params": {"name": "search_tickets", "arguments": {"query": "refund", "status": "open"}}}
-reply = {"jsonrpc": "2.0", "id": 7,
-         "result": {"content": [{"type": "text", "text": "T-1042: refund delayed"}], "isError": False}}
+           "params": {"name": "get_maintenance_history", "arguments": {"tag": "CNC-14", "limit": 1},
+                      "_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}}}
 
-print(json.dumps(request, indent=2))
-assert reply["id"] == request["id"], "replies must match the request id"
-print("tool said:", reply["result"]["content"][0]["text"])
+ok = {"jsonrpc": "2.0", "id": 7, "result": {"resultType": "complete", "isError": False,
+      "content": [{"type": "text", "text": "{\"date\": \"2026-11-18\", \"note\": \"Vibration at high RPM\"}"}]}}
+refused = {"jsonrpc": "2.0", "id": 7, "result": {"resultType": "complete", "isError": True,
+      "content": [{"type": "text", "text": "Error executing tool get_maintenance_history: No machine 'CNC-14' in your plant."}]}}
+
+def for_the_model(reply):
+    assert reply["id"] == request["id"], "a reply must match its request id"
+    if "error" in reply:  # protocol error: the host deals with it
+        raise RuntimeError(reply["error"]["message"])
+    text = "\n".join(c["text"] for c in reply["result"]["content"] if c["type"] == "text")
+    return {"tool_result": text, "is_error": reply["result"]["isError"]}
+
+print(json.dumps(for_the_model(ok)))
+print(json.dumps(for_the_model(refused)))
 ```
+
+### Transports: local and remote
+
+| Aspect | stdio (local) | Streamable HTTP (remote) |
+| --- | --- | --- |
+| How it runs | The host starts the server as a child process and talks over standard input and output | The server is a web service at one URL, for example `https://mcp.example.in/maintenance` |
+| Good for | Files, local databases, developer tools | Shared company systems, updated and logged in one place |
+| Who is the user | Whoever runs the host on that machine | Whoever signed in: an OAuth token on every request |
+
+With **Streamable HTTP**, the client POSTs each message to the one URL, and the server answers with JSON, or with a stream of events when it sends progress first. In 2026-07-28, `Mcp-Method` and `Mcp-Name` headers copy the method and tool name from the body, so a gateway can route and rate-limit by tool; the server rejects a request whose headers and body disagree. With no session id, several copies can run behind a plain load balancer. If a workflow needs state, a tool returns a handle such as `draft_id` and the model passes it back.
+
+Two gotchas. Older tutorials use the **HTTP+SSE** transport (`transport="sse"`), which is deprecated: do not start anything new on it. And a stdio server must write only MCP messages to standard output: one stray `print` breaks the connection, so log to standard error.
+
+### Building a server in Python
+
+The official Python SDK is the `mcp` package, version 2.x as of November 2026 (`pip install "mcp[cli]"`). Its main class is `MCPServer`. SDK 1.x tutorials import `FastMCP` from `mcp.server.fastmcp`, which fails on 2.x: update the code or pin `mcp<2`.
+
+```python
+# tickets_server.py
+from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
+
+mcp = MCPServer("tickets")
+
+@mcp.tool()
+def search_tickets(query: str, status: str = "open") -> list[dict]:
+    """Search support tickets by keywords. status is 'open' or 'closed'. Returns up to 10."""
+    if status not in ("open", "closed"):
+        raise ToolError("status must be 'open' or 'closed'.")
+    return ticket_db.search(query, status=status, limit=10)
+
+@mcp.resource("ticket://{ticket_id}")
+def ticket(ticket_id: str) -> str:
+    """The full text of one ticket."""
+    return ticket_db.get(ticket_id).body
+
+@mcp.prompt()
+def summarise_ticket(ticket_id: str) -> str:
+    return f"Summarise ticket {ticket_id} in five bullets."
+
+if __name__ == "__main__":
+    mcp.run()  # stdio; use mcp.run(transport="streamable-http") for a remote server
+```
+
+The function's name, type hints and docstring become the tool's name, input schema and description, so the tool-design lesson applies directly. Raising `ToolError` returns an `isError: true` result with your message.
+
+**Test before you connect a model.** The MCP Inspector (`npx @modelcontextprotocol/inspector`, or `mcp dev tickets_server.py`) lets you call each tool with your own arguments, including bad ones, and see raw results. Most bugs show up faster here than in a chat.
+
+**Your own client.** Assistants and code editors include clients; your own agent can use the SDK:
+
+```python
+import asyncio
+from mcp import Client, StdioServerParameters
+
+async def main():
+    server = StdioServerParameters(command="python", args=["tickets_server.py"])
+    async with Client(server) as client:  # or Client("https://.../mcp") for a remote server
+        tools = await client.list_tools()
+        print([t.name for t in tools.tools])
+        result = await client.call_tool("search_tickets", {"query": "refund"})
+        print(result.is_error, result.structured_content)
+
+asyncio.run(main())
+```
+
+Give each tool's `name`, `description` and `input_schema` to the model, send its calls to `client.call_tool`, and pass `is_error` back so the model knows a call failed.
+
+### What a server can ask of the client
+
+**Elicitation** lets a tool ask the user something mid-call: a missing detail, or "Close all 40 tickets?" before a bulk change. In 2026-07-28 it works in rounds: the server returns `resultType: "input_required"` with its questions, the host asks the user, and the client repeats the call with the answers. For a password or payment, which must not pass through the AI app, the server sends the user to a web page instead (URL mode).
+
+Older material also describes **sampling** (the server asks the host's model to write text) and **roots** (the host tells the server which folders to use). Both were deprecated in 2026-07-28; they keep working for at least twelve months, but build nothing new on them. Long-running jobs (**tasks**) and interactive screens (**MCP Apps**) are now optional extensions.
+
+### Tools cost context
+
+Every connected tool's name, description and schema sit in the model's context every turn. Anthropic's documentation (checked November 2026) says a typical five-server setup can use about 55,000 tokens of definitions before any work starts, and that tool choice gets worse beyond 30 to 50 tools. So:
+
+- Offer few, task-shaped tools with distinct names; if two servers might both have `search`, prefix by system (`maint_search`).
+- Cap results: a `limit` argument, short fields, IDs instead of full documents.
+- Load tools on demand where the host supports it. For example, Claude's tool search tool keeps tools marked `defer_loading` out of context until the model searches for them.
+
+### Security in brief
+
+A server is code with access to real systems, and its output flows into the model. The main risks: **tool poisoning** (hidden instructions in descriptions or results), **changes after approval** (pin versions), **name clashes** between servers, and **too much reach** (one company-wide token). The later lesson, Securing agent tools and MCP servers, goes deeper; the worked example shows the builder's side.
 
 ## A worked example
 
-A Pune manufacturing company's engineers use an AI assistant in their IDE and another in their chat tool. Both need access to the maintenance log database.
+A Pune manufacturing company has two plants, PUN-1 and PUN-2. Engineers use one AI assistant in their IDE and another in chat, and both need the maintenance log. Contractors must see only their own plant.
 
-Instead of two integrations, you build one remote MCP server with three tools: `find_machine` (by tag or name), `get_maintenance_history` (last N events for a machine) and `log_observation` (adds a note; writes only to a notes table). It authenticates each user through the company's single sign-on and queries the database with that user's own permissions, so a contractor sees only their plant.
+You build one remote MCP server with three tools: `find_machine`, `get_maintenance_history` and `log_observation`. Remote MCP uses OAuth: the company's single sign-on (SSO) is the **authorization server** that issues tokens, and your MCP server is the **resource server** that checks them.
 
-Both assistants connect to the same server. An engineer asks in chat: "When was CNC-14's spindle last serviced, and has anyone reported vibration since?" The assistant calls `find_machine`, then `get_maintenance_history`, and answers with dates and the names in the log. Every call appears in the server's audit log with user, tool and arguments.
+```flow
+title: First connection to the remote server
+Assistant calls the server with no token -> 401 reply with a link to the server's metadata
+401 reply with a link to the server's metadata -> Assistant reads which sign-in service to use
+Assistant reads which sign-in service to use -> Engineer signs in with company SSO
+Engineer signs in with company SSO -> SSO issues a token for this server only | user, plant, scopes
+SSO issues a token for this server only -> Assistant repeats the call with the token
+Assistant repeats the call with the token -> Server checks the token, then runs the tool as that user
+```
 
-When IT later adds a new spare-parts system, they add a second MCP server, and both assistants gain the tools without any change to the assistants themselves.
+The SDK serves the metadata and sends the 401 for you. Your code checks tokens and applies the user's limits:
 
-| Event | What happened |
-| --- | --- |
-| Engineer asks about CNC-14 | Chat assistant called find_machine, then get_maintenance_history |
-| Contractor asks about another plant | The server's per-user permissions returned nothing |
-| Audit review | Every call listed with user, tool and arguments |
-| New spare-parts system | A second server added; both assistants gained its tools |
+```python
+# maintenance_server.py
+import json, sqlite3
+from mcp.server import MCPServer
+from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.provider import AccessToken
+from mcp.server.auth.settings import AuthSettings
+from mcp.server.mcpserver.exceptions import ToolError
+
+db = sqlite3.connect("maintenance.db", check_same_thread=False)
+audit = open("audit.jsonl", "a", buffering=1)  # one JSON line per call
+
+def verify_with_sso(token: str) -> dict | None:
+    """Your SSO library checks signature, expiry and issuer; returns the claims or None."""
+    ...
+
+class SSOTokenVerifier:
+    async def verify_token(self, token: str) -> AccessToken | None:
+        claims = verify_with_sso(token)
+        if claims is None:
+            return None
+        return AccessToken(token=token, client_id=claims["azp"], subject=claims["sub"],
+                           scopes=claims["scope"].split(), resource=claims["aud"],
+                           claims={"plant": claims["plant"]})
+
+mcp = MCPServer("maintenance", token_verifier=SSOTokenVerifier(), auth=AuthSettings(
+    issuer_url="https://sso.example.in",
+    resource_server_url="https://mcp.example.in/maintenance",
+    required_scopes=["maintenance.read"],
+    validate_token_resource=True,  # refuse tokens issued for any other service
+))
+
+def caller(tool: str, args: dict) -> tuple[str, str, list[str]]:
+    """Who is calling, from the checked token, never from the model. Writes the audit line."""
+    tok = get_access_token()
+    audit.write(json.dumps({"user": tok.subject, "client": tok.client_id, "tool": tool, "args": args}) + "\n")
+    return tok.subject, tok.claims["plant"], tok.scopes
+
+@mcp.tool()
+def get_maintenance_history(tag: str, limit: int = 5) -> list[dict]:
+    """Latest maintenance events for one machine in your plant, newest first. limit is 1 to 20."""
+    user, plant, _ = caller("get_maintenance_history", {"tag": tag, "limit": limit})
+    rows = db.execute(
+        "SELECT e.done_on, e.kind, e.note, e.by_user FROM events e JOIN machines m ON m.id = e.machine_id "
+        "WHERE m.tag = ? AND m.plant_id = ? ORDER BY e.done_on DESC LIMIT ?",
+        (tag, plant, max(1, min(limit, 20)))).fetchall()
+    if not rows:
+        raise ToolError(f"No machine '{tag}' in your plant. Call find_machine to search by name.")
+    return [{"date": d, "kind": k, "note": n, "by": b} for d, k, n, b in rows]
+
+@mcp.tool()
+def log_observation(tag: str, note: str) -> str:
+    """Add a short note (max 500 characters) to a machine's log. Writes only to the notes table."""
+    user, plant, scopes = caller("log_observation", {"tag": tag, "note": note[:80]})
+    if "maintenance.write" not in scopes:
+        raise ToolError("Your sign-in does not allow writing notes. Ask your supervisor to add it.")
+    row = db.execute("SELECT id FROM machines WHERE tag = ? AND plant_id = ?", (tag, plant)).fetchone()
+    if row is None:
+        raise ToolError(f"No machine '{tag}' in your plant.")
+    db.execute("INSERT INTO notes (machine_id, note, by_user) VALUES (?, ?, ?)", (row[0], note[:500], user))
+    db.commit()
+    return f"Note added to {tag}."
+
+if __name__ == "__main__":
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8000,
+            streamable_http_path="/maintenance")  # serve behind HTTPS in production
+```
+
+Three design choices carry the security:
+
+1. **The plant comes from the token, not the model.** No tool has a `plant_id` argument, so no prompt can ask for another plant. Every query filters by the plant the SSO put in the token.
+2. **The token must be for this server.** With `validate_token_resource=True`, a genuine token issued for another service gets a 401.
+3. **Writes need a scope.** Reading needs `maintenance.read`; `log_observation` also needs `maintenance.write`.
+
+We tested this server with stand-in tokens for two users (`find_machine` is the same pattern, left out above). Anita, an engineer at PUN-1, asks in chat: "When was CNC-14's spindle last serviced, and has anyone reported vibration since?" The assistant calls `get_maintenance_history` and gets two rows: bearings replaced on 2 October 2026 by suresh.p, and "Vibration at high RPM" on 18 November 2026 by meera.d. It answers with both, then logs her note with `log_observation`.
+
+Ravi, a contractor whose token says PUN-2 and `maintenance.read` only, asks the same from his IDE. The same query runs with `plant_id = 'PUN-2'`, finds nothing, and returns "No machine 'CNC-14' in your plant." His `log_observation` call gets "Your sign-in does not allow writing notes." Both are results with `isError: true`, so the assistant explains them. The audit log has one line per call, for example `{"user": "ravi.contractor", "client": "ide-assistant", "tool": "get_maintenance_history", "args": {"tag": "CNC-14", "limit": 2}}`.
+
+Two more layers make this production-grade. The server's database account should only read machines and events and insert into notes, so a bug in your filter cannot delete anything. And the server must **never forward Anita's token** to another API. That is token passthrough, which the MCP security guidance forbids; if a downstream API needs the user, get a separate token issued for that API.
+
+When IT later adds a spare-parts system, they deploy a second server with the same sign-in, and both assistants gain its tools unchanged.
 
 ## Common mistakes
 
-- **Installing unknown servers.** A third-party server runs with whatever access you give it. Read the code or use trusted sources.
-- **One super-user credential.** If the server ignores the user's own permissions, every user can reach everything.
-- **Exposing the whole database.** Offer task-shaped tools, not a `run_sql` tool, unless the users are database administrators.
-- **Treating tool results as trusted.** Text from a ticket or document can contain injected instructions; the host must treat it as data.
-- **No logging.** You cannot investigate what an assistant did without a record of tool calls.
-- **Installing third-party servers without reading their tool descriptions and code.**
-- **Unpinned server versions.** A later update can change what tools do or say.
-- **One service-account token for everyone.** User permissions stop applying.
+- **Following an old tutorial line by line.** `FastMCP` imports, `transport="sse"`, session ids and the `initialize` handshake are from 2024 and 2025. Check versions first.
+- **One super-user credential for everyone.** If the server ignores who is asking, every user reaches everything. Act as the signed-in user.
+- **Taking identity from a tool argument.** A `user_id` or `plant_id` parameter lets the model, or text injected into it, pick someone else's data. Read identity from the checked token.
+- **Token passthrough.** Accepting tokens not issued for your server, or forwarding the user's token to other services, breaks audit and scope checks.
+- **Exposing the whole database.** Offer task-shaped tools, not `run_sql`, unless the users are database administrators.
+- **Huge results.** Thousands of rows flood the context and slow every later turn. Cap, paginate and summarise.
+- **No timeouts.** A tool waiting on a slow ERP blocks the agent. Time out the server's own calls, and set a client read timeout (`read_timeout_seconds` in the Python `Client`).
+- **Trusting servers and results.** Unknown or unpinned servers, and ticket text treated as instructions, invite tool poisoning and prompt injection.
+- **No logging.** Without user, tool and arguments for each call, you cannot investigate an incident.
 
 ## When you do not need MCP
 
-- **One app with a few tools** that only it uses: plain tool definitions in code are simpler.
+- **One app with a few tools** that only it uses: plain tool definitions in your code are simpler.
 - **Fixed workflows** where your code calls functions directly and no model chooses tools.
-- **Strict environments** where every new connection needs a security review: start with a single in-process tool set, and move to MCP once the tools are shared.
+- **Strict environments** where every new network service needs review: start with in-process tools, and move to MCP once a second app needs them.
 
-MCP pays off when several hosts or agents need the same tools, or when you want users to plug existing assistants into your systems.
+MCP pays off when several hosts or agents need the same tools, or people want to plug the assistants they already use into your systems.
 
 ## From demo to production
 
-- **Run remote servers behind OAuth** with narrow scopes, ideally through the company's single sign-on.
-- **Log every call** centrally with user, tool, arguments and result size.
-- **Pin and review server versions**, including changes to tool descriptions.
-- **Keep an approved-server list** for the company, and block others.
-- **Rate-limit and time out** every tool, and require approval for write tools.
+- **OAuth through company sign-in**, narrow scopes, tokens checked for this server, identity from the token, a least-privilege database account.
+- **A central audit log** of user, client, tool, arguments and result size.
+- **An approved-server list**, pinned versions, and a review whenever tool descriptions change.
+- **Limits on every tool:** timeouts, result caps, rate limits, and user confirmation for writes.
 
 ## Practice
 
-Take Anthropic's free Introduction to Model Context Protocol course, or read the official introduction and a server quickstart.
+Take Anthropic's free Introduction to Model Context Protocol course, or read the official introduction and the Python SDK's get-started guide.
 
-1. Build a local MCP server with two tools over a small SQLite database of your choice (books, fees, appointments).
-2. Connect it to an MCP-capable client and ask questions that need both tools.
-3. Add a write tool that only inserts into one table, log every call to a file, and try a prompt injection hidden in one record to see how your client handles it.
-4. Open your server in the MCP Inspector, call each tool with bad arguments, and improve every error message that would not help a model recover.
+1. Build a local stdio server with two tools over a small SQLite database of your choice (books, fees, appointments) using `MCPServer`.
+2. Open it in the MCP Inspector, call each tool with bad arguments, and rewrite every error message that would not help a model recover.
+3. Connect it to an MCP-capable assistant and ask questions that need both tools. Add a write tool that only inserts into one table, log every call, and hide a prompt injection in one record to see what happens.
+4. Run it with `transport="streamable-http"`, add a `TokenVerifier` that accepts two test tokens for two users, and show that each user sees only their own rows.
 
-**You are done when you can** explain host, client and server, show your server working in a real client, and name three security questions you would ask about any MCP server.
+**You are done when you can** explain host, client and server, show your server in a real client, show two users getting different results from one tool, and name three questions to ask before installing someone else's server.
