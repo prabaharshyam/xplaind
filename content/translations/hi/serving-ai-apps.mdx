@@ -1,256 +1,322 @@
 ---
 id: serving-ai-apps
 lang: hi
-title: "AI app को serve करना"
-outcome: "Production में AI API चलाना सीखोगे: workers, timeouts, streaming responses, health checks और graceful shutdown।"
-answer: "AI API को कई workers के साथ serve करो, model calls पर timeouts रखो, responses stream करो ताकि users को text जल्दी दिखे, health checks रखो, और shutdown ऐसा हो जो चल रही requests को पूरा होने दे।"
-why_it_matters: "जो FastAPI app आपके laptop पर चलता है, वो बीस असली users के साथ गिर सकता है: धीमे model calls पर requests अटक जाती हैं, workers block हो जाते हैं और दस seconds तक किसी को पहला शब्द नहीं दिखता। इसे ठीक से serve करना pilot से production की तरफ़ पहला कदम है।"
+title: "एक AI app को serve करना"
+outcome: "Production में एक AI API चलाओ: workers, layers में timeouts, proxies के बीच भी चलने वाली streaming, load shedding, health checks और graceful shutdown।"
+answer: "एक AI API को कई workers के साथ serve करो: हर model call पर एक deadline, stream होते answers, एक cap जो extra load को 429 के साथ shed करे, ईमानदार health checks, और ऐसा shutdown जो streams को पूरा होने दे।"
+why_it_matters: "जो FastAPI app आपके laptop पर चलता है, वो बीस real users आते ही गिर सकता है: धीमी model calls पर requests लटक जाती हैं, workers block हो जाते हैं और दस seconds तक किसी को पहला शब्द भी नहीं दिखता। उसे ठीक से serve करना ही pilot से production की तरफ़ पहला कदम है।"
 flashcards:
-  - q: "App को serve करने में क्या-क्या आता है?"
-    a: "उसे ऐसे चलाना कि users उस पर भरोसा कर सकें: अपने-आप start हो, crash होने पर restart हो, कई requests संभाले और progress जल्दी दिखाए।"
-  - q: "कई Uvicorn workers क्यों चलाएँ?"
-    a: "CPU-heavy काम एक अकेले process को सबके लिए block कर देता है। कई workers, अक्सर हर core पर एक या दो, load बाँट लेते हैं।"
-  - q: "Timeouts को layers में कैसे रखें?"
-    a: "Model calls पर, पूरी request पर और load balancer पर रखो, और अंदर वाले timeouts बाहर वालों से छोटे हों।"
-  - q: "AI responses को stream क्यों करें?"
-    a: "पहले token तक का समय पूरी generation के समय से घटकर एक second से कम हो जाता है, इसलिए users को spinner की जगह progress दिखता है।"
+  - q: "एक app को serve करने में क्या-क्या आता है?"
+    a: "उसे ऐसे चलाना कि users उस पर भरोसा कर सकें: अपने-आप start हो, crash होने पर restart हो, एक साथ कई requests संभाले, extra load को साफ़ तरीके से मना करे, और progress जल्दी दिखाए।"
+  - q: "एक async endpoint के अंदर एक blocking call सबको नुकसान क्यों पहुँचाती है?"
+    a: "एक process अपनी सारी async requests एक ही event loop पर चलाता है। Sync Redis client या PDF parsing जैसी एक blocking call उस loop को freeze कर देती है, तो उस worker की हर request रुक जाती है। एक async client, एक सादा def endpoint, या एक background queue use करो।"
+  - q: "एक model call के लिए timeouts को layers में कैसे रखें?"
+    a: "अंदर वाला बाहर वाले से छोटा हो: हर attempt पर SDK timeout, फिर retries समेत पूरी call के लिए एक deadline, फिर load balancer। Retries उसी budget में से खर्च होती हैं।"
+  - q: "SDK timeout एक stream के लिए deadline क्यों नहीं है?"
+    a: "वो connect करने को और chunks के बीच के हर wait को limit करता है, वो भी हर attempt पर अलग से। जो stream tokens भेजती रहती है वो उससे बहुत आगे तक चल सकती है, और retries और समय जोड़ देती हैं। पूरी call को अपनी खुद की deadline में लपेटो।"
   - q: "/health और /ready में क्या फ़र्क है?"
-    a: "/health बताता है कि process चालू है। /ready बताता है कि database जैसी dependencies तक पहुँच सकते हैं, ताकि traffic सिर्फ़ ready instances को जाए।"
-  - q: "Health checks को model call क्यों नहीं करना चाहिए?"
-    a: "उनमें पैसा लगता है और provider धीमा हो तो वो fail हो जाते हैं, जिससे healthy instances भी service से बाहर हो जाते हैं।"
+    a: "/health बताता है कि process ज़िंदा है, नहीं तो platform उसे restart कर देता है। /ready बताता है कि ये instance traffic ले सकता है, जैसे उसका index load हो चुका है। किसी shared database की एक छोटी-सी blip पर /ready को fail मत करो, वरना हर instance एक साथ drop हो जाएगा।"
+  - q: "Streams local पर चलती हैं, पर production में सब एक साथ क्यों पहुँचता है?"
+    a: "बीच में कोई proxy, ingress या compression layer response को buffer कर रही है। Streaming route के लिए buffering off करो और सिर्फ़ localhost पर नहीं, real path से test करो।"
   - q: "Graceful shutdown क्या है?"
-    a: "Deploy के समय नई requests लेना बंद करो और चल रही requests को, लंबी streams सहित, grace period के अंदर पूरा होने दो।"
-  - q: "जिन jobs में मिनट लगते हैं उन्हें कैसे संभालें?"
-    a: "Job accept करो, तुरंत एक id लौटा दो, उसे background queue पर process करो, और client को poll करने दो या webhook दो।"
+    a: "Deploy के समय instance नई requests लेना बंद कर देता है और चल रही requests को, लंबी streams समेत, पूरा होने देता है। Server का grace period सबसे लंबी stream से ज़्यादा होना चाहिए, और platform का server वाले से ज़्यादा।"
+  - q: "जो job मिनटों लेता है उसे कैसे संभालें?"
+    a: "उसे accept करो, तुरंत एक job id return करो, उसे background queue पर process करो, और client को poll करने दो। Job id को input से derive करो, ताकि एक double click काम को दो बार start न करे।"
   - q: "Load shedding क्या है?"
-    a: "जब service अपनी capacity पर हो, तब अतिरिक्त requests को 429 या 503 के साथ जल्दी मना कर देना, ताकि जो requests पहले accept हो चुकी हैं वो अच्छे समय में पूरी हों।"
-  - q: "Graceful shutdown का period सबसे लंबी stream से ज़्यादा क्यों होना चाहिए?"
-    a: "वरना deploy उन users के जवाब बीच में काट देता है जो अभी पढ़ ही रहे हैं।"
+    a: "जब service capacity पर हो तब extra requests को 429 और एक Retry-After header के साथ जल्दी मना कर देना, ताकि जो requests पहले से accept हो चुकी हैं वो समय पर पूरी हों।"
+  - q: "जब model provider 429 return करे तो app को क्या करना चाहिए?"
+    a: "Backoff और jitter के साथ कुछ बार retry करो, retry-after को मानो, और request deadline के अंदर रहो। फिर साफ़ तरीके से fail करो या fallback करो। हर user को भी limit करो, ताकि एक इंसान पूरा shared quota खत्म न कर सके।"
 exercise:
   title: "शाम की slowdown ठीक करो"
-  setup: "पटना की एक exam-prep app की AI answer service एक Uvicorn process चलाती है। रात 9 बजे students को कोई text दिखने से पहले 15 seconds इंतज़ार करना पड़ता है, कुछ requests मिनटों तक अटकी रहती हैं, summarise करने के लिए PDF uploads सबको freeze कर देते हैं, और platform का health check model को call करता है, इसलिए provider के धीमे होते ही instances restart हो जाते हैं।"
+  setup: "पटना के एक exam-prep app की AI answer service एक ही Uvicorn process पर चलती है। रात 9 बजे students को कोई भी text दिखने से पहले 15 seconds इंतज़ार करना पड़ता है, कुछ requests मिनटों तक लटकी रहती हैं, summarise करने के लिए PDF uploads सबको freeze कर देते हैं, और platform का health check model को call करता है, इसलिए जब भी provider धीमा होता है instances restart हो जाते हैं।"
   questions:
-    - q: "पहले text के 15 seconds के इंतज़ार को क्या ठीक करता है?"
-      a: "जवाब को token-by-token stream करो, ताकि पहले शब्द एक second से कम में दिखें।"
-    - q: "Requests का मिनटों तक अटकना क्या रोकता है?"
-      a: "Model call, request और load balancer पर timeouts, और जब कोई timeout चले तो एक काम का message।"
+    - q: "पहले text के लिए 15-second wait को क्या ठीक करेगा?"
+      a: "Answer को server-sent events के रूप में stream करो, ताकि पहले शब्द एक-दो second में दिखें, और check करो कि रास्ते में कोई proxy stream को buffer न कर रहा हो।"
+    - q: "Requests को मिनटों तक लटकने से क्या रोकेगा?"
+      a: "ज़्यादा से ज़्यादा एक retry के साथ एक छोटा SDK timeout, पूरी model call के चारों ओर एक deadline, और उस deadline से ऊपर एक load balancer limit, साथ में deadline fire होने पर एक काम का message।"
     - q: "PDF summarising को कैसे संभालें?"
-      a: "उसे background queue पर ले जाओ: तुरंत job id लौटाओ, progress दिखाओ, और तैयार होने पर summary उठाओ।"
-    - q: "Health check को इसकी जगह क्या करना चाहिए?"
-      a: "Process के लिए एक सस्ता /health, और एक /ready जो database और queue check करे, model को कभी नहीं।"
+      a: "उसे एक background queue पर ले जाओ: file से derive किया हुआ एक job id तुरंत return करो, progress दिखाओ, और ready होने पर summary fetch करो। ध्यान रखो कि enqueue call event loop को block न करे।"
+    - q: "इसकी जगह health check को क्या करना चाहिए?"
+      a: "एक सस्ता /health जो सिर्फ़ बताए कि process ज़िंदा है, और एक /ready जो बताए कि instance ठीक से start हो गया है। दोनों में से कोई model को call नहीं करता। Provider errors पर अलग से alert करो।"
 ask:
   - "मुझे कितने Uvicorn workers चलाने चाहिए?"
-  - "FastAPI से responses stream कैसे करूँ?"
+  - "FastAPI से responses कैसे stream करूँ?"
   - "Background job queue कब use करनी चाहिए?"
 explain_in_interview:
-  answer: "Serving का मतलब है app को ऐसे चलाना कि users उस पर भरोसा कर सकें। Python AI service के लिए, ये आमतौर पर कई workers के साथ Uvicorn पर FastAPI है। Model calls slow होती हैं, इसलिए आप हर model और tool call पर timeouts set करते हो, client को tokens stream करते हो ताकि time to first token एक second से कम हो, और बड़ी PDF index करने जैसे लंबे jobs को background queue में भेजते हो। Health checks platform को टूटे instances restart करने देते हैं, और graceful shutdown requests को पूरा होने देता है। जैसे, इससे Lucknow का एक edtech assistant fix होता है जो हर शाम slow हो जाता था। Streaming complexity जोड़ता है: client disconnects handle करो ताकि बिना पढ़े tokens के लिए pay करना बंद हो।"
-  follow_up: "Health check को language model call क्यों नहीं करना चाहिए?"
-  follow_up_answer: "Health check हर कुछ seconds में चलता है, इसलिए model call करना पैसा बर्बाद करता है और load बढ़ाता है। और अगर model provider slow है, तो हर instance unhealthy दिखेगा और एक साथ restart हो जाएगा। Health checks सस्ते रखो और dependencies को एक अलग readiness endpoint में check करो।"
-translated_on: 2026-11-14
+  answer: "Serving का मतलब है app को ऐसे चलाना कि users उस पर भरोसा कर सकें। एक Python AI service के लिए ये आमतौर पर कई workers के साथ Uvicorn पर FastAPI होता है। Model calls धीमी होती हैं, इसलिए मैं हर model call के चारों ओर एक deadline रखता हूँ जिसके अंदर retries हों, tokens को server-sent events के रूप में stream करता हूँ ताकि text एक-दो second में दिखे, और concurrent model calls पर cap लगाता हूँ ताकि extra requests queue में खड़ी रहने की जगह तुरंत 429 पाएँ। किसी बड़े PDF को index करने जैसे लंबे jobs background queue में जाते हैं। Health checks सस्ते रहते हैं, और graceful shutdown deploy के दौरान streams को पूरा होने देता है। Production में आमतौर पर जो surprise मिलता है वो है stream को buffer करने वाला कोई proxy, इसलिए मैं real path से test करता हूँ।"
+  follow_up: "Health check को language model को call क्यों नहीं करना चाहिए?"
+  follow_up_answer: "Health check हर कुछ seconds में चलता है, तो model को call करना पैसे बर्बाद करता है और load बढ़ाता है। इससे भी बुरा, जब provider धीमा हो तो हर instance एक साथ unhealthy दिखता है और restart हो जाता है, और एक धीमा provider पूरे outage में बदल जाता है। Health checks को अपने process तक सीमित रखो और provider errors पर अलग से alert करो।"
+translated_on: 2026-11-28
 ---
 
 ## ये क्या है
 
-Serving का मतलब है अपनी application को ऐसे चलाना कि असली users उस पर भरोसा कर सकें। वो अपने-आप start होती है, crash होने पर restart होती है, एक साथ कई requests संभालती है, और model धीमा हो तब भी जल्दी कुछ दिखा देती है।
+Serving का मतलब है अपनी application को ऐसे चलाना कि real users उस पर भरोसा कर सकें। वो अपने-आप start होती है, crash होने पर restart होती है, एक साथ कई requests संभालती है, extra load को साफ़ तरीके से मना करती है, और model धीमा हो तब भी जल्दी कुछ दिखा देती है।
 
-Python AI service के लिए आम stack ये है: app के लिए FastAPI, और उसे चलाने वाले server की तरह **Uvicorn**, parallelism के लिए कई worker processes के साथ। सामने कुछ होता है, जैसे load balancer, ingress या Cloud Run जैसा platform, जो HTTPS संभालता है और traffic बाँटता है।
+एक Python AI service के लिए आम stack है app के लिए FastAPI और उसे चलाने वाले server के रूप में **Uvicorn**, कई worker processes के साथ। HTTPS संभालने और traffic बाँटने के लिए आगे कुछ बैठा होता है, जैसे एक load balancer, एक ingress, या Cloud Run जैसा कोई platform।
 
-AI services की दो खास बातें होती हैं। Requests धीमी होती हैं, अक्सर 2 से 30 seconds, क्योंकि वो model calls का इंतज़ार करती हैं। और users ये इंतज़ार तभी सहते हैं जब उन्हें progress दिखे, इसीलिए **streaming** मायने रखती है।
+AI services एक आम web API से तीन तरह से अलग हैं। Requests धीमी होती हैं, अक्सर 2 से 30 seconds, क्योंकि वो model calls का इंतज़ार करती हैं। Users इसे तभी झेलते हैं जब उन्हें progress दिखे, इसीलिए **streaming** ज़रूरी है। और जो resource कम है वो किसी और का है: provider आपकी requests और tokens प्रति मिनट limit करता है, इसलिए आमतौर पर bottleneck आपका CPU नहीं, उसका quota और आपका bill होता है।
 
 ```flow
-Users -[HTTPS]-> Load balancer | timeout 30 s, /ready check करता है
-Load balancer -> Container 1 | 4 workers, Uvicorn + FastAPI
-Load balancer -> Container 2 | 4 workers
-Container 1 -> Model API | timeout 25 s, tokens user तक stream होते हैं
-Container 1 -> Background queue | OCR, indexing; job id और status
+Users -[HTTPS]-> Load balancer | idle timeout 30 s, ready instances को भेजता है
+Load balancer -> Container 1 | 4 Uvicorn workers, हर एक में ज़्यादा से ज़्यादा 40 model calls
+Load balancer -> Container 2 | वैसा ही
+Container 1 -[deadline 25 s, retries inside]-> Model API | tokens user तक stream होकर आते हैं
+Container 1 -> Background queue | OCR और indexing; एक job id return करती है
 ```
 
 इस lesson में हम लखनऊ की एक edtech company के doubt-solving assistant के साथ चलेंगे, जो हर शाम रेंगने लगता था।
 
 ## ये काम कैसे करता है
 
-**Workers और concurrency.** Async endpoints वाला एक Uvicorn process, network का इंतज़ार कर रही कई requests को थामे रख सकता है। CPU-heavy काम, जैसे PDF parse करना या local embedding model चलाना, उस process को block कर देता है। इसलिए कई workers चलाओ, आम तौर पर हर CPU core पर एक या दो, या भारी काम को background queue पर ले जाओ।
+### Workers और event loop
 
-**हर जगह timeouts.** हर model और tool call पर, पूरी request पर और load balancer पर timeout लगाओ, और अंदर वाले बाहर वालों से छोटे हों। अटकने की जगह साफ़ 503 या 504 लौटाओ।
+एक Uvicorn process अपने async endpoints एक ही **event loop** पर चलाता है। जब एक request model का await कर रही होती है, loop बाकी requests को serve करता है, इसलिए एक process सैकड़ों इंतज़ार करती requests संभाल सकता है। लेकिन जो भी चीज़ loop को block करे, वो उस process की हर request को freeze कर देती है: एक synchronous Redis, database या `requests` call, PDF parsing, एक local embedding model।
 
-**Streaming.** `StreamingResponse` और server-sent events से, model जैसे-जैसे tokens बनाता है, आप उन्हें client तक आगे भेजते जाते हो। पहले token तक का समय पूरी generation के समय से घटकर एक second से काफ़ी कम हो जाता है। Client के disconnect होने को संभालो, ताकि उन tokens के पैसे न दो जिन्हें कोई पढ़ेगा नहीं।
+इलाज: network calls के लिए एक **async client** use करो; या endpoint को एक सादा `def` लिखो, जिसे FastAPI एक thread pool में चलाता है; या भारी काम को एक **background queue** पर ले जाओ। फिर कई workers चलाओ, आमतौर पर हर CPU core पर एक या दो, ताकि एक crash सब कुछ न गिरा दे। जो service ज़्यादातर किसी model API का इंतज़ार करती है, उसके लिए workers जोड़ने से ज़्यादा blocking calls हटाना मदद करता है।
 
-**Health checks.** एक सस्ता `/health` endpoint (process चालू है) और एक `/ready` endpoint (database जैसी dependencies तक पहुँच सकते हैं) से platform टूटे instances को restart कर सकता है और traffic सिर्फ़ ready instances को भेज सकता है। Health check में model को call मत करो।
+### Layers में timeouts
 
-**Graceful shutdown.** जब platform deploy के लिए किसी instance को रोके, तो वो नई requests लेना बंद करे और चल रही requests को grace period के अंदर पूरा होने दे। लंबी streaming responses के लिए grace period आपकी आम generation से लंबा होना चाहिए।
+हर wait की एक limit चाहिए, अंदर वाली बाहर वाली से छोटी, वरना बाहर वाली पहले fire होगी और user को आपके message की जगह एक खाली load balancer error मिलेगा। एक **total** timeout पूरी request पर cap लगाता है। एक **idle** timeout चुप्पी पर cap लगाता है, इसलिए जो stream भेजती रहे वो कभी नहीं कटती; उदाहरण के लिए, AWS Application Load Balancer default रूप से 60-second idle timeout use करता है।
 
-**Background काम.** जिन jobs में मिनट लगते हैं, जैसे 500 pages की PDF को index करना, वो request के अंदर नहीं चलने चाहिए। Job accept करो, तुरंत एक id लौटा दो, उसे worker queue पर process करो और client को poll करने दो या webhook दो।
+Official Anthropic Python SDK में एक जाल है। उसका `timeout` connect करने पर और अगले chunk के हर wait पर, हर attempt के लिए अलग से लगता है; ये total deadline नहीं है। ये default रूप से 429s और server errors को दो बार retry भी करता है, और उतना इंतज़ार करता है जितना provider का `retry-after` header कहे। इसलिए `timeout=30, max_retries=2` एक request को 90 seconds से काफ़ी आगे तक रोक सकता है। पूरी call के चारों ओर अपनी एक deadline रखो, retries उसके अंदर।
 
-**एक streaming endpoint:**
+| Layer | किस तरह का | Example value | ये क्या पकड़ता है |
+| --- | --- | --- | --- |
+| SDK `timeout` | हर attempt, हर chunk पर | 10 s | एक dead connection या रुकी हुई stream |
+| SDK `max_retries` | गिनती | 1 | Provider की एक छोटी error; उसी budget में से खर्च होता है |
+| आपकी deadline | Total, retries समेत | 25 s | ऊपर का सब कुछ, आपके लिखे message के साथ |
+| Load balancer | आमतौर पर idle | 30 s | एक लटका हुआ instance; layers सही हों तो कभी पहले fire नहीं होता |
+| Shutdown grace | Total | 30 s server, 40 s platform | Deploy के दौरान कटती streams |
+
+### Streaming, और उसे क्या तोड़ता है
+
+**Server-sent events** (SSE) में server response को खुला रखता है और हर टुकड़ा एक `data:` line के रूप में भेजता है। Version 0.135.0 से FastAPI इसे सीधे support करता है: `response_class=EventSourceResponse` set करो और endpoint से `yield` करो। FastAPI हर item को JSON के रूप में encode करता है, इसलिए answer में एक newline format को नहीं तोड़ सकती। ये `Cache-Control: no-cache` और `X-Accel-Buffering: no` (nginx के लिए एक hint) set करता है, और 15 seconds चुप्पी के बाद एक keep-alive comment भेजता है।
+
+Streaming generation को तेज़ नहीं करती; ये इंतज़ार को छोटा महसूस कराती है, क्योंकि पहले शब्द एक-दो second में आ जाते हैं। दिक्कतें सिर्फ़ production में दिखती हैं:
+
+- **Buffering proxies।** कोई ingress, proxy या compression layer पूरा response रोक कर रख सकती है, तो users को पहले कुछ नहीं दिखता और फिर सब एक साथ। nginx default रूप से proxied responses को buffer करता है, और सिर्फ़ header हमेशा काफ़ी नहीं होता। उस route के लिए buffering off करो (nginx में `proxy_buffering off;`) और real path से test करो।
+- **Idle timeouts।** एक लंबी चुप्पी, जैसे जब model एक लंबा prompt पढ़ रहा हो, balancer को trip कर सकती है। Keep-alive comments उसके idle timeout से ज़्यादा बार आने चाहिए।
+- **Browser में POST।** `EventSource` request body नहीं भेज सकता; POST stream को `fetch` और एक stream reader से पढ़ो।
+- **बीच में failure।** एक 200 और आधे answer के बाद status code नहीं बदल सकता। एक error event भेजो, आधा text "answer interrupted, try again" के साथ दिखाओ, और उसे कभी cache मत करो। इन्हें अपने logs में गिनो, क्योंकि status-code dashboards इन्हें miss कर देते हैं।
+- **Disconnects।** जब tab बंद होता है, FastAPI generator को cancel करता है और SDK का `async with` model stream को बंद कर देता है, तो बिना पढ़े tokens के पैसे देना बंद हो जाता है।
+
+### Endpoint
+
+Load shed करने वाला एक concurrency cap, model call के चारों ओर एक deadline, JSON events और पढ़ने लायक errors। API के एक local fake के against FastAPI 0.165, Anthropic SDK 2.14 और Python 3.13 के साथ test किया गया; इसके लिए FastAPI 0.135.0 या उसके बाद का और Python 3.11 या उसके बाद का चाहिए।
 
 ```python
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
-
-app = FastAPI()
-
-# Question is your Pydantic request model; model_stream is your async model client.
-@app.post("/answer")
-async def answer(req: Request, body: Question):
-    async def tokens():
-        async for text in model_stream(body.text, timeout=25):
-            if await req.is_disconnected():
-                break                     # stop paying for unread tokens
-            yield f"data: {text}\n\n"
-    return StreamingResponse(tokens(), media_type="text/event-stream")
-```
-
-**पहले और बाद में नापना.** हर request के तीन numbers record करो: पहले token तक का समय, कुल समय और timeout हुआ या नहीं। औसत नहीं, 95th percentile देखो, क्योंकि सबसे धीमी requests पर ही users शिकायत करते हैं। Launch से पहले, शाम के expected peak पर Locust जैसे tool से load-test करो, और हर बदलाव के बाद दोबारा।
-
-**असली streaming endpoint.** Model से tokens को server-sent events की तरह आगे भेजो, timeout, concurrency cap और disconnect handling के साथ:
-
-```python
-import asyncio, json
+import asyncio
 import anthropic
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.sse import EventSourceResponse
 from pydantic import BaseModel
 
 app = FastAPI()
-client = anthropic.AsyncAnthropic(timeout=30, max_retries=2)
-SLOTS = asyncio.Semaphore(50)                     # at most 50 model calls at once per process
+client = anthropic.AsyncAnthropic(timeout=10, max_retries=1)   # per attempt, per chunk
+SLOTS = asyncio.Semaphore(40)      # at most 40 model calls at once in this process
+MODEL_DEADLINE = 25                # seconds for the whole model call, retries included
 
 class Question(BaseModel):
     text: str
 
-@app.post("/answer")
-async def answer(req: Request, body: Question):
-    if SLOTS.locked():
-        raise HTTPException(status_code=429, detail="Busy, please retry in a few seconds")
-    async def events():
-        async with SLOTS:
-            try:
-                async with client.messages.stream(
-                        model="claude-sonnet-5-5", max_tokens=600,         # check the docs for current names
-                        messages=[{"role": "user", "content": body.text}]) as stream:
-                    async for text in stream.text_stream:
-                        if await req.is_disconnected():
-                            return                                         # stop paying for unread tokens
-                        yield f"data: {json.dumps({'text': text})}\n\n"
-                yield "data: [DONE]\n\n"
-            except anthropic.APIError:
-                yield f"data: {json.dumps({'error': 'The AI service is unavailable. Please try again.'})}\n\n"
-    return StreamingResponse(events(), media_type="text/event-stream")
+async def model_slot():
+    try:                                         # wait at most 1 s for a free slot
+        await asyncio.wait_for(SLOTS.acquire(), timeout=1)
+    except TimeoutError:
+        raise HTTPException(429, "Busy, please try again in a few seconds",
+                            headers={"Retry-After": "5"})
+    try:
+        yield                                    # the request streams here
+    finally:
+        SLOTS.release()                          # after the stream ends, even on disconnect
+
+async def with_deadline(chunks, seconds):
+    loop = asyncio.get_running_loop()
+    end = loop.time() + seconds
+    it = aiter(chunks)
+    while True:
+        try:
+            yield await asyncio.wait_for(anext(it), end - loop.time())
+        except StopAsyncIteration:
+            return
+
+async def model_text(question: str):
+    async with client.messages.stream(
+            model="claude-sonnet-5-5", max_tokens=600,      # check the docs for current names
+            messages=[{"role": "user", "content": question}]) as stream:
+        async for text in stream.text_stream:
+            yield text
+
+@app.post("/answer", response_class=EventSourceResponse)
+async def answer(body: Question, _: None = Depends(model_slot)):
+    try:
+        async for text in with_deadline(model_text(body.text), MODEL_DEADLINE):
+            yield {"text": text}
+        yield {"done": True}
+    except TimeoutError:
+        yield {"error": "This is taking longer than usual. Please try again."}
+    except anthropic.APIError:
+        yield {"error": "The AI service is busy. Please try again."}
 
 @app.get("/health")
 async def health():
     return {"ok": True}
 ```
 
-हर chunk को JSON में encode करने से text के अंदर की newlines event format को नहीं तोड़तीं। `async with` से बाहर निकलने पर stream बंद हो जाती है, जिससे user के disconnect होने पर generation रुक जाती है।
+इसे ऐसा क्यों बनाया गया है:
 
-**इसे चलाना.** कई worker processes, और सबसे लंबी stream से बड़ा graceful timeout:
+- **Slot response शुरू होने से पहले लिया जाता है**, एक dependency में, क्योंकि 200 जाने के बाद 429 भेजना नामुमकिन है। एक second का wait छोटे bursts को सोख लेता है; उससे आगे, एक चुप queue से एक तेज़ "busy" बेहतर है। Stream खत्म होने पर, disconnect पर भी, `finally` slot वापस कर देता है।
+- **Deadline हर wait को लपेटती है, yield को नहीं।** `with_deadline` हर step को, retries के साथ stream खोलने समेत, एक ही end time के against time करता है। किसी `yield` के चारों ओर timeout block async generators में गड़बड़ करता है।
+- **Cap हर process का अलग है**: 40 slots, 4 workers और 2 containers मतलब एक साथ 320 calls।
+
+### Rate limits: आपकी और provider की
+
+शाम के peak पर provider का 429 सबसे आम failure है। Backoff और **jitter** (wait का एक random हिस्सा, ताकि हज़ारों clients एक ही पल में retry न करें) के साथ थोड़ी देर retry करो; SDK ये करता है और `retry-after` को मानता है, तो गिनती इतनी कम रखो कि deadline में फ़िट हो। फिर साफ़ तरीके से fail करो, या एक gateway के ज़रिए किसी दूसरे region या approved छोटे model पर fallback करो (LLM gateways वाला lesson देखो)। **हर user को भी limit करो**, जैसे 10 मिनट में 20 सवाल और एक daily token cap, वरना एक script सबका quota खत्म कर सकती है और आपके bill की कोई सीमा नहीं रहेगी। आपके अपने 429 में `Retry-After` होता है, और आपके front end को उसे मानना चाहिए।
+
+### Health, readiness और shutdown
+
+- **`/health`** (liveness) बताता है कि process ज़िंदा है और किसी और चीज़ को नहीं छूता, ताकि platform सिर्फ़ उन्हीं processes को restart करे जो सच में अटके हैं।
+- **`/ready`** (readiness) बताता है कि ये instance traffic ले सकता है: start-up का काम, जैसे index load करना, पूरा होने तक 503. इसे किसी shared dependency पर fail मत करो। अगर हर instance एक ही database check करे, तो एक blip सबको एक साथ fail कर देती है और balancer सबको हटा देता है, जिससे partial outage total outage बन जाता है। हर request पर एक साफ़ error return करो और अलग से alert करो।
+- **दोनों में से कोई model को call नहीं करता।** इसमें पैसे लगते हैं, और एक धीमा provider हर instance को एक साथ unhealthy mark कर देगा।
+
+**Graceful shutdown।** Deploy पर platform SIGTERM भेजता है। Server connections लेना बंद करता है और चल रही requests को `--timeout-graceful-shutdown` तक पूरा होने देता है। ये आपकी सबसे लंबी stream से ज़्यादा होना चाहिए, और platform का grace period server वाले से ज़्यादा, वरना platform पहले ही process को kill कर देगा। Kubernetes default रूप से 30 seconds देता है (`terminationGracePeriodSeconds` बढ़ाओ)। Cloud Run SIGTERM के बाद सिर्फ़ 10 seconds देता है, तो वहाँ scale-down के दौरान लंबी streams कट सकती हैं; client को retry का option देने दो।
+
+### इसे चलाना
 
 ```bash
-gunicorn app.main:app -k uvicorn.workers.UvicornWorker --workers 4 \
-  --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 90
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 \
+  --timeout-graceful-shutdown 30
 ```
 
-**Queue के साथ background jobs.** लंबा काम worker को जाता है; request तुरंत job id लौटा देती है। Redis Queue के साथ:
+दो workers वाले एक test में, SIGTERM आने पर चल रही एक stream ने अपने सारे tokens पूरे किए, जबकि नई requests serve नहीं हुईं। अगर आप Gunicorn use करते हो, तो ध्यान रखो कि हाल के Uvicorn versions `uvicorn.workers` को deprecate करते हैं; `uvicorn-worker` package use करो (`-k uvicorn_worker.UvicornWorker`)।
+
+### Queue के साथ background jobs
+
+जो काम मिनटों लेता है, जैसे OCR या 500 pages के PDF को index करना, वो एक worker process पर जाता है, और request तुरंत एक job id return करती है। Redis Queue (RQ) के साथ:
 
 ```python
+from fastapi import HTTPException
 from redis import Redis
 from rq import Queue
+from rq.exceptions import DuplicateJobError
 
 queue = Queue("ingest", connection=Redis.from_url("redis://redis:6379"))
 
-@app.post("/documents")
-async def upload(doc_id: str):
-    job = queue.enqueue("workers.index_pdf", doc_id, job_timeout=1800, retry=None)
-    return {"job_id": job.id, "status_url": f"/jobs/{job.id}"}
+@app.post("/documents/{doc_id}/index")
+def start_indexing(doc_id: str):        # plain def: runs in a thread, so Redis cannot block the loop
+    job_id = f"index-{doc_id}"          # same document, same job id
+    try:
+        queue.enqueue("workers.index_pdf", doc_id, job_id=job_id, unique=True,
+                      job_timeout=1800, result_ttl=86400)
+    except DuplicateJobError:
+        pass                            # a double click or a client retry: the job already exists
+    return {"job_id": job_id, "status_url": f"/jobs/{job_id}"}
 
 @app.get("/jobs/{job_id}")
-async def job_status(job_id: str):
+def job_status(job_id: str):
     job = queue.fetch_job(job_id)
-    return {"status": job.get_status() if job else "unknown"}
+    if job is None:
+        raise HTTPException(404, "Unknown or expired job")
+    return {"status": job.get_status()}
 ```
 
-Celery, Arq और cloud task queues भी यही pattern follow करती हैं।
+RQ 2.8 में जोड़ा गया `unique=True` submission को **idempotent** बनाता है: एक ही request दो बार आए तो एक ही job बनता है। `result_ttl` पूरे हुए job को एक दिन तक रखता है; default 500 seconds है, जिसके बाद status URL 404 return करता है। Worker को भी दो बार चलने पर safe बनाओ, क्योंकि worker बीच में crash हो सकता है। Celery, Arq और cloud task queues भी यही pattern follow करते हैं।
 
-**Readiness जो सच बताए.** `/ready` को एक तेज़ query और छोटे timeout के साथ database और vector store check करना चाहिए, और start-up के दौरान जब तक models या indexes load न हों, 503 लौटाना चाहिए। तब platform traffic सिर्फ़ उन instances को भेजता है जो सच में जवाब दे सकते हैं।
+### Measure और observe करना
 
-**Browser में try करो।** देखो कि concurrency cap क्यों ज़रूरी है: cap से ज़्यादा requests इंतज़ार करती हैं। Numbers बदलो और चलाओ।
+हर request की एक line log करो: request id, user, model, tokens, cost, time to first token, total time और outcome (done, deadline, provider error, shed)। p95 time to first token, shed rate और provider 429 rate पर नज़र रखो; एक request को services के पार follow करना tracing वाला lesson cover करता है। Launch से पहले और हर change के बाद Locust जैसे किसी tool से शाम के peak का load-test करो।
+
+### अपने browser में try करो
+
+साठ requests एक साथ आती हैं; एक साथ दस ही चल सकती हैं। एक ऐसी queue जो कभी मना नहीं करती, उसकी तुलना 429 से पहले एक छोटे wait से करो।
 
 ```python
 import asyncio, random, time
 
-async def model_call(i, slots):
-    async with slots:
-        await asyncio.sleep(random.uniform(0.05, 0.15))     # pretend model latency
-        return i
-
-async def main(cap, n=40):
-    slots = asyncio.Semaphore(cap)
+async def model_call(slots, max_wait, waits):
     t0 = time.perf_counter()
-    await asyncio.gather(*(model_call(i, slots) for i in range(n)))
-    print(f"cap {cap:>2}: {n} requests in {time.perf_counter() - t0:.2f} s")
+    try:
+        await asyncio.wait_for(slots.acquire(), max_wait)   # None queues forever
+    except asyncio.TimeoutError:
+        return "rejected"                                   # send a fast 429: busy, retry soon
+    waits.append(time.perf_counter() - t0)                  # time spent waiting for a slot
+    try:
+        await asyncio.sleep(random.uniform(0.05, 0.15))     # pretend model call
+    finally:
+        slots.release()
+    return "served"
 
-random.seed(0)
-for cap in (2, 10, 40):
-    await main(cap)
+async def burst(cap, max_wait, n=60):
+    slots, waits = asyncio.Semaphore(cap), []
+    results = await asyncio.gather(*(model_call(slots, max_wait, waits) for _ in range(n)))
+    print(f"max_wait {str(max_wait):>4}: served {results.count('served'):>2}, "
+          f"rejected {results.count('rejected'):>2}, worst wait {max(waits, default=0):.2f} s")
+
+random.seed(1)
+for max_wait in (None, 0.1, 0.01):
+    await burst(cap=10, max_wait=max_wait)
 ```
+
+बिना limit के, आखिरी request शुरू होने से पहले लगभग पाँच model-call के बराबर समय इंतज़ार करती है; जब real calls seconds लेती हैं, तो यही वो चुप spinner है जिसे देखकर users छोड़ जाते हैं। एक छोटे wait के साथ, extra requests को तुरंत "busy" सुनने को मिलता है।
 
 ## एक example से समझो
 
-लखनऊ की एक edtech का doubt-solving assistant एक Uvicorn process पर चलता था। शाम के पढ़ाई वाले घंटों में students को कोई भी text दिखने से पहले 12 seconds इंतज़ार करना पड़ता था। एक तिहाई requests load balancer की 30-second वाली limit पर timeout हो जाती थीं, और OCR के लिए handwritten notes के uploads सबके लिए server को freeze कर देते थे।
+ये एक illustrative case है: numbers दिखाते हैं कि किस तरह के बदलाव की उम्मीद करें, ये कोई measured study नहीं है। लखनऊ की एक edtech का doubt-solving assistant एक ही Uvicorn process पर चलता था। शाम को students को कोई भी text दिखने के लिए लगभग 12 seconds इंतज़ार करना पड़ता था। लगभग एक तिहाई requests load balancer की 30-second limit से टकराती थीं, क्योंकि बिना stream वाला answer पूरा होने तक कुछ नहीं भेजता। Upload किए गए हाथ से लिखे notes पर OCR एक `async def` endpoint के अंदर चलता था और सबके लिए server को freeze कर देता था।
 
-बदलाव ये हुए:
+बदलाव:
 
-- जवाब stream होते हैं: पहले शब्द लगभग 700 milliseconds में दिखते हैं।
-- हर container में चार Uvicorn workers, और दो containers, load balancer के पीछे।
-- Timeouts: model call 25 s, request 28 s, load balancer 30 s। Timeout होने पर app खाली error की जगह "इसमें आम से ज़्यादा समय लग रहा है; कृपया फिर से try करें" भेजता है।
-- OCR background queue में चला गया। Upload एक job id लौटाता है; page "आपके notes पढ़े जा रहे हैं..." दिखाता है और तैयार होने पर result उठा लेता है।
-- `/ready` database और queue check करता है; टूटा हुआ container 20 seconds के अंदर traffic लेना बंद कर देता है।
+- FastAPI के SSE support के साथ **streaming**। Staging में answer फिर भी एक साथ आता था, क्योंकि nginx ingress उसे buffer कर रहा था; `/answer` के लिए buffering off करने से ठीक हो गया।
+- **हर container में चार workers, दो containers**, हर worker में 40 model slots, ये check करने के बाद कि एक साथ 320 calls provider quota में फ़िट होती हैं।
+- **Layers में timeouts**: एक retry के साथ SDK 10 s, हर model call पर 25 s deadline, और दोनों के ऊपर balancer का 30 s idle timeout। Deadline fire होने पर student को "This is taking longer than usual; please try again" दिखता है।
+- **Limits**: हर student के लिए 10 मिनट में 20 सवाल, और सारे slots busy होने पर `Retry-After` के साथ एक तेज़ 429, जो "Many students are asking right now, retrying in 5 seconds" के रूप में दिखता है।
+- **OCR एक background queue पर**, file से derive किए गए job id के साथ, ताकि एक double tap से एक ही job बने। Result ready होने तक page "Reading your notes..." दिखाता है।
+- **Health और deploys**: `/ready` सिर्फ़ start-up check करता है; graceful shutdown 30 s है, 40 s के platform grace period के अंदर।
 
-शाम के peak में timeouts 33% से घटकर 1% से कम हो गए, और जो students जवाब दिखने से पहले ही छोड़ देते थे, उनकी संख्या दो तिहाई कम हो गई।
-
-| शाम के peak पर measure | पहले | बाद में |
+| शाम के peak पर measure (illustrative) | पहले | बाद में |
 | --- | --- | --- |
-| पहले text तक का समय | लगभग 12 s | लगभग 0.7 s |
-| Timeout होने वाली requests | 33% | 1% से कम |
-| OCR uploads से server freeze | रोज़ | कभी नहीं |
-| जवाब से पहले छोड़ देने वाले students | Baseline | दो तिहाई कम |
+| पहले text तक का समय, p95 | लगभग 12 s | लगभग 1 से 2 s |
+| Timeout से टकराती requests | लगभग 33% | 1% से कम |
+| OCR uploads से server freeze | रोज़ | कोई नहीं |
+| Answer से पहले छोड़ने वाले students | Baseline | लगभग दो तिहाई कम |
+| Students तक पहुँचते provider 429s | अक्सर, खाली errors के रूप में | कभी-कभार, एक साफ़ "busy, retrying" के रूप में |
 
 ## आम गलतियाँ
 
-- **Production में एक ही worker।** एक अटकी हुई request सबको रोक देती है। कई चलाओ और नापो।
-- **Timeouts न होना।** एक अटका हुआ model call एक worker को हमेशा के लिए पकड़े रखता है।
-- **पूरे जवाब का इंतज़ार करना।** Streaming के बिना users spinner देखते रहते हैं और चले जाते हैं।
-- **Model को call करने वाले health checks।** उनमें पैसा लगता है और provider धीमा हो तो वो fail हो जाते हैं, जिससे healthy instances बाहर हो जाते हैं।
-- **Requests के अंदर लंबे jobs।** जिस भी चीज़ में कुछ seconds से ज़्यादा CPU लग सकता है, उसके लिए queue use करो।
-- **Launch से पहले load test न करना।** शाम का पहला peak वो पहली बार नहीं होना चाहिए जब service असली traffic देखे।
-- **Concurrent model calls पर cap न होना**, जिससे अचानक आई burst provider की rate limits से टकराती है और हर request धीमी हो जाती है।
-- **SSE events में raw text**, जहाँ जवाब के अंदर की एक newline stream तोड़ देती है।
-- **Ready checks जो सिर्फ़ इतना बताते हैं कि process ज़िंदा है।**
+- **`async def` के अंदर एक sync client।** एक blocking Redis, database या HTTP call उस worker की हर request को freeze कर देती है।
+- **SDK timeout को deadline मान लेना।** Retries और `retry-after` waits उसके ऊपर जुड़ते जाते हैं।
+- **Stream के अंदर cap check करना।** तब तक 200 जा चुका होता है और 429 नामुमकिन है।
+- **ये भूल जाना कि caps गुणा होते हैं।** 4 workers और 3 containers में हर process पर 50 मतलब एक साथ 600 calls, शायद provider quota से बहुत ज़्यादा।
+- **Streaming को सिर्फ़ localhost पर test करना**, जहाँ कोई proxy उसे buffer नहीं करता।
+- **किसी shared dependency पर readiness check।** एक database blip हर instance को एक साथ हटा देती है।
+- **Platform से लंबा server grace period।** Platform पहले process को kill कर देता है और streams फिर भी कट जाती हैं।
+- **Clients जो 429 पर तुरंत retry करते हैं**, और एक छोटे overload को लंबे overload में बदल देते हैं।
+- **Random job ids**, जिससे एक double click वही महँगा job दो बार start कर देता है।
 
 ## जब सादा serving काफ़ी है
 
-- **कुछ users वाले internal tools**: एक process, timeouts और एक health check काफ़ी हैं।
-- **Batch jobs** जिनका users से सामना नहीं होता: web service से बेहतर एक scheduled script है।
-- **Platform-hosted functions**, जैसे serverless routes, जहाँ platform workers और shutdown संभालता है।
+- **कुछ ही users वाले internal tools**: एक process, model calls पर एक deadline और एक health check काफ़ी हैं।
+- **Batch jobs** जो कभी users के सामने नहीं आते: web service से एक scheduled script बेहतर है।
+- **Serverless routes**, जहाँ platform workers और shutdown संभालता है। उसकी time limit को अपनी सबसे लंबी stream से मिलाकर check करो।
 
 ## Demo से production तक
 
-- **हर process पर concurrency cap लगाओ** और load shed करो, साफ़ 429 के साथ।
-- **Timeouts अंदर से बाहर** रखो: model call, request, load balancer।
-- **Disconnect handling के साथ stream करो**, और graceful shutdown सबसे लंबी stream से ज़्यादा रखो।
-- **लंबा काम queue पर ले जाओ**, job ids और status के साथ।
-- **पहले token तक का समय, कुल समय और timeouts को p95 पर track करो।**
+- **Blocking calls हटाओ**, फिर कई workers चलाओ।
+- **Model calls पर** और हर user पर **cap लगाओ**, और total को provider quota से मिलाकर check करो।
+- **Timeouts को layers में रखो** और real path से stream करो।
+- **लंबे काम को queue करो**, idempotent job ids के साथ, और grace periods set करो।
+- **हर request पर log करो**: tokens, cost, time to first token और outcome; p95 पर नज़र रखो।
 
 ## Practice करो
 
-FastAPI का deployment concepts वाला page और streaming पर उसका custom responses वाला page पढ़ो।
+FastAPI का deployment concepts page और streaming पर उसका custom responses page पढ़ो।
 
-1. अपने FastAPI app में एक streaming endpoint जोड़ो जो model के tokens को client तक आगे भेजे, और पहले token तक का समय पहले और बाद में नापो।
-2. Model call और request पर timeouts, `/health` और `/ready` endpoints जोड़ो, और चार workers के साथ चलाओ।
-3. एक धीमे task को job id और status endpoint के साथ background job में ले जाओ।
-4. किसी load tool से अपने endpoint पर 100 concurrent requests भेजो और पक्का करो कि अतिरिक्त requests timeout होने की जगह तुरंत 429 पाती हैं।
+1. Model tokens को server-sent events के रूप में stream करो, और browser में time to first token पहले और बाद में measure करो।
+2. Slot dependency को 2 के cap के साथ जोड़ो, एक साथ 3 requests भेजो, और confirm करो कि तीसरी को लगभग एक second के अंदर 429 मिलता है।
+3. आगे nginx या अपने platform का ingress लगाओ, confirm करो कि stream टुकड़ों में आती है, फिर buffering on करो और उसे टूटते देखो।
+4. एक धीमे task को idempotent job id के साथ background job पर ले जाओ। उसे दो बार submit करो और confirm करो कि सिर्फ़ एक job चलता है।
+5. `--workers 4 --timeout-graceful-shutdown 30` के साथ चलाओ, एक लंबी stream शुरू करो, server रोको और confirm करो कि stream पूरी होती है।
 
-और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 9 latency, throughput और streaming समझाता है।
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 9 latency, throughput और streaming cover करता है।
 
-**आपका काम पूरा जब:** आप एक second से कम का पहले token तक का समय, एक काम की error लौटाता timeout, और एक धीमा job जो अब दूसरे users को block नहीं करता, ये सब दिखा सको।
+**आपका काम पूरा है जब आप** अपने real proxy से एक-दो second में पहला text दिखा सको, एक deadline को काम का message return करते दिखा सको, एक burst को लटकने की जगह तेज़ 429s पाते दिखा सको, और एक धीमा job दिखा सको जो अब बाकी users को block नहीं करता।
