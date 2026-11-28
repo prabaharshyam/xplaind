@@ -1,209 +1,272 @@
 ---
 id: ai-system-design
 lang: hinglish
-title: "AI system design"
-outcome: "Ek AI product ko paper par design karo: users, success metric, components, request flow, failure modes, evaluation aur operations."
-answer: "AI system design ka matlab hai users aur success metric se shuru karke components, request flow, failure modes, evaluation aur operations tak ek chhote document mein likhna, taaki team aur client agree karein aur phir build ho."
-why_it_matters: "Do page ka design document woh galtiyan hafta ek mein pakad leta hai jo build ke ek mahine baad dikhti. Compliance, cost aur latency ke sawaalon ke jawab pehle se maujood hote hain."
+title: "AI system design karna"
+outcome: "Kisi AI product ko kaagaz par design karo: uske components, ek request unmein se kaise guzarti hai, har user par kitna cost aata hai, wo kitni jaldi jawaab deta hai, kahaan fail hota hai aur aap use kaise measure karoge."
+answer: "AI system design ka matlab hai uske parts chunna, ek request ko unmein se trace karna, aur build karne se pehle cost, speed, quality aur failure par numbers lagaana."
+why_it_matters: "Numbers waala design mehenge surprises kaagaz par hi pakad leta hai: aisa bill jo spend cap se takra jaaye, aisi review queue jiske liye do log aur chahiye, aisa data rule jo aapke model ko hi bahar kar de. Clients, reviewers aur senior interviewers sabse pehle inhi numbers par sawaal karte hain."
 flashcards:
-  - q: "AI system design kya hai?"
-    a: "Ek AI product ko paper par plan karna: users, success metric, components, request flow, failure modes, evaluation aur operations."
-  - q: "Design document kitna lamba hona chahiye?"
-    a: "Do se chaar saaf pages jo team aur client sach mein padhein."
-  - q: "Goal section mein kya hona chahiye?"
-    a: "Kaun use karta hai, kis task ke liye, aur baseline ke saath ek success metric, jaise 6 minute se 2 se kam."
-  - q: "Kaunse constraints AI design ko shape karte hain?"
-    a: "Volume aur peaks, latency budget, cost per request, languages, data residency, privacy rules aur access rights."
-  - q: "Request flow ko step by step kyun describe karein?"
-    a: "Isse dikhta hai ki kaunsa data kahan jaata hai, jisse privacy, latency aur failure ke issues jaldi saamne aate hain."
-  - q: "Failure-mode table kya hai?"
-    a: "Har component ke liye kya galat ho sakta hai aur use pakadne wala guard, jaise outages ke liye fallback model."
-  - q: "Launch bar kya hai?"
-    a: "Test set par tay thresholds jo launch se pehle poore karne hain, jaise citations ke saath 85% correct."
-  - q: "Open questions kyun shaamil karein?"
-    a: "Jo trade-offs tay nahi hue unhe options ke saath likhne se team imaandaar rehti hai aur client ke decisions par focus milta hai."
-  - q: "Daily requests ko peak load estimate mein kaise badlein?"
-    a: "Daily requests ko un busy hours se baanto jinmein woh aate hain, peak factor (aksar 2 se 3) se guna karo, aur requests aur tokens per minute mein badlo taaki rate limits se compare kar sako."
+  - q: "Design document aur boxes waale diagram mein kya farq hai?"
+    a: "Numbers aur decisions. Har box ka ek kaam, ek owner, ek latency allowance aur ek failure row hoti hai, aur har arrow batata hai ki usse kaun-sa data guzarta hai."
+  - q: "Retrieval-based assistant mein do pipelines kaun-si hoti hain?"
+    a: "Offline ingestion pipeline (parse, chunk, embed, index, versions aur dates ke saath) aur online request path (checks, search, rerank, model, output checks). Zyaadatar quality bugs ingestion mein shuru hote hain."
+  - q: "Daily requests ko peak load mein kaise badalte hain?"
+    a: "Daily requests ko busy minutes se bhaag do, phir lagbhag 2 se 3 ke peak factor se guna karo. Phir provider ki tokens-per-minute limits se milaane ke liye use tokens per request se guna karo."
+  - q: "Claude API par, kya cached input tokens input rate limit mein gine jaate hain?"
+    a: "Nahi. November 2026 tak, cache reads input tokens per minute mein nahi gine jaate, isliye lambe system prompt ko cache karne se cost ghatti hai aur throughput bhi badhta hai."
+  - q: "Sirf rate limit nahi, monthly spend cap bhi kyun check karna hai?"
+    a: "Koi design apni tokens-per-minute limit se kaafi neeche rehkar bhi apne tier ka monthly spend cap paar kar sakta hai. Cap chhoote hi API agle mahine tak ya tier badalne tak jawaab dena band kar deta hai."
+  - q: "Sab kuch context window mein daalne ki jagah retrieval kab zaroori hai?"
+    a: "Jab corpus window se bahut bada ho, aksar badalta ho, ya har user ke liye alag access rules chahiye hon. 25 million tokens ke documents 1-million-token window mein nahi aa sakte."
   - q: "Latency budget kya hai?"
-    a: "Total response time ka ek target, jo har step (retrieval, reranking, model first token, tools) ke allowance mein baanta ho, taaki har hisse ke paas poora karne ke liye ek number ho."
+    a: "User ko dikhne waale intezaar ka ek target, jise har step ke liye ek allowance mein baanta jaata hai aur traces se p95 par measure kiya jaata hai, taaki total phisle toh dheema step aasaani se mil jaaye."
+  - q: "Retrieval system mein access control kahaan hona chahiye?"
+    a: "Search ke andar hi, user ki permissions par ek filter ke roop mein, model tak koi bhi text pahunchne se pehle. Generation ke baad filter karna bahut der hai: model use pehle hi padh chuka hai."
+  - q: "Human review ka size kaise tay karte hain?"
+    a: "Roz ki requests, guna kisi insaan ke paas jaane waala hissa, guna har review ke minutes. Roz 7,500, unmein 4% aur har ek par 3 minutes, yaani 15 ghante, lagbhag do full-time reviewers."
+  - q: "20 trap questions par 100% kamzor saboot kyun hai?"
+    a: "20 mein zero failures ke baad bhi asli failure rate lagbhag 15% ho sakta hai (rule of three: 3 ko 20 se bhaag). Us par bharosa karne se pehle trap set bada karo."
 exercise:
-  title: "Design ka sketch banao"
-  setup: "Bhopal ka ek state health department 5,000 field health workers ke liye ek assistant chahta hai jo Hindi aur English ke 300 guideline PDFs se vaccination schedules aur scheme rules ke sawaalon ke jawab de. Workers basic Android phones par patchy mobile data par use karte hain. Guidelines saal mein kuch baar badalte hain. Data India mein hi rehna chahiye."
+  title: "Numbers ke saath design karo"
+  setup: "Bhopal mein Madhya Pradesh health department apne 5,000 field health workers ke liye ek assistant chahta hai, jo Hindi aur English ki 300 guideline PDFs se vaccination schedules aur scheme rules ke sawaalon ka jawaab de. Workers basic Android phones par, ruk-ruk kar chalne waale mobile data se kaam karte hain. Guidelines saal mein kuch baar badalti hain. Documents aur logs India mein hi rehne chahiye. Estimate ke liye maan lo: har worker roz 8 busy hours mein 4 sawaal, peak factor 2.5, mahine mein 26 working days aur har sawaal par ₹0.50 ka model cost."
   questions:
-    - q: "Kaunsa success metric aur baseline propose karoge?"
-      a: "Jaise, jawab milne ka time, supervisor ko call karne se lagbhag 20 minute se 1 minute se kam, test set par citations ke saath 90% correct."
-    - q: "Kaunse constraints design ko sabse zyada shape karte hain?"
-      a: "Patchy data aur basic phones, isliye chhote streamed jawab aur halka interface; Hindi aur English; Indian hosting; aur guideline versions."
-    - q: "Do failure modes aur unke guards batao."
-      a: "Superseded guidelines, jo effective-date filters se sambhalte hain; aur provider outage, jo fallback model aur supervisor ko call karne ke saaf message se sambhalta hai."
-    - q: "Evaluation plan mein kya hoga?"
-      a: "Dono languages mein real workers ke sawaalon ka test set, jinke jawab nahi diye ja sakte woh bhi, recall aur correctness metrics aur ek launch bar ke saath."
+    - q: "Peak load kya hai, aur har worker par mahine ka model cost kitna hai?"
+      a: "Roz 20,000 sawaal, toh 20,000 ÷ 480 minutes × 2.5 = peak par lagbhag 104 ek minute mein. 20,000 × 26 × ₹0.50 = ₹2.6 lakh mahina, lagbhag ₹52 prati worker."
+    - q: "Ruk-ruk kar chalne waala data aur basic phones components ko kaise badalte hain?"
+      a: "Saari search aur model calls server par hi rehti hain. Jawaab chhote aur plain text mein hote hain, ek citation ke saath, aur stream karne ki jagah poore ek saath bheje jaate hain. Phone ek request id ke saath retry karta hai, taaki kisi sawaal ka jawaab do baar na jaaye."
+    - q: "Do failure modes batao, har ek ke saath ek detection signal aur ek guard."
+      a: "Puraana pad chuka (superseded) schedule: chunks par effective dates hoti hain, filter puraane waale hata deta hai, aur agar koi nikal jaaye toh ek dated-trap eval fail hota hai. Aisa Hindi sawaal jise English text nahi milta: hybrid search, aur har bhaasha ke liye alag recall track karna."
+    - q: "Evaluation aur human review kaise dikhenge?"
+      a: "Dono bhaashaon mein lagbhag 200 asli sawaal, jinmein aise sawaal bhi hon jinka jawaab nahi hai aur puraane-schedule waale traps bhi. Dose aur age waale jawaabon ko guideline quote karni hogi; jin par bharosa kam ho wo block medical officer ke paas jaayein, aur us queue ka size ghanton mein tay ho."
 ask:
-  - "AI system design document mein kya hona chahiye?"
-  - "AI system design interview ki taiyaari kaise karun?"
-  - "AI system ke failure modes ki list kaise banaun?"
+  - "Kisi AI assistant ka prati user cost kaise estimate karoon?"
+  - "AI system design mein kaun-se failure modes cover hone chahiye?"
+  - "RAG system ke liye latency budget kaise set karoon?"
 explain_in_interview:
-  answer: "AI system design ka matlab hai AI product ko banane se pehle ya banate waqt kaagaz par plan karna. Ek chhota design document cover karta hai users aur baseline ke saath ek success metric, latency aur cost jaise requirements, components, ek request unke through kaise flow karti hai, har step par kya fail ho sakta hai aur use kya pakadta hai, aur aap ise kaise evaluate aur operate karoge. Jaise, Mumbai ke ek insurer ka underwriting assistant retrieval misses ko hybrid search se aur provider outages ko fallback model se map karta hai. Trade-off time hai: real build mein, pehle din har box draw karne ke bajaye system ko ek-ek layer karke badhao."
-  follow_up: "Agar model provider down ho jaye toh aap system ko kaise protect karoge?"
-  follow_up_answer: "Chhote errors ke liye retries, same gateway ke peeche ek fallback model, aur dono fail hon toh graceful error message. Main ise failure-mode table mein list karunga, alerts ke saath taaki kisi ko pata chale ki fallback use ho raha hai."
-translated_on: 2026-11-16
+  answer: "Main user aur numbers se design karta hoon. Mumbai ki ek insurer ke underwriting assistant ke liye maine pehle goal tay kiya: lookup time 6 minutes se 2 par. Phir ek sawaal ko do pipelines se trace kiya: ingestion, jahaan documents ko versions aur effective dates milti hain, aur request path, jahaan model ke kuch bhi dekhne se pehle search department ke hisaab se filter karta hai. Maine load aur cost estimate kiya: roz 7,500 sawaal, peak par lagbhag 39 ek minute mein, mote taur par ₹670 prati user mahina. Isse dikha ki bill rate limit nahi, balki nichle API tiers ke monthly spend caps paar kar jaayega. Har step ka ek latency allowance hai aur ek failure row, jismein detection signal hai."
+  follow_up: "Agar model provider down ho jaaye toh aap system ko kaise bachaoge?"
+  follow_up_answer: "Chhoti errors ko backoff ke saath retry karoonga, retry-after header ka dhyaan rakhte hue. Phir usi gateway ke peechhe ek fallback model par switch karoonga, jo eval set par pehle se tested ho. Agar dono fail hon, toh saaf message dikhaoonga aur senior underwriter tak jaane ka raasta. Agar fallback kuch minutes se zyada traffic sambhaale, toh alert karoonga."
+translated_on: 2026-11-28
 ---
 
 ## Ye kya hai
 
-**AI system design** build se pehle ya build karte hue ek AI product ko paper par plan karna hai. Isme shaamil hai ki woh kiski seva karta hai aur success kaise measure hoti hai, uske components aur request unmein se kaise guzarti hai, kahan fail ho sakta hai, aur production mein use kaise evaluate aur chalaya jaata hai. Ek chhota design document team ko decisions par agree karne, risks jaldi pakadne aur clients aur reviewers ko system samjhane mein madad karta hai.
+**AI system design** ka matlab hai kaagaz par tay karna ki koi AI product kin cheezon se bana hai, aur numbers se saabit karna ki wo chalega. Achha design chhah sawaalon ke jawaab deta hai: parts kya hain, har arrow se kaun-sa data guzarta hai, ek request ka cost kitna hai, user kitna intezaar karta hai, kya toot-ta hai aur humein kaise pata chalega, aur quality kaise measure karenge?
+
+"Design interview" lesson mein ek design ko ghadi ke dabaav mein present karne ki baat hai; ye lesson batata hai ki usmein kya hona chahiye.
+
+Jo product documents se jawaab deta hai, uski do pipelines hoti hain: **ingestion** offline chalti hai aur documents ko ek index mein badalti hai; **request path** har sawaal par chalta hai. Zyaadatar quality problems ingestion mein shuru hoti hain, isliye dono banao.
 
 ```flow
-User, an underwriter -> Web app -> API service -> Input guardrails
-Input guardrails -> Hybrid search | department filter + effective date
-Hybrid search -> Reranker -[top 5]-> Model in the insurer's cloud region
-Model in the insurer's cloud region -[outage]-> Fallback model
-Model in the insurer's cloud region -> Output guardrails -> Answer with citation links
-Fallback model -> Output guardrails
+title: Underwriting assistant, request path
+Underwriter ka sawaal -> API service | login, department, har user ki cap
+API service -> Input checks | personal data mask karna, injection flag karna
+Input checks -> Query rewrite | small model
+Query rewrite -> Hybrid search | department aur effective-date filters
+Hybrid search -[top 40]-> Reranker
+Reranker -[top 6]-> Main model | sirf passages se jawaab, citations ke saath
+Main model -[outage]-> Fallback model
+Main model -> Citation check
+Fallback model -> Citation check
+Citation check -[pass]-> Clauses ke links ke saath jawaab
+Citation check -[fail]-> Jawaab se inkaar, senior underwriter ko route
 ```
 
-Iske aas-paas: masked tracing, CI mein evals, aur latency, cost, feedback aur refusals ke dashboards.
+```flow
+dir: LR
+title: Ingestion pipeline, har raat
+Nayi wordings aur circulars -> Parser and OCR | tables ko tables hi rakhta hai -> Chunker | section path ke saath 400 tokens -> Embeddings and keyword index -> Index | version, effective date, department
+```
 
-Ye lesson Mumbai ke ek general insurer ke internal underwriting assistant ke design ko follow karta hai.
+Ye lesson ek hi design ko follow karta hai: Mumbai ki ek general insurer mein 300 underwriters ke liye ek assistant, jo 2,000 policy wordings, circulars aur guidelines se jawaab deta hai. Saare volumes, token counts aur timings isi design ki assumptions hain, kisi asli insurer ke measurements nahi.
 
 ## Ye kaam kaise karta hai
 
-Ek practical design document, do se chaar pages, ye cover karta hai:
+### User aur constraints se shuru karo
 
-**1. Users aur goals.** Kaun use karta hai, kis task ke liye, aur baseline ke saath success metric (jaise, "policy questions ka median answer time 6 minute se 2 se kam karna").
+Goal ko ek baseline waale metric ki tarah likho: "Kisi policy sawaal ka jawaab dhoondhne ka median time, 6 minutes se 2 se kam." Phir wo constraints likho jo kisi box ya number ko badalte hain.
 
-**2. Requirements aur constraints.** Volume aur peak load, latency budget, cost per request, languages, data residency, privacy aur compliance rules, kaun kaunsa data dekh sakta hai.
+- **Jawaab kaun padhta hai, aur galat jawaab ki keemat kya hai?** Ek trained underwriter, par ek galat exclusion kisi policy ki galat pricing karwa sakta hai. Isliye har jawaab ek clause cite karta hai.
+- **Volume aur peaks.** 300 users, har ek har working day lagbhag 25 sawaal, zyaadatar 8 busy hours ke andar.
+- **Data rules.** Documents, index aur logs India mein hi rehte hain. Model calls India ke bahar process ho sakti hain ya nahi, ye compliance team tay karegi, aur wahi faisla tay karega ki provider ko seedhe call karna hai ya kisi cloud provider ka regional endpoint lena hai, agar India mein koi endpoint chuna hua model deta ho. Pehle hafte mein hi poochho.
+- **Access.** Motor underwriters ko health reinsurance treaties nahi dikhni chahiye, aur yahi rule search ka dhaancha tay karta hai.
 
-**3. Components.** Interface; API service; retrieval (document ingestion, parsing, chunking, embeddings, index, hybrid search, reranking); prompt aur model choices (aur ek fallback model); tools; guardrails; human review points; logging, tracing aur evaluation.
+### Wo decisions jo har design ko batane hote hain
 
-**4. Request flow.** Ek request ke saath kya hota hai, step by step, har step par pass hone wale data ke saath. Ek simple diagram madad karta hai.
+Boxes ki list design nahi hoti. Bade choices aur har ek ki wajah batao.
 
-**5. Failure modes aur guards.** Har component ke liye kya galat ho sakta hai aur use kya pakadta hai:
-
-- retrieval misses → hybrid search, metadata filters, recall ka evaluation;
-- hallucination → grounding, citations, sources chup hon toh refusal;
-- injection → least privilege, data marking, approvals;
-- provider outage → retries, fallback model, graceful error;
-- runaway cost → caps, budgets, alerts;
-- stale data → re-indexing pipeline, freshness alerts.
-
-**6. Evaluation.** Test set (size, sources, categories), retrieval aur answers ke metrics, launch bar, aur regressions CI mein kaise pakde jaate hain.
-
-**7. Operations.** Deployment, monitoring signals, alerts, on-call, release process aur data retention.
-
-**8. Open questions aur trade-offs.** Jo abhi tay nahi hua aur uske options.
-
-Agar aap interview nahi de rahe, build kar rahe ho, toh pehle din har box banane ki jagah system ko ek-ek layer karke badhao. AI app ko layers (context, guardrails, router aur gateway, caches, agents) mein badhane waala lesson us order ko cover karta hai.
-
-**Ek failure-mode table:**
-
-| Component | Kya galat ho sakta hai | Guard |
+| Decision | Is design ka choice | Ise kab badlo |
 | --- | --- | --- |
-| Parsing | Scanned tables ulajh jaati hain | Table extraction; flagged pages ka review |
-| Retrieval | Superseded circulars pehle rank hote hain | Effective-date filter |
-| Retrieval | Sahi passage chhoot jaata hai | Hybrid search, reranker, recall track |
-| Generation | Bina support ke claims | Citations zaroori; sources chup hon toh refusal |
-| Documents | Upload ki gayi files mein injection | Koi write tools nahi; content ko data maana jaata hai |
-| Provider | Outage ya rate limits | Retries, fallback model, saaf message |
-| Cost | Be-lagaam usage | Per-user caps, daily budget alert |
+| Sirf prompt, retrieval ya fine-tuning | Retrieval: documents har mahine badalte hain aur jawaabon ko citations chahiye | Zaroorat knowledge ki nahi, volume par format ya style ki ho ("Prompting, RAG ya fine-tuning" dekho) |
+| Long context ya retrieval | Retrieval: lagbhag 25 million tokens ke documents, 1-million-token window ke saamne | Corpus chhota aur sthir ho, aur caching use sasta rakhe |
+| Model tier | Jawaabon ke liye mid-sized model; query rewriting ke liye small model | Small model kisi poori category ke liye launch bar paar kar le |
+| Hosted API ya self-hosted open weights | Hosted, region compliance tay karegi | Data aapke servers se bahar na ja sake, ya sthir volume GPUs ko busy rakhe |
+| Vector store | Vector extension ke saath Postgres | Index ek machine se bada ho jaaye |
+| Streamed ya batch | Streamed: koi insaan intezaar kar raha hai | Koi intezaar nahi kar raha: batch API aadhe cost par |
 
-**Design ka review.** Ek request ko user ke tap se jawab tak walk through karo. Har box par teen sawaal poochho: yahan kaunsa data hai, kaun dekh sakta hai, aur agar ye hissa fail ho ya slow ho toh kya hota hai. Security ya compliance reviewer ko walk-through mein jaldi bulao. "Ye data kahan store hota hai?" jaise sawaal hafta ek mein sasta, aur hafta das mein mehnga hote hain.
+Database chunne se pehle index ka size nikaalo. Maan lo 2,000 documents, ausatan 25 pages, har page lagbhag 500 tokens: 25 million tokens, yaani 400 tokens ke 62,500 chunks. Har embedding mein 1,024 numbers aur har number 4 bytes ka, toh lagbhag 256 MB vectors, jo ek aam server ki memory mein aa jaate hain. Distributed vector database bina kisi faayde ke cost badhaayega.
 
-**Use current rakhna.** Document ko jeeta-jaagta maano. Jab koi decision badle, page update karo aur end mein ek chhote decision log mein date aur wajah note karo. Naye team members aur client reviewers chat threads se history jodne ki jagah ek sahi page padhte hain.
+### Ek request trace karo, har step ke data ke saath
 
-**Code mein back-of-envelope numbers.** Capacity, rate limits aur cost kai design choices tay karte hain; boxes banane se pehle unhe nikaalo:
+Har step kya leta hai aur aage kya bhejta hai, ye likho; privacy aur cost ki problems yahin dikhti hain.
+
+1. **API service.** Sawaal, user id aur department leta hai; jo users apni daily cap paar kar chuke hain unhe reject karta hai.
+2. **Input checks.** Log karne se pehle policy aur phone numbers mask karta hai; jo text model ko instructions dene ki koshish kare use flag karta hai.
+3. **Query rewrite.** Ek small model "does the fire one cover riots" jaise sawaal ko policy name waali query mein badalta hai: lagbhag 300 tokens andar, 40 bahar.
+4. **Hybrid search.** Keyword aur vector search parallel mein chalte hain, department aur effective date se filter hokar. Keyword search policy codes aur clause numbers pakadta hai, yaani wo exact strings jo embeddings aksar miss kar dete hain.
+5. **Reranker.** Top 40 candidates ko score karta hai aur 6 rakhta hai.
+6. **Main model.** Lagbhag 1,500 tokens ke fixed instructions leta hai (har call par ek jaise, isliye cached) aur 2,700 naye tokens: 400 tokens ke chhah passages aur sawaal. Ye lagbhag 350 tokens likhta hai.
+7. **Citation check.** Saada code: har cited clause id bheje gaye passages mein honi chahiye, warna jawaab refuse hokar kisi insaan ke paas route hota hai.
+
+Access control step 4 mein rehta hai. Jawaab ke baad filter karoge toh model wo text pehle hi padh chuka hoga jo user ko nahi dikhna chahiye.
+
+### Boxes se pehle numbers: load, limits aur cost
 
 ```python
-def estimate(daily_requests, busy_hours=8, peak_factor=2.5,
-             in_tokens=3_500, out_tokens=350, price_in=3, price_out=15, usd_to_inr=84,
-             tpm_limit=400_000):
-    """Prices in USD per million tokens; check current prices and note the date."""
-    peak_per_min = daily_requests / (busy_hours * 60) * peak_factor
-    tokens_per_min = peak_per_min * (in_tokens + out_tokens)
-    cost_day = daily_requests * (in_tokens * price_in + out_tokens * price_out) / 1e6 * usd_to_inr
+# Anthropic list prices, US dollars per million tokens, checked 28 November 2026
+SONNET = {"in": 2.00, "cache_read": 0.10, "out": 10.00}   # Claude Sonnet 5.5
+HAIKU = {"in": 0.10, "out": 0.50}                          # Claude Haiku 5.5, prompts up to 100,000 tokens
+
+def estimate(users=300, questions_per_user=25, work_days=22, busy_hours=8, peak_factor=2.5,
+             cached_in=1_500, fresh_in=2_700, out=350,   # main model, tokens per question
+             rewrite_in=300, rewrite_out=40,             # small model rewrites the query
+             usd_to_inr=94, fixed_inr_month=60_000):     # suppose: search, hosting, tracing
+    daily = users * questions_per_user
+    peak_per_min = daily / (busy_hours * 60) * peak_factor
+    usd = ((fresh_in * SONNET["in"] + cached_in * SONNET["cache_read"] + out * SONNET["out"])
+           + (rewrite_in * HAIKU["in"] + rewrite_out * HAIKU["out"])) / 1e6
+    month_inr = daily * work_days * usd * usd_to_inr + fixed_inr_month
     return {
-        "peak requests per minute": round(peak_per_min, 1),
-        "peak tokens per minute": round(tokens_per_min),
-        "within rate limit": tokens_per_min < tpm_limit,
-        "cost per day ₹": round(cost_day),
-        "cost per month ₹": round(cost_day * 30),
+        "peak questions a minute": round(peak_per_min),
+        "peak uncached input tokens a minute": round(peak_per_min * fresh_in),
+        "peak output tokens a minute": round(peak_per_min * out),
+        "model cost per question (rupees)": round(usd * usd_to_inr, 2),
+        "model spend a month (US dollars)": round(daily * work_days * usd),
+        "total a month (rupees)": round(month_inr),
+        "per user a month (rupees)": round(month_inr / users),
     }
 
-print(estimate(daily_requests=20_000))
+print(estimate())
+# {'peak questions a minute': 39, 'peak uncached input tokens a minute': 105469,
+#  'peak output tokens a minute': 13672, 'model cost per question (rupees)': 0.86,
+#  'model spend a month (US dollars)': 1502, 'total a month (rupees)': 201141,
+#  'per user a month (rupees)': 670}
 ```
 
-Agar peak tokens per minute provider ki limit se zyada hain, toh design ko higher tier, caching, kuch steps ke liye chhota model ya ek queue chahiye. Agar monthly cost client ko chaunka de, toh abhi pata karo, launch ke baad nahi.
+₹94 ka ek dollar aur ₹60,000 ke fixed costs sirf udaaharan ke liye hain. Ise published limits se milaao. Claude API par, November 2026 tak, sabse nichla standard tier (Start) Sonnet 5.5 ke liye ek minute mein 2,000,000 input tokens aur 400,000 output tokens deta hai. Cache reads input limit mein nahi gine jaate. Toh peak load uska lagbhag 5% hi use karta hai: rate limit problem nahi hai.
 
-**Latency budget, step by step.** Ek target aur har step ka allowance likho, phir usi ke against measure karo:
+Problem monthly bill hai. Har tier ka ek monthly spend cap bhi hai: Start ka $500, Build ka $1,000 aur Scale ka $200,000. Lagbhag $1,500 mahine par ye design dono nichle tiers mein se kisi par bhi mahine ke beech mein ruk jaayega, aisi errors ke saath jinhe retries theek nahi kar sakte. Design ko tier ya cloud contract ka naam batana hoga aur cap se neeche ek budget alert lagaana hoga. Cloud platforms apne quotas khud tay karte hain, aur Anthropic ke pricing page ke mutaabik unke regional aur multi-region endpoints global waalon se 10% mehenge hain, isliye compliance jo route chune uske liye hisaab phir se karo.
+
+Fresh input sabse bada cost hai: har sawaal ke $0.0091 mein se $0.0054 (2,700 tokens, $2 prati million par). 6 ki jagah 4 passages bhejne se lagbhag 18% bachta hai, agar eval set par recall bana rahe. Cache writes chhode gaye hain: is traffic par cached prefix kabhi-kabhaar hi expire hota hai. Fixed costs total ka 30% hain, isliye usage badhne ke saath prati user cost ghatta hai.
+
+### Ek latency budget, step by step
+
+Underwriters jawaab stream hote-hote padhte hain, isliye target hai: 100 mein se 95 sawaalon (p95) par pehla text 2 seconds se kam mein dikhe.
 
 | Step | Allowance (p95) |
 | --- | --- |
-| Auth, request parse karna | 50 ms |
-| Query rewrite (chhota model) | 400 ms |
-| Hybrid search | 150 ms |
-| 30 candidates ki reranking | 250 ms |
-| Model, first token tak ka time | 1,200 ms |
-| First token tak total | lagbhag 2 s |
+| Login, cap aur input checks | 50 ms |
+| Query rewrite, small model | 300 ms |
+| Hybrid search, keyword aur vector parallel mein | 150 ms |
+| 40 candidates ki reranking | 200 ms |
+| Main model, pehle token tak ka samay | 1,000 ms |
+| Total, lagbhag 300 ms bachaakar | 1.7 s |
 
-Ab har component owner ke paas ek number hai. Jab total phisalta hai, trace dikhata hai ki kaunsa step apna allowance tod gaya.
+p95s ko jodne se asli p95 zyada dikhta hai, kyunki saare steps shaayad hi kabhi ek saath dheeme hote hain, isliye ye budget safe hai, exact nahi. Agar model, maan lo, ek second mein 60 tokens stream kare, toh 350-token jawaab ko lagbhag 6 seconds aur lagenge. Jab total phisle, toh trace dikhata hai ki kis step ne apna allowance toda. Sabse pehle kaatne waala step query rewrite hai.
 
-**Layers mein architecture.** Parts jodne ka ek useful order, zaroori se optional tak: achhe context ke saath model call (retrieval, tools); inputs aur outputs par guardrails; router aur gateway (kai models, fallbacks, keys, budgets); caching; aur aakhir mein write actions ke saath agent patterns. Har layer capability aur naye failure modes laati hai, isliye ek layer tab jodo jab measured need dikhe.
+### Failure modes, unhe kaise pakdein, aur guard
 
-**Design decisions records ke roop mein.** Document mein ek chhota decision log rakho: date, decision, dekhe gaye options, wajah, kisne agree kiya. Jaise: "2026-11-02: reranker ke saath hybrid search; vector-only ne policy codes miss kiye (recall 71% vs 89%); client IT ke saath agree." Baad ke reviewers aur naye team members sirf kya nahi, kyun bhi dekhte hain.
+Failure row tabhi kaam ki hai jab kisi ko failure ka pata chale, isliye har row mein ek detection signal do.
 
-**Shuru karne ke liye ek template.** Design document ko repository mein Markdown ki tarah store karo, is lesson ke aath headings, estimate output, latency budget, failure-mode table aur decision log ke saath. Use pull requests mein code ki tarah review karo.
+| Component | Kya galat hota hai | Aapko kaise pata chalega | Guard |
+| --- | --- | --- | --- |
+| Parsing | Scanned tables uljha hua text ban jaati hain | Har document ka parse score | Table extraction; flagged pages indexing se pehle check |
+| Index | Puraana pad chuka (superseded) circular pehle number par aata hai | Eval set ke dated trap questions fail hote hain | Effective-date filter; puraane versions rakhe jaate hain par marked |
+| Search | Sahi clause chhoot jaata hai | Eval set par recall at 5, har hafte track | Hybrid search, reranker, query rewrite |
+| Access | Koi user doosre department ki treaty dekh leta hai | Har department ke ek user ke saath CI test | Search ke andar permission filter |
+| Model | Aisa claim jise passages support nahi karte | Citation check failures; sampled traffic par judge score | Sirf passages se jawaab, warna refuse |
+| Documents | Upload hui file mein chhipe instructions | Traces mein injection flags | Koi write tools nahi; passages ko instructions nahi, data ke roop mein mark kiya jaata hai |
+| Provider | Outage, rate limit ya ramp limit errors (429) | Error rate aur fallback share | Backoff ke saath retries, fallback model, saaf message |
+| Cost | Usage bekaaboo ho jaata hai | Budget ke saamne daily spend | Har user ki caps, budget ke 80% par ek alert |
+
+### Human review: kahaan, aur kitna
+
+Logon ko wahaan rakho jahaan model sabse kamzor hai aur galtiyaan sabse mehengi hain. Yahaan, refused aur kam score waale jawaab ek senior underwriter ke paas jaate hain, naye circulars indexing se pehle check hote hain, aur har mahine 30 jawaab sample kiye jaate hain.
+
+Phir uska size nikaalo. Roz 7,500 sawaalon mein se agar 4% route hon, toh 300 reviews. Har ek par 3 minutes, yaani roz 15 ghante, lagbhag do full-time reviewers. Agar client itne log nahi laga sakta, toh retrieval theek karo ya kam tarah ke sawaal route karo. Jis queue par koi baitha nahi, wo guard nahi hai.
+
+### Evaluation aur launch bar
+
+Test set asli sawaalon se, category ke hisaab se banao, jaise 60 single-document sawaal, 25 jinmein do documents chahiye, 15 superseded-circular traps, aur 20 jo documents cover nahi karte, jinhe refuse hona hi chahiye. Retrieval measure karo (recall at 5: kya sahi clause top five mein hai?) aur jawaab bhi (sahi aur cited, ek model judge se score, jise underwriter labels se check kiya gaya ho).
+
+Jaano ki ek chhota set kya dikha sakta hai: 120 sawaalon par 85% sahi ka 95% margin dono taraf lagbhag 6 points hai. Toh do models ke beech 2-point ka farq noise hai. Aur 20 mein se 20 refusals ke baad bhi asli failure rate lagbhag 15% ho sakta hai. Asli traffic aane ke saath traps badhaao. Har prompt ya model change par CI mein fast checks chalaao: 120 sawaal, lagbhag ₹0.86 har ek, yaani lagbhag ₹100 ek run, upar se judge.
+
+### Document ko zinda rakho
+
+Ise repository mein Markdown ke roop mein rakho, pull requests mein review karo, aur aakhir mein open questions aur ek decision log ho: date, decision, options, reason, kisne maana. Jaise: "2026-11-02: reranker ke saath hybrid search. Vector-only search policy codes miss kar raha tha (recall at 5: eval set par 71% banaam 89%). Client IT ke saath tay." Pehle hafte mein hi kisi compliance reviewer ko ise samjha do, jab "Ye kahaan store hota hai?" ka jawaab dena abhi sasta hai.
 
 ## Ek example se samjho
 
-Mumbai ke ek general insurer ke internal assistant ka design summary, jo 2,000 policy wordings, circulars aur underwriting guidelines se underwriters ke sawaalon ke jawab deta hai:
+Insurer ke design document ka pehla page:
 
-- *Goal*: underwriters ka lookup time 6 minute se 2; 120-question test set par citations ke saath 85% correct launch bar, "documents mein nahi hai" waale sawaalon par 100% refusal.
-- *Constraints*: 300 users, peak par 40 requests per minute, first token 2 s se kam, data India mein, department ke hisaab se access.
-- *Components*: purane circulars ke liye OCR ke saath layout-aware parsing; section paths ke saath 400-token chunks; department filters ke saath hybrid search aur reranker; insurer ke cloud region ke zariye mid-sized model aur ek fallback; links ki tarah render hote citations; masked logs ke saath tracing.
-- *Failure modes*: superseded circulars (effective-date filter), scanned tables (table extraction, flagged pages), uploaded documents se injection (koi write tools nahi), outage (fallback, phir ek saaf message).
-- *Evaluation*: recall at 5, calibrated judge se answer correctness aur mahine mein 30 answers ka underwriter review; CI mein fast checks.
-- *Operations*: container service, latency, cost, feedback aur refusal rate ke dashboards, nightly re-indexing.
-
-Document mein do din lage aur jab compliance team ne hafta ek mein data residency ke baare mein poochha toh ek mahine ka rework bach gaya.
-
-| Design element | Decision |
+| Section | Content |
 | --- | --- |
-| Goal | Lookup time 6 minute se 2 |
-| Launch bar | 120 questions par citations ke saath 85% correct; out-of-scope par 100% refusal |
-| Constraints | 300 users, peak par 40 requests per minute, first token 2 s se kam, data India mein |
-| Payoff | Compliance ke hafta-ek residency sawaal ka jawab document se, ek mahine ka rework bacha |
+| Goal | 300 underwriters ke liye median lookup time 6 minutes se 2 se kam |
+| Launch bar | 120 sawaalon par kam se kam 85% sahi aur cited; sabhi 20 out-of-scope sawaal refuse; recall at 5 kam se kam 85% |
+| Load and cost | Roz 7,500 sawaal, peak par 39 ek minute mein; har sawaal par ₹0.86 model cost; lagbhag ₹2 lakh mahina, ₹670 prati user, prices 28 November 2026 ko check |
+| Latency | p95 par pehla text 2 s se kam; poora jawaab lagbhag 8 s mein |
+| Components | OCR aur table extraction ke saath nightly ingestion; department aur date filters ke saath hybrid search; reranker; tested fallback ke saath mid-sized model; citation check |
+| Human review | Lagbhag 4% sawaal senior underwriters ko, lagbhag do reviewers ka samay; har mahine 30 jawaab sample |
+| Open questions | Kya model calls India se bahar ja sakti hain? Lagbhag $1,500 mahine ko kaun-sa API tier ya cloud contract cover karega? |
+
+Kisi bhi code se pehle numbers ne kya badla:
+
+1. **Spend cap.** Bill do tiers ke monthly caps se upar hai, isliye teesre hafte mein service rukne ki jagah, contract ka faisla plan mein aa gaya.
+2. **Review queue.** Client ne "kabhi-kabhaar" review maan rakha tha; do logon ke ghante dekhkar unhone retrieval ke kaam aur ek rota ke liye paise diye.
+3. **Vector store.** 256 MB vectors insurer ke maujooda Postgres mein aa jaate hain: review karne ke liye ek vendor kam.
+4. **Compliance ka sawaal.** Pehle hafte mein uthaaya gaya, isliye gateway banne se pehle model route tay ho gaya.
+
+Ab ise ek badlaav se test karo. Maan lo agle saal 2,700 claims staff judte hain. Das guna users ka matlab peak par lagbhag 390 sawaal ek minute mein aur lagbhag 1.05 million uncached input tokens ek minute mein: ab bhi Start tier ki input limit se neeche, par lagbhag $15,000 mahina. Prati user cost lagbhag ₹490 par aa jaata hai, kyunki fixed costs bant jaate hain. Sabse pehle review queue toot-ti hai: 75,000 ka 4% yaani roz 3,000 reviews, isliye pehle route hone waala hissa ghataana hoga.
 
 ## Aam galtiyaan
 
-- **User aur metric ki jagah model se shuru karna.**
-- **Failure analysis na karna.** Har component kisi na kisi tarah fail hota hai.
-- **Evaluation plan na hona.** "Dekhte hain kaisa chalta hai" plan nahi hai.
-- **Constraints ko ignore karna.** Latency, cost aur data rules design ko shape karte hain.
-- **Lambe documents jo koi nahi padhta.** Do se chaar saaf pages.
-- **Capacity aur cost estimate chhod dena**, phir launch ke baad rate limits ya bill ka pata chalna.
-- **Poore system ke liye ek hi latency target**, har step ke allowance ke bina.
-- **Bina wajah record kiye design decisions**, jinpar har mahine dobara behas hoti hai.
+- **Bina numbers ke boxes.** Lakshan: kisi box ka na owner hai, na latency allowance, na failure row, isliye reviewers use challenge nahi kar sakte.
+- **Sirf request path banaana.** Lakshan: na parsing, na versions, na effective dates, jab tak koi puraana circular user tak na pahunch jaaye.
+- **Rate limit check karna par spend cap nahi.** Lakshan: "Hum tokens-per-minute limit se kaafi neeche hain", par na monthly bill, na price check date.
+- **Generation ke baad access filter karna.** Lakshan: "UI restricted jawaab chhipa deta hai". Model restricted text pehle hi padh chuka hai.
+- **Detection column ke bina failure table.** Lakshan: aisi failures ke guards jinhe koi notice hi nahi karega.
+- **Bina size ki human review.** Lakshan: "Uncertain jawaab kisi insaan ke paas jaate hain", par na hissa, na minutes, na team.
+- **Chhote eval set par bharosa.** Lakshan: 120 sawaalon par 2-point ki badhat se model chunna, ya 20 mein se 20 refusals ko saboot maanna.
+- **Lamba document jise koi nahi padhta.** Do se chaar pages, summary table pehle.
 
-## Jab poora design document zaroorat se zyada ho
+## Kab poora design document zaroorat se zyada hai
 
-- **Ek idea test karne ka ek hafte ka prototype**: goal, data aur success measure ke saath aadha page note kaafi hai.
-- **Chhota internal tool** jisme kam users hon aur sensitive data na ho.
-- **Maujooda system ke andar ek badlaav**, jise naye document ki nahi, uske design document ke update ki zaroorat hai.
+- **Ek hafte ka prototype:** aadha page, jismein goal, data, success measure aur prati request mota cost ho.
+- **Ek chhota internal tool**, jiske users kam hon aur koi sensitive data na ho.
+- **Kisi maujooda system ke andar badlaav:** uski jagah uska document aur decision log update karo.
 
 ## Demo se production tak
 
-- **Design document ko repository mein rakho**, har bade badlaav ke saath update karo.
-- **Capacity aur cost estimate dobara chalao** jab traffic, models ya prices badlein.
-- **Har step ko uske latency allowance ke against measure karo** traces se.
-- **Decision log banaye rakho** dates aur wajah ke saath.
-- **Har incident ke baad failure modes review karo** aur naye rows jodo.
+- Jab bhi traffic, models, token counts ya prices badlein, **estimate phir se chalaao**, aur prices par date daalo.
+- Har hafte **traces ko latency budget se milaao**.
+- **Har detection signal ko dashboard par rakho**, fallback use, spend aur refusal rate ke alerts ke saath.
+- **Har incident ke baad ek failure row jodo.**
+- **Har mahine human review ka size phir se nikaalo.**
 
 ## Practice karo
 
-Neeche link ki hui Eugene Yan ki LLM-based systems banane ki patterns padho.
+Neeche linked, LLM-based systems ke liye Eugene Yan ke patterns padho. Gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 10 AI application architecture ko layer by layer cover karta hai, aur chapter 9 latency aur cost ko.
 
-Is lesson ka check ek project hai: ek AI product ke liye do se chaar page ka design document likho, jisme users aur success metrics, components, request flow, failure modes aur guards, evaluation aur operations ho.
+Is lesson ka check ek project hai: apni pasand ke kisi AI product ke liye do se chaar page ka design document. Ye saaton hon toh pass:
 
-Aur gehraai ke liye, Chip Huyen ki *AI Engineering* (O'Reilly, 2025) ka chapter 10 AI application architecture ko layer by layer cover karta hai, aur chapter 9 latency aur cost ko.
+1. Baseline ke saath ek success metric.
+2. Peak-load aur cost-per-user estimate, uski assumptions aur prices check karne ki date ke saath.
+3. Har component se trace ki gayi ek request, har step ke data ke saath.
+4. Har step ke allowance waala latency budget.
+5. Kam se kam chhah rows ki failure table, har row mein ek detection signal aur ek guard.
+6. Category ke hisaab se test set, launch bar ke saath.
+7. Open questions aur ek chhota decision log.
 
-**Aapka kaam poora jab:** aap kisi ko apna design das minute mein walk through kara sako aur har component ke liye "ye hissa fail ho toh kya hota hai?" ka jawab de sako.
+Phir worked example ki tarah kisi ek assumption ko das se guna karo, aur likho ki sabse pehle kya toot-ta hai.
+
+**Aapka kaam poora hai jab aap** kisi ko das minutes mein apna design samjha sako aur har component ke liye jawaab de sako: "Iska cost kya hai, ye kitna dheema ho sakta hai, aur fail hone par kya hota hai?"
