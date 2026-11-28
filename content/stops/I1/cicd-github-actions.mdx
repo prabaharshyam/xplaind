@@ -3,8 +3,8 @@ id: cicd-github-actions
 level: I1
 theme: ops
 title: "CI/CD with GitHub Actions"
-outcome: "Set up a pipeline that tests every pull request, builds and pushes an image on merge, deploys to staging automatically and to production after approval, with a way to roll back."
-answer: "CI/CD with GitHub Actions runs your tests on every pull request, builds an image when code merges, deploys to staging automatically and to production after approval."
+outcome: "Set up a pipeline that tests every pull request with a stable AI eval, builds one image on merge, deploys it to staging and smoke tests it, then promotes it to production after approval, with a rollback you have practised."
+answer: "CI/CD with GitHub Actions tests every pull request, builds one image on merge, deploys it to staging, then promotes the same image to production after approval."
 why_it_matters: "Manual deploys at a client go wrong at the worst time and leave no record. A pipeline makes every change tested, traceable and reversible, and it is the first thing a client's engineering lead looks for when deciding whether to take over your system."
 hours: 3
 gap_tags: []
@@ -18,45 +18,45 @@ check:
   question_ids: [cicd-github-actions-1, cicd-github-actions-2, cicd-github-actions-3]
 flashcards:
   - q: "What is continuous integration (CI)?"
-    a: "Running checks such as lint, type checks, unit tests and a small eval on every change, so a failing change cannot merge."
-  - q: "What is continuous delivery (CD)?"
-    a: "Taking a merged change through environments automatically: build an image, deploy to staging, smoke test, then production, often after approval."
-  - q: "Where do GitHub Actions workflows live?"
-    a: "As YAML files in .github/workflows/, running on events such as a pull request or a push to main."
-  - q: "Why add a small eval to CI for an AI app?"
-    a: "Prompt and retrieval changes are code changes. A fast eval on golden questions catches quality drops before merging."
+    a: "Running checks such as lint, type checks, unit tests and a small eval on every pull request, with branch protection set so a failing change cannot merge."
+  - q: "What is the difference between continuous delivery and continuous deployment?"
+    a: "Continuous delivery keeps every merged change ready to release, and a person approves the production step. Continuous deployment goes to production automatically when all checks pass."
+  - q: "What are the parts of a GitHub Actions workflow?"
+    a: "A YAML file in .github/workflows/ that runs on events. It holds jobs; each job runs steps on a fresh machine called a runner. A step runs a command or uses a ready-made action."
+  - q: "How do you make an AI smoke eval a stable gate in CI?"
+    a: "Use about 50 golden questions, temperature 0, one retry for a failed case, and compare with the main branch's score allowing a small tolerance. Run it only when prompts, retrieval or evals change."
   - q: "What is a deployment environment in GitHub Actions?"
-    a: "A named target such as staging or production, with its own secrets and rules, such as required reviewers before deploy."
+    a: "A named target such as staging or production with its own secrets, variables and rules. Its secrets stay locked until a required reviewer approves. Required reviewers need a public repository or GitHub Enterprise."
   - q: "Why build one image and promote it?"
-    a: "So production runs exactly what was tested in staging. Rebuilding per environment can introduce differences."
-  - q: "What is OpenID Connect used for in CI?"
-    a: "Letting the runner sign in to the cloud with short-lived credentials, instead of storing long-lived keys as secrets."
+    a: "So production runs exactly what was tested in staging. Rebuilding per environment can pull different package versions or base images."
+  - q: "What does OpenID Connect (OIDC) do in a deploy job?"
+    a: "The job asks GitHub for a signed token naming its repository and environment. The cloud trusts that token and gives back credentials that expire, by default after an hour on AWS. No long-lived key is stored."
   - q: "How does tagging images with the commit hash help rollback?"
-    a: "Rolling back is just redeploying the previous commit's image, which can be a single button or command."
-  - q: "What is OIDC between GitHub Actions and a cloud?"
-    a: "The workflow gets a short-lived token from GitHub that the cloud trusts for a named repository and branch, so no long-lived cloud keys are stored as secrets."
-  - q: "Why run the smoke eval only when prompts or retrieval change?"
-    a: "It calls a model and costs money and time. A paths filter runs it on the pull requests that can change AI behaviour and skips the rest."
+    a: "Every production version has an exact name. Rolling back means redeploying the last good tag, with no rebuild, which can be one manual workflow run."
+  - q: "Why pin third-party actions to a full commit SHA?"
+    a: "A tag such as v4 can be moved. In March 2025 attackers moved the tags of tj-actions/changed-files to malicious code. A commit SHA cannot be moved; Dependabot can still propose updates."
+  - q: "What is the expand and contract pattern for database changes?"
+    a: "Change the schema in steps the old code can survive: add the new column first, ship code that uses it, and remove the old column in a later release. Then rolling back the app never breaks on the database."
 exercise:
   title: "Find the gaps in this pipeline"
-  setup: "A Gurugram startup's pipeline: CI runs only on pushes to main, not on pull requests. Tests run, but there is no eval. The AWS access key is pasted into the workflow file. The deploy job rebuilds the Docker image separately for staging and production. Nobody has ever rolled back."
+  setup: "A Gurugram startup's pipeline: CI runs only on pushes to main. An AWS access key is pasted into the workflow file. The deploy job rebuilds the Docker image separately for staging and production. The whole workflow has concurrency with cancel-in-progress set to true, and last Friday a production deploy stopped halfway when a second merge landed."
   questions:
     - q: "What is the risk of running CI only on main?"
-      a: "Broken changes are found after they merge. Run CI on pull requests so failures block the merge."
+      a: "Broken changes are found after they merge. Run CI on pull requests and make it a required check, so failures block the merge."
     - q: "What should replace the pasted AWS key?"
-      a: "Remove it and rotate it now, then use OpenID Connect for short-lived credentials, or at least the CI system's encrypted secrets."
+      a: "Treat it as leaked: deactivate and rotate it now. Then deploy with OIDC and an IAM role that trusts only this repository's production environment."
     - q: "Why is rebuilding the image for each environment a problem?"
-      a: "Production may get a different image from the one tested in staging. Build once, tag with the commit, promote the same image."
-    - q: "What two additions matter most for an AI app here?"
-      a: "A small eval in CI that fails below a threshold, and a practiced rollback to the previous image."
+      a: "Production may get a different image from the one tested in staging. Build once, tag with the commit, promote that image."
+    - q: "Why did the deploy stop halfway, and what is the fix?"
+      a: "The new run cancelled the running one, deploy included. Cancel only pull request runs, and give deploy jobs their own concurrency group without cancel-in-progress."
 ask:
   - "What is the difference between CI and CD?"
-  - "How do I test prompt changes in CI?"
-  - "How do I store secrets in GitHub Actions safely?"
+  - "How do I make an AI eval in CI stable, not flaky?"
+  - "How do I set up OIDC from GitHub Actions to AWS?"
 explain_in_interview:
-  answer: "CI/CD automates checking and shipping code. Continuous integration runs lint, type checks, unit tests and, for AI systems, a small eval suite on every pull request, and a change that fails does not merge. Continuous delivery then builds an image tagged with the commit, deploys it to staging, runs smoke tests and deploys the same image to production, often after a named person approves. In GitHub Actions these are YAML workflows in the .github/workflows folder, triggered by events. For example, an insurer's team can trace every production change to a commit. The trade-off is pipeline setup and maintenance, and slow tests slow everyone."
+  answer: "CI/CD automates checking and shipping code. Continuous integration runs lint, type checks, unit tests and, for AI systems, a small eval on every pull request, and branch protection stops a failing change from merging. Continuous delivery builds one image tagged with the commit, deploys it to staging, smoke tests it and promotes the same image to production after a named person approves. Deploy jobs sign in to the cloud through OIDC, so no long-lived keys are stored, and third-party actions are pinned to commit hashes. For example, an insurer's team can trace every production change to a commit and an approver. The trade-off is setup and upkeep, and slow or flaky checks slow everyone."
   follow_up: "How do you roll back a bad deploy?"
-  follow_up_answer: "Because each image is tagged with its commit, you redeploy the previous known-good tag rather than rebuilding. Keep database changes backward compatible so the old version still works, then fix the problem in a new pull request."
+  follow_up_answer: "Redeploy the last good commit's image, with no rebuild, through a manual rollback workflow that uses the same approval. It works only if database changes are backward compatible, so ship schema changes in expand and contract steps, then fix the bug in a new pull request."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-11-09
@@ -64,162 +64,119 @@ reviewed_on: 2026-11-09
 
 ## What it is
 
-**Continuous integration (CI)** runs checks on every change: lint, type checks, unit tests, and for AI systems a small eval suite. A change that fails does not merge.
+**Continuous integration (CI)** runs checks on every pull request: lint, type checks, unit tests and, for AI systems, a small eval. Branch protection makes a failing change unable to merge.
 
-**Continuous delivery (CD)** takes a merged change through environments automatically: build an image, deploy to staging, run smoke tests, then deploy to production, often after a person approves.
+**Continuous delivery (CD)** takes each merged change through environments automatically: build an image, deploy it to staging, smoke test it, then promote it to production after a person approves. Without that approval step it is called **continuous deployment**. Most client teams in banking, insurance and health want the approval.
 
-GitHub Actions is one common way to do both. Workflows are YAML files in `.github/workflows/` that run on events such as a pull request or a push to main. GitLab CI, Azure DevOps and Jenkins work similarly; clients will have their own choice.
+GitHub Actions is one common way to do both. GitLab CI, Azure DevOps and Jenkins use the same ideas with different syntax; a client will have their own choice.
 
 ```flow
+title: From pull request to production
 Pull request -> CI: lint, types, tests, smoke eval -> Pass?
-Pass? -[no]-> Blocked
-Pass? -[yes]-> Can merge -> Merge to main
-Merge to main -> Build the image | tag = commit hash
-Build the image -> Deploy to staging -> Smoke tests -> Approval by a named reviewer -> Deploy the same image to production -> Problem?
-Problem? -[yes]-> Redeploy the previous tag
+Pass? -[no]-> Merge blocked
+Pass? -[yes]-> Review and merge to main
+Review and merge to main -> Build one image | tag = commit hash
+Build one image -> Deploy to staging -> Smoke test staging -> Approval by a named reviewer
+Approval by a named reviewer -> Promote the same image to production -> Healthy?
+Healthy? -[no]-> Redeploy the last good tag
 ```
 
 This lesson follows the handover of a claims assistant to an insurer's engineering team in Kochi.
 
 ## How it works
 
-**Triggers and jobs.** A workflow runs on events (`pull_request`, `push` to main, a tag, a manual dispatch). It contains jobs; each job runs steps on a fresh machine, called a runner.
+### The parts of a workflow
 
-**The CI job** checks out code, installs dependencies (with caching), runs lint, types and tests. For an AI app, add a small, fast eval: 20 golden questions against a fixed retrieval index, failing the build if accuracy drops below a threshold. Keep slow, costly evals for a nightly job.
+| Part | What it is | In this lesson |
+| --- | --- | --- |
+| Workflow | A YAML file in `.github/workflows/` | `ci-cd.yml` and `rollback.yml` |
+| Event | What starts it | A pull request, a push to main, a manual run |
+| Job | A group of steps on one fresh machine (a runner) | test, smoke-eval, build, deploy-staging, deploy-production |
+| Step | One command, or one ready-made **action** | `uv run pytest`, `docker/build-push-action` |
+| Environment | A named deploy target with its own secrets and rules | staging, production |
 
-**The build job** builds the Docker image, tags it with the commit hash and pushes it to the client's registry.
+Jobs run in parallel unless one `needs` another. Each job starts on a clean machine, so anything it needs (code, tools, credentials) it must fetch itself.
 
-**Deploy jobs** use **environments**. A `staging` environment deploys automatically; a `production` environment requires a named reviewer's approval and has its own secrets. Secrets are stored in the CI system or fetched from the cloud at run time; never in the repository. Better still, let the runner sign in to the cloud with short-lived credentials through OpenID Connect instead of stored keys.
-
-**Rollback.** Because each deploy uses an image tagged with a commit, rolling back means redeploying the previous tag. Make it a single button or command and practice it.
-
-**What runs where, and how often:**
+### What runs where, and how often
 
 | Check | When | Typical time | Fails the build? |
 | --- | --- | --- | --- |
-| Lint and format | Every PR | Seconds | Yes |
-| Type checks | Every PR | Under a minute | Yes |
-| Unit tests with a fake model | Every PR | 1 to 3 minutes | Yes |
-| Smoke eval, 20 golden questions | Every PR touching prompts or retrieval | 1 to 2 minutes | Yes, below a threshold |
+| Lint, format, type checks | Every pull request | Under a minute | Yes |
+| Unit tests with a fake model | Every pull request | 1 to 3 minutes | Yes |
+| Smoke eval, 50 golden questions | Pull requests touching prompts, retrieval or evals | 2 to 4 minutes | Yes, if it falls clearly below main |
+| Staging smoke test | After each staging deploy | Under a minute | Yes, blocks production |
 | Full eval, hundreds of cases | Nightly | 10 to 60 minutes | Alerts the team |
-| Load test | Before major releases | Varies | Blocks release if too slow |
 
-**Caching.** Installing dependencies on every run is slow. Cache them, keyed on the lock file, so CI takes minutes, not ten. Fast CI gets used; slow CI gets bypassed.
+The times are typical ranges, not measurements. The rule behind the table: the faster and cheaper a check, the earlier it runs.
 
-**Branch protection.** In the repository settings, require the CI job to pass and at least one review before merging to main. Without this, CI is only advice.
+### A smoke eval that does not flake
 
-**Secrets in practice.** The workflow needs some secrets: a model API key for the smoke eval, credentials to push images, credentials to deploy. Store them in the repository's or environment's secret settings, where they are encrypted and hidden in logs. Give each environment its own secrets, so a staging key can never touch production. For cloud access, prefer OpenID Connect: the cloud trusts the specific repository and branch, and issues a credential that expires after a short time, often an hour. There is then no long-lived key to leak at all.
+A model is not perfectly repeatable, so a small eval can pass and fail on the same code. With 20 questions, each question is worth 5 points: one answer flipping moves a score from 0.85 to 0.80. A gate that flips on rerun teaches people to press "Re-run" until it is green, and then real failures are ignored too. Four habits fix this:
 
-**A complete workflow.** CI on every pull request, a smoke eval only when AI files change, and build plus deploy on main:
+- **Use about 50 cases.** Each case is then worth 2 points, not 5.
+- **Use temperature 0** where your model supports it, and a fixed retrieval index.
+- **Retry a failed case once.** A real regression fails twice; noise usually does not.
+- **Compare with main, not a fixed number.** Store main's score in `evals/baseline.json` (a nightly job can refresh it) and fail only if the pull request is more than 2 cases worse. Keep a hard floor as well, so slow drift cannot pass.
 
-```yaml
-name: ci
-on:
-  pull_request:
-  push:
-    branches: [main]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with: {enable-cache: true}
-      - run: uv sync --frozen
-      - run: uv run ruff check . && uv run mypy src && uv run pytest -q
-
-  smoke-eval:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: changed
-        with:
-          filters: |
-            ai: ['prompts/**', 'src/retrieval/**', 'evals/**']
-      - uses: astral-sh/setup-uv@v5
-        if: steps.changed.outputs.ai == 'true'
-      - if: steps.changed.outputs.ai == 'true'
-        run: uv sync --frozen && uv run python evals/smoke.py --min-accuracy 0.85
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.EVAL_API_KEY }}
-
-  build:
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions: {contents: read, packages: write}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
-        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
-      - uses: docker/build-push-action@v6
-        with: {push: true, tags: "ghcr.io/${{ github.repository }}:${{ github.sha }}"}
-
-  deploy-production:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: production                    # requires a reviewer's approval
-    permissions: {id-token: write, contents: read}
-    steps:
-      - uses: aws-actions/configure-aws-credentials@v4
-        with: {role-to-assume: "${{ vars.DEPLOY_ROLE_ARN }}", aws-region: ap-south-1}
-      - run: ./scripts/deploy.sh ghcr.io/${{ github.repository }}:${{ github.sha }}
-```
-
-The production job gets cloud access through OIDC (`id-token: write` and a role the cloud trusts), so no long-lived cloud keys sit in GitHub. Azure and Google Cloud have equivalent login actions.
-
-**The smoke eval script decides with its exit code.** Any non-zero exit fails the job:
+The check `expected in answer` below is a crude smoke test: it rewards long answers that happen to contain the phrase. The nightly full eval should use stricter grading. The script decides with its exit code; any non-zero exit fails the job.
 
 ```python
 import argparse, json, sys
-from app.answer import answer                 # your pipeline
+from app.answer import answer   # your pipeline, called with temperature 0
 
-p = argparse.ArgumentParser(); p.add_argument("--min-accuracy", type=float, default=0.85)
+p = argparse.ArgumentParser()
+p.add_argument("--baseline", default="evals/baseline.json")
+p.add_argument("--tolerance", type=int, default=2)   # cases, not percent
+p.add_argument("--floor", type=float, default=0.80)
 args = p.parse_args()
-cases = [json.loads(l) for l in open("evals/smoke.jsonl")]
-correct = sum(c["expected"].lower() in answer(c["question"]).lower() for c in cases)
-acc = correct / len(cases)
-print(f"smoke accuracy {acc:.0%} on {len(cases)} cases")
-sys.exit(0 if acc >= args.min_accuracy else 1)
+
+def ok(case):
+    return case["expected"].lower() in answer(case["question"]).lower()
+
+cases = [json.loads(line) for line in open("evals/smoke.jsonl")]
+correct = sum(ok(c) or ok(c) for c in cases)          # one retry per failed case
+base = json.load(open(args.baseline))["correct"]
+print(f"smoke: {correct}/{len(cases)} correct, main has {base}")
+failed = correct < base - args.tolerance or correct / len(cases) < args.floor
+sys.exit(1 if failed else 0)
 ```
 
-**Pin actions.** Third-party actions run with access to your repository. Pin them to a version (or, for stricter setups, a full commit hash) and review updates, so a compromised action cannot slip into your pipeline.
+### Secrets, environments and OIDC
 
-**Cancel superseded runs.** The `concurrency` block cancels the older run when you push again to the same branch, which saves runner minutes and model calls.
+**Secrets** live in the repository's or environment's settings, encrypted and masked in logs, never in the repository. Give each environment its own secrets, so a staging key can never reach production. An environment's secrets stay locked until a required reviewer approves the job.
 
-**Try it in your browser.** Check a workflow for unpinned actions and missing timeouts. Change the YAML and run it.
+**Required reviewers.** You can name up to six people or teams; one approval is enough. You can also stop the person who started a deploy from approving it. On GitHub Free, Pro and Team, required reviewers work only in public repositories; private repositories need GitHub Enterprise. Check the client's plan before you promise an approval gate.
 
-```python
-import yaml
+**Pull requests from forks get no secrets** (except a limited `GITHUB_TOKEN`). That is why the smoke eval below skips fork pull requests, which a maintainer then evaluates by hand. Avoid the `pull_request_target` trigger as a workaround: it runs with your secrets, so running a fork's code under it lets a stranger read them.
 
-workflow = yaml.safe_load("""
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: some-org/setup-thing@main
-      - run: pytest -q
-""")
-for name, job in workflow["jobs"].items():
-    if "timeout-minutes" not in job:
-        print(f"{name}: add timeout-minutes so a stuck job cannot run for hours")
-    for step in job["steps"]:
-        ref = step.get("uses", "")
-        if ref and ref.split("@")[-1] in ("main", "master"):
-            print(f"{name}: pin {ref} to a version, not a branch")
-```
+**OIDC instead of keys.** With `id-token: write`, a job can ask GitHub for a signed token that names the repository and environment, for example `repo:kochi-insure/claims-assistant:environment:production`. The cloud trusts tokens that match exactly that name and returns credentials that expire, by default after one hour on AWS. There is no long-lived key to leak. Azure and Google Cloud have the same pattern.
 
-## A worked example
+**Registry.** Pushing to GitHub's registry (GHCR) needs only `GITHUB_TOKEN`. But a service on AWS that pulls a private GHCR image needs a stored pull credential. If the client runs on AWS, pushing to their ECR registry is often simpler, because the IAM role already grants pull access.
 
-You hand over a claims-assistant to a Kochi insurer's engineering team. Their lead, Anjali, wants every change tested and nothing in production without her team's sign-off.
+### Supply chain: pin every action
+
+A third-party action runs with access to your code and secrets. A version tag such as `@v4` is only a pointer, and its owner (or an attacker) can move it. In March 2025, attackers moved the tags of the popular `tj-actions/changed-files` action to malicious code that printed secrets into build logs (CVE-2025-30066). Workflows pinned to an earlier commit SHA kept running the safe code.
+
+So pin every third-party action to its full 40-character commit SHA, with the version in a comment, and let Dependabot propose updates (add `package-ecosystem: "github-actions"` to `.github/dependabot.yml`). Read the diff before you merge an update. Two notes from checking on 28 November 2026:
+
+- `astral-sh/setup-uv` no longer publishes moving major tags after v7, so `@v10` would not resolve. Its own README pins a SHA.
+- GitHub now documents workflow lockfiles (`.github/workflows/actions.lock`, made with `gh actions-lock`) that pin actions used by your actions too. Its setup guide is listed for GitHub Enterprise Cloud; on other plans, use SHA pins.
+
+### Speed, cost and safety switches
+
+- **Caching.** `setup-uv` caches packages on GitHub-hosted runners by default. For other tools, cache on the lock file. Fast CI gets used; slow CI gets bypassed.
+- **Concurrency.** Cancel an older run when someone pushes again to the same pull request. Never cancel a run on main: it may be halfway through a deploy. Give each deploy target its own concurrency group so two deploys never overlap.
+- **Timeouts.** A job's default timeout is 360 minutes. Set `timeout-minutes` on every job so a stuck model call cannot burn six hours of runner time.
+- **Path filters inside the job.** If you skip a whole workflow with `on.pull_request.paths`, a required check from it stays "Pending" and blocks the merge. So the smoke eval job always runs and its steps check what changed.
+- **Least privilege.** Set `permissions: {contents: read}` at the top and add only what a job needs, such as `packages: write` or `id-token: write`.
+
+### Branch protection
+
+In the repository's rules for main, require the test and smoke-eval checks to pass and at least one review before merging. Without this, CI is only advice.
+
+### The complete workflow
+
+Action versions checked on 28 November 2026. All six declare the Node 24 runtime.
 
 ```yaml
 name: ci-cd
@@ -227,69 +184,189 @@ on:
   pull_request:
   push:
     branches: [main]
+
+permissions: {contents: read}
+concurrency:                       # cancels old pull request runs only
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+env:
+  IMAGE: ${{ vars.IMAGE_REPO }}:${{ github.sha }}   # registry names must be lowercase
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+      - run: uv sync --frozen
+      - run: uv run ruff check . && uv run mypy src && uv run pytest -q
+
+  smoke-eval:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {contents: read, pull-requests: read}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: changed
+        with:
+          filters: |
+            ai: ['prompts/**', 'src/retrieval/**', 'evals/**']
+      - if: steps.changed.outputs.ai == 'true'
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+      - if: steps.changed.outputs.ai == 'true'
+        run: uv sync --frozen && uv run python evals/smoke.py --tolerance 2
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.EVAL_API_KEY }}
+
+  build:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions: {contents: read, packages: write}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with: {context: ., push: true, tags: "${{ env.IMAGE }}"}
+
+  deploy-staging:
+    needs: build
+    environment: staging
+    concurrency: {group: deploy-staging}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {contents: read, id-token: write}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: aws-actions/configure-aws-credentials@45666896f5d8e0f10ae255413f3a4cdd03bdc8f5 # v6.3.1
+        with: {role-to-assume: "${{ vars.DEPLOY_ROLE_ARN }}", aws-region: ap-south-1}
+      - run: ./scripts/migrate.sh && ./scripts/deploy.sh "$IMAGE"
+      - run: ./scripts/smoke_test.sh "${{ vars.BASE_URL }}"   # health check plus five real questions
+
+  deploy-production:
+    needs: deploy-staging
+    environment: production          # required reviewers; its own role and secrets
+    concurrency: {group: deploy-production}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {contents: read, id-token: write}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: aws-actions/configure-aws-credentials@45666896f5d8e0f10ae255413f3a4cdd03bdc8f5 # v6.3.1
+        with: {role-to-assume: "${{ vars.DEPLOY_ROLE_ARN }}", aws-region: ap-south-1}
+      - run: ./scripts/migrate.sh && ./scripts/deploy.sh "$IMAGE"   # same image, no rebuild
+      - run: ./scripts/smoke_test.sh "${{ vars.BASE_URL }}"
+```
+
+`vars.DEPLOY_ROLE_ARN` and `vars.BASE_URL` are environment variables, so the same lines point at staging in one job and production in the other.
+
+### Rollback, and why migrations decide whether it works
+
+Because every image is tagged with its commit, rollback is a redeploy of the last good tag. Make it a manual workflow that uses the same production environment and approval:
+
+```yaml
+name: rollback
+on:
+  workflow_dispatch:
+    inputs:
+      sha: {description: "Commit of the last good image", required: true}
+permissions: {contents: read, id-token: write}
+jobs:
+  rollback:
+    environment: production
+    concurrency: {group: deploy-production}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: aws-actions/configure-aws-credentials@45666896f5d8e0f10ae255413f3a4cdd03bdc8f5 # v6.3.1
+        with: {role-to-assume: "${{ vars.DEPLOY_ROLE_ARN }}", aws-region: ap-south-1}
+      - run: ./scripts/deploy.sh "${{ vars.IMAGE_REPO }}:$SHA"
+        env: {SHA: "${{ inputs.sha }}"}   # passed as a variable, not pasted into the script
+```
+
+Rolling back the app does not roll back the database. If release 42 renames a column, release 41's image will crash against the new schema. So run migrations as their own step before the deploy, and change the schema in **expand and contract** steps: release one adds the new column and writes to both; release two reads the new one; release three, weeks later, drops the old column. At every point, the previous image still works.
+
+**Try it in your browser.** This checker finds jobs without timeouts and actions not pinned to a commit SHA. Paste in your own workflow and run it.
+
+```python
+import re, yaml
+
+workflow = yaml.safe_load("""
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen
-      - run: uv run ruff check . && uv run mypy src && uv run pytest -q
-      - run: uv run python evals/smoke.py --min-accuracy 0.85
-  deploy-staging:
-    if: github.event_name == 'push'
-    needs: test
-    environment: staging
-    runs-on: ubuntu-latest
-    steps:
-      - run: ./scripts/build_push_deploy.sh staging ${{ github.sha }}
-  deploy-production:
-    needs: deploy-staging
-    environment: production        # requires approval from the insurer's leads
-    runs-on: ubuntu-latest
-    steps:
-      - run: ./scripts/deploy.sh production ${{ github.sha }}   # same image, no rebuild
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: some-org/setup-thing@v2
+      - run: pytest -q
+""")
+for name, job in workflow["jobs"].items():
+    if "timeout-minutes" not in job:
+        print(f"{name}: add timeout-minutes (the default is 360)")
+    for step in job.get("steps", []):
+        ref = step.get("uses", "")
+        if ref and not ref.startswith("./") and not re.fullmatch(r"[0-9a-f]{40}", ref.split("@")[-1]):
+            print(f"{name}: pin {ref} to a full commit SHA")
 ```
 
-A week later a teammate changes the prompt and the smoke eval drops from 0.89 to 0.78; CI fails and the PR cannot merge. Later a production deploy causes slow responses; Anjali redeploys the previous commit's image from the workflow page in two minutes, before most users notice.
+## A worked example
 
-**What changed for the insurer's team.** Before the pipeline, deploys happened when someone remembered, from a laptop, and nobody was sure which version was live. After it, every production version is a commit hash shown on the workflow page, every deploy has a named approver, and the smoke eval has blocked three prompt changes in two months that would each have reduced answer quality. Anjali says the most useful part is not speed but certainty: when a claims manager reports a bad answer, the team can say exactly which code and prompt produced it.
+You hand over the claims assistant to the Kochi insurer's engineering team. Their lead, Anjali, wants every change tested and nothing in production without her team's sign-off. The insurer uses GitHub Enterprise Cloud with private repositories, so required reviewers are available. You set up the two workflows above. The numbers below are an illustration of how the gates behave.
+
+**Day 1: setting up.** You create staging and production environments. Production lists Anjali and her deputy as reviewers, with self-review blocked. In AWS you create two IAM roles. The production role trusts only `repo:kochi-insure/claims-assistant:environment:production`. You delete the old access key that a contractor had left in a `.env` file. You record main's smoke score in `evals/baseline.json`: 46 of 50.
+
+**Week 2: a prompt change.** A teammate shortens the system prompt to save tokens. The smoke eval runs because `prompts/` changed. First pass: 39 of 50. Two of the 11 failures pass on retry, so the score is 41 of 50 (0.82). That is 5 cases below main's 46, more than the tolerance of 2, so the check fails and the pull request cannot merge. A fixed threshold of 0.80 would have let it through. The teammate restores two sentences about policy numbers, scores 45, and merges.
+
+**Week 5: a slow release.** A new retrieval setting passes every check but makes answers slow in production. Anjali opens the rollback workflow, pastes the previous commit hash and approves. The last good image is back in about two minutes, with no rebuild. The release had only added a column, so the old image runs fine against the database.
+
+**What changed for the insurer.** Before, deploys happened from a laptop, and nobody was sure which version was live. Now every production version is a commit hash with a named approver. When a claims manager reports a bad answer, the team can say exactly which code and prompt produced it.
 
 ## Common mistakes
 
-- **Tests only on main.** Problems are found after merging. Run CI on pull requests.
-- **No eval in CI for prompt changes.** Prompt edits are code changes; test them.
-- **Secrets in workflow files.** Use the CI system's secrets or short-lived cloud credentials.
-- **Building different images per environment.** Build once, promote the same image through staging to production.
-- **A rollback nobody has tried.** Practice it before you need it.
-
-- **Flaky tests left in place.** A test that fails randomly teaches people to rerun CI until it passes, and then real failures get ignored too. Fix or remove flaky tests quickly.
-- **Evals that call a live model on every PR without a budget.** Keep the PR eval small and cheap, cache what you can, and run the full suite on a schedule.
-- **Long-lived cloud keys stored as secrets** when OIDC is available.
-- **Running paid evals on every push** instead of only on relevant changes.
-- **Unpinned third-party actions.**
+- **CI only on main.** Problems are found after merging. Run CI on pull requests and make it a required check.
+- **A tiny eval with a fixed threshold.** It flakes, and people learn to rerun until green. Use about 50 cases, temperature 0, one retry, and compare with main.
+- **Paid evals on every push.** Run the smoke eval only when prompts, retrieval or evals change; run the full suite nightly.
+- **Skipping a whole workflow with a path filter.** Its required checks stay Pending. Filter inside the job.
+- **Secrets in files, or long-lived cloud keys as secrets.** Use environment secrets, and OIDC for cloud access.
+- **Rebuilding per environment.** Build once, promote the same image.
+- **Tag-pinned third-party actions.** Tags move. Pin full SHAs and let Dependabot propose updates.
+- **Workflow-wide cancel-in-progress.** A new merge kills a deploy halfway. Cancel pull request runs only.
+- **No timeouts.** A stuck job runs for up to six hours.
+- **A rollback nobody has tried, or a migration that breaks it.** Practise rollback, and use expand and contract.
+- **Flaky tests left in place.** Fix or remove them quickly, or real failures get ignored too.
 
 ## When a lighter pipeline is enough
 
-- **A personal project**: lint and tests on push are plenty.
+- **A personal project**: lint and tests on pull requests are plenty.
 - **Platforms with built-in deploys**, such as Vercel previews, where CI only needs checks.
 - **Notebooks and research code** that never deploy.
 
 ## From demo to production
 
-- **Require CI and review** before merging to main.
-- **Use environments** with approvals and separate secrets for production.
-- **Deploy with OIDC**, not stored cloud keys.
-- **Gate AI changes** on a smoke eval and run the full eval nightly.
-- **Practise rollback** to the previous image tag.
+What a client's engineering lead will check before taking over your pipeline:
+
+- **Main is protected**: required checks and at least one review.
+- **Production needs approval**, has its own secrets and a role that trusts only that environment.
+- **No long-lived cloud keys** anywhere in GitHub.
+- **Every action is pinned** to a commit SHA, with Dependabot on.
+- **The AI gate is stable**, with a baseline and a nightly full eval.
+- **Rollback is written down and has been run**, and migrations follow expand and contract.
 
 ## Practice
 
-Follow GitHub's Actions quickstart and the page on deployment environments.
+Follow GitHub's Actions quickstart and the page on deployment environments. Use a public repository, so required reviewers work on a free account.
 
-1. Add a workflow that runs lint and tests on every pull request in one of your repositories.
-2. Add a job that builds and pushes your Docker image tagged with the commit hash on merges to main.
-3. Create staging and production environments, require your own approval for production, and practice a rollback to the previous image.
-4. Add the paths filter so your smoke eval runs only when prompts or retrieval code change, and open two pull requests to show it running once and skipping once.
+1. Add a workflow that runs lint and tests on every pull request, and make it a required check on main.
+2. Pin every action to a commit SHA and add a Dependabot file for `github-actions`.
+3. Add a job that builds and pushes your Docker image tagged with the commit hash on merges to main.
+4. Create staging and production environments, add yourself as a required reviewer for production, and deploy the same image to both.
+5. Add the smoke eval with the in-job path filter. Open two pull requests to show it running once and skipping once.
+6. Run the rollback workflow to redeploy the previous image.
 
-**You are done when you can** show a failing PR blocked by CI, an approval gate before production, and a rollback you performed.
+**You are done when you can** show a failing pull request blocked by CI, an approval gate before production, and a rollback you performed.
