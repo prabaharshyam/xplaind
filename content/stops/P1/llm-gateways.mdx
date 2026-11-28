@@ -3,9 +3,9 @@ id: llm-gateways
 level: P1
 theme: ops
 title: "LLM gateways"
-outcome: "Put a gateway in front of model providers to route requests, fall back when one fails, enforce rate limits and budgets per team, and track cost in one place."
-answer: "An LLM gateway sits in front of model providers to route requests, switch to a backup when one fails, enforce limits and budgets per team, and track cost in one place."
-why_it_matters: "Once a client has several AI features and teams, each calling different providers with their own keys, nobody knows the total spend and one provider outage breaks everything. A gateway fixes both, and platform roles ask about it directly."
+outcome: "Put a gateway in front of model providers to route requests, fail over safely when one breaks, give each team its own rate limits and budget, and see cost by feature in one place."
+answer: "An LLM gateway is one service between your apps and model providers. It routes requests, fails over when a provider breaks, holds the keys, and enforces rate limits and budgets per team."
+why_it_matters: "Once a company has several AI features and teams, each calling providers with its own keys, nobody knows the total spend, one noisy job can use up the shared quota, and one provider outage breaks everything. A gateway fixes all three, and platform roles ask about it directly."
 hours: 3
 gap_tags: []
 primary_resource: litellm-gateway
@@ -18,45 +18,45 @@ check:
   question_ids: [llm-gateways-1, llm-gateways-2, llm-gateways-3]
 flashcards:
   - q: "What is an LLM gateway?"
-    a: "A service between applications and model providers that handles routing, fallbacks, keys, budgets, logging and caching in one place."
-  - q: "Why use model aliases?"
-    a: "Apps call names like chat-default; the gateway maps them to a specific model, so upgrades happen centrally without code changes."
-  - q: "What is a fallback chain?"
-    a: "An ordered list of alternatives tried on errors or timeouts, such as the same model in another region, then an approved second provider."
-  - q: "What must a fallback model satisfy?"
-    a: "It must be good enough for the task and allowed under the data rules, including region."
-  - q: "How do gateways improve key security?"
-    a: "Teams get gateway keys; real provider keys live only in the gateway's secret store and can be rotated centrally."
-  - q: "What do per-feature budgets give you?"
-    a: "Caps and alerts per team or feature, and cost reports that show what to fix."
-  - q: "What is the main risk of a gateway?"
-    a: "It becomes a single point of failure for every AI feature, so run several instances with health checks and monitoring."
-  - q: "Why mask prompts in gateway logs?"
-    a: "The gateway sees every request, so unmasked logs make it the largest sensitive data store you have."
-  - q: "What is a virtual key in a gateway?"
-    a: "A key the gateway issues to one team or feature, mapped to real provider keys it never sees, with its own allowed models, budget and logs."
+    a: "One service between your applications and the model providers. Apps call it in one API format, and it handles routing, failover, provider keys, rate limits, budgets and logging once, for everyone."
+  - q: "Why do apps call a model alias such as chat-default?"
+    a: "The gateway maps the alias to a real model. You can change or upgrade that model in one reviewed config change, after evals pass, without touching any app."
+  - q: "What are the two layers of failover in a gateway?"
+    a: "First, other deployments of the same model behind the alias (for example, a second Indian region). Second, a fallback alias with a different approved model, used when every deployment of the first has failed."
+  - q: "What is a cool-down (circuit breaker) for a deployment?"
+    a: "After too many failures in a short window, the gateway skips that deployment for a set time. Requests stop waiting for its timeout, and it is tried again when the cool-down ends."
+  - q: "Why can a stream not always fall back?"
+    a: "If the provider fails before the first token, the gateway can quietly try the backup. Once the user has seen half an answer, a switch means restarting or stitching two models' text, so the app must handle it."
+  - q: "What is the difference between a rate limit and a budget on a gateway key?"
+    a: "A rate limit caps requests or tokens per minute, to share provider quota fairly; it returns 429 and clients may retry later. A budget caps money over a period; when it is spent, retrying does not help."
+  - q: "How should per-key token limits relate to the provider quota?"
+    a: "The limits for the features that must never be starved should add up to less than the provider quota, with headroom. Otherwise one busy batch job can take the quota the customer-facing chatbot needs."
   - q: "Why must a fallback model be tested on your evals?"
-    a: "A different model can change format, tone or accuracy. If the fallback breaks your output parser or quality bar, it turns an outage into silent errors."
+    a: "A different model can change format, tone, tool-call shape or accuracy. If it breaks the output parser or the quality bar, the fallback turns an outage into silent wrong answers."
+  - q: "Why can a fallback hide a real problem?"
+    a: "A wrong or expired key on the primary makes every request fall back, and users see no error. Alert on the fallback rate per alias, not only on errors."
+  - q: "What is the main risk of a gateway itself?"
+    a: "Every AI feature now depends on it, and it sees every prompt. Run several instances with health checks, mask its logs, and keep a documented emergency bypass."
 exercise:
   title: "Plan the gateway"
-  setup: "A Pune healthtech has three AI features: a symptom-intake chatbot for patients in India, a coding assistant for its engineers, and a nightly job summarising doctor notes. Each team calls providers directly with its own keys. Patient data must stay in India. Last month a provider's rate limit took the chatbot down for 30 minutes, and nobody knows which feature drives the ₹9 lakh monthly bill."
+  setup: "A Pune healthtech has three AI features: a symptom-intake chatbot for patients in India, a coding assistant for its engineers, and a nightly job that summarises doctor notes. Each team calls providers directly with its own keys. Its contracts with hospitals say patient data must be processed only in India. Last month the nightly job ran late into the morning, used up the shared provider quota, and the chatbot returned rate-limit errors for 30 minutes. Nobody knows which feature drives the 9 lakh rupee monthly bill."
   questions:
-    - q: "What should the gateway do with provider keys?"
-      a: "Hold them in its secret store, rotate them, and give each feature its own gateway key tagged with team and feature."
-    - q: "What fallback suits the patient chatbot?"
-      a: "The same model in another Indian region, then an approved comparable model hosted in India, never a region outside India."
+    - q: "How do you stop the nightly job starving the chatbot again?"
+      a: "Give each feature its own gateway key with a tokens-per-minute limit, so the chatbot's and job's limits sum below the provider quota, and the job waits on 429s instead of taking the chatbot's share."
+    - q: "What failover suits the patient chatbot?"
+      a: "The same model in a second Indian region behind the alias, then an approved model hosted in India that passed the chatbot's evals. Never a region outside India, and no cross-region profile that can leave it."
     - q: "How does the gateway answer the bill question?"
-      a: "By logging tokens and cost per key and feature, giving a monthly report that shows each feature's share."
+      a: "Each feature's key logs tokens and cost with team and feature tags. A monthly report by key shows each feature's share, converted to rupees at a stated rate."
     - q: "How should the gateway itself be run?"
-      a: "At least two instances behind a load balancer, with health checks, its own monitoring and masked logs."
+      a: "At least two instances behind a load balancer, with health checks, its own monitoring, masked logs, and alerts on the fallback rate."
 ask:
   - "What is an LLM gateway and do I need one?"
-  - "How do I set up model fallbacks?"
-  - "How do I track AI costs by team?"
+  - "How do I set up model fallbacks safely?"
+  - "How do I stop one team using up our shared rate limit?"
 explain_in_interview:
-  answer: "An LLM gateway is a service that sits between your applications and the model providers. Apps call it with one API format, and it handles the shared concerns once: routing to the right model, falling back when a provider fails, holding the real provider keys, enforcing budgets per team, and logging every request with its tokens and cost. For example, a fintech in Bengaluru with five AI features from four teams can give each team its own gateway key and see all spending in one place. The trade-off is that the gateway becomes a critical dependency and a small extra hop, so it must run as more than one instance."
-  follow_up: "How would you set up fallbacks in a gateway without breaking data rules?"
-  follow_up_answer: "Define an ordered list per model alias, first the same model in a second region, then an approved alternative model. Only include providers and regions allowed for that data, and set timeouts and retries so a slow provider fails over quickly."
+  answer: "An LLM gateway is one service between your applications and the model providers. Apps call it with one API format and a model alias, and it handles the shared work once: routing, failover to a second region or an approved backup model, holding the real provider keys, per-team rate limits and budgets, and logging tokens and cost for every request. For example, a Bengaluru fintech with five AI features can stop a nightly batch job from using up the quota its customer chatbot needs. The trade-off is that the gateway becomes critical infrastructure, so it runs as several instances with an emergency bypass."
+  follow_up: "How would you set up fallbacks without breaking data rules?"
+  follow_up_answer: "Put deployments of the same model in two allowed regions behind one alias, then one fallback alias with an approved model that passed the evals. Include only allowed regions and providers, add a cool-down so a dead deployment is skipped, and alert on the fallback rate."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-11-09
@@ -64,197 +64,261 @@ reviewed_on: 2026-11-09
 
 ## What it is
 
-An **LLM gateway** is a service that sits between your applications and the model providers. Applications call the gateway with one API format; the gateway forwards each request to the right provider and model, and handles the cross-cutting concerns once:
+An **LLM gateway** is one service between your applications and the model providers. Applications send every request to the gateway in one API format. The gateway forwards it to the right provider and model, and handles the shared work once, instead of in every app:
 
 - **Routing**: which model and provider serve this request.
-- **Fallbacks**: what to try when a provider errors, times out or rate-limits.
+- **Failover**: what to try when a provider errors, times out or rate-limits you.
 - **Keys and access**: teams get gateway keys; the real provider keys live only in the gateway.
-- **Limits and budgets**: per team, per key, per user.
-- **Logging and cost**: every request, its tokens and its cost, in one place.
-- **Caching**: optional reuse of identical requests.
+- **Rate limits and budgets**: per team, per feature or per user.
+- **Logging and cost**: every request with its tokens, cost and latency, in one place.
 
-Open-source options such as LiteLLM, commercial gateways, and the cloud providers' API management services all fill this role.
+This lesson follows a Bengaluru fintech where five AI features from four teams each called providers directly, with their own keys.
 
 ```flow
-Chatbot -[key A]-> Gateway, 2 instances
-Extraction -[key B]-> Gateway, 2 instances
-Summariser -[key C]-> Gateway, 2 instances
-Search -[key D]-> Gateway, 2 instances
-Gateway, 2 instances -[alias chat-default]-> Model X, Mumbai
-Model X, Mumbai -[fails]-> Fallback 1: model X, second region
-Fallback 1: model X, second region -[fails]-> Fallback 2: approved model Y, provider 2
+title: One gateway in front of every provider
+Chatbot -[key chatbot]-> Gateway, 2 or more instances
+Claims extraction -[key claims]-> Gateway, 2 or more instances
+Nightly summaries -[key batch]-> Gateway, 2 or more instances
+Gateway, 2 or more instances -[alias chat-default]-> Model X, Mumbai
+Model X, Mumbai -[fails, cool-down]-> Model X, Hyderabad
+Model X, Hyderabad -[fails]-> Fallback alias: approved model Y, India
 ```
 
-The gateway adds budgets per key with alerts at 75%, retries and timeouts, and masked logs (team, feature, model, tokens, cost, latency). The provider keys live only here, in a secret store, and are rotated.
+Each key carries its own rate limit and budget. The gateway checks them before forwarding, logs the result, and keeps provider keys in a secret store.
 
-This lesson follows a fintech in Bengaluru where five AI features from four teams each called providers directly.
+### Three ways to get a gateway
+
+| Kind | Examples | Pick it when |
+| --- | --- | --- |
+| Self-hosted, open source | LiteLLM proxy (MIT licence) | Data must stay in your own cloud account and region, and you have a platform team that can run a service with a database |
+| Your cloud's API management | Azure API Management (its `llm-token-limit` policy), Google Apigee (its LLM token quota policy) | You already use that cloud's API management for other APIs and mostly call that cloud's models |
+| A vendor's managed gateway | Several vendors host one for you | You are small, have no one to run infrastructure, and the vendor's data processing locations are allowed for your data |
+
+The decision usually comes down to two questions. Where may your data be processed? And who will be woken up when the gateway breaks at night? A managed gateway sees every prompt, so check where it processes data before anything else.
 
 ## How it works
 
-**One interface.** Most gateways accept an OpenAI-compatible or similar request format and translate it for each provider, so switching a feature from one model to another is a configuration change, not a code change.
+### One interface and model aliases
 
-**Routing rules.** Route by model alias (`summariser-default` points to a specific model you can change centrally), by team, by region (send Indian user data only to Indian-region endpoints) or by request features. Smarter routers send easy requests to cheap models; the next lesson covers this.
+Most gateways accept the OpenAI-style chat format and translate it for each provider. Apps never name a real model. They call an **alias** such as `chat-default`, and the gateway maps it to a real model. Upgrading every app to a new model becomes one reviewed line in the gateway config, tested on your golden set first.
 
-**Fallbacks.** A chain such as: primary model in the Mumbai region; on timeout or 5xx, the same model in another region; on failure again, a different provider's comparable model. Fallbacks need care: the fallback model must be good enough for the task and allowed under the data rules.
+### Two layers of failover
 
-**Retries and timeouts.** The gateway retries with backoff on 429s and transient errors, and enforces timeouts, so every application does not reimplement it.
+Good failover has two layers, and it helps to keep them separate in your head.
 
-**Budgets.** Each key carries a monthly or daily budget; requests past it are refused or downgraded. Alerts fire at thresholds.
+1. **Deployments behind one alias.** The same model in two places, for example Mumbai and Hyderabad. The gateway retries on another deployment when one fails.
+2. **A fallback alias.** A different, approved model, used only when every deployment of the first alias has failed.
 
-**The cost of a gateway.** It is one more service to run, secure and keep available; if it goes down, every AI feature does. Run it with at least two instances, health checks and its own monitoring.
+A failing deployment should not slow every request. A **cool-down** (also called a circuit breaker) handles this. After too many failures in a short window, the gateway skips that deployment for a set time. Requests stop paying the timeout first. When the cool-down ends, the gateway tries the deployment again.
 
-**Gateway features and the problems they solve:**
+### A gateway configuration
 
-| Feature | Problem it solves |
-| --- | --- |
-| One request format | Each team writing code for each provider |
-| Model aliases | Model names hard-coded in many apps |
-| Fallbacks | One provider outage taking a feature down |
-| Central keys | Provider keys scattered across teams and laptops |
-| Budgets per key | One feature quietly using most of the spend |
-| Unified logs | No view of cost, latency or errors across features |
-| Caching | Paying again for identical requests |
-
-**Testing fallbacks.** A fallback that has never fired may not work. In staging, break the primary on purpose, with a wrong key or a blocked endpoint, and check that requests succeed through the next option, that latency stays acceptable, and that logs record which model actually served each request. Repeat after every change to the chain. Also run the feature's evals against each fallback model, so you know what quality users get during an outage.
-
-**Rolling out a gateway.** Move one low-risk feature first, compare its errors, latency and cost with before, then migrate the others one at a time. Keep each team's old direct keys working for a short overlap, then revoke them, so the gateway becomes the only path to providers.
-
-**A gateway configuration.** LiteLLM's proxy is a common open-source choice; other gateways follow the same ideas. One file defines aliases, real models, fallbacks and the admin key:
+LiteLLM's proxy is a common open-source choice; other gateways use the same ideas with different syntax. One file defines aliases, deployments, retries, cool-downs and the fallback. Checked against LiteLLM 1.111.0.
 
 ```yaml
-# litellm-config.yaml
+# gateway.yaml: the whole gateway in one reviewed file
 model_list:
-  - model_name: chat-default                 # the alias apps use
+  # Alias chat-default: the same model deployed in two Indian regions.
+  - model_name: chat-default
     litellm_params:
-      model: anthropic/claude-sonnet-5-5     # check the docs for current names
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: bedrock/<model id>             # in-Region ID or India profile, never APAC or global
+      aws_region_name: ap-south-1           # Mumbai
+      order: 1                              # used first while healthy
+      timeout: 30                           # seconds, normal calls
+      stream_timeout: 10                    # seconds, streaming calls
+  - model_name: chat-default
+    litellm_params:
+      model: bedrock/<model id>
+      aws_region_name: ap-south-2           # Hyderabad
+      order: 2                              # used when Mumbai fails or cools down
       timeout: 30
+      stream_timeout: 10
+  # Fallback alias: another provider, also in India, approved and tested on the evals.
   - model_name: chat-backup
     litellm_params:
-      model: bedrock/<model id from your Bedrock console>
-      aws_region_name: ap-south-1
-  - model_name: fast
-    litellm_params:
-      model: anthropic/claude-haiku-5-5
+      model: vertex_ai/<model id>
+      vertex_project: os.environ/GCP_PROJECT
+      vertex_location: asia-south1          # Mumbai
+      timeout: 30
 
-litellm_settings:
-  num_retries: 2
+router_settings:
+  num_retries: 2                            # retries on 429s and server errors
+  allowed_fails: 3                          # more than 3 failures in a minute starts a cool-down
+  cooldown_time: 60                         # seconds a cooling deployment is skipped
   fallbacks: [{"chat-default": ["chat-backup"]}]
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  database_url: os.environ/GATEWAY_DB_URL     # stores keys, budgets and spend
+  database_url: os.environ/DATABASE_URL     # keys, limits, budgets and spend live here
 ```
 
-Run it with two or more instances behind a load balancer: `litellm --config litellm-config.yaml --port 4000`.
+Start it with `litellm --config gateway.yaml --port 4000`. Run two or more instances behind a load balancer, all pointing at the same database.
 
-**Apps call the alias, not the provider.** Any OpenAI-compatible client works:
+**A region trap on Bedrock.** Bedrock's cross-Region inference profiles can process prompts outside the Region you call. An APAC profile stays within Asia Pacific, not India, and a global profile can use any supported commercial Region. For some Claude models Bedrock now has an India geographic profile that routes only between Mumbai and Hyderabad. If data must be processed in India, use that profile or an in-Region model ID, and check the Bedrock Regional availability table first: not every model is offered in-Region in Hyderabad.
+
+### Apps call the alias, not the provider
+
+Any OpenAI-compatible client works. Read the response headers to see what actually served the request:
 
 ```python
 import os
 from openai import OpenAI
 
-client = OpenAI(base_url="https://gateway.internal.example.in", api_key=os.environ["TEAM_CLAIMS_KEY"])
-reply = client.chat.completions.create(model="chat-default",
-                                       messages=[{"role": "user", "content": "Summarise this claim: ..."}])
+client = OpenAI(base_url=os.environ["GATEWAY_URL"], api_key=os.environ["CHATBOT_KEY"])
+
+raw = client.chat.completions.with_raw_response.create(
+    model="chat-default",                       # the alias, never a provider model name
+    messages=[{"role": "user", "content": "Explain my last card statement in two lines: ..."}],
+)
+reply = raw.parse()
+print(reply.choices[0].message.content)
+print("model group:", raw.headers.get("x-litellm-model-group"))      # chat-backup means it fell back
+print("fallbacks:", raw.headers.get("x-litellm-attempted-fallbacks"))
+print("cost in USD:", raw.headers.get("x-litellm-response-cost"))
 ```
 
-Switching every app to a new model is now one line in the gateway config, reviewed like code and tested on the golden set first.
+### Keys with rate limits and budgets
 
-**Keys with budgets per team.** The admin creates a virtual key for each feature:
+The admin creates one virtual key per feature. A virtual key is a key the gateway issues; it maps to the real provider keys, which the team never sees.
 
 ```bash
-curl -s https://gateway.internal.example.in/key/generate \
+curl -s "$GATEWAY_URL/key/generate" \
   -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H "Content-Type: application/json" \
-  -d '{"models": ["chat-default", "fast"], "max_budget": 50, "budget_duration": "30d",
-       "metadata": {"team": "claims", "owner": "platform-lead"}}'
+  -d '{"key_alias": "chatbot", "models": ["chat-default", "chat-backup"],
+       "rpm_limit": 600, "tpm_limit": 200000,
+       "max_budget": 400, "budget_duration": "30d",
+       "metadata": {"team": "support", "feature": "chatbot", "owner": "platform-lead"}}'
 ```
 
-The team never sees the provider keys; revoking their virtual key cuts them off without rotating anything else. Budgets are in the gateway's currency setting (often US dollars), so convert and note the rate.
+`rpm_limit` caps requests per minute and `tpm_limit` caps tokens per minute for this key. List the fallback alias in `models` too: in testing, a key allowed only `chat-default` got a plain error instead of the backup. Revoking the key cuts one feature off without rotating anything else. Three behaviours from testing this setup are worth knowing:
 
-**Region-aware routing.** For Indian personal data, point the aliases used by those features only at Indian-region endpoints, and keep a separate alias for features allowed to use other regions. Log the region of every call so an audit can confirm the rule held.
+- **Rate limit and budget fail differently.** Going over `rpm_limit` returned HTTP 429, which a client can retry after a pause. A spent budget returned HTTP 422 with type `budget_exceeded`. Retrying that only wastes time, so clients must treat it as final and alert a person.
+- **Budgets are approximate.** The gateway checks the budget before each request, so the request that crosses the line still completes. In a test with a 0.05 dollar budget, spend reached 0.065 before requests were refused. Set the cap a little below what you can really afford.
+- **Check the reset date.** Read `budget_reset_at` from `/key/info` after creating a key, rather than assuming the period starts today. Budgets are in US dollars, so convert to rupees at a stated rate in your reports.
 
-**The gateway is critical infrastructure.** Monitor its own latency (it should add only milliseconds), error rate and database health, keep it close to your apps, and have a documented emergency path, such as a feature flag that sends one critical feature directly to its provider.
+### Sharing a provider's quota fairly
 
-**Try it in your browser.** A gateway's fallback chain, simulated: when the primary fails, the next model answers.
+Your provider gives you a quota per model, for example a number of tokens per minute in Mumbai. Every key shares it. The rule: **the limits of the features that must never be starved should add up to less than the provider quota, with headroom.** Batch jobs get a smaller limit, run at night, and wait on 429s. Without per-key limits, the first busy job takes the whole quota, and the customer chatbot fails even though "the provider is up".
+
+### Fallback edge cases
+
+Fallbacks are where gateways fail in production. Plan for these:
+
+- **Streams.** If a stream fails before the first token, the gateway can try the next deployment and the user never knows; LiteLLM does this. Once the user has seen half an answer, a switch means restarting the answer or stitching text from two models. Decide in the app what to show, for example "the answer was interrupted, retry?".
+- **Tool calls.** Never retry a request whose tool call already ran something with side effects, such as a payment or an email. Make those tools safe to repeat, with an idempotency key, or do not retry them.
+- **Prompt caching.** Provider prompt caches do not move with you. During a fallback, every request pays full price and full latency for the long system prompt, so expect cost and time to first token to jump during an outage.
+- **Format and tool-call shape.** The backup model may format JSON or tool calls slightly differently. Run the feature's evals on the fallback alias, and test the parser on its output.
+- **Errors that should not fall back.** A malformed request fails on every model. Falling back only adds latency and cost. Fall back on timeouts, 429s and server errors.
+- **Fallbacks that hide a broken key.** In a test, a wrong key on the primary returned 401, the gateway did not retry it, and it fell back at once. Users saw nothing wrong. Alert when the fallback rate for an alias rises, not only on errors.
+
+### Try it: cool-downs in a fallback chain
+
+This simulation has a Mumbai outage from request 3 to request 12. Watch how the cool-down stops requests waiting on Mumbai, and how a cool-down that is too long keeps skipping Mumbai after it has recovered.
 
 ```python
 import random
 
-random.seed(5)
-def call(model):
-    if model == "primary" and random.random() < 0.3:
-        raise TimeoutError("primary timed out")
-    return f"answer from {model}"
+random.seed(7)
+ALLOWED_FAILS = 2      # cool down after more than this many failures
+COOLDOWN = 5           # requests to skip a cooling deployment
+fails = {"mumbai": 0, "hyderabad": 0, "backup": 0}
+cooling_until = {"mumbai": 0, "hyderabad": 0, "backup": 0}
 
-def gateway(chain=("primary", "backup")):
-    for model in chain:
+def call(deployment, t):
+    # Mumbai has an outage from request 3 to request 12.
+    if deployment == "mumbai" and 3 <= t <= 12:
+        raise TimeoutError("timed out")
+    if random.random() < 0.05:
+        raise TimeoutError("timed out")
+    return deployment
+
+def gateway(t, chain=("mumbai", "hyderabad", "backup")):
+    tried = []
+    for d in chain:
+        if t < cooling_until[d]:
+            continue                       # skip without waiting for a timeout
         try:
-            return call(model)
-        except TimeoutError as err:
-            print("  fell back:", err)
-    return "all models failed"
+            served = call(d, t)
+            fails[d] = 0
+            return served, tried
+        except TimeoutError:
+            tried.append(d)
+            fails[d] += 1
+            if fails[d] > ALLOWED_FAILS:
+                cooling_until[d] = t + COOLDOWN
+                fails[d] = 0
+    return "error", tried
 
-for i in range(5):
-    print(i, gateway())
+for t in range(16):
+    served, tried = gateway(t)
+    note = f"(waited on {', '.join(tried)})" if tried else ""
+    print(f"request {t:2}: served by {served:9} {note}")
 ```
+
+Requests 3 to 5 each wait for a Mumbai timeout. Then Mumbai cools down and requests 6 to 9 go straight to Hyderabad. Request 8 shows the second layer: Hyderabad has a random timeout, so the backup answers. At request 10 the cool-down ends while Mumbai is still down, so requests 10 to 12 wait on it again and a second cool-down starts. Mumbai is back from request 13, but it is still cooling down, so it is not used. Try `COOLDOWN = 2` and `ALLOWED_FAILS = 0` to see the trade-off between waiting on timeouts and missing a recovery.
+
+### Region-aware routing and logs
+
+For Indian personal data, the aliases those features use should point only at Indian-region deployments. Keep a separate alias for features allowed to use other regions. Log the alias, deployment and region of every call, so an audit can confirm the rule held. Mask personal data in the gateway's logs: it sees every prompt, so unmasked logs make it your biggest sensitive data store.
+
+### The cost of a gateway
+
+It is one more service to run, secure and keep available, and every AI feature depends on it. Measure its own overhead: send the same set of requests directly and through the gateway, and compare median and slow (p95) latency, especially time to first token for streams. Keep it close to your apps, monitor its error rate and database, and keep a documented emergency path, such as a feature flag that sends one critical feature directly to its provider.
 
 ## A worked example
 
-A Bengaluru fintech has five AI features built by four teams. Each team has its own provider keys; finance sees one big monthly bill. A provider outage last month took down the customer chatbot for 50 minutes.
+The Bengaluru fintech has five AI features from four teams. Each team holds its own provider keys, and finance sees one big monthly bill. The figures below are an illustration of a typical rollout, not measured results.
 
-You deploy a gateway with two instances on their Kubernetes cluster:
+**The trigger.** A provider outage took the customer chatbot down for about 50 minutes. In the same month, a nightly statement-summary job overran into the morning and used most of the shared token quota, so the chatbot also returned rate-limit errors.
 
-- Every team gets a gateway key tagged with team and feature; provider keys are moved into the gateway's secret store and rotated.
-- Model aliases: `chat-default`, `extract-default`, `embed-default`, each pointing to a specific model, so upgrades happen centrally after evals pass.
-- Fallbacks for `chat-default`: same model in a second region, then a comparable model from a second provider approved by the compliance team.
-- Budgets: each feature has a monthly cap and an alert at 75%.
-- Logs: every request with team, feature, model, tokens, cost and latency go to their analytics store.
+**The setup.** The platform team deploys the gateway as two instances on the company's Kubernetes cluster.
 
-The next provider incident causes 90 seconds of slower responses while the fallback takes over, instead of 50 minutes of errors. Finance gets a monthly cost report by feature for the first time, and it shows that one internal summarisation job uses 40% of spend. That team moves it to a batch job and a cheaper model.
+- **Keys.** Every feature gets its own gateway key, tagged with team and feature. Provider keys move into the gateway's secret store and are rotated. The old direct keys keep working for two weeks, then are revoked, so the gateway becomes the only path.
+- **Aliases.** `chat-default`, `extract-default` and `embed-default`, each mapped to a specific model.
+- **Failover for `chat-default`.** The same model in Mumbai and Hyderabad, with a 60-second cool-down, then a fallback alias with a model from a second provider, also hosted in India and approved by compliance.
+- **Evals on the fallback.** Before go-live, the team runs the chatbot's 300-question golden set on both. Suppose the primary scores 92% and the backup 88%, with two JSON format failures that a parser fix resolves. The team accepts 88% for outages and records it in the runbook.
+- **Quota sharing.** Suppose the Mumbai quota is 400,000 tokens per minute. The chatbot gets 200,000 and claims extraction 100,000. The batch job gets 60,000 and runs after midnight. That totals 360,000, which leaves headroom for spikes.
+- **Budgets and logs.** Each key has a monthly budget with an alert at 75%. Every request is logged with team, feature, alias, deployment, tokens, cost and latency, with personal data masked.
 
-| Measure | Before the gateway | After |
-| --- | --- | --- |
-| Effect of a provider incident | 50 minutes of chatbot errors | 90 seconds of slower responses |
-| Provider keys | Held by four teams | Only in the gateway, rotated |
-| Cost visibility | One monthly bill | Report by team and feature |
-| Biggest finding | Unknown | A summary job using 40% of spend, moved to batch and a cheaper model |
+**The result.** In the next provider incident, users see a short period of slower answers while Mumbai cools down and Hyderabad serves, instead of errors. The fallback-rate alert tells the on-call engineer what happened. The first cost report by feature shows the statement-summary job using about 40% of spend. That team moves it to a cheaper model and the provider's batch API.
 
 ## Common mistakes
 
-- **A single gateway instance.** You have created a new single point of failure. Run several.
-- **Fallbacks to unapproved models or regions.** An outage should not silently send data somewhere it is not allowed to go.
-- **Model names hard-coded in apps.** Use aliases so upgrades and swaps are central.
-- **No per-feature attribution.** Cost reports by provider alone do not tell you what to fix.
+- **One gateway instance.** You have created a new single point of failure for every AI feature. Run several.
+- **Fallbacks to unapproved models or regions.** An outage must not quietly send data somewhere it is not allowed to go. This includes Bedrock APAC or global profiles when data must stay in India.
+- **Model names in application code.** Use aliases so upgrades and swaps happen in one place.
+- **Key limits that add up to more than the provider quota.** Then one busy key can still starve the others.
+- **Retrying a budget error.** A spent budget will not refill in a few seconds. Treat it as final and alert someone.
+- **Untested fallbacks.** A fallback that has never fired may break output formats or quality when it first does.
+- **Alerting only on errors.** Fallbacks hide failures from users, so a broken primary key can go unnoticed for weeks.
 - **Gateway logs with full prompts and no masking.** The gateway becomes the biggest sensitive data store you have.
-- **A single gateway instance** that takes every AI feature down when it fails.
-- **Untested fallbacks**, which break output formats or quality when they first fire.
-- **Model names in application code** instead of gateway aliases.
 
 ## When a gateway is overkill
 
-- **One app with one provider**: the provider SDK with retries and a budget alert is enough.
+- **One app with one provider.** The provider's SDK with retries, a timeout and a billing alert is enough.
 - **A small team** that would spend more time running the gateway than it saves.
-- **A managed platform** that already provides keys, budgets and routing.
+- **A managed platform** that already gives you keys, budgets and routing.
 
-A gateway pays off once several teams or apps share providers, keys and budgets.
+A gateway pays off once several teams or apps share providers, keys, quota and budgets.
 
 ## From demo to production
 
-- **Run at least two instances** with health checks and their own monitoring.
-- **Keep the config in Git**, reviewed, and tested on the golden set for model changes.
-- **Issue virtual keys** per team with budgets and owners.
-- **Route personal data to approved regions only**, and log regions.
-- **Drill fallbacks** by breaking the primary in staging.
+- **Run two or more instances** with health checks, their own monitoring and a shared database.
+- **Keep the config in Git**, reviewed like code, and test model changes on the golden set.
+- **Issue one key per feature**, with a rate limit, a budget and a named owner.
+- **Route personal data only to approved regions**, and log the region of every call.
+- **Drill failover in staging.** Break the primary on purpose with a wrong key or a blocked endpoint. Check that requests still succeed, that latency stays acceptable, and that logs and headers show which model served them. Repeat after every change to the chain.
+- **Roll out one low-risk feature first**, compare its errors, latency and cost with before, then move the others one at a time.
 
 ## Practice
 
-Read the LiteLLM gateway docs and the RouteLLM post.
+Read the LiteLLM gateway docs and the RouteLLM post. LiteLLM's published Docker image is the easiest way to run the proxy, because virtual keys need a Postgres database and its client.
 
-1. Run an open-source gateway locally in Docker with two model providers (or two models from one provider) behind one alias.
-2. Configure a fallback, then break the primary (a wrong key) and show requests still succeed.
-3. Create two keys with different budgets and show the second is refused after its budget is spent.
+1. Run the gateway locally with Postgres and two models (two providers, or two models from one provider). Put the first behind the alias `chat-default` and the second behind `chat-backup`, with a fallback between them.
+2. Give the primary a wrong key. Show that requests still succeed, and that the `x-litellm-attempted-fallbacks` header says 1.
+3. Create a key with `rpm_limit` of 3. Send 5 requests in a minute and show that the fourth gets HTTP 429.
+4. Create a key with a tiny budget. Spend it, show the budget error, and note how far spend went past the cap.
 
-For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers routers and gateways in an AI architecture.
+For more depth, chapter 10 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) places routers and gateways in a wider AI application architecture.
 
-**You are done when you can** switch a feature's model without changing its code, and show a cost report by key.
+**You are done when you can** switch a feature's model without changing its code, show that one key's rate limit cannot starve another, and show a cost report by key.
