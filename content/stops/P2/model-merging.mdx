@@ -3,9 +3,9 @@ id: model-merging
 level: P2
 theme: llm
 title: "Model merging: combining fine-tuned models into one"
-outcome: "Explain what model merging is and when it beats training one multi-task model, describe averaging, task vectors, SLERP, TIES and DARE and layer stacking, and test a merged model safely."
-answer: "Model merging combines the weights of models fine-tuned from the same base into one model. It can join skills without retraining or GPUs, but it must be tested like any new model."
-why_it_matters: "Teams often fine-tune separate models for separate tasks, then struggle to serve and maintain them all. Merging can fold several skills into one model, avoid the forgetting that comes with training tasks one after another, and many top open models are merges. It is cheap to try and easy to misuse."
+outcome: "Explain what model merging is and when it beats serving separate adapters or training one multi-task model, use averaging, SLERP, TIES and DARE with tuned settings, and test a merged model safely."
+answer: "Model merging combines the weights of models fine-tuned from the same base into one model. It joins skills without retraining or GPUs, but trades some accuracy, so test it like a new model."
+why_it_matters: "Teams fine-tune separate models for separate tasks, then must serve and maintain them all. Merging can fold several skills into one model file with no training run. It is cheap to try and easy to misuse: for small LoRA adapters it saves almost no memory, and every merge loses something you must measure."
 hours: 2.5
 gap_tags: []
 primary_resource: hf-merge-models-mergekit
@@ -19,39 +19,40 @@ check:
   question_ids: [model-merging-1, model-merging-2, model-merging-3]
 flashcards:
   - q: "What is model merging?"
-    a: "Combining the weights of two or more models, usually fine-tuned from the same base, into one model."
+    a: "Combining the weights of two or more models, usually fine-tuned from the same base, into one model you serve on its own."
   - q: "How is merging different from an ensemble?"
-    a: "An ensemble runs several models and combines their answers, costing several calls. Merging combines the weights once, so you serve one model."
+    a: "An ensemble runs several models on every request and combines their answers, so each request costs several calls. A merge combines the weights once, and you serve one model at normal cost."
   - q: "What is a task vector?"
-    a: "The change fine-tuning made: fine-tuned weights minus base weights. Adding task vectors adds skills; subtracting one can remove a behaviour."
-  - q: "Why merge instead of training one model on all tasks?"
-    a: "Each task can be trained separately and well, without forgetting earlier tasks, and the merge needs no GPUs."
-  - q: "What do TIES and DARE do before merging?"
-    a: "They drop most of the tiny weight changes, which mostly add noise, so the important changes from different tasks interfere less."
-  - q: "What is SLERP?"
-    a: "Spherical linear interpolation: blending two models along a curved path instead of a straight average, with a factor deciding which model counts more. It merges two at a time."
-  - q: "What is layer stacking?"
-    a: "Building a model from layers of different models, sometimes making a bigger model. It usually needs further training to work well."
+    a: "The change fine-tuning made: fine-tuned weights minus base weights. Adding task vectors to the base adds skills; subtracting one can weaken a behaviour."
+  - q: "Does merging three LoRA adapters save much memory?"
+    a: "No. Adapters are small next to the base model, often under a hundred megabytes each against several gigabytes. Merge them for one simple model file or mixed requests, not for memory."
+  - q: "What are the three steps of TIES?"
+    a: "Trim each task vector to its largest changes, elect one sign per weight, then average only the kept changes that agree with that sign. On a conflict, one task's change wins and the other is dropped."
+  - q: "What does DARE do?"
+    a: "It randomly drops a share of each task vector's changes and scales the survivors up so the total effect stays about the same. It can be combined with TIES-style sign election."
+  - q: "What is SLERP and why not just average?"
+    a: "Spherical linear interpolation blends two models along an arc, not a straight line. A straight average of two different directions shrinks the result; the arc keeps its size. It merges two models at a time."
   - q: "What must you always do after merging?"
-    a: "Test the merged model on every task it should handle, and check it did not lose general abilities or safety behaviour."
+    a: "Test the merged model on every task's own held-out set against its separate model, plus general skills and safety checks, with an acceptance bar set before you look."
 exercise:
-  title: "One model for a bank's three assistants"
-  setup: "A Mumbai bank has three LoRA adapters on the same open 8B base model: one classifies customer complaints, one drafts replies in English and Hindi, and one extracts fields from KYC documents. Serving three adapters is manageable, but the team wants to put one model on branch laptops with no internet."
+  title: "One model for a bank's branch assistant"
+  setup: "A Mumbai bank has three LoRA adapters on the same open 8B base model: one classifies customer complaints, one drafts replies in English and Hindi, and one extracts fields from KYC documents. Branch staff paste a whole customer letter, and one letter is often a complaint that needs a reply. The offline app the bank's IT team approved loads one model file at a time and cannot pick an adapter per request. KYC scanning is a separate screen."
   questions:
-    - q: "Why is merging a reasonable thing to try here?"
-      a: "All three adapters share one base model, so their changes can be combined into one model that fits on a laptop, without retraining."
-    - q: "Which method should they try first?"
-      a: "A simple weighted average of the adapters, then TIES or DARE if tasks interfere. Start simple and compare."
+    - q: "Is saving memory a good reason to merge here? What is the real reason?"
+      a: "No: three adapters add only a few hundred MB to the base. The reason is one model file that handles a mixed request, since the app cannot choose an adapter per request."
+    - q: "Which method should they try first, and how should they pick its settings?"
+      a: "A weighted average as the baseline, then TIES. Try a few densities and weights on a small dev set per task, keep the best, and log the config."
     - q: "How should they judge the merge?"
-      a: "On each task's own test set against its separate adapter, plus general and safety checks. Accept small drops only if they meet the bar."
-    - q: "The merged model's extraction accuracy drops from 96% to 88%. What now?"
-      a: "Try a higher weight for the extraction adapter, use TIES or DARE, or keep extraction as a separate adapter and merge only the other two."
+      a: "On each task's own test set against its separate adapter, plus general and safety checks, against a bar set in advance, such as no task more than 2 points worse."
+    - q: "The merged model's KYC extraction falls from 96% to 88%. What now?"
+      a: "Raise the KYC weight and retest. If it still misses the bar, merge only complaints and replies, and keep KYC as its own model for the separate scan screen."
 ask:
   - "What is model merging and why does it work?"
   - "What is the difference between TIES, DARE and SLERP?"
-  - "When should I merge models instead of fine-tuning one?"
+  - "When should I merge adapters instead of serving them separately?"
+  - "How do I choose density and weights for a TIES merge?"
 explain_in_interview:
-  answer: "Model merging combines two or more fine-tuned models into one by mixing their weights, and it works best when they were fine-tuned from the same base model. You take each task vector, the change fine-tuning made to the base, and combine them: a weighted average, SLERP between two models, or TIES and DARE, which prune small conflicting changes first. For example, a model fine-tuned for complaints and another for replies can be merged into one that does both, on an ordinary computer without GPUs. The limit is that results vary, so you test every merge like a new model."
+  answer: "Model merging combines two or more fine-tuned models into one by mixing their weights, and it works best when they were fine-tuned from the same base. You take each task vector, the change fine-tuning made to the base, and combine them: a weighted average, SLERP between two models, or TIES and DARE, which prune small changes and settle sign conflicts first. It needs no GPU. But it is not free: on a conflicting weight one task loses, so precise tasks often drop. For LoRA adapters, multi-adapter serving is often the better choice, so I merge only when one model file or mixed requests matter, and I test every task and safety before shipping."
   follow_up: "How is model merging different from an ensemble?"
   follow_up_answer: "An ensemble runs several models and combines their answers, so every request costs several calls. A merge combines the weights once, and afterwards you serve a single model at normal cost."
 drafted_with_ai: true
@@ -61,18 +62,22 @@ reviewed_on: 2026-11-09
 
 ## What it is
 
-Fine-tuning changes one model. **Model merging** combines two or more models into one by mixing their weights. It usually works best when the models were fine-tuned from the **same base model**, so their weights line up.
+Fine-tuning changes one model. **Model merging** combines two or more models into one by mixing their weights. No training run is needed: a merge is arithmetic on the weight files.
 
-Why bother?
+Merging works best when the models were fine-tuned from the **same base model**. Why? Fine-tuning moves the weights only a short distance from where they started. Two models fine-tuned from one base still sit close to it and to each other, and weight number 1,000 means roughly the same thing in both. Two models trained from scratch learn their features in different orders, so averaging them mixes unrelated numbers and usually breaks both.
 
-- **Several skills in one model.** If you fine-tuned one model for complaints and another for replies, a merge can do both.
-- **No forgetting from training tasks in sequence.** Training on task A, then task B, often makes a model forget A. Training each separately and merging avoids that.
-- **No GPUs needed.** Simple merges are arithmetic on weights and run on an ordinary computer.
-- **Smaller deployments.** One model instead of several, useful on phones, laptops and other devices with limited memory, or where data must not leave the device.
+Why merge?
 
-Merging is different from an **ensemble**. An ensemble runs several models and combines their answers, which costs several calls per request. A merge combines the weights once; afterwards you serve a single model at normal cost.
+- **One model for mixed requests.** If one request needs two skills (classify a complaint and draft the reply), a merged model handles it in one call, with no router choosing between models.
+- **One file to ship.** A merged model is a plain model. Any runtime can load it, including ones with no adapter support.
+- **Less forgetting than training in sequence.** Training on task A and then task B often makes a model forget A. Training each task separately and merging reduces that risk, but brings its own problem: the tasks' changes interfere, so every task must be retested.
+- **No GPUs needed.** Simple merges run on a CPU. You need disk space and memory for the models, not a GPU.
 
-Merging is still young and partly experimental. Many top entries on open model leaderboards have been merges, but results vary, so treat every merge as a new model to test.
+What merging does **not** buy you is memory, when the inputs are LoRA adapters. A LoRA adapter is small. For example, rank 16 on every linear layer of a Llama-3-8B-shaped model is about 42 million parameters, roughly 84 MB at 16-bit, against about 16 GB for the base at 16-bit. Three adapters add about 1.6% to the base. Merging them saves almost nothing.
+
+Merging is also different from an **ensemble**. An ensemble runs several models on every request and combines their answers, so each request costs several calls. A merge combines the weights once; afterwards you serve one model at normal cost.
+
+A note on reputation. In 2024 merges filled the top of Hugging Face's Open LLM Leaderboard. The leaderboard team hid merges by default, saying their scores often did not carry over to real use. The leaderboard itself was retired in March 2025. The lesson stands: a merge's public scores tell you little about your tasks.
 
 ```flow
 title: Merging fine-tuned models
@@ -83,29 +88,89 @@ Fine-tune for task B -> Task vector B | B minus base
 Task vector A -> Combine | average, SLERP, TIES, DARE
 Task vector B -> Combine
 Combine -> Merged model
-Merged model -> Test every task, general skills, safety
+Merged model -> Test every task and safety
+Test every task and safety -[pass the bar]-> Ship one model
+Test every task and safety -[miss the bar]-> Keep separate models
 ```
 
 ## How it works
 
-**Task vectors.** Subtract the base model's weights from a fine-tuned model's weights and you get a **task vector**: the change that fine-tuning made. With LoRA, the adapter itself is essentially the task vector. Adding task vectors to the base combines skills, and subtracting one can reduce a behaviour, which researchers have used to weaken unwanted abilities or biases.
+### Task vectors
 
-**Linear combination.** The simplest merge is a weighted average of the weights or of the task vectors. It works surprisingly well, especially for models from the same base. "Model soups" averaged several fine-tuned versions of one model and improved accuracy at no extra running cost. Weights let one model count more than another.
+Subtract the base model's weights from a fine-tuned model's weights and you get a **task vector**: the change fine-tuning made. Add task vectors to the base and you combine skills. Subtract one and you weaken a behaviour. The paper that named task vectors (Ilharco and others, ICLR 2023) made GPT-2 produce far fewer toxic outputs by subtracting a task vector learned from toxic text.
 
-**SLERP.** Spherical linear interpolation blends two models along a curved path rather than a straight line, which can preserve each model's character better than a plain average. An interpolation factor from 0 to 1 sets which model counts more. It merges two models at a time; merge a third by repeating.
+With LoRA, the adapter stores the task vector in factored form: two thin matrices, A and B, whose product B times A is the change to each layer. This detail matters later. Combining the A matrices and B matrices separately is not the same as combining the real changes.
 
-**TIES and DARE.** Fine-tuning changes nearly every weight, but most changes are tiny and add little. Those small changes from different tasks can clash when merged. Both methods first **prune** each task vector, keeping only the important changes:
+### Weighted average and task arithmetic
 
-- **TIES** keeps the largest changes, then settles conflicts where tasks push a weight in opposite directions, before merging.
-- **DARE** randomly drops most changes and rescales the rest to keep their overall effect.
+The simplest merge is a weighted sum of task vectors added to the base. With weights of 0.5 and 0.5 it is an average; with weights of 1.0 and 1.0 it is plain **task arithmetic**. Averaging works surprisingly well for models from one base. The "model soups" paper (Wortsman and others, ICML 2022) averaged many fine-tuned versions of one model and often beat the best single one, at no extra running cost.
 
-Both often give clearly better merges than plain averaging, and the advantage grows as you merge more models.
+The weakness is interference. An average halves a change that only one task made, and when two tasks push a weight in opposite directions, they cancel.
 
-**Layer stacking.** Instead of mixing weights, build a model from layers of different models, sometimes called a "frankenmerge". It can make a bigger model from smaller ones (one team built a 10.7B model from two copies of a 7B one), and is one way to start a mixture-of-experts model from an existing one. These usually need further training to work well.
+### SLERP
 
-**Concatenation** joins adapters side by side. It keeps all parameters, so it saves no memory and is rarely worth it.
+**Spherical linear interpolation** blends two models along an arc instead of a straight line. Why the arc? If two weight vectors point in different directions, the midpoint of the straight line between them is shorter than either. The model's weights shrink, which can dull both models. The arc keeps the size. A factor `t` from 0 to 1 sets the blend: 0 is the first model, 1 the second. SLERP takes exactly two models; for a third, merge again.
 
-Merging two LoRA adapters with PEFT looks like this:
+### TIES and DARE
+
+Fine-tuning changes nearly every weight, but most changes are tiny. These small changes add little, yet they clash when merged. **TIES** (Yadav and others, NeurIPS 2023) cleans each task vector in three steps:
+
+1. **Trim.** Keep only the largest changes in each task vector. The `density` setting is the share kept: 0.3 keeps the top 30%.
+2. **Elect a sign.** For each weight, add up the kept changes. The direction with more total change wins.
+3. **Disjoint mean.** Average only the kept changes that agree with the winning sign. A change only one task made keeps its full size.
+
+**DARE** (Yu and others, 2023) replaces the trim step. It drops a random share of each task vector's changes and scales the survivors up so the total effect stays about the same. It can be combined with TIES as `dare_ties`: DARE's random drop, then TIES's sign election.
+
+The papers that introduced both methods report gains over plain averaging. Check this on your own tasks. Newer variants exist, such as Model Breadcrumbs and DELLA, and mergekit supports them. Sakana AI showed in 2024 that an evolutionary search can find good merge recipes automatically. Learn TIES well first.
+
+**Try it in your browser.** Two task vectors with a conflict on weight 0, agreement on weight 3, and changes only one task made on weights 4 and 5.
+
+```python
+import numpy as np
+
+# Changes two fine-tunes made to the same 8 weights (their task vectors).
+# Weight 0: the tasks disagree. Weight 3: they agree. Weights 4 and 5: only one task cares.
+# The rest are tiny changes, mostly noise.
+task_a = np.array([ 0.90, 0.02, -0.03, 0.80, 0.01, -0.70,  0.02, 0.00])
+task_b = np.array([-0.85, 0.03,  0.02, 0.75, 0.60,  0.01, -0.02, 0.01])
+
+def ties(vectors, density=0.4):
+    stacked = np.stack(vectors)
+    # 1. Trim: in each vector, keep only the largest changes (the top `density` share).
+    trimmed = []
+    for v in stacked:
+        cut = np.quantile(np.abs(v), 1 - density)
+        trimmed.append(np.where(np.abs(v) >= cut, v, 0.0))
+    trimmed = np.stack(trimmed)
+    # 2. Elect a sign per weight: the direction with more total change wins.
+    sign = np.where(trimmed.sum(axis=0) >= 0, 1.0, -1.0)
+    # 3. Disjoint mean: average only the kept changes that agree with that sign.
+    agree = (np.sign(trimmed) == sign) & (trimmed != 0)
+    count = np.maximum(agree.sum(axis=0), 1)
+    return (trimmed * agree).sum(axis=0) / count
+
+average = (task_a + task_b) / 2
+merged = ties([task_a, task_b])
+for name, v in [("task A ", task_a), ("task B ", task_b), ("average", average), ("TIES   ", merged)]:
+    print(name, v.round(2) + 0.0)
+```
+
+The output:
+
+```text
+task A  [ 0.9   0.02 -0.03  0.8   0.01 -0.7   0.02  0.  ]
+task B  [-0.85  0.03  0.02  0.75  0.6   0.01 -0.02  0.01]
+average [ 0.03  0.02  0.    0.78  0.3  -0.34  0.    0.  ]
+TIES    [ 0.9   0.    0.    0.78  0.6  -0.7   0.    0.  ]
+```
+
+Read it weight by weight. The average cancels weight 0 to almost nothing, so both tasks lose it, and it halves weights 4 and 5. TIES keeps 4 and 5 at full size and clears the noise. But look at weight 0: TIES keeps task A's 0.9 and throws away task B's change completely. TIES does not make conflicts go away. It picks a winner, and the losing task pays. This is why a precise task often drops after a merge.
+
+### Layer stacking
+
+Instead of mixing weights, you can build a model from layers of different models, sometimes called a "frankenmerge". It can grow a model. SOLAR 10.7B (Kim and others, 2023) took two copies of a 32-layer 7B model, removed 8 layers from each, and joined them into 48 layers. It needed further pretraining to work well, and most stacked models do.
+
+### Merging LoRA adapters with PEFT
 
 ```python
 from peft import PeftModel
@@ -115,87 +180,121 @@ base = AutoModelForCausalLM.from_pretrained("base-model-id")
 model = PeftModel.from_pretrained(base, "adapters/complaints", adapter_name="complaints")
 model.load_adapter("adapters/replies", adapter_name="replies")
 
-# Combine into a new adapter; TIES keeps the strongest changes (density) and resolves conflicts.
+# ties_svd applies TIES to the real change (B times A) of each layer, then compresses it back to a LoRA.
 model.add_weighted_adapter(
     adapters=["complaints", "replies"], weights=[1.0, 1.0],
-    adapter_name="merged", combination_type="ties", density=0.3,
+    adapter_name="merged", combination_type="ties_svd", density=0.5,
 )
 model.set_adapter("merged")
+merged = model.merge_and_unload()   # one plain model, no adapter needed at run time
+merged.save_pretrained("merged-model")
 ```
 
-For whole models, the open-source tool mergekit runs merges from a short configuration file.
+Gotchas in PEFT (checked against version 0.22):
+
+- The plain `linear`, `ties` and `dare_*` types combine the A and B matrices separately. PEFT's own documentation calls `linear` a rough approximation. Prefer the `_svd` types, which work on the real change.
+- The plain types need every adapter to have the same rank `r`. The `_svd` types do not.
+- `cat` joins the adapters side by side. It gives the exact sum of the changes, but the new adapter's rank is the sum of all ranks.
+- DoRA adapters are not supported.
+
+### Merging full models with mergekit
+
+For full fine-tunes, the open-source tool mergekit runs a merge from a short YAML file:
+
+```yaml
+merge_method: ties
+base_model: ./base-8b
+models:
+  - model: ./complaints-8b
+    parameters: {density: 0.5, weight: 1.0}
+  - model: ./replies-8b
+    parameters: {density: 0.5, weight: 1.0}
+dtype: bfloat16
+```
+
+Run it with `mergekit-yaml merge.yml ./merged`. For TIES, mergekit divides by the total weight by default (`normalize`), so weights of 1.0 and 1.0 act as an even blend.
+
+### Choosing the settings
+
+Merge settings are guesses until you measure them. A small search is cheap, because a merge needs no training run.
+
+1. Hold out a small **dev set** per task, for example 100 to 200 examples, separate from the final test set.
+2. Start with equal weights and try density 0.2, 0.5 and 0.8. For SLERP, try `t` of 0.3, 0.5 and 0.7.
+3. If one task drops, raise its weight, for example from 1.0 to 1.5, and try again.
+4. Keep the best setting by your acceptance bar, not by the average score. Then run the test set once.
+5. Save each config with its scores, so you can rebuild any merge.
 
 | Method | How it combines | Strengths | Watch out for |
 | --- | --- | --- | --- |
-| Weighted average | Averages weights or task vectors | Simple, often good | Tasks can interfere |
-| SLERP | Blends two models along a curve | Smooth blend of two | Two models at a time |
-| TIES | Keeps big changes, resolves sign conflicts | Better with several tasks | Density setting needs tuning |
-| DARE | Drops most changes randomly, rescales | Robust, simple to apply | Randomness; test more than once |
-| Layer stacking | Combines layers, can grow size | Can upscale or build MoE | Usually needs further training |
-
-**Try it in your browser.** Average two task vectors, then try a TIES-style merge that keeps only the big changes.
-
-```python
-import numpy as np
-
-rng = np.random.default_rng(7)
-base = rng.normal(size=10)
-task_a = np.where(rng.random(10) < 0.3, rng.normal(0, 1, 10), rng.normal(0, 0.05, 10))
-task_b = np.where(rng.random(10) < 0.3, rng.normal(0, 1, 10), rng.normal(0, 0.05, 10))
-
-average = base + (task_a + task_b) / 2
-def trim(v, keep=0.3):
-    cut = np.quantile(np.abs(v), 1 - keep)
-    return np.where(np.abs(v) >= cut, v, 0)
-ties = base + trim(task_a) + trim(task_b)
-print("average change:", (average - base).round(2))
-print("TIES change:   ", (ties - base).round(2))
-```
+| Weighted average | Weighted sum of task vectors | Simple baseline, often good | Halves single-task changes; conflicts cancel |
+| SLERP | Blends two models along an arc | Keeps weight size; smooth blend | Two models at a time |
+| TIES | Trim, elect sign, disjoint mean | Better with several tasks | On a conflict one task loses; tune density |
+| DARE | Random drop, then rescale | Pairs well with TIES | Random: compare a few seeds |
+| Layer stacking | Joins layers, can grow size | Can make a bigger model | Usually needs further training |
 
 ## A worked example
 
-A bank in Mumbai has three LoRA adapters on the same open 8B base model: complaint classification, reply drafting in English and Hindi, and KYC field extraction. They want one model on branch laptops with no internet.
+A bank in Mumbai has three LoRA adapters, all rank 16 on the same open 8B base model: complaint classification, reply drafting in English and Hindi, and KYC field extraction. Branch staff paste a whole customer letter, and many letters are complaints that also need a reply. The offline app the bank's IT team approved loads one model file at a time and cannot pick an adapter per request. KYC scanning is a separate screen in the app, used a few times a day.
 
-They try three merges and test each on every task's own test set:
+Memory is not the reason to merge here. The three adapters add only about 250 MB to a base of about 16 GB at 16-bit. The reasons are one model file and one call for a mixed letter.
 
-| Model | Complaint accuracy | Reply quality (reviewer score out of 5) | KYC extraction accuracy |
-| --- | --- | --- | --- |
-| Separate adapters (target) | 93% | 4.3 | 96% |
-| Weighted average of all three | 89% | 4.0 | 84% |
-| TIES, density 0.3 | 92% | 4.2 | 88% |
-| TIES of complaints and replies; KYC kept separate | 92% | 4.2 | 96% |
+Before merging, the team writes down the test sets and the bar:
 
-The numbers are for illustration. Extraction, the most precise task, suffered most in every full merge. The team ships a merged model for complaints and replies and keeps the KYC adapter separate, loaded only when a document is scanned. Both fit on the laptops. They also re-run their safety and refusal checks, because merging can weaken behaviour none of the adapters was trained on.
+- **Complaints:** 400 labelled letters; accuracy.
+- **Replies:** 150 letters; two reviewers score each draft from 1 to 5 against a rubric, and the scores are averaged.
+- **KYC:** 300 scanned documents; share of fields extracted exactly right.
+- **Safety:** 200 prompts the assistant must refuse, such as requests for another customer's account details.
+- **Bar:** no task more than 2 points below its separate adapter (0.2 for replies), and no fewer refusals.
+
+They tune on separate dev sets, then run the test sets. The numbers below are for illustration, not measured results.
+
+| Model | PEFT setting | Complaints | Replies (out of 5) | KYC | Meets the bar? |
+| --- | --- | --- | --- | --- | --- |
+| Separate adapters (target) | none | 93% | 4.3 | 96% | target |
+| Average of all three | `svd`, weights 1/3 each | 89% | 4.0 | 84% | no |
+| TIES of all three | `ties_svd`, density 0.5, weights 1.0 | 92% | 4.2 | 88% | no: KYC |
+| TIES, KYC weighted up | as above, KYC weight 1.5 | 91% | 4.1 | 91% | no: KYC |
+| TIES of complaints and replies | `ties_svd`, density 0.5 | 92% | 4.2 | n/a | yes |
+
+The plain average dilutes every skill to a third, so it fails everywhere. TIES does better, but KYC extraction, the most precise task, loses conflicts it cannot afford. Weighting it up helps KYC and starts to hurt the others.
+
+So the team ships two files. The letter screen uses the merged complaints-and-replies model, which handles a mixed letter in one call. The scan screen loads a second model, the base with the KYC adapter folded in, only when a document is scanned. The safety set passes with the same refusal count. They re-ran it because merging can weaken behaviour that none of the adapters was trained on.
 
 ## Common mistakes
 
-- **Merging models from different bases** without understanding the risks. Results are usually poor.
-- **Testing only one task.** A merge can quietly hurt another task or general abilities.
-- **Skipping safety checks.** Refusal and safety behaviour can weaken after merging.
-- **Trusting leaderboard merges blindly.** Some are tuned to benchmarks; test on your own data.
-- **Using concatenation to save memory.** It does not.
-- **Forgetting the licence.** A merge inherits the licence terms of every model in it.
+- **Merging models from different bases.** Also check that the inputs share a tokenizer and a chat template. A merge of models that expect different prompt formats can produce broken replies.
+- **Merging LoRA adapters to save memory.** Adapters are small; the saving is tiny.
+- **Judging by the average score.** A merge can look fine on average while one task drops badly. Compare every task against its own target.
+- **Tuning on the test set.** Picking density and weights on the test set makes the test score look better than real use will be. Use a dev set.
+- **Using plain `linear` or `ties` on LoRA adapters and expecting an exact sum.** These types combine the A and B matrices separately. Use `cat` for an exact sum; the `_svd` types are exact only when `svd_rank` is at least the sum of the ranks.
+- **Skipping safety checks.** A 2024 study (Hammoud and others, Findings of EMNLP) found that merging can carry one model's weak safety behaviour into the merged model.
+- **Trusting public merges.** Test a downloaded merge on your own data.
+- **Forgetting the licence.** A merge must follow the terms of every model in it. A non-commercial input can limit how you may use the merge, so read each licence. Some licences add naming rules: Llama 3.1's licence asks that a shared model built from it has a name starting with "Llama".
 
 ## When not to merge
 
-- **Tasks that need high precision** may be better kept as separate adapters.
-- **You can afford one good multi-task fine-tune** with enough data for every task.
-- **Serving several adapters is already cheap**, as many servers support it efficiently.
-- **The models come from different base models.**
+Ask these questions in order:
+
+1. **Can you serve the adapters separately?** For LoRA adapters this is usually the best choice. Servers such as vLLM keep one base model in GPU memory and apply a different adapter per request, even in the same batch. For example: `vllm serve base-model-id --enable-lora --lora-modules complaints=./adapters/complaints replies=./adapters/replies --max-loras 4`. Each request names its adapter. Merge LoRA adapters mainly when the runtime cannot do this, or one request needs several skills at once.
+2. **Is one task very precise?** Extraction, maths or strict formats often lose in a merge. Keep it separate.
+3. **Can you afford one multi-task fine-tune?** With data for every task, training on the mix often beats a merge, because the model learns to balance the tasks.
+4. **Do the models come from different bases?** Do not merge.
 
 ## From demo to production
 
-- **Version merges like models**: the inputs, method, weights and settings in a config file.
-- **Keep the separate adapters** as a fallback and for comparison.
-- **Test every task, plus general and safety checks**, before each release.
-- **Re-merge when any input model changes**, and re-test.
+- **Version merges like models.** Keep the config file, input model versions, scores and test set versions together.
+- **Keep the separate models** as a fallback and as the comparison point.
+- **Test every task, plus general and safety checks**, before each release, against the bar you set in advance.
+- **Re-merge and re-test when any input changes.** A new adapter version means a new merge.
+- **Record the licence of every input** in the merged model's card.
 
 ## Practice
 
-1. Find a merged model on Hugging Face and read its card: which models and which method were used?
-2. With two small LoRA adapters on one base, merge them by averaging and by TIES, and compare on a few examples of each task.
-3. Write a test plan for a merge in your own field: which tasks, which test sets, which safety checks.
+1. Find a merged model on Hugging Face and read its card. Which models, which method and which settings were used? Is the mergekit config included?
+2. Run the browser example above. Change task B's weight 0 from -0.85 to -0.95 and predict TIES's output before you run it. Then try density 0.2 and 0.8.
+3. With two small LoRA adapters on one base, merge them with `svd` at weights 0.5 and 0.5 (an average) and with `ties_svd` at three densities. Score each on 20 examples per task and write down which setting you would ship and why.
+4. Write a test plan for a merge in your own field: the tasks, the test sets, the safety checks and the acceptance bar.
 
 For more depth, chapter 7 of Chip Huyen's *AI Engineering* (O'Reilly, 2025) covers model merging and multi-task fine-tuning.
 
-**You are done when you can** explain merging versus ensembling, describe task vectors and what TIES or DARE add, and plan how to test a merged model.
+**You are done when you can** explain merging versus ensembling and versus multi-adapter serving, describe what TIES and DARE do and what they cost, pick and tune a merge method, and plan how to test a merged model.
