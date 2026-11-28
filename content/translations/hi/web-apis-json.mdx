@@ -2,199 +2,345 @@
 id: web-apis-json
 lang: hi
 title: "Web API call करो और JSON पढ़ो"
-outcome: "Python से public web API call कर पाओगे, status code check करना और JSON reply से values पढ़ना सीख जाओगे।"
-answer: "Python में web API call करने के लिए requests.get(url) use करो, check करो कि status code 200 है, फिर response.json() से dictionary की तरह values पढ़ो।"
-why_it_matters: "Language model को call करना भी web API call करना ही है। अगर requests, JSON और status codes अभी से जाने-पहचाने हों, तो LLM वाले steps दीवार की जगह एक छोटा अगला कदम लगते हैं।"
+outcome: "Python से एक असली web API को timeout और key के साथ call करो, status code check करो, nested JSON को safely पढ़ो, और retries और pages handle करो।"
+answer: "requests.get(url, params=..., timeout=10) call करो, errors पर रुकने के लिए raise_for_status() चलाओ, फिर response.json() को nested dictionaries और lists की तरह पढ़ो।"
+why_it_matters: "Language model को call करना असल में एक web API को call करना ही है। अगर requests, JSON और status codes अभी से जाने-पहचाने हो गए, तो LLM वाले steps दीवार जैसे नहीं, बस एक छोटा अगला step लगेंगे।"
 flashcards:
   - q: "Web API क्या है?"
-    a: "आपके program के लिए internet पर किसी दूसरी service से data या actions माँगने का तरीका, किसी URL पर HTTP request भेजकर।"
-  - q: "Status codes 200, 401, 404 और 429 का क्या मतलब है?"
-    a: "200 काम हो गया; 401 sign in नहीं है (अक्सर key गायब या गलत); 404 URL या item मौजूद नहीं; 429 बहुत ज़्यादा requests, धीमे चलो।"
-  - q: "500 से 504 वाले status codes का आमतौर पर क्या मतलब होता है?"
-    a: "Server फ़ेल हो गया। ये errors अक्सर अस्थायी होते हैं और दोबारा try करने पर चल सकते हैं।"
-  - q: "r.json() क्या करता है?"
-    a: "Reply के JSON text को Python dictionaries और lists में बदल देता है जिन्हें आप पढ़ सको, जैसे data['current']['temp_c']।"
+    a: "आपके program के लिए internet पर किसी दूसरी service से data या actions माँगने का एक तरीका: एक URL पर HTTP request भेजो और reply पढ़ो।"
+  - q: "Status codes 200, 401, 403, 404 और 429 का मतलब क्या है?"
+    a: "200 काम हो गया। 401 key नहीं है या गलत है। 403 key valid है पर इसकी permission नहीं है। 404 URL या item मौजूद नहीं है। 429 बहुत ज़्यादा requests, धीरे चलो।"
+  - q: "कौन-सी failed requests retry करना safe है?"
+    a: "Timeouts, connection errors, 429, 500, 502, 503 और 504, हर बार ज़्यादा देर wait करके। 400, 401, 403, 404 या 422 को बिना कुछ बदले कभी retry मत करो। POST को तभी retry करो जब API कोई idempotency key support करे।"
+  - q: "r.json() क्या करता है, और ये कब fail होता है?"
+    a: "ये reply के JSON text को Python dictionaries और lists में बदलता है। जब body JSON नहीं होती, जैसे किसी proxy से आया HTML error page, तब ये JSONDecodeError raise करता है।"
   - q: "हर request में timeout क्यों ज़रूरी है?"
-    a: "उसके बिना, किसी धीमे या टूटे server की request हमेशा के लिए अटक सकती है और आपका program freeze कर सकती है।"
+    a: "Default में requests हमेशा के लिए wait करता रहता है। तब एक slow या टूटा हुआ server आपके program को या पूरे nightly job को freeze कर सकता है। timeout=10 दो, या (5, 20) जैसा एक (connect, read) pair दो।"
   - q: "API keys कहाँ रखनी चाहिए?"
-    a: "Environment variables में, जिन्हें os.environ से पढ़ो, कभी उस code में लिखकर नहीं जिसे share करो।"
-  - q: "requests में params और json में क्या फ़र्क है?"
-    a: "params GET requests के लिए URL में query parameters जोड़ता है। json एक JSON body भेजता है, आमतौर पर POST के साथ।"
+    a: "एक environment variable में, जिसे os.environ से पढ़ा जाए; उस code में कभी नहीं जिसे आप share या commit करते हो। अगर os.environ['NAME'] KeyError raise करे, तो मतलब उस terminal में variable set नहीं है।"
+  - q: "किसी list endpoint से सारे results कैसे पढ़ते हैं?"
+    a: "API के page और limit (या next link) parameters से pages पर loop करो। जब कोई page छोटा या खाली आए तब रुक जाओ, और pages की गिनती पर एक cap लगाओ ताकि कोई bug हमेशा loop न करता रहे।"
   - q: "raise_for_status() क्या करता है?"
-    a: "Status code 4xx या 5xx हो तो error उठाता है, ताकि आपका code error reply के साथ आगे न बढ़ता रहे।"
+    a: "अगर status code 4xx या 5xx है तो HTTPError raise करता है, ताकि आपका code किसी error reply को data समझकर आगे न बढ़ता रहे।"
 exercise:
   title: "API call को debug करो"
-  setup: "Pune का Arjun requests.get(url, params={'country': 'IN', 'year': 2026}) से एक public holidays API call करता है। चार runs में ये मिलता है: (1) status 401 और message 'missing API key'; (2) उसे ठीक करने के बाद, status 200, पर data['holidays'][0]['name'] से KeyError आता है क्योंकि असली JSON में सबसे ऊपर एक list है; (3) API धीमी होने पर program कई मिनट तक अटका रहता है; (4) 50 शहरों के लिए loop में चलाने पर 30वें call के बाद status 429 आता है।"
+  setup: "Pune का Arjun requests.get(url, params={'country': 'IN', 'year': 2026}) से एक public holidays API call करता है। चार runs में ये आता है: (1) 'missing API key' message के साथ status 401, जबकि os.environ['HOLIDAY_KEY'] ने बिना किसी error के उसकी key पढ़ ली थी; (2) वो ठीक करने के बाद status 200, पर data['holidays'][0]['name'] TypeError: list indices must be integers or slices, not str raise करता है; (3) API slow होने पर program कई मिनट तक hang हो जाता है; (4) 50 cities के लिए loop में चलाने पर 30वीं call के बाद status 429 आता है।"
   questions:
-    - q: "(1) का संभावित कारण और सुरक्षित fix क्या है?"
-      a: "Key भेजी नहीं गई या set नहीं थी। उसे environment variable से पढ़ो और API की documentation वाले header में भेजो।"
-    - q: "(2) को वो कैसे संभाले?"
-      a: "पहले पूरा reply print करके उसकी shape देखे। अगर सबसे ऊपर list है, तो data[0]['name'] पढ़े।"
+    - q: "(1) की संभावित वजह क्या है, और safe fix क्या है?"
+      a: "Key पढ़ी गई पर server तक पहुँची ही नहीं: या तो भेजी नहीं गई, या गलत header या parameter में भेजी गई। उसे ठीक वहीं भेजो जहाँ API की documentation कहती है, और पढ़ो अब भी environment variable से ही।"
+    - q: "(2) वाला TypeError उसे क्या बताता है, और उसे इसे कैसे ठीक करना चाहिए?"
+      a: "उसने list पर string key लगाई, यानी JSON का top level एक list है, object नहीं (या, कम संभावना है, holidays[0] एक list है)। Shape देखने के लिए reply print करो, फिर data[0]['name'] पढ़ो या data पर loop करो।"
     - q: "(3) को क्या रोकता है?"
-      a: "requests.get में timeout=10 (या ऐसा कुछ) देना, और timeout error को साफ़ message के साथ संभालना।"
-    - q: "(4) का क्या मतलब है, और उसे क्या करना चाहिए?"
-      a: "वो rate limit पर पहुँच गया। धीमा चले, backoff के साथ रुककर retry करे, और Retry-After header हो तो उसे माने।"
+      a: "requests.get को timeout=10 (या (5, 20) जैसा pair) देना, requests.Timeout को catch करना, और हार मानने से पहले एक साफ़ message के साथ कुछ बार retry करना।"
+    - q: "(4) का मतलब क्या है, और उसे क्या करना चाहिए?"
+      a: "वो rate limit से टकरा गया। Wait करके बढ़ती देरी के साथ retry करे, Retry-After header आए तो उसका पालन करे, और 50 calls के बीच फ़ासला रखे ताकि documented limit से नीचे रहे।"
 ask:
-  - "REST API आसान शब्दों में क्या है?"
-  - "Python में अपनी API key सुरक्षित कैसे रखूँ?"
-  - "HTTP status codes का क्या मतलब है?"
+  - "आसान शब्दों में REST API क्या है?"
+  - "Python में अपनी API key safe कैसे रखूँ?"
+  - "मेरे code को कौन-से API errors retry करने चाहिए, और कौन-से नहीं?"
 explain_in_interview:
-  answer: "Web API आपके program को internet पर किसी दूसरी service से data या actions माँगने देती है। आप एक URL पर HTTP request भेजते हो, और service एक status code के साथ reply करती है जो बताता है कि काम हुआ या नहीं, और आमतौर पर data के साथ एक JSON body। Python में आप URL, parameters और timeout के साथ requests.get call करते हो, check करते हो कि status 200 है, फिर response.json() को dictionaries और lists की तरह पढ़ते हो। जैसे, एक air-quality dashboard हर city के लिए एक public API call करता है। Language model call करना भी same तरीके से काम करता है। Limits हैं rate limits, failures और अपनी API key को code से बाहर रखना।"
-  follow_up: "अगर API status 429 return करे, तो क्या करोगे?"
-  follow_up_answer: "429 का मतलब है बहुत ज़्यादा requests, यानी आप rate limit से टकरा गए। धीमे हो जाओ, wait करो और exponential backoff के साथ retry करो, और अगर service Retry-After header भेजे तो उसका ध्यान रखो। Tight loop में तुरंत retry मत करो।"
-translated_on: 2026-11-14
+  answer: "Web API आपके program को internet पर किसी दूसरी service से data या actions माँगने देता है। आप एक URL पर HTTP request भेजते हो, और service एक status code और आमतौर पर एक JSON body के साथ reply करती है। Python में मैं एक requests Session use करता हूँ, जिसमें key environment variable से एक header में जाती है और हर call पर timeout होता है। मैं status check करता हूँ, फिर response.json() को dictionaries और lists की तरह पढ़ता हूँ। मैं सिर्फ़ timeouts, 429 और 5xx को backoff के साथ retry करता हूँ, और list endpoints के लिए pages पर loop करता हूँ। Language model को call करना भी बिल्कुल ऐसे ही काम करता है।"
+  follow_up: "अगर कोई API status 429 return करे तो आप क्या करोगे?"
+  follow_up_answer: "429 का मतलब बहुत ज़्यादा requests, यानी मैं rate limit से टकरा गया। मैं exponential backoff के साथ wait करके retry करूँगा, service Retry-After header भेजे तो उसका पालन करूँगा, और अपना overall request rate कम करूँगा। Tight loop में तुरंत retry कभी नहीं करूँगा।"
+translated_on: 2026-11-28
 ---
 
 ## ये क्या है
 
-आपके program को सब कुछ खुद जानने की ज़रूरत नहीं। **Web API** उसे internet पर किसी दूसरी service से data या actions माँगने देता है: आज का मौसम, map का route, किसी payment का status, सरकारी open data, या किसी AI model का जवाब। हर AI model provider इसी तरह काम करता है, इसलिए Python से API call करना वो मुख्य skill है जिस पर आगे language models को call करना टिका है।
+एक **web API** आपके program को internet पर किसी दूसरी service से data या actions माँगने देता है: air quality, map का route, किसी payment का status, सरकारी open data, या किसी AI model का जवाब। हर AI model provider तक इसी तरह पहुँचा जाता है, इसलिए आगे language models को call करने के पीछे यही core skill है।
 
-आप किसी URL पर एक **HTTP request** भेजते हो। Service जवाब में देती है:
+आपका program एक URL पर एक **HTTP request** भेजता है। Service इसके साथ reply करती है:
 
-- एक **status code**: काम हुआ या नहीं?
-- आमतौर पर **JSON** में एक body: यानी data।
+- एक **status code**, तीन अंकों का एक number जो बताता है कि काम हुआ या नहीं;
+- आमतौर पर **JSON** में एक **body**, यानी objects (`{"key": value}`) और lists (`[1, 2, 3]`) वाला एक text format, जिसे Python dictionaries और lists में बदल देता है।
 
 ```flow
+title: एक API call, शुरू से आख़िर तक
 dir: LR
-आपका Python program | requests.get(...) -[GET /weather?city=Chennai, header X-API-Key]-> Weather service
-Weather service -[200 OK, JSON body]-> r.json() | city: "Chennai", temp_c: 31.5
+आपका code | session.get(url, params, timeout) -[GET, key X-API-Key header में]-> API server
+API server -[status code और JSON body]-> Status check करो
+Status check करो -[2xx]-> r.json() | dicts और lists
+Status check करो -[429 या 5xx]-> Wait करो और retry करो
+Status check करो -[बाकी 4xx]-> Request ठीक करो
 ```
 
-इस lesson में हम Anita के साथ चलेंगे, जो अपने शहर के लिए एक छोटा air-quality dashboard बना रही है। Lesson के अंत तक आप public API call कर पाओगे, status check कर पाओगे और nested JSON सुरक्षित तरीके से पढ़ पाओगे।
+इस lesson में हम Delhi की एक student, Anita, के साथ चलेंगे, जो एक छोटा air-quality dashboard बना रही है। वो **OpenAQ** use करती है, एक non-profit platform जो दुनिया भर से, Indian monitoring stations समेत, air-quality readings इकट्ठा करता है। इसके API के लिए एक free key चाहिए, इसलिए पूरा routine practise करने के लिए ये एक अच्छी जगह है: key, timeout, status, JSON, retries और pages।
 
 ## ये काम कैसे करता है
 
-### requests library
+### Request के हिस्से
 
-```python
-import requests
+हर API की documentation requests को इन्हीं हिस्सों में बताती है:
 
-r = requests.get("https://api.example.com/weather",
-                 params={"city": "Chennai"}, timeout=10)
-print(r.status_code)
-data = r.json()          # JSON text becomes Python dictionaries and lists
-print(data["temp_c"])
-```
+| हिस्सा | ये क्या है | `requests` में | OpenAQ example |
+| --- | --- | --- | --- |
+| Base URL | वो address जिससे सारी calls शुरू होती हैं | URL का हिस्सा | `https://api.openaq.org/v3` |
+| Endpoint | एक तरह के data का path | URL का हिस्सा | `/locations/8118/latest` |
+| Query parameters | URL में `?` के बाद जोड़े गए filters | `params={...}` | `iso=IN`, `limit=100`, `page=2` |
+| Headers | Metadata, key समेत | `headers={...}` | `X-API-Key: your key` |
+| Body | आपका भेजा हुआ data, आमतौर पर POST के साथ | `json={...}` | data पढ़ने के लिए ज़रूरी नहीं |
 
-`params` URL में query parameters जोड़ता है, इसलिए ये request `.../weather?city=Chennai` पर जाती है।
+`params={"iso": "IN"}` URL पर `?iso=IN` बन जाता है; `requests` spaces और special characters को escape भी करता है। JSON body भेजने के लिए `json=` use करो (`data=` नहीं): ये आपकी dictionary को convert करता है और सही content type set करता है।
 
-### Status codes
-
-| Code | मतलब | क्या करें |
-| --- | --- | --- |
-| `200` | OK: काम हो गया | Data use करो |
-| `400` | Bad request: आपकी request में कुछ गलत है | Parameters और body check करो |
-| `401` / `403` | Sign in नहीं है, या इजाज़त नहीं | API key और permissions check करो |
-| `404` | नहीं मिला | URL या item id check करो |
-| `429` | बहुत ज़्यादा requests | धीमे चलो; रुककर retry करो |
-| `500` से `504` | Server फ़ेल हो गया | अक्सर अस्थायी; बाद में retry करो |
-
-Data use करने से पहले check करो। `r.raise_for_status()` 4xx और 5xx codes पर error उठाता है, ताकि आपका code error reply को data समझकर आगे न बढ़े।
-
-### Python में JSON
-
-`r.json()` reply को dictionaries (JSON objects के लिए) और lists (JSON arrays के लिए) में बदल देता है। Nested values को एक-एक step में पढ़ो:
-
-```python
-data["current"]["temp_c"]          # an object inside an object
-data["results"][0]["location"]     # the first item of a list
-```
-
-जो code reply पढ़ेगा उसे लिखने से पहले, हमेशा पूरा reply एक बार print करो, ताकि उसकी असली shape दिखे।
-
-### Parameters, headers और bodies
-
-| Part | किसलिए | Example |
-| --- | --- | --- |
-| `params` | URL पर query parameters | `params={"city": "Pune"}` |
-| `headers` | Keys, content type और बाकी metadata | `headers={"Authorization": "Bearer ..."}` |
-| `json` | आपकी भेजी हुई JSON body, आमतौर पर POST के साथ | `requests.post(url, json={"text": "..."})` |
-
-### Timeouts
-
-`timeout=` के बिना, किसी धीमे या टूटे server की request **हमेशा के लिए** अटक सकती है, और आपका program या पूरा automation freeze हो सकता है। हमेशा एक लगाओ, और `requests.Timeout` को संभालो।
-
-### Keys और secrets
-
-API keys कभी उस code में मत लिखो जिसे share या commit करो। उन्हें environment variable से पढ़ो:
+### आपकी पहली call
 
 ```python
 import os
-key = os.environ["AQ_KEY"]
+import requests
+
+BASE = "https://api.openaq.org/v3"
+key = os.environ["OPENAQ_API_KEY"]
+
+r = requests.get(f"{BASE}/locations/8118/latest",
+                 headers={"X-API-Key": key}, timeout=(5, 20))
+print(r.status_code)          # 200 if it worked
+r.raise_for_status()          # stop here on any 4xx or 5xx
+data = r.json()               # JSON text becomes dicts and lists
+print(list(data))             # ['meta', 'results']
 ```
+
+Location 8118 New Delhi का एक station है जिसे OpenAQ अपने quick start में ख़ुद use करता है। इस छोटे-से block में पहले से तीन आदतें हैं:
+
+- **Key एक environment variable से आती है**, इसलिए वो code में कभी नहीं दिखती।
+- **Timeout है।** `(5, 20)` का मतलब है connect होने के लिए 5 seconds तक और server के data भेजने के लिए 20 seconds तक wait करो।
+- **`raise_for_status()`, `r.json()` से पहले चलता है।** Error reply data नहीं है, और उसे data मानने से तीन lines बाद confusing failures आते हैं।
+
+### Status codes
+
+पहला अंक बताता है कि problem किसकी है: **2xx** काम हो गया, **4xx** आपकी request गलत है, **5xx** server fail हुआ।
+
+| Code | मतलब | क्या करें | Retry? |
+| --- | --- | --- | --- |
+| `200` | OK | Data use करो | — |
+| `400` | Bad request | Parameters और body check करो | नहीं |
+| `401` | Unauthorized: key नहीं है, गलत है या expire हो गई | Key और वो header check करो जिसमें वो जाती है | नहीं |
+| `403` | Forbidden: key valid है पर इसकी permission नहीं | अपना plan या permissions check करो | नहीं |
+| `404` | Not found | URL path और item id check करो | नहीं |
+| `422` | Unprocessable: request validation में fail हुई | Body में error detail पढ़ो | नहीं |
+| `429` | Too many requests | Wait करो, फिर और धीरे retry करो | हाँ |
+| `500`, `502`, `503`, `504` | Server या कोई proxy fail हुआ | Wait करो, फिर retry करो | हाँ |
+
+याद रखने का एक काम का तरीका: **401 पूछता है "आप कौन हो?", 403 कहता है "मुझे पता है आप कौन हो, और जवाब है ना।"** 401 का fix key है; 403 का fix आपका account या plan है। कई Python APIs, जिनमें FastAPI framework से बने APIs भी हैं, कोई field missing हो या उसका type गलत हो तो 422 return करते हैं, और body बताती है कि कौन-सा field।
+
+### JSON पढ़ना
+
+Reply को पढ़ने वाला code लिखने से पहले, उसे एक बार अच्छे से format करके print करो:
+
+```python
+import json
+print(json.dumps(data, indent=2)[:1500])
+```
+
+Latest-readings endpoint से आए एक reply को छोटा करें तो उसका shape ऐसा होता है (shape OpenAQ की documentation के हिसाब से है; values बनाई हुई हैं):
+
+```json
+{
+  "meta": {"name": "openaq-api", "page": 1, "limit": 100, "found": 2},
+  "results": [
+    {"datetime": {"utc": "2026-11-28T05:00:00Z", "local": "2026-11-28T10:30:00+05:30"},
+     "value": 182.0, "sensorsId": 1001, "locationsId": 8118,
+     "coordinates": {"latitude": 28.63, "longitude": 77.2}},
+    {"datetime": {"utc": "2026-11-28T05:00:00Z", "local": "2026-11-28T10:30:00+05:30"},
+     "value": 301.0, "sensorsId": 1002, "locationsId": 8118,
+     "coordinates": {"latitude": 28.63, "longitude": 77.2}}
+  ]
+}
+```
+
+इसे बाहर से अंदर की तरफ़ पढ़ो। Curly braces एक dictionary हैं, इसलिए आप string key use करते हो। Square brackets एक list हैं, इसलिए आप 0 से गिनती करके एक number use करते हो।
+
+```python
+data["results"][0]["value"]               # 182.0
+data["results"][0]["datetime"]["local"]   # '2026-11-28T10:30:00+05:30'
+[row["value"] for row in data["results"]] # [182.0, 301.0]
+```
+
+जो दो errors आपको सबसे ज़्यादा दिखेंगे, उनमें से हर एक किसी एक गलती की तरफ़ इशारा करता है:
+
+- `TypeError: list indices must be integers or slices, not str` का मतलब है आपने list पर string key लगाई। जैसे, `data["results"]["value"]` fail होता है क्योंकि `results` एक list है। कोई item चुनो (`[0]`) या loop करो।
+- `KeyError: 'value'` का मतलब है उस dictionary में ऐसी कोई key नहीं है। Spelling check करो, या फिर वो field optional है।
+
+Optional fields के लिए, key **missing** हो तो `row.get("value", 0)` `0` return करता है। पर कई APIs key को `null` के साथ भेजते हैं, जिसे Python `None` पढ़ता है, और तब `.get` आपका default नहीं, `None` return करता है। दोनों cases cover करने के लिए `row.get("value") or 0` लिखो। ध्यान रहे: `or` एक असली `0` को भी replace कर देता है, इसलिए जिन numbers में zero का मतलब होता है, वहाँ इसकी जगह `is None` test करो।
+
+### जब body JSON न हो
+
+जब body JSON नहीं होती तो `r.json()` `requests.JSONDecodeError` raise करता है, और ऐसा आपकी उम्मीद से ज़्यादा होता है। `502` या `503` अक्सर API के आगे लगे किसी proxy या load balancer से आता है, और उसकी body एक HTML error page होती है। कुछ services `200` के साथ HTML maintenance page return करती हैं। Decoding fail हो तो `r.text` के पहले 200 characters print करो ताकि दिखे क्या आया; worked example का helper यही करता है।
+
+### Timeouts
+
+Default में `requests` का कोई timeout नहीं होता, इसलिए कभी जवाब न देने वाले server को की गई call हमेशा wait कर सकती है और nightly job को freeze कर सकती है। हमेशा `timeout=` दो। `timeout=10` जैसा एक single number दोनों limits set करता है। `(5, 20)` जैसा pair **connect** limit (server तक पहुँचना) और **read** limit (data का wait करना) अलग-अलग set करता है।
+
+एक gotcha: read limit अगले data के टुकड़े के लिए सबसे लंबा wait है, पूरे download की limit नहीं। जो server हर कुछ seconds में थोड़ा-सा data भेजता रहे, वो एक call को 20 seconds से कहीं ज़्यादा देर तक ज़िंदा रख सकता है। जब timeout सच में fire होता है, तो `requests` `requests.Timeout` raise करता है; उसे catch करो और retry करो या साफ़-साफ़ report करो।
+
+### Keys और secrets
+
+जो code आप share या commit करते हो उसमें API keys कभी मत लिखो। Key अपने terminal में set करो (Linux या macOS पर `export OPENAQ_API_KEY=...`; Windows PowerShell में `$env:OPENAQ_API_KEY="..."`) और उसे `os.environ["OPENAQ_API_KEY"]` से पढ़ो।
+
+अगर वो line `KeyError: 'OPENAQ_API_KEY'` raise करे, तो कोई request भेजी ही नहीं गई: variable **इस** terminal में set नहीं है। नया terminal वो variable याद नहीं रखता जो आपने किसी दूसरे terminal में set किया था। इसके उलट, `401` का मतलब है request गई और server ने key reject कर दी या उसे ढूँढ नहीं पाया। दो और rules: key को कभी print या log मत करो, और अगर वो कभी किसी public repository में पहुँच जाए, तो तुरंत नई key बनाओ और पुरानी delete करो।
 
 ### सुरक्षित तरीके से retry करना
 
-कुछ failures अपने आप ठीक हो जाते हैं। `429` या `503` अक्सर कुछ seconds बाद चल जाता है। एक सीधा, शिष्ट retry ऐसा दिखता है:
+कुछ failures कुछ seconds बाद ख़ुद ठीक हो जाते हैं: timeouts, टूटे connections, `429` और `5xx`। बाकी कभी ठीक नहीं होंगे: `401` या `404` को बिना कुछ बदले retry करने से बस वही गलती दोहराई जाती है। एक अच्छा retry:
+
+- सिर्फ़ उन failures को retry करता है जिनके temporary होने की संभावना ज़्यादा है;
+- हर बार ज़्यादा देर wait करता है (**exponential backoff**: 1, 2, 4 seconds), और server `Retry-After` header भेजे तो उसका पालन करता है;
+- कुछ tries के बाद हार मानकर एक साफ़ error raise करता है, error reply के साथ आगे नहीं बढ़ता।
+
+**GETs को खुलकर retry करो, पर POST को retry करने से पहले सोचो।** GET सिर्फ़ पढ़ता है, इसलिए उसे दोहराने में कोई नुकसान नहीं। POST अक्सर कुछ *बनाता* है: एक payment, एक order, एक message। अगर पहली attempt server तक पहुँच गई पर reply वापस आते हुए खो गया, तो बिना सोचे किया गया retry उसे दो बार बना देता है। Stripe जैसे payment APIs इसे एक **idempotency key** से हल करते हैं: एक unique id जो आप एक बार बनाते हो और उसी request के हर retry के साथ header में भेजते हो, ताकि server को पता चले कि ये repeat है।
 
 ```python
-import time
+import uuid
 
-for attempt in range(3):
-    r = requests.get(url, params=params, timeout=10)
-    if r.status_code not in (429, 500, 502, 503, 504):
-        break
-    retry_after = r.headers.get("Retry-After", "")
-    wait = int(retry_after) if retry_after.isdigit() else 2 ** attempt
-    time.sleep(wait)
+key = str(uuid.uuid4())                       # make it once, before the first try
+headers = {"Idempotency-Key": key}            # send the same key on every retry
 ```
 
-ये सिर्फ़ उन errors को retry करता है जो likely अस्थायी हैं, हर बार ज़्यादा इंतज़ार करता है, और server अगर `Retry-After` header भेजे तो उसे मानता है। `401` या `404` को कभी retry मत करो: request ही गलत है, और दोहराने से कुछ नहीं बदलता।
+अगर कोई API ऐसी key नहीं देता, तो उसकी POSTs को auto-retry मत करो; दोबारा try करने से पहले check करो कि पहली वाली काम कर गई या नहीं।
 
-### API documentation पढ़ना
+### Pagination
 
-हर API की documentation इन्हीं सवालों के जवाब देती है, आमतौर पर इसी क्रम में: **base URL**, **authenticate** कैसे करें (कौन-सा header key ले जाता है), **endpoints** (`/latest` या `/holidays` जैसे paths), हर endpoint के **parameters**, एक **example response**, उसके **error codes**, और **rate limits**। Code लिखने से पहले ये sections पढ़ो, और example response को एक file में copy कर लो ताकि हर बार API call किए बिना अपना parsing test कर सको। आगे किसी AI model की API call करना बिल्कुल यही process है: endpoint ढूँढो, header में key भेजो, JSON body post करो और JSON reply पढ़ो।
+List endpoint शायद ही कभी सब कुछ एक साथ return करता है। वो एक बार में एक **page** return करता है, और आप अगला माँगते हो। OpenAQ `page` और `limit` parameters use करता है (default `limit` 100 है) और total `meta.found` में बताता है। दूसरे APIs इसकी जगह एक `next` URL या cursor return करते हैं; documentation बताती है कौन-सा।
+
+चुपचाप होने वाला failure है सिर्फ़ page 1 पढ़ना। Code चलता है, 100 results दिखाता है और सही लगता है। अगर कोई count 100 या 1000 जैसे round number में आए, तो सबसे पहले pagination पर शक करो।
+
+अपनी loop condition के लिए total पर भरोसा मत करो। बड़े sets के लिए OpenAQ का `found` `">1000"` जैसी string हो सकता है, जिससे arithmetic टूट जाता है। इसकी जगह, जब कोई page `limit` से छोटा या खाली आए तब रुको, और safety net के तौर पर pages की गिनती पर cap लगाओ (नीचे `get_all` देखो)।
 
 ### Limits और cost
 
-ज़्यादातर APIs प्रति मिनट requests की limit रखती हैं और कुछ हर call पर पैसे लेती हैं। Documentation का limits वाला section पढ़ो, और `429` मिले तो server पर हथौड़ा चलाने की जगह बढ़ते delays के साथ रुककर retry करो।
+ज़्यादातर APIs प्रति minute या प्रति दिन requests limit करते हैं, और paid APIs, language-model APIs समेत, use के पैसे लेते हैं। कई APIs ऐसे headers भेजते हैं जो बताते हैं कि आप कहाँ खड़े हो; OpenAQ `x-ratelimit-remaining` और `x-ratelimit-reset` भेजता है, और limit पार करने पर `429` return करता है। 500 cities पर loop करने से पहले documentation का limits page पढ़ो, calls के बीच एक छोटा `time.sleep` जोड़ो, और जो results दोबारा use करोगे उन्हें फिर से fetch करने की जगह cache करो।
+
+### API documentation पढ़ना
+
+Code लिखने से पहले documentation में ये ढूँढो: **base URL**, **authenticate** कैसे करना है, **endpoints** और उनके **parameters**, एक **example response**, **error codes**, **pagination** और **rate limits**। Example response को एक file में save कर लो ताकि हर बार API call किए बिना अपनी parsing test कर सको। आगे AI model को call करना भी यही routine है।
 
 ## एक example से समझो
 
-Anita अपने शहर की air quality का एक छोटा dashboard बना रही है। वो एक public API use करती है जो किसी location की current readings देती है।
+Anita को दो चीज़ें चाहिए: हर उस Indian station की list जो OpenAQ को पता है, और Delhi के एक station की latest readings। वो एक छोटा helper बनाती है जिससे होकर हर call जाती है, ताकि timeout, retries, logging और error checks एक ही जगह रहें।
 
 ```python
-import os, requests
+import logging
+import os
+import time
 
-url = "https://api.airquality.example/v1/latest"
-r = requests.get(url, params={"city": "Delhi"},
-                 headers={"X-API-Key": os.environ["AQ_KEY"]}, timeout=10)
+import requests
 
-if r.status_code == 200:
-    for reading in r.json()["results"][:5]:
-        print(reading["location"], reading["parameter"], reading.get("value", "no reading"))
-elif r.status_code == 429:
-    print("Rate limited; try again in a minute")
-else:
-    print("Request failed:", r.status_code, r.text[:200])
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("aq")
+
+BASE = "https://api.openaq.org/v3"
+RETRYABLE = {429, 500, 502, 503, 504}
+
+session = requests.Session()                      # reuses connections
+session.headers["X-API-Key"] = os.environ["OPENAQ_API_KEY"]
+
+def get_json(path, params=None, tries=4):
+    for attempt in range(tries):
+        last = attempt == tries - 1
+        wait = 2 ** attempt                       # 1, 2, 4 seconds
+        try:
+            r = session.get(BASE + path, params=params, timeout=(5, 20))
+        except (requests.Timeout, requests.ConnectionError) as e:
+            log.warning("%s: %s (try %d)", path, type(e).__name__, attempt + 1)
+            if last:
+                raise
+            time.sleep(wait)
+            continue
+        if r.status_code in RETRYABLE and not last:
+            ra = r.headers.get("Retry-After", "")
+            wait = int(ra) if ra.isdigit() else wait
+            log.warning("%s: %d, retry in %ds", path, r.status_code, wait)
+            time.sleep(min(wait, 60))
+            continue
+        r.raise_for_status()                      # 4xx, or still failing
+        try:
+            return r.json()
+        except requests.JSONDecodeError:
+            raise RuntimeError(f"not JSON: {r.text[:200]!r}") from None
 ```
 
-(यहाँ URL सिर्फ़ समझाने के लिए है; lesson का resource असली, चलने वाले examples दिखाता है।)
+हर हिस्सा क्यों है:
 
-| Run | क्या हुआ | कारण | Fix |
+- **`Session`** connection को reuse करता है, जो बहुत सारी calls के लिए ज़्यादा तेज़ है, और key वाला header रखता है ताकि कोई call उसे भूले नहीं।
+- **Timeouts और connection errors catch करके retry किए जाते हैं**, क्योंकि यही सबसे आम temporary failure हैं। आख़िरी try पर error raise होता है, छिपाया नहीं जाता।
+- **आख़िरी try के बाद कोई sleep नहीं**, और wait 60 seconds पर cap है, ताकि कोई अजीब `Retry-After` value job को एक घंटे तक न रोक दे।
+- **जो reply retry नहीं होता, उस हर reply पर `raise_for_status()` चलता है**, ताकि `401`, `404`, या कभी ठीक न हुआ `503` program को एक साफ़ message के साथ रोक दे।
+- **हर failure path और status के साथ log होता है**, जो आपको तब चाहिए जब कोई nightly job रात 3 बजे fail हो।
+
+फिर दोनों tasks:
+
+```python
+def get_all(path, params, limit=100, max_pages=50):
+    rows = []
+    for page in range(1, max_pages + 1):
+        data = get_json(path, {**params, "limit": limit, "page": page})
+        batch = data["results"]
+        rows.extend(batch)
+        if len(batch) < limit:                    # short or empty page
+            break
+    return rows
+
+stations = get_all("/locations", {"iso": "IN"})
+print(len(stations), "stations")
+for s in stations[:3]:
+    print(s["id"], s["name"])
+
+latest = get_json("/locations/8118/latest")
+for row in latest["results"]:
+    print(row["sensorsId"], row["value"], row["datetime"]["local"])
+```
+
+हर `sensorsId` station का एक instrument है, जैसे उसका PM2.5 या NO2 sensor। एक अलग endpoint, `/locations/8118/sensors`, बताता है कि हर एक कौन-सा pollutant measure करता है। ऐसे दो endpoints को जोड़ना API का आम काम है।
+
+उसके पहले runs ऐसे गए:
+
+| Run | उसे क्या दिखा | वजह | Fix |
 | --- | --- | --- | --- |
-| 1 | `401 Unauthorized` | नए terminal में उसकी key set नहीं थी | चलाने से पहले `export AQ_KEY=...` |
-| 2 | `200`, फिर एक location पर `KeyError: 'value'` | कुछ locations में `value` field नहीं है | पूरा JSON print किया; `.get("value", "no reading")` use किया |
-| 3 | कई मिनट अटका रहा | Testing के दौरान उसने `timeout=` हटा दिया था | `timeout=10` वापस लगाया |
-| 4 | पाँच readings print हुईं | चल रहा है | Dashboard के लिए तैयार |
+| 1 | `KeyError: 'OPENAQ_API_KEY'`, कोई request नहीं गई | उसने नया terminal खोला था और वहाँ variable set नहीं था | उस terminal में variable set किया, फिर दोबारा चलाया |
+| 2 | `401 Client Error: Unauthorized` | उसने किसी दूसरे API के tutorial से `Authorization: Bearer ...` copy किया था | Key को `X-API-Key` में भेजा, जैसा OpenAQ के docs कहते हैं |
+| 3 | `TypeError: list indices must be integers or slices, not str` | उसने `latest["results"]["value"]` लिखा; `results` एक list है | Shape print किया, फिर list पर loop किया |
+| 4 | पूरे India के लिए ठीक 100 stations | उसने `/locations` को एक बार call किया और सिर्फ़ page 1 पढ़ा | Pages पर loop करने के लिए `get_all` लिखा |
+| 5 | एक log line `429, retry in 1s`, फिर पूरी list | तेज़ी से paging करने पर rate limit लग गई | कुछ नहीं: helper ने wait किया और आगे बढ़ गया |
 
-दूसरे run में पूरा JSON एक बार print करने से उसका एक घंटे का अंदाज़ा लगाना बच गया।
+Runs 1 से 3 में हर एक ने अलग error type दिया, और हर type सीधे अपनी वजह की तरफ़ इशारा करता था। Code दोबारा पढ़ने से पहले error का पहला शब्द पढ़ो।
+
+जब script बड़ी हो जाए, तो retry का काम उस library को दे सकते हो जिस पर `requests` बना है। ये एक आम production setup है:
+
+```python
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+retry = Retry(total=4, backoff_factor=1,
+              status_forcelist=[429, 500, 502, 503, 504],
+              allowed_methods=["GET"])        # never auto-retry POST
+session = requests.Session()
+session.mount("https://", HTTPAdapter(max_retries=retry))
+```
+
+ये back off करता है, 429 और 503 पर `Retry-After` का पालन करता है, और connection errors आपके लिए retry करता है। जब किसी listed status पर tries ख़त्म हो जाएँ, तो ये आख़िरी reply return करने की जगह `requests.exceptions.RetryError` raise करता है, इसलिए उसे भी catch करो। हर call पर timeout, एक JSON check और एक page loop आपको अब भी चाहिए।
 
 ## आम गलतियाँ
 
-- **Status code check न करना।** फिर code error replies पर उलझाने वाले ढंग से fail होता है।
-- **Timeout न लगाना।** धीमा server आपका program अटका सकता है।
-- **JSON की shape का अंदाज़ा लगाना।** पहले उसे print करके पढ़ो।
-- **Code में API keys।** Environment variables use करो।
-- **Rate limits को अनदेखा करना।** उन्हें मानो, वरना block हो जाओगे।
-- **ये मान लेना कि हर field हमेशा मौजूद होगी।** Optional fields के लिए default के साथ `.get()` use करो।
+- **Status check करने से पहले data पढ़ना।** तब error reply कुछ lines बाद confusing तरीके से fail होता है। पहले `raise_for_status()` call करो।
+- **कोई timeout नहीं।** एक चुप server पूरा program hang कर देता है।
+- **JSON का shape अंदाज़े से मानना।** एक बार `json.dumps(data, indent=2)` से print करो, फिर access path लिखो।
+- **List पर string key।** यही ऊपर वाला `TypeError` है; कोई index चुनो या loop करो।
+- **`null` values के साथ `.get(key, default)` पर भरोसा करना।** Key `null` के साथ मौजूद हो तो ये `None` return करता है।
+- **सिर्फ़ page 1 पढ़ना।** 100 जैसा round count ख़तरे का निशान है।
+- **सब कुछ retry करना, या बहुत तेज़ी से करना।** `401` या `404` को retry करने से calls बर्बाद होती हैं, tight loop आपको block करवा देता है, और idempotency key के बिना POST retry करने से customer से दो बार पैसे कट सकते हैं।
+- **Code, screenshots या logs में keys।** Environment variables use करो, और key leak हो तो तुरंत बदल दो।
 
 ## Practice करो
 
-नीचे link किया requests library का quickstart पढ़ो।
+नीचे linked requests library का quickstart पढ़ो, फिर इनमें से कोई एक असली API use करो (दोनों November 2026 तक check किए गए):
 
-1. **Call करो।** कोई free public API call करो, जैसे public holidays API या कोई भारतीय open data API, और JSON से तीन values print करो।
-2. **Errors संभालो।** 404, 429 और timeout को साफ़ messages के साथ संभालो।
-3. **Key सुरक्षित करो।** कोई भी key environment variable में डालो और confirm करो कि code अब भी चलता है।
+- **OpenAQ**: Indian शहरों का air-quality data। इसके लिए इसकी website से एक free key चाहिए, जो `X-API-Key` header में भेजी जाती है।
+- **Open-Meteo**: weather और air-quality forecasts। इसे key नहीं चाहिए और non-commercial use के लिए free है, इसलिए पहली call के लिए ये सबसे तेज़ रास्ता है।
 
-**आपका काम पूरा जब:** आप API call कर सको, status check कर सको, nested JSON सुरक्षित तरीके से पढ़ सको और समझा सको कि हर request में timeout क्यों चाहिए।
+1. **Call करो और देखो।** एक endpoint call करो, reply को `json.dumps(data, indent=2)` से print करो, और तीन values के access paths लिखो, जिनमें से कम से कम एक किसी list के अंदर हो।
+2. **जान-बूझकर fail करवाओ।** गलत key, गलत path और `timeout=0.001` भेजो। हर एक का exact error note करो, और check करो कि आपका code `r.json()` पर crash होने की जगह एक साफ़ message print करता है।
+3. **Helper जोड़ो।** हर call के आगे `get_json` helper लगाओ और confirm करो कि वो log और retry करता है।
+4. **हर page पढ़ो।** किसी list endpoint के लिए page cap के साथ सारे pages fetch करो, और अपना count सिर्फ़ page 1 वाले count से compare करो।
+5. **Key secure करो।** उसे environment variable में ले जाओ, नया terminal खोलो और confirm करो कि आपको पता है कि उसके set न होने पर क्या होता है।
+
+**आपका काम पूरा है जब आप** key और timeout के साथ API call कर सको, सिर्फ़ error देखकर बता सको कि failure आपका है या server का, nested JSON बिना अंदाज़े के पढ़ सको, हर page fetch कर सको, और समझा सको कि आप कौन-से failures retry करते हो और क्यों।

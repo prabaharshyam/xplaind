@@ -1,200 +1,346 @@
 ---
 id: web-apis-json
 lang: tanglish
-title: "Web API-a call panni JSON-a padikkiradhu"
-outcome: "Python-la oru public web API-a call pannalaam, status code-a check pannalaam, JSON reply-la irundhu values-a padikkalaam."
-answer: "Python-la oru web API-a call panna, requests.get(url) use pannunga, status code 200-aa irukkaa-nu check pannunga, apram response.json()-la irundhu values-a oru dictionary maadhiri padinga."
-why_it_matters: "Oru language model-a call panradhu-na oru web API-a call panradhu thaan. requests, JSON, status codes ippove pazhakkam aayiduchchuna, LLM steps oru suvar maadhiri illaama, oru chinna adutha step maadhiri theriyum."
+title: "Oru web API-a call panni JSON-a padinga"
+outcome: "Python-la irundhu oru unmaiyaana web API-a timeout, key kooda call panni, status code-a check panni, nested JSON-a safe-aa padichu, retries-aiyum pages-aiyum handle panna mudiyum."
+answer: "requests.get(url, params=..., timeout=10)-a call pannunga, errors vandhaa niruththa raise_for_status()-a run pannunga, appuram response.json()-a nested dictionaries, lists-aa padinga."
+why_it_matters: "Oru language model-a call panradhunnaa oru web API-a call panradhu thaan. requests, JSON, status codes ippove pazhakkamaayittaa, LLM steps oru suvar maadhiri illaama oru chinna adutha step maadhiri theriyum."
 flashcards:
   - q: "Web API-na enna?"
-    a: "Unga program innoru service kitta internet vazhiyaa data illa actions kekkura vazhi; oru URL-ku HTTP request anuppi."
-  - q: "Status codes 200, 401, 404, 429 enna artham?"
-    a: "200 work aachu; 401 sign in aagala (perumbaalum key illa illa thappu); 404 URL illa item illa; 429 romba adhigamaana requests, mella poonga."
-  - q: "500 mudhal 504 varaikkum status codes perumbaalum enna artham?"
-    a: "Server fail aayiduchu. Indha errors perumbaalum temporary; marubadi try pannaa work aagalaam."
-  - q: "r.json() enna pannum?"
-    a: "Reply-la irukkura JSON text-a neenga padikkakoodiya Python dictionaries, lists-aa maathum, udhaaranam: data['current']['temp_c']."
-  - q: "Ovvoru request-kum timeout yen vennum?"
-    a: "Illannaa, mellaana illa udaincha server-ku poora request eppovum thongi unga program-a freeze pannidalaam."
-  - q: "API keys enga vaikkanum?"
-    a: "os.environ-la padikkura environment variables-la; neenga share panra code-la eppovum ezhudhaatheenga."
-  - q: "requests-la params-kum json-kum enna vithyaasam?"
-    a: "params, GET requests-ku URL-la query parameters-a serkkum. json, JSON body-a anuppum, perumbaalum POST-oda."
+    a: "Unga program internet vazhiyaa innoru service-kitta data allathu actions kekkura oru vazhi: oru URL-kku HTTP request anuppi, reply-a padikkiradhu."
+  - q: "Status codes 200, 401, 403, 404, 429 enna arththam?"
+    a: "200 velai senjudhu. 401 key illai allathu thappu. 403 key valid thaan, aanaa idhukku anumadhi illai. 404 URL allathu item illai. 429 romba adhigamaana requests, medhuvaa ponga."
+  - q: "Endha failed requests-a retry panradhu safe?"
+    a: "Timeouts, connection errors, 429, 500, 502, 503, 504, ovvoru thadavaiyum wait-a adhigamaakkitte. 400, 401, 403, 404, 422-a edhaiyum maaththaama retry pannave koodaadhu. Oru POST-a, API support panra oru idempotency key irundhaa mattum thaan retry pannunga."
+  - q: "r.json() enna pannum, adhu eppo fail aagum?"
+    a: "Reply-oda JSON text-a Python dictionaries, lists-aa maathum. Body JSON illainnaa, udhaaranamaa oru proxy-la irundhu varra HTML error page maadhiri, adhu oru JSONDecodeError-a raise pannum."
+  - q: "Ovvoru request-kkum yen kandippaa timeout venum?"
+    a: "Default-aa requests mudivillaama wait pannitte irukkum. Appo oru slow allathu udainja server unga program-aiyo oru muzhu nightly job-aiyo freeze pannidalaam. timeout=10 kudunga, allathu (5, 20) maadhiri oru (connect, read) pair kudunga."
+  - q: "API keys enga irukkanum?"
+    a: "os.environ vechu padikkira oru environment variable-la; neenga share allathu commit panra code-la orupodhum illai. os.environ['NAME'] KeyError-a raise pannaa, andha terminal-la variable set aagalainnu arththam."
+  - q: "Oru list endpoint-la irundhu ellaa results-aiyum eppadi padikkiradhu?"
+    a: "API-oda page, limit (allathu next link) parameters vechu pages mela loop pannunga. Oru page kuraivaa allathu kaaliyaa vandhaa niruththunga, oru bug mudivillaama loop aagaama irukka pages ennikkaikku oru cap vainga."
   - q: "raise_for_status() enna pannum?"
-    a: "Status code 4xx illa 5xx-aa irundhaa error raise pannum; adhanaala unga code oru error reply-oda thodaraadhu."
+    a: "Status code 4xx allathu 5xx-aa irundhaa oru HTTPError-a raise pannum, adhanaala unga code oru error reply-a data-nnu ninaichu thodarndhu pogaadhu."
 exercise:
   title: "API call-a debug pannunga"
-  setup: "Pune-la Arjun oru public holidays API-a requests.get(url, params={'country': 'IN', 'year': 2026}) vachchu call panraaru. Naalu runs-la kidaichadhu: (1) status 401, 'missing API key'-nu message; (2) adha fix pannadhukku apram status 200, aana data['holidays'][0]['name'] KeyError raise pannudhu, yenna unmaiyaana JSON top level-layae oru list; (3) API mellaa irukkum podhu program nimishakkanakkaa thonguthu; (4) 50 cities-ku loop-la run pannaa 30-vadhu call-ku apram status 429."
+  setup: "Pune-la irukkura Arjun, requests.get(url, params={'country': 'IN', 'year': 2026}) vechu oru public holidays API-a call panraaru. Naalu runs-la idhu varudhu: (1) 'missing API key'-ngura message kooda status 401, aanaa os.environ['HOLIDAY_KEY'] endha error-um illaama avaroda key-a padichudhu; (2) adhai fix pannadhukku appuram status 200, aanaa data['holidays'][0]['name'] TypeError: list indices must be integers or slices, not str-a raise pannudhu; (3) API slow-aa irukkumbodhu program nimishakkanakkaa hang aagudhu; (4) 50 cities-kku oru loop-la run pannaa 30-aavadhu call-kku appuram status 429 varudhu."
   questions:
-    - q: "(1)-ku saathiyamaana kaaranam enna, paadhukaappaana fix enna?"
-      a: "Key anuppappadala illa set aagala. Adha environment variable-la irundhu padichchu, API documentation sollura header-la anuppunga."
-    - q: "(2)-a avar eppadi handle pannanum?"
-      a: "Mudhalla muzhu reply-yum print panni adhoda shape-a paarunga. Top level oru list-naa, adhukku badhila data[0]['name'] padinga."
+    - q: "(1)-kku vaaippulla kaaranam enna, safe-aana fix enna?"
+      a: "Key padikkappattuchu, aanaa server-kku poi seralai: adhu anuppappadalai, allathu thappaana header allathu parameter-la anuppappattuchu. API-oda documentation enga solludho sariyaa angeye anuppunga, appavum environment variable-la irundhe padinga."
+    - q: "(2)-la varra TypeError avarukku enna solludhu, adhai eppadi fix pannanum?"
+      a: "Avar oru list mela string key use pannirukkaaru, adhanaala JSON-oda top level oru list, object illai (allathu, kuraivaana vaaippaa, holidays[0] oru list). Adhoda shape-a paarkka reply-a print panni, appuram data[0]['name']-a padikkanum allathu data mela loop pannanum."
     - q: "(3)-a edhu thadukkum?"
-      a: "requests.get-ku timeout=10 (illa adhu pola) kudukkuradhu, timeout error-a oru thelivaana message-oda handle panradhu."
-    - q: "(4) enna artham, avar enna pannanum?"
-      a: "Rate limit-a thottuttaaru. Mella poonga, kaathirundhu backoff-oda retry pannunga, Retry-After header irundhaa madhinga."
+      a: "requests.get-kku timeout=10 (allathu (5, 20) maadhiri oru pair) kudukkiradhu, requests.Timeout-a catch panradhu, vittudradhukku munnaadi oru thelivaana message kooda sila thadavai retry panradhu."
+    - q: "(4) enna arththam, avar enna pannanum?"
+      a: "Avar rate limit-a thottuttaaru. Wait panni, delays-a adhigamaakkitte retry pannanum, Retry-After header vandhaa adhai madhikkanum, documented limit-kku keezhaye irukka 50 calls-a idaiveli vittu pannanum."
 ask:
-  - "REST API-na simple-aa enna?"
-  - "Python-la en API key-a eppadi paadhukaappaa vaikkiradhu?"
-  - "HTTP status codes enna artham?"
+  - "REST API-na simple-aa sonnaa enna?"
+  - "Python-la en API key-a eppadi safe-aa vaikkiradhu?"
+  - "En code endha API errors-a retry pannanum, edhai panna koodaadhu?"
 explain_in_interview:
-  answer: "Web API unga program-a internet mela innoru service kitta data illa actions kekka vidum. Oru URL-ku oru HTTP request anuppuveenga, service adhu work aacha-nu sollra oru status code-oda-um, perumbaalum data-oda oru JSON body-oda-um reply pannum. Python-la URL, parameters, oru timeout-oda requests.get call panni, status 200-aa-nu check panni, apram response.json()-a dictionaries, lists maadhiri padippeenga. Example: oru air-quality dashboard ovvoru city-kum oru public API-a call pannum. Oru language model-a call panradhum ade maadhiri thaan work aagum. Limits: rate limits, failures, unga API key-a code-ku veliya vechukradhu."
-  follow_up: "Oru API status 429 return pannaa enna pannuveenga?"
-  follow_up_answer: "429-na too many requests, so rate limit-a hit pannirukeenga. Slow down pannunga, wait panni exponential backoff-oda retry pannunga, service Retry-After header anuppina adha respect pannunga. Oru tight loop-la udane retry pannaadheenga."
-translated_on: 2026-11-16
+  answer: "Oru web API unga program-a internet vazhiyaa innoru service-kitta data allathu actions kekka vidudhu. Neenga oru URL-kku HTTP request anuppureenga, service oru status code-odayum perumbaalum oru JSON body-odayum reply pannudhu. Python-la naan oru requests Session use panren: key oru environment variable-la irundhu oru header-la pogum, ovvoru call-kkum timeout irukkum. Status-a check panni, appuram response.json()-a dictionaries, lists-aa padikkiren. Timeouts, 429, 5xx-a mattum backoff kooda retry panren, list endpoints-kku pages mela loop panren. Oru language model-a call panradhum idhe maadhiri thaan velai seiyudhu."
+  follow_up: "Oru API status 429 return pannaa neenga enna pannuveenga?"
+  follow_up_answer: "429-na romba adhigamaana requests, adhaavadhu naan rate limit-a thottutten. Exponential backoff kooda wait panni retry pannuven, service Retry-After header anuppinaa adhai madhippen, en mothha request rate-a kuraippen. Oru tight loop-la udane retry pannave maatten."
+translated_on: 2026-11-28
 ---
 
 ## Idhu enna
 
-Unga program ellaathayum thaane therinjukka vendiyadhu illa. Oru **web API** innoru service kitta internet vazhiyaa data illa actions-a kekka vidum: innaiku weather, oru map route, oru payment-oda status, arasaanga open data, illannaa oru AI model-oda badhil. Ovvoru AI model provider-um ippadi thaan work panraanga, adhanaala Python-la irundhu oru API-a call panradhu thaan, apram language models-a call panradhukku adippadai skill.
+Oru **web API** unga program-a internet vazhiyaa innoru service-kitta data allathu actions kekka vidudhu: air quality, oru map route, oru payment-oda status, arasaanga open data, allathu oru AI model-oda badhil. Ovvoru AI model provider-aiyum indha vazhiyila thaan anugurom, adhanaala pinnaadi language models-a call panradhukku adippadaiyaana core skill idhu thaan.
 
-Oru URL-ku **HTTP request** anuppureenga. Service idhoda reply pannum:
+Unga program oru URL-kku oru **HTTP request** anuppudhu. Service idhoda reply pannudhu:
 
-- oru **status code**: work aachaa?
-- perumbaalum **JSON**-la oru body: adhu thaan data.
+- oru **status code**, adhu velai senjudhaannu solra oru moonu ilakka ennu;
+- perumbaalum **JSON**-la oru **body**, adhaavadhu objects (`{"key": value}`), lists (`[1, 2, 3]`) irukkura oru text format; adhai Python dictionaries, lists-aa maathudhu.
 
 ```flow
+title: Oru API call, aarambam mudhal mudivu varai
 dir: LR
-Unga Python program | requests.get(...) -[GET /weather?city=Chennai, header X-API-Key]-> Weather service
-Weather service -[200 OK, JSON body]-> r.json() | city: "Chennai", temp_c: 31.5
+Unga code | session.get(url, params, timeout) -[GET, X-API-Key header-la key]-> API server
+API server -[status code, JSON body]-> Status-a check pannunga
+Status-a check pannunga -[2xx]-> r.json() | dicts, lists
+Status-a check pannunga -[429 allathu 5xx]-> Wait panni retry pannunga
+Status-a check pannunga -[maththa 4xx]-> Request-a fix pannunga
 ```
 
-Thanga ooruku oru chinna air-quality dashboard build panra Anita-va indha lesson follow pannum. Lesson mudiyum podhu oru public API-a call panni, status-a check panni, nested JSON-a paadhukaappaa padikka mudiyum.
+Indha lesson-la Delhi-la oru chinna air-quality dashboard build panra student Anita kooda porom. Avanga **OpenAQ** use panraanga; idhu ulagam muzhukka irundhu, Indhiya monitoring stations utpada, air-quality readings-a segarikkira oru non-profit platform. Adhoda API-kku oru free key venum, adhanaala muzhu routine-aiyum practise panna idhu oru nalla idam: key, timeout, status, JSON, retries, pages.
 
 ## Idhu eppadi work aagudhu
 
-### requests library
+### Oru request-oda pagudhigal
 
-```python
-import requests
+Ovvoru API-oda documentation-um requests-a idhe pagudhigalaa thaan vivarikkudhu:
 
-r = requests.get("https://api.example.com/weather",
-                 params={"city": "Chennai"}, timeout=10)
-print(r.status_code)
-data = r.json()          # JSON text becomes Python dictionaries and lists
-print(data["temp_c"])
-```
+| Pagudhi | Adhu enna | `requests`-la | OpenAQ udhaaranam |
+| --- | --- | --- | --- |
+| Base URL | Ellaa calls-um aarambikkira address | URL-oda oru pagudhi | `https://api.openaq.org/v3` |
+| Endpoint | Oru vagai data-kkaana path | URL-oda oru pagudhi | `/locations/8118/latest` |
+| Query parameters | URL-la `?`-kku appuram serkkira filters | `params={...}` | `iso=IN`, `limit=100`, `page=2` |
+| Headers | Key utpada metadata | `headers={...}` | `X-API-Key: your key` |
+| Body | Neenga anuppura data, perumbaalum POST kooda | `json={...}` | data padikka thevaiyillai |
 
-`params` URL-la query parameters-a serkkum, adhanaala indha request `.../weather?city=Chennai`-ku pogum.
+`params={"iso": "IN"}` URL-la `?iso=IN`-aa maarudhu; `requests` spaces, special characters-aiyum escape pannum. Oru JSON body anuppa `json=` use pannunga (`data=` illai): adhu unga dictionary-a convert panni, sariyaana content type-a set pannum.
 
-### Status codes
-
-| Code | Artham | Enna pannanum |
-| --- | --- | --- |
-| `200` | OK: work aachu | Data-a use pannunga |
-| `400` | Bad request: unga request-la edhaavadhu thappu | Parameters, body-a check pannunga |
-| `401` / `403` | Sign in aagala, illa anumadhi illa | API key, permissions-a check pannunga |
-| `404` | Kidaikkala | URL illa item id-a check pannunga |
-| `429` | Romba adhigamaana requests | Mella poonga; kaathirundhu retry pannunga |
-| `500` mudhal `504` | Server fail aachu | Perumbaalum temporary; apram retry pannunga |
-
-Data-a use panradhukku munnaadi check pannunga. `r.raise_for_status()` 4xx, 5xx codes-ku error raise pannum, adhanaala unga code oru error reply-a data maadhiri eduthukittu thodaraadhu.
-
-### Python-la JSON
-
-`r.json()` reply-a dictionaries (JSON objects-ku) lists (JSON arrays-ku) aa maathum. Nested values-a step by step padinga:
-
-```python
-data["current"]["temp_c"]          # an object inside an object
-data["results"][0]["location"]     # the first item of a list
-```
-
-Adha padikkura code ezhudharadhukku munnaadi, oru thadavai muzhu reply-yum print panni adhoda unmaiyaana shape-a paarunga.
-
-### Parameters, headers, bodies
-
-| Part | Edhukku use aagum | Example |
-| --- | --- | --- |
-| `params` | URL-la query parameters | `params={"city": "Pune"}` |
-| `headers` | Keys, content type, matha metadata | `headers={"Authorization": "Bearer ..."}` |
-| `json` | Neenga anuppura JSON body, perumbaalum POST-oda | `requests.post(url, json={"text": "..."})` |
-
-### Timeouts
-
-`timeout=` illaama, mellaana illa udaincha server-ku poora request **eppovum** thongi, unga program-a illa muzhu automation-a freeze pannidalaam. Eppovum oru timeout set pannunga, `requests.Timeout`-a handle pannunga.
-
-### Keys, secrets
-
-API keys-a neenga share panra illa commit panra code-la ezhudhaatheenga. Environment variable-la irundhu padinga:
+### Unga mudhal call
 
 ```python
 import os
-key = os.environ["AQ_KEY"]
+import requests
+
+BASE = "https://api.openaq.org/v3"
+key = os.environ["OPENAQ_API_KEY"]
+
+r = requests.get(f"{BASE}/locations/8118/latest",
+                 headers={"X-API-Key": key}, timeout=(5, 20))
+print(r.status_code)          # 200 if it worked
+r.raise_for_status()          # stop here on any 4xx or 5xx
+data = r.json()               # JSON text becomes dicts and lists
+print(list(data))             # ['meta', 'results']
 ```
+
+Location 8118 oru New Delhi station, OpenAQ thannoda quick start-laye idhai use pannudhu. Indha chinna block-laye moonu pazhakkangal irukku:
+
+- **Key oru environment variable-la irundhu varudhu**, adhanaala adhu code-la eppavume theriyaadhu.
+- **Oru timeout irukku.** `(5, 20)`-na connect aaga 5 seconds varai, server data anuppa 20 seconds varai wait pannum.
+- **`raise_for_status()`, `r.json()`-kku munnaadi run aagudhu.** Oru error reply data illai, adhai data-vaa nadaththinaa moonu lines-kku appuram kuzhappamaana failures varum.
+
+### Status codes
+
+Mudhal ilakkam yaaroda prachanainnu sollum: **2xx** velai senjudhu, **4xx** unga request thappu, **5xx** server fail aayiduchu.
+
+| Code | Arththam | Enna pannanum | Retry? |
+| --- | --- | --- | --- |
+| `200` | OK | Data-va use pannunga | — |
+| `400` | Bad request | Parameters, body-a check pannunga | Illai |
+| `401` | Unauthorized: key illai, thappu allathu expire aayiduchu | Key-aiyum adhu pora header-aiyum check pannunga | Illai |
+| `403` | Forbidden: key valid, aanaa idhukku anumadhi illai | Unga plan allathu permissions-a check pannunga | Illai |
+| `404` | Not found | URL path-aiyum item id-aiyum check pannunga | Illai |
+| `422` | Unprocessable: request validation-la fail aayiduchu | Body-la irukkura error detail-a padinga | Illai |
+| `429` | Too many requests | Wait panni, innum medhuvaa retry pannunga | Aamaa |
+| `500`, `502`, `503`, `504` | Server allathu oru proxy fail aayiduchu | Wait panni retry pannunga | Aamaa |
+
+Nyaabagam vechukka oru useful vazhi: **401 "Neenga yaaru?"nnu kekkudhu, 403 "Neenga yaarunnu theriyum, aanaa mudiyaadhu"nnu solludhu.** 401-kku fix key; 403-kku fix unga account allathu plan. Niraiya Python APIs, FastAPI framework vechu build pannadhu utpada, oru field illainnaa allathu adhu thappaana type-la irundhaa 422 return pannum, endha field-nu body sollum.
+
+### JSON-a padikkiradhu
+
+Adhai padikkira code ezhudhuradhukku munnaadi, reply-a oru thadavai azhagaa format panni print pannunga:
+
+```python
+import json
+print(json.dumps(data, indent=2)[:1500])
+```
+
+Latest-readings endpoint-la irundhu varra oru reply-a trim pannaa adhukku indha shape irukkum (shape OpenAQ-oda documentation-a follow pannudhu; values karpanaiyaanavai):
+
+```json
+{
+  "meta": {"name": "openaq-api", "page": 1, "limit": 100, "found": 2},
+  "results": [
+    {"datetime": {"utc": "2026-11-28T05:00:00Z", "local": "2026-11-28T10:30:00+05:30"},
+     "value": 182.0, "sensorsId": 1001, "locationsId": 8118,
+     "coordinates": {"latitude": 28.63, "longitude": 77.2}},
+    {"datetime": {"utc": "2026-11-28T05:00:00Z", "local": "2026-11-28T10:30:00+05:30"},
+     "value": 301.0, "sensorsId": 1002, "locationsId": 8118,
+     "coordinates": {"latitude": 28.63, "longitude": 77.2}}
+  ]
+}
+```
+
+Veliyila irundhu ulla nokki padinga. Curly braces oru dictionary, adhanaala string key use pannuveenga. Square brackets oru list, adhanaala 0-la irundhu enni oru number use pannuveenga.
+
+```python
+data["results"][0]["value"]               # 182.0
+data["results"][0]["datetime"]["local"]   # '2026-11-28T10:30:00+05:30'
+[row["value"] for row in data["results"]] # [182.0, 301.0]
+```
+
+Neenga ellaaththaiyum vida adhigamaa paarkkappora rendu errors, ovvonnum oru kurippitta thappai kaattum:
+
+- `TypeError: list indices must be integers or slices, not str`-na neenga oru list mela string key use pannirukkeenga. Udhaaranamaa, `data["results"]["value"]` fail aagum, yennaa `results` oru list. Oru item-a edunga (`[0]`) allathu loop pannunga.
+- `KeyError: 'value'`-na andha dictionary-la appadi oru key illai. Spelling-a check pannunga, illainnaa andha field optional.
+
+Optional fields-kku, key **illainnaa** `row.get("value", 0)` `0`-a return pannum. Aanaa niraiya APIs key-a `null` kooda anuppum, adhai Python `None`-aa padikkum, appo `.get` unga default-a illaama `None`-a return pannum. Rendu cases-aiyum cover panna `row.get("value") or 0` ezhudhunga. Kavanam: `or` oru unmaiyaana `0`-aiyum replace pannidum, adhanaala zero-kku arththam irukkura numbers-kku, adhukku badhilaa `is None` test pannunga.
+
+### Body JSON illaadhappo
+
+Body JSON illainnaa `r.json()` `requests.JSONDecodeError`-a raise pannum, idhu neenga ninaikkiradhai vida adhigamaa nadakkum. Oru `502` allathu `503` perumbaalum API-kku munnaadi irukkura oru proxy allathu load balancer-la irundhu varum, adhoda body oru HTML error page. Sila services oru `200` kooda oru HTML maintenance page-a return pannum. Decoding fail aanaa, enna vandhuchunnu paarkka `r.text`-oda mudhal 200 characters-a print pannunga; worked example-la irukkura helper idhai thaan pannudhu.
+
+### Timeouts
+
+Default-aa `requests`-kku timeout illai, adhanaala badhile sollaadha oru server-kku pora call mudivillaama wait panni oru nightly job-a freeze pannidalaam. Eppavum `timeout=` kudunga. `timeout=10` maadhiri oru single number rendu limits-aiyum set pannum. `(5, 20)` maadhiri oru pair **connect** limit-aiyum (server-a adaiyuradhu) **read** limit-aiyum (data-kkaaga wait panradhu) thanithaniyaa set pannum.
+
+Oru gotcha: read limit-na adutha data thundukkaaga wait panra adhigapatcha neram, muzhu download-kkaana limit illai. Ovvoru sila seconds-kkum konjam data anuppura oru server, oru call-a 20 seconds-a vida romba adhiga neram uyirodu vechirukka mudiyum. Oru timeout unmaiyileye fire aanaa, `requests` `requests.Timeout`-a raise pannum; adhai catch panni retry pannunga allathu thelivaa report pannunga.
+
+### Keys, secrets
+
+Neenga share allathu commit panra code-la API keys-a orupodhum ezhudhaadheenga. Key-a unga terminal-la set pannunga (Linux allathu macOS-la `export OPENAQ_API_KEY=...`; Windows PowerShell-la `$env:OPENAQ_API_KEY="..."`), adhai `os.environ["OPENAQ_API_KEY"]` vechu padinga.
+
+Andha line `KeyError: 'OPENAQ_API_KEY'`-a raise pannaa, endha request-um anuppappadave illai: variable **indha** terminal-la set aagalai. Innoru terminal-la neenga set panna variable-a oru pudhu terminal nyaabagam vechukkaadhu. Aanaa oru `401`-na request poyiduchu, server key-a reject panniduchu allathu adhai kandupidikka mudiyalai. Innum rendu rules: key-a orupodhum print allathu log pannaadheenga; adhu eppavaavadhu oru public repository-la poi serndhuttaa, udane oru pudhu key create panni pazhaya key-a delete pannunga.
 
 ### Paadhukaappaa retry panradhu
 
-Sila failures thaanaave sariyaagum. Oru `429` illa `503` konja second kazhichu perumbaalum work aagum. Simple-aana, mariyaadhaiyaana retry ippadi irukkum:
+Sila failures sila seconds-kku appuram thaanaave sariyaayidum: timeouts, drop aana connections, `429`, `5xx`. Maththadhu orupodhum sariyaagaadhu: oru `401` allathu `404`-a edhaiyum maaththaama retry pannaa adhe thappu thirumba nadakkum, avvalavu thaan. Oru nalla retry:
+
+- thaatkaaligamaa irukka vaaippulla failures-a mattum retry pannum;
+- ovvoru thadavaiyum innum adhigamaa wait pannum (**exponential backoff**: 1, 2, 4 seconds), server `Retry-After` header anuppinaa adhai follow pannum;
+- sila tries-kku appuram vittuttu oru thelivaana error-a raise pannum, oru error reply-a vechukkittu thodarndhu pogaadhu.
+
+**GETs-a thaaraalamaa retry pannunga, aanaa oru POST-a retry panradhukku munnaadi yosinga.** Oru GET padikka mattum thaan seiyum, adhanaala adhai repeat panradhula prachanai illai. Oru POST perumbaalum edhaavadhu onnai *create* pannum: oru payment, oru order, oru message. Mudhal attempt server-a adainju, aanaa reply thirumbi varra vazhiyila tholainjuttaa, kanmoodiththanamaana oru retry adhai rendu thadavai create pannidum. Stripe maadhiri payment APIs idhai oru **idempotency key** vechu theerkkudhu: neenga oru thadavai uruvaakki, adhe request-oda ovvoru retry-layum oru header-la anuppura oru unique id; adhanaala idhu repeat-nu server-kku theriyum.
 
 ```python
-import time
+import uuid
 
-for attempt in range(3):
-    r = requests.get(url, params=params, timeout=10)
-    if r.status_code not in (429, 500, 502, 503, 504):
-        break
-    retry_after = r.headers.get("Retry-After", "")
-    wait = int(retry_after) if retry_after.isdigit() else 2 ** attempt
-    time.sleep(wait)
+key = str(uuid.uuid4())                       # make it once, before the first try
+headers = {"Idempotency-Key": key}            # send the same key on every retry
 ```
 
-Idhu temporary-aa irukka vaaippu irukkura errors-a mattum retry pannum, ovvoru thadavaiyum adhigam neram kaathirukkum, server `Retry-After` header anuppinaa adha madhikkum. `401` illa `404`-a eppovum retry pannaadheenga: request-e thappu, thirumba pannaa onnum maaraadhu.
+Oru API appadi oru key kudukkalainnaa, adhoda POSTs-a auto-retry pannaadheenga; thirumba try panradhukku munnaadi mudhal POST velai senjudhaannu check pannunga.
 
-### API documentation-a padikkiradhu
+### Pagination
 
-Ovvoru API-oda documentation-um ade kelvigalukku badhil solludhu, perumbaalum ade varisaila: **base URL**, eppadi **authenticate** panradhu (edhu header-la key povanum), **endpoints** (`/latest` illa `/holidays` maadhiri paths), ovvoru endpoint-oda **parameters**, oru **example response**, adhu use panra **error codes**, adhoda **rate limits**. Code ezhudharadhukku munnaadi indha sections-a padinga, example response-a oru file-la copy pannunga, appo ovvoru thadavaiyum API-a call pannaama unga parsing-a test pannalaam. Pinnaadi oru AI model-oda API-a call panradhum idhe process thaan: endpoint-a kandupidinga, header-la key-a anuppunga, JSON body post pannunga, JSON reply-a padinga.
+Oru list endpoint ellaaththaiyum ore thadavaiyila return panradhu aridhu. Adhu oru thadavaikku oru **page** return pannum, neenga aduththadhai kekkanum. OpenAQ `page`, `limit` parameters use pannudhu (default `limit` 100), mothha ennikkaiyai `meta.found`-la solludhu. Maththa APIs idhukku badhilaa oru `next` URL allathu oru cursor-a return pannum; edhunnu documentation sollum.
+
+Saththamillaama nadakkura failure-na page 1-a mattum padikkiradhu. Code run aagum, 100 results kaattum, sariyaa irukkura maadhiri theriyum. Oru count 100 allathu 1000 maadhiri oru round number-aa vandhaa, mudhalla pagination-a sandhegappadunga.
+
+Unga loop condition-kku mothha ennikkaiyai nambaadheenga. Periya sets-kku OpenAQ-oda `found` `">1000"` maadhiri oru string-aa irukkalaam, adhu arithmetic-a udaichudum. Adhukku badhilaa, oru page `limit`-a vida kuraivaa allathu kaaliyaa vandhaa niruththunga, oru safety net-aa pages ennikkaikku oru cap vainga (keezha irukkura `get_all`-a paarunga).
 
 ### Limits, cost
 
-Perumbaalaana APIs oru nimishathukku requests-a limit pannum, sila oru call-ku kaasu vaangum. Documentation-oda limits section-a padinga, `429` vandhaa server-a adichchu odaikkaama, adhigamaagura delays-oda kaathirundhu retry pannunga.
+Perumbaalaana APIs oru nimishaththukku allathu oru naalaikku requests-a limit pannum, paid APIs, language-model APIs utpada, use-kku charge pannum. Niraiya APIs neenga enga nikkireenganu kaattura headers anuppum; OpenAQ `x-ratelimit-remaining`, `x-ratelimit-reset` anuppum, neenga limit-a thaandinaa `429` return pannum. 500 cities mela loop panradhukku munnaadi documentation-oda limits page-a padinga, calls-kku naduvula oru chinna `time.sleep` serunga, thirumba use pannappora results-a thirumba fetch pannaama cache pannunga.
+
+### API documentation-a padikkiradhu
+
+Code ezhudhuradhukku munnaadi, documentation-la idhaiyellaam kandupidinga: **base URL**, eppadi **authenticate** panradhu, **endpoints**, avatroda **parameters**, oru **example response**, **error codes**, **pagination**, **rate limits**. Ovvoru thadavaiyum API-a call pannaamale unga parsing-a test panna, example response-a oru file-la save pannunga. Pinnaadi oru AI model-a call panradhum idhe routine thaan.
 
 ## Oru worked example
 
-Anita thanga ooruku air quality-oda oru chinna dashboard build panraanga. Oru location-ku ippo irukkura readings-a tharra oru public API use panraanga.
+Anita-kku rendu vishayangal venum: OpenAQ-kku therinja ellaa Indhiya stations-oda list, oru Delhi station-oda latest readings. Avanga oru chinna helper build panraanga, ovvoru call-um adhu vazhiyaa thaan pogum, adhanaala timeout, retries, logging, error checks ellaam ore idaththula irukkum.
 
 ```python
-import os, requests
+import logging
+import os
+import time
 
-url = "https://api.airquality.example/v1/latest"
-r = requests.get(url, params={"city": "Delhi"},
-                 headers={"X-API-Key": os.environ["AQ_KEY"]}, timeout=10)
+import requests
 
-if r.status_code == 200:
-    for reading in r.json()["results"][:5]:
-        print(reading["location"], reading["parameter"], reading.get("value", "no reading"))
-elif r.status_code == 429:
-    print("Rate limited; try again in a minute")
-else:
-    print("Request failed:", r.status_code, r.text[:200])
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("aq")
+
+BASE = "https://api.openaq.org/v3"
+RETRYABLE = {429, 500, 502, 503, 504}
+
+session = requests.Session()                      # reuses connections
+session.headers["X-API-Key"] = os.environ["OPENAQ_API_KEY"]
+
+def get_json(path, params=None, tries=4):
+    for attempt in range(tries):
+        last = attempt == tries - 1
+        wait = 2 ** attempt                       # 1, 2, 4 seconds
+        try:
+            r = session.get(BASE + path, params=params, timeout=(5, 20))
+        except (requests.Timeout, requests.ConnectionError) as e:
+            log.warning("%s: %s (try %d)", path, type(e).__name__, attempt + 1)
+            if last:
+                raise
+            time.sleep(wait)
+            continue
+        if r.status_code in RETRYABLE and not last:
+            ra = r.headers.get("Retry-After", "")
+            wait = int(ra) if ra.isdigit() else wait
+            log.warning("%s: %d, retry in %ds", path, r.status_code, wait)
+            time.sleep(min(wait, 60))
+            continue
+        r.raise_for_status()                      # 4xx, or still failing
+        try:
+            return r.json()
+        except requests.JSONDecodeError:
+            raise RuntimeError(f"not JSON: {r.text[:200]!r}") from None
 ```
 
-(Inga irukkura URL udhaaranathukku mattum; indha lesson-oda resource-la unmaiyaana, work aagura examples irukku.)
+Ovvoru pagudhiyum yen irukku:
 
-| Run | Enna nadandhadhu | Kaaranam | Fix |
+- Oru **`Session`** connection-a reuse pannum, niraiya calls-kku adhu innum vegam; key header-aiyum adhu vechirukkum, adhanaala endha call-um adhai marakkaadhu.
+- **Timeouts, connection errors catch pannappattu retry aagudhu**, yennaa avai thaan ellaaththaiyum vida adhigamaa varra thaatkaaliga failure. Kadaisi try-la error maraikkappadaama raise aagudhu.
+- **Kadaisi try-kku appuram sleep illai**, wait 60 seconds-kku cap pannappattirukku, adhanaala oru visiththiramaana `Retry-After` value job-a oru mani neram niruththi vaikka mudiyaadhu.
+- **Retry aagaadha ovvoru reply-layum `raise_for_status()` run aagudhu**, adhanaala oru `401`, oru `404`, allathu sariyaagave aagaadha oru `503` oru thelivaana message kooda program-a niruththum.
+- **Ovvoru failure-um path, status kooda log aagudhu**; oru nightly job 3 a.m.-kku fail aagumbodhu ungalukku thevaippadradhu idhu thaan.
+
+Appuram rendu tasks:
+
+```python
+def get_all(path, params, limit=100, max_pages=50):
+    rows = []
+    for page in range(1, max_pages + 1):
+        data = get_json(path, {**params, "limit": limit, "page": page})
+        batch = data["results"]
+        rows.extend(batch)
+        if len(batch) < limit:                    # short or empty page
+            break
+    return rows
+
+stations = get_all("/locations", {"iso": "IN"})
+print(len(stations), "stations")
+for s in stations[:3]:
+    print(s["id"], s["name"])
+
+latest = get_json("/locations/8118/latest")
+for row in latest["results"]:
+    print(row["sensorsId"], row["value"], row["datetime"]["local"])
+```
+
+Ovvoru `sensorsId`-um station-la irukkura oru instrument, udhaaranamaa adhoda PM2.5 allathu NO2 sensor. Oru thani endpoint, `/locations/8118/sensors`, ovvonnum endha pollutant-a measure pannudhunnu sollum. Ippadi rendu endpoints-a join panradhu saadhaarana API velai thaan.
+
+Avangaloda mudhal runs ippadi pochu:
+
+| Run | Avanga enna paarththaanga | Kaaranam | Fix |
 | --- | --- | --- | --- |
-| 1 | `401 Unauthorized` | Pudhu terminal-la avanga key set aagala | Run panradhukku munnaadi `export AQ_KEY=...` |
-| 2 | `200`, apram oru location-ku `KeyError: 'value'` | Sila locations-ku `value` field illa | Muzhu JSON-a print pannaanga; `.get("value", "no reading")` use pannaanga |
-| 3 | Nimishakkanakkaa thonginadhu | Test panna podhu `timeout=` a eduthuttaanga | `timeout=10`-a thirumba vachchaanga |
-| 4 | Anju readings print aachu | Work aagudhu | Dashboard-ku ready |
+| 1 | `KeyError: 'OPENAQ_API_KEY'`, endha request-um anuppappadalai | Avanga oru pudhu terminal-a thirandhaanga, anga variable set aagalai | Andha terminal-la variable-a set panni, thirumba run pannaanga |
+| 2 | `401 Client Error: Unauthorized` | Innoru API-oda tutorial-la irundhu `Authorization: Bearer ...`-a copy pannirundhaanga | OpenAQ-oda docs solra maadhiri key-a `X-API-Key`-la anuppinaanga |
+| 3 | `TypeError: list indices must be integers or slices, not str` | Avanga `latest["results"]["value"]` ezhudhinaanga; `results` oru list | Shape-a print panni, appuram list mela loop pannaanga |
+| 4 | Muzhu Indhiyaavukkum sariyaa 100 stations | `/locations`-a oru thadavai call panni page 1-a mattum padichaanga | Pages mela loop panna `get_all` ezhudhinaanga |
+| 5 | `429, retry in 1s`-ngura oru log line, appuram muzhu list | Vegamaa page pannadhaala rate limit-a thottuchu | Edhuvum illai: helper wait panni thodarndhuchu |
 
-Rendaavadhu run-la muzhu JSON-a oru thadavai print pannadhu, avangalukku oru mani neram guess panradhula irundhu kaapaathichu.
+Runs 1-la irundhu 3 varai ovvonnum oru vera error type kuduththuchu, ovvoru type-um neraa adhoda kaaranaththai kaattuchu. Code-a thirumba padikkiradhukku munnaadi error-oda mudhal vaarththaiyai padinga.
+
+Script perusaagumbodhu, retry velaiyai `requests` endha library mela build aayirukko adhukitta kuduththudalaam. Idhu oru common production setup:
+
+```python
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+retry = Retry(total=4, backoff_factor=1,
+              status_forcelist=[429, 500, 502, 503, 504],
+              allowed_methods=["GET"])        # never auto-retry POST
+session = requests.Session()
+session.mount("https://", HTTPAdapter(max_retries=retry))
+```
+
+Adhu back off pannum, 429, 503-la `Retry-After`-a follow pannum, connection errors-a ungalukkaaga retry pannum. List-la irukkura oru status-la tries theerndhuttaa, kadaisi reply-a return pannaama `requests.exceptions.RetryError`-a raise pannum, adhanaala adhaiyum catch pannunga. Ovvoru call-kkum timeout, oru JSON check, oru page loop innum ungalukku venum.
 
 ## Podhuvaa panra thappugal
 
-- **Status code-a check pannaadhadhu.** Appuram error replies-la code kuzhappamaa fail aagum.
-- **Timeout illaama irukkiradhu.** Mellaana server unga program-a thonga vechchidum.
-- **JSON shape-a guess panradhu.** Print panni mudhalla padinga.
-- **Code-la API keys.** Environment variables use pannunga.
-- **Rate limits-a ignore panradhu.** Madhinga, illannaa block aaiduveenga.
-- **Ovvoru field-um eppovum irukkum-nu nenaikkiradhu.** Optional fields-ku default-oda `.get()` use pannunga.
+- **Status-a check panradhukku munnaadi data-va padikkiradhu.** Appo oru error reply sila lines-kku appuram kuzhappamaa fail aagum. Mudhalla `raise_for_status()`-a call pannunga.
+- **Timeout illai.** Badhil sollaadha oru server muzhu program-aiyum hang pannidum.
+- **JSON shape-a guess panradhu.** `json.dumps(data, indent=2)` vechu oru thadavai print panni, appuram access path-a ezhudhunga.
+- **Oru list mela string key.** Adhu thaan mela sonna `TypeError`; oru index-a edunga allathu loop pannunga.
+- **`null` values irukkumbodhu `.get(key, default)`-a nambradhu.** Key `null` kooda irundhaa adhu `None`-a return pannum.
+- **Page 1-a mattum padikkiradhu.** 100 maadhiri oru round count thaan echcharikkai adaiyaalam.
+- **Ellaaththaiyum retry panradhu, allathu romba vegamaa panradhu.** `401` allathu `404`-a retry pannaa calls veenaagum, oru tight loop ungalai block aakkidum, idempotency key illaama oru POST-a retry pannaa oru customer-kitta rendu thadavai charge aagalaam.
+- **Code, screenshots allathu logs-la keys.** Environment variables use pannunga, oru key leak aanaa udane adhai replace pannunga.
 
 ## Practice pannunga
 
-Keezha link panni irukkura requests library-oda quickstart-a padinga.
+Keezha link pannirukkura requests library-oda quickstart-a padinga, appuram indha unmaiyaana APIs-la onnai use pannunga (rendume November 2026 nilavarappadi check pannappattadhu):
 
-1. **Call pannunga.** Public holidays API illa Indian open data API maadhiri oru free public API-a call panni, JSON-la irundhu moonu values-a print pannunga.
-2. **Errors-a handle pannunga.** 404, 429, oru timeout-a thelivaana messages-oda handle pannunga.
-3. **Key-a paadhukaappaa vainga.** Edhaavadhu key irundhaa adha environment variable-ku maathunga, code innum work aagudhaa-nu confirm pannunga.
+- **OpenAQ**: Indhiya nagarangalukkaana air-quality data. Adhukku adhoda website-la irundhu oru free key venum, adhu `X-API-Key` header-la anuppappadum.
+- **Open-Meteo**: weather, air-quality forecasts. Adhukku key vendaam, non-commercial use-kku free, adhanaala idhu thaan ellaaththaiyum vida vegamaana mudhal call.
 
-**Mudinjadhu-nu eppo sollalaam:** Oru API-a call panni, status-a check panni, nested JSON-a paadhukaappaa padichchu, ovvoru request-kum timeout yen vennum-nu explain panna mudiyum.
+1. **Call panni paarunga.** Oru endpoint-a call panni, `json.dumps(data, indent=2)` vechu reply-a print panni, moonu values-kku access paths ezhudhunga; kurainjadhu onnaavadhu oru list-kkulla irukkanum.
+2. **Venumne fail panna vainga.** Oru thappaana key, oru thappaana path, `timeout=0.001` anuppunga. Ovvonnukkum varra sariyaana error-a note pannunga, `r.json()`-la crash aagaama unga code oru thelivaana message print pannudhaannu check pannunga.
+3. **Helper-a serunga.** Ovvoru call-kkum munnaadi `get_json` helper-a vechu, adhu log panni retry pannudhaannu confirm pannunga.
+4. **Ellaa page-aiyum padinga.** Oru list endpoint-kku, oru page cap kooda ellaa pages-aiyum fetch panni, unga count-a page 1-la mattum varradhoda compare pannunga.
+5. **Key-a secure pannunga.** Adhai oru environment variable-kku maaththi, oru pudhu terminal-a thirandhu, adhu set aagalainnaa enna nadakkumnu ungalukku theriyumaannu confirm pannunga.
+
+**Mudinjadhu-nnu eppo sollalaam:** oru key, oru timeout kooda oru API-a call panna mudiyum, oru failure ungaloda-thaa server-oda-thaannu error-a mattum vechu solla mudiyum, guess pannaama nested JSON-a padikka mudiyum, ellaa page-aiyum fetch panna mudiyum, endha failures-a retry panreenga yennu explain panna mudiyum.
