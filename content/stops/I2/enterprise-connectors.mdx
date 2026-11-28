@@ -4,8 +4,8 @@ level: I2
 theme: retrieval
 title: "Enterprise connectors"
 outcome: "Pull documents and records from SharePoint, Salesforce, SAP, Jira and cloud storage reliably: authentication, paging, rate limits, incremental sync, deletions and permissions."
-answer: "Enterprise connectors pull documents from tools like SharePoint, Salesforce and Jira, handling login, paging, rate limits and incremental sync, while keeping each user's access rights."
-why_it_matters: "An assistant is only as useful as the data it can reach, and that data sits in a dozen business systems with their own APIs and quirks. Connector work often takes a large share of an FDE project's engineering time, and the part clients notice when it breaks."
+answer: "Enterprise connectors copy documents and records from tools like SharePoint, Salesforce and Jira into your AI system, handling login, paging, rate limits, changes, deletions and access rights."
+why_it_matters: "An assistant is only as useful as the data it can reach, and that data sits in a dozen business systems with their own APIs and quirks. Connectors decide whether answers are current and whether people see only what they may open. They are also what clients notice first when something breaks."
 hours: 4
 gap_tags: []
 primary_resource: microsoft-graph-overview
@@ -18,45 +18,45 @@ check:
   question_ids: [enterprise-connectors-1, enterprise-connectors-2, enterprise-connectors-3]
 flashcards:
   - q: "What is a connector?"
-    a: "Code that moves data between a business system, such as SharePoint or Salesforce, and your AI system."
+    a: "Code that moves data between a business system, such as SharePoint or Salesforce, and your AI system, keeping it current, complete and permission-aware."
   - q: "How do connectors usually authenticate?"
-    a: "With OAuth through an app registered by the client's IT team, scoped read-only to the agreed sites or objects."
-  - q: "Why save the paging cursor?"
-    a: "So a failed run can resume where it stopped instead of starting again from page 1."
-  - q: "How should a connector handle rate limits?"
-    a: "Respect Retry-After headers, back off on 429 responses, and spread large first loads over off-peak hours."
+    a: "With OAuth through an app registered by the client's IT team, scoped read-only to the agreed sites or objects. Tokens expire (Microsoft's default is 60 to 90 minutes), so fetch each one from a token cache, never once per run."
+  - q: "When should a connector save its paging position?"
+    a: "After each page is fully processed, together with the ids of any items that failed. Save the final delta link only after the last page. Then a crash resumes at the right page and skips nothing."
+  - q: "How should a connector handle a 429 response?"
+    a: "Wait for the time in the Retry-After header, which can be seconds or a date. With no header, back off exponentially. Add a little random jitter so parallel workers do not retry together."
   - q: "What is incremental sync?"
-    a: "After the first full copy, fetching only changes since the last run, using change tokens, modified-since filters or webhooks."
+    a: "After the first full copy, fetching only what changed since the last run, using delta tokens, a modified-since filter or webhooks."
   - q: "Why do deletions need special care?"
-    a: "If the sync does not report deletions, deleted documents stay searchable. Use a method that reports them or reconcile ids periodically."
-  - q: "What metadata should a connector keep?"
-    a: "Source id, URL, title, author, modified time, path or object type, owner, and access rights."
+    a: "A modified-since query never returns deleted records, so they stay searchable. Use a feed that reports deletions, such as Graph delta or Salesforce's get-deleted resource, and reconcile ids weekly."
+  - q: "What metadata should a connector keep, and why?"
+    a: "Source id, URL, title, path, author, modified time, owner and access rights. They drive citations, filters, permission checks and debugging, so update them even when the text is unchanged."
   - q: "What should each sync run record?"
-    a: "Items read, added, changed, deleted and failed, and the time taken, with alerts when a connector stops or failures jump."
+    a: "Items read, added, changed, unchanged, deleted and failed, plus run time. Alert when a run fails, does not start, or reads far fewer items than usual."
   - q: "Why store a content hash for each synced item?"
-    a: "If a file's metadata changed but its text did not, the hash matches and you skip re-parsing and re-embedding, saving time and money."
-  - q: "How does a Microsoft Graph delta query report deletions?"
-    a: "Deleted items come back in the delta results with a 'deleted' marker, so the connector can remove their chunks from the index."
+    a: "If a file's metadata changed but its text did not, the hash matches and you skip re-chunking and re-embedding, saving time and money."
+  - q: "What does Microsoft Graph do when a saved delta link stops working?"
+    a: "It returns 410 Gone with a Location header that starts a fresh full listing. Re-list everything, then reconcile ids, because a fresh listing does not report what was deleted meanwhile."
 exercise:
   title: "Fix the connector"
   setup: "A Pune manufacturer's maintenance assistant reads 60,000 manuals from a network file share and work orders from SAP. The current connector re-reads every file every night, takes nine hours, and sometimes runs into the morning shift. Retired manuals still appear in answers. Last week the job crashed at file 41,000 and restarted from the beginning. Nobody noticed when it failed for three days."
   questions:
     - q: "How do you shorten the nightly run?"
-      a: "Switch to incremental sync: compare modified times or a change journal and process only new and changed files."
+      a: "Sync incrementally: compare each file's modified time and size with the last run (or read the file server's change journal) and parse only new and changed files. Hash the extracted text to skip re-embedding files whose text did not change."
     - q: "Why do retired manuals still appear, and what fixes it?"
-      a: "Deletions and moves are not detected. Reconcile the list of file ids against the index and remove missing ones."
+      a: "The connector never detects deletions or moves. Each night, list all file paths, compare them with the ids in the index, and delete chunks for anything no longer there. A moved file is then a delete plus an add."
     - q: "How do you avoid restarting from file 1?"
-      a: "Save progress, such as the last processed path or cursor, and resume from it after a failure."
+      a: "Save progress after each batch, such as the last processed path in a sorted listing, together with a list of files that failed. On restart, retry the failed files, then continue from the saved path."
     - q: "How would the team have noticed the three-day failure?"
-      a: "Record per-run counts and alert when a run fails, does not start, or processes far fewer items than usual."
+      a: "Record per-run counts and alert when a run fails, does not start on time, or processes far fewer items than usual. Send the alert to a person who owns the connector, not to a shared inbox."
 ask:
   - "How does Microsoft Graph delta sync work?"
   - "Should I build connectors or use Airbyte?"
   - "How do I sync permissions from SharePoint?"
 explain_in_interview:
-  answer: "A connector is the code that moves data from a business system, like SharePoint, Salesforce or Jira, into the AI system. It logs in, usually with read-only OAuth, reads the API page by page, and respects rate limits by backing off when throttled. After the first full load it syncs only changes, using delta queries or modified-since filters, and it carries deletions and each item's permissions too. For example, a sales assistant in Gurugram stays current on SharePoint decks and Salesforce accounts without a nightly full copy. The hard part is permissions: if they are not synced, the assistant can show people documents they should not see."
+  answer: "A connector is the code that moves data from a business system, like SharePoint, Salesforce or Jira, into the AI system. It logs in, usually with read-only OAuth, reads the API page by page, and backs off when throttled. After the first full load it syncs only changes, using delta queries or modified-since filters, and it carries deletions and each item's permissions too. It saves its position after every page, so a crash resumes instead of restarting or skipping. For example, a sales assistant in Gurugram stays current on SharePoint decks and Salesforce accounts without a nightly full copy. The hard part is permissions: if they are not synced, people see documents they should not."
   follow_up: "How do you make sure a deleted or restricted document stops appearing in answers?"
-  follow_up_answer: "The connector must sync deletions and permission changes, not only new and changed items. Removed items are deleted from the index, and every search filters by the user's current access groups, so the assistant only retrieves what that user may open."
+  follow_up_answer: "Sync deletions with a feed that reports them, and reconcile ids weekly as a safety net. Store group ids on each chunk and filter every search by the user's current groups, so a removed member loses access as soon as the group lookup sees the change. If an item's permissions cannot be read, do not index it."
 drafted_with_ai: true
 reviewed_by: "Shyam Prabahar"
 reviewed_on: 2026-11-08
@@ -64,7 +64,7 @@ reviewed_on: 2026-11-08
 
 ## What it is
 
-A **connector** is the code that moves data between a business system and your AI system. Most enterprise AI projects need several:
+A **connector** is the code that moves data between a business system and your AI system. A good connector does four jobs: it copies everything once, keeps the copy current, removes what was deleted, and carries who may read each item. Most enterprise AI projects need several:
 
 - **Documents**: SharePoint and OneDrive (through Microsoft Graph), Google Drive, Confluence, network file shares, cloud storage buckets.
 - **Records**: CRM systems such as Salesforce, ERPs such as SAP, ticketing such as Jira or ServiceNow, plus the client's own databases.
@@ -73,96 +73,184 @@ A **connector** is the code that moves data between a business system and your A
 You can build connectors yourself, use an integration platform (Airbyte, Fivetran and others offer many ready-made ones), or use the connectors bundled with a search or AI platform. Either way you must understand what they do.
 
 ```flow
+title: A connector feeding an assistant
 SharePoint -[Graph, OAuth, delta]-> Connector | pages, backs off, resumes
-Salesforce -[API, modified since]-> Connector
-Jira, file shares, databases -> Connector
-Connector -> Items + metadata + permissions + deletions -> Parse, chunk, embed -> Index for the assistant
-Parse, chunk, embed -> Run log | read 312, added 40, changed 266, deleted 6, failed 0
+Salesforce -[REST, SystemModstamp, get deleted]-> Connector
+Jira, SAP, file shares -> Connector
+Connector -> Items, metadata, permissions, deletions -> Parse, chunk, embed -> Index for the assistant
+Parse, chunk, embed -> Run log | read 312, added 12, changed 41, unchanged 253, deleted 6, failed 0
 ```
 
-This lesson follows a sales assistant for a consumer-goods company in Gurugram, built on SharePoint and Salesforce.
+This lesson follows a Gurugram sales assistant built on SharePoint and Salesforce.
 
 ## How it works
 
-**Authentication.** Usually OAuth with an app registered by the client's IT team, scoped to read-only and to the sites, objects or projects agreed. Some systems use API keys or service users; store them in the secret manager.
+### Authentication
 
-**Reading in pages.** APIs return results in pages with a cursor or next link. Loop until there are no more pages, and save the cursor so a failed run can resume.
+Usually OAuth with an app registered by the client's IT team, scoped to read-only and to the sites, objects or projects agreed. Some systems use API keys or service users; keep those in a secret manager, never in code.
 
-**Rate limits.** Every API limits calls per minute or per day; SharePoint and Salesforce throttle heavy users. Respect `Retry-After` headers, back off on 429 responses and spread big initial loads over off-peak hours.
+Two things break long runs. First, access tokens expire: Microsoft gives them a default life of 60 to 90 minutes, so a two-night first load cannot use one token. Ask your auth library's cache (for example MSAL) for a token before each request; it fetches a new one near expiry. Second, client secrets and certificates expire too. Put the date in the runbook and alert a month before.
 
-**Incremental sync.** The first run copies everything. Later runs fetch only changes since the last run, using change tokens (Microsoft Graph's delta queries), "modified since" filters or webhooks. Full re-reads of 200,000 documents every night are slow, costly and get you throttled.
+### Reading in pages
 
-**Deletions.** Incremental feeds must tell you what was deleted, or deleted files stay searchable forever. Check that your method reports deletions; if not, run a periodic reconciliation that compares ids.
+APIs return results in pages. Each page ends with a cursor or a "next" link. Loop until there is no next page. The rule that matters: **save your position after each page is fully processed**, not before and not only at the end. Saving before processing skips items if you crash; saving only at the end means a crash at page 9,000 restarts at page 1.
 
-**Permissions.** Read each item's access rights along with its content, for permission-aware retrieval.
+### Rate limits
 
-**Formats and metadata.** Keep source id, URL, title, author, modified time, path or object type and owner. These drive citations, filters and debugging.
+Every API limits calls. Microsoft Graph returns 429 Too Many Requests with a `Retry-After` header and asks you to wait that long before retrying; if there is no header, back off exponentially. Under the HTTP standard, `Retry-After` can be a number of seconds or a date, so parse both. Add a second or so of random jitter so that parallel workers do not all retry at the same moment and get throttled again.
 
-**Observability.** For each run record items read, added, changed, deleted, failed and time taken. Alert when a connector stops or failure counts jump.
+### Incremental sync and change detection
 
-**Ways to detect changes:**
+The first run copies everything; later runs fetch only what changed. Nightly full re-reads of 200,000 documents are slow, costly and get you throttled.
 
-| Method | How it works | Watch out for |
-| --- | --- | --- |
-| Change or delta tokens | The API returns changes since a saved token | Tokens can expire or break; keep a full re-scan fallback |
-| Modified-since filter | Query items with a modified time after the last run | Often misses deletions; clocks and time zones must match |
-| Webhooks | The system calls you when something changes | Calls can be lost; pair with a periodic check |
-| Full comparison | List all ids and compare with your index | Slow on large sets; good as a weekly safety net |
+| Method | Example | Reports deletions? | Watch out for |
+| --- | --- | --- | --- |
+| Delta token | Microsoft Graph delta | Yes | Links can stop working (410 Gone); keep a full re-scan path |
+| Modified-since filter | Salesforce `SystemModstamp`, Jira `updated` | No | Pair with a deletion feed; overlap windows by a few minutes |
+| Deletion feed | Salesforce get-deleted resource | Only deletions | Salesforce keeps at most 15 days |
+| Webhooks | Jira `jira:issue_deleted` | If the event exists | Deliveries can be lost; never the only source |
+| Full id comparison | Your weekly reconciliation | Yes, by difference | Slow on large sets; run it weekly as a safety net |
 
-**Build, buy or borrow.** Integration platforms such as Airbyte or Fivetran save weeks for common systems, and a search platform's bundled connectors may already read permissions. They still need checking: confirm they report deletions, read access rights, and expose run counts you can alert on. Write your own when the system is unusual, such as an in-house database or a vendor portal, or when the client's security team will not approve a third-party tool.
+Two Graph delta gotchas: the same item can appear more than once in one feed (the last occurrence wins, so upsert by source id), and a deleted item comes back with a `deleted` marker and no content, so check for it before downloading.
 
-**An incremental connector in code.** Microsoft Graph's delta query for a SharePoint or OneDrive library returns changed and deleted items, page by page, ending with a link to use next time:
+### Deletions
+
+A modified-since query cannot see a record that no longer exists, so deleted documents keep being quoted. Every connector needs a feed that reports deletions or a periodic id comparison, preferably both.
+
+### Permissions
+
+The hardest part: an assistant that ignores permissions shows a junior employee the salary review deck.
+
+- **Read access rights with each item.** Graph's permissions endpoint returns a file's effective sharing, including access inherited from folders. Store allowed user and group ids on every chunk.
+- **Keep groups as groups.** Do not expand "Sales North" into 400 user ids at index time. At query time, look up the user's current groups (from their sign-in token or a directory call) and filter by them. A person who leaves a group then loses access as soon as your group lookup sees the change, with no re-index.
+- **Permission-only changes are hard to see.** Sharing a file does not change its content. Graph delta can mark items that changed sharing if you send the `Prefer: deltashowsharingchanges` header, together with `deltashowremovedasdeleted` and `deltatraversepermissiongaps`, which Microsoft says it requires. But Microsoft documents that delta returns only items whose content or metadata changed, plus their parent folders, so files that only inherit access may not appear. Microsoft also says processing permissions correctly needs the `Sites.FullControl.All` app permission, which security teams often refuse. Treat the marker as a hint. Back it with a scheduled re-read of permissions on the sites and folders the client marks as sensitive.
+- **Fail closed.** If you cannot read an item's permissions, do not index it.
+
+### An incremental connector in code
+
+This sync for one SharePoint library follows the rules above. It saves its position per page, keeps a retry list for failed items, refreshes tokens, and handles throttling and a broken delta link:
 
 ```python
-import hashlib, json, time
-from pathlib import Path
-import httpx
+import email.utils, hashlib, json, random, time
+from pathlib import Path        # client below is an httpx.Client
 
+GRAPH = "https://graph.microsoft.com/v1.0"
 STATE = Path("state/sharepoint-delta.json")
 
-def get(client, url):
-    for attempt in range(5):
-        r = client.get(url)
+class StopRun(Exception): pass    # fatal: stop now, leave saved state as it is
+class Resync(Exception): pass     # 410 Gone: the saved link no longer works
+
+def wait_for(r, attempt):
+    value = r.headers.get("Retry-After", "")
+    if value.isdigit():
+        delay = int(value)                                  # seconds
+    elif value:
+        when = email.utils.parsedate_to_datetime(value)     # an HTTP date
+        delay = max(0, when.timestamp() - time.time())
+    else:
+        delay = min(60, 2 ** attempt)                       # no header: back off
+    return delay + random.uniform(0, 1)                     # jitter
+
+def get(client, url, token, prefer=None):
+    headers = {"Authorization": f"Bearer {token()}"}  # token() reads a cache
+    if prefer:
+        headers["Prefer"] = prefer
+    for attempt in range(6):
+        r = client.get(url, headers=headers)
         if r.status_code in (429, 503):
-            time.sleep(int(r.headers.get("Retry-After", 2 ** attempt)))
-            continue
+            time.sleep(wait_for(r, attempt)); continue
+        if r.status_code == 410:
+            raise Resync(r.headers.get("Location"))
+        if r.status_code in (401, 403):
+            raise StopRun(f"access refused: {r.status_code}")
         r.raise_for_status()
         return r.json()
-    raise RuntimeError("gave up after repeated throttling")
+    raise StopRun("still throttled after 6 tries")
 
-def sync(token, drive_id, index):
-    counts = {"read": 0, "upserted": 0, "deleted": 0, "skipped": 0, "failed": 0}
-    url = (json.loads(STATE.read_text())["delta_link"] if STATE.exists()
-           else f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/delta")
-    with httpx.Client(headers={"Authorization": f"Bearer {token}"}, timeout=30) as client:
-        while url:
-            page = get(client, url)
-            for item in page.get("value", []):
-                counts["read"] += 1
-                try:
-                    if "deleted" in item:
-                        index.delete_doc(item["id"]); counts["deleted"] += 1
-                    elif "file" in item:
-                        text = download_and_parse(client, item)            # your parser
-                        digest = hashlib.sha256(text.encode()).hexdigest()
-                        if index.hash_of(item["id"]) == digest:
-                            counts["skipped"] += 1
-                        else:
-                            index.upsert_doc(item["id"], text, digest, meta_from(item))
-                            counts["upserted"] += 1
-                except Exception:
-                    counts["failed"] += 1
-            url = page.get("@odata.nextLink")
-            if not url and "@odata.deltaLink" in page:
-                STATE.parent.mkdir(exist_ok=True)
-                STATE.write_text(json.dumps({"delta_link": page["@odata.deltaLink"]}))
+def process(client, token, drive_id, item, index, counts, retry):
+    if "deleted" in item:
+        index.delete_doc(item["id"])        # must not fail if already gone
+        if item["id"] in retry:
+            retry.remove(item["id"])
+        counts["deleted"] += 1
+        return
+    if "file" not in item:
+        return                              # folders carry no text
+    perms = get(client, f"{GRAPH}/drives/{drive_id}/items/{item['id']}/permissions", token)
+    acl = acl_from(perms)                   # user and group ids allowed to read
+    text = download_and_parse(item)         # your parser
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    if index.hash_of(item["id"]) == digest:
+        index.update_meta(item["id"], meta_from(item), acl)  # renamed or reshared: no re-embed
+        counts["unchanged"] += 1
+    else:
+        new = index.upsert_doc(item["id"], text, digest, meta_from(item), acl)
+        counts["added" if new else "changed"] += 1
+
+def save(state):
+    STATE.parent.mkdir(exist_ok=True)
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state))
+    tmp.replace(STATE)                      # atomic: never half-written
+
+def sync(client, token, drive_id, index):
+    state = json.loads(STATE.read_text()) if STATE.exists() else {}
+    retry = state.get("retry", [])
+    counts = dict.fromkeys(["read", "added", "changed", "unchanged", "deleted", "failed"], 0)
+    for item_id in list(retry):             # last run's failures first
+        try:
+            item = get(client, f"{GRAPH}/drives/{drive_id}/items/{item_id}", token)
+            process(client, token, drive_id, item, index, counts, retry)
+            if item_id in retry:
+                retry.remove(item_id)
+        except StopRun:
+            raise
+        except Exception:
+            counts["failed"] += 1           # stays listed; alert if it stays for days
+    url = (state.get("next_link") or state.get("delta_link")
+           or f"{GRAPH}/drives/{drive_id}/root/delta")
+    while True:
+        try:
+            page = get(client, url, token, prefer="deltashowremovedasdeleted, "
+                       "deltatraversepermissiongaps, deltashowsharingchanges")
+        except Resync as e:
+            state = {"retry": retry, "reconcile": True}   # full listing, then compare ids
+            url = e.args[0] or f"{GRAPH}/drives/{drive_id}/root/delta"
+            continue
+        for item in page.get("value", []):
+            counts["read"] += 1
+            try:
+                process(client, token, drive_id, item, index, counts, retry)
+            except StopRun:
+                raise
+            except Exception:
+                counts["failed"] += 1
+                if item["id"] not in retry:
+                    retry.append(item["id"])
+        state["retry"] = retry
+        if "@odata.nextLink" in page:       # page done: save where to resume
+            url = state["next_link"] = page["@odata.nextLink"]
+            save(state)
+        else:                               # last page: save the link for next time
+            state.pop("next_link", None)
+            state["delta_link"] = page["@odata.deltaLink"]
+            save(state)
+            break
     print(counts)
     return counts
 ```
 
-The first run has no saved link, so it reads everything; later runs get only changes. Save the delta link only after the last page succeeds, so a failed run repeats rather than skips changes. If a saved link stops working, fall back to a full re-scan.
+Why it is built this way:
 
-**A weekly reconciliation.** Even good change feeds miss things. Compare ids:
+- **Position and failures are saved together**, in one atomic write after each page. A crash mid-page replays that page, which is safe because upserts and deletes are keyed by source id. A failed item is never skipped: it sits on the retry list until it succeeds.
+- **One bad file does not freeze the feed.** Refusing to advance while any item fails sounds safe, but one corrupt PDF would then block every future change.
+- **Metadata travels with the text.** `meta_from` keeps source id, URL, title, path, author, modified time and owner for citations and filters. A rename changes these but not the text, so they are updated without re-embedding.
+- **Fatal errors stop the run without saving.** An access error or endless throttling is not an item failure; counting it as one would put the whole library on the retry list.
+- **A broken link triggers a full listing.** On 410 Gone, Graph's `Location` header starts a fresh enumeration. That lists what exists, not what was deleted meanwhile, so the `reconcile` flag tells the scheduler to run the id comparison next.
+
+### A weekly reconciliation
+
+Even good change feeds miss things. Compare the ids the source has with the ids the index has:
 
 ```python
 def reconcile(source_ids: set, index_ids: set, index):
@@ -173,36 +261,47 @@ def reconcile(source_ids: set, index_ids: set, index):
     return {"removed_stale": len(stale), "missing_to_fetch": len(missing)}
 ```
 
-**Skip unchanged content.** A file's modified time changes when someone renames it or edits a property. Store a hash of the extracted text with each document and skip re-embedding when it matches. On large libraries this saves most of the embedding cost.
+If `removed_stale` is more than a handful, your change feed has a bug; fix it.
 
-**Respect the source.** Run big first loads at night in the client's time zone, keep concurrency low, and agree limits with their IT team. Getting a client's SharePoint throttled during office hours is a fast way to lose trust.
+### Records: Salesforce, Jira and SAP
+
+- **Salesforce.** Query changed records with a filter on `SystemModstamp`, not `LastModifiedDate`, because `SystemModstamp` also moves when automated processes change a record. Subtract a few minutes from the last run time so records committed late are not missed. For deletions, call the get-deleted REST resource for each object with a start and end time in UTC. It covers at most the last 15 days and works to the minute, so if the connector is down longer than that, only a full id comparison can catch up. It also shows only deletions the integration user could see.
+- **Jira Cloud.** Search with JQL through the `search/jql` endpoint, which pages with a `nextPageToken` instead of the old `startAt` offset. Filter with `updated >= "last run time"`. Deleted issues simply vanish from search, so subscribe to the `jira:issue_deleted` webhook and still reconcile ids, because webhooks can be missed.
+- **SAP.** You rarely get direct table access. The client's SAP team exposes data, usually as OData services (often built on CDS views), sometimes through older BAPI or RFC calls, or through their integration middleware. Some OData services support delta tokens; otherwise use a changed-on date field and a reconciliation. The main gotcha is time: getting a service built and approved takes longer than your code, so ask in week one.
+- **Schema drift.** Admins add fields, rename picklist values and retire objects. Pin the API version in your URLs, map only the fields you agreed, and alert when a describe call shows new or missing fields, rather than silently indexing everything.
+- **Record permissions.** Salesforce access comes from owners, roles and sharing rules, which are hard to copy exactly. A safe first release indexes only objects every sales user may read, or checks access live with the user's own login before showing a record.
+
+### Build, buy or borrow
+
+Integration platforms such as Airbyte or Fivetran save weeks for common systems. Before you trust one, check that it reports deletions, carries access rights and exposes run counts you can alert on. Write your own for unusual systems, such as an in-house database, or when the client's security team will not approve a third-party tool.
 
 ## A worked example
 
-A Gurugram consumer-goods company wants a sales assistant over SharePoint (product sheets, trade-scheme circulars) and Salesforce (accounts, opportunities).
+A Gurugram consumer-goods company wants a sales assistant over SharePoint (product sheets, trade-scheme circulars) and Salesforce (accounts, opportunities). The figures below are illustrative, to show the shape of the work.
 
-SharePoint: an app registration with read access to six sites. The first full sync of 38,000 files runs over two nights to stay under throttling limits. Afterwards, delta queries every 15 minutes return only changed and deleted items, typically 200 to 400 per run, which takes about a minute. Each item's permissions are read and stored.
+**SharePoint.** An app registration with read access to six sites. Suppose the first full sync of 38,000 files is spread over two nights to stay well under throttling limits; if the saved next link still works the second night carries on from it, and if Graph answers 410 the listing starts again. Afterwards a delta run every 15 minutes returns a few hundred changed or deleted items and finishes in about a minute. Each run also re-reads permissions for changed items, and a nightly job re-reads permissions on the two sites that hold pricing and HR files.
 
-Salesforce: a read-only integration user limited to Account, Opportunity and Product objects. Records are pulled with a "modified since" query every 30 minutes and turned into short text summaries for retrieval, with the record id and owner kept as metadata.
+**Salesforce.** A read-only integration user limited to Account, Opportunity and Product. Every 30 minutes the connector queries records whose `SystemModstamp` is after the last run minus five minutes, turns each into a short text summary with the record id and owner as metadata, and calls the get-deleted resource for the same window. If a sales manager deletes a duplicate account at 11:10, it leaves the index by about 11:30.
 
-In week three, the regional team renames a SharePoint site and the delta token becomes invalid. The connector's error rate alert fires; the job falls back to a full re-scan of that site overnight, and nothing is missed. Your runbook for the client's IT team explains exactly this case.
+**The incident.** Suppose in week three a delta request returns 410 Gone. The connector follows the `Location` header, re-lists the library overnight, then runs the id comparison and removes 14 files deleted while the link was broken. The alert reached the on-call engineer before the client noticed, and the runbook already covered this case.
 
 | Measure | Before | After |
 | --- | --- | --- |
 | SharePoint sync | Full re-read nightly, about 6 hours, often throttled | Delta every 15 minutes, about 1 minute |
-| Salesforce sync | Daily export | Every 30 minutes |
-| Deleted documents still searchable | Dozens | None, checked weekly |
+| Salesforce sync | Daily export, deletions never removed | Every 30 minutes, deletions within one run |
+| Deleted documents still searchable | Dozens | None in the weekly check |
 | Time to notice a failed sync | Days | Minutes, through alerts |
 
 ## Common mistakes
 
-- **Full re-syncs every time.** Use change tokens or modified-since queries.
-- **Ignoring deletions.** Deleted and expired documents keep getting quoted.
+- **Full re-syncs every time.** Use delta tokens or modified-since queries after the first load.
+- **Ignoring deletions.** A modified-since query never returns deleted records; add a deletion feed and a weekly id comparison.
+- **Saving the cursor at the wrong time.** Before processing skips items after a crash; only at the end restarts from page 1. Save after each page.
+- **Swallowing failed items.** Counting a failure and moving on loses that item forever. Keep a retry list.
+- **One token for a long run.** It expires after 60 to 90 minutes and the job dies at 3 a.m.
+- **Expanding groups into users at index time.** Membership changes then need a full re-index to take effect.
 - **Over-broad access.** Ask for read-only access to named sites and objects, not the whole tenant.
-- **No resume after failure.** A crash at page 9,000 should not restart from page 1.
 - **Silent connectors.** If nobody is alerted when a sync stops, the assistant quietly goes stale.
-- **No runbook for the client's IT team.** Write down what to do when tokens break, permissions change or a site is renamed.
-- **Saving the sync cursor before the run finishes.** A crash then skips changes forever.
 - **Re-embedding every modified file** even when only its metadata changed.
 
 ## When you do not need a custom connector
@@ -213,19 +312,20 @@ In week three, the regional team renames a SharePoint site and the delta token b
 
 ## From demo to production
 
-- **Record per-run counts** and alert on stalls or failure spikes.
-- **Save cursors only after success**, and keep a full re-scan fallback.
-- **Reconcile ids weekly** to catch missed deletions.
-- **Hash content** to skip unchanged documents.
-- **Agree schedules and limits** with the client's IT team, in writing.
+Starting defaults, agreed with the client's IT team in writing:
+
+- **Schedules:** document delta every 15 minutes, record queries every 30 minutes, permission re-read nightly, full id comparison weekly. Big first loads only at night in the client's time zone, with low concurrency.
+- **Alerts:** a run fails or does not start within two intervals; items read drop below half the usual; any item stays on the retry list for more than a day; a secret expires within 30 days.
+- **Runbook:** what to do on 410 Gone, on an access error, and when a site, object or field is renamed.
 
 ## Practice
 
 Read the Microsoft Graph overview, then pick any API with paging that you can use for free (GitHub issues, a public dataset API, or Graph with a developer tenant).
 
-1. Write a connector that pulls all items with paging, honours rate limits and stores a cursor so it can resume.
-2. Add an incremental mode that fetches only items changed since the last run, and a check that detects deleted items.
-3. Record per-run counts (read, added, updated, deleted, failed) and print a one-line summary.
-4. Run your connector, delete a file at the source, rerun, and confirm the file's chunks are gone from the index.
+1. Write a connector that pulls all items with paging, honours `Retry-After`, and saves its position after each page so it can resume.
+2. Kill it halfway through the first load and restart it. Confirm it continues from the saved page and does not start again.
+3. Add an incremental mode that fetches only items changed since the last run, and a check that detects deleted items.
+4. Record per-run counts (read, added, changed, unchanged, deleted, failed) and print a one-line summary.
+5. Delete an item at the source, rerun, and confirm its chunks are gone from the index.
 
-**You are done when you can** run your connector twice in a row and show the second run fetching only what changed, including a deletion.
+**You are done when you can** run your connector twice in a row and show the second run fetching only what changed, including a deletion, and show a crashed run resuming from the right page.
