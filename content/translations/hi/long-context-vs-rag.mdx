@@ -2,216 +2,298 @@
 id: long-context-vs-rag
 lang: hi
 title: "Long context या RAG"
-outcome: "तय कर पाओगे कि कब पूरे documents को long context window में डालना है और कब retrieve करना है, accuracy, cost, latency और documents की संख्या को तौलकर।"
-answer: "जब documents कम हों और पूरे चाहिए हों, तो उन्हें सीधे long context window में डालो। जब documents बहुत हों, अक्सर बदलते हों, या cost और speed मायने रखती हो, तब RAG use करो।"
-why_it_matters: "Context windows अब सैकड़ों हज़ार tokens रखती हैं, तो clients पूछते हैं: \"Retrieval बनाने की ज़रूरत ही क्यों?\" ईमानदार जवाब corpus के size, सवाल कितनी बार दोहराए जाते हैं, और लंबे inputs में accuracy कैसी रहती है, इन पर निर्भर है। इस trade-off को समझा पाना interview और design का आम सवाल है।"
+outcome: "किसी real use case के लिए long context, RAG और agentic search में से चुन पाओगे: accuracy, prompt caching के साथ cost, latency और corpus size को तौलकर, और अपने tests से उस choice को साबित करके।"
+answer: "जब documents कम हों और सवालों के लिए सब चाहिए हों, तो पूरे documents भेजो। जब corpus बड़ा हो या बदलता रहता हो, तो retrieve करो। जब जवाब के लिए कई lookups चाहिए हों, तो एक agent को search करने दो।"
+why_it_matters: "Latest Claude models एक million tokens तक ले लेते हैं, तो clients पूछते हैं कि अब भी कोई retrieval क्यों बनाता है। ईमानदार जवाब corpus के size, सवाल कितनी बार दोहराए जाते हैं, लंबे inputs में गहराई तक जाने पर accuracy कैसी रहती है, और caching cost पर क्या असर डालती है, इन पर निर्भर है। इस trade-off को numbers के साथ समझाना interview और system design का आम सवाल है।"
 flashcards:
-  - q: "Long context और RAG में क्या फ़र्क है?"
-    a: "Long context पूरे documents को prompt में डालता है; RAG सिर्फ़ सबसे relevant passages retrieve करके वही भेजता है।"
+  - q: "किसी model को ज़रूरी जानकारी देने के तीन तरीके क्या हैं?"
+    a: "Long context पूरे documents prompt में भेजता है। RAG एक बार search करके सबसे अच्छे कुछ passages भेजता है। Agentic search model को search tools देता है और उसे चीज़ें ढूँढने, पढ़ने और फिर से search करने देता है, जब तक वो जवाब न दे सके।"
   - q: "'Lost in the middle' क्या है?"
-    a: "ये findings कि models लंबे input के बीच की जानकारी को, शुरू या आख़िर की जानकारी से कम अच्छी तरह use करते हैं।"
-  - q: "Input की लंबाई cost और speed पर कैसे असर डालती है?"
-    a: "आप हर call पर हर input token का पैसा देते हो, और input जितना लंबा, पहला token आने में उतना समय लगता है।"
-  - q: "Prompt caching इस trade-off को कैसे बदलती है?"
-    a: "जब वही लंबा document कई सवालों में दोबारा use हो, तो पहली call के बाद cached input बहुत सस्ता और तेज़ हो जाता है।"
-  - q: "Long context कब बेहतर choice है?"
-    a: "एक या कुछ documents के लिए, एक session में कई सवालों के लिए, और ऐसे सवालों के लिए जिनमें पूरा document चाहिए, जैसे summaries और cross-references।"
-  - q: "RAG कब बेहतर choice है?"
-    a: "बड़े या बढ़ते collections के लिए, छोटे factual सवालों के लिए, और कई users के लिए।"
-  - q: "बीच का रास्ता क्या है?"
-    a: "Document level पर retrieve करके सही कुछ documents ढूँढो, फिर उन पूरे documents को context में डालो।"
-  - q: "लंबे prompt में सवाल कहाँ रखना चाहिए?"
-    a: "लंबे material के बाद, instructions के साथ।"
+    a: "ये finding (Liu और साथी, 2023) कि models लंबे input की शुरुआत या आख़िर के पास की जानकारी को बीच की जानकारी से बेहतर use करते हैं, जिससे accuracy का curve U जैसा बनता है।"
+  - q: "Context rot क्या है, और effective context क्या है?"
+    a: "Context rot मतलब input बढ़ने के साथ accuracy का गिरना, simple tasks पर भी। Effective context वो length है जिस पर आपका अपना task accurate रहता है। ये advertised window से काफ़ी कम हो सकती है, इसलिए इसे खुद measure करो।"
+  - q: "सिर्फ़ एक planted fact वाला test काफ़ी क्यों नहीं है?"
+    a: "एक exact sentence ढूँढना सबसे आसान case है, और आजकल के models इसे अक्सर pass कर लेते हैं। Real सवालों में कई facts, inference और मिलते-जुलते text को ignore करना पड़ता है। Test में distractors और two-hop सवाल जोड़ो।"
+  - q: "Input length cost और speed पर कैसे असर डालती है?"
+    a: "हर call पर हर input token के पैसे लगते हैं, और input लंबा होने के साथ time to first token बढ़ता है। जब वही लंबा prefix दोहराया जाता है, तो prompt caching दोनों को कम करती है।"
+  - q: "Prompt caching long context की cost को कैसे बदलती है?"
+    a: "Provider एक जैसा prompt prefix, जैसे एक contract, store कर लेता है, और बाद की calls उसे सस्ते में पढ़ती हैं। Claude Sonnet 5.5 पर, 28 November 2026 तक, एक cache read normal input price का 5% पड़ता है और एक 5-minute cache write 125%।"
+  - q: "Prompt caching को पैसे बचाने से क्या रोक सकता है?"
+    a: "Cache lifetime से लंबे gaps (default 5 minutes, हर hit पर reset), prefix की शुरुआत में कोई भी बदलाव जैसे timestamp, पहला response शुरू होने से पहले भेजी गई parallel calls, और हर user के लिए अलग document।"
+  - q: "Long context और RAG में कैसे चुनें?"
+    a: "एक या कुछ documents, जिन पर ऐसे कई सवाल हों जिन्हें पूरा text चाहिए: long context, cached। बड़े या बदलते collections, छोटे factual सवाल और कई users: RAG। फिर अपने tests से confirm करो।"
+  - q: "Agentic search one-shot RAG से कब बेहतर है?"
+    a: "जब अगला lookup इस पर निर्भर हो कि पिछले ने क्या पाया, जब जवाब clause numbers या error codes जैसे exact identifiers पर टिके हों, या जब data इतनी तेज़ी से बदले कि index न हो सके। इसमें ज़्यादा calls और ज़्यादा इंतज़ार लगता है।"
   - q: "Document-level retrieval क्या है?"
-    a: "Search से सही कुछ पूरे documents चुनना, फिर उन्हें context में डालना, ताकि RAG का scale और long context की पूर्णता, दोनों मिलें।"
-  - q: "अपने documents पर position के असर को कैसे test करें?"
-    a: "किसी असली-से लंबे document में शुरू, बीच और आख़िर में एक जाना-पहचाना fact डालो, हर बार उसके बारे में पूछो, और position के हिसाब से accuracy की तुलना करो।"
+    a: "सही कुछ पूरे documents चुनने के लिए search करो, अक्सर metadata filters के साथ, फिर उन documents को context में डालो। RAG का scale और long context की पूरी तस्वीर, दोनों मिलते हैं।"
 exercise:
   title: "Approach चुनो"
-  setup: "Pune की एक engineering firm की AI team के पास तीन requests आती हैं: (A) एक manager आज दोपहर एक 120-page tender document के बारे में 20 सवाल पूछना चाहता है, जिनमें 'कौन-से clauses हमारी standard terms से टकराते हैं?' भी है; (B) 3,000 field engineers 18,000 equipment manuals से जल्दी जवाब चाहते हैं, जो हर हफ़्ते बदलते हैं; (C) एक lawyer system के 4,000 contracts में से एक client के पाँच contracts की indemnity terms की तुलना करना चाहता है।"
+  setup: "Pune की एक engineering firm की AI team के पास तीन requests आती हैं: (A) एक manager एक 120-page tender document के बारे में लगभग 20 सवाल पूछना चाहता है, जो पूरी दोपहर में फैले होंगे, जिनमें 'हमारी standard terms से कौन-से clauses conflict करते हैं?' भी है; (B) 3,000 field engineers को 18,000 equipment manuals से जल्दी जवाब चाहिए, जो हर हफ़्ते बदलते हैं, अक्सर error code या part number से; (C) एक lawyer system के 4,000 contracts में से एक client के साथ के पाँच contracts की indemnity terms compare करना चाहता है।"
   questions:
-    - q: "(A) के लिए कौन-सा approach ठीक बैठता है, और क्यों?"
-      a: "Caching के साथ long context: एक document, एक session में कई सवाल, और टकराव वाले सवाल जिनमें पूरा document चाहिए।"
-    - q: "(B) के लिए कौन-सा approach ठीक बैठता है?"
-      a: "RAG: collection किसी भी context window के लिए बहुत बड़ा है, हर हफ़्ते बदलता है, और सवाल छोटे और factual हैं।"
-    - q: "(C) के लिए कौन-सा approach ठीक बैठता है?"
-      a: "बीच का रास्ता: client के metadata से पाँच contracts retrieve करो, फिर तुलना के लिए उन पूरे contracts को context में डालो।"
-    - q: "Team को (A) वाली choice पर भरोसा करने से पहले उसे कैसे confirm करना चाहिए?"
-      a: "जाने-पहचाने जवाबों वाले test सवाल लिखो, उन्हें long context और RAG दोनों से चलाओ, और accuracy, latency और cost की तुलना करो।"
+    - q: "(A) के लिए कौन-सा approach सही है, और cache कैसे set up करना चाहिए?"
+      a: "Tender को cache करके long context, document पहले और सवाल आख़िर में। सवालों के बीच का gap 5 minutes से ज़्यादा है, इसलिए 1-hour cache lifetime use करो।"
+    - q: "(B) के लिए कौन-सा approach सही है?"
+      a: "Equipment model के filters के साथ RAG, साथ में error codes और part numbers के लिए exact keyword search। Manuals किसी भी window के लिए बहुत बड़े हैं और हर हफ़्ते बदलते हैं।"
+    - q: "(C) के लिए कौन-सा approach सही है?"
+      a: "Document-level retrieval: client metadata से पाँचों contracts ढूँढो, फिर comparison के लिए वो पूरे contracts context में डालो।"
+    - q: "Choice (A) पर भरोसा करने से पहले team उसे कैसे confirm करे?"
+      a: "ऐसे test सवाल लिखो जिनके जवाब पता हों, cross-clause और distractor सवालों समेत, उन्हें long context और RAG दोनों से चलाओ, और accuracy, latency, cost और cache reads compare करो।"
 ask:
-  - "Long context models के साथ भी क्या RAG की ज़रूरत है?"
-  - "Prompt caching कैसे काम करती है?"
-  - "Context rot क्या है?"
+  - "क्या long context models के होते हुए भी RAG की ज़रूरत है?"
+  - "Prompt caching long context की cost को कैसे बदलती है?"
+  - "Fixed RAG pipeline की जगह agent को कब search करना चाहिए?"
 explain_in_interview:
-  answer: "Model को ज़रूरी information देने के दो तरीके हैं। Long context पूरे documents prompt में डाल देता है; RAG सिर्फ़ कुछ सबसे relevant passages retrieve करता है। Long context से model सब कुछ देख सकता है और cross-reference कर सकता है, पर हर call पर हर input token का पैसा लगता है, responses slow होते हैं, और models बीच वाली information को कम अच्छे से use करते हैं। RAG सस्ता, तेज़ है और लाखों documents तक scale करता है, पर जो retrieval miss करे वो miss हो जाता है। जैसे, Chennai की एक law firm एक contract शुरू से आख़िर तक review करते हुए उसे पूरा भेज सकती है, जबकि अपना पूरा archive search करने के लिए RAG चाहिए। बीच का रास्ता: सही documents retrieve करो और उन्हें पूरा भेजो।"
-  follow_up: "Prompt caching कब decision को long context की तरफ़ बदलता है?"
-  follow_up_answer: "जब वही लंबा document कई सवालों में reuse होता है। Cached input बाद की calls पर काफ़ी सस्ता और तेज़ हो सकता है, इसलिए एक contract पर बार-बार सवाल affordable हो जाते हैं। जब हर सवाल को अलग documents चाहिए, तब ये कम मदद करता है।"
-translated_on: 2026-11-14
+  answer: "किसी model को उसकी ज़रूरत की चीज़ देने के तीन तरीके हैं। Long context पूरे documents भेजता है, तो model cross-reference कर सकता है, लेकिन हर call हर token के पैसे देती है, जवाब धीमे होते हैं और inputs बढ़ने पर accuracy गिरती है। RAG कुछ passages retrieve करता है: सस्ता, तेज़ और scalable, लेकिन search जो miss करे वो ये भी miss करता है। Agentic search model को एक loop में search tools call करने देता है, जो multi-step सवाल संभाल लेता है, पर ज़्यादा calls और इंतज़ार की क़ीमत पर। जैसे, Chennai की एक law firm एक contract को caching के साथ पूरा भेज सकती है, 25,000 precedents पर RAG use कर सकती है और cross-references follow करने के लिए एक agent लगा सकती है। मैं real सवालों पर accuracy, cost और latency measure करके चुनता हूँ।"
+  follow_up: "Prompt caching कब फ़ैसले को long context की तरफ़ ले जाती है?"
+  follow_up_answer: "जब वही लंबा prefix cache lifetime के अंदर दोबारा use हो। Claude Sonnet 5.5 पर, 28 November 2026 तक, एक 40,000-token contract पर 12 सवालों की cost cached लगभग $0.18 है, uncached $1.00 के मुक़ाबले। अगर सवाल lifetime से ज़्यादा अंतर पर आएँ, तो हर call फिर से write premium देती है और caching ज़्यादा महँगी पड़ती है।"
+translated_on: 2026-11-28
 ---
 
 ## ये क्या है
 
-Model को ज़रूरी जानकारी देने के दो तरीके हैं:
+किसी सवाल का जवाब देने के लिए model को ज़रूरी जानकारी देने के तीन तरीके हैं:
 
-- **Long context**: पूरा document, या कई, prompt में डालो और सवाल पूछो।
-- **Retrieval (RAG)**: सबसे relevant कुछ passages search करो और सिर्फ़ वही prompt में डालो।
+- **Long context**: पूरे documents prompt में डालो, फिर पूछो।
+- **Retrieval (RAG)**: एक index पर एक बार search चलाओ और सिर्फ़ सबसे अच्छे कुछ passages prompt में डालो।
+- **Agentic search**: model को search tools दो (keyword search, एक metadata filter, "open document", एक database query) और उसे तय करने दो कि क्या ढूँढना है, results पढ़ने दो और फिर से search करने दो, जब तक वो जवाब न दे सके।
 
-आज के models बहुत लंबे inputs लेते हैं, तो long context अक्सर मुमकिन है। वो समझदारी है या नहीं, ये accuracy, cost, latency और scale पर निर्भर है।
+28 November 2026 तक, Anthropic के हर latest Claude model की context window 1-million-token की है, Anthropic के अंदाज़े से लगभग 555,000 शब्द। तो long context अक्सर possible है। वो समझदारी है या नहीं, ये accuracy, cost, latency और scale पर निर्भर है।
 
-| | Long context | RAG |
-|---|---|---|
-| Model को क्या मिलता है | पूरा contract (40,000 tokens), instructions और आख़िर में सवाल | 3 chunks और सवाल (3,000 tokens) |
-| ताक़त | सब कुछ देखता है, cross-reference कर सकता है | सस्ता, तेज़, लाखों documents तक scale होता है |
-| कमज़ोरी | Cache न हो तो महँगा, धीमा | जो retrieval से छूटे, वो छूट जाता है |
+| | Long context | RAG | Agentic search |
+| --- | --- | --- | --- |
+| Model क्या पढ़ता है | पूरे documents | एक search से 3 से 10 passages | कई steps में उसकी searches जो भी लौटाएँ |
+| ताक़त | सब कुछ देखता है; cross-reference कर सकता है | सस्ता, तेज़, millions of documents तक scale करता है | Multi-step सवाल और exact identifiers follow करता है |
+| कमज़ोरी | Length के साथ cost और delay बढ़ते हैं; लंबे inputs में accuracy गिरती है | एक search जो miss करे, वो ये भी miss करता है | ज़्यादा calls, धीमा, कम predictable |
+| Engineering | कम | Chunking, indexing, tuning | अच्छे tools, step limits, logging |
+
+```flow
+title: Measure करने से पहले, पहला फ़ैसला
+आपके documents -[window में आ जाएँ, अक्सर reuse हों]-> Caching के साथ long context
+आपके documents -[बहुत ज़्यादा, छोटे factual सवाल]-> RAG
+आपके documents -[बहुत ज़्यादा, जवाब को कई lookups चाहिए]-> Agentic search
+RAG -[सवालों को पूरे documents चाहिए]-> Document-level retrieval, फिर long context
+```
+
+ये lesson Chennai की एक law firm को follow करता है, जो तीन बहुत अलग-अलग uses के लिए एक contract assistant बना रही है।
+
+## ये कैसे काम करता है
+
+### Inputs बढ़ने पर accuracy गिरती है
+
+Models लंबे input की हर position को बराबर अच्छी तरह use नहीं करते।
+
+- **Lost in the middle.** Liu और साथियों (2023) ने models को कई documents दिए और पाया कि accuracy तब सबसे ज़्यादा थी जब जवाब शुरुआत या आख़िर के पास था, और बीच में सबसे कम: एक U-shaped curve।
+- **Context rot.** Chroma की report (July 2025) ने 18 models test किए और पाया कि input बढ़ने के साथ performance कम भरोसेमंद होती गई, simple tasks पर भी। जब सवाल और जवाब शब्दों और मतलब में कम मिलते-जुलते थे, यानी model को match करने की जगह infer करना पड़ा, तो ये और तेज़ी से गिरी। एक भी plausible distractor, यानी ऐसा sentence जो जवाब जैसा दिखे पर हो नहीं, accuracy घटा देता था, और ज़्यादा distractors उसे और घटाते थे।
+
+इसे ऐसे समझो: जवाब के आसपास जितने ज़्यादा मिलते-जुलते sentences होंगे, model के ग़लत वाला उठाने के उतने ज़्यादा मौके होंगे।
+
+इसलिए **advertised window** (API जितना accept करती है) को **effective context** से अलग रखो: वो length जिस पर *आपका* task accurate रहता है। "Needle in a haystack" test, यानी एक planted sentence ढूँढना, सबसे आसान case है, और आजकल के models इसे अक्सर pass कर लेते हैं। Pass होने से उन सवालों के बारे में कम पता चलता है जो clauses compare करते हैं, figures जोड़ते हैं या किसी rule के पुराने version को ignore करना माँगते हैं।
+
+### Cost: हर call पर हर token के पैसे
+
+जब तक document cache न हो, हर सवाल उसे पूरा दोबारा भेजता है और पूरे के पैसे दोबारा देता है। Claude Sonnet 5.5 की list prices, 28 November 2026 को Anthropic के pricing page पर check कीं:
+
+| Item | USD प्रति million tokens | Input price का गुना |
+| --- | --- | --- |
+| Input | $2.00 | 1x |
+| Cache write, 5-minute lifetime | $2.50 | 1.25x |
+| Cache write, 1-hour lifetime | $4.00 | 2x |
+| Cache read | $0.10 | 0.05x |
+| Output | $10.00 | 5x |
+
+Cache-read का गुना model के हिसाब से बदलता है: Claude Fable 5.2 पर 0.025x, Claude Opus 5.5 और Sonnet 5.5 पर 0.05x, और Claude Haiku 5.5 समेत बाक़ी ज़्यादातर पर 0.1x। कुछ models लंबे prompts के लिए प्रति token ज़्यादा charge भी करते हैं: Claude Haiku 5.5 का input $0.10 प्रति million tokens है जब prompt 100,000 tokens तक हो, और उससे लंबा होने पर पूरी request के लिए $0.50 (वही check date)। दूसरे providers caching का price अलग तरह से रखते हैं, इसलिए अपने provider का page पढ़ो और date लिख लो।
+
+### Prompt caching: ये क्या बदलती है, और कब fail होती है
+
+**कैसे काम करती है।** Provider आपके prompt की processed शुरुआत (prefix) store कर लेता है। बाद की कोई request जिसका prefix byte-for-byte वही हो, उसे cache से पढ़ती है: सस्ता, और first token तक तेज़। इसलिए लंबा, stable हिस्सा पहले रखो और सवाल आख़िर में, इससे सवाल भी वहीं रहता है जहाँ से model लिखना शुरू करता है।
+
+**Lifetime.** Default में एक cache entry 5 minutes रहती है, और हर hit clock को reset करता है। 1-hour lifetime का write 2x पड़ता है। Anthropic के docs कहते हैं कि 5-minute cache एक read के बाद अपनी क़ीमत वसूल कर लेता है और 1-hour cache दो के बाद।
+
+**Gotchas जो experts check करते हैं:**
+
+- **Lifetime से लंबे gaps.** अगर 5-minute cache के साथ सवाल हर 15 minutes पर आएँ, तो हर call फिर से 1.25x write देती है, यानी आप बिना cache से *ज़्यादा* पैसे देते हो।
+- **बदलता prefix.** Document से पहले एक timestamp, एक user name या re-order की गई tool list उसके बाद आने वाली हर चीज़ का match तोड़ देती है।
+- **Parallel calls.** Cache entry तभी available होती है जब पहला response शुरू हो जाए, इसलिए एक साथ भेजे गए दस सवाल सब miss करते हैं।
+- **हर user का एक document.** अगर 500 users अपना-अपना contract upload करें, तो वो 500 अलग cache writes हैं। Caching हर session की मदद करती है, पूरे system की नहीं।
+- **Isolation.** Caches organisations के बीच कभी share नहीं होते, और Anthropic की API पर workspaces के बीच भी नहीं।
+
+Check करो कि ये चला: response का `usage` `cache_creation_input_tokens` और `cache_read_input_tokens` report करता है। अगर reads zero पर ही रहें, तो कुछ prefix को तोड़ रहा है।
+
+### Latency और scale
+
+Input length के साथ time to first token बढ़ता है, इसलिए बहुत लंबे uncached prompts chat को धीमा महसूस कराते हैं। Agentic search हर step पर एक model round trip जोड़ता है। और window की एक limit है; किसी company के documents की नहीं। जैसे, लगभग 30,000 tokens वाले 18,000 manuals कुल 540 million tokens बनते हैं, यानी 1-million-token window का 540 गुना। जब corpus window से बड़ा हो जाए, तो किसी चीज़ को चुनना पड़ता है कि क्या भेजना है।
+
+### Agentic search, तीसरा option
+
+आपके code के चुने एक search की जगह, model खुद search चलाता है। Anthropic अपनी context engineering guide (September 2025) में इस "just in time" approach को समझाता है: Claude Code ज़रूरत पड़ने पर files ढूँढने के लिए glob और grep जैसे tools use करता है, जबकि कुछ files पहले से load होती हैं। Guide trade-off साफ़ बताती है: run time पर explore करना pre-computed retrieval results पढ़ने से धीमा है।
 
 ```flow
 dir: LR
-title: बीच का रास्ता
-Question -> सही 2 documents ढूँढो -> उन्हें पूरा model को भेजो
+title: एक सवाल पर agentic search
+सवाल -> Client से contracts search करो | filters के साथ keyword search
+Client से contracts search करो -> Master agreement खोलो | clause 9 पढ़ता है
+Master agreement खोलो -> Clause 9 के references search करो
+Clause 9 के references search करो -> Citations के साथ जवाब
 ```
 
-इस lesson में हम Chennai की एक law firm को देखेंगे जो contract-review assistant बना रही है, जिसके दो बहुत अलग use हैं।
+**कहाँ जीतता है:** ऐसे सवाल जहाँ अगला lookup पिछले result पर निर्भर हो, exact identifiers (clause numbers, error codes, part numbers) जिन्हें embeddings धुँधला कर देते हैं, और तेज़ी से बदलता data जिसे re-index करने की जगह live query कर सको। Tools हर user की permissions भी लागू कर सकते हैं।
 
-## ये काम कैसे करता है
+**क्या cost है:** हर step एक और model call है जो बढ़ती हुई conversation दोबारा भेजती है। जैसे, 2,000 tokens के instructions और tools हों और हर step पर 3,000 tokens के results जुड़ें, तो छह steps 2,000 + 5,000 + ... + 17,000 = 57,000 input tokens भेजते हैं, जबकि एक RAG call में लगभग 3,000। पहले के turns cache करने से ये कम होता है।
 
-**लंबे inputs में accuracy।** Models सारी positions को बराबर use नहीं करते। Studies में पाया गया कि लंबे context के बीच की जानकारी शुरू या आख़िर की जानकारी से कम अच्छी तरह use होती है ("lost in the middle"), और input बढ़ने पर आसान tasks में भी performance गिर सकती है। नए models बेहतर हुए हैं, पर आपको अपने documents और सवालों के types पर test करना चाहिए।
+**कैसे fail होता है:** बहुत जल्दी रुक जाता है, एक ही search पर loop करता है, या tool output से अपना context भर लेता है। समझदार defaults: steps पर cap लगाओ (जैसे, 8), tools पूरी files की जगह document IDs के साथ छोटे snippets लौटाएँ, और हर tool call log करो ताकि failures पढ़ सको।
 
-**Cost।** आप हर call पर हर input token का पैसा देते हो। हर सवाल के साथ 200,000 tokens का document भेजना, 3,000 tokens के retrieve किए passages भेजने से कहीं ज़्यादा महँगा है। **Prompt caching** इसे बदल देती है: अगर वही लंबा document कई सवालों में दोबारा use हो, तो बाद की calls पर cached input बहुत सस्ता और तेज़ हो सकता है।
+### दो और patterns
 
-**Latency।** Input जितना लंबा, पहला token आने में उतना समय। Cache न हो तो लंबे prompts interactive use को धीमा कर देते हैं।
+- **Document-level retrieval.** Titles, summaries या metadata पर search करके सही कुछ पूरे documents चुनो, फिर long context को उन्हें पढ़ने दो। ये contracts, policies और reports के लिए ठीक है।
+- **Map-reduce.** "सारी 40 board meetings summarise करो" जैसे काम के लिए, हर document को अलग से summarise करो (map), फिर summaries को जोड़ो (reduce)। ये किसी भी corpus size पर चलता है पर detail खो देता है, इसलिए हर summary से citations रखने को कहो।
 
-**Scale।** Context window की एक limit है; company के documents की नहीं। Corpus window से बड़ा हो जाए, तो आपको कुछ तो retrieve करना ही पड़ेगा, कम से कम ये चुनने के लिए कि कौन-से documents भेजने हैं।
+```python
+def doc_level_prompt(question, search_docs, load_doc, max_docs=3):
+    docs = search_docs(question, k=max_docs)    # over titles, summaries and metadata
+    context = "\n\n".join(f"<document title='{d['title']}'>\n{load_doc(d['id'])}\n</document>" for d in docs)
+    return context + f"\n\nAnswer from the documents above. Cite titles and clause numbers.\nQuestion: {question}"
+```
 
-**अंगूठे के नियम।**
+### Privacy
 
-- एक या कुछ documents, एक session में उनके बारे में कई सवाल, और ऐसे सवाल जिनमें पूरा document चाहिए (summaries, sections के बीच तुलना): long context, बेहतर हो अगर cached हो।
-- बड़े या बढ़ते collections, छोटे factual सवाल, कई users: RAG।
-- बीच का रास्ता: document level पर retrieve करो (सही दो contracts ढूँढो), फिर उन पूरे documents को context में डालो।
+Long context पूरे documents model provider को भेजता है; RAG सिर्फ़ passages भेजता है। अगर documents में personal data है, तो client का data agreement और भारत की data-protection obligations check करो, और जो task को नहीं चाहिए उसे redact करो।
 
-**Hybrid आदतें।** Long context में भी instructions और सवाल आख़िर में रखो, sections या pages की citations माँगो, और documents को एक जैसे, labelled format में रखो।
+### Decision rules
 
-**Options की तुलना:**
+- एक या कुछ documents, एक session में कई सवाल, ऐसे जवाब जिन्हें पूरा text चाहिए: **long context, cached**।
+- बड़ा या बढ़ता collection, छोटे factual सवाल, कई users: **RAG**।
+- ऐसे जवाब जिन्हें कई dependent lookups या exact identifiers चाहिए: **agentic search**, step limits के साथ।
+- पूरे documents चाहिए पर चुनने को सैकड़ों हैं: **document-level retrieval, फिर long context**।
 
-| Factor | Long context | RAG |
-| --- | --- | --- |
-| Corpus का size | Context window तक | असीमित |
-| जिन सवालों में पूरा document चाहिए | मज़बूत | कमज़ोर, chunking पर निर्भर |
-| छोटे factual lookups | ठीक, पर महँगा | मज़बूत |
-| हर सवाल का cost | Cache के बिना ज़्यादा, caching से कम | कम |
-| Latency | ज़्यादा, caching से कम | कम |
-| बदलते documents | हर बार दोबारा भेजो | बदले items को दोबारा index करो |
-| Engineering की मेहनत | कम | ज़्यादा: chunking, indexing, retrieval tuning |
+### अपने documents पर position और distractors test करो
 
-**Cost की एक तुलना, हिसाब के साथ।** मान लो input की price हर दस लाख tokens पर तय है। हर सवाल के साथ 40,000 tokens का contract भेजने पर 12 सवालों के लिए करीब 480,000 input tokens लगते हैं। Caching के साथ, बाद की calls cached contract को सामान्य price के एक हिस्से में पढ़ती हैं, तो कुल cost करीब चौथाई तक गिर सकती है। RAG हर सवाल पर करीब 3,000 tokens भेजता है, कुल 36,000, जो और भी सस्ता है पर cross-reference वाले सवालों में बदतर score आया। सही choice उस task के लिए accuracy को इन costs के सामने तौलती है, अकेली cost से नहीं।
+Published studies चेतावनी देती हैं, जवाब नहीं। ये harness बनावटी audit notes (जो किसी real चीज़ से टकरा नहीं सकते) कई depths पर plant करता है, मिलते-जुलते distractors जोड़ता है और एक two-hop सवाल test करता है:
 
-**अपने documents पर test करना।** Published studies चेतावनी देती हैं, जवाब नहीं। ऐसे सवाल लिखो जिनका जवाब document में शुरू, बीच और आख़िर में हो, और ऐसे सवाल जिनमें दो दूर के sections चाहिए। दोनों तरह से चलाओ और failures पढ़ो।
+```python
+import random
 
-**Code में position test।** किसी असली document की अलग-अलग गहराइयों पर एक fact डालो और देखो कि जवाब सही रहते हैं या नहीं:
+FACT = "Audit note: the Hosur warehouse inspection code is HW-7319."
+DISTRACTORS = ["Audit note: the Hosur office inspection code is HO-7391.",
+               "Audit note: the 2019 Hosur warehouse code, now withdrawn, was HW-1973."]
+HOPS = ["Audit note: the Hosur warehouse audit is led by Farida Sheikh.",
+        "Audit note: Farida Sheikh's desk extension is 4826."]
+CODE_Q = "What is the current inspection code for the Hosur warehouse?"
+TESTS = {   # name: (where to insert notes, question, expected answer)
+    "single fact": (lambda d: [(d, FACT)], CODE_Q, "HW-7319"),
+    "distractors": (lambda d: [(d, FACT)] + [(random.random(), s) for s in DISTRACTORS], CODE_Q, "HW-7319"),
+    "two hops": (lambda d: [(d, HOPS[0]), ((d + 0.5) % 1, HOPS[1])],
+                 "Which extension reaches the person who leads the Hosur warehouse audit?", "4826"),
+}
+
+def build(doc, inserts):
+    paras = doc.split("\n\n")                        # insert between paragraphs, never mid-sentence
+    for depth, note in sorted(inserts, reverse=True):
+        paras.insert(int(len(paras) * depth), note)
+    return "\n\n".join(paras)
+
+def run(doc, ask, depths=(0.05, 0.25, 0.5, 0.75, 0.95), runs=3):
+    for name, (inserts, question, expected) in TESTS.items():
+        for d in depths:
+            ok = sum(expected in ask(build(doc, inserts(d)) + "\n\nAnswer from the document only. " + question)
+                     for _ in range(runs))
+            print(f"{name:12} depth {d:4.0%}: {ok}/{runs} correct")
+```
+
+`ask` कोई भी function है जो prompt भेजे और text लौटाए। Anthropic SDK के साथ:
 
 ```python
 import anthropic
 
 client = anthropic.Anthropic()
-FACT = "The penalty for late GST filing under clause 14.3 is ₹750 per day."
-QUESTION = "What is the penalty per day for late GST filing under clause 14.3?"
 
-def plant(doc, depth):
-    cut = int(len(doc) * depth)
-    return doc[:cut] + "\n\n" + FACT + "\n\n" + doc[cut:]
-
-def position_test(doc, depths=(0.05, 0.5, 0.95), runs=3):
-    for d in depths:
-        correct = 0
-        for _ in range(runs):
-            r = client.messages.create(
-                model="claude-sonnet-5-5", max_tokens=100,       # check the docs for current names
-                messages=[{"role": "user", "content": plant(doc, d) + "\n\n" + QUESTION}])
-            text = "".join(b.text for b in r.content if b.type == "text")
-            correct += "750" in text
-        print(f"fact at {d:.0%} depth: {correct}/{runs} correct")
+def ask(prompt):
+    r = client.messages.create(model="claude-opus-5-5", max_tokens=2000,   # the model you will deploy
+                               output_config={"effort": "low"},
+                               messages=[{"role": "user", "content": prompt}])
+    return "".join(b.text for b in r.content if b.type == "text")
 ```
 
-इसे अपने असली documents और lengths के साथ चलाओ। फिर ऐसे सवाल test करो जिनमें दो दूर के sections चाहिए, जहाँ long context अक्सर RAG को हराता है।
+उम्मीद करो कि single-fact row लगभग perfect होगी; distractor और two-hop rows ही असली जानकारी देती हैं। फिर अपने real सवालों के types जोड़ो, जैसे sections के बीच comparisons।
 
-**Cost की तुलना जो आप खुद बदल सको।** मौजूदा prices डालो, और जिस दिन check किया वो date भी लिखो:
+### एक cost model जिसे आप बदल सकते हो
 
 ```python
-def cost_inr(input_tokens, output_tokens, price_in, price_out, cached_tokens=0, cache_read_ratio=0.1,
-             usd_to_inr=84):
-    """Prices in USD per million tokens. cache_read_ratio: cached input price as a share of normal."""
-    uncached = input_tokens - cached_tokens
-    usd = (uncached * price_in + cached_tokens * price_in * cache_read_ratio + output_tokens * price_out) / 1e6
-    return usd * usd_to_inr
+# Claude Sonnet 5.5 list prices in USD per million tokens, checked 28 November 2026
+# (platform.claude.com/docs/en/about-claude/pricing). Re-check before you use them.
+PRICE_IN, PRICE_OUT = 2.00, 10.00
+WRITE_X, READ_X = 1.25, 0.05   # 5-minute cache write and cache read, as multiples of PRICE_IN
 
-questions, doc, out = 12, 40_000, 300
-long_ctx = sum(cost_inr(doc + 100, out, 3, 15, cached_tokens=doc if i else 0) for i in range(questions))
-rag = questions * cost_inr(3_000, out, 3, 15)
-print(f"long context with caching ₹{long_ctx:.1f}, RAG ₹{rag:.1f}")
+def call_usd(fresh_in, out, cache_write=0, cache_read=0):
+    """Cost of one call. fresh_in: normal input tokens; cache_write/cache_read: cached prefix tokens."""
+    inp = fresh_in + cache_write * WRITE_X + cache_read * READ_X
+    return (inp * PRICE_IN + out * PRICE_OUT) / 1e6
+
+Q, DOC, ASK, OUT, RAG_IN = 12, 40_000, 100, 300, 3_000
+
+no_cache = Q * call_usd(DOC + ASK, OUT)
+cached = call_usd(ASK, OUT, cache_write=DOC) + (Q - 1) * call_usd(ASK, OUT, cache_read=DOC)
+expired = Q * call_usd(ASK, OUT, cache_write=DOC)   # every gap longer than the cache lifetime
+rag = Q * call_usd(RAG_IN + ASK, OUT)
+
+for name, usd in [("long context, no cache", no_cache), ("long context, cached", cached),
+                  ("long context, cache always expired", expired), ("RAG, 3,000 tokens", rag)]:
+    print(f"{name:36} ${usd:.3f}")
 ```
 
-पहली call पूरे document का पैसा देती है (और आम तौर पर cache लिखने के लिए थोड़ा extra); बाद की calls, अगर cache की उम्र के अंदर आएँ, तो उसे सस्ते में पढ़ती हैं। Numbers को अपने document sizes और traffic के हिसाब से बदलो।
+ये no cache पर $0.998, cached पर $0.182, cache हमेशा expire होने पर $1.238, और RAG के लिए $0.110 print करता है। Caching long-context bill को 80% से ज़्यादा घटा देती है, जिससे वो RAG के क़रीब आ जाता है; expire हुआ cache उसे सबसे महँगा option बना देता है। Dollars को उस दिन के rate पर convert करो, और अपने documents के tokens अपने provider के counter से गिनो, क्योंकि tokenizers अलग-अलग होते हैं।
 
-**Code में बीच का रास्ता।** Chunks नहीं, पूरे documents retrieve करो, फिर पढ़ने का काम long context को करने दो:
+## एक worked example
 
-```python
-def doc_level_answer(question, search_docs, load_doc, max_docs=2):
-    docs = search_docs(question, k=max_docs)          # search over document summaries or titles
-    context = "\n\n".join(f"<document title='{d['title']}'>\n{load_doc(d['id'])}\n</document>" for d in docs)
-    return context + f"\n\nAnswer using the documents above, citing titles and sections.\nQuestion: {question}"
-```
+Chennai की एक law firm को contract assistant चाहिए। नीचे के numbers illustrative हैं, उस तरह के जो team record करेगी; costs 28 November 2026 को check की गई Claude Sonnet 5.5 prices पर हैं।
 
-ये contracts, policies और reports के लिए ठीक है जहाँ सवालों में पूरा document चाहिए पर आपके पास उनके सैकड़ों हैं।
+**1. एक contract review करना.** एक lawyer 60-page agreement (लगभग 40,000 tokens) upload करता है और लगभग 12 सवाल पूछता है: termination rights, indemnity caps, conflict करने वाले clauses। कई जवाबों को पूरा document चाहिए, इसलिए team long context use करती है, contract cached और सवाल आख़िर में। Lawyers सवालों के बीच अक्सर 5 minutes से ज़्यादा रुकते हैं, इसलिए वो 1-hour cache चुनते हैं। तब बारह सवालों की cost लगभग $0.24 होती है, uncached लगभग $1.00 के मुक़ाबले। मान लो 30-question test पर long context 27 सही करता है और chunk-based RAG 22, और RAG की ज़्यादातर ग़लतियाँ clauses के बीच cross-references पर हैं। Team distractor test भी चलाती है, क्योंकि उनके contracts में उसी clause के पुराने, बदले जा चुके versions हैं।
 
-**तीन चीज़ें नापकर तय करो।** आपके सवालों के types पर accuracy, आपके traffic पर हर जवाब का cost, और पहले token का समय। हर option के लिए numbers एक छोटी table में लिखो और client के साथ चुनो, आदत से नहीं।
+**2. Precedent library में search करना.** 25,000 पुराने contracts, किसी भी window से बहुत आगे। Lawyers पूछते हैं "IT services contracts में ऐसे indemnity clauses ढूँढो जो पिछले 12 months में दी गई fees तक capped हों"। Team metadata filters (contract type, year) के साथ hybrid retrieval use करके सबसे अच्छे 20 clauses ढूँढती है, फिर एक model उन्हें citations के साथ summarise करता है। वो recall measure करते हैं: मान लो 50 test सवालों में से 46 के लिए सही clause top 20 में है।
 
-## एक example से समझो
+**3. Cross-references follow करना.** एक partner पूछता है: "इस client के साथ हमारे कौन-से contracts उस master agreement clause पर निर्भर हैं जो 2025 amendment में बदला?" एक search इसका जवाब नहीं दे सकता: system को amendment ढूँढना है, पढ़ना है कि कौन-सा clause बदला, फिर उस clause को cite करने वाले contracts ढूँढने हैं। Team तीन tools (client से search, document खोलना, clause number से search) और 8 steps के cap के साथ agentic search use करती है। मान लो एक typical जवाब में 5 tool calls और लगभग 30 seconds लगते हैं: chat के लिए बहुत धीमा, research task के लिए ठीक।
 
-Chennai की एक law firm contract review के लिए assistant चाहती है। दो use cases:
-
-*एक contract की review।* एक lawyer 60 पन्नों का agreement (करीब 40,000 tokens) upload करता है और एक दर्जन सवाल पूछता है: termination rights, indemnity caps, clauses के बीच टकराव। कई जवाबों में पूरा document चाहिए। आप contract को cache करके long context use करते हो। पहला सवाल 9 सेकंड लेता है; बाद वाले 2 से 3 सेकंड लेते हैं और cache की वजह से बहुत सस्ते पड़ते हैं। 30 सवालों के test पर long context 90% लाता है, जबकि chunk-based RAG 73%, जो clauses के बीच के cross-references miss कर गया।
-
-*Firm की precedent library में search।* 25,000 पुराने contracts, किसी भी context window से बहुत ज़्यादा। Lawyers पूछते हैं "IT services contracts में ऐसे indemnity clauses ढूँढो जिनकी cap पिछले 12 महीनों में दी fees तक है।" आप metadata filters के साथ hybrid retrieval से सबसे अच्छे 20 clauses ढूँढते हो, फिर एक model उन्हें citations के साथ summarise करता है।
-
-Firm को दोनों मिलते हैं, हर एक वहाँ जहाँ वो फिट बैठता है।
-
-| Use case | Approach | Accuracy | नोट्स |
+| Use case | Approach | क्यों | Illustrative result |
 | --- | --- | --- | --- |
-| एक 60-page contract की review | Long context, cached | 90% | Chunk-based RAG का score 73% था |
-| 25,000 precedents में search | Filters के साथ hybrid retrieval | Recall से नापा गया | किसी भी window से बहुत बड़ा |
+| एक 60-page contract | Long context, 1-hour cache | जवाबों को पूरा text चाहिए | Chunk RAG के 22/30 के मुक़ाबले 27/30; एक session का लगभग $0.24 |
+| 25,000 precedents | Filters के साथ hybrid retrieval | किसी भी window से बहुत आगे | 46/50 के लिए सही clause top 20 में |
+| Cross-reference सवाल | Agentic search, 8-step cap | अगला lookup पिछले पर निर्भर | हर जवाब पर लगभग 5 calls और 30 seconds |
 
-## आम गलतियाँ
+## आम ग़लतियाँ
 
-- **ये मान लेना कि long context हमेशा ज़्यादा accurate है।** Test करो; लंबाई और position के साथ accuracy गिर सकती है।
-- **हर सवाल का cost ignore करना।** हर सवाल पर लंबे uncached prompts scale पर महँगे पड़ते हैं।
-- **Caching भूल जाना।** एक ही document के बार-बार use में ये economics बदल देती है।
-- **सवाल पहले रखना।** Instructions और सवाल लंबे material के बाद रखो।
-- **"RAG ख़त्म हो गया" वाली सोच।** बड़े collections को अब भी retrieval चाहिए।
-- **Caching के बिना costs की तुलना करना**, जब वही document कई सवालों के काम आ रहा हो।
-- **ये मान लेना कि बड़ी window का मतलब model उसे पूरा अच्छी तरह use करता है।** Positions और cross-references test करो।
+- **Advertised window पर भरोसा करना.** 1 million tokens accept करने वाला model उन्हें अच्छी तरह use करे, ये ज़रूरी नहीं। अपने सवालों के types पर effective context measure करो।
+- **सिर्फ़ एक planted fact से test करना.** ये सबसे आसान case है। Distractors, two-hop सवाल और बिना जवाब वाले सवाल जोड़ो।
+- **Caching के बिना costs compare करना**, या ऐसे cache पर भरोसा करना जो कभी hit नहीं होगा (ऊपर के gotchas देखो)।
+- **सवाल, timestamp या user name को document से पहले रखना.** इससे cache टूटता है और accuracy पर भी असर पड़ता है।
+- **"RAG ख़त्म हो गया" वाली सोच.** बड़े और बदलते collections को अब भी retrieval चाहिए, कम से कम documents चुनने के लिए।
+- **One-hop lookups के लिए agent use करना.** अगर एक search से जवाब मिल जाए, तो agent बस calls और delay जोड़ता है।
+- **बिना step limit या logs के agent चलाना.** जो failures दिखें ही नहीं, उन्हें ठीक नहीं कर सकते।
+- **Personal data से भरे पूरे documents भेजना**, जब passages से ही सवाल का जवाब मिल जाता।
 
 ## जब choice साफ़ हो
 
 - **एक छोटा document**: बस उसे prompt में डाल दो।
-- **लाखों documents**: किसी न किसी तरह का retrieval चाहिए, कम से कम documents चुनने के लिए।
-- **Structured data से जवाब**, जैसे records या tables: database query या tool use करो, इनमें से कोई नहीं।
+- **Millions of documents**: किसी न किसी तरह का retrieval चाहिए, कम से कम documents चुनने के लिए।
+- **Structured data से जवाब**, जैसे records या tables: इनमें से कुछ नहीं, एक tool के ज़रिए database query करो।
 
 ## Demo से production तक
 
-- **चुने हुए approach की accuracy, cost और latency record करो**, अपने golden set पर, और model बदलने पर दोबारा check करो।
-- **Prompt caching use करो** उन लंबे documents के लिए जो कुछ मिनटों के अंदर दोबारा use होते हैं।
-- **हर request के input tokens log करो** और अनचाही बढ़त पर alert लगाओ।
-- **Position test दोबारा चलाओ** जब model बदले या documents की लंबाई बढ़े।
-- **बीच का रास्ता याद रखो**: collections बढ़ने पर document-level retrieval अक्सर जीतता है।
+- **चुने हुए approach के लिए accuracy, cost और latency record करो** अपने golden set पर, और हर model change पर फिर check करो।
+- **Cache hit rate track करो** `cache_read_input_tokens` से, और गिरने पर alert करो।
+- **हर request के input tokens log करो** और अचानक बढ़ने पर alert करो।
+- **Position और distractor tests फिर चलाओ** जब models बदलो या documents बढ़ें।
+- **Agents के लिए, हर tool call log करो** और हर जवाब के steps पर नज़र रखो; बढ़ती गिनती एक early warning है।
+- **Prices उनकी date के साथ फिर check करो**, कम से कम हर quarter।
 
-## Practice करो
+## Practice
 
-Lost in the Middle का abstract, Chroma की context rot report और अपने provider की prompt caching guide पढ़ो।
+Lost in the Middle का abstract और figures, Chroma की context rot report और अपने provider की prompt caching guide पढ़ो।
 
-1. कोई एक लंबा document (annual report या policy) चुनो और 15 सवाल लिखो, कुछ ऐसे जिनमें पूरा document चाहिए।
-2. उन्हें long context से और अपनी RAG pipeline से जवाब दिलवाओ। हर एक की accuracy, latency और cost record करो।
-3. Long-context वाला run prompt caching के साथ दोहराओ और तुलना करो।
-4. अपने लंबे document पर position_test पाँच गहराइयों पर चलाओ और गहराई के सामने accuracy plot करो।
+1. एक लंबा document (annual report या policy) चुनो और 15 सवाल लिखो: कुछ single facts, कुछ जिन्हें दो दूर-दूर के sections चाहिए, एक जिसका जवाब document में है ही नहीं।
+2. उनके जवाब long context से और अपनी RAG pipeline से लो। हर एक के लिए accuracy, latency और cost record करो।
+3. Long-context run को prompt caching के साथ दोहराओ। Confirm करो कि `cache_read_input_tokens` zero से ऊपर है, फिर cost और time to first token compare करो।
+4. ऊपर वाला harness अपने document पर पाँच depths पर चलाओ और हर test type के लिए depth के against accuracy plot करो।
+5. दो-section वाले सवालों में से दो के लिए, model को document पर एक keyword search tool दो और गिनो कि वो कितने steps लेता है।
 
-और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 5 context length और models लंबे inputs को कितना अच्छा use करते हैं, ये cover करता है, और chapter 6 कब retrieve करना है।
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 5 context length और models लंबे inputs को कितनी अच्छी तरह use करते हैं, ये cover करता है, और chapter 6 RAG और agents को।
 
-**आपका काम पूरा जब** आप बताए गए use case के लिए, अपने खुद के numbers के साथ, long context या RAG recommend कर सको।
+**आपका काम पूरा है जब आप** किसी दिए गए use case के लिए long context, RAG या agentic search recommend कर सको, अपने खुद के accuracy, cost और latency numbers के साथ।
