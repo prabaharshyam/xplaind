@@ -3,219 +3,329 @@ id: tracing-llm-apps
 lang: hi
 title: "LLM apps की tracing"
 outcome: "हर request को retrieval, prompts, model calls और tools से होकर trace कर पाओगे, inputs, outputs, tokens, cost और timings के साथ, और traces से गलत जवाबों को debug कर पाओगे।"
-answer: "Tracing LLM request का हर step record करती है: retrieval, prompts, model calls और tool calls, inputs, outputs, tokens, cost और time के साथ, ताकि आप देख सको कि जवाब कहाँ गलत हुआ।"
-why_it_matters: "जब client कहे \"assistant ने कल Ramesh को गलत जवाब दिया\", तो आपको ठीक-ठीक देखना होता है कि उसने क्या retrieve किया, कौन-सा prompt भेजा और क्या वापस आया। Traces के बिना आप अंदाज़े लगाते हो। Traces के साथ ज़्यादातर AI bugs मिनटों में मिल जाते हैं।"
+answer: "Tracing किसी LLM request का हर step record करती है: retrieval, prompts, model calls और tool calls, उनके inputs, outputs, tokens, cost और time के साथ, ताकि आप देख सको कि जवाब कहाँ गलत हुआ।"
+why_it_matters: "जब client कहे «assistant ने कल Ramesh को गलत जवाब दिया», तो आपको ठीक-ठीक देखना होता है कि उसने क्या retrieve किया, कौन-सा prompt भेजा और क्या वापस आया। Traces के बिना आप अंदाज़ा लगाते हो। Traces के साथ ज़्यादातर AI bugs मिनटों में मिल जाते हैं।"
 flashcards:
   - q: "Trace क्या होता है?"
     a: "एक request का शुरू से अंत तक का record, जो nested spans से बना होता है, हर step का एक span, inputs, outputs और timings के साथ।"
   - q: "Model-call span में क्या record होता है?"
-    a: "Inputs, outputs, start और end time, model का नाम, token counts और cost।"
-  - q: "Traces और आम logs में क्या फ़र्क है?"
-    a: "Logs बताते हैं कि कुछ हुआ; traces हर step के inputs और outputs दिखाते हैं, ताकि आप देख सको कि system ने वही जवाब क्यों दिया।"
+    a: "Inputs, outputs, start और end time, माँगा गया model और जवाब देने वाला model, prompt version, token counts और cost। Text mask होता है, और तभी record होता है जब आप opt in करो।"
+  - q: "Traces आम logs से कैसे अलग हैं?"
+    a: "Logs बताते हैं कि कुछ हुआ; traces हर step के inputs और outputs दिखाते हैं, ताकि आप देख सको कि system ने वैसा जवाब क्यों दिया।"
   - q: "Debugging में कौन-से attributes सबसे ज़्यादा काम आते हैं?"
-    a: "Pseudonymous user id, session id, app version, prompt version, और retrieved document ids उनके scores के साथ।"
+    a: "एक pseudonymous user id, session id, app version, prompt version, और retrieve हुए document ids उनके scores के साथ।"
   - q: "Traces के लिए privacy के कौन-से कदम चाहिए?"
-    a: "भेजने से पहले personal data mask करो या हटाओ, retention period तय करो, देखने वालों को सीमित रखो, और ज़रूरत हो तो in-region tool use करो।"
-  - q: "ज़्यादा volume में traces का sampling कैसे करें?"
-    a: "जिन traces में errors या खराब feedback हो वो सब रखो, और बाकी में से एक sample रखो।"
+    a: "भेजने से पहले personal data mask करो या हटा दो, एक retention period तय करो, देखने वालों को सीमित रखो, और ज़रूरत हो तो in-region tool use करो।"
+  - q: "ज़्यादा volume पर traces की sampling कैसे करें?"
+    a: "Tail sampling से हर error वाला और हर slow trace रखो, और बाकी का एक हिस्सा। Head sampling इतनी जल्दी फ़ैसला करती है कि सारे errors नहीं रख पाती। Feedback बाद में आता है, इसलिए सब कुछ थोड़े समय के लिए रखो।"
   - q: "खराब जवाब का trace खोलने पर पहला सवाल क्या होता है?"
-    a: "क्या सही passage retrieve हुआ और prompt में गया? इससे retrieval failures और generation failures अलग हो जाते हैं।"
+    a: "क्या सही passage retrieve हुआ और prompt में डाला गया? इससे retrieval failures और generation failures अलग हो जाते हैं।"
   - q: "OpenTelemetry क्या है?"
     a: "Traces का आम open standard, जिस पर कई AI tracing tools बने हैं।"
   - q: "OpenTelemetry GenAI conventions क्या हैं?"
-    a: "Model calls के लिए standard attribute नाम, जैसे gen_ai.request.model और gen_ai.usage.input_tokens, ताकि अलग-अलग tracing tools आपके spans को एक ही तरह पढ़ें।"
+    a: "Model, tool और agent spans के standard नाम, जैसे gen_ai.request.model और gen_ai.usage.input_tokens, ताकि tools आपके spans को एक जैसा पढ़ें। November 2026 के हिसाब से ये अभी भी Development marked हैं।"
   - q: "Tail sampling क्या है?"
-    a: "Trace पूरा होने के बाद तय करना कि उसे रखना है या नहीं, ताकि errors या slow steps वाले सारे traces रखे जाएँ और normal वालों का सिर्फ़ एक sample store हो।"
+    a: "Trace के spans आ जाने के बाद तय करना कि उसे रखना है या नहीं, जैसे किसी OpenTelemetry Collector में, ताकि errors या slow steps वाला हर trace रखा जाए और normal वालों का सिर्फ़ एक हिस्सा।"
 exercise:
   title: "Trace पढ़ो"
-  setup: "Jaipur के एक bank के assistant ने customer को बताया कि senior citizens के लिए fixed-deposit rate 7.1% है; असली current rate 7.6% है। Trace में दिखता है: rewrite_query 0.3 s 'senior citizen FD rate'; hybrid_search top: doc 'FD rates April 2026' (0.74), 'FD rates October 2026' (0.72); rerank April वाले document को पहले रखता है; generate 2.1 s April वाले document से 7.1% quote करता है। Trace पर prompt version का tag नहीं है।"
+  setup: "Jaipur के एक bank के assistant ने एक customer को बताया कि senior citizens के लिए fixed-deposit rate 7.1% है; current rate 7.6% है। Trace में दिखता है: rewrite_query 0.3 s 'senior citizen FD rate'; hybrid_search top: doc 'FD rates April 2026' (0.74), 'FD rates October 2026' (0.72); rerank April वाले document को पहले रखता है; generate 2.1 s April वाले document से 7.1% quote करता है। Trace पर prompt version का tag नहीं है। (ये rates काल्पनिक हैं, made up.)"
   questions:
     - q: "ये model की failure है या retrieval की?"
-      a: "Retrieval की। Model ने सबसे ऊपर वाले passage को ईमानदारी से quote किया, जो एक पुरानी rate sheet थी।"
+      a: "Retrieval की। Model ने top passage को ईमानदारी से quote किया, जो एक पुरानी rate sheet थी।"
     - q: "Trace किस fix की तरफ़ इशारा करता है?"
-      a: "Rate sheets के साथ effective dates store करो और पुरानी हो चुकी sheets filter कर दो, ताकि सिर्फ़ October वाली sheet eligible रहे।"
+      a: "Rate sheets के साथ effective dates store करो और superseded sheets filter कर दो, ताकि सिर्फ़ October वाली sheet eligible रहे।"
     - q: "Trace में क्या missing है, और ये क्यों मायने रखता है?"
       a: "Prompt version। इसके बिना आप नहीं बता सकते कि हाल के किसी prompt change का इसमें हाथ था या नहीं।"
-    - q: "इस trace का बाद में क्या होना चाहिए?"
-      a: "इसे golden set में eval case की तरह save करो, ताकि अब से stale-rate retrieval की test होती रहे।"
+    - q: "इसके बाद इस trace का क्या होना चाहिए?"
+      a: "इसे golden set में eval case की तरह save करो, ताकि अब से stale-rate retrieval test होता रहे।"
 ask:
   - "LLM trace में मुझे क्या record करना चाहिए?"
   - "LLM apps की tracing के लिए कौन-से tools use कर सकता हूँ?"
-  - "Traces में personal data कैसे बाहर रखूँ?"
+  - "Traces से personal data बाहर कैसे रखूँ?"
 explain_in_interview:
-  answer: "Trace एक request को शुरू से आख़िर तक spans के एक set के रूप में record करता है, हर step का एक: query rewrite, retrieval, reranking, हर model call और हर tool call। हर span inputs, outputs और timing store करता है, और model spans tokens और cost store करते हैं। Langfuse या Arize Phoenix जैसे tools, अक्सर OpenTelemetry पर, steps को nested दिखाते हैं ताकि आप देख सको कि कोई answer क्यों आया। जैसे, Bhubaneswar के एक state helpdesk assistant ने एक किसान को गलत scheme amount बताया, और trace ने दिखाया कि सही passage retrieve हुआ था या नहीं और model ने उसे ignore किया या नहीं। सावधानी ये है कि traces में personal data होता है, इसलिए fields mask करो, retention set करो और access restrict करो।"
-  follow_up: "Traces app को सिर्फ़ debug करने में नहीं, improve करने में कैसे मदद करते हैं?"
-  follow_up_answer: "ये आपको per step latency, tokens और cost और model के हिसाब से error rates measure करने देते हैं। और आप interesting या failed traces को एक dataset में save कर सकते हो, ताकि वो eval cases बन जाएँ जिनके against हर future prompt या model change test हो।"
-translated_on: 2026-11-14
+  answer: "Trace एक request को शुरू से अंत तक spans के set के रूप में record करता है, हर step का एक span: query rewrite, retrieval, reranking, हर model call और हर tool call। हर span inputs, outputs और timing store करता है, और model spans tokens और cost भी store करते हैं। Langfuse या Arize Phoenix जैसे tools, अक्सर OpenTelemetry पर, steps को nested दिखाते हैं ताकि आप देख सको कि जवाब वैसा क्यों आया। जैसे, Bhubaneswar में एक state helpdesk assistant ने एक किसान को scheme की गलत amount बताई, और trace ने दिखाया कि सही passage retrieve हुआ या नहीं और model ने उसे ignore किया या नहीं। सावधानी ये है कि traces में personal data होता है, इसलिए fields mask करो, retention तय करो और access सीमित रखो।"
+  follow_up: "Traces सिर्फ़ debug करने में नहीं, app को बेहतर बनाने में कैसे मदद करते हैं?"
+  follow_up_answer: "इनसे आप हर step की latency, tokens और cost, और हर model के error rates माप सकते हो। और आप दिलचस्प या fail हुए traces को एक dataset में save कर सकते हो, ताकि वो eval cases बन जाएँ जिन पर आगे का हर prompt या model change test हो।"
+translated_on: 2026-11-28
 ---
 
 ## ये क्या है
 
-**Trace** एक request का शुरू से अंत तक का record होता है। ये **spans** से बनता है, हर step का एक span: query rewrite, retrieval, reranker, हर model call, हर tool call। हर span अपने inputs, outputs, start और end times store करता है, और model calls के लिए model का नाम, token counts और cost भी। Spans nested होते हैं, इसलिए आप देख सकते हो कि agent की तीसरी tool call दूसरे model turn के अंदर हुई थी।
+एक **trace** एक request को शुरू से अंत तक record करता है। ये **spans** से बना होता है, हर step का एक: query rewrite, retrieval, reranker, हर model call, हर tool call। हर span अपने inputs, outputs, start और end time और आपके जोड़े हुए कोई भी attributes store करता है। Model spans model का नाम, token counts और cost भी store करते हैं। Spans एक-दूसरे के अंदर nest होते हैं, इसलिए आप देख सकते हो कि agent का तीसरा tool call उसके दूसरे model turn के अंदर हुआ।
 
-आम application logs बताते हैं कि कुछ हुआ। AI system के traces बताते हैं कि उसने वही जवाब क्यों दिया। Langfuse और Arize Phoenix जैसे open-source tools, commercial tools और cloud providers के अपने tools, सब traces store और दिखाते हैं। इनमें से कई OpenTelemetry पर बने हैं, जो traces का आम standard है।
+Logs बताते हैं कि कुछ हुआ। Traces बताते हैं कि system ने वैसा जवाब क्यों दिया। ये आम web apps से ज़्यादा LLM apps के लिए मायने रखता है: एक retrieved passage बदलते ही वही code अलग जवाब देता है, और हर step ने क्या देखा इसका record न हो तो आप bug reproduce नहीं कर सकते।
+
+Langfuse और Arize Phoenix जैसे self-host हो सकने वाले tools, commercial tools और cloud providers, सब traces store करते और दिखाते हैं। ज़्यादातर **OpenTelemetry** (OTel) accept करते हैं, जो traces का open standard है, इसलिए आप एक बार instrument करके बाद में tools बदल सकते हो।
 
 ```flow
-title: Trace 8f3a, एक citizen का सवाल: 3.8 s, ₹0.42
-Trace 8f3a | tags: user anon-5521, session s-901, app 2.4.0, prompt v17 -> rewrite_query, 0.4 s | in: सवाल, out: search text
+title: Trace 8f3a, एक नागरिक का सवाल: 3.8 s, ₹0.42
+Trace 8f3a | user anon-5521, session s-901, app 2.4.0, prompt v17 -> rewrite_query, 0.4 s | in: सवाल, out: search text
 rewrite_query, 0.4 s -> hybrid_search, 0.3 s | out: doc ids और scores
-hybrid_search, 0.3 s -> rerank, 0.2 s | out: दोबारा क्रम में ids
+hybrid_search, 0.3 s -> rerank, 0.2 s | out: नए क्रम में ids
 rerank, 0.2 s -> generate, 2.9 s | model, tokens in और out, cost, output text
 ```
 
-इस lesson में हम Bhubaneswar के एक state-government helpdesk assistant को follow करेंगे, जिसने एक किसान को scheme की गलत रकम बता दी थी।
+ये lesson Bhubaneswar के एक state-government helpdesk assistant को follow करता है, जिसने एक किसान को scheme की गलत amount बताई।
 
 ## ये काम कैसे करता है
 
-**Instrument करो।** ज़्यादातर tools model client के लिए decorator या wrapper देते हैं। हर decorated function एक span बन जाता है, और model calls अपने आप tokens और cost record करती हैं। बाद में काम आने वाले attributes जोड़ो: user id (या pseudonymous id), session id, app version, prompt version, retrieved document ids और उनके scores।
+### क्या record करें
 
-**Group करो।** **Session** एक conversation के traces को एक साथ group करता है; user ids से आप देख सकते हो कि एक user ने पूरा क्या-क्या झेला।
+इतना record करो कि बाद में बता सको हर step को क्या मिला, उसने क्या लौटाया और कौन-सा version चला।
 
-**Data का ध्यान रखो।** Traces में prompts और outputs होते हैं, जिनमें personal data हो सकता है। भेजने से पहले sensitive fields mask करो या हटा दो, retention period तय करो, traces कौन देख सकता है ये सीमित रखो, और client माँगे तो self-hosted या in-region tool चुनो।
-
-**इस्तेमाल कैसे करो।**
-
-- *Debug*: खराब जवाब का trace खोलो। क्या सही passage retrieve हुआ? क्या वो prompt में था? क्या model ने उसे ignore कर दिया?
-- *Measure*: हर step का latency, हर request के tokens और cost, हर model की error rates।
-- *Improve*: दिलचस्प traces को dataset में save करो; वो eval cases बन जाते हैं।
-
-**Sampling।** ज़्यादा volume में, errors या कम feedback वाले सारे traces रखो, और बाकी का एक sample।
-
-**हर तरह के tool से क्या मिलता है:**
-
-| Option | ताकत | कब सोचो |
+| Span | Record करने लायक attributes | आपको इनकी ज़रूरत क्यों पड़ेगी |
 | --- | --- | --- |
-| Open-source, self-hosted (Langfuse, Phoenix) | Data आपके पास रहता है; चलाना free है | Client को in-region या on-premises data चाहिए |
-| Commercial hosted tools | चलाने का झंझट कम; extra analysis features | Speed ज़रूरी है और data rules इजाज़त देते हैं |
-| Cloud provider की tracing | मौजूदा cloud stack में फिट बैठती है | App पहले से उसी cloud पर चल रहा है |
-| Plain OpenTelemetry और अपना store | पूरा control, standard format | आपके पास पहले से observability tooling चल रही है |
+| Root (पूरी request) | Pseudonymous user id, session id, app version | एक user का खराब जवाब ढूँढना; quality drop को किसी release से जोड़ना |
+| Retrieval और rerank | Document ids, scores, top-k | Retrieval failures को generation failures से अलग करना |
+| Model call | माँगा गया और जवाब देने वाला model, prompt name और version, input और output tokens, cost | Prompt debug करना; cost का chart बनाना; चुपचाप हुआ model change पकड़ना |
+| Tool call | Tool name, call id, arguments और result (masked), error | देखना कि किस tool ने खराब data लौटाया |
 
-**हफ़्ते का trace review।** हर हफ़्ते तीस मिनट अलग रखो। खराब user feedback, errors या असामान्य रूप से ज़्यादा cost वाले traces निकालो, और आम traces का एक random sample भी। हर खराब जवाब के लिए note करो कि कौन-सा step fail हुआ: query rewrite, retrieval, reranking, prompt या model। इन notes को गिनो। कुछ हफ़्तों बाद ये counts बताते हैं कि engineering मेहनत कहाँ रंग लाएगी, और save किए गए traces असली use से बने eval cases का बढ़ता हुआ set बन जाते हैं।
+दो model नाम मायने रखते हैं। आपने जो model माँगा (`gen_ai.request.model`), वो जवाब देने वाले model (`gen_ai.response.model`) से अलग हो सकता है। Provider किसी short alias, जैसे `gpt-4`, को किसी dated snapshot, जैसे `gpt-4-0613`, पर map कर सकता है। जब आपकी तरफ़ से कोई बदलाव किए बिना रातों-रात quality गिर जाए, तो सबसे पहले response model check करो।
 
-**हर step का cost और latency।** हर span time और tokens record करता है, इसलिए step के हिसाब से totals का chart बनाना आसान है। Teams अक्सर चौंक जाती हैं: बड़े model पर चलने वाली query-rewrite call का cost जवाब से भी ज़्यादा हो सकता है, या reranker model से ज़्यादा देरी जोड़ सकता है।
+### OpenTelemetry से instrument करना
 
-**Plain OpenTelemetry से tracing।** ज़्यादातर LLM tracing tools (Langfuse, Arize Phoenix और दूसरे) OpenTelemetry data लेते हैं, इसलिए standard से instrument करोगे तो बाद में tool बदलने की आज़ादी रहती है:
+ज़्यादातर tools एक decorator या model client के चारों ओर एक wrapper देते हैं जो आपके लिए spans बनाता है, अक्सर OpenTelemetry के रूप में। एक बार खुद spans लिखने से समझ आता है कि wrappers क्या करते हैं:
 
 ```python
+import os
 from opentelemetry import trace
+from opentelemetry.trace import SpanKind
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-provider = TracerProvider()
-provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))   # endpoint and auth from env vars
-trace.set_tracer_provider(provider)
-tracer = trace.get_tracer("policy-rag")
+from helpers import mask, search, call_model   # your own code
 
-def answer(question, user_id, session_id):
+PRICES_INR = {"big-model": {"in": 0.10, "out": 0.40}}   # per 1,000 tokens; made up
+PRICES_CHECKED = "2026-11-28"
+CAPTURE_TEXT = os.getenv("CAPTURE_TEXT") == "1"         # off unless you opt in
+
+provider = TracerProvider(resource=Resource.create(
+    {"service.name": "scheme-helpdesk", "service.version": "2.4.0"}))
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))  # endpoint from env
+trace.set_tracer_provider(provider)
+tracer = trace.get_tracer("scheme-helpdesk")
+
+def cost_inr(model, tokens_in, tokens_out):
+    p = PRICES_INR[model]
+    return round((tokens_in * p["in"] + tokens_out * p["out"]) / 1000, 4)
+
+def answer(question, user_ref, session_id, prompt_version="v17"):
     with tracer.start_as_current_span("answer") as root:
-        root.set_attributes({"app.release": "assistant-2026.11.3", "user.id": user_id, "session.id": session_id})
-        with tracer.start_as_current_span("retrieve") as span:
-            hits = search(question)
-            span.set_attributes({"retrieval.ids": [h["id"] for h in hits],
-                                 "retrieval.top_score": hits[0]["score"] if hits else 0})
-        with tracer.start_as_current_span("generate") as span:
-            reply = call_model(question, hits)
-            span.set_attributes({"gen_ai.request.model": reply.model,
-                                 "gen_ai.usage.input_tokens": reply.usage.input_tokens,
-                                 "gen_ai.usage.output_tokens": reply.usage.output_tokens})
+        root.set_attributes({"user.id": user_ref, "session.id": session_id})
+        with tracer.start_as_current_span("retrieval") as span:
+            hits = search(question, k=5)
+            span.set_attributes({"gen_ai.operation.name": "retrieval",
+                                 "gen_ai.retrieval.top_k": 5,
+                                 "app.retrieval.doc_ids": [h["id"] for h in hits],
+                                 "app.retrieval.scores": [h["score"] for h in hits]})
+        model = "big-model"
+        with tracer.start_as_current_span(f"chat {model}", kind=SpanKind.CLIENT) as span:
+            reply = call_model(model, question, hits)
+            span.set_attributes({
+                "gen_ai.operation.name": "chat",
+                "gen_ai.conversation.id": session_id,
+                "gen_ai.provider.name": reply.provider,
+                "gen_ai.request.model": model,             # what you asked for
+                "gen_ai.response.model": reply.model,      # what actually answered
+                "gen_ai.prompt.name": "scheme-answer",
+                "gen_ai.prompt.version": prompt_version,
+                "gen_ai.usage.input_tokens": reply.input_tokens,
+                "gen_ai.usage.output_tokens": reply.output_tokens,
+                "app.cost_inr": cost_inr(model, reply.input_tokens, reply.output_tokens),
+                "app.prices_checked": PRICES_CHECKED})
+            if CAPTURE_TEXT:
+                span.set_attribute("gen_ai.input.messages", [
+                    {"role": "user", "parts": [{"type": "text", "content": mask(question)}]}])
+                span.set_attribute("gen_ai.output.messages", [
+                    {"role": "assistant", "parts": [{"type": "text", "content": mask(reply.text)}]}])
         return reply
 ```
 
-`gen_ai.*` नाम generative AI के लिए OpenTelemetry की conventions follow करते हैं, जिन्हें tracing tools समझते हैं। `OTEL_EXPORTER_OTLP_ENDPOINT` को अपने tool की तरफ़ point करो, और client माँगे तो उसे Indian region में self-host करो।
+ध्यान देने वाली बातें:
 
-**Export से पहले mask करो।** Personal data को span attributes या events में जाने से पहले अपने code में ही हटा दो। हर prompt और answer पर, जो आप attach करते हो, एक छोटा helper लगाओ, जो security lessons वाले masking patterns use करे; शुरू करने के लिए इतना काफ़ी है। फिर store हुए traces का एक sample देखो कि ये सच में काम कर रहा है।
+- **नाम।** `gen_ai.*` नाम OpenTelemetry की GenAI semantic conventions से आते हैं। Model span का नाम `chat` और model का नाम होता है, `{gen_ai.operation.name} {gen_ai.request.model}` pattern के हिसाब से। `app.` से शुरू होने वाले नाम आपके अपने हैं; standard जो fields cover नहीं करता, उन्हें जोड़ने का यही आम तरीका है।
+- **Cost का कोई standard नाम नहीं है।** Conventions token counts define करती हैं पर कोई cost attribute नहीं, इसलिए code एक price table से rupees निकालता है और record करता है कि prices कब check हुईं। कुछ tools इसके बजाय model के नाम और tokens से cost निकाल सकते हैं। Prices बदलती हैं, इसलिए असली app में इन्हें check date के साथ config में रखो। यहाँ के rates काल्पनिक हैं (made up)।
+- **Text default में off है।** Prompts और जवाब बड़े होते हैं और अक्सर personal होते हैं। Conventions कहती हैं कि instrumentation इन्हें तब तक capture न करे जब तक आप opt in न करो। यहाँ `CAPTURE_TEXT` इन्हें कंट्रोल करता है, और process से कुछ भी बाहर जाने से पहले `mask()` phone numbers और बाकी personal data हटा देता है।
+- **Export।** `OTLPSpanExporter()` environment variables से `OTEL_EXPORTER_OTLP_ENDPOINT` और headers पढ़ता है। इसे अपने tool की तरफ़ point करो, और client चाहे तो उसे किसी Indian region में self-host करो। फिर tool बदलने का मतलब बस endpoint बदलना है।
 
-**काम के traces बचाकर रखो।** सब कुछ 10% पर sample करोगे तो वो ज़्यादातर rare failures खो जाएँगी जो आपको चाहिए। दो आम तरीके:
+ये code OpenTelemetry Python SDK 1.45 से test हुआ था, जो November 2026 में current था।
 
-- **Head sampling और exceptions**: जिन requests में error आए, thumbs down मिले या latency threshold पार हो, उनके traces हमेशा रखो (उन्हें ऐसे attribute से mark करो जिसे आपका exporter या collector check करे), और बाकी का sample लो।
-- **OpenTelemetry Collector में tail sampling**: collector हर trace के पूरा होने का इंतज़ार करता है, फिर errors या slow spans वाले सारे traces रखता है और बाकी का एक percentage।
+**Conventions अभी बदल रही हैं।** November 2026 के हिसाब से GenAI conventions अभी भी "Development" marked हैं, और 2026 में conventions अपनी अलग repository, `semantic-conventions-genai`, में चली गईं, जिसकी पहली release v0.1.0 है। Ready-made instrumentation पुराने नाम emit कर सकता है जब तक आप opt in न करो। जैसे, Python के लिए OpenTelemetry का OpenAI instrumentation एक पुराना version follow करता है जब तक आप `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental` set न करो। Instrumentation versions pin करो और हर upgrade के बाद एक sample span check करो।
 
-**Traces से हर step का cost और latency।** Spans को नाम से group करो और रोज़ का time और tokens जोड़ो। "हर step का कुल cost में हिस्सा" वाला chart अक्सर कोई सस्ती जीत दिखा देता है, जैसे बड़े model पर चलता rewrite step, या एक बहुत बड़े filter की वजह से धीमा retrieval।
+### Prompt और output text कहाँ जाए
 
-**Trace से test case तक।** एक button या command जोड़ो जो trace id लेकर उसका सवाल, retrieved ids और expected answer eval set में लिख दे। ये जितना आसान होगा, eval set असली failures से उतनी तेज़ी से बढ़ेगा।
+Conventions तीन विकल्प देती हैं: text record न करना (default); उसे span attributes पर record करना (`gen_ai.input.messages`, `gen_ai.output.messages`); या उसे अलग storage में upload करके span पर सिर्फ़ एक reference रखना। Development के लिए attributes ठीक हैं। Production में हर span पर 3,000-token का prompt slow और महँगा है, और कुछ backends attribute या span size पर limit लगाते हैं। Python SDK default में कोई length limit नहीं लगाता पर एक span पर ज़्यादा से ज़्यादा 128 attributes रखता है; `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT` लंबी values को truncate करता है। अलग storage से आप prompt text पर timing data से ज़्यादा सख़्त access भी दे सकते हो।
 
-**Browser में try करो।** एक छोटा tracer: हर step अपना time record करता है, इसलिए धीमा वाला साफ़ दिख जाता है।
+### Agents और tool calls की tracing
+
+Agent loop में चलता है: model कोई tool माँगता है, आपका code उसे चलाता है, result वापस model को जाता है, और ऐसे ही आगे। हर turn और हर tool run को उसका अपना span बनाकर trace करो, सब एक agent span के अंदर। Conventions इन्हें `invoke_agent`, `chat` और `execute_tool` spans कहती हैं, और tool span में `gen_ai.tool.name` और `gen_ai.tool.call.id` होते हैं, यानी वो id जो model ने उस call को दी।
+
+```text
+invoke_agent scheme-helper                    5.9 s
+  chat big-model        turn 1: asks for lookup_farmer
+  execute_tool lookup_farmer      0.3 s   call_id c1
+  chat big-model        turn 2: asks for scheme_rules
+  execute_tool scheme_rules       0.4 s   call_id c2
+    POST /check   (span from the rules service)
+  chat big-model        turn 3: final answer
+```
+
+ये tree ऐसा loop दिखाता है जो कभी खत्म नहीं होता, ऐसा tool error जिसे model ने ignore किया, या ऐसा turn जिसने tokens दोगुने कर दिए।
+
+### Services के पार
+
+ऊपर की आखिरी line एक दूसरी service से आई। ये तभी काम करता है जब trace id request के साथ चले। OpenTelemetry इसे W3C `traceparent` HTTP header में भेजता है, जो `00-` के बाद trace id, parent span id और flags जैसा दिखता है। आम HTTP clients और web frameworks (जैसे `requests`, `httpx`, FastAPI) के instrumentation packages ये header आपके लिए जोड़ते और पढ़ते हैं। अगर आप किसी service को हाथ से call करते हो, तो इसे खुद जोड़ो:
+
+```python
+from opentelemetry.propagate import inject
+
+headers = {}
+inject(headers)    # adds traceparent for the current span
+requests.post(RULES_URL, json=payload, headers=headers)
+```
+
+इसके बिना tool server के spans एक अलग trace में पहुँचते हैं, और slow step एक gap जैसा दिखता है।
+
+### Sampling: जो traces मायने रखते हैं उन्हें रखो
+
+ज़्यादा volume पर आप हर trace store नहीं कर सकते। फ़ैसला कहाँ होता है, ये मायने रखता है:
+
+- **Head sampling** request शुरू होते ही फ़ैसला करती है, जैसे SDK में एक 10% `TraceIdRatioBased` sampler। ये सस्ती है, पर इसे अभी पता नहीं होता कि request fail होगी या slow होगी। 10% sampling के साथ दस में से नौ errors खो जाते हैं।
+- **Tail sampling** trace के spans आने का इंतज़ार करती है। OpenTelemetry Collector का tail sampling processor spans को memory में रखता है, default में 30 seconds तक, फिर «error status वाला हर trace रखो», «5 seconds से ज़्यादा वाला हर trace रखो» और «बाकी का 10% रखो» जैसे rules लगाता है। एक trace के सारे spans एक ही Collector instance तक पहुँचने चाहिए, इसलिए multi-instance setup में trace id के हिसाब से routing चाहिए।
+- **Feedback देर से आता है।** Thumbs down या किसी official की complaint मिनटों या दिनों बाद आती है, जब कोई भी sampler फ़ैसला कर चुका होता है। अगर आपको हर वो trace रखना ही है जिस पर बाद में खराब feedback आए, तो सारे traces backend को भेजो, उन्हें थोड़े समय के लिए रखो (जैसे 14 दिन), और जिन पर feedback या score आया उन्हें लंबी retention दो।
+
+एक समझदार default: जब तक traffic कम है सब भेजो; जब storage cost मायने रखने लगे तब tail sampling जोड़ो।
+
+### Feedback और online evaluation
+
+Complaints से बस कुछ ही खराब जवाब पता चलते हैं। इसके बजाय traces पर scores जोड़ो:
+
+- **User feedback।** जवाब के साथ trace id front end को भेजो, और thumbs up या down उसी id के साथ record करो।
+- **Automatic scores।** Live traces के एक sample पर एक सस्ता check चलाओ, जैसे «क्या जवाब किसी retrieved passage को cite करता है?» या कोई judge model जो faithfulness rate करे। Score को trace पर store करो। Conventions इसके लिए एक `gen_ai.evaluation.result` event define करती हैं।
+
+अब weekly review random पढ़ने के बजाय «low faithfulness» या «thumbs down» पर filter कर सकता है।
+
+### हर हफ़्ते traces का इस्तेमाल
+
+- **Debug।** खराब जवाब का trace खोलो और इसी क्रम में पूछो: क्या सही passage retrieve हुआ, क्या वो prompt में था, क्या model ने उसे ignore किया?
+- **मापो।** Spans को नाम से group करो और हर दिन का time और cost जोड़ो। Chart अक्सर एक आसान फ़ायदा दिखाता है, जैसे large model पर चलता rewrite step या एक slow reranker।
+- **Review।** हफ़्ते में तीस मिनट उन traces पर लगाओ जिन पर खराब feedback, errors, low scores या high cost हो, और कुछ random traces पर भी। हर एक के लिए fail होने वाला step note करो। कुछ हफ़्तों बाद counts दिखा देंगे कि मेहनत कहाँ रंग लाती है।
+- **Failures को tests बनाओ।** एक command जोड़ो जो trace id ले और उसका सवाल, retrieved ids और सही जवाब eval set में लिख दे। ये जितना आसान होगा, eval set उतनी तेज़ी से बढ़ेगा।
+
+### Tool चुनना
+
+| Option | ताकत | कब सोचें |
+| --- | --- | --- |
+| Self-hosted (Langfuse, Phoenix) | Data आपके पास रहता है; कोई licence fee नहीं | Client को in-region या on-premises data चाहिए |
+| Commercial hosted tools | Operate करने को कम; extra analysis features | Speed मायने रखती है और data rules इजाज़त देते हैं |
+| Cloud provider की tracing | मौजूदा cloud stack में फ़िट | App पहले से उसी cloud पर चलता है |
+| अपने store के साथ plain OpenTelemetry | पूरा control, standard format | आप पहले से observability tooling चलाते हो |
+
+### अपने browser में try करो
+
+बिना library का एक छोटा tracer: हर step अपना time और cost record करता है, और children अपने parent के नीचे print होते हैं।
 
 ```python
 import time, random
 from contextlib import contextmanager
 
-spans = []
+PRICE = {"in": 0.10, "out": 0.40}        # made-up ₹ per 1,000 tokens
+spans, depth = [], [0]
+
 @contextmanager
-def span(name):
+def span(name, tokens_in=0, tokens_out=0):
+    row = {"name": "  " * depth[0] + name,
+           "cost": (tokens_in * PRICE["in"] + tokens_out * PRICE["out"]) / 1000}
+    spans.append(row)                     # start order, so children follow parents
+    depth[0] += 1
     t0 = time.perf_counter()
-    yield
-    spans.append((name, (time.perf_counter() - t0) * 1000))
+    try:
+        yield
+    finally:
+        row["ms"] = (time.perf_counter() - t0) * 1000
+        depth[0] -= 1
 
 random.seed(2)
 with span("answer"):
-    with span("rewrite"): time.sleep(0.02)
+    with span("rewrite", 240, 15): time.sleep(0.02)
     with span("retrieve"): time.sleep(random.uniform(0.05, 0.2))
-    with span("generate"): time.sleep(0.1)
-for name, ms in sorted(spans, key=lambda s: -s[1]):
-    print(f"{name:<9} {ms:6.0f} ms")
+    with span("generate", 3210, 182): time.sleep(0.1)
+
+for r in spans:
+    print(f"{r['name']:<12} {r['ms']:6.0f} ms   ₹{r['cost']:.3f}")
+print("total cost   ₹%.2f" % sum(r["cost"] for r in spans))
 ```
+
+Times हर run पर बदलते हैं; costs नहीं बदलतीं। Cost में generate step सबसे भारी है, जबकि सबसे slow retrieval हो सकता है।
 
 ## एक example से समझो
 
-Bhubaneswar का एक state-government helpdesk assistant citizens के schemes के सवालों के जवाब देता है। एक अफ़सर बताते हैं: "इसने एक किसान को बताया कि state की crop-support scheme की instalment ₹4,000 है। असल में ₹2,000 है।" (यहाँ scheme और रकमें example के लिए बनाई गई हैं।)
+Bhubaneswar का एक state-government helpdesk assistant schemes के बारे में नागरिकों के सवालों के जवाब देता है। एक official report करते हैं: «इसने एक किसान को बताया कि state की crop-support scheme में instalment ₹4,000 है। असल में ₹2,000 है।» (यहाँ की scheme, amounts और prices इस example के लिए काल्पनिक हैं, made up.)
 
-आप उस session के traces search करते हो और उस वाले को खोलते हो:
+App हर trace को एक Indian region में self-hosted Langfuse को भेजता है और उन्हें 14 दिन रखता है (self-hosted retention settings के लिए Langfuse का enterprise licence चाहिए), इसलिए trace अभी भी मौजूद है। आप session और time से filter करके उसे खोलते हो:
 
 ```text
 trace 8f3a  user=anon-5521  app=2.4.0  prompt=v17   3.8 s  ₹0.42
-  rewrite_query        0.4 s   "crop-support scheme instalment amount"
+  rewrite_query        0.4 s   "crop-support scheme instalment amount"   ₹0.03
   hybrid_search        0.3 s   top: doc 112 (0.71), doc 87 (0.69), doc 113 (0.66)
   rerank               0.2 s   top: doc 87, doc 112, doc 113
-  generate             2.9 s   in 3,210 tok / out 182 tok
+  generate             2.9 s   in 3,210 tok / out 182 tok                ₹0.39
 ```
 
-Doc 87 एक 2019 का note है, scheme के पुराने version के बारे में, जिसमें रकम अलग थी। Reranking के बाद ये सबसे ऊपर आया, मौजूदा scheme guideline से भी ऊपर। Model ने उसे ईमानदारी से quote कर दिया। Bug model में नहीं है; वो एक पुराना document है जिस पर effective date ही नहीं थी।
+Cost price table से जुड़ता है: answer call प्रति 1,000 tokens 3,210 × ₹0.10 + 182 × ₹0.40 है, लगभग ₹0.39, और rewrite call ₹0.03 जोड़ता है।
 
-आप `effective_from` metadata और एक filter जोड़ते हो, उस trace की query को test में दोबारा चलाते हो, और इस trace को golden set में save कर देते हो ताकि ये case अब से test होता रहे। पूरी जाँच में पंद्रह मिनट लगे क्योंकि हर step record था।
+Step by step:
 
-| जाँच का step | लगा समय |
-| --- | --- |
-| User और time से session का trace ढूँढना | 2 मिनट |
-| देखना कि 2019 का note सबसे ऊपर आया | 3 मिनट |
-| Effective dates और filter जोड़ना, query दोबारा चलाना | 8 मिनट |
-| Trace को golden-set case की तरह save करना | 2 मिनट |
+| Span | इसमें क्या दिखा | फ़ैसला |
+| --- | --- | --- |
+| rewrite_query | Search text में key words बने रहे | ठीक |
+| hybrid_search | Doc 112 पहले नंबर पर आया, पर पुराना doc 87 अभी भी eligible था | Root cause: कोई date filter नहीं |
+| rerank | Doc 87 को doc 112 से ऊपर कर दिया | पुराने doc को जिता दिया |
+| generate | जवाब ने doc 87 से ₹4,000 quote किया | Model ने अपना काम किया |
+
+Doc 87 scheme के पुराने version के बारे में 2019 का एक note है, जिसमें amount अलग है। उस पर कोई effective date नहीं है, इसलिए system को किसी ने नहीं बताया कि वो पुराना हो चुका है। Bug model नहीं है; ये एक पुराना document है जिसे eligible होना ही नहीं चाहिए था।
+
+आप `effective_from` और `superseded_by` metadata जोड़ते हो, reranking से पहले superseded documents filter करते हो, trace का सवाल एक test में दोबारा चलाते हो, और trace को golden set में save करते हो। Cost column ये भी दिखाता है कि large model पर चलने वाला rewrite step हर request का लगभग 7% है; एक small model काफ़ी होगा। पूरी जाँच में लगभग पंद्रह मिनट लगे क्योंकि हर step record था।
 
 ## आम गलतियाँ
 
-- **सिर्फ़ final answer log करना।** तब आप retrieval failures और generation failures में फ़र्क नहीं कर पाते।
-- **Version tags न लगाना।** Traces पर app और prompt versions के बिना आप किसी change को quality गिरने से जोड़ नहीं सकते।
-- **Personal data को बिना mask किए trace करना।** Traces एक sensitive data store बन जाते हैं। Mask करो, access सीमित रखो और expire करो।
-- **कभी देखना ही नहीं।** Traces तभी काम के हैं जब कोई उन्हें पढ़े; हर हफ़्ते एक sample review करो।
-- **Failures को tests में न बदलना।** हर traced खराब जवाब एक तैयार eval case है।
-- **सिर्फ़ model call को trace करना**, जिससे retrieval और tool की problems दिखती ही नहीं।
-- **Uniform sampling**, जो ज़्यादातर rare failures फेंक देती है।
-- **हर जगह proprietary tracing calls**, जिससे बाद में बदलना दर्दनाक हो जाता है; OpenTelemetry को prefer करो।
+- **सिर्फ़ final answer log करना**, या सिर्फ़ model call trace करना। Retrieval और tool की problems दिखती ही नहीं।
+- **Version tags नहीं।** App, prompt और response-model versions के बिना आप किसी बदलाव को quality drop से नहीं जोड़ सकते।
+- **सिर्फ़ माँगा गया model record करना।** Provider का alias नए snapshot पर चला जाता है, और आपके traces में कुछ भी ये नहीं दिखाता।
+- **Traces में बिना mask किया personal data।** Traces एक sensitive data store बन जाते हैं। Export से पहले mask करो, access सीमित रखो और उन्हें expire करो।
+- **Fixed rate पर head sampling**, जो उन दुर्लभ failures में से ज़्यादातर फेंक देती है जिनकी आपको ज़रूरत है।
+- **Service boundaries पर trace context खो जाना**, जिससे tool server की slow call एक बेवजह gap जैसी दिखती है।
+- **बिना check date के hard-coded prices**, जिससे cost charts असली bill से भटक जाते हैं।
+- **कभी देखना ही नहीं**, या खराब traces को कभी eval cases न बनाना।
+- **हर जगह proprietary tracing calls**, जिससे बाद में tool बदलना मुश्किल हो जाता है; OpenTelemetry को प्राथमिकता दो।
 
-## जब simple logs काफ़ी हों
+## कब simple logs काफ़ी हैं
 
-- **हर request में एक model call**, बिना retrieval या tools के: tokens, time और outcome वाली एक structured log line काफ़ी हो सकती है।
-- **सिर्फ़ आपके अपने use का prototype।**
-- **Batch jobs**, जहाँ हर item के logs और एक summary report से debugging हो जाती है।
+- **हर request में सिर्फ़ एक model call**, बिना retrieval या tools के: tokens, time, model और outcome के साथ एक structured log line काफ़ी हो सकती है।
+- **एक prototype जिसे सिर्फ़ आप use करते हो।**
+- **Batch jobs**, जहाँ per-item logs और एक summary report से debugging हो जाती है।
 
 ## Demo से production तक
 
-- **हर step को trace करो** release, user और session attributes के साथ।
-- **Export से पहले personal data mask करो**, और retention और access controls लगाओ।
-- **सारे failures और slow requests रखो**, बाकी का sample लो।
-- **हर हफ़्ते step के हिसाब से cost और latency का chart देखो।**
-- **खराब traces को eval cases में बदलो** एक ही command से।
+- **हर step के लिए spans**, versions और response model के साथ।
+- **Text default में off**; on हो तो masked और सख़्त access के साथ stored।
+- **हर service में context propagation।**
+- **सब कुछ थोड़े समय रखो**; errors, slow और low-scored traces ज़्यादा समय रखो।
+- **Config में एक dated price table**, और step के हिसाब से weekly cost और latency chart।
+- **Traces पर scores**, और trace से eval case तक एक command का रास्ता।
 
 ## Practice करो
 
 Langfuse का tracing overview और OpenTelemetry का traces वाला page पढ़ो।
 
-1. अपने RAG app में एक free, self-host हो सकने वाले tool से tracing जोड़ो, rewrite, retrieval (document ids और scores के साथ), reranking और generation को अलग-अलग spans की तरह record करते हुए।
-2. Traces पर app version और prompt version का tag लगाओ, और भेजने से पहले email addresses और phone numbers mask करो।
-3. दस सवाल पूछो, सबसे धीमा step और सबसे महँगी request ढूँढो, और एक खराब जवाब का trace eval case की तरह save करो।
-4. अपने traces को OpenTelemetry से एक self-hosted tool में export करो, फिर endpoint दूसरे tool पर बदल दो और confirm करो कि वही spans दिखते हैं।
+1. एक free, self-host हो सकने वाले tool से अपने RAG app में tracing जोड़ो। Rewrite, retrieval (document ids और scores के साथ), reranking और generation को अलग-अलग spans के रूप में record करो, request और response दोनों models के साथ।
+2. Traces को एक app version और एक prompt version से tag करो। Export से पहले email addresses और phone numbers mask करो, फिर दस stored traces खोलकर check करो कि कुछ leak नहीं हुआ।
+3. दस सवाल पूछो। सबसे slow step और सबसे महँगी request ढूँढो, अपनी dated price table से उसकी cost निकालो, और एक खराब जवाब का trace eval case के रूप में save करो।
+4. एक दूसरी छोटी service से HTTP पर एक tool call करो, और confirm करो कि उसका span उसी trace के अंदर दिखता है।
+5. OpenTelemetry से एक tool को export करो, फिर सिर्फ़ endpoint बदलकर दूसरे tool पर ले जाओ और confirm करो कि वही spans दिखते हैं।
 
-और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 logs, traces और AI applications में क्या record करना चाहिए, इस पर है।
+और गहराई के लिए, Chip Huyen की *AI Engineering* (O'Reilly, 2025) का chapter 10 AI applications के लिए monitoring और observability cover करता है।
 
-**आपका काम पूरा जब:** आप किसी भी जवाब का trace खोलकर बता सको कि गलत जवाब किस step की वजह से आया।
+**आपका काम पूरा है जब आप** किसी भी जवाब का trace खोलकर बता सको कि किस step से गलत जवाब आया, उस request की cost क्या थी और कौन-से prompt और model versions ने उसे बनाया।
